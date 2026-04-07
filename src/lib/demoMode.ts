@@ -37,6 +37,11 @@ export function isDemoMode(): boolean {
   return readRuntimeDemo();
 }
 
+/** โหมดสาธิตที่ "ตั้งใจเปิด" จาก env เท่านั้น (ไม่รวม fallback อัตโนมัติ) */
+export function isConfiguredDemoMode(): boolean {
+  return import.meta.env.VITE_DEMO_MODE === 'true';
+}
+
 /** สาธิตเพราะ API ล้ม — ไม่ใช่แค่ VITE_DEMO_MODE (ใช้โชว์แบนเนอร์) */
 export function isRuntimeDemoFallback(): boolean {
   return import.meta.env.VITE_DEMO_MODE !== 'true' && readRuntimeDemo();

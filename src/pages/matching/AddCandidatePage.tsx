@@ -4,7 +4,7 @@ import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import PageHeader from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { isDemoMode, enableRuntimeDemo } from '@/lib/demoMode';
+import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { createCandidate } from '@/lib/demoStorage';
 import type { DrivingResult, Gender, YesNo } from '@/types';
 const TITLE_PREFIX_SELECT = [
@@ -107,7 +107,7 @@ const AddCandidatePage: React.FC = () => {
       first_work_date: firstWorkDate || undefined,
     };
 
-    if (isDemoMode()) {
+    if (isConfiguredDemoMode()) {
       setSaving(true);
       try {
         createCandidate(payload);
@@ -148,14 +148,7 @@ const AddCandidatePage: React.FC = () => {
       navigate('/matching/candidates');
     } catch (e) {
       if (e instanceof TypeError) {
-        enableRuntimeDemo();
-        try {
-          createCandidate(payload);
-          toast.success('บันทึกแล้ว (สลับเป็นโหมดสาธิต — เก็บในเครื่องนี้เพราะต่อ API ไม่ได้)');
-          navigate('/matching/candidates');
-        } catch {
-          setError(apiUnreachableHint());
-        }
+        setError(apiUnreachableHint());
       } else {
         setError(e instanceof Error ? e.message : String(e));
       }

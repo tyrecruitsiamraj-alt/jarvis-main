@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
 import type { JobCategory, JobRequest, JobType } from '@/types';
 import { createJob, JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { useAuth } from '@/contexts/AuthContext';
-import { isDemoMode, enableRuntimeDemo } from '@/lib/demoMode';
+import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 
@@ -88,11 +87,11 @@ const AddJobPage: React.FC = () => {
 
   const recruiterOptions = useMemo(() => {
     void staffRosterRev;
-    return buildRecruiterNameOptions(isDemoMode() ? undefined : staffJobs);
+    return buildRecruiterNameOptions(isConfiguredDemoMode() ? undefined : staffJobs);
   }, [staffRosterRev, staffJobs]);
   const screenerOptions = useMemo(() => {
     void staffRosterRev;
-    return buildScreenerNameOptions(isDemoMode() ? undefined : staffJobs);
+    return buildScreenerNameOptions(isConfiguredDemoMode() ? undefined : staffJobs);
   }, [staffRosterRev, staffJobs]);
 
   useEffect(() => {
@@ -102,7 +101,7 @@ const AddJobPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isDemoMode()) return;
+    if (isConfiguredDemoMode()) return;
     let cancelled = false;
     apiFetch('/api/jobs?limit=500')
       .then(async (r) => (r.ok ? ((await r.json()) as JobRequest[]) : []))
@@ -223,7 +222,7 @@ const AddJobPage: React.FC = () => {
       penalty_per_day: Math.trunc(penaltyNum),
     };
 
-    if (isDemoMode()) {
+    if (isConfiguredDemoMode()) {
       setSaving(true);
       try {
         createJob({
@@ -277,30 +276,7 @@ const AddJobPage: React.FC = () => {
       navigate('/jobs/list');
     } catch (e) {
       if (e instanceof TypeError) {
-        enableRuntimeDemo();
-        try {
-          createJob({
-            unit_name: payload.unit_name,
-            request_date: payload.request_date,
-            required_date: payload.required_date,
-            urgency: payload.urgency,
-            total_income: payload.total_income,
-            location_address: payload.location_address,
-            job_type: payload.job_type,
-            job_category: payload.job_category,
-            recruiter_name: payload.recruiter_name,
-            screener_name: payload.screener_name,
-            age_range_min: payload.age_range_min,
-            age_range_max: payload.age_range_max,
-            vehicle_required: payload.vehicle_required,
-            work_schedule: payload.work_schedule,
-            penalty_per_day: payload.penalty_per_day,
-          });
-          toast.success('บันทึกแล้ว (สลับเป็นโหมดสาธิต — เก็บในเครื่องนี้เพราะต่อ API ไม่ได้)');
-          navigate('/jobs/list');
-        } catch {
-          setFormError(apiUnreachableHint());
-        }
+        setFormError(apiUnreachableHint());
       } else {
         setFormError(e instanceof Error ? e.message : String(e));
       }

@@ -3,7 +3,7 @@ import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
 import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
-import { isDemoMode } from '@/lib/demoMode';
+import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import {
@@ -44,12 +44,12 @@ const PublicJobBoardPage: React.FC = () => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
         apiJobsRef.current = arr;
-        setJobs(mergeJobSources(arr, getJobs()));
+        setJobs(isConfiguredDemoMode() ? mergeJobSources(arr, getJobs()) : arr);
       })
       .catch(() => {
         if (cancelled) return;
         apiJobsRef.current = [];
-        setJobs(mergeJobSources([], getJobs()));
+        setJobs(isConfiguredDemoMode() ? mergeJobSources([], getJobs()) : []);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -60,7 +60,7 @@ const PublicJobBoardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isDemoMode()) return;
+    if (!isConfiguredDemoMode()) return;
     const sync = () => setJobs(mergeJobSources(apiJobsRef.current, getJobs()));
     window.addEventListener(DEMO_JOBS_CHANGED_EVENT, sync);
     return () => window.removeEventListener(DEMO_JOBS_CHANGED_EVENT, sync);
