@@ -8,20 +8,17 @@ import { UserRole } from '@/types';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { isDemoMode, isDevRoleEntryEnabled } from '@/lib/demoMode';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { User, Users2, Shield } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { loginAsDemo, devRoleSignIn, signIn } = useAuth();
+  const { loginAsDemo, devRoleSignIn } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const demo = isDemoMode();
   const roleEntry = isDevRoleEntryEnabled();
+  const canPickRole = demo || roleEntry;
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const pickRole = async (role: UserRole, path: string) => {
@@ -42,19 +39,6 @@ const LoginPage: React.FC = () => {
       }
     }
   };
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const msg = await signIn(email, password);
-      if (msg) setError(msg);
-      else navigate('/', { replace: true });
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   const roleTiles: {
     role: UserRole;
@@ -96,14 +80,21 @@ const LoginPage: React.FC = () => {
       <p className="text-[11px] text-muted-foreground text-center mb-3">
         {demo
           ? 'โหมดสาธิต — ข้อมูลบางส่วนอยู่ในเบราว์เซอร์ ไม่ใช่ทั้งหมดใน DB'
-          : 'ไม่ต้องใส่อีเมลหรือรหัสผ่าน — ใช้บัญชีแรกใน DB ตาม role (รัน npm run dev + db:seed และ JARVIS_DEV_ROLE_LOGIN=true ที่ API)'}
+          : roleEntry
+            ? 'ใช้บัญชีแรกใน DB ตาม role (db:seed + JARVIS_DEV_ROLE_LOGIN=true ที่ API)'
+            : 'ตั้ง VITE_DEV_ROLE_ENTRY=true หรือ VITE_DEMO_MODE=true แล้ว build ใหม่'}
       </p>
+      {!canPickRole ? (
+        <p className="text-[11px] text-amber-700 dark:text-amber-500 text-center mb-3">
+          ยังไม่ได้เปิดโหมดเลือกสิทธิ์ — ปุ่มด้านล่างถูกปิดจนกว่าจะตั้งค่าตามบรรทัดด้านบน
+        </p>
+      ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {roleTiles.map(({ role, path, label, desc, icon: Icon, className }) => (
           <button
             key={role}
             type="button"
-            disabled={submitting}
+            disabled={submitting || !canPickRole}
             onClick={() => void pickRole(role, path)}
             className={cn(
               'p-4 rounded-xl border border-border/80 bg-secondary/30 text-left transition-all shadow-sm disabled:opacity-50',
@@ -143,60 +134,12 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div className="glass-card rounded-2xl border border-border/80 p-6 shadow-lg shadow-black/[0.04] space-y-4">
-          {demo || roleEntry ? (
-            <>
-              {rolePickerBlock}
-              {error ? (
-                <p className="text-xs text-destructive text-center" role="alert">
-                  {error}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <p className="text-xs text-muted-foreground text-center">
-                เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน (รัน{' '}
-                <code className="text-[10px]">npm run db:migrate</code> และ{' '}
-                <code className="text-[10px]">npm run db:seed</code> ครั้งแรก)
-              </p>
-              {error ? (
-                <p className="text-xs text-destructive text-center" role="alert">
-                  {error}
-                </p>
-              ) : null}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="bg-background"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full p-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
-              >
-                {submitting ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-          )}
+          {rolePickerBlock}
+          {error ? (
+            <p className="text-xs text-destructive text-center" role="alert">
+              {error}
+            </p>
+          ) : null}
 
           <div className="pt-4 border-t border-border/80">
             <button
