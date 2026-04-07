@@ -7,7 +7,7 @@ import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { UserRole } from '@/types';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { isDemoMode, isDevRoleEntryEnabled } from '@/lib/demoMode';
+import { isDemoMode } from '@/lib/demoMode';
 import { User, Users2, Shield } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
@@ -16,8 +16,6 @@ const LoginPage: React.FC = () => {
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const demo = isDemoMode();
-  const roleEntry = isDevRoleEntryEnabled();
-  const canPickRole = demo || roleEntry;
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -28,15 +26,13 @@ const LoginPage: React.FC = () => {
       navigate(path, { replace: true });
       return;
     }
-    if (roleEntry) {
-      setSubmitting(true);
-      try {
-        const msg = await devRoleSignIn(role);
-        if (msg) setError(msg);
-        else navigate(path, { replace: true });
-      } finally {
-        setSubmitting(false);
-      }
+    setSubmitting(true);
+    try {
+      const msg = await devRoleSignIn(role);
+      if (msg) setError(msg);
+      else navigate(path, { replace: true });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -80,21 +76,14 @@ const LoginPage: React.FC = () => {
       <p className="text-[11px] text-muted-foreground text-center mb-3">
         {demo
           ? 'โหมดสาธิต — ข้อมูลบางส่วนอยู่ในเบราว์เซอร์ ไม่ใช่ทั้งหมดใน DB'
-          : roleEntry
-            ? 'ใช้บัญชีแรกใน DB ตาม role (db:seed + JARVIS_DEV_ROLE_LOGIN=true ที่ API)'
-            : 'ตั้ง VITE_DEV_ROLE_ENTRY=true หรือ VITE_DEMO_MODE=true แล้ว build ใหม่'}
+          : 'เลือกบทบาทเพื่อเข้าใช้งานและดูฟีเจอร์ตามสิทธิ์ — ไม่ต้องใส่อีเมลหรือรหัสผ่าน (เชื่อมบัญชีในฐานข้อมูลตาม role ที่เลือก)'}
       </p>
-      {!canPickRole ? (
-        <p className="text-[11px] text-amber-700 dark:text-amber-500 text-center mb-3">
-          ยังไม่ได้เปิดโหมดเลือกสิทธิ์ — ปุ่มด้านล่างถูกปิดจนกว่าจะตั้งค่าตามบรรทัดด้านบน
-        </p>
-      ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {roleTiles.map(({ role, path, label, desc, icon: Icon, className }) => (
           <button
             key={role}
             type="button"
-            disabled={submitting || !canPickRole}
+            disabled={submitting}
             onClick={() => void pickRole(role, path)}
             className={cn(
               'p-4 rounded-xl border border-border/80 bg-secondary/30 text-left transition-all shadow-sm disabled:opacity-50',

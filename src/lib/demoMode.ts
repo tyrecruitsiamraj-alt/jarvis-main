@@ -8,7 +8,3 @@ export function isDemoMode(): boolean {
   return import.meta.env.VITE_DEMO_MODE === 'true';
 }
 
-/** หน้า Login แสดงปุ่มเลือกสิทธิ์ → JWT จริง (ต้องเปิด JARVIS_DEV_ROLE_LOGIN ที่ API) */
-export function isDevRoleEntryEnabled(): boolean {
-  return import.meta.env.VITE_DEV_ROLE_ENTRY === 'true';
-}

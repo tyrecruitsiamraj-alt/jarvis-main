@@ -44,8 +44,8 @@ React (Vite) SPA with serverless-style API routes (`api/`) and optional **local 
 
 5. **Sign in**
 
-   - **Production mode** (default): email/password on the login screen.
-   - **Demo mode**: set `VITE_DEMO_MODE=true` in `.env.local` and pick a role (no backend auth).
+   - **Default**: pick **Staff / Supervisor / Admin** on the entry screen (no email/password); API uses the first seeded user for that role. Set `JARVIS_DEV_ROLE_LOGIN=false` on the server only if you want to disable this.
+   - **Demo mode**: set `VITE_DEMO_MODE=true` in `.env.local` and pick a role (browser-side demo user; not full DB).
 
 ## Deploy to Vercel
 
@@ -59,7 +59,7 @@ React (Vite) SPA with serverless-style API routes (`api/`) and optional **local 
    | `PG_SSL` | API | Hosted Postgres often needs `true` |
    | `AUTH_JWT_SECRET` | API | Long random secret; required for login / cookies |
    | `VITE_DEMO_MODE` | **Build** | `false` for real DB (default if unset in many setups—set explicitly) |
-   | `VITE_DEV_ROLE_ENTRY` | **Build** | Optional; `true` only if you also set server `JARVIS_DEV_ROLE_LOGIN=true` (unsafe on public URLs) |
+   | `JARVIS_DEV_ROLE_LOGIN` | API | Default **on** (unset = allowed). Set `false` to disable role-pick login on strict production. |
 
    Do **not** commit secrets; add them only in the Vercel UI.
 

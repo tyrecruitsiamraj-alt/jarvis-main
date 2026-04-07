@@ -12,7 +12,7 @@ interface AuthContextType {
   user: User | null;
   /** Demo only: pick a role without backend */
   loginAsDemo: (role: UserRole) => void;
-  /** โหมดทดสอบ: เลือกสิทธิ์ → cookie JWT จาก user คนแรกใน DB ที่มี role นั้น (ต้องเปิด JARVIS_DEV_ROLE_LOGIN ที่เซิร์ฟเวอร์) */
+  /** เลือกสิทธิ์ → cookie JWT จาก user คนแรกใน DB ที่มี role นั้น (ปิดได้ด้วย JARVIS_DEV_ROLE_LOGIN=false) */
   devRoleSignIn: (role: UserRole) => Promise<string | null>;
   /** Production: email + password → sets httpOnly cookie via API */
   signIn: (email: string, password: string) => Promise<string | null>;

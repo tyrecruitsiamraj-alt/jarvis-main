@@ -1,7 +1,7 @@
 /**
- * Development / internal only: issue a session as the first DB user matching role.
- * Enable with JARVIS_DEV_ROLE_LOGIN=true in server env (.env.local for api:local).
- * Never enable on public production without network restrictions.
+ * Issue a session as the first active DB user matching role (no password).
+ * Default: allowed unless JARVIS_DEV_ROLE_LOGIN is explicitly false/0/no/off.
+ * For strict production, set JARVIS_DEV_ROLE_LOGIN=false.
  */
 import { dbQuery } from '../../_lib/postgres.js';
 import {
@@ -46,7 +46,10 @@ function toUserResponse(row: UserRow) {
 }
 
 function devRoleLoginAllowed(): boolean {
-  const v = String(process.env.JARVIS_DEV_ROLE_LOGIN || '').toLowerCase();
+  const raw = process.env.JARVIS_DEV_ROLE_LOGIN;
+  if (raw === undefined || String(raw).trim() === '') return true;
+  const v = String(raw).toLowerCase().trim();
+  if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
   return v === 'true' || v === '1' || v === 'yes';
 }
 
@@ -57,7 +60,12 @@ export default async function handler(req: ApiReq, res: ApiRes) {
   }
 
   if (!devRoleLoginAllowed()) {
-    return sendError(res, 403, 'Forbidden', 'Dev role login is disabled (set JARVIS_DEV_ROLE_LOGIN=true on server)');
+    return sendError(
+      res,
+      403,
+      'Forbidden',
+      'Role pick login is disabled (JARVIS_DEV_ROLE_LOGIN=false).',
+    );
   }
 
   if (!getJwtSecret()) {
