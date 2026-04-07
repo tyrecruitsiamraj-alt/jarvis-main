@@ -7,7 +7,7 @@ import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { UserRole } from '@/types';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { isDemoMode } from '@/lib/demoMode';
+import { isDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
 import { User, Users2, Shield } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
@@ -75,7 +75,9 @@ const LoginPage: React.FC = () => {
       <p className="text-xs font-semibold text-foreground text-center mb-1">เลือกสิทธิ์เข้าใช้งาน</p>
       <p className="text-[11px] text-muted-foreground text-center mb-3">
         {demo
-          ? 'โหมดสาธิต — ข้อมูลบางส่วนอยู่ในเบราว์เซอร์ ไม่ใช่ทั้งหมดใน DB'
+          ? isRuntimeDemoFallback()
+            ? 'ต่อเซิร์ฟเวอร์ไม่ได้ — ใช้โหมดสาธิตอัตโนมัติ (ข้อมูลบางส่วนในเบราว์เซอร์)'
+            : 'โหมดสาธิต — ข้อมูลบางส่วนอยู่ในเบราว์เซอร์ ไม่ใช่ทั้งหมดใน DB'
           : 'เลือกบทบาทเพื่อเข้าใช้งานและดูฟีเจอร์ตามสิทธิ์ — ไม่ต้องใส่อีเมลหรือรหัสผ่าน (เชื่อมบัญชีในฐานข้อมูลตาม role ที่เลือก)'}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

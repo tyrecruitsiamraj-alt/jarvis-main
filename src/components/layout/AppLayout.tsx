@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { cn } from '@/lib/utils';
+import { isDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 const mainNav = [
@@ -41,6 +42,16 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       className={cn('min-h-screen flex flex-col', config.pageBackgroundMode === 'solid' && 'bg-background')}
       style={shellBg}
     >
+      {(isDemoMode() || isRuntimeDemoFallback()) ? (
+        <div
+          role="status"
+          className="text-center text-xs py-2 px-4 border-b border-amber-500/35 bg-amber-500/15 text-amber-950 dark:text-amber-100"
+        >
+          {isRuntimeDemoFallback()
+            ? 'ต่อ API ไม่ได้ — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์อยู่ เมื่อเชื่อมฐานข้อมูลแล้วให้ออกจากระบบและรีเฟรชเพื่อใช้ข้อมูลจริง'
+            : 'โหมดสาธิต — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์ บางส่วนอาจไม่ตรงกับฐานข้อมูลจริง'}
+        </div>
+      ) : null}
       {/* Top header - desktop */}
       <header className="hidden md:flex items-center justify-between px-6 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="flex items-center gap-8">
