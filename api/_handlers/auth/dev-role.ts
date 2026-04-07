@@ -54,9 +54,15 @@ function devRoleLoginAllowed(): boolean {
 }
 
 export default async function handler(req: ApiReq, res: ApiRes) {
-  const method = (req.method || 'GET').toUpperCase();
+  let method = (req.method || 'GET').toUpperCase();
+  if (method !== 'POST' && req.body && typeof req.body === 'object' && req.body !== null) {
+    const b = req.body as Record<string, unknown>;
+    if (b.role === 'admin' || b.role === 'supervisor' || b.role === 'staff') {
+      method = 'POST';
+    }
+  }
   if (method !== 'POST') {
-    return sendError(res, 405, 'Method not allowed');
+    return sendError(res, 405, 'Method not allowed', 'Use POST with JSON body { "role": "staff"|"supervisor"|"admin" }');
   }
 
   if (!devRoleLoginAllowed()) {

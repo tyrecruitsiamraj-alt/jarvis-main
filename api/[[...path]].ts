@@ -46,6 +46,23 @@ function resolveApiPathname(req: VercelishReq): string {
   return fromCatchAll;
 }
 
+/** Vercel / proxy บางกรณีส่ง method ว่าง — อ่านจาก header สำรอง */
+function resolveHttpMethod(req: VercelishReq): string {
+  const raw = req.method;
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    return raw.toUpperCase();
+  }
+  const h = req.headers ?? {};
+  const pick = (key: string): string | undefined => {
+    const v = h[key] ?? h[key.toLowerCase()];
+    if (Array.isArray(v)) return v[0];
+    return typeof v === 'string' ? v : undefined;
+  };
+  const override = pick('x-http-method-override') ?? pick('x-vercel-http-method');
+  if (override?.trim()) return override.toUpperCase();
+  return 'GET';
+}
+
 export default async function handler(req: VercelishReq, res: VercelishRes): Promise<void> {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -67,7 +84,7 @@ export default async function handler(req: VercelishReq, res: VercelishRes): Pro
   delete query.path;
 
   const vercelReq: ApiReq = {
-    method: req.method,
+    method: resolveHttpMethod(req),
     query,
     body: req.body,
     headers: (req.headers ?? {}) as Record<string, string | string[] | undefined>,

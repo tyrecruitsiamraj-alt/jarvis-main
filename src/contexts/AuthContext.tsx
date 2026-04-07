@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User, UserRole } from '@/types';
 import { mockUsers } from '@/data/mockData';
-import { isDemoMode } from '@/lib/demoMode';
+import {
+  isDemoMode,
+  enableRuntimeDemo,
+  clearRuntimeDemoFlag,
+} from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
-import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { refreshWorkCalendarFromApi } from '@/lib/workCalendarStore';
 
@@ -106,8 +109,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const r = await apiFetch('/api/auth/me');
         if (cancelled) return;
         if (!r.ok) {
-          setUser(null);
+          if (r.status === 401 || r.status === 403) {
+            setUser(null);
+            clearJobStaffApiCache();
+            return;
+          }
+          enableRuntimeDemo();
           clearJobStaffApiCache();
+          const saved = localStorage.getItem(DEMO_STORAGE_KEY);
+          if (saved && isStoredRole(saved)) {
+            setUser(userForDemoRole(saved) ?? null);
+          } else {
+            setUser(null);
+          }
           return;
         }
         const data = (await r.json()) as { user?: Record<string, unknown> };
@@ -118,7 +132,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           void refreshWorkCalendarFromApi();
         } else clearJobStaffApiCache();
       } catch {
-        if (!cancelled) setUser(null);
+        if (!cancelled) {
+          enableRuntimeDemo();
+          clearJobStaffApiCache();
+          const saved = localStorage.getItem(DEMO_STORAGE_KEY);
+          if (saved && isStoredRole(saved)) {
+            setUser(userForDemoRole(saved) ?? null);
+          } else {
+            setUser(null);
+          }
+        }
       } finally {
         if (!cancelled) setBootstrapping(false);
       }
@@ -160,8 +183,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (fromBody) return fromBody;
         const t = text.trim();
         const looksLikeHtml = /^\s*</.test(t) || /<\s*html/i.test(t);
-        if (!t || looksLikeHtml || r.status === 502 || r.status === 503 || r.status === 504) {
-          return apiUnreachableHint();
+        if (
+          !t ||
+          looksLikeHtml ||
+          r.status === 405 ||
+          r.status === 502 ||
+          r.status === 503 ||
+          r.status === 504
+        ) {
+          enableRuntimeDemo();
+          const next = userForDemoRole(role);
+          if (next) {
+            setUser(next);
+            localStorage.setItem(DEMO_STORAGE_KEY, role);
+          }
+          return null;
         }
         const snippet = t.slice(0, 180);
         return snippet || `เข้าสู่ระบบไม่สำเร็จ (HTTP ${r.status})`;
@@ -175,7 +211,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     } catch (e) {
       if (e instanceof TypeError) {
-        return apiUnreachableHint();
+        enableRuntimeDemo();
+        const next = userForDemoRole(role);
+        if (next) {
+          setUser(next);
+          localStorage.setItem(DEMO_STORAGE_KEY, role);
+        }
+        return null;
       }
       return e instanceof Error ? e.message : 'Dev role sign-in failed';
     }
@@ -214,6 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isDemoMode()) {
       setUser(null);
       localStorage.removeItem(DEMO_STORAGE_KEY);
+      clearRuntimeDemoFlag();
       return;
     }
     try {
