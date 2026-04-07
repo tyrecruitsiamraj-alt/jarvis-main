@@ -3,6 +3,7 @@ import { User, UserRole } from '@/types';
 import { mockUsers } from '@/data/mockData';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
+import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { refreshWorkCalendarFromApi } from '@/lib/workCalendarStore';
 
@@ -160,7 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const t = text.trim();
         const looksLikeHtml = /^\s*</.test(t) || /<\s*html/i.test(t);
         if (!t || looksLikeHtml || r.status === 502 || r.status === 503 || r.status === 504) {
-          return 'ต่อ API ไม่ได้ — รัน npm run dev (เปิด API พอร์ต 3000 + Vite พร้อมกัน) หรือแยกเทอร์มินัล: npm run api:local กับ npm run dev:vite';
+          return apiUnreachableHint();
         }
         const snippet = t.slice(0, 180);
         return snippet || `เข้าสู่ระบบไม่สำเร็จ (HTTP ${r.status})`;
@@ -174,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     } catch (e) {
       if (e instanceof TypeError) {
-        return 'ต่อ API ไม่ได้ — รัน npm run dev หรือให้ npm run api:local ทำงานที่พอร์ต 3000 แล้วลองใหม่';
+        return apiUnreachableHint();
       }
       return e instanceof Error ? e.message : 'Dev role sign-in failed';
     }

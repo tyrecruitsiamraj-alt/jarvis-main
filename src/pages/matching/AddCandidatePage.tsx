@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
+import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import PageHeader from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -148,7 +149,7 @@ const AddCandidatePage: React.FC = () => {
     } catch (e) {
       const net =
         e instanceof TypeError
-          ? 'เชื่อมต่อ /api ไม่ได้ — ให้รัน `npx vercel dev` (พอร์ต 3000) คู่กับ `npm run dev` เพื่อให้ Vite proxy ไปที่ API'
+          ? apiUnreachableHint()
           : e instanceof Error
             ? e.message
             : String(e);

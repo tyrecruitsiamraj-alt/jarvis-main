@@ -8,6 +8,7 @@ import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSele
 import { useAuth } from '@/contexts/AuthContext';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
+import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 
 const WORK_DAY_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '— เลือก —' },
@@ -276,7 +277,7 @@ const AddJobPage: React.FC = () => {
     } catch (e) {
       const net =
         e instanceof TypeError
-          ? 'เชื่อมต่อ /api ไม่ได้ — รัน API (npm run api:local หรือ vercel dev) ให้สอดคล้อง Vite proxy'
+          ? apiUnreachableHint()
           : e instanceof Error
             ? e.message
             : String(e);
