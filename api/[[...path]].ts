@@ -68,7 +68,7 @@ export default async function handler(req: VercelishReq, res: VercelishRes): Pro
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie');
 
-  if (req.method === 'OPTIONS') {
+  if (resolveHttpMethod(req) === 'OPTIONS') {
     res.status(204).end();
     return;
   }
