@@ -9,16 +9,58 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { isDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
 import { User, Users2, Shield } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { loginAsDemo, devRoleSignIn } = useAuth();
+  const { loginAsDemo, devRoleSignIn, signIn, signUp } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const demo = isDemoMode();
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [registerRole, setRegisterRole] = useState<UserRole>('staff');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const msg = await signIn(email, password);
+      if (msg) setError(msg);
+      else navigate('/', { replace: true });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const msg = await signUp({
+        email,
+        password,
+        full_name: fullName,
+        role: registerRole,
+      });
+      if (msg) {
+        setError(msg);
+        return;
+      }
+      setAuthMode('login');
+      setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   const pickRole = async (role: UserRole, path: string) => {
     setError(null);
     if (demo) {
@@ -125,6 +167,118 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div className="glass-card rounded-2xl border border-border/80 p-6 shadow-lg shadow-black/[0.04] space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setAuthMode('login')}
+              className={cn(
+                'rounded-lg px-3 py-2 text-sm font-medium',
+                authMode === 'login' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
+              )}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('register')}
+              className={cn(
+                'rounded-lg px-3 py-2 text-sm font-medium',
+                authMode === 'register' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
+              )}
+            >
+              Register
+            </button>
+          </div>
+
+          {authMode === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full p-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+              >
+                {submitting ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="fullName">Full name</Label>
+                <Input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emailRegister">Email</Label>
+                <Input
+                  id="emailRegister"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="passwordRegister">Password (ขั้นต่ำ 8 ตัวอักษร)</Label>
+                <Input
+                  id="passwordRegister"
+                  type="password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="roleRegister">Role</Label>
+                <select
+                  id="roleRegister"
+                  value={registerRole}
+                  onChange={(e) => setRegisterRole(e.target.value as UserRole)}
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="staff">Staff</option>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full p-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+              >
+                {submitting ? 'Creating account…' : 'Create account'}
+              </button>
+            </form>
+          )}
+
+          <div className="pt-1 border-t border-border/80" />
           {rolePickerBlock}
           {error ? (
             <p className="text-xs text-destructive text-center" role="alert">

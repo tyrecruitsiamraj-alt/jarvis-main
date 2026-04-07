@@ -20,6 +20,13 @@ interface AuthContextType {
   devRoleSignIn: (role: UserRole) => Promise<string | null>;
   /** Production: email + password → sets httpOnly cookie via API */
   signIn: (email: string, password: string) => Promise<string | null>;
+  /** Public register: create a user account */
+  signUp: (payload: {
+    email: string;
+    password: string;
+    full_name: string;
+    role: UserRole;
+  }) => Promise<string | null>;
   logout: () => void | Promise<void>;
   hasPermission: (requiredRole: UserRole | UserRole[]) => boolean;
   isAuthenticated: boolean;
@@ -252,6 +259,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   }, []);
 
+  const signUp = useCallback(
+    async (payload: { email: string; password: string; full_name: string; role: UserRole }): Promise<string | null> => {
+      const r = await apiFetch('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: payload.email.trim(),
+          password: payload.password,
+          full_name: payload.full_name.trim(),
+          role: payload.role,
+        }),
+      });
+      let data: Record<string, unknown> = {};
+      try {
+        data = (await r.json()) as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+      if (!r.ok) {
+        const msg =
+          typeof data.message === 'string'
+            ? data.message
+            : typeof data.error === 'string'
+              ? data.error
+              : 'Register failed';
+        return msg;
+      }
+      return null;
+    },
+    [],
+  );
+
   const logout = useCallback(async () => {
     if (isDemoMode()) {
       setUser(null);
@@ -285,6 +323,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginAsDemo,
         devRoleSignIn,
         signIn,
+        signUp,
         logout,
         hasPermission,
         isAuthenticated: !!user,

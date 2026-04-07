@@ -1,10 +1,9 @@
 import { dbQuery } from '../../_lib/postgres.js';
 import { hashPassword, getJwtSecret } from '../../_lib/auth.js';
 import {
-  withAuth,
+  type ApiReq,
   sendError,
   handleApiError,
-  type AuthedReq,
   type ApiRes,
 } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
@@ -14,7 +13,7 @@ function isUserRole(v: unknown): v is UserRole {
   return v === 'admin' || v === 'supervisor' || v === 'staff';
 }
 
-async function registerHandler(req: AuthedReq, res: ApiRes) {
+async function registerHandler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'POST') {
     return sendError(res, 405, 'Method not allowed');
@@ -86,4 +85,4 @@ async function registerHandler(req: AuthedReq, res: ApiRes) {
   }
 }
 
-export default withAuth(registerHandler, { roles: ['admin'] });
+export default registerHandler;
