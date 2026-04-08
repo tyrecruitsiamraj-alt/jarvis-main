@@ -14,18 +14,12 @@ const DEMO_STORAGE_KEY = 'jarvis_user_role';
 
 interface AuthContextType {
   user: User | null;
-  /** Demo only: pick a role without backend */
-  loginAsDemo: (role: UserRole) => void;
-  /** เลือกสิทธิ์ → cookie JWT จาก user คนแรกใน DB ที่มี role นั้น (ปิดได้ด้วย JARVIS_DEV_ROLE_LOGIN=false) */
-  devRoleSignIn: (role: UserRole) => Promise<string | null>;
-  /** Production: email + password → sets httpOnly cookie via API */
   signIn: (email: string, password: string) => Promise<string | null>;
-  /** Public register: create a user account */
   signUp: (payload: {
     email: string;
     password: string;
-    full_name: string;
-    role: UserRole;
+    first_name: string;
+    last_name: string;
   }) => Promise<string | null>;
   logout: () => void | Promise<void>;
   hasPermission: (requiredRole: UserRole | UserRole[]) => boolean;
@@ -159,77 +153,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const loginAsDemo = useCallback((role: UserRole) => {
-    const next = userForDemoRole(role);
-    if (next) {
-      setUser(next);
-      localStorage.setItem(DEMO_STORAGE_KEY, role);
-    }
-  }, []);
-
-  const devRoleSignIn = useCallback(async (role: UserRole): Promise<string | null> => {
-    try {
-      const r = await apiFetch('/api/auth/dev-role', {
-        method: 'POST',
-        body: JSON.stringify({ role }),
-      });
-      const text = await r.text();
-      let data: Record<string, unknown> = {};
-      try {
-        if (text.trim()) data = JSON.parse(text) as Record<string, unknown>;
-      } catch {
-        /* ไม่ใช่ JSON (เช่น HTML จากพร็อกซี) */
-      }
-      if (!r.ok) {
-        const fromBody =
-          typeof data.message === 'string'
-            ? data.message
-            : typeof data.error === 'string'
-              ? data.error
-              : '';
-        if (fromBody) return fromBody;
-        const t = text.trim();
-        const looksLikeHtml = /^\s*</.test(t) || /<\s*html/i.test(t);
-        if (
-          !t ||
-          looksLikeHtml ||
-          r.status === 405 ||
-          r.status === 502 ||
-          r.status === 503 ||
-          r.status === 504
-        ) {
-          enableRuntimeDemo();
-          const next = userForDemoRole(role);
-          if (next) {
-            setUser(next);
-            localStorage.setItem(DEMO_STORAGE_KEY, role);
-          }
-          return null;
-        }
-        const snippet = t.slice(0, 180);
-        return snippet || `เข้าสู่ระบบไม่สำเร็จ (HTTP ${r.status})`;
-      }
-      const rawUser = data.user as Record<string, unknown> | undefined;
-      const u = rawUser ? mapApiUser(rawUser) : null;
-      if (!u) return 'คำตอบจากเซิร์ฟเวอร์ไม่ถูกต้อง';
-      setUser(u);
-      void refreshJobStaffFromApi();
-      void refreshWorkCalendarFromApi();
-      return null;
-    } catch (e) {
-      if (e instanceof TypeError) {
-        enableRuntimeDemo();
-        const next = userForDemoRole(role);
-        if (next) {
-          setUser(next);
-          localStorage.setItem(DEMO_STORAGE_KEY, role);
-        }
-        return null;
-      }
-      return e instanceof Error ? e.message : 'Dev role sign-in failed';
-    }
-  }, []);
-
   const signIn = useCallback(async (email: string, password: string): Promise<string | null> => {
     const r = await apiFetch('/api/auth/login', {
       method: 'POST',
@@ -260,14 +183,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = useCallback(
-    async (payload: { email: string; password: string; full_name: string; role: UserRole }): Promise<string | null> => {
+    async (payload: {
+      email: string;
+      password: string;
+      first_name: string;
+      last_name: string;
+    }): Promise<string | null> => {
       const r = await apiFetch('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify({
           email: payload.email.trim(),
           password: payload.password,
-          full_name: payload.full_name.trim(),
-          role: payload.role,
+          first_name: payload.first_name.trim(),
+          last_name: payload.last_name.trim(),
         }),
       });
       let data: Record<string, unknown> = {};
@@ -320,8 +248,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        loginAsDemo,
-        devRoleSignIn,
         signIn,
         signUp,
         logout,

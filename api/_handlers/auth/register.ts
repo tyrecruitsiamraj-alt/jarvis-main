@@ -9,10 +9,6 @@ import {
 import { readJsonBody, getString } from '../../_lib/body.js';
 import type { UserRole } from '../../_lib/auth.js';
 
-function isUserRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff';
-}
-
 async function registerHandler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'POST') {
@@ -30,14 +26,27 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
     const body = raw as Record<string, unknown>;
     const email = getString(body.email)?.toLowerCase();
     const password = getString(body.password);
-    const full_name = getString(body.full_name) || email || '';
-    const role = body.role;
+    const first_name = getString(body.first_name);
+    const last_name = getString(body.last_name);
+    const legacyFull = getString(body.full_name);
+    const role: UserRole = 'staff';
+
+    let full_name: string;
+    if (first_name && last_name) {
+      full_name = `${first_name} ${last_name}`.replace(/\s+/g, ' ').trim();
+    } else if (legacyFull) {
+      full_name = legacyFull;
+    } else {
+      return sendError(
+        res,
+        400,
+        'Bad request',
+        'first_name and last_name are required',
+      );
+    }
 
     if (!email || !password) {
       return sendError(res, 400, 'Bad request', 'email and password are required');
-    }
-    if (!isUserRole(role)) {
-      return sendError(res, 400, 'Bad request', 'role must be admin, supervisor, or staff');
     }
     if (password.length < 8) {
       return sendError(res, 400, 'Bad request', 'password must be at least 8 characters');

@@ -11,6 +11,23 @@ import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import { isDemoMode } from '@/lib/demoMode';
 
 type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit';
+type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
+
+const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
+const REF_CATEGORIES: ReferenceCategory[] = [
+  'สถานะพนักงาน',
+  'ลักษณะงาน',
+  'ประเภทงาน',
+  'สาเหตุปัญหา',
+  'ผลการขับรถ',
+];
+const DEFAULT_REF_DATA: Record<ReferenceCategory, string[]> = {
+  สถานะพนักงาน: ['ผ่านงาน', 'รออบรม', 'หยุดงาน'],
+  ลักษณะงาน: ['ผู้บริหารคนไทย', 'ผู้บริหารต่างชาติ', 'ส่วนกลาง', 'Valet Parking'],
+  ประเภทงาน: ['เอกชน', 'ราชการ', 'ธนาคาร'],
+  สาเหตุปัญหา: ['มาสาย', 'ขาดงาน', 'เอกสารไม่ครบ'],
+  ผลการขับรถ: ['ผ่าน', 'ไม่ผ่าน', 'ยังไม่ทดสอบ'],
+};
 
 const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminOnly: boolean }[] = [
   { id: 'appearance', label: 'ธีม / โลโก้', icon: Palette, adminOnly: false },
@@ -30,6 +47,9 @@ const AdminSettings: React.FC = () => {
   const [apiAuditLogs, setApiAuditLogs] = useState<AuditLog[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [referenceData, setReferenceData] = useState<Record<ReferenceCategory, string[]>>(DEFAULT_REF_DATA);
+  const [editingCategory, setEditingCategory] = useState<ReferenceCategory | null>(null);
+  const [newRefValue, setNewRefValue] = useState('');
 
   useEffect(() => {
     if (!canAdmin || demo) return;
@@ -50,6 +70,56 @@ const AdminSettings: React.FC = () => {
         .finally(() => setAuditLoading(false));
     }
   }, [canAdmin, activeTab, demo]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(REF_DATA_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<Record<ReferenceCategory, string[]>>;
+      const merged: Record<ReferenceCategory, string[]> = { ...DEFAULT_REF_DATA };
+      for (const k of REF_CATEGORIES) {
+        const arr = parsed[k];
+        if (Array.isArray(arr)) {
+          merged[k] = arr.filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+        }
+      }
+      setReferenceData(merged);
+    } catch {
+      /* ignore bad storage */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(REF_DATA_STORAGE_KEY, JSON.stringify(referenceData));
+    } catch {
+      /* ignore storage quota/private mode */
+    }
+  }, [referenceData]);
+
+  const openReferenceEditor = (cat: ReferenceCategory) => {
+    setEditingCategory(cat);
+    setNewRefValue('');
+  };
+
+  const addReferenceValue = () => {
+    if (!editingCategory) return;
+    const v = newRefValue.trim();
+    if (!v) return;
+    setReferenceData((prev) => {
+      const current = prev[editingCategory];
+      if (current.some((x) => x.toLowerCase() === v.toLowerCase())) return prev;
+      return { ...prev, [editingCategory]: [...current, v] };
+    });
+    setNewRefValue('');
+  };
+
+  const removeReferenceValue = (cat: ReferenceCategory, idx: number) => {
+    setReferenceData((prev) => ({
+      ...prev,
+      [cat]: prev[cat].filter((_, i) => i !== idx),
+    }));
+  };
 
   if (!canAdmin) {
     return (
@@ -210,16 +280,75 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'reference' && (
           <div className="space-y-3">
-            {['สถานะพนักงาน', 'ลักษณะงาน', 'ประเภทงาน', 'สาเหตุปัญหา', 'ผลการขับรถ'].map((cat) => (
+            {REF_CATEGORIES.map((cat) => (
               <div key={cat} className="glass-card rounded-xl p-4 border border-border">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground text-sm">{cat}</span>
-                  <button type="button" className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">
+                  <div>
+                    <div className="font-semibold text-foreground text-sm">{cat}</div>
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      {referenceData[cat].length} รายการ
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openReferenceEditor(cat)}
+                    className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20"
+                  >
                     จัดการ
                   </button>
                 </div>
               </div>
             ))}
+
+            {editingCategory && (
+              <div className="glass-card rounded-xl p-4 border border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-semibold text-foreground">จัดการ: {editingCategory}</div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCategory(null)}
+                    className="text-xs px-2 py-1 rounded bg-secondary text-muted-foreground"
+                  >
+                    ปิด
+                  </button>
+                </div>
+
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newRefValue}
+                    onChange={(e) => setNewRefValue(e.target.value)}
+                    placeholder="เพิ่มรายการใหม่"
+                    className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  />
+                  <button
+                    type="button"
+                    onClick={addReferenceValue}
+                    className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm"
+                  >
+                    เพิ่ม
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {referenceData[editingCategory].map((item, idx) => (
+                    <div key={`${item}-${idx}`} className="flex items-center justify-between rounded border border-border px-3 py-2">
+                      <span className="text-sm text-foreground">{item}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeReferenceValue(editingCategory, idx)}
+                        className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive"
+                      >
+                        ลบ
+                      </button>
+                    </div>
+                  ))}
+                  {referenceData[editingCategory].length === 0 && (
+                    <div className="text-sm text-muted-foreground">ยังไม่มีรายการ</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

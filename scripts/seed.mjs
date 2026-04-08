@@ -1,6 +1,11 @@
 /**
  * Seed default users (idempotent). Run after db:migrate.
  * Password: SEED_USER_PASSWORD from env or default "ChangeMe123!" (change in production).
+ *
+ * Optional single real admin (ไม่ commit รหัส — ใส่ใน .env.local เท่านั้น):
+ *   SEED_SOLE_ADMIN_EMAIL, SEED_SOLE_ADMIN_PASSWORD
+ *   SEED_SOLE_ADMIN_NAME (optional)
+ *   SEED_SOLE_ADMIN_DEMOTE_OTHERS=true (default) → ลด role ของ admin คนอื่นเป็น staff
  */
 import fs from "fs";
 import path from "path";
@@ -83,6 +88,47 @@ try {
       );
       console.log("Seeded user:", email);
     }
+    const soleEmail = (env.SEED_SOLE_ADMIN_EMAIL || "").trim().toLowerCase();
+    const solePassword = (env.SEED_SOLE_ADMIN_PASSWORD || "").trim();
+    const soleName = (env.SEED_SOLE_ADMIN_NAME || "").trim() || "Administrator";
+    const demoteOthers = !["false", "0", "no"].includes(
+      String(env.SEED_SOLE_ADMIN_DEMOTE_OTHERS || "true").toLowerCase().trim(),
+    );
+
+    if (soleEmail && solePassword) {
+      if (solePassword.length < 8) {
+        console.error("SEED_SOLE_ADMIN_PASSWORD must be at least 8 characters");
+        process.exit(1);
+      }
+      const soleHash = await bcrypt.hash(solePassword, 12);
+      await client.query(
+        `
+        INSERT INTO users (email, password_hash, role, full_name)
+        VALUES (lower($1::text), $2, 'admin', $3)
+        ON CONFLICT ((lower(email))) DO UPDATE SET
+          password_hash = EXCLUDED.password_hash,
+          role = 'admin',
+          full_name = EXCLUDED.full_name,
+          updated_at = now()
+        `,
+        [soleEmail, soleHash, soleName],
+      );
+      console.log("Sole admin upserted:", soleEmail);
+      if (demoteOthers) {
+        const { rowCount } = await client.query(
+          `
+          UPDATE users
+          SET role = 'staff', updated_at = now()
+          WHERE role = 'admin' AND lower(email) <> lower($1::text)
+          `,
+          [soleEmail],
+        );
+        console.log("Demoted other admin users to staff:", rowCount);
+      }
+    } else if (soleEmail || solePassword) {
+      console.warn("Set both SEED_SOLE_ADMIN_EMAIL and SEED_SOLE_ADMIN_PASSWORD to enable sole-admin bootstrap.");
+    }
+
     console.log("Seed complete. Default password for all seeded users:", defaultPassword);
   } finally {
     client.release();
