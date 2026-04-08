@@ -18,10 +18,11 @@ export type BrandingConfig = {
 /** เปลี่ยนคีย์เมื่อ rebrand เพื่อไม่ให้ชื่อเก่าค้างใน localStorage ของผู้ใช้ */
 const KEY = 'so_recruit_branding_v1';
 const LEGACY_BRANDING_KEY = 'jarvis_branding_v1';
+const DEFAULT_LOGO_PATH = '/so-work-logo.png';
 
 export const DEFAULT_BRANDING: BrandingConfig = {
   appName: 'So Recruit',
-  logoDataUrl: null,
+  logoDataUrl: DEFAULT_LOGO_PATH,
   primaryHsl: '0 72% 50%',
   backgroundHsl: '0 0% 98%',
   foregroundHsl: '0 0% 12%',
@@ -41,6 +42,9 @@ export function loadBranding(): BrandingConfig {
     const merged = { ...DEFAULT_BRANDING, ...p };
     if (merged.appName === 'JARVIS' || merged.appName === 'Lovable App') {
       merged.appName = DEFAULT_BRANDING.appName;
+    }
+    if (!merged.logoDataUrl || !String(merged.logoDataUrl).trim()) {
+      merged.logoDataUrl = DEFAULT_LOGO_PATH;
     }
     return merged;
   } catch {

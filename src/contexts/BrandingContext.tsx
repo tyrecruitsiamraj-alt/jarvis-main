@@ -24,7 +24,11 @@ type BrandingContextValue = {
 const BrandingContext = createContext<BrandingContextValue | null>(null);
 
 function mergeServerPayload(remote: Record<string, unknown>): BrandingConfig {
-  return { ...DEFAULT_BRANDING, ...remote } as BrandingConfig;
+  const merged = { ...DEFAULT_BRANDING, ...remote } as BrandingConfig;
+  if (!merged.logoDataUrl || !String(merged.logoDataUrl).trim()) {
+    merged.logoDataUrl = DEFAULT_BRANDING.logoDataUrl;
+  }
+  return merged;
 }
 
 export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
