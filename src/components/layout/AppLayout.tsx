@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Briefcase, BarChart3, Settings, LogOut, UserCircle, CalendarDays, Search, Users } from 'lucide-react';
+import { LogOut, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
@@ -8,158 +8,111 @@ import { cn } from '@/lib/utils';
 import { isDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
-const mainNav = [
-  { path: '/', label: 'หน้าหลัก', icon: Home },
-  { path: '/wl', label: 'WL', icon: CalendarDays },
-  { path: '/matching', label: 'Matching', icon: Search },
-  { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users },
-  { path: '/jobs', label: 'หน่วยงาน', icon: Briefcase },
-  { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-];
+import BottomDockNav from '@/components/layout/bottom-nav/BottomDockNav';
+import { DOCK_NAV_ITEMS, isDockPathActive } from '@/components/layout/bottom-nav/dockNavConfig';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout } = useAuth();
   const { config } = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
 
-  const isActive = (path: string) => {
-    const p = location.pathname;
-    if (path === '/') return p === '/';
-    if (path === '/matching/candidates') return p.startsWith('/matching/candidates');
-    if (path === '/matching') {
-      if (p.startsWith('/matching/candidates')) return false;
-      return p.startsWith('/matching');
-    }
-    return p.startsWith(path);
-  };
-
-  const canOpenSettings = hasPermission('admin');
-
   return (
     <div
-      className={cn('min-h-screen flex flex-col', config.pageBackgroundMode === 'solid' && 'bg-background')}
+      className={cn('min-h-[100dvh] min-h-screen flex flex-col', config.pageBackgroundMode === 'solid' && 'bg-background')}
       style={shellBg}
     >
       {(isDemoMode() || isRuntimeDemoFallback()) ? (
         <div
           role="status"
-          className="text-center text-xs py-2 px-4 border-b border-amber-500/35 bg-amber-500/15 text-amber-950 dark:text-amber-100"
+          className="text-center text-xs py-2 px-4 sm:px-6 border-b border-amber-500/35 bg-amber-500/15 text-amber-950 dark:text-amber-100"
         >
           {isRuntimeDemoFallback()
             ? 'ต่อ API ไม่ได้ — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์อยู่ เมื่อเชื่อมฐานข้อมูลแล้วให้ออกจากระบบและรีเฟรชเพื่อใช้ข้อมูลจริง'
             : 'โหมดสาธิต — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์ บางส่วนอาจไม่ตรงกับฐานข้อมูลจริง'}
         </div>
       ) : null}
-      {/* Top header - desktop */}
-      <header className="hidden md:flex items-center justify-between px-6 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="flex items-center gap-8">
-          <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2">
+
+      {/* Top header — จอใหญ่ (lg+) */}
+      <header className="hidden lg:flex items-center justify-between gap-4 px-4 xl:px-8 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-40">
+        <div className="flex items-center gap-4 xl:gap-8 min-w-0 flex-1">
+          <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
             <BrandMark size="md" />
-            <BrandTitle className="text-lg font-bold text-foreground" />
+            <BrandTitle className="text-lg font-bold text-foreground truncate max-w-[200px] xl:max-w-none" />
           </button>
-          <nav className="flex items-center gap-1">
-            {mainNav.map(item => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                  isActive(item.path)
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                )}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </button>
-            ))}
-            {canOpenSettings && (
-              <button
-                type="button"
-                onClick={() => navigate('/settings')}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                  isActive('/settings')
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                )}
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
-            )}
+          <nav className="flex items-center gap-0.5 xl:gap-1 flex-wrap min-w-0" aria-label="เมนูหลัก">
+            {DOCK_NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = isDockPathActive(item.path, location.pathname);
+              return (
+                <button
+                  key={item.path}
+                  type="button"
+                  onClick={() => navigate(item.path)}
+                  className={cn(
+                    'flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all touch-manipulation',
+                    active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+                  )}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="whitespace-nowrap">{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 xl:gap-3 shrink-0">
           <NotificationPanel />
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary">
-            <UserCircle className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">{user?.full_name}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary">{user?.role}</span>
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary max-w-[220px]">
+            <UserCircle className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary shrink-0">{user?.role}</span>
           </div>
-          <button type="button" onClick={() => void logout()} className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+          <div className="flex xl:hidden items-center gap-1.5 px-2 py-1 rounded-lg bg-secondary">
+            <UserCircle className="w-4 h-4 text-primary" />
+            <span className="text-xs font-medium text-primary uppercase">{user?.role}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="ออกจากระบบ"
+          >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* Mobile header */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
-        <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left">
+      {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg) */}
+      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-40 safe-area-pt">
+        <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left min-w-0 touch-manipulation py-1">
           <BrandMark size="sm" />
-          <BrandTitle className="text-base font-bold text-foreground" />
+          <BrandTitle className="text-base font-bold text-foreground truncate" />
         </button>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 shrink-0">
           <NotificationPanel />
-          {canOpenSettings && (
-            <button
-              type="button"
-              onClick={() => navigate('/settings')}
-              className={cn(
-                'p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary',
-                isActive('/settings') && 'text-primary bg-primary/10',
-              )}
-              aria-label="การตั้งค่า"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          )}
-          <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary max-[380px]:hidden">
+          <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium uppercase">
             {user?.role}
           </span>
-          <button type="button" onClick={() => void logout()} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive">
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-destructive touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="ออกจากระบบ"
+          >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 pb-20 md:pb-6">
+      <main className="flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-[7.5rem] lg:pb-8">
         {children}
       </main>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-xl border-t border-border z-50 safe-area-bottom">
-        <div className="flex items-stretch justify-start gap-0.5 overflow-x-auto px-1 py-2 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {mainNav.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={cn(
-                'flex shrink-0 flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg transition-all min-w-[3.25rem] max-w-[4.5rem]',
-                isActive(item.path)
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
-              )}
-            >
-              <item.icon className={cn('w-5 h-5 shrink-0', isActive(item.path) && 'drop-shadow-[0_0_6px_hsl(var(--primary))]')} />
-              <span className="text-[9px] font-medium text-center leading-tight line-clamp-2 w-full">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      <div className="lg:hidden">
+        <BottomDockNav pathname={location.pathname} />
+      </div>
     </div>
   );
 };

@@ -18,6 +18,7 @@ import devRoleHandler from './auth/dev-role.js';
 import logoutHandler from './auth/logout.js';
 import meHandler from './auth/me.js';
 import registerHandler from './auth/register.js';
+import forgotPasswordHandler from './auth/forgot-password.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 
@@ -46,4 +47,5 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/auth/logout': logoutHandler as ApiHandler,
   '/api/auth/me': meHandler as ApiHandler,
   '/api/auth/register': registerHandler as ApiHandler,
+  '/api/auth/forgot-password': forgotPasswordHandler as ApiHandler,
 };

@@ -98,6 +98,9 @@
 }
 
 @layer utilities {
+  .safe-area-pt {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
   .glass-card {
     @apply bg-card border border-border shadow-sm;
   }

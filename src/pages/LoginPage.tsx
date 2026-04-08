@@ -8,6 +8,15 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { apiFetch } from '@/lib/apiFetch';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +31,10 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,10 +73,42 @@ const LoginPage: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  const submitForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotMsg(null);
+    const em = forgotEmail.trim() || email.trim();
+    if (!em) {
+      setForgotMsg('กรุณากรอกอีเมล');
+      return;
+    }
+    setForgotBusy(true);
+    try {
+      const r = await apiFetch('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: em }),
+      });
+      const data = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
+      setForgotMsg(
+        typeof data.message === 'string'
+          ? data.message
+          : typeof data.error === 'string'
+            ? data.error
+            : r.ok
+              ? 'ส่งคำขอแล้ว'
+              : 'ไม่สามารถดำเนินการได้',
+      );
+    } catch {
+      setForgotMsg('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
   return (
     <div
       className={cn(
-        'min-h-screen flex items-center justify-center p-4',
+        'min-h-[100dvh] min-h-screen flex items-center justify-center p-4 sm:p-6',
         config.pageBackgroundMode === 'solid' && 'bg-background',
       )}
       style={shellBg}
@@ -71,7 +116,7 @@ const LoginPage: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md mx-auto"
       >
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex justify-center">
@@ -83,7 +128,7 @@ const LoginPage: React.FC = () => {
           <p className="text-sm text-muted-foreground mt-1">Workforce Management System</p>
         </div>
 
-        <div className="glass-card rounded-2xl border border-border/80 p-6 shadow-lg shadow-black/[0.04] space-y-4">
+        <div className="glass-card rounded-2xl border border-border/80 p-5 sm:p-6 shadow-lg shadow-black/[0.04] space-y-4">
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -121,7 +166,20 @@ const LoginPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="password">Password</Label>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline underline-offset-4 touch-manipulation py-1"
+                    onClick={() => {
+                      setForgotEmail(email);
+                      setForgotMsg(null);
+                      setForgotOpen(true);
+                    }}
+                  >
+                    ลืมรหัสผ่าน?
+                  </button>
+                </div>
                 <Input
                   id="password"
                   type="password"
@@ -129,12 +187,13 @@ const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="min-h-[44px]"
                 />
               </div>
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full p-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+                className="w-full min-h-[48px] p-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60 touch-manipulation"
               >
                 {submitting ? 'Signing in…' : 'Sign in'}
               </button>
@@ -217,13 +276,59 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
+        <p className="mt-6 text-center text-xs text-muted-foreground px-1">
           ต้องการสมัครงานภายนอก?{' '}
-          <Link to="/apply" className="font-medium text-primary hover:underline underline-offset-4">
+          <Link to="/apply" className="font-medium text-primary hover:underline underline-offset-4 touch-manipulation">
             ดูบอร์ดประกาศรับสมัคร
           </Link>
         </p>
       </motion.div>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>ลืมรหัสผ่าน</DialogTitle>
+            <DialogDescription>
+              กรอกอีเมลที่ใช้ลงทะเบียน ระบบจะแจ้งขั้นตอนถัดไป (หรือติดต่อ Admin เพื่อรีเซ็ตรหัสโดยตรง)
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitForgot} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="forgot-email">Email</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                autoComplete="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder={email || 'your@email.com'}
+                className="min-h-[44px]"
+              />
+            </div>
+            {forgotMsg ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                {forgotMsg}
+              </p>
+            ) : null}
+            <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row">
+              <button
+                type="button"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-border text-sm touch-manipulation min-h-[44px]"
+                onClick={() => setForgotOpen(false)}
+              >
+                ปิด
+              </button>
+              <button
+                type="submit"
+                disabled={forgotBusy}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60 touch-manipulation min-h-[44px]"
+              >
+                {forgotBusy ? 'กำลังส่ง…' : 'ส่งคำขอ'}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
