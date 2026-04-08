@@ -41,7 +41,7 @@ const BrandingAppearanceTab: React.FC = () => {
             value={config.appName}
             onChange={(e) => updateConfig({ appName: e.target.value })}
             className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-            placeholder="JARVIS"
+            placeholder="So Recruit"
           />
         </div>
 

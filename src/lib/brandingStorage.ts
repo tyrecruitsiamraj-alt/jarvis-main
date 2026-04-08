@@ -15,10 +15,12 @@ export type BrandingConfig = {
   gradientToHsl: string;
 };
 
-const KEY = 'jarvis_branding_v1';
+/** เปลี่ยนคีย์เมื่อ rebrand เพื่อไม่ให้ชื่อเก่าค้างใน localStorage ของผู้ใช้ */
+const KEY = 'so_recruit_branding_v1';
+const LEGACY_BRANDING_KEY = 'jarvis_branding_v1';
 
 export const DEFAULT_BRANDING: BrandingConfig = {
-  appName: 'JARVIS',
+  appName: 'So Recruit',
   logoDataUrl: null,
   primaryHsl: '0 72% 50%',
   backgroundHsl: '0 0% 98%',
@@ -32,10 +34,15 @@ export const DEFAULT_BRANDING: BrandingConfig = {
 export function loadBranding(): BrandingConfig {
   if (typeof window === 'undefined') return DEFAULT_BRANDING;
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+    if (!raw) raw = localStorage.getItem(LEGACY_BRANDING_KEY);
     if (!raw) return DEFAULT_BRANDING;
     const p = JSON.parse(raw) as Partial<BrandingConfig>;
-    return { ...DEFAULT_BRANDING, ...p };
+    const merged = { ...DEFAULT_BRANDING, ...p };
+    if (merged.appName === 'JARVIS' || merged.appName === 'Lovable App') {
+      merged.appName = DEFAULT_BRANDING.appName;
+    }
+    return merged;
   } catch {
     return DEFAULT_BRANDING;
   }
@@ -45,6 +52,7 @@ export function saveBranding(c: BrandingConfig): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(KEY, JSON.stringify(c));
+    localStorage.removeItem(LEGACY_BRANDING_KEY);
   } catch {
     /* quota */
   }
@@ -122,6 +130,9 @@ export function hslComponentsToHex(hsl: string): string {
 
 export function applyBrandingToDocument(c: BrandingConfig): void {
   if (typeof document === 'undefined') return;
+  const name = (c.appName || DEFAULT_BRANDING.appName).trim() || DEFAULT_BRANDING.appName;
+  document.title = name;
+
   const root = document.documentElement;
 
   root.style.setProperty('--primary', c.primaryHsl);

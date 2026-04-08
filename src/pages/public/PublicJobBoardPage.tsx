@@ -100,7 +100,7 @@ const PublicJobBoardPage: React.FC = () => {
             ค้นหางานที่เหมาะกับคุณ
           </h1>
           <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
-            ดูตำแหน่งจากระบบ JARVIS แบบเรียลไทม์ จากนั้นสมัครผ่านแอป{' '}
+            ดูตำแหน่งจากระบบ So Recruit แบบเรียลไทม์ จากนั้นสมัครผ่านแอป{' '}
             <span className="text-foreground font-medium">SOWORK</span> ตามลิงก์ด้านล่าง
           </p>
         </div>

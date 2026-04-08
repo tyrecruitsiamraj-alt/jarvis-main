@@ -14,7 +14,7 @@ const sizeClass: Record<Size, { box: string; text: string; img: string }> = {
 export const BrandMark: React.FC<{ size?: Size; className?: string }> = ({ size = 'md', className }) => {
   const { config } = useBranding();
   const s = sizeClass[size];
-  const letter = (config.appName || 'J').trim().charAt(0).toUpperCase() || 'J';
+  const letter = (config.appName || 'S').trim().charAt(0).toUpperCase() || 'S';
 
   if (config.logoDataUrl) {
     return (
@@ -35,5 +35,5 @@ export const BrandMark: React.FC<{ size?: Size; className?: string }> = ({ size 
 
 export const BrandTitle: React.FC<{ className?: string }> = ({ className }) => {
   const { config } = useBranding();
-  return <span className={className}>{config.appName || 'JARVIS'}</span>;
+  return <span className={className}>{config.appName || 'So Recruit'}</span>;
 };
