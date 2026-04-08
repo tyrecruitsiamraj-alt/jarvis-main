@@ -9,6 +9,7 @@ import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace 
 import { getJobs } from '@/lib/demoStorage';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
+import { haversineKm } from '@/lib/geo';
 
 const normalizeThaiText = (text: string) =>
   text
@@ -49,6 +50,8 @@ const similarityScore = (source: string, query: string) => {
   return score;
 };
 
+type PreCheckRow = { job: JobRequest; distanceKm: number | null };
+
 const PreCheckPage: React.FC = () => {
   const navigate = useNavigate();
   const [district, setDistrict] = useState('');
@@ -57,6 +60,9 @@ const PreCheckPage: React.FC = () => {
   const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(() => !isDemoMode());
+  const [centerLat, setCenterLat] = useState<number | null>(null);
+  const [centerLng, setCenterLng] = useState<number | null>(null);
+  const [geoHint, setGeoHint] = useState<string>('');
 
   useEffect(() => {
     if (isDemoMode()) return;
@@ -84,27 +90,112 @@ const PreCheckPage: React.FC = () => {
     };
   }, []);
 
-  const filteredJobs = useMemo(() => {
+  useEffect(() => {
+    if (isDemoMode()) {
+      setCenterLat(null);
+      setCenterLng(null);
+      setGeoHint('');
+      return;
+    }
+    const q = district.trim();
+    if (!q) {
+      setCenterLat(null);
+      setCenterLng(null);
+      setGeoHint('');
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void (async () => {
+        setGeoHint('กำลังหาพิกัดจาก Google…');
+        try {
+          const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${q}, Thailand`)}`);
+          if (!r.ok) {
+            if (r.status === 503) {
+              setGeoHint('ยังไม่ตั้ง GOOGLE_MAPS_API_KEY — ใช้แค่ค้นหาจากข้อความที่อยู่ (รัศมีไม่ทำงาน)');
+            } else {
+              setGeoHint('หาพิกัดไม่สำเร็จ — ใช้แค่ค้นหาข้อความ');
+            }
+            setCenterLat(null);
+            setCenterLng(null);
+            return;
+          }
+          const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
+          if (typeof data.lat !== 'number' || typeof data.lng !== 'number') {
+            setGeoHint('ไม่พบพิกัดสำหรับคำนี้');
+            setCenterLat(null);
+            setCenterLng(null);
+            return;
+          }
+          setCenterLat(data.lat);
+          setCenterLng(data.lng);
+          setGeoHint(
+            `จุดอ้างอิง: ${data.formatted_address || q} — ระยะทางเป็นเส้นตรงบนโลก (ไม่ใช่ระยะขับรถ) ภายในรัศมี ${radius} กม.`,
+          );
+        } catch {
+          setGeoHint('เครือข่ายผิดพลาด — ใช้แค่ค้นหาข้อความ');
+          setCenterLat(null);
+          setCenterLng(null);
+        }
+      })();
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [district, radius]);
+
+  const filteredRows = useMemo((): PreCheckRow[] => {
     const allJobs = isDemoMode() ? mergePreCheckJobs() : apiJobs;
-    return allJobs
-      .filter((j) => j.status !== 'closed' && j.status !== 'cancelled')
+    const open = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+
+    const textMatched = open
       .map((j) => ({
         job: j,
-        score: district ? similarityScore(j.location_address, district) : 100,
+        score: district.trim() ? similarityScore(j.location_address, district) : 100,
       }))
-      .filter(({ score }) => !district || score >= 30)
-      .sort((a, b) => {
-        if (a.job.urgency === 'urgent' && b.job.urgency !== 'urgent') return -1;
-        if (a.job.urgency !== 'urgent' && b.job.urgency === 'urgent') return 1;
-        return b.score - a.score;
-      })
+      .filter(({ score }) => !district.trim() || score >= 30)
       .map(({ job }) => job);
-  }, [district, apiJobs]);
+
+    const withDist: PreCheckRow[] = textMatched.map((j) => {
+      let distanceKm: number | null = null;
+      if (
+        centerLat !== null &&
+        centerLng !== null &&
+        typeof j.lat === 'number' &&
+        typeof j.lng === 'number'
+      ) {
+        distanceKm = haversineKm(centerLat, centerLng, j.lat, j.lng);
+      }
+      return { job: j, distanceKm };
+    });
+
+    let rows = withDist;
+    if (centerLat !== null && centerLng !== null) {
+      rows = withDist.filter(
+        (row) => row.distanceKm === null || row.distanceKm <= radius,
+      );
+    }
+
+    rows.sort((a, b) => {
+      if (a.job.urgency === 'urgent' && b.job.urgency !== 'urgent') return -1;
+      if (a.job.urgency !== 'urgent' && b.job.urgency === 'urgent') return 1;
+      const da = a.distanceKm;
+      const db = b.distanceKm;
+      if (da !== null && db !== null) return da - db;
+      if (da !== null) return -1;
+      if (db !== null) return 1;
+      return 0;
+    });
+
+    return rows;
+  }, [district, apiJobs, centerLat, centerLng, radius]);
 
   const getClientInfo = (jobName: string): ClientWorkplace | undefined => {
     const list = isDemoMode() ? mockClients : apiClients;
     return list.find((c) => c.name === jobName);
   };
+
+  const detailDistance =
+    jobDetail && centerLat !== null && centerLng !== null && jobDetail.lat != null && jobDetail.lng != null
+      ? haversineKm(centerLat, centerLng, jobDetail.lat, jobDetail.lng)
+      : null;
 
   return (
     <div>
@@ -125,7 +216,7 @@ const PreCheckPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">รัศมี (กม.)</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">รัศมี (กม.) — ใช้เมื่อหาพิกัดได้</label>
             <div className="flex gap-1.5">
               {[5, 10, 15, 20].map((r) => (
                 <button
@@ -142,13 +233,14 @@ const PreCheckPage: React.FC = () => {
               ))}
             </div>
           </div>
+          {geoHint ? <p className="text-[11px] text-muted-foreground leading-snug">{geoHint}</p> : null}
         </div>
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดรายการงาน...</div>}
         <div className="text-sm text-muted-foreground">
-          งานที่เปิดอยู่ใกล้พื้นที่: <span className="text-primary font-semibold">{filteredJobs.length}</span> งาน
+          งานที่ตรงเงื่อนไข: <span className="text-primary font-semibold">{filteredRows.length}</span> งาน
         </div>
         <div className="space-y-2">
-          {filteredJobs.map((j) => (
+          {filteredRows.map(({ job: j, distanceKm }) => (
             <div
               key={j.id}
               role="button"
@@ -171,8 +263,15 @@ const PreCheckPage: React.FC = () => {
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="w-3 h-3" /> {j.location_address}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                รายได้: ฿{j.total_income.toLocaleString()} • ต้องการ: {j.required_date}
+              <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                <span>
+                  รายได้: ฿{j.total_income.toLocaleString()} • ต้องการ: {j.required_date}
+                </span>
+                {distanceKm !== null ? (
+                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} กม. (เส้นตรง)</span>
+                ) : centerLat !== null ? (
+                  <span className="text-warning">ไม่มีพิกัดงาน — แสดงเพราะข้อความตรง</span>
+                ) : null}
               </div>
             </div>
           ))}
@@ -198,6 +297,11 @@ const PreCheckPage: React.FC = () => {
                       <div className="text-xs text-muted-foreground">{jobDetail.location_address}</div>
                     </div>
                   </div>
+                  {detailDistance !== null ? (
+                    <p className="text-xs text-muted-foreground">
+                      ระยะประมาณจากจุดค้นหา: <span className="font-medium text-foreground">{detailDistance.toFixed(1)} กม.</span> (เส้นตรงบนพื้นผิวโลก ไม่ใช่เส้นทางรถ)
+                    </p>
+                  ) : null}
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">ลักษณะงาน</span>

@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Candidate, CANDIDATE_STATUS_LABELS } from '@/types';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
 import { useDemoAwareCandidates } from '@/hooks/useDemoAwareCandidates';
+import { haversineKm } from '@/lib/geo';
 
-type CandidateWithMatchScore = Candidate & { distance: number; matchScore: number };
+type CandidateWithMatchScore = Candidate & { distance: number | null; matchScore: number };
 
 const radiusOptions = [10, 15, 20];
 
@@ -38,15 +39,17 @@ const MatchingPage: React.FC = () => {
       .filter((c) => statusFilter === 'all' || c.status === statusFilter)
       .map((c) => {
         const dist =
-          job && c.lat && c.lng && job.lat && job.lng
-            ? Math.sqrt(
-                Math.pow((c.lat - job.lat) * 111, 2) + Math.pow((c.lng - job.lng) * 111, 2),
-              )
-            : Math.random() * 25;
-        const matchScore = Math.max(0, Math.min(100, Math.round(100 - dist * 3 - c.risk_percentage)));
-        return { ...c, distance: Math.round(dist * 10) / 10, matchScore };
+          job && c.lat != null && c.lng != null && job.lat != null && job.lng != null
+            ? haversineKm(job.lat, job.lng, c.lat, c.lng)
+            : null;
+        const distRounded = dist !== null ? Math.round(dist * 10) / 10 : null;
+        const matchScore =
+          dist !== null
+            ? Math.max(0, Math.min(100, Math.round(100 - dist * 3 - c.risk_percentage)))
+            : Math.max(0, Math.min(55, Math.round(55 - c.risk_percentage)));
+        return { ...c, distance: distRounded, matchScore };
       })
-      .filter((c) => c.distance <= radius)
+      .filter((c) => c.distance === null || c.distance <= radius)
       .sort((a, b) => b.matchScore - a.matchScore);
   };
 
@@ -142,7 +145,8 @@ const MatchingPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
                 <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> {c.distance} กม.
+                  <MapPin className="w-3 h-3" />{' '}
+                  {c.distance !== null ? `${c.distance} กม. (เส้นตรง)` : 'ไม่มีพิกัด'}
                 </span>
                 <span>อายุ {c.age} ปี</span>
                 <span>Risk: {c.risk_percentage}%</span>
@@ -226,7 +230,11 @@ const MatchingPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">ระยะทาง</span>
-                  <span>{candidateDetail.distance} กม.</span>
+                  <span>
+                    {candidateDetail.distance !== null
+                      ? `${candidateDetail.distance} กม. (เส้นตรง)`
+                      : 'ไม่มีพิกัดผู้สมัคร/งาน'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Match Score</span>

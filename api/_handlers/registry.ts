@@ -19,6 +19,7 @@ import logoutHandler from './auth/logout.js';
 import meHandler from './auth/me.js';
 import registerHandler from './auth/register.js';
 import publicJobsHandler from './public/jobs.js';
+import brandingHandler from './branding.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -38,6 +39,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/audit-logs': auditLogsHandler as ApiHandler,
   '/api/employees': employeesHandler as ApiHandler,
   '/api/geocode': geocodeHandler as ApiHandler,
+  '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
   '/api/auth/dev-role': devRoleHandler as ApiHandler,

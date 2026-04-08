@@ -1,14 +1,18 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { hexToHslComponents, hslComponentsToHex } from '@/lib/brandingStorage';
 import { BrandMark } from '@/components/shared/BrandMark';
-import { Palette, ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
+import { Palette, ImagePlus, RotateCcw, Trash2, CloudUpload } from 'lucide-react';
 
 const MAX_LOGO_CHARS = 1_200_000;
 
 const BrandingAppearanceTab: React.FC = () => {
-  const { config, updateConfig, resetToDefaults } = useBranding();
+  const { config, updateConfig, resetToDefaults, syncBrandingToOrg } = useBranding();
+  const { hasPermission } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [syncFeedback, setSyncFeedback] = useState<{ ok: boolean; message: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const onLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -170,22 +174,51 @@ const BrandingAppearanceTab: React.FC = () => {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm('รีเซ็ตเป็นค่าเริ่มต้นของระบบ?')) {
-              resetToDefaults();
-            }
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-secondary text-sm font-medium text-foreground"
-        >
-          <RotateCcw className="w-4 h-4" />
-          รีเซ็ตค่าเริ่มต้น
-        </button>
-        <p className="text-xs text-muted-foreground self-center">
-          การตั้งค่าถูกบันทึกในเบราว์เซอร์นี้อัตโนมัติ (localStorage)
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('รีเซ็ตเป็นค่าเริ่มต้นของระบบ?')) {
+                resetToDefaults();
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-secondary text-sm font-medium text-foreground"
+          >
+            <RotateCcw className="w-4 h-4" />
+            รีเซ็ตค่าเริ่มต้น
+          </button>
+          {hasPermission('admin') ? (
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={() => {
+                setSyncFeedback(null);
+                setSyncing(true);
+                void syncBrandingToOrg().then((r) => {
+                  setSyncing(false);
+                  setSyncFeedback({
+                    ok: r.ok,
+                    message: r.message || (r.ok ? 'สำเร็จ' : 'ล้มเหลว'),
+                  });
+                });
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
+            >
+              <CloudUpload className="w-4 h-4" />
+              {syncing ? 'กำลังเผยแพร่…' : 'เผยแพร่ให้ทุกคน (บันทึกบนเซิร์ฟเวอร์)'}
+            </button>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          การแก้ในแท็บนี้บันทึกในเบราว์เซอร์ของคุณทันที — ผู้ใช้คนอื่นจะเห็นโลโก้/ธีมเดียวกันเมื่อ Admin กด &quot;เผยแพร่ให้ทุกคน&quot;
+          และรัน migration ตาราง <code className="text-[10px]">app_branding</code> บน PostgreSQL แล้ว
         </p>
+        {syncFeedback ? (
+          <p className={syncFeedback.ok ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
+            {syncFeedback.message}
+          </p>
+        ) : null}
       </div>
     </div>
   );
