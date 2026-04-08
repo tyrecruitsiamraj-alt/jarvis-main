@@ -70,6 +70,12 @@ async function getBranding(_req: ApiReq, res: ApiRes): Promise<void> {
     }
     res.status(200).json({ config: typeof p === 'object' && p !== null ? p : null });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Graceful fallback before migration 016 is applied
+    if (/app_branding/i.test(msg) && /(does not exist|relation)/i.test(msg)) {
+      res.status(200).json({ config: null, message: 'Branding table is not initialized yet' });
+      return;
+    }
     handleApiError(res, e, 'branding GET');
   }
 }
@@ -99,6 +105,15 @@ async function putBranding(req: AuthedReq, res: ApiRes): Promise<void> {
 
     res.status(200).json({ ok: true, config: sanitized });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/app_branding/i.test(msg) && /(does not exist|relation)/i.test(msg)) {
+      return sendError(
+        res,
+        503,
+        'Service unavailable',
+        'Branding storage is not initialized. Run database migration first.',
+      );
+    }
     handleApiError(res, e, 'branding PUT', { userId: req.user.sub });
   }
 }
