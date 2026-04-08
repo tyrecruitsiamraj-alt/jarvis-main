@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { mockJobRequests, mockClients } from '@/data/mockData';
@@ -10,16 +10,7 @@ import { getJobs } from '@/lib/demoStorage';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { haversineKm } from '@/lib/geo';
-
-const normalizeThaiText = (text: string) =>
-  text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '')
-    .replace(/^เขต/, '')
-    .replace(/^อำเภอ/, '')
-    .replace(/^แขวง/, '')
-    .replace(/^ตำบล/, '');
+import { Input } from '@/components/ui/input';
 
 function mergePreCheckJobs(): JobRequest[] {
   const map = new Map<string, JobRequest>();
@@ -27,42 +18,24 @@ function mergePreCheckJobs(): JobRequest[] {
   return [...map.values()];
 }
 
-const similarityScore = (source: string, query: string) => {
-  const s = normalizeThaiText(source);
-  const q = normalizeThaiText(query);
-  if (!q) return 100;
-  if (s.includes(q)) return 100;
-  const tokens = s.split(/[,/|\s-]+/).map((t) => t.trim()).filter(Boolean);
-  for (const t of tokens) {
-    if (t.includes(q) || q.includes(t)) return 95;
-    if (q.length >= 2 && t.startsWith(q)) return 92;
-  }
-  let score = 0;
-  const sourceParts = s.split(/[,/|-]/).map((p) => p.trim()).filter(Boolean);
-  for (const part of sourceParts) {
-    if (part.includes(q) || q.includes(part)) score = Math.max(score, 85);
-    let matchedChars = 0;
-    for (const ch of [...q]) {
-      if (part.includes(ch)) matchedChars++;
-    }
-    if (q.length > 0) score = Math.max(score, Math.round((matchedChars / q.length) * 60));
-  }
-  return score;
-};
-
 type PreCheckRow = { job: JobRequest; distanceKm: number | null };
+type Center = { lat: number; lng: number; label: string };
 
 const PreCheckPage: React.FC = () => {
   const navigate = useNavigate();
-  const [district, setDistrict] = useState('');
+  const [placeQuery, setPlaceQuery] = useState('');
+  const [latText, setLatText] = useState('');
+  const [lngText, setLngText] = useState('');
+  const [projectFilter, setProjectFilter] = useState('');
   const [radius, setRadius] = useState(10);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
   const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(() => !isDemoMode());
-  const [centerLat, setCenterLat] = useState<number | null>(null);
-  const [centerLng, setCenterLng] = useState<number | null>(null);
-  const [geoHint, setGeoHint] = useState<string>('');
+  const [searchingPlace, setSearchingPlace] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [hint, setHint] = useState('');
+  const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
 
   useEffect(() => {
     if (isDemoMode()) return;
@@ -90,88 +63,73 @@ const PreCheckPage: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (isDemoMode()) {
-      setCenterLat(null);
-      setCenterLng(null);
-      setGeoHint('');
-      return;
-    }
-    const q = district.trim();
+  const allJobs = useMemo(() => (isDemoMode() ? mergePreCheckJobs() : apiJobs), [apiJobs]);
+  const projectOptions = useMemo(
+    () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [allJobs],
+  );
+
+  const searchPlace = async () => {
+    const q = placeQuery.trim();
     if (!q) {
-      setCenterLat(null);
-      setCenterLng(null);
-      setGeoHint('');
+      setHint('Please enter a location to search.');
       return;
     }
-    const t = window.setTimeout(() => {
-      void (async () => {
-        setGeoHint('กำลังหาพิกัดจาก Google…');
-        try {
-          const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${q}, Thailand`)}`);
-          if (!r.ok) {
-            if (r.status === 503) {
-              setGeoHint('ยังไม่ตั้ง GOOGLE_MAPS_API_KEY — ใช้แค่ค้นหาจากข้อความที่อยู่ (รัศมีไม่ทำงาน)');
-            } else {
-              setGeoHint('หาพิกัดไม่สำเร็จ — ใช้แค่ค้นหาข้อความ');
-            }
-            setCenterLat(null);
-            setCenterLng(null);
-            return;
-          }
-          const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
-          if (typeof data.lat !== 'number' || typeof data.lng !== 'number') {
-            setGeoHint('ไม่พบพิกัดสำหรับคำนี้');
-            setCenterLat(null);
-            setCenterLng(null);
-            return;
-          }
-          setCenterLat(data.lat);
-          setCenterLng(data.lng);
-          setGeoHint(
-            `จุดอ้างอิง: ${data.formatted_address || q} — ระยะทางเป็นเส้นตรงบนโลก (ไม่ใช่ระยะขับรถ) ภายในรัศมี ${radius} กม.`,
-          );
-        } catch {
-          setGeoHint('เครือข่ายผิดพลาด — ใช้แค่ค้นหาข้อความ');
-          setCenterLat(null);
-          setCenterLng(null);
-        }
-      })();
-    }, 450);
-    return () => window.clearTimeout(t);
-  }, [district, radius]);
+    setSearchingPlace(true);
+    setHint('Searching location from Google Maps...');
+    try {
+      const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${q}, Thailand`)}`);
+      if (!r.ok) {
+        if (r.status === 503) setHint('GOOGLE_MAPS_API_KEY is not configured.');
+        else setHint('Location search failed.');
+        return;
+      }
+      const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
+      if (typeof data.lat !== 'number' || typeof data.lng !== 'number') {
+        setHint('No coordinates found for this location.');
+        return;
+      }
+      setLatText(String(data.lat));
+      setLngText(String(data.lng));
+      setHint(`Coordinates found: ${data.formatted_address || q}`);
+    } catch {
+      setHint('Network error while searching location.');
+    } finally {
+      setSearchingPlace(false);
+    }
+  };
+
+  const runPrecheck = () => {
+    const lat = Number(latText);
+    const lng = Number(lngText);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setHint('Please enter valid Latitude / Longitude.');
+      return;
+    }
+    setChecking(true);
+    setAppliedCenter({
+      lat,
+      lng,
+      label: placeQuery.trim() || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+    });
+    setHint(`Checked within ${radius} km radius.`);
+    window.setTimeout(() => setChecking(false), 120);
+  };
 
   const filteredRows = useMemo((): PreCheckRow[] => {
-    const allJobs = isDemoMode() ? mergePreCheckJobs() : apiJobs;
+    if (!appliedCenter) return [];
     const open = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+    const filteredByProject = projectFilter ? open.filter((j) => j.unit_name === projectFilter) : open;
 
-    const textMatched = open
-      .map((j) => ({
-        job: j,
-        score: district.trim() ? similarityScore(j.location_address, district) : 100,
-      }))
-      .filter(({ score }) => !district.trim() || score >= 30)
-      .map(({ job }) => job);
-
-    const withDist: PreCheckRow[] = textMatched.map((j) => {
-      let distanceKm: number | null = null;
-      if (
-        centerLat !== null &&
-        centerLng !== null &&
-        typeof j.lat === 'number' &&
-        typeof j.lng === 'number'
-      ) {
-        distanceKm = haversineKm(centerLat, centerLng, j.lat, j.lng);
-      }
-      return { job: j, distanceKm };
-    });
-
-    let rows = withDist;
-    if (centerLat !== null && centerLng !== null) {
-      rows = withDist.filter(
-        (row) => row.distanceKm === null || row.distanceKm <= radius,
-      );
-    }
+    const rows = filteredByProject
+      .map((j) => {
+        let distanceKm: number | null = null;
+        if (typeof j.lat === 'number' && typeof j.lng === 'number') {
+          distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, j.lat, j.lng);
+        }
+        return { job: j, distanceKm };
+      })
+      .filter((row) => row.distanceKm === null || row.distanceKm <= radius);
 
     rows.sort((a, b) => {
       if (a.job.urgency === 'urgent' && b.job.urgency !== 'urgent') return -1;
@@ -185,7 +143,7 @@ const PreCheckPage: React.FC = () => {
     });
 
     return rows;
-  }, [district, apiJobs, centerLat, centerLng, radius]);
+  }, [appliedCenter, allJobs, projectFilter, radius]);
 
   const getClientInfo = (jobName: string): ClientWorkplace | undefined => {
     const list = isDemoMode() ? mockClients : apiClients;
@@ -193,53 +151,134 @@ const PreCheckPage: React.FC = () => {
   };
 
   const detailDistance =
-    jobDetail && centerLat !== null && centerLng !== null && jobDetail.lat != null && jobDetail.lng != null
-      ? haversineKm(centerLat, centerLng, jobDetail.lat, jobDetail.lng)
+    jobDetail && appliedCenter && jobDetail.lat != null && jobDetail.lng != null
+      ? haversineKm(appliedCenter.lat, appliedCenter.lng, jobDetail.lat, jobDetail.lng)
       : null;
 
   return (
     <div>
-      <PageHeader title="Pre-Check" subtitle="เช็กงานใกล้ผู้สมัครใหม่" backPath="/matching" />
+      <PageHeader title="Pre-Check" subtitle="Check suitable projects by location" backPath="/matching" />
       <div className="px-4 md:px-6 space-y-4">
-        <div className="glass-card rounded-xl p-4 border border-border space-y-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">พิมพ์อำเภอ / เขต</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="เช่น บางนา, สีลม, จตุจักร..."
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">รัศมี (กม.) — ใช้เมื่อหาพิกัดได้</label>
-            <div className="flex gap-1.5">
-              {[5, 10, 15, 20].map((r) => (
+        <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
+          <section className="glass-card rounded-xl p-4 border border-border space-y-3">
+            <h3 className="text-sm font-semibold">Pre-Check Location</h3>
+            <p className="text-xs text-muted-foreground">Verify where a new employee best fits by location.</p>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Search from Google Maps</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder='e.g. "Suvarnabhumi Airport", "CentralWorld"'
+                    value={placeQuery}
+                    onChange={(e) => setPlaceQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
                 <button
-                  key={r}
                   type="button"
-                  onClick={() => setRadius(r)}
-                  className={cn(
-                    'flex-1 py-1.5 rounded-lg text-sm font-medium',
-                    radius === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
-                  )}
+                  onClick={() => void searchPlace()}
+                  disabled={searchingPlace}
+                  className="px-4 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 disabled:opacity-60"
                 >
-                  {r}
+                  {searchingPlace ? 'Searching...' : 'Search'}
                 </button>
-              ))}
+              </div>
             </div>
-          </div>
-          {geoHint ? <p className="text-[11px] text-muted-foreground leading-snug">{geoHint}</p> : null}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Latitude</label>
+                <Input value={latText} onChange={(e) => setLatText(e.target.value)} placeholder="13.6900" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Longitude</label>
+                <Input value={lngText} onChange={(e) => setLngText(e.target.value)} placeholder="100.7501" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Project (Optional)</label>
+                <select
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">-- All Projects --</option>
+                  {projectOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Radius (km)</label>
+                <div className="flex gap-1.5">
+                  {[5, 10, 15, 20].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRadius(r)}
+                      className={cn(
+                        'flex-1 py-1.5 rounded-lg text-sm font-medium',
+                        radius === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
+                      )}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={runPrecheck}
+              disabled={checking}
+              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
+            >
+              {checking ? 'Checking...' : 'Check'}
+            </button>
+
+            {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+          </section>
+
+          <section className="glass-card rounded-xl p-4 border border-border space-y-3">
+            <h3 className="text-sm font-semibold">Map</h3>
+            {appliedCenter ? (
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">Pin: {appliedCenter.label}</div>
+                <iframe
+                  title="Precheck map"
+                  src={`https://maps.google.com/maps?q=${appliedCenter.lat},${appliedCenter.lng}&z=13&output=embed`}
+                  className="w-full h-56 rounded-lg border border-border"
+                  loading="lazy"
+                />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No map data yet.
+                <p className="mt-1 text-xs">Search a place or input coordinates and click Check.</p>
+              </div>
+            )}
+          </section>
         </div>
-        {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดรายการงาน...</div>}
+
+        {loadingJobs && <div className="text-sm text-muted-foreground">Loading jobs...</div>}
         <div className="text-sm text-muted-foreground">
-          งานที่ตรงเงื่อนไข: <span className="text-primary font-semibold">{filteredRows.length}</span> งาน
+          Suitable projects: <span className="text-primary font-semibold">{filteredRows.length}</span>
         </div>
+
         <div className="space-y-2">
+          {!appliedCenter && (
+            <div className="glass-card rounded-xl p-5 border border-border text-center text-muted-foreground">
+              Search from Google Maps or input coordinates, then click Check.
+            </div>
+          )}
+
           {filteredRows.map(({ job: j, distanceKm }) => (
             <div
               key={j.id}
@@ -257,7 +296,7 @@ const PreCheckPage: React.FC = () => {
                     j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info',
                   )}
                 >
-                  {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                  {j.urgency === 'urgent' ? 'Urgent' : 'Advance'}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -265,23 +304,24 @@ const PreCheckPage: React.FC = () => {
               </div>
               <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                 <span>
-                  รายได้: ฿{j.total_income.toLocaleString()} • ต้องการ: {j.required_date}
+                  Income: {j.total_income.toLocaleString()} THB • Required: {j.required_date}
                 </span>
                 {distanceKm !== null ? (
-                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} กม. (เส้นตรง)</span>
-                ) : centerLat !== null ? (
-                  <span className="text-warning">ไม่มีพิกัดงาน — แสดงเพราะข้อความตรง</span>
+                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} km (straight-line)</span>
+                ) : appliedCenter ? (
+                  <span className="text-warning">No job coordinates</span>
                 ) : null}
               </div>
             </div>
           ))}
         </div>
       </div>
+
       <Dialog open={!!jobDetail} onOpenChange={(o) => !o && setJobDetail(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">รายละเอียดหน่วยงาน</DialogTitle>
-            <DialogDescription className="sr-only">รายละเอียดงานและลูกค้า</DialogDescription>
+            <DialogTitle className="text-foreground">Project Details</DialogTitle>
+            <DialogDescription className="sr-only">Project and client details</DialogDescription>
           </DialogHeader>
           {jobDetail &&
             (() => {
@@ -299,53 +339,53 @@ const PreCheckPage: React.FC = () => {
                   </div>
                   {detailDistance !== null ? (
                     <p className="text-xs text-muted-foreground">
-                      ระยะประมาณจากจุดค้นหา: <span className="font-medium text-foreground">{detailDistance.toFixed(1)} กม.</span> (เส้นตรงบนพื้นผิวโลก ไม่ใช่เส้นทางรถ)
+                      Distance from selected point: <span className="font-medium text-foreground">{detailDistance.toFixed(1)} km</span>
                     </p>
                   ) : null}
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">ลักษณะงาน</span>
+                      <span className="text-muted-foreground">Job Type</span>
                       <span>{JOB_TYPE_LABELS[jobDetail.job_type as keyof typeof JOB_TYPE_LABELS]}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">ประเภท</span>
+                      <span className="text-muted-foreground">Category</span>
                       <span>{JOB_CATEGORY_LABELS[jobDetail.job_category as keyof typeof JOB_CATEGORY_LABELS]}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">ความเร่งด่วน</span>
+                      <span className="text-muted-foreground">Urgency</span>
                       <span className={jobDetail.urgency === 'urgent' ? 'text-destructive' : 'text-info'}>
-                        {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                        {jobDetail.urgency === 'urgent' ? 'Urgent' : 'Advance'}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">รายได้</span>
-                      <span className="text-success font-medium">฿{jobDetail.total_income.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Income</span>
+                      <span className="text-success font-medium">{jobDetail.total_income.toLocaleString()} THB</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">วันที่ต้องการ</span>
+                      <span className="text-muted-foreground">Required Date</span>
                       <span>{jobDetail.required_date}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">ค่าปรับ/วัน</span>
-                      <span className="text-destructive">฿{jobDetail.penalty_per_day.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Penalty / day</span>
+                      <span className="text-destructive">{jobDetail.penalty_per_day.toLocaleString()} THB</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">สรรหา</span>
+                      <span className="text-muted-foreground">Recruiter</span>
                       <span>{jobDetail.recruiter_name || '-'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">คัดสรร</span>
+                      <span className="text-muted-foreground">Screener</span>
                       <span>{jobDetail.screener_name || '-'}</span>
                     </div>
                     {client && (
                       <>
                         <div className="border-t border-border pt-2 mt-2" />
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">ผู้ติดต่อ</span>
+                          <span className="text-muted-foreground">Contact</span>
                           <span>{client.contact_person}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">โทร</span>
+                          <span className="text-muted-foreground">Phone</span>
                           <a href={`tel:${client.contact_phone}`} className="text-primary font-medium">
                             {client.contact_phone}
                           </a>
@@ -359,7 +399,7 @@ const PreCheckPage: React.FC = () => {
                         href={`tel:${client.contact_phone}`}
                         className="flex-1 text-center py-2 rounded-lg bg-success text-white text-sm font-medium"
                       >
-                        📞 โทรลูกค้า
+                        Call Client
                       </a>
                     )}
                     <button
@@ -370,7 +410,7 @@ const PreCheckPage: React.FC = () => {
                       }}
                       className="flex-1 text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
                     >
-                      ดูรายละเอียดงาน
+                      View Job
                     </button>
                   </div>
                 </div>
