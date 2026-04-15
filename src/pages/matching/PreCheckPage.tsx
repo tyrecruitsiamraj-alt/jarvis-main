@@ -143,16 +143,23 @@ const PreCheckPage: React.FC = () => {
       return { rows: [] as PreCheckRow[], fallbackFromRadius: false };
     }
 
-    let rowsBase = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
-    if (projectFilter) rowsBase = rowsBase.filter((j) => j.unit_name === projectFilter);
-
-    if (appliedTextQuery) {
-      rowsBase = rowsBase.filter((j) =>
-        `${j.unit_name} ${j.location_address}`.toLowerCase().includes(appliedTextQuery),
-      );
+    const activeRows = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+    let rowsBase = activeRows;
+    if (projectFilter) {
+      const byProject = rowsBase.filter((j) => j.unit_name === projectFilter);
+      if (byProject.length > 0) rowsBase = byProject;
     }
 
-    const rowsAll = rowsBase.map((j) => {
+    if (appliedTextQuery) {
+      const byText = rowsBase.filter((j) =>
+        `${j.unit_name} ${j.location_address}`.toLowerCase().includes(appliedTextQuery),
+      );
+      if (byText.length > 0) rowsBase = byText;
+    }
+
+    const rowsForDistance = rowsBase.length > 0 ? rowsBase : activeRows;
+
+    const rowsAll = rowsForDistance.map((j) => {
       let distanceKm: number | null = null;
       if (
         appliedCenter &&
@@ -175,9 +182,7 @@ const PreCheckPage: React.FC = () => {
         return a.job.required_date.localeCompare(b.job.required_date);
       });
 
-    if (!appliedCenter) {
-      return { rows: sortRows(rowsAll), fallbackFromRadius: rowsAll.length !== activeRows.length };
-    }
+    if (!appliedCenter) return { rows: sortRows(rowsAll), fallbackFromRadius: false };
 
     const rowsInRadius = rowsAll.filter((row) => row.distanceKm === null || row.distanceKm <= radius);
     if (rowsInRadius.length > 0) return { rows: sortRows(rowsInRadius), fallbackFromRadius: false };
