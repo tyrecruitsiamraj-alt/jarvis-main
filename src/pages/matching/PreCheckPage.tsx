@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { mockJobRequests, mockClients } from '@/data/mockData';
@@ -20,6 +20,10 @@ function mergePreCheckJobs(): JobRequest[] {
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null };
 type Center = { lat: number; lng: number; label: string };
+
+function isLikelyThailandCoord(lat: number, lng: number): boolean {
+  return lat >= 4 && lat <= 22.5 && lng >= 96 && lng <= 106.5;
+}
 
 const PreCheckPage: React.FC = () => {
   const navigate = useNavigate();
@@ -83,15 +87,21 @@ const PreCheckPage: React.FC = () => {
 
     if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && text) {
       try {
-        const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${text}, Thailand`)}`);
+        const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(text)}`);
         if (r.ok) {
           const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
           if (typeof data.lat === 'number' && typeof data.lng === 'number') {
             lat = data.lat;
             lng = data.lng;
-            setLatText(String(lat));
-            setLngText(String(lng));
-            setHint(`เจอพิกัดแล้ว: ${data.formatted_address || text}`);
+            if (isLikelyThailandCoord(lat, lng)) {
+              setLatText(String(lat));
+              setLngText(String(lng));
+              setHint(`เจอพิกัดแล้ว: ${data.formatted_address || text}`);
+            } else {
+              lat = Number.NaN;
+              lng = Number.NaN;
+              setHint('พิกัดที่ค้นหาอยู่นอกประเทศไทย เลยสลับเป็นค้นหาจากข้อความแทน');
+            }
           }
         }
       } catch {
@@ -139,7 +149,12 @@ const PreCheckPage: React.FC = () => {
 
     const rowsAll = rowsBase.map((j) => {
       let distanceKm: number | null = null;
-      if (appliedCenter && typeof j.lat === 'number' && typeof j.lng === 'number') {
+      if (
+        appliedCenter &&
+        typeof j.lat === 'number' &&
+        typeof j.lng === 'number' &&
+        isLikelyThailandCoord(j.lat, j.lng)
+      ) {
         distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, j.lat, j.lng);
       }
       return { job: j, distanceKm };

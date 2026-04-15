@@ -1,4 +1,4 @@
-﻿type Res = {
+type Res = {
   status: (code: number) => {
     json: (body: unknown) => void;
   };
@@ -32,10 +32,13 @@ async function nominatimForward(address: string): Promise<{ lat: number; lng: nu
   url.searchParams.set('format', 'json');
   url.searchParams.set('limit', '1');
   url.searchParams.set('addressdetails', '0');
+  // Keep fallback geocoding inside Thailand to avoid cross-country mismatches.
+  url.searchParams.set('countrycodes', 'th');
   const r = await fetch(url.toString(), {
     headers: {
       'User-Agent': 'jarvis-main/1.0 (precheck geocode fallback)',
       Accept: 'application/json',
+      'Accept-Language': 'th,en',
     },
   });
   if (!r.ok) return null;
