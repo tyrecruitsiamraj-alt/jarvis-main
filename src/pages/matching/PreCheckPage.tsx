@@ -36,6 +36,7 @@ const PreCheckPage: React.FC = () => {
   const [checking, setChecking] = useState(false);
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
+  const [appliedTextQuery, setAppliedTextQuery] = useState('');
 
   useEffect(() => {
     if (isDemoMode()) return;
@@ -76,17 +77,16 @@ const PreCheckPage: React.FC = () => {
       return;
     }
     setSearchingPlace(true);
-    setHint('Searching location from Google Maps...');
+    setHint('Searching location...');
     try {
       const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${q}, Thailand`)}`);
       if (!r.ok) {
-        if (r.status === 503) setHint('GOOGLE_MAPS_API_KEY is not configured.');
-        else setHint('Location search failed.');
+        setHint('Location search unavailable right now. You can still check by text search.');
         return;
       }
       const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
       if (typeof data.lat !== 'number' || typeof data.lng !== 'number') {
-        setHint('No coordinates found for this location.');
+        setHint('No coordinates found. You can still check by text search.');
         return;
       }
       setLatText(String(data.lat));
@@ -102,34 +102,55 @@ const PreCheckPage: React.FC = () => {
   const runPrecheck = () => {
     const lat = Number(latText);
     const lng = Number(lngText);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setHint('Please enter valid Latitude / Longitude.');
+    const text = placeQuery.trim().toLowerCase();
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      setChecking(true);
+      setAppliedTextQuery('');
+      setAppliedCenter({
+        lat,
+        lng,
+        label: placeQuery.trim() || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      });
+      setHint(`Checked within ${radius} km radius.`);
+      window.setTimeout(() => setChecking(false), 120);
       return;
     }
-    setChecking(true);
-    setAppliedCenter({
-      lat,
-      lng,
-      label: placeQuery.trim() || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-    });
-    setHint(`Checked within ${radius} km radius.`);
-    window.setTimeout(() => setChecking(false), 120);
+
+    if (text) {
+      setAppliedCenter(null);
+      setAppliedTextQuery(text);
+      setHint('Checked with text-only location matching.');
+      return;
+    }
+
+    setHint('Please enter valid coordinates or a place name.');
   };
 
   const filteredRows = useMemo((): PreCheckRow[] => {
-    if (!appliedCenter) return [];
-    const open = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
-    const filteredByProject = projectFilter ? open.filter((j) => j.unit_name === projectFilter) : open;
+    if (!appliedCenter && !appliedTextQuery) return [];
 
-    const rows = filteredByProject
+    let rowsBase = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+
+    if (projectFilter) {
+      rowsBase = rowsBase.filter((j) => j.unit_name === projectFilter);
+    }
+
+    if (appliedTextQuery) {
+      rowsBase = rowsBase.filter((j) =>
+        `${j.unit_name} ${j.location_address}`.toLowerCase().includes(appliedTextQuery),
+      );
+    }
+
+    const rows = rowsBase
       .map((j) => {
         let distanceKm: number | null = null;
-        if (typeof j.lat === 'number' && typeof j.lng === 'number') {
+        if (appliedCenter && typeof j.lat === 'number' && typeof j.lng === 'number') {
           distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, j.lat, j.lng);
         }
         return { job: j, distanceKm };
       })
-      .filter((row) => row.distanceKm === null || row.distanceKm <= radius);
+      .filter((row) => !appliedCenter || row.distanceKm === null || row.distanceKm <= radius);
 
     rows.sort((a, b) => {
       if (a.job.urgency === 'urgent' && b.job.urgency !== 'urgent') return -1;
@@ -143,7 +164,7 @@ const PreCheckPage: React.FC = () => {
     });
 
     return rows;
-  }, [appliedCenter, allJobs, projectFilter, radius]);
+  }, [appliedCenter, appliedTextQuery, allJobs, projectFilter, radius]);
 
   const getClientInfo = (jobName: string): ClientWorkplace | undefined => {
     const list = isDemoMode() ? mockClients : apiClients;
@@ -273,7 +294,7 @@ const PreCheckPage: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          {!appliedCenter && (
+          {!appliedCenter && !appliedTextQuery && (
             <div className="glass-card rounded-xl p-5 border border-border text-center text-muted-foreground">
               Search from Google Maps or input coordinates, then click Check.
             </div>
