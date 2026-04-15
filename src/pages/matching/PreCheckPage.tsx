@@ -175,7 +175,9 @@ const PreCheckPage: React.FC = () => {
         return a.job.required_date.localeCompare(b.job.required_date);
       });
 
-    if (!appliedCenter) return { rows: sortRows(rowsAll), fallbackFromRadius: false };
+    if (!appliedCenter) {
+      return { rows: sortRows(rowsAll), fallbackFromRadius: rowsAll.length !== activeRows.length };
+    }
 
     const rowsInRadius = rowsAll.filter((row) => row.distanceKm === null || row.distanceKm <= radius);
     if (rowsInRadius.length > 0) return { rows: sortRows(rowsInRadius), fallbackFromRadius: false };
@@ -188,7 +190,7 @@ const PreCheckPage: React.FC = () => {
 
   useEffect(() => {
     if (precheckResult.fallbackFromRadius) {
-      setHint('ไม่เจองานในรัศมีที่ตั้งไว้ — แสดงงานใกล้ที่สุดแทน');
+      setHint('ไม่เจอผลตรงเงื่อนไขทั้งหมด — แสดงงานที่ใกล้หรือเกี่ยวข้องที่สุดแทน');
     }
   }, [precheckResult.fallbackFromRadius]);
 
