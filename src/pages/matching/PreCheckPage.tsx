@@ -99,32 +99,55 @@ const PreCheckPage: React.FC = () => {
     }
   };
 
-  const runPrecheck = () => {
-    const lat = Number(latText);
-    const lng = Number(lngText);
-    const text = placeQuery.trim().toLowerCase();
+  const runPrecheck = async () => {
+    const text = placeQuery.trim();
+    let lat = Number(latText);
+    let lng = Number(lngText);
+
+    setChecking(true);
+
+    // If no explicit coordinates, try geocode automatically from typed address.
+    if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && text) {
+      try {
+        const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${text}, Thailand`)}`);
+        if (r.ok) {
+          const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
+          if (typeof data.lat === 'number' && typeof data.lng === 'number') {
+            lat = data.lat;
+            lng = data.lng;
+            setLatText(String(data.lat));
+            setLngText(String(data.lng));
+            setHint(`Coordinates resolved from address: ${data.formatted_address || text}`);
+          }
+        }
+      } catch {
+        // Ignore and continue fallback below
+      }
+    }
 
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      setChecking(true);
       setAppliedTextQuery('');
       setAppliedCenter({
         lat,
         lng,
-        label: placeQuery.trim() || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        label: text || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       });
-      setHint(`Checked within ${radius} km radius.`);
-      window.setTimeout(() => setChecking(false), 120);
+      setHint(`Showing nearest jobs first within ${radius} km.`);
+      setChecking(false);
       return;
     }
 
     if (text) {
+      // Final fallback: still allow operation by text matching so user is never blocked.
       setAppliedCenter(null);
-      setAppliedTextQuery(text);
-      setHint('Checked with text-only location matching.');
+      setAppliedTextQuery(text.toLowerCase());
+      setHint('Coordinates unavailable, using text-based matching only.');
+      setChecking(false);
       return;
     }
 
-    setHint('Please enter valid coordinates or a place name.');
+    setHint('Please enter an address or valid coordinates.');
+    setChecking(false);
   };
 
   const filteredRows = useMemo((): PreCheckRow[] => {
@@ -152,15 +175,14 @@ const PreCheckPage: React.FC = () => {
       })
       .filter((row) => !appliedCenter || row.distanceKm === null || row.distanceKm <= radius);
 
+    // Business rule: nearest first. Rows without coordinates go to the end.
     rows.sort((a, b) => {
-      if (a.job.urgency === 'urgent' && b.job.urgency !== 'urgent') return -1;
-      if (a.job.urgency !== 'urgent' && b.job.urgency === 'urgent') return 1;
       const da = a.distanceKm;
       const db = b.distanceKm;
       if (da !== null && db !== null) return da - db;
       if (da !== null) return -1;
       if (db !== null) return 1;
-      return 0;
+      return a.job.required_date.localeCompare(b.job.required_date);
     });
 
     return rows;
@@ -183,7 +205,7 @@ const PreCheckPage: React.FC = () => {
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
           <section className="glass-card rounded-xl p-4 border border-border space-y-3">
             <h3 className="text-sm font-semibold">Pre-Check Location</h3>
-            <p className="text-xs text-muted-foreground">Verify where a new employee best fits by location.</p>
+            <p className="text-xs text-muted-foreground">Type candidate address and get nearest projects first.</p>
 
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">Search from Google Maps</label>
@@ -191,7 +213,7 @@ const PreCheckPage: React.FC = () => {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder='e.g. "Suvarnabhumi Airport", "CentralWorld"'
+                    placeholder='e.g. "Samrong", "Suvarnabhumi Airport", "CentralWorld"'
                     value={placeQuery}
                     onChange={(e) => setPlaceQuery(e.target.value)}
                     className="pl-9"
@@ -257,7 +279,7 @@ const PreCheckPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={runPrecheck}
+              onClick={() => void runPrecheck()}
               disabled={checking}
               className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
             >
@@ -282,7 +304,7 @@ const PreCheckPage: React.FC = () => {
             ) : (
               <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                 No map data yet.
-                <p className="mt-1 text-xs">Search a place or input coordinates and click Check.</p>
+                <p className="mt-1 text-xs">Type candidate address and click Check.</p>
               </div>
             )}
           </section>
@@ -296,7 +318,7 @@ const PreCheckPage: React.FC = () => {
         <div className="space-y-2">
           {!appliedCenter && !appliedTextQuery && (
             <div className="glass-card rounded-xl p-5 border border-border text-center text-muted-foreground">
-              Search from Google Maps or input coordinates, then click Check.
+              Type candidate address, then click Check.
             </div>
           )}
 
@@ -328,7 +350,7 @@ const PreCheckPage: React.FC = () => {
                   Income: {j.total_income.toLocaleString()} THB • Required: {j.required_date}
                 </span>
                 {distanceKm !== null ? (
-                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} km (straight-line)</span>
+                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} km (nearest first)</span>
                 ) : appliedCenter ? (
                   <span className="text-warning">No job coordinates</span>
                 ) : null}
