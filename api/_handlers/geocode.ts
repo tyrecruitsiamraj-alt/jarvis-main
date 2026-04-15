@@ -103,6 +103,7 @@ export default async function handler(req: Req, res: Res) {
   if (addressQuery) {
     url.searchParams.set('address', addressQuery);
     url.searchParams.set('region', 'th');
+    url.searchParams.set('components', 'country:TH');
   } else if (lat !== null && lng !== null) {
     url.searchParams.set('latlng', `${lat},${lng}`);
   } else {

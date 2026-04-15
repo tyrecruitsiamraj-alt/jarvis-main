@@ -110,6 +110,11 @@ const PreCheckPage: React.FC = () => {
     }
 
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      if (!isLikelyThailandCoord(lat, lng)) {
+        setHint('พิกัดที่ใช้ค้นหาอยู่นอกประเทศไทย กรุณาระบุที่อยู่ในไทย');
+        setSearching(false);
+        return;
+      }
       setAppliedTextQuery('');
       setAppliedCenter({
         lat,
@@ -193,7 +198,11 @@ const PreCheckPage: React.FC = () => {
   };
 
   const detailDistance =
-    jobDetail && appliedCenter && jobDetail.lat != null && jobDetail.lng != null
+    jobDetail &&
+    appliedCenter &&
+    jobDetail.lat != null &&
+    jobDetail.lng != null &&
+    isLikelyThailandCoord(jobDetail.lat, jobDetail.lng)
       ? haversineKm(appliedCenter.lat, appliedCenter.lng, jobDetail.lat, jobDetail.lng)
       : null;
 
