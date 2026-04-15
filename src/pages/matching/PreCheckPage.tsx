@@ -32,8 +32,7 @@ const PreCheckPage: React.FC = () => {
   const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(() => !isDemoMode());
-  const [searchingPlace, setSearchingPlace] = useState(false);
-  const [checking, setChecking] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
   const [appliedTextQuery, setAppliedTextQuery] = useState('');
@@ -70,43 +69,19 @@ const PreCheckPage: React.FC = () => {
     [allJobs],
   );
 
-  const searchPlace = async () => {
-    const q = placeQuery.trim();
-    if (!q) {
-      setHint('Please enter a location to search.');
-      return;
-    }
-    setSearchingPlace(true);
-    setHint('Searching location...');
-    try {
-      const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${q}, Thailand`)}`);
-      if (!r.ok) {
-        setHint('Location search unavailable right now. You can still check by text search.');
-        return;
-      }
-      const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
-      if (typeof data.lat !== 'number' || typeof data.lng !== 'number') {
-        setHint('No coordinates found. You can still check by text search.');
-        return;
-      }
-      setLatText(String(data.lat));
-      setLngText(String(data.lng));
-      setHint(`Coordinates found: ${data.formatted_address || q}`);
-    } catch {
-      setHint('Network error while searching location.');
-    } finally {
-      setSearchingPlace(false);
-    }
-  };
-
-  const runPrecheck = async () => {
+  const handleSearch = async () => {
     const text = placeQuery.trim();
     let lat = Number(latText);
     let lng = Number(lngText);
 
-    setChecking(true);
+    if (!text && (!Number.isFinite(lat) || !Number.isFinite(lng))) {
+      setHint('กรุณาพิมพ์ที่อยู่ผู้สมัคร');
+      return;
+    }
 
-    // If no explicit coordinates, try geocode automatically from typed address.
+    setSearching(true);
+
+    // Primary flow: type address and click Search once.
     if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && text) {
       try {
         const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${text}, Thailand`)}`);
@@ -115,13 +90,13 @@ const PreCheckPage: React.FC = () => {
           if (typeof data.lat === 'number' && typeof data.lng === 'number') {
             lat = data.lat;
             lng = data.lng;
-            setLatText(String(data.lat));
-            setLngText(String(data.lng));
-            setHint(`Coordinates resolved from address: ${data.formatted_address || text}`);
+            setLatText(String(lat));
+            setLngText(String(lng));
+            setHint(`เจอพิกัดแล้ว: ${data.formatted_address || text}`);
           }
         }
       } catch {
-        // Ignore and continue fallback below
+        // continue to text fallback
       }
     }
 
@@ -132,32 +107,29 @@ const PreCheckPage: React.FC = () => {
         lng,
         label: text || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       });
-      setHint(`Showing nearest jobs first within ${radius} km.`);
-      setChecking(false);
+      setHint(`เรียงงานใกล้สุดก่อน (ภายใน ${radius} กม.)`);
+      setSearching(false);
       return;
     }
 
     if (text) {
-      // Final fallback: still allow operation by text matching so user is never blocked.
+      // Fallback when geocode unavailable: still show likely nearby jobs by text.
       setAppliedCenter(null);
       setAppliedTextQuery(text.toLowerCase());
-      setHint('Coordinates unavailable, using text-based matching only.');
-      setChecking(false);
+      setHint('ยังหา lat/lng ไม่ได้ เลยใช้ค้นหาจากข้อความที่อยู่แทน');
+      setSearching(false);
       return;
     }
 
-    setHint('Please enter an address or valid coordinates.');
-    setChecking(false);
+    setHint('กรุณากรอกข้อมูลให้ครบ');
+    setSearching(false);
   };
 
   const filteredRows = useMemo((): PreCheckRow[] => {
     if (!appliedCenter && !appliedTextQuery) return [];
 
     let rowsBase = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
-
-    if (projectFilter) {
-      rowsBase = rowsBase.filter((j) => j.unit_name === projectFilter);
-    }
+    if (projectFilter) rowsBase = rowsBase.filter((j) => j.unit_name === projectFilter);
 
     if (appliedTextQuery) {
       rowsBase = rowsBase.filter((j) =>
@@ -175,7 +147,7 @@ const PreCheckPage: React.FC = () => {
       })
       .filter((row) => !appliedCenter || row.distanceKm === null || row.distanceKm <= radius);
 
-    // Business rule: nearest first. Rows without coordinates go to the end.
+    // Nearest first; unknown distance at the end.
     rows.sort((a, b) => {
       const da = a.distanceKm;
       const db = b.distanceKm;
@@ -200,20 +172,20 @@ const PreCheckPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Pre-Check" subtitle="Check suitable projects by location" backPath="/matching" />
+      <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
       <div className="px-4 md:px-6 space-y-4">
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
           <section className="glass-card rounded-xl p-4 border border-border space-y-3">
             <h3 className="text-sm font-semibold">Pre-Check Location</h3>
-            <p className="text-xs text-muted-foreground">Type candidate address and get nearest projects first.</p>
+            <p className="text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัคร แล้วกด Search ครั้งเดียว</p>
 
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Search from Google Maps</label>
+              <label className="text-xs font-medium text-muted-foreground">Candidate Address</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder='e.g. "Samrong", "Suvarnabhumi Airport", "CentralWorld"'
+                    placeholder='เช่น "สำโรง", "สนามบินสุวรรณภูมิ"'
                     value={placeQuery}
                     onChange={(e) => setPlaceQuery(e.target.value)}
                     className="pl-9"
@@ -221,22 +193,22 @@ const PreCheckPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => void searchPlace()}
-                  disabled={searchingPlace}
+                  onClick={() => void handleSearch()}
+                  disabled={searching}
                   className="px-4 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 disabled:opacity-60"
                 >
-                  {searchingPlace ? 'Searching...' : 'Search'}
+                  {searching ? 'Searching...' : 'Search'}
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Latitude</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Latitude (optional)</label>
                 <Input value={latText} onChange={(e) => setLatText(e.target.value)} placeholder="13.6900" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Longitude</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Longitude (optional)</label>
                 <Input value={lngText} onChange={(e) => setLngText(e.target.value)} placeholder="100.7501" />
               </div>
             </div>
@@ -277,15 +249,6 @@ const PreCheckPage: React.FC = () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void runPrecheck()}
-              disabled={checking}
-              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
-            >
-              {checking ? 'Checking...' : 'Check'}
-            </button>
-
             {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
           </section>
 
@@ -304,7 +267,7 @@ const PreCheckPage: React.FC = () => {
             ) : (
               <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                 No map data yet.
-                <p className="mt-1 text-xs">Type candidate address and click Check.</p>
+                <p className="mt-1 text-xs">Type address and press Search.</p>
               </div>
             )}
           </section>
@@ -318,7 +281,7 @@ const PreCheckPage: React.FC = () => {
         <div className="space-y-2">
           {!appliedCenter && !appliedTextQuery && (
             <div className="glass-card rounded-xl p-5 border border-border text-center text-muted-foreground">
-              Type candidate address, then click Check.
+              Type candidate address, then press Search once.
             </div>
           )}
 
