@@ -81,7 +81,6 @@ const PreCheckPage: React.FC = () => {
 
     setSearching(true);
 
-    // Primary flow: type address and click Search once.
     if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && text) {
       try {
         const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(`${text}, Thailand`)}`);
@@ -96,7 +95,7 @@ const PreCheckPage: React.FC = () => {
           }
         }
       } catch {
-        // continue to text fallback
+        // fallback below
       }
     }
 
@@ -107,13 +106,12 @@ const PreCheckPage: React.FC = () => {
         lng,
         label: text || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       });
-      setHint(`เรียงงานใกล้สุดก่อน (ภายใน ${radius} กม.)`);
+      setHint(`เรียงงานใกล้สุดก่อน (ตั้งรัศมี ${radius} กม.)`);
       setSearching(false);
       return;
     }
 
     if (text) {
-      // Fallback when geocode unavailable: still show likely nearby jobs by text.
       setAppliedCenter(null);
       setAppliedTextQuery(text.toLowerCase());
       setHint('ยังหา lat/lng ไม่ได้ เลยใช้ค้นหาจากข้อความที่อยู่แทน');
@@ -125,8 +123,10 @@ const PreCheckPage: React.FC = () => {
     setSearching(false);
   };
 
-  const filteredRows = useMemo((): PreCheckRow[] => {
-    if (!appliedCenter && !appliedTextQuery) return [];
+  const precheckResult = useMemo(() => {
+    if (!appliedCenter && !appliedTextQuery) {
+      return { rows: [] as PreCheckRow[], fallbackFromRadius: false };
+    }
 
     let rowsBase = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
     if (projectFilter) rowsBase = rowsBase.filter((j) => j.unit_name === projectFilter);
@@ -137,28 +137,40 @@ const PreCheckPage: React.FC = () => {
       );
     }
 
-    const rows = rowsBase
-      .map((j) => {
-        let distanceKm: number | null = null;
-        if (appliedCenter && typeof j.lat === 'number' && typeof j.lng === 'number') {
-          distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, j.lat, j.lng);
-        }
-        return { job: j, distanceKm };
-      })
-      .filter((row) => !appliedCenter || row.distanceKm === null || row.distanceKm <= radius);
-
-    // Nearest first; unknown distance at the end.
-    rows.sort((a, b) => {
-      const da = a.distanceKm;
-      const db = b.distanceKm;
-      if (da !== null && db !== null) return da - db;
-      if (da !== null) return -1;
-      if (db !== null) return 1;
-      return a.job.required_date.localeCompare(b.job.required_date);
+    const rowsAll = rowsBase.map((j) => {
+      let distanceKm: number | null = null;
+      if (appliedCenter && typeof j.lat === 'number' && typeof j.lng === 'number') {
+        distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, j.lat, j.lng);
+      }
+      return { job: j, distanceKm };
     });
 
-    return rows;
+    const sortRows = (rows: PreCheckRow[]) =>
+      [...rows].sort((a, b) => {
+        const da = a.distanceKm;
+        const db = b.distanceKm;
+        if (da !== null && db !== null) return da - db;
+        if (da !== null) return -1;
+        if (db !== null) return 1;
+        return a.job.required_date.localeCompare(b.job.required_date);
+      });
+
+    if (!appliedCenter) return { rows: sortRows(rowsAll), fallbackFromRadius: false };
+
+    const rowsInRadius = rowsAll.filter((row) => row.distanceKm === null || row.distanceKm <= radius);
+    if (rowsInRadius.length > 0) return { rows: sortRows(rowsInRadius), fallbackFromRadius: false };
+
+    // If radius is too strict and no rows match, show nearest rows anyway.
+    return { rows: sortRows(rowsAll), fallbackFromRadius: true };
   }, [appliedCenter, appliedTextQuery, allJobs, projectFilter, radius]);
+
+  const filteredRows = precheckResult.rows;
+
+  useEffect(() => {
+    if (precheckResult.fallbackFromRadius) {
+      setHint('ไม่เจองานในรัศมีที่ตั้งไว้ — แสดงงานใกล้ที่สุดแทน');
+    }
+  }, [precheckResult.fallbackFromRadius]);
 
   const getClientInfo = (jobName: string): ClientWorkplace | undefined => {
     const list = isDemoMode() ? mockClients : apiClients;
@@ -188,6 +200,12 @@ const PreCheckPage: React.FC = () => {
                     placeholder='เช่น "สำโรง", "สนามบินสุวรรณภูมิ"'
                     value={placeQuery}
                     onChange={(e) => setPlaceQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleSearch();
+                      }
+                    }}
                     className="pl-9"
                   />
                 </div>
