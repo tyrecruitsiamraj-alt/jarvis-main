@@ -39,13 +39,16 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
 ];
 
 const AdminSettings: React.FC = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canAdmin = hasPermission('admin');
   const demo = isDemoMode();
   const [activeTab, setActiveTab] = useState<SettingsTab>('users');
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiAuditLogs, setApiAuditLogs] = useState<AuditLog[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [userActionError, setUserActionError] = useState('');
+  const [userActionOk, setUserActionOk] = useState('');
   const [auditLoading, setAuditLoading] = useState(false);
   const [referenceData, setReferenceData] = useState<Record<ReferenceCategory, string[]>>(DEFAULT_REF_DATA);
   const [editingCategory, setEditingCategory] = useState<ReferenceCategory | null>(null);
@@ -70,6 +73,43 @@ const AdminSettings: React.FC = () => {
         .finally(() => setAuditLoading(false));
     }
   }, [canAdmin, activeTab, demo]);
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    setUserActionError('');
+    setUserActionOk('');
+  }, [activeTab]);
+
+  const updateUser = async (id: string, patch: { role?: User['role']; is_active?: boolean }) => {
+    if (demo) return;
+    setSavingUserId(id);
+    setUserActionError('');
+    setUserActionOk('');
+    try {
+      const r = await apiFetch('/api/app-users', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, ...patch }),
+      });
+      const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!r.ok) {
+        const msg =
+          typeof body.message === 'string'
+            ? body.message
+            : typeof body.error === 'string'
+              ? body.error
+              : 'ไม่สามารถอัปเดตสิทธิ์ผู้ใช้ได้';
+        setUserActionError(msg);
+        return;
+      }
+      const updated = body as User;
+      setApiUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setUserActionOk('บันทึกสิทธิ์ผู้ใช้เรียบร้อย');
+    } catch {
+      setUserActionError('เกิดข้อผิดพลาดระหว่างอัปเดตสิทธิ์ผู้ใช้');
+    } finally {
+      setSavingUserId(null);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -205,6 +245,16 @@ const AdminSettings: React.FC = () => {
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
           ) : (
             <div className="glass-card rounded-xl border border-border overflow-hidden">
+              {userActionError ? (
+                <div className="mx-4 mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {userActionError}
+                </div>
+              ) : null}
+              {userActionOk ? (
+                <div className="mx-4 mt-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+                  {userActionOk}
+                </div>
+              ) : null}
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
@@ -213,12 +263,13 @@ const AdminSettings: React.FC = () => {
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {apiUsers.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                      <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                         ยังไม่มีผู้ใช้ (หรือโหลดไม่สำเร็จ)
                       </td>
                     </tr>
@@ -229,28 +280,42 @@ const AdminSettings: React.FC = () => {
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
                       <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                       <td className="px-4 py-3 text-center">
-                        <span
+                        <select
+                          value={u.role}
+                          disabled={savingUserId === u.id}
+                          onChange={(e) => {
+                            const next = e.target.value as User['role'];
+                            if (next === u.role) return;
+                            void updateUser(u.id, { role: next });
+                          }}
                           className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            u.role === 'admin'
-                              ? 'bg-destructive/15 text-destructive'
-                              : u.role === 'supervisor'
-                                ? 'bg-warning/15 text-warning'
-                                : 'bg-info/15 text-info',
+                            'rounded-md border border-border bg-secondary px-2 py-1 text-xs',
+                            savingUserId === u.id && 'opacity-60',
                           )}
                         >
-                          {u.role}
-                        </span>
+                          <option value="admin">admin</option>
+                          <option value="supervisor">supervisor</option>
+                          <option value="staff">staff</option>
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span
+                        <button
+                          type="button"
+                          disabled={savingUserId === u.id}
+                          onClick={() => void updateUser(u.id, { is_active: !u.is_active })}
                           className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            u.is_active ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground',
+                            'text-xs px-2 py-0.5 rounded-full transition-colors',
+                            u.is_active
+                              ? 'bg-success/15 text-success hover:bg-success/25'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                            savingUserId === u.id && 'opacity-60',
                           )}
                         >
                           {u.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-center text-[11px] text-muted-foreground">
+                        {user?.id === u.id ? 'คุณ' : savingUserId === u.id ? 'saving…' : '-'}
                       </td>
                     </tr>
                   ))}
@@ -258,6 +323,71 @@ const AdminSettings: React.FC = () => {
               </table>
             </div>
           ))}
+
+        {activeTab === 'users' && !demo && !usersLoading && (
+          <div className="glass-card rounded-xl p-4 border border-border space-y-3">
+            <div className="text-sm font-semibold text-foreground">จัดการสิทธิ์ผู้ใช้</div>
+            {userActionError ? (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {userActionError}
+              </div>
+            ) : null}
+            {userActionOk ? (
+              <div className="rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+                {userActionOk}
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              {apiUsers.map((u) => (
+                <div key={`manage-${u.id}`} className="rounded-lg border border-border p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground truncate">{u.full_name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={u.role}
+                      disabled={savingUserId === u.id}
+                      onChange={(e) => {
+                        const next = e.target.value as User['role'];
+                        if (next === u.role) return;
+                        void updateUser(u.id, { role: next });
+                      }}
+                      className={cn(
+                        'rounded-md border border-border bg-secondary px-2 py-1 text-xs',
+                        savingUserId === u.id && 'opacity-60',
+                      )}
+                    >
+                      <option value="admin">admin</option>
+                      <option value="supervisor">supervisor</option>
+                      <option value="staff">staff</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={savingUserId === u.id}
+                      onClick={() => void updateUser(u.id, { is_active: !u.is_active })}
+                      className={cn(
+                        'text-xs px-2 py-1 rounded-full transition-colors',
+                        u.is_active
+                          ? 'bg-success/15 text-success hover:bg-success/25'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                        savingUserId === u.id && 'opacity-60',
+                      )}
+                    >
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                    <span className="text-[11px] text-muted-foreground">
+                      {user?.id === u.id ? 'บัญชีของคุณ' : savingUserId === u.id ? 'saving…' : ''}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
 
