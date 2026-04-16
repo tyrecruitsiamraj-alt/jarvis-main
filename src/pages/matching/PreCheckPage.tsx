@@ -10,7 +10,7 @@ import { getJobs } from '@/lib/demoStorage';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { haversineKm } from '@/lib/geo';
-import { jobLatLng, parseJobsPayload } from '@/lib/jobCoords';
+import { jobLatLng, parseJobsPayload, mergeJobsForPrecheck } from '@/lib/jobCoords';
 import { Input } from '@/components/ui/input';
 
 function mergePreCheckJobs(): JobRequest[] {
@@ -80,12 +80,11 @@ const PreCheckPage: React.FC = () => {
     };
   }, []);
 
-  const usingSampleJobsFallback = !isDemoMode() && !loadingJobs && apiJobs.length === 0 && !jobsLoadError;
+  const usingSampleJobsFallback = !isDemoMode() && !loadingJobs && apiJobs.length === 0;
 
   const allJobs = useMemo(() => {
     if (isDemoMode()) return mergePreCheckJobs();
-    if (apiJobs.length > 0) return apiJobs;
-    return mergePreCheckJobs();
+    return mergeJobsForPrecheck(apiJobs, mergePreCheckJobs());
   }, [apiJobs]);
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -94,39 +93,47 @@ const PreCheckPage: React.FC = () => {
 
   const handleSearch = async () => {
     const text = placeQuery.trim();
-    let lat = Number(latText);
-    let lng = Number(lngText);
+    let lat = Number.NaN;
+    let lng = Number.NaN;
 
-    if (!text && (!Number.isFinite(lat) || !Number.isFinite(lng))) {
+    if (!text && (!Number.isFinite(Number(latText)) || !Number.isFinite(Number(lngText)))) {
       setHint('กรุณาพิมพ์ที่อยู่ผู้สมัคร');
       return;
     }
 
     setSearching(true);
 
-    if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && text) {
+    if (text) {
+      const geoQuery = /ประเทศไทย|Thailand/i.test(text) ? text : `${text}, Thailand`;
       try {
-        const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(text)}`);
+        const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(geoQuery)}`);
         if (r.ok) {
           const data = (await r.json()) as { lat?: number | string; lng?: number | string; formatted_address?: string };
           const latN = typeof data.lat === 'number' ? data.lat : Number(data.lat);
           const lngN = typeof data.lng === 'number' ? data.lng : Number(data.lng);
           if (Number.isFinite(latN) && Number.isFinite(lngN)) {
-            lat = latN;
-            lng = lngN;
-            if (isLikelyThailandCoord(lat, lng)) {
+            if (isLikelyThailandCoord(latN, lngN)) {
+              lat = latN;
+              lng = lngN;
               setLatText(String(lat));
               setLngText(String(lng));
               setHint(`เจอพิกัดแล้ว: ${data.formatted_address || text}`);
             } else {
-              lat = Number.NaN;
-              lng = Number.NaN;
               setHint('พิกัดที่ค้นหาอยู่นอกประเทศไทย เลยสลับเป็นค้นหาจากข้อความแทน');
             }
           }
         }
       } catch {
-        // fallback below
+        /* manual fallback below */
+      }
+    }
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      const mLat = Number(latText);
+      const mLng = Number(lngText);
+      if (Number.isFinite(mLat) && Number.isFinite(mLng)) {
+        lat = mLat;
+        lng = mLng;
       }
     }
 
@@ -203,7 +210,7 @@ const PreCheckPage: React.FC = () => {
         if (da !== null && db !== null) return da - db;
         if (da !== null) return -1;
         if (db !== null) return 1;
-        return a.job.required_date.localeCompare(b.job.required_date);
+        return (a.job.required_date || '').localeCompare(b.job.required_date || '');
       });
 
     if (!appliedCenter) return { rows: sortRows(rowsAll), fallbackFromRadius: false };
@@ -385,7 +392,7 @@ const PreCheckPage: React.FC = () => {
         ) : null}
         {usingSampleJobsFallback ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-            ยังไม่มีงานจากเซิร์ฟเวอร์หรือโหลดไม่สำเร็จ — แสดงงานตัวอย่างชั่วคราวเพื่อให้ Pre-Check ใช้งานได้ทันที
+ยังไม่มีงานจากเซิร์ฟเวอร์ — รวมงานตัวอย่างไว้ในรายการด้านล่างเพื่อให้ค้นหาได้ทันที
           </div>
         ) : null}
         <div className="text-sm text-muted-foreground">
