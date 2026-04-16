@@ -10,6 +10,7 @@ import { getJobs } from '@/lib/demoStorage';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { haversineKm } from '@/lib/geo';
+import { jobLatLng, parseJobsPayload } from '@/lib/jobCoords';
 import { Input } from '@/components/ui/input';
 
 function mergePreCheckJobs(): JobRequest[] {
@@ -36,6 +37,7 @@ const PreCheckPage: React.FC = () => {
   const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(() => !isDemoMode());
+  const [jobsLoadError, setJobsLoadError] = useState('');
   const [searching, setSearching] = useState(false);
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
@@ -45,18 +47,29 @@ const PreCheckPage: React.FC = () => {
     if (isDemoMode()) return;
     let cancelled = false;
     setLoadingJobs(true);
+    setJobsLoadError('');
     Promise.all([apiFetch('/api/jobs?limit=500'), apiFetch('/api/clients?active_only=1')])
       .then(async ([jobsRes, clientsRes]) => {
         const jobsJson = jobsRes.ok ? ((await jobsRes.json()) as unknown) : [];
         const clientsJson = clientsRes.ok ? ((await clientsRes.json()) as unknown) : [];
         if (cancelled) return;
-        setApiJobs(Array.isArray(jobsJson) ? jobsJson : []);
+        if (!jobsRes.ok) {
+          setJobsLoadError(
+            jobsRes.status === 401
+              ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่เพื่อโหลดรายการงาน'
+              : `โหลดรายการงานไม่สำเร็จ (HTTP ${jobsRes.status})`,
+          );
+          setApiJobs([]);
+        } else {
+          setApiJobs(parseJobsPayload(jobsJson));
+        }
         setApiClients(Array.isArray(clientsJson) ? (clientsJson as ClientWorkplace[]) : []);
       })
       .catch(() => {
         if (!cancelled) {
           setApiJobs([]);
           setApiClients([]);
+          setJobsLoadError('โหลดรายการงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
         }
       })
       .finally(() => {
@@ -67,7 +80,13 @@ const PreCheckPage: React.FC = () => {
     };
   }, []);
 
-  const allJobs = useMemo(() => (isDemoMode() ? mergePreCheckJobs() : apiJobs), [apiJobs]);
+  const usingSampleJobsFallback = !isDemoMode() && !loadingJobs && apiJobs.length === 0 && !jobsLoadError;
+
+  const allJobs = useMemo(() => {
+    if (isDemoMode()) return mergePreCheckJobs();
+    if (apiJobs.length > 0) return apiJobs;
+    return mergePreCheckJobs();
+  }, [apiJobs]);
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
@@ -89,10 +108,12 @@ const PreCheckPage: React.FC = () => {
       try {
         const r = await apiFetch(`/api/geocode?address=${encodeURIComponent(text)}`);
         if (r.ok) {
-          const data = (await r.json()) as { lat?: number; lng?: number; formatted_address?: string };
-          if (typeof data.lat === 'number' && typeof data.lng === 'number') {
-            lat = data.lat;
-            lng = data.lng;
+          const data = (await r.json()) as { lat?: number | string; lng?: number | string; formatted_address?: string };
+          const latN = typeof data.lat === 'number' ? data.lat : Number(data.lat);
+          const lngN = typeof data.lng === 'number' ? data.lng : Number(data.lng);
+          if (Number.isFinite(latN) && Number.isFinite(lngN)) {
+            lat = latN;
+            lng = lngN;
             if (isLikelyThailandCoord(lat, lng)) {
               setLatText(String(lat));
               setLngText(String(lng));
@@ -143,7 +164,14 @@ const PreCheckPage: React.FC = () => {
       return { rows: [] as PreCheckRow[], fallbackFromRadius: false };
     }
 
-    const activeRows = allJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+    const isOpenish = (j: JobRequest) => j.status === 'open' || j.status === 'in_progress';
+    let activeRows = allJobs.filter(isOpenish);
+    if (activeRows.length === 0) {
+      activeRows = allJobs.filter((j) => j.status !== 'cancelled');
+    }
+    if (activeRows.length === 0) {
+      activeRows = allJobs;
+    }
     let rowsBase = activeRows;
     if (projectFilter) {
       const byProject = rowsBase.filter((j) => j.unit_name === projectFilter);
@@ -161,13 +189,9 @@ const PreCheckPage: React.FC = () => {
 
     const rowsAll = rowsForDistance.map((j) => {
       let distanceKm: number | null = null;
-      if (
-        appliedCenter &&
-        typeof j.lat === 'number' &&
-        typeof j.lng === 'number' &&
-        isLikelyThailandCoord(j.lat, j.lng)
-      ) {
-        distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, j.lat, j.lng);
+      const jl = jobLatLng(j);
+      if (appliedCenter && jl && isLikelyThailandCoord(jl.lat, jl.lng)) {
+        distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, jl.lat, jl.lng);
       }
       return { job: j, distanceKm };
     });
@@ -204,14 +228,12 @@ const PreCheckPage: React.FC = () => {
     return list.find((c) => c.name === jobName);
   };
 
-  const detailDistance =
-    jobDetail &&
-    appliedCenter &&
-    jobDetail.lat != null &&
-    jobDetail.lng != null &&
-    isLikelyThailandCoord(jobDetail.lat, jobDetail.lng)
-      ? haversineKm(appliedCenter.lat, appliedCenter.lng, jobDetail.lat, jobDetail.lng)
-      : null;
+  const detailDistance = (() => {
+    if (!jobDetail || !appliedCenter) return null;
+    const jl = jobLatLng(jobDetail);
+    if (!jl || !isLikelyThailandCoord(jl.lat, jl.lng)) return null;
+    return haversineKm(appliedCenter.lat, appliedCenter.lng, jl.lat, jl.lng);
+  })();
 
   return (
     <div>
@@ -323,6 +345,49 @@ const PreCheckPage: React.FC = () => {
         </div>
 
         {loadingJobs && <div className="text-sm text-muted-foreground">Loading jobs...</div>}
+        {jobsLoadError ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span>{jobsLoadError}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
+              onClick={() => {
+                if (isDemoMode()) return;
+                setJobsLoadError('');
+                setLoadingJobs(true);
+                void Promise.all([apiFetch('/api/jobs?limit=500'), apiFetch('/api/clients?active_only=1')])
+                  .then(async ([jobsRes, clientsRes]) => {
+                    if (!jobsRes.ok) {
+                      setJobsLoadError(
+                        jobsRes.status === 401
+                          ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่เพื่อโหลดรายการงาน'
+                          : `โหลดรายการงานไม่สำเร็จ (HTTP ${jobsRes.status})`,
+                      );
+                      setApiJobs([]);
+                    } else {
+                      const raw = (await jobsRes.json()) as unknown;
+                      setApiJobs(parseJobsPayload(raw));
+                      setJobsLoadError('');
+                    }
+                    const clientsJson = clientsRes.ok ? ((await clientsRes.json()) as unknown) : [];
+                    setApiClients(Array.isArray(clientsJson) ? (clientsJson as ClientWorkplace[]) : []);
+                  })
+                  .catch(() => {
+                    setApiJobs([]);
+                    setJobsLoadError('โหลดรายการงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
+                  })
+                  .finally(() => setLoadingJobs(false));
+              }}
+            >
+              Retry load
+            </button>
+          </div>
+        ) : null}
+        {usingSampleJobsFallback ? (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+            ยังไม่มีงานจากเซิร์ฟเวอร์หรือโหลดไม่สำเร็จ — แสดงงานตัวอย่างชั่วคราวเพื่อให้ Pre-Check ใช้งานได้ทันที
+          </div>
+        ) : null}
         <div className="text-sm text-muted-foreground">
           Suitable projects: <span className="text-primary font-semibold">{filteredRows.length}</span>
         </div>
