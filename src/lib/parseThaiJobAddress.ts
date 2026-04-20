@@ -44,7 +44,29 @@ export function inferProvinceFromAddress(address: string): string | null {
   return null;
 }
 
+/** อำเภอ/เขต: รูปแบบมาตรฐาน หรือคำว่า "เขต …" / "อ." / "อำเภอ …" ในข้อความ */
 export function inferDistrictFromAddress(address: string): string | null {
-  const { district } = parseJobLocationAddress(address);
-  return district;
+  const parsed = parseJobLocationAddress(address);
+  if (parsed.district) return parsed.district;
+
+  const s = address.trim();
+  if (!s) return null;
+
+  const khet = s.match(
+    /(?:^|[\s,，])เขต\s*(.+?)(?=\s+(?:แขวง|จังหวัด|จ\.|ถนน|เลขที่|ตำบล|รหัสไปรษณีย์|อาคาร)|$)/u,
+  );
+  if (khet?.[1]) {
+    const d = khet[1].trim();
+    if (d) return d;
+  }
+
+  const amphoe = s.match(
+    /(?:^|[\s,，])(?:อ\.|อำเภอ(?!\/))\s+(.+?)(?=\s+(?:จังหวัด|จ\.|ตำบล|อำเภอ\/เขต)|$)/u,
+  );
+  if (amphoe?.[1]) {
+    const d = amphoe[1].trim();
+    if (d && !d.startsWith('/')) return d;
+  }
+
+  return null;
 }

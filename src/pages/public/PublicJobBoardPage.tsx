@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
@@ -139,6 +139,11 @@ const PublicJobBoardPage: React.FC = () => {
     window.open(SOWORK_APPLY_URL, '_blank', 'noopener,noreferrer');
   };
 
+  const onProvinceFilterChange = useCallback((next: string) => {
+    setProvinceFilter(next);
+    setDistrictFilter('');
+  }, []);
+
   return (
     <div className="relative border-b border-border/40 bg-gradient-to-b from-primary/[0.07] via-background to-background">
       <div className="mx-auto max-w-6xl px-4 md:px-6 pt-10 pb-4 md:pt-14 md:pb-8">
@@ -191,16 +196,13 @@ const PublicJobBoardPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="relative z-10 mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           <LocationFilterSelect
             label="จังหวัด"
             placeholder="เลือกจังหวัด"
             value={provinceFilter}
-            onChange={(next) => {
-              setProvinceFilter(next);
-              setDistrictFilter('');
-            }}
-            options={[...provinceOptions]}
+            onChange={onProvinceFilterChange}
+            options={provinceOptions}
             disabled={loading}
           />
           <LocationFilterSelect
@@ -209,12 +211,12 @@ const PublicJobBoardPage: React.FC = () => {
             value={districtFilter}
             onChange={setDistrictFilter}
             options={districtOptions}
-            disabled={loading || districtOptions.length === 0}
+            disabled={loading}
           />
         </div>
         {!loading && districtOptions.length === 0 && visible.length > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
-            ยังไม่มีข้อมูลอำเภอ/เขตในรูปแบบมาตรฐานในประกาศ — ใช้จังหวัดหรือช่องค้นหาด้านบนแทนได้
+            ยังดึงชื่ออำเภอ/เขตจากประกาศไม่ได้ — เลือกจังหวัดหรือค้นจากช่องด้านบนได้ตามปกติ (ดรอปดาวน์อำเภอเปิดเลือก &quot;ทั้งหมด&quot; ได้)
           </p>
         )}
 

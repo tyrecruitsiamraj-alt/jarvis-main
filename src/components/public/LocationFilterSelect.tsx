@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   Select,
   SelectContent,
@@ -15,7 +15,7 @@ export type LocationFilterSelectProps = {
   placeholder: string;
   value: string;
   onChange: (next: string) => void;
-  options: string[];
+  options: readonly string[];
   disabled?: boolean;
 };
 
@@ -27,7 +27,14 @@ const LocationFilterSelect: React.FC<LocationFilterSelectProps> = ({
   options,
   disabled,
 }) => {
-  const selectValue = value ? value : ALL_VALUE;
+  const selectValue = useMemo(() => {
+    if (!value) return ALL_VALUE;
+    return options.includes(value) ? value : ALL_VALUE;
+  }, [value, options]);
+
+  useEffect(() => {
+    if (value && !options.includes(value)) onChange('');
+  }, [value, options, onChange]);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-[220px]">
@@ -45,7 +52,7 @@ const LocationFilterSelect: React.FC<LocationFilterSelectProps> = ({
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent position="popper" className="max-h-72">
+        <SelectContent position="popper" className="z-[200] max-h-72">
           <SelectItem value={ALL_VALUE}>ทั้งหมด (ไม่กรอง)</SelectItem>
           {options.map((opt) => (
             <SelectItem key={opt} value={opt}>
