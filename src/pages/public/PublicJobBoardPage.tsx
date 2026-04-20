@@ -6,8 +6,12 @@ import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
-import { parseJobLocationAddress } from '@/lib/parseThaiJobAddress';
-import LocationFilterCombobox from '@/components/public/LocationFilterCombobox';
+import {
+  inferDistrictFromAddress,
+  inferProvinceFromAddress,
+} from '@/lib/parseThaiJobAddress';
+import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
+import LocationFilterSelect from '@/components/public/LocationFilterSelect';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +29,24 @@ const SOWORK_APPLY_URL =
 type PublicFilter = 'all' | 'urgent';
 
 const isPublicVisible = (j: JobRequest) => j.status === 'open' || j.status === 'in_progress';
+
+function normSearch(s: string): string {
+  return s.normalize('NFC').toLowerCase().trim();
+}
+
+/** ให้คำว่า "กรุงเทพ" / "กทม" ค้นเจองานที่อยู่ กรุงเทพมหานคร */
+function jobSearchBlob(j: JobRequest): string {
+  const addr = j.location_address || '';
+  const prov = inferProvinceFromAddress(addr);
+  let extra = '';
+  if (prov === 'กรุงเทพมหานคร' || /กรุงเทพ|กทม\.?|bangkok/i.test(addr)) {
+    extra = ' กรุงเทพ กรุงเทพฯ กทม กทม. bangkok';
+  }
+  if (prov) extra += ` ${prov}`;
+  return normSearch(
+    `${j.unit_name} ${addr} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.work_schedule || ''}${extra}`,
+  );
+}
 
 const PublicJobBoardPage: React.FC = () => {
   const [jobs, setJobs] = useState<JobRequest[]>(getMergedJobsInitial);
@@ -74,22 +96,16 @@ const PublicJobBoardPage: React.FC = () => {
     return jobs.filter(isPublicVisible);
   }, [jobs]);
 
-  const provinceOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of visible) {
-      const { province } = parseJobLocationAddress(j.location_address);
-      if (province) set.add(province);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
-  }, [visible]);
+  const provinceOptions = THAI_PROVINCE_NAMES_SORTED;
 
   const districtOptions = useMemo(() => {
     const set = new Set<string>();
     for (const j of visible) {
-      const { province, district } = parseJobLocationAddress(j.location_address);
-      if (!district) continue;
-      if (provinceFilter && province !== provinceFilter) continue;
-      set.add(district);
+      const dist = inferDistrictFromAddress(j.location_address);
+      if (!dist) continue;
+      const jobProv = inferProvinceFromAddress(j.location_address);
+      if (provinceFilter && jobProv !== provinceFilter) continue;
+      set.add(dist);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
   }, [visible, provinceFilter]);
@@ -100,22 +116,22 @@ const PublicJobBoardPage: React.FC = () => {
   }, [districtFilter, districtOptions]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q = normSearch(search);
     return visible
       .filter((j) => {
         if (chip === 'urgent') return j.urgency === 'urgent';
         return true;
       })
       .filter((j) => {
-        const { province, district } = parseJobLocationAddress(j.location_address);
-        if (provinceFilter && province !== provinceFilter) return false;
-        if (districtFilter && district !== districtFilter) return false;
+        const jobProv = inferProvinceFromAddress(j.location_address);
+        const jobDist = inferDistrictFromAddress(j.location_address);
+        if (provinceFilter && jobProv !== provinceFilter) return false;
+        if (districtFilter && jobDist !== districtFilter) return false;
         return true;
       })
       .filter((j) => {
         if (!q) return true;
-        const hay = `${j.unit_name} ${j.location_address} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.work_schedule || ''}`.toLowerCase();
-        return hay.includes(q);
+        return jobSearchBlob(j).includes(q);
       });
   }, [visible, search, chip, provinceFilter, districtFilter]);
 
@@ -176,29 +192,29 @@ const PublicJobBoardPage: React.FC = () => {
         </div>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <LocationFilterCombobox
+          <LocationFilterSelect
             label="จังหวัด"
-            placeholder="เลือกหรือค้นหาจังหวัด"
+            placeholder="เลือกจังหวัด"
             value={provinceFilter}
             onChange={(next) => {
               setProvinceFilter(next);
               setDistrictFilter('');
             }}
-            options={provinceOptions}
+            options={[...provinceOptions]}
             disabled={loading}
           />
-          <LocationFilterCombobox
+          <LocationFilterSelect
             label="อำเภอ / เขต"
-            placeholder="เลือกหรือค้นหาอำเภอ/เขต"
+            placeholder="เลือกอำเภอ/เขต"
             value={districtFilter}
             onChange={setDistrictFilter}
             options={districtOptions}
             disabled={loading || districtOptions.length === 0}
           />
         </div>
-        {provinceOptions.length === 0 && !loading && (
+        {!loading && districtOptions.length === 0 && visible.length > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
-            ประกาศที่มีอยู่ยังไม่มีข้อมูลจังหวัดในรูปแบบมาตรฐาน — ใช้ช่องค้นหาด้านบนเพื่อค้นจากที่อยู่ได้ตามปกติ
+            ยังไม่มีข้อมูลอำเภอ/เขตในรูปแบบมาตรฐานในประกาศ — ใช้จังหวัดหรือช่องค้นหาด้านบนแทนได้
           </p>
         )}
 
