@@ -7,6 +7,7 @@ import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { districtMatchesFilter } from '@/lib/districtMatch';
 import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
@@ -324,6 +325,18 @@ const PublicJobBoardPage: React.FC = () => {
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2">
                   <dt className="text-muted-foreground">สถานที่</dt>
                   <dd className="text-right font-medium text-foreground max-w-[65%]">{selected.location_address}</dd>
+                </div>
+                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <dt className="text-muted-foreground">อำเภอ / เขต</dt>
+                  <dd className="text-right font-medium text-foreground max-w-[65%]">
+                    {displayDistrictLine(selected.location_address || '') ?? '—'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <dt className="text-muted-foreground">จังหวัด</dt>
+                  <dd className="text-right font-medium text-foreground max-w-[65%]">
+                    {inferProvinceFromAddress(selected.location_address || '') ?? '—'}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2">
                   <dt className="text-muted-foreground">รายได้รวม (โดยประมาณ)</dt>
