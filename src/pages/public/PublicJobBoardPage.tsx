@@ -6,10 +6,9 @@ import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
-import {
-  inferDistrictFromAddress,
-  inferProvinceFromAddress,
-} from '@/lib/parseThaiJobAddress';
+import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { districtMatchesFilter } from '@/lib/districtMatch';
+import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import LocationFilterSelect from '@/components/public/LocationFilterSelect';
 import {
@@ -99,16 +98,9 @@ const PublicJobBoardPage: React.FC = () => {
   const provinceOptions = THAI_PROVINCE_NAMES_SORTED;
 
   const districtOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of visible) {
-      const dist = inferDistrictFromAddress(j.location_address);
-      if (!dist) continue;
-      const jobProv = inferProvinceFromAddress(j.location_address);
-      if (provinceFilter && jobProv !== provinceFilter) continue;
-      set.add(dist);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
-  }, [visible, provinceFilter]);
+    if (!provinceFilter) return [];
+    return [...getDistrictOptionsForProvince(provinceFilter)];
+  }, [provinceFilter]);
 
   useEffect(() => {
     if (!districtFilter) return;
@@ -124,9 +116,8 @@ const PublicJobBoardPage: React.FC = () => {
       })
       .filter((j) => {
         const jobProv = inferProvinceFromAddress(j.location_address);
-        const jobDist = inferDistrictFromAddress(j.location_address);
         if (provinceFilter && jobProv !== provinceFilter) return false;
-        if (districtFilter && jobDist !== districtFilter) return false;
+        if (districtFilter && !districtMatchesFilter(j.location_address, districtFilter)) return false;
         return true;
       })
       .filter((j) => {
@@ -207,18 +198,13 @@ const PublicJobBoardPage: React.FC = () => {
           />
           <LocationFilterSelect
             label="อำเภอ / เขต"
-            placeholder="เลือกอำเภอ/เขต"
+            placeholder={provinceFilter ? 'เลือกอำเภอ/เขต' : 'เลือกจังหวัดก่อน'}
             value={districtFilter}
             onChange={setDistrictFilter}
             options={districtOptions}
-            disabled={loading}
+            disabled={loading || !provinceFilter}
           />
         </div>
-        {!loading && districtOptions.length === 0 && visible.length > 0 && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            ยังดึงชื่ออำเภอ/เขตจากประกาศไม่ได้ — เลือกจังหวัดหรือค้นจากช่องด้านบนได้ตามปกติ (ดรอปดาวน์อำเภอเปิดเลือก &quot;ทั้งหมด&quot; ได้)
-          </p>
-        )}
 
         {loading && (
           <p className="mt-8 text-sm text-muted-foreground animate-pulse">กำลังโหลดประกาศงาน...</p>
