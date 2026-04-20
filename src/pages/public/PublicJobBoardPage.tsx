@@ -6,6 +6,8 @@ import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
+import { parseJobLocationAddress } from '@/lib/parseThaiJobAddress';
+import LocationFilterCombobox from '@/components/public/LocationFilterCombobox';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +30,8 @@ const PublicJobBoardPage: React.FC = () => {
   const [jobs, setJobs] = useState<JobRequest[]>(getMergedJobsInitial);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [provinceFilter, setProvinceFilter] = useState('');
+  const [districtFilter, setDistrictFilter] = useState('');
   const [chip, setChip] = useState<PublicFilter>('all');
   const [selected, setSelected] = useState<JobRequest | null>(null);
   const apiJobsRef = useRef<JobRequest[]>([]);
@@ -70,6 +74,31 @@ const PublicJobBoardPage: React.FC = () => {
     return jobs.filter(isPublicVisible);
   }, [jobs]);
 
+  const provinceOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const j of visible) {
+      const { province } = parseJobLocationAddress(j.location_address);
+      if (province) set.add(province);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
+  }, [visible]);
+
+  const districtOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const j of visible) {
+      const { province, district } = parseJobLocationAddress(j.location_address);
+      if (!district) continue;
+      if (provinceFilter && province !== provinceFilter) continue;
+      set.add(district);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
+  }, [visible, provinceFilter]);
+
+  useEffect(() => {
+    if (!districtFilter) return;
+    if (!districtOptions.includes(districtFilter)) setDistrictFilter('');
+  }, [districtFilter, districtOptions]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return visible
@@ -78,11 +107,17 @@ const PublicJobBoardPage: React.FC = () => {
         return true;
       })
       .filter((j) => {
+        const { province, district } = parseJobLocationAddress(j.location_address);
+        if (provinceFilter && province !== provinceFilter) return false;
+        if (districtFilter && district !== districtFilter) return false;
+        return true;
+      })
+      .filter((j) => {
         if (!q) return true;
         const hay = `${j.unit_name} ${j.location_address} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.work_schedule || ''}`.toLowerCase();
         return hay.includes(q);
       });
-  }, [visible, search, chip]);
+  }, [visible, search, chip, provinceFilter, districtFilter]);
 
   const openApply = () => {
     window.open(SOWORK_APPLY_URL, '_blank', 'noopener,noreferrer');
@@ -105,7 +140,7 @@ const PublicJobBoardPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="relative flex-1 max-w-xl">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -139,6 +174,33 @@ const PublicJobBoardPage: React.FC = () => {
             ))}
           </div>
         </div>
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <LocationFilterCombobox
+            label="จังหวัด"
+            placeholder="เลือกหรือค้นหาจังหวัด"
+            value={provinceFilter}
+            onChange={(next) => {
+              setProvinceFilter(next);
+              setDistrictFilter('');
+            }}
+            options={provinceOptions}
+            disabled={loading}
+          />
+          <LocationFilterCombobox
+            label="อำเภอ / เขต"
+            placeholder="เลือกหรือค้นหาอำเภอ/เขต"
+            value={districtFilter}
+            onChange={setDistrictFilter}
+            options={districtOptions}
+            disabled={loading || districtOptions.length === 0}
+          />
+        </div>
+        {provinceOptions.length === 0 && !loading && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            ประกาศที่มีอยู่ยังไม่มีข้อมูลจังหวัดในรูปแบบมาตรฐาน — ใช้ช่องค้นหาด้านบนเพื่อค้นจากที่อยู่ได้ตามปกติ
+          </p>
+        )}
 
         {loading && (
           <p className="mt-8 text-sm text-muted-foreground animate-pulse">กำลังโหลดประกาศงาน...</p>
