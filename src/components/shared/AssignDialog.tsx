@@ -19,7 +19,10 @@ interface AssignDialogProps {
 const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, employeeId, employeeName }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(employeeId || '');
   const [selectedClient, setSelectedClient] = useState('');
-  const [shift, setShift] = useState('08:00-17:00');
+  const [startDate, setStartDate] = useState(date || '');
+  const [endDate, setEndDate] = useState(date || '');
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('17:00');
   const [saving, setSaving] = useState(false);
   const [apiEmployees, setApiEmployees] = useState<Employee[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
@@ -30,10 +33,13 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     if (open) {
       setSelectedEmployee(employeeId || '');
       setSelectedClient('');
-      setShift('08:00-17:00');
+      setStartDate(date || '');
+      setEndDate(date || '');
+      setStartTime('08:00');
+      setEndTime('17:00');
       setLoadError(null);
     }
-  }, [open, employeeId]);
+  }, [open, employeeId, date]);
 
   useEffect(() => {
     if (!open || isDemoMode()) return;
@@ -50,13 +56,13 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           setApiClients(Array.isArray(cls) ? cls : []);
           setApiJobs(Array.isArray(jobs) ? jobs : []);
           if ((!emps || emps.length === 0) && (!cls || cls.length === 0) && (!jobs || jobs.length === 0)) {
-            setLoadError('‡∏¢‡∏±‡∏á‡πÑ‡∏°‡πà‡∏°‡∏µ‡∏û‡∏ô‡∏±‡∏Å‡∏á‡∏≤‡∏ô‡∏´‡∏£‡∏∑‡∏≠‡∏•‡∏π‡∏Å‡∏Ñ‡πâ‡∏≤‡πÉ‡∏ô‡∏£‡∏∞‡∏ö‡∏ö ‚Äî ‡πÄ‡∏û‡∏¥‡πà‡∏°‡πÉ‡∏ô Employees / Clients (Admin) ‡∏Å‡πà‡∏≠‡∏ô');
+            setLoadError('¬—ß‰¡Ë¡’æπ—°ß“πÀ√◊Õ≈Ÿ°§È“„π√–∫∫ ó ‡æ‘Ë¡„π Employees / Clients (Admin) °ËÕπ');
           }
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setLoadError('‡πÇ‡∏´‡∏•‡∏î‡∏Ç‡πâ‡∏≠‡∏°‡∏π‡∏•‡πÑ‡∏°‡πà‡∏™‡∏≥‡πÄ‡∏£‡πá‡∏à');
+          setLoadError('‚À≈¥¢ÈÕ¡Ÿ≈‰¡Ë ”‡√Á®');
           setApiEmployees([]);
           setApiClients([]);
           setApiJobs([]);
@@ -73,6 +79,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const activeClients = isDemoMode()
     ? mockClients.filter((c) => c.is_active)
     : apiClients.filter((c) => c.is_active !== false);
+
   const fallbackUnitsFromJobs = isDemoMode()
     ? []
     : Array.from(
@@ -86,6 +93,24 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const employeeList = isDemoMode() ? mockEmployees : apiEmployees;
   const clientList = isDemoMode() ? mockClients : apiClients;
 
+  function buildDateRange(from: string, to: string): string[] {
+    if (!from || !to) return [];
+    const start = new Date(`${from}T00:00:00`);
+    const end = new Date(`${to}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [];
+
+    const out: string[] = [];
+    const cur = new Date(start);
+    while (cur <= end) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const d = String(cur.getDate()).padStart(2, '0');
+      out.push(`${y}-${m}-${d}`);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  }
+
   const handleAssign = async () => {
     const empId = employeeId || selectedEmployee;
     const emp = employeeList.find((e) => e.id === empId);
@@ -93,23 +118,40 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     const fallbackUnit = fallbackUnitsFromJobs.find((u) => `unit:${u}` === selectedClient);
     if (!emp || (!client && !fallbackUnit)) return;
 
+    const dates = buildDateRange(startDate, endDate);
+    if (dates.length === 0) {
+      toast.error('°√ÿ≥“‡≈◊Õ°™Ë«ß«—π∑’Ë„ÀÈ∂Ÿ°µÈÕß');
+      return;
+    }
+    if (!startTime || !endTime) {
+      toast.error('°√ÿ≥“‡≈◊Õ°‡«≈“‡√‘Ë¡·≈–‡«≈“ ‘Èπ ÿ¥');
+      return;
+    }
+
     setSaving(true);
+    const shift = `${startTime}-${endTime}`;
+
     try {
-      const res = await createWorkCalendarAssignment({
-        employee_id: emp.id,
-        work_date: date,
-        client_id: client?.id,
-        client_name: client?.name ?? fallbackUnit,
-        shift,
-        status: 'normal_work',
-        income: client?.default_income,
-        cost: client?.default_cost,
-      });
-      if (!res.ok) {
-        toast.error(res.message ?? '‡∏ö‡∏±‡∏ô‡∏ó‡∏∂‡∏Å‡πÑ‡∏°‡πà‡∏™‡∏≥‡πÄ‡∏£‡πá‡∏à');
-        return;
+      for (const workDate of dates) {
+        const res = await createWorkCalendarAssignment({
+          employee_id: emp.id,
+          work_date: workDate,
+          client_id: client?.id,
+          client_name: client?.name ?? fallbackUnit,
+          shift,
+          status: 'normal_work',
+          income: client?.default_income,
+          cost: client?.default_cost,
+        });
+        if (!res.ok) {
+          toast.error(res.message ?? `∫—π∑÷°‰¡Ë ”‡√Á® (${workDate})`);
+          return;
+        }
       }
-      toast.success(`‡∏°‡∏≠‡∏ö‡∏´‡∏°‡∏≤‡∏¢ ${emp.first_name} ‡πÑ‡∏õ‡∏ó‡∏µ‡πà ${client?.name ?? fallbackUnit} ‡∏ß‡∏±‡∏ô‡∏ó‡∏µ‡πà ${date}`);
+
+      toast.success(
+        `¡Õ∫À¡“¬ ${emp.first_name} ‰ª∑’Ë ${client?.name ?? fallbackUnit} ™Ë«ß ${startDate} ∂÷ß ${endDate}`,
+      );
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -120,9 +162,9 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-foreground">‡∏°‡∏≠‡∏ö‡∏´‡∏°‡∏≤‡∏¢‡∏á‡∏≤‡∏ô - {date}</DialogTitle>
+          <DialogTitle className="text-foreground">¡Õ∫À¡“¬ß“π - {date}</DialogTitle>
           <DialogDescription className="sr-only">
-            ‡πÄ‡∏•‡∏∑‡∏≠‡∏Å‡∏û‡∏ô‡∏±‡∏Å‡∏á‡∏≤‡∏ô ‡∏´‡∏ô‡πà‡∏ß‡∏¢‡∏á‡∏≤‡∏ô ‡πÅ‡∏•‡∏∞‡∏ä‡πà‡∏ß‡∏á‡πÄ‡∏ß‡∏•‡∏≤ ‡πÄ‡∏û‡∏∑‡πà‡∏≠‡∏¢‡∏∑‡∏ô‡∏¢‡∏±‡∏ô‡∏Å‡∏≤‡∏£‡∏°‡∏≠‡∏ö‡∏´‡∏°‡∏≤‡∏¢‡∏á‡∏≤‡∏ô
+            ‡≈◊Õ°æπ—°ß“π ÀπË«¬ß“π ·≈–™Ë«ß‡«≈“ ‡æ◊ËÕ¬◊π¬—π°“√¡Õ∫À¡“¬ß“π
           </DialogDescription>
         </DialogHeader>
 
@@ -134,7 +176,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
 
         <div className="space-y-4 mt-2">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">‡∏û‡∏ô‡∏±‡∏Å‡∏á‡∏≤‡∏ô</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">æπ—°ß“π</label>
             {employeeName ? (
               <div className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground">
                 {employeeName}
@@ -145,7 +187,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                 onChange={(e) => setSelectedEmployee(e.target.value)}
                 className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
               >
-                <option value="">‡πÄ‡∏•‡∏∑‡∏≠‡∏Å‡∏û‡∏ô‡∏±‡∏Å‡∏á‡∏≤‡∏ô</option>
+                <option value="">‡≈◊Õ°æπ—°ß“π</option>
                 {activeEmployees.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.first_name} {e.last_name} ({e.nickname})
@@ -156,13 +198,13 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">‡∏´‡∏ô‡πà‡∏ß‡∏¢‡∏á‡∏≤‡∏ô / ‡∏•‡∏π‡∏Å‡∏Ñ‡πâ‡∏≤</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">ÀπË«¬ß“π / ≈Ÿ°§È“</label>
             <select
               value={selectedClient}
               onChange={(e) => setSelectedClient(e.target.value)}
               className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
             >
-              <option value="">‡πÄ‡∏•‡∏∑‡∏≠‡∏Å‡∏´‡∏ô‡πà‡∏ß‡∏¢‡∏á‡∏≤‡∏ô</option>
+              <option value="">‡≈◊Õ°ÀπË«¬ß“π</option>
               {activeClients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -176,19 +218,46 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             </select>
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">‡∏Å‡∏∞ / ‡πÄ‡∏ß‡∏•‡∏≤</label>
-            <select
-              value={shift}
-              onChange={(e) => setShift(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-            >
-              <option value="06:00-15:00">06:00-15:00</option>
-              <option value="07:00-16:00">07:00-16:00</option>
-              <option value="08:00-17:00">08:00-17:00</option>
-              <option value="08:30-17:30">08:30-17:30</option>
-              <option value="09:00-18:00">09:00-18:00</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">‡√‘Ë¡«—π∑’Ë</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">∂÷ß«—π∑’Ë</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">‡«≈“‡√‘Ë¡</label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">‡«≈“ ‘Èπ ÿ¥</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              />
+            </div>
           </div>
 
           <button
@@ -197,7 +266,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             disabled={saving || !selectedClient || (!employeeId && !selectedEmployee)}
             className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {saving ? '‡∏Å‡∏≥‡∏•‡∏±‡∏á‡∏ö‡∏±‡∏ô‡∏ó‡∏∂‡∏Å‚Ä¶' : '‡∏¢‡∏∑‡∏ô‡∏¢‡∏±‡∏ô‡∏°‡∏≠‡∏ö‡∏´‡∏°‡∏≤‡∏¢'}
+            {saving ? '°”≈—ß∫—π∑÷°Ö' : '¬◊π¬—π¡Õ∫À¡“¬'}
           </button>
         </div>
       </DialogContent>
