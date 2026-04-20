@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { isDemoMode } from '@/lib/demoMode';
 import { createWorkCalendarAssignment } from '@/lib/workCalendarStore';
 import { apiFetch } from '@/lib/apiFetch';
-import type { ClientWorkplace, Employee } from '@/types';
+import { parseJobsPayload } from '@/lib/jobCoords';
+import type { ClientWorkplace, Employee, JobRequest } from '@/types';
 
 interface AssignDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const [saving, setSaving] = useState(false);
   const [apiEmployees, setApiEmployees] = useState<Employee[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
+  const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,12 +42,14 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     Promise.all([
       apiFetch('/api/employees?limit=500').then(async (r) => (r.ok ? ((await r.json()) as Employee[]) : [])),
       apiFetch('/api/clients?active_only=1').then(async (r) => (r.ok ? ((await r.json()) as ClientWorkplace[]) : [])),
+      apiFetch('/api/jobs?limit=500').then(async (r) => (r.ok ? parseJobsPayload(await r.json()) : [])),
     ])
-      .then(([emps, cls]) => {
+      .then(([emps, cls, jobs]) => {
         if (!cancelled) {
           setApiEmployees(Array.isArray(emps) ? emps : []);
           setApiClients(Array.isArray(cls) ? cls : []);
-          if ((!emps || emps.length === 0) && (!cls || cls.length === 0)) {
+          setApiJobs(Array.isArray(jobs) ? jobs : []);
+          if ((!emps || emps.length === 0) && (!cls || cls.length === 0) && (!jobs || jobs.length === 0)) {
             setLoadError('ยังไม่มีพนักงานหรือลูกค้าในระบบ — เพิ่มใน Employees / Clients (Admin) ก่อน');
           }
         }
@@ -55,6 +59,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           setLoadError('โหลดข้อมูลไม่สำเร็จ');
           setApiEmployees([]);
           setApiClients([]);
+          setApiJobs([]);
         }
       });
     return () => {
@@ -67,7 +72,16 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     : apiEmployees.filter((e) => e.status === 'active');
   const activeClients = isDemoMode()
     ? mockClients.filter((c) => c.is_active)
-    : apiClients.filter((c) => c.is_active);
+    : apiClients.filter((c) => c.is_active !== false);
+  const fallbackUnitsFromJobs = isDemoMode()
+    ? []
+    : Array.from(
+        new Set(
+          apiJobs
+            .map((j) => (typeof j.unit_name === 'string' ? j.unit_name.trim() : ''))
+            .filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b, 'th'));
 
   const employeeList = isDemoMode() ? mockEmployees : apiEmployees;
   const clientList = isDemoMode() ? mockClients : apiClients;
@@ -76,25 +90,26 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     const empId = employeeId || selectedEmployee;
     const emp = employeeList.find((e) => e.id === empId);
     const client = clientList.find((c) => c.id === selectedClient);
-    if (!emp || !client) return;
+    const fallbackUnit = fallbackUnitsFromJobs.find((u) => `unit:${u}` === selectedClient);
+    if (!emp || (!client && !fallbackUnit)) return;
 
     setSaving(true);
     try {
       const res = await createWorkCalendarAssignment({
         employee_id: emp.id,
         work_date: date,
-        client_id: client.id,
-        client_name: client.name,
+        client_id: client?.id,
+        client_name: client?.name ?? fallbackUnit,
         shift,
         status: 'normal_work',
-        income: client.default_income,
-        cost: client.default_cost,
+        income: client?.default_income,
+        cost: client?.default_cost,
       });
       if (!res.ok) {
         toast.error(res.message ?? 'บันทึกไม่สำเร็จ');
         return;
       }
-      toast.success(`มอบหมาย ${emp.first_name} ไปที่ ${client.name} วันที่ ${date}`);
+      toast.success(`มอบหมาย ${emp.first_name} ไปที่ ${client?.name ?? fallbackUnit} วันที่ ${date}`);
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -151,6 +166,11 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
               {activeClients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                </option>
+              ))}
+              {fallbackUnitsFromJobs.map((name) => (
+                <option key={`unit:${name}`} value={`unit:${name}`}>
+                  {name}
                 </option>
               ))}
             </select>
