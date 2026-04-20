@@ -34,6 +34,13 @@ function normSearch(s: string): string {
   return s.normalize('NFC').toLowerCase().trim();
 }
 
+function searchTokens(input: string): string[] {
+  return normSearch(input)
+    .split(/[\s,./\-_|]+/u)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+}
+
 /** ให้คำว่า "กรุงเทพ" / "กทม" ค้นเจองานที่อยู่ กรุงเทพมหานคร */
 function jobSearchBlob(j: JobRequest): string {
   const addr = j.location_address || '';
@@ -108,9 +115,9 @@ const PublicJobBoardPage: React.FC = () => {
     if (!districtOptions.includes(districtFilter)) setDistrictFilter('');
   }, [districtFilter, districtOptions]);
 
-  const filtered = useMemo(() => {
+  const { filtered, usedRelatedFallback } = useMemo(() => {
     const q = normSearch(search);
-    return visible
+    const baseRows = visible
       .filter((j) => {
         if (chip === 'urgent') return j.urgency === 'urgent';
         return true;
@@ -120,11 +127,23 @@ const PublicJobBoardPage: React.FC = () => {
         if (provinceFilter && jobProv !== provinceFilter) return false;
         if (districtFilter && !districtMatchesFilter(j.location_address, districtFilter)) return false;
         return true;
-      })
-      .filter((j) => {
-        if (!q) return true;
-        return jobSearchBlob(j).includes(q);
       });
+    if (!q) return { filtered: baseRows, usedRelatedFallback: false };
+
+    const exact = baseRows.filter((j) => jobSearchBlob(j).includes(q));
+    if (exact.length > 0) return { filtered: exact, usedRelatedFallback: false };
+
+    const tokens = searchTokens(search);
+    if (tokens.length === 0) return { filtered: baseRows, usedRelatedFallback: false };
+
+    const related = baseRows.filter((j) => {
+      const blob = jobSearchBlob(j);
+      return tokens.some((t) => blob.includes(t) || t.includes(blob));
+    });
+    if (related.length > 0) return { filtered: related, usedRelatedFallback: true };
+
+    // Same behavior as PreCheck fallback: if strict text match returns nothing, keep nearby rows.
+    return { filtered: baseRows, usedRelatedFallback: true };
   }, [visible, search, chip, provinceFilter, districtFilter]);
 
   const openApply = () => {
@@ -209,6 +228,12 @@ const PublicJobBoardPage: React.FC = () => {
 
         {loading && (
           <p className="mt-8 text-sm text-muted-foreground animate-pulse">กำลังโหลดประกาศงาน...</p>
+        )}
+
+        {!loading && usedRelatedFallback && search.trim() && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            ไม่พบผลที่ตรงคำค้นทั้งหมด เลยแสดงงานที่ใกล้เคียงให้แทน
+          </p>
         )}
 
         {!loading && filtered.length === 0 && (
