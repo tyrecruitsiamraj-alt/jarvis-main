@@ -42,7 +42,7 @@ const GlobalCalendar: React.FC = () => {
     return workCalendar.find((w) => w.employee_id === empId && w.work_date === dateStr);
   };
 
-  const shift = (dir: number) => {
+  const offsetWeek = (dir: number) => {
     const d = new Date(startDate);
     d.setDate(d.getDate() + dir * 7);
     setStartDate(d);
@@ -59,11 +59,11 @@ const GlobalCalendar: React.FC = () => {
       ) : (
       <div className="px-4 md:px-6">
         <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => shift(-1)} className="p-2 rounded-lg bg-secondary"><ChevronLeft className="w-4 h-4" /></button>
+          <button type="button" onClick={() => offsetWeek(-1)} className="p-2 rounded-lg bg-secondary"><ChevronLeft className="w-4 h-4" /></button>
           <span className="text-sm font-medium text-foreground">
             {days[0].toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {days[days.length - 1].toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
           </span>
-          <button onClick={() => shift(1)} className="p-2 rounded-lg bg-secondary"><ChevronRight className="w-4 h-4" /></button>
+          <button type="button" onClick={() => offsetWeek(1)} className="p-2 rounded-lg bg-secondary"><ChevronRight className="w-4 h-4" /></button>
         </div>
 
         <div className="overflow-x-auto glass-card rounded-xl border border-border">
@@ -95,7 +95,12 @@ const GlobalCalendar: React.FC = () => {
                       <td key={i} className={cn('px-1 py-1.5', isToday && 'bg-primary/5')}>
                         {entry && entry.status !== 'available' ? (
                           <div className={cn('rounded-md px-1.5 py-1 text-center', WORK_STATUS_COLORS[entry.status])}>
-                            <div className="text-[9px] font-medium text-foreground truncate">{entry.client_name?.split(' ')[0]}</div>
+                            <div
+                              className="text-[9px] font-medium text-foreground leading-tight break-words line-clamp-3 max-w-[76px] mx-auto"
+                              title={entry.client_name || undefined}
+                            >
+                              {entry.client_name || '—'}
+                            </div>
                           </div>
                         ) : (
                           <div className="text-center text-muted-foreground/50 text-[10px]">ว่าง</div>

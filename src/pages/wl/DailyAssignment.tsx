@@ -7,6 +7,7 @@ import { useWlEmployees } from '@/hooks/useWlEmployees';
 import { Plus, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Employee, WorkCalendarEntry, WORK_STATUS_LABELS } from '@/types';
+import { shiftStartLabel } from '@/lib/utils';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
 
 const DailyAssignment: React.FC = () => {
@@ -51,7 +52,7 @@ const DailyAssignment: React.FC = () => {
                   className="glass-card rounded-lg p-3 border border-border flex items-center justify-between cursor-pointer hover:border-primary/40 transition-colors">
                   <div>
                     <div className="font-medium text-foreground text-sm">{emp?.first_name} {emp?.last_name}</div>
-                    <div className="text-xs text-muted-foreground">{entry.client_name} • {entry.shift}</div>
+                    <div className="text-xs text-muted-foreground">{entry.client_name} • {shiftStartLabel(entry.shift) || '-'}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={entry.status} type="work" />
@@ -110,7 +111,10 @@ const DailyAssignment: React.FC = () => {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">ลูกค้า</span><span className="text-foreground">{editDialog.entry.client_name || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">กะ</span><span className="text-foreground">{editDialog.entry.shift || '-'}</span></div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">เวลาเริ่มงาน</span>
+                  <span className="text-foreground text-right">{shiftStartLabel(editDialog.entry.shift) || '-'}</span>
+                </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">สถานะ</span><span>{WORK_STATUS_LABELS[editDialog.entry.status as keyof typeof WORK_STATUS_LABELS]}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">รายได้</span><span className="text-success">฿{editDialog.entry.income?.toLocaleString() || 0}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">ต้นทุน</span><span className="text-warning">฿{editDialog.entry.cost?.toLocaleString() || 0}</span></div>

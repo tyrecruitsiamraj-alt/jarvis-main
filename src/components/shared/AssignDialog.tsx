@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { mockEmployees, mockClients } from '@/data/mockData';
 import { toast } from 'sonner';
@@ -16,27 +16,126 @@ interface AssignDialogProps {
   employeeName?: string;
 }
 
+const THAI_MONTHS: { value: number; label: string }[] = [
+  { value: 1, label: 'มกราคม' },
+  { value: 2, label: 'กุมภาพันธ์' },
+  { value: 3, label: 'มีนาคม' },
+  { value: 4, label: 'เมษายน' },
+  { value: 5, label: 'พฤษภาคม' },
+  { value: 6, label: 'มิถุนายน' },
+  { value: 7, label: 'กรกฎาคม' },
+  { value: 8, label: 'สิงหาคม' },
+  { value: 9, label: 'กันยายน' },
+  { value: 10, label: 'ตุลาคม' },
+  { value: 11, label: 'พฤศจิกายน' },
+  { value: 12, label: 'ธันวาคม' },
+];
+
+function toYmdLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseYmd(ymd: string | undefined): { y: number; m: number; d: number } | null {
+  if (!ymd || typeof ymd !== 'string') return null;
+  const m = ymd.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (Number.isNaN(dt.getTime()) || dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) {
+    return null;
+  }
+  return { y, m: mo, d };
+}
+
+function ceToBeYear(y: number): number {
+  return y + 543;
+}
+
+function dmyBeToYmd(day: number, month: number, yearBe: number): string | null {
+  const yCe = yearBe - 543;
+  const dt = new Date(yCe, month - 1, day);
+  if (Number.isNaN(dt.getTime()) || dt.getFullYear() !== yCe || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
+    return null;
+  }
+  const m = String(month).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${yCe}-${m}-${d}`;
+}
+
+function formatTitleDmyBe(ymd: string): string {
+  const p = parseYmd(ymd);
+  if (!p) return ymd;
+  return `${p.d}/${p.m}/${ceToBeYear(p.y)}`;
+}
+
+function buildDateRange(from: string, to: string | null): string[] {
+  if (!from) return [];
+  const end = to && to >= from ? to : from;
+  const start = new Date(`${from}T00:00:00`);
+  const endD = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(endD.getTime()) || start > endD) return [];
+
+  const out: string[] = [];
+  const cur = new Date(start);
+  while (cur <= endD) {
+    out.push(toYmdLocal(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
 const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, employeeId, employeeName }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(employeeId || '');
   const [selectedClient, setSelectedClient] = useState('');
-  const [startDate, setStartDate] = useState(date || '');
-  const [endDate, setEndDate] = useState(date || '');
+  const [startDay, setStartDay] = useState(1);
+  const [startMonth, setStartMonth] = useState(1);
+  const [startYearBe, setStartYearBe] = useState(ceToBeYear(new Date().getFullYear()));
+  const [endDay, setEndDay] = useState<number | ''>('');
+  const [endMonth, setEndMonth] = useState<number | ''>('');
+  const [endYearBe, setEndYearBe] = useState<number | ''>('');
   const [startTime, setStartTime] = useState('08:00');
-  const [endTime, setEndTime] = useState('17:00');
+  const [endTime, setEndTime] = useState('');
+  const [endTimeUnknown, setEndTimeUnknown] = useState(false);
   const [saving, setSaving] = useState(false);
   const [apiEmployees, setApiEmployees] = useState<Employee[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const yearOptionsBe = useMemo(() => {
+    const cy = new Date().getFullYear();
+    const centerBe = ceToBeYear(cy);
+    const out: number[] = [];
+    for (let be = centerBe - 15; be <= centerBe + 15; be += 1) out.push(be);
+    return out;
+  }, []);
+
+  const dayOptions = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
+
+  const applyDateProp = (ymd: string) => {
+    const p = parseYmd(ymd) ?? parseYmd(toYmdLocal(new Date()));
+    if (!p) return;
+    setStartDay(p.d);
+    setStartMonth(p.m);
+    setStartYearBe(ceToBeYear(p.y));
+    setEndDay('');
+    setEndMonth('');
+    setEndYearBe('');
+  };
+
   useEffect(() => {
     if (open) {
       setSelectedEmployee(employeeId || '');
       setSelectedClient('');
-      setStartDate(date || '');
-      setEndDate(date || '');
+      applyDateProp(date || toYmdLocal(new Date()));
       setStartTime('08:00');
-      setEndTime('17:00');
+      setEndTime('');
+      setEndTimeUnknown(false);
       setLoadError(null);
     }
   }, [open, employeeId, date]);
@@ -93,23 +192,16 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const employeeList = isDemoMode() ? mockEmployees : apiEmployees;
   const clientList = isDemoMode() ? mockClients : apiClients;
 
-  function buildDateRange(from: string, to: string): string[] {
-    if (!from || !to) return [];
-    const start = new Date(`${from}T00:00:00`);
-    const end = new Date(`${to}T00:00:00`);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [];
+  const endDateFilled =
+    endDay !== '' &&
+    endMonth !== '' &&
+    endYearBe !== '' &&
+    typeof endDay === 'number' &&
+    typeof endMonth === 'number' &&
+    typeof endYearBe === 'number';
 
-    const out: string[] = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      const y = cur.getFullYear();
-      const m = String(cur.getMonth() + 1).padStart(2, '0');
-      const d = String(cur.getDate()).padStart(2, '0');
-      out.push(`${y}-${m}-${d}`);
-      cur.setDate(cur.getDate() + 1);
-    }
-    return out;
-  }
+  const anyEndField = endDay !== '' || endMonth !== '' || endYearBe !== '';
+  const endDatePartial = anyEndField && !endDateFilled;
 
   const handleAssign = async () => {
     const empId = employeeId || selectedEmployee;
@@ -118,19 +210,41 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     const fallbackUnit = fallbackUnitsFromJobs.find((u) => `unit:${u}` === selectedClient);
     if (!emp || (!client && !fallbackUnit)) return;
 
-    const dates = buildDateRange(startDate, endDate);
+    const startIso = dmyBeToYmd(startDay, startMonth, startYearBe);
+    if (!startIso) {
+      toast.error('กรุณาเลือกวันเริ่มงานให้ถูกต้อง');
+      return;
+    }
+
+    if (endDatePartial) {
+      toast.error('ถ้าระบุถึงวันที่ ให้เลือกวัน เดือน และปี พ.ศ. ให้ครบ หรือเว้นว่างทั้งหมด');
+      return;
+    }
+
+    let endIso: string | null = null;
+    if (endDateFilled) {
+      endIso = dmyBeToYmd(endDay as number, endMonth as number, endYearBe as number);
+      if (!endIso) {
+        toast.error('กรุณาเลือกวันสิ้นสุดให้ถูกต้อง หรือเว้นว่างเพื่อลงวันเดียว');
+        return;
+      }
+    }
+
+    if (!startTime.trim()) {
+      toast.error('กรุณาเลือกเวลาเริ่มงาน');
+      return;
+    }
+
+    const dates = buildDateRange(startIso, endIso);
     if (dates.length === 0) {
-      toast.error('กรุณาเลือกช่วงวันที่ให้ถูกต้อง');
+      toast.error('ช่วงวันที่ไม่ถูกต้อง');
       return;
     }
-    if (!startTime || !endTime) {
-      toast.error('กรุณาเลือกเวลาเริ่มและเวลาสิ้นสุด');
-      return;
-    }
+
+    const shift =
+      !endTimeUnknown && endTime.trim() ? `${startTime.trim()}-${endTime.trim()}` : startTime.trim();
 
     setSaving(true);
-    const shift = `${startTime}-${endTime}`;
-
     try {
       for (const workDate of dates) {
         const res = await createWorkCalendarAssignment({
@@ -149,9 +263,8 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
         }
       }
 
-      toast.success(
-        `มอบหมาย ${emp.first_name} ไปที่ ${client?.name ?? fallbackUnit} ช่วง ${startDate} ถึง ${endDate}`,
-      );
+      const endLabel = endIso ?? startIso;
+      toast.success(`มอบหมาย ${emp.first_name} ไปที่ ${client?.name ?? fallbackUnit} ช่วง ${startIso} ถึง ${endLabel}`);
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -162,7 +275,9 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-foreground">มอบหมายงาน - {date}</DialogTitle>
+          <DialogTitle className="text-foreground">
+            มอบหมายงาน — วันที่ {formatTitleDmyBe(date || toYmdLocal(new Date()))}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             เลือกพนักงาน หน่วยงาน และช่วงเวลา เพื่อยืนยันการมอบหมายงาน
           </DialogDescription>
@@ -218,30 +333,101 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">เริ่มวันที่</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-              />
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">วันเริ่มงาน (วัน / เดือน / ปี พ.ศ.)</label>
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                value={startDay}
+                onChange={(e) => setStartDay(Number(e.target.value))}
+                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+              >
+                {dayOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={startMonth}
+                onChange={(e) => setStartMonth(Number(e.target.value))}
+                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+              >
+                {THAI_MONTHS.map((mo) => (
+                  <option key={mo.value} value={mo.value}>
+                    {mo.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={startYearBe}
+                onChange={(e) => setStartYearBe(Number(e.target.value))}
+                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+              >
+                {yearOptionsBe.map((be) => (
+                  <option key={be} value={be}>
+                    {be}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">ถึงวันที่</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-              />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              ถึงวันที่ (ไม่บังคับ — เว้นว่าง = ลงวันเดียวกับวันเริ่ม)
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                value={endDay === '' ? '' : String(endDay)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setEndDay(v === '' ? '' : Number(v));
+                }}
+                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+              >
+                <option value="">วัน</option>
+                {dayOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={endMonth === '' ? '' : String(endMonth)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setEndMonth(v === '' ? '' : Number(v));
+                }}
+                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+              >
+                <option value="">เดือน</option>
+                {THAI_MONTHS.map((mo) => (
+                  <option key={mo.value} value={mo.value}>
+                    {mo.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={endYearBe === '' ? '' : String(endYearBe)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setEndYearBe(v === '' ? '' : Number(v));
+                }}
+                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+              >
+                <option value="">ปี พ.ศ.</option>
+                {yearOptionsBe.map((be) => (
+                  <option key={be} value={be}>
+                    {be}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">เวลาเริ่ม</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">เวลาเริ่มงาน</label>
               <input
                 type="time"
                 value={startTime}
@@ -250,13 +436,30 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">เวลาสิ้นสุด</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">เวลาเลิกงาน (ไม่บังคับ)</label>
               <input
                 type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                disabled={endTimeUnknown}
+                onChange={(e) => {
+                  setEndTimeUnknown(false);
+                  setEndTime(e.target.value);
+                }}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
               />
+              <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 shrink-0 rounded border-border"
+                  checked={endTimeUnknown}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setEndTimeUnknown(on);
+                    if (on) setEndTime('');
+                  }}
+                />
+                <span>ยังไม่ทราบเวลาเลิกงาน — ระบบจะบันทึกเฉพาะเวลาเริ่ม (ไม่ต้องใส่เวลาข้างบน)</span>
+              </label>
             </div>
           </div>
 
@@ -275,4 +478,3 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
 };
 
 export default AssignDialog;
-

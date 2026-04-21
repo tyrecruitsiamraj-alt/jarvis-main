@@ -5,7 +5,7 @@ import AssignDialog from '@/components/shared/AssignDialog';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
 import { WorkCalendarEntry, WorkStatus, WORK_STATUS_COLORS, WORK_STATUS_LABELS } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, shiftStartLabel } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
@@ -116,7 +116,10 @@ const MonthlyPlanner: React.FC = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">วันที่</span><span className="text-foreground">{cellDetail.entry.work_date}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">ลูกค้า</span><span className="text-foreground">{cellDetail.entry.client_name || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">กะ</span><span className="text-foreground">{cellDetail.entry.shift || '-'}</span></div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">เวลาเริ่มงาน</span>
+                  <span className="text-foreground text-right">{shiftStartLabel(cellDetail.entry.shift) || '-'}</span>
+                </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">รายได้</span><span className="text-success">฿{cellDetail.entry.income?.toLocaleString() || 0}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">ต้นทุน</span><span className="text-warning">฿{cellDetail.entry.cost?.toLocaleString() || 0}</span></div>
                 {cellDetail.entry.issue_reason && (
