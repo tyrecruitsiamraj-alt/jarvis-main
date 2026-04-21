@@ -19,6 +19,7 @@ import { CANDIDATE_STAFFING_OPTIONS } from '@/lib/candidateStaffing';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { upsertCandidateInDemoStorage, hydrateCandidateStaffing } from '@/lib/demoStorage';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 
 const TITLE_PREFIX_SELECT = [
   { value: '', label: '— ไม่มี —' },
@@ -422,30 +423,26 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่สมัคร</label>
-                <input
-                  type="date"
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่สมัคร (วัน / เดือน / ปี พ.ศ.)</label>
+                <DateSelectDmyBe
                   value={form.application_date}
-                  onChange={(e) => setForm({ ...form, application_date: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  onChange={(v) => setForm({ ...form, application_date: v })}
                 />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">คุยครั้งแรก</label>
-                <input
-                  type="date"
+                <DateSelectDmyBe
                   value={form.first_contact_date}
-                  onChange={(e) => setForm({ ...form, first_contact_date: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  onChange={(v) => setForm({ ...form, first_contact_date: v })}
+                  allowEmpty
                 />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">ลงงานครั้งแรก</label>
-                <input
-                  type="date"
+                <DateSelectDmyBe
                   value={form.first_work_date}
-                  onChange={(e) => setForm({ ...form, first_work_date: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  onChange={(v) => setForm({ ...form, first_work_date: v })}
+                  allowEmpty
                 />
               </div>
             </div>

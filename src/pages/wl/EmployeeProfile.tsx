@@ -6,6 +6,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { mockEmployees, mockTrainingRecords } from '@/data/mockData';
 import { User, BarChart3, Award, AlertTriangle, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { Candidate, Employee, TrainingRecord } from '@/types';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
@@ -229,7 +230,7 @@ const EmployeeProfile: React.FC = () => {
               {employee.status}
             </span>
           </div>
-          <div className="text-xs text-muted-foreground">เริ่มงาน: {employee.join_date}</div>
+          <div className="text-xs text-muted-foreground">เริ่มงาน: {formatYmdDmyBe(employee.join_date)}</div>
         </div>
 
         {/* Stats */}
@@ -270,7 +271,7 @@ const EmployeeProfile: React.FC = () => {
                 className="glass-card rounded-lg p-3 border border-border flex items-center justify-between"
               >
                 <div>
-                  <div className="text-sm font-medium text-foreground">{w.work_date}</div>
+                  <div className="text-sm font-medium text-foreground">{formatYmdDmyBe(w.work_date)}</div>
                   <div className="text-xs text-muted-foreground">
                     {w.client_name || 'ว่าง'} {w.shift && `• ${w.shift}`}
                   </div>
@@ -295,7 +296,7 @@ const EmployeeProfile: React.FC = () => {
                 >
                   <div>
                     <div className="text-sm font-medium text-foreground">{t.training_name}</div>
-                    <div className="text-xs text-muted-foreground">{t.training_date}</div>
+                    <div className="text-xs text-muted-foreground">{formatYmdDmyBe(t.training_date)}</div>
                   </div>
                   <span
                     className={cn(

@@ -10,6 +10,7 @@ import { User, Phone, MapPin, AlertTriangle, Briefcase, Pencil } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { candidateStaffingLabel } from '@/lib/candidateStaffing';
 import { getCandidates, hydrateCandidateStaffing } from '@/lib/demoStorage';
 import { wlEmployeeIdFromCandidateId } from '@/lib/wlFromCandidate';
@@ -235,7 +236,7 @@ const CandidateProfile: React.FC = () => {
                   <div>
                     <div className="text-sm font-medium text-foreground">{i.client_name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {i.interview_date} • {i.location}
+                      {formatYmdDmyBe(i.interview_date)} • {i.location}
                     </div>
                   </div>
                   <span
@@ -266,7 +267,7 @@ const CandidateProfile: React.FC = () => {
                   <div>
                     <div className="text-sm font-medium text-foreground">{w.client_name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {w.start_date} - {w.end_date || 'ปัจจุบัน'}
+                      {formatYmdDmyBe(w.start_date)} - {w.end_date ? formatYmdDmyBe(w.end_date) : 'ปัจจุบัน'}
                     </div>
                   </div>
                   <span

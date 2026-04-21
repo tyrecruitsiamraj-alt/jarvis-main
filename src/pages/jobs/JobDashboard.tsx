@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import DetailListDialog from '@/components/shared/DetailListDialog';
@@ -26,7 +27,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (id: string) => void)
   return {
     id: j.id,
     title: j.unit_name,
-    subtitle: `${JOB_TYPE_LABELS[j.job_type]} • ${JOB_CATEGORY_LABELS[j.job_category]} • ต้องการ ${j.required_date} • ${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}`,
+    subtitle: `${JOB_TYPE_LABELS[j.job_type]} • ${JOB_CATEGORY_LABELS[j.job_category]} • ต้องการ ${formatYmdDmyBe(j.required_date)} • ${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}`,
     badge,
     badgeVariant,
     onClick: () => onNavigate(j.id),

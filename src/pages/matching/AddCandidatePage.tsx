@@ -5,6 +5,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import { createCandidate } from '@/lib/demoStorage';
 import type { DrivingResult, Gender, YesNo } from '@/types';
 const TITLE_PREFIX_SELECT = [
@@ -402,32 +403,17 @@ const AddCandidatePage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่สมัคร</label>
-                <input
-                  type="date"
-                  value={applicationDate}
-                  onChange={(e) => setApplicationDate(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
+                <DateSelectDmyBe value={applicationDate} onChange={setApplicationDate} allowEmpty />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่คุยครั้งแรก</label>
-                <input
-                  type="date"
-                  value={firstContactDate}
-                  onChange={(e) => setFirstContactDate(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
+                <DateSelectDmyBe value={firstContactDate} onChange={setFirstContactDate} allowEmpty />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ลงงานครั้งแรก</label>
-                <input
-                  type="date"
-                  value={firstWorkDate}
-                  onChange={(e) => setFirstWorkDate(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
+                <DateSelectDmyBe value={firstWorkDate} onChange={setFirstWorkDate} allowEmpty />
               </div>
             </div>
           </div>

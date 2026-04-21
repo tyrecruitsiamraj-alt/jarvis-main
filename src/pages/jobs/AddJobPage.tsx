@@ -9,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
+import { toYmdLocal } from '@/lib/dateTh';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 
 const WORK_DAY_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '— เลือก —' },
@@ -75,8 +77,8 @@ const AddJobPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [unitName, setUnitName] = useState('');
-  const [requestDate, setRequestDate] = useState('');
-  const [requiredDate, setRequiredDate] = useState('');
+  const [requestDate, setRequestDate] = useState(() => toYmdLocal(new Date()));
+  const [requiredDate, setRequiredDate] = useState(() => toYmdLocal(new Date()));
   const [jobType, setJobType] = useState<JobType>('thai_executive');
   const [jobCategory, setJobCategory] = useState<JobCategory>('private');
   const [totalIncome, setTotalIncome] = useState('');
@@ -305,23 +307,13 @@ const AddJobPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ขอ *</label>
-              <input
-                type="date"
-                value={requestDate}
-                onChange={(e) => setRequestDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-              />
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ขอ * (วัน / เดือน / ปี พ.ศ.)</label>
+              <DateSelectDmyBe value={requestDate} onChange={setRequestDate} />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ต้องการ *</label>
-              <input
-                type="date"
-                value={requiredDate}
-                onChange={(e) => setRequiredDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-              />
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ต้องการ * (วัน / เดือน / ปี พ.ศ.)</label>
+              <DateSelectDmyBe value={requiredDate} onChange={setRequiredDate} />
             </div>
 
             <div>

@@ -8,12 +8,14 @@ import { Plus, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Employee, WorkCalendarEntry, WORK_STATUS_LABELS } from '@/types';
 import { shiftStartLabel } from '@/lib/utils';
+import { toYmdLocal } from '@/lib/dateTh';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
 
 const DailyAssignment: React.FC = () => {
   const workCalendar = useWorkCalendarEntries();
   const { employees: wlEmployees, loading: loadingEmps } = useWlEmployees();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => toYmdLocal(new Date()));
   const [searchTerm, setSearchTerm] = useState('');
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; empId: string; empName: string }>({ open: false, empId: '', empName: '' });
   type WorkCalendarEntryWithEmployee = WorkCalendarEntry & { emp?: Employee };
@@ -38,8 +40,10 @@ const DailyAssignment: React.FC = () => {
         <div className="px-4 md:px-6 text-sm text-muted-foreground">กำลังโหลด…</div>
       ) : (
       <div className="px-4 md:px-6 space-y-4">
-        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-          className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground" />
+        <div>
+          <label className="text-xs font-medium text-muted-foreground mb-1 block">เลือกวันที่ (วัน / เดือน / ปี พ.ศ.)</label>
+          <DateSelectDmyBe value={selectedDate} onChange={setSelectedDate} />
+        </div>
 
         {/* Assigned today */}
         <div>

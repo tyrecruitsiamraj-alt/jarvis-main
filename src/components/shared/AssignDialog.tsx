@@ -7,6 +7,15 @@ import { createWorkCalendarAssignment } from '@/lib/workCalendarStore';
 import { apiFetch } from '@/lib/apiFetch';
 import { parseJobsPayload } from '@/lib/jobCoords';
 import type { ClientWorkplace, Employee, JobRequest } from '@/types';
+import {
+  THAI_MONTHS,
+  parseYmd,
+  toYmdLocal,
+  ceToBeYear,
+  dmyBeToYmd,
+  formatYmdDmyBe,
+  buildDateRangeYmd,
+} from '@/lib/dateTh';
 
 interface AssignDialogProps {
   open: boolean;
@@ -14,79 +23,6 @@ interface AssignDialogProps {
   date: string;
   employeeId?: string;
   employeeName?: string;
-}
-
-const THAI_MONTHS: { value: number; label: string }[] = [
-  { value: 1, label: 'มกราคม' },
-  { value: 2, label: 'กุมภาพันธ์' },
-  { value: 3, label: 'มีนาคม' },
-  { value: 4, label: 'เมษายน' },
-  { value: 5, label: 'พฤษภาคม' },
-  { value: 6, label: 'มิถุนายน' },
-  { value: 7, label: 'กรกฎาคม' },
-  { value: 8, label: 'สิงหาคม' },
-  { value: 9, label: 'กันยายน' },
-  { value: 10, label: 'ตุลาคม' },
-  { value: 11, label: 'พฤศจิกายน' },
-  { value: 12, label: 'ธันวาคม' },
-];
-
-function toYmdLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function parseYmd(ymd: string | undefined): { y: number; m: number; d: number } | null {
-  if (!ymd || typeof ymd !== 'string') return null;
-  const m = ymd.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  const dt = new Date(y, mo - 1, d);
-  if (Number.isNaN(dt.getTime()) || dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) {
-    return null;
-  }
-  return { y, m: mo, d };
-}
-
-function ceToBeYear(y: number): number {
-  return y + 543;
-}
-
-function dmyBeToYmd(day: number, month: number, yearBe: number): string | null {
-  const yCe = yearBe - 543;
-  const dt = new Date(yCe, month - 1, day);
-  if (Number.isNaN(dt.getTime()) || dt.getFullYear() !== yCe || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
-    return null;
-  }
-  const m = String(month).padStart(2, '0');
-  const d = String(day).padStart(2, '0');
-  return `${yCe}-${m}-${d}`;
-}
-
-function formatTitleDmyBe(ymd: string): string {
-  const p = parseYmd(ymd);
-  if (!p) return ymd;
-  return `${p.d}/${p.m}/${ceToBeYear(p.y)}`;
-}
-
-function buildDateRange(from: string, to: string | null): string[] {
-  if (!from) return [];
-  const end = to && to >= from ? to : from;
-  const start = new Date(`${from}T00:00:00`);
-  const endD = new Date(`${end}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(endD.getTime()) || start > endD) return [];
-
-  const out: string[] = [];
-  const cur = new Date(start);
-  while (cur <= endD) {
-    out.push(toYmdLocal(cur));
-    cur.setDate(cur.getDate() + 1);
-  }
-  return out;
 }
 
 const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, employeeId, employeeName }) => {
@@ -235,7 +171,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
       return;
     }
 
-    const dates = buildDateRange(startIso, endIso);
+    const dates = buildDateRangeYmd(startIso, endIso);
     if (dates.length === 0) {
       toast.error('ช่วงวันที่ไม่ถูกต้อง');
       return;
@@ -276,7 +212,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            มอบหมายงาน — วันที่ {formatTitleDmyBe(date || toYmdLocal(new Date()))}
+            มอบหมายงาน — วันที่ {formatYmdDmyBe(date || toYmdLocal(new Date()))}
           </DialogTitle>
           <DialogDescription className="sr-only">
             เลือกพนักงาน หน่วยงาน และช่วงเวลา เพื่อยืนยันการมอบหมายงาน

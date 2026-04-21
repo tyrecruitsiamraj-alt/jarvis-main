@@ -4,6 +4,8 @@ import PageHeader from '@/components/shared/PageHeader';
 import type { EmployeeStatus } from '@/types';
 import { reverseGeocodeLatLng, parseGoogleMapsUrl } from '@/lib/googleMaps';
 import { apiFetch } from '@/lib/apiFetch';
+import { toYmdLocal } from '@/lib/dateTh';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 
 const AddEmployeePage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,7 +20,7 @@ const AddEmployeePage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<EmployeeStatus>('active');
   const [position, setPosition] = useState('');
-  const [joinDate, setJoinDate] = useState('');
+  const [joinDate, setJoinDate] = useState(() => toYmdLocal(new Date()));
 
   const [locationMode, setLocationMode] = useState<'manual' | 'google' | 'latlong'>('manual');
   const [manualAddress, setManualAddress] = useState('');
@@ -213,13 +215,8 @@ const AddEmployeePage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">เริ่มงาน *</label>
-              <input
-                type="date"
-                value={joinDate}
-                onChange={(e) => setJoinDate(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-              />
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">เริ่มงาน * (วัน / เดือน / ปี พ.ศ.)</label>
+              <DateSelectDmyBe value={joinDate} onChange={setJoinDate} />
             </div>
           </div>
 

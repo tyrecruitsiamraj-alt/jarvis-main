@@ -6,6 +6,7 @@ import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
 import { WorkCalendarEntry, WorkStatus, WORK_STATUS_COLORS, WORK_STATUS_LABELS } from '@/types';
 import { cn, shiftStartLabel } from '@/lib/utils';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
@@ -114,7 +115,7 @@ const MonthlyPlanner: React.FC = () => {
                 <StatusBadge status={cellDetail.entry.status} type="work" />
               </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">วันที่</span><span className="text-foreground">{cellDetail.entry.work_date}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">วันที่</span><span className="text-foreground">{formatYmdDmyBe(cellDetail.entry.work_date)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">ลูกค้า</span><span className="text-foreground">{cellDetail.entry.client_name || '-'}</span></div>
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">เวลาเริ่มงาน</span>

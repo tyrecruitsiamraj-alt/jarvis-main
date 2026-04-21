@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
 
-/** ตรงกับค่า <input type="date"> และ work_date ใน store (ปฏิทินท้องถิ่น ไม่ใช่ UTC จาก toISOString) */
+/** work_date ใน store เป็น YYYY-MM-DD ตามปฏิทินท้องถิ่น (ไม่ใช่ UTC จาก toISOString) */
 function formatLocalYmd(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');

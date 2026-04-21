@@ -9,6 +9,7 @@ import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace 
 import { getJobs } from '@/lib/demoStorage';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { haversineKm } from '@/lib/geo';
 import { jobLatLng, parseJobsPayload, mergeJobsForPrecheck } from '@/lib/jobCoords';
 import { Input } from '@/components/ui/input';
@@ -431,7 +432,7 @@ const PreCheckPage: React.FC = () => {
               </div>
               <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                 <span>
-                  Income: {j.total_income.toLocaleString()} THB • Required: {j.required_date}
+                  Income: {j.total_income.toLocaleString()} THB • Required: {formatYmdDmyBe(j.required_date)}
                 </span>
                 {distanceKm !== null ? (
                   <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} km (nearest first)</span>
@@ -490,7 +491,7 @@ const PreCheckPage: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Required Date</span>
-                      <span>{jobDetail.required_date}</span>
+                      <span>{formatYmdDmyBe(jobDetail.required_date)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Penalty / day</span>

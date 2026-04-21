@@ -21,6 +21,8 @@ import type {
   JobUrgency,
 } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
+import { formatYmdDmyBe } from '@/lib/dateTh';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import {
   MapPin,
   AlertTriangle,
@@ -492,12 +494,12 @@ const JobDetailPage: React.FC = () => {
 
             <div>
               <span className="text-muted-foreground">วันที่ขอ:</span>{' '}
-              <span className="text-foreground">{job.request_date}</span>
+              <span className="text-foreground">{formatYmdDmyBe(job.request_date)}</span>
             </div>
 
             <div>
               <span className="text-muted-foreground">วันที่ต้องการ:</span>{' '}
-              <span className="text-foreground">{job.required_date}</span>
+              <span className="text-foreground">{formatYmdDmyBe(job.required_date)}</span>
             </div>
 
             <div>
@@ -579,7 +581,7 @@ const JobDetailPage: React.FC = () => {
                         : a.assignment_type === 'replacement'
                           ? 'แทนงาน'
                           : 'จุ่ม'}{' '}
-                      • เริ่ม {a.start_date}
+                      • เริ่ม {formatYmdDmyBe(a.start_date)}
                       {a.trial_days ? ` • จุ่ม ${a.trial_days} วัน` : ''}
                     </div>
                   </div>
@@ -715,21 +717,17 @@ const JobDetailPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ขอ</label>
-                  <input
-                    type="date"
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ขอ (วัน / เดือน / ปี พ.ศ.)</label>
+                  <DateSelectDmyBe
                     value={editForm.request_date}
-                    onChange={(e) => setEditForm({ ...editForm, request_date: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    onChange={(v) => setEditForm({ ...editForm, request_date: v })}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ต้องการ</label>
-                  <input
-                    type="date"
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ต้องการ (วัน / เดือน / ปี พ.ศ.)</label>
+                  <DateSelectDmyBe
                     value={editForm.required_date}
-                    onChange={(e) => setEditForm({ ...editForm, required_date: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    onChange={(v) => setEditForm({ ...editForm, required_date: v })}
                   />
                 </div>
               </div>
@@ -761,12 +759,11 @@ const JobDetailPage: React.FC = () => {
               </div>
               {editForm.status === 'closed' && (
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ปิด</label>
-                  <input
-                    type="date"
-                    value={editForm.closed_date}
-                    onChange={(e) => setEditForm({ ...editForm, closed_date: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">วันที่ปิด (วัน / เดือน / ปี พ.ศ.)</label>
+                  <DateSelectDmyBe
+                    value={editForm.closed_date || ''}
+                    onChange={(v) => setEditForm({ ...editForm, closed_date: v })}
+                    allowEmpty
                   />
                 </div>
               )}

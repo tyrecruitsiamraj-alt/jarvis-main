@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
@@ -41,7 +42,7 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
     >
       <div className="font-medium text-foreground text-sm line-clamp-1">{job.unit_name}</div>
       <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
-        <span>ต้องการ {job.required_date}</span>
+        <span>ต้องการ {formatYmdDmyBe(job.required_date)}</span>
         <span className={cn(job.urgency === 'urgent' ? 'text-destructive' : 'text-info')}>
           {job.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
         </span>

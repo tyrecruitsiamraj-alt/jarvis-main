@@ -6,6 +6,7 @@ import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { districtMatchesFilter } from '@/lib/districtMatch';
@@ -282,7 +283,7 @@ const PublicJobBoardPage: React.FC = () => {
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
-                    ต้องการ {job.required_date}
+                    ต้องการ {formatYmdDmyBe(job.required_date)}
                   </span>
                 </div>
               </CardContent>
@@ -369,7 +370,7 @@ const PublicJobBoardPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2">
                   <dt className="text-muted-foreground">วันที่ต้องการคน</dt>
-                  <dd>{selected.required_date}</dd>
+                  <dd>{formatYmdDmyBe(selected.required_date)}</dd>
                 </div>
                 {(selected.age_range_min != null || selected.age_range_max != null) && (
                   <div className="flex justify-between gap-4 border-b border-border/60 py-2">
