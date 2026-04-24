@@ -289,7 +289,7 @@ const LoginPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle>ลืมรหัสผ่าน</DialogTitle>
             <DialogDescription>
-              กรอกอีเมลที่ใช้ลงทะเบียน ระบบจะแจ้งขั้นตอนถัดไป (หรือติดต่อ Admin เพื่อรีเซ็ตรหัสโดยตรง)
+              กรอกอีเมลที่ใช้ลงทะเบียน แล้วระบบจะสร้างรหัสชั่วคราวใหม่ให้ทันที
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitForgot} className="space-y-3">
