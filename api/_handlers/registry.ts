@@ -19,6 +19,7 @@ import logoutHandler from './auth/logout.js';
 import meHandler from './auth/me.js';
 import registerHandler from './auth/register.js';
 import forgotPasswordHandler from './auth/forgot-password.js';
+import changePasswordHandler from './auth/change-password.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 
@@ -48,4 +49,5 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/auth/me': meHandler as ApiHandler,
   '/api/auth/register': registerHandler as ApiHandler,
   '/api/auth/forgot-password': forgotPasswordHandler as ApiHandler,
+  '/api/auth/change-password': changePasswordHandler as ApiHandler,
 };

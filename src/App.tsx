@@ -30,6 +30,7 @@ import JobDetailPage from "@/pages/jobs/JobDetailPage";
 import AddJobPage from "@/pages/jobs/AddJobPage";
 import SupervisorDashboard from "@/pages/dashboard/SupervisorDashboard";
 import AdminSettings from "@/pages/settings/AdminSettings";
+import ChangePasswordPage from "@/pages/ChangePasswordPage";
 import NotFound from "./pages/NotFound";
 import RoleHubPage from "./pages/RoleHubPage";
 
@@ -73,6 +74,7 @@ const ProtectedRoutes = () => {
         <Route path="/jobs/:id" element={<JobDetailPage />} />
         <Route path="/dashboard" element={<SupervisorDashboard />} />
         <Route path="/settings" element={<AdminSettings />} />
+        <Route path="/account/change-password" element={<ChangePasswordPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
