@@ -1,12 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  THAI_MONTHS,
-  parseYmd,
-  toYmdLocal,
-  ceToBeYear,
-  dmyBeToYmd,
-  beYearRange,
-} from '@/lib/dateTh';
+import React, { useMemo, useState } from 'react';
+import { CalendarIcon, X } from 'lucide-react';
+import { parseYmd, toYmdLocal, ceToBeYear } from '@/lib/dateTh';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 export interface DateSelectDmyBeProps {
   /** YYYY-MM-DD หรือ '' ถ้า allowEmpty */
@@ -17,9 +13,7 @@ export interface DateSelectDmyBeProps {
   className?: string;
 }
 
-/**
- * เลือกวันที่แบบ วัน / เดือน (ชื่อไทย) / ปี พ.ศ. — ค่าที่ส่งออกยังเป็น YYYY-MM-DD สำหรับ API
- */
+/** เลือกวันที่จากปฏิทินแบบคลิกวัน — ค่าที่ส่งออกยังเป็น YYYY-MM-DD สำหรับ API */
 const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   value,
   onChange,
@@ -27,107 +21,66 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   disabled = false,
   className = '',
 }) => {
-  const [d, setD] = useState<number | ''>('');
-  const [m, setM] = useState<number | ''>('');
-  const [yBe, setYBe] = useState<number | ''>('');
+  const [open, setOpen] = useState(false);
 
-  const yearOptions = useMemo(() => beYearRange(new Date().getFullYear(), 15), []);
-  const dayOptions = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
+  const selectedDate = useMemo(() => {
+    const parsed = parseYmd(value);
+    if (!parsed) return undefined;
+    return new Date(parsed.y, parsed.m - 1, parsed.d);
+  }, [value]);
 
-  useEffect(() => {
-    const p = parseYmd(value);
-    if (p) {
-      setD(p.d);
-      setM(p.m);
-      setYBe(ceToBeYear(p.y));
-      return;
-    }
-    if (allowEmpty) {
-      setD('');
-      setM('');
-      setYBe('');
-      return;
-    }
-    const t = parseYmd(toYmdLocal(new Date()));
-    if (t) {
-      setD(t.d);
-      setM(t.m);
-      setYBe(ceToBeYear(t.y));
-    }
-  }, [value, allowEmpty]);
+  const displayLabel = useMemo(() => {
+    if (!value) return allowEmpty ? 'เลือกวันที่' : '';
+    const parsed = parseYmd(value);
+    if (!parsed) return value;
+    return `${parsed.d}/${parsed.m}/${ceToBeYear(parsed.y)}`;
+  }, [allowEmpty, value]);
 
-  const tryEmit = useCallback(
-    (nextD: number | '', nextM: number | '', nextYBe: number | '') => {
-      if (allowEmpty && nextD === '' && nextM === '' && nextYBe === '') {
-        onChange('');
-        return;
-      }
-      if (typeof nextD === 'number' && typeof nextM === 'number' && typeof nextYBe === 'number') {
-        const iso = dmyBeToYmd(nextD, nextM, nextYBe);
-        if (iso) onChange(iso);
-      }
-    },
-    [allowEmpty, onChange],
-  );
-
-  const sel = 'bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground disabled:opacity-50';
+  const buttonClass =
+    'w-full h-10 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground flex items-center justify-between disabled:opacity-50';
 
   return (
-    <div className={`grid grid-cols-3 gap-2 ${className}`}>
-      <select
-        disabled={disabled}
-        value={d === '' ? '' : String(d)}
-        onChange={(e) => {
-          const v = e.target.value;
-          const nextD = v === '' ? '' : Number(v);
-          setD(nextD);
-          tryEmit(nextD, m, yBe);
-        }}
-        className={sel}
-      >
-        {allowEmpty && <option value="">วัน</option>}
-        {dayOptions.map((x) => (
-          <option key={x} value={x}>
-            {x}
-          </option>
-        ))}
-      </select>
-      <select
-        disabled={disabled}
-        value={m === '' ? '' : String(m)}
-        onChange={(e) => {
-          const v = e.target.value;
-          const nextM = v === '' ? '' : Number(v);
-          setM(nextM);
-          tryEmit(d, nextM, yBe);
-        }}
-        className={sel}
-      >
-        {allowEmpty && <option value="">เดือน</option>}
-        {THAI_MONTHS.map((mo) => (
-          <option key={mo.value} value={mo.value}>
-            {mo.label}
-          </option>
-        ))}
-      </select>
-      <select
-        disabled={disabled}
-        value={yBe === '' ? '' : String(yBe)}
-        onChange={(e) => {
-          const v = e.target.value;
-          const nextY = v === '' ? '' : Number(v);
-          setYBe(nextY);
-          tryEmit(d, m, nextY);
-        }}
-        className={sel}
-      >
-        {allowEmpty && <option value="">ปี พ.ศ.</option>}
-        {yearOptions.map((be) => (
-          <option key={be} value={be}>
-            {be}
-          </option>
-        ))}
-      </select>
+    <div className={className}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button type="button" disabled={disabled} className={buttonClass}>
+            <span className={!displayLabel ? 'text-muted-foreground' : ''}>
+              {displayLabel || 'เลือกวันที่'}
+            </span>
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => {
+              if (!date) {
+                if (allowEmpty) onChange('');
+                return;
+              }
+              onChange(toYmdLocal(date));
+              setOpen(false);
+            }}
+            initialFocus
+          />
+          {allowEmpty && (
+            <div className="border-t border-border p-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setOpen(false);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-secondary hover:bg-secondary/80"
+              >
+                <X className="h-3.5 w-3.5" />
+                ล้างวันที่
+              </button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };
