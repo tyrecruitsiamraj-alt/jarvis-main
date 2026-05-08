@@ -29,13 +29,21 @@ function buildAddressIndex(): AddressIndex {
 
   for (const row of getAllData()) {
     const zipCode = String(row.zipCode || '').trim();
-    const provinceNameById = new Map(row.provinceList.map((p) => [p.provinceId, p.provinceName.trim()]));
-    const districtById = new Map(row.districtList.map((d) => [d.districtId, d.districtName.trim()]));
+    const provinceList = Array.isArray(row?.provinceList) ? row.provinceList : [];
+    const districtList = Array.isArray(row?.districtList) ? row.districtList : [];
+    const subDistrictList = Array.isArray(row?.subDistrictList) ? row.subDistrictList : [];
 
-    for (const sub of row.subDistrictList) {
+    const provinceNameById = new Map(
+      provinceList.map((p) => [String(p.provinceId), String(p.provinceName ?? '').trim()]),
+    );
+    const districtById = new Map(
+      districtList.map((d) => [String(d.districtId), String(d.districtName ?? '').trim()]),
+    );
+
+    for (const sub of subDistrictList) {
       const province = provinceNameById.get(sub.provinceId)?.trim() || '';
       const district = districtById.get(sub.districtId)?.trim() || '';
-      const subdistrict = sub.subDistrictName.trim();
+      const subdistrict = String(sub.subDistrictName ?? '').trim();
       if (!province || !district || !subdistrict) continue;
 
       provinces.add(province);
