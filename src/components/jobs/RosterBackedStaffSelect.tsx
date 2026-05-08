@@ -116,7 +116,7 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
       </select>
 
       {canManageRoster && (
-        <div className="mt-2 space-y-2 rounded-lg border border-border/70 bg-secondary/25 p-2.5">
+        <div className="mt-1.5 space-y-1.5 rounded-lg border border-border/70 bg-secondary/25 p-2">
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
             จัดการรายชื่อในรายการ (Admin)
           </p>
