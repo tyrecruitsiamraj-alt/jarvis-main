@@ -12,6 +12,12 @@ import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import { toYmdLocal } from '@/lib/dateTh';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
+import {
+  getDistrictOptions,
+  getProvinceOptions,
+  getSubdistrictOptions,
+  getZipCodeForSubdistrict,
+} from '@/lib/thaiAddressCascade';
 
 const WORK_DAY_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '— เลือก —' },
@@ -143,6 +149,13 @@ const AddJobPage: React.FC = () => {
   const [workTimeFrom, setWorkTimeFrom] = useState('');
   const [workTimeTo, setWorkTimeTo] = useState('');
   const [penaltyPerDay, setPenaltyPerDay] = useState('');
+
+  const provinceOptions = useMemo(() => getProvinceOptions(), []);
+  const districtOptions = useMemo(() => getDistrictOptions(province), [province]);
+  const subdistrictOptions = useMemo(
+    () => getSubdistrictOptions(province, district),
+    [province, district],
+  );
 
   const fullAddress = useMemo(() => {
     return [
@@ -506,32 +519,70 @@ const AddJobPage: React.FC = () => {
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">ตำบล / แขวง *</label>
-                <input
-                  type="text"
+                <select
                   value={subdistrict}
-                  onChange={(e) => setSubdistrict(e.target.value)}
+                  onChange={(e) => {
+                    const nextSubdistrict = e.target.value;
+                    setSubdistrict(nextSubdistrict);
+                    const inferredZip = getZipCodeForSubdistrict(province, district, nextSubdistrict);
+                    setPostalCode(inferredZip ?? '');
+                  }}
+                  disabled={!province || !district}
                   className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
+                >
+                  <option value="">
+                    {!province || !district ? 'เลือกจังหวัดและอำเภอ/เขตก่อน' : '— เลือกตำบล/แขวง —'}
+                  </option>
+                  {subdistrictOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">อำเภอ / เขต *</label>
-                <input
-                  type="text"
+                <select
                   value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
+                  onChange={(e) => {
+                    setDistrict(e.target.value);
+                    setSubdistrict('');
+                    setPostalCode('');
+                  }}
+                  disabled={!province}
                   className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
+                >
+                  <option value="">
+                    {!province ? 'เลือกจังหวัดก่อน' : '— เลือกอำเภอ/เขต —'}
+                  </option>
+                  {districtOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">จังหวัด *</label>
-                <input
-                  type="text"
+                <select
                   value={province}
-                  onChange={(e) => setProvince(e.target.value)}
+                  onChange={(e) => {
+                    setProvince(e.target.value);
+                    setDistrict('');
+                    setSubdistrict('');
+                    setPostalCode('');
+                  }}
                   className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
+                >
+                  <option value="">— เลือกจังหวัด —</option>
+                  {provinceOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
