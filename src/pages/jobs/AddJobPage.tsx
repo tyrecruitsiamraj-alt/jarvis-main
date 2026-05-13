@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import type { JobCategory, JobRequest, JobType } from '@/types';
+import type { JobCategory, JobRequest, JobType, SoOperationUnit } from '@/types';
 import { createJob, JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
@@ -84,6 +84,10 @@ const AddJobPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [unitName, setUnitName] = useState('');
+  type SoOpUnitsMode = 'loading' | 'text' | 'select' | 'error';
+  const [soOpUnitsMode, setSoOpUnitsMode] = useState<SoOpUnitsMode>('loading');
+  const [soOpUnits, setSoOpUnits] = useState<SoOperationUnit[]>([]);
+  const [soOpUnitsError, setSoOpUnitsError] = useState<string | null>(null);
   const [requestNo, setRequestNo] = useState('');
   const [resignedTitlePrefix, setResignedTitlePrefix] = useState('');
   const [resignedFirstName, setResignedFirstName] = useState('');
@@ -126,6 +130,55 @@ const AddJobPage: React.FC = () => {
       .catch(() => {
         if (!cancelled) setStaffJobs([]);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isConfiguredDemoMode()) {
+      setSoOpUnitsMode('text');
+      return;
+    }
+    let cancelled = false;
+    setSoOpUnitsError(null);
+    (async () => {
+      try {
+        const r = await apiFetch('/api/so-operation/units');
+        if (cancelled) return;
+        if (r.status === 501) {
+          setSoOpUnits([]);
+          setSoOpUnitsMode('text');
+          return;
+        }
+        if (!r.ok) {
+          setSoOpUnits([]);
+          setSoOpUnitsMode('error');
+          setSoOpUnitsError(`โหลดรายการหน่วยงานไม่สำเร็จ (HTTP ${r.status})`);
+          return;
+        }
+        const data = (await r.json()) as unknown;
+        const units = Array.isArray(data)
+          ? data.filter(
+              (u): u is SoOperationUnit =>
+                u !== null &&
+                typeof u === 'object' &&
+                'name' in u &&
+                typeof (u as SoOperationUnit).name === 'string' &&
+                'id' in u &&
+                typeof (u as SoOperationUnit).id === 'string',
+            )
+          : [];
+        setSoOpUnits(units);
+        setSoOpUnitsMode('select');
+      } catch {
+        if (!cancelled) {
+          setSoOpUnits([]);
+          setSoOpUnitsMode('error');
+          setSoOpUnitsError(apiUnreachableHint());
+        }
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -186,8 +239,15 @@ const AddJobPage: React.FC = () => {
 
     const normalizedUnitName = unitName.trim();
     if (!normalizedUnitName) {
-      setFormError('กรุณากรอกชื่อหน่วยงาน');
+      setFormError(soOpUnitsMode === 'select' ? 'กรุณาเลือกหน่วยงานจากรายการ' : 'กรุณากรอกชื่อหน่วยงาน');
       return;
+    }
+    if (soOpUnitsMode === 'select') {
+      const allowed = new Set(soOpUnits.map((u) => u.name));
+      if (!allowed.has(normalizedUnitName)) {
+        setFormError('กรุณาเลือกหน่วยงานจากรายการที่มาจากระบบ so-operation เท่านั้น');
+        return;
+      }
     }
     if (!requestDate) {
       setFormError('กรุณาเลือกวันที่ขอ');
@@ -336,12 +396,43 @@ const AddJobPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="text-xs font-medium text-muted-foreground mb-1 block">ชื่อหน่วยงาน *</label>
-              <input
-                type="text"
-                value={unitName}
-                onChange={(e) => setUnitName(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-              />
+              {soOpUnitsMode === 'loading' ? (
+                <div className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground">
+                  กำลังโหลดรายการหน่วยงาน…
+                </div>
+              ) : soOpUnitsMode === 'select' ? (
+                <select
+                  value={unitName}
+                  onChange={(e) => setUnitName(e.target.value)}
+                  required
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="">— เลือกหน่วยงาน (จากฐานข้อมูล so-operation) —</option>
+                  {soOpUnits.map((u) => (
+                    <option key={u.id} value={u.name}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={unitName}
+                  onChange={(e) => setUnitName(e.target.value)}
+                  placeholder={
+                    soOpUnitsMode === 'error'
+                      ? 'ตั้งค่า SO_OPERATION_* แล้วลองใหม่ หรือกรอกชื่อหน่วยงานชั่วคราว'
+                      : undefined
+                  }
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                />
+              )}
+              {soOpUnitsMode === 'select' ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  รายการมาจาก schema ที่ตั้งใน SO_OPERATION_SCHEMA / SO_OPERATION_UNITS_TABLE เท่านั้น
+                </p>
+              ) : null}
+              {soOpUnitsError ? <p className="text-xs text-destructive mt-1">{soOpUnitsError}</p> : null}
             </div>
 
             <div>

@@ -75,6 +75,12 @@ export interface IssueReason {
   is_active: boolean;
 }
 
+/** หน่วยงานจาก schema so-operation (ดู SO_OPERATION_* ใน env) */
+export interface SoOperationUnit {
+  id: string;
+  name: string;
+}
+
 // ============ CLIENTS / WORKPLACES ============
 export interface ClientWorkplace {
   id: string;
