@@ -35,8 +35,8 @@ const variantStyles: Record<BadgeVariant, string> = {
   destructive: 'bg-destructive/15 text-destructive border-destructive/30',
   warning: 'bg-warning/15 text-warning border-warning/30',
   info: 'bg-info/15 text-info border-info/30',
-  muted: 'bg-muted text-muted-foreground border-border',
-  primary: 'bg-primary/15 text-primary border-primary/30',
+  muted: 'bg-white/50 text-muted-foreground border-white/70',
+  primary: 'bg-orange-500/12 text-orange-700 border-orange-300/40',
 };
 
 interface StatusBadgeProps {

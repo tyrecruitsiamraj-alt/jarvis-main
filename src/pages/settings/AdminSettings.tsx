@@ -325,7 +325,7 @@ const AdminSettings: React.FC = () => {
           ))}
 
         {activeTab === 'users' && !demo && !usersLoading && (
-          <div className="glass-card rounded-xl p-4 border border-border space-y-3">
+          <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
             <div className="text-sm font-semibold text-foreground">จัดการสิทธิ์ผู้ใช้</div>
             {userActionError ? (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -394,7 +394,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'roles' && (
           <div className="space-y-3">
             {['admin', 'supervisor', 'staff'].map((role) => (
-              <div key={role} className="glass-card rounded-xl p-4 border border-border">
+              <div key={role} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                 <div className="font-semibold text-foreground capitalize mb-2">{role}</div>
                 <div className="text-sm text-muted-foreground">
                   {role === 'admin'
@@ -411,7 +411,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'reference' && (
           <div className="space-y-3">
             {REF_CATEGORIES.map((cat) => (
-              <div key={cat} className="glass-card rounded-xl p-4 border border-border">
+              <div key={cat} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-semibold text-foreground text-sm">{cat}</div>
@@ -422,7 +422,7 @@ const AdminSettings: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => openReferenceEditor(cat)}
-                    className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20"
+                    className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600 hover:bg-orange-500/15"
                   >
                     จัดการ
                   </button>
@@ -431,7 +431,7 @@ const AdminSettings: React.FC = () => {
             ))}
 
             {editingCategory && (
-              <div className="glass-card rounded-xl p-4 border border-border">
+              <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                 <div className="flex items-center justify-between mb-3">
                   <div className="font-semibold text-foreground">จัดการ: {editingCategory}</div>
                   <button
@@ -449,12 +449,12 @@ const AdminSettings: React.FC = () => {
                     value={newRefValue}
                     onChange={(e) => setNewRefValue(e.target.value)}
                     placeholder="เพิ่มรายการใหม่"
-                    className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="jarvis-soft-field flex-1"
                   />
                   <button
                     type="button"
                     onClick={addReferenceValue}
-                    className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm"
+                    className="px-3 py-2 jarvis-pill-btn text-sm"
                   >
                     เพิ่ม
                   </button>
@@ -513,7 +513,7 @@ const AdminSettings: React.FC = () => {
           ) : auditLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลด audit log…</p>
           ) : apiAuditLogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground glass-card rounded-xl p-4 border border-border">
+            <p className="text-sm text-muted-foreground glass-card rounded-[1.5rem] p-4 border border-white/70">
               ยังไม่มีบันทึกใน audit log (ระบบจะเพิ่มเมื่อมีการบันทึกผ่าน API)
             </p>
           ) : (

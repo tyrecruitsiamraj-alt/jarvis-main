@@ -84,7 +84,7 @@ const MonthlyPlanner: React.FC = () => {
                           </div>
                         ) : (
                           <div onClick={() => setAssignDialog({ open: true, date: getDateStr(d), empId: emp.id, empName: `${emp.first_name} ${emp.last_name}` })}
-                            className="w-6 h-6 rounded-md mx-auto bg-secondary/30 cursor-pointer hover:bg-primary/20 transition-colors" title="กดเพื่อมอบหมายงาน" />
+                            className="w-6 h-6 rounded-md mx-auto bg-secondary/30 cursor-pointer hover:bg-orange-500/15 transition-colors" title="กดเพื่อมอบหมายงาน" />
                         )}
                       </td>
                     );

@@ -38,7 +38,7 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full text-left rounded-lg border border-border/80 bg-secondary/20 hover:bg-primary/10 hover:border-primary/30 px-3 py-2 transition-colors"
+      className="w-full text-left rounded-2xl border border-white/70 bg-white/40 hover:bg-orange-50/40 hover:border-orange-300/40 px-3 py-2 transition-colors"
     >
       <div className="font-medium text-foreground text-sm line-clamp-1">{job.unit_name}</div>
       <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
@@ -118,19 +118,19 @@ const MatchingDashboard: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               onClick={() => navigate(item.path)}
-              className="glass-card rounded-xl p-3 border border-border hover:border-primary/40 transition-all text-center"
+              className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 hover:border-orange-300/50 transition-all text-center"
             >
-              <item.icon className="w-5 h-5 text-primary mx-auto mb-1" />
+              <item.icon className="w-5 h-5 text-orange-600 mx-auto mb-1" />
               <div className="text-xs font-semibold text-foreground leading-tight">{item.label}</div>
             </motion.button>
           ))}
         </div>
 
         {/* สรุปสถานะ Candidates — กดเปิดรายการพร้อมกรอง */}
-        <div className="rounded-xl border border-border/80 bg-card/40 p-3 md:p-4 space-y-3">
+        <div className="glass-card rounded-[1.5rem] border border-white/70 p-3 md:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" />
+              <Users className="w-4 h-4 text-orange-600" />
               สรุปตามสถานะ · Candidates
             </h3>
             {loadingMatchCandidates ? (
@@ -145,7 +145,7 @@ const MatchingDashboard: React.FC = () => {
                 key={st}
                 type="button"
                 onClick={() => navigate(`/matching/candidates?status=${st}`)}
-                className="rounded-lg border border-border bg-secondary/25 hover:border-primary/35 hover:bg-primary/5 p-3 text-left transition-colors"
+                className="glass-card rounded-2xl border border-white/70 bg-white/40 hover:border-orange-300/50 hover:bg-orange-50/30 p-3 text-left transition-colors"
               >
                 <div className="text-[11px] font-medium text-muted-foreground leading-snug">
                   {CANDIDATE_STATUS_LABELS[st]}
@@ -161,7 +161,7 @@ const MatchingDashboard: React.FC = () => {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-primary" />
+              <Briefcase className="w-4 h-4 text-orange-600" />
               Job Request Summary
             </h3>
             <Button type="button" variant="outline" size="sm" onClick={() => setAllJobsOpen(true)}>

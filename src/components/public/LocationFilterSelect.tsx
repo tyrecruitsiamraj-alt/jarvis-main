@@ -46,7 +46,7 @@ const LocationFilterSelect: React.FC<LocationFilterSelectProps> = ({
       >
         <SelectTrigger
           className={cn(
-            'h-11 w-full rounded-xl border-border bg-card shadow-sm',
+            'h-11 w-full',
             !value && 'text-muted-foreground',
           )}
         >

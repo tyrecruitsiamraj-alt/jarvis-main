@@ -1,8 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, type LucideIcon } from 'lucide-react';
+import {
+  CalendarDays,
+  Search,
+  Briefcase,
+  Users,
+  BarChart3,
+  Settings,
+  ArrowRight,
+  type LucideIcon,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrandTitle } from '@/components/shared/BrandMark';
+import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { motion } from 'framer-motion';
 
 const menuItems: {
@@ -11,20 +20,50 @@ const menuItems: {
   desc?: string;
   subtitle?: string;
   icon: LucideIcon;
-  color: string;
+  accent: string;
   adminOnly?: boolean;
 }[] = [
-  { path: '/wl', label: 'WL', desc: 'บริหารกำลังคน / ปฏิทินงาน', icon: CalendarDays, color: 'bg-primary/10 text-primary' },
-  { path: '/matching', label: 'Matching', desc: 'จับคู่ผู้สมัครกับงาน', icon: Search, color: 'bg-info/10 text-info' },
-  { path: '/jobs', label: 'หน่วยงาน', desc: 'จัดการใบขอและหน่วยงาน', icon: Briefcase, color: 'bg-warning/10 text-warning' },
-  { path: '/matching/candidates', label: 'ผู้สมัคร', subtitle: 'Candidates', icon: Users, color: 'bg-success/10 text-success' },
-  { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, color: 'bg-destructive/10 text-destructive' },
+  {
+    path: '/wl',
+    label: 'WL',
+    desc: 'บริหารกำลังคน / ปฏิทินงาน',
+    icon: CalendarDays,
+    accent: 'text-orange-500 bg-orange-500/10',
+  },
+  {
+    path: '/matching',
+    label: 'Matching',
+    desc: 'จับคู่ผู้สมัครกับงาน',
+    icon: Search,
+    accent: 'text-amber-700 bg-amber-500/12',
+  },
+  {
+    path: '/jobs',
+    label: 'หน่วยงาน',
+    desc: 'จัดการใบขอและหน่วยงาน',
+    icon: Briefcase,
+    accent: 'text-orange-600 bg-orange-400/12',
+  },
+  {
+    path: '/matching/candidates',
+    label: 'ผู้สมัคร',
+    subtitle: 'Candidates',
+    icon: Users,
+    accent: 'text-stone-700 bg-stone-500/10',
+  },
+  {
+    path: '/dashboard',
+    label: 'Dashboard',
+    desc: 'ภาพรวมและ KPI',
+    icon: BarChart3,
+    accent: 'text-neutral-800 bg-neutral-500/10',
+  },
   {
     path: '/settings',
     label: 'Settings',
     desc: 'ตั้งค่าระบบ / ธีม',
     icon: Settings,
-    color: 'bg-muted text-muted-foreground',
+    accent: 'text-muted-foreground bg-white/60',
     adminOnly: true,
   },
 ];
@@ -35,35 +74,86 @@ const HomePage: React.FC = () => {
 
   const filteredMenus = menuItems.filter((item) => !item.adminOnly || hasPermission('admin'));
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
+
   return (
-    <div className="px-4 md:px-6 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-foreground">สวัสดี, {user?.full_name}</h1>
-        <p className="text-sm text-muted-foreground">
-          ยินดีต้อนรับสู่ระบบ <BrandTitle className="font-semibold text-foreground" />
-        </p>
+    <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 px-4 sm:px-5 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* subtle orb accent */}
+      <div
+        className="pointer-events-none absolute -top-8 right-0 h-40 w-40 jarvis-orange-orb opacity-30 blur-sm"
+        aria-hidden
+      />
+
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="jarvis-frost relative mb-8 overflow-hidden p-6 md:p-8"
+      >
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/70 border border-white/80 shadow-sm">
+              <BrandMark size="md" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{greeting}</p>
+              <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight text-foreground truncate">
+                {user?.full_name}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                ยินดีต้อนรับสู่ระบบ{' '}
+                <BrandTitle className="font-semibold text-foreground" />
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/jobs')}
+            className="jarvis-pill-btn shrink-0 self-start sm:self-center px-6 py-3 text-sm touch-manipulation"
+          >
+            สร้างงานใหม่
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-orange-100/25"
+          aria-hidden
+        />
+      </motion.div>
+
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-muted-foreground">เมนูหลัก</h2>
+        <span className="text-xs text-muted-foreground hidden sm:inline">{filteredMenus.length} modules</span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
         {filteredMenus.map((item, i) => (
           <motion.button
             key={item.path}
-            initial={{ opacity: 0, y: 10 }}
+            type="button"
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
             onClick={() => navigate(item.path)}
-            className="glass-card rounded-xl p-4 md:p-6 border border-border hover:border-primary/40 transition-all text-left group"
+            className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-6 group touch-manipulation"
           >
-            <div className={`w-10 h-10 rounded-lg ${item.color} flex items-center justify-center mb-3`}>
+            <div
+              className={`w-11 h-11 rounded-2xl ${item.accent} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}
+            >
               <item.icon className="w-5 h-5" />
             </div>
-            <div className="font-semibold text-foreground text-sm">{item.label}</div>
+            <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>
             {item.subtitle ? (
               <div className="text-[11px] font-medium text-muted-foreground tracking-wide mt-0.5">{item.subtitle}</div>
             ) : null}
             {item.desc ? (
-              <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.desc}</div>
+              <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{item.desc}</div>
             ) : null}
+            <div className="mt-4 flex items-center gap-1 text-xs font-medium text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
+              เปิด
+              <ArrowRight className="h-3 w-3" aria-hidden />
+            </div>
           </motion.button>
         ))}
       </div>

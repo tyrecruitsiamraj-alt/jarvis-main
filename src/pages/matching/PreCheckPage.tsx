@@ -248,7 +248,7 @@ const PreCheckPage: React.FC = () => {
       <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
       <div className="px-4 md:px-6 space-y-4">
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
-          <section className="glass-card rounded-xl p-4 border border-border space-y-3">
+          <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
             <h3 className="text-sm font-semibold">Pre-Check Location</h3>
             <p className="text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัคร แล้วกด Search ครั้งเดียว</p>
 
@@ -298,7 +298,7 @@ const PreCheckPage: React.FC = () => {
                 <select
                   value={projectFilter}
                   onChange={(e) => setProjectFilter(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                  className="w-full jarvis-soft-field"
                 >
                   <option value="">-- All Projects --</option>
                   {projectOptions.map((name) => (
@@ -331,7 +331,7 @@ const PreCheckPage: React.FC = () => {
             {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
           </section>
 
-          <section className="glass-card rounded-xl p-4 border border-border space-y-3">
+          <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
             <h3 className="text-sm font-semibold">Map</h3>
             {appliedCenter ? (
               <div className="space-y-2">
@@ -414,10 +414,10 @@ const PreCheckPage: React.FC = () => {
               tabIndex={0}
               onClick={() => setJobDetail(j)}
               onKeyDown={(e) => e.key === 'Enter' && setJobDetail(j)}
-              className="glass-card rounded-xl p-4 border border-border cursor-pointer hover:border-primary/40 transition-colors"
+              className="glass-card rounded-[1.5rem] p-4 border border-white/70 cursor-pointer hover:border-orange-300/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold text-primary text-sm">{j.unit_name}</div>
+                <div className="font-semibold text-orange-600 text-sm">{j.unit_name}</div>
                 <span
                   className={cn(
                     'text-xs px-2 py-0.5 rounded-full',
@@ -457,8 +457,8 @@ const PreCheckPage: React.FC = () => {
               return (
                 <div className="space-y-3 mt-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-primary" />
+                    <div className="w-10 h-10 rounded-full bg-orange-500/15 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-orange-600" />
                     </div>
                     <div>
                       <div className="font-bold text-foreground">{jobDetail.unit_name}</div>
@@ -536,7 +536,7 @@ const PreCheckPage: React.FC = () => {
                         setJobDetail(null);
                         navigate(`/jobs/${jobDetail.id}`);
                       }}
-                      className="flex-1 text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
+                      className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium"
                     >
                       View Job
                     </button>

@@ -65,7 +65,7 @@ const ChangePasswordPage: React.FC = () => {
       <PageHeader title="เปลี่ยนรหัสผ่าน" subtitle="อัปเดตรหัสผ่านสำหรับบัญชีของคุณ" backPath="/" />
 
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-xl p-4 md:p-6 border border-border max-w-xl space-y-4">
+        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-xl space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">รหัสผ่านเดิม</label>
@@ -74,7 +74,7 @@ const ChangePasswordPage: React.FC = () => {
                 autoComplete="current-password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -85,7 +85,7 @@ const ChangePasswordPage: React.FC = () => {
                 autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -96,7 +96,7 @@ const ChangePasswordPage: React.FC = () => {
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -115,7 +115,7 @@ const ChangePasswordPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={busy}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+                className="px-4 py-2 jarvis-pill-btn text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
               >
                 {busy ? 'กำลังบันทึก…' : 'บันทึกรหัสผ่านใหม่'}
               </button>

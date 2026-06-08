@@ -171,7 +171,7 @@ const SupervisorDashboard: React.FC = () => {
   const SectionHeader = ({ id, title, icon: Icon }: { id: string; title: string; icon: React.ElementType }) => (
     <button type="button" onClick={() => toggleSection(id)} className="w-full flex items-center justify-between py-2 text-left">
       <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <Icon className="w-4 h-4 text-primary" /> {title}
+        <Icon className="w-4 h-4 text-orange-600" /> {title}
       </h3>
       {expandedSection === id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
     </button>
@@ -189,7 +189,7 @@ const SupervisorDashboard: React.FC = () => {
         {/* ฟิลเตอร์ — แถวเดียว อ่านง่าย */}
         <div className="rounded-xl border border-border/80 bg-card/50 p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Filter className="w-4 h-4 text-primary shrink-0" />
+            <Filter className="w-4 h-4 text-orange-600 shrink-0" />
             <span>ขอบเขตข้อมูล</span>
             <span className="text-xs font-normal text-muted-foreground">เลือกแล้วตัวเลขด้านล่างจะเปลี่ยนตามทันที</span>
           </div>
@@ -428,7 +428,7 @@ const SupervisorDashboard: React.FC = () => {
         <details className="group rounded-xl border border-border bg-card/40 open:bg-card/60 transition-colors">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2">
-              <ListFilter className="w-4 h-4 text-primary" />
+              <ListFilter className="w-4 h-4 text-orange-600" />
               รายละเอียดเชิงลึก (แยกประเภท บุคลากร ตารางเต็ม)
             </span>
             <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -442,7 +442,7 @@ const SupervisorDashboard: React.FC = () => {
                     key={type}
                     type="button"
                     onClick={() => showJobList(JOB_TYPE_LABELS[type], byJobType(type))}
-                    className="glass-card rounded-xl p-3 border border-border text-left hover:border-primary/40 transition-colors"
+                    className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-orange-300/50 transition-colors"
                   >
                     <p className="text-xs text-muted-foreground truncate">{JOB_TYPE_LABELS[type]}</p>
                     <p className="text-xl font-bold text-foreground mt-1">{byJobType(type).length}</p>
@@ -494,7 +494,7 @@ const SupervisorDashboard: React.FC = () => {
                     key={cat}
                     type="button"
                     onClick={() => showJobList(JOB_CATEGORY_LABELS[cat], byJobCategory(cat))}
-                    className="glass-card rounded-xl p-3 border border-border text-left hover:border-primary/40 transition-colors"
+                    className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-orange-300/50 transition-colors"
                   >
                     <p className="text-xs text-muted-foreground">{JOB_CATEGORY_LABELS[cat]}</p>
                     <p className="text-xl font-bold text-foreground mt-1">{byJobCategory(cat).length}</p>
@@ -544,7 +544,7 @@ const SupervisorDashboard: React.FC = () => {
               <SectionHeader id="closedBreakdown" title="รายละเอียดงานที่ปิดแล้ว" icon={CheckCircle2} />
               {expandedSection === 'closedBreakdown' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                  <div className="glass-card rounded-xl p-4 border border-border">
+                  <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">ปิดแยกตามลักษณะงาน</p>
                     {(['thai_executive', 'foreign_executive', 'central', 'valet_parking'] as const).map((type) => {
                       const closed = closedJobs.filter((j) => j.job_type === type);
@@ -565,7 +565,7 @@ const SupervisorDashboard: React.FC = () => {
                       );
                     })}
                   </div>
-                  <div className="glass-card rounded-xl p-4 border border-border">
+                  <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">ปิดแยกตามประเภทงาน</p>
                     {(['bank', 'government', 'private'] as const).map((cat) => {
                       const closed = closedJobs.filter((j) => j.job_category === cat);
@@ -594,7 +594,7 @@ const SupervisorDashboard: React.FC = () => {
               <SectionHeader id="personnel" title="เจ้าหน้าที่สรรหา & คัดสรร" icon={Filter} />
               {expandedSection === 'personnel' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                  <div className="glass-card rounded-xl p-4 border border-border">
+                  <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">เจ้าหน้าที่สรรหา</p>
                     {recruiters.map((name) => {
                       const rJobs = jobs.filter((j) => j.recruiter_name === name);
@@ -607,7 +607,7 @@ const SupervisorDashboard: React.FC = () => {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-foreground">{name}</span>
-                            <span className="text-sm font-bold text-primary">{rJobs.length} งาน</span>
+                            <span className="text-sm font-bold text-orange-600">{rJobs.length} งาน</span>
                           </div>
                           <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-muted-foreground">
                             {(['thai_executive', 'foreign_executive', 'central', 'valet_parking'] as const).map((t) => {
@@ -623,7 +623,7 @@ const SupervisorDashboard: React.FC = () => {
                       );
                     })}
                   </div>
-                  <div className="glass-card rounded-xl p-4 border border-border">
+                  <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">เจ้าหน้าที่คัดสรร</p>
                     {screeners.map((name) => {
                       const sJobs = jobs.filter((j) => j.screener_name === name);
@@ -636,7 +636,7 @@ const SupervisorDashboard: React.FC = () => {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-foreground">{name}</span>
-                            <span className="text-sm font-bold text-primary">{sJobs.length} งาน</span>
+                            <span className="text-sm font-bold text-orange-600">{sJobs.length} งาน</span>
                           </div>
                           <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-muted-foreground">
                             {(['bank', 'government', 'private'] as const).map((c) => {
@@ -679,7 +679,7 @@ const SupervisorDashboard: React.FC = () => {
                           onClick={() => navigate(`/jobs/${j.id}`)}
                           className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                         >
-                          <td className="px-3 py-2 font-medium text-primary max-w-[150px] truncate">{j.unit_name}</td>
+                          <td className="px-3 py-2 font-medium text-orange-600 max-w-[150px] truncate">{j.unit_name}</td>
                           <td className="px-3 py-2 text-center text-muted-foreground">{JOB_TYPE_LABELS[j.job_type]}</td>
                           <td className="px-3 py-2 text-center text-muted-foreground">{JOB_CATEGORY_LABELS[j.job_category]}</td>
                           <td className="px-3 py-2 text-center">

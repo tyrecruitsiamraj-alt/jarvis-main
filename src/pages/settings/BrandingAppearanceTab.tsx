@@ -32,9 +32,9 @@ const BrandingAppearanceTab: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="glass-card rounded-xl p-4 md:p-6 border border-border space-y-4">
+      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Palette className="w-4 h-4 text-primary" />
+          <Palette className="w-4 h-4 text-orange-600" />
           โลโก้และชื่อระบบ
         </h3>
 
@@ -44,13 +44,13 @@ const BrandingAppearanceTab: React.FC = () => {
             type="text"
             value={config.appName}
             onChange={(e) => updateConfig({ appName: e.target.value })}
-            className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+            className="jarvis-soft-field"
             placeholder="So Recruit"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/30">
+          <div className="flex items-center gap-3 p-3 rounded-2xl border border-white/70 bg-white/45">
             <BrandMark size="md" />
             <BrandMark size="lg" />
           </div>
@@ -59,7 +59,7 @@ const BrandingAppearanceTab: React.FC = () => {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium w-fit"
+              className="inline-flex items-center gap-2 px-3 py-2 jarvis-pill-btn text-sm font-medium w-fit"
             >
               <ImagePlus className="w-4 h-4" />
               อัปโหลดโลโก้
@@ -79,7 +79,7 @@ const BrandingAppearanceTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-4 md:p-6 border border-border space-y-4">
+      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">สีหลัก (ปุ่ม ลิงก์ ไฮไลต์)</h3>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -93,7 +93,7 @@ const BrandingAppearanceTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-4 md:p-6 border border-border space-y-4">
+      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">สีพื้นหลังและข้อความ</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
@@ -128,7 +128,7 @@ const BrandingAppearanceTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-4 md:p-6 border border-border space-y-4">
+      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">พื้นหลังหน้าจอ</h3>
         <div className="flex flex-wrap gap-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -203,7 +203,7 @@ const BrandingAppearanceTab: React.FC = () => {
                   });
                 });
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-4 py-2 jarvis-pill-btn text-sm font-medium disabled:opacity-60"
             >
               <CloudUpload className="w-4 h-4" />
               {syncing ? 'กำลังเผยแพร่…' : 'เผยแพร่ให้ทุกคน (บันทึกบนเซิร์ฟเวอร์)'}

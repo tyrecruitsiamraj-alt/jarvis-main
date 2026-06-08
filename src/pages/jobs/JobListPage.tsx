@@ -100,7 +100,7 @@ const JobListPage: React.FC = () => {
               placeholder="ค้นหางาน..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
@@ -112,7 +112,7 @@ const JobListPage: React.FC = () => {
               id="job-list-unit"
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
-              className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              className="jarvis-soft-field flex-1"
             >
               <option value="all">ทั้งหมด</option>
               {unitOptions.map((u) => (
@@ -149,7 +149,7 @@ const JobListPage: React.FC = () => {
               <button
                 key={j.id}
                 onClick={() => navigate(`/jobs/${j.id}`)}
-                className="w-full glass-card rounded-xl p-4 border border-border text-left hover:border-primary/40"
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">{j.unit_name}</span>

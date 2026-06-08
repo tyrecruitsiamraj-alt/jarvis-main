@@ -163,7 +163,7 @@ const EmployeeProfile: React.FC = () => {
           backPath="/wl/employees"
         />
         <div className="px-4 md:px-6 space-y-6">
-          <div className="glass-card rounded-xl p-4 border border-border space-y-3">
+          <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-info/20 flex items-center justify-center">
                 <User className="w-6 h-6 text-info" />
@@ -181,7 +181,7 @@ const EmployeeProfile: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(`/matching/candidates/${wlCandidate.id}`)}
-              className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-primary text-primary-foreground"
+              className="inline-flex items-center gap-2 text-sm px-3 py-2 jarvis-pill-btn"
             >
               <ExternalLink className="w-4 h-4" />
               เปิดโปรไฟล์ผู้สมัคร
@@ -207,10 +207,10 @@ const EmployeeProfile: React.FC = () => {
       />
       <div className="px-4 md:px-6 space-y-6">
         {/* Info card */}
-        <div className="glass-card rounded-xl p-4 border border-border space-y-3">
+        <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-              <User className="w-6 h-6 text-primary" />
+            <div className="w-12 h-12 rounded-full bg-orange-500/15 flex items-center justify-center">
+              <User className="w-6 h-6 text-orange-600" />
             </div>
             <div>
               <div className="font-bold text-foreground">

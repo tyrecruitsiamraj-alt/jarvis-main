@@ -21,11 +21,11 @@ interface DetailListDialogProps {
 }
 
 const badgeStyles: Record<string, string> = {
-  default: 'bg-secondary text-muted-foreground',
-  success: 'bg-success/15 text-success',
-  warning: 'bg-warning/15 text-warning',
-  destructive: 'bg-destructive/15 text-destructive',
-  info: 'bg-info/15 text-info',
+  default: 'bg-white/60 text-muted-foreground border border-white/80',
+  success: 'bg-emerald-500/12 text-emerald-700 border border-emerald-200/50',
+  warning: 'bg-amber-500/12 text-amber-800 border border-amber-200/50',
+  destructive: 'bg-red-500/12 text-red-700 border border-red-200/50',
+  info: 'bg-sky-500/12 text-sky-700 border border-sky-200/50',
 };
 
 const DetailListDialog: React.FC<DetailListDialogProps> = ({
@@ -54,20 +54,21 @@ const DetailListDialog: React.FC<DetailListDialogProps> = ({
                 key={item.id}
                 onClick={item.onClick}
                 className={cn(
-                  'rounded-lg p-3 border border-border bg-secondary/30 flex items-center justify-between gap-3',
-                  item.onClick && 'cursor-pointer hover:bg-secondary/60 transition-colors',
+                  'rounded-2xl p-3 border border-white/70 bg-white/45 flex items-center justify-between gap-3',
+                  item.onClick && 'cursor-pointer hover:bg-white/70 transition-colors',
                 )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-foreground text-sm truncate">{item.title}</div>
-                  {item.subtitle && <div className="text-xs text-muted-foreground mt-0.5">{item.subtitle}</div>}
+                  {item.subtitle && (
+                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.subtitle}</div>
+                  )}
                   {item.extra}
                 </div>
-
                 {item.badge && (
                   <span
                     className={cn(
-                      'text-xs px-2 py-0.5 rounded-full whitespace-nowrap',
+                      'text-xs px-2.5 py-1 rounded-full shrink-0 font-medium',
                       badgeStyles[item.badgeVariant || 'default'],
                     )}
                   >

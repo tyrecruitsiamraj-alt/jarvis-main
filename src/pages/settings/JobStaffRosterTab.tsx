@@ -117,7 +117,7 @@ function RosterSection({
                 <input
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  className="flex-1 min-w-[140px] bg-secondary border border-border rounded-lg px-2 py-1.5 text-sm"
+                  className="flex-1 min-w-[140px] jarvis-soft-field px-2 py-1.5 text-sm"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void saveEdit(name);
@@ -146,7 +146,7 @@ function RosterSection({
                 <button
                   type="button"
                   onClick={() => startEdit(name)}
-                  className="text-xs px-2 py-1 rounded bg-secondary text-primary hover:underline"
+                  className="text-xs px-2 py-1 rounded bg-secondary text-orange-600 hover:underline"
                 >
                   เปลี่ยนชื่อ
                 </button>
@@ -168,7 +168,7 @@ function RosterSection({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="พิมพ์ชื่อใหม่แล้วกดเพิ่ม"
-          className="flex-1 min-w-[180px] bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+          className="flex-1 min-w-[180px] jarvis-soft-field"
           onKeyDown={(e) => e.key === 'Enter' && void add()}
         />
         <button
@@ -208,7 +208,7 @@ const JobStaffRosterTab: React.FC = () => {
   return (
     <div className="space-y-4">
       {!isDemoMode() && (
-        <p className="text-sm text-muted-foreground glass-card rounded-xl p-3 border border-border border-info/30 bg-info/5">
+        <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
           โหมด API: รายชื่อสรรหา/คัดสรรบันทึกในฐานข้อมูล การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
         </p>
       )}

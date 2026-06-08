@@ -6,7 +6,7 @@ import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import DetailListDialog from '@/components/shared/DetailListDialog';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
-import { Briefcase, Plus, AlertTriangle, CheckCircle, ListTodo } from 'lucide-react';
+import { Briefcase, Building2, Plus, AlertTriangle, CheckCircle, ListTodo } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
@@ -65,7 +65,7 @@ const JobDashboard: React.FC = () => {
     <div>
       <PageHeader title="หน่วยงาน" subtitle="จัดการหน่วยงานและใบขอ"
         actions={hasPermission('staff') ? (
-          <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm">
+          <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm">
             <Plus className="w-4 h-4" /> สร้างงานใหม่
           </button>
         ) : undefined}
@@ -98,11 +98,26 @@ const JobDashboard: React.FC = () => {
         </div>
 
         {/* Quick nav */}
-        <div className="flex gap-3">
-          <button onClick={() => navigate('/jobs/list')} className="flex-1 glass-card rounded-xl p-4 border border-border hover:border-primary/40 text-center">
-            <Briefcase className="w-6 h-6 text-primary mx-auto mb-1" />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/jobs/list')}
+            className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-orange-300/50 text-center"
+          >
+            <Briefcase className="w-6 h-6 text-orange-600 mx-auto mb-1" />
             <div className="text-sm font-semibold text-foreground">รายการงานทั้งหมด</div>
           </button>
+          {hasPermission('staff') ? (
+            <button
+              type="button"
+              onClick={() => navigate('/jobs/units')}
+              className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-orange-300/50 text-center"
+            >
+              <Building2 className="w-6 h-6 text-orange-600 mx-auto mb-1" />
+              <div className="text-sm font-semibold text-foreground">หน่วยงาน (so-operation)</div>
+              <div className="text-xs text-muted-foreground mt-0.5">เพิ่ม / แก้ไขชื่อหน่วยงาน</div>
+            </button>
+          ) : null}
         </div>
 
         {/* Recent jobs */}
@@ -112,7 +127,7 @@ const JobDashboard: React.FC = () => {
             {jobs.slice(0, 4).map(j => (
               <motion.button key={j.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 onClick={() => navigate(`/jobs/${j.id}`)}
-                className="w-full glass-card rounded-xl p-4 border border-border text-left hover:border-primary/40 transition-all">
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50 transition-all">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">{j.unit_name}</span>
                   <div className="flex items-center gap-2">

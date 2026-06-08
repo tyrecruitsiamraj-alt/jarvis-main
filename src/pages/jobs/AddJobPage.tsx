@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import type { JobCategory, JobRequest, JobType, SoOperationUnit } from '@/types';
 import { createJob, JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
@@ -88,6 +88,10 @@ const AddJobPage: React.FC = () => {
   const [soOpUnitsMode, setSoOpUnitsMode] = useState<SoOpUnitsMode>('loading');
   const [soOpUnits, setSoOpUnits] = useState<SoOperationUnit[]>([]);
   const [soOpUnitsError, setSoOpUnitsError] = useState<string | null>(null);
+  const [soOpReloadKey, setSoOpReloadKey] = useState(0);
+  const [newSoOpUnitName, setNewSoOpUnitName] = useState('');
+  const [addingSoOpUnit, setAddingSoOpUnit] = useState(false);
+  const [addSoOpUnitErr, setAddSoOpUnitErr] = useState<string | null>(null);
   const [requestNo, setRequestNo] = useState('');
   const [resignedTitlePrefix, setResignedTitlePrefix] = useState('');
   const [resignedFirstName, setResignedFirstName] = useState('');
@@ -182,7 +186,7 @@ const AddJobPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [soOpReloadKey]);
 
   const [houseNo, setHouseNo] = useState('');
   const [projectName, setProjectName] = useState('');
@@ -232,6 +236,42 @@ const AddJobPage: React.FC = () => {
     () => buildWorkScheduleString(workDayFrom, workDayTo, workTimeFrom, workTimeTo),
     [workDayFrom, workDayTo, workTimeFrom, workTimeTo],
   );
+
+  const submitNewSoOpUnit = async () => {
+    const name = newSoOpUnitName.trim();
+    if (!name || addingSoOpUnit || soOpUnitsMode !== 'select') return;
+    setAddSoOpUnitErr(null);
+    setAddingSoOpUnit(true);
+    try {
+      const r = await apiFetch('/api/so-operation/units', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      });
+      const body: unknown = await r.json().catch(() => null);
+      if (!r.ok) {
+        const msg =
+          body && typeof body === 'object' && 'message' in body
+            ? String((body as { message?: string }).message || '')
+            : '';
+        setAddSoOpUnitErr(msg || `บันทึกไม่สำเร็จ (HTTP ${r.status})`);
+        return;
+      }
+      if (
+        body &&
+        typeof body === 'object' &&
+        'name' in body &&
+        typeof (body as SoOperationUnit).name === 'string'
+      ) {
+        setUnitName((body as SoOperationUnit).name);
+        setNewSoOpUnitName('');
+        setSoOpReloadKey((k) => k + 1);
+      }
+    } catch {
+      setAddSoOpUnitErr(apiUnreachableHint());
+    } finally {
+      setAddingSoOpUnit(false);
+    }
+  };
 
   const handleSave = async () => {
     if (saving) return;
@@ -390,30 +430,73 @@ const AddJobPage: React.FC = () => {
       <PageHeader title="สร้างงานใหม่" backPath="/jobs" />
 
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-xl p-4 md:p-6 border border-border w-full space-y-4">
+        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 w-full space-y-4">
           {formError && <div className="text-sm text-destructive">{formError}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="text-xs font-medium text-muted-foreground mb-1 block">ชื่อหน่วยงาน *</label>
+              {soOpUnitsMode === 'text' && !isConfiguredDemoMode() ? (
+                <div className="mb-2 rounded-lg border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-foreground">
+                  ยังไม่เชื่อมตารางหน่วยงานใน <strong>so-operation</strong> — ชื่อที่คีย์ที่นี่จะเก็บเฉพาะในใบงาน (
+                  <code className="text-[10px] bg-muted/80 px-1 rounded">jarvis_rm.jobs</code>) เท่านั้น
+                  {' · '}
+                  <Link to="/jobs/units" className="text-primary font-medium hover:underline">
+                    ตั้งค่าและจัดการหน่วยงาน
+                  </Link>
+                </div>
+              ) : null}
               {soOpUnitsMode === 'loading' ? (
-                <div className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground">
+                <div className="w-full jarvis-soft-field text-muted-foreground">
                   กำลังโหลดรายการหน่วยงาน…
                 </div>
               ) : soOpUnitsMode === 'select' ? (
-                <select
-                  value={unitName}
-                  onChange={(e) => setUnitName(e.target.value)}
-                  required
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                >
-                  <option value="">— เลือกหน่วยงาน (จากฐานข้อมูล so-operation) —</option>
-                  {soOpUnits.map((u) => (
-                    <option key={u.id} value={u.name}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    value={unitName}
+                    onChange={(e) => setUnitName(e.target.value)}
+                    required
+                    className="jarvis-soft-field"
+                  >
+                    <option value="">— เลือกหน่วยงาน (จากฐานข้อมูล so-operation) —</option>
+                    {soOpUnits.map((u) => (
+                      <option key={u.id} value={u.name}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    รายการอ่านจาก schema SO_OPERATION_SCHEMA / ตาราง SO_OPERATION_UNITS_TABLE — เพิ่มหรือแก้ไขที่นี่จะบันทึกลง
+                    so-operation เท่านั้น
+                  </p>
+                  <div className="mt-2 rounded-lg border border-border/70 bg-muted/15 p-3 space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground">
+                      เพิ่มหน่วยงานใหม่ใน so-operation แล้วเลือกทันที
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={newSoOpUnitName}
+                        onChange={(e) => setNewSoOpUnitName(e.target.value)}
+                        placeholder="ชื่อหน่วยงานใหม่"
+                        className="jarvis-soft-field flex-1"
+                        disabled={addingSoOpUnit}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void submitNewSoOpUnit()}
+                        disabled={addingSoOpUnit || !newSoOpUnitName.trim()}
+                        className="shrink-0 px-4 py-2 jarvis-pill-btn text-sm font-medium disabled:opacity-50"
+                      >
+                        {addingSoOpUnit ? 'กำลังบันทึก…' : 'บันทึกและเลือก'}
+                      </button>
+                    </div>
+                    {addSoOpUnitErr ? <p className="text-xs text-destructive">{addSoOpUnitErr}</p> : null}
+                    <Link to="/jobs/units" className="text-xs text-orange-600 hover:underline inline-block">
+                      เปิดหน้าจัดการหน่วยงานทั้งหมด
+                    </Link>
+                  </div>
+                </>
               ) : (
                 <input
                   type="text"
@@ -424,15 +507,12 @@ const AddJobPage: React.FC = () => {
                       ? 'ตั้งค่า SO_OPERATION_* แล้วลองใหม่ หรือกรอกชื่อหน่วยงานชั่วคราว'
                       : undefined
                   }
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               )}
-              {soOpUnitsMode === 'select' ? (
-                <p className="text-xs text-muted-foreground mt-1">
-                  รายการมาจาก schema ที่ตั้งใน SO_OPERATION_SCHEMA / SO_OPERATION_UNITS_TABLE เท่านั้น
-                </p>
+              {soOpUnitsMode === 'select' ? null : soOpUnitsError ? (
+                <p className="text-xs text-destructive mt-1">{soOpUnitsError}</p>
               ) : null}
-              {soOpUnitsError ? <p className="text-xs text-destructive mt-1">{soOpUnitsError}</p> : null}
             </div>
 
             <div>
@@ -442,7 +522,7 @@ const AddJobPage: React.FC = () => {
                 value={requestNo}
                 onChange={(e) => setRequestNo(e.target.value)}
                 placeholder="เช่น REQ-2026-001"
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -451,7 +531,7 @@ const AddJobPage: React.FC = () => {
               <select
                 value={resignedTitlePrefix}
                 onChange={(e) => setResignedTitlePrefix(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 {TITLE_PREFIX_OPTIONS.map((opt) => (
                   <option key={opt.value || 'none'} value={opt.value}>
@@ -468,7 +548,7 @@ const AddJobPage: React.FC = () => {
                 value={resignedFirstName}
                 onChange={(e) => setResignedFirstName(e.target.value)}
                 placeholder="กรอกชื่อ"
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -479,7 +559,7 @@ const AddJobPage: React.FC = () => {
                 value={resignedLastName}
                 onChange={(e) => setResignedLastName(e.target.value)}
                 placeholder="กรอกนามสกุล"
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -491,7 +571,7 @@ const AddJobPage: React.FC = () => {
                 value={resignedAge}
                 onChange={(e) => setResignedAge(e.target.value)}
                 placeholder="เช่น 35"
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -502,7 +582,7 @@ const AddJobPage: React.FC = () => {
                 value={resignedReason}
                 onChange={(e) => setResignedReason(e.target.value)}
                 placeholder="ระบุเหตุผลการลาออก"
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -521,7 +601,7 @@ const AddJobPage: React.FC = () => {
               <select
                 value={jobType}
                 onChange={(e) => setJobType(e.target.value as JobType)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="thai_executive">ผู้บริหารคนไทย</option>
                 <option value="foreign_executive">ผู้บริหารต่างชาติ</option>
@@ -535,7 +615,7 @@ const AddJobPage: React.FC = () => {
               <select
                 value={jobCategory}
                 onChange={(e) => setJobCategory(e.target.value as JobCategory)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="private">เอกชน</option>
                 <option value="government">ราชการ</option>
@@ -569,7 +649,7 @@ const AddJobPage: React.FC = () => {
                 type="number"
                 value={totalIncome}
                 onChange={(e) => setTotalIncome(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
           </div>
@@ -584,7 +664,7 @@ const AddJobPage: React.FC = () => {
                   type="text"
                   value={houseNo}
                   onChange={(e) => setHouseNo(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -594,7 +674,7 @@ const AddJobPage: React.FC = () => {
                   type="text"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -604,7 +684,7 @@ const AddJobPage: React.FC = () => {
                   type="text"
                   value={road}
                   onChange={(e) => setRoad(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -619,7 +699,7 @@ const AddJobPage: React.FC = () => {
                     setPostalCode(inferredZip ?? '');
                   }}
                   disabled={!province || !district}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="">
                     {!province || !district ? 'เลือกจังหวัดและอำเภอ/เขตก่อน' : '— เลือกตำบล/แขวง —'}
@@ -642,7 +722,7 @@ const AddJobPage: React.FC = () => {
                     setPostalCode('');
                   }}
                   disabled={!province}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="">
                     {!province ? 'เลือกจังหวัดก่อน' : '— เลือกอำเภอ/เขต —'}
@@ -665,7 +745,7 @@ const AddJobPage: React.FC = () => {
                     setSubdistrict('');
                     setPostalCode('');
                   }}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="">— เลือกจังหวัด —</option>
                   {provinceOptions.map((opt) => (
@@ -682,13 +762,13 @@ const AddJobPage: React.FC = () => {
                   type="text"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
               <div className="md:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">ที่อยู่รวม (บันทึก)</label>
-                <div className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground min-h-[42px]">
+                <div className="jarvis-soft-field min-h-[42px]">
                   {fullAddress || '-'}
                 </div>
               </div>
@@ -707,14 +787,14 @@ const AddJobPage: React.FC = () => {
                     value={ageRangeMin}
                     onChange={(e) => setAgeRangeMin(e.target.value)}
                     placeholder="ต่ำสุด"
-                    className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="jarvis-soft-field flex-1"
                   />
                   <input
                     type="number"
                     value={ageRangeMax}
                     onChange={(e) => setAgeRangeMax(e.target.value)}
                     placeholder="สูงสุด"
-                    className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="jarvis-soft-field flex-1"
                   />
                 </div>
               </div>
@@ -727,7 +807,7 @@ const AddJobPage: React.FC = () => {
                     <select
                       value={vehicleVan}
                       onChange={(e) => setVehicleVan(e.target.value as VehicleAllow)}
-                      className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      className="jarvis-soft-field"
                     >
                       <option value="ใช้ได้">ใช้ได้</option>
                       <option value="ใช้ไม่ได้">ใช้ไม่ได้</option>
@@ -738,7 +818,7 @@ const AddJobPage: React.FC = () => {
                     <select
                       value={vehicleSedan}
                       onChange={(e) => setVehicleSedan(e.target.value as VehicleAllow)}
-                      className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      className="jarvis-soft-field"
                     >
                       <option value="ใช้ได้">ใช้ได้</option>
                       <option value="ใช้ไม่ได้">ใช้ไม่ได้</option>
@@ -749,7 +829,7 @@ const AddJobPage: React.FC = () => {
                     <select
                       value={vehiclePickup}
                       onChange={(e) => setVehiclePickup(e.target.value as VehicleAllow)}
-                      className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      className="jarvis-soft-field"
                     >
                       <option value="ใช้ได้">ใช้ได้</option>
                       <option value="ใช้ไม่ได้">ใช้ไม่ได้</option>
@@ -770,7 +850,7 @@ const AddJobPage: React.FC = () => {
                       <select
                         value={workDayFrom}
                         onChange={(e) => setWorkDayFrom(e.target.value)}
-                        className="flex-1 min-w-[120px] bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                        className="flex-1 min-w-[120px] jarvis-soft-field"
                       >
                         {WORK_DAY_OPTIONS.map((o) => (
                           <option key={`f-${o.value || 'empty'}`} value={o.value}>
@@ -782,7 +862,7 @@ const AddJobPage: React.FC = () => {
                       <select
                         value={workDayTo}
                         onChange={(e) => setWorkDayTo(e.target.value)}
-                        className="flex-1 min-w-[120px] bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                        className="flex-1 min-w-[120px] jarvis-soft-field"
                       >
                         {WORK_DAY_OPTIONS.map((o) => (
                           <option key={`t-${o.value || 'empty'}`} value={o.value}>
@@ -798,7 +878,7 @@ const AddJobPage: React.FC = () => {
                       <select
                         value={workTimeFrom}
                         onChange={(e) => setWorkTimeFrom(e.target.value)}
-                        className="flex-1 min-w-[100px] bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                        className="flex-1 min-w-[100px] jarvis-soft-field"
                       >
                         <option value="">— เลือก —</option>
                         {TIME_SLOTS.map((t) => (
@@ -811,7 +891,7 @@ const AddJobPage: React.FC = () => {
                       <select
                         value={workTimeTo}
                         onChange={(e) => setWorkTimeTo(e.target.value)}
-                        className="flex-1 min-w-[100px] bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                        className="flex-1 min-w-[100px] jarvis-soft-field"
                       >
                         <option value="">— เลือก —</option>
                         {TIME_SLOTS.map((t) => (
@@ -834,7 +914,7 @@ const AddJobPage: React.FC = () => {
                   type="number"
                   value={penaltyPerDay}
                   onChange={(e) => setPenaltyPerDay(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
             </div>
@@ -845,7 +925,7 @@ const AddJobPage: React.FC = () => {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 jarvis-pill-btn font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>

@@ -20,8 +20,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div
-      className={cn('min-h-[100dvh] min-h-screen flex flex-col', config.pageBackgroundMode === 'solid' && 'bg-background')}
-      style={shellBg}
+      className={cn(
+        'min-h-[100dvh] min-h-screen flex flex-col',
+        config.pageBackgroundMode === 'solid' ? 'jarvis-warm-bg' : 'bg-background',
+      )}
+      style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
       {(isDemoMode() || isRuntimeDemoFallback()) ? (
         <div
@@ -35,7 +38,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       ) : null}
 
       {/* Top header — จอใหญ่ (lg+) */}
-      <header className="hidden lg:flex items-center justify-between gap-4 px-4 xl:px-8 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-40">
+      <header className="hidden lg:flex items-center justify-between gap-4 px-4 xl:px-8 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40">
         <div className="flex items-center gap-4 xl:gap-8 min-w-0 flex-1">
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
             <BrandMark size="md" />
@@ -52,7 +55,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   onClick={() => navigate(item.path)}
                   className={cn(
                     'flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all touch-manipulation',
-                    active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+                    active ? 'bg-orange-500/12 text-orange-700' : 'text-muted-foreground hover:text-foreground hover:bg-white/50',
                   )}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
@@ -64,19 +67,19 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
           <NotificationPanel />
-          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary max-w-[220px]">
-            <UserCircle className="w-4 h-4 text-primary shrink-0" />
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[220px]">
+            <UserCircle className="w-4 h-4 text-orange-600 shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary shrink-0">{user?.role}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0">{user?.role}</span>
           </div>
-          <div className="flex xl:hidden items-center gap-1.5 px-2 py-1 rounded-lg bg-secondary">
-            <UserCircle className="w-4 h-4 text-primary" />
-            <span className="text-xs font-medium text-primary uppercase">{user?.role}</span>
+          <div className="flex xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70">
+            <UserCircle className="w-4 h-4 text-orange-600" />
+            <span className="text-xs font-medium text-orange-700 uppercase">{user?.role}</span>
           </div>
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 rounded-full text-muted-foreground hover:text-orange-600 hover:bg-white/60 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="เปลี่ยนรหัสผ่าน"
             title="เปลี่ยนรหัสผ่าน"
           >
@@ -94,20 +97,20 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg) */}
-      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-40 safe-area-pt">
+      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40 safe-area-pt">
         <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left min-w-0 touch-manipulation py-1">
           <BrandMark size="sm" />
           <BrandTitle className="text-base font-bold text-foreground truncate" />
         </button>
         <div className="flex items-center gap-1 shrink-0">
           <NotificationPanel />
-          <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium uppercase">
+          <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}
           </span>
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-orange-600 hover:bg-orange-500/12 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="เปลี่ยนรหัสผ่าน"
           >
             <KeyRound className="w-4 h-4" />
@@ -123,7 +126,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-[7.5rem] lg:pb-8">
+      <main className="relative flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-[7.5rem] lg:pb-8">
+        <div className="jarvis-page-orb top-0 right-4 h-48 w-48 opacity-[0.18] pointer-events-none hidden md:block" aria-hidden />
         {children}
       </main>
 

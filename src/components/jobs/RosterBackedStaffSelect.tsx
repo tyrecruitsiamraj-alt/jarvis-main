@@ -102,7 +102,7 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
       <select
         value={selectValue}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+        className="jarvis-soft-field"
       >
         <option value="">— ไม่ระบุ —</option>
         {trimmed && !inOptions ? (
@@ -133,7 +133,7 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
               type="button"
               disabled={staffMutating}
               onClick={() => void tryAdd()}
-              className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground"
+              className="shrink-0 text-xs px-2.5 py-1.5 jarvis-pill-btn"
             >
               {staffMutating ? '…' : 'เพิ่ม'}
             </button>

@@ -247,7 +247,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.title_prefix}
                   onChange={(e) => setForm({ ...form, title_prefix: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   {TITLE_PREFIX_OPTIONS.map((opt) => (
                     <option key={opt.value || 'none'} value={opt.value}>
@@ -261,7 +261,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <input
                   value={form.first_name}
                   onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 />
               </div>
               <div>
@@ -269,7 +269,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <input
                   value={form.last_name}
                   onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 />
               </div>
             </div>
@@ -281,7 +281,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                   type="tel"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 />
               </div>
               <div>
@@ -291,7 +291,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                   min={1}
                   value={form.age}
                   onChange={(e) => setForm({ ...form, age: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 />
               </div>
               <div>
@@ -299,7 +299,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.gender}
                   onChange={(e) => setForm({ ...form, gender: e.target.value as Gender })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   <option value="male">ชาย</option>
                   <option value="female">หญิง</option>
@@ -314,7 +314,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.drinking}
                   onChange={(e) => setForm({ ...form, drinking: e.target.value as YesNo })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   <option value="no">ไม่ดื่ม</option>
                   <option value="yes">ดื่ม</option>
@@ -325,7 +325,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.smoking}
                   onChange={(e) => setForm({ ...form, smoking: e.target.value as YesNo })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   <option value="no">ไม่สูบ</option>
                   <option value="yes">สูบ</option>
@@ -336,7 +336,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.tattoo}
                   onChange={(e) => setForm({ ...form, tattoo: e.target.value as YesNo })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   <option value="no">ไม่มี</option>
                   <option value="yes">มี</option>
@@ -350,7 +350,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.van_driving}
                   onChange={(e) => setForm({ ...form, van_driving: e.target.value as DrivingResult })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   <option value="not_tested">ยังไม่สอบ</option>
                   <option value="passed">ผ่าน</option>
@@ -362,7 +362,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.sedan_driving}
                   onChange={(e) => setForm({ ...form, sedan_driving: e.target.value as DrivingResult })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   <option value="not_tested">ยังไม่สอบ</option>
                   <option value="passed">ผ่าน</option>
@@ -377,7 +377,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 rows={3}
-                className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm resize-y min-h-[72px]"
+                className="jarvis-soft-field px-4 jarvis-soft-area resize-y min-h-[72px]"
               />
             </div>
 
@@ -413,7 +413,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <select
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as CandidateStatus })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   {(Object.keys(CANDIDATE_STATUS_LABELS) as CandidateStatus[]).map((s) => (
                     <option key={s} value={s}>
@@ -429,7 +429,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                   onChange={(e) =>
                     setForm({ ...form, staffing_track: e.target.value as CandidateStaffingTrack })
                   }
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 >
                   {CANDIDATE_STAFFING_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -446,7 +446,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                 <input
                   value={form.responsible_recruiter}
                   onChange={(e) => setForm({ ...form, responsible_recruiter: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 />
               </div>
               <div>
@@ -457,7 +457,7 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
                   max={100}
                   value={form.risk_percentage}
                   onChange={(e) => setForm({ ...form, risk_percentage: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-2 py-2 text-sm"
+                  className="jarvis-soft-field px-4"
                 />
               </div>
             </div>

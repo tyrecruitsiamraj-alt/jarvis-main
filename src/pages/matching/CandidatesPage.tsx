@@ -190,7 +190,7 @@ const CandidatesPage: React.FC = () => {
           hasPermission('staff') ? (
             <button
               onClick={() => navigate('/matching/candidates/add')}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm"
+              className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm"
             >
               <Plus className="w-4 h-4" /> เพิ่ม
             </button>
@@ -203,7 +203,7 @@ const CandidatesPage: React.FC = () => {
         {error && <div className="text-sm text-destructive">เกิดข้อผิดพลาด: {error}</div>}
 
         {/* สรุปจำนวนตามสถานะ — กดเพื่อกรองรายชื่อด้านล่าง */}
-        <div className="rounded-xl border border-border/80 bg-card/40 p-3 md:p-4 space-y-3">
+        <div className="glass-card rounded-[1.5rem] border border-white/70 p-3 md:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">สรุปผู้สมัครตามสถานะ</h3>
             <span className="text-xs text-muted-foreground">รวม {candidates.length} คน</span>
@@ -217,8 +217,8 @@ const CandidatesPage: React.FC = () => {
                 className={cn(
                   'rounded-lg border p-3 text-left transition-colors',
                   filter === st
-                    ? 'border-primary bg-primary/10 shadow-sm'
-                    : 'border-border bg-secondary/25 hover:border-primary/35 hover:bg-primary/5',
+                    ? 'border-primary bg-orange-500/12 shadow-sm'
+                    : 'border-border bg-secondary/25 hover:border-primary/35 hover:bg-orange-50/40',
                 )}
               >
                 <div className="text-[11px] font-medium text-muted-foreground leading-snug">
@@ -241,7 +241,7 @@ const CandidatesPage: React.FC = () => {
               placeholder="ค้นหาผู้สมัคร..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
@@ -266,11 +266,11 @@ const CandidatesPage: React.FC = () => {
         {isMobile ? (
           <div className="space-y-2">
             {filtered.map((c) => (
-              <div key={c.id} className="glass-card rounded-xl p-4 border border-border">
+              <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                 <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                    className="font-semibold text-foreground text-sm hover:text-primary"
+                    className="font-semibold text-foreground text-sm hover:text-orange-600"
                   >
                     {formatCandidateDisplayName(c)}
                   </button>
@@ -287,7 +287,7 @@ const CandidatesPage: React.FC = () => {
                     value={c.staffing_track ?? 'regular'}
                     onChange={(e) => void applyStaffingTrack(c, e.target.value as CandidateStaffingTrack)}
                     disabled={!hasPermission('supervisor')}
-                    className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-xs text-foreground disabled:opacity-60"
+                    className="w-full jarvis-soft-field px-2 py-1.5 text-xs text-foreground disabled:opacity-60"
                   >
                     {CANDIDATE_STAFFING_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -298,7 +298,7 @@ const CandidatesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-primary">Risk: {c.risk_percentage}%</span>
+                  <span className="text-xs text-orange-600">Risk: {c.risk_percentage}%</span>
 
                   <div className="flex gap-2">
                     <a href={`tel:${c.phone}`} className="p-1.5 rounded-lg bg-success/10 text-success">
@@ -308,7 +308,7 @@ const CandidatesPage: React.FC = () => {
                     {hasPermission('supervisor') && (
                       <button
                         onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                        className="text-xs px-2 py-1 rounded bg-primary/10 text-primary"
+                        className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600"
                       >
                         มอบหมายงาน
                       </button>
@@ -342,7 +342,7 @@ const CandidatesPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                        className="font-medium text-foreground hover:text-primary"
+                        className="font-medium text-foreground hover:text-orange-600"
                       >
                         {formatCandidateDisplayName(c)}
                       </button>
@@ -377,7 +377,7 @@ const CandidatesPage: React.FC = () => {
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => void applyStaffingTrack(c, e.target.value as CandidateStaffingTrack)}
                         disabled={!hasPermission('supervisor')}
-                        className="w-full max-w-[180px] bg-secondary border border-border rounded-lg px-2 py-1.5 text-xs text-foreground disabled:opacity-60"
+                        className="w-full max-w-[180px] jarvis-soft-field px-2 py-1.5 text-xs text-foreground disabled:opacity-60"
                       >
                         {CANDIDATE_STAFFING_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
@@ -391,7 +391,7 @@ const CandidatesPage: React.FC = () => {
                       {hasPermission('supervisor') && (
                         <button
                           onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                          className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20"
+                          className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600 hover:bg-orange-500/15"
                         >
                           มอบหมายงาน
                         </button>

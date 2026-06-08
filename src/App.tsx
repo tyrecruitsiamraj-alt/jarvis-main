@@ -28,6 +28,7 @@ import JobDashboard from "@/pages/jobs/JobDashboard";
 import JobListPage from "@/pages/jobs/JobListPage";
 import JobDetailPage from "@/pages/jobs/JobDetailPage";
 import AddJobPage from "@/pages/jobs/AddJobPage";
+import SoOperationUnitsPage from "@/pages/jobs/SoOperationUnitsPage";
 import SupervisorDashboard from "@/pages/dashboard/SupervisorDashboard";
 import AdminSettings from "@/pages/settings/AdminSettings";
 import ChangePasswordPage from "@/pages/ChangePasswordPage";
@@ -40,8 +41,11 @@ const ProtectedRoutes = () => {
   const { isAuthenticated, bootstrapping } = useAuth();
   if (bootstrapping) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
-        กำลังโหลด session…
+      <div className="jarvis-warm-bg min-h-screen flex items-center justify-center text-muted-foreground text-sm">
+        <div className="jarvis-frost px-8 py-6 text-center">
+          <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-orange-400/40 border-t-orange-500 animate-spin" aria-hidden />
+          กำลังโหลด session…
+        </div>
       </div>
     );
   }
@@ -70,6 +74,7 @@ const ProtectedRoutes = () => {
         <Route path="/matching/pre-check" element={<PreCheckPage />} />
         <Route path="/jobs" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
+        <Route path="/jobs/units" element={<SoOperationUnitsPage />} />
         <Route path="/jobs/add" element={<AddJobPage />} />
         <Route path="/jobs/:id" element={<JobDetailPage />} />
         <Route path="/dashboard" element={<SupervisorDashboard />} />

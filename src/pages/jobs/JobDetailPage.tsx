@@ -468,7 +468,7 @@ const JobDetailPage: React.FC = () => {
       />
 
       <div className="px-4 md:px-6 space-y-6">
-        <div className="glass-card rounded-xl p-4 border border-border space-y-3">
+        <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
           <div className="flex items-center justify-between">
             <StatusBadge status={job.status} type="job" />
             <span
@@ -557,7 +557,7 @@ const JobDetailPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-95"
+                className="text-xs px-3 py-1.5 jarvis-pill-btn hover:opacity-95"
               >
                 + เพิ่มคน
               </button>
@@ -592,7 +592,7 @@ const JobDetailPage: React.FC = () => {
                       a.status === 'started'
                         ? 'bg-success/15 text-success'
                         : a.status === 'passed'
-                          ? 'bg-primary/15 text-primary'
+                          ? 'bg-primary/15 text-orange-600'
                           : a.status === 'failed'
                             ? 'bg-destructive/15 text-destructive'
                             : a.status === 'sent'
@@ -629,7 +629,7 @@ const JobDetailPage: React.FC = () => {
               <select
                 value={assignmentType}
                 onChange={(e) => setAssignmentType(e.target.value as JobAssignment['assignment_type'])}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="trial">จุ่ม</option>
                 <option value="start">เริ่มงาน</option>
@@ -643,7 +643,7 @@ const JobDetailPage: React.FC = () => {
                 placeholder="ค้นหาชื่อหรือเบอร์..."
                 value={pickerSearch}
                 onChange={(e) => setPickerSearch(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+                className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -663,7 +663,7 @@ const JobDetailPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => void addCandidateToJob(c)}
-                      className="w-full text-left rounded-lg border border-border bg-card/50 px-3 py-2.5 text-sm hover:bg-secondary hover:border-primary/30 transition-colors"
+                      className="w-full text-left rounded-lg border border-border bg-card/50 px-3 py-2.5 text-sm hover:bg-secondary hover:border-orange-300/40 transition-colors"
                     >
                       <span className="font-medium text-foreground">{formatCandidateDisplayName(c)}</span>
                       <span className="block text-xs text-muted-foreground mt-0.5">{c.phone}</span>
@@ -703,7 +703,7 @@ const JobDetailPage: React.FC = () => {
                 <input
                   value={editForm.unit_name}
                   onChange={(e) => setEditForm({ ...editForm, unit_name: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                  className="w-full jarvis-soft-field"
                 />
               </div>
               <div>
@@ -712,7 +712,7 @@ const JobDetailPage: React.FC = () => {
                   value={editForm.location_address}
                   onChange={(e) => setEditForm({ ...editForm, location_address: e.target.value })}
                   rows={2}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm resize-y min-h-[60px]"
+                  className="w-full jarvis-soft-field resize-y min-h-[60px]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -737,7 +737,7 @@ const JobDetailPage: React.FC = () => {
                   <select
                     value={editForm.urgency}
                     onChange={(e) => setEditForm({ ...editForm, urgency: e.target.value as JobUrgency })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   >
                     <option value="urgent">ด่วน</option>
                     <option value="advance">ล่วงหน้า</option>
@@ -748,7 +748,7 @@ const JobDetailPage: React.FC = () => {
                   <select
                     value={editForm.status}
                     onChange={(e) => setEditForm({ ...editForm, status: e.target.value as JobStatus })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   >
                     <option value="open">เปิด</option>
                     <option value="in_progress">ดำเนินการ</option>
@@ -773,7 +773,7 @@ const JobDetailPage: React.FC = () => {
                   <select
                     value={editForm.job_type}
                     onChange={(e) => setEditForm({ ...editForm, job_type: e.target.value as JobType })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   >
                     {(Object.keys(JOB_TYPE_LABELS) as JobType[]).map((k) => (
                       <option key={k} value={k}>
@@ -787,7 +787,7 @@ const JobDetailPage: React.FC = () => {
                   <select
                     value={editForm.job_category}
                     onChange={(e) => setEditForm({ ...editForm, job_category: e.target.value as JobCategory })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   >
                     {(Object.keys(JOB_CATEGORY_LABELS) as JobCategory[]).map((k) => (
                       <option key={k} value={k}>
@@ -804,7 +804,7 @@ const JobDetailPage: React.FC = () => {
                   min={0}
                   value={editForm.total_income}
                   onChange={(e) => setEditForm({ ...editForm, total_income: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                  className="w-full jarvis-soft-field"
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -835,7 +835,7 @@ const JobDetailPage: React.FC = () => {
                     min={0}
                     value={editForm.age_min}
                     onChange={(e) => setEditForm({ ...editForm, age_min: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   />
                 </div>
                 <div>
@@ -845,7 +845,7 @@ const JobDetailPage: React.FC = () => {
                     min={0}
                     value={editForm.age_max}
                     onChange={(e) => setEditForm({ ...editForm, age_max: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   />
                 </div>
               </div>
@@ -854,7 +854,7 @@ const JobDetailPage: React.FC = () => {
                 <input
                   value={editForm.vehicle_required}
                   onChange={(e) => setEditForm({ ...editForm, vehicle_required: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                  className="w-full jarvis-soft-field"
                 />
               </div>
               <div>
@@ -862,7 +862,7 @@ const JobDetailPage: React.FC = () => {
                 <input
                   value={editForm.work_schedule}
                   onChange={(e) => setEditForm({ ...editForm, work_schedule: e.target.value })}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                  className="w-full jarvis-soft-field"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -873,7 +873,7 @@ const JobDetailPage: React.FC = () => {
                     min={0}
                     value={editForm.penalty_per_day}
                     onChange={(e) => setEditForm({ ...editForm, penalty_per_day: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   />
                 </div>
                 <div>
@@ -883,7 +883,7 @@ const JobDetailPage: React.FC = () => {
                     min={0}
                     value={editForm.days_without_worker}
                     onChange={(e) => setEditForm({ ...editForm, days_without_worker: e.target.value })}
-                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm"
+                    className="w-full jarvis-soft-field"
                   />
                 </div>
               </div>

@@ -157,10 +157,10 @@ const PublicJobBoardPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative border-b border-border/40 bg-gradient-to-b from-primary/[0.07] via-background to-background">
+    <div className="relative border-b border-white/50 bg-gradient-to-b from-orange-100/30 via-transparent to-transparent">
       <div className="mx-auto max-w-6xl px-4 md:px-6 pt-10 pb-4 md:pt-14 md:pb-8">
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/40 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-700 mb-4">
             <Sparkles className="h-3.5 w-3.5" />
             บอร์ดประกาศรับสมัคร
           </div>
@@ -181,7 +181,7 @@ const PublicJobBoardPage: React.FC = () => {
               placeholder="ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-11 w-full rounded-xl border border-border bg-card pl-10 pr-4 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="jarvis-soft-field h-11 pl-10 pr-4"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -198,8 +198,8 @@ const PublicJobBoardPage: React.FC = () => {
                 className={cn(
                   'rounded-full px-4 py-2 text-xs font-semibold transition-all',
                   chip === f.id
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/80',
+                    ? 'jarvis-pill-btn px-4 py-2 text-xs shadow-md'
+                    : 'bg-white/55 text-secondary-foreground hover:bg-white/75 border border-white/80',
                 )}
               >
                 {f.label}
@@ -238,7 +238,7 @@ const PublicJobBoardPage: React.FC = () => {
         )}
 
         {!loading && filtered.length === 0 && (
-          <div className="mt-12 rounded-2xl border border-dashed border-border bg-card/50 p-10 text-center">
+          <div className="mt-12 jarvis-frost rounded-[1.5rem] border-dashed border-white/70 p-10 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
             <p className="font-medium text-foreground">ยังไม่มีตำแหน่งที่ตรงกับตัวกรอง</p>
             <p className="mt-1 text-sm text-muted-foreground">ลองเปลี่ยนคำค้นหาหรือเลือก &quot;ทั้งหมด&quot;</p>
@@ -249,11 +249,11 @@ const PublicJobBoardPage: React.FC = () => {
           {filtered.map((job) => (
             <Card
               key={job.id}
-              className="group overflow-hidden border-border/80 bg-card/95 shadow-sm transition-all duration-200 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/5"
+              className="group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-orange-300/40"
             >
               <CardHeader className="space-y-3 pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                  <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-orange-600 transition-colors">
                     {job.unit_name}
                   </h2>
                   {job.urgency === 'urgent' && (
@@ -273,7 +273,7 @@ const PublicJobBoardPage: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-2 pb-4">
                 <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
-                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600/70" />
                   {job.location_address}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -299,7 +299,7 @@ const PublicJobBoardPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={openApply}
-                    className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-primary py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+                    className="jarvis-pill-btn flex-1 py-2.5 text-xs font-semibold"
                   >
                     สมัคร SOWORK
                     <ExternalLink className="h-3.5 w-3.5 opacity-90" />
@@ -315,7 +315,7 @@ const PublicJobBoardPage: React.FC = () => {
           <button
             type="button"
             onClick={openApply}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            className="jarvis-pill-btn inline-flex w-full sm:w-auto px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
             ไปที่แอปสมัครงาน SOWORK
             <ExternalLink className="h-4 w-4" />

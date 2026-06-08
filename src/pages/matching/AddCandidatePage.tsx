@@ -149,7 +149,7 @@ const AddCandidatePage: React.FC = () => {
       <PageHeader title="เพิ่มผู้สมัครใหม่" backPath="/matching/candidates" />
 
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-xl p-4 md:p-6 border border-border max-w-3xl space-y-4">
+        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
           {error && <div className="text-sm text-destructive">{error}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -158,7 +158,7 @@ const AddCandidatePage: React.FC = () => {
               <select
                 value={titlePrefix}
                 onChange={(e) => setTitlePrefix(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 {TITLE_PREFIX_OPTIONS.map((opt) => (
                   <option key={opt.value || 'none'} value={opt.value}>
@@ -174,7 +174,7 @@ const AddCandidatePage: React.FC = () => {
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -184,7 +184,7 @@ const AddCandidatePage: React.FC = () => {
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -194,7 +194,7 @@ const AddCandidatePage: React.FC = () => {
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -204,7 +204,7 @@ const AddCandidatePage: React.FC = () => {
                 type="number"
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
 
@@ -213,7 +213,7 @@ const AddCandidatePage: React.FC = () => {
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value as Gender)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="male">ชาย</option>
                 <option value="female">หญิง</option>
@@ -231,7 +231,7 @@ const AddCandidatePage: React.FC = () => {
                 <select
                   value={drinkingUi}
                   onChange={(e) => setDrinkingUi(e.target.value as typeof drinkingUi)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="ไม่ดื่ม">ไม่ดื่ม</option>
                   <option value="ดื่ม">ดื่ม</option>
@@ -243,7 +243,7 @@ const AddCandidatePage: React.FC = () => {
                 <select
                   value={smokingUi}
                   onChange={(e) => setSmokingUi(e.target.value as typeof smokingUi)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="ไม่สูบ">ไม่สูบ</option>
                   <option value="สูบ">สูบ</option>
@@ -255,7 +255,7 @@ const AddCandidatePage: React.FC = () => {
                 <select
                   value={tattooUi}
                   onChange={(e) => setTattooUi(e.target.value as typeof tattooUi)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="ไม่มี">ไม่มี</option>
                   <option value="มี">มี</option>
@@ -267,7 +267,7 @@ const AddCandidatePage: React.FC = () => {
                 <select
                   value={vanDriving}
                   onChange={(e) => setVanDriving(e.target.value as DrivingResult)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="not_tested">ยังไม่สอบ</option>
                   <option value="passed">ผ่าน</option>
@@ -280,7 +280,7 @@ const AddCandidatePage: React.FC = () => {
                 <select
                   value={sedanDriving}
                   onChange={(e) => setSedanDriving(e.target.value as DrivingResult)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 >
                   <option value="not_tested">ยังไม่สอบ</option>
                   <option value="passed">ผ่าน</option>
@@ -300,7 +300,7 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={houseNo}
                   onChange={(e) => setHouseNo(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -310,7 +310,7 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={village}
                   onChange={(e) => setVillage(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -320,7 +320,7 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={road}
                   onChange={(e) => setRoad(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -330,7 +330,7 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={subdistrict}
                   onChange={(e) => setSubdistrict(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -340,7 +340,7 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -350,7 +350,7 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={province}
                   onChange={(e) => setProvince(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
@@ -360,13 +360,13 @@ const AddCandidatePage: React.FC = () => {
                   type="text"
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
               </div>
 
               <div className="md:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">ตัวอย่างที่อยู่รวม</label>
-                <div className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground min-h-[42px]">
+                <div className="jarvis-soft-field min-h-[42px]">
                   {fullAddress || '-'}
                 </div>
               </div>
@@ -397,7 +397,7 @@ const AddCandidatePage: React.FC = () => {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 jarvis-pill-btn font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>

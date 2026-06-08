@@ -229,14 +229,14 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">พนักงาน</label>
             {employeeName ? (
-              <div className="bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground">
+              <div className="jarvis-soft-field">
                 {employeeName}
               </div>
             ) : (
               <select
                 value={selectedEmployee}
                 onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="">เลือกพนักงาน</option>
                 {activeEmployees.map((e) => (
@@ -253,7 +253,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             <select
               value={selectedClient}
               onChange={(e) => setSelectedClient(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              className="jarvis-soft-field"
             >
               <option value="">เลือกหน่วยงาน</option>
               {activeClients.map((c) => (
@@ -275,7 +275,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
               <select
                 value={startDay}
                 onChange={(e) => setStartDay(Number(e.target.value))}
-                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+                className="jarvis-soft-field px-4 text-foreground"
               >
                 {dayOptions.map((d) => (
                   <option key={d} value={d}>
@@ -286,7 +286,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
               <select
                 value={startMonth}
                 onChange={(e) => setStartMonth(Number(e.target.value))}
-                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+                className="jarvis-soft-field px-4 text-foreground"
               >
                 {THAI_MONTHS.map((mo) => (
                   <option key={mo.value} value={mo.value}>
@@ -297,7 +297,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
               <select
                 value={startYearBe}
                 onChange={(e) => setStartYearBe(Number(e.target.value))}
-                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+                className="jarvis-soft-field px-4 text-foreground"
               >
                 {yearOptionsBe.map((be) => (
                   <option key={be} value={be}>
@@ -319,7 +319,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                   const v = e.target.value;
                   setEndDay(v === '' ? '' : Number(v));
                 }}
-                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+                className="jarvis-soft-field px-4 text-foreground"
               >
                 <option value="">วัน</option>
                 {dayOptions.map((d) => (
@@ -334,7 +334,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                   const v = e.target.value;
                   setEndMonth(v === '' ? '' : Number(v));
                 }}
-                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+                className="jarvis-soft-field px-4 text-foreground"
               >
                 <option value="">เดือน</option>
                 {THAI_MONTHS.map((mo) => (
@@ -349,7 +349,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                   const v = e.target.value;
                   setEndYearBe(v === '' ? '' : Number(v));
                 }}
-                className="bg-secondary border border-border rounded-lg px-2 py-2 text-sm text-foreground"
+                className="jarvis-soft-field px-4 text-foreground"
               >
                 <option value="">ปี พ.ศ.</option>
                 {yearOptionsBe.map((be) => (
@@ -368,7 +368,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -381,7 +381,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                   setEndTimeUnknown(false);
                   setEndTime(e.target.value);
                 }}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
+                className="jarvis-soft-field disabled:opacity-50"
               />
               <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
                 <input
@@ -403,7 +403,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             type="button"
             onClick={() => void handleAssign()}
             disabled={saving || !selectedClient || (!employeeId && !selectedEmployee)}
-            className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 jarvis-pill-btn font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'กำลังบันทึก…' : 'ยืนยันมอบหมาย'}
           </button>

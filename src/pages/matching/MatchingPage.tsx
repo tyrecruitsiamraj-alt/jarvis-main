@@ -62,13 +62,13 @@ const MatchingPage: React.FC = () => {
         {(loadingJobs || loadingCandidates) && (
           <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</div>
         )}
-        <div className="glass-card rounded-xl p-4 border border-border space-y-3">
+        <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">หน่วยงาน / งาน</label>
             <select
               value={selectedJob}
               onChange={(e) => setSelectedJob(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              className="jarvis-soft-field"
             >
               {jobs.length === 0 ? (
                 <option value="">ไม่มีงาน</option>
@@ -105,7 +105,7 @@ const MatchingPage: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="inprocess">In Process</option>
                 <option value="all">ทั้งหมด</option>
@@ -122,12 +122,12 @@ const MatchingPage: React.FC = () => {
 
         <div className="space-y-2">
           {matched.map((c) => (
-            <div key={c.id} className="glass-card rounded-xl p-4 border border-border">
+            <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
               <div className="flex items-center justify-between mb-2">
                 <button
                   type="button"
                   onClick={() => setCandidateDetail(c)}
-                  className="font-semibold text-primary text-sm hover:underline text-left"
+                  className="font-semibold text-orange-600 text-sm hover:underline text-left"
                 >
                   {formatCandidateDisplayName(c)}
                 </button>
@@ -161,7 +161,7 @@ const MatchingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                  className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs"
+                  className="px-3 py-1.5 rounded-lg bg-orange-500/12 text-orange-600 text-xs"
                 >
                   ดูรายละเอียด
                 </button>
@@ -183,8 +183,8 @@ const MatchingPage: React.FC = () => {
           {candidateDetail && (
             <div className="space-y-3 mt-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <User className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 rounded-full bg-orange-500/15 flex items-center justify-center">
+                  <User className="w-5 h-5 text-orange-600" />
                 </div>
                 <div>
                   <div className="font-bold text-foreground">{formatCandidateDisplayName(candidateDetail)}</div>
@@ -261,7 +261,7 @@ const MatchingPage: React.FC = () => {
                     setCandidateDetail(null);
                     navigate(`/matching/candidates/${candidateDetail.id}`);
                   }}
-                  className="flex-1 text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
+                  className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium"
                 >
                   ดูโปรไฟล์เต็ม
                 </button>

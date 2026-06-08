@@ -138,7 +138,7 @@ const WLEmployees: React.FC = () => {
           hasPermission('supervisor') ? (
             <button
               onClick={() => navigate('/wl/employees/add')}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm"
+              className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm"
             >
               <Plus className="w-4 h-4" /> เพิ่ม
             </button>
@@ -158,7 +158,7 @@ const WLEmployees: React.FC = () => {
               placeholder="ค้นหาพนักงาน..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
@@ -186,7 +186,7 @@ const WLEmployees: React.FC = () => {
               <button
                 key={emp.id}
                 onClick={() => navigate(`/wl/employees/${emp.id}`)}
-                className="w-full glass-card rounded-xl p-4 border border-border text-left hover:border-primary/40 transition-all"
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">

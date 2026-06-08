@@ -145,7 +145,7 @@ const AddEmployeePage: React.FC = () => {
     <div>
       <PageHeader title="เพิ่มพนักงาน" backPath="/wl/employees" />
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-xl p-4 md:p-6 border border-border max-w-2xl space-y-4">
+        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-2xl space-y-4">
           {formError && <div className="text-sm text-destructive">{formError}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -154,7 +154,7 @@ const AddEmployeePage: React.FC = () => {
                 type="text"
                 value={employeeCode}
                 onChange={(e) => setEmployeeCode(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -163,7 +163,7 @@ const AddEmployeePage: React.FC = () => {
                 type="text"
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -172,7 +172,7 @@ const AddEmployeePage: React.FC = () => {
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -181,7 +181,7 @@ const AddEmployeePage: React.FC = () => {
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -190,7 +190,7 @@ const AddEmployeePage: React.FC = () => {
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -199,7 +199,7 @@ const AddEmployeePage: React.FC = () => {
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             </div>
             <div>
@@ -207,7 +207,7 @@ const AddEmployeePage: React.FC = () => {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as EmployeeStatus)}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               >
                 <option value="active">ใช้งาน</option>
                 <option value="inactive">ไม่ใช้งาน</option>
@@ -242,7 +242,7 @@ const AddEmployeePage: React.FC = () => {
                 value={manualAddress}
                 onChange={(e) => setManualAddress(e.target.value)}
                 placeholder="ที่อยู่..."
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                className="jarvis-soft-field"
               />
             )}
             {locationMode === 'google' && (
@@ -252,7 +252,7 @@ const AddEmployeePage: React.FC = () => {
                   value={googleLink}
                   onChange={(e) => setGoogleLink(e.target.value)}
                   placeholder="Google Maps link..."
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field"
                 />
                 <div className="text-xs text-muted-foreground mt-1">ที่อยู่ที่ตรวจพบ: {manualAddress || '-'}</div>
               </>
@@ -264,14 +264,14 @@ const AddEmployeePage: React.FC = () => {
                   value={latText}
                   onChange={(e) => setLatText(e.target.value)}
                   placeholder="Latitude"
-                  className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field flex-1"
                 />
                 <input
                   type="text"
                   value={lngText}
                   onChange={(e) => setLngText(e.target.value)}
                   placeholder="Longitude"
-                  className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  className="jarvis-soft-field flex-1"
                 />
               </div>
             )}
@@ -283,7 +283,7 @@ const AddEmployeePage: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 jarvis-pill-btn font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>
