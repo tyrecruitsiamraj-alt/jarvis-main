@@ -388,9 +388,6 @@ const LoginPage: React.FC = () => {
             <div className="relative z-10 space-y-4">
               <div>
                 <p className="text-sm font-semibold text-foreground">ดูประกาศรับสมัครพนักงาน</p>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  Browse public job openings, explore opportunities, and connect with teams across units.
-                </p>
               </div>
               <Link
                 to="/apply"
