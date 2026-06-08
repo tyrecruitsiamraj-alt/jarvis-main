@@ -375,7 +375,14 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="relative z-10 flex flex-1 items-center justify-center py-8">
-              <div className="jarvis-orange-orb h-44 w-44 animate-pulse" style={{ animationDuration: '4s' }} aria-hidden />
+              <div className="relative flex items-center justify-center">
+                <div
+                  className="absolute h-40 w-40 rounded-full opacity-25 blur-2xl"
+                  style={{ background: `hsl(${config.primaryHsl})` }}
+                  aria-hidden
+                />
+                <BrandMark size="hero" className="relative z-10" />
+              </div>
             </div>
 
             <div className="relative z-10 space-y-4">

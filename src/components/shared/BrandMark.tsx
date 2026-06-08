@@ -2,13 +2,19 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { useBranding } from '@/contexts/BrandingContext';
 
-type Size = 'xs' | 'sm' | 'md' | 'lg';
+type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'hero';
 
 const sizeClass: Record<Size, { box: string; text: string; img: string }> = {
   xs: { box: 'w-6 h-6 rounded-md', text: 'text-[10px]', img: 'w-6 h-6 rounded-md' },
   sm: { box: 'w-7 h-7 rounded-lg', text: 'text-xs', img: 'w-7 h-7 rounded-lg' },
   md: { box: 'w-8 h-8 rounded-lg', text: 'text-sm', img: 'w-8 h-8 rounded-lg' },
   lg: { box: 'w-16 h-16 rounded-2xl', text: 'text-2xl', img: 'w-16 h-16 rounded-2xl' },
+  xl: { box: 'w-28 h-28 rounded-3xl', text: 'text-3xl', img: 'w-28 h-28 rounded-3xl p-3' },
+  hero: {
+    box: 'w-44 h-44 rounded-full',
+    text: 'text-4xl',
+    img: 'w-44 h-44 rounded-full p-5 object-contain bg-white/85 border border-white/90 shadow-[0_12px_48px_rgba(24,20,16,0.1)]',
+  },
 };
 
 export const BrandMark: React.FC<{ size?: Size; className?: string }> = ({ size = 'md', className }) => {
