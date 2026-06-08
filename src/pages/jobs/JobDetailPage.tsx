@@ -30,9 +30,9 @@ import {
   CheckCircle,
   XCircle,
   Play,
-  Search,
   Pencil,
 } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
@@ -636,16 +636,12 @@ const JobDetailPage: React.FC = () => {
                 <option value="replacement">แทนงาน</option>
               </select>
             </div>
-            <div className="relative mt-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="search"
-                placeholder="ค้นหาชื่อหรือเบอร์..."
-                value={pickerSearch}
-                onChange={(e) => setPickerSearch(e.target.value)}
-                className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
+            <SearchField
+              wrapperClassName="mt-3"
+              placeholder="ค้นหาชื่อหรือเบอร์..."
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+            />
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-3">
             {pickerLoading ? (

@@ -4,7 +4,8 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import AssignDialog from '@/components/shared/AssignDialog';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
-import { Plus, Search } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Employee, WorkCalendarEntry, WORK_STATUS_LABELS } from '@/types';
 import { shiftStartLabel } from '@/lib/utils';
@@ -70,11 +71,13 @@ const DailyAssignment: React.FC = () => {
         {/* Available */}
         <div>
           <h3 className="text-sm font-semibold text-foreground mb-2">ว่าง ({filteredAvailable.length} คน)</h3>
-          <div className="relative mb-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="text" placeholder="ค้นหาพนักงาน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
-          </div>
+          <SearchField
+            wrapperClassName="mb-2"
+            type="text"
+            placeholder="ค้นหาพนักงาน..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
           <div className="space-y-2">
             {filteredAvailable.map(emp => (
               <div key={emp.id} className="glass-card rounded-lg p-3 border border-border flex items-center justify-between">

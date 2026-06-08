@@ -21,7 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Search, Sparkles, Briefcase, Calendar, Banknote, ExternalLink } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, ExternalLink } from 'lucide-react';
 
 const SOWORK_APPLY_URL =
   (import.meta.env.VITE_SOWORK_APPLY_URL as string | undefined)?.trim() ||
@@ -174,16 +175,12 @@ const PublicJobBoardPage: React.FC = () => {
         </div>
 
         <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              placeholder="ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="jarvis-soft-field h-11 pl-10 pr-4"
-            />
-          </div>
+          <SearchField
+            wrapperClassName="flex-1 max-w-xl"
+            placeholder="ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <div className="flex flex-wrap gap-2">
             {(
               [

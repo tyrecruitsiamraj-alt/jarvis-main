@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Candidate, Employee, EmployeeStatus } from '@/types';
-import { Plus, Search } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { mockEmployees } from '@/data/mockData';
@@ -151,16 +152,12 @@ const WLEmployees: React.FC = () => {
         {error && <div className="text-sm text-destructive">เกิดข้อผิดพลาด: {error}</div>}
 
         <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="ค้นหาพนักงาน..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
+          <SearchField
+            type="text"
+            placeholder="ค้นหาพนักงาน..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
           <div className="flex gap-1.5 overflow-x-auto">
             {statusFilters.map((f) => (

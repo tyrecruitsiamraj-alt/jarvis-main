@@ -4,7 +4,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
-import { Search } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
@@ -93,16 +93,13 @@ const JobListPage: React.FC = () => {
         {loading && <div className="text-sm text-muted-foreground">กำลังโหลดงาน...</div>}
 
         <div className="flex flex-col md:flex-row gap-3 md:items-center flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="ค้นหางาน..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
+          <SearchField
+            wrapperClassName="flex-1 min-w-[200px]"
+            type="text"
+            placeholder="ค้นหางาน..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
           <div className="flex items-center gap-2 min-w-[200px]">
             <label htmlFor="job-list-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">

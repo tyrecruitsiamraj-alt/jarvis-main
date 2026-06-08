@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { mockJobRequests, mockClients } from '@/data/mockData';
-import { MapPin, Search, Building2 } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { MapPin, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
@@ -255,21 +256,18 @@ const PreCheckPage: React.FC = () => {
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">Candidate Address</label>
               <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder='เช่น "สำโรง", "สนามบินสุวรรณภูมิ"'
-                    value={placeQuery}
-                    onChange={(e) => setPlaceQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void handleSearch();
-                      }
-                    }}
-                    className="pl-9"
-                  />
-                </div>
+                <SearchField
+                  type="text"
+                  placeholder='เช่น "สำโรง", "สนามบินสุวรรณภูมิ"'
+                  value={placeQuery}
+                  onChange={(e) => setPlaceQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleSearch();
+                    }
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => void handleSearch()}

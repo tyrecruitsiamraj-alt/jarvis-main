@@ -9,7 +9,8 @@ import {
   type CandidateStatus,
 } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Search, Phone } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { Plus, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -234,16 +235,12 @@ const CandidatesPage: React.FC = () => {
         <p className="text-xs text-muted-foreground font-medium">รายชื่อทั้งหมด</p>
 
         <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="ค้นหาผู้สมัคร..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full jarvis-soft-field pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
+          <SearchField
+            type="text"
+            placeholder="ค้นหาผู้สมัคร..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {statusFilters.map((f) => (
