@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiFetch';
-import { ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -351,26 +351,6 @@ const LoginPage: React.FC = () => {
             >
               Sign in with Microsoft (Coming Soon)
             </button>
-          </div>
-
-          {/* Dark promo card */}
-          <div className="jarvis-dark-card mt-4 p-5 sm:p-6 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-orange-400 text-xs font-semibold uppercase tracking-wider mb-1">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                New in
-              </div>
-              <p className="text-sm font-medium text-white/90 leading-snug">
-                Discover open roles &amp; apply without signing in
-              </p>
-            </div>
-            <Link
-              to="/apply"
-              className="jarvis-pill-btn shrink-0 px-5 py-2.5 text-xs bg-white text-[#141210] hover:bg-white/90 hover:text-[#141210] shadow-none"
-            >
-              Discover
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-            </Link>
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
