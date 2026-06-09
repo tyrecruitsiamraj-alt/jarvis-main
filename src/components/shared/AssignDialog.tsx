@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import { mockEmployees, mockClients } from '@/data/mockData';
 import { toast } from 'sonner';
 import { isDemoMode } from '@/lib/demoMode';
@@ -7,15 +8,7 @@ import { createWorkCalendarAssignment } from '@/lib/workCalendarStore';
 import { apiFetch } from '@/lib/apiFetch';
 import { parseJobsPayload } from '@/lib/jobCoords';
 import type { ClientWorkplace, Employee, JobRequest } from '@/types';
-import {
-  THAI_MONTHS,
-  parseYmd,
-  toYmdLocal,
-  ceToBeYear,
-  dmyBeToYmd,
-  formatYmdDmyBe,
-  buildDateRangeYmd,
-} from '@/lib/dateTh';
+import { parseYmd, toYmdLocal, formatYmdDmyBe, buildDateRangeYmd } from '@/lib/dateTh';
 
 interface AssignDialogProps {
   open: boolean;
@@ -28,12 +21,9 @@ interface AssignDialogProps {
 const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, employeeId, employeeName }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(employeeId || '');
   const [selectedClient, setSelectedClient] = useState('');
-  const [startDay, setStartDay] = useState(1);
-  const [startMonth, setStartMonth] = useState(1);
-  const [startYearBe, setStartYearBe] = useState(ceToBeYear(new Date().getFullYear()));
-  const [endDay, setEndDay] = useState<number | ''>('');
-  const [endMonth, setEndMonth] = useState<number | ''>('');
-  const [endYearBe, setEndYearBe] = useState<number | ''>('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endDateUnknown, setEndDateUnknown] = useState(false);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('');
   const [endTimeUnknown, setEndTimeUnknown] = useState(false);
@@ -43,25 +33,12 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const yearOptionsBe = useMemo(() => {
-    const cy = new Date().getFullYear();
-    const centerBe = ceToBeYear(cy);
-    const out: number[] = [];
-    for (let be = centerBe - 15; be <= centerBe + 15; be += 1) out.push(be);
-    return out;
-  }, []);
-
-  const dayOptions = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
-
   const applyDateProp = (ymd: string) => {
     const p = parseYmd(ymd) ?? parseYmd(toYmdLocal(new Date()));
     if (!p) return;
-    setStartDay(p.d);
-    setStartMonth(p.m);
-    setStartYearBe(ceToBeYear(p.y));
-    setEndDay('');
-    setEndMonth('');
-    setEndYearBe('');
+    setStartDate(`${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`);
+    setEndDate('');
+    setEndDateUnknown(false);
   };
 
   useEffect(() => {
@@ -128,17 +105,6 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const employeeList = isDemoMode() ? mockEmployees : apiEmployees;
   const clientList = isDemoMode() ? mockClients : apiClients;
 
-  const endDateFilled =
-    endDay !== '' &&
-    endMonth !== '' &&
-    endYearBe !== '' &&
-    typeof endDay === 'number' &&
-    typeof endMonth === 'number' &&
-    typeof endYearBe === 'number';
-
-  const anyEndField = endDay !== '' || endMonth !== '' || endYearBe !== '';
-  const endDatePartial = anyEndField && !endDateFilled;
-
   const handleAssign = async () => {
     const empId = employeeId || selectedEmployee;
     const emp = employeeList.find((e) => e.id === empId);
@@ -146,24 +112,18 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     const fallbackUnit = fallbackUnitsFromJobs.find((u) => `unit:${u}` === selectedClient);
     if (!emp || (!client && !fallbackUnit)) return;
 
-    const startIso = dmyBeToYmd(startDay, startMonth, startYearBe);
-    if (!startIso) {
+    if (!parseYmd(startDate)) {
       toast.error('กรุณาเลือกวันเริ่มงานให้ถูกต้อง');
       return;
     }
 
-    if (endDatePartial) {
-      toast.error('ถ้าระบุถึงวันที่ ให้เลือกวัน เดือน และปี พ.ศ. ให้ครบ หรือเว้นว่างทั้งหมด');
-      return;
-    }
-
     let endIso: string | null = null;
-    if (endDateFilled) {
-      endIso = dmyBeToYmd(endDay as number, endMonth as number, endYearBe as number);
-      if (!endIso) {
-        toast.error('กรุณาเลือกวันสิ้นสุดให้ถูกต้อง หรือเว้นว่างเพื่อลงวันเดียว');
+    if (!endDateUnknown && endDate) {
+      if (!parseYmd(endDate)) {
+        toast.error('กรุณาเลือกวันเลิกให้ถูกต้อง หรือเลือกไม่ทราบวันเลิกงาน');
         return;
       }
+      endIso = endDate;
     }
 
     if (!startTime.trim()) {
@@ -171,7 +131,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
       return;
     }
 
-    const dates = buildDateRangeYmd(startIso, endIso);
+    const dates = buildDateRangeYmd(startDate, endIso);
     if (dates.length === 0) {
       toast.error('ช่วงวันที่ไม่ถูกต้อง');
       return;
@@ -199,8 +159,8 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
         }
       }
 
-      const endLabel = endIso ?? startIso;
-      toast.success(`มอบหมาย ${emp.first_name} ไปที่ ${client?.name ?? fallbackUnit} ช่วง ${startIso} ถึง ${endLabel}`);
+      const endLabel = endIso ?? startDate;
+      toast.success(`มอบหมาย ${emp.first_name} ไปที่ ${client?.name ?? fallbackUnit} ช่วง ${startDate} ถึง ${endLabel}`);
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -229,9 +189,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">พนักงาน</label>
             {employeeName ? (
-              <div className="jarvis-soft-field">
-                {employeeName}
-              </div>
+              <div className="jarvis-soft-field">{employeeName}</div>
             ) : (
               <select
                 value={selectedEmployee}
@@ -270,95 +228,38 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">วันเริ่มงาน (วัน / เดือน / ปี พ.ศ.)</label>
-            <div className="grid grid-cols-3 gap-2">
-              <select
-                value={startDay}
-                onChange={(e) => setStartDay(Number(e.target.value))}
-                className="jarvis-soft-field px-4 text-foreground"
-              >
-                {dayOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={startMonth}
-                onChange={(e) => setStartMonth(Number(e.target.value))}
-                className="jarvis-soft-field px-4 text-foreground"
-              >
-                {THAI_MONTHS.map((mo) => (
-                  <option key={mo.value} value={mo.value}>
-                    {mo.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={startYearBe}
-                onChange={(e) => setStartYearBe(Number(e.target.value))}
-                className="jarvis-soft-field px-4 text-foreground"
-              >
-                {yearOptionsBe.map((be) => (
-                  <option key={be} value={be}>
-                    {be}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              วันเริ่มงาน (วัน / เดือน / ปี พ.ศ.)
+            </label>
+            <DateSelectDmyBe value={startDate} onChange={setStartDate} />
           </div>
 
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              ถึงวันที่ (ไม่บังคับ — เว้นว่าง = ลงวันเดียวกับวันเริ่ม)
+              วันเลิก (วัน / เดือน / ปี พ.ศ.)
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              <select
-                value={endDay === '' ? '' : String(endDay)}
+            {endDateUnknown ? (
+              <div className="jarvis-soft-field text-muted-foreground">ไม่ทราบวันเลิกงาน</div>
+            ) : (
+              <DateSelectDmyBe
+                value={endDate}
+                onChange={setEndDate}
+                allowEmpty
+              />
+            )}
+            <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 shrink-0 rounded border-border"
+                checked={endDateUnknown}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  setEndDay(v === '' ? '' : Number(v));
+                  const on = e.target.checked;
+                  setEndDateUnknown(on);
+                  if (on) setEndDate('');
                 }}
-                className="jarvis-soft-field px-4 text-foreground"
-              >
-                <option value="">วัน</option>
-                {dayOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={endMonth === '' ? '' : String(endMonth)}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setEndMonth(v === '' ? '' : Number(v));
-                }}
-                className="jarvis-soft-field px-4 text-foreground"
-              >
-                <option value="">เดือน</option>
-                {THAI_MONTHS.map((mo) => (
-                  <option key={mo.value} value={mo.value}>
-                    {mo.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={endYearBe === '' ? '' : String(endYearBe)}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setEndYearBe(v === '' ? '' : Number(v));
-                }}
-                className="jarvis-soft-field px-4 text-foreground"
-              >
-                <option value="">ปี พ.ศ.</option>
-                {yearOptionsBe.map((be) => (
-                  <option key={be} value={be}>
-                    {be}
-                  </option>
-                ))}
-              </select>
-            </div>
+              />
+              <span>ไม่ทราบวันเลิกงาน — ระบบจะลงเฉพาะวันเริ่มงาน</span>
+            </label>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -394,7 +295,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
                     if (on) setEndTime('');
                   }}
                 />
-                <span>ยังไม่ทราบเวลาเลิกงาน — ระบบจะบันทึกเฉพาะเวลาเริ่ม (ไม่ต้องใส่เวลาข้างบน)</span>
+                <span>ยังไม่ทราบเวลาเลิกงาน — ระบบจะบันทึกเฉพาะเวลาเริ่ม</span>
               </label>
             </div>
           </div>

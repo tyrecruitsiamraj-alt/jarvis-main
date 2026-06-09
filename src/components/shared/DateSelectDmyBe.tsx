@@ -37,7 +37,7 @@ const DateSelectDmyBe: React.FC<DateSelectDmyBeProps> = ({
   }, [allowEmpty, value]);
 
   const buttonClass =
-    'w-full h-10 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground flex items-center justify-between disabled:opacity-50';
+    'jarvis-soft-field w-full h-10 flex items-center justify-between disabled:opacity-50 text-left';
 
   return (
     <div className={className}>

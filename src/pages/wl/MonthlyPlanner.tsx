@@ -12,6 +12,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
 import { formatMonthlyPlannerEmployeeLine } from '@/lib/formatMonthlyPlannerEmployee';
 
+const THAI_WEEKDAY_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] as const;
+
+function isSunday(year: number, month: number, day: number): boolean {
+  return new Date(year, month, day).getDay() === 0;
+}
+
 const MonthlyPlanner: React.FC = () => {
   const calendarEntries = useWorkCalendarEntries();
   const { employees: wlEmployees, loading } = useWlEmployees();
@@ -56,6 +62,10 @@ const MonthlyPlanner: React.FC = () => {
               <span className="text-muted-foreground">{WORK_STATUS_LABELS[status]}</span>
             </div>
           ))}
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+            <span className="text-muted-foreground">วันอาทิตย์ (วันหยุด WL)</span>
+          </div>
         </div>
 
         <div className="overflow-x-auto glass-card rounded-xl border border-border">
@@ -63,9 +73,22 @@ const MonthlyPlanner: React.FC = () => {
             <thead>
               <tr className="border-b border-border">
                 <th className="sticky left-0 bg-card z-10 px-3 py-2 text-left text-muted-foreground font-medium min-w-[280px] max-w-[360px]">พนักงาน</th>
-                {days.map(d => (
-                  <th key={d} className="px-1 py-2 text-center text-muted-foreground font-medium min-w-[32px]">{d}</th>
-                ))}
+                {days.map((d) => {
+                  const sunday = isSunday(year, month, d);
+                  const weekday = THAI_WEEKDAY_SHORT[new Date(year, month, d).getDay()];
+                  return (
+                    <th
+                      key={d}
+                      className={cn(
+                        'px-1 py-1.5 text-center font-medium min-w-[32px]',
+                        sunday ? 'text-red-600 bg-red-500/10' : 'text-muted-foreground',
+                      )}
+                    >
+                      <div className="text-[9px] leading-none opacity-80">{weekday}</div>
+                      <div>{d}</div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -76,18 +99,44 @@ const MonthlyPlanner: React.FC = () => {
                   <td className="sticky left-0 bg-card z-10 px-3 py-2 font-medium text-foreground text-[11px] leading-snug align-top max-w-[360px]">
                     {empLabel}
                   </td>
-                  {days.map(d => {
+                  {days.map((d) => {
                     const entry = getEntry(emp.id, d);
+                    const sunday = isSunday(year, month, d);
                     return (
-                      <td key={d} className="px-1 py-2 text-center">
+                      <td
+                        key={d}
+                        className={cn('px-1 py-2 text-center', sunday && 'bg-red-500/8')}
+                      >
                         {entry ? (
-                          <div onClick={() => setCellDetail({ open: true, entry, empName: empLabel })}
-                            className={cn('w-6 h-6 rounded-md mx-auto flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all', WORK_STATUS_COLORS[entry.status])}>
-                            <span className="text-[8px] font-bold text-foreground">{entry.client_name?.charAt(0) || ''}</span>
+                          <div
+                            onClick={() => setCellDetail({ open: true, entry, empName: empLabel })}
+                            className={cn(
+                              'w-6 h-6 rounded-md mx-auto flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all',
+                              WORK_STATUS_COLORS[entry.status],
+                            )}
+                          >
+                            <span className="text-[8px] font-bold text-foreground">
+                              {entry.client_name?.charAt(0) || ''}
+                            </span>
                           </div>
                         ) : (
-                          <div onClick={() => setAssignDialog({ open: true, date: getDateStr(d), empId: emp.id, empName: empLabel })}
-                            className="w-6 h-6 rounded-md mx-auto bg-secondary/30 cursor-pointer hover:bg-orange-500/15 transition-colors" title="กดเพื่อมอบหมายงาน" />
+                          <div
+                            onClick={() =>
+                              setAssignDialog({
+                                open: true,
+                                date: getDateStr(d),
+                                empId: emp.id,
+                                empName: empLabel,
+                              })
+                            }
+                            className={cn(
+                              'w-6 h-6 rounded-md mx-auto cursor-pointer transition-colors',
+                              sunday
+                                ? 'bg-red-500/15 border border-red-400/25 hover:bg-red-500/25'
+                                : 'bg-secondary/30 hover:bg-orange-500/15',
+                            )}
+                            title={sunday ? 'วันหยุด (อาทิตย์) — กดเพื่อมอบหมายงาน' : 'กดเพื่อมอบหมายงาน'}
+                          />
                         )}
                       </td>
                     );
