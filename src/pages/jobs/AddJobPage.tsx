@@ -96,7 +96,6 @@ const AddJobPage: React.FC = () => {
   const [resignedTitlePrefix, setResignedTitlePrefix] = useState('');
   const [resignedFirstName, setResignedFirstName] = useState('');
   const [resignedLastName, setResignedLastName] = useState('');
-  const [resignedAge, setResignedAge] = useState('');
   const [resignedReason, setResignedReason] = useState('');
   const [requestDate, setRequestDate] = useState(() => toYmdLocal(new Date()));
   const [requiredDate, setRequiredDate] = useState(() => toYmdLocal(new Date()));
@@ -326,18 +325,11 @@ const AddJobPage: React.FC = () => {
       return;
     }
 
-    const resignedAgeNum = resignedAge.trim() ? Number(resignedAge.trim()) : undefined;
-    if (resignedAgeNum !== undefined && (!Number.isFinite(resignedAgeNum) || resignedAgeNum <= 0)) {
-      setFormError('อายุผู้ลาออกต้องเป็นตัวเลขมากกว่า 0');
-      return;
-    }
-
     const payload = {
       request_no: requestNo.trim() || undefined,
       resigned_title_prefix: resignedTitlePrefix.trim() || undefined,
       resigned_first_name: resignedFirstName.trim() || undefined,
       resigned_last_name: resignedLastName.trim() || undefined,
-      resigned_age: resignedAgeNum ? Math.trunc(resignedAgeNum) : undefined,
       resigned_reason: resignedReason.trim() || undefined,
       unit_name: normalizedUnitName,
       request_date: requestDate,
@@ -364,7 +356,6 @@ const AddJobPage: React.FC = () => {
           resigned_title_prefix: payload.resigned_title_prefix,
           resigned_first_name: payload.resigned_first_name,
           resigned_last_name: payload.resigned_last_name,
-          resigned_age: payload.resigned_age,
           resigned_reason: payload.resigned_reason,
           unit_name: payload.unit_name,
           request_date: payload.request_date,
@@ -559,18 +550,6 @@ const AddJobPage: React.FC = () => {
                 value={resignedLastName}
                 onChange={(e) => setResignedLastName(e.target.value)}
                 placeholder="กรอกนามสกุล"
-                className="jarvis-soft-field"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">อายุผู้ลาออก</label>
-              <input
-                type="number"
-                min={1}
-                value={resignedAge}
-                onChange={(e) => setResignedAge(e.target.value)}
-                placeholder="เช่น 35"
                 className="jarvis-soft-field"
               />
             </div>
