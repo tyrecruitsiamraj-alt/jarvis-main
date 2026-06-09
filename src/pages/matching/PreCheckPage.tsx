@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { mockJobRequests, mockClients } from '@/data/mockData';
 import SearchField from '@/components/shared/SearchField';
-import { MapPin, Building2 } from 'lucide-react';
+import { MapPin, Building2, ClipboardCheck, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
@@ -249,13 +249,20 @@ const PreCheckPage: React.FC = () => {
       <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
       <div className="px-4 md:px-6 space-y-4">
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
-          <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
-            <h3 className="text-sm font-semibold">Pre-Check Location</h3>
-            <p className="text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัคร แล้วกด Search ครั้งเดียว</p>
+          <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/12 flex items-center justify-center shrink-0">
+                <ClipboardCheck className="w-4 h-4 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">ค้นหาตำแหน่งผู้สมัคร</h3>
+                <p className="text-xs text-muted-foreground">พิมพ์ที่อยู่แล้วกดค้นหา — ระบบจะเรียงงานใกล้สุดก่อน</p>
+              </div>
+            </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Candidate Address</label>
-              <div className="flex gap-2">
+              <label className="text-xs font-medium text-muted-foreground">ที่อยู่ผู้สมัคร</label>
+              <div className="flex flex-col sm:flex-row gap-2">
                 <SearchField
                   type="text"
                   placeholder='เช่น "สำโรง", "สนามบินสุวรรณภูมิ"'
@@ -272,33 +279,33 @@ const PreCheckPage: React.FC = () => {
                   type="button"
                   onClick={() => void handleSearch()}
                   disabled={searching}
-                  className="px-4 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 disabled:opacity-60"
+                  className="shrink-0 px-5 py-2.5 jarvis-pill-btn text-sm disabled:opacity-60"
                 >
-                  {searching ? 'Searching...' : 'Search'}
+                  {searching ? 'กำลังค้นหา…' : 'ค้นหา'}
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Latitude (optional)</label>
-                <Input value={latText} onChange={(e) => setLatText(e.target.value)} placeholder="13.6900" />
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">ละติจูด (ไม่บังคับ)</label>
+                <Input value={latText} onChange={(e) => setLatText(e.target.value)} placeholder="13.6900" className="jarvis-soft-field" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Longitude (optional)</label>
-                <Input value={lngText} onChange={(e) => setLngText(e.target.value)} placeholder="100.7501" />
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">ลองจิจูด (ไม่บังคับ)</label>
+                <Input value={lngText} onChange={(e) => setLngText(e.target.value)} placeholder="100.7501" className="jarvis-soft-field" />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Project (Optional)</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">กรองหน่วยงาน (ไม่บังคับ)</label>
                 <select
                   value={projectFilter}
                   onChange={(e) => setProjectFilter(e.target.value)}
                   className="w-full jarvis-soft-field"
                 >
-                  <option value="">-- All Projects --</option>
+                  <option value="">— ทุกหน่วยงาน —</option>
                   {projectOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -307,50 +314,66 @@ const PreCheckPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Radius (km)</label>
-                <div className="flex gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">รัศมี (กม.)</label>
+                <div className="flex flex-wrap gap-1.5">
                   {[5, 10, 15, 20].map((r) => (
                     <button
                       key={r}
                       type="button"
                       onClick={() => setRadius(r)}
                       className={cn(
-                        'flex-1 py-1.5 rounded-lg text-sm font-medium',
-                        radius === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
+                        'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                        radius === r
+                          ? 'bg-orange-600 text-white shadow-sm'
+                          : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-orange-300/50',
                       )}
                     >
-                      {r}
+                      {r} กม.
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            {hint ? (
+              <p className="text-xs text-muted-foreground rounded-xl bg-white/40 border border-white/70 px-3 py-2">{hint}</p>
+            ) : null}
           </section>
 
-          <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
-            <h3 className="text-sm font-semibold">Map</h3>
+          <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-orange-500/12 flex items-center justify-center shrink-0">
+                <Navigation className="w-4 h-4 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">แผนที่</h3>
+                <p className="text-xs text-muted-foreground">ตำแหน่งที่ใช้ค้นหางานใกล้เคียง</p>
+              </div>
+            </div>
             {appliedCenter ? (
               <div className="space-y-2">
-                <div className="text-xs text-muted-foreground">Pin: {appliedCenter.label}</div>
+                <div className="text-xs text-muted-foreground rounded-xl bg-white/40 border border-white/70 px-3 py-2">
+                  <MapPin className="w-3 h-3 inline mr-1 text-orange-600" />
+                  {appliedCenter.label}
+                </div>
                 <iframe
-                  title="Precheck map"
+                  title="แผนที่ Pre-Check"
                   src={`https://maps.google.com/maps?q=${appliedCenter.lat},${appliedCenter.lng}&z=13&output=embed`}
-                  className="w-full h-56 rounded-lg border border-border"
+                  className="w-full h-56 md:h-64 rounded-2xl border border-white/70"
                   loading="lazy"
                 />
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                No map data yet.
-                <p className="mt-1 text-xs">Type address and press Search.</p>
+              <div className="rounded-2xl border border-dashed border-white/70 bg-white/30 p-8 text-center">
+                <MapPin className="w-8 h-8 text-orange-400/50 mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">ยังไม่มีตำแหน่งบนแผนที่</p>
+                <p className="mt-1 text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัครแล้วกดค้นหา</p>
               </div>
             )}
           </section>
         </div>
 
-        {loadingJobs && <div className="text-sm text-muted-foreground">Loading jobs...</div>}
+        {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดรายการงาน…</div>}
         {jobsLoadError ? (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span>{jobsLoadError}</span>
@@ -385,7 +408,7 @@ const PreCheckPage: React.FC = () => {
                   .finally(() => setLoadingJobs(false));
               }}
             >
-              Retry load
+              โหลดใหม่
             </button>
           </div>
         ) : null}
@@ -394,14 +417,23 @@ const PreCheckPage: React.FC = () => {
 ยังไม่มีงานจากเซิร์ฟเวอร์ — รวมงานตัวอย่างไว้ในรายการด้านล่างเพื่อให้ค้นหาได้ทันที
           </div>
         ) : null}
-        <div className="text-sm text-muted-foreground">
-          Suitable projects: <span className="text-primary font-semibold">{filteredRows.length}</span>
+        <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-orange-600 shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            งานที่เหมาะสม{' '}
+            <span className="text-orange-600 font-bold tabular-nums">{filteredRows.length}</span> รายการ
+            {appliedCenter ? (
+              <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
+            ) : null}
+          </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {!appliedCenter && !appliedTextQuery && (
-            <div className="glass-card rounded-xl p-5 border border-border text-center text-muted-foreground">
-              Type candidate address, then press Search once.
+            <div className="glass-card rounded-[1.5rem] p-8 border border-white/70 text-center">
+              <ClipboardCheck className="w-8 h-8 text-amber-500/50 mx-auto mb-2" />
+              <p className="text-sm font-medium text-foreground">เริ่มจากที่อยู่ผู้สมัคร</p>
+              <p className="text-xs text-muted-foreground mt-1">พิมพ์ที่อยู่แล้วกดค้นหาเพื่อดูงานใกล้เคียง</p>
             </div>
           )}
 
@@ -422,7 +454,7 @@ const PreCheckPage: React.FC = () => {
                     j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info',
                   )}
                 >
-                  {j.urgency === 'urgent' ? 'Urgent' : 'Advance'}
+                  {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -433,9 +465,9 @@ const PreCheckPage: React.FC = () => {
                   Income: {j.total_income.toLocaleString()} THB • Required: {formatYmdDmyBe(j.required_date)}
                 </span>
                 {distanceKm !== null ? (
-                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} km (nearest first)</span>
+                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} กม. (ใกล้สุดก่อน)</span>
                 ) : appliedCenter ? (
-                  <span className="text-warning">No job coordinates</span>
+                  <span className="text-warning">งานนี้ไม่มีพิกัด</span>
                 ) : null}
               </div>
             </div>
@@ -446,8 +478,8 @@ const PreCheckPage: React.FC = () => {
       <Dialog open={!!jobDetail} onOpenChange={(o) => !o && setJobDetail(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Project Details</DialogTitle>
-            <DialogDescription className="sr-only">Project and client details</DialogDescription>
+            <DialogTitle className="text-foreground">รายละเอียดงาน</DialogTitle>
+            <DialogDescription className="sr-only">รายละเอียดงานและหน่วยงาน</DialogDescription>
           </DialogHeader>
           {jobDetail &&
             (() => {

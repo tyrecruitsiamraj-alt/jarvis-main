@@ -23,6 +23,7 @@ export function candidateToWlEmployeeRow(c: Candidate): Employee {
   return {
     id,
     employee_code: `WL-${c.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+    ...(c.title_prefix?.trim() ? { title_prefix: c.title_prefix.trim() } : {}),
     first_name: c.first_name,
     last_name: c.last_name,
     phone: c.phone,

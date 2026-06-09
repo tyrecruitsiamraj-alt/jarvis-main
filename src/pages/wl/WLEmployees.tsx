@@ -7,10 +7,9 @@ import SearchField from '@/components/shared/SearchField';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { mockEmployees } from '@/data/mockData';
 import { DEMO_CANDIDATES_CHANGED_EVENT, getCandidates, getEmployees } from '@/lib/demoStorage';
 import { mergeCandidateSources } from '@/lib/mergeCandidates';
-import { candidateToWlEmployeeRow, isWlStaffingTrack } from '@/lib/wlFromCandidate';
+import { combineWlEmployeeList } from '@/lib/wlEmployeeList';
 import { readJsonSafe } from '@/lib/api';
 import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
@@ -21,35 +20,6 @@ const statusFilters: { value: EmployeeStatus | 'all'; label: string }[] = [
   { value: 'inactive', label: 'ไม่ใช้งาน' },
   { value: 'suspended', label: 'ระงับ' },
 ];
-
-const mergeEmployees = (apiItems: Employee[], localItems: Employee[]) => {
-  const map = new Map<string, Employee>();
-  if (isDemoMode()) {
-    [...mockEmployees, ...localItems, ...apiItems].forEach((item) => {
-      map.set(item.id, item);
-    });
-  } else {
-    apiItems.forEach((item) => {
-      map.set(item.id, item);
-    });
-  }
-
-  return [...map.values()].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-};
-
-function combineWlEmployeeList(
-  apiEmps: Employee[],
-  localEmps: Employee[],
-  mergedCandidates: Candidate[],
-): Employee[] {
-  const base = mergeEmployees(apiEmps, localEmps);
-  const wlRows = mergedCandidates.filter(isWlStaffingTrack).map(candidateToWlEmployeeRow);
-  return [...base, ...wlRows].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-}
 
 const WLEmployees: React.FC = () => {
   const navigate = useNavigate();

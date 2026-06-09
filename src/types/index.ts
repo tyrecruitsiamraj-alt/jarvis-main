@@ -18,10 +18,14 @@ export type EmployeeStatus = 'active' | 'inactive' | 'suspended';
 export interface Employee {
   id: string;
   employee_code: string;
+  /** คำนำหน้า เช่น นาย นางสาว */
+  title_prefix?: string;
   first_name: string;
   last_name: string;
   nickname?: string;
   phone: string;
+  /** ฐานเงินเดือน (บาท) — แสดงใน Monthly Planner */
+  base_salary?: number;
   status: EmployeeStatus;
   position: string;
   join_date: string;

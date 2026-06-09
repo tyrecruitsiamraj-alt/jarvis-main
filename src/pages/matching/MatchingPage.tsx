@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
-import { Phone, MapPin, User } from 'lucide-react';
+import { Phone, MapPin, User, Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Candidate, CANDIDATE_STATUS_LABELS } from '@/types';
@@ -62,7 +62,16 @@ const MatchingPage: React.FC = () => {
         {(loadingJobs || loadingCandidates) && (
           <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</div>
         )}
-        <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+        <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-orange-500/12 flex items-center justify-center shrink-0">
+              <SlidersHorizontal className="w-4 h-4 text-orange-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">ตั้งค่าการจับคู่</h2>
+              <p className="text-xs text-muted-foreground">เลือกงาน รัศมี และสถานะผู้สมัคร</p>
+            </div>
+          </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">หน่วยงาน / งาน</label>
             <select
@@ -81,18 +90,20 @@ const MatchingPage: React.FC = () => {
               )}
             </select>
           </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">รัศมี (กม.)</label>
-              <div className="flex gap-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">รัศมี (กม.)</label>
+              <div className="flex flex-wrap gap-1.5">
                 {radiusOptions.map((r) => (
                   <button
                     key={r}
                     type="button"
                     onClick={() => setRadius(r)}
                     className={cn(
-                      'flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                      radius === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
+                      'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                      radius === r
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-orange-300/50',
                     )}
                   >
                     {r} กม.
@@ -100,14 +111,14 @@ const MatchingPage: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="flex-1">
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">สถานะ</label>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">สถานะผู้สมัคร</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="jarvis-soft-field"
               >
-                <option value="inprocess">In Process</option>
+                <option value="inprocess">กำลังดำเนินการ</option>
                 <option value="all">ทั้งหมด</option>
                 <option value="waiting_to_start">รอเริ่มงาน</option>
                 <option value="no_job">ไม่มีงาน</option>
@@ -116,13 +127,28 @@ const MatchingPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="text-sm text-muted-foreground">
-          พบผู้สมัคร <span className="text-primary font-semibold">{matched.length}</span> คนในรัศมี {radius} กม.
+        <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
+          <Search className="w-4 h-4 text-orange-600 shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            พบผู้สมัคร{' '}
+            <span className="text-orange-600 font-bold tabular-nums">{matched.length}</span> คน
+            <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
+            {job ? (
+              <span className="hidden sm:inline text-muted-foreground"> · {job.unit_name}</span>
+            ) : null}
+          </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {matched.length === 0 && !loadingJobs && !loadingCandidates ? (
+            <div className="glass-card rounded-[1.5rem] p-8 border border-white/70 text-center text-muted-foreground">
+              <Search className="w-8 h-8 text-orange-400/60 mx-auto mb-2" />
+              <p className="text-sm font-medium text-foreground">ไม่พบผู้สมัครในรัศมีที่เลือก</p>
+              <p className="text-xs mt-1">ลองขยายรัศมีหรือเปลี่ยนสถานะผู้สมัคร</p>
+            </div>
+          ) : null}
           {matched.map((c) => (
-            <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
+            <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-orange-300/50 transition-colors">
               <div className="flex items-center justify-between mb-2">
                 <button
                   type="button"
@@ -165,7 +191,10 @@ const MatchingPage: React.FC = () => {
                 >
                   ดูรายละเอียด
                 </button>
-                <button type="button" className="px-3 py-1.5 rounded-lg bg-warning/10 text-warning text-xs">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-full bg-white/50 border border-white/70 text-muted-foreground text-xs hover:border-orange-300/50"
+                >
                   อัปเดตสถานะ
                 </button>
               </div>

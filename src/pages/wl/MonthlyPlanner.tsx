@@ -10,6 +10,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
+import { formatMonthlyPlannerEmployeeLine } from '@/lib/formatMonthlyPlannerEmployee';
 
 const MonthlyPlanner: React.FC = () => {
   const calendarEntries = useWorkCalendarEntries();
@@ -61,36 +62,39 @@ const MonthlyPlanner: React.FC = () => {
           <table className="min-w-full text-xs">
             <thead>
               <tr className="border-b border-border">
-                <th className="sticky left-0 bg-card z-10 px-3 py-2 text-left text-muted-foreground font-medium min-w-[120px]">พนักงาน</th>
+                <th className="sticky left-0 bg-card z-10 px-3 py-2 text-left text-muted-foreground font-medium min-w-[280px] max-w-[360px]">พนักงาน</th>
                 {days.map(d => (
                   <th key={d} className="px-1 py-2 text-center text-muted-foreground font-medium min-w-[32px]">{d}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {activeEmployees.map(emp => (
+              {activeEmployees.map((emp) => {
+                const empLabel = formatMonthlyPlannerEmployeeLine(emp);
+                return (
                 <tr key={emp.id} className="border-b border-border/50 hover:bg-secondary/30">
-                  <td className="sticky left-0 bg-card z-10 px-3 py-2 font-medium text-foreground whitespace-nowrap">
-                    {emp.nickname || emp.first_name}
+                  <td className="sticky left-0 bg-card z-10 px-3 py-2 font-medium text-foreground text-[11px] leading-snug align-top max-w-[360px]">
+                    {empLabel}
                   </td>
                   {days.map(d => {
                     const entry = getEntry(emp.id, d);
                     return (
                       <td key={d} className="px-1 py-2 text-center">
                         {entry ? (
-                          <div onClick={() => setCellDetail({ open: true, entry, empName: `${emp.first_name} ${emp.last_name}` })}
+                          <div onClick={() => setCellDetail({ open: true, entry, empName: empLabel })}
                             className={cn('w-6 h-6 rounded-md mx-auto flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all', WORK_STATUS_COLORS[entry.status])}>
                             <span className="text-[8px] font-bold text-foreground">{entry.client_name?.charAt(0) || ''}</span>
                           </div>
                         ) : (
-                          <div onClick={() => setAssignDialog({ open: true, date: getDateStr(d), empId: emp.id, empName: `${emp.first_name} ${emp.last_name}` })}
+                          <div onClick={() => setAssignDialog({ open: true, date: getDateStr(d), empId: emp.id, empName: empLabel })}
                             className="w-6 h-6 rounded-md mx-auto bg-secondary/30 cursor-pointer hover:bg-orange-500/15 transition-colors" title="กดเพื่อมอบหมายงาน" />
                         )}
                       </td>
                     );
                   })}
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

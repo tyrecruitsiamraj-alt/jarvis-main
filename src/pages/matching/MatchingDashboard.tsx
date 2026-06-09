@@ -3,7 +3,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
-import { Users, Search, ClipboardCheck, Briefcase, type LucideIcon } from 'lucide-react';
+import { Users, Search, ClipboardCheck, Briefcase, ArrowRight, type LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
 import { useDemoAwareCandidates } from '@/hooks/useDemoAwareCandidates';
@@ -93,9 +93,27 @@ const MatchingDashboard: React.FC = () => {
 
   const allJobsSorted = useMemo(() => [...jobs].sort(sortByRequiredDate), [jobs]);
 
-  const toolMenus: { path: string; label: string; icon: LucideIcon }[] = [
-    { path: '/matching/match', label: 'Matching', icon: Search },
-    { path: '/matching/pre-check', label: 'Pre-Check', icon: ClipboardCheck },
+  const toolMenus: {
+    path: string;
+    label: string;
+    desc: string;
+    icon: LucideIcon;
+    accent: string;
+  }[] = [
+    {
+      path: '/matching/match',
+      label: 'Matching',
+      desc: 'จับคู่ผู้สมัครกับงานตามรัศมีและคะแนน Match',
+      icon: Search,
+      accent: 'text-orange-700 bg-orange-500/12',
+    },
+    {
+      path: '/matching/pre-check',
+      label: 'Pre-Check',
+      desc: 'ค้นหางานใกล้ที่อยู่ผู้สมัครก่อนสมัคร',
+      icon: ClipboardCheck,
+      accent: 'text-amber-700 bg-amber-500/12',
+    },
   ];
 
   const openJob = (id: string) => {
@@ -103,13 +121,14 @@ const MatchingDashboard: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="relative">
+      <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader title="Matching Module" subtitle="จับคู่กับงาน" />
       <div className="px-4 md:px-6 space-y-6">
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูลงาน...</div>}
 
         {/* Matching + Pre-Check */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
           {toolMenus.map((item, i) => (
             <motion.button
               key={item.path}
@@ -118,10 +137,22 @@ const MatchingDashboard: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               onClick={() => navigate(item.path)}
-              className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 hover:border-orange-300/50 transition-all text-center"
+              className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 group touch-manipulation text-left"
             >
-              <item.icon className="w-5 h-5 text-orange-600 mx-auto mb-1" />
-              <div className="text-xs font-semibold text-foreground leading-tight">{item.label}</div>
+              <div
+                className={cn(
+                  'w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105',
+                  item.accent,
+                )}
+              >
+                <item.icon className="w-5 h-5" />
+              </div>
+              <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>
+              <div className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-2">{item.desc}</div>
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                เปิด
+                <ArrowRight className="h-3 w-3" aria-hidden />
+              </div>
             </motion.button>
           ))}
         </div>

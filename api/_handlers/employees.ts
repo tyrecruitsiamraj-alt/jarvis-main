@@ -11,6 +11,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 type EmployeeRow = {
   id: string;
   employee_code: string;
+  title_prefix?: string | null;
   first_name: string;
   last_name: string;
   nickname: string | null;
@@ -27,6 +28,7 @@ type EmployeeRow = {
   total_income: number;
   total_cost: number;
   total_issues: number;
+  base_salary?: number | null;
   avatar_url: string | null;
   created_at: string | Date;
 };
@@ -66,6 +68,7 @@ function toEmployeeResponse(row: EmployeeRow) {
   return {
     id: row.id,
     employee_code: row.employee_code,
+    ...(row.title_prefix?.trim() ? { title_prefix: row.title_prefix.trim() } : {}),
     first_name: row.first_name,
     last_name: row.last_name,
     nickname: row.nickname || undefined,
@@ -82,6 +85,7 @@ function toEmployeeResponse(row: EmployeeRow) {
     total_income: row.total_income,
     total_cost: row.total_cost,
     total_issues: row.total_issues,
+    ...(row.base_salary != null && row.base_salary > 0 ? { base_salary: row.base_salary } : {}),
     avatar_url: row.avatar_url || undefined,
     created_at: toIsoString(row.created_at),
   };
