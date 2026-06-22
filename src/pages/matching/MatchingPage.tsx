@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
 import { Phone, MapPin, User, Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,16 @@ const MatchingPage: React.FC = () => {
 
   const matched = getCandidatesInRadius();
 
+  const jobOptions = useMemo(
+    () =>
+      jobs.map((j) => ({
+        value: j.id,
+        label: j.unit_name,
+        keywords: [j.location_address, j.job_type, j.job_category].filter(Boolean).join(' '),
+      })),
+    [jobs],
+  );
+
   return (
     <div>
       <PageHeader title="Matching" subtitle="จับคู่ผู้สมัครกับงาน" backPath="/matching" />
@@ -74,21 +85,15 @@ const MatchingPage: React.FC = () => {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">หน่วยงาน / งาน</label>
-            <select
+            <SearchableSelect
               value={selectedJob}
-              onChange={(e) => setSelectedJob(e.target.value)}
-              className="jarvis-soft-field"
-            >
-              {jobs.length === 0 ? (
-                <option value="">ไม่มีงาน</option>
-              ) : (
-                jobs.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.unit_name}
-                  </option>
-                ))
-              )}
-            </select>
+              onChange={setSelectedJob}
+              options={jobOptions}
+              placeholder={jobs.length === 0 ? 'ไม่มีงาน' : 'เลือกหน่วยงาน / งาน'}
+              searchPlaceholder="ค้นหาหน่วยงาน..."
+              emptyText="ไม่พบงาน"
+              disabled={jobs.length === 0}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

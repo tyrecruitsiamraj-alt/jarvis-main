@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
-import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, ArrowRight } from 'lucide-react';
+import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, HeartPulse, ArrowRight } from 'lucide-react';
 
 export type HubRole = 'staff' | 'supervisor' | 'admin';
 
@@ -17,6 +17,7 @@ type HubLink = {
 
 const STAFF_LINKS: HubLink[] = [
   { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, accent: 'text-orange-600 bg-orange-500/12' },
+  { path: '/driver-care', label: 'Driver Care', desc: 'เตือนความเสี่ยงคนขับลาออก', icon: HeartPulse, accent: 'text-rose-700 bg-rose-500/12' },
   { path: '/jobs/list', label: 'หน่วยงาน', desc: 'ดูรายการใบขอ', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12' },
 ];
 

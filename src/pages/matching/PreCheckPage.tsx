@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { mockJobRequests, mockClients } from '@/data/mockData';
 import SearchField from '@/components/shared/SearchField';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, Building2, ClipboardCheck, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -91,6 +92,14 @@ const PreCheckPage: React.FC = () => {
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
+  );
+
+  const projectSelectOptions = useMemo(
+    () => [
+      { value: '', label: '— ทุกหน่วยงาน —' },
+      ...projectOptions.map((name) => ({ value: name, label: name })),
+    ],
+    [projectOptions],
   );
 
   const handleSearch = async () => {
@@ -300,18 +309,14 @@ const PreCheckPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">กรองหน่วยงาน (ไม่บังคับ)</label>
-                <select
+                <SearchableSelect
                   value={projectFilter}
-                  onChange={(e) => setProjectFilter(e.target.value)}
-                  className="w-full jarvis-soft-field"
-                >
-                  <option value="">— ทุกหน่วยงาน —</option>
-                  {projectOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setProjectFilter}
+                  options={projectSelectOptions}
+                  placeholder="— ทุกหน่วยงาน —"
+                  searchPlaceholder="ค้นหาหน่วยงาน..."
+                  emptyText="ไม่พบหน่วยงาน"
+                />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">รัศมี (กม.)</label>

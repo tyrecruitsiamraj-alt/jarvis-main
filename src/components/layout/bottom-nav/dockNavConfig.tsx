@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, Settings } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, Settings, HeartPulse } from 'lucide-react';
 
 export type DockNavItem = {
   path: string;
@@ -7,11 +7,12 @@ export type DockNavItem = {
   icon: LucideIcon;
 };
 
-/** 7 เมนูหลัก — ลำดับต้องตรงกับ UI bottom dock */
+/** 8 เมนูหลัก — ลำดับต้องตรงกับ UI bottom dock */
 export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/', label: 'หน้าหลัก', icon: Home },
   { path: '/wl', label: 'WL', icon: CalendarDays },
   { path: '/matching', label: 'Matching', icon: Search },
+  { path: '/driver-care', label: 'Driver Care', icon: HeartPulse },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users },
   { path: '/jobs', label: 'หน่วยงาน', icon: Briefcase },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -26,6 +27,7 @@ export function isDockPathActive(path: string, pathname: string): boolean {
     if (p.startsWith('/matching/candidates')) return false;
     return p.startsWith('/matching');
   }
+  if (path === '/driver-care') return p.startsWith('/driver-care');
   return p.startsWith(path);
 }
 

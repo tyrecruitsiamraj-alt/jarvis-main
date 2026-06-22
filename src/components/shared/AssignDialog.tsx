@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
+import TimeSelect24 from '@/components/shared/TimeSelect24';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import type { SearchableSelectGroup } from '@/components/shared/SearchableSelect';
 import { mockEmployees, mockClients } from '@/data/mockData';
 import { toast } from 'sonner';
 import { isDemoMode } from '@/lib/demoMode';
@@ -105,6 +108,40 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const employeeList = isDemoMode() ? mockEmployees : apiEmployees;
   const clientList = isDemoMode() ? mockClients : apiClients;
 
+  const employeeOptions = useMemo(
+    () =>
+      activeEmployees.map((e) => ({
+        value: e.id,
+        label: `${e.first_name} ${e.last_name}${e.nickname ? ` (${e.nickname})` : ''}`,
+        keywords: [e.phone, e.employee_code, e.position, e.title_prefix].filter(Boolean).join(' '),
+      })),
+    [activeEmployees],
+  );
+
+  const clientOptions = useMemo((): SearchableSelectGroup[] => {
+    const groups: SearchableSelectGroup[] = [];
+    if (activeClients.length > 0) {
+      groups.push({
+        heading: 'ลูกค้า / สถานที่',
+        options: activeClients.map((c) => ({
+          value: c.id,
+          label: c.name,
+          keywords: [c.address, c.contact_person, c.contact_phone].filter(Boolean).join(' '),
+        })),
+      });
+    }
+    if (fallbackUnitsFromJobs.length > 0) {
+      groups.push({
+        heading: 'หน่วยงานจากงาน',
+        options: fallbackUnitsFromJobs.map((name) => ({
+          value: `unit:${name}`,
+          label: name,
+        })),
+      });
+    }
+    return groups;
+  }, [activeClients, fallbackUnitsFromJobs]);
+
   const handleAssign = async () => {
     const empId = employeeId || selectedEmployee;
     const emp = employeeList.find((e) => e.id === empId);
@@ -191,40 +228,27 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             {employeeName ? (
               <div className="jarvis-soft-field">{employeeName}</div>
             ) : (
-              <select
+              <SearchableSelect
                 value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="jarvis-soft-field"
-              >
-                <option value="">เลือกพนักงาน</option>
-                {activeEmployees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.first_name} {e.last_name} ({e.nickname})
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedEmployee}
+                options={employeeOptions}
+                placeholder="เลือกพนักงาน"
+                searchPlaceholder="ค้นหาชื่อ พนักงาน..."
+                emptyText="ไม่พบพนักงาน"
+              />
             )}
           </div>
 
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">หน่วยงาน / ลูกค้า</label>
-            <select
+            <SearchableSelect
               value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className="jarvis-soft-field"
-            >
-              <option value="">เลือกหน่วยงาน</option>
-              {activeClients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-              {fallbackUnitsFromJobs.map((name) => (
-                <option key={`unit:${name}`} value={`unit:${name}`}>
-                  {name}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedClient}
+              groups={clientOptions}
+              placeholder="เลือกหน่วยงาน"
+              searchPlaceholder="ค้นหาหน่วยงาน ลูกค้า..."
+              emptyText="ไม่พบหน่วยงาน"
+            />
           </div>
 
           <div>
@@ -265,25 +289,18 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">เวลาเริ่มงาน</label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="jarvis-soft-field"
-              />
+              <TimeSelect24 value={startTime} onChange={setStartTime} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">เวลาเลิกงาน (ไม่บังคับ)</label>
-              <input
-                type="time"
-                value={endTime}
-                disabled={endTimeUnknown}
-                onChange={(e) => {
-                  setEndTimeUnknown(false);
-                  setEndTime(e.target.value);
-                }}
-                className="jarvis-soft-field disabled:opacity-50"
-              />
+              {endTimeUnknown ? (
+                <div className="jarvis-soft-field text-muted-foreground">ไม่ทราบเวลาเลิกงาน</div>
+              ) : (
+                <TimeSelect24
+                  value={endTime || '17:00'}
+                  onChange={setEndTime}
+                />
+              )}
               <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"

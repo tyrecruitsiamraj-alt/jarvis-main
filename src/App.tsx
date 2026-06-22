@@ -29,6 +29,9 @@ import JobListPage from "@/pages/jobs/JobListPage";
 import JobDetailPage from "@/pages/jobs/JobDetailPage";
 import AddJobPage from "@/pages/jobs/AddJobPage";
 import SoOperationUnitsPage from "@/pages/jobs/SoOperationUnitsPage";
+import DriverCareOverview from "@/pages/driver-care/DriverCareOverview";
+import DriverRiskList from "@/pages/driver-care/DriverRiskList";
+import DriverActionTracking from "@/pages/driver-care/DriverActionTracking";
 import SupervisorDashboard from "@/pages/dashboard/SupervisorDashboard";
 import AdminSettings from "@/pages/settings/AdminSettings";
 import ChangePasswordPage from "@/pages/ChangePasswordPage";
@@ -72,6 +75,9 @@ const ProtectedRoutes = () => {
         <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
         <Route path="/matching/match" element={<MatchingPage />} />
         <Route path="/matching/pre-check" element={<PreCheckPage />} />
+        <Route path="/driver-care" element={<DriverCareOverview />} />
+        <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
+        <Route path="/driver-care/actions" element={<DriverActionTracking />} />
         <Route path="/jobs" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
         <Route path="/jobs/units" element={<SoOperationUnitsPage />} />

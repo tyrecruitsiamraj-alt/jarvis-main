@@ -7,6 +7,7 @@ import {
   Users,
   BarChart3,
   Settings,
+  HeartPulse,
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -36,6 +37,13 @@ const menuItems: {
     desc: 'จับคู่ผู้สมัครกับงาน',
     icon: Search,
     accent: 'text-amber-700 bg-amber-500/12',
+  },
+  {
+    path: '/driver-care',
+    label: 'Driver Care',
+    desc: 'เตือนความเสี่ยงคนขับลาออก',
+    icon: HeartPulse,
+    accent: 'text-rose-700 bg-rose-500/12',
   },
   {
     path: '/jobs',
