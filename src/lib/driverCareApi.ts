@@ -8,17 +8,19 @@ import type {
   DriverRiskListItem,
 } from '@/types/driverCare';
 
-function qs(params: Record<string, string | undefined>): string {
-  const sp = new URLSearchParams();
+function buildDriverCareUrl(
+  view: string,
+  params: Record<string, string | undefined> = {},
+): string {
+  const sp = new URLSearchParams({ view });
   Object.entries(params).forEach(([k, v]) => {
     if (v) sp.set(k, v);
   });
-  const s = sp.toString();
-  return s ? `?${s}` : '';
+  return `/api/driver-care?${sp.toString()}`;
 }
 
 export async function fetchDriverCareOverview(): Promise<DriverCareOverviewResponse> {
-  const r = await apiFetch('/api/driver-care?view=overview');
+  const r = await apiFetch(buildDriverCareUrl('overview'));
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดภาพรวม Driver Care ไม่สำเร็จ'));
   return readJsonSafe<DriverCareOverviewResponse>(r);
 }
@@ -30,7 +32,7 @@ export async function fetchDriverRiskList(filters: {
   actionStatus?: string;
   search?: string;
 }): Promise<DriverRiskListItem[]> {
-  const r = await apiFetch(`/api/driver-care?view=risk-list${qs(filters)}`);
+  const r = await apiFetch(buildDriverCareUrl('risk-list', filters));
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดรายชื่อความเสี่ยงไม่สำเร็จ'));
   return readJsonSafe<DriverRiskListItem[]>(r);
 }
@@ -42,12 +44,12 @@ export async function fetchDriverActions(filters: {
   overdueOnly?: boolean;
 }): Promise<DriverActionTrackingItem[]> {
   const r = await apiFetch(
-    `/api/driver-care?view=actions${qs({
+    buildDriverCareUrl('actions', {
       status: filters.status,
       riskLevel: filters.riskLevel,
       actionBy: filters.actionBy,
       overdueOnly: filters.overdueOnly ? '1' : undefined,
-    })}`,
+    }),
   );
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลด Action Tracking ไม่สำเร็จ'));
   return readJsonSafe<DriverActionTrackingItem[]>(r);
