@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import { fetchDriverCareOverview, recalculateDriverCareRisk } from '@/lib/driverCareApi';
+import DriverCareScoringGuide from '@/components/driver-care/DriverCareScoringGuide';
 import { DRIVER_CARE_RISK_LABELS } from '@/types/driverCare';
 import { AlertTriangle, ClipboardList, HeartPulse, ListChecks, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -88,6 +89,8 @@ const DriverCareOverview: React.FC = () => {
                 <div className="text-xs text-muted-foreground mt-1">ประวัติการติดตามและสถานะเคส</div>
               </button>
             </div>
+
+            <DriverCareScoringGuide />
 
             <div className="grid md:grid-cols-2 gap-4">
               <section className="glass-card rounded-[1.5rem] p-4 border border-white/70">
