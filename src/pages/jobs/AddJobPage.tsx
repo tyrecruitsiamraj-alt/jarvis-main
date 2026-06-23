@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import type { JobCategory, JobRequest, JobType, SoOperationUnit } from '@/types';
+import type { JobCategory, JobRequest, JobType } from '@/types';
 import { createJob, JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
@@ -84,14 +84,6 @@ const AddJobPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [unitName, setUnitName] = useState('');
-  type SoOpUnitsMode = 'loading' | 'text' | 'select' | 'error';
-  const [soOpUnitsMode, setSoOpUnitsMode] = useState<SoOpUnitsMode>('loading');
-  const [soOpUnits, setSoOpUnits] = useState<SoOperationUnit[]>([]);
-  const [soOpUnitsError, setSoOpUnitsError] = useState<string | null>(null);
-  const [soOpReloadKey, setSoOpReloadKey] = useState(0);
-  const [newSoOpUnitName, setNewSoOpUnitName] = useState('');
-  const [addingSoOpUnit, setAddingSoOpUnit] = useState(false);
-  const [addSoOpUnitErr, setAddSoOpUnitErr] = useState<string | null>(null);
   const [requestNo, setRequestNo] = useState('');
   const [resignedTitlePrefix, setResignedTitlePrefix] = useState('');
   const [resignedFirstName, setResignedFirstName] = useState('');
@@ -137,55 +129,6 @@ const AddJobPage: React.FC = () => {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (isConfiguredDemoMode()) {
-      setSoOpUnitsMode('text');
-      return;
-    }
-    let cancelled = false;
-    setSoOpUnitsError(null);
-    (async () => {
-      try {
-        const r = await apiFetch('/api/so-operation/units');
-        if (cancelled) return;
-        if (r.status === 501) {
-          setSoOpUnits([]);
-          setSoOpUnitsMode('text');
-          return;
-        }
-        if (!r.ok) {
-          setSoOpUnits([]);
-          setSoOpUnitsMode('error');
-          setSoOpUnitsError(`โหลดรายการหน่วยงานไม่สำเร็จ (HTTP ${r.status})`);
-          return;
-        }
-        const data = (await r.json()) as unknown;
-        const units = Array.isArray(data)
-          ? data.filter(
-              (u): u is SoOperationUnit =>
-                u !== null &&
-                typeof u === 'object' &&
-                'name' in u &&
-                typeof (u as SoOperationUnit).name === 'string' &&
-                'id' in u &&
-                typeof (u as SoOperationUnit).id === 'string',
-            )
-          : [];
-        setSoOpUnits(units);
-        setSoOpUnitsMode('select');
-      } catch {
-        if (!cancelled) {
-          setSoOpUnits([]);
-          setSoOpUnitsMode('error');
-          setSoOpUnitsError(apiUnreachableHint());
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [soOpReloadKey]);
 
   const [houseNo, setHouseNo] = useState('');
   const [projectName, setProjectName] = useState('');
@@ -236,57 +179,14 @@ const AddJobPage: React.FC = () => {
     [workDayFrom, workDayTo, workTimeFrom, workTimeTo],
   );
 
-  const submitNewSoOpUnit = async () => {
-    const name = newSoOpUnitName.trim();
-    if (!name || addingSoOpUnit || soOpUnitsMode !== 'select') return;
-    setAddSoOpUnitErr(null);
-    setAddingSoOpUnit(true);
-    try {
-      const r = await apiFetch('/api/so-operation/units', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-      });
-      const body: unknown = await r.json().catch(() => null);
-      if (!r.ok) {
-        const msg =
-          body && typeof body === 'object' && 'message' in body
-            ? String((body as { message?: string }).message || '')
-            : '';
-        setAddSoOpUnitErr(msg || `บันทึกไม่สำเร็จ (HTTP ${r.status})`);
-        return;
-      }
-      if (
-        body &&
-        typeof body === 'object' &&
-        'name' in body &&
-        typeof (body as SoOperationUnit).name === 'string'
-      ) {
-        setUnitName((body as SoOperationUnit).name);
-        setNewSoOpUnitName('');
-        setSoOpReloadKey((k) => k + 1);
-      }
-    } catch {
-      setAddSoOpUnitErr(apiUnreachableHint());
-    } finally {
-      setAddingSoOpUnit(false);
-    }
-  };
-
   const handleSave = async () => {
     if (saving) return;
     setFormError(null);
 
     const normalizedUnitName = unitName.trim();
     if (!normalizedUnitName) {
-      setFormError(soOpUnitsMode === 'select' ? 'กรุณาเลือกหน่วยงานจากรายการ' : 'กรุณากรอกชื่อหน่วยงาน');
+      setFormError('กรุณากรอกชื่อหน่วยงาน');
       return;
-    }
-    if (soOpUnitsMode === 'select') {
-      const allowed = new Set(soOpUnits.map((u) => u.name));
-      if (!allowed.has(normalizedUnitName)) {
-        setFormError('กรุณาเลือกหน่วยงานจากรายการที่มาจากระบบ so-operation เท่านั้น');
-        return;
-      }
     }
     if (!requestDate) {
       setFormError('กรุณาเลือกวันที่ขอ');
@@ -427,83 +327,14 @@ const AddJobPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="text-xs font-medium text-muted-foreground mb-1 block">ชื่อหน่วยงาน *</label>
-              {soOpUnitsMode === 'text' && !isConfiguredDemoMode() ? (
-                <div className="mb-2 rounded-lg border border-warning/35 bg-warning/10 px-3 py-2 text-xs text-foreground">
-                  ยังไม่เชื่อมตารางหน่วยงานใน <strong>so-operation</strong> — ชื่อที่คีย์ที่นี่จะเก็บเฉพาะในใบงาน (
-                  <code className="text-[10px] bg-muted/80 px-1 rounded">jarvis_rm.jobs</code>) เท่านั้น
-                  {' · '}
-                  <Link to="/jobs/units" className="text-primary font-medium hover:underline">
-                    ตั้งค่าและจัดการหน่วยงาน
-                  </Link>
-                </div>
-              ) : null}
-              {soOpUnitsMode === 'loading' ? (
-                <div className="w-full jarvis-soft-field text-muted-foreground">
-                  กำลังโหลดรายการหน่วยงาน…
-                </div>
-              ) : soOpUnitsMode === 'select' ? (
-                <>
-                  <select
-                    value={unitName}
-                    onChange={(e) => setUnitName(e.target.value)}
-                    required
-                    className="jarvis-soft-field"
-                  >
-                    <option value="">— เลือกหน่วยงาน (จากฐานข้อมูล so-operation) —</option>
-                    {soOpUnits.map((u) => (
-                      <option key={u.id} value={u.name}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    รายการอ่านจาก schema SO_OPERATION_SCHEMA / ตาราง SO_OPERATION_UNITS_TABLE — เพิ่มหรือแก้ไขที่นี่จะบันทึกลง
-                    so-operation เท่านั้น
-                  </p>
-                  <div className="mt-2 rounded-lg border border-border/70 bg-muted/15 p-3 space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground">
-                      เพิ่มหน่วยงานใหม่ใน so-operation แล้วเลือกทันที
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="text"
-                        value={newSoOpUnitName}
-                        onChange={(e) => setNewSoOpUnitName(e.target.value)}
-                        placeholder="ชื่อหน่วยงานใหม่"
-                        className="jarvis-soft-field flex-1"
-                        disabled={addingSoOpUnit}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void submitNewSoOpUnit()}
-                        disabled={addingSoOpUnit || !newSoOpUnitName.trim()}
-                        className="shrink-0 px-4 py-2 jarvis-pill-btn text-sm font-medium disabled:opacity-50"
-                      >
-                        {addingSoOpUnit ? 'กำลังบันทึก…' : 'บันทึกและเลือก'}
-                      </button>
-                    </div>
-                    {addSoOpUnitErr ? <p className="text-xs text-destructive">{addSoOpUnitErr}</p> : null}
-                    <Link to="/jobs/units" className="text-xs text-orange-600 hover:underline inline-block">
-                      เปิดหน้าจัดการหน่วยงานทั้งหมด
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <input
-                  type="text"
-                  value={unitName}
-                  onChange={(e) => setUnitName(e.target.value)}
-                  placeholder={
-                    soOpUnitsMode === 'error'
-                      ? 'ตั้งค่า SO_OPERATION_* แล้วลองใหม่ หรือกรอกชื่อหน่วยงานชั่วคราว'
-                      : undefined
-                  }
-                  className="jarvis-soft-field"
-                />
-              )}
-              {soOpUnitsMode === 'select' ? null : soOpUnitsError ? (
-                <p className="text-xs text-destructive mt-1">{soOpUnitsError}</p>
-              ) : null}
+              <input
+                type="text"
+                value={unitName}
+                onChange={(e) => setUnitName(e.target.value)}
+                required
+                placeholder="เช่น สำนักงานใหญ่, โรงงานระยอง"
+                className="jarvis-soft-field"
+              />
             </div>
 
             <div>

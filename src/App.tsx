@@ -28,7 +28,6 @@ import JobDashboard from "@/pages/jobs/JobDashboard";
 import JobListPage from "@/pages/jobs/JobListPage";
 import JobDetailPage from "@/pages/jobs/JobDetailPage";
 import AddJobPage from "@/pages/jobs/AddJobPage";
-import SoOperationUnitsPage from "@/pages/jobs/SoOperationUnitsPage";
 import DriverCareOverview from "@/pages/driver-care/DriverCareOverview";
 import DriverRiskList from "@/pages/driver-care/DriverRiskList";
 import DriverActionTracking from "@/pages/driver-care/DriverActionTracking";
@@ -80,7 +79,6 @@ const ProtectedRoutes = () => {
         <Route path="/driver-care/actions" element={<DriverActionTracking />} />
         <Route path="/jobs" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
-        <Route path="/jobs/units" element={<SoOperationUnitsPage />} />
         <Route path="/jobs/add" element={<AddJobPage />} />
         <Route path="/jobs/:id" element={<JobDetailPage />} />
         <Route path="/dashboard" element={<SupervisorDashboard />} />

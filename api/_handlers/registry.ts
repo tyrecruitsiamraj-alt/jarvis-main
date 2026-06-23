@@ -8,7 +8,6 @@ import jobStaffHandler from './job-staff.js';
 import jobAssignmentsHandler from './job-assignments.js';
 import workCalendarHandler from './work-calendar.js';
 import clientsHandler from './clients.js';
-import soOperationUnitsHandler from './so-operation-units.js';
 import candidateInterviewsHandler from './candidate-interviews.js';
 import candidateWorkHistoryHandler from './candidate-work-history.js';
 import trainingRecordsHandler from './training-records.js';
@@ -36,7 +35,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/job-assignments': jobAssignmentsHandler as ApiHandler,
   '/api/work-calendar': workCalendarHandler as ApiHandler,
   '/api/clients': clientsHandler as ApiHandler,
-  '/api/so-operation/units': soOperationUnitsHandler as ApiHandler,
   '/api/candidate-interviews': candidateInterviewsHandler as ApiHandler,
   '/api/candidate-work-history': candidateWorkHistoryHandler as ApiHandler,
   '/api/training-records': trainingRecordsHandler as ApiHandler,

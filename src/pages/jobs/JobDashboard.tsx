@@ -6,7 +6,7 @@ import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import DetailListDialog from '@/components/shared/DetailListDialog';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
-import { Briefcase, Building2, Plus, AlertTriangle, CheckCircle, ListTodo } from 'lucide-react';
+import { Briefcase, Plus, AlertTriangle, CheckCircle, ListTodo } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
@@ -107,17 +107,6 @@ const JobDashboard: React.FC = () => {
             <Briefcase className="w-6 h-6 text-orange-600 mx-auto mb-1" />
             <div className="text-sm font-semibold text-foreground">รายการงานทั้งหมด</div>
           </button>
-          {hasPermission('staff') ? (
-            <button
-              type="button"
-              onClick={() => navigate('/jobs/units')}
-              className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-orange-300/50 text-center"
-            >
-              <Building2 className="w-6 h-6 text-orange-600 mx-auto mb-1" />
-              <div className="text-sm font-semibold text-foreground">หน่วยงาน (so-operation)</div>
-              <div className="text-xs text-muted-foreground mt-0.5">เพิ่ม / แก้ไขชื่อหน่วยงาน</div>
-            </button>
-          ) : null}
         </div>
 
         {/* Recent jobs */}
