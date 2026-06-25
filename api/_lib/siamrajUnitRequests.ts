@@ -1,5 +1,4 @@
 import { dbQuery } from './postgres.js';
-import { logWarn } from './logger.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import {
   getSiamrajSqlServerUnitRequestById,
@@ -20,19 +19,6 @@ export function getSiamrajDbSource(): SiamrajDbSource | null {
     if (hasPg) return 'postgres';
   }
   return null;
-}
-
-function sqlServerFallbackEnabled(): boolean {
-  const raw = (process.env.SIAMRAJ_SQLSERVER_FALLBACK || 'postgres').toLowerCase();
-  if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
-  return !!getSiamrajSchema();
-}
-
-function isSqlServerConnectivityError(e: unknown): boolean {
-  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
-  return /failed to connect|etimedout|econnrefused|enotfound|connection timeout|socket hang up|network-related|server was not found/.test(
-    msg,
-  );
 }
 
 function normalizeLookupId(id: string): string {
@@ -209,13 +195,20 @@ function staffingQueueWhere(): string {
   `;
 }
 
-export async function listSiamrajPostgresUnitRequests(options: { limit?: number; mode?: string }) {
+export async function listSiamrajUnitRequests(options: { limit?: number; mode?: string }) {
+  const source = getSiamrajDbSource();
+  if (!source) return [];
+
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerUnitRequests(options);
+  }
+
   const schema = getSiamrajSchema();
   if (!schema) return [];
 
   const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
-  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue').toLowerCase();
-  const where = mode === 'all' ? '1=1' : staffingQueueWhere();
+  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
+  const where = mode === 'staffing_queue' ? staffingQueueWhere() : '1=1';
 
   const { rows } = await dbQuery<SiamrajUnitRequestRow>(
     `SELECT ${BASE_SELECT}
@@ -229,7 +222,14 @@ export async function listSiamrajPostgresUnitRequests(options: { limit?: number;
   return rows.map(mapSiamrajRow);
 }
 
-export async function getSiamrajPostgresUnitRequestById(id: string) {
+export async function getSiamrajUnitRequestById(id: string) {
+  const source = getSiamrajDbSource();
+  if (!source) return null;
+
+  if (source === 'sqlserver') {
+    return getSiamrajSqlServerUnitRequestById(normalizeLookupId(id));
+  }
+
   const schema = getSiamrajSchema();
   if (!schema) return null;
 
@@ -243,45 +243,4 @@ export async function getSiamrajPostgresUnitRequestById(id: string) {
   );
 
   return rows[0] ? mapSiamrajRow(rows[0]) : null;
-}
-
-export async function listSiamrajUnitRequests(options: { limit?: number; mode?: string }) {
-  const source = getSiamrajDbSource();
-  if (!source) return [];
-
-  if (source === 'sqlserver') {
-    try {
-      return await listSiamrajSqlServerUnitRequests(options);
-    } catch (e) {
-      if (!sqlServerFallbackEnabled() || !isSqlServerConnectivityError(e)) throw e;
-      logWarn('siamraj.sqlserver_fallback', {
-        message: e instanceof Error ? e.message : String(e),
-        fallback: 'postgres',
-      });
-      return listSiamrajPostgresUnitRequests(options);
-    }
-  }
-
-  return listSiamrajPostgresUnitRequests(options);
-}
-
-export async function getSiamrajUnitRequestById(id: string) {
-  const source = getSiamrajDbSource();
-  if (!source) return null;
-
-  if (source === 'sqlserver') {
-    try {
-      return await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id));
-    } catch (e) {
-      if (!sqlServerFallbackEnabled() || !isSqlServerConnectivityError(e)) throw e;
-      logWarn('siamraj.sqlserver_fallback', {
-        message: e instanceof Error ? e.message : String(e),
-        fallback: 'postgres',
-        id,
-      });
-      return getSiamrajPostgresUnitRequestById(id);
-    }
-  }
-
-  return getSiamrajPostgresUnitRequestById(id);
 }

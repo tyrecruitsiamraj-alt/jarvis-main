@@ -59,23 +59,28 @@ export async function getSiamrajSqlServerPool(): Promise<sql.ConnectionPool> {
     return globalForMssql.__jarvisMssqlPool;
   }
 
-  const pool = await sql.connect({
-    user: cfg.user,
-    password: cfg.password,
-    server: cfg.server,
-    database: cfg.database,
-    port: cfg.port,
-    options: {
-      encrypt: cfg.encrypt,
-      trustServerCertificate: cfg.trustServerCertificate,
-    },
-    pool: { max: 5, min: 0, idleTimeoutMillis: 30000 },
-    connectionTimeout: 15000,
-    requestTimeout: 45000,
-  });
+  try {
+    const pool = await sql.connect({
+      user: cfg.user,
+      password: cfg.password,
+      server: cfg.server,
+      database: cfg.database,
+      port: cfg.port,
+      options: {
+        encrypt: cfg.encrypt,
+        trustServerCertificate: cfg.trustServerCertificate,
+      },
+      pool: { max: 5, min: 0, idleTimeoutMillis: 30000 },
+      connectionTimeout: 30000,
+      requestTimeout: 60000,
+    });
 
-  globalForMssql.__jarvisMssqlPool = pool;
-  return pool;
+    globalForMssql.__jarvisMssqlPool = pool;
+    return pool;
+  } catch (e) {
+    globalForMssql.__jarvisMssqlPool = undefined;
+    throw e;
+  }
 }
 
 export async function siamrajSqlServerPing(): Promise<boolean> {
