@@ -10,6 +10,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
 import { isDemoMode } from '@/lib/demoMode';
 import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
+import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { apiFetch } from '@/lib/apiFetch';
 
 type JobListFilter = 'all' | 'active' | 'closed';
@@ -23,32 +25,43 @@ const JobListPage: React.FC = () => {
 
   const [jobs, setJobs] = useState<JobRequest[]>(getMergedJobsInitial());
   const [loading, setLoading] = useState(false);
+  const [siamrajPrimary, setSiamrajPrimary] = useState(false);
   const apiJobsRef = useRef<JobRequest[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
 
-    apiFetch('/api/jobs?limit=500')
-      .then(async (r) => {
+    (async () => {
+      try {
+        const meta = await fetchSiamrajFeedMeta();
+        if (cancelled) return;
+
+        if (meta.enabled) {
+          setSiamrajPrimary(true);
+          const arr = await fetchSiamrajUnitRequests(500);
+          if (cancelled) return;
+          apiJobsRef.current = arr;
+          setJobs(arr);
+          return;
+        }
+
+        setSiamrajPrimary(false);
+        const r = await apiFetch('/api/jobs?limit=500');
         if (!r.ok) throw new Error(`API_${r.status}`);
-        return r.json() as Promise<JobRequest[]>;
-      })
-      .then((data) => {
+        const data = (await r.json()) as JobRequest[];
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
         apiJobsRef.current = arr;
         setJobs(mergeJobSources(arr, getJobs()));
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return;
         apiJobsRef.current = [];
         setJobs(mergeJobSources([], getJobs()));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -79,7 +92,7 @@ const JobListPage: React.FC = () => {
       })
       .filter(
         (j) =>
-          `${j.unit_name} ${j.location_address} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]}`
+          `${j.unit_name} ${j.request_no || ''} ${j.location_address} ${j.request_action_name || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''}`
             .toLowerCase()
             .includes(q),
       );
@@ -87,7 +100,11 @@ const JobListPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="รายการงานทั้งหมด" subtitle={`${filtered.length} งาน`} backPath="/jobs" />
+      <PageHeader
+        title="รายการงานทั้งหมด"
+        subtitle={siamrajPrimary ? `${filtered.length} ใบขอจาก Siamraj` : `${filtered.length} งาน`}
+        backPath="/jobs"
+      />
 
       <div className="px-4 md:px-6 space-y-4">
         {loading && <div className="text-sm text-muted-foreground">กำลังโหลดงาน...</div>}
@@ -145,16 +162,19 @@ const JobListPage: React.FC = () => {
             {filtered.map((j) => (
               <button
                 key={j.id}
-                onClick={() => navigate(`/jobs/${j.id}`)}
+                onClick={() => navigateToUnitRequest(j, navigate)}
                 className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-foreground text-sm">{j.unit_name}</span>
+                  <span className="font-semibold text-foreground text-sm">
+                    {j.request_no ? `${j.unit_name} · ${j.request_no}` : j.unit_name}
+                  </span>
                   <StatusBadge status={j.status} type="job" />
                 </div>
 
                 <div className="text-xs text-muted-foreground">
-                  {JOB_TYPE_LABELS[j.job_type]} • {JOB_CATEGORY_LABELS[j.job_category]}
+                  {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
+                  {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
                 </div>
 
                 <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
@@ -173,9 +193,9 @@ const JobListPage: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">หน่วยงาน</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ลักษณะงาน</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ประเภท</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ไซต์ / ใบขอ</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ประเภทใบขอ</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ผู้ลาออก</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">สถานที่</th>
                   <th className="px-4 py-3 text-center text-muted-foreground font-medium">ด่วน</th>
                   <th className="px-4 py-3 text-right text-muted-foreground font-medium">รายได้</th>
@@ -187,12 +207,14 @@ const JobListPage: React.FC = () => {
                 {filtered.map((j) => (
                   <tr
                     key={j.id}
-                    onClick={() => navigate(`/jobs/${j.id}`)}
+                    onClick={() => navigateToUnitRequest(j, navigate)}
                     className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                   >
-                    <td className="px-4 py-3 font-medium text-foreground">{j.unit_name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{JOB_TYPE_LABELS[j.job_type]}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{JOB_CATEGORY_LABELS[j.job_category]}</td>
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      {j.request_no ? `${j.unit_name} (${j.request_no})` : j.unit_name}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{j.resigned_employee_name || '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{j.location_address}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={j.urgency === 'urgent' ? 'text-destructive' : 'text-info'}>

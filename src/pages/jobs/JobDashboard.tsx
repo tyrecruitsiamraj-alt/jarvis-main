@@ -5,11 +5,12 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import DetailListDialog from '@/components/shared/DetailListDialog';
-import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
+import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
 import { Briefcase, Plus, AlertTriangle, CheckCircle, ListTodo } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import { navigateToUnitRequest } from '@/lib/jobNavigation';
 
 type JobDialogItem = {
   id: string;
@@ -20,24 +21,25 @@ type JobDialogItem = {
   onClick?: () => void;
 };
 
-function jobRequestToDialogItem(j: JobRequest, onNavigate: (id: string) => void): JobDialogItem {
+function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => void): JobDialogItem {
   const badge = j.status === 'closed' ? 'ปิดแล้ว' : 'ดำเนินการ';
   const badgeVariant: JobDialogItem['badgeVariant'] =
     j.status === 'closed' ? 'success' : j.status === 'cancelled' ? 'destructive' : 'warning';
+  const actionLabel = j.request_action_name ? ` • ${j.request_action_name}` : '';
   return {
     id: j.id,
-    title: j.unit_name,
-    subtitle: `${JOB_TYPE_LABELS[j.job_type]} • ${JOB_CATEGORY_LABELS[j.job_category]} • ต้องการ ${formatYmdDmyBe(j.required_date)} • ${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}`,
+    title: j.request_no ? `${j.unit_name} (${j.request_no})` : j.unit_name,
+    subtitle: `${j.request_action_name || JOB_TYPE_LABELS[j.job_type]}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)}`,
     badge,
     badgeVariant,
-    onClick: () => onNavigate(j.id),
+    onClick: () => onNavigate(j),
   };
 }
 
 const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const { jobs, loading } = useDemoAwareJobs();
+  const { jobs, loading, siamrajPrimary, readOnly } = useUnitRequestsFeed();
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
   const [jobDialogItems, setJobDialogItems] = useState<JobDialogItem[]>([]);
@@ -48,13 +50,15 @@ const JobDashboard: React.FC = () => {
   const closedCount = closedJobs.length;
   const activeCount = activeJobs.length;
 
+  const goToJob = (job: JobRequest) => navigateToUnitRequest(job, navigate);
+
   const openJobList = (title: string, list: JobRequest[]) => {
     setJobDialogTitle(`${title} (${list.length})`);
     setJobDialogItems(
       list.map((j) =>
-        jobRequestToDialogItem(j, (id) => {
+        jobRequestToDialogItem(j, (job) => {
           setJobDialogOpen(false);
-          navigate(`/jobs/${id}`);
+          goToJob(job);
         }),
       ),
     );
@@ -63,12 +67,16 @@ const JobDashboard: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="หน่วยงาน" subtitle="จัดการหน่วยงานและใบขอ"
-        actions={hasPermission('staff') ? (
-          <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm">
-            <Plus className="w-4 h-4" /> สร้างงานใหม่
-          </button>
-        ) : undefined}
+      <PageHeader
+        title="หน่วยงาน"
+        subtitle={siamrajPrimary ? 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์' : 'จัดการหน่วยงานและใบขอ'}
+        actions={
+          !readOnly && hasPermission('staff') ? (
+            <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm">
+              <Plus className="w-4 h-4" /> สร้างงานใหม่
+            </button>
+          ) : undefined
+        }
       />
       <div className="px-4 md:px-6 space-y-6">
         {loading && <div className="text-sm text-muted-foreground">กำลังโหลดงาน...</div>}
@@ -115,19 +123,29 @@ const JobDashboard: React.FC = () => {
           <div className="space-y-2">
             {jobs.slice(0, 4).map(j => (
               <motion.button key={j.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                onClick={() => navigate(`/jobs/${j.id}`)}
+                onClick={() => goToJob(j)}
                 className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50 transition-all">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-foreground text-sm">{j.unit_name}</span>
+                  <span className="font-semibold text-foreground text-sm">
+                    {j.request_no ? `${j.unit_name} · ${j.request_no}` : j.unit_name}
+                  </span>
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info'}`}>
-                      {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
-                    </span>
+                    {j.request_action_name ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/12 text-orange-700">
+                        {j.request_action_name}
+                      </span>
+                    ) : (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info'}`}>
+                        {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                      </span>
+                    )}
                     <StatusBadge status={j.status} type="job" />
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {JOB_TYPE_LABELS[j.job_type]} • {JOB_CATEGORY_LABELS[j.job_category]} • ฿{j.total_income.toLocaleString()}
+                  {j.resigned_employee_name ? `ลาออก: ${j.resigned_employee_name} • ` : ''}
+                  ต้องการ {formatYmdDmyBe(j.required_date)}
+                  {j.submittedByName ? ` • ส่งโดย ${j.submittedByName}` : ''}
                 </div>
                 {j.total_penalty > 0 && (
                   <div className="flex items-center gap-1 mt-1 text-xs text-destructive">

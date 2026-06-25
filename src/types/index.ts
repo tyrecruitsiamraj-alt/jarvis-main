@@ -102,9 +102,27 @@ export type JobType = 'thai_executive' | 'foreign_executive' | 'central' | 'vale
 export type JobCategory = 'private' | 'government' | 'bank';
 export type JobUrgency = 'urgent' | 'advance';
 export type JobStatus = 'open' | 'in_progress' | 'closed' | 'cancelled';
+export type JobRequestSource = 'jarvis' | 'siamraj';
 
 export interface JobRequest {
   id: string;
+  source?: JobRequestSource;
+  readOnly?: boolean;
+  externalId?: string;
+  submittedByName?: string;
+  submittedByEmail?: string;
+  submittedAt?: string;
+  request_action_code?: string;
+  request_action_name?: string;
+  site_code?: string;
+  position_units?: number;
+  lastWorkingDay?: string;
+  contact_phone?: string;
+  siamraj_status?: string;
+  need_staff?: boolean;
+  staff_title_code?: string;
+  job_description_code_1?: string;
+  job_description_code_2?: string;
   request_no?: string;
   resigned_title_prefix?: string;
   resigned_first_name?: string;

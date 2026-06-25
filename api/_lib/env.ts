@@ -26,6 +26,10 @@ const DB_ENV_KEYS = [
   'PGSCHEMA',
   'DATABASE_SCHEMA',
   'PG_SSL',
+  'SIAMRAJ_SCHEMA',
+  'SO_OPERATION_SCHEMA',
+  'SIAMRAJ_UNIT_REQUESTS_ENABLED',
+  'SIAMRAJ_UNIT_REQUESTS_MODE',
 ] as const;
 
 let localDbEnvApplied = false;

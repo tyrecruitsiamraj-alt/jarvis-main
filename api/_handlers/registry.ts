@@ -23,6 +23,7 @@ import changePasswordHandler from './auth/change-password.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 import driverCareHandler from './driver-care.js';
+import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -43,6 +44,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/employees': employeesHandler as ApiHandler,
   '/api/geocode': geocodeHandler as ApiHandler,
   '/api/driver-care': driverCareHandler as ApiHandler,
+  '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
