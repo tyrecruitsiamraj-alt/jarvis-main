@@ -25,6 +25,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
   try {
+    if (method === 'GET') {
+      res.setHeader?.('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
     if (method === 'GET' && getQuery(req, 'meta') === '1') {
       return res.status(200).json({
         enabled: isSiamrajUnitRequestsEnabled(),

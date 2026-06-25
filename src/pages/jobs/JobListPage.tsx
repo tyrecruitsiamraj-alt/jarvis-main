@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -7,12 +7,9 @@ import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import SearchField from '@/components/shared/SearchField';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
-import { isDemoMode } from '@/lib/demoMode';
-import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
-import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
-import { apiFetch } from '@/lib/apiFetch';
+import { RefreshCw } from 'lucide-react';
 
 type JobListFilter = 'all' | 'active' | 'closed';
 
@@ -23,57 +20,7 @@ const JobListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState<string>('all');
 
-  const [jobs, setJobs] = useState<JobRequest[]>(getMergedJobsInitial());
-  const [loading, setLoading] = useState(false);
-  const [siamrajPrimary, setSiamrajPrimary] = useState(false);
-  const apiJobsRef = useRef<JobRequest[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-
-    (async () => {
-      try {
-        const meta = await fetchSiamrajFeedMeta();
-        if (cancelled) return;
-
-        if (meta.enabled) {
-          setSiamrajPrimary(true);
-          const arr = await fetchSiamrajUnitRequests(500);
-          if (cancelled) return;
-          apiJobsRef.current = arr;
-          setJobs(arr);
-          return;
-        }
-
-        setSiamrajPrimary(false);
-        const r = await apiFetch('/api/jobs?limit=500');
-        if (!r.ok) throw new Error(`API_${r.status}`);
-        const data = (await r.json()) as JobRequest[];
-        if (cancelled) return;
-        const arr = Array.isArray(data) ? data : [];
-        apiJobsRef.current = arr;
-        setJobs(mergeJobSources(arr, getJobs()));
-      } catch {
-        if (cancelled) return;
-        apiJobsRef.current = [];
-        setJobs(mergeJobSources([], getJobs()));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isDemoMode()) return;
-    const sync = () => setJobs(mergeJobSources(apiJobsRef.current, getJobs()));
-    window.addEventListener(DEMO_JOBS_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(DEMO_JOBS_CHANGED_EVENT, sync);
-  }, []);
+  const { jobs, loading, refreshing, siamrajPrimary, refetch } = useUnitRequestsFeed();
 
   const unitOptions = useMemo(() => {
     const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
@@ -104,6 +51,17 @@ const JobListPage: React.FC = () => {
         title="รายการงานทั้งหมด"
         subtitle={siamrajPrimary ? `${filtered.length} ใบขอจาก Siamraj` : `${filtered.length} งาน`}
         backPath="/jobs"
+        actions={
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={refreshing}
+            className="flex items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50"
+          >
+            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+            รีเฟรช
+          </button>
+        }
       />
 
       <div className="px-4 md:px-6 space-y-4">

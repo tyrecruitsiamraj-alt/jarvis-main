@@ -12,7 +12,7 @@ export type SiamrajFeedMeta = {
 };
 
 export async function fetchSiamrajFeedMeta(): Promise<SiamrajFeedMeta> {
-  const r = await apiFetch('/api/siamraj/unit-requests?meta=1');
+  const r = await apiFetch('/api/siamraj/unit-requests?meta=1', { cache: 'no-store' });
   if (!r.ok) {
     return { enabled: false, schema: null, readOnly: true, mode: 'staffing_queue' };
   }
@@ -20,7 +20,7 @@ export async function fetchSiamrajFeedMeta(): Promise<SiamrajFeedMeta> {
 }
 
 export async function fetchSiamrajUnitRequests(limit = 200): Promise<JobRequest[]> {
-  const r = await apiFetch(`/api/siamraj/unit-requests?limit=${limit}`);
+  const r = await apiFetch(`/api/siamraj/unit-requests?limit=${limit}`, { cache: 'no-store' });
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดใบขอจาก Siamraj ไม่สำเร็จ'));
   return readJsonSafe<JobRequest[]>(r);
 }

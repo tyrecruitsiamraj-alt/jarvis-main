@@ -21,6 +21,7 @@ import {
   Wallet,
   Receipt,
   ListFilter,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -51,7 +52,7 @@ const SupervisorDashboard: React.FC = () => {
   const [dialogItems, setDialogItems] = useState<DetailDialogItem[]>([]);
   const [staffRosterRev, setStaffRosterRev] = useState(0);
 
-  const { jobs, loading: loadingJobs } = useDemoAwareJobs();
+  const { jobs, loading: loadingJobs, refreshing, refetch } = useDemoAwareJobs();
   const today = new Date();
 
   useEffect(() => {
@@ -182,6 +183,19 @@ const SupervisorDashboard: React.FC = () => {
       <PageHeader
         title="Dashboard"
         subtitle="ภาพรวมสำหรับผู้บริหาร — งาน รายได้ และค่าปรับ (ตามฟิลเตอร์ด้านล่าง)"
+        actions={
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={refreshing}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50',
+            )}
+          >
+            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+            รีเฟรช
+          </button>
+        }
       />
       <div className="px-4 md:px-6 space-y-6 pb-24 max-w-6xl mx-auto">
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูล…</div>}
