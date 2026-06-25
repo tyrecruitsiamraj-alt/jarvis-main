@@ -16,6 +16,7 @@ const AUTH_TOKEN_STORAGE_KEY = 'jarvis_auth_token';
 interface AuthContextType {
   user: User | null;
   signIn: (email: string, password: string) => Promise<string | null>;
+  signInWithDevRole: (role: UserRole) => Promise<string | null>;
   signUp: (payload: {
     email: string;
     password: string;
@@ -156,10 +157,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = useCallback(async (email: string, password: string): Promise<string | null> => {
-    const r = await apiFetch('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email: email.trim(), password }),
-    });
+    let r: Response;
+    try {
+      r = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+    } catch {
+      return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — รัน npm run dev ให้ API ทำงานพร้อมหน้าเว็บ';
+    }
     let data: Record<string, unknown> = {};
     try {
       data = (await r.json()) as Record<string, unknown>;
@@ -173,6 +179,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : typeof data.error === 'string'
             ? data.error
             : 'Sign in failed';
+      return msg;
+    }
+    if (typeof data.token === 'string' && data.token.trim()) {
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token.trim());
+    }
+    const rawUser = data.user as Record<string, unknown> | undefined;
+    const u = rawUser ? mapApiUser(rawUser) : null;
+    if (!u) return 'Invalid response from server';
+    setUser(u);
+    void refreshJobStaffFromApi();
+    void refreshWorkCalendarFromApi();
+    return null;
+  }, []);
+
+  const signInWithDevRole = useCallback(async (role: UserRole): Promise<string | null> => {
+    let r: Response;
+    try {
+      r = await apiFetch('/api/auth/dev-role', {
+        method: 'POST',
+        body: JSON.stringify({ role }),
+      });
+    } catch {
+      return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — รัน npm run dev ให้ API ทำงานพร้อมหน้าเว็บ';
+    }
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await r.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    if (!r.ok) {
+      const msg =
+        typeof data.message === 'string'
+          ? data.message
+          : typeof data.error === 'string'
+            ? data.error
+            : 'เข้าสู่ระบบด้วยสิทธิ์ไม่สำเร็จ';
       return msg;
     }
     if (typeof data.token === 'string' && data.token.trim()) {
@@ -256,6 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         signIn,
+        signInWithDevRole,
         signUp,
         logout,
         hasPermission,

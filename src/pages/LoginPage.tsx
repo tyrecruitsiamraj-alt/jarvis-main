@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import type { UserRole } from '@/types';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -16,11 +17,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiFetch';
-import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Shield } from 'lucide-react';
+
+const devRoleEntryEnabled = import.meta.env.VITE_DEV_ROLE_ENTRY === 'true';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithDevRole } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -36,6 +39,7 @@ const LoginPage: React.FC = () => {
   const [forgotBusy, setForgotBusy] = useState(false);
   const [forgotMsg, setForgotMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [devRoleBusy, setDevRoleBusy] = useState<UserRole | null>(null);
 
   const todayLabel = useMemo(() => {
     const d = new Date();
@@ -50,6 +54,8 @@ const LoginPage: React.FC = () => {
       const msg = await signIn(email, password);
       if (msg) setError(msg);
       else navigate('/', { replace: true });
+    } catch {
+      setError('เข้าสู่ระบบไม่สำเร็จ — ลองใหม่อีกครั้ง');
     } finally {
       setSubmitting(false);
     }
@@ -108,6 +114,20 @@ const LoginPage: React.FC = () => {
       setForgotMsg('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
     } finally {
       setForgotBusy(false);
+    }
+  };
+
+  const handleDevRole = async (role: UserRole) => {
+    setError(null);
+    setDevRoleBusy(role);
+    try {
+      const msg = await signInWithDevRole(role);
+      if (msg) setError(msg);
+      else navigate('/', { replace: true });
+    } catch {
+      setError('เข้าสู่ระบบไม่สำเร็จ — ลองใหม่อีกครั้ง');
+    } finally {
+      setDevRoleBusy(null);
     }
   };
 
@@ -342,6 +362,28 @@ const LoginPage: React.FC = () => {
               <p className="text-xs text-destructive text-center" role="alert">
                 {error}
               </p>
+            ) : null}
+
+            {devRoleEntryEnabled && authMode === 'login' ? (
+              <div className="rounded-2xl border border-orange-200/80 bg-orange-50/60 p-3 space-y-2">
+                <p className="text-xs font-medium text-orange-800 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" />
+                  เข้าใช้งานด่วน (เลือกสิทธิ์)
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['staff', 'supervisor', 'admin'] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      disabled={!!devRoleBusy || submitting}
+                      onClick={() => void handleDevRole(role)}
+                      className="rounded-full border border-orange-200 bg-white/80 px-2 py-2 text-xs font-medium text-orange-900 hover:bg-white disabled:opacity-50 touch-manipulation"
+                    >
+                      {devRoleBusy === role ? '…' : role === 'staff' ? 'Staff' : role === 'supervisor' ? 'Supervisor' : 'Admin'}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : null}
 
             <button
