@@ -90,7 +90,16 @@ const SupervisorDashboard: React.FC = () => {
   const byJobType = (type: string) => filteredJobs.filter((j) => j.job_type === type);
   const byJobCategory = (cat: string) => filteredJobs.filter((j) => j.job_category === cat);
 
-  const getAgeDays = (j: JobRequest) => differenceInDays(today, parseISO(j.request_date));
+  const safeJobDate = (ymd?: string | null) => {
+    if (!ymd || typeof ymd !== 'string') return null;
+    const d = parseISO(ymd.slice(0, 10));
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const getAgeDays = (j: JobRequest) => {
+    const d = safeJobDate(j.request_date);
+    return d ? differenceInDays(today, d) : 0;
+  };
   const over30 = openJobs.filter((j) => getAgeDays(j) > 30);
   const range15to30 = openJobs.filter((j) => {
     const d = getAgeDays(j);
@@ -102,17 +111,24 @@ const SupervisorDashboard: React.FC = () => {
   });
   const over14 = openJobs.filter((j) => getAgeDays(j) > 14);
 
-  const closedOnTime = closedJobs.filter(
-    (j) => j.closed_date && differenceInDays(parseISO(j.closed_date), parseISO(j.required_date)) <= 0,
-  );
-  const closedLate = closedJobs.filter(
-    (j) => j.closed_date && differenceInDays(parseISO(j.closed_date), parseISO(j.required_date)) > 0,
-  );
+  const closedOnTime = closedJobs.filter((j) => {
+    const closed = safeJobDate(j.closed_date);
+    const required = safeJobDate(j.required_date);
+    return closed && required && differenceInDays(closed, required) <= 0;
+  });
+  const closedLate = closedJobs.filter((j) => {
+    const closed = safeJobDate(j.closed_date);
+    const required = safeJobDate(j.required_date);
+    return closed && required && differenceInDays(closed, required) > 0;
+  });
   const closedUrgent = closedJobs.filter((j) => j.urgency === 'urgent');
   const closedAdvance = closedJobs.filter((j) => j.urgency === 'advance');
 
   const currentMonth = today.getMonth();
-  const remainingThisMonth = openJobs.filter((j) => parseISO(j.required_date).getMonth() === currentMonth);
+  const remainingThisMonth = openJobs.filter((j) => {
+    const d = safeJobDate(j.required_date);
+    return d ? d.getMonth() === currentMonth : false;
+  });
 
   const totalIncome = useMemo(
     () => filteredJobs.reduce((s, j) => s + (j.total_income ?? 0), 0),

@@ -97,7 +97,7 @@ export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
     submittedByName: r.requester_name?.trim() || undefined,
     submittedByEmail: r.requester_email?.trim() || undefined,
     submittedAt: toIso(r.act_saleco_datetime) || undefined,
-    requiredDate: toYmd(r.act_saleco_effective_date) || undefined,
+    required_date: toYmd(r.act_saleco_effective_date) || toYmd(r.act_saleco_datetime) || new Date().toISOString().slice(0, 10),
     lastWorkingDay: toYmd(r.act_saleco_effective_date) || undefined,
     unit_name: r.site_code || '—',
     site_code: r.site_code || undefined,
