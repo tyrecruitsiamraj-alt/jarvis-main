@@ -20,7 +20,7 @@ const JobListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState<string>('all');
 
-  const { jobs, loading, refreshing, siamrajPrimary, refetch } = useUnitRequestsFeed();
+  const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
   const unitOptions = useMemo(() => {
     const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
@@ -66,6 +66,11 @@ const JobListPage: React.FC = () => {
 
       <div className="px-4 md:px-6 space-y-4">
         {loading && <div className="text-sm text-muted-foreground">กำลังโหลดงาน...</div>}
+        {loadError && (
+          <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+            {loadError}
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row gap-3 md:items-center flex-wrap">
           <SearchField

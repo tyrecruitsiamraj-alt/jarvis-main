@@ -40,7 +40,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
 const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, refetch } = useUnitRequestsFeed();
+  const { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch } = useUnitRequestsFeed();
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
   const [jobDialogItems, setJobDialogItems] = useState<JobDialogItem[]>([]);
@@ -99,6 +99,11 @@ const JobDashboard: React.FC = () => {
       />
       <div className="px-4 md:px-6 space-y-6">
         {loading && <div className="text-sm text-muted-foreground">กำลังโหลดงาน...</div>}
+        {loadError && (
+          <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+            {loadError}
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard
             title="งานทั้งหมด"

@@ -21,7 +21,7 @@ async function loadLiveJobs(): Promise<{
   const meta = await fetchSiamrajFeedMeta();
 
   if (meta.enabled) {
-    const siamrajJobs = await fetchSiamrajUnitRequests(500);
+    const siamrajJobs = await fetchSiamrajUnitRequests(200);
     return {
       jobs: siamrajJobs,
       siamrajPrimary: true,
@@ -47,6 +47,7 @@ export function useUnitRequestsFeed(): {
   siamrajPrimary: boolean;
   readOnly: boolean;
   dbSource: 'postgres' | 'sqlserver' | null;
+  loadError: string | null;
   refetch: () => Promise<void>;
 } {
   const [jobs, setJobs] = useState<JobRequest[]>(() => (isDemoMode() ? readMergedDemoJobs() : []));
@@ -55,11 +56,13 @@ export function useUnitRequestsFeed(): {
   const [siamrajPrimary, setSiamrajPrimary] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [dbSource, setDbSource] = useState<'postgres' | 'sqlserver' | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const siamrajPrimaryRef = useRef(false);
 
   const refetch = useCallback(async () => {
     if (isDemoMode()) {
       setJobs(readMergedDemoJobs());
+      setLoadError(null);
       return;
     }
 
@@ -71,8 +74,10 @@ export function useUnitRequestsFeed(): {
       setReadOnly(result.readOnly);
       setDbSource(result.dbSource);
       siamrajPrimaryRef.current = result.siamrajPrimary;
-    } catch {
+      setLoadError(null);
+    } catch (e) {
       setJobs([]);
+      setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลหน่วยงานไม่สำเร็จ');
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -118,7 +123,7 @@ export function useUnitRequestsFeed(): {
     siamrajPrimaryRef.current = siamrajPrimary;
   }, [siamrajPrimary]);
 
-  return { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, refetch };
+  return { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
 }
 
 /** @deprecated use useUnitRequestsFeed */

@@ -100,7 +100,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   };
 }
 
-/** Query จาก st_request_head / staff / p2 / p3_rate / ms_site (ตามรูปแบบ Siamraj ST) */
+/** Query เต็มสำหรับดูรายละเอียดใบขอเดียว */
 const BASE_SQL = `
   SELECT
     A.request_no AS external_id,
@@ -143,14 +143,6 @@ const BASE_SQL = `
   WHERE A.status = 'A'
 `;
 
-function listScopeWhere(): string {
-  return `
-    AND SS.department_code BETWEEN @deptFrom AND @deptTo
-    AND A.site_code BETWEEN @siteFrom AND @siteTo
-    AND YEAR(A.request_date) = @yyyy
-  `;
-}
-
 const SELECT_COLUMNS = `
   external_id, request_no, act_saleco_datetime, act_saleco_effective_date,
   site_code, site_name, customer_name, status, staff_fullname, mobile_phone,
@@ -160,14 +152,88 @@ const SELECT_COLUMNS = `
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
 `;
 
-function staffingQueueExtraWhere(): string {
+function staffingQueueExtraWhere(alias = 'A'): string {
   return `
     AND (
-      EXISTS (SELECT 1 FROM st_ms_request mr WHERE mr.request_code = A.request_code AND mr.request_name LIKE N'%ลาออก%')
-      OR EXISTS (SELECT 1 FROM st_ms_request mr WHERE mr.request_code = A.request_code AND mr.request_name LIKE N'%เปลี่ยน%')
+      EXISTS (SELECT 1 FROM st_ms_request mr WHERE mr.request_code = ${alias}.request_code AND mr.request_name LIKE N'%ลาออก%')
+      OR EXISTS (SELECT 1 FROM st_ms_request mr WHERE mr.request_code = ${alias}.request_code AND mr.request_name LIKE N'%เปลี่ยน%')
     )
   `;
 }
+
+/** รายการ — เลือก TOP N ก่อน แล้ว join แบบเบา (ไม่มี subquery ซ้ำทุกแถว) */
+const LIST_SQL = `
+  WITH recent AS (
+    SELECT TOP (@limit) A.request_no
+    FROM st_request_head A
+    INNER JOIN ms_site SS ON A.site_code = SS.site_code
+    WHERE A.status = 'A'
+      AND SS.department_code BETWEEN @deptFrom AND @deptTo
+      AND A.site_code BETWEEN @siteFrom AND @siteTo
+      AND YEAR(A.request_date) = @yyyy
+      @extraWhere
+    ORDER BY A.request_date DESC
+  ),
+  ranked AS (
+    SELECT
+      A.request_no AS external_id,
+      A.request_no,
+      A.request_date AS act_saleco_datetime,
+      COALESCE(S.resign_date, A.want_date_from) AS act_saleco_effective_date,
+      A.site_code,
+      SS.site_name,
+      A.status,
+      LTRIM(RTRIM(COALESCE(do_staff.fname, '') + ' ' + COALESCE(do_staff.lname, ''))) AS requester_name,
+      sc.customer_name,
+      LTRIM(RTRIM(
+        COALESCE(B.work_place1, '') + COALESCE(B.work_place2, '') + COALESCE(B.work_place3, '')
+      )) AS work_addr,
+      A.staff_title_code,
+      A.job_description_code_1,
+      A.job_description_code_2,
+      st_title.staff_title_name,
+      job1.job_description_name AS job_name1,
+      job2.job_description_name AS job_name2,
+      A.request_code AS request_action_code,
+      mr.request_name AS request_action_name,
+      LTRIM(RTRIM(COALESCE(abs_staff.fname, '') + ' ' + COALESCE(abs_staff.lname, ''))) AS staff_fullname,
+      S.resign_date,
+      rt.resign_type_name AS reason_main_name,
+      fee.fee_name,
+      C.payment_rate,
+      C.draw_rate,
+      B.work_date,
+      B.work_time,
+      B.age,
+      B.sex,
+      p3.abs_customer_fine,
+      p1.contact_name,
+      p1.phone AS mobile_phone,
+      ROW_NUMBER() OVER (PARTITION BY A.request_no ORDER BY C.payment_rate DESC) AS rn
+    FROM recent R
+    INNER JOIN st_request_head A ON A.request_no = R.request_no
+    INNER JOIN ms_site SS ON A.site_code = SS.site_code
+    LEFT JOIN st_request_staff S ON S.request_no = A.request_no
+    INNER JOIN st_request_p2 B ON A.request_no = B.request_no
+    INNER JOIN st_request_p3_rate C ON B.request_no = C.request_no
+    LEFT JOIN hr_staff do_staff ON do_staff.staff_id = A.do_id
+    LEFT JOIN hr_staff abs_staff ON abs_staff.staff_id = S.staff_id
+    LEFT JOIN st_ms_request mr ON mr.request_code = A.request_code
+    LEFT JOIN hr_ms_resign_type rt ON rt.resign_type_code = S.resign_type_code
+    LEFT JOIN hr_ms_staff_title st_title ON st_title.staff_title_code = A.staff_title_code
+    LEFT JOIN hr_ms_job_description_1 job1 ON job1.job_description_code_1 = A.job_description_code_1
+    LEFT JOIN hr_ms_job_description_2 job2 ON job2.job_description_code_2 = A.job_description_code_2
+    LEFT JOIN st_request_p1 p1 ON p1.request_no = A.request_no
+    LEFT JOIN st_request_p3 p3 ON p3.request_no = A.request_no
+    LEFT JOIN st_site_contract_p1 sc ON sc.contract_no = A.contract_no
+    LEFT JOIN wg2_ms_fee fee ON fee.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)
+  )
+  SELECT
+    ${SELECT_COLUMNS}
+  FROM ranked
+  WHERE rn = 1
+  ORDER BY act_saleco_datetime DESC
+`;
 
 export async function listSiamrajSqlServerUnitRequests(options: { limit?: number; mode?: string }) {
   const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
@@ -175,21 +241,12 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
   const extraWhere = mode === 'all' ? '' : staffingQueueExtraWhere();
   const filters = getSqlFilters();
 
-  const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
-    `
-    WITH base AS (
-      ${BASE_SQL}
-      ${listScopeWhere()}
-      ${extraWhere}
-    )
-    SELECT TOP (@limit)
-      ${SELECT_COLUMNS}
-    FROM base
-    WHERE rn = 1
-    ORDER BY act_saleco_datetime DESC
-  `,
-    { limit, ...filters },
-  );
+  const sql = LIST_SQL.replace('@extraWhere', extraWhere);
+
+  const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(sql, {
+    limit,
+    ...filters,
+  });
 
   return rows.map(mapSqlServerRow);
 }
