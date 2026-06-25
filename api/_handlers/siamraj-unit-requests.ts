@@ -37,6 +37,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         sqlServer: getSiamrajSqlServerConfig()
           ? { host: getSiamrajSqlServerConfig()?.server, database: getSiamrajSqlServerConfig()?.database }
           : null,
+        postgresFallback: !!getSiamrajSchema() && !!getSiamrajSqlServerConfig(),
         readOnly: true,
         mode: process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue',
       });

@@ -43,6 +43,7 @@ const DB_ENV_KEYS = [
   'SIAMRAJ_SQL_DEPT_TO',
   'SIAMRAJ_SQL_SITE_FROM',
   'SIAMRAJ_SQL_SITE_TO',
+  'SIAMRAJ_SQLSERVER_FALLBACK',
 ] as const;
 
 let localDbEnvApplied = false;
