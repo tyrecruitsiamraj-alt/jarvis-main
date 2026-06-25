@@ -1,4 +1,25 @@
 import { dbQuery } from './postgres.js';
+import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
+import {
+  getSiamrajSqlServerUnitRequestById,
+  listSiamrajSqlServerUnitRequests,
+} from './siamrajSqlServerRequests.js';
+
+export type SiamrajDbSource = 'postgres' | 'sqlserver';
+
+export function getSiamrajDbSource(): SiamrajDbSource | null {
+  const explicit = (process.env.SIAMRAJ_DB_SOURCE || 'auto').toLowerCase();
+  const hasSql = !!getSiamrajSqlServerConfig();
+  const hasPg = !!getSiamrajSchema();
+
+  if (explicit === 'sqlserver' && hasSql) return 'sqlserver';
+  if (explicit === 'postgres' && hasPg) return 'postgres';
+  if (explicit === 'auto' || explicit === '') {
+    if (hasSql) return 'sqlserver';
+    if (hasPg) return 'postgres';
+  }
+  return null;
+}
 
 function quotePgIdent(ident: string): string {
   return `"${String(ident).replace(/"/g, '""')}"`;
@@ -14,7 +35,7 @@ export function getSiamrajSchema(): string | null {
 export function isSiamrajUnitRequestsEnabled(): boolean {
   const flag = (process.env.SIAMRAJ_UNIT_REQUESTS_ENABLED || 'true').toLowerCase();
   if (flag === 'false' || flag === '0' || flag === 'no') return false;
-  return !!getSiamrajSchema();
+  return !!getSiamrajDbSource();
 }
 
 function fq(schema: string, table: string): string {
@@ -168,6 +189,13 @@ function staffingQueueWhere(): string {
 }
 
 export async function listSiamrajUnitRequests(options: { limit?: number; mode?: string }) {
+  const source = getSiamrajDbSource();
+  if (!source) return [];
+
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerUnitRequests(options);
+  }
+
   const schema = getSiamrajSchema();
   if (!schema) return [];
 
@@ -187,7 +215,14 @@ export async function listSiamrajUnitRequests(options: { limit?: number; mode?: 
   return rows.map(mapSiamrajRow);
 }
 
-export async function getSiamrajUnitRequestById(actSalecoId: string) {
+export async function getSiamrajUnitRequestById(id: string) {
+  const source = getSiamrajDbSource();
+  if (!source) return null;
+
+  if (source === 'sqlserver') {
+    return getSiamrajSqlServerUnitRequestById(id);
+  }
+
   const schema = getSiamrajSchema();
   if (!schema) return null;
 
@@ -196,7 +231,7 @@ export async function getSiamrajUnitRequestById(actSalecoId: string) {
      ${buildFromClause(schema)}
      WHERE h.act_saleco_id::text = $1
      LIMIT 1`,
-    [actSalecoId],
+    [id],
   );
 
   return rows[0] ? mapSiamrajRow(rows[0]) : null;

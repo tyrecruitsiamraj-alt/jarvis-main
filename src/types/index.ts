@@ -118,6 +118,7 @@ export interface JobRequest {
   position_units?: number;
   lastWorkingDay?: string;
   contact_phone?: string;
+  contact_name?: string;
   siamraj_status?: string;
   need_staff?: boolean;
   staff_title_code?: string;

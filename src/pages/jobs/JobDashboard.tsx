@@ -39,7 +39,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
 const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const { jobs, loading, siamrajPrimary, readOnly } = useUnitRequestsFeed();
+  const { jobs, loading, siamrajPrimary, readOnly, dbSource } = useUnitRequestsFeed();
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
   const [jobDialogItems, setJobDialogItems] = useState<JobDialogItem[]>([]);
@@ -69,7 +69,13 @@ const JobDashboard: React.FC = () => {
     <div>
       <PageHeader
         title="หน่วยงาน"
-        subtitle={siamrajPrimary ? 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์' : 'จัดการหน่วยงานและใบขอ'}
+        subtitle={
+          siamrajPrimary
+            ? dbSource === 'sqlserver'
+              ? 'อ่านใบขอจาก Siamraj SQL Server — อัปเดตเมื่อมีการคีย์'
+              : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
+            : 'จัดการหน่วยงานและใบขอ'
+        }
         actions={
           !readOnly && hasPermission('staff') ? (
             <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm">

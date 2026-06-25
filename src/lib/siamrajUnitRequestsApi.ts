@@ -4,7 +4,9 @@ import type { JobRequest } from '@/types';
 
 export type SiamrajFeedMeta = {
   enabled: boolean;
+  dbSource?: 'postgres' | 'sqlserver' | null;
   schema: string | null;
+  sqlServer?: { host: string; database: string } | null;
   readOnly: boolean;
   mode: string;
 };
@@ -30,11 +32,12 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
 }
 
 export function isSiamrajJob(job: JobRequest): boolean {
-  return job.source === 'siamraj' || job.id.startsWith('siamraj:');
+  return job.source === 'siamraj' || job.id.startsWith('siamraj:') || job.id.startsWith('siamraj-sql:');
 }
 
 export function siamrajExternalId(job: JobRequest): string | null {
   if (job.externalId) return job.externalId;
+  if (job.id.startsWith('siamraj-sql:')) return job.id.slice('siamraj-sql:'.length);
   if (job.id.startsWith('siamraj:')) return job.id.slice('siamraj:'.length);
   return null;
 }

@@ -77,9 +77,17 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 />
                 <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
                 <Field label="ทำงานวันสุดท้าย" value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined} />
+                <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
                 <Field label="รหัสไซต์" value={data.site_code || data.unit_name} />
-                <Field label="จำนวนอัตรา" value={data.position_units} />
+                <Field label="สถานที่ทำงาน" value={data.location_address} />
+                <Field label="ลักษณะงาน" value={data.job_description_code_1} />
                 <Field label="ประเภทใบขอ" value={data.request_action_name} />
+                <Field label="ชื่อคนลาออก" value={data.resigned_employee_name} />
+                <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />
+                <Field label="รายได้ (อัตราจ่าย)" value={data.total_income ? `฿${data.total_income.toLocaleString()}` : undefined} />
+                <Field label="วันเวลาเข้างาน" value={data.work_schedule} />
+                <Field label="ชื่อผู้ติดต่อหน่วยงาน" value={data.contact_name} />
+                <Field label="เบอร์ติดต่อ" value={data.contact_phone} />
               </div>
             </section>
 

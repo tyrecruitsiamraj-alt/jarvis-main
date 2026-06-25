@@ -20,6 +20,7 @@ export function useUnitRequestsFeed(): {
   const [loading, setLoading] = useState(!isDemoMode());
   const [siamrajPrimary, setSiamrajPrimary] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
+  const [dbSource, setDbSource] = useState<'postgres' | 'sqlserver' | null>(null);
 
   useEffect(() => {
     if (isDemoMode()) {
@@ -43,6 +44,7 @@ export function useUnitRequestsFeed(): {
         if (meta.enabled) {
           setSiamrajPrimary(true);
           setReadOnly(meta.readOnly);
+          setDbSource(meta.dbSource ?? null);
           const siamrajJobs = await fetchSiamrajUnitRequests(500);
           if (!cancelled) setJobs(siamrajJobs);
           return;
@@ -65,7 +67,7 @@ export function useUnitRequestsFeed(): {
     };
   }, []);
 
-  return { jobs, loading, siamrajPrimary, readOnly };
+  return { jobs, loading, siamrajPrimary, readOnly, dbSource };
 }
 
 /** @deprecated use useUnitRequestsFeed */

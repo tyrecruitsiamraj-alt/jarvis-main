@@ -6,11 +6,13 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import {
-  getSiamrajUnitRequestById,
+  getSiamrajDbSource,
   getSiamrajSchema,
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
+  getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
+import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -26,7 +28,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'GET' && getQuery(req, 'meta') === '1') {
       return res.status(200).json({
         enabled: isSiamrajUnitRequestsEnabled(),
+        dbSource: getSiamrajDbSource(),
         schema: getSiamrajSchema(),
+        sqlServer: getSiamrajSqlServerConfig()
+          ? { host: getSiamrajSqlServerConfig()?.server, database: getSiamrajSqlServerConfig()?.database }
+          : null,
         readOnly: true,
         mode: process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue',
       });
@@ -41,7 +47,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         res,
         503,
         'Service unavailable',
-        'ตั้งค่า SIAMRAJ_SCHEMA (หรือ SO_OPERATION_SCHEMA) บนเซิร์ฟเวอร์ก่อน',
+        'ตั้งค่า SIAMRAJ_SCHEMA / SO_OPERATION_SCHEMA หรือ DB_HOST+DB_USER+DB_NAME บนเซิร์ฟเวอร์ก่อน',
       );
     }
 
