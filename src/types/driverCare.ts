@@ -118,3 +118,68 @@ export const DRIVER_ACTION_TYPE_LABELS: Record<DriverActionType, string> = {
   supervisor_escalation: 'ส่งต่อหัวหน้างาน',
   other: 'อื่นๆ',
 };
+
+export type DriverCareSkillCategory = 'observation' | 'intervention' | 'communication' | 'other';
+export type DriverCareKnowledgeCategory =
+  | 'pre_resign_behavior'
+  | 'intervention'
+  | 'policy'
+  | 'other';
+
+export interface DriverCareSkill {
+  id: string;
+  title: string;
+  category: DriverCareSkillCategory;
+  description: string;
+  fileUrl: string | null;
+  sortOrder: number;
+  createdByName: string | null;
+  updatedAt: string;
+}
+
+export interface DriverCareKnowledge {
+  id: string;
+  title: string;
+  category: DriverCareKnowledgeCategory;
+  summary: string | null;
+  content: string;
+  fileUrl: string | null;
+  fileName: string | null;
+  sortOrder: number;
+  createdByName: string | null;
+  updatedAt: string;
+}
+
+export interface DriverCareSkillInput {
+  id?: string;
+  title: string;
+  category: DriverCareSkillCategory;
+  description: string;
+  fileUrl?: string;
+  sortOrder?: number;
+}
+
+export interface DriverCareKnowledgeInput {
+  id?: string;
+  title: string;
+  category: DriverCareKnowledgeCategory;
+  summary?: string;
+  content: string;
+  fileUrl?: string;
+  fileName?: string;
+  sortOrder?: number;
+}
+
+export const DRIVER_CARE_SKILL_CATEGORY_LABELS: Record<DriverCareSkillCategory, string> = {
+  observation: 'สังเกตพฤติกรรม',
+  intervention: 'ทักษะติดตาม',
+  communication: 'การสื่อสาร',
+  other: 'อื่นๆ',
+};
+
+export const DRIVER_CARE_KNOWLEDGE_CATEGORY_LABELS: Record<DriverCareKnowledgeCategory, string> = {
+  pre_resign_behavior: 'พฤติกรรมก่อนลาออก',
+  intervention: 'แนวทางติดตาม',
+  policy: 'นโยบาย / ระเบียบ',
+  other: 'อื่นๆ',
+};

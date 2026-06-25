@@ -79,3 +79,53 @@ export async function updateDriverAction(input: DriverActionUpdateInput): Promis
   });
   if (!r.ok) throw new Error(await readErrorMessage(r, 'อัปเดต Action ไม่สำเร็จ'));
 }
+
+export async function fetchDriverCareSkills() {
+  const r = await apiFetch(buildDriverCareUrl('skills'));
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลด Skills ไม่สำเร็จ'));
+  return readJsonSafe<import('@/types/driverCare').DriverCareSkill[]>(r);
+}
+
+export async function fetchDriverCareKnowledge() {
+  const r = await apiFetch(buildDriverCareUrl('knowledge'));
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลด Knowledge ไม่สำเร็จ'));
+  return readJsonSafe<import('@/types/driverCare').DriverCareKnowledge[]>(r);
+}
+
+export async function saveDriverCareSkill(
+  input: import('@/types/driverCare').DriverCareSkillInput,
+) {
+  const r = await apiFetch('/api/driver-care?action=save-skill', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึก Skill ไม่สำเร็จ'));
+  return readJsonSafe<import('@/types/driverCare').DriverCareSkill>(r);
+}
+
+export async function saveDriverCareKnowledge(
+  input: import('@/types/driverCare').DriverCareKnowledgeInput,
+) {
+  const r = await apiFetch('/api/driver-care?action=save-knowledge', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึก Knowledge ไม่สำเร็จ'));
+  return readJsonSafe<import('@/types/driverCare').DriverCareKnowledge>(r);
+}
+
+export async function deleteDriverCareSkill(id: string) {
+  const r = await apiFetch('/api/driver-care?action=delete-skill', {
+    method: 'PATCH',
+    body: JSON.stringify({ id }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'ลบ Skill ไม่สำเร็จ'));
+}
+
+export async function deleteDriverCareKnowledge(id: string) {
+  const r = await apiFetch('/api/driver-care?action=delete-knowledge', {
+    method: 'PATCH',
+    body: JSON.stringify({ id }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'ลบ Knowledge ไม่สำเร็จ'));
+}

@@ -31,6 +31,7 @@ import AddJobPage from "@/pages/jobs/AddJobPage";
 import DriverCareOverview from "@/pages/driver-care/DriverCareOverview";
 import DriverRiskList from "@/pages/driver-care/DriverRiskList";
 import DriverActionTracking from "@/pages/driver-care/DriverActionTracking";
+import DriverCareResources from "@/pages/driver-care/DriverCareResources";
 import SupervisorDashboard from "@/pages/dashboard/SupervisorDashboard";
 import AdminSettings from "@/pages/settings/AdminSettings";
 import ChangePasswordPage from "@/pages/ChangePasswordPage";
@@ -77,6 +78,7 @@ const ProtectedRoutes = () => {
         <Route path="/driver-care" element={<DriverCareOverview />} />
         <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
         <Route path="/driver-care/actions" element={<DriverActionTracking />} />
+        <Route path="/driver-care/resources" element={<DriverCareResources />} />
         <Route path="/jobs" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
         <Route path="/jobs/add" element={<AddJobPage />} />

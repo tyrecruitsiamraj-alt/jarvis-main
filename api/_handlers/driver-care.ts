@@ -15,6 +15,10 @@ import {
   empT,
   wcT,
 } from '../_lib/driverCareRisk.js';
+import { tableInAppSchema } from '../_lib/schema.js';
+
+const skillT = tableInAppSchema('driver_care_skill');
+const knowledgeT = tableInAppSchema('driver_care_knowledge');
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -282,6 +286,164 @@ async function getActions(filters: Record<string, string>) {
   });
 }
 
+type SkillRow = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  file_url: string | null;
+  sort_order: number;
+  created_by_name: string | null;
+  updated_at: string | Date;
+};
+
+type KnowledgeRow = {
+  id: string;
+  title: string;
+  category: string;
+  summary: string | null;
+  content: string;
+  file_url: string | null;
+  file_name: string | null;
+  sort_order: number;
+  created_by_name: string | null;
+  updated_at: string | Date;
+};
+
+function mapSkillRow(r: SkillRow) {
+  return {
+    id: r.id,
+    title: r.title,
+    category: r.category,
+    description: r.description,
+    fileUrl: r.file_url,
+    sortOrder: r.sort_order,
+    createdByName: r.created_by_name,
+    updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
+  };
+}
+
+function mapKnowledgeRow(r: KnowledgeRow) {
+  return {
+    id: r.id,
+    title: r.title,
+    category: r.category,
+    summary: r.summary,
+    content: r.content,
+    fileUrl: r.file_url,
+    fileName: r.file_name,
+    sortOrder: r.sort_order,
+    createdByName: r.created_by_name,
+    updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
+  };
+}
+
+async function getSkills() {
+  const { rows } = await dbQuery<SkillRow>(
+    `select id, title, category, description, file_url, sort_order, created_by_name, updated_at
+     from ${skillT}
+     where is_active = true
+     order by sort_order asc, title asc`,
+  );
+  return rows.map(mapSkillRow);
+}
+
+async function getKnowledge() {
+  const { rows } = await dbQuery<KnowledgeRow>(
+    `select id, title, category, summary, content, file_url, file_name, sort_order, created_by_name, updated_at
+     from ${knowledgeT}
+     where is_active = true
+     order by sort_order asc, updated_at desc`,
+  );
+  return rows.map(mapKnowledgeRow);
+}
+
+async function saveSkill(req: AuthedReq, b: Record<string, unknown>) {
+  const id = getString(b.id);
+  const title = getString(b.title)?.trim();
+  const category = getString(b.category) || 'intervention';
+  const description = getString(b.description) || '';
+  const fileUrl = getString(b.fileUrl) || null;
+  const sortOrder = Number(b.sortOrder);
+  const byName = req.user.email || 'User';
+
+  if (!title) return null;
+
+  if (id) {
+    const { rows } = await dbQuery<SkillRow>(
+      `update ${skillT} set
+        title = $2, category = $3, description = $4, file_url = $5,
+        sort_order = $6, updated_at = now()
+       where id = $1::uuid and is_active = true
+       returning id, title, category, description, file_url, sort_order, created_by_name, updated_at`,
+      [id, title, category, description, fileUrl, Number.isFinite(sortOrder) ? sortOrder : 0],
+    );
+    if (!rows[0]) return null;
+    return mapSkillRow(rows[0]);
+  }
+
+  const { rows } = await dbQuery<SkillRow>(
+    `insert into ${skillT} (title, category, description, file_url, sort_order, created_by_name)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id, title, category, description, file_url, sort_order, created_by_name, updated_at`,
+    [title, category, description, fileUrl, Number.isFinite(sortOrder) ? sortOrder : 0, byName],
+  );
+  return rows[0] ? mapSkillRow(rows[0]) : null;
+}
+
+async function saveKnowledge(req: AuthedReq, b: Record<string, unknown>) {
+  const id = getString(b.id);
+  const title = getString(b.title)?.trim();
+  const category = getString(b.category) || 'pre_resign_behavior';
+  const summary = getString(b.summary) || null;
+  const content = getString(b.content) || '';
+  const fileUrl = getString(b.fileUrl) || null;
+  const fileName = getString(b.fileName) || null;
+  const sortOrder = Number(b.sortOrder);
+  const byName = req.user.email || 'User';
+
+  if (!title) return null;
+
+  if (id) {
+    const { rows } = await dbQuery<KnowledgeRow>(
+      `update ${knowledgeT} set
+        title = $2, category = $3, summary = $4, content = $5,
+        file_url = $6, file_name = $7, sort_order = $8, updated_at = now()
+       where id = $1::uuid and is_active = true
+       returning id, title, category, summary, content, file_url, file_name, sort_order, created_by_name, updated_at`,
+      [
+        id,
+        title,
+        category,
+        summary,
+        content,
+        fileUrl,
+        fileName,
+        Number.isFinite(sortOrder) ? sortOrder : 0,
+      ],
+    );
+    return rows[0] ? mapKnowledgeRow(rows[0]) : null;
+  }
+
+  const { rows } = await dbQuery<KnowledgeRow>(
+    `insert into ${knowledgeT} (
+      title, category, summary, content, file_url, file_name, sort_order, created_by_name
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+    returning id, title, category, summary, content, file_url, file_name, sort_order, created_by_name, updated_at`,
+    [
+      title,
+      category,
+      summary,
+      content,
+      fileUrl,
+      fileName,
+      Number.isFinite(sortOrder) ? sortOrder : 0,
+      byName,
+    ],
+  );
+  return rows[0] ? mapKnowledgeRow(rows[0]) : null;
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   const action = getQuery(req, 'action');
@@ -314,7 +476,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
           }),
         );
       }
-      return sendError(res, 400, 'Bad request', 'view required: overview | risk-list | actions');
+      if (view === 'skills') {
+        return res.status(200).json(await getSkills());
+      }
+      if (view === 'knowledge') {
+        return res.status(200).json(await getKnowledge());
+      }
+      return sendError(res, 400, 'Bad request', 'view required: overview | risk-list | actions | skills | knowledge');
     }
 
     if (method === 'POST' && action === 'recalculate') {
@@ -364,6 +532,42 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ],
       );
       return res.status(201).json({ ok: true, id: rows[0]?.id });
+    }
+
+    if (method === 'POST' && action === 'save-skill') {
+      const raw = await readJsonBody(req);
+      if (typeof raw !== 'object' || raw === null) {
+        return sendError(res, 400, 'Bad request', 'Invalid JSON body');
+      }
+      const saved = await saveSkill(req, raw as Record<string, unknown>);
+      if (!saved) return sendError(res, 400, 'Bad request', 'title required');
+      return res.status(200).json(saved);
+    }
+
+    if (method === 'POST' && action === 'save-knowledge') {
+      const raw = await readJsonBody(req);
+      if (typeof raw !== 'object' || raw === null) {
+        return sendError(res, 400, 'Bad request', 'Invalid JSON body');
+      }
+      const saved = await saveKnowledge(req, raw as Record<string, unknown>);
+      if (!saved) return sendError(res, 400, 'Bad request', 'title required');
+      return res.status(200).json(saved);
+    }
+
+    if (method === 'PATCH' && (action === 'delete-skill' || action === 'delete-knowledge')) {
+      const raw = await readJsonBody(req);
+      if (typeof raw !== 'object' || raw === null) {
+        return sendError(res, 400, 'Bad request', 'Invalid JSON body');
+      }
+      const id = getString((raw as Record<string, unknown>).id);
+      if (!id) return sendError(res, 400, 'Bad request', 'id required');
+      const table = action === 'delete-skill' ? skillT : knowledgeT;
+      const { rows } = await dbQuery<{ id: string }>(
+        `update ${table} set is_active = false, updated_at = now() where id = $1::uuid returning id`,
+        [id],
+      );
+      if (!rows[0]) return sendError(res, 404, 'Not found', 'Record not found');
+      return res.status(200).json({ ok: true, id: rows[0].id });
     }
 
     if (method === 'PATCH' && action === 'update-action') {

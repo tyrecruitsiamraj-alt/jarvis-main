@@ -6,7 +6,7 @@ import StatCard from '@/components/shared/StatCard';
 import { fetchDriverCareOverview, recalculateDriverCareRisk } from '@/lib/driverCareApi';
 import DriverCareScoringGuide from '@/components/driver-care/DriverCareScoringGuide';
 import { DRIVER_CARE_RISK_LABELS } from '@/types/driverCare';
-import { AlertTriangle, ClipboardList, HeartPulse, ListChecks, RefreshCw, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, ClipboardList, HeartPulse, ListChecks, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +87,13 @@ const DriverCareOverview: React.FC = () => {
               <button type="button" onClick={() => navigate('/driver-care/actions')} className="flex-1 jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left">
                 <div className="font-semibold text-foreground">ติดตาม Action</div>
                 <div className="text-xs text-muted-foreground mt-1">ประวัติการติดตามและสถานะเคส</div>
+              </button>
+              <button type="button" onClick={() => navigate('/settings?tab=driverCare')} className="flex-1 jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left">
+                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-orange-600" />
+                  Skills & Knowledge
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">ตั้งค่าที่ Settings → Driver Care</div>
               </button>
             </div>
 

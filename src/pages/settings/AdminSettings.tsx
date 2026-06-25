@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { mockUsers, mockAuditLogs } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, HeartPulse } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
+import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
 import { isDemoMode } from '@/lib/demoMode';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit';
+type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -34,6 +36,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร', icon: UserCog, adminOnly: true },
+  { id: 'driverCare', label: 'Driver Care', icon: HeartPulse, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
 ];
@@ -42,7 +45,19 @@ const AdminSettings: React.FC = () => {
   const { hasPermission, user } = useAuth();
   const canAdmin = hasPermission('admin');
   const demo = isDemoMode();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('users');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const initialTab: SettingsTab =
+    tabFromUrl === 'driverCare' ||
+    tabFromUrl === 'appearance' ||
+    tabFromUrl === 'users' ||
+    tabFromUrl === 'roles' ||
+    tabFromUrl === 'jobStaff' ||
+    tabFromUrl === 'reference' ||
+    tabFromUrl === 'audit'
+      ? tabFromUrl
+      : 'users';
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiAuditLogs, setApiAuditLogs] = useState<AuditLog[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -390,6 +405,8 @@ const AdminSettings: React.FC = () => {
         )}
 
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
+
+        {activeTab === 'driverCare' && <DriverCareResourcesPanel />}
 
         {activeTab === 'roles' && (
           <div className="space-y-3">
