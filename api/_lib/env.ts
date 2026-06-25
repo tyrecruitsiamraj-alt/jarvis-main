@@ -38,6 +38,11 @@ const DB_ENV_KEYS = [
   'DB_NAME',
   'DB_ENCRYPT',
   'DB_TRUST_SERVER_CERTIFICATE',
+  'SIAMRAJ_SQL_YEAR',
+  'SIAMRAJ_SQL_DEPT_FROM',
+  'SIAMRAJ_SQL_DEPT_TO',
+  'SIAMRAJ_SQL_SITE_FROM',
+  'SIAMRAJ_SQL_SITE_TO',
 ] as const;
 
 let localDbEnvApplied = false;
