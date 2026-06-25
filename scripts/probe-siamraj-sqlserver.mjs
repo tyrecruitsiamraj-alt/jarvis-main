@@ -18,13 +18,28 @@ function parseEnvFile(filePath) {
   return out;
 }
 
+function parseSqlServerEndpoint(hostRaw, envPort) {
+  const host = hostRaw.trim();
+  const defaultPort =
+    envPort !== undefined && String(envPort).trim() !== '' ? Number(envPort) : 1433;
+  const commaIdx = host.lastIndexOf(',');
+  if (commaIdx > 0) {
+    const maybePort = host.slice(commaIdx + 1).trim();
+    if (/^\d+$/.test(maybePort)) {
+      return { server: host.slice(0, commaIdx).trim(), port: Number(maybePort) };
+    }
+  }
+  return { server: host, port: defaultPort };
+}
+
 const env = { ...parseEnvFile('.env'), ...parseEnvFile('.env.local') };
+const { server, port } = parseSqlServerEndpoint(env.DB_HOST || '', env.DB_PORT);
 const config = {
   user: env.DB_USER,
   password: env.DB_PASSWORD,
-  server: env.DB_HOST,
+  server,
   database: env.DB_NAME,
-  port: Number(env.DB_PORT || 1433),
+  port,
   options: {
     encrypt: (env.DB_ENCRYPT || 'false').toLowerCase() === 'true',
     trustServerCertificate: (env.DB_TRUST_SERVER_CERTIFICATE || 'true').toLowerCase() !== 'false',

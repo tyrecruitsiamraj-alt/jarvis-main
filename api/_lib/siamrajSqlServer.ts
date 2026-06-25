@@ -10,19 +10,40 @@ export type SiamrajSqlServerConfig = {
   trustServerCertificate: boolean;
 };
 
+/** รองรับ DB_HOST แบบ "host" หรือ "host,port" (รูปแบบ connection string ของ SQL Server) */
+export function parseSqlServerEndpoint(
+  hostRaw: string,
+  envPort?: string | number,
+): { server: string; port: number } {
+  const host = hostRaw.trim();
+  const defaultPort =
+    envPort !== undefined && String(envPort).trim() !== '' ? Number(envPort) : 1433;
+
+  const commaIdx = host.lastIndexOf(',');
+  if (commaIdx > 0) {
+    const maybePort = host.slice(commaIdx + 1).trim();
+    if (/^\d+$/.test(maybePort)) {
+      return { server: host.slice(0, commaIdx).trim(), port: Number(maybePort) };
+    }
+  }
+  return { server: host, port: defaultPort };
+}
+
 export function getSiamrajSqlServerConfig(): SiamrajSqlServerConfig | null {
-  const server = (process.env.DB_HOST || '').trim();
+  const hostRaw = (process.env.DB_HOST || '').trim();
   const user = (process.env.DB_USER || '').trim();
   const password = process.env.DB_PASSWORD ?? '';
   const database = (process.env.DB_NAME || '').trim();
-  if (!server || !user || !database) return null;
+  if (!hostRaw || !user || !database) return null;
+
+  const { server, port } = parseSqlServerEndpoint(hostRaw, process.env.DB_PORT);
 
   return {
     user,
     password,
     server,
     database,
-    port: Number(process.env.DB_PORT || 1433),
+    port,
     encrypt: (process.env.DB_ENCRYPT || 'false').toLowerCase() === 'true',
     trustServerCertificate: (process.env.DB_TRUST_SERVER_CERTIFICATE || 'true').toLowerCase() !== 'false',
   };
