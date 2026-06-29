@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { cn } from '@/lib/utils';
-import { Copy, Globe, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Copy, Database, Globe, RefreshCw, ShieldAlert } from 'lucide-react';
 import { isDemoMode } from '@/lib/demoMode';
 
 export type OutboundIpCheck = {
@@ -34,31 +34,34 @@ export type OutboundIpCheck = {
     };
   };
   firewallHint: string;
+  logId?: string | null;
+  saved?: boolean;
+  saveError?: string | null;
+  registry?: IpRegistryEntry[];
 };
 
-const LOG_KEY = 'jarvis_outbound_ip_log_v1';
-const MAX_LOG = 30;
+type IpRegistryEntry = {
+  ip: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  seenCount: number;
+  lastVercelRegion: string | null;
+  lastMssqlHost: string | null;
+  lastMssqlReachable: boolean | null;
+};
 
-function loadLog(): OutboundIpCheck[] {
-  try {
-    const raw = localStorage.getItem(LOG_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as OutboundIpCheck[];
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_LOG) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLog(entry: OutboundIpCheck, prev: OutboundIpCheck[]): OutboundIpCheck[] {
-  const next = [entry, ...prev.filter((x) => x.checkedAt !== entry.checkedAt)].slice(0, MAX_LOG);
-  try {
-    localStorage.setItem(LOG_KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
-  return next;
-}
+type IpCheckHistoryRow = {
+  id: string;
+  checkedAt: string;
+  userEmail: string | null;
+  ips: string[];
+  vercelRegion: string | null;
+  onVercel: boolean;
+  mssql: {
+    host: string | null;
+    reachable: boolean | null;
+  };
+};
 
 function formatTh(iso: string): string {
   try {
@@ -71,21 +74,35 @@ function formatTh(iso: string): string {
 const VercelOutboundIpTab: React.FC = () => {
   const demo = isDemoMode();
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latest, setLatest] = useState<OutboundIpCheck | null>(null);
-  const [log, setLog] = useState<OutboundIpCheck[]>(() => loadLog());
+  const [registry, setRegistry] = useState<IpRegistryEntry[]>([]);
+  const [history, setHistory] = useState<IpCheckHistoryRow[]>([]);
   const [copied, setCopied] = useState(false);
 
-  const allKnownIps = useMemo(() => {
-    const set = new Set<string>();
-    for (const entry of log) {
-      for (const ip of entry.outbound.ips) set.add(ip);
+  const allKnownIps = useMemo(() => registry.map((r) => r.ip).sort(), [registry]);
+
+  const loadHistory = useCallback(async () => {
+    if (demo) return;
+    setHistoryLoading(true);
+    try {
+      const r = await apiFetch('/api/diagnostics/outbound-ip?mode=history&limit=50', { cache: 'no-store' });
+      const data = (await r.json().catch(() => ({}))) as {
+        registry?: IpRegistryEntry[];
+        checks?: IpCheckHistoryRow[];
+        message?: string;
+      };
+      if (r.ok) {
+        setRegistry(Array.isArray(data.registry) ? data.registry : []);
+        setHistory(Array.isArray(data.checks) ? data.checks : []);
+      }
+    } catch {
+      /* ignore — history optional on first load */
+    } finally {
+      setHistoryLoading(false);
     }
-    if (latest) {
-      for (const ip of latest.outbound.ips) set.add(ip);
-    }
-    return [...set].sort();
-  }, [log, latest]);
+  }, [demo]);
 
   const runCheck = useCallback(async () => {
     if (demo) {
@@ -102,17 +119,21 @@ const VercelOutboundIpTab: React.FC = () => {
         return;
       }
       setLatest(data);
-      setLog((prev) => saveLog(data, prev));
+      if (Array.isArray(data.registry)) setRegistry(data.registry);
+      await loadHistory();
     } catch {
       setError('เชื่อมต่อ API ไม่ได้');
     } finally {
       setLoading(false);
     }
-  }, [demo]);
+  }, [demo, loadHistory]);
 
   useEffect(() => {
-    if (!demo) void runCheck();
-  }, [demo, runCheck]);
+    if (!demo) {
+      void loadHistory();
+      void runCheck();
+    }
+  }, [demo, loadHistory, runCheck]);
 
   const copyIps = async () => {
     const text = allKnownIps.join('\n');
@@ -137,7 +158,7 @@ const VercelOutboundIpTab: React.FC = () => {
             </h3>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
               เช็กจาก API บน <strong className="font-medium text-foreground">Vercel Production</strong> — IP ที่แสดงคือ
-              address เดียวกับที่ MSSQL (<code className="text-[11px]">DB_HOST</code>) เห็นเมื่อ Jarvis พยายาม connect
+              address เดียวกับที่ MSSQL (<code className="text-[11px]">DB_HOST</code>) เห็น · บันทึกลง PostgreSQL อัตโนมัติ
             </p>
           </div>
           <button
@@ -154,19 +175,15 @@ const VercelOutboundIpTab: React.FC = () => {
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 flex gap-2">
           <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
-            Vercel Serverless ใช้ IP ขาออกแบบ dynamic — อาจได้หลาย IP หรือเปลี่ยนเมื่อ redeploy
-            แนะนำเช็กเป็นระยะและ allowlist ทุก IP ใน log ด้านล่าง หรือใช้{' '}
-            <a
-              href="https://vercel.com/docs/connectivity/static-ips"
-              target="_blank"
-              rel="noreferrer"
-              className="underline font-medium"
-            >
-              Vercel Static IPs
-            </a>{' '}
-            (แผน Pro+) ถ้าต้องการ IP คงที่
+            Vercel Serverless ใช้ IP ขาออกแบบ dynamic — เก็บทุก IP ในตารางด้านล่างแล้ว allowlist ที่ firewall MSSQL
           </p>
         </div>
+
+        {latest?.saveError ? (
+          <p className="text-sm text-amber-800 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+            บันทึก DB ไม่สำเร็จ: {latest.saveError} — รัน <code className="text-xs">npm run db:migrate</code> ก่อน
+          </p>
+        ) : null}
 
         {error ? (
           <p className="text-sm text-destructive rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
@@ -189,13 +206,10 @@ const VercelOutboundIpTab: React.FC = () => {
           ) : (
             <p className="text-sm text-muted-foreground">ยังไม่พบ IP — กดเช็กอีกครั้ง</p>
           )}
-          {latest.targets.mssql.reachable === false ? (
-            <p className="text-xs text-amber-900">
-              ตอนนี้ยัง connect MSSQL ไม่ได้ (มักเพราะ firewall ยังไม่เปิด) — แต่ IP ด้านบนถูกต้องแล้ว
-              ให้เอาไป allow ก่อน แล้วกดเช็กใหม่
+          {latest.saved && latest.logId ? (
+            <p className="text-xs text-emerald-700 flex items-center gap-1">
+              <Database className="w-3.5 h-3.5" /> บันทึกลง DB แล้ว
             </p>
-          ) : latest.targets.mssql.reachable ? (
-            <p className="text-xs text-emerald-700 font-medium">MSSQL เชื่อมได้แล้วจาก Deploy นี้</p>
           ) : null}
         </section>
       ) : null}
@@ -205,72 +219,36 @@ const VercelOutboundIpTab: React.FC = () => {
           <section className="glass-card rounded-xl border border-border p-4 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ผลล่าสุด</h4>
             <p className="text-xs text-muted-foreground">{formatTh(latest.checkedAt)}</p>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">IP ขาออกที่ตรวจพบ</p>
-              {latest.outbound.ips.length === 0 ? (
-                <p className="text-sm text-muted-foreground">ไม่พบ IP</p>
-              ) : (
-                <ul className="space-y-1">
-                  {latest.outbound.ips.map((ip) => (
-                    <li key={ip} className="font-mono text-sm bg-secondary/50 rounded-lg px-3 py-2">
-                      {ip}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p>Runtime: {latest.runtime.vercel ? 'Vercel' : 'Local / อื่นๆ'}</p>
-              {latest.runtime.region ? <p>Region: {latest.runtime.region}</p> : null}
-              {latest.runtime.url ? <p>URL: {latest.runtime.url}</p> : null}
-            </div>
-            <div className="text-xs space-y-1 border-t border-border pt-3">
-              <p className="font-medium text-foreground">แหล่งที่มา</p>
-              {latest.outbound.sources.map((s) => (
-                <p key={s.service} className={s.ok ? 'text-muted-foreground' : 'text-destructive'}>
-                  {s.service}: {s.ok ? s.ip : s.error || 'failed'}
-                </p>
+            <ul className="space-y-1">
+              {latest.outbound.ips.map((ip) => (
+                <li key={ip} className="font-mono text-sm bg-secondary/50 rounded-lg px-3 py-2">
+                  {ip}
+                </li>
               ))}
-            </div>
+            </ul>
+            {latest.runtime.region ? (
+              <p className="text-xs text-muted-foreground">Region: {latest.runtime.region}</p>
+            ) : null}
           </section>
-
           <section className="glass-card rounded-xl border border-border p-4 space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">การเชื่อม DB จาก Deploy นี้</h4>
-            {latest.targets.postgres.configured ? (
-              <div className="text-sm space-y-1">
-                <p className="font-medium">PostgreSQL</p>
-                <p className="text-muted-foreground font-mono text-xs">{latest.targets.postgres.host}</p>
-                <p
-                  className={cn(
-                    'text-xs font-medium',
-                    latest.targets.postgres.reachable ? 'text-emerald-600' : 'text-destructive',
-                  )}
-                >
-                  {latest.targets.postgres.reachable ? 'เชื่อมได้' : 'เชื่อมไม่ได้'}
-                  {latest.targets.postgres.error ? ` — ${latest.targets.postgres.error}` : ''}
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">ไม่ได้ตั้ง DATABASE_URL</p>
-            )}
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">การเชื่อม MSSQL</h4>
             {latest.targets.mssql.configured ? (
-              <div className="text-sm space-y-1 border-t border-border pt-3">
-                <p className="font-medium">SQL Server (Siamraj)</p>
-                <p className="text-muted-foreground font-mono text-xs">
-                  {latest.targets.mssql.host}:{latest.targets.mssql.port} / {latest.targets.mssql.database}
+              <>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {latest.targets.mssql.host}:{latest.targets.mssql.port}
                 </p>
                 <p
                   className={cn(
-                    'text-xs font-medium',
+                    'text-sm font-medium',
                     latest.targets.mssql.reachable ? 'text-emerald-600' : 'text-destructive',
                   )}
                 >
                   {latest.targets.mssql.reachable ? 'เชื่อมได้' : 'เชื่อมไม่ได้'}
                   {latest.targets.mssql.error ? ` — ${latest.targets.mssql.error}` : ''}
                 </p>
-              </div>
+              </>
             ) : (
-              <p className="text-xs text-muted-foreground border-t border-border pt-3">ไม่ได้ตั้ง DB_HOST (MSSQL)</p>
+              <p className="text-xs text-muted-foreground">ไม่ได้ตั้ง DB_HOST</p>
             )}
             <p className="text-xs text-muted-foreground italic">{latest.firewallHint}</p>
           </section>
@@ -279,7 +257,10 @@ const VercelOutboundIpTab: React.FC = () => {
 
       <section className="glass-card rounded-xl border border-border p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-semibold text-foreground">IP ที่เคยพบ (สำหรับ Allowlist)</h4>
+          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Database className="w-4 h-4 text-orange-600" />
+            IP ที่เคย Connect (เก็บใน Database)
+          </h4>
           {allKnownIps.length > 0 ? (
             <button
               type="button"
@@ -291,26 +272,57 @@ const VercelOutboundIpTab: React.FC = () => {
             </button>
           ) : null}
         </div>
-        {allKnownIps.length === 0 ? (
-          <p className="text-sm text-muted-foreground">ยังไม่มี log — กด &quot;เช็ก IP ตอนนี้&quot;</p>
+
+        {historyLoading && registry.length === 0 ? (
+          <p className="text-sm text-muted-foreground">กำลังโหลดจาก DB…</p>
+        ) : registry.length === 0 ? (
+          <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูล — กดเช็ก IP ครั้งแรก</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {allKnownIps.map((ip) => (
-              <span key={ip} className="font-mono text-xs rounded-full bg-secondary px-3 py-1.5">
-                {ip}
-              </span>
-            ))}
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-secondary/30">
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">IP</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">เห็นครั้งแรก</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">ล่าสุด</th>
+                  <th className="px-3 py-2 text-center font-medium text-muted-foreground">ครั้ง</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Region</th>
+                  <th className="px-3 py-2 text-center font-medium text-muted-foreground">MSSQL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {registry.map((row) => (
+                  <tr key={row.ip} className="border-b border-border/50">
+                    <td className="px-3 py-2 font-mono font-medium">{row.ip}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{formatTh(row.firstSeenAt)}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{formatTh(row.lastSeenAt)}</td>
+                    <td className="px-3 py-2 text-center tabular-nums">{row.seenCount}</td>
+                    <td className="px-3 py-2 text-xs">{row.lastVercelRegion || '—'}</td>
+                    <td className="px-3 py-2 text-center text-xs">
+                      {row.lastMssqlReachable === true ? (
+                        <span className="text-emerald-600">OK</span>
+                      ) : row.lastMssqlReachable === false ? (
+                        <span className="text-destructive">fail</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {log.length > 0 ? (
+        {history.length > 0 ? (
           <div className="border-t border-border pt-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">ประวัติการเช็ก (ในเบราว์เซอร์นี้)</p>
-            <ul className="text-xs space-y-1 max-h-40 overflow-y-auto">
-              {log.map((entry) => (
-                <li key={entry.checkedAt} className="text-muted-foreground">
-                  {formatTh(entry.checkedAt)} — {entry.outbound.ips.join(', ') || '—'}
-                  {entry.runtime.region ? ` (${entry.runtime.region})` : ''}
+            <p className="text-xs font-medium text-muted-foreground mb-2">ประวัติการเช็ก (จาก Database)</p>
+            <ul className="text-xs space-y-1 max-h-48 overflow-y-auto">
+              {history.map((row) => (
+                <li key={row.id} className="text-muted-foreground">
+                  {formatTh(row.checkedAt)} — {row.ips.join(', ') || '—'}
+                  {row.vercelRegion ? ` (${row.vercelRegion})` : ''}
+                  {row.userEmail ? ` · ${row.userEmail}` : ''}
                 </li>
               ))}
             </ul>
