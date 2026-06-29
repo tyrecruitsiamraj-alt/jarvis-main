@@ -136,9 +136,8 @@ const VercelOutboundIpTab: React.FC = () => {
               IP ขาออก (Outbound) สำหรับ Firewall Allowlist
             </h3>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              เช็กจาก API บน Vercel — IP ที่ Database / SQL Server จะเห็นเมื่อ Jarvis query ข้อมูล
-              เก็บ log ไว้แล้วนำไป allow ใน firewall ของ{' '}
-              <code className="text-[11px]">DB_HOST</code> / PostgreSQL
+              เช็กจาก API บน <strong className="font-medium text-foreground">Vercel Production</strong> — IP ที่แสดงคือ
+              address เดียวกับที่ MSSQL (<code className="text-[11px]">DB_HOST</code>) เห็นเมื่อ Jarvis พยายาม connect
             </p>
           </div>
           <button
@@ -175,6 +174,31 @@ const VercelOutboundIpTab: React.FC = () => {
           </p>
         ) : null}
       </div>
+
+      {latest && latest.targets.mssql.configured ? (
+        <section className="rounded-xl border-2 border-orange-400/40 bg-orange-500/10 p-4 space-y-2">
+          <p className="text-sm font-semibold text-foreground">Allowlist สำหรับ MSSQL ของคุณ</p>
+          <p className="text-xs font-mono text-muted-foreground">
+            {latest.targets.mssql.host}:{latest.targets.mssql.port} → {latest.targets.mssql.database}
+          </p>
+          {latest.outbound.ips.length > 0 ? (
+            <p className="text-sm text-foreground">
+              ให้ IT เปิด firewall รับ IP:{' '}
+              <span className="font-mono font-semibold">{latest.outbound.ips.join(', ')}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">ยังไม่พบ IP — กดเช็กอีกครั้ง</p>
+          )}
+          {latest.targets.mssql.reachable === false ? (
+            <p className="text-xs text-amber-900">
+              ตอนนี้ยัง connect MSSQL ไม่ได้ (มักเพราะ firewall ยังไม่เปิด) — แต่ IP ด้านบนถูกต้องแล้ว
+              ให้เอาไป allow ก่อน แล้วกดเช็กใหม่
+            </p>
+          ) : latest.targets.mssql.reachable ? (
+            <p className="text-xs text-emerald-700 font-medium">MSSQL เชื่อมได้แล้วจาก Deploy นี้</p>
+          ) : null}
+        </section>
+      ) : null}
 
       {latest ? (
         <div className="grid md:grid-cols-2 gap-4">

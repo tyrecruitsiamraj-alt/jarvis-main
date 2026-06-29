@@ -137,8 +137,12 @@ export async function probeOutboundIpAndTargets(): Promise<OutboundIpProbeResult
         error: mssqlError,
       },
     },
-    firewallHint: onVercel
-      ? 'IP ขาออกจาก Vercel อาจเปลี่ยนได้ (ยกเว้นเปิด Static IPs) — เก็บ log ทุกครั้งที่เช็กแล้ว allowlist ทุก IP ที่พบ'
-      : 'รันเช็กบน Production (Vercel) เพื่อดู IP ที่ Database จะเห็นจาก Deploy จริง — local dev ใช้ IP ของเครื่องคุณ',
+    firewallHint: mssqlCfg
+      ? onVercel
+        ? `IP ใน outbound.ips คือ source ที่ ${mssqlCfg.server}:${mssqlCfg.port} (MSSQL) จะเห็น — allowlist ที่ firewall แม้ตอนนี้ยัง connect ไม่ได้`
+        : `รันเช็กบน Production Vercel — IP ที่แสดงจากเครื่อง local ไม่ใช่ IP ที่ MSSQL ${mssqlCfg.server} จะเห็น`
+      : onVercel
+        ? 'IP ขาออกจาก Vercel อาจเปลี่ยนได้ (ยกเว้นเปิด Static IPs) — เก็บ log ทุกครั้งที่เช็กแล้ว allowlist ทุก IP ที่พบ'
+        : 'รันเช็กบน Production (Vercel) เพื่อดู IP ที่ Database จะเห็นจาก Deploy จริง — local dev ใช้ IP ของเครื่องคุณ',
   };
 }
