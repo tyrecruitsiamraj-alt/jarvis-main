@@ -5,14 +5,15 @@ import { mockUsers, mockAuditLogs } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, HeartPulse } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, HeartPulse, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
+import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
 import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
 import { isDemoMode } from '@/lib/demoMode';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare';
+type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare' | 'outboundIp';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -37,6 +38,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร', icon: UserCog, adminOnly: true },
   { id: 'driverCare', label: 'Driver Care', icon: HeartPulse, adminOnly: true },
+  { id: 'outboundIp', label: 'Vercel IP', icon: Globe, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
 ];
@@ -49,6 +51,7 @@ const AdminSettings: React.FC = () => {
   const tabFromUrl = searchParams.get('tab');
   const initialTab: SettingsTab =
     tabFromUrl === 'driverCare' ||
+    tabFromUrl === 'outboundIp' ||
     tabFromUrl === 'appearance' ||
     tabFromUrl === 'users' ||
     tabFromUrl === 'roles' ||
@@ -407,6 +410,8 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
 
         {activeTab === 'driverCare' && <DriverCareResourcesPanel />}
+
+        {activeTab === 'outboundIp' && <VercelOutboundIpTab />}
 
         {activeTab === 'roles' && (
           <div className="space-y-3">

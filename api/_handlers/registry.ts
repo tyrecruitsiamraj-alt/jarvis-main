@@ -24,6 +24,7 @@ import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 import driverCareHandler from './driver-care.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
+import outboundIpHandler from './diagnostics/outbound-ip.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -45,6 +46,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/geocode': geocodeHandler as ApiHandler,
   '/api/driver-care': driverCareHandler as ApiHandler,
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
+  '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
