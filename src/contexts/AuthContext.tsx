@@ -3,6 +3,7 @@ import { User, UserRole } from '@/types';
 import { mockUsers } from '@/data/mockData';
 import {
   isDemoMode,
+  isConfiguredDemoMode,
   enableRuntimeDemo,
   clearRuntimeDemoFlag,
 } from '@/lib/demoMode';
@@ -130,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         const data = (await r.json()) as { user?: Record<string, unknown> };
         const u = data.user ? mapApiUser(data.user) : null;
+        clearRuntimeDemoFlag();
         setUser(u);
         if (u) {
           void refreshJobStaffFromApi();
@@ -187,6 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
+    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -224,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
+    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -267,11 +271,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const logout = useCallback(async () => {
-    if (isDemoMode()) {
+    const configuredDemo = isConfiguredDemoMode();
+    clearRuntimeDemoFlag();
+    if (configuredDemo) {
       setUser(null);
       localStorage.removeItem(DEMO_STORAGE_KEY);
       localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-      clearRuntimeDemoFlag();
       return;
     }
     try {

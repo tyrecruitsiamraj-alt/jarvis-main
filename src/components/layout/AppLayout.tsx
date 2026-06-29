@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, UserCircle } from 'lucide-react';
+import { KeyRound, LogOut, RefreshCw, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { cn } from '@/lib/utils';
-import { isDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
+import { isConfiguredDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
+import { reloadForLiveData, tryRecoverFromRuntimeDemo } from '@/lib/apiRecovery';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import BottomDockNav from '@/components/layout/bottom-nav/BottomDockNav';
@@ -17,6 +18,43 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
+  const [runtimeFallback, setRuntimeFallback] = useState(() => isRuntimeDemoFallback());
+  const [recovering, setRecovering] = useState(false);
+
+  const attemptRecovery = async (reloadOnSuccess = true) => {
+    if (!isRuntimeDemoFallback()) {
+      setRuntimeFallback(false);
+      return;
+    }
+    setRecovering(true);
+    try {
+      const result = await tryRecoverFromRuntimeDemo();
+      if (result === 'recovered') {
+        setRuntimeFallback(false);
+        if (reloadOnSuccess) reloadForLiveData();
+      }
+    } finally {
+      setRecovering(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!runtimeFallback) return;
+
+    void attemptRecovery(true);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void attemptRecovery(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const id = window.setInterval(() => void attemptRecovery(true), 30_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(id);
+    };
+  }, [runtimeFallback]);
+
+  const showDemoBanner = isConfiguredDemoMode() || runtimeFallback;
 
   return (
     <div
@@ -26,14 +64,29 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       )}
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
-      {(isDemoMode() || isRuntimeDemoFallback()) ? (
+      {showDemoBanner ? (
         <div
           role="status"
-          className="text-center text-xs py-2 px-4 sm:px-6 border-b border-amber-500/35 bg-amber-500/15 text-amber-950 dark:text-amber-100"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 text-center text-xs py-2 px-4 sm:px-6 border-b border-amber-500/35 bg-amber-500/15 text-amber-950 dark:text-amber-100"
         >
-          {isRuntimeDemoFallback()
-            ? 'ต่อ API ไม่ได้ — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์อยู่ เมื่อเชื่อมฐานข้อมูลแล้วให้ออกจากระบบและรีเฟรชเพื่อใช้ข้อมูลจริง'
-            : 'โหมดสาธิต — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์ บางส่วนอาจไม่ตรงกับฐานข้อมูลจริง'}
+          <span>
+            {runtimeFallback
+              ? recovering
+                ? 'กำลังตรวจสอบการเชื่อมต่อ API…'
+                : 'ต่อ API ไม่ได้ — ใช้ข้อมูลตัวอย่างชั่วคราว ระบบจะสลับเป็นข้อมูลจริงอัตโนมัติเมื่อ API พร้อม'
+              : 'โหมดสาธิต — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์ บางส่วนอาจไม่ตรงกับฐานข้อมูลจริง'}
+          </span>
+          {runtimeFallback ? (
+            <button
+              type="button"
+              disabled={recovering}
+              onClick={() => void attemptRecovery(true)}
+              className="inline-flex items-center justify-center gap-1.5 self-center rounded-full border border-amber-600/30 bg-white/80 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-white disabled:opacity-60 touch-manipulation"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', recovering && 'animate-spin')} />
+              ใช้ข้อมูลจริง
+            </button>
+          ) : null}
         </div>
       ) : null}
 

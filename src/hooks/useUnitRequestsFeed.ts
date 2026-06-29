@@ -4,6 +4,7 @@ import { isDemoMode } from '@/lib/demoMode';
 import { mergeJobSources } from '@/lib/mergeJobs';
 import { apiFetch } from '@/lib/apiFetch';
 import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
@@ -23,7 +24,7 @@ async function loadLiveJobs(): Promise<{
   if (meta.enabled) {
     const siamrajJobs = await fetchSiamrajUnitRequests(200);
     return {
-      jobs: siamrajJobs,
+      jobs: enrichJobsWithUrgency(siamrajJobs),
       siamrajPrimary: true,
       readOnly: meta.readOnly,
       dbSource: meta.dbSource ?? null,

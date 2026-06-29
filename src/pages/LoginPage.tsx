@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import type { UserRole } from '@/types';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -17,13 +16,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiFetch';
-import { ArrowRight, Eye, EyeOff, Shield } from 'lucide-react';
-
-const devRoleEntryEnabled = import.meta.env.VITE_DEV_ROLE_ENTRY === 'true';
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithDevRole } = useAuth();
+  const { signIn, signUp } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -39,7 +36,6 @@ const LoginPage: React.FC = () => {
   const [forgotBusy, setForgotBusy] = useState(false);
   const [forgotMsg, setForgotMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [devRoleBusy, setDevRoleBusy] = useState<UserRole | null>(null);
 
   const todayLabel = useMemo(() => {
     const d = new Date();
@@ -117,40 +113,26 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDevRole = async (role: UserRole) => {
-    setError(null);
-    setDevRoleBusy(role);
-    try {
-      const msg = await signInWithDevRole(role);
-      if (msg) setError(msg);
-      else navigate('/', { replace: true });
-    } catch {
-      setError('เข้าสู่ระบบไม่สำเร็จ — ลองใหม่อีกครั้ง');
-    } finally {
-      setDevRoleBusy(null);
-    }
-  };
-
   const submitLabel = authMode === 'login'
     ? submitting ? 'Signing in…' : 'Sign in'
     : submitting ? 'Creating account…' : 'Create account';
 
   return (
     <div
-      className={cn('jarvis-warm-bg relative overflow-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
+      className={cn('jarvis-warm-bg relative overflow-x-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
       {/* ambient orbs */}
       <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-orange-orb opacity-40 blur-sm" aria-hidden />
       <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-orange-orb opacity-25 blur-md" aria-hidden />
 
-      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center justify-center gap-6 p-4 sm:p-6 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
+      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center gap-6 overflow-y-auto p-4 py-8 sm:p-6 sm:py-10 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
         {/* Left — glass login */}
         <motion.div
           initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex w-full max-w-lg flex-col justify-center lg:max-w-md lg:flex-1"
+          className="flex w-full max-w-lg flex-col justify-center lg:max-w-md lg:flex-1 lg:my-auto"
         >
           <div className="jarvis-frost p-6 sm:p-8 space-y-5">
             <div className="flex items-center gap-3">
@@ -362,28 +344,6 @@ const LoginPage: React.FC = () => {
               <p className="text-xs text-destructive text-center" role="alert">
                 {error}
               </p>
-            ) : null}
-
-            {devRoleEntryEnabled && authMode === 'login' ? (
-              <div className="rounded-2xl border border-orange-200/80 bg-orange-50/60 p-3 space-y-2">
-                <p className="text-xs font-medium text-orange-800 flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5" />
-                  เข้าใช้งานด่วน (เลือกสิทธิ์)
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['staff', 'supervisor', 'admin'] as const).map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      disabled={!!devRoleBusy || submitting}
-                      onClick={() => void handleDevRole(role)}
-                      className="rounded-full border border-orange-200 bg-white/80 px-2 py-2 text-xs font-medium text-orange-900 hover:bg-white disabled:opacity-50 touch-manipulation"
-                    >
-                      {devRoleBusy === role ? '…' : role === 'staff' ? 'Staff' : role === 'supervisor' ? 'Supervisor' : 'Admin'}
-                    </button>
-                  ))}
-                </div>
-              </div>
             ) : null}
 
             <button

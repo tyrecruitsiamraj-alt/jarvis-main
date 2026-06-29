@@ -10,6 +10,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
+import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
+import {
+  jobRoleFilterOptions,
+  filterUnitRequestsByJobRole,
+  type SiamrajJobRoleFilter,
+} from '@/lib/siamrajUnitFilters';
 
 type JobListFilter = 'all' | 'active' | 'closed';
 
@@ -19,18 +25,29 @@ const JobListPage: React.FC = () => {
   const [filter, setFilter] = useState<JobListFilter>('all');
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState<string>('all');
+  const [jobRoleFilter, setJobRoleFilter] = useState<SiamrajJobRoleFilter>('all');
 
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
+  const jobRoleOptions = useMemo(
+    () => (siamrajPrimary ? jobRoleFilterOptions(jobs) : []),
+    [jobs, siamrajPrimary],
+  );
+
+  const roleScopedJobs = useMemo(
+    () => (siamrajPrimary ? filterUnitRequestsByJobRole(jobs, jobRoleFilter) : jobs),
+    [jobs, siamrajPrimary, jobRoleFilter],
+  );
+
   const unitOptions = useMemo(() => {
-    const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
+    const set = new Set(roleScopedJobs.map((j) => j.unit_name).filter(Boolean));
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [jobs]);
+  }, [roleScopedJobs]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    return jobs
+    return roleScopedJobs
       .filter((j) => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
         if (filter === 'all') return true;
@@ -43,7 +60,20 @@ const JobListPage: React.FC = () => {
             .toLowerCase()
             .includes(q),
       );
-  }, [jobs, filter, search, unitFilter]);
+  }, [roleScopedJobs, filter, search, unitFilter]);
+
+  const groups = useMemo(() => {
+    const byUnit = new Map<string, JobRequest[]>();
+    for (const j of filtered) {
+      const key = j.unit_name || '—';
+      const bucket = byUnit.get(key);
+      if (bucket) bucket.push(j);
+      else byUnit.set(key, [j]);
+    }
+    return [...byUnit.entries()]
+      .map(([unit, items]) => ({ unit, items }))
+      .sort((a, b) => a.unit.localeCompare(b.unit, 'th'));
+  }, [filtered]);
 
   return (
     <div>
@@ -100,6 +130,26 @@ const JobListPage: React.FC = () => {
             </select>
           </div>
 
+          {siamrajPrimary ? (
+            <div className="flex items-center gap-2 min-w-[220px]">
+              <label htmlFor="job-list-role" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                ลักษณะงาน
+              </label>
+              <select
+                id="job-list-role"
+                value={jobRoleFilter}
+                onChange={(e) => setJobRoleFilter(e.target.value)}
+                className="jarvis-soft-field flex-1"
+              >
+                {jobRoleOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           <div className="flex gap-1.5 overflow-x-auto">
             {[
               { value: 'all' as const, label: 'ทั้งหมด' },
@@ -120,35 +170,45 @@ const JobListPage: React.FC = () => {
           </div>
         </div>
 
-        {isMobile ? (
-          <div className="space-y-2">
-            {filtered.map((j) => (
-              <button
-                key={j.id}
-                onClick={() => navigateToUnitRequest(j, navigate)}
-                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-foreground text-sm">
-                    {j.request_no ? `${j.unit_name} · ${j.request_no}` : j.unit_name}
-                  </span>
-                  <StatusBadge status={j.status} type="job" />
+        {filtered.length === 0 && !loading ? (
+          <div className="text-sm text-muted-foreground py-8 text-center">ไม่พบใบขอ</div>
+        ) : isMobile ? (
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <section key={group.unit} className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <h2 className="font-semibold text-foreground text-sm">{group.unit}</h2>
+                  <span className="text-xs text-muted-foreground">{group.items.length} ใบขอ</span>
                 </div>
 
-                <div className="text-xs text-muted-foreground">
-                  {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
-                  {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
-                </div>
+                {group.items.map((j) => (
+                  <button
+                    key={j.id}
+                    onClick={() => navigateToUnitRequest(j, navigate)}
+                    className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-foreground text-sm">
+                        {j.request_no || j.unit_name}
+                      </span>
+                      <StatusBadge status={j.status} type="job" />
+                    </div>
 
-                <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
+                      {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
+                      {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
+                    </div>
 
-                <div className="flex items-center justify-between mt-2 text-xs">
-                  <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
-                  <span className={j.urgency === 'urgent' ? 'text-destructive' : 'text-info'}>
-                    {j.urgency === 'urgent' ? '🔴 ด่วน' : '🔵 ล่วงหน้า'}
-                  </span>
-                </div>
-              </button>
+                    <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+
+                    <div className="flex items-center justify-between mt-2 text-xs">
+                      <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
+                      <JobUrgencyBadge job={j} />
+                    </div>
+                  </button>
+                ))}
+              </section>
             ))}
           </div>
         ) : (
@@ -156,8 +216,9 @@ const JobListPage: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ไซต์ / ใบขอ</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">เลขที่ใบขอ</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ประเภทใบขอ</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ตำแหน่ง</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ผู้ลาออก</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">สถานที่</th>
                   <th className="px-4 py-3 text-center text-muted-foreground font-medium">ด่วน</th>
@@ -167,28 +228,42 @@ const JobListPage: React.FC = () => {
               </thead>
 
               <tbody>
-                {filtered.map((j) => (
-                  <tr
-                    key={j.id}
-                    onClick={() => navigateToUnitRequest(j, navigate)}
-                    className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
-                  >
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {j.request_no ? `${j.unit_name} (${j.request_no})` : j.unit_name}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{j.resigned_employee_name || '—'}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{j.location_address}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={j.urgency === 'urgent' ? 'text-destructive' : 'text-info'}>
-                        {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-foreground">฿{j.total_income.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center">
-                      <StatusBadge status={j.status} type="job" />
-                    </td>
-                  </tr>
+                {groups.map((group) => (
+                  <React.Fragment key={group.unit}>
+                    <tr className="border-b border-border bg-secondary/40">
+                      <th
+                        colSpan={8}
+                        scope="colgroup"
+                        className="px-4 py-2 text-left font-semibold text-foreground"
+                      >
+                        {group.unit}
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          {group.items.length} ใบขอ
+                        </span>
+                      </th>
+                    </tr>
+
+                    {group.items.map((j) => (
+                      <tr
+                        key={j.id}
+                        onClick={() => navigateToUnitRequest(j, navigate)}
+                        className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-medium text-foreground">{j.request_no || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{j.job_description_code_1 || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{j.resigned_employee_name || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{j.location_address}</td>
+                        <td className="px-4 py-3 text-center">
+                          <JobUrgencyBadge job={j} compact />
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground">฿{j.total_income.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge status={j.status} type="job" />
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
