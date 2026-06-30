@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.git/
+.gitignore
+
+# Secrets — ส่งผ่าน docker-compose env_file แทน
+.env
+.env.local
+
+# Dev / test files
+tests/
+docs/
+coverage/
+playwright*
+*.test.*
+*.spec.*
+
+# Package manager locks (เก็บไว้แค่ package-lock.json สำหรับ npm ci)
+bun.lock
+bun.lockb
+
+# Vercel deploy artifacts
+.vercel/
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
