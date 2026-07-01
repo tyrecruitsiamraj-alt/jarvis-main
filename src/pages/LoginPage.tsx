@@ -90,11 +90,16 @@ const LoginPage: React.FC = () => {
         setError(msg);
         return;
       }
-      setAuthMode('login');
-      setFirstName('');
-      setLastName('');
-      setPassword('');
-      setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
+      const loginMsg = await signIn(email, password);
+      if (loginMsg) {
+        setAuthMode('login');
+        setFirstName('');
+        setLastName('');
+        setPassword('');
+        setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
+        return;
+      }
+      navigate('/', { replace: true });
     } finally {
       setSubmitting(false);
     }

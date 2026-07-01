@@ -12,9 +12,15 @@ export function isDevRoleLoginAllowed(): boolean {
   return String(process.env.JARVIS_DEV_ROLE_LOGIN || '').trim().toLowerCase() === 'true';
 }
 
-/** Public self-registration — disabled in production unless invite flow exists. */
+function parseEnvFlag(raw: string | undefined, defaultWhenUnset: boolean): boolean {
+  if (raw == null || String(raw).trim() === '') return defaultWhenUnset;
+  const v = String(raw).trim().toLowerCase();
+  if (v === 'true' || v === '1' || v === 'yes' || v === 'on') return true;
+  if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
+  return defaultWhenUnset;
+}
+
+/** Public self-registration — ปิดใน production โดยค่าเริ่มต้น; เปิดได้ด้วย JARVIS_ALLOW_PUBLIC_REGISTER=true */
 export function isPublicRegistrationAllowed(): boolean {
-  if (isProductionRuntime()) return false;
-  const raw = String(process.env.JARVIS_ALLOW_PUBLIC_REGISTER || 'true').trim().toLowerCase();
-  return raw !== 'false' && raw !== '0' && raw !== 'no' && raw !== 'off';
+  return parseEnvFlag(process.env.JARVIS_ALLOW_PUBLIC_REGISTER, !isProductionRuntime());
 }

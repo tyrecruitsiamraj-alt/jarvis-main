@@ -22,6 +22,13 @@ describe('runtime security', () => {
     expect(isPublicRegistrationAllowed()).toBe(false);
   });
 
+  it('allows public register in production when explicitly enabled', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    process.env.JARVIS_ALLOW_PUBLIC_REGISTER = 'true';
+    expect(isPublicRegistrationAllowed()).toBe(true);
+  });
+
   it('allows dev-role only when explicitly enabled outside production', () => {
     process.env.NODE_ENV = 'development';
     process.env.VERCEL_ENV = 'preview';
