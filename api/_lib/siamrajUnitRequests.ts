@@ -4,6 +4,7 @@ import {
   getSiamrajSqlServerUnitRequestById,
   listSiamrajSqlServerUnitRequests,
 } from './siamrajSqlServerRequests.js';
+import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 
 export type SiamrajDbSource = 'postgres' | 'sqlserver';
 
@@ -94,6 +95,8 @@ function toYmd(v: string | Date | null | undefined): string {
 export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
   const reasonParts = [r.reason_main_name, r.reason_sub_name].filter(Boolean);
   const vehicleParts = [r.vehicle_type_name, r.vehicle_remark].filter(Boolean);
+  const roleLabel = primaryJobRoleLabel(r.job_description_code_1, r.staff_title_code, r.job_description_code_1);
+  const jobType = inferJobTypeFromDescription(r.job_description_code_1, r.staff_title_code);
 
   return {
     id: `siamraj:${r.act_saleco_id}`,
@@ -121,13 +124,13 @@ export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
     siamraj_status: r.status || undefined,
     need_staff: r.act_saleco_need_staff ?? undefined,
     staff_title_code: r.staff_title_code || undefined,
-    job_description_code_1: r.job_description_code_1 || undefined,
+    job_description_code_1: roleLabel || r.job_description_code_1 || undefined,
     job_description_code_2: r.job_description_code_2 || undefined,
     request_date: toYmd(r.act_saleco_datetime) || new Date().toISOString().slice(0, 10),
     created_at: toIso(r.act_saleco_datetime) || new Date().toISOString(),
     urgency: 'advance' as const,
     total_income: 0,
-    job_type: 'central' as const,
+    job_type: jobType,
     job_category: 'private' as const,
     penalty_per_day: 0,
     days_without_worker: 0,

@@ -112,13 +112,13 @@ const CandidatesPage: React.FC = () => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
         apiCandidatesRef.current = arr;
-        setCandidates(mergeCandidateSources(arr, getCandidates()));
+        setCandidates(mergeCandidateSources(arr, []));
       })
       .catch(() => {
         if (cancelled) return;
         apiCandidatesRef.current = [];
-        setCandidates(mergeCandidateSources([], getCandidates()));
-        setError(null);
+        setCandidates([]);
+        setError('โหลดรายชื่อผู้สมัครไม่สำเร็จ — ลองใหม่อีกครั้ง');
       })
       .finally(() => {
         if (cancelled) return;
@@ -218,8 +218,8 @@ const CandidatesPage: React.FC = () => {
                 className={cn(
                   'rounded-lg border p-3 text-left transition-colors',
                   filter === st
-                    ? 'border-primary bg-orange-500/12 shadow-sm'
-                    : 'border-border bg-secondary/25 hover:border-primary/35 hover:bg-orange-50/40',
+                    ? 'border-primary bg-blue-500/12 shadow-sm'
+                    : 'border-border bg-secondary/25 hover:border-primary/35 hover:bg-blue-50/40',
                 )}
               >
                 <div className="text-[11px] font-medium text-muted-foreground leading-snug">
@@ -267,7 +267,7 @@ const CandidatesPage: React.FC = () => {
                 <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                    className="font-semibold text-foreground text-sm hover:text-orange-600"
+                    className="font-semibold text-foreground text-sm hover:text-blue-600"
                   >
                     {formatCandidateDisplayName(c)}
                   </button>
@@ -295,7 +295,7 @@ const CandidatesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-orange-600">Risk: {c.risk_percentage}%</span>
+                  <span className="text-xs text-blue-600">Risk: {c.risk_percentage}%</span>
 
                   <div className="flex gap-2">
                     <a href={`tel:${c.phone}`} className="p-1.5 rounded-lg bg-success/10 text-success">
@@ -305,7 +305,7 @@ const CandidatesPage: React.FC = () => {
                     {hasPermission('supervisor') && (
                       <button
                         onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                        className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600"
+                        className="text-xs px-2 py-1 rounded bg-blue-500/12 text-blue-600"
                       >
                         มอบหมายงาน
                       </button>
@@ -339,7 +339,7 @@ const CandidatesPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                        className="font-medium text-foreground hover:text-orange-600"
+                        className="font-medium text-foreground hover:text-blue-600"
                       >
                         {formatCandidateDisplayName(c)}
                       </button>
@@ -388,7 +388,7 @@ const CandidatesPage: React.FC = () => {
                       {hasPermission('supervisor') && (
                         <button
                           onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                          className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600 hover:bg-orange-500/15"
+                          className="text-xs px-2 py-1 rounded bg-blue-500/12 text-blue-600 hover:bg-blue-500/15"
                         >
                           มอบหมายงาน
                         </button>

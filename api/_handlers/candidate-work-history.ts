@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthDataRoute,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const tbl = tableInAppSchema('candidate_work_history');
 
@@ -114,6 +115,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to create');
+      await auditFromAuthed(req, {
+        action: 'candidate_work_history.create',
+        entityType: 'candidate_work_history',
+        entityId: row.id,
+        after: toRow(row),
+      });
       return res.status(201).json(toRow(row));
     } catch (e) {
       return handleApiError(res, e, 'candidate-work-history POST', { userId: req.user.sub });
@@ -168,6 +175,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to update');
+      await auditFromAuthed(req, {
+        action: 'candidate_work_history.update',
+        entityType: 'candidate_work_history',
+        entityId: id,
+        before: toRow(cur),
+        after: toRow(row),
+      });
       return res.status(200).json(toRow(row));
     } catch (e) {
       return handleApiError(res, e, 'candidate-work-history PATCH', { userId: req.user.sub });
@@ -177,4 +191,4 @@ async function handler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuthDataRoute(handler);
+export default withRbac(handler, 'candidate-work-history');

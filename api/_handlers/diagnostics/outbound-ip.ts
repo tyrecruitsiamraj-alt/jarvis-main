@@ -7,7 +7,7 @@ import {
   formatRegistryForApi,
 } from '../../_lib/outboundIpLogs.js';
 import {
-  withAuth,
+  withRbac,
   sendError,
   handleApiError,
   type AuthedReq,
@@ -20,10 +20,6 @@ function parseLimit(q: unknown): number {
 }
 
 async function handler(req: AuthedReq, res: ApiRes) {
-  if (req.user.role !== 'admin') {
-    return sendError(res, 403, 'Forbidden', 'Only administrators can check outbound IP');
-  }
-
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'GET') {
     return sendError(res, 405, 'Method not allowed');
@@ -74,4 +70,4 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
 }
 
-export default withAuth(handler, { roles: ['admin'] });
+export default withRbac(handler, 'diagnostics-outbound-ip');

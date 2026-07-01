@@ -122,8 +122,10 @@ export interface JobRequest {
   siamraj_status?: string;
   need_staff?: boolean;
   staff_title_code?: string;
+  staff_title_name?: string;
   job_description_code_1?: string;
   job_description_code_2?: string;
+  gender_requirement?: string;
   request_no?: string;
   resigned_title_prefix?: string;
   resigned_first_name?: string;

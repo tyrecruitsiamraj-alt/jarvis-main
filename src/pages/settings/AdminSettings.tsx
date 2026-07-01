@@ -12,6 +12,7 @@ import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
 import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
 import { isDemoMode } from '@/lib/demoMode';
+import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 
 type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare' | 'outboundIp';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
@@ -77,8 +78,11 @@ const AdminSettings: React.FC = () => {
     if (activeTab === 'users') {
       setUsersLoading(true);
       apiFetch('/api/app-users')
-        .then(async (r) => (r.ok ? ((await r.json()) as User[]) : []))
-        .then((d) => setApiUsers(Array.isArray(d) ? d : []))
+        .then(async (r) => {
+          if (!r.ok) return [];
+          return parseAppUserList(await r.json());
+        })
+        .then((d) => setApiUsers(d))
         .catch(() => setApiUsers([]))
         .finally(() => setUsersLoading(false));
     }
@@ -119,8 +123,12 @@ const AdminSettings: React.FC = () => {
         setUserActionError(msg);
         return;
       }
-      const updated = body as User;
-      setApiUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      const updated = parseAppUser(body);
+      if (!updated) {
+        setUserActionError('รูปแบบข้อมูลผู้ใช้จากเซิร์ฟเวอร์ไม่ถูกต้อง');
+        return;
+      }
+      setApiUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
       setUserActionOk('บันทึกสิทธิ์ผู้ใช้เรียบร้อย');
     } catch {
       setUserActionError('เกิดข้อผิดพลาดระหว่างอัปเดตสิทธิ์ผู้ใช้');
@@ -213,7 +221,7 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'users' &&
           (demo ? (
-            <div className="glass-card rounded-xl border border-border overflow-hidden">
+            <div className="glass-card rounded-xl border border-border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
@@ -262,7 +270,7 @@ const AdminSettings: React.FC = () => {
           ) : usersLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
           ) : (
-            <div className="glass-card rounded-xl border border-border overflow-hidden">
+            <div className="glass-card rounded-xl border border-border overflow-x-auto">
               {userActionError ? (
                 <div className="mx-4 mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {userActionError}
@@ -302,7 +310,8 @@ const AdminSettings: React.FC = () => {
                           value={u.role}
                           disabled={savingUserId === u.id}
                           onChange={(e) => {
-                            const next = e.target.value as User['role'];
+                            const next = e.target.value;
+                            if (!isUserRole(next)) return;
                             if (next === u.role) return;
                             void updateUser(u.id, { role: next });
                           }}
@@ -369,7 +378,8 @@ const AdminSettings: React.FC = () => {
                       value={u.role}
                       disabled={savingUserId === u.id}
                       onChange={(e) => {
-                        const next = e.target.value as User['role'];
+                        const next = e.target.value;
+                        if (!isUserRole(next)) return;
                         if (next === u.role) return;
                         void updateUser(u.id, { role: next });
                       }}
@@ -444,7 +454,7 @@ const AdminSettings: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => openReferenceEditor(cat)}
-                    className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600 hover:bg-orange-500/15"
+                    className="text-xs px-2 py-1 rounded bg-blue-500/12 text-blue-600 hover:bg-blue-500/15"
                   >
                     จัดการ
                   </button>

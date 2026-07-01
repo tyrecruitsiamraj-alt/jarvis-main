@@ -1,4 +1,10 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import {
+  formatGenderRequirement,
+  inferJobTypeFromDescription,
+  parseAgeRange,
+  primaryJobRoleLabel,
+} from './siamrajJobMapping.js';
 
 type SqlServerRequestRow = {
   external_id: string;
@@ -58,7 +64,11 @@ function getSqlFilters() {
 
 function mapSqlServerRow(r: SqlServerRequestRow) {
   const workSchedule = [r.work_date, r.work_time].filter(Boolean).join(' • ');
-  const jobDesc = [r.staff_title_name, r.job_name1, r.job_name2, r.fee_name].filter(Boolean).join(' / ');
+  const roleLabel = primaryJobRoleLabel(r.job_name1, r.staff_title_name, r.job_description_code_1);
+  const jobDesc = [roleLabel, r.job_name2, r.fee_name].filter(Boolean).join(' / ');
+  const ageRange = parseAgeRange(r.age);
+  const genderRequirement = formatGenderRequirement(r.sex);
+  const jobType = inferJobTypeFromDescription(r.job_name1, r.staff_title_name, r.job_description_code_1);
 
   return {
     id: `siamraj-sql:${r.external_id}`,
@@ -86,13 +96,17 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     status: 'open' as const,
     siamraj_status: r.status || undefined,
     staff_title_code: r.staff_title_code || undefined,
-    job_description_code_1: r.job_name1 || jobDesc || r.job_description_code_1 || undefined,
+    staff_title_name: r.staff_title_name || undefined,
+    job_description_code_1: roleLabel || jobDesc || undefined,
     job_description_code_2: r.job_name2 || r.job_description_code_2 || undefined,
+    age_range_min: ageRange.min,
+    age_range_max: ageRange.max,
+    gender_requirement: genderRequirement,
     request_date: toYmd(r.act_saleco_datetime) || new Date().toISOString().slice(0, 10),
     created_at: toIso(r.act_saleco_datetime) || new Date().toISOString(),
     urgency: 'advance' as const,
     total_income: r.payment_rate ?? 0,
-    job_type: 'central' as const,
+    job_type: jobType,
     job_category: 'private' as const,
     penalty_per_day: r.abs_customer_fine ?? 0,
     days_without_worker: 0,
@@ -134,7 +148,10 @@ const BASE_SQL = `
     (SELECT z.abs_customer_fine FROM st_request_p3 z WHERE z.request_no = A.request_no) AS abs_customer_fine,
     (SELECT z.contact_name FROM st_request_p1 z WHERE z.request_no = A.request_no) AS contact_name,
     (SELECT z.phone FROM st_request_p1 z WHERE z.request_no = A.request_no) AS mobile_phone,
-    ROW_NUMBER() OVER (PARTITION BY A.request_no ORDER BY C.payment_rate DESC) AS rn
+    ROW_NUMBER() OVER (
+      PARTITION BY A.request_no
+      ORDER BY CASE WHEN C.is_wage = 'Y' THEN 0 ELSE 1 END, C.payment_rate DESC
+    ) AS rn
   FROM st_request_head A
   LEFT JOIN st_request_staff S ON S.request_no = A.request_no
   INNER JOIN st_request_p2 B ON A.request_no = B.request_no

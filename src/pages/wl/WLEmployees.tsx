@@ -29,7 +29,9 @@ const WLEmployees: React.FC = () => {
   const [search, setSearch] = useState('');
 
   const [employees, setEmployees] = useState<Employee[]>(() =>
-    combineWlEmployeeList([], getEmployees(), mergeCandidateSources([], getCandidates())),
+    isDemoMode()
+      ? combineWlEmployeeList([], getEmployees(), mergeCandidateSources([], getCandidates()))
+      : [],
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,18 +58,16 @@ const WLEmployees: React.FC = () => {
         if (cancelled) return;
         apiEmpRef.current = Array.isArray(eData) ? eData : [];
         apiCandRef.current = Array.isArray(cData) ? cData : [];
-        const cand = mergeCandidateSources(apiCandRef.current, getCandidates());
-        setEmployees(combineWlEmployeeList(apiEmpRef.current, getEmployees(), cand));
+        const cand = mergeCandidateSources(apiCandRef.current, []);
+        setEmployees(combineWlEmployeeList(apiEmpRef.current, [], cand));
         setError(null);
       })
       .catch(() => {
         if (cancelled) return;
         apiEmpRef.current = [];
         apiCandRef.current = [];
-        setEmployees(
-          combineWlEmployeeList([], getEmployees(), mergeCandidateSources([], getCandidates())),
-        );
-        setError(null);
+        setEmployees([]);
+        setError('โหลดรายชื่อพนักงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
       })
       .finally(() => {
         if (cancelled) return;
@@ -153,7 +153,7 @@ const WLEmployees: React.FC = () => {
               <button
                 key={emp.id}
                 onClick={() => navigate(`/wl/employees/${emp.id}`)}
-                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50 transition-all"
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">

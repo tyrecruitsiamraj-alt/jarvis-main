@@ -8,15 +8,27 @@ import {
 } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
 import type { UserRole } from '../../_lib/auth.js';
+import { isPublicRegistrationAllowed } from '../../_lib/runtime.js';
+import { rateLimitOrReject } from '../../_lib/rateLimit.js';
+
+const GENERIC_REGISTER_DISABLED =
+  'การสมัครสมาชิกด้วยตนเองปิดใช้งาน — ติดต่อผู้ดูแลระบบเพื่อขอบัญชี';
 
 async function registerHandler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'POST') {
     return sendError(res, 405, 'Method not allowed');
   }
+
+  if (!isPublicRegistrationAllowed()) {
+    return sendError(res, 403, 'Forbidden', GENERIC_REGISTER_DISABLED);
+  }
+
   if (!getJwtSecret()) {
     return sendError(res, 503, 'Service unavailable', 'AUTH_JWT_SECRET is not configured');
   }
+
+  if (!rateLimitOrReject(req, res, 'auth:register', 5, 60 * 60 * 1000)) return;
 
   try {
     const raw = await readJsonBody(req);

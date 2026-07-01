@@ -185,7 +185,7 @@ const JobListPage: React.FC = () => {
                   <button
                     key={j.id}
                     onClick={() => navigateToUnitRequest(j, navigate)}
-                    className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50"
+                    className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-semibold text-foreground text-sm">
@@ -201,6 +201,18 @@ const JobListPage: React.FC = () => {
                     </div>
 
                     <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+
+                    {(j.recruiter_name || j.screener_name) && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        ผู้รับผิดชอบ:{' '}
+                        {[
+                          j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
+                          j.screener_name ? `คัดสรร ${j.screener_name}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between mt-2 text-xs">
                       <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
@@ -220,6 +232,7 @@ const JobListPage: React.FC = () => {
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ประเภทใบขอ</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ตำแหน่ง</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ผู้ลาออก</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ผู้รับผิดชอบ</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">สถานที่</th>
                   <th className="px-4 py-3 text-center text-muted-foreground font-medium">ด่วน</th>
                   <th className="px-4 py-3 text-right text-muted-foreground font-medium">รายได้</th>
@@ -232,7 +245,7 @@ const JobListPage: React.FC = () => {
                   <React.Fragment key={group.unit}>
                     <tr className="border-b border-border bg-secondary/40">
                       <th
-                        colSpan={8}
+                        colSpan={9}
                         scope="colgroup"
                         className="px-4 py-2 text-left font-semibold text-foreground"
                       >
@@ -253,6 +266,22 @@ const JobListPage: React.FC = () => {
                         <td className="px-4 py-3 text-muted-foreground">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
                         <td className="px-4 py-3 text-muted-foreground">{j.job_description_code_1 || '—'}</td>
                         <td className="px-4 py-3 text-muted-foreground">{j.resigned_employee_name || '—'}</td>
+                        <td className="px-4 py-3">
+                          {j.recruiter_name || j.screener_name ? (
+                            <div className="text-xs leading-tight">
+                              <div>
+                                <span className="text-muted-foreground">สรรหา </span>
+                                {j.recruiter_name || '—'}
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">คัดสรร </span>
+                                {j.screener_name || '—'}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{j.location_address}</td>
                         <td className="px-4 py-3 text-center">
                           <JobUrgencyBadge job={j} compact />

@@ -1,0 +1,77 @@
+import { describe, it, expect } from 'vitest';
+import { checkApiAccess, meetsMinimumRole, minimumRoleFor } from '../../api/_lib/rbac';
+import { canAccessPath, minimumRoleForPath, roleHomePath } from '../../src/lib/rbac';
+
+describe('api rbac matrix', () => {
+  it('staff cannot create jobs (supervisor+ only)', () => {
+    expect(checkApiAccess('staff', 'jobs', 'POST').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'jobs', 'POST').ok).toBe(true);
+  });
+
+  it('staff can read jobs and create candidates', () => {
+    expect(checkApiAccess('staff', 'jobs', 'GET').ok).toBe(true);
+    expect(checkApiAccess('staff', 'candidates', 'POST').ok).toBe(true);
+    expect(checkApiAccess('staff', 'candidates', 'PATCH').ok).toBe(false);
+  });
+
+  it('supervisor cannot access admin settings APIs', () => {
+    expect(checkApiAccess('supervisor', 'app-users', 'GET').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'audit-logs', 'GET').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'job-staff', 'POST').ok).toBe(false);
+    expect(checkApiAccess('admin', 'app-users', 'GET').ok).toBe(true);
+  });
+
+  it('clients: staff read, supervisor patch, admin post', () => {
+    expect(minimumRoleFor('clients', 'GET')).toBe('staff');
+    expect(minimumRoleFor('clients', 'PATCH')).toBe('supervisor');
+    expect(minimumRoleFor('clients', 'POST')).toBe('admin');
+    expect(checkApiAccess('supervisor', 'clients', 'PATCH').ok).toBe(true);
+    expect(checkApiAccess('supervisor', 'clients', 'POST').ok).toBe(false);
+  });
+
+  it('driver-care: staff can log actions, supervisor recalculates', () => {
+    expect(checkApiAccess('staff', 'driver-care', 'POST', 'log').ok).toBe(true);
+    expect(checkApiAccess('staff', 'driver-care-recalculate', 'POST').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'driver-care-recalculate', 'POST').ok).toBe(true);
+  });
+
+  it('role hierarchy', () => {
+    expect(meetsMinimumRole('admin', 'staff')).toBe(true);
+    expect(meetsMinimumRole('staff', 'admin')).toBe(false);
+  });
+});
+
+describe('frontend route rbac', () => {
+  it('maps role homes', () => {
+    expect(roleHomePath('staff')).toBe('/staff');
+    expect(roleHomePath('supervisor')).toBe('/supervisor');
+    expect(roleHomePath('admin')).toBe('/admin');
+  });
+
+  it('staff cannot access admin settings or supervisor dashboard', () => {
+    expect(canAccessPath('staff', '/settings')).toBe(false);
+    expect(canAccessPath('staff', '/dashboard')).toBe(false);
+    expect(canAccessPath('staff', '/jobs/add')).toBe(false);
+    expect(canAccessPath('staff', '/admin')).toBe(false);
+    expect(canAccessPath('staff', '/jobs')).toBe(true);
+  });
+
+  it('supervisor cannot access admin routes', () => {
+    expect(canAccessPath('supervisor', '/settings')).toBe(false);
+    expect(canAccessPath('supervisor', '/admin')).toBe(false);
+    expect(canAccessPath('supervisor', '/dashboard')).toBe(true);
+    expect(canAccessPath('supervisor', '/jobs/add')).toBe(true);
+  });
+
+  it('admin can access all guarded routes', () => {
+    expect(canAccessPath('admin', '/settings')).toBe(true);
+    expect(canAccessPath('admin', '/dashboard')).toBe(true);
+    expect(canAccessPath('admin', '/admin')).toBe(true);
+  });
+
+  it('minimum roles for sensitive paths', () => {
+    expect(minimumRoleForPath('/settings')).toBe('admin');
+    expect(minimumRoleForPath('/dashboard')).toBe('supervisor');
+    expect(minimumRoleForPath('/matching/candidates')).toBe('staff');
+  });
+});

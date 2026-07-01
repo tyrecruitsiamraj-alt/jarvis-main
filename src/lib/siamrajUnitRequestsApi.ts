@@ -31,6 +31,19 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
   return readJsonSafe<JobRequest>(r);
 }
 
+/** บันทึกผู้รับผิดชอบ (สรรหา/คัดสรร) ของใบขอ Siamraj — เก็บใน PostgreSQL ฝั่ง Jarvis */
+export async function saveSiamrajUnitAssignment(
+  requestNo: string,
+  payload: { recruiter_name?: string | null; screener_name?: string | null },
+): Promise<void> {
+  const r = await apiFetch('/api/siamraj/unit-assignments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_no: requestNo, ...payload }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกผู้รับผิดชอบไม่สำเร็จ'));
+}
+
 export function isSiamrajJob(job: JobRequest): boolean {
   return job.source === 'siamraj' || job.id.startsWith('siamraj:') || job.id.startsWith('siamraj-sql:');
 }

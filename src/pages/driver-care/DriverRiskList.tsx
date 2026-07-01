@@ -35,14 +35,15 @@ const DriverRiskList: React.FC = () => {
     [riskLevel, site, actionStatus, search],
   );
 
-  const { data = [], isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['driver-care', 'risk-list', filters],
     queryFn: () => fetchDriverRiskList(filters),
   });
 
+  const items = data?.items ?? [];
   const sites = useMemo(
-    () => Array.from(new Set(data.map((d) => d.siteName).filter((s) => s && s !== '—'))).sort(),
-    [data],
+    () => Array.from(new Set(items.map((d) => d.siteName).filter((s) => s && s !== '—'))).sort(),
+    [items],
   );
 
   const handleSave = async (input: DriverActionLogInput) => {
@@ -85,8 +86,23 @@ const DriverRiskList: React.FC = () => {
           </select>
         </div>
 
-        {isLoading && <p className="text-sm text-muted-foreground">กำลังโหลด…</p>}
-        {error && <p className="text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p>}
+        {isLoading && (
+          <p className="text-sm text-muted-foreground rounded-xl border border-border/60 bg-secondary/20 px-3 py-2">
+            กำลังโหลด…
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+            {error instanceof Error ? error.message : String(error)}
+          </p>
+        )}
+        {data && data.needsRecalculation && (
+          <p className="text-sm text-amber-800 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+            {data.hasScores
+              ? `แสดงคะแนนวันที่ ${data.scoreDate} — ยังไม่มีคะแนนวันนี้ (${data.businessDate})`
+              : 'ยังไม่มีคะแนนความเสี่ยง — หัวหน้างานต้องรันคำนวณจากหน้า Driver Care'}
+          </p>
+        )}
 
         <div className="overflow-x-auto glass-card rounded-xl border border-border">
           <table className="min-w-full text-xs">
@@ -104,12 +120,14 @@ const DriverRiskList: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {data.length === 0 && !isLoading ? (
+              {items.length === 0 && !isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">ไม่พบข้อมูล — รัน seed และคำนวณความเสี่ยง</td>
+                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                    {data?.hasScores ? 'ไม่พบข้อมูลตามตัวกรอง' : 'ยังไม่มีคะแนนความเสี่ยง — รันคำนวณจากหน้า Driver Care'}
+                  </td>
                 </tr>
               ) : (
-                data.map((row) => (
+                items.map((row) => (
                   <tr key={row.riskScoreId} className="border-b border-border/50 hover:bg-secondary/20">
                     <td className="px-3 py-2 font-medium whitespace-nowrap">{row.driverName}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.employeeCode}</td>
@@ -128,7 +146,7 @@ const DriverRiskList: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <button type="button" onClick={() => setDialogDriver(row)} className="px-2 py-1 rounded-lg bg-orange-500/12 text-orange-700 text-[11px] font-medium whitespace-nowrap">
+                      <button type="button" onClick={() => setDialogDriver(row)} className="px-2 py-1 rounded-lg bg-blue-500/12 text-blue-700 text-[11px] font-medium whitespace-nowrap">
                         บันทึก Action
                       </button>
                     </td>

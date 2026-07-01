@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthStaffCreateSupervisorMutate,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const candidatesTable = tableInAppSchema('candidates');
 
@@ -285,6 +286,12 @@ async function candidatesHandler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 500, 'Failed to create candidate');
       }
 
+      await auditFromAuthed(req, {
+        action: 'candidate.create',
+        entityType: 'candidate',
+        entityId: created.id,
+        after: toCandidateResponse(created),
+      });
       return res.status(201).json(toCandidateResponse(created));
     } catch (e) {
       return handleApiError(res, e, 'candidates POST', { userId: req.user.sub });
@@ -427,6 +434,13 @@ async function candidatesHandler(req: AuthedReq, res: ApiRes) {
 
       const updated = rows[0];
       if (!updated) return sendError(res, 500, 'Failed to update candidate');
+      await auditFromAuthed(req, {
+        action: 'candidate.update',
+        entityType: 'candidate',
+        entityId: id,
+        before: toCandidateResponse(cur),
+        after: toCandidateResponse(updated),
+      });
       return res.status(200).json(toCandidateResponse(updated));
     } catch (e) {
       return handleApiError(res, e, 'candidates PATCH', { userId: req.user.sub });
@@ -437,12 +451,30 @@ async function candidatesHandler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getString(req.query?.id);
       if (!id) return sendError(res, 400, 'Bad request', 'Query id is required');
-      const { rows } = await dbQuery<{ id: string }>(
-        `delete from ${candidatesTable} where id = $1 returning id`,
+
+      const { rows: existingRows } = await dbQuery<CandidateRow>(
+        `select * from ${candidatesTable} where id = $1 limit 1`,
         [id],
       );
-      if (rows.length === 0) return sendError(res, 404, 'Not found', 'Candidate not found');
-      return res.status(200).json({ ok: true, id: rows[0].id });
+      const cur = existingRows[0];
+      if (!cur) return sendError(res, 404, 'Not found', 'Candidate not found');
+
+      // Soft archive — avoids hard delete and preserves assignment history.
+      const { rows } = await dbQuery<CandidateRow>(
+        `update ${candidatesTable} set status = 'drop' where id = $1 returning *`,
+        [id],
+      );
+      const archived = rows[0];
+      if (!archived) return sendError(res, 500, 'Failed to archive candidate');
+
+      await auditFromAuthed(req, {
+        action: 'candidate.archive',
+        entityType: 'candidate',
+        entityId: id,
+        before: toCandidateResponse(cur),
+        after: toCandidateResponse(archived),
+      });
+      return res.status(200).json({ ok: true, id: archived.id, archived: true });
     } catch (e) {
       return handleApiError(res, e, 'candidates DELETE', { userId: req.user.sub });
     }
@@ -451,4 +483,4 @@ async function candidatesHandler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuthStaffCreateSupervisorMutate(candidatesHandler);
+export default withRbac(candidatesHandler, 'candidates');

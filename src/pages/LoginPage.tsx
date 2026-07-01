@@ -17,10 +17,14 @@ import {
 } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import type { UserRole } from '@/types';
+
+// ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
+const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithDevRole } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -52,6 +56,20 @@ const LoginPage: React.FC = () => {
       else navigate('/', { replace: true });
     } catch {
       setError('เข้าสู่ระบบไม่สำเร็จ — ลองใหม่อีกครั้ง');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDevRole = async (role: UserRole) => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const msg = await signInWithDevRole(role);
+      if (msg) setError(msg);
+      else navigate('/', { replace: true });
+    } catch {
+      setError('เข้าสู่ระบบด้วยสิทธิ์ไม่สำเร็จ — ตรวจสอบว่า API ทำงานและ JARVIS_DEV_ROLE_LOGIN=true');
     } finally {
       setSubmitting(false);
     }
@@ -123,8 +141,8 @@ const LoginPage: React.FC = () => {
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
       {/* ambient orbs */}
-      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-orange-orb opacity-40 blur-sm" aria-hidden />
-      <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-orange-orb opacity-25 blur-md" aria-hidden />
+      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-blue-orb opacity-40 blur-sm" aria-hidden />
+      <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-blue-orb opacity-25 blur-md" aria-hidden />
 
       <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center gap-6 overflow-y-auto p-4 py-8 sm:p-6 sm:py-10 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
         {/* Left — glass login */}
@@ -201,7 +219,7 @@ const LoginPage: React.FC = () => {
                     </Label>
                     <button
                       type="button"
-                      className="text-xs font-medium text-orange-600 hover:underline underline-offset-4 touch-manipulation"
+                      className="text-xs font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation"
                       onClick={() => {
                         setForgotEmail(email);
                         setForgotMsg(null);
@@ -346,6 +364,27 @@ const LoginPage: React.FC = () => {
               </p>
             ) : null}
 
+            {devRoleEntryEnabled ? (
+              <div className="space-y-2 rounded-2xl border border-dashed border-orange-300/60 bg-orange-50/40 p-3">
+                <p className="text-xs font-medium text-orange-900 text-center">
+                  Dev — เข้าเร็วตามสิทธิ์ (ไม่ต้องกรอกรหัส)
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['staff', 'supervisor', 'admin'] as UserRole[]).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => void handleDevRole(role)}
+                      className="rounded-full border border-orange-200 bg-white/80 px-2 py-2 text-[11px] font-semibold capitalize text-orange-900 hover:bg-white disabled:opacity-50"
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <button
               type="button"
               disabled
@@ -357,7 +396,7 @@ const LoginPage: React.FC = () => {
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
             ต้องการสมัครงานภายนอก?{' '}
-            <Link to="/apply" className="font-medium text-orange-600 hover:underline underline-offset-4 touch-manipulation">
+            <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
               ดูบอร์ดประกาศรับสมัคร
             </Link>
           </p>
@@ -400,12 +439,12 @@ const LoginPage: React.FC = () => {
               </Link>
             </div>
 
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-orange-100/20" aria-hidden />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-blue-100/20" aria-hidden />
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
             ต้องการสมัครงานภายนอก?{' '}
-            <Link to="/apply" className="font-medium text-orange-600 hover:underline underline-offset-4 touch-manipulation">
+            <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
               ดูบอร์ดประกาศรับสมัคร
             </Link>
           </p>

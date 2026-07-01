@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
+import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
 import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
 import { isConfiguredDemoMode } from '@/lib/demoMode';
@@ -53,7 +54,7 @@ function jobSearchBlob(j: JobRequest): string {
   }
   if (prov) extra += ` ${prov}`;
   return normSearch(
-    `${j.unit_name} ${addr} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.work_schedule || ''}${extra}`,
+    `${j.unit_name} ${addr} ${j.job_description_code_1 || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.work_schedule || ''}${extra}`,
   );
 }
 
@@ -77,7 +78,7 @@ const PublicJobBoardPage: React.FC = () => {
       })
       .then((data) => {
         if (cancelled) return;
-        const arr = Array.isArray(data) ? data : [];
+        const arr = Array.isArray(data) ? enrichJobsWithUrgency(data) : [];
         apiJobsRef.current = arr;
         setJobs(isConfiguredDemoMode() ? mergeJobSources(arr, getJobs()) : arr);
       })
@@ -158,10 +159,10 @@ const PublicJobBoardPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative border-b border-white/50 bg-gradient-to-b from-orange-100/30 via-transparent to-transparent">
+    <div className="relative border-b border-white/50 bg-gradient-to-b from-blue-100/30 via-transparent to-transparent">
       <div className="mx-auto max-w-6xl px-4 md:px-6 pt-10 pb-4 md:pt-14 md:pb-8">
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-300/40 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-700 mb-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 mb-4">
             <Sparkles className="h-3.5 w-3.5" />
             บอร์ดประกาศรับสมัคร
           </div>
@@ -246,11 +247,11 @@ const PublicJobBoardPage: React.FC = () => {
           {filtered.map((job) => (
             <Card
               key={job.id}
-              className="group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-orange-300/40"
+              className="group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40"
             >
               <CardHeader className="space-y-3 pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-orange-600 transition-colors">
+                  <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                     {job.unit_name}
                   </h2>
                   {job.urgency === 'urgent' && (
@@ -261,16 +262,22 @@ const PublicJobBoardPage: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                    {JOB_TYPE_LABELS[job.job_type]}
+                    {job.job_description_code_1 || JOB_TYPE_LABELS[job.job_type]}
                   </span>
-                  <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {JOB_CATEGORY_LABELS[job.job_category]}
-                  </span>
+                  {job.job_description_code_1 && job.job_type ? (
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      {JOB_TYPE_LABELS[job.job_type]}
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      {JOB_CATEGORY_LABELS[job.job_category]}
+                    </span>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 pb-4">
                 <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
-                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600/70" />
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
                   {job.location_address}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -333,11 +340,17 @@ const PublicJobBoardPage: React.FC = () => {
             <div className="space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium">
-                  {JOB_TYPE_LABELS[selected.job_type]}
+                  {selected.job_description_code_1 || JOB_TYPE_LABELS[selected.job_type]}
                 </span>
-                <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">
-                  {JOB_CATEGORY_LABELS[selected.job_category]}
-                </span>
+                {selected.job_description_code_1 ? (
+                  <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">
+                    {JOB_TYPE_LABELS[selected.job_type]}
+                  </span>
+                ) : (
+                  <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">
+                    {JOB_CATEGORY_LABELS[selected.job_category]}
+                  </span>
+                )}
                 {selected.urgency === 'urgent' && (
                   <span className="rounded-lg bg-destructive/15 px-2.5 py-1 text-xs font-semibold text-destructive">
                     รับด่วน
@@ -375,6 +388,12 @@ const PublicJobBoardPage: React.FC = () => {
                     <dd>
                       {selected.age_range_min ?? '—'} – {selected.age_range_max ?? '—'} ปี
                     </dd>
+                  </div>
+                )}
+                {selected.gender_requirement && (
+                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                    <dt className="text-muted-foreground">เพศ</dt>
+                    <dd>{selected.gender_requirement}</dd>
                   </div>
                 )}
                 {selected.vehicle_required && (

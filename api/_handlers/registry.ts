@@ -19,11 +19,14 @@ import logoutHandler from './auth/logout.js';
 import meHandler from './auth/me.js';
 import registerHandler from './auth/register.js';
 import forgotPasswordHandler from './auth/forgot-password.js';
+import resetPasswordHandler from './auth/reset-password.js';
 import changePasswordHandler from './auth/change-password.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 import driverCareHandler from './driver-care.js';
+import driverCareRecalculateHandler from './driver-care-recalculate.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
+import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import outboundIpHandler from './diagnostics/outbound-ip.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
@@ -45,7 +48,9 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/employees': employeesHandler as ApiHandler,
   '/api/geocode': geocodeHandler as ApiHandler,
   '/api/driver-care': driverCareHandler as ApiHandler,
+  '/api/driver-care/recalculate': driverCareRecalculateHandler as ApiHandler,
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
+  '/api/siamraj/unit-assignments': siamrajUnitAssignmentsHandler as ApiHandler,
   '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
@@ -55,5 +60,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/auth/me': meHandler as ApiHandler,
   '/api/auth/register': registerHandler as ApiHandler,
   '/api/auth/forgot-password': forgotPasswordHandler as ApiHandler,
+  '/api/auth/reset-password': resetPasswordHandler as ApiHandler,
   '/api/auth/change-password': changePasswordHandler as ApiHandler,
 };

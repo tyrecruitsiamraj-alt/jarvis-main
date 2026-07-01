@@ -19,7 +19,7 @@ export function parseJobsPayload(raw: unknown): JobRequest[] {
   return [];
 }
 
-/** Merge mock/local jobs with API list (same id: API wins). Pre-Check never runs on an empty pool. */
+/** Merge local demo jobs with API list (same id: API wins). Demo / pre-check only. */
 export function mergeJobsForPrecheck(apiJobs: JobRequest[], localJobs: JobRequest[]): JobRequest[] {
   const map = new Map<string, JobRequest>();
   for (const j of localJobs) {

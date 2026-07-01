@@ -1,7 +1,6 @@
 /**
  * Issue a session as the first active DB user matching role (no password).
- * Default: allowed unless JARVIS_DEV_ROLE_LOGIN is explicitly false/0/no/off.
- * For strict production, set JARVIS_DEV_ROLE_LOGIN=false.
+ * Fail-closed: only when NOT production and JARVIS_DEV_ROLE_LOGIN=true.
  */
 import { dbQuery } from '../../_lib/postgres.js';
 import {
@@ -13,6 +12,7 @@ import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/
 import { readJsonBody } from '../../_lib/body.js';
 import type { UserRole } from '../../_lib/auth.js';
 import { tableInAppSchema } from '../../_lib/schema.js';
+import { isDevRoleLoginAllowed } from '../../_lib/runtime.js';
 
 const usersTable = tableInAppSchema('users');
 
@@ -45,33 +45,14 @@ function toUserResponse(row: UserRow) {
   };
 }
 
-function devRoleLoginAllowed(): boolean {
-  const raw = process.env.JARVIS_DEV_ROLE_LOGIN;
-  if (raw === undefined || String(raw).trim() === '') return true;
-  const v = String(raw).toLowerCase().trim();
-  if (v === 'false' || v === '0' || v === 'no' || v === 'off') return false;
-  return v === 'true' || v === '1' || v === 'yes';
-}
-
 export default async function handler(req: ApiReq, res: ApiRes) {
-  let method = (req.method || 'GET').toUpperCase();
-  if (method !== 'POST' && req.body && typeof req.body === 'object' && req.body !== null) {
-    const b = req.body as Record<string, unknown>;
-    if (b.role === 'admin' || b.role === 'supervisor' || b.role === 'staff') {
-      method = 'POST';
-    }
-  }
+  const method = (req.method || 'GET').toUpperCase();
   if (method !== 'POST') {
     return sendError(res, 405, 'Method not allowed', 'Use POST with JSON body { "role": "staff"|"supervisor"|"admin" }');
   }
 
-  if (!devRoleLoginAllowed()) {
-    return sendError(
-      res,
-      403,
-      'Forbidden',
-      'Role pick login is disabled (JARVIS_DEV_ROLE_LOGIN=false).',
-    );
+  if (!isDevRoleLoginAllowed()) {
+    return sendError(res, 404, 'Not found', 'Not available');
   }
 
   if (!getJwtSecret()) {
@@ -118,7 +99,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     });
 
     res.setHeader?.('Set-Cookie', buildSetCookieHeader(token, ttl));
-    return res.status(200).json({ user: toUserResponse(row), token });
+    return res.status(200).json({ user: toUserResponse(row) });
   } catch (e) {
     return handleApiError(res, e, 'auth/dev-role');
   }

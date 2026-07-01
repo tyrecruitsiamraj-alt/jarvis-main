@@ -2,8 +2,9 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { User, UserRole } from '@/types';
 import { mockUsers } from '@/data/mockData';
 import {
-  isDemoMode,
   isConfiguredDemoMode,
+  isRuntimeDemoFallback,
+  isRuntimeDemoFallbackEnabled,
   enableRuntimeDemo,
   clearRuntimeDemoFlag,
 } from '@/lib/demoMode';
@@ -12,7 +13,6 @@ import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRem
 import { refreshWorkCalendarFromApi } from '@/lib/workCalendarStore';
 
 const DEMO_STORAGE_KEY = 'jarvis_user_role';
-const AUTH_TOKEN_STORAGE_KEY = 'jarvis_auth_token';
 
 interface AuthContextType {
   user: User | null;
@@ -49,24 +49,15 @@ function isStoredRole(s: string | null): s is UserRole {
 }
 
 function userForDemoRole(role: UserRole): User | null {
-  if (isDemoMode()) {
-    return mockUsers.find((u) => u.role === role) ?? null;
+  return mockUsers.find((u) => u.role === role) ?? null;
+}
+
+function restoreDemoUserFromStorage(): User | null {
+  const saved = localStorage.getItem(DEMO_STORAGE_KEY);
+  if (saved && isStoredRole(saved)) {
+    return userForDemoRole(saved);
   }
-  const name = (import.meta.env.VITE_APP_OPERATOR_NAME as string | undefined)?.trim() || 'Operator';
-  const idByRole: Record<UserRole, string> = {
-    admin: 'local-admin',
-    supervisor: 'local-supervisor',
-    staff: 'local-staff',
-  };
-  return {
-    id: idByRole[role],
-    username: role,
-    full_name: name,
-    email: '',
-    role,
-    is_active: true,
-    created_at: new Date().toISOString().slice(0, 10),
-  };
+  return null;
 }
 
 function mapApiUser(raw: Record<string, unknown>): User | null {
@@ -92,17 +83,17 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    if (!isDemoMode()) return null;
-    const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-    if (saved && isStoredRole(saved)) {
-      return userForDemoRole(saved);
+    if (isConfiguredDemoMode() || isRuntimeDemoFallback()) {
+      return restoreDemoUserFromStorage();
     }
     return null;
   });
-  const [bootstrapping, setBootstrapping] = useState(() => !isDemoMode());
+  const [bootstrapping, setBootstrapping] = useState(
+    () => !isConfiguredDemoMode() && !isRuntimeDemoFallback(),
+  );
 
   useEffect(() => {
-    if (isDemoMode()) {
+    if (isConfiguredDemoMode() || isRuntimeDemoFallback()) {
       setBootstrapping(false);
       return;
     }
@@ -115,16 +106,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!r.ok) {
           if (r.status === 401 || r.status === 403) {
             setUser(null);
-            localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
             clearJobStaffApiCache();
             return;
           }
-          enableRuntimeDemo();
           clearJobStaffApiCache();
-          const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-          if (saved && isStoredRole(saved)) {
-            setUser(userForDemoRole(saved) ?? null);
+          if (isRuntimeDemoFallbackEnabled()) {
+            enableRuntimeDemo();
+            setUser(restoreDemoUserFromStorage());
           } else {
+            clearRuntimeDemoFlag();
             setUser(null);
           }
           return;
@@ -139,12 +129,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else clearJobStaffApiCache();
       } catch {
         if (!cancelled) {
-          enableRuntimeDemo();
           clearJobStaffApiCache();
-          const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-          if (saved && isStoredRole(saved)) {
-            setUser(userForDemoRole(saved) ?? null);
+          if (isRuntimeDemoFallbackEnabled()) {
+            enableRuntimeDemo();
+            setUser(restoreDemoUserFromStorage());
           } else {
+            clearRuntimeDemoFlag();
             setUser(null);
           }
         }
@@ -183,9 +173,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : 'Sign in failed';
       return msg;
     }
-    if (typeof data.token === 'string' && data.token.trim()) {
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token.trim());
-    }
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
@@ -220,9 +207,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ? data.error
             : 'เข้าสู่ระบบด้วยสิทธิ์ไม่สำเร็จ';
       return msg;
-    }
-    if (typeof data.token === 'string' && data.token.trim()) {
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token.trim());
     }
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
@@ -276,7 +260,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (configuredDemo) {
       setUser(null);
       localStorage.removeItem(DEMO_STORAGE_KEY);
-      localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
       return;
     }
     try {
@@ -284,7 +267,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       /* still clear client state */
     }
-    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     clearJobStaffApiCache();
     setUser(null);
   }, []);

@@ -42,12 +42,32 @@ const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch } = useUnitRequestsFeed();
+  const [unitFilter, setUnitFilter] = useState<string>('all');
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
   const [jobDialogItems, setJobDialogItems] = useState<JobDialogItem[]>([]);
 
-  const closedJobs = useMemo(() => jobs.filter((j) => j.status === 'closed'), [jobs]);
-  const activeJobs = useMemo(() => jobs.filter((j) => j.status !== 'closed'), [jobs]);
+  const unitOptions = useMemo(() => {
+    const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
+    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [jobs]);
+
+  const unitCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of jobs) {
+      if (!j.unit_name) continue;
+      m.set(j.unit_name, (m.get(j.unit_name) ?? 0) + 1);
+    }
+    return m;
+  }, [jobs]);
+
+  const scopedJobs = useMemo(() => {
+    if (unitFilter === 'all') return jobs;
+    return jobs.filter((j) => j.unit_name === unitFilter);
+  }, [jobs, unitFilter]);
+
+  const closedJobs = useMemo(() => scopedJobs.filter((j) => j.status === 'closed'), [scopedJobs]);
+  const activeJobs = useMemo(() => scopedJobs.filter((j) => j.status !== 'closed'), [scopedJobs]);
 
   const closedCount = closedJobs.length;
   const activeCount = activeJobs.length;
@@ -72,11 +92,13 @@ const JobDashboard: React.FC = () => {
       <PageHeader
         title="หน่วยงาน"
         subtitle={
-          siamrajPrimary
-            ? dbSource === 'sqlserver'
-              ? 'อ่านใบขอจาก Siamraj SQL Server — อัปเดตเมื่อมีการคีย์'
-              : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
-            : 'จัดการหน่วยงานและใบขอ'
+          unitFilter !== 'all'
+            ? `${scopedJobs.length} ใบขอ · ${unitFilter}`
+            : siamrajPrimary
+              ? dbSource === 'sqlserver'
+                ? 'อ่านใบขอจาก Siamraj SQL Server — อัปเดตเมื่อมีการคีย์'
+                : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
+              : 'จัดการหน่วยงานและใบขอ'
         }
         actions={
           <div className="flex items-center gap-2">
@@ -90,7 +112,7 @@ const JobDashboard: React.FC = () => {
               <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
               รีเฟรช
             </button>
-            {!readOnly && hasPermission('staff') ? (
+            {!readOnly && hasPermission('supervisor') ? (
               <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm">
                 <Plus className="w-4 h-4" /> สร้างงานใหม่
               </button>
@@ -105,13 +127,35 @@ const JobDashboard: React.FC = () => {
             {loadError}
           </div>
         )}
+
+        {!loading && unitOptions.length > 0 && (
+          <div className="flex items-center gap-2 max-w-xl">
+            <label htmlFor="job-dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+              หน่วยงาน
+            </label>
+            <select
+              id="job-dashboard-unit"
+              value={unitFilter}
+              onChange={(e) => setUnitFilter(e.target.value)}
+              className="jarvis-soft-field flex-1"
+            >
+              <option value="all">ทั้งหมด ({jobs.length})</option>
+              {unitOptions.map((u) => (
+                <option key={u} value={u}>
+                  {u} ({unitCounts.get(u) ?? 0})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard
             title="งานทั้งหมด"
-            value={jobs.length}
+            value={scopedJobs.length}
             icon={Briefcase}
             variant="primary"
-            onClick={() => openJobList('งานทั้งหมด', jobs)}
+            onClick={() => openJobList('งานทั้งหมด', scopedJobs)}
           />
           <StatCard
             title="ดำเนินการ"
@@ -134,23 +178,29 @@ const JobDashboard: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/jobs/list')}
-            className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-orange-300/50 text-center"
+            className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-blue-300/50 text-center"
           >
-            <Briefcase className="w-6 h-6 text-orange-600 mx-auto mb-1" />
+            <Briefcase className="w-6 h-6 text-blue-600 mx-auto mb-1" />
             <div className="text-sm font-semibold text-foreground">รายการงานทั้งหมด</div>
           </button>
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">งานล่าสุด</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            งานล่าสุด
+            {unitFilter !== 'all' ? ` · ${unitFilter}` : ''}
+          </h3>
           <div className="space-y-2">
-            {jobs.slice(0, 4).map((j) => (
+            {scopedJobs.length === 0 && !loading ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">ไม่มีใบขอในหน่วยงานนี้</p>
+            ) : (
+              scopedJobs.slice(0, 4).map((j) => (
               <motion.button
                 key={j.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 onClick={() => goToJob(j)}
-                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50 transition-all"
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">
@@ -158,7 +208,7 @@ const JobDashboard: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-2">
                     {j.request_action_name ? (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/12 text-orange-700">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/12 text-blue-700">
                         {j.request_action_name}
                       </span>
                     ) : (
@@ -168,7 +218,11 @@ const JobDashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {j.job_description_code_1 ? `${j.job_description_code_1} • ` : ''}
+                  {j.job_description_code_1 ? `${j.job_description_code_1} • ` : `${JOB_TYPE_LABELS[j.job_type]} • `}
+                  {j.gender_requirement ? `เพศ ${j.gender_requirement} • ` : ''}
+                  {(j.age_range_min != null || j.age_range_max != null)
+                    ? `อายุ ${j.age_range_min ?? '—'}–${j.age_range_max ?? '—'} • `
+                    : ''}
                   {j.resigned_employee_name ? `ลาออก: ${j.resigned_employee_name} • ` : ''}
                   ต้องการ {formatYmdDmyBe(j.required_date)}
                   {j.submittedByName ? ` • ส่งโดย ${j.submittedByName}` : ''}
@@ -179,7 +233,8 @@ const JobDashboard: React.FC = () => {
                   </div>
                 )}
               </motion.button>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

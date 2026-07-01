@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import { getDatabaseUrl, getPgSchema, isPgSslEnabled } from './env.js';
 
 type PoolState = {
@@ -54,5 +54,65 @@ export async function dbQuery<T>(
   const pool = getOrCreatePool();
   const result = await pool.query<T>(text, params);
   return { rows: result.rows };
+}
+
+/** Run queries on an existing transaction client. */
+export async function dbQueryInTx<T extends QueryResultRow>(
+  client: PoolClient,
+  text: string,
+  params?: unknown[],
+): Promise<{ rows: T[] }> {
+  const result = await client.query<T>(text, params);
+  return { rows: result.rows };
+}
+
+async function setSearchPath(client: PoolClient): Promise<void> {
+  const schema = getPgSchema();
+  if (schema) {
+    await client.query(`SET search_path TO "${schema}"`);
+  }
+}
+
+/**
+ * Atomic transaction wrapper. Rolls back on any thrown error.
+ * Use dbQueryInTx inside the callback — do not mix with dbQuery in the same unit of work.
+ */
+export async function dbTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const pool = getOrCreatePool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await setSearchPath(client);
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (e) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* connection may already be broken */
+    }
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export function isPgUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    (e as { code: string }).code === '23505'
+  );
+}
+
+export function isPgForeignKeyViolation(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    (e as { code: string }).code === '23503'
+  );
 }
 

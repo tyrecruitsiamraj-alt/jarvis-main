@@ -133,7 +133,7 @@ const MonthlyPlanner: React.FC = () => {
                               'w-6 h-6 rounded-md mx-auto cursor-pointer transition-colors',
                               sunday
                                 ? 'bg-red-500/15 border border-red-400/25 hover:bg-red-500/25'
-                                : 'bg-secondary/30 hover:bg-orange-500/15',
+                                : 'bg-secondary/30 hover:bg-blue-500/15',
                             )}
                             title={sunday ? 'วันหยุด (อาทิตย์) — กดเพื่อมอบหมายงาน' : 'กดเพื่อมอบหมายงาน'}
                           />

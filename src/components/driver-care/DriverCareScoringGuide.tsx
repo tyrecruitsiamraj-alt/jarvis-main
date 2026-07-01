@@ -101,7 +101,7 @@ const DriverCareScoringGuide: React.FC<{ defaultOpen?: boolean; className?: stri
         aria-expanded={open}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <Scale className="w-4 h-4 text-orange-600 shrink-0" />
+          <Scale className="w-4 h-4 text-blue-600 shrink-0" />
           <div>
             <h3 className="text-sm font-semibold text-foreground">เกณฑ์การคิดคะแนนความเสี่ยง</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -153,7 +153,7 @@ const DriverCareScoringGuide: React.FC<{ defaultOpen?: boolean; className?: stri
               <div key={block.title} className="rounded-xl border border-white/60 bg-white/35 p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
                   <h4 className="text-xs font-semibold text-foreground">{block.title}</h4>
-                  <span className="text-[10px] font-medium text-orange-700 bg-orange-500/10 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-medium text-blue-700 bg-blue-500/10 px-2 py-0.5 rounded-full">
                     {block.cap}
                   </span>
                 </div>

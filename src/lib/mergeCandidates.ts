@@ -22,5 +22,5 @@ export function mergeCandidateSources(apiItems: Candidate[], localItems: Candida
 }
 
 export function getMergedCandidatesInitial(): Candidate[] {
-  return mergeCandidateSources([], getCandidates());
+  return isDemoMode() ? mergeCandidateSources([], getCandidates()) : [];
 }

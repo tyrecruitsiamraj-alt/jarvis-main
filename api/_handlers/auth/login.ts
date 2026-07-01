@@ -4,10 +4,12 @@ import {
   buildSetCookieHeader,
   verifyPassword,
   getJwtSecret,
+  type UserRole,
 } from '../../_lib/auth.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
-import type { UserRole } from '../../_lib/auth.js';
+import { rateLimitOrReject } from '../../_lib/rateLimit.js';
+import { auditFromAnonymous } from '../../_lib/audit.js';
 
 type UserRow = {
   id: string;
@@ -49,6 +51,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     return sendError(res, 503, 'Service unavailable', 'AUTH_JWT_SECRET is not configured');
   }
 
+  if (!rateLimitOrReject(req, res, 'auth:login', 10, 15 * 60 * 1000)) return;
+
   try {
     const raw = await readJsonBody(req);
     if (typeof raw !== 'object' || raw === null) {
@@ -73,14 +77,32 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
     const row = rows[0];
     if (!row || !isUserRole(row.role)) {
+      await auditFromAnonymous(req, { userName: email }, {
+        action: 'auth.login.failed',
+        entityType: 'auth',
+        entityId: 'login',
+        after: { reason: 'invalid_credentials' },
+      });
       return sendError(res, 401, 'Unauthorized', 'Invalid email or password');
     }
     if (!row.is_active) {
+      await auditFromAnonymous(req, { userId: row.id, userName: email, userRole: row.role }, {
+        action: 'auth.login.failed',
+        entityType: 'auth',
+        entityId: row.id,
+        after: { reason: 'account_disabled' },
+      });
       return sendError(res, 403, 'Forbidden', 'Account is disabled');
     }
 
     const ok = await verifyPassword(password, row.password_hash);
     if (!ok) {
+      await auditFromAnonymous(req, { userId: row.id, userName: email, userRole: row.role }, {
+        action: 'auth.login.failed',
+        entityType: 'auth',
+        entityId: row.id,
+        after: { reason: 'invalid_credentials' },
+      });
       return sendError(res, 401, 'Unauthorized', 'Invalid email or password');
     }
 
@@ -92,7 +114,13 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     });
 
     res.setHeader?.('Set-Cookie', buildSetCookieHeader(token, ttl));
-    return res.status(200).json({ user: toUserResponse(row), token });
+    await auditFromAnonymous(req, { userId: row.id, userName: row.email, userRole: row.role }, {
+      action: 'auth.login.success',
+      entityType: 'auth',
+      entityId: row.id,
+      after: { role: row.role },
+    });
+    return res.status(200).json({ user: toUserResponse(row) });
   } catch (e) {
     return handleApiError(res, e, 'auth/login');
   }

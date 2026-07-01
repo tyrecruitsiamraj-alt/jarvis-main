@@ -5,12 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { cn } from '@/lib/utils';
-import { isConfiguredDemoMode, isRuntimeDemoFallback } from '@/lib/demoMode';
+import { isConfiguredDemoMode, isRuntimeDemoFallback, isRuntimeDemoFallbackEnabled } from '@/lib/demoMode';
 import { reloadForLiveData, tryRecoverFromRuntimeDemo } from '@/lib/apiRecovery';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import BottomDockNav from '@/components/layout/bottom-nav/BottomDockNav';
 import { DOCK_NAV_ITEMS, isDockPathActive } from '@/components/layout/bottom-nav/dockNavConfig';
+import { filterByMinimumRole } from '@/lib/rbac';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
@@ -18,11 +19,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
-  const [runtimeFallback, setRuntimeFallback] = useState(() => isRuntimeDemoFallback());
+  const navItems = filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
+  const [runtimeFallback, setRuntimeFallback] = useState(
+    () => isRuntimeDemoFallbackEnabled() && isRuntimeDemoFallback(),
+  );
   const [recovering, setRecovering] = useState(false);
 
   const attemptRecovery = async (reloadOnSuccess = true) => {
-    if (!isRuntimeDemoFallback()) {
+    if (!isRuntimeDemoFallbackEnabled() || !isRuntimeDemoFallback()) {
       setRuntimeFallback(false);
       return;
     }
@@ -54,7 +58,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     };
   }, [runtimeFallback]);
 
-  const showDemoBanner = isConfiguredDemoMode() || runtimeFallback;
+  const showDemoBanner = isConfiguredDemoMode() || (isRuntimeDemoFallbackEnabled() && runtimeFallback);
 
   return (
     <div
@@ -98,7 +102,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <BrandTitle className="text-lg font-bold text-foreground truncate max-w-[200px] xl:max-w-none" />
           </button>
           <nav className="flex items-center gap-0.5 xl:gap-1 flex-wrap min-w-0" aria-label="เมนูหลัก">
-            {DOCK_NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const active = isDockPathActive(item.path, location.pathname);
               return (
@@ -108,7 +112,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   onClick={() => navigate(item.path)}
                   className={cn(
                     'flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all touch-manipulation',
-                    active ? 'bg-orange-500/12 text-orange-700' : 'text-muted-foreground hover:text-foreground hover:bg-white/50',
+                    active ? 'bg-blue-500/12 text-blue-700' : 'text-muted-foreground hover:text-foreground hover:bg-white/50',
                   )}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
@@ -121,18 +125,18 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
           <NotificationPanel />
           <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[220px]">
-            <UserCircle className="w-4 h-4 text-orange-600 shrink-0" />
+            <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0">{user?.role}</span>
           </div>
           <div className="flex xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70">
-            <UserCircle className="w-4 h-4 text-orange-600" />
-            <span className="text-xs font-medium text-orange-700 uppercase">{user?.role}</span>
+            <UserCircle className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-medium text-blue-700 uppercase">{user?.role}</span>
           </div>
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-full text-muted-foreground hover:text-orange-600 hover:bg-white/60 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-white/60 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="เปลี่ยนรหัสผ่าน"
             title="เปลี่ยนรหัสผ่าน"
           >
@@ -163,7 +167,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-lg text-muted-foreground hover:text-orange-600 hover:bg-orange-500/12 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/12 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="เปลี่ยนรหัสผ่าน"
           >
             <KeyRound className="w-4 h-4" />
@@ -179,13 +183,13 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </header>
 
-      <main className="relative flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-[7.5rem] lg:pb-8">
+      <main className="relative flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-[7.5rem] lg:pb-8 overflow-x-clip">
         <div className="jarvis-page-orb top-0 right-4 h-48 w-48 opacity-[0.18] pointer-events-none hidden md:block" aria-hidden />
         {children}
       </main>
 
       <div className="lg:hidden">
-        <BottomDockNav pathname={location.pathname} />
+        <BottomDockNav pathname={location.pathname} items={navItems} />
       </div>
     </div>
   );

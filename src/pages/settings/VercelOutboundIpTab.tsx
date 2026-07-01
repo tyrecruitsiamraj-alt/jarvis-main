@@ -153,7 +153,7 @@ const VercelOutboundIpTab: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Globe className="w-4 h-4 text-orange-600" />
+              <Globe className="w-4 h-4 text-blue-600" />
               IP ขาออก (Outbound) สำหรับ Firewall Allowlist
             </h3>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -193,7 +193,7 @@ const VercelOutboundIpTab: React.FC = () => {
       </div>
 
       {latest && latest.targets.mssql.configured ? (
-        <section className="rounded-xl border-2 border-orange-400/40 bg-orange-500/10 p-4 space-y-2">
+        <section className="rounded-xl border-2 border-blue-400/40 bg-blue-500/10 p-4 space-y-2">
           <p className="text-sm font-semibold text-foreground">Allowlist สำหรับ MSSQL ของคุณ</p>
           <p className="text-xs font-mono text-muted-foreground">
             {latest.targets.mssql.host}:{latest.targets.mssql.port} → {latest.targets.mssql.database}
@@ -258,7 +258,7 @@ const VercelOutboundIpTab: React.FC = () => {
       <section className="glass-card rounded-xl border border-border p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Database className="w-4 h-4 text-orange-600" />
+            <Database className="w-4 h-4 text-blue-600" />
             IP ที่เคย Connect (เก็บใน Database)
           </h4>
           {allKnownIps.length > 0 ? (

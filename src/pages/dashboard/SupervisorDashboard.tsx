@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
@@ -27,6 +27,14 @@ import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO } from 'date-fns';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
+import { navigateToUnitRequest } from '@/lib/jobNavigation';
+import {
+  extractJobRole,
+  filterUnitRequestsByJobRole,
+  jobRoleFilterOptions,
+  jobRoleCounts,
+  type SiamrajJobRoleFilter,
+} from '@/lib/siamrajUnitFilters';
 
 type DetailDialogItem = {
   id: string;
@@ -44,6 +52,8 @@ function formatBaht(n: number) {
 
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [unitFilter, setUnitFilter] = useState<string>('all');
+  const [jobRoleFilter, setJobRoleFilter] = useState<SiamrajJobRoleFilter>('all');
   const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
   const [screenerFilter, setScreenerFilter] = useState<string>('all');
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
@@ -70,12 +80,60 @@ const SupervisorDashboard: React.FC = () => {
     return buildScreenerNameOptions(jobs);
   }, [staffRosterRev, jobs]);
 
-  const filteredJobs = useMemo(() => {
-    let result = jobs;
-    if (recruiterFilter !== 'all') result = result.filter((j) => j.recruiter_name === recruiterFilter);
-    if (screenerFilter !== 'all') result = result.filter((j) => j.screener_name === screenerFilter);
-    return result;
-  }, [jobs, recruiterFilter, screenerFilter]);
+  const unitOptions = useMemo(() => {
+    const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
+    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [jobs]);
+
+  const unitCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of jobs) {
+      if (!j.unit_name) continue;
+      m.set(j.unit_name, (m.get(j.unit_name) ?? 0) + 1);
+    }
+    return m;
+  }, [jobs]);
+
+  const jobRoleOptions = useMemo(() => jobRoleFilterOptions(jobs), [jobs]);
+
+  const applyDashboardFilters = useCallback(
+    (source: JobRequest[], skip: Array<'unit' | 'role' | 'recruiter' | 'screener'>) => {
+      let result = source;
+      if (!skip.includes('unit') && unitFilter !== 'all') {
+        result = result.filter((j) => j.unit_name === unitFilter);
+      }
+      if (!skip.includes('role') && jobRoleFilter !== 'all') {
+        result = filterUnitRequestsByJobRole(result, jobRoleFilter);
+      }
+      if (!skip.includes('recruiter') && recruiterFilter !== 'all') {
+        result = result.filter((j) => j.recruiter_name === recruiterFilter);
+      }
+      if (!skip.includes('screener') && screenerFilter !== 'all') {
+        result = result.filter((j) => j.screener_name === screenerFilter);
+      }
+      return result;
+    },
+    [unitFilter, jobRoleFilter, recruiterFilter, screenerFilter],
+  );
+
+  const filteredJobs = useMemo(() => applyDashboardFilters(jobs, []), [jobs, applyDashboardFilters]);
+
+  /** แยกตามหน่วยงาน — เคารพฟิลเตอร์อื่น ยกเว้นหน่วยงาน */
+  const jobsScopedForUnitBreakdown = useMemo(
+    () => applyDashboardFilters(jobs, ['unit']),
+    [jobs, applyDashboardFilters],
+  );
+
+  /** แยกตามลักษณะงาน — เคารพฟิลเตอร์อื่น ยกเว้นลักษณะงาน */
+  const jobsScopedForRoleBreakdown = useMemo(
+    () => applyDashboardFilters(jobs, ['role']),
+    [jobs, applyDashboardFilters],
+  );
+
+  const roleBreakdown = useMemo(() => {
+    const counts = jobRoleCounts(jobsScopedForRoleBreakdown);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'));
+  }, [jobsScopedForRoleBreakdown]);
 
   const totalJobs = filteredJobs.length;
   const urgentJobs = filteredJobs.filter((j) => j.urgency === 'urgent');
@@ -87,7 +145,7 @@ const SupervisorDashboard: React.FC = () => {
   const openUrgent = useMemo(() => openJobs.filter((j) => j.urgency === 'urgent'), [openJobs]);
   const openAdvance = useMemo(() => openJobs.filter((j) => j.urgency === 'advance'), [openJobs]);
 
-  const byJobType = (type: string) => filteredJobs.filter((j) => j.job_type === type);
+  const byJobRole = (role: string) => filteredJobs.filter((j) => extractJobRole(j) === role);
   const byJobCategory = (cat: string) => filteredJobs.filter((j) => j.job_category === cat);
 
   const safeJobDate = (ymd?: string | null) => {
@@ -158,7 +216,7 @@ const SupervisorDashboard: React.FC = () => {
   const jobToItem = (j: JobRequest): DetailDialogItem => {
     const pen = j.total_penalty ?? 0;
     const sub = [
-      `${JOB_TYPE_LABELS[j.job_type]} • ${JOB_CATEGORY_LABELS[j.job_category]}`,
+      `${extractJobRole(j)} • ${JOB_CATEGORY_LABELS[j.job_category]}`,
       `${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'} • อายุใบขอ ${getAgeDays(j)} วัน`,
       `รายได้ ${formatBaht(j.total_income ?? 0)}`,
       pen > 0 ? `ค่าปรับสะสม ${formatBaht(pen)}${j.days_without_worker ? ` • ขาดคน ${j.days_without_worker} วัน` : ''}` : null,
@@ -174,7 +232,7 @@ const SupervisorDashboard: React.FC = () => {
         j.status === 'closed' ? 'success' : j.status === 'cancelled' ? 'destructive' : 'warning',
       onClick: () => {
         setDialogOpen(false);
-        navigate(`/jobs/${j.id}`);
+        navigateToUnitRequest(j, navigate);
       },
     };
   };
@@ -188,7 +246,7 @@ const SupervisorDashboard: React.FC = () => {
   const SectionHeader = ({ id, title, icon: Icon }: { id: string; title: string; icon: React.ElementType }) => (
     <button type="button" onClick={() => toggleSection(id)} className="w-full flex items-center justify-between py-2 text-left">
       <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <Icon className="w-4 h-4 text-orange-600" /> {title}
+        <Icon className="w-4 h-4 text-blue-600" /> {title}
       </h3>
       {expandedSection === id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
     </button>
@@ -198,7 +256,14 @@ const SupervisorDashboard: React.FC = () => {
     <div>
       <PageHeader
         title="Dashboard"
-        subtitle="ภาพรวมสำหรับผู้บริหาร — งาน รายได้ และค่าปรับ (ตามฟิลเตอร์ด้านล่าง)"
+        subtitle={
+          [
+            unitFilter !== 'all' ? `หน่วยงาน: ${unitFilter}` : null,
+            jobRoleFilter !== 'all' ? `ลักษณะงาน: ${jobRoleFilter}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'ภาพรวมสำหรับผู้บริหาร — งาน รายได้ และค่าปรับ (ตามฟิลเตอร์ด้านล่าง)'
+        }
         actions={
           <button
             type="button"
@@ -219,11 +284,40 @@ const SupervisorDashboard: React.FC = () => {
         {/* ฟิลเตอร์ — แถวเดียว อ่านง่าย */}
         <div className="rounded-xl border border-border/80 bg-card/50 p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Filter className="w-4 h-4 text-orange-600 shrink-0" />
+            <Filter className="w-4 h-4 text-blue-600 shrink-0" />
             <span>ขอบเขตข้อมูล</span>
             <span className="text-xs font-normal text-muted-foreground">เลือกแล้วตัวเลขด้านล่างจะเปลี่ยนตามทันที</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">หน่วยงาน</label>
+              <select
+                value={unitFilter}
+                onChange={(e) => setUnitFilter(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="all">ทั้งหมด ({jobs.length})</option>
+                {unitOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {u} ({unitCounts.get(u) ?? 0})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">ลักษณะงาน</label>
+              <select
+                value={jobRoleFilter}
+                onChange={(e) => setJobRoleFilter(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                {jobRoleOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">เจ้าหน้าที่สรรหา</label>
               <select
@@ -458,7 +552,7 @@ const SupervisorDashboard: React.FC = () => {
         <details className="group rounded-xl border border-border bg-card/40 open:bg-card/60 transition-colors">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2">
-              <ListFilter className="w-4 h-4 text-orange-600" />
+              <ListFilter className="w-4 h-4 text-blue-600" />
               รายละเอียดเชิงลึก (แยกประเภท บุคลากร ตารางเต็ม)
             </span>
             <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -466,22 +560,39 @@ const SupervisorDashboard: React.FC = () => {
           <div className="px-4 pb-5 pt-0 space-y-6 border-t border-border/60">
             <div>
               <SectionHeader id="jobType" title="แยกตามลักษณะงาน" icon={Briefcase} />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-                {(['thai_executive', 'foreign_executive', 'central', 'valet_parking'] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => showJobList(JOB_TYPE_LABELS[type], byJobType(type))}
-                    className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-orange-300/50 transition-colors"
-                  >
-                    <p className="text-xs text-muted-foreground truncate">{JOB_TYPE_LABELS[type]}</p>
-                    <p className="text-xl font-bold text-foreground mt-1">{byJobType(type).length}</p>
-                    <div className="flex gap-2 mt-1 text-[10px]">
-                      <span className="text-destructive">{byJobType(type).filter((j) => j.urgency === 'urgent').length} ด่วน</span>
-                      <span className="text-info">{byJobType(type).filter((j) => j.urgency === 'advance').length} ล่วงหน้า</span>
-                    </div>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-2">
+                {roleBreakdown.length === 0 ? (
+                  <p className="text-xs text-muted-foreground col-span-full">ยังไม่มีข้อมูลลักษณะงาน</p>
+                ) : (
+                  roleBreakdown.map(([role, count]) => {
+                    const roleJobs = jobsScopedForRoleBreakdown.filter((j) => extractJobRole(j) === role);
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => {
+                          setJobRoleFilter(role);
+                          showJobList(`ลักษณะงาน: ${role}`, roleJobs);
+                        }}
+                        className={cn(
+                          'jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-blue-300/50 transition-colors',
+                          jobRoleFilter === role && 'border-blue-400/60 bg-blue-500/10',
+                        )}
+                      >
+                        <p className="text-xs text-muted-foreground line-clamp-2">{role}</p>
+                        <p className="text-xl font-bold text-foreground mt-1">{count}</p>
+                        <div className="flex gap-2 mt-1 text-[10px]">
+                          <span className="text-destructive">
+                            {roleJobs.filter((j) => j.urgency === 'urgent').length} ด่วน
+                          </span>
+                          <span className="text-info">
+                            {roleJobs.filter((j) => j.urgency === 'advance').length} ล่วงหน้า
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
               {expandedSection === 'jobType' && (
                 <div className="mt-3 glass-card rounded-xl border border-border overflow-x-auto">
@@ -495,15 +606,21 @@ const SupervisorDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(['thai_executive', 'foreign_executive', 'central', 'valet_parking'] as const).map((type) => {
-                        const items = byJobType(type);
+                      {roleBreakdown.map(([role]) => {
+                        const items = byJobRole(role);
                         return (
                           <tr
-                            key={type}
-                            className="border-b border-border/50 cursor-pointer hover:bg-secondary/20"
-                            onClick={() => showJobList(JOB_TYPE_LABELS[type], items)}
+                            key={role}
+                            className={cn(
+                              'border-b border-border/50 cursor-pointer hover:bg-secondary/20',
+                              jobRoleFilter === role && 'bg-blue-500/10',
+                            )}
+                            onClick={() => {
+                              setJobRoleFilter(role);
+                              showJobList(`ลักษณะงาน: ${role}`, items);
+                            }}
                           >
-                            <td className="px-3 py-2 font-medium">{JOB_TYPE_LABELS[type]}</td>
+                            <td className="px-3 py-2 font-medium max-w-[200px]">{role}</td>
                             <td className="px-3 py-2 text-center">{items.filter((j) => j.status !== 'closed').length}</td>
                             <td className="px-3 py-2 text-center text-success">{items.filter((j) => j.status === 'closed').length}</td>
                             <td className="px-3 py-2 text-center font-bold">{items.length}</td>
@@ -524,7 +641,7 @@ const SupervisorDashboard: React.FC = () => {
                     key={cat}
                     type="button"
                     onClick={() => showJobList(JOB_CATEGORY_LABELS[cat], byJobCategory(cat))}
-                    className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-orange-300/50 transition-colors"
+                    className="jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-blue-300/50 transition-colors"
                   >
                     <p className="text-xs text-muted-foreground">{JOB_CATEGORY_LABELS[cat]}</p>
                     <p className="text-xl font-bold text-foreground mt-1">{byJobCategory(cat).length}</p>
@@ -576,18 +693,18 @@ const SupervisorDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                   <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">ปิดแยกตามลักษณะงาน</p>
-                    {(['thai_executive', 'foreign_executive', 'central', 'valet_parking'] as const).map((type) => {
-                      const closed = closedJobs.filter((j) => j.job_type === type);
-                      const total = byJobType(type).length;
+                    {roleBreakdown.map(([role]) => {
+                      const closed = closedJobs.filter((j) => extractJobRole(j) === role);
+                      const total = byJobRole(role).length;
                       return (
                         <button
-                          key={type}
+                          key={role}
                           type="button"
-                          onClick={() => showJobList(`${JOB_TYPE_LABELS[type]} (ปิดแล้ว)`, closed)}
+                          onClick={() => showJobList(`${role} (ปิดแล้ว)`, closed)}
                           className="flex w-full items-center justify-between py-1.5 border-b border-border/30 last:border-0 hover:bg-secondary/30 rounded px-1 text-left"
                         >
-                          <span className="text-xs text-foreground">{JOB_TYPE_LABELS[type]}</span>
-                          <span className="text-xs font-bold">
+                          <span className="text-xs text-foreground line-clamp-1">{role}</span>
+                          <span className="text-xs font-bold shrink-0 ml-2">
                             <span className="text-success">{closed.length}</span>
                             <span className="text-muted-foreground">/{total}</span>
                           </span>
@@ -621,6 +738,46 @@ const SupervisorDashboard: React.FC = () => {
             </div>
 
             <div>
+              <SectionHeader id="units" title="แยกตามหน่วยงาน" icon={Briefcase} />
+              {expandedSection === 'units' && (
+                <div className="mt-2 glass-card rounded-[1.5rem] p-4 border border-white/70 max-h-80 overflow-y-auto">
+                  {unitOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">ยังไม่มีข้อมูลหน่วยงาน</p>
+                  ) : (
+                    unitOptions.map((unit) => {
+                      const uJobs = jobsScopedForUnitBreakdown.filter((j) => j.unit_name === unit);
+                      const openCount = uJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled').length;
+                      return (
+                        <button
+                          key={unit}
+                          type="button"
+                          onClick={() => {
+                            setUnitFilter(unit);
+                            showJobList(`หน่วยงาน: ${unit}`, uJobs);
+                          }}
+                          className={cn(
+                            'w-full py-2 border-b border-border/30 last:border-0 hover:bg-secondary/30 rounded px-1 text-left',
+                            unitFilter === unit && 'bg-blue-500/10',
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground line-clamp-2">{unit}</span>
+                            <span className="text-sm font-bold text-blue-600 shrink-0">{uJobs.length} ใบขอ</span>
+                          </div>
+                          <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-muted-foreground">
+                            <span>ดำเนินการ: {openCount}</span>
+                            <span>ปิดแล้ว: {uJobs.filter((j) => j.status === 'closed').length}</span>
+                            <span>ด่วน: {uJobs.filter((j) => j.urgency === 'urgent').length}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
               <SectionHeader id="personnel" title="เจ้าหน้าที่สรรหา & คัดสรร" icon={Filter} />
               {expandedSection === 'personnel' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
@@ -637,7 +794,7 @@ const SupervisorDashboard: React.FC = () => {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-foreground">{name}</span>
-                            <span className="text-sm font-bold text-orange-600">{rJobs.length} งาน</span>
+                            <span className="text-sm font-bold text-blue-600">{rJobs.length} งาน</span>
                           </div>
                           <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-muted-foreground">
                             {(['thai_executive', 'foreign_executive', 'central', 'valet_parking'] as const).map((t) => {
@@ -666,7 +823,7 @@ const SupervisorDashboard: React.FC = () => {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-foreground">{name}</span>
-                            <span className="text-sm font-bold text-orange-600">{sJobs.length} งาน</span>
+                            <span className="text-sm font-bold text-blue-600">{sJobs.length} งาน</span>
                           </div>
                           <div className="flex flex-wrap gap-3 mt-1 text-[10px] text-muted-foreground">
                             {(['bank', 'government', 'private'] as const).map((c) => {
@@ -706,11 +863,11 @@ const SupervisorDashboard: React.FC = () => {
                       {filteredJobs.map((j) => (
                         <tr
                           key={j.id}
-                          onClick={() => navigate(`/jobs/${j.id}`)}
+                          onClick={() => navigateToUnitRequest(j, navigate)}
                           className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                         >
-                          <td className="px-3 py-2 font-medium text-orange-600 max-w-[150px] truncate">{j.unit_name}</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{JOB_TYPE_LABELS[j.job_type]}</td>
+                          <td className="px-3 py-2 font-medium text-blue-600 max-w-[150px] truncate">{j.unit_name}</td>
+                          <td className="px-3 py-2 text-center text-muted-foreground max-w-[120px] truncate">{extractJobRole(j)}</td>
                           <td className="px-3 py-2 text-center text-muted-foreground">{JOB_CATEGORY_LABELS[j.job_category]}</td>
                           <td className="px-3 py-2 text-center">
                             <span

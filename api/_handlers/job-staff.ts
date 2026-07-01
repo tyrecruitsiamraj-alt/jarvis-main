@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuth,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const rosterTable = tableInAppSchema('job_staff_roster');
 const excludedTable = tableInAppSchema('job_staff_picker_excluded');
@@ -67,10 +68,6 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'POST') {
     try {
-      if (req.user.role !== 'admin') {
-        return sendError(res, 403, 'Forbidden', 'Only administrators can change job staff roster');
-      }
-
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
@@ -104,7 +101,14 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
         `,
           [role, name.trim()],
         );
-        return res.status(200).json(await fetchState());
+        const state = await fetchState();
+        await auditFromAuthed(req, {
+          action: 'job_staff.add',
+          entityType: 'job_staff',
+          entityId: role,
+          after: { op: 'add', role, name: name.trim() },
+        });
+        return res.status(200).json(state);
       }
 
       if (op === 'remove') {
@@ -121,7 +125,14 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
           `insert into ${excludedTable} (role, name_norm) values ($1, $2) on conflict do nothing`,
           [role, nn],
         );
-        return res.status(200).json(await fetchState());
+        const state = await fetchState();
+        await auditFromAuthed(req, {
+          action: 'job_staff.remove',
+          entityType: 'job_staff',
+          entityId: role,
+          after: { op: 'remove', role, name: name.trim() },
+        });
+        return res.status(200).json(state);
       }
 
       if (op === 'rename') {
@@ -170,7 +181,14 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
           );
         }
 
-        return res.status(200).json(await fetchState());
+        const state = await fetchState();
+        await auditFromAuthed(req, {
+          action: 'job_staff.rename',
+          entityType: 'job_staff',
+          entityId: role,
+          after: { op: 'rename', role, oldName: oldName.trim(), newName: newName.trim() },
+        });
+        return res.status(200).json(state);
       }
 
       return sendError(res, 400, 'Bad request', 'Unknown op; use add, remove, or rename');
@@ -182,4 +200,4 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuth(jobStaffHandler);
+export default withRbac(jobStaffHandler, 'job-staff');

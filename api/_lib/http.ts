@@ -1,4 +1,5 @@
 import { logError } from './logger.js';
+import { isProductionRuntime } from './runtime.js';
 import {
   getTokenFromReq,
   getTokenFromAuthHeader,
@@ -6,6 +7,7 @@ import {
   type UserRole,
   type JwtUserPayload,
 } from './auth.js';
+import { checkApiAccess, meetsMinimumRole, type ApiResource } from './rbac.js';
 
 export type ApiRes = {
   setHeader?: (name: string, value: string | string[]) => void;
@@ -43,21 +45,19 @@ export function handleApiError(
   context: string,
   fields?: Record<string, unknown>,
 ): void {
-  const message = e instanceof Error ? e.message : String(e);
+  const detail = e instanceof Error ? e.message : String(e);
   const stack = e instanceof Error ? e.stack : undefined;
-  logError(context, { ...fields, message, stack });
-  res.status(500).json({ error: 'Internal server error', message });
+  logError(context, { ...fields, message: detail, stack });
+  if (isProductionRuntime()) {
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+  res.status(500).json({ error: 'Internal server error', message: detail });
 }
 
-const ROLE_LEVEL: Record<UserRole, number> = {
-  admin: 3,
-  supervisor: 2,
-  staff: 1,
-};
 
 function meetsRole(userRole: UserRole, allowed: UserRole[]): boolean {
-  const level = ROLE_LEVEL[userRole];
-  return allowed.some((r) => level >= ROLE_LEVEL[r]);
+  return allowed.some((r) => meetsMinimumRole(userRole, r));
 }
 
 /**
@@ -70,7 +70,8 @@ export function withAuth<T extends ApiReq>(
   const allowed = options?.roles;
 
   return async (req: ApiReq, res: ApiRes) => {
-    const token = getTokenFromReq(req) || getTokenFromAuthHeader(req);
+    const token =
+      getTokenFromReq(req) || (!isProductionRuntime() ? getTokenFromAuthHeader(req) : null);
     if (!token) {
       return sendError(res, 401, 'Unauthorized', 'Missing auth cookie');
     }
@@ -90,7 +91,27 @@ export function withAuth<T extends ApiReq>(
   };
 }
 
-/** Staff can read; supervisor+ can write (POST/PATCH/PUT/DELETE). */
+/**
+ * Authenticated route with centralized RBAC (api/_lib/rbac.ts).
+ * Backend is the authority — returns 403 when role is insufficient.
+ */
+export function withRbac(
+  handler: (req: AuthedReq, res: ApiRes) => Promise<void>,
+  resource: ApiResource,
+  options?: { hintFromReq?: (req: ApiReq) => string | undefined },
+): (req: ApiReq, res: ApiRes) => Promise<void> {
+  return withAuth(async (req, res) => {
+    const method = (req.method || 'GET').toUpperCase();
+    const hint = options?.hintFromReq?.(req);
+    const access = checkApiAccess(req.user.role, resource, method, hint);
+    if (!access.ok) {
+      return sendError(res, 403, 'Forbidden', access.message);
+    }
+    await handler(req, res);
+  });
+}
+
+/** @deprecated Use withRbac(handler, resource) — kept for gradual migration. */
 export function withAuthDataRoute(
   handler: (req: AuthedReq, res: ApiRes) => Promise<void>,
 ): (req: ApiReq, res: ApiRes) => Promise<void> {
@@ -103,7 +124,7 @@ export function withAuthDataRoute(
   };
 }
 
-/** GET/POST: staff+; PATCH/PUT/DELETE: supervisor+ (create ทุกระดับ, แก้ไขเฉพาะ supervisor ขึ้นไป). */
+/** @deprecated Use withRbac(handler, resource) — kept for gradual migration. */
 export function withAuthStaffCreateSupervisorMutate(
   handler: (req: AuthedReq, res: ApiRes) => Promise<void>,
 ): (req: ApiReq, res: ApiRes) => Promise<void> {

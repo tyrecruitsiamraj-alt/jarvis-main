@@ -54,7 +54,7 @@ const DailyAssignment: React.FC = () => {
               const emp = wlEmployees.find(e => e.id === entry.employee_id);
               return (
                 <div key={entry.id} onClick={() => setEditDialog({ open: true, entry: { ...entry, emp } })}
-                  className="glass-card rounded-lg p-3 border border-border flex items-center justify-between cursor-pointer hover:border-orange-300/50 transition-colors">
+                  className="glass-card rounded-lg p-3 border border-border flex items-center justify-between cursor-pointer hover:border-blue-300/50 transition-colors">
                   <div>
                     <div className="font-medium text-foreground text-sm">{emp?.first_name} {emp?.last_name}</div>
                     <div className="text-xs text-muted-foreground">{entry.client_name} • {shiftStartLabel(entry.shift) || '-'}</div>

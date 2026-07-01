@@ -32,7 +32,14 @@ async function loadLiveJobs(): Promise<{
   }
 
   const r = await apiFetch('/api/jobs?limit=500', { cache: 'no-store' });
-  const data = r.ok ? ((await r.json()) as JobRequest[]) : [];
+  if (!r.ok) {
+    throw new Error(
+      r.status === 401
+        ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่'
+        : 'โหลดรายการงานไม่สำเร็จ',
+    );
+  }
+  const data = (await r.json()) as JobRequest[];
   return {
     jobs: Array.isArray(data) ? data : [],
     siamrajPrimary: false,
@@ -78,7 +85,11 @@ export function useUnitRequestsFeed(): {
       setLoadError(null);
     } catch (e) {
       setJobs([]);
-      setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลหน่วยงานไม่สำเร็จ');
+      setLoadError(
+        e instanceof Error && e.message
+          ? e.message
+          : 'โหลดข้อมูลหน่วยงานไม่สำเร็จ — ลองใหม่อีกครั้ง',
+      );
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -125,10 +136,4 @@ export function useUnitRequestsFeed(): {
   }, [siamrajPrimary]);
 
   return { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
-}
-
-/** @deprecated use useUnitRequestsFeed */
-export function useDemoAwareJobs() {
-  const { jobs, loading, refetch, refreshing } = useUnitRequestsFeed();
-  return { jobs, loading, refetch, refreshing };
 }

@@ -146,7 +146,7 @@ function RosterSection({
                 <button
                   type="button"
                   onClick={() => startEdit(name)}
-                  className="text-xs px-2 py-1 rounded bg-secondary text-orange-600 hover:underline"
+                  className="text-xs px-2 py-1 rounded bg-secondary text-blue-600 hover:underline"
                 >
                   เปลี่ยนชื่อ
                 </button>

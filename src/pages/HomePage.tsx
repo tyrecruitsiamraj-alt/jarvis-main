@@ -29,7 +29,7 @@ const menuItems: {
     label: 'WL',
     desc: 'บริหารกำลังคน / ปฏิทินงาน',
     icon: CalendarDays,
-    accent: 'text-orange-500 bg-orange-500/10',
+    accent: 'text-blue-500 bg-blue-500/10',
   },
   {
     path: '/matching',
@@ -50,7 +50,7 @@ const menuItems: {
     label: 'หน่วยงาน',
     desc: 'จัดการใบขอและหน่วยงาน',
     icon: Briefcase,
-    accent: 'text-orange-600 bg-orange-400/12',
+    accent: 'text-blue-600 bg-blue-400/12',
   },
   {
     path: '/matching/candidates',
@@ -89,7 +89,7 @@ const HomePage: React.FC = () => {
     <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 px-4 sm:px-5 md:px-6 lg:px-8 py-6 md:py-8">
       {/* subtle orb accent */}
       <div
-        className="pointer-events-none absolute -top-8 right-0 h-40 w-40 jarvis-orange-orb opacity-30 blur-sm"
+        className="pointer-events-none absolute -top-8 right-0 h-40 w-40 jarvis-blue-orb opacity-30 blur-sm"
         aria-hidden
       />
 
@@ -125,7 +125,7 @@ const HomePage: React.FC = () => {
           </button>
         </div>
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-orange-100/25"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-blue-100/25"
           aria-hidden
         />
       </motion.div>
@@ -158,7 +158,7 @@ const HomePage: React.FC = () => {
             {item.desc ? (
               <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{item.desc}</div>
             ) : null}
-            <div className="mt-4 flex items-center gap-1 text-xs font-medium text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="mt-4 flex items-center gap-1 text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
               เปิด
               <ArrowRight className="h-3 w-3" aria-hidden />
             </div>

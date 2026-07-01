@@ -1,5 +1,5 @@
 import {
-  withAuth,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -13,12 +13,35 @@ import {
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
+import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
   if (typeof v === 'string') return v;
   if (Array.isArray(v) && typeof v[0] === 'string') return v[0];
   return '';
+}
+
+/**
+ * แปะผู้รับผิดชอบ (สรรหา/คัดสรร) จาก PostgreSQL ลงในใบขอที่อ่านมาจาก Siamraj (read-only)
+ * เป็นข้อมูลเสริม — ถ้าดึงจาก PG ไม่ได้ ปล่อยผ่านโดยไม่ทำให้ feed ล่ม
+ */
+async function attachAssignments(items: unknown[]): Promise<void> {
+  const list = items as Array<Record<string, unknown>>;
+  const keyOf = (it: Record<string, unknown>) => String(it.request_no || it.externalId || '');
+  try {
+    const keys = list.map(keyOf).filter(Boolean);
+    if (keys.length === 0) return;
+    const map = await getUnitAssignmentsMap(keys);
+    if (map.size === 0) return;
+    for (const it of list) {
+      const a = map.get(keyOf(it));
+      if (a?.recruiter_name) it.recruiter_name = a.recruiter_name;
+      if (a?.screener_name) it.screener_name = a.screener_name;
+    }
+  } catch {
+    /* ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม */
+  }
 }
 
 async function handler(req: AuthedReq, res: ApiRes) {
@@ -60,16 +83,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (id) {
       const item = await getSiamrajUnitRequestById(id);
       if (!item) return sendError(res, 404, 'Not found', 'ไม่พบใบขอ');
+      await attachAssignments([item]);
       return res.status(200).json(item);
     }
 
     const limit = Number(getQuery(req, 'limit') || '200');
     const mode = getQuery(req, 'mode');
     const items = await listSiamrajUnitRequests({ limit, mode });
+    await attachAssignments(items);
     return res.status(200).json(items);
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');
   }
 }
 
-export default withAuth(handler, { roles: ['staff', 'supervisor', 'admin'] });
+export default withRbac(handler, 'siamraj-unit-requests');

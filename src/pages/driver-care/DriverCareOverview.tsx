@@ -6,19 +6,15 @@ import StatCard from '@/components/shared/StatCard';
 import { fetchDriverCareOverview, recalculateDriverCareRisk } from '@/lib/driverCareApi';
 import DriverCareScoringGuide from '@/components/driver-care/DriverCareScoringGuide';
 import { DRIVER_CARE_RISK_LABELS } from '@/types/driverCare';
+import { useAuth } from '@/contexts/AuthContext';
 import { AlertTriangle, BookOpen, ClipboardList, HeartPulse, ListChecks, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const riskVariant = (level: string) => {
-  if (level === 'high') return 'destructive' as const;
-  if (level === 'medium') return 'warning' as const;
-  if (level === 'watch') return 'info' as const;
-  return 'success' as const;
-};
-
 const DriverCareOverview: React.FC = () => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canRecalculate = hasPermission('supervisor');
   const [recalculating, setRecalculating] = React.useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -29,8 +25,8 @@ const DriverCareOverview: React.FC = () => {
   const handleRecalculate = async () => {
     setRecalculating(true);
     try {
-      const n = await recalculateDriverCareRisk();
-      toast.success(`คำนวณความเสี่ยงใหม่แล้ว ${n} คน`);
+      const { recalculated, scoreDate } = await recalculateDriverCareRisk();
+      toast.success(`คำนวณความเสี่ยงวันที่ ${scoreDate} แล้ว ${recalculated} คน`);
       await refetch();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -40,6 +36,7 @@ const DriverCareOverview: React.FC = () => {
   };
 
   const m = data?.metrics;
+  const showEmptyScores = data && !data.hasScores;
 
   return (
     <div>
@@ -47,27 +44,67 @@ const DriverCareOverview: React.FC = () => {
         title="Driver Care"
         subtitle="ระบบเตือนความเสี่ยงคนขับลาออก"
         actions={
-          <button
-            type="button"
-            onClick={() => void handleRecalculate()}
-            disabled={recalculating}
-            className="flex items-center gap-1.5 px-3 py-2 jarvis-pill-btn text-sm disabled:opacity-50"
-          >
-            <RefreshCw className={cn('w-4 h-4', recalculating && 'animate-spin')} />
-            คำนวณใหม่
-          </button>
+          canRecalculate ? (
+            <button
+              type="button"
+              onClick={() => void handleRecalculate()}
+              disabled={recalculating}
+              className="flex items-center gap-1.5 px-3 py-2 jarvis-pill-btn text-sm disabled:opacity-50"
+            >
+              <RefreshCw className={cn('w-4 h-4', recalculating && 'animate-spin')} />
+              คำนวณใหม่
+            </button>
+          ) : undefined
         }
       />
       <div className="px-4 md:px-6 space-y-6">
-        {isLoading && <p className="text-sm text-muted-foreground">กำลังโหลดภาพรวม…</p>}
+        {isLoading && (
+          <p className="text-sm text-muted-foreground rounded-xl border border-border/60 bg-secondary/20 px-3 py-2">
+            กำลังโหลดภาพรวม…
+          </p>
+        )}
         {error && (
           <p className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
             {error instanceof Error ? error.message : String(error)}
           </p>
         )}
 
-        {m && (
+        {data && data.needsRecalculation && (
+          <p className="text-sm text-amber-800 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+            {showEmptyScores
+              ? 'ยังไม่มีคะแนนความเสี่ยง — หัวหน้างานสามารถกด "คำนวณใหม่" เพื่อสร้างคะแนนวันนี้ (วันที่ธุรกิจ Asia/Bangkok)'
+              : `คะแนนล่าสุดวันที่ ${data.scoreDate} — ยังไม่มีคะแนนวันนี้ (${data.businessDate})`}
+          </p>
+        )}
+
+        {showEmptyScores && !isLoading && (
+          <div className="glass-card rounded-[1.5rem] p-6 border border-white/70 text-center space-y-2">
+            <p className="font-semibold text-foreground">ยังไม่มีข้อมูลคะแนนความเสี่ยง</p>
+            <p className="text-sm text-muted-foreground">
+              การอ่าน Dashboard ไม่คำนวณคะแนนอัตโนมัติ — ต้องรันคำนวณแยกต่างหาก
+            </p>
+            {canRecalculate && (
+              <button
+                type="button"
+                onClick={() => void handleRecalculate()}
+                disabled={recalculating}
+                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 jarvis-pill-btn text-sm disabled:opacity-50"
+              >
+                <RefreshCw className={cn('w-4 h-4', recalculating && 'animate-spin')} />
+                คำนวณความเสี่ยงวันนี้
+              </button>
+            )}
+          </div>
+        )}
+
+        {m && data.hasScores && (
           <>
+            {data.scoreDate && (
+              <p className="text-xs text-muted-foreground">
+                คะแนนวันที่ {data.scoreDate}
+                {data.businessDate !== data.scoreDate ? ` (วันธุรกิจปัจจุบัน ${data.businessDate})` : ''}
+              </p>
+            )}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard title="คนขับ Active" value={m.activeDrivers} icon={Users} variant="primary" />
               <StatCard title="เสี่ยงสูง" value={m.highRisk} icon={AlertTriangle} variant="destructive" onClick={() => navigate('/driver-care/risk-list?riskLevel=high')} />
@@ -90,7 +127,7 @@ const DriverCareOverview: React.FC = () => {
               </button>
               <button type="button" onClick={() => navigate('/settings?tab=driverCare')} className="flex-1 jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left">
                 <div className="font-semibold text-foreground flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-orange-600" />
+                  <BookOpen className="w-4 h-4 text-blue-600" />
                   Skills & Knowledge
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">ตั้งค่าที่ Settings → Driver Care</div>

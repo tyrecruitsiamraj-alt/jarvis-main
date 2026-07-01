@@ -592,7 +592,7 @@ const JobDetailPage: React.FC = () => {
                       a.status === 'started'
                         ? 'bg-success/15 text-success'
                         : a.status === 'passed'
-                          ? 'bg-primary/15 text-orange-600'
+                          ? 'bg-primary/15 text-blue-600'
                           : a.status === 'failed'
                             ? 'bg-destructive/15 text-destructive'
                             : a.status === 'sent'
@@ -659,7 +659,7 @@ const JobDetailPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => void addCandidateToJob(c)}
-                      className="w-full text-left rounded-lg border border-border bg-card/50 px-3 py-2.5 text-sm hover:bg-secondary hover:border-orange-300/40 transition-colors"
+                      className="w-full text-left rounded-lg border border-border bg-card/50 px-3 py-2.5 text-sm hover:bg-secondary hover:border-blue-300/40 transition-colors"
                     >
                       <span className="font-medium text-foreground">{formatCandidateDisplayName(c)}</span>
                       <span className="block text-xs text-muted-foreground mt-0.5">{c.phone}</span>

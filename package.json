@@ -22,7 +22,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:readiness": "vitest run tests/api tests/demo"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

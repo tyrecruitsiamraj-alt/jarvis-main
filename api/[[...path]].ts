@@ -4,6 +4,9 @@
  */
 import { apiRoutes } from './_handlers/registry.js';
 import type { ApiReq, ApiRes } from './_lib/http.js';
+import { applyCorsHeaders } from './_lib/cors.js';
+import { isProductionRuntime } from './_lib/runtime.js';
+import { logError } from './_lib/logger.js';
 
 /** Vercel injects Node-compatible req/res; avoid @vercel/node dependency here. */
 type VercelishReq = {
@@ -64,41 +67,48 @@ function resolveHttpMethod(req: VercelishReq): string {
 }
 
 export default async function handler(req: VercelishReq, res: VercelishRes): Promise<void> {
-  const originHeader = typeof req.headers?.origin === 'string' ? req.headers.origin.trim() : '';
-  // ถ้ามี Origin ให้ตอบกลับแบบระบุ origin จริงเพื่อให้เบราว์เซอร์ส่ง cookie เมื่อใช้ credentials: 'include'
-  res.setHeader('Access-Control-Allow-Origin', originHeader ? originHeader : '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie');
+  const method = resolveHttpMethod(req);
+  const vercelReq: ApiReq = {
+    method,
+    query: {},
+    body: req.body,
+    headers: (req.headers ?? {}) as Record<string, string | string[] | undefined>,
+  };
 
-  if (resolveHttpMethod(req) === 'OPTIONS') {
-    res.status(204).end();
+  const apiRes = res as unknown as ApiRes;
+  const allowedOrigin = applyCorsHeaders(vercelReq, apiRes);
+
+  if (method === 'OPTIONS') {
+    if (allowedOrigin) {
+      res.status(204).end();
+    } else {
+      res.status(403).json({ error: 'Forbidden', message: 'CORS origin not allowed' });
+    }
     return;
   }
 
   const pathname = resolveApiPathname(req);
   const fn = apiRoutes[pathname];
   if (!fn) {
-    res.status(404).json({ error: 'Not found', path: pathname });
+    res.status(404).json({ error: 'Not found' });
     return;
   }
 
   const query: Record<string, unknown> = { ...((req.query ?? {}) as Record<string, unknown>) };
   delete query.path;
-
-  const vercelReq: ApiReq = {
-    method: resolveHttpMethod(req),
-    query,
-    body: req.body,
-    headers: (req.headers ?? {}) as Record<string, string | string[] | undefined>,
-  };
+  vercelReq.query = query;
 
   try {
-    await fn(vercelReq, res as unknown as ApiRes);
+    await fn(vercelReq, apiRes);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const detail = e instanceof Error ? e.message : String(e);
+    logError('api.catch-all', { path: pathname, message: detail, stack: e instanceof Error ? e.stack : undefined });
     try {
-      res.status(500).json({ error: 'Internal server error', message });
+      if (isProductionRuntime()) {
+        res.status(500).json({ error: 'Internal server error' });
+      } else {
+        res.status(500).json({ error: 'Internal server error', message: detail });
+      }
     } catch {
       /* response already sent */
     }

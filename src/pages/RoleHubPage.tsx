@@ -16,13 +16,13 @@ type HubLink = {
 };
 
 const STAFF_LINKS: HubLink[] = [
-  { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, accent: 'text-orange-600 bg-orange-500/12' },
+  { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, accent: 'text-blue-600 bg-blue-500/12' },
   { path: '/driver-care', label: 'Driver Care', desc: 'เตือนความเสี่ยงคนขับลาออก', icon: HeartPulse, accent: 'text-rose-700 bg-rose-500/12' },
   { path: '/jobs/list', label: 'หน่วยงาน', desc: 'ดูรายการใบขอ', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12' },
 ];
 
 const SUPERVISOR_EXTRA: HubLink[] = [
-  { path: '/matching', label: 'Matching', desc: 'จับคู่ผู้สมัครกับงาน', icon: Search, accent: 'text-orange-700 bg-orange-400/12' },
+  { path: '/matching', label: 'Matching', desc: 'จับคู่ผู้สมัครกับงาน', icon: Search, accent: 'text-blue-700 bg-blue-400/12' },
   { path: '/jobs', label: 'แดชบอร์ดหน่วยงาน', desc: 'สรุปและสร้างงาน', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12' },
   { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, accent: 'text-neutral-800 bg-neutral-500/10' },
 ];
@@ -69,7 +69,7 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
               </div>
               <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>
               <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{item.desc}</div>
-              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
                 เปิด
                 <ArrowRight className="h-3 w-3" aria-hidden />
               </div>

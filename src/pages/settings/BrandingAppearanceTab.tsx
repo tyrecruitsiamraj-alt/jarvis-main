@@ -34,7 +34,7 @@ const BrandingAppearanceTab: React.FC = () => {
     <div className="space-y-6 max-w-2xl">
       <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Palette className="w-4 h-4 text-orange-600" />
+          <Palette className="w-4 h-4 text-blue-600" />
           โลโก้และชื่อระบบ
         </h3>
 

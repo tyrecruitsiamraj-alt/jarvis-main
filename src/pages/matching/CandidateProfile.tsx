@@ -129,8 +129,8 @@ const CandidateProfile: React.FC = () => {
       <div className="px-4 md:px-6 space-y-6">
         <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-orange-500/15 flex items-center justify-center">
-              <User className="w-6 h-6 text-orange-600" />
+            <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
+              <User className="w-6 h-6 text-blue-600" />
             </div>
             <div className="flex-1">
               <div className="font-bold text-foreground">{formatCandidateDisplayName(candidate)}</div>
@@ -273,7 +273,7 @@ const CandidateProfile: React.FC = () => {
                   <span
                     className={cn(
                       'text-xs px-2 py-0.5 rounded-full',
-                      w.work_type === 'start' ? 'bg-primary/15 text-orange-600' : 'bg-warning/15 text-warning',
+                      w.work_type === 'start' ? 'bg-primary/15 text-blue-600' : 'bg-warning/15 text-warning',
                     )}
                   >
                     {w.work_type === 'start' ? 'เริ่มงาน' : 'แทนงาน'}

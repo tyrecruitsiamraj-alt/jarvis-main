@@ -6,22 +6,22 @@ import {
 } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
 import { dbQuery } from '../../_lib/postgres.js';
-import { hashPassword } from '../../_lib/auth.js';
+import { createPasswordResetToken } from '../../_lib/passwordReset.js';
+import { rateLimitOrReject } from '../../_lib/rateLimit.js';
+import { logInfo } from '../../_lib/logger.js';
+import { isProductionRuntime } from '../../_lib/runtime.js';
+import { auditFromAnonymous } from '../../_lib/audit.js';
 
-function genTempPassword(length = 12): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-  let out = '';
-  for (let i = 0; i < length; i += 1) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
+const GENERIC_FORGOT_MESSAGE =
+  'หากมีบัญชีอีเมลนี้ในระบบ เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลของคุณ';
 
 async function forgotPasswordHandler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'POST').toUpperCase();
   if (method !== 'POST') {
     return sendError(res, 405, 'Method not allowed');
   }
+
+  if (!rateLimitOrReject(req, res, 'auth:forgot-password', 5, 60 * 60 * 1000)) return;
 
   try {
     const raw = await readJsonBody(req);
@@ -43,27 +43,29 @@ async function forgotPasswordHandler(req: ApiReq, res: ApiRes) {
       [email],
     );
     const user = lookup.rows[0];
-    if (!user) {
-      return sendError(res, 404, 'Not found', 'ไม่พบบัญชีผู้ใช้นี้ในระบบ');
-    }
-    if (!user.is_active) {
-      return sendError(res, 403, 'Forbidden', 'บัญชีนี้ถูกปิดใช้งาน');
+
+    if (user?.is_active) {
+      const token = await createPasswordResetToken(user.id);
+      const appUrl = (process.env.APP_PUBLIC_URL || process.env.VITE_APP_URL || '').trim();
+      const resetPath = `/reset-password?token=${encodeURIComponent(token)}`;
+      const resetUrl = appUrl ? `${appUrl.replace(/\/$/, '')}${resetPath}` : resetPath;
+
+      logInfo('auth.password_reset_issued', {
+        userId: user.id,
+        email,
+        resetUrl: isProductionRuntime() ? '[redacted]' : resetUrl,
+      });
+
+      await auditFromAnonymous(req, { userId: user.id, userName: email }, {
+        action: 'auth.password_reset.requested',
+        entityType: 'auth',
+        entityId: user.id,
+      });
+
+      // Email delivery is not wired yet — token is never returned in API response.
     }
 
-    const tempPassword = genTempPassword(12);
-    const password_hash = await hashPassword(tempPassword);
-    await dbQuery(
-      `
-      update users
-      set password_hash = $1
-      where id = $2
-    `,
-      [password_hash, user.id],
-    );
-
-    return res.status(200).json({
-      message: `รีเซ็ตรหัสผ่านแล้ว ใช้รหัสชั่วคราวนี้เพื่อล็อกอิน: ${tempPassword}`,
-    });
+    return res.status(200).json({ message: GENERIC_FORGOT_MESSAGE });
   } catch (e) {
     return handleApiError(res, e, 'auth/forgot-password');
   }

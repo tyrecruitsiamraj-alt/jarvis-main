@@ -38,7 +38,7 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full text-left rounded-2xl border border-white/70 bg-white/40 hover:bg-orange-50/40 hover:border-orange-300/40 px-3 py-2 transition-colors"
+      className="w-full text-left rounded-2xl border border-white/70 bg-white/40 hover:bg-blue-50/40 hover:border-blue-300/40 px-3 py-2 transition-colors"
     >
       <div className="font-medium text-foreground text-sm line-clamp-1">{job.unit_name}</div>
       <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
@@ -105,7 +105,7 @@ const MatchingDashboard: React.FC = () => {
       label: 'Matching',
       desc: 'จับคู่ผู้สมัครกับงานตามรัศมีและคะแนน Match',
       icon: Search,
-      accent: 'text-orange-700 bg-orange-500/12',
+      accent: 'text-blue-700 bg-blue-500/12',
     },
     {
       path: '/matching/pre-check',
@@ -149,7 +149,7 @@ const MatchingDashboard: React.FC = () => {
               </div>
               <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>
               <div className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-2">{item.desc}</div>
-              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
                 เปิด
                 <ArrowRight className="h-3 w-3" aria-hidden />
               </div>
@@ -161,7 +161,7 @@ const MatchingDashboard: React.FC = () => {
         <div className="glass-card rounded-[1.5rem] border border-white/70 p-3 md:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-orange-600" />
+              <Users className="w-4 h-4 text-blue-600" />
               สรุปตามสถานะ · Candidates
             </h3>
             {loadingMatchCandidates ? (
@@ -176,7 +176,7 @@ const MatchingDashboard: React.FC = () => {
                 key={st}
                 type="button"
                 onClick={() => navigate(`/matching/candidates?status=${st}`)}
-                className="glass-card rounded-2xl border border-white/70 bg-white/40 hover:border-orange-300/50 hover:bg-orange-50/30 p-3 text-left transition-colors"
+                className="glass-card rounded-2xl border border-white/70 bg-white/40 hover:border-blue-300/50 hover:bg-blue-50/30 p-3 text-left transition-colors"
               >
                 <div className="text-[11px] font-medium text-muted-foreground leading-snug">
                   {CANDIDATE_STATUS_LABELS[st]}
@@ -192,7 +192,7 @@ const MatchingDashboard: React.FC = () => {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-orange-600" />
+              <Briefcase className="w-4 h-4 text-blue-600" />
               Job Request Summary
             </h3>
             <Button type="button" variant="outline" size="sm" onClick={() => setAllJobsOpen(true)}>

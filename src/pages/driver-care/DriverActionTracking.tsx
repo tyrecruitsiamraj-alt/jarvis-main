@@ -57,8 +57,16 @@ const DriverActionTracking: React.FC = () => {
           </label>
         </div>
 
-        {isLoading && <p className="text-sm text-muted-foreground">กำลังโหลด…</p>}
-        {error && <p className="text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p>}
+        {isLoading && (
+          <p className="text-sm text-muted-foreground rounded-xl border border-border/60 bg-secondary/20 px-3 py-2">
+            กำลังโหลด…
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+            {error instanceof Error ? error.message : String(error)}
+          </p>
+        )}
 
         <div className="overflow-x-auto glass-card rounded-xl border border-border">
           <table className="min-w-full text-xs">

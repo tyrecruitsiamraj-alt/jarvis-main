@@ -4,7 +4,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { isDemoMode } from '@/lib/demoMode';
 import { useSyncExternalStore } from 'react';
 
-let entries: WorkCalendarEntry[] = [...mockWorkCalendar];
+let entries: WorkCalendarEntry[] = isDemoMode() ? [...mockWorkCalendar] : [];
 const listeners = new Set<() => void>();
 
 export const WORK_CALENDAR_CHANGED_EVENT = 'jarvis-work-calendar-changed';

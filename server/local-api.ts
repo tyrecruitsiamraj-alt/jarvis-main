@@ -11,6 +11,9 @@ import { URL } from 'node:url';
 
 import { apiRoutes } from '../api/_handlers/registry.ts';
 import { logError, logInfo, logWarn } from '../api/_lib/logger.ts';
+import { applyCorsHeaders } from '../api/_lib/cors.ts';
+import { isProductionRuntime } from '../api/_lib/runtime.ts';
+import type { ApiReq } from '../api/_lib/http.ts';
 
 type VercelLikeRes = {
   setHeader?: (name: string, value: string | string[]) => void;
@@ -51,12 +54,27 @@ async function readBodyString(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-function setCors(res: ServerResponse, origin?: string) {
-  // ระบุ origin จริงเพื่อให้เบราว์เซอร์ส่ง cookie เมื่อใช้ credentials: 'include'
-  res.setHeader('Access-Control-Allow-Origin', origin && origin.trim() ? origin.trim() : '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie');
+function setCors(res: ServerResponse, req: ApiReq): boolean {
+  const apiRes = {
+    setHeader(name: string, value: string | string[]) {
+      res.setHeader(name, value);
+    },
+    status: () => ({ json: () => undefined }),
+  };
+  const allowed = applyCorsHeaders(req, apiRes as Parameters<typeof applyCorsHeaders>[1]);
+  const method = (req.method || 'GET').toUpperCase();
+  if (method === 'OPTIONS') {
+    if (allowed) {
+      res.statusCode = 204;
+      res.end();
+    } else {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Forbidden', message: 'CORS origin not allowed' }));
+    }
+    return false;
+  }
+  return true;
 }
 
 type Handler = (
@@ -74,14 +92,6 @@ const routes = apiRoutes as Record<string, Handler>;
 const port = Number(process.env.LOCAL_API_PORT || process.env.PORT || 3000);
 
 const server = createServer(async (req, res) => {
-  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
-  setCors(res, origin);
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 204;
-    res.end();
-    return;
-  }
-
   let pathname: string;
   try {
     pathname = new URL(req.url || '/', `http://127.0.0.1`).pathname;
@@ -91,18 +101,8 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const handler = routes[pathname];
-  if (!handler) {
-    res.statusCode = 404;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Not found', path: pathname }));
-    return;
-  }
-
   const url = new URL(req.url || '/', `http://127.0.0.1`);
   const query = queryFromUrl(url);
-  const requestId = randomUUID();
-  const started = Date.now();
 
   let body: unknown = undefined;
   if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
@@ -119,12 +119,25 @@ const server = createServer(async (req, res) => {
     }
   }
 
-  const vercelReq = {
+  const vercelReq: ApiReq = {
     method: req.method,
     query,
     body,
     headers: req.headers as Record<string, string | string[] | undefined>,
   };
+
+  if (!setCors(res, vercelReq)) return;
+
+  const handler = routes[pathname];
+  if (!handler) {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
+  const requestId = randomUUID();
+  const started = Date.now();
 
   logInfo('api.request', {
     requestId,
@@ -147,7 +160,10 @@ const server = createServer(async (req, res) => {
       logError('api.unhandled', { requestId, message, stack: e instanceof Error ? e.stack : undefined });
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ error: 'Unhandled server error', message }));
+      const payload = isProductionRuntime()
+        ? { error: 'Internal server error' }
+        : { error: 'Internal server error', message };
+      res.end(JSON.stringify(payload));
     }
   }
 });

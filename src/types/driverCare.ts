@@ -31,12 +31,23 @@ export interface DriverCareOverviewMetrics {
   overdueAction: number;
 }
 
-export interface DriverCareOverviewResponse {
+export interface DriverCareReadMeta {
+  scoreDate: string | null;
+  businessDate: string;
+  hasScores: boolean;
+  needsRecalculation: boolean;
+}
+
+export interface DriverCareOverviewResponse extends DriverCareReadMeta {
   metrics: DriverCareOverviewMetrics;
   riskByLevel: { level: DriverCareRiskLevel; count: number }[];
   topSites: { siteName: string; count: number }[];
   topReasons: { reason: string; count: number }[];
   actionStatus: { status: DriverActionStatus; count: number }[];
+}
+
+export interface DriverRiskListResponse extends DriverCareReadMeta {
+  items: DriverRiskListItem[];
 }
 
 export interface DriverRiskListItem {

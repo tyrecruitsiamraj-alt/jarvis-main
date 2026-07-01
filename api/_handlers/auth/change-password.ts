@@ -8,6 +8,7 @@ import {
   type ApiRes,
 } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
+import { auditFromAuthed } from '../../_lib/audit.js';
 
 type UserRow = {
   id: string;
@@ -68,6 +69,12 @@ async function changePasswordHandler(req: AuthedReq, res: ApiRes) {
     `,
       [nextHash, user.id],
     );
+
+    await auditFromAuthed(req, {
+      action: 'auth.password_change',
+      entityType: 'auth',
+      entityId: user.id,
+    });
 
     return res.status(200).json({ message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว' });
   } catch (e) {

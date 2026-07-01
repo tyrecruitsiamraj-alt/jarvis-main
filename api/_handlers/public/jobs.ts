@@ -1,6 +1,8 @@
-/**
- * Unauthenticated read-only job list/detail for public career board.
- */
+import {
+  isSiamrajUnitRequestsEnabled,
+  listSiamrajUnitRequests,
+  getSiamrajUnitRequestById,
+} from '../../_lib/siamrajUnitRequests.js';
 import { dbQuery } from '../../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { getString } from '../../_lib/body.js';
@@ -21,6 +23,8 @@ type JobRow = {
   screener_name: string | null;
   age_range_min: number | null;
   age_range_max: number | null;
+  gender_requirement?: string | null;
+  job_description_code_1?: string | null;
   vehicle_required: string | null;
   work_schedule: string | null;
   penalty_per_day: number;
@@ -30,6 +34,8 @@ type JobRow = {
   closed_date: string | Date | null;
   created_at: string | Date;
 };
+
+type PublicJob = ReturnType<typeof toPublicJob>;
 
 function toYmd(value: string | Date): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -42,32 +48,33 @@ function toIsoString(value: string | Date): string {
   return Number.isNaN(d.getTime()) ? value : d.toISOString();
 }
 
-function toJobResponse(row: JobRow) {
+function toPublicJob(row: JobRow | Record<string, unknown>) {
+  const r = row as JobRow;
   return {
-    id: row.id,
-    unit_name: row.unit_name,
-    request_date: toYmd(row.request_date),
-    required_date: toYmd(row.required_date),
-    urgency: row.urgency,
-    total_income: row.total_income,
-    location_address: row.location_address,
-    lat: row.lat === null ? undefined : row.lat,
-    lng: row.lng === null ? undefined : row.lng,
-    job_type: row.job_type,
-    job_category: row.job_category,
-    recruiter_name: row.recruiter_name || undefined,
-    screener_name: row.screener_name || undefined,
-    age_range_min: row.age_range_min === null ? undefined : row.age_range_min,
-    age_range_max: row.age_range_max === null ? undefined : row.age_range_max,
-    vehicle_required: row.vehicle_required || undefined,
-    work_schedule: row.work_schedule || undefined,
-    penalty_per_day: row.penalty_per_day,
-    days_without_worker: row.days_without_worker,
-    total_penalty: row.total_penalty,
-    status: row.status,
-    closed_date: row.closed_date ? toYmd(row.closed_date) : undefined,
-    created_at: toIsoString(row.created_at),
+    id: r.id,
+    unit_name: r.unit_name,
+    request_date: toYmd(r.request_date),
+    required_date: toYmd(r.required_date),
+    urgency: r.urgency,
+    total_income: r.total_income,
+    location_address: r.location_address,
+    lat: r.lat === null || r.lat === undefined ? undefined : r.lat,
+    lng: r.lng === null || r.lng === undefined ? undefined : r.lng,
+    job_type: r.job_type,
+    job_category: r.job_category,
+    job_description_code_1: r.job_description_code_1 || undefined,
+    age_range_min: r.age_range_min === null || r.age_range_min === undefined ? undefined : r.age_range_min,
+    age_range_max: r.age_range_max === null || r.age_range_max === undefined ? undefined : r.age_range_max,
+    gender_requirement: r.gender_requirement || undefined,
+    vehicle_required: r.vehicle_required || undefined,
+    work_schedule: r.work_schedule || undefined,
+    status: r.status,
+    created_at: toIsoString(r.created_at),
   };
+}
+
+function isPublicVisible(job: { status?: string }) {
+  return job.status === 'open' || job.status === 'in_progress';
 }
 
 const parseIntOrNull = (v: unknown): number | null => {
@@ -75,27 +82,49 @@ const parseIntOrNull = (v: unknown): number | null => {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 
+async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
+  const items = await listSiamrajUnitRequests({ limit, mode: 'all' });
+  return items.filter(isPublicVisible).map((j) => toPublicJob(j as unknown as JobRow));
+}
+
+async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
+  const item = await getSiamrajUnitRequestById(id);
+  if (!item || !isPublicVisible(item)) return null;
+  return toPublicJob(item as unknown as JobRow);
+}
+
 export default async function handler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'GET') return sendError(res, 405, 'Method not allowed');
 
   try {
     const id = getString(req.query?.id);
+    const limit = Math.min(200, Math.max(1, parseIntOrNull(req.query?.limit) ?? 50));
+
+    if (isSiamrajUnitRequestsEnabled()) {
+      if (id) {
+        const job = await getPublicSiamrajJob(id);
+        if (!job) return sendError(res, 404, 'Not found', 'Job not found');
+        return res.status(200).json(job);
+      }
+      const jobs = await listPublicSiamrajJobs(limit);
+      return res.status(200).json(jobs);
+    }
+
     if (id) {
       const { rows } = await dbQuery<JobRow>(
         `select * from jarvis_rm.jobs where id = $1 and status in ('open', 'in_progress') limit 1`,
         [id],
       );
       if (rows.length === 0) return sendError(res, 404, 'Not found', 'Job not found');
-      return res.status(200).json(toJobResponse(rows[0]));
+      return res.status(200).json(toPublicJob(rows[0]));
     }
 
-    const limit = Math.min(100, Math.max(1, parseIntOrNull(req.query?.limit) ?? 50));
     const { rows } = await dbQuery<JobRow>(
       `select * from jarvis_rm.jobs where status in ('open', 'in_progress') order by created_at desc limit $1`,
       [limit],
     );
-    return res.status(200).json(rows.map(toJobResponse));
+    return res.status(200).json(rows.map(toPublicJob));
   } catch (e) {
     return handleApiError(res, e, 'public/jobs');
   }

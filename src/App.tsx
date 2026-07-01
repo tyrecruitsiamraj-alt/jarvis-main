@@ -38,6 +38,7 @@ import AdminSettings from "@/pages/settings/AdminSettings";
 import ChangePasswordPage from "@/pages/ChangePasswordPage";
 import NotFound from "./pages/NotFound";
 import RoleHubPage from "./pages/RoleHubPage";
+import RequireRole from "@/components/auth/RequireRole";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +48,7 @@ const ProtectedRoutes = () => {
     return (
       <div className="jarvis-warm-bg min-h-screen flex items-center justify-center text-muted-foreground text-sm">
         <div className="jarvis-frost px-8 py-6 text-center">
-          <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-orange-400/40 border-t-orange-500 animate-spin" aria-hidden />
+          <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-blue-400/40 border-t-blue-500 animate-spin" aria-hidden />
           กำลังโหลด session…
         </div>
       </div>
@@ -58,7 +59,8 @@ const ProtectedRoutes = () => {
   }
   return (
     <AppLayout>
-      <Routes>
+      <RequireRole>
+        <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/staff" element={<RoleHubPage role="staff" />} />
         <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />
@@ -89,7 +91,8 @@ const ProtectedRoutes = () => {
         <Route path="/settings" element={<AdminSettings />} />
         <Route path="/account/change-password" element={<ChangePasswordPage />} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </RequireRole>
     </AppLayout>
   );
 };

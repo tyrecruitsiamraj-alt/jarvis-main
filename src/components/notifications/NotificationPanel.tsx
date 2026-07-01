@@ -40,7 +40,7 @@ const NotificationPanel: React.FC = () => {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-sm text-foreground">การแจ้งเตือน</h3>
           {unreadCount > 0 && (
-            <button onClick={markAllAsRead} className="text-xs text-orange-600 hover:underline flex items-center gap-1">
+            <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
               <CheckCheck className="w-3 h-3" /> อ่านทั้งหมด
             </button>
           )}
