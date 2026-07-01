@@ -49,10 +49,13 @@ function toIsoString(value: string | Date): string {
 }
 
 function toPublicJob(row: JobRow | Record<string, unknown>) {
-  const r = row as JobRow;
+  const r = row as JobRow & Record<string, unknown>;
   return {
     id: r.id,
     unit_name: r.unit_name,
+    request_no: r.request_no ?? undefined,
+    request_action_name: r.request_action_name ?? undefined,
+    resigned_employee_name: r.resigned_employee_name ?? undefined,
     request_date: toYmd(r.request_date),
     required_date: toYmd(r.required_date),
     urgency: r.urgency,
@@ -69,6 +72,7 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     vehicle_required: r.vehicle_required || undefined,
     work_schedule: r.work_schedule || undefined,
     status: r.status,
+    source: r.source || undefined,
     created_at: toIsoString(r.created_at),
   };
 }
@@ -99,7 +103,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
   try {
     const id = getString(req.query?.id);
-    const limit = Math.min(200, Math.max(1, parseIntOrNull(req.query?.limit) ?? 50));
+    const limit = Math.min(200, Math.max(1, parseIntOrNull(req.query?.limit) ?? 200));
 
     if (isSiamrajUnitRequestsEnabled()) {
       if (id) {

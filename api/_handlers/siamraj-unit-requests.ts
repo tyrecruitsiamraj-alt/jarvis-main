@@ -14,6 +14,7 @@ import {
 } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
+import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -28,7 +29,7 @@ function getQuery(req: AuthedReq, key: string): string {
  */
 async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
-  const keyOf = (it: Record<string, unknown>) => String(it.request_no || it.externalId || '');
+  const keyOf = (it: Record<string, unknown>) => String(it.request_no || it.externalId || it.id || '');
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -41,6 +42,23 @@ async function attachAssignments(items: unknown[]): Promise<void> {
     }
   } catch {
     /* ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม */
+  }
+}
+
+async function attachNotes(items: unknown[]): Promise<void> {
+  const list = items as Array<Record<string, unknown>>;
+  const keyOf = (it: Record<string, unknown>) => String(it.request_no || it.externalId || it.id || '');
+  try {
+    const keys = list.map(keyOf).filter(Boolean);
+    if (keys.length === 0) return;
+    const map = await getUnitNotesMap(keys);
+    if (map.size === 0) return;
+    for (const it of list) {
+      const n = map.get(keyOf(it));
+      if (n?.note) it.list_note = n.note;
+    }
+  } catch {
+    /* หมายเหตุเป็นข้อมูลเสริม */
   }
 }
 
@@ -84,6 +102,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const item = await getSiamrajUnitRequestById(id);
       if (!item) return sendError(res, 404, 'Not found', 'ไม่พบใบขอ');
       await attachAssignments([item]);
+      await attachNotes([item]);
       return res.status(200).json(item);
     }
 
@@ -91,6 +110,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const mode = getQuery(req, 'mode');
     const items = await listSiamrajUnitRequests({ limit, mode });
     await attachAssignments(items);
+    await attachNotes(items);
     return res.status(200).json(items);
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');

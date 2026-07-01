@@ -29,6 +29,7 @@ export type ApiResource =
   | 'branding'
   | 'siamraj-unit-requests'
   | 'siamraj-unit-assignments'
+  | 'siamraj-unit-notes'
   | 'diagnostics-outbound-ip';
 
 /**
@@ -105,6 +106,9 @@ export function minimumRoleFor(
 
     case 'siamraj-unit-assignments':
       // staff มอบหมายผู้รับผิดชอบ (สรรหา/คัดสรร) ให้ใบขอได้
+      return 'staff';
+
+    case 'siamraj-unit-notes':
       return 'staff';
 
     default:

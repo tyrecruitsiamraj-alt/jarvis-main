@@ -157,6 +157,8 @@ export interface JobRequest {
   status: JobStatus;
   closed_date?: string;
   created_at: string;
+  /** หมายเหตุจากรายการงานทั้งหมด (เก็บใน PostgreSQL สำหรับใบขอ Siamraj) */
+  list_note?: string;
 }
 
 export interface JobAssignment {

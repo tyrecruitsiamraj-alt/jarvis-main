@@ -13,7 +13,9 @@ import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { haversineKm } from '@/lib/geo';
-import { jobLatLng, parseJobsPayload } from '@/lib/jobCoords';
+import { jobLatLng } from '@/lib/jobCoords';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { Input } from '@/components/ui/input';
 
 function mergePreCheckJobs(): JobRequest[] {
@@ -37,10 +39,8 @@ const PreCheckPage: React.FC = () => {
   const [projectFilter, setProjectFilter] = useState('');
   const [radius, setRadius] = useState(10);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
-  const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(() => !isDemoMode());
-  const [jobsLoadError, setJobsLoadError] = useState('');
+  const { jobs: feedJobs, loading: loadingJobs, loadError: jobsLoadError, refetch: refetchJobs } = useUnitRequestsFeed();
   const [searching, setSearching] = useState(false);
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
@@ -49,34 +49,14 @@ const PreCheckPage: React.FC = () => {
   useEffect(() => {
     if (isDemoMode()) return;
     let cancelled = false;
-    setLoadingJobs(true);
-    setJobsLoadError('');
-    Promise.all([apiFetch('/api/jobs?limit=500'), apiFetch('/api/clients?active_only=1')])
-      .then(async ([jobsRes, clientsRes]) => {
-        const jobsJson = jobsRes.ok ? ((await jobsRes.json()) as unknown) : [];
+    apiFetch('/api/clients?active_only=1')
+      .then(async (clientsRes) => {
         const clientsJson = clientsRes.ok ? ((await clientsRes.json()) as unknown) : [];
         if (cancelled) return;
-        if (!jobsRes.ok) {
-          setJobsLoadError(
-            jobsRes.status === 401
-              ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่เพื่อโหลดรายการงาน'
-              : `โหลดรายการงานไม่สำเร็จ (HTTP ${jobsRes.status})`,
-          );
-          setApiJobs([]);
-        } else {
-          setApiJobs(parseJobsPayload(jobsJson));
-        }
         setApiClients(Array.isArray(clientsJson) ? (clientsJson as ClientWorkplace[]) : []);
       })
       .catch(() => {
-        if (!cancelled) {
-          setApiJobs([]);
-          setApiClients([]);
-          setJobsLoadError('โหลดรายการงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingJobs(false);
+        if (!cancelled) setApiClients([]);
       });
     return () => {
       cancelled = true;
@@ -85,8 +65,8 @@ const PreCheckPage: React.FC = () => {
 
   const allJobs = useMemo(() => {
     if (isDemoMode()) return mergePreCheckJobs();
-    return apiJobs;
-  }, [apiJobs]);
+    return feedJobs;
+  }, [feedJobs]);
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
@@ -195,9 +175,7 @@ const PreCheckPage: React.FC = () => {
     }
 
     if (appliedTextQuery) {
-      const byText = rowsBase.filter((j) =>
-        `${j.unit_name} ${j.location_address}`.toLowerCase().includes(appliedTextQuery),
-      );
+      const byText = rowsBase.filter((j) => unitRequestSearchBlob(j).includes(appliedTextQuery));
       if (byText.length > 0) rowsBase = byText;
     }
 
@@ -383,33 +361,7 @@ const PreCheckPage: React.FC = () => {
             <button
               type="button"
               className="shrink-0 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
-              onClick={() => {
-                if (isDemoMode()) return;
-                setJobsLoadError('');
-                setLoadingJobs(true);
-                void Promise.all([apiFetch('/api/jobs?limit=500'), apiFetch('/api/clients?active_only=1')])
-                  .then(async ([jobsRes, clientsRes]) => {
-                    if (!jobsRes.ok) {
-                      setJobsLoadError(
-                        jobsRes.status === 401
-                          ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่เพื่อโหลดรายการงาน'
-                          : `โหลดรายการงานไม่สำเร็จ (HTTP ${jobsRes.status})`,
-                      );
-                      setApiJobs([]);
-                    } else {
-                      const raw = (await jobsRes.json()) as unknown;
-                      setApiJobs(parseJobsPayload(raw));
-                      setJobsLoadError('');
-                    }
-                    const clientsJson = clientsRes.ok ? ((await clientsRes.json()) as unknown) : [];
-                    setApiClients(Array.isArray(clientsJson) ? (clientsJson as ClientWorkplace[]) : []);
-                  })
-                  .catch(() => {
-                    setApiJobs([]);
-                    setJobsLoadError('โหลดรายการงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
-                  })
-                  .finally(() => setLoadingJobs(false));
-              }}
+              onClick={() => void refetchJobs()}
             >
               โหลดใหม่
             </button>
@@ -445,7 +397,12 @@ const PreCheckPage: React.FC = () => {
               className="glass-card rounded-[1.5rem] p-4 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold text-blue-600 text-sm">{j.unit_name}</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-blue-600 text-sm">{unitRequestCardTitle(j)}</div>
+                  {unitRequestCardSubtitle(j) ? (
+                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{unitRequestCardSubtitle(j)}</div>
+                  ) : null}
+                </div>
                 <span
                   className={cn(
                     'text-xs px-2 py-0.5 rounded-full',
@@ -489,8 +446,11 @@ const PreCheckPage: React.FC = () => {
                       <Building2 className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <div className="font-bold text-foreground">{jobDetail.unit_name}</div>
-                      <div className="text-xs text-muted-foreground">{jobDetail.location_address}</div>
+                      <div className="font-bold text-foreground">{unitRequestCardTitle(jobDetail)}</div>
+                      {unitRequestCardSubtitle(jobDetail) ? (
+                        <div className="text-xs text-muted-foreground mt-0.5">{unitRequestCardSubtitle(jobDetail)}</div>
+                      ) : null}
+                      <div className="text-xs text-muted-foreground mt-1">{jobDetail.location_address}</div>
                     </div>
                   </div>
                   {detailDistance !== null ? (

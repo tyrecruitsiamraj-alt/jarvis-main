@@ -23,6 +23,26 @@ function submittedDate(job: JobRequest): Date | null {
   return parseJobDate(job.submittedAt) ?? parseJobDate(job.created_at) ?? parseJobDate(job.request_date);
 }
 
+export function getJobRequestSubmittedDate(job: JobRequest): Date | null {
+  return submittedDate(job);
+}
+
+export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
+  const submitted = submittedDate(job);
+  if (!submitted) return null;
+  const todayStart = parseISO(today.toISOString().slice(0, 10));
+  return differenceInCalendarDays(todayStart, submitted);
+}
+
+export function compareJobsByOldestRequestFirst(a: JobRequest, b: JobRequest): number {
+  const da = submittedDate(a);
+  const db = submittedDate(b);
+  if (!da && !db) return 0;
+  if (!da) return 1;
+  if (!db) return -1;
+  return da.getTime() - db.getTime();
+}
+
 export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {
   const submitted = submittedDate(job);
   const required = parseJobDate(job.required_date);

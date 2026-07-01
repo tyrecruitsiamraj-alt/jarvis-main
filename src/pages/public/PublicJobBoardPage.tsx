@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
+import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
 import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
@@ -53,9 +54,7 @@ function jobSearchBlob(j: JobRequest): string {
     extra = ' กรุงเทพ กรุงเทพฯ กทม กทม. bangkok';
   }
   if (prov) extra += ` ${prov}`;
-  return normSearch(
-    `${j.unit_name} ${addr} ${j.job_description_code_1 || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.work_schedule || ''}${extra}`,
-  );
+  return normSearch(`${unitRequestSearchBlob(j)} ${addr}${extra}`);
 }
 
 const PublicJobBoardPage: React.FC = () => {
@@ -71,7 +70,7 @@ const PublicJobBoardPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiFetch('/api/public/jobs')
+    apiFetch('/api/public/jobs?limit=200')
       .then(async (r) => {
         if (!r.ok) throw new Error('fail');
         return r.json() as Promise<JobRequest[]>;
@@ -251,9 +250,17 @@ const PublicJobBoardPage: React.FC = () => {
             >
               <CardHeader className="space-y-3 pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
-                    {job.unit_name}
-                  </h2>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
+                      {unitRequestCardTitle(job)}
+                    </h2>
+                    {unitRequestCardSubtitle(job) ? (
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{unitRequestCardSubtitle(job)}</p>
+                    ) : null}
+                    {job.unit_name && job.request_no ? (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground/80">{job.unit_name}</p>
+                    ) : null}
+                  </div>
                   {job.urgency === 'urgent' && (
                     <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
                       ด่วน
@@ -331,7 +338,7 @@ const PublicJobBoardPage: React.FC = () => {
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-md sm:max-w-lg border-border/80">
           <DialogHeader>
-            <DialogTitle className="text-left text-lg pr-8">{selected?.unit_name}</DialogTitle>
+            <DialogTitle className="text-left text-lg pr-8">{selected ? unitRequestCardTitle(selected) : ''}</DialogTitle>
             <DialogDescription className="sr-only">
               รายละเอียดตำแหน่งงานสำหรับผู้สมัคร
             </DialogDescription>

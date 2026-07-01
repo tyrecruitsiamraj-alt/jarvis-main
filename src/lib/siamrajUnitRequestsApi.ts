@@ -44,6 +44,26 @@ export async function saveSiamrajUnitAssignment(
   if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกผู้รับผิดชอบไม่สำเร็จ'));
 }
 
+export async function fetchUnitNoteHistory(limit = 50): Promise<string[]> {
+  const r = await apiFetch(`/api/siamraj/unit-notes?history=1&limit=${limit}`, { cache: 'no-store' });
+  if (!r.ok) return [];
+  const data = await readJsonSafe<{ items?: string[] }>(r);
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+export async function saveUnitRequestNote(requestNo: string, note: string): Promise<void> {
+  const r = await apiFetch('/api/siamraj/unit-notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_no: requestNo, note: note.trim() || null }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกหมายเหตุไม่สำเร็จ'));
+}
+
+export function unitRequestNoteKey(job: JobRequest): string {
+  return (job.request_no || job.externalId || job.id).trim();
+}
+
 export function isSiamrajJob(job: JobRequest): boolean {
   return job.source === 'siamraj' || job.id.startsWith('siamraj:') || job.id.startsWith('siamraj-sql:');
 }

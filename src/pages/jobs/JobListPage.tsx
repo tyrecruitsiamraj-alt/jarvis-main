@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -11,6 +11,15 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
+import { UnitRequestNoteCell } from '@/components/jobs/UnitRequestNoteField';
+import { formatYmdDmyBe } from '@/lib/dateTh';
+import {
+  compareJobsByOldestRequestFirst,
+  getJobRequestAgeDays,
+  getJobRequestSubmittedDate,
+} from '@/lib/jobUrgency';
+import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
+import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import {
   jobRoleFilterOptions,
   filterUnitRequestsByJobRole,
@@ -19,6 +28,19 @@ import {
 
 type JobListFilter = 'all' | 'active' | 'closed';
 
+function formatSubmittedDate(job: JobRequest): string {
+  const d = getJobRequestSubmittedDate(job);
+  if (!d) return '—';
+  return formatYmdDmyBe(d.toISOString().slice(0, 10));
+}
+
+function ageDaysLabel(job: JobRequest): string {
+  const days = getJobRequestAgeDays(job);
+  if (days == null) return '—';
+  if (days <= 0) return 'วันนี้';
+  return `${days} วัน`;
+}
+
 const JobListPage: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -26,8 +48,28 @@ const JobListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [jobRoleFilter, setJobRoleFilter] = useState<SiamrajJobRoleFilter>('all');
+  const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
+  const [screenerFilter, setScreenerFilter] = useState<string>('all');
+  const [staffRosterRev, setStaffRosterRev] = useState(0);
+  const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
 
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
+
+  useEffect(() => {
+    const fn = () => setStaffRosterRev((x) => x + 1);
+    window.addEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
+    return () => window.removeEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
+  }, []);
+
+  const recruiters = useMemo(() => {
+    void staffRosterRev;
+    return buildRecruiterNameOptions(jobs);
+  }, [staffRosterRev, jobs]);
+
+  const screeners = useMemo(() => {
+    void staffRosterRev;
+    return buildScreenerNameOptions(jobs);
+  }, [staffRosterRev, jobs]);
 
   const jobRoleOptions = useMemo(
     () => (siamrajPrimary ? jobRoleFilterOptions(jobs) : []),
@@ -50,17 +92,20 @@ const JobListPage: React.FC = () => {
     return roleScopedJobs
       .filter((j) => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+        if (recruiterFilter !== 'all' && j.recruiter_name !== recruiterFilter) return false;
+        if (screenerFilter !== 'all' && j.screener_name !== screenerFilter) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
       })
       .filter(
         (j) =>
-          `${j.unit_name} ${j.request_no || ''} ${j.location_address} ${j.request_action_name || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''}`
+          `${j.unit_name} ${j.request_no || ''} ${j.location_address} ${j.request_action_name || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
             .toLowerCase()
             .includes(q),
-      );
-  }, [roleScopedJobs, filter, search, unitFilter]);
+      )
+      .sort(compareJobsByOldestRequestFirst);
+  }, [roleScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
 
   const groups = useMemo(() => {
     const byUnit = new Map<string, JobRequest[]>();
@@ -71,9 +116,24 @@ const JobListPage: React.FC = () => {
       else byUnit.set(key, [j]);
     }
     return [...byUnit.entries()]
-      .map(([unit, items]) => ({ unit, items }))
-      .sort((a, b) => a.unit.localeCompare(b.unit, 'th'));
+      .map(([unit, items]) => ({
+        unit,
+        items: [...items].sort(compareJobsByOldestRequestFirst),
+      }))
+      .sort((a, b) => {
+        const oldestA = a.items[0];
+        const oldestB = b.items[0];
+        if (!oldestA || !oldestB) return a.unit.localeCompare(b.unit, 'th');
+        return compareJobsByOldestRequestFirst(oldestA, oldestB);
+      });
   }, [filtered]);
+
+  const tableColSpan = 13;
+
+  const noteForJob = (j: JobRequest) => {
+    const key = j.request_no || j.externalId || j.id;
+    return noteOverrides[key] ?? j.list_note ?? '';
+  };
 
   return (
     <div>
@@ -150,6 +210,44 @@ const JobListPage: React.FC = () => {
             </div>
           ) : null}
 
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <label htmlFor="job-list-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+              เจ้าหน้าที่สรรหา
+            </label>
+            <select
+              id="job-list-recruiter"
+              value={recruiterFilter}
+              onChange={(e) => setRecruiterFilter(e.target.value)}
+              className="jarvis-soft-field flex-1"
+            >
+              <option value="all">ทั้งหมด</option>
+              {recruiters.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <label htmlFor="job-list-screener" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+              เจ้าหน้าที่คัดสรร
+            </label>
+            <select
+              id="job-list-screener"
+              value={screenerFilter}
+              onChange={(e) => setScreenerFilter(e.target.value)}
+              className="jarvis-soft-field flex-1"
+            >
+              <option value="all">ทั้งหมด</option>
+              {screeners.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex gap-1.5 overflow-x-auto">
             {[
               { value: 'all' as const, label: 'ทั้งหมด' },
@@ -182,61 +280,92 @@ const JobListPage: React.FC = () => {
                 </div>
 
                 {group.items.map((j) => (
-                  <button
+                  <div
                     key={j.id}
-                    onClick={() => navigateToUnitRequest(j, navigate)}
-                    className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50"
+                    className="glass-card rounded-[1.5rem] p-4 border border-white/70"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold text-foreground text-sm">
-                        {j.request_no || j.unit_name}
-                      </span>
-                      <StatusBadge status={j.status} type="job" />
-                    </div>
-
-                    <div className="text-xs text-muted-foreground">
-                      {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
-                      {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
-                      {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
-                    </div>
-
-                    <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
-
-                    {(j.recruiter_name || j.screener_name) && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        ผู้รับผิดชอบ:{' '}
-                        {[
-                          j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
-                          j.screener_name ? `คัดสรร ${j.screener_name}` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
+                    <button
+                      type="button"
+                      onClick={() => navigateToUnitRequest(j, navigate)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <span className="font-semibold text-foreground text-sm">
+                          {j.request_no || j.unit_name}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
+                            ผ่านมา {ageDaysLabel(j)}
+                          </span>
+                          <StatusBadge status={j.status} type="job" />
+                        </div>
                       </div>
-                    )}
 
-                    <div className="flex items-center justify-between mt-2 text-xs">
-                      <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
-                      <JobUrgencyBadge job={j} />
+                      <div className="text-xs text-muted-foreground">
+                        {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
+                        {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
+                        {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
+                      </div>
+
+                      <div className="text-xs text-muted-foreground mt-1 grid gap-0.5">
+                        <span>กรอกโดย: {j.submittedByName || '—'}</span>
+                        <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
+                        <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+
+                      {(j.recruiter_name || j.screener_name) && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          ผู้รับผิดชอบ:{' '}
+                          {[
+                            j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
+                            j.screener_name ? `คัดสรร ${j.screener_name}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-2 text-xs">
+                        <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
+                        <JobUrgencyBadge job={j} />
+                      </div>
+                    </button>
+
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
+                      <UnitRequestNoteCell
+                        job={{ ...j, list_note: noteForJob(j) }}
+                        onSaved={(note) => {
+                          const key = j.request_no || j.externalId || j.id;
+                          setNoteOverrides((prev) => ({ ...prev, [key]: note }));
+                        }}
+                      />
                     </div>
-                  </button>
+                  </div>
                 ))}
               </section>
             ))}
           </div>
         ) : (
-          <div className="glass-card rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="glass-card rounded-xl border border-border overflow-x-auto">
+            <table className="w-full text-sm min-w-[1100px]">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">เลขที่ใบขอ</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ประเภทใบขอ</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ตำแหน่ง</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ผู้ลาออก</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">ผู้รับผิดชอบ</th>
-                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">สถานที่</th>
-                  <th className="px-4 py-3 text-center text-muted-foreground font-medium">ด่วน</th>
-                  <th className="px-4 py-3 text-right text-muted-foreground font-medium">รายได้</th>
-                  <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผ่านมา</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้กรอก</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ด่วน</th>
+                  <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะ</th>
                 </tr>
               </thead>
 
@@ -245,7 +374,7 @@ const JobListPage: React.FC = () => {
                   <React.Fragment key={group.unit}>
                     <tr className="border-b border-border bg-secondary/40">
                       <th
-                        colSpan={9}
+                        colSpan={tableColSpan}
                         scope="colgroup"
                         className="px-4 py-2 text-left font-semibold text-foreground"
                       >
@@ -262,13 +391,21 @@ const JobListPage: React.FC = () => {
                         onClick={() => navigateToUnitRequest(j, navigate)}
                         className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                       >
-                        <td className="px-4 py-3 font-medium text-foreground">{j.request_no || '—'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{j.job_description_code_1 || '—'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{j.resigned_employee_name || '—'}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">{j.request_no || '—'}</td>
+                        <td className="px-3 py-3 text-xs whitespace-nowrap">
+                          <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                            {ageDaysLabel(j)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{j.submittedByName || '—'}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatSubmittedDate(j)}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs">{j.job_description_code_1 || '—'}</td>
+                        <td className="px-3 py-3 text-muted-foreground text-xs">{j.resigned_employee_name || '—'}</td>
+                        <td className="px-3 py-3">
                           {j.recruiter_name || j.screener_name ? (
-                            <div className="text-xs leading-tight">
+                            <div className="text-xs leading-tight whitespace-nowrap">
                               <div>
                                 <span className="text-muted-foreground">สรรหา </span>
                                 {j.recruiter_name || '—'}
@@ -282,12 +419,21 @@ const JobListPage: React.FC = () => {
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{j.location_address}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-2">
+                          <UnitRequestNoteCell
+                            job={{ ...j, list_note: noteForJob(j) }}
+                            compact
+                            onSaved={(note) => {
+                              const key = j.request_no || j.externalId || j.id;
+                              setNoteOverrides((prev) => ({ ...prev, [key]: note }));
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-3 text-center">
                           <JobUrgencyBadge job={j} compact />
                         </td>
-                        <td className="px-4 py-3 text-right text-foreground">฿{j.total_income.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
+                        <td className="px-3 py-3 text-center">
                           <StatusBadge status={j.status} type="job" />
                         </td>
                       </tr>

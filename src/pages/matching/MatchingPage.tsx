@@ -11,6 +11,7 @@ import { Candidate, CANDIDATE_STATUS_LABELS } from '@/types';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
 import { useDemoAwareCandidates } from '@/hooks/useDemoAwareCandidates';
 import { haversineKm } from '@/lib/geo';
+import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSelectLabel } from '@/lib/unitRequestDisplay';
 
 type CandidateWithMatchScore = Candidate & { distance: number | null; matchScore: number };
 
@@ -60,8 +61,10 @@ const MatchingPage: React.FC = () => {
     () =>
       jobs.map((j) => ({
         value: j.id,
-        label: j.unit_name,
-        keywords: [j.location_address, j.job_type, j.job_category].filter(Boolean).join(' '),
+        label: unitRequestSelectLabel(j),
+        keywords: [j.location_address, j.request_no, j.request_action_name, j.job_type, j.job_category]
+          .filter(Boolean)
+          .join(' '),
       })),
     [jobs],
   );
@@ -139,7 +142,7 @@ const MatchingPage: React.FC = () => {
             <span className="text-blue-600 font-bold tabular-nums">{matched.length}</span> คน
             <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
             {job ? (
-              <span className="hidden sm:inline text-muted-foreground"> · {job.unit_name}</span>
+              <span className="hidden sm:inline text-muted-foreground"> · {unitRequestCardTitle(job)}</span>
             ) : null}
           </p>
         </div>

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { unitRequestCardSubtitle, unitRequestCardTitle } from '@/lib/unitRequestDisplay';
 
 const TOP_N = 10;
 
@@ -40,7 +41,10 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
       onClick={onOpen}
       className="w-full text-left rounded-2xl border border-white/70 bg-white/40 hover:bg-blue-50/40 hover:border-blue-300/40 px-3 py-2 transition-colors"
     >
-      <div className="font-medium text-foreground text-sm line-clamp-1">{job.unit_name}</div>
+      <div className="font-medium text-foreground text-sm line-clamp-1">{unitRequestCardTitle(job)}</div>
+      {unitRequestCardSubtitle(job) ? (
+        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{unitRequestCardSubtitle(job)}</div>
+      ) : null}
       <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
         <span>ต้องการ {formatYmdDmyBe(job.required_date)}</span>
         <span className={cn(job.urgency === 'urgent' ? 'text-destructive' : 'text-info')}>
