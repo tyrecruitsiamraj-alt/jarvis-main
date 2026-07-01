@@ -42,6 +42,7 @@ export function clearRuntimeDemoFlag(): void {
 
 /** โหมดสาธิต: env หรือ runtime fallback (เมื่อเปิดใช้ได้เท่านั้น) */
 export function isDemoMode(): boolean {
+  if (import.meta.env.PROD) return false;
   if (import.meta.env.VITE_DEMO_MODE === 'true') return true;
   if (!isRuntimeDemoFallbackEnabled()) return false;
   return readRuntimeDemo();
@@ -49,6 +50,7 @@ export function isDemoMode(): boolean {
 
 /** โหมดสาธิตที่ "ตั้งใจเปิด" จาก env เท่านั้น (ไม่รวม fallback อัตโนมัติ) */
 export function isConfiguredDemoMode(): boolean {
+  if (import.meta.env.PROD) return false;
   return import.meta.env.VITE_DEMO_MODE === 'true';
 }
 
