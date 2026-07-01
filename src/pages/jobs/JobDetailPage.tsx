@@ -454,7 +454,7 @@ const JobDetailPage: React.FC = () => {
         title={job.unit_name}
         backPath="/jobs/list"
         actions={
-          hasPermission('admin') ? (
+          hasPermission('supervisor') ? (
             <button
               type="button"
               onClick={openJobEdit}

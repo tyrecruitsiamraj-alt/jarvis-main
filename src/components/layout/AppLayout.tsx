@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { isConfiguredDemoMode, isRuntimeDemoFallback, isRuntimeDemoFallbackEnabled } from '@/lib/demoMode';
 import { reloadForLiveData, tryRecoverFromRuntimeDemo } from '@/lib/apiRecovery';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
+import JobNotificationWatcher from '@/components/notifications/JobNotificationWatcher';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import BottomDockNav from '@/components/layout/bottom-nav/BottomDockNav';
 import { DOCK_NAV_ITEMS, isDockPathActive } from '@/components/layout/bottom-nav/dockNavConfig';
@@ -68,6 +69,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       )}
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
+      <JobNotificationWatcher />
       {showDemoBanner ? (
         <div
           role="status"

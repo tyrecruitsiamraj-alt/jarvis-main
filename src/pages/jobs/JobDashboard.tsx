@@ -7,8 +7,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import DetailListDialog from '@/components/shared/DetailListDialog';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
-import { Briefcase, Plus, AlertTriangle, CheckCircle, ListTodo, RefreshCw } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Briefcase, AlertTriangle, CheckCircle, ListTodo, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
@@ -40,8 +39,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
 
 const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
-  const { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch } = useUnitRequestsFeed();
+  const { jobs, loading, refreshing, siamrajPrimary, dbSource, loadError, refetch } = useUnitRequestsFeed();
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
@@ -101,23 +99,16 @@ const JobDashboard: React.FC = () => {
               : 'จัดการหน่วยงานและใบขอ'
         }
         actions={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              disabled={refreshing}
-              className="flex items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50"
-              title="โหลดข้อมูลใหม่"
-            >
-              <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-              รีเฟรช
-            </button>
-            {!readOnly && hasPermission('supervisor') ? (
-              <button onClick={() => navigate('/jobs/add')} className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm">
-                <Plus className="w-4 h-4" /> สร้างงานใหม่
-              </button>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={refreshing}
+            className="flex items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50"
+            title="โหลดข้อมูลใหม่"
+          >
+            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+            รีเฟรช
+          </button>
         }
       />
       <div className="px-4 md:px-6 space-y-6">

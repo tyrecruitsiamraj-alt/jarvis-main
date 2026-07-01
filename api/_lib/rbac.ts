@@ -62,9 +62,8 @@ export function minimumRoleFor(
       return 'supervisor';
 
     case 'clients':
-      // staff: read; supervisor: limited update; admin: create/full
+      // staff: read; supervisor+: create/update/delete; settings ไม่เกี่ยว
       if (isRead) return 'staff';
-      if (m === 'POST' || m === 'DELETE') return 'admin';
       return 'supervisor';
 
     case 'work-calendar':
@@ -105,8 +104,8 @@ export function minimumRoleFor(
       return 'staff';
 
     case 'siamraj-unit-assignments':
-      // staff มอบหมายผู้รับผิดชอบ (สรรหา/คัดสรร) ให้ใบขอได้
-      return 'staff';
+      if (isRead) return 'staff';
+      return 'supervisor';
 
     case 'siamraj-unit-notes':
       return 'staff';

@@ -432,7 +432,7 @@ const AdminSettings: React.FC = () => {
                   {role === 'admin'
                     ? 'เข้าถึงได้ทุกหน้า จัดการ users, permissions, master data, dashboard, settings — แก้รายชื่อเจ้าหน้าที่สรรหา/คัดสรรได้ที่แท็บสรรหา / คัดสรร'
                     : role === 'supervisor'
-                      ? 'แก้ไขข้อมูลพนักงาน หน่วยงาน แผนงาน สถานะ matching ดู dashboard (ไม่มีสิทธิ์ Settings)'
+                      ? 'สิทธิ์เทียบเท่า Admin ในทุกโมดูลงาน (งาน ผู้สมัคร พนักงาน WL Dashboard Driver Care ฯลฯ) — ยกเว้นหน้า Settings เท่านั้น'
                       : 'ใช้งานเฉพาะหน้าที่ได้รับมอบหมาย ดู dashboard ได้แต่แก้ไขไม่ได้'}
                 </div>
               </div>

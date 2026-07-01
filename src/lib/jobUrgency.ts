@@ -43,6 +43,13 @@ export function compareJobsByOldestRequestFirst(a: JobRequest, b: JobRequest): n
   return da.getTime() - db.getTime();
 }
 
+export function compareJobsByAgeDaysDesc(a: JobRequest, b: JobRequest, today = new Date()): number {
+  const ageA = getJobRequestAgeDays(a, today) ?? -1;
+  const ageB = getJobRequestAgeDays(b, today) ?? -1;
+  if (ageA !== ageB) return ageB - ageA;
+  return compareJobsByOldestRequestFirst(a, b);
+}
+
 export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {
   const submitted = submittedDate(job);
   const required = parseJobDate(job.required_date);

@@ -24,10 +24,16 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, parseISO, endOfMonth, startOfMonth } from 'date-fns';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
+import DateRangeCalendarPicker, {
+  type DateRangeYmd,
+  isYmdInRange,
+  jobRequestDateYmd,
+} from '@/components/shared/DateRangeCalendarPicker';
+import { toYmdLocal, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   extractJobRole,
   filterUnitRequestsByJobRole,
@@ -50,12 +56,18 @@ function formatBaht(n: number) {
   return `฿${n.toLocaleString('th-TH')}`;
 }
 
+function defaultMonthRange(): DateRangeYmd {
+  const now = new Date();
+  return { from: toYmdLocal(startOfMonth(now)), to: toYmdLocal(endOfMonth(now)) };
+}
+
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [jobRoleFilter, setJobRoleFilter] = useState<SiamrajJobRoleFilter>('all');
   const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
   const [screenerFilter, setScreenerFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultMonthRange());
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState('');
@@ -97,8 +109,11 @@ const SupervisorDashboard: React.FC = () => {
   const jobRoleOptions = useMemo(() => jobRoleFilterOptions(jobs), [jobs]);
 
   const applyDashboardFilters = useCallback(
-    (source: JobRequest[], skip: Array<'unit' | 'role' | 'recruiter' | 'screener'>) => {
+    (source: JobRequest[], skip: Array<'unit' | 'role' | 'recruiter' | 'screener' | 'date'>) => {
       let result = source;
+      if (!skip.includes('date') && dateRange) {
+        result = result.filter((j) => isYmdInRange(jobRequestDateYmd(j), dateRange));
+      }
       if (!skip.includes('unit') && unitFilter !== 'all') {
         result = result.filter((j) => j.unit_name === unitFilter);
       }
@@ -113,7 +128,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       return result;
     },
-    [unitFilter, jobRoleFilter, recruiterFilter, screenerFilter],
+    [dateRange, unitFilter, jobRoleFilter, recruiterFilter, screenerFilter],
   );
 
   const filteredJobs = useMemo(() => applyDashboardFilters(jobs, []), [jobs, applyDashboardFilters]);
@@ -258,6 +273,7 @@ const SupervisorDashboard: React.FC = () => {
         title="Dashboard"
         subtitle={
           [
+            dateRange ? `วันที่กรอก: ${formatYmdDmyBe(dateRange.from)} – ${formatYmdDmyBe(dateRange.to)}` : null,
             unitFilter !== 'all' ? `หน่วยงาน: ${unitFilter}` : null,
             jobRoleFilter !== 'all' ? `ลักษณะงาน: ${jobRoleFilter}` : null,
           ]
@@ -288,7 +304,11 @@ const SupervisorDashboard: React.FC = () => {
             <span>ขอบเขตข้อมูล</span>
             <span className="text-xs font-normal text-muted-foreground">เลือกแล้วตัวเลขด้านล่างจะเปลี่ยนตามทันที</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+            <div className="sm:col-span-2 xl:col-span-2">
+              <label className="text-xs text-muted-foreground mb-1 block">ช่วงวันที่กรอกใบขอ</label>
+              <DateRangeCalendarPicker value={dateRange} onChange={setDateRange} />
+            </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">หน่วยงาน</label>
               <select

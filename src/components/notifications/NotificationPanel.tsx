@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, AlertTriangle, RefreshCw, UserCheck, AlertCircle, CheckCheck } from 'lucide-react';
+import { Bell, Briefcase, CheckCircle2, CheckCheck } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { NotificationType } from '@/types/notification';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -9,10 +9,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
 
 const typeConfig: Record<NotificationType, { icon: React.ElementType; color: string }> = {
-  urgent_job: { icon: AlertTriangle, color: 'text-destructive bg-destructive/10' },
-  status_update: { icon: RefreshCw, color: 'text-info bg-info/10' },
-  assignment: { icon: UserCheck, color: 'text-success bg-success/10' },
-  alert: { icon: AlertCircle, color: 'text-warning bg-warning/10' },
+  new_job: { icon: Briefcase, color: 'text-blue-600 bg-blue-500/10' },
+  job_closed: { icon: CheckCircle2, color: 'text-success bg-success/10' },
 };
 
 const NotificationPanel: React.FC = () => {
@@ -27,7 +25,11 @@ const NotificationPanel: React.FC = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+        <button
+          type="button"
+          className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          aria-label="การแจ้งเตือน"
+        >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
@@ -40,25 +42,32 @@ const NotificationPanel: React.FC = () => {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-sm text-foreground">การแจ้งเตือน</h3>
           {unreadCount > 0 && (
-            <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+            <button
+              type="button"
+              onClick={markAllAsRead}
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+            >
               <CheckCheck className="w-3 h-3" /> อ่านทั้งหมด
             </button>
           )}
         </div>
         <div className="max-h-80 overflow-y-auto">
           {notifications.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground text-sm">ไม่มีการแจ้งเตือน</div>
+            <div className="p-6 text-center text-muted-foreground text-sm">
+              ไม่มีการแจ้งเตือน — จะแจ้งเมื่อมีใบขอใหม่หรืองานปิดแล้ว
+            </div>
           ) : (
-            notifications.map(n => {
+            notifications.map((n) => {
               const config = typeConfig[n.type];
               const Icon = config.icon;
               return (
                 <button
                   key={n.id}
+                  type="button"
                   onClick={() => handleClick(n.id, n.link)}
                   className={cn(
                     'w-full text-left px-4 py-3 border-b border-border/50 hover:bg-secondary/50 transition-colors flex gap-3',
-                    !n.read && 'bg-primary/5'
+                    !n.read && 'bg-primary/5',
                   )}
                 >
                   <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5', config.color)}>
@@ -66,7 +75,12 @@ const NotificationPanel: React.FC = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={cn('text-sm font-medium truncate', !n.read ? 'text-foreground' : 'text-muted-foreground')}>
+                      <span
+                        className={cn(
+                          'text-sm font-medium truncate',
+                          !n.read ? 'text-foreground' : 'text-muted-foreground',
+                        )}
+                      >
                         {n.title}
                       </span>
                       {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}

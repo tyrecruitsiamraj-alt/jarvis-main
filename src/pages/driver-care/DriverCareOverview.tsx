@@ -125,12 +125,12 @@ const DriverCareOverview: React.FC = () => {
                 <div className="font-semibold text-foreground">ติดตาม Action</div>
                 <div className="text-xs text-muted-foreground mt-1">ประวัติการติดตามและสถานะเคส</div>
               </button>
-              <button type="button" onClick={() => navigate('/settings?tab=driverCare')} className="flex-1 jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left">
+              <button type="button" onClick={() => navigate('/driver-care/resources')} className="flex-1 jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left">
                 <div className="font-semibold text-foreground flex items-center gap-1.5">
                   <BookOpen className="w-4 h-4 text-blue-600" />
                   Skills & Knowledge
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">ตั้งค่าที่ Settings → Driver Care</div>
+                <div className="text-xs text-muted-foreground mt-1">จัดการทักษะและความรู้ Driver Care</div>
               </button>
             </div>
 

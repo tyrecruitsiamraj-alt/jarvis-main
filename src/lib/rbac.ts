@@ -35,7 +35,6 @@ const ROUTE_RULES: RouteRule[] = [
   { match: (p) => p === '/settings' || p.startsWith('/settings/'), minimumRole: 'admin', note: 'settings' },
   { match: (p) => p === '/supervisor', minimumRole: 'supervisor', note: 'supervisor hub' },
   { match: (p) => p === '/dashboard', minimumRole: 'supervisor', note: 'team dashboard' },
-  { match: (p) => p === '/jobs/add', minimumRole: 'supervisor', note: 'create job' },
   { match: (p) => p === '/wl/employees/add', minimumRole: 'supervisor', note: 'create employee' },
 ];
 
@@ -52,6 +51,11 @@ export function canAccessPath(userRole: UserRole | null | undefined, pathname: s
   return meetsMinimumRole(userRole, minimumRoleForPath(pathname));
 }
 
+/** หน้า Settings และฟีเจอร์ที่ผูกกับ Settings เท่านั้น */
+export function canAccessSettings(userRole: UserRole | null | undefined): boolean {
+  return userRole === 'admin';
+}
+
 /** Filter dock / menu items by minimum role. */
 export function filterByMinimumRole<T extends { minimumRole?: UserRole }>(
   items: T[],
@@ -64,15 +68,16 @@ export function filterByMinimumRole<T extends { minimumRole?: UserRole }>(
 /**
  * Permission matrix (documentation + UI helpers).
  * Backend api/_lib/rbac.ts is authoritative for API mutations.
+ * Supervisor: operational access แบบ admin — ยกเว้นหน้า /settings และ API ที่เกี่ยวกับ settings
  */
 export const PERMISSION_MATRIX = {
-  dashboard: { staff: 'read own/limited', supervisor: 'read team', admin: 'read all' },
+  dashboard: { staff: 'read own/limited', supervisor: 'read team + KPI', admin: 'read all' },
   candidates: { staff: 'create/read', supervisor: 'create/update/archive', admin: 'all' },
   jobs: { staff: 'read', supervisor: 'create/update/archive', admin: 'all' },
   employees: { staff: 'read limited', supervisor: 'create/update', admin: 'all' },
-  clients: { staff: 'read', supervisor: 'update limited', admin: 'all' },
+  clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all' },
   workCalendar: { staff: 'create own/team', supervisor: 'manage team', admin: 'all' },
-  driverCare: { staff: 'read/action if assigned', supervisor: 'manage action', admin: 'all' },
+  driverCare: { staff: 'read/action if assigned', supervisor: 'manage + recalc', admin: 'all' },
   settings: { staff: 'none', supervisor: 'none', admin: 'all' },
   auditLogs: { staff: 'none', supervisor: 'none', admin: 'all' },
 } as const;

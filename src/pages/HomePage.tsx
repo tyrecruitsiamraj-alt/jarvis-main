@@ -115,14 +115,6 @@ const HomePage: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/jobs')}
-            className="jarvis-pill-btn shrink-0 self-start sm:self-center px-6 py-3 text-sm touch-manipulation"
-          >
-            สร้างงานใหม่
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </button>
         </div>
         <div
           className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-blue-100/25"

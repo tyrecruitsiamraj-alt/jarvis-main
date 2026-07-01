@@ -14,7 +14,7 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteCell } from '@/components/jobs/UnitRequestNoteField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
-  compareJobsByOldestRequestFirst,
+  compareJobsByAgeDaysDesc,
   getJobRequestAgeDays,
   getJobRequestSubmittedDate,
 } from '@/lib/jobUrgency';
@@ -104,31 +104,8 @@ const JobListPage: React.FC = () => {
             .toLowerCase()
             .includes(q),
       )
-      .sort(compareJobsByOldestRequestFirst);
+      .sort(compareJobsByAgeDaysDesc);
   }, [roleScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
-
-  const groups = useMemo(() => {
-    const byUnit = new Map<string, JobRequest[]>();
-    for (const j of filtered) {
-      const key = j.unit_name || '—';
-      const bucket = byUnit.get(key);
-      if (bucket) bucket.push(j);
-      else byUnit.set(key, [j]);
-    }
-    return [...byUnit.entries()]
-      .map(([unit, items]) => ({
-        unit,
-        items: [...items].sort(compareJobsByOldestRequestFirst),
-      }))
-      .sort((a, b) => {
-        const oldestA = a.items[0];
-        const oldestB = b.items[0];
-        if (!oldestA || !oldestB) return a.unit.localeCompare(b.unit, 'th');
-        return compareJobsByOldestRequestFirst(oldestA, oldestB);
-      });
-  }, [filtered]);
-
-  const tableColSpan = 13;
 
   const noteForJob = (j: JobRequest) => {
     const key = j.request_no || j.externalId || j.id;
@@ -271,81 +248,74 @@ const JobListPage: React.FC = () => {
         {filtered.length === 0 && !loading ? (
           <div className="text-sm text-muted-foreground py-8 text-center">ไม่พบใบขอ</div>
         ) : isMobile ? (
-          <div className="space-y-5">
-            {groups.map((group) => (
-              <section key={group.unit} className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <h2 className="font-semibold text-foreground text-sm">{group.unit}</h2>
-                  <span className="text-xs text-muted-foreground">{group.items.length} ใบขอ</span>
-                </div>
-
-                {group.items.map((j) => (
-                  <div
-                    key={j.id}
-                    className="glass-card rounded-[1.5rem] p-4 border border-white/70"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => navigateToUnitRequest(j, navigate)}
-                      className="w-full text-left"
-                    >
-                      <div className="flex items-center justify-between mb-2 gap-2">
-                        <span className="font-semibold text-foreground text-sm">
-                          {j.request_no || j.unit_name}
-                        </span>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
-                            ผ่านมา {ageDaysLabel(j)}
-                          </span>
-                          <StatusBadge status={j.status} type="job" />
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-muted-foreground">
-                        {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
-                        {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
-                        {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
-                      </div>
-
-                      <div className="text-xs text-muted-foreground mt-1 grid gap-0.5">
-                        <span>กรอกโดย: {j.submittedByName || '—'}</span>
-                        <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
-                        <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
-                      </div>
-
-                      <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
-
-                      {(j.recruiter_name || j.screener_name) && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          ผู้รับผิดชอบ:{' '}
-                          {[
-                            j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
-                            j.screener_name ? `คัดสรร ${j.screener_name}` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between mt-2 text-xs">
-                        <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
-                        <JobUrgencyBadge job={j} />
-                      </div>
-                    </button>
-
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
-                      <UnitRequestNoteCell
-                        job={{ ...j, list_note: noteForJob(j) }}
-                        onSaved={(note) => {
-                          const key = j.request_no || j.externalId || j.id;
-                          setNoteOverrides((prev) => ({ ...prev, [key]: note }));
-                        }}
-                      />
+          <div className="space-y-3">
+            {filtered.map((j) => (
+              <div
+                key={j.id}
+                className="glass-card rounded-[1.5rem] p-4 border border-white/70"
+              >
+                <button
+                  type="button"
+                  onClick={() => navigateToUnitRequest(j, navigate)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="font-semibold text-foreground text-sm">
+                      {j.request_no || j.unit_name}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
+                        ผ่านมา {ageDaysLabel(j)}
+                      </span>
+                      <StatusBadge status={j.status} type="job" />
                     </div>
                   </div>
-                ))}
-              </section>
+
+                  <div className="text-xs font-medium text-foreground/90">{j.unit_name}</div>
+
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
+                    {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
+                    {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground mt-1 grid gap-0.5">
+                    <span>กรอกโดย: {j.submittedByName || '—'}</span>
+                    <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
+                    <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+
+                  {(j.recruiter_name || j.screener_name) && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      ผู้รับผิดชอบ:{' '}
+                      {[
+                        j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
+                        j.screener_name ? `คัดสรร ${j.screener_name}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between mt-2 text-xs">
+                    <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
+                    <JobUrgencyBadge job={j} />
+                  </div>
+                </button>
+
+                <div className="mt-3 pt-3 border-t border-border/50">
+                  <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
+                  <UnitRequestNoteCell
+                    job={{ ...j, list_note: noteForJob(j) }}
+                    onSaved={(note) => {
+                      const key = j.request_no || j.externalId || j.id;
+                      setNoteOverrides((prev) => ({ ...prev, [key]: note }));
+                    }}
+                  />
+                </div>
+              </div>
             ))}
           </div>
         ) : (
@@ -355,6 +325,7 @@ const JobListPage: React.FC = () => {
                 <tr className="border-b border-border bg-secondary/30">
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผ่านมา</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
@@ -370,75 +341,59 @@ const JobListPage: React.FC = () => {
               </thead>
 
               <tbody>
-                {groups.map((group) => (
-                  <React.Fragment key={group.unit}>
-                    <tr className="border-b border-border bg-secondary/40">
-                      <th
-                        colSpan={tableColSpan}
-                        scope="colgroup"
-                        className="px-4 py-2 text-left font-semibold text-foreground"
-                      >
-                        {group.unit}
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {group.items.length} ใบขอ
-                        </span>
-                      </th>
-                    </tr>
-
-                    {group.items.map((j) => (
-                      <tr
-                        key={j.id}
-                        onClick={() => navigateToUnitRequest(j, navigate)}
-                        className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
-                      >
-                        <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">{j.request_no || '—'}</td>
-                        <td className="px-3 py-3 text-xs whitespace-nowrap">
-                          <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                            {ageDaysLabel(j)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{j.submittedByName || '—'}</td>
-                        <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatSubmittedDate(j)}</td>
-                        <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
-                        <td className="px-3 py-3 text-muted-foreground text-xs">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
-                        <td className="px-3 py-3 text-muted-foreground text-xs">{j.job_description_code_1 || '—'}</td>
-                        <td className="px-3 py-3 text-muted-foreground text-xs">{j.resigned_employee_name || '—'}</td>
-                        <td className="px-3 py-3">
-                          {j.recruiter_name || j.screener_name ? (
-                            <div className="text-xs leading-tight whitespace-nowrap">
-                              <div>
-                                <span className="text-muted-foreground">สรรหา </span>
-                                {j.recruiter_name || '—'}
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">คัดสรร </span>
-                                {j.screener_name || '—'}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <UnitRequestNoteCell
-                            job={{ ...j, list_note: noteForJob(j) }}
-                            compact
-                            onSaved={(note) => {
-                              const key = j.request_no || j.externalId || j.id;
-                              setNoteOverrides((prev) => ({ ...prev, [key]: note }));
-                            }}
-                          />
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <JobUrgencyBadge job={j} compact />
-                        </td>
-                        <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
-                        <td className="px-3 py-3 text-center">
-                          <StatusBadge status={j.status} type="job" />
-                        </td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
+                {filtered.map((j) => (
+                  <tr
+                    key={j.id}
+                    onClick={() => navigateToUnitRequest(j, navigate)}
+                    className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
+                  >
+                    <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">{j.request_no || '—'}</td>
+                    <td className="px-3 py-3 text-xs whitespace-nowrap">
+                      <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                        {ageDaysLabel(j)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-foreground text-xs">{j.unit_name || '—'}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{j.submittedByName || '—'}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatSubmittedDate(j)}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs">{j.job_description_code_1 || '—'}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs">{j.resigned_employee_name || '—'}</td>
+                    <td className="px-3 py-3">
+                      {j.recruiter_name || j.screener_name ? (
+                        <div className="text-xs leading-tight whitespace-nowrap">
+                          <div>
+                            <span className="text-muted-foreground">สรรหา </span>
+                            {j.recruiter_name || '—'}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">คัดสรร </span>
+                            {j.screener_name || '—'}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <UnitRequestNoteCell
+                        job={{ ...j, list_note: noteForJob(j) }}
+                        compact
+                        onSaved={(note) => {
+                          const key = j.request_no || j.externalId || j.id;
+                          setNoteOverrides((prev) => ({ ...prev, [key]: note }));
+                        }}
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <JobUrgencyBadge job={j} compact />
+                    </td>
+                    <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
+                    <td className="px-3 py-3 text-center">
+                      <StatusBadge status={j.status} type="job" />
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>

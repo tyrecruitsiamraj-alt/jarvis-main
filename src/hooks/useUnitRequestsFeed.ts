@@ -5,6 +5,7 @@ import { mergeJobSources } from '@/lib/mergeJobs';
 import { apiFetch } from '@/lib/apiFetch';
 import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
+import { publishUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
@@ -134,6 +135,10 @@ export function useUnitRequestsFeed(): {
   useEffect(() => {
     siamrajPrimaryRef.current = siamrajPrimary;
   }, [siamrajPrimary]);
+
+  useEffect(() => {
+    publishUnitRequestsFeed(jobs, loading);
+  }, [jobs, loading]);
 
   return { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
 }

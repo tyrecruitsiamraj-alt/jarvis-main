@@ -1,4 +1,4 @@
-export type NotificationType = 'urgent_job' | 'status_update' | 'assignment' | 'alert';
+export type NotificationType = 'new_job' | 'job_closed';
 
 export interface Notification {
   id: string;
@@ -8,4 +8,5 @@ export interface Notification {
   timestamp: string;
   read: boolean;
   link?: string;
+  jobId?: string;
 }

@@ -21,12 +21,20 @@ describe('api rbac matrix', () => {
     expect(checkApiAccess('admin', 'app-users', 'GET').ok).toBe(true);
   });
 
-  it('clients: staff read, supervisor patch, admin post', () => {
+  it('staff cannot assign recruiter/screener; supervisor can', () => {
+    expect(checkApiAccess('staff', 'siamraj-unit-assignments', 'GET').ok).toBe(true);
+    expect(checkApiAccess('staff', 'siamraj-unit-assignments', 'POST').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'siamraj-unit-assignments', 'POST').ok).toBe(true);
+  });
+
+  it('clients: staff read, supervisor write including create', () => {
     expect(minimumRoleFor('clients', 'GET')).toBe('staff');
     expect(minimumRoleFor('clients', 'PATCH')).toBe('supervisor');
-    expect(minimumRoleFor('clients', 'POST')).toBe('admin');
+    expect(minimumRoleFor('clients', 'POST')).toBe('supervisor');
+    expect(minimumRoleFor('clients', 'DELETE')).toBe('supervisor');
     expect(checkApiAccess('supervisor', 'clients', 'PATCH').ok).toBe(true);
-    expect(checkApiAccess('supervisor', 'clients', 'POST').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'clients', 'POST').ok).toBe(true);
+    expect(checkApiAccess('supervisor', 'clients', 'DELETE').ok).toBe(true);
   });
 
   it('driver-care: staff can log actions, supervisor recalculates', () => {
@@ -51,16 +59,18 @@ describe('frontend route rbac', () => {
   it('staff cannot access admin settings or supervisor dashboard', () => {
     expect(canAccessPath('staff', '/settings')).toBe(false);
     expect(canAccessPath('staff', '/dashboard')).toBe(false);
-    expect(canAccessPath('staff', '/jobs/add')).toBe(false);
+    expect(canAccessPath('staff', '/wl/employees/add')).toBe(false);
     expect(canAccessPath('staff', '/admin')).toBe(false);
     expect(canAccessPath('staff', '/jobs')).toBe(true);
   });
 
-  it('supervisor cannot access admin routes', () => {
+  it('supervisor cannot access admin settings but can use operational routes', () => {
     expect(canAccessPath('supervisor', '/settings')).toBe(false);
     expect(canAccessPath('supervisor', '/admin')).toBe(false);
     expect(canAccessPath('supervisor', '/dashboard')).toBe(true);
-    expect(canAccessPath('supervisor', '/jobs/add')).toBe(true);
+    expect(canAccessPath('supervisor', '/wl/employees/add')).toBe(true);
+    expect(canAccessPath('supervisor', '/jobs/abc')).toBe(true);
+    expect(canAccessPath('supervisor', '/driver-care/resources')).toBe(true);
   });
 
   it('admin can access all guarded routes', () => {

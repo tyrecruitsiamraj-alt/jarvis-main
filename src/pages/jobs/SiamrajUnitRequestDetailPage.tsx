@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
@@ -12,11 +13,12 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { Database, ExternalLink, Users } from 'lucide-react';
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
-  if (value === undefined || value === null || value === '') return null;
+  const display =
+    value === undefined || value === null || value === '' ? '—' : value;
   return (
     <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
       <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="text-sm text-foreground mt-0.5 whitespace-pre-wrap">{value}</div>
+      <div className="text-sm text-foreground mt-0.5 whitespace-pre-wrap">{display}</div>
     </div>
   );
 }
@@ -24,6 +26,8 @@ function Field({ label, value }: { label: string; value?: string | number | null
 const SiamrajUnitRequestDetailPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canAssignStaff = hasPermission('supervisor');
 
   const queryClient = useQueryClient();
 
@@ -165,40 +169,52 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <Users className="w-4 h-4 text-blue-600" />
                 ผู้รับผิดชอบ
               </h3>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <RosterBackedStaffSelect
-                  role="recruiter"
-                  label="เจ้าหน้าที่สรรหา"
-                  value={recruiter}
-                  onChange={setRecruiter}
-                  optionNames={recruiterOptions}
-                  canManageRoster={false}
-                  rosterRev={rosterRev}
-                />
-                <RosterBackedStaffSelect
-                  role="screener"
-                  label="เจ้าหน้าที่คัดสรร"
-                  value={screener}
-                  onChange={setScreener}
-                  optionNames={screenerOptions}
-                  canManageRoster={false}
-                  rosterRev={rosterRev}
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void saveAssignment()}
-                  disabled={saving || !requestNo || !dirty}
-                  className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
-                >
-                  {saving ? 'กำลังบันทึก…' : 'บันทึกผู้รับผิดชอบ'}
-                </button>
-                {saveMsg && <span className="text-xs text-muted-foreground">{saveMsg}</span>}
-                {!requestNo && (
-                  <span className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกไม่ได้</span>
-                )}
-              </div>
+              {canAssignStaff ? (
+                <>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <RosterBackedStaffSelect
+                      role="recruiter"
+                      label="เจ้าหน้าที่สรรหา"
+                      value={recruiter}
+                      onChange={setRecruiter}
+                      optionNames={recruiterOptions}
+                      canManageRoster={false}
+                      rosterRev={rosterRev}
+                    />
+                    <RosterBackedStaffSelect
+                      role="screener"
+                      label="เจ้าหน้าที่คัดสรร"
+                      value={screener}
+                      onChange={setScreener}
+                      optionNames={screenerOptions}
+                      canManageRoster={false}
+                      rosterRev={rosterRev}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void saveAssignment()}
+                      disabled={saving || !requestNo || !dirty}
+                      className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
+                    >
+                      {saving ? 'กำลังบันทึก…' : 'บันทึกผู้รับผิดชอบ'}
+                    </button>
+                    {saveMsg && <span className="text-xs text-muted-foreground">{saveMsg}</span>}
+                    {!requestNo && (
+                      <span className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกไม่ได้</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <Field label="เจ้าหน้าที่สรรหา" value={data.recruiter_name} />
+                  <Field label="เจ้าหน้าที่คัดสรร" value={data.screener_name} />
+                  <p className="sm:col-span-2 text-xs text-muted-foreground">
+                    กำหนดผู้รับผิดชอบได้เฉพาะ Supervisor ขึ้นไป
+                  </p>
+                </div>
+              )}
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
