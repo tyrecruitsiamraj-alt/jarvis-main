@@ -18,24 +18,15 @@ import {
 import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff, Mail } from 'lucide-react';
 import type { UserRole } from '@/types';
+import CompanyEmailLoginGate, { MicrosoftLogo } from '@/components/auth/CompanyEmailLoginGate';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
+  emailLoginGate: boolean;
   companyEmailRequired: boolean;
   allowedDomains: string[];
   companyEmailHint: string | null;
 };
-
-function MicrosoftLogo({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="20" height="20" viewBox="0 0 21 21" aria-hidden>
-      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-    </svg>
-  );
-}
 
 // ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
 const devRoleEntryEnabled = false;
@@ -94,6 +85,8 @@ const LoginPage: React.FC = () => {
     const domain = authConfig?.allowedDomains?.[0];
     return domain ? `name@${domain}` : 'your@email.com';
   }, [authConfig]);
+
+  const emailLoginGate = authConfig?.emailLoginGate === true;
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,6 +248,21 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
+            {authConfig === null ? (
+              <p className="text-sm text-muted-foreground text-center py-6">กำลังโหลด…</p>
+            ) : emailLoginGate ? (
+              <CompanyEmailLoginGate
+                email={email}
+                onEmailChange={setEmail}
+                emailPlaceholder={emailPlaceholder}
+                companyEmailHint={authConfig.companyEmailHint}
+                magicLinkMsg={magicLinkMsg}
+                magicLinkBusy={magicLinkBusy}
+                error={error}
+                onSubmit={handleMagicLink}
+              />
+            ) : (
+              <>
             <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
               <button
                 type="button"
@@ -588,6 +596,8 @@ const LoginPage: React.FC = () => {
                 Sign in with Microsoft (Coming Soon)
               </button>
             ) : null}
+              </>
+            )}
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">

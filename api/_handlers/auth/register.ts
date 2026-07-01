@@ -15,6 +15,7 @@ import {
   isCompanyEmail,
   isCompanyEmailLoginEnforced,
 } from '../../_lib/companyEmail.js';
+import { isPostmarkConfigured } from '../../_lib/postmark.js';
 
 const GENERIC_REGISTER_DISABLED =
   'การสมัครสมาชิกด้วยตนเองปิดใช้งาน — ติดต่อผู้ดูแลระบบเพื่อขอบัญชี';
@@ -27,6 +28,15 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
 
   if (!isPublicRegistrationAllowed()) {
     return sendError(res, 403, 'Forbidden', GENERIC_REGISTER_DISABLED);
+  }
+
+  if (isPostmarkConfigured()) {
+    return sendError(
+      res,
+      403,
+      'Forbidden',
+      'การสมัครด้วยตนเองปิดใช้งาน — ติดต่อผู้ดูแลระบบเพื่อขอบัญชีอีเมลบริษัท',
+    );
   }
 
   if (!getJwtSecret()) {

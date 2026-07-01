@@ -18,6 +18,8 @@ export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
 
   return res.status(200).json({
     companyEmailLogin: emailLoginEnabled,
+    /** เมื่อ Postmark พร้อม — หน้า Login เป็นกากบัง Web ด้วยอีเมลบริษัทเท่านั้น */
+    emailLoginGate: emailLoginEnabled,
     companyEmailRequired: isCompanyEmailLoginEnforced(),
     allowedDomains: domains,
     companyEmailHint:
