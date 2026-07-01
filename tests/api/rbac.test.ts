@@ -56,9 +56,9 @@ describe('frontend route rbac', () => {
     expect(roleHomePath('admin')).toBe('/admin');
   });
 
-  it('staff cannot access admin settings or supervisor dashboard', () => {
+  it('staff cannot access admin settings or supervisor-only routes', () => {
     expect(canAccessPath('staff', '/settings')).toBe(false);
-    expect(canAccessPath('staff', '/dashboard')).toBe(false);
+    expect(canAccessPath('staff', '/dashboard')).toBe(true);
     expect(canAccessPath('staff', '/wl/employees/add')).toBe(false);
     expect(canAccessPath('staff', '/admin')).toBe(false);
     expect(canAccessPath('staff', '/jobs')).toBe(true);
@@ -81,7 +81,7 @@ describe('frontend route rbac', () => {
 
   it('minimum roles for sensitive paths', () => {
     expect(minimumRoleForPath('/settings')).toBe('admin');
-    expect(minimumRoleForPath('/dashboard')).toBe('supervisor');
+    expect(minimumRoleForPath('/dashboard')).toBe('staff');
     expect(minimumRoleForPath('/matching/candidates')).toBe('staff');
   });
 });

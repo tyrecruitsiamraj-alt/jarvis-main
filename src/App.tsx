@@ -10,6 +10,8 @@ import { BrandingProvider } from "@/contexts/BrandingContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
+import MagicLinkVerifyPage from "@/pages/MagicLinkVerifyPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import HomePage from "@/pages/HomePage";
 import WLDashboard from "@/pages/wl/WLDashboard";
 import MonthlyPlanner from "@/pages/wl/MonthlyPlanner";
@@ -121,6 +123,8 @@ const App = () => (
                 />
                 <Route path="/careers" element={<Navigate to="/apply" replace />} />
                 <Route path="/mapwork" element={<Navigate to="/apply" replace />} />
+                <Route path="/auth/magic-link" element={<MagicLinkVerifyPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/*" element={<ProtectedRoutes />} />
               </Routes>
             </BrowserRouter>

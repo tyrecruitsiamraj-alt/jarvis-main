@@ -10,6 +10,11 @@ import { readJsonBody, getString } from '../../_lib/body.js';
 import type { UserRole } from '../../_lib/auth.js';
 import { isPublicRegistrationAllowed } from '../../_lib/runtime.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
+import {
+  companyEmailRequiredMessage,
+  isCompanyEmail,
+  isCompanyEmailLoginEnforced,
+} from '../../_lib/companyEmail.js';
 
 const GENERIC_REGISTER_DISABLED =
   'การสมัครสมาชิกด้วยตนเองปิดใช้งาน — ติดต่อผู้ดูแลระบบเพื่อขอบัญชี';
@@ -59,6 +64,9 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
 
     if (!email || !password) {
       return sendError(res, 400, 'Bad request', 'email and password are required');
+    }
+    if (isCompanyEmailLoginEnforced() && !isCompanyEmail(email)) {
+      return sendError(res, 400, 'Bad request', companyEmailRequiredMessage());
     }
     if (password.length < 8) {
       return sendError(res, 400, 'Bad request', 'password must be at least 8 characters');

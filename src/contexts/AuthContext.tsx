@@ -18,6 +18,8 @@ interface AuthContextType {
   user: User | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithDevRole: (role: UserRole) => Promise<string | null>;
+  requestMagicLink: (email: string) => Promise<string | null>;
+  verifyMagicLink: (token: string) => Promise<string | null>;
   signUp: (payload: {
     email: string;
     password: string;
@@ -218,6 +220,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   }, []);
 
+  const requestMagicLink = useCallback(async (email: string): Promise<string | null> => {
+    let r: Response;
+    try {
+      r = await apiFetch('/api/auth/magic-link', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim() }),
+      });
+    } catch {
+      return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — รัน npm run dev ให้ API ทำงานพร้อมหน้าเว็บ';
+    }
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await r.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    if (!r.ok) {
+      return (
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.error === 'string' && data.error) ||
+        'ส่งลิงก์เข้าสู่ระบบไม่สำเร็จ'
+      );
+    }
+    return null;
+  }, []);
+
+  const verifyMagicLink = useCallback(async (token: string): Promise<string | null> => {
+    let r: Response;
+    try {
+      r = await apiFetch('/api/auth/magic-link-verify', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
+    } catch {
+      return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+    }
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await r.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    if (!r.ok) {
+      return (
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.error === 'string' && data.error) ||
+        'ลิงก์เข้าสู่ระบบไม่ถูกต้องหรือหมดอายุแล้ว'
+      );
+    }
+    const rawUser = data.user as Record<string, unknown> | undefined;
+    const u = rawUser ? mapApiUser(rawUser) : null;
+    if (!u) return 'Invalid response from server';
+    clearRuntimeDemoFlag();
+    setUser(u);
+    void refreshJobStaffFromApi();
+    void refreshWorkCalendarFromApi();
+    return null;
+  }, []);
+
   const signUp = useCallback(
     async (payload: {
       email: string;
@@ -287,6 +348,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         signIn,
         signInWithDevRole,
+        requestMagicLink,
+        verifyMagicLink,
         signUp,
         logout,
         hasPermission,

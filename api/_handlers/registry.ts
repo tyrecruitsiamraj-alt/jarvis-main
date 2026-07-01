@@ -21,6 +21,9 @@ import registerHandler from './auth/register.js';
 import forgotPasswordHandler from './auth/forgot-password.js';
 import resetPasswordHandler from './auth/reset-password.js';
 import changePasswordHandler from './auth/change-password.js';
+import authConfigHandler from './auth/config.js';
+import magicLinkHandler from './auth/magic-link.js';
+import magicLinkVerifyHandler from './auth/magic-link-verify.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 import driverCareHandler from './driver-care.js';
@@ -64,4 +67,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/auth/forgot-password': forgotPasswordHandler as ApiHandler,
   '/api/auth/reset-password': resetPasswordHandler as ApiHandler,
   '/api/auth/change-password': changePasswordHandler as ApiHandler,
+  '/api/auth/config': authConfigHandler as ApiHandler,
+  '/api/auth/magic-link': magicLinkHandler as ApiHandler,
+  '/api/auth/magic-link-verify': magicLinkVerifyHandler as ApiHandler,
 };

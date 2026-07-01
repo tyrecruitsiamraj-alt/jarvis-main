@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
@@ -16,18 +16,29 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiFetch';
-import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Mail } from 'lucide-react';
 import type { UserRole } from '@/types';
+
+type AuthConfig = {
+  companyEmailLogin: boolean;
+  companyEmailRequired: boolean;
+  allowedDomains: string[];
+  companyEmailHint: string | null;
+};
 
 // ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
 const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithDevRole } = useAuth();
+  const { signIn, signUp, signInWithDevRole, requestMagicLink } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'email'>('password');
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
+  const [magicLinkMsg, setMagicLinkMsg] = useState<string | null>(null);
+  const [magicLinkBusy, setMagicLinkBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -45,6 +56,57 @@ const LoginPage: React.FC = () => {
     const d = new Date();
     return d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await apiFetch('/api/auth/config');
+        if (!r.ok || cancelled) return;
+        const data = (await r.json()) as AuthConfig;
+        if (!cancelled) {
+          setAuthConfig(data);
+          if (data.companyEmailLogin) {
+            setLoginMethod('email');
+          }
+        }
+      } catch {
+        /* optional config */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const emailPlaceholder = useMemo(() => {
+    const domain = authConfig?.allowedDomains?.[0];
+    return domain ? `name@${domain}` : 'your@email.com';
+  }, [authConfig]);
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setMagicLinkMsg(null);
+    const em = email.trim();
+    if (!em) {
+      setError('กรุณากรอกอีเมลบริษัท');
+      return;
+    }
+    setMagicLinkBusy(true);
+    try {
+      const err = await requestMagicLink(em);
+      if (err) {
+        setError(err);
+        return;
+      }
+      setMagicLinkMsg(
+        'หากมีบัญชีอีเมลบริษัทนี้ในระบบ เราได้ส่งลิงก์เข้าสู่ระบบไปแล้ว กรุณาตรวจสอบอีเมลของคุณ',
+      );
+    } finally {
+      setMagicLinkBusy(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +263,80 @@ const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            {authMode === 'login' ? (
+            {authMode === 'login' && authConfig?.companyEmailLogin ? (
+              <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMethod('email');
+                    setError(null);
+                    setMagicLinkMsg(null);
+                  }}
+                  className={cn(
+                    'flex-1 rounded-full px-3 py-2 text-xs sm:text-sm font-medium transition-all',
+                    loginMethod === 'email'
+                      ? 'bg-[#141210] text-white shadow-md'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  อีเมลบริษัท
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMethod('password');
+                    setError(null);
+                    setMagicLinkMsg(null);
+                  }}
+                  className={cn(
+                    'flex-1 rounded-full px-3 py-2 text-xs sm:text-sm font-medium transition-all',
+                    loginMethod === 'password'
+                      ? 'bg-[#141210] text-white shadow-md'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  รหัสผ่าน
+                </button>
+              </div>
+            ) : null}
+
+            {authMode === 'login' && loginMethod === 'email' && authConfig?.companyEmailLogin ? (
+              <form onSubmit={handleMagicLink} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="company-email" className="text-xs font-medium text-muted-foreground ml-1">
+                    อีเมลบริษัท
+                  </Label>
+                  <input
+                    id="company-email"
+                    type="email"
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={emailPlaceholder}
+                    required
+                    className="jarvis-soft-field min-h-[48px]"
+                  />
+                  {authConfig.companyEmailHint ? (
+                    <p className="text-[11px] text-muted-foreground ml-1">{authConfig.companyEmailHint}</p>
+                  ) : null}
+                </div>
+
+                {magicLinkMsg ? (
+                  <p className="text-xs text-muted-foreground text-center rounded-xl bg-white/50 border border-white/70 px-3 py-2" role="status">
+                    {magicLinkMsg}
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={magicLinkBusy}
+                  className="jarvis-pill-btn w-full min-h-[52px] px-6 py-3 text-sm touch-manipulation"
+                >
+                  {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'ส่งลิงก์เข้าสู่ระบบ'}
+                  <Mail className="h-4 w-4" aria-hidden />
+                </button>
+              </form>
+            ) : authMode === 'login' ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-xs font-medium text-muted-foreground ml-1">
@@ -213,9 +348,13 @@ const LoginPage: React.FC = () => {
                     autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    placeholder={emailPlaceholder}
                     required
                     className="jarvis-soft-field min-h-[48px]"
                   />
+                  {authConfig?.companyEmailHint ? (
+                    <p className="text-[11px] text-muted-foreground ml-1">{authConfig.companyEmailHint}</p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2 ml-1">
@@ -316,6 +455,9 @@ const LoginPage: React.FC = () => {
                     required
                     className="jarvis-soft-field min-h-[48px]"
                   />
+                  {authConfig?.companyEmailHint ? (
+                    <p className="text-[11px] text-muted-foreground ml-1">{authConfig.companyEmailHint}</p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="passwordRegister" className="text-xs font-medium text-muted-foreground ml-1">
@@ -390,13 +532,19 @@ const LoginPage: React.FC = () => {
               </div>
             ) : null}
 
-            <button
-              type="button"
-              disabled
-              className="w-full rounded-full border border-white/40 bg-white/40 px-4 py-3 text-sm text-muted-foreground opacity-60 cursor-not-allowed"
-            >
-              Sign in with Microsoft (Coming Soon)
-            </button>
+            {authConfig?.companyEmailLogin ? (
+              <p className="text-center text-[11px] text-muted-foreground">
+                เข้าสู่ระบบด้วยอีเมลบริษัทผ่าน {authConfig.allowedDomains.map((d) => `@${d}`).join(', ')}
+              </p>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="w-full rounded-full border border-white/40 bg-white/40 px-4 py-3 text-sm text-muted-foreground opacity-60 cursor-not-allowed"
+              >
+                Sign in with Microsoft (Coming Soon)
+              </button>
+            )}
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
@@ -461,7 +609,7 @@ const LoginPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle>ลืมรหัสผ่าน</DialogTitle>
             <DialogDescription>
-              กรอกอีเมลที่ใช้ลงทะเบียน แล้วระบบจะสร้างรหัสชั่วคราวใหม่ให้ทันที
+              กรอกอีเมลที่ใช้ลงทะเบียน ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปทางอีเมล
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitForgot} className="space-y-3">

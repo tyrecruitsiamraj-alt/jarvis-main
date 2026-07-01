@@ -34,7 +34,6 @@ const ROUTE_RULES: RouteRule[] = [
   { match: (p) => p === '/admin', minimumRole: 'admin', note: 'admin hub' },
   { match: (p) => p === '/settings' || p.startsWith('/settings/'), minimumRole: 'admin', note: 'settings' },
   { match: (p) => p === '/supervisor', minimumRole: 'supervisor', note: 'supervisor hub' },
-  { match: (p) => p === '/dashboard', minimumRole: 'supervisor', note: 'team dashboard' },
   { match: (p) => p === '/wl/employees/add', minimumRole: 'supervisor', note: 'create employee' },
 ];
 

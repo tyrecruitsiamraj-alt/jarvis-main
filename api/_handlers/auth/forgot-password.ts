@@ -8,9 +8,11 @@ import { readJsonBody, getString } from '../../_lib/body.js';
 import { dbQuery } from '../../_lib/postgres.js';
 import { createPasswordResetToken } from '../../_lib/passwordReset.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
-import { logInfo } from '../../_lib/logger.js';
 import { isProductionRuntime } from '../../_lib/runtime.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
+import { sendEmail, isPostmarkConfigured } from '../../_lib/postmark.js';
+import { buildAuthUrl, buildPasswordResetEmail } from '../../_lib/emailTemplates.js';
+import { logInfo, logError } from '../../_lib/logger.js';
 
 const GENERIC_FORGOT_MESSAGE =
   'หากมีบัญชีอีเมลนี้ในระบบ เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลของคุณ';
@@ -46,9 +48,9 @@ async function forgotPasswordHandler(req: ApiReq, res: ApiRes) {
 
     if (user?.is_active) {
       const token = await createPasswordResetToken(user.id);
-      const appUrl = (process.env.APP_PUBLIC_URL || process.env.VITE_APP_URL || '').trim();
       const resetPath = `/reset-password?token=${encodeURIComponent(token)}`;
-      const resetUrl = appUrl ? `${appUrl.replace(/\/$/, '')}${resetPath}` : resetPath;
+      const resetUrl = buildAuthUrl(resetPath);
+      const expiresMinutes = Number(process.env.PASSWORD_RESET_TTL_MINUTES || 60) || 60;
 
       logInfo('auth.password_reset_issued', {
         userId: user.id,
@@ -56,13 +58,26 @@ async function forgotPasswordHandler(req: ApiReq, res: ApiRes) {
         resetUrl: isProductionRuntime() ? '[redacted]' : resetUrl,
       });
 
+      if (isPostmarkConfigured()) {
+        const mail = buildPasswordResetEmail(resetUrl, expiresMinutes);
+        try {
+          await sendEmail({
+            to: email,
+            subject: mail.subject,
+            textBody: mail.textBody,
+            htmlBody: mail.htmlBody,
+            tag: 'password-reset',
+          });
+        } catch {
+          logError('auth.password_reset.send_failed', { email });
+        }
+      }
+
       await auditFromAnonymous(req, { userId: user.id, userName: email }, {
         action: 'auth.password_reset.requested',
         entityType: 'auth',
         entityId: user.id,
       });
-
-      // Email delivery is not wired yet — token is never returned in API response.
     }
 
     return res.status(200).json({ message: GENERIC_FORGOT_MESSAGE });

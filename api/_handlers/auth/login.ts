@@ -1,7 +1,5 @@
 import { dbQuery } from '../../_lib/postgres.js';
 import {
-  signAuthToken,
-  buildSetCookieHeader,
   verifyPassword,
   getJwtSecret,
   type UserRole,
@@ -10,35 +8,19 @@ import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/
 import { readJsonBody, getString } from '../../_lib/body.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
+import {
+  companyEmailRequiredMessage,
+  isCompanyEmail,
+  isCompanyEmailLoginEnforced,
+} from '../../_lib/companyEmail.js';
+import { issueAuthSession, type AuthUserRow } from '../../_lib/authSession.js';
 
-type UserRow = {
-  id: string;
-  email: string;
+type UserRow = AuthUserRow & {
   password_hash: string;
-  role: UserRole;
-  full_name: string;
-  is_active: boolean;
-  created_at: string | Date;
 };
 
 function isUserRole(v: unknown): v is UserRole {
   return v === 'admin' || v === 'supervisor' || v === 'staff';
-}
-
-function toUserResponse(row: UserRow) {
-  const created =
-    row.created_at instanceof Date
-      ? row.created_at.toISOString().slice(0, 10)
-      : String(row.created_at).slice(0, 10);
-  return {
-    id: row.id,
-    username: row.email,
-    full_name: row.full_name || row.email,
-    email: row.email,
-    role: row.role,
-    is_active: row.is_active,
-    created_at: created,
-  };
 }
 
 export default async function handler(req: ApiReq, res: ApiRes) {
@@ -63,6 +45,10 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const password = getString(body.password);
     if (!email || !password) {
       return sendError(res, 400, 'Bad request', 'email and password are required');
+    }
+
+    if (isCompanyEmailLoginEnforced() && !isCompanyEmail(email)) {
+      return sendError(res, 400, 'Bad request', companyEmailRequiredMessage());
     }
 
     const { rows } = await dbQuery<UserRow>(
@@ -106,21 +92,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       return sendError(res, 401, 'Unauthorized', 'Invalid email or password');
     }
 
-    const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
-    const token = signAuthToken({
-      sub: row.id,
-      email: row.email,
-      role: row.role,
-    });
-
-    res.setHeader?.('Set-Cookie', buildSetCookieHeader(token, ttl));
-    await auditFromAnonymous(req, { userId: row.id, userName: row.email, userRole: row.role }, {
-      action: 'auth.login.success',
-      entityType: 'auth',
-      entityId: row.id,
-      after: { role: row.role },
-    });
-    return res.status(200).json({ user: toUserResponse(row) });
+    await issueAuthSession(req, res, row, 'auth.login.success');
   } catch (e) {
     return handleApiError(res, e, 'auth/login');
   }

@@ -18,7 +18,7 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/driver-care', label: 'Driver Care', icon: HeartPulse },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users },
   { path: '/jobs', label: 'หน่วยงาน', icon: Briefcase },
-  { path: '/dashboard', label: 'Dashboard', icon: BarChart3, minimumRole: 'supervisor' },
+  { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { path: '/settings', label: 'ตั้งค่า', icon: Settings, minimumRole: 'admin' },
 ];
 
