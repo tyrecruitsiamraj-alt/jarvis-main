@@ -23,6 +23,16 @@ jobs:
                   port: ${{ secrets.SSH_yVGCXuBGm57HHVYGy7fPORT || 22 }}
                   command_timeout: 90m
                   script: |
+                      set -euo pipefail
                       cd jarvis-main
                       git pull https://${{ secrets.GIT_USERNAME }}:${{ secrets.GIT_PASSWORD }}@github.com/tyrecruitsiamraj-alt/jarvis-main.git main
+                      chmod +x scripts/sync-env.sh
+                      ./scripts/sync-env.sh .env POSTMARK_SERVER_TOKEN "${{ secrets.POSTMARK_SERVER_TOKEN }}"
+                      ./scripts/sync-env.sh .env EMAIL_SENDER "${{ secrets.EMAIL_SENDER }}"
+                      ./scripts/sync-env.sh .env APP_PUBLIC_URL "https://jarvis.siamrajathanee.dev"
+                      ./scripts/sync-env.sh .env VITE_DEMO_MODE "false"
+                      ./scripts/sync-env.sh .env VITE_DEV_ROLE_ENTRY "false"
+                      ./scripts/sync-env.sh .env JARVIS_DEV_ROLE_LOGIN "false"
+                      ./scripts/sync-env.sh .env CORS_ALLOWED_ORIGINS "https://jarvis.siamrajathanee.dev,https://jarvis-main-tyteam.vercel.app,http://localhost:5173"
                       docker compose up -d --build
+                      docker compose exec -T app npm run db:migrate || true
