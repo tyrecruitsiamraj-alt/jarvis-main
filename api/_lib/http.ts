@@ -13,8 +13,27 @@ export type ApiRes = {
   setHeader?: (name: string, value: string | string[]) => void;
   status: (code: number) => {
     json: (body: unknown) => void;
+    end?: (chunk?: string) => void;
   };
 };
+
+/** HTTP redirect — ใช้กับ OAuth callback/start (Location + Set-Cookie) */
+export function sendRedirect(
+  res: ApiRes,
+  location: string,
+  cookies?: string | string[],
+): void {
+  if (cookies) {
+    res.setHeader?.('Set-Cookie', cookies);
+  }
+  res.setHeader?.('Location', location);
+  const out = res.status(302);
+  if (out.end) {
+    out.end();
+  } else {
+    out.json({ redirect: location });
+  }
+}
 
 export type ApiReq = {
   method?: string;

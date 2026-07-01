@@ -15,9 +15,10 @@ import {
 } from '../../_lib/companyEmail.js';
 import { issueAuthSession, type AuthUserRow } from '../../_lib/authSession.js';
 import { isPostmarkConfigured } from '../../_lib/postmark.js';
+import { isAzureAdConfigured } from '../../_lib/azureAdAuth.js';
 
 const PASSWORD_LOGIN_DISABLED_MESSAGE =
-  'กรุณาเข้าสู่ระบบด้วยอีเมลบริษัท — กดปุ่ม Microsoft แล้วตรวจสอบลิงก์ในอีเมล';
+  'กรุณาเข้าสู่ระบบด้วย Microsoft — ติดต่อผู้ดูแลระบบหากยังไม่มีบัญชี';
 
 type UserRow = AuthUserRow & {
   password_hash: string;
@@ -39,7 +40,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
   if (!rateLimitOrReject(req, res, 'auth:login', 10, 15 * 60 * 1000)) return;
 
-  if (isPostmarkConfigured()) {
+  if (isPostmarkConfigured() || isAzureAdConfigured()) {
     return sendError(res, 403, 'Forbidden', PASSWORD_LOGIN_DISABLED_MESSAGE);
   }
 

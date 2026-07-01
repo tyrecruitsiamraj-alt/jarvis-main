@@ -3,6 +3,7 @@ import {
   buildSetCookieHeader,
   type UserRole,
 } from './auth.js';
+import { azureAuthSuccessRedirect } from './azureAdAuth.js';
 import type { ApiReq, ApiRes } from './http.js';
 import { auditFromAnonymous } from './audit.js';
 
@@ -31,11 +32,16 @@ export function toUserResponse(row: AuthUserRow) {
   };
 }
 
+export type AuthSessionAuditAction =
+  | 'auth.login.success'
+  | 'auth.magic_link.success'
+  | 'auth.azure_ad.success';
+
 export async function issueAuthSession(
   req: ApiReq,
   res: ApiRes,
   row: AuthUserRow,
-  auditAction: 'auth.login.success' | 'auth.magic_link.success',
+  auditAction: AuthSessionAuditAction,
 ): Promise<void> {
   const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
   const token = signAuthToken({
@@ -52,4 +58,32 @@ export async function issueAuthSession(
     after: { role: row.role },
   });
   res.status(200).json({ user: toUserResponse(row) });
+}
+
+/** ออก session แล้วคืน URL สำหรับ redirect (OAuth callback) */
+export async function issueAuthSessionRedirect(
+  req: ApiReq,
+  res: ApiRes,
+  row: AuthUserRow,
+  returnTo: string,
+  auditAction: 'auth.azure_ad.success',
+  extraCookies: string[] = [],
+): Promise<string> {
+  const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
+  const token = signAuthToken({
+    sub: row.id,
+    email: row.email,
+    role: row.role,
+  });
+
+  const cookies = [buildSetCookieHeader(token, ttl), ...extraCookies];
+  res.setHeader?.('Set-Cookie', cookies);
+  await auditFromAnonymous(req, { userId: row.id, userName: row.email, userRole: row.role }, {
+    action: auditAction,
+    entityType: 'auth',
+    entityId: row.id,
+    after: { role: row.role },
+  });
+
+  return azureAuthSuccessRedirect(returnTo);
 }

@@ -33,6 +33,11 @@ function createRes(res: ServerResponse): VercelLikeRes {
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify(body));
         },
+        end(chunk?: string) {
+          if (res.writableEnded) return;
+          res.statusCode = code;
+          res.end(chunk);
+        },
       };
     },
   };

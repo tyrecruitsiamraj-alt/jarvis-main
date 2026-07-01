@@ -9,6 +9,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithDevRole: (role: UserRole) => Promise<string | null>;
   requestMagicLink: (email: string) => Promise<string | null>;
+  signInWithMicrosoft: (returnTo?: string) => void;
   verifyMagicLink: (token: string) => Promise<string | null>;
   signUp: (payload: {
     email: string;
@@ -193,6 +194,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   }, []);
 
+  const signInWithMicrosoft = useCallback((returnTo = '/') => {
+    const safe =
+      returnTo.startsWith('/') && !returnTo.startsWith('//') && !returnTo.startsWith('/api/')
+        ? returnTo
+        : '/';
+    window.location.assign(`/api/auth/azure-ad/start?returnTo=${encodeURIComponent(safe)}`);
+  }, []);
+
   const verifyMagicLink = useCallback(async (token: string): Promise<string | null> => {
     let r: Response;
     try {
@@ -288,6 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signInWithDevRole,
         requestMagicLink,
+        signInWithMicrosoft,
         verifyMagicLink,
         signUp,
         logout,

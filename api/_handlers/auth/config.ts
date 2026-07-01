@@ -5,6 +5,7 @@ import {
   isCompanyEmailLoginEnforced,
 } from '../../_lib/companyEmail.js';
 import { isPostmarkConfigured } from '../../_lib/postmark.js';
+import { isAzureAdConfigured } from '../../_lib/azureAdAuth.js';
 import { sendError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 
 export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
@@ -15,11 +16,14 @@ export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
 
   const domains = getCompanyEmailDomains();
   const emailLoginEnabled = isPostmarkConfigured();
+  const microsoftLogin = isAzureAdConfigured();
+  const emailLoginGate = emailLoginEnabled || microsoftLogin;
 
   return res.status(200).json({
     companyEmailLogin: emailLoginEnabled,
-    /** เมื่อ Postmark พร้อม — หน้า Login เป็นกากบัง Web ด้วยอีเมลบริษัทเท่านั้น */
-    emailLoginGate: emailLoginEnabled,
+    microsoftLogin,
+    /** เมื่อ Postmark หรือ Azure AD พร้อม — หน้า Login เป็นกากบัง Web */
+    emailLoginGate,
     companyEmailRequired: isCompanyEmailLoginEnforced(),
     allowedDomains: domains,
     companyEmailHint:

@@ -24,6 +24,8 @@ import changePasswordHandler from './auth/change-password.js';
 import authConfigHandler from './auth/config.js';
 import magicLinkHandler from './auth/magic-link.js';
 import magicLinkVerifyHandler from './auth/magic-link-verify.js';
+import azureAdStartHandler from './auth/azure-ad-start.js';
+import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
 import driverCareHandler from './driver-care.js';
@@ -70,4 +72,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/auth/config': authConfigHandler as ApiHandler,
   '/api/auth/magic-link': magicLinkHandler as ApiHandler,
   '/api/auth/magic-link-verify': magicLinkVerifyHandler as ApiHandler,
+  '/api/auth/azure-ad/start': azureAdStartHandler as ApiHandler,
+  '/api/auth/azure-ad/callback': azureAdCallbackHandler as ApiHandler,
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
@@ -22,10 +22,19 @@ import CompanyEmailLoginGate, { MicrosoftLogo } from '@/components/auth/CompanyE
 
 type AuthConfig = {
   companyEmailLogin: boolean;
+  microsoftLogin: boolean;
   emailLoginGate: boolean;
   companyEmailRequired: boolean;
   allowedDomains: string[];
   companyEmailHint: string | null;
+};
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  no_account: 'บัญชี Microsoft นี้ยังไม่ได้ลงทะเบียนในระบบ — ติดต่อผู้ดูแล',
+  disabled: 'บัญชีนี้ถูกปิดใช้งาน',
+  domain: 'กรุณาใช้อีเมลบริษัทที่อนุญาตเท่านั้น',
+  state: 'เซสชันหมดอายุ — กรุณาลองเข้าสู่ระบบอีกครั้ง',
+  oauth: 'เข้าสู่ระบบ Microsoft ไม่สำเร็จ — ลองใหม่อีกครั้ง',
 };
 
 // ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
@@ -33,7 +42,8 @@ const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, signInWithDevRole, requestMagicLink } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { signIn, signUp, signInWithDevRole, requestMagicLink, signInWithMicrosoft } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -41,6 +51,7 @@ const LoginPage: React.FC = () => {
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [magicLinkMsg, setMagicLinkMsg] = useState<string | null>(null);
   const [magicLinkBusy, setMagicLinkBusy] = useState(false);
+  const [microsoftBusy, setMicrosoftBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +69,15 @@ const LoginPage: React.FC = () => {
     const d = new Date();
     return d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }, []);
+
+  useEffect(() => {
+    const code = searchParams.get('auth_error');
+    if (!code) return;
+    setError(AUTH_ERROR_MESSAGES[code] || 'เข้าสู่ระบบไม่สำเร็จ');
+    const next = new URLSearchParams(searchParams);
+    next.delete('auth_error');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,11 +139,16 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleMicrosoftLogin = async () => {
+  const handleMicrosoftLogin = () => {
     setAuthMode('login');
     setError(null);
     setMagicLinkMsg(null);
-    await sendCompanyEmailLink();
+    if (authConfig?.microsoftLogin) {
+      setMicrosoftBusy(true);
+      signInWithMicrosoft('/');
+      return;
+    }
+    void sendCompanyEmailLink();
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -258,6 +283,10 @@ const LoginPage: React.FC = () => {
                 companyEmailHint={authConfig.companyEmailHint}
                 magicLinkMsg={magicLinkMsg}
                 magicLinkBusy={magicLinkBusy}
+                microsoftLogin={authConfig.microsoftLogin}
+                companyEmailLogin={authConfig.companyEmailLogin}
+                microsoftBusy={microsoftBusy}
+                onMicrosoftLogin={handleMicrosoftLogin}
                 error={error}
                 onSubmit={handleMagicLink}
               />
@@ -296,16 +325,22 @@ const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            {authMode === 'login' && authConfig?.companyEmailLogin ? (
+            {authMode === 'login' && (authConfig?.companyEmailLogin || authConfig?.microsoftLogin) ? (
               <>
                 <button
                   type="button"
                   className="btn-primary w-full touch-manipulation min-h-[48px]"
-                  onClick={() => void handleMicrosoftLogin()}
-                  disabled={magicLinkBusy}
+                  onClick={handleMicrosoftLogin}
+                  disabled={magicLinkBusy || microsoftBusy}
                 >
                   <MicrosoftLogo />
-                  {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'เข้าสู่ระบบด้วย Microsoft'}
+                  {microsoftBusy
+                    ? 'กำลังเปลี่ยนหน้า…'
+                    : authConfig?.microsoftLogin
+                      ? 'เข้าสู่ระบบด้วย Microsoft'
+                      : magicLinkBusy
+                        ? 'กำลังส่งลิงก์…'
+                        : 'เข้าสู่ระบบด้วย Microsoft'}
                 </button>
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center" aria-hidden>
@@ -587,7 +622,7 @@ const LoginPage: React.FC = () => {
               </div>
             ) : null}
 
-            {authMode === 'login' && !authConfig?.companyEmailLogin ? (
+            {authMode === 'login' && !authConfig?.companyEmailLogin && !authConfig?.microsoftLogin ? (
               <button
                 type="button"
                 disabled
