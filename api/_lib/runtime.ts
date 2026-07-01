@@ -20,7 +20,7 @@ function parseEnvFlag(raw: string | undefined, defaultWhenUnset: boolean): boole
   return defaultWhenUnset;
 }
 
-/** Public self-registration — ปิดใน production โดยค่าเริ่มต้น; เปิดได้ด้วย JARVIS_ALLOW_PUBLIC_REGISTER=true */
+/** Public self-registration — เปิดโดยค่าเริ่มต้น; ปิดได้ด้วย JARVIS_ALLOW_PUBLIC_REGISTER=false */
 export function isPublicRegistrationAllowed(): boolean {
-  return parseEnvFlag(process.env.JARVIS_ALLOW_PUBLIC_REGISTER, !isProductionRuntime());
+  return parseEnvFlag(process.env.JARVIS_ALLOW_PUBLIC_REGISTER, true);
 }

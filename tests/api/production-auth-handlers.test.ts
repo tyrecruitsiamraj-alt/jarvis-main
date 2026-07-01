@@ -75,9 +75,10 @@ describe('production auth handlers', () => {
     expect(dbQuery).not.toHaveBeenCalled();
   });
 
-  it('blocks public register in production runtime', async () => {
+  it('blocks public register when explicitly disabled', async () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'production';
+    process.env.JARVIS_ALLOW_PUBLIC_REGISTER = 'false';
 
     const { res, status, json } = mockRes();
     await registerHandler(

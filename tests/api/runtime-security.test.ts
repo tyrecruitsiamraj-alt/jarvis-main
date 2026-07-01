@@ -17,16 +17,17 @@ describe('runtime security', () => {
   it('treats VERCEL_ENV=production as production', () => {
     process.env.NODE_ENV = 'development';
     process.env.VERCEL_ENV = 'production';
+    delete process.env.JARVIS_ALLOW_PUBLIC_REGISTER;
     expect(isProductionRuntime()).toBe(true);
     expect(isDevRoleLoginAllowed()).toBe(false);
-    expect(isPublicRegistrationAllowed()).toBe(false);
+    expect(isPublicRegistrationAllowed()).toBe(true);
   });
 
-  it('allows public register in production when explicitly enabled', () => {
+  it('blocks public register when explicitly disabled', () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'production';
-    process.env.JARVIS_ALLOW_PUBLIC_REGISTER = 'true';
-    expect(isPublicRegistrationAllowed()).toBe(true);
+    process.env.JARVIS_ALLOW_PUBLIC_REGISTER = 'false';
+    expect(isPublicRegistrationAllowed()).toBe(false);
   });
 
   it('allows dev-role only when explicitly enabled outside production', () => {
