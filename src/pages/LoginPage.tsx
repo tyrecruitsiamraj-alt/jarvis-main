@@ -26,6 +26,17 @@ type AuthConfig = {
   companyEmailHint: string | null;
 };
 
+function MicrosoftLogo({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 21 21" aria-hidden>
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  );
+}
+
 // ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
 const devRoleEntryEnabled = false;
 
@@ -86,11 +97,16 @@ const LoginPage: React.FC = () => {
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    await sendCompanyEmailLink();
+  };
+
+  const sendCompanyEmailLink = async (emailOverride?: string) => {
     setError(null);
     setMagicLinkMsg(null);
-    const em = email.trim();
+    const em = (emailOverride ?? email).trim();
     if (!em) {
       setError('กรุณากรอกอีเมลบริษัท');
+      setLoginMethod('email');
       return;
     }
     setMagicLinkBusy(true);
@@ -100,12 +116,21 @@ const LoginPage: React.FC = () => {
         setError(err);
         return;
       }
+      setEmail(em);
+      setLoginMethod('email');
       setMagicLinkMsg(
         'หากมีบัญชีอีเมลบริษัทนี้ในระบบ เราได้ส่งลิงก์เข้าสู่ระบบไปแล้ว กรุณาตรวจสอบอีเมลของคุณ',
       );
     } finally {
       setMagicLinkBusy(false);
     }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    setAuthMode('login');
+    setError(null);
+    setMagicLinkMsg(null);
+    await sendCompanyEmailLink();
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -262,6 +287,28 @@ const LoginPage: React.FC = () => {
                 Register
               </button>
             </div>
+
+            {authMode === 'login' && authConfig?.companyEmailLogin ? (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary w-full touch-manipulation min-h-[48px]"
+                  onClick={() => void handleMicrosoftLogin()}
+                  disabled={magicLinkBusy}
+                >
+                  <MicrosoftLogo />
+                  {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'เข้าสู่ระบบด้วย Microsoft'}
+                </button>
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center" aria-hidden>
+                    <span className="w-full border-t border-border/60" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 text-muted-foreground bg-transparent">หรือ</span>
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             {authMode === 'login' && authConfig?.companyEmailLogin ? (
               <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
@@ -532,11 +579,7 @@ const LoginPage: React.FC = () => {
               </div>
             ) : null}
 
-            {authConfig?.companyEmailLogin ? (
-              <p className="text-center text-[11px] text-muted-foreground">
-                เข้าสู่ระบบด้วยอีเมลบริษัทผ่าน {authConfig.allowedDomains.map((d) => `@${d}`).join(', ')}
-              </p>
-            ) : (
+            {authMode === 'login' && !authConfig?.companyEmailLogin ? (
               <button
                 type="button"
                 disabled
@@ -544,7 +587,7 @@ const LoginPage: React.FC = () => {
               >
                 Sign in with Microsoft (Coming Soon)
               </button>
-            )}
+            ) : null}
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">

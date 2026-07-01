@@ -192,6 +192,18 @@
     @apply opacity-55 cursor-not-allowed;
   }
 
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-3 rounded-md border border-[#8c8c8c] bg-white px-4 py-3 text-sm font-semibold text-[#5e5e5e] shadow-sm transition-colors;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    @apply bg-[#f3f3f3];
+  }
+
+  .btn-primary:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
   .jarvis-menu-card {
     @apply jarvis-frost text-left transition-all duration-300;
   }
