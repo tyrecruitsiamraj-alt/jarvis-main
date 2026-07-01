@@ -1,11 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
-import { mergeJobSources, getMergedJobsInitial } from '@/lib/mergeJobs';
-import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
-import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -58,14 +55,13 @@ function jobSearchBlob(j: JobRequest): string {
 }
 
 const PublicJobBoardPage: React.FC = () => {
-  const [jobs, setJobs] = useState<JobRequest[]>(getMergedJobsInitial);
+  const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('');
   const [districtFilter, setDistrictFilter] = useState('');
   const [chip, setChip] = useState<PublicFilter>('all');
   const [selected, setSelected] = useState<JobRequest | null>(null);
-  const apiJobsRef = useRef<JobRequest[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,13 +74,11 @@ const PublicJobBoardPage: React.FC = () => {
       .then((data) => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? enrichJobsWithUrgency(data) : [];
-        apiJobsRef.current = arr;
-        setJobs(isConfiguredDemoMode() ? mergeJobSources(arr, getJobs()) : arr);
+        setJobs(arr);
       })
       .catch(() => {
         if (cancelled) return;
-        apiJobsRef.current = [];
-        setJobs(isConfiguredDemoMode() ? mergeJobSources([], getJobs()) : []);
+        setJobs([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -92,13 +86,6 @@ const PublicJobBoardPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    if (!isConfiguredDemoMode()) return;
-    const sync = () => setJobs(mergeJobSources(apiJobsRef.current, getJobs()));
-    window.addEventListener(DEMO_JOBS_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(DEMO_JOBS_CHANGED_EVENT, sync);
   }, []);
 
   const visible = useMemo(() => {

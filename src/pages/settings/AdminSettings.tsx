@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { mockUsers, mockAuditLogs } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
@@ -11,7 +10,6 @@ import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
 import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
-import { isDemoMode } from '@/lib/demoMode';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 
 type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare' | 'outboundIp';
@@ -47,7 +45,6 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
 const AdminSettings: React.FC = () => {
   const { hasPermission, user } = useAuth();
   const canAdmin = hasPermission('admin');
-  const demo = isDemoMode();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const initialTab: SettingsTab =
@@ -74,7 +71,7 @@ const AdminSettings: React.FC = () => {
   const [newRefValue, setNewRefValue] = useState('');
 
   useEffect(() => {
-    if (!canAdmin || demo) return;
+    if (!canAdmin) return;
     if (activeTab === 'users') {
       setUsersLoading(true);
       apiFetch('/api/app-users')
@@ -94,7 +91,7 @@ const AdminSettings: React.FC = () => {
         .catch(() => setApiAuditLogs([]))
         .finally(() => setAuditLoading(false));
     }
-  }, [canAdmin, activeTab, demo]);
+  }, [canAdmin, activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'users') return;
@@ -103,7 +100,6 @@ const AdminSettings: React.FC = () => {
   }, [activeTab]);
 
   const updateUser = async (id: string, patch: { role?: User['role']; is_active?: boolean }) => {
-    if (demo) return;
     setSavingUserId(id);
     setUserActionError('');
     setUserActionOk('');
@@ -220,54 +216,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'appearance' && <BrandingAppearanceTab />}
 
         {activeTab === 'users' &&
-          (demo ? (
-            <div className="glass-card rounded-xl border border-border overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-secondary/30">
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อ</th>
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">Username</th>
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockUsers.map((u) => (
-                    <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
-                      <td className="px-4 py-3 font-medium text-foreground">{u.full_name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            u.role === 'admin'
-                              ? 'bg-destructive/15 text-destructive'
-                              : u.role === 'supervisor'
-                                ? 'bg-warning/15 text-warning'
-                                : 'bg-info/15 text-info',
-                          )}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            u.is_active ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {u.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : usersLoading ? (
+          (usersLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
           ) : (
             <div className="glass-card rounded-xl border border-border overflow-x-auto">
@@ -351,7 +300,7 @@ const AdminSettings: React.FC = () => {
             </div>
           ))}
 
-        {activeTab === 'users' && !demo && !usersLoading && (
+        {activeTab === 'users' && !usersLoading && (
           <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
             <div className="text-sm font-semibold text-foreground">จัดการสิทธิ์ผู้ใช้</div>
             {userActionError ? (
@@ -430,10 +379,10 @@ const AdminSettings: React.FC = () => {
                 <div className="font-semibold text-foreground capitalize mb-2">{role}</div>
                 <div className="text-sm text-muted-foreground">
                   {role === 'admin'
-                    ? 'เข้าถึงได้ทุกหน้า จัดการ users, permissions, master data, dashboard, settings — แก้รายชื่อเจ้าหน้าที่สรรหา/คัดสรรได้ที่แท็บสรรหา / คัดสรร'
+                    ? 'เข้าถึงได้ทุกหน้า จัดการ users, settings และ master data'
                     : role === 'supervisor'
-                      ? 'สิทธิ์เทียบเท่า Admin ในทุกโมดูลงาน (งาน ผู้สมัคร พนักงาน WL Dashboard Driver Care ฯลฯ) — ยกเว้นหน้า Settings เท่านั้น'
-                      : 'ใช้งานเฉพาะหน้าที่ได้รับมอบหมาย ดู dashboard ได้แต่แก้ไขไม่ได้'}
+                      ? 'ดู Dashboard ได้ — กำหนดเจ้าหน้าที่สรรหา/คัดสรร และแก้ไขข้อมูลได้ (ยกเว้นหน้า Settings)'
+                      : 'ดู Dashboard และข้อมูลได้ — แก้ไขข้อมูลหรือกำหนดผู้รับผิดชอบไม่ได้ (เฉพาะ Supervisor ขึ้นไป)'}
                 </div>
               </div>
             ))}
@@ -515,34 +464,7 @@ const AdminSettings: React.FC = () => {
         )}
 
         {activeTab === 'audit' &&
-          (demo ? (
-            <div className="space-y-2">
-              {mockAuditLogs.map((log) => (
-                <div key={log.id} className="glass-card rounded-lg p-3 border border-border">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-foreground">{log.user_name}</span>
-                    <span className="text-[10px] text-muted-foreground">{log.timestamp}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <span
-                      className={cn(
-                        'px-1.5 py-0.5 rounded mr-1',
-                        log.action === 'CREATE'
-                          ? 'bg-success/15 text-success'
-                          : log.action === 'UPDATE'
-                            ? 'bg-warning/15 text-warning'
-                            : 'bg-destructive/15 text-destructive',
-                      )}
-                    >
-                      {log.action}
-                    </span>
-                    {log.entity_type} • {log.new_value}
-                    {log.old_value && <span className="text-muted-foreground/60"> (เดิม: {log.old_value})</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : auditLoading ? (
+          (auditLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลด audit log…</p>
           ) : apiAuditLogs.length === 0 ? (
             <p className="text-sm text-muted-foreground glass-card rounded-[1.5rem] p-4 border border-white/70">

@@ -11,9 +11,7 @@ RUN npm ci
 COPY . .
 
 # VITE_ variables ต้องส่งตอน build เพราะ Vite อบลงใน bundle
-ARG VITE_DEMO_MODE=false
 ARG VITE_DEV_ROLE_ENTRY=false
-ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 ENV VITE_DEV_ROLE_ENTRY=$VITE_DEV_ROLE_ENTRY
 
 RUN npm run build

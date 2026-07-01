@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, RefreshCw, UserCircle } from 'lucide-react';
+import { KeyRound, LogOut, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { cn } from '@/lib/utils';
-import { isConfiguredDemoMode, isRuntimeDemoFallback, isRuntimeDemoFallbackEnabled } from '@/lib/demoMode';
-import { reloadForLiveData, tryRecoverFromRuntimeDemo } from '@/lib/apiRecovery';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import JobNotificationWatcher from '@/components/notifications/JobNotificationWatcher';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -21,45 +19,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
   const navItems = filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
-  const [runtimeFallback, setRuntimeFallback] = useState(
-    () => isRuntimeDemoFallbackEnabled() && isRuntimeDemoFallback(),
-  );
-  const [recovering, setRecovering] = useState(false);
-
-  const attemptRecovery = async (reloadOnSuccess = true) => {
-    if (!isRuntimeDemoFallbackEnabled() || !isRuntimeDemoFallback()) {
-      setRuntimeFallback(false);
-      return;
-    }
-    setRecovering(true);
-    try {
-      const result = await tryRecoverFromRuntimeDemo();
-      if (result === 'recovered') {
-        setRuntimeFallback(false);
-        if (reloadOnSuccess) reloadForLiveData();
-      }
-    } finally {
-      setRecovering(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!runtimeFallback) return;
-
-    void attemptRecovery(true);
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void attemptRecovery(true);
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    const id = window.setInterval(() => void attemptRecovery(true), 30_000);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible);
-      window.clearInterval(id);
-    };
-  }, [runtimeFallback]);
-
-  const showDemoBanner = isConfiguredDemoMode() || (isRuntimeDemoFallbackEnabled() && runtimeFallback);
 
   return (
     <div
@@ -70,31 +29,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
       <JobNotificationWatcher />
-      {showDemoBanner ? (
-        <div
-          role="status"
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 text-center text-xs py-2 px-4 sm:px-6 border-b border-amber-500/35 bg-amber-500/15 text-amber-950 dark:text-amber-100"
-        >
-          <span>
-            {runtimeFallback
-              ? recovering
-                ? 'กำลังตรวจสอบการเชื่อมต่อ API…'
-                : 'ต่อ API ไม่ได้ — ใช้ข้อมูลตัวอย่างชั่วคราว ระบบจะสลับเป็นข้อมูลจริงอัตโนมัติเมื่อ API พร้อม'
-              : 'โหมดสาธิต — ใช้ข้อมูลตัวอย่างในเบราว์เซอร์ บางส่วนอาจไม่ตรงกับฐานข้อมูลจริง'}
-          </span>
-          {runtimeFallback ? (
-            <button
-              type="button"
-              disabled={recovering}
-              onClick={() => void attemptRecovery(true)}
-              className="inline-flex items-center justify-center gap-1.5 self-center rounded-full border border-amber-600/30 bg-white/80 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-white disabled:opacity-60 touch-manipulation"
-            >
-              <RefreshCw className={cn('w-3.5 h-3.5', recovering && 'animate-spin')} />
-              ใช้ข้อมูลจริง
-            </button>
-          ) : null}
-        </div>
-      ) : null}
 
       {/* Top header — จอใหญ่ (lg+) */}
       <header className="hidden lg:flex items-center justify-between gap-4 px-4 xl:px-8 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40">

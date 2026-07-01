@@ -1,15 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { mockJobRequests, mockClients } from '@/data/mockData';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, Building2, ClipboardCheck, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
-import { getJobs } from '@/lib/demoStorage';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { haversineKm } from '@/lib/geo';
@@ -17,12 +14,6 @@ import { jobLatLng } from '@/lib/jobCoords';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { Input } from '@/components/ui/input';
-
-function mergePreCheckJobs(): JobRequest[] {
-  const map = new Map<string, JobRequest>();
-  [...mockJobRequests, ...getJobs()].forEach((j) => map.set(j.id, j));
-  return [...map.values()];
-}
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null };
 type Center = { lat: number; lng: number; label: string };
@@ -47,7 +38,6 @@ const PreCheckPage: React.FC = () => {
   const [appliedTextQuery, setAppliedTextQuery] = useState('');
 
   useEffect(() => {
-    if (isDemoMode()) return;
     let cancelled = false;
     apiFetch('/api/clients?active_only=1')
       .then(async (clientsRes) => {
@@ -63,10 +53,7 @@ const PreCheckPage: React.FC = () => {
     };
   }, []);
 
-  const allJobs = useMemo(() => {
-    if (isDemoMode()) return mergePreCheckJobs();
-    return feedJobs;
-  }, [feedJobs]);
+  const allJobs = feedJobs;
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
@@ -218,8 +205,7 @@ const PreCheckPage: React.FC = () => {
   }, [precheckResult.fallbackFromRadius]);
 
   const getClientInfo = (jobName: string): ClientWorkplace | undefined => {
-    const list = isDemoMode() ? mockClients : apiClients;
-    return list.find((c) => c.name === jobName);
+    return apiClients.find((c) => c.name === jobName);
   };
 
   const detailDistance = (() => {

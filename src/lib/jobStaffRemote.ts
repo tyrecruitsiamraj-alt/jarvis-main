@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
-import { isDemoMode } from '@/lib/demoMode';
-import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
+
+export const JOB_STAFF_ROSTER_CHANGED_EVENT = 'jarvis-job-staff-roster-changed';
 
 export type JobStaffApiState = {
   recruiters: string[];
@@ -38,9 +38,8 @@ function parseState(data: unknown): JobStaffApiState | null {
   };
 }
 
-/** โหลดรายชื่อสรรหา/คัดสรรจาก API (โหมดไม่สาธิต) แล้วอัปเดตแคช + แจ้ง UI */
+/** โหลดรายชื่อสรรหา/คัดสรรจาก API แล้วอัปเดตแคช + แจ้ง UI */
 export async function refreshJobStaffFromApi(): Promise<void> {
-  if (isDemoMode()) return;
   try {
     const r = await apiFetch('/api/job-staff');
     if (!r.ok) return;

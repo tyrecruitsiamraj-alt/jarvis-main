@@ -43,11 +43,27 @@ export function compareJobsByOldestRequestFirst(a: JobRequest, b: JobRequest): n
   return da.getTime() - db.getTime();
 }
 
+export function hasJobAssignee(job: JobRequest): boolean {
+  return Boolean(job.recruiter_name?.trim() || job.screener_name?.trim());
+}
+
 export function compareJobsByAgeDaysDesc(a: JobRequest, b: JobRequest, today = new Date()): number {
   const ageA = getJobRequestAgeDays(a, today) ?? -1;
   const ageB = getJobRequestAgeDays(b, today) ?? -1;
   if (ageA !== ageB) return ageB - ageA;
   return compareJobsByOldestRequestFirst(a, b);
+}
+
+/** มีผู้รับผิดชอบก่อน แล้วเรียงตามวันที่ผ่านมา (มาก → น้อย) */
+export function compareJobsByAssigneeThenAgeDaysDesc(
+  a: JobRequest,
+  b: JobRequest,
+  today = new Date(),
+): number {
+  const aAssigned = hasJobAssignee(a);
+  const bAssigned = hasJobAssignee(b);
+  if (aAssigned !== bAssigned) return aAssigned ? -1 : 1;
+  return compareJobsByAgeDaysDesc(a, b, today);
 }
 
 export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {

@@ -55,6 +55,23 @@ export function canAccessSettings(userRole: UserRole | null | undefined): boolea
   return userRole === 'admin';
 }
 
+/** ทุกสิทธิ์ที่ login แล้วเข้า Dashboard ได้ */
+export function canAccessDashboard(userRole: UserRole | null | undefined): boolean {
+  return Boolean(userRole);
+}
+
+/** กำหนดเจ้าหน้าที่สรรหา / คัดสรร — Supervisor ขึ้นไป */
+export function canAssignJobStaff(userRole: UserRole | null | undefined): boolean {
+  if (!userRole) return false;
+  return meetsMinimumRole(userRole, 'supervisor');
+}
+
+/** แก้ไขข้อมูลในระบบ — Supervisor ขึ้นไป (Staff อ่านอย่างเดียว) */
+export function canEditOperationalData(userRole: UserRole | null | undefined): boolean {
+  if (!userRole) return false;
+  return meetsMinimumRole(userRole, 'supervisor');
+}
+
 /** Filter dock / menu items by minimum role. */
 export function filterByMinimumRole<T extends { minimumRole?: UserRole }>(
   items: T[],
@@ -70,12 +87,12 @@ export function filterByMinimumRole<T extends { minimumRole?: UserRole }>(
  * Supervisor: operational access แบบ admin — ยกเว้นหน้า /settings และ API ที่เกี่ยวกับ settings
  */
 export const PERMISSION_MATRIX = {
-  dashboard: { staff: 'read own/limited', supervisor: 'read team + KPI', admin: 'read all' },
+  dashboard: { staff: 'read', supervisor: 'read', admin: 'read' },
   candidates: { staff: 'create/read', supervisor: 'create/update/archive', admin: 'all' },
-  jobs: { staff: 'read', supervisor: 'create/update/archive', admin: 'all' },
+  jobs: { staff: 'read', supervisor: 'create/update/assign staff', admin: 'all' },
   employees: { staff: 'read limited', supervisor: 'create/update', admin: 'all' },
   clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all' },
-  workCalendar: { staff: 'create own/team', supervisor: 'manage team', admin: 'all' },
+  workCalendar: { staff: 'read + create entries', supervisor: 'manage team', admin: 'all' },
   driverCare: { staff: 'read/action if assigned', supervisor: 'manage + recalc', admin: 'all' },
   settings: { staff: 'none', supervisor: 'none', admin: 'all' },
   auditLogs: { staff: 'none', supervisor: 'none', admin: 'all' },

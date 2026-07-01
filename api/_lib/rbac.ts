@@ -92,7 +92,7 @@ export function minimumRoleFor(
 
     case 'job-staff':
       if (isRead) return 'staff';
-      return 'admin';
+      return 'supervisor';
 
     case 'app-users':
     case 'audit-logs':
@@ -108,7 +108,8 @@ export function minimumRoleFor(
       return 'supervisor';
 
     case 'siamraj-unit-notes':
-      return 'staff';
+      if (isRead) return 'staff';
+      return 'supervisor';
 
     default:
       return 'admin';

@@ -6,7 +6,7 @@ import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
 import { Users, Search, ClipboardCheck, Briefcase, ArrowRight, type LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
-import { useDemoAwareCandidates } from '@/hooks/useDemoAwareCandidates';
+import { useCandidates } from '@/hooks/useCandidates';
 import { CANDIDATE_STATUS_LABELS, type CandidateStatus } from '@/types';
 import {
   Dialog,
@@ -59,7 +59,7 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
 const MatchingDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { jobs, loading: loadingJobs } = useDemoAwareJobs();
-  const { candidates: matchCandidates, loading: loadingMatchCandidates } = useDemoAwareCandidates();
+  const { candidates: matchCandidates, loading: loadingMatchCandidates } = useCandidates();
   const [allJobsOpen, setAllJobsOpen] = useState(false);
 
   const candidateStatusCounts = useMemo(() => {

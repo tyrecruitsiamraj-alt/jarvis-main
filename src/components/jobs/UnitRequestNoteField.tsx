@@ -1,26 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { isDemoMode } from '@/lib/demoMode';
 import {
   fetchUnitNoteHistory,
   saveUnitRequestNote,
   unitRequestNoteKey,
 } from '@/lib/siamrajUnitRequestsApi';
-import {
-  getDemoUnitNote,
-  getDemoUnitNoteHistory,
-  saveDemoUnitNote,
-  UNIT_NOTES_CHANGED_EVENT,
-} from '@/lib/unitNotesDemo';
 
 type Props = {
   requestKey: string;
   initialNote?: string;
   compact?: boolean;
+  readOnly?: boolean;
   onSaved?: (note: string) => void;
 };
 
-const UnitRequestNoteField: React.FC<Props> = ({ requestKey, initialNote = '', compact, onSaved }) => {
+const UnitRequestNoteField: React.FC<Props> = ({
+  requestKey,
+  initialNote = '',
+  compact,
+  readOnly = false,
+  onSaved,
+}) => {
   const [value, setValue] = useState(initialNote);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -36,49 +37,36 @@ const UnitRequestNoteField: React.FC<Props> = ({ requestKey, initialNote = '', c
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const items = isDemoMode() ? getDemoUnitNoteHistory() : await fetchUnitNoteHistory();
+      const items = await fetchUnitNoteHistory();
       if (!cancelled) setSuggestions(items);
     };
     void load();
-
-    if (!isDemoMode()) return () => { cancelled = true; };
-
-    const onChanged = () => setSuggestions(getDemoUnitNoteHistory());
-    window.addEventListener(UNIT_NOTES_CHANGED_EVENT, onChanged);
     return () => {
       cancelled = true;
-      window.removeEventListener(UNIT_NOTES_CHANGED_EVENT, onChanged);
     };
   }, []);
 
   const persist = useCallback(
     async (next: string) => {
+      if (readOnly) return;
       const trimmed = next.trim();
       if (trimmed === lastSaved.current.trim()) return;
 
       setSaving(true);
       setError(null);
       try {
-        if (isDemoMode()) {
-          saveDemoUnitNote(requestKey, trimmed);
-        } else {
-          await saveUnitRequestNote(requestKey, trimmed);
-        }
+        await saveUnitRequestNote(requestKey, trimmed);
         lastSaved.current = trimmed;
         onSaved?.(trimmed);
-        if (isDemoMode()) {
-          setSuggestions(getDemoUnitNoteHistory());
-        } else {
-          const items = await fetchUnitNoteHistory();
-          setSuggestions(items);
-        }
+        const items = await fetchUnitNoteHistory();
+        setSuggestions(items);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'บันทึกหมายเหตุไม่สำเร็จ');
       } finally {
         setSaving(false);
       }
     },
-    [onSaved, requestKey],
+    [onSaved, readOnly, requestKey],
   );
 
   return (
@@ -91,8 +79,9 @@ const UnitRequestNoteField: React.FC<Props> = ({ requestKey, initialNote = '', c
         type="text"
         list={listId}
         value={value}
-        placeholder="หมายเหตุ..."
-        disabled={saving}
+        placeholder={readOnly ? '—' : 'หมายเหตุ...'}
+        disabled={saving || readOnly}
+        readOnly={readOnly}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => void persist(value)}
         onKeyDown={(e) => {
@@ -127,9 +116,19 @@ export function UnitRequestNoteCell({
   compact?: boolean;
   onSaved?: (note: string) => void;
 }) {
+  const { hasPermission } = useAuth();
+  const readOnly = !hasPermission('supervisor');
   const key = unitRequestNoteKey(job as Parameters<typeof unitRequestNoteKey>[0]);
-  const initial = job.list_note ?? (isDemoMode() ? getDemoUnitNote(key) : '');
-  return <UnitRequestNoteField requestKey={key} initialNote={initial} compact={compact} onSaved={onSaved} />;
+  const initial = job.list_note ?? '';
+  return (
+    <UnitRequestNoteField
+      requestKey={key}
+      initialNote={initial}
+      compact={compact}
+      readOnly={readOnly}
+      onSaved={onSaved}
+    />
+  );
 }
 
 export default UnitRequestNoteField;

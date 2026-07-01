@@ -8,7 +8,7 @@ import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSele
 import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
-import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
+import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { Database, ExternalLink, Users } from 'lucide-react';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { checkApiAccess, meetsMinimumRole, minimumRoleFor } from '../../api/_lib/rbac';
-import { canAccessPath, minimumRoleForPath, roleHomePath } from '../../src/lib/rbac';
+import { canAccessPath, canAccessDashboard, canAssignJobStaff, canEditOperationalData, minimumRoleForPath, roleHomePath } from '../../src/lib/rbac';
 
 describe('api rbac matrix', () => {
   it('staff cannot create jobs (supervisor+ only)', () => {
@@ -17,14 +17,16 @@ describe('api rbac matrix', () => {
   it('supervisor cannot access admin settings APIs', () => {
     expect(checkApiAccess('supervisor', 'app-users', 'GET').ok).toBe(false);
     expect(checkApiAccess('supervisor', 'audit-logs', 'GET').ok).toBe(false);
-    expect(checkApiAccess('supervisor', 'job-staff', 'POST').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'job-staff', 'POST').ok).toBe(true);
     expect(checkApiAccess('admin', 'app-users', 'GET').ok).toBe(true);
   });
 
-  it('staff cannot assign recruiter/screener; supervisor can', () => {
+  it('staff cannot assign recruiter/screener or edit unit notes', () => {
     expect(checkApiAccess('staff', 'siamraj-unit-assignments', 'GET').ok).toBe(true);
     expect(checkApiAccess('staff', 'siamraj-unit-assignments', 'POST').ok).toBe(false);
     expect(checkApiAccess('supervisor', 'siamraj-unit-assignments', 'POST').ok).toBe(true);
+    expect(checkApiAccess('staff', 'siamraj-unit-notes', 'POST').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'siamraj-unit-notes', 'POST').ok).toBe(true);
   });
 
   it('clients: staff read, supervisor write including create', () => {
@@ -83,5 +85,16 @@ describe('frontend route rbac', () => {
     expect(minimumRoleForPath('/settings')).toBe('admin');
     expect(minimumRoleForPath('/dashboard')).toBe('staff');
     expect(minimumRoleForPath('/matching/candidates')).toBe('staff');
+  });
+
+  it('dashboard and edit/assign helpers', () => {
+    expect(canAccessDashboard('staff')).toBe(true);
+    expect(canAccessDashboard('supervisor')).toBe(true);
+    expect(canAccessDashboard('admin')).toBe(true);
+    expect(canAccessDashboard(null)).toBe(false);
+    expect(canAssignJobStaff('staff')).toBe(false);
+    expect(canAssignJobStaff('supervisor')).toBe(true);
+    expect(canEditOperationalData('staff')).toBe(false);
+    expect(canEditOperationalData('supervisor')).toBe(true);
   });
 });

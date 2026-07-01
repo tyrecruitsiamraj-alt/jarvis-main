@@ -16,9 +16,8 @@ import {
   type YesNo,
 } from '@/types';
 import { CANDIDATE_STAFFING_OPTIONS } from '@/lib/candidateStaffing';
-import { isDemoMode } from '@/lib/demoMode';
+import { hydrateCandidateStaffing } from '@/lib/candidateStaffing';
 import { apiFetch } from '@/lib/apiFetch';
-import { upsertCandidateInDemoStorage, hydrateCandidateStaffing } from '@/lib/demoStorage';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import { TITLE_PREFIX_OPTIONS, normalizeTitlePrefix } from '@/lib/titlePrefixOptions';
 
@@ -161,13 +160,6 @@ export const CandidateEditDialog: React.FC<CandidateEditDialogProps> = ({
           : {}),
         risk_percentage: risk,
       };
-
-      if (isDemoMode()) {
-        upsertCandidateInDemoStorage(next);
-        onSaved(hydrateCandidateStaffing(next));
-        onOpenChange(false);
-        return;
-      }
 
       const body: Record<string, unknown> = {
         id: next.id,

@@ -14,11 +14,11 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteCell } from '@/components/jobs/UnitRequestNoteField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
-  compareJobsByAgeDaysDesc,
+  compareJobsByAssigneeThenAgeDaysDesc,
   getJobRequestAgeDays,
   getJobRequestSubmittedDate,
 } from '@/lib/jobUrgency';
-import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
+import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import {
   jobRoleFilterOptions,
@@ -104,7 +104,7 @@ const JobListPage: React.FC = () => {
             .toLowerCase()
             .includes(q),
       )
-      .sort(compareJobsByAgeDaysDesc);
+      .sort(compareJobsByAssigneeThenAgeDaysDesc);
   }, [roleScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
 
   const noteForJob = (j: JobRequest) => {

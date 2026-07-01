@@ -7,7 +7,6 @@ services:
       dockerfile: Dockerfile
       args:
         # VITE_ vars อบลงใน bundle ตอน build — อ่านค่าจาก .env หรือกำหนดตรงนี้
-        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
         VITE_DEV_ROLE_ENTRY: ${VITE_DEV_ROLE_ENTRY:-false}
     image: jarvis-app:latest
     container_name: jarvis-app

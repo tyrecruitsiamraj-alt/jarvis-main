@@ -6,7 +6,6 @@ import {
   loadBranding,
   saveBranding,
 } from '@/lib/brandingStorage';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -36,7 +35,6 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [config, setConfigState] = useState<BrandingConfig>(() => loadBranding());
 
   useEffect(() => {
-    if (isDemoMode()) return;
     let cancelled = false;
     (async () => {
       try {

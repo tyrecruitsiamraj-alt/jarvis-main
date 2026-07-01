@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
-import { isDemoMode } from '@/lib/demoMode';
-import { mergeJobSources } from '@/lib/mergeJobs';
 import { apiFetch } from '@/lib/apiFetch';
 import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
@@ -9,10 +6,6 @@ import { publishUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
-
-function readMergedDemoJobs(): JobRequest[] {
-  return mergeJobSources([], getJobs());
-}
 
 async function loadLiveJobs(): Promise<{
   jobs: JobRequest[];
@@ -59,8 +52,8 @@ export function useUnitRequestsFeed(): {
   loadError: string | null;
   refetch: () => Promise<void>;
 } {
-  const [jobs, setJobs] = useState<JobRequest[]>(() => (isDemoMode() ? readMergedDemoJobs() : []));
-  const [loading, setLoading] = useState(!isDemoMode());
+  const [jobs, setJobs] = useState<JobRequest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [siamrajPrimary, setSiamrajPrimary] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
@@ -69,12 +62,6 @@ export function useUnitRequestsFeed(): {
   const siamrajPrimaryRef = useRef(false);
 
   const refetch = useCallback(async () => {
-    if (isDemoMode()) {
-      setJobs(readMergedDemoJobs());
-      setLoadError(null);
-      return;
-    }
-
     setRefreshing(true);
     try {
       const result = await loadLiveJobs();
@@ -98,22 +85,10 @@ export function useUnitRequestsFeed(): {
   }, []);
 
   useEffect(() => {
-    if (isDemoMode()) {
-      const load = () => setJobs(readMergedDemoJobs());
-      load();
-      setLoading(false);
-      setSiamrajPrimary(false);
-      setReadOnly(false);
-      window.addEventListener(DEMO_JOBS_CHANGED_EVENT, load);
-      return () => window.removeEventListener(DEMO_JOBS_CHANGED_EVENT, load);
-    }
-
     void refetch();
   }, [refetch]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
-
     const onVisible = () => {
       if (document.visibilityState === 'visible') void refetch();
     };
@@ -122,8 +97,6 @@ export function useUnitRequestsFeed(): {
   }, [refetch]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
-
     const id = window.setInterval(() => {
       if (!siamrajPrimaryRef.current) return;
       void refetch();

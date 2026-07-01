@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { cn } from '@/lib/utils';
 import { Copy, Database, Globe, RefreshCw, ShieldAlert } from 'lucide-react';
-import { isDemoMode } from '@/lib/demoMode';
 
 export type OutboundIpCheck = {
   checkedAt: string;
@@ -72,7 +71,6 @@ function formatTh(iso: string): string {
 }
 
 const VercelOutboundIpTab: React.FC = () => {
-  const demo = isDemoMode();
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +82,6 @@ const VercelOutboundIpTab: React.FC = () => {
   const allKnownIps = useMemo(() => registry.map((r) => r.ip).sort(), [registry]);
 
   const loadHistory = useCallback(async () => {
-    if (demo) return;
     setHistoryLoading(true);
     try {
       const r = await apiFetch('/api/diagnostics/outbound-ip?mode=history&limit=50', { cache: 'no-store' });
@@ -102,13 +99,9 @@ const VercelOutboundIpTab: React.FC = () => {
     } finally {
       setHistoryLoading(false);
     }
-  }, [demo]);
+  }, []);
 
   const runCheck = useCallback(async () => {
-    if (demo) {
-      setError('โหมดสาธิต — รันเช็กบน Production (Vercel) หลัง login จริง');
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -126,14 +119,12 @@ const VercelOutboundIpTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [demo, loadHistory]);
+  }, [loadHistory]);
 
   useEffect(() => {
-    if (!demo) {
-      void loadHistory();
-      void runCheck();
-    }
-  }, [demo, loadHistory, runCheck]);
+    void loadHistory();
+    void runCheck();
+  }, [loadHistory, runCheck]);
 
   const copyIps = async () => {
     const text = allKnownIps.join('\n');
@@ -164,7 +155,7 @@ const VercelOutboundIpTab: React.FC = () => {
           <button
             type="button"
             onClick={() => void runCheck()}
-            disabled={loading || demo}
+            disabled={loading}
             className="jarvis-pill-btn px-4 py-2 text-sm shrink-0 disabled:opacity-50"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />

@@ -3,16 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { mockEmployees, mockTrainingRecords } from '@/data/mockData';
 import { User, BarChart3, Award, AlertTriangle, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { Candidate, Employee, TrainingRecord } from '@/types';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
-import { getCandidates, hydrateCandidateStaffing } from '@/lib/demoStorage';
-import { mergeCandidateSources } from '@/lib/mergeCandidates';
+import { hydrateCandidateStaffing } from '@/lib/candidateStaffing';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
 import { isWlStaffingTrack, parseWlEmployeeCandidateId } from '@/lib/wlFromCandidate';
 
@@ -37,23 +34,6 @@ const EmployeeProfile: React.FC = () => {
     const candId = parseWlEmployeeCandidateId(id);
 
     if (candId) {
-      if (isDemoMode()) {
-        const list = mergeCandidateSources([], getCandidates());
-        const c = list.find((x) => x.id === candId);
-        if (!cancelled) {
-          if (c && isWlStaffingTrack(c)) {
-            setWlCandidate(c);
-            setError(null);
-          } else {
-            setError('ไม่พบผู้สมัครในกลุ่ม WL หรือถูกเปลี่ยนประเภทแล้ว');
-          }
-          setLoading(false);
-        }
-        return () => {
-          cancelled = true;
-        };
-      }
-
       apiFetch(`/api/candidates?id=${encodeURIComponent(candId)}`)
         .then(async (r) => {
           if (!r.ok) throw new Error('ไม่พบข้อมูลผู้สมัคร');
@@ -78,18 +58,6 @@ const EmployeeProfile: React.FC = () => {
           setLoading(false);
         });
 
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (isDemoMode()) {
-      const found = mockEmployees.find((e) => e.id === id) ?? null;
-      if (!cancelled) {
-        setEmployee(found);
-        setError(found ? null : 'ไม่พบข้อมูลพนักงาน');
-        setLoading(false);
-      }
       return () => {
         cancelled = true;
       };
@@ -122,7 +90,7 @@ const EmployeeProfile: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!id || parseWlEmployeeCandidateId(id) || isDemoMode()) {
+    if (!id || parseWlEmployeeCandidateId(id)) {
       setApiTrainings([]);
       return;
     }
@@ -146,11 +114,7 @@ const EmployeeProfile: React.FC = () => {
   }, [id, workCalendar]);
 
   const trainings =
-    id && !parseWlEmployeeCandidateId(id)
-      ? isDemoMode()
-        ? mockTrainingRecords.filter((t) => t.employee_id === id)
-        : apiTrainings
-      : [];
+    id && !parseWlEmployeeCandidateId(id) ? apiTrainings : [];
 
   if (loading) return <div className="p-6 text-muted-foreground">กำลังโหลดข้อมูลพนักงาน...</div>;
 
@@ -206,7 +170,6 @@ const EmployeeProfile: React.FC = () => {
         backPath="/wl/employees"
       />
       <div className="px-4 md:px-6 space-y-6">
-        {/* Info card */}
         <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
@@ -233,7 +196,6 @@ const EmployeeProfile: React.FC = () => {
           <div className="text-xs text-muted-foreground">เริ่มงาน: {formatYmdDmyBe(employee.join_date)}</div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
             title="Reliability"
@@ -261,7 +223,6 @@ const EmployeeProfile: React.FC = () => {
           />
         </div>
 
-        {/* Work history */}
         <div>
           <h3 className="text-sm font-semibold text-foreground mb-2">ประวัติการทำงาน (ล่าสุด)</h3>
           <div className="space-y-2">
@@ -282,7 +243,6 @@ const EmployeeProfile: React.FC = () => {
           </div>
         </div>
 
-        {/* Training */}
         <div>
           <h3 className="text-sm font-semibold text-foreground mb-2">ประวัติการอบรม</h3>
           <div className="space-y-2">

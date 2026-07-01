@@ -1,14 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  addRecruiterToRoster,
-  addScreenerToRoster,
-  getRecruitersRoster,
-  getScreenersRoster,
-  removeRecruiterFromRoster,
-  removeScreenerFromRoster,
-} from '@/lib/demoStorage';
 import { getJobStaffApiCache, mutateJobStaffRemote } from '@/lib/jobStaffRemote';
-import { isDemoMode } from '@/lib/demoMode';
 
 type Role = 'recruiter' | 'screener';
 
@@ -17,7 +8,7 @@ export type RosterBackedStaffSelectProps = {
   label: string;
   value: string;
   onChange: (next: string) => void;
-  /** รายชื่อใน dropdown (รวม roster + จากงาน/mock) */
+  /** รายชื่อใน dropdown (รวม roster + จากงาน) */
   optionNames: string[];
   canManageRoster: boolean;
   /** bump เมื่อ roster เปลี่ยน (ฟัง event ที่ parent แล้วส่ง rev) */
@@ -39,9 +30,6 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
 }) => {
   const rosterOnly = useMemo(() => {
     void rosterRev;
-    if (isDemoMode()) {
-      return role === 'recruiter' ? getRecruitersRoster() : getScreenersRoster();
-    }
     const c = getJobStaffApiCache();
     return role === 'recruiter' ? (c?.recruiters ?? []) : (c?.screeners ?? []);
   }, [role, rosterRev]);
@@ -57,13 +45,6 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
   const tryAdd = async () => {
     const t = addDraft.trim();
     if (!t || staffMutating) return;
-    if (isDemoMode()) {
-      if (role === 'recruiter') addRecruiterToRoster(t);
-      else addScreenerToRoster(t);
-      setAddDraft('');
-      onChange(t);
-      return;
-    }
     setStaffMutating(true);
     const res = await mutateJobStaffRemote({ op: 'add', role, name: t });
     setStaffMutating(false);
@@ -78,17 +59,12 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
   const tryRemove = async () => {
     if (!removePick || staffMutating) return;
     if (!window.confirm(`ลบ «${removePick}» ออกจากรายการหลัก?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงตามข้อมูลงาน`)) return;
-    if (isDemoMode()) {
-      if (role === 'recruiter') removeRecruiterFromRoster(removePick);
-      else removeScreenerFromRoster(removePick);
-    } else {
-      setStaffMutating(true);
-      const res = await mutateJobStaffRemote({ op: 'remove', role, name: removePick });
-      setStaffMutating(false);
-      if (!res.ok) {
-        window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-        return;
-      }
+    setStaffMutating(true);
+    const res = await mutateJobStaffRemote({ op: 'remove', role, name: removePick });
+    setStaffMutating(false);
+    if (!res.ok) {
+      window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
+      return;
     }
     if (nameMatch(value, removePick)) onChange('');
     setRemovePick('');

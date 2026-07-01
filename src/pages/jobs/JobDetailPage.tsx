@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { mockJobAssignments, mockJobRequests, mockCandidates } from '@/data/mockData';
 import type {
   Candidate,
   JobAssignment,
@@ -35,46 +34,11 @@ import {
 import SearchField from '@/components/shared/SearchField';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import {
-  appendJobAssignment,
-  getCandidates,
-  getJobAssignments,
-  getJobs,
-  JOB_STAFF_ROSTER_CHANGED_EVENT,
-  upsertJobInDemoStorage,
-} from '@/lib/demoStorage';
+import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
-
-const mergeJobsForFallback = (localItems: JobRequest[]) => {
-  const map = new Map<string, JobRequest>();
-  [...mockJobRequests, ...localItems].forEach((item) => {
-    map.set(item.id, item);
-  });
-  return [...map.values()];
-};
-
-function mergeAssignmentsForJob(
-  jobId: string | undefined,
-  includeMock: boolean,
-  fromApi: JobAssignment[],
-): JobAssignment[] {
-  if (!jobId) return [];
-  const map = new Map<string, JobAssignment>();
-  if (includeMock) {
-    mockJobAssignments.filter((a) => a.job_id === jobId).forEach((a) => map.set(a.id, a));
-  }
-  getJobAssignments()
-    .filter((a) => a.job_id === jobId)
-    .forEach((a) => map.set(a.id, a));
-  fromApi.filter((a) => a.job_id === jobId).forEach((a) => map.set(a.id, a));
-  return [...map.values()].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-}
 
 type JobEditForm = {
   unit_name: string;
@@ -157,7 +121,6 @@ const JobDetailPage: React.FC = () => {
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerCandidates, setPickerCandidates] = useState<Candidate[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
-  const [assignRev, setAssignRev] = useState(0);
   const [assignmentType, setAssignmentType] = useState<JobAssignment['assignment_type']>('trial');
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -169,11 +132,11 @@ const JobDetailPage: React.FC = () => {
 
   const recruiterNameOptions = useMemo(() => {
     void staffRosterRev;
-    return buildRecruiterNameOptions(isDemoMode() ? undefined : staffJobsForNames);
+    return buildRecruiterNameOptions(staffJobsForNames);
   }, [staffRosterRev, staffJobsForNames]);
   const screenerNameOptions = useMemo(() => {
     void staffRosterRev;
-    return buildScreenerNameOptions(isDemoMode() ? undefined : staffJobsForNames);
+    return buildScreenerNameOptions(staffJobsForNames);
   }, [staffRosterRev, staffJobsForNames]);
 
   useEffect(() => {
@@ -195,14 +158,6 @@ const JobDetailPage: React.FC = () => {
     setEditError(null);
     try {
       const updated = editFormToJob(job, editForm);
-
-      if (isDemoMode()) {
-        upsertJobInDemoStorage(updated);
-        setJob(updated);
-        setEditOpen(false);
-        setEditForm(null);
-        return;
-      }
 
       const r = await apiFetch('/api/jobs', {
         method: 'PATCH',
@@ -263,12 +218,6 @@ const JobDetailPage: React.FC = () => {
     let cancelled = false;
     setLoading(true);
 
-    const findLocal = (): JobRequest | null => {
-      if (!isDemoMode()) return null;
-      const merged = mergeJobsForFallback(getJobs());
-      return merged.find((j) => j.id === id) || null;
-    };
-
     apiFetch(`/api/jobs?id=${encodeURIComponent(id)}`)
       .then(async (r) => {
         if (!r.ok) {
@@ -281,12 +230,12 @@ const JobDetailPage: React.FC = () => {
         if (data && typeof data === 'object' && 'id' in data && data.id) {
           setJob(data);
         } else {
-          setJob(findLocal());
+          setJob(null);
         }
       })
       .catch(() => {
         if (cancelled) return;
-        setJob(findLocal());
+        setJob(null);
       })
       .finally(() => {
         if (cancelled) return;
@@ -299,7 +248,7 @@ const JobDetailPage: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!id || isDemoMode()) return;
+    if (!id) return;
     let cancelled = false;
     apiFetch('/api/jobs?limit=500')
       .then(async (r) => (r.ok ? ((await r.json()) as JobRequest[]) : []))
@@ -315,7 +264,7 @@ const JobDetailPage: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!id || isDemoMode()) {
+    if (!id) {
       setApiAssignments([]);
       return;
     }
@@ -334,20 +283,15 @@ const JobDetailPage: React.FC = () => {
   }, [id]);
 
   const assignments = useMemo(() => {
-    void assignRev;
-    return mergeAssignmentsForJob(id, isDemoMode(), apiAssignments);
-  }, [id, assignRev, apiAssignments]);
+    if (!id) return [];
+    return apiAssignments
+      .filter((a) => a.job_id === id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [id, apiAssignments]);
 
   useEffect(() => {
     if (!addOpen) return;
     setPickerSearch('');
-    if (isDemoMode()) {
-      const map = new Map<string, Candidate>();
-      [...mockCandidates, ...getCandidates()].forEach((c) => map.set(c.id, c));
-      setPickerCandidates([...map.values()]);
-      setPickerLoading(false);
-      return;
-    }
     let cancelled = false;
     setPickerLoading(true);
     apiFetch('/api/candidates?limit=500')
@@ -395,12 +339,6 @@ const JobDetailPage: React.FC = () => {
       trial_days: assignmentType === 'trial' ? 3 : 0,
       created_at: new Date().toISOString(),
     };
-    if (isDemoMode()) {
-      appendJobAssignment(row);
-      setAssignRev((n) => n + 1);
-      setAddOpen(false);
-      return;
-    }
     const r = await apiFetch('/api/job-assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -810,7 +748,7 @@ const JobDetailPage: React.FC = () => {
                   value={editForm.recruiter_name}
                   onChange={(v) => setEditForm({ ...editForm, recruiter_name: v })}
                   optionNames={recruiterNameOptions}
-                  canManageRoster={hasPermission('admin')}
+                  canManageRoster={hasPermission('supervisor')}
                   rosterRev={staffRosterRev}
                 />
                 <RosterBackedStaffSelect
@@ -819,7 +757,7 @@ const JobDetailPage: React.FC = () => {
                   value={editForm.screener_name}
                   onChange={(v) => setEditForm({ ...editForm, screener_name: v })}
                   optionNames={screenerNameOptions}
-                  canManageRoster={hasPermission('admin')}
+                  canManageRoster={hasPermission('supervisor')}
                   rosterRev={staffRosterRev}
                 />
               </div>

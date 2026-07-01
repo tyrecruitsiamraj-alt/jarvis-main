@@ -1,18 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User, UserRole } from '@/types';
-import { mockUsers } from '@/data/mockData';
-import {
-  isConfiguredDemoMode,
-  isRuntimeDemoFallback,
-  isRuntimeDemoFallbackEnabled,
-  enableRuntimeDemo,
-  clearRuntimeDemoFlag,
-} from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { refreshWorkCalendarFromApi } from '@/lib/workCalendarStore';
-
-const DEMO_STORAGE_KEY = 'jarvis_user_role';
 
 interface AuthContextType {
   user: User | null;
@@ -46,22 +36,6 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   staff: 1,
 };
 
-function isStoredRole(s: string | null): s is UserRole {
-  return s === 'admin' || s === 'supervisor' || s === 'staff';
-}
-
-function userForDemoRole(role: UserRole): User | null {
-  return mockUsers.find((u) => u.role === role) ?? null;
-}
-
-function restoreDemoUserFromStorage(): User | null {
-  const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-  if (saved && isStoredRole(saved)) {
-    return userForDemoRole(saved);
-  }
-  return null;
-}
-
 function mapApiUser(raw: Record<string, unknown>): User | null {
   const id = typeof raw.id === 'string' ? raw.id : '';
   const email = typeof raw.email === 'string' ? raw.email : '';
@@ -84,22 +58,10 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    if (isConfiguredDemoMode() || isRuntimeDemoFallback()) {
-      return restoreDemoUserFromStorage();
-    }
-    return null;
-  });
-  const [bootstrapping, setBootstrapping] = useState(
-    () => !isConfiguredDemoMode() && !isRuntimeDemoFallback(),
-  );
+  const [user, setUser] = useState<User | null>(null);
+  const [bootstrapping, setBootstrapping] = useState(true);
 
   useEffect(() => {
-    if (isConfiguredDemoMode() || isRuntimeDemoFallback()) {
-      setBootstrapping(false);
-      return;
-    }
-
     let cancelled = false;
     (async () => {
       try {
@@ -112,18 +74,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
           clearJobStaffApiCache();
-          if (isRuntimeDemoFallbackEnabled()) {
-            enableRuntimeDemo();
-            setUser(restoreDemoUserFromStorage());
-          } else {
-            clearRuntimeDemoFlag();
-            setUser(null);
-          }
+          setUser(null);
           return;
         }
         const data = (await r.json()) as { user?: Record<string, unknown> };
         const u = data.user ? mapApiUser(data.user) : null;
-        clearRuntimeDemoFlag();
         setUser(u);
         if (u) {
           void refreshJobStaffFromApi();
@@ -132,13 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         if (!cancelled) {
           clearJobStaffApiCache();
-          if (isRuntimeDemoFallbackEnabled()) {
-            enableRuntimeDemo();
-            setUser(restoreDemoUserFromStorage());
-          } else {
-            clearRuntimeDemoFlag();
-            setUser(null);
-          }
+          setUser(null);
         }
       } finally {
         if (!cancelled) setBootstrapping(false);
@@ -178,7 +127,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
-    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -213,7 +161,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
-    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -272,7 +219,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
-    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -316,13 +262,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const logout = useCallback(async () => {
-    const configuredDemo = isConfiguredDemoMode();
-    clearRuntimeDemoFlag();
-    if (configuredDemo) {
-      setUser(null);
-      localStorage.removeItem(DEMO_STORAGE_KEY);
-      return;
-    }
     try {
       await apiFetch('/api/auth/logout', { method: 'POST', body: '{}' });
     } catch {

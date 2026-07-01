@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -13,16 +13,9 @@ import SearchField from '@/components/shared/SearchField';
 import { Plus, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  DEMO_CANDIDATES_CHANGED_EVENT,
-  getCandidates,
-  hydrateCandidateStaffing,
-  setDemoCandidateStaffingTrack,
-} from '@/lib/demoStorage';
-import { mergeCandidateSources, getMergedCandidatesInitial } from '@/lib/mergeCandidates';
-import { CANDIDATE_STAFFING_OPTIONS } from '@/lib/candidateStaffing';
+import { hydrateCandidateStaffing, CANDIDATE_STAFFING_OPTIONS } from '@/lib/candidateStaffing';
+import { mergeCandidateSources } from '@/lib/mergeCandidates';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 
 const statusFilters: { value: CandidateStatus | 'all'; label: string }[] = [
@@ -59,19 +52,11 @@ const CandidatesPage: React.FC = () => {
   });
   const [search, setSearch] = useState('');
 
-  const [candidates, setCandidates] = useState<Candidate[]>(getMergedCandidatesInitial());
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const apiCandidatesRef = useRef<Candidate[]>([]);
 
   const applyStaffingTrack = async (c: Candidate, track: CandidateStaffingTrack) => {
-    if (isDemoMode()) {
-      setDemoCandidateStaffingTrack(c.id, track);
-      setCandidates((prev) =>
-        prev.map((x) => (x.id === c.id ? hydrateCandidateStaffing({ ...x, staffing_track: track }) : x)),
-      );
-      return;
-    }
     try {
       const r = await apiFetch('/api/candidates', {
         method: 'PATCH',
@@ -89,14 +74,6 @@ const CandidatesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isDemoMode()) {
-      apiCandidatesRef.current = [];
-      setCandidates(mergeCandidateSources([], getCandidates()));
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -111,12 +88,10 @@ const CandidatesPage: React.FC = () => {
       .then((data) => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
-        apiCandidatesRef.current = arr;
-        setCandidates(mergeCandidateSources(arr, []));
+        setCandidates(mergeCandidateSources(arr));
       })
       .catch(() => {
         if (cancelled) return;
-        apiCandidatesRef.current = [];
         setCandidates([]);
         setError('โหลดรายชื่อผู้สมัครไม่สำเร็จ — ลองใหม่อีกครั้ง');
       })
@@ -128,14 +103,6 @@ const CandidatesPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    if (!isDemoMode()) return;
-    const sync = () =>
-      setCandidates(mergeCandidateSources(apiCandidatesRef.current, getCandidates()));
-    window.addEventListener(DEMO_CANDIDATES_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(DEMO_CANDIDATES_CHANGED_EVENT, sync);
   }, []);
 
   useEffect(() => {

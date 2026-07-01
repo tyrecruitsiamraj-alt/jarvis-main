@@ -4,9 +4,7 @@ import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import type { SearchableSelectGroup } from '@/components/shared/SearchableSelect';
-import { mockEmployees, mockClients } from '@/data/mockData';
 import { toast } from 'sonner';
-import { isDemoMode } from '@/lib/demoMode';
 import { createWorkCalendarAssignment } from '@/lib/workCalendarStore';
 import { apiFetch } from '@/lib/apiFetch';
 import { parseJobsPayload } from '@/lib/jobCoords';
@@ -57,7 +55,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   }, [open, employeeId, date]);
 
   useEffect(() => {
-    if (!open || isDemoMode()) return;
+    if (!open) return;
     let cancelled = false;
     setLoadError(null);
     Promise.all([
@@ -88,25 +86,19 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     };
   }, [open]);
 
-  const activeEmployees = isDemoMode()
-    ? mockEmployees.filter((e) => e.status === 'active')
-    : apiEmployees.filter((e) => e.status === 'active');
-  const activeClients = isDemoMode()
-    ? mockClients.filter((c) => c.is_active)
-    : apiClients.filter((c) => c.is_active !== false);
+  const activeEmployees = apiEmployees.filter((e) => e.status === 'active');
+  const activeClients = apiClients.filter((c) => c.is_active !== false);
 
-  const fallbackUnitsFromJobs = isDemoMode()
-    ? []
-    : Array.from(
-        new Set(
-          apiJobs
-            .map((j) => (typeof j.unit_name === 'string' ? j.unit_name.trim() : ''))
-            .filter(Boolean),
-        ),
-      ).sort((a, b) => a.localeCompare(b, 'th'));
+  const fallbackUnitsFromJobs = Array.from(
+    new Set(
+      apiJobs
+        .map((j) => (typeof j.unit_name === 'string' ? j.unit_name.trim() : ''))
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b, 'th'));
 
-  const employeeList = isDemoMode() ? mockEmployees : apiEmployees;
-  const clientList = isDemoMode() ? mockClients : apiClients;
+  const employeeList = apiEmployees;
+  const clientList = apiClients;
 
   const employeeOptions = useMemo(
     () =>
@@ -216,7 +208,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           </DialogDescription>
         </DialogHeader>
 
-        {!isDemoMode() && loadError && (
+        {loadError && (
           <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
             {loadError}
           </p>

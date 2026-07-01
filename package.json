@@ -14,7 +14,6 @@
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrate:status": "node scripts/migrate.mjs --status",
     "db:seed": "node scripts/seed.mjs",
-    "db:seed:demo": "tsx scripts/seed-demo-data.ts",
     "db:seed:driver-care": "tsx scripts/seed-driver-care-demo.ts",
     "deploy:vercel": "vercel deploy --prod --yes",
     "build": "vite build",
@@ -23,7 +22,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:readiness": "vitest run tests/api tests/demo"
+    "test:readiness": "vitest run tests/api"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

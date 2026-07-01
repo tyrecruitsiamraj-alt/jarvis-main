@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Candidate, CANDIDATE_STATUS_LABELS } from '@/types';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
-import { useDemoAwareCandidates } from '@/hooks/useDemoAwareCandidates';
+import { useCandidates } from '@/hooks/useCandidates';
 import { haversineKm } from '@/lib/geo';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSelectLabel } from '@/lib/unitRequestDisplay';
 
@@ -20,7 +20,7 @@ const radiusOptions = [10, 15, 20];
 const MatchingPage: React.FC = () => {
   const navigate = useNavigate();
   const { jobs, loading: loadingJobs } = useDemoAwareJobs();
-  const { candidates, loading: loadingCandidates } = useDemoAwareCandidates();
+  const { candidates, loading: loadingCandidates } = useCandidates();
   const [selectedJob, setSelectedJob] = useState('');
   const [radius, setRadius] = useState(15);
   const [statusFilter, setStatusFilter] = useState<string>('inprocess');

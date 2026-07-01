@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, endOfMonth, startOfMonth } from 'date-fns';
-import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
+import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import DateRangeCalendarPicker, {
