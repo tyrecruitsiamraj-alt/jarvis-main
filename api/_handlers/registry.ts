@@ -74,4 +74,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/auth/magic-link-verify': magicLinkVerifyHandler as ApiHandler,
   '/api/auth/azure-ad/start': azureAdStartHandler as ApiHandler,
   '/api/auth/azure-ad/callback': azureAdCallbackHandler as ApiHandler,
+  /** NextAuth-compatible path — ใช้ได้ถ้า Azure Portal ลงทะเบียน path นี้แทน */
+  '/api/auth/callback/azure-ad': azureAdCallbackHandler as ApiHandler,
 };

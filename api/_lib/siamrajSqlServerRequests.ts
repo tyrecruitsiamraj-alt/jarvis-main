@@ -13,6 +13,8 @@ type SqlServerRequestRow = {
   act_saleco_effective_date: Date | string | null;
   site_code: string | null;
   site_name: string | null;
+  department_code: string | null;
+  department_name: string | null;
   customer_name: string | null;
   status: string | null;
   staff_fullname: string | null;
@@ -84,6 +86,8 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     lastWorkingDay: toYmd(r.resign_date) || undefined,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
     site_code: r.site_code || undefined,
+    department_code: r.department_code?.trim() || undefined,
+    department_name: r.department_name?.trim() || undefined,
     location_address: r.work_addr || r.site_name || r.site_code || '',
     request_action_code: r.request_action_code || undefined,
     request_action_name: r.request_action_name || undefined,
@@ -122,6 +126,8 @@ const BASE_SQL = `
     COALESCE(S.resign_date, A.want_date_from) AS act_saleco_effective_date,
     A.site_code,
     SS.site_name,
+    RTRIM(SS.department_code) AS department_code,
+    (SELECT TOP 1 D.department_name FROM ms_department D WHERE D.department_code = SS.department_code ORDER BY D.seq) AS department_name,
     A.status,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name,
     (SELECT z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no) AS customer_name,
@@ -161,7 +167,7 @@ const BASE_SQL = `
 
 const SELECT_COLUMNS = `
   external_id, request_no, act_saleco_datetime, act_saleco_effective_date,
-  site_code, site_name, customer_name, status, staff_fullname, mobile_phone,
+  site_code, site_name, department_code, department_name, customer_name, status, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
   resign_date, reason_main_name, work_addr, work_date, work_time, age, sex,

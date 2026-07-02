@@ -17,7 +17,7 @@ export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
   const domains = getCompanyEmailDomains();
   const emailLoginEnabled = isPostmarkConfigured();
   const microsoftLogin = isAzureAdConfigured();
-  const emailLoginGate = emailLoginEnabled || microsoftLogin;
+  const emailLoginGate = false;
 
   return res.status(200).json({
     companyEmailLogin: emailLoginEnabled,

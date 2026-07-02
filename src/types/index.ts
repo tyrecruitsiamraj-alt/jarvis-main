@@ -115,6 +115,8 @@ export interface JobRequest {
   request_action_code?: string;
   request_action_name?: string;
   site_code?: string;
+  department_code?: string;
+  department_name?: string;
   position_units?: number;
   lastWorkingDay?: string;
   contact_phone?: string;

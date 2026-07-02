@@ -21,9 +21,9 @@ import {
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import {
-  jobRoleFilterOptions,
-  filterUnitRequestsByJobRole,
-  type SiamrajJobRoleFilter,
+  departmentFilterOptions,
+  filterUnitRequestsByDepartment,
+  type SiamrajDepartmentFilter,
 } from '@/lib/siamrajUnitFilters';
 
 type JobListFilter = 'all' | 'active' | 'closed';
@@ -47,7 +47,7 @@ const JobListPage: React.FC = () => {
   const [filter, setFilter] = useState<JobListFilter>('all');
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState<string>('all');
-  const [jobRoleFilter, setJobRoleFilter] = useState<SiamrajJobRoleFilter>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<SiamrajDepartmentFilter>('all');
   const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
   const [screenerFilter, setScreenerFilter] = useState<string>('all');
   const [staffRosterRev, setStaffRosterRev] = useState(0);
@@ -71,25 +71,25 @@ const JobListPage: React.FC = () => {
     return buildScreenerNameOptions(jobs);
   }, [staffRosterRev, jobs]);
 
-  const jobRoleOptions = useMemo(
-    () => (siamrajPrimary ? jobRoleFilterOptions(jobs) : []),
+  const departmentOptions = useMemo(
+    () => (siamrajPrimary ? departmentFilterOptions(jobs) : []),
     [jobs, siamrajPrimary],
   );
 
-  const roleScopedJobs = useMemo(
-    () => (siamrajPrimary ? filterUnitRequestsByJobRole(jobs, jobRoleFilter) : jobs),
-    [jobs, siamrajPrimary, jobRoleFilter],
+  const departmentScopedJobs = useMemo(
+    () => (siamrajPrimary ? filterUnitRequestsByDepartment(jobs, departmentFilter) : jobs),
+    [jobs, siamrajPrimary, departmentFilter],
   );
 
   const unitOptions = useMemo(() => {
-    const set = new Set(roleScopedJobs.map((j) => j.unit_name).filter(Boolean));
+    const set = new Set(departmentScopedJobs.map((j) => j.unit_name).filter(Boolean));
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [roleScopedJobs]);
+  }, [departmentScopedJobs]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    return roleScopedJobs
+    return departmentScopedJobs
       .filter((j) => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
         if (recruiterFilter !== 'all' && j.recruiter_name !== recruiterFilter) return false;
@@ -100,12 +100,12 @@ const JobListPage: React.FC = () => {
       })
       .filter(
         (j) =>
-          `${j.unit_name} ${j.request_no || ''} ${j.location_address} ${j.request_action_name || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
+          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
             .toLowerCase()
             .includes(q),
       )
       .sort(compareJobsByAssigneeThenAgeDaysDesc);
-  }, [roleScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
+  }, [departmentScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
 
   const noteForJob = (j: JobRequest) => {
     const key = j.request_no || j.externalId || j.id;
@@ -169,16 +169,16 @@ const JobListPage: React.FC = () => {
 
           {siamrajPrimary ? (
             <div className="flex items-center gap-2 min-w-[220px]">
-              <label htmlFor="job-list-role" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                ลักษณะงาน
+              <label htmlFor="job-list-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                แผนก
               </label>
               <select
-                id="job-list-role"
-                value={jobRoleFilter}
-                onChange={(e) => setJobRoleFilter(e.target.value)}
+                id="job-list-department"
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
                 className="jarvis-soft-field flex-1"
               >
-                {jobRoleOptions.map((o) => (
+                {departmentOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>

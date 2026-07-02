@@ -58,6 +58,14 @@ export function sanitizeReturnPath(raw: string | null | undefined): string {
   return v;
 }
 
+function oauthCookieFlags(maxAgeSec: number): string {
+  const https = (getAppPublicUrl() || '').startsWith('https://');
+  if (https || isProductionLike()) {
+    return `Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAgeSec}`;
+  }
+  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}`;
+}
+
 function cookieFlags(maxAgeSec: number): string {
   const secure = isProductionLike() ? 'Secure; ' : '';
   const sameSite = process.env.AUTH_COOKIE_SAMESITE === 'strict' ? 'Strict' : 'Lax';
@@ -65,7 +73,7 @@ function cookieFlags(maxAgeSec: number): string {
 }
 
 export function buildOAuthStartCookies(state: string, returnTo: string): string[] {
-  const flags = cookieFlags(OAUTH_STATE_TTL_SEC);
+  const flags = oauthCookieFlags(OAUTH_STATE_TTL_SEC);
   return [
     `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; ${flags}`,
     `${OAUTH_RETURN_COOKIE}=${encodeURIComponent(returnTo)}; ${flags}`,
@@ -73,7 +81,7 @@ export function buildOAuthStartCookies(state: string, returnTo: string): string[
 }
 
 export function buildOAuthClearCookies(): string[] {
-  const flags = cookieFlags(0);
+  const flags = oauthCookieFlags(0);
   return [
     `${OAUTH_STATE_COOKIE}=; ${flags}`,
     `${OAUTH_RETURN_COOKIE}=; ${flags}`,
@@ -103,6 +111,7 @@ export function buildAzureAuthorizeUrl(state: string): string {
     response_mode: 'query',
     scope: azureAdScopes(),
     state,
+    prompt: 'select_account',
   });
   return `https://login.microsoftonline.com/${tenantId()}/oauth2/v2.0/authorize?${params.toString()}`;
 }
