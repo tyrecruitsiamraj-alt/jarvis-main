@@ -321,24 +321,20 @@ const SupervisorDashboard: React.FC = () => {
       <div className="px-4 md:px-6 space-y-6 pb-24 max-w-6xl mx-auto">
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูล…</div>}
 
-        {/* ฟิลเตอร์ — แถวเดียว อ่านง่าย */}
-        <div className="rounded-xl border border-border/80 bg-card/50 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Filter className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>ขอบเขตข้อมูล</span>
-            <span className="text-xs font-normal text-muted-foreground">เลือกแล้วตัวเลขด้านล่างจะเปลี่ยนตามทันที</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-            <div className="sm:col-span-2 xl:col-span-2">
-              <label className="text-xs text-muted-foreground mb-1 block">ช่วงวันที่กรอกใบขอ</label>
-              <DateRangeCalendarPicker value={dateRange} onChange={setDateRange} />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">หน่วยงาน</label>
+        {/* ฟิลเตอร์ — แยกแถวเหมือนหน้ารายการหน่วยงาน */}
+        <div className="space-y-4">
+          <DateRangeCalendarPicker layout="panel" value={dateRange} onChange={setDateRange} />
+
+          {unitOptions.length > 0 ? (
+            <div className="flex items-center gap-2 w-full sm:max-w-md">
+              <label htmlFor="dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+                หน่วยงาน
+              </label>
               <select
+                id="dashboard-unit"
                 value={unitFilter}
                 onChange={(e) => setUnitFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="jarvis-soft-field flex-1 min-w-0"
               >
                 <option value="all">ทั้งหมด ({jobs.length})</option>
                 {unitOptions.map((u) => (
@@ -348,12 +344,18 @@ const SupervisorDashboard: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">แผนก</label>
+          ) : null}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-center">
+            <div className="flex items-center gap-2 min-w-0">
+              <label htmlFor="dashboard-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+                แผนก
+              </label>
               <select
+                id="dashboard-department"
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="jarvis-soft-field flex-1 min-w-0"
               >
                 {departmentOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -362,12 +364,16 @@ const SupervisorDashboard: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">เจ้าหน้าที่สรรหา</label>
+
+            <div className="flex items-center gap-2 min-w-0">
+              <label htmlFor="dashboard-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
+                เจ้าหน้าที่สรรหา
+              </label>
               <select
+                id="dashboard-recruiter"
                 value={recruiterFilter}
                 onChange={(e) => setRecruiterFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="jarvis-soft-field flex-1 min-w-0"
               >
                 <option value="all">ทั้งหมด</option>
                 <option value={STAFF_ASSIGNEE_UNASSIGNED}>
@@ -380,12 +386,16 @@ const SupervisorDashboard: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">เจ้าหน้าที่คัดสรร</label>
+
+            <div className="flex items-center gap-2 min-w-0">
+              <label htmlFor="dashboard-screener" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
+                เจ้าหน้าที่คัดสรร
+              </label>
               <select
+                id="dashboard-screener"
                 value={screenerFilter}
                 onChange={(e) => setScreenerFilter(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="jarvis-soft-field flex-1 min-w-0"
               >
                 <option value="all">ทั้งหมด</option>
                 <option value={STAFF_ASSIGNEE_UNASSIGNED}>
