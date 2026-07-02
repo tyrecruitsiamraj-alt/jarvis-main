@@ -28,6 +28,8 @@ import {
 
 type JobListFilter = 'all' | 'active' | 'closed';
 
+const PAGE_SIZE = 20;
+
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
   if (!d) return '—';
@@ -52,6 +54,7 @@ const JobListPage: React.FC = () => {
   const [screenerFilter, setScreenerFilter] = useState<string>('all');
   const [staffRosterRev, setStaffRosterRev] = useState(0);
   const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
 
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
@@ -107,6 +110,24 @@ const JobListPage: React.FC = () => {
       .sort(compareJobsByAssigneeThenAgeDaysDesc);
   }, [departmentScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search, unitFilter, departmentFilter, recruiterFilter, screenerFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pageFrom = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const pageTo = Math.min(page * PAGE_SIZE, filtered.length);
+
   const noteForJob = (j: JobRequest) => {
     const key = j.request_no || j.externalId || j.id;
     return noteOverrides[key] ?? j.list_note ?? '';
@@ -116,7 +137,15 @@ const JobListPage: React.FC = () => {
     <div>
       <PageHeader
         title="รายการงานทั้งหมด"
-        subtitle={siamrajPrimary ? `${filtered.length} ใบขอจาก Siamraj` : `${filtered.length} งาน`}
+        subtitle={
+          siamrajPrimary
+            ? filtered.length > 0
+              ? `${filtered.length} ใบขอจาก Siamraj · แสดง ${pageFrom}–${pageTo}`
+              : '0 ใบขอจาก Siamraj'
+            : filtered.length > 0
+              ? `${filtered.length} งาน · แสดง ${pageFrom}–${pageTo}`
+              : '0 งาน'
+        }
         backPath="/jobs"
         actions={
           <button
@@ -249,7 +278,7 @@ const JobListPage: React.FC = () => {
           <div className="text-sm text-muted-foreground py-8 text-center">ไม่พบใบขอ</div>
         ) : isMobile ? (
           <div className="space-y-3">
-            {filtered.map((j) => (
+            {paginated.map((j) => (
               <div
                 key={j.id}
                 className="glass-card rounded-[1.5rem] p-4 border border-white/70"
@@ -341,7 +370,7 @@ const JobListPage: React.FC = () => {
               </thead>
 
               <tbody>
-                {filtered.map((j) => (
+                {paginated.map((j) => (
                   <tr
                     key={j.id}
                     onClick={() => navigateToUnitRequest(j, navigate)}
@@ -399,6 +428,32 @@ const JobListPage: React.FC = () => {
             </table>
           </div>
         )}
+
+        {filtered.length > PAGE_SIZE ? (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <p className="text-xs text-muted-foreground">
+              หน้า {page} / {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-4 py-2 rounded-full border border-border text-sm disabled:opacity-40"
+              >
+                ก่อนหน้า
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="px-4 py-2 rounded-full border border-border text-sm disabled:opacity-40"
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
