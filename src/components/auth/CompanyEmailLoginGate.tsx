@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 
 export function MicrosoftLogo({ className }: { className?: string }) {
@@ -41,46 +41,55 @@ const CompanyEmailLoginGate: React.FC<Props> = ({
   error,
   onSubmit,
 }) => {
-  const showMagicLinkForm = companyEmailLogin;
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const msBusy = microsoftBusy || magicLinkBusy;
+  const showEmailFallback = companyEmailLogin && !microsoftLogin;
 
   return (
     <>
-      <p className="text-sm text-center text-foreground font-medium">เข้าใช้งานระบบ</p>
-      <p className="text-xs text-center text-muted-foreground -mt-2">
-        {microsoftLogin && !showMagicLinkForm
-          ? 'เข้าสู่ระบบด้วยบัญชี Microsoft ของบริษัท'
-          : microsoftLogin
-            ? 'เข้าสู่ระบบด้วย Microsoft หรือรับลิงก์ทางอีเมล'
-            : 'กรอกอีเมลบริษัทแล้วรับลิงก์เข้าสู่ระบบทางอีเมล'}
+      <h1 className="text-xl font-semibold mb-1 text-center text-foreground">ยินดีต้อนรับ</h1>
+      <p className="text-sm text-muted-foreground mb-7 text-center">
+        เข้าสู่ระบบด้วยบัญชีองค์กรของคุณ
       </p>
 
-      {microsoftLogin ? (
+      <button
+        type="button"
+        disabled={msBusy}
+        onClick={() => {
+          if (microsoftLogin) {
+            onMicrosoftLogin?.();
+            return;
+          }
+          if (showEmailFallback) {
+            setShowEmailForm(true);
+          } else {
+            onMicrosoftLogin?.();
+          }
+        }}
+        className="btn-primary w-full touch-manipulation min-h-[52px]"
+      >
+        <MicrosoftLogo />
+        {microsoftBusy
+          ? 'กำลังเปลี่ยนหน้า…'
+          : magicLinkBusy
+            ? 'กำลังส่งลิงก์…'
+            : 'เข้าสู่ระบบด้วย Microsoft'}
+      </button>
+
+      {companyEmailLogin && microsoftLogin ? (
         <button
           type="button"
-          disabled={microsoftBusy || magicLinkBusy}
-          onClick={() => onMicrosoftLogin?.()}
-          className="btn-primary w-full touch-manipulation min-h-[52px]"
+          className="mt-4 w-full text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline touch-manipulation"
+          onClick={() => setShowEmailForm((v) => !v)}
         >
-          <MicrosoftLogo />
-          {microsoftBusy ? 'กำลังเปลี่ยนหน้า…' : 'เข้าสู่ระบบด้วย Microsoft'}
+          {showEmailForm ? 'ซ่อนฟอร์มอีเมล' : 'หรือรับลิงก์เข้าสู่ระบบทางอีเมล'}
         </button>
       ) : null}
 
-      {showMagicLinkForm ? (
-        <form onSubmit={onSubmit} className="space-y-4">
-          {microsoftLogin ? (
-            <div className="relative py-1">
-              <div className="absolute inset-0 flex items-center" aria-hidden>
-                <span className="w-full border-t border-border/60" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-2 text-muted-foreground bg-transparent">หรือรับลิงก์ทางอีเมล</span>
-              </div>
-            </div>
-          ) : null}
-
+      {(showEmailForm || showEmailFallback) && companyEmailLogin ? (
+        <form onSubmit={onSubmit} className="mt-5 space-y-3 text-left">
           <div className="space-y-1.5">
-            <Label htmlFor="company-email" className="text-xs font-medium text-muted-foreground ml-1">
+            <Label htmlFor="company-email" className="text-xs font-medium text-muted-foreground">
               อีเมลบริษัท
             </Label>
             <input
@@ -91,48 +100,40 @@ const CompanyEmailLoginGate: React.FC<Props> = ({
               onChange={(e) => onEmailChange(e.target.value)}
               placeholder={emailPlaceholder}
               required
-              className="jarvis-soft-field min-h-[48px]"
+              className="jarvis-soft-field min-h-[44px] w-full"
             />
             {companyEmailHint ? (
-              <p className="text-[11px] text-muted-foreground ml-1">{companyEmailHint}</p>
+              <p className="text-[11px] text-muted-foreground">{companyEmailHint}</p>
             ) : null}
           </div>
-
-          {magicLinkMsg ? (
-            <p
-              className="text-xs text-muted-foreground text-center rounded-xl bg-white/50 border border-white/70 px-3 py-2"
-              role="status"
-            >
-              {magicLinkMsg}
-            </p>
-          ) : null}
-
-          {!microsoftLogin ? (
-            <button
-              type="submit"
-              disabled={magicLinkBusy}
-              className="btn-primary w-full touch-manipulation min-h-[52px]"
-            >
-              <MicrosoftLogo />
-              {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'เข้าสู่ระบบด้วย Microsoft'}
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={magicLinkBusy}
-              className="jarvis-pill-btn w-full min-h-[52px] px-6 py-3 text-sm touch-manipulation"
-            >
-              {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'ส่งลิงก์เข้าสู่ระบบทางอีเมล'}
-            </button>
-          )}
+          <button
+            type="submit"
+            disabled={magicLinkBusy}
+            className="jarvis-pill-btn w-full min-h-[44px] px-4 py-2.5 text-sm touch-manipulation"
+          >
+            {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'ส่งลิงก์เข้าสู่ระบบ'}
+          </button>
         </form>
       ) : null}
 
+      {magicLinkMsg ? (
+        <p
+          className="mt-4 text-xs text-muted-foreground text-center rounded-xl bg-white/50 border border-white/70 px-3 py-2"
+          role="status"
+        >
+          {magicLinkMsg}
+        </p>
+      ) : null}
+
       {error ? (
-        <p className="text-xs text-destructive text-center" role="alert">
+        <p className="mt-4 text-xs text-destructive text-center" role="alert">
           {error}
         </p>
       ) : null}
+
+      <p className="mt-6 text-xs text-muted-foreground text-center">
+        เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
+      </p>
     </>
   );
 };

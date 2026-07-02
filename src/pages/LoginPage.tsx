@@ -245,6 +245,61 @@ const LoginPage: React.FC = () => {
     ? submitting ? 'Signing in…' : 'Sign in'
     : submitting ? 'Creating account…' : 'Create account';
 
+  if (emailLoginGate) {
+    return (
+      <main
+        className={cn('min-h-[100dvh] grid place-items-center px-6 py-10 jarvis-warm-bg', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
+        style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
+      >
+        <div className="w-full max-w-sm text-center space-y-4">
+          <div className="mb-6 flex justify-center">
+            <span className="inline-flex items-center gap-3 text-2xl">
+              <BrandMark size="lg" />
+              <span className="font-semibold tracking-tight text-foreground">
+                <BrandTitle />
+              </span>
+            </span>
+          </div>
+
+          <div className="jarvis-frost p-8">
+            {authConfig === null ? (
+              <p className="text-sm text-muted-foreground text-center py-4">กำลังโหลด…</p>
+            ) : (
+              <CompanyEmailLoginGate
+                email={email}
+                onEmailChange={setEmail}
+                emailPlaceholder={emailPlaceholder}
+                companyEmailHint={authConfig.companyEmailHint}
+                magicLinkMsg={magicLinkMsg}
+                magicLinkBusy={magicLinkBusy}
+                microsoftLogin={authConfig.microsoftLogin}
+                companyEmailLogin={authConfig.companyEmailLogin}
+                microsoftBusy={microsoftBusy}
+                onMicrosoftLogin={handleMicrosoftLogin}
+                error={error}
+                onSubmit={handleMagicLink}
+              />
+            )}
+          </div>
+
+          <div className="jarvis-frost p-6 text-left">
+            <p className="text-sm font-semibold text-foreground">ดูประกาศรับสมัครพนักงาน</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              สมัครงานภายนอกผ่านบอร์ดประกาศรับสมัครของบริษัท
+            </p>
+            <Link
+              to="/apply"
+              className="jarvis-pill-btn mt-4 w-full min-h-[48px] px-6 py-3 text-sm touch-manipulation"
+            >
+              Join now
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div
       className={cn('jarvis-warm-bg relative overflow-x-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
@@ -275,21 +330,6 @@ const LoginPage: React.FC = () => {
 
             {authConfig === null ? (
               <p className="text-sm text-muted-foreground text-center py-6">กำลังโหลด…</p>
-            ) : emailLoginGate ? (
-              <CompanyEmailLoginGate
-                email={email}
-                onEmailChange={setEmail}
-                emailPlaceholder={emailPlaceholder}
-                companyEmailHint={authConfig.companyEmailHint}
-                magicLinkMsg={magicLinkMsg}
-                magicLinkBusy={magicLinkBusy}
-                microsoftLogin={authConfig.microsoftLogin}
-                companyEmailLogin={authConfig.companyEmailLogin}
-                microsoftBusy={microsoftBusy}
-                onMicrosoftLogin={handleMicrosoftLogin}
-                error={error}
-                onSubmit={handleMagicLink}
-              />
             ) : (
               <>
             <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
