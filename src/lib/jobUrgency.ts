@@ -21,7 +21,7 @@ export const URGENCY_FILTER_OPTIONS: { value: UrgencyFilter; label: string; hint
   },
   {
     value: 'escalated',
-    label: 'งานด่วน (ยกระดับ)',
+    label: 'เกินกำหนด',
     hint: 'เดิมเป็นล่วงหน้า แต่เหลือเวลาถึงวันที่ต้องการน้อยกว่า 7 วัน',
   },
 ];
@@ -116,7 +116,7 @@ export function enrichJobsWithUrgency(jobs: JobRequest[], today = new Date()): J
 }
 
 export function urgencyDisplayLabel(meta: JobUrgencyMeta): string {
-  if (meta.escalated) return 'งานด่วน';
+  if (meta.escalated) return 'เกินกำหนด';
   return meta.urgency === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า';
 }
 

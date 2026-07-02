@@ -165,7 +165,6 @@ const BASE_SQL = `
     A.request_code AS request_action_code,
     (SELECT z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = S.staff_id) AS staff_fullname,
-    S.resign_date,
     (SELECT z.resign_type_name FROM hr_ms_resign_type z WHERE z.resign_type_code = S.resign_type_code) AS reason_main_name,
     (SELECT z.fee_name FROM wg2_ms_fee z WHERE z.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)) AS fee_name,
     C.payment_rate,
@@ -202,7 +201,7 @@ const SELECT_COLUMNS = `
   customer_name, status, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
-  resign_date, reason_main_name, work_addr, work_date, work_time, age, sex,
+  reason_main_name, work_addr, work_date, work_time, age, sex,
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
 `;
 
