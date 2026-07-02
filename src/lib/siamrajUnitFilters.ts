@@ -10,14 +10,23 @@ export function extractDepartmentCode(job: JobRequest): string {
   return normalizeDepartmentCode(job.department_code);
 }
 
-/** ชื่อแสดงใน dropdown / การ์ด */
+/** แสดงรหัสสั้น เช่น LBD → Lbd */
+export function formatDepartmentCodeDisplay(code: string): string {
+  const c = code.trim();
+  if (!c || c === '—') return 'ไม่ระบุ';
+  if (c.length <= 3) {
+    return c.charAt(0).toUpperCase() + c.slice(1).toLowerCase();
+  }
+  return c;
+}
+
+/** ชื่อแสดงใน dropdown / การ์ด — ใช้เฉพาะรหัสแผนกสั้นๆ */
 export function extractDepartmentLabel(job: JobRequest): string {
-  const code = extractDepartmentCode(job);
-  const name = job.department_name?.trim();
-  if (code !== '—' && name) return `${code} — ${name}`;
-  if (name) return name;
-  if (code !== '—') return code;
-  return 'ไม่ระบุ';
+  return formatDepartmentCodeDisplay(extractDepartmentCode(job));
+}
+
+export function departmentLabelForCode(_jobs: JobRequest[], code: string): string {
+  return formatDepartmentCodeDisplay(code);
 }
 
 export type SiamrajDepartmentFilter = 'all' | string;
@@ -37,11 +46,6 @@ export function departmentCounts(jobs: JobRequest[]): Map<string, number> {
     counts.set(code, (counts.get(code) ?? 0) + 1);
   }
   return counts;
-}
-
-export function departmentLabelForCode(jobs: JobRequest[], code: string): string {
-  const sample = jobs.find((j) => extractDepartmentCode(j) === code);
-  return sample ? extractDepartmentLabel(sample) : code === '—' ? 'ไม่ระบุ' : code;
 }
 
 export function departmentFilterOptions(
