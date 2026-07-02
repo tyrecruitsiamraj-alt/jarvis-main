@@ -84,14 +84,14 @@ const JobListPage: React.FC = () => {
     [jobs, siamrajPrimary],
   );
 
-  const jobSubtypeOptions = useMemo(
-    () => (siamrajPrimary ? jobSubtypeFilterOptions(jobs) : []),
-    [jobs, siamrajPrimary],
-  );
-
   const departmentScopedJobs = useMemo(
     () => (siamrajPrimary ? filterUnitRequestsByDepartment(jobs, departmentFilter) : jobs),
     [jobs, siamrajPrimary, departmentFilter],
+  );
+
+  const jobSubtypeOptions = useMemo(
+    () => (siamrajPrimary ? jobSubtypeFilterOptions(departmentScopedJobs) : []),
+    [departmentScopedJobs, siamrajPrimary],
   );
 
   const subtypeScopedJobs = useMemo(
@@ -135,6 +135,17 @@ const JobListPage: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [filter, search, unitFilter, departmentFilter, jobSubtypeFilter, recruiterFilter, screenerFilter]);
+
+  useEffect(() => {
+    if (jobSubtypeFilter === 'all') return;
+    const stillValid = jobSubtypeOptions.some((o) => o.value === jobSubtypeFilter);
+    if (!stillValid) setJobSubtypeFilter('all');
+  }, [departmentFilter, jobSubtypeOptions, jobSubtypeFilter]);
+
+  useEffect(() => {
+    if (unitFilter === 'all') return;
+    if (!unitOptions.includes(unitFilter)) setUnitFilter('all');
+  }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -183,24 +194,24 @@ const JobListPage: React.FC = () => {
           </div>
         )}
 
-        <SearchField
-          wrapperClassName="w-full"
-          type="text"
-          placeholder="ค้นหางาน..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <SearchField
+            wrapperClassName="flex-1 min-w-0"
+            type="text"
+            placeholder="ค้นหางาน..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
-        <div className="flex flex-col md:flex-row gap-3 md:items-center flex-wrap">
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <label htmlFor="job-list-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+          <div className="flex items-center gap-2 w-full sm:w-[280px] shrink-0">
+            <label htmlFor="job-list-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
               หน่วยงาน
             </label>
             <select
               id="job-list-unit"
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
-              className="jarvis-soft-field flex-1"
+              className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
               {unitOptions.map((u) => (
@@ -210,17 +221,24 @@ const JobListPage: React.FC = () => {
               ))}
             </select>
           </div>
+        </div>
 
+        <div
+          className={cn(
+            'grid gap-3 items-center',
+            siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
+          )}
+        >
           {siamrajPrimary ? (
-            <div className="flex items-center gap-2 min-w-[220px]">
-              <label htmlFor="job-list-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <label htmlFor="job-list-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
                 แผนก
               </label>
               <select
                 id="job-list-department"
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="jarvis-soft-field flex-1"
+                className="jarvis-soft-field flex-1 min-w-0"
               >
                 {departmentOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -232,15 +250,15 @@ const JobListPage: React.FC = () => {
           ) : null}
 
           {siamrajPrimary ? (
-            <div className="flex items-center gap-2 min-w-[240px]">
-              <label htmlFor="job-list-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <label htmlFor="job-list-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
                 ลักษณะงานย่อย
               </label>
               <select
                 id="job-list-subtype"
                 value={jobSubtypeFilter}
                 onChange={(e) => setJobSubtypeFilter(e.target.value)}
-                className="jarvis-soft-field flex-1"
+                className="jarvis-soft-field flex-1 min-w-0"
               >
                 {jobSubtypeOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -251,15 +269,15 @@ const JobListPage: React.FC = () => {
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <label htmlFor="job-list-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <label htmlFor="job-list-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
               เจ้าหน้าที่สรรหา
             </label>
             <select
               id="job-list-recruiter"
               value={recruiterFilter}
               onChange={(e) => setRecruiterFilter(e.target.value)}
-              className="jarvis-soft-field flex-1"
+              className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
               {recruiters.map((r) => (
@@ -270,15 +288,15 @@ const JobListPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-center gap-2 min-w-[200px]">
-            <label htmlFor="job-list-screener" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <label htmlFor="job-list-screener" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
               เจ้าหน้าที่คัดสรร
             </label>
             <select
               id="job-list-screener"
               value={screenerFilter}
               onChange={(e) => setScreenerFilter(e.target.value)}
-              className="jarvis-soft-field flex-1"
+              className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
               {screeners.map((s) => (
@@ -288,8 +306,9 @@ const JobListPage: React.FC = () => {
               ))}
             </select>
           </div>
+        </div>
 
-          <div className="flex gap-1.5 overflow-x-auto">
+        <div className="flex gap-1.5">
             {[
               { value: 'all' as const, label: 'ทั้งหมด' },
               { value: 'active' as const, label: 'ดำเนินการ' },
@@ -306,7 +325,6 @@ const JobListPage: React.FC = () => {
                 {f.label}
               </button>
             ))}
-          </div>
         </div>
 
         {filtered.length === 0 && !loading ? (
