@@ -29,7 +29,8 @@ function getQuery(req: AuthedReq, key: string): string {
  */
 async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
-  const keyOf = (it: Record<string, unknown>) => String(it.request_no || it.externalId || it.id || '');
+  const keyOf = (it: Record<string, unknown>) =>
+    String(it.request_no || it.externalId || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -37,8 +38,9 @@ async function attachAssignments(items: unknown[]): Promise<void> {
     if (map.size === 0) return;
     for (const it of list) {
       const a = map.get(keyOf(it));
-      if (a?.recruiter_name) it.recruiter_name = a.recruiter_name;
-      if (a?.screener_name) it.screener_name = a.screener_name;
+      if (!a) continue;
+      it.recruiter_name = a.recruiter_name;
+      it.screener_name = a.screener_name;
     }
   } catch {
     /* ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม */
@@ -47,7 +49,8 @@ async function attachAssignments(items: unknown[]): Promise<void> {
 
 async function attachNotes(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
-  const keyOf = (it: Record<string, unknown>) => String(it.request_no || it.externalId || it.id || '');
+  const keyOf = (it: Record<string, unknown>) =>
+    String(it.request_no || it.externalId || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -55,7 +58,8 @@ async function attachNotes(items: unknown[]): Promise<void> {
     if (map.size === 0) return;
     for (const it of list) {
       const n = map.get(keyOf(it));
-      if (n?.note) it.list_note = n.note;
+      if (!n) continue;
+      it.list_note = n.note;
     }
   } catch {
     /* หมายเหตุเป็นข้อมูลเสริม */

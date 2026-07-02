@@ -10,7 +10,7 @@ type SqlServerRequestRow = {
   external_id: string;
   request_no: string;
   act_saleco_datetime: Date | string | null;
-  act_saleco_effective_date: Date | string | null;
+  want_date_from: Date | string | null;
   site_code: string | null;
   site_name: string | null;
   department_code: string | null;
@@ -85,11 +85,11 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     externalId: r.external_id,
     source: 'siamraj' as const,
     readOnly: true,
-    request_no: r.request_no,
+    request_no: (r.request_no || '').trim(),
     submittedByName: r.requester_name?.trim() || undefined,
     submittedAt: toIso(r.act_saleco_datetime) || undefined,
     required_date:
-      toYmd(r.act_saleco_effective_date) ||
+      toYmd(r.want_date_from) ||
       toYmd(r.act_saleco_datetime) ||
       new Date().toISOString().slice(0, 10),
     lastWorkingDay: toYmd(r.resign_date) || undefined,
@@ -144,7 +144,8 @@ const BASE_SQL = `
     A.request_no AS external_id,
     A.request_no,
     A.request_date AS act_saleco_datetime,
-    COALESCE(S.resign_date, A.want_date_from) AS act_saleco_effective_date,
+    A.want_date_from,
+    S.resign_date,
     A.site_code,
     SS.site_name,
     RTRIM(SS.department_code) AS department_code,
@@ -196,7 +197,7 @@ const BASE_SQL_BY_ID = `${BASE_SQL}
 `;
 
 const SELECT_COLUMNS = `
-  external_id, request_no, act_saleco_datetime, act_saleco_effective_date,
+  external_id, request_no, act_saleco_datetime, want_date_from, resign_date,
   site_code, site_name, department_code, department_name, contract_type_code, contract_type_name,
   customer_name, status, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,

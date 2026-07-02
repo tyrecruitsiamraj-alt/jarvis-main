@@ -11,12 +11,15 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
-import { UnitRequestNoteCell } from '@/components/jobs/UnitRequestNoteField';
+import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   compareJobsByAssigneeThenAgeDaysDesc,
   getJobRequestAgeDays,
   getJobRequestSubmittedDate,
+  matchesNoteFilter,
+  matchesUrgencyFilter,
+  URGENCY_FILTER_OPTIONS,
 } from '@/lib/jobUrgency';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions, countUnassignedRecruiters, countUnassignedScreeners, matchesRecruiterFilter, matchesScreenerFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
@@ -64,6 +67,8 @@ const JobListPage: React.FC = () => {
     jobSubtypeFilter,
     recruiterFilter,
     screenerFilter,
+    urgencyFilter,
+    noteFilter,
     page,
     pageSize,
   } = listState;
@@ -79,7 +84,6 @@ const JobListPage: React.FC = () => {
   );
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
-  const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
 
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
@@ -158,18 +162,20 @@ const JobListPage: React.FC = () => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
         if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
+        if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
+        if (!matchesNoteFilter(j, noteFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
       })
       .filter(
         (j) =>
-          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
+          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
             .toLowerCase()
             .includes(q),
       )
       .sort(compareJobsByAssigneeThenAgeDaysDesc);
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, urgencyFilter, noteFilter]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -195,11 +201,6 @@ const JobListPage: React.FC = () => {
 
   const pageFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageTo = Math.min(page * pageSize, filtered.length);
-
-  const noteForJob = (j: JobRequest) => {
-    const key = j.request_no || j.externalId || j.id;
-    return noteOverrides[key] ?? j.list_note ?? '';
-  };
 
   return (
     <div>
@@ -356,6 +357,46 @@ const JobListPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <label htmlFor="job-list-urgency" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+              ความเร่งด่วน
+            </label>
+            <select
+              id="job-list-urgency"
+              value={urgencyFilter}
+              onChange={(e) => updateListState({ urgencyFilter: e.target.value as typeof urgencyFilter })}
+              className="jarvis-soft-field flex-1 min-w-0"
+            >
+              {URGENCY_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value} title={o.hint}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 min-w-0">
+            <label htmlFor="job-list-note-filter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+              หมายเหตุ
+            </label>
+            <select
+              id="job-list-note-filter"
+              value={noteFilter}
+              onChange={(e) => updateListState({ noteFilter: e.target.value as typeof noteFilter })}
+              className="jarvis-soft-field flex-1 min-w-0"
+            >
+              <option value="all">ทั้งหมด</option>
+              <option value="has">มีหมายเหตุ</option>
+              <option value="empty">ไม่มีหมายเหตุ</option>
+            </select>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          <strong>งานด่วน</strong> = ใบขอล่วงหน้าที่เหลือเวลาถึงวันที่ต้องการน้อยกว่า 7 วัน (ยกระดับ) · แก้หมายเหตุได้ในหน้ารายละเอียดใบขอ
+        </p>
+
         <div className="flex gap-1.5">
             {[
               { value: 'all' as const, label: 'ทั้งหมด' },
@@ -436,16 +477,12 @@ const JobListPage: React.FC = () => {
                   </div>
                 </button>
 
-                <div className="mt-3 pt-3 border-t border-border/50">
-                  <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
-                  <UnitRequestNoteCell
-                    job={{ ...j, list_note: noteForJob(j) }}
-                    onSaved={(note) => {
-                      const key = j.request_no || j.externalId || j.id;
-                      setNoteOverrides((prev) => ({ ...prev, [key]: note }));
-                    }}
-                  />
-                </div>
+                {j.list_note?.trim() ? (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
+                    <UnitRequestNotePreview note={j.list_note} />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -509,15 +546,8 @@ const JobListPage: React.FC = () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2">
-                      <UnitRequestNoteCell
-                        job={{ ...j, list_note: noteForJob(j) }}
-                        compact
-                        onSaved={(note) => {
-                          const key = j.request_no || j.externalId || j.id;
-                          setNoteOverrides((prev) => ({ ...prev, [key]: note }));
-                        }}
-                      />
+                    <td className="px-3 py-2 max-w-[200px]">
+                      <UnitRequestNotePreview note={j.list_note} />
                     </td>
                     <td className="px-3 py-3 text-center">
                       <JobUrgencyBadge job={j} compact />

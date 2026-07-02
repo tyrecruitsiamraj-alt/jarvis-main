@@ -3,6 +3,29 @@ import type { JobRequest, JobUrgency } from '@/types';
 
 export const URGENCY_LEAD_DAYS = 7;
 
+export type UrgencyFilter = 'all' | 'urgent' | 'advance' | 'escalated';
+
+export type NoteFilter = 'all' | 'has' | 'empty';
+
+export const URGENCY_FILTER_OPTIONS: { value: UrgencyFilter; label: string; hint?: string }[] = [
+  { value: 'all', label: 'ทั้งหมด' },
+  {
+    value: 'urgent',
+    label: 'ฉุกเฉิน',
+    hint: 'วันที่ส่งถึงวันที่ต้องการน้อยกว่า 7 วัน',
+  },
+  {
+    value: 'advance',
+    label: 'ล่วงหน้า',
+    hint: 'วันที่ส่งถึงวันที่ต้องการ 7 วันขึ้นไป',
+  },
+  {
+    value: 'escalated',
+    label: 'งานด่วน (ยกระดับ)',
+    hint: 'เดิมเป็นล่วงหน้า แต่เหลือเวลาถึงวันที่ต้องการน้อยกว่า 7 วัน',
+  },
+];
+
 export type JobUrgencyMeta = {
   urgency: JobUrgency;
   /** วันที่ส่ง → วันที่ต้องการ (lead time ตอนส่ง) */
@@ -95,4 +118,20 @@ export function enrichJobsWithUrgency(jobs: JobRequest[], today = new Date()): J
 export function urgencyDisplayLabel(meta: JobUrgencyMeta): string {
   if (meta.escalated) return 'งานด่วน';
   return meta.urgency === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า';
+}
+
+export function matchesUrgencyFilter(job: JobRequest, filter: UrgencyFilter): boolean {
+  if (filter === 'all') return true;
+  const meta = computeJobUrgency(job);
+  if (filter === 'escalated') return meta.escalated;
+  if (filter === 'urgent') return meta.urgency === 'urgent' && !meta.escalated;
+  if (filter === 'advance') return meta.urgency === 'advance';
+  return true;
+}
+
+export function matchesNoteFilter(job: JobRequest, filter: NoteFilter): boolean {
+  const note = (job.list_note || '').trim();
+  if (filter === 'has') return note.length > 0;
+  if (filter === 'empty') return note.length === 0;
+  return true;
 }

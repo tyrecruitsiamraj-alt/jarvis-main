@@ -7,18 +7,16 @@ import {
   unitRequestNoteKey,
 } from '@/lib/siamrajUnitRequestsApi';
 
-type Props = {
+type BaseProps = {
   requestKey: string;
   initialNote?: string;
-  compact?: boolean;
   readOnly?: boolean;
   onSaved?: (note: string) => void;
 };
 
-const UnitRequestNoteField: React.FC<Props> = ({
+const UnitRequestNoteEditor: React.FC<BaseProps> = ({
   requestKey,
   initialNote = '',
-  compact,
   readOnly = false,
   onSaved,
 }) => {
@@ -26,8 +24,8 @@ const UnitRequestNoteField: React.FC<Props> = ({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const lastSaved = useRef(initialNote);
-  const listId = `unit-note-${requestKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
   useEffect(() => {
     setValue(initialNote);
@@ -46,89 +44,104 @@ const UnitRequestNoteField: React.FC<Props> = ({
     };
   }, []);
 
-  const persist = useCallback(
-    async (next: string) => {
-      if (readOnly) return;
-      const trimmed = next.trim();
-      if (trimmed === lastSaved.current.trim()) return;
+  const dirty = value.trim() !== lastSaved.current.trim();
 
-      setSaving(true);
-      setError(null);
-      try {
-        await saveUnitRequestNote(requestKey, trimmed);
-        lastSaved.current = trimmed;
-        onSaved?.(trimmed);
-        const items = await fetchUnitNoteHistory();
-        setSuggestions(items);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'บันทึกหมายเหตุไม่สำเร็จ');
-      } finally {
-        setSaving(false);
-      }
-    },
-    [onSaved, readOnly, requestKey],
-  );
+  const persist = useCallback(async () => {
+    if (readOnly || saving) return;
+    const trimmed = value.trim();
+    if (trimmed === lastSaved.current.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    setSavedMsg(null);
+    try {
+      await saveUnitRequestNote(requestKey.trim(), trimmed);
+      lastSaved.current = trimmed;
+      onSaved?.(trimmed);
+      setSavedMsg('บันทึกหมายเหตุแล้ว');
+      const items = await fetchUnitNoteHistory();
+      setSuggestions(items);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกหมายเหตุไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }, [onSaved, readOnly, requestKey, saving, value]);
 
   return (
-    <div
-      className={cn('min-w-0', compact ? 'max-w-[220px]' : 'w-full')}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <input
-        type="text"
-        list={listId}
+    <div className="space-y-2">
+      <textarea
         value={value}
-        placeholder={readOnly ? '—' : 'หมายเหตุ...'}
+        placeholder={readOnly ? '—' : 'พิมพ์หมายเหตุ…'}
         disabled={saving || readOnly}
         readOnly={readOnly}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => void persist(value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            (e.target as HTMLInputElement).blur();
-          }
+        rows={4}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setSavedMsg(null);
         }}
         className={cn(
-          'jarvis-soft-field w-full text-xs',
+          'jarvis-soft-field w-full text-sm min-h-[96px] resize-y',
           saving && 'opacity-60',
           error && 'border-destructive/50',
         )}
         aria-label="หมายเหตุใบขอ"
       />
-      <datalist id={listId}>
-        {suggestions.map((s) => (
-          <option key={s} value={s} />
-        ))}
-      </datalist>
-      {error ? <p className="text-[10px] text-destructive mt-0.5">{error}</p> : null}
+      {suggestions.length > 0 ? (
+        <p className="text-[10px] text-muted-foreground">
+          หมายเหตุที่เคยใช้: {suggestions.slice(0, 5).join(' · ')}
+        </p>
+      ) : null}
+      {!readOnly ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void persist()}
+            disabled={saving || !dirty}
+            className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
+          >
+            {saving ? 'กำลังบันทึก…' : 'บันทึกหมายเหตุ'}
+          </button>
+          {savedMsg ? <span className="text-xs text-muted-foreground">{savedMsg}</span> : null}
+          {error ? <span className="text-xs text-destructive">{error}</span> : null}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">กำหนดหมายเหตุได้เฉพาะ Supervisor ขึ้นไป</p>
+      )}
     </div>
   );
 };
 
-export function UnitRequestNoteCell({
+export function UnitRequestNotePreview({ note }: { note?: string | null }) {
+  const trimmed = (note || '').trim();
+  if (!trimmed) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  return (
+    <span className="text-xs text-foreground line-clamp-2" title={trimmed}>
+      {trimmed}
+    </span>
+  );
+}
+
+export function UnitRequestNoteDetail({
   job,
-  compact,
   onSaved,
 }: {
   job: { request_no?: string; externalId?: string; id: string; list_note?: string };
-  compact?: boolean;
   onSaved?: (note: string) => void;
 }) {
   const { hasPermission } = useAuth();
   const readOnly = !hasPermission('supervisor');
   const key = unitRequestNoteKey(job as Parameters<typeof unitRequestNoteKey>[0]);
-  const initial = job.list_note ?? '';
   return (
-    <UnitRequestNoteField
+    <UnitRequestNoteEditor
       requestKey={key}
-      initialNote={initial}
-      compact={compact}
+      initialNote={job.list_note ?? ''}
       readOnly={readOnly}
       onSaved={onSaved}
     />
   );
 }
 
-export default UnitRequestNoteField;
+export default UnitRequestNoteEditor;

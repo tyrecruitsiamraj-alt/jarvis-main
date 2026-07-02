@@ -1,4 +1,5 @@
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
+import type { NoteFilter, UrgencyFilter } from '@/lib/jobUrgency';
 
 export type JobListFilter = 'all' | 'active' | 'closed';
 
@@ -10,6 +11,8 @@ export type JobListPageState = {
   jobSubtypeFilter: string;
   recruiterFilter: string;
   screenerFilter: string;
+  urgencyFilter: UrgencyFilter;
+  noteFilter: NoteFilter;
   page: number;
   pageSize: PageSizeOption;
 };
@@ -22,11 +25,15 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   jobSubtypeFilter: 'all',
   recruiterFilter: 'all',
   screenerFilter: 'all',
+  urgencyFilter: 'all',
+  noteFilter: 'all',
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 };
 
 const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
+const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'urgent', 'advance', 'escalated']);
+const NOTE_VALUES = new Set<NoteFilter>(['all', 'has', 'empty']);
 
 function parsePageSize(raw: string | null): PageSizeOption {
   const n = Number(raw);
@@ -42,6 +49,9 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
   const pageRaw = Number(params.get('p') || '1');
   const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.trunc(pageRaw) : 1;
 
+  const urgencyRaw = (params.get('urg') || JOB_LIST_DEFAULTS.urgencyFilter) as UrgencyFilter;
+  const noteRaw = (params.get('nf') || JOB_LIST_DEFAULTS.noteFilter) as NoteFilter;
+
   return {
     filter,
     search: params.get('q') ?? JOB_LIST_DEFAULTS.search,
@@ -50,6 +60,8 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     jobSubtypeFilter: params.get('st') || JOB_LIST_DEFAULTS.jobSubtypeFilter,
     recruiterFilter: params.get('r') || JOB_LIST_DEFAULTS.recruiterFilter,
     screenerFilter: params.get('sc') || JOB_LIST_DEFAULTS.screenerFilter,
+    urgencyFilter: URGENCY_VALUES.has(urgencyRaw) ? urgencyRaw : JOB_LIST_DEFAULTS.urgencyFilter,
+    noteFilter: NOTE_VALUES.has(noteRaw) ? noteRaw : JOB_LIST_DEFAULTS.noteFilter,
     page,
     pageSize: parsePageSize(params.get('ps')),
   };
@@ -64,6 +76,8 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   if (state.jobSubtypeFilter !== JOB_LIST_DEFAULTS.jobSubtypeFilter) params.set('st', state.jobSubtypeFilter);
   if (state.recruiterFilter !== JOB_LIST_DEFAULTS.recruiterFilter) params.set('r', state.recruiterFilter);
   if (state.screenerFilter !== JOB_LIST_DEFAULTS.screenerFilter) params.set('sc', state.screenerFilter);
+  if (state.urgencyFilter !== JOB_LIST_DEFAULTS.urgencyFilter) params.set('urg', state.urgencyFilter);
+  if (state.noteFilter !== JOB_LIST_DEFAULTS.noteFilter) params.set('nf', state.noteFilter);
   if (state.page > 1) params.set('p', String(state.page));
   if (state.pageSize !== JOB_LIST_DEFAULTS.pageSize) params.set('ps', String(state.pageSize));
   return params;
@@ -81,6 +95,8 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'jobSubtypeFilter',
   'recruiterFilter',
   'screenerFilter',
+  'urgencyFilter',
+  'noteFilter',
   'pageSize',
 ];
 

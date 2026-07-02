@@ -10,7 +10,11 @@ import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobSt
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { formatYmdDmyBe } from '@/lib/dateTh';
-import { Database, ExternalLink, Users } from 'lucide-react';
+import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
+import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
+import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
+import type { JobRequest } from '@/types';
+import { Database, ExternalLink, Users, StickyNote } from 'lucide-react';
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   const display =
@@ -75,14 +79,24 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     (screener.trim() || '') !== (data?.screener_name ?? '');
 
   const saveAssignment = async () => {
-    if (!requestNo || saving) return;
+    const key = requestNo?.trim();
+    if (!key || saving) return;
     setSaving(true);
     setSaveMsg(null);
     try {
-      await saveSiamrajUnitAssignment(requestNo, {
+      await saveSiamrajUnitAssignment(key, {
         recruiter_name: recruiter.trim() || null,
         screener_name: screener.trim() || null,
       });
+      queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+        old
+          ? {
+              ...old,
+              recruiter_name: recruiter.trim() || undefined,
+              screener_name: screener.trim() || undefined,
+            }
+          : old,
+      );
       await queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-request', id] });
       setSaveMsg('บันทึกผู้รับผิดชอบแล้ว');
     } catch (e) {
@@ -91,6 +105,11 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const urgencyMeta = data ? computeJobUrgency(data) : null;
+  const urgencyHint = URGENCY_FILTER_OPTIONS.find((o) =>
+    urgencyMeta?.escalated ? o.value === 'escalated' : o.value === urgencyMeta?.urgency,
+  )?.hint;
 
   return (
     <div>
@@ -118,6 +137,12 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
           <>
             <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 flex flex-wrap items-center gap-2">
               <StatusBadge status={data.status} type="job" />
+              <JobUrgencyBadge job={data} />
+              {urgencyHint ? (
+                <span className="text-xs text-muted-foreground" title={urgencyHint}>
+                  {urgencyHint}
+                </span>
+              ) : null}
               {data.request_action_name ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-foreground">
                   {data.request_action_name}
@@ -197,7 +222,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => void saveAssignment()}
-                      disabled={saving || !requestNo || !dirty}
+                      disabled={saving || !requestNo?.trim() || !dirty}
                       className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
                     >
                       {saving ? 'กำลังบันทึก…' : 'บันทึกผู้รับผิดชอบ'}
@@ -219,6 +244,21 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               )}
             </section>
 
+            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <StickyNote className="w-4 h-4 text-blue-600" />
+                หมายเหตุ
+              </h3>
+              <UnitRequestNoteDetail
+                job={data}
+                onSaved={(note) => {
+                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                    old ? { ...old, list_note: note || undefined } : old,
+                  );
+                }}
+              />
+            </section>
+
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
               <h3 className="text-sm font-semibold">ผู้ลาออก / ตำแหน่ง</h3>
               <div className="grid sm:grid-cols-2 gap-2">
@@ -235,7 +275,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => navigate('/jobs/list')}
+              onClick={() => navigate(backPath)}
               className="jarvis-pill-btn text-sm px-4 py-2"
             >
               กลับรายการ
