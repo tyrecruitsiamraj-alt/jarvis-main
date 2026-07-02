@@ -323,28 +323,40 @@ const SupervisorDashboard: React.FC = () => {
 
         {/* ฟิลเตอร์ — แยกแถวเหมือนหน้ารายการหน่วยงาน */}
         <div className="space-y-4">
-          <DateRangeCalendarPicker layout="panel" value={dateRange} onChange={setDateRange} />
-
-          {unitOptions.length > 0 ? (
-            <div className="flex items-center gap-2 w-full sm:max-w-md">
-              <label htmlFor="dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-                หน่วยงาน
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <label htmlFor="dashboard-date" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+                วันที่กรอก
               </label>
-              <select
-                id="dashboard-unit"
-                value={unitFilter}
-                onChange={(e) => setUnitFilter(e.target.value)}
-                className="jarvis-soft-field flex-1 min-w-0"
-              >
-                <option value="all">ทั้งหมด ({jobs.length})</option>
-                {unitOptions.map((u) => (
-                  <option key={u} value={u}>
-                    {u} ({unitCounts.get(u) ?? 0})
-                  </option>
-                ))}
-              </select>
+              <DateRangeCalendarPicker
+                triggerId="dashboard-date"
+                className="flex-1 min-w-0"
+                value={dateRange}
+                onChange={setDateRange}
+              />
             </div>
-          ) : null}
+
+            {unitOptions.length > 0 ? (
+              <div className="flex items-center gap-2 w-full sm:w-[280px] shrink-0">
+                <label htmlFor="dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+                  หน่วยงาน
+                </label>
+                <select
+                  id="dashboard-unit"
+                  value={unitFilter}
+                  onChange={(e) => setUnitFilter(e.target.value)}
+                  className="jarvis-soft-field flex-1 min-w-0"
+                >
+                  <option value="all">ทั้งหมด ({jobs.length})</option>
+                  {unitOptions.map((u) => (
+                    <option key={u} value={u}>
+                      {u} ({unitCounts.get(u) ?? 0})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-center">
             <div className="flex items-center gap-2 min-w-0">
