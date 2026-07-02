@@ -44,7 +44,7 @@ const devRoleEntryEnabled = false;
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { signIn, signUp, signInWithDevRole, requestMagicLink, signInWithMicrosoft } = useAuth();
+  const { signIn, signUp, signInWithDevRole, requestMagicLink } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -52,7 +52,6 @@ const LoginPage: React.FC = () => {
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [magicLinkMsg, setMagicLinkMsg] = useState<string | null>(null);
   const [magicLinkBusy, setMagicLinkBusy] = useState(false);
-  const [microsoftBusy, setMicrosoftBusy] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -107,7 +106,7 @@ const LoginPage: React.FC = () => {
     return domain ? `name@${domain}` : 'your@email.com';
   }, [authConfig]);
 
-  const emailLoginGate = authConfig?.emailLoginGate === true;
+  const emailLoginGate = authConfig?.companyEmailLogin === true;
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,16 +139,11 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleMicrosoftLogin = () => {
+  const handleMicrosoftLogin = async () => {
     setAuthMode('login');
     setError(null);
     setMagicLinkMsg(null);
-    if (!authConfig?.microsoftLogin) {
-      setError(AUTH_ERROR_MESSAGES.azure_not_configured);
-      return;
-    }
-    setMicrosoftBusy(true);
-    signInWithMicrosoft('/');
+    await sendCompanyEmailLink();
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -246,105 +240,6 @@ const LoginPage: React.FC = () => {
     ? submitting ? 'Signing in…' : 'Sign in'
     : submitting ? 'Creating account…' : 'Create account';
 
-  if (emailLoginGate) {
-    return (
-      <div
-        className={cn('jarvis-warm-bg relative overflow-x-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
-        style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
-      >
-        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-blue-orb opacity-40 blur-sm" aria-hidden />
-        <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-blue-orb opacity-25 blur-md" aria-hidden />
-
-        <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center gap-6 overflow-y-auto p-4 py-8 sm:p-6 sm:py-10 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
-          <motion.div
-            initial={{ opacity: 0, x: -24 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex w-full max-w-lg flex-col justify-center lg:max-w-md lg:flex-1 lg:my-auto"
-          >
-            <div className="w-full max-w-sm mx-auto text-center">
-              <div className="mb-10 flex justify-center">
-                <span className="inline-flex items-center gap-3 text-2xl">
-                  <BrandMark size="lg" />
-                  <span className="font-semibold tracking-tight text-foreground">
-                    <BrandTitle />
-                  </span>
-                </span>
-              </div>
-
-              <div className="jarvis-frost p-8">
-                {authConfig === null ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">กำลังโหลด…</p>
-                ) : (
-                  <CompanyEmailLoginGate
-                    busy={microsoftBusy}
-                    microsoftLogin={authConfig.microsoftLogin}
-                    onMicrosoftLogin={handleMicrosoftLogin}
-                    error={error}
-                  />
-                )}
-              </div>
-            </div>
-
-            <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
-              ต้องการสมัครงานภายนอก?{' '}
-              <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
-                ดูบอร์ดประกาศรับสมัคร
-              </Link>
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="hidden lg:flex w-full max-w-md flex-1 flex-col justify-center"
-          >
-            <div className="jarvis-frost relative min-h-[480px] overflow-hidden p-8 flex flex-col justify-between">
-              <div className="relative z-10">
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Today</p>
-                <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground leading-tight">{todayLabel}</p>
-              </div>
-
-              <div className="relative z-10 flex flex-1 items-center justify-center py-8">
-                <div className="relative flex items-center justify-center">
-                  <div
-                    className="absolute h-40 w-40 rounded-full opacity-25 blur-2xl"
-                    style={{ background: `hsl(${config.primaryHsl})` }}
-                    aria-hidden
-                  />
-                  <BrandMark size="hero" className="relative z-10" />
-                </div>
-              </div>
-
-              <div className="relative z-10 space-y-4">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">ดูประกาศรับสมัครพนักงาน</p>
-                </div>
-                <Link
-                  to="/apply"
-                  className="jarvis-pill-btn w-full min-h-[48px] px-6 py-3 text-sm touch-manipulation"
-                >
-                  Join now
-                  <ArrowRight className="h-4 w-4" aria-hidden />
-                </Link>
-              </div>
-
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-blue-100/20" aria-hidden />
-            </div>
-
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              ต้องการสมัครงานภายนอก?{' '}
-              <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
-                ดูบอร์ดประกาศรับสมัคร
-              </Link>
-            </p>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn('jarvis-warm-bg relative overflow-x-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
@@ -375,6 +270,17 @@ const LoginPage: React.FC = () => {
 
             {authConfig === null ? (
               <p className="text-sm text-muted-foreground text-center py-6">กำลังโหลด…</p>
+            ) : emailLoginGate ? (
+              <CompanyEmailLoginGate
+                email={email}
+                onEmailChange={setEmail}
+                emailPlaceholder={emailPlaceholder}
+                companyEmailHint={authConfig.companyEmailHint}
+                magicLinkMsg={magicLinkMsg}
+                magicLinkBusy={magicLinkBusy}
+                error={error}
+                onSubmit={handleMagicLink}
+              />
             ) : (
               <>
             <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
@@ -410,22 +316,16 @@ const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            {authMode === 'login' && (authConfig?.companyEmailLogin || authConfig?.microsoftLogin) ? (
+            {authMode === 'login' && authConfig?.companyEmailLogin ? (
               <>
                 <button
                   type="button"
                   className="btn-primary w-full touch-manipulation min-h-[48px]"
-                  onClick={handleMicrosoftLogin}
-                  disabled={magicLinkBusy || microsoftBusy}
+                  onClick={() => void handleMicrosoftLogin()}
+                  disabled={magicLinkBusy}
                 >
                   <MicrosoftLogo />
-                  {microsoftBusy
-                    ? 'กำลังเปลี่ยนหน้า…'
-                    : authConfig?.microsoftLogin
-                      ? 'เข้าสู่ระบบด้วย Microsoft'
-                      : magicLinkBusy
-                        ? 'กำลังส่งลิงก์…'
-                        : 'เข้าสู่ระบบด้วย Microsoft'}
+                  {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'เข้าสู่ระบบด้วย Microsoft'}
                 </button>
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center" aria-hidden>
@@ -707,7 +607,7 @@ const LoginPage: React.FC = () => {
               </div>
             ) : null}
 
-            {authMode === 'login' && !authConfig?.companyEmailLogin && !authConfig?.microsoftLogin ? (
+            {authMode === 'login' && !authConfig?.companyEmailLogin ? (
               <button
                 type="button"
                 disabled

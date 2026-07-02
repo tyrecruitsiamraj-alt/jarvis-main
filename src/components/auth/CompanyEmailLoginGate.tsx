@@ -1,4 +1,5 @@
 import React from 'react';
+import { Label } from '@/components/ui/label';
 
 export function MicrosoftLogo({ className }: { className?: string }) {
   return (
@@ -12,43 +13,75 @@ export function MicrosoftLogo({ className }: { className?: string }) {
 }
 
 type Props = {
-  busy?: boolean;
-  microsoftLogin?: boolean;
-  onMicrosoftLogin: () => void;
+  email: string;
+  onEmailChange: (value: string) => void;
+  emailPlaceholder: string;
+  companyEmailHint: string | null;
+  magicLinkMsg: string | null;
+  magicLinkBusy: boolean;
   error: string | null;
+  onSubmit: (e: React.FormEvent) => void;
 };
 
 const CompanyEmailLoginGate: React.FC<Props> = ({
-  busy = false,
-  microsoftLogin = false,
-  onMicrosoftLogin,
+  email,
+  onEmailChange,
+  emailPlaceholder,
+  companyEmailHint,
+  magicLinkMsg,
+  magicLinkBusy,
   error,
+  onSubmit,
 }) => (
   <>
-    <h1 className="text-xl font-semibold mb-1 text-center text-foreground">ยินดีต้อนรับ</h1>
-    <p className="text-sm text-muted-foreground mb-7 text-center">
-      เข้าสู่ระบบด้วยบัญชีองค์กรของคุณ
+    <p className="text-sm text-center text-foreground font-medium">เข้าใช้งานระบบ</p>
+    <p className="text-xs text-center text-muted-foreground -mt-2">
+      กรอกอีเมลบริษัทแล้วรับลิงก์เข้าสู่ระบบทางอีเมล
     </p>
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="company-email" className="text-xs font-medium text-muted-foreground ml-1">
+          อีเมลบริษัท
+        </Label>
+        <input
+          id="company-email"
+          type="email"
+          autoComplete="username"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          placeholder={emailPlaceholder}
+          required
+          className="jarvis-soft-field min-h-[48px]"
+        />
+        {companyEmailHint ? (
+          <p className="text-[11px] text-muted-foreground ml-1">{companyEmailHint}</p>
+        ) : null}
+      </div>
 
-    <button
-      type="button"
-      disabled={busy || !microsoftLogin}
-      onClick={onMicrosoftLogin}
-      className="btn-primary w-full touch-manipulation min-h-[52px]"
-    >
-      <MicrosoftLogo />
-      {busy ? 'กำลังเปลี่ยนหน้า…' : 'เข้าสู่ระบบด้วย Microsoft'}
-    </button>
+      {magicLinkMsg ? (
+        <p
+          className="text-xs text-muted-foreground text-center rounded-xl bg-white/50 border border-white/70 px-3 py-2"
+          role="status"
+        >
+          {magicLinkMsg}
+        </p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={magicLinkBusy}
+        className="btn-primary w-full touch-manipulation min-h-[52px]"
+      >
+        <MicrosoftLogo />
+        {magicLinkBusy ? 'กำลังส่งลิงก์…' : 'เข้าสู่ระบบด้วย Microsoft'}
+      </button>
+    </form>
 
     {error ? (
-      <p className="mt-4 text-xs text-destructive text-center" role="alert">
+      <p className="text-xs text-destructive text-center" role="alert">
         {error}
       </p>
     ) : null}
-
-    <p className="mt-6 text-xs text-muted-foreground text-center">
-      เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
-    </p>
   </>
 );
 
