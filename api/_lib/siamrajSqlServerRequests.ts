@@ -117,6 +117,11 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   };
 }
 
+/** ใบขอที่ยังไม่ปิด — ยังต้องหาคน (ไม่กรอง is_inform_all) */
+function openStaffingRequestWhere(alias = 'A'): string {
+  return `${alias}.status = 'A' AND ${alias}.is_stop = 'N'`;
+}
+
 /** Query เต็มสำหรับดูรายละเอียดใบขอเดียว */
 const BASE_SQL = `
   SELECT
@@ -162,6 +167,13 @@ const BASE_SQL = `
   INNER JOIN st_request_p2 B ON A.request_no = B.request_no
   INNER JOIN st_request_p3_rate C ON B.request_no = C.request_no
   INNER JOIN ms_site SS ON A.site_code = SS.site_code
+`;
+
+const BASE_SQL_LIST = `${BASE_SQL}
+  WHERE ${openStaffingRequestWhere()}
+`;
+
+const BASE_SQL_BY_ID = `${BASE_SQL}
   WHERE A.status = 'A'
 `;
 
@@ -195,14 +207,14 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
       SELECT TOP (@limit) A.request_no
       FROM st_request_head A
       INNER JOIN ms_site SS ON A.site_code = SS.site_code
-      WHERE A.status = 'A'
+      WHERE ${openStaffingRequestWhere()}
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
         ${extraWhere}
       ORDER BY A.request_date DESC
     ),
     base AS (
-      ${BASE_SQL}
+      ${BASE_SQL_LIST}
       AND A.request_no IN (SELECT request_no FROM recent)
     )
     SELECT
@@ -221,7 +233,7 @@ export async function getSiamrajSqlServerUnitRequestById(requestNo: string) {
   const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
     `
     WITH base AS (
-      ${BASE_SQL}
+      ${BASE_SQL_BY_ID}
       AND A.request_no = @requestNo
     )
     SELECT TOP 1

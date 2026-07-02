@@ -16,7 +16,7 @@ async function loadLiveJobs(): Promise<{
   const meta = await fetchSiamrajFeedMeta();
 
   if (meta.enabled) {
-    const siamrajJobs = await fetchSiamrajUnitRequests(200);
+    const siamrajJobs = await fetchSiamrajUnitRequests(500);
     return {
       jobs: enrichJobsWithUrgency(siamrajJobs),
       siamrajPrimary: true,

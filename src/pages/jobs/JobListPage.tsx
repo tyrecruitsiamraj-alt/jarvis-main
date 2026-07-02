@@ -139,15 +139,15 @@ const JobListPage: React.FC = () => {
           </div>
         )}
 
-        <div className="flex flex-col md:flex-row gap-3 md:items-center flex-wrap">
-          <SearchField
-            wrapperClassName="flex-1 min-w-[200px]"
-            type="text"
-            placeholder="ค้นหางาน..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <SearchField
+          wrapperClassName="w-full"
+          type="text"
+          placeholder="ค้นหางาน..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
+        <div className="flex flex-col md:flex-row gap-3 md:items-center flex-wrap">
           <div className="flex items-center gap-2 min-w-[200px]">
             <label htmlFor="job-list-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
               หน่วยงาน
