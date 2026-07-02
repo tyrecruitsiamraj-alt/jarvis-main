@@ -69,7 +69,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   const jobDesc = [roleLabel, r.job_name2, r.fee_name].filter(Boolean).join(' / ');
   const ageRange = parseAgeRange(r.age);
   const genderRequirement = formatGenderRequirement(r.sex);
-  const jobType = inferJobTypeFromDescription(r.job_name1, r.staff_title_name, r.job_description_code_1);
+  const jobType = inferJobTypeFromDescription(r.job_name1, r.job_name2, r.staff_title_name, r.job_description_code_1);
 
   return {
     id: `siamraj-sql:${r.external_id}`,

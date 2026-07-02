@@ -12,6 +12,7 @@ export function unitRequestCardSubtitle(job: JobRequest): string {
   const action = job.request_action_name || JOB_TYPE_LABELS[job.job_type];
   if (action) parts.push(action);
   if (job.job_description_code_1) parts.push(job.job_description_code_1);
+  if (job.job_description_code_2) parts.push(job.job_description_code_2);
   if (job.resigned_employee_name) parts.push(job.resigned_employee_name);
   return parts.join(' • ');
 }
@@ -33,6 +34,7 @@ export function unitRequestSearchBlob(job: JobRequest): string {
     job.request_action_name,
     job.location_address,
     job.job_description_code_1,
+    job.job_description_code_2,
     JOB_TYPE_LABELS[job.job_type],
     JOB_CATEGORY_LABELS[job.job_category],
     job.resigned_employee_name,

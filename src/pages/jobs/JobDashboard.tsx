@@ -12,6 +12,11 @@ import { motion } from 'framer-motion';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { cn } from '@/lib/utils';
+import {
+  filterUnitRequestsByJobSubtype,
+  jobSubtypeFilterOptions,
+  type SiamrajJobSubtypeFilter,
+} from '@/lib/siamrajUnitFilters';
 
 type JobDialogItem = {
   id: string;
@@ -27,10 +32,12 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
   const badgeVariant: JobDialogItem['badgeVariant'] =
     j.status === 'closed' ? 'success' : j.status === 'cancelled' ? 'destructive' : 'warning';
   const actionLabel = j.request_action_name ? ` • ${j.request_action_name}` : '';
+  const positionParts = [j.job_description_code_1, j.job_description_code_2].filter(Boolean).join(' / ');
+  const roleLabel = positionParts || JOB_TYPE_LABELS[j.job_type];
   return {
     id: j.id,
     title: j.request_no ? `${j.unit_name} (${j.request_no})` : j.unit_name,
-    subtitle: `${j.request_action_name || JOB_TYPE_LABELS[j.job_type]}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)}`,
+    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)}`,
     badge,
     badgeVariant,
     onClick: () => onNavigate(j),
@@ -41,6 +48,7 @@ const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { jobs, loading, refreshing, siamrajPrimary, dbSource, loadError, refetch } = useUnitRequestsFeed();
   const [unitFilter, setUnitFilter] = useState<string>('all');
+  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>('all');
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
   const [jobDialogItems, setJobDialogItems] = useState<JobDialogItem[]>([]);
@@ -49,6 +57,11 @@ const JobDashboard: React.FC = () => {
     const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
   }, [jobs]);
+
+  const jobSubtypeOptions = useMemo(
+    () => (siamrajPrimary ? jobSubtypeFilterOptions(jobs) : []),
+    [jobs, siamrajPrimary],
+  );
 
   const unitCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -60,9 +73,11 @@ const JobDashboard: React.FC = () => {
   }, [jobs]);
 
   const scopedJobs = useMemo(() => {
-    if (unitFilter === 'all') return jobs;
-    return jobs.filter((j) => j.unit_name === unitFilter);
-  }, [jobs, unitFilter]);
+    let list = jobs;
+    if (unitFilter !== 'all') list = list.filter((j) => j.unit_name === unitFilter);
+    if (siamrajPrimary) list = filterUnitRequestsByJobSubtype(list, jobSubtypeFilter);
+    return list;
+  }, [jobs, unitFilter, jobSubtypeFilter, siamrajPrimary]);
 
   const closedJobs = useMemo(() => scopedJobs.filter((j) => j.status === 'closed'), [scopedJobs]);
   const activeJobs = useMemo(() => scopedJobs.filter((j) => j.status !== 'closed'), [scopedJobs]);
@@ -119,24 +134,48 @@ const JobDashboard: React.FC = () => {
           </div>
         )}
 
-        {!loading && unitOptions.length > 0 && (
-          <div className="flex items-center gap-2 max-w-xl">
-            <label htmlFor="job-dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-              หน่วยงาน
-            </label>
-            <select
-              id="job-dashboard-unit"
-              value={unitFilter}
-              onChange={(e) => setUnitFilter(e.target.value)}
-              className="jarvis-soft-field flex-1"
-            >
-              <option value="all">ทั้งหมด ({jobs.length})</option>
-              {unitOptions.map((u) => (
-                <option key={u} value={u}>
-                  {u} ({unitCounts.get(u) ?? 0})
-                </option>
-              ))}
-            </select>
+        {!loading && (unitOptions.length > 0 || jobSubtypeOptions.length > 1) && (
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+            {unitOptions.length > 0 ? (
+              <div className="flex items-center gap-2 max-w-xl flex-1 min-w-[220px]">
+                <label htmlFor="job-dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                  หน่วยงาน
+                </label>
+                <select
+                  id="job-dashboard-unit"
+                  value={unitFilter}
+                  onChange={(e) => setUnitFilter(e.target.value)}
+                  className="jarvis-soft-field flex-1"
+                >
+                  <option value="all">ทั้งหมด ({jobs.length})</option>
+                  {unitOptions.map((u) => (
+                    <option key={u} value={u}>
+                      {u} ({unitCounts.get(u) ?? 0})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {siamrajPrimary && jobSubtypeOptions.length > 1 ? (
+              <div className="flex items-center gap-2 max-w-xl flex-1 min-w-[240px]">
+                <label htmlFor="job-dashboard-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                  ลักษณะงานย่อย
+                </label>
+                <select
+                  id="job-dashboard-subtype"
+                  value={jobSubtypeFilter}
+                  onChange={(e) => setJobSubtypeFilter(e.target.value)}
+                  className="jarvis-soft-field flex-1"
+                >
+                  {jobSubtypeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -209,13 +248,14 @@ const JobDashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {j.job_description_code_1 ? `${j.job_description_code_1} • ` : `${JOB_TYPE_LABELS[j.job_type]} • `}
-                  {j.gender_requirement ? `เพศ ${j.gender_requirement} • ` : ''}
+                  {j.job_description_code_1 ? `${j.job_description_code_1}` : JOB_TYPE_LABELS[j.job_type]}
+                  {j.job_description_code_2 ? ` / ${j.job_description_code_2}` : ''}
+                  {j.gender_requirement ? ` • เพศ ${j.gender_requirement}` : ''}
                   {(j.age_range_min != null || j.age_range_max != null)
-                    ? `อายุ ${j.age_range_min ?? '—'}–${j.age_range_max ?? '—'} • `
+                    ? ` • อายุ ${j.age_range_min ?? '—'}–${j.age_range_max ?? '—'}`
                     : ''}
-                  {j.resigned_employee_name ? `ลาออก: ${j.resigned_employee_name} • ` : ''}
-                  ต้องการ {formatYmdDmyBe(j.required_date)}
+                  {j.resigned_employee_name ? ` • ลาออก: ${j.resigned_employee_name}` : ''}
+                  {` • ต้องการ ${formatYmdDmyBe(j.required_date)}`}
                   {j.submittedByName ? ` • ส่งโดย ${j.submittedByName}` : ''}
                 </div>
                 {j.total_penalty > 0 && (

@@ -96,7 +96,7 @@ export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
   const reasonParts = [r.reason_main_name, r.reason_sub_name].filter(Boolean);
   const vehicleParts = [r.vehicle_type_name, r.vehicle_remark].filter(Boolean);
   const roleLabel = primaryJobRoleLabel(r.job_description_code_1, r.staff_title_code, r.job_description_code_1);
-  const jobType = inferJobTypeFromDescription(r.job_description_code_1, r.staff_title_code);
+  const jobType = inferJobTypeFromDescription(r.job_description_code_1, r.job_description_code_2, r.staff_title_code);
 
   return {
     id: `siamraj:${r.act_saleco_id}`,

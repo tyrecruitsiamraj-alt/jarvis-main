@@ -66,3 +66,60 @@ export function departmentFilterOptions(
 
   return options;
 }
+
+/** ค่า filter สำหรับใบขอที่ไม่มีลักษณะงานย่อย */
+export const JOB_SUBTYPE_UNSET = '__unset__';
+
+export type SiamrajJobSubtypeFilter = 'all' | string;
+
+export function extractJobSubtypeKey(job: JobRequest): string {
+  const v = job.job_description_code_2?.trim();
+  return v || JOB_SUBTYPE_UNSET;
+}
+
+export function formatJobSubtypeLabel(key: string): string {
+  if (key === JOB_SUBTYPE_UNSET) return 'ไม่ระบุ';
+  return key;
+}
+
+export function extractJobSubtypeLabel(job: JobRequest): string {
+  return formatJobSubtypeLabel(extractJobSubtypeKey(job));
+}
+
+export function filterUnitRequestsByJobSubtype(
+  jobs: JobRequest[],
+  filter: SiamrajJobSubtypeFilter,
+): JobRequest[] {
+  if (filter === 'all') return jobs;
+  return jobs.filter((j) => extractJobSubtypeKey(j) === filter);
+}
+
+export function jobSubtypeCounts(jobs: JobRequest[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const j of jobs) {
+    const key = extractJobSubtypeKey(j);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function jobSubtypeFilterOptions(
+  jobs: JobRequest[],
+): { value: SiamrajJobSubtypeFilter; label: string }[] {
+  const counts = jobSubtypeCounts(jobs);
+
+  const options: { value: SiamrajJobSubtypeFilter; label: string }[] = [
+    { value: 'all', label: `ทั้งหมด (${jobs.length})` },
+  ];
+
+  for (const [key, count] of [...counts.entries()].sort(
+    (a, b) => b[1] - a[1] || formatJobSubtypeLabel(a[0]).localeCompare(formatJobSubtypeLabel(b[0]), 'th'),
+  )) {
+    options.push({
+      value: key,
+      label: `${formatJobSubtypeLabel(key)} (${count})`,
+    });
+  }
+
+  return options;
+}

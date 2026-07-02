@@ -23,7 +23,11 @@ import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobSt
 import {
   departmentFilterOptions,
   filterUnitRequestsByDepartment,
+  extractJobSubtypeLabel,
+  filterUnitRequestsByJobSubtype,
+  jobSubtypeFilterOptions,
   type SiamrajDepartmentFilter,
+  type SiamrajJobSubtypeFilter,
 } from '@/lib/siamrajUnitFilters';
 
 type JobListFilter = 'all' | 'active' | 'closed';
@@ -50,6 +54,7 @@ const JobListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [departmentFilter, setDepartmentFilter] = useState<SiamrajDepartmentFilter>('all');
+  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>('all');
   const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
   const [screenerFilter, setScreenerFilter] = useState<string>('all');
   const [staffRosterRev, setStaffRosterRev] = useState(0);
@@ -79,20 +84,30 @@ const JobListPage: React.FC = () => {
     [jobs, siamrajPrimary],
   );
 
+  const jobSubtypeOptions = useMemo(
+    () => (siamrajPrimary ? jobSubtypeFilterOptions(jobs) : []),
+    [jobs, siamrajPrimary],
+  );
+
   const departmentScopedJobs = useMemo(
     () => (siamrajPrimary ? filterUnitRequestsByDepartment(jobs, departmentFilter) : jobs),
     [jobs, siamrajPrimary, departmentFilter],
   );
 
+  const subtypeScopedJobs = useMemo(
+    () => (siamrajPrimary ? filterUnitRequestsByJobSubtype(departmentScopedJobs, jobSubtypeFilter) : departmentScopedJobs),
+    [departmentScopedJobs, siamrajPrimary, jobSubtypeFilter],
+  );
+
   const unitOptions = useMemo(() => {
-    const set = new Set(departmentScopedJobs.map((j) => j.unit_name).filter(Boolean));
+    const set = new Set(subtypeScopedJobs.map((j) => j.unit_name).filter(Boolean));
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [departmentScopedJobs]);
+  }, [subtypeScopedJobs]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    return departmentScopedJobs
+    return subtypeScopedJobs
       .filter((j) => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
         if (recruiterFilter !== 'all' && j.recruiter_name !== recruiterFilter) return false;
@@ -103,12 +118,12 @@ const JobListPage: React.FC = () => {
       })
       .filter(
         (j) =>
-          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
+          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
             .toLowerCase()
             .includes(q),
       )
       .sort(compareJobsByAssigneeThenAgeDaysDesc);
-  }, [departmentScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
@@ -119,7 +134,7 @@ const JobListPage: React.FC = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [filter, search, unitFilter, departmentFilter, recruiterFilter, screenerFilter]);
+  }, [filter, search, unitFilter, departmentFilter, jobSubtypeFilter, recruiterFilter, screenerFilter]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -208,6 +223,26 @@ const JobListPage: React.FC = () => {
                 className="jarvis-soft-field flex-1"
               >
                 {departmentOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          {siamrajPrimary ? (
+            <div className="flex items-center gap-2 min-w-[240px]">
+              <label htmlFor="job-list-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                ลักษณะงานย่อย
+              </label>
+              <select
+                id="job-list-subtype"
+                value={jobSubtypeFilter}
+                onChange={(e) => setJobSubtypeFilter(e.target.value)}
+                className="jarvis-soft-field flex-1"
+              >
+                {jobSubtypeOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
@@ -305,6 +340,7 @@ const JobListPage: React.FC = () => {
                   <div className="text-xs text-muted-foreground mt-1">
                     {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
                     {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
+                    {j.job_description_code_2 ? ` • ${j.job_description_code_2}` : ''}
                     {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
                   </div>
 
@@ -349,7 +385,7 @@ const JobListPage: React.FC = () => {
           </div>
         ) : (
           <div className="glass-card rounded-xl border border-border overflow-x-auto">
-            <table className="w-full text-sm min-w-[1100px]">
+            <table className="w-full text-sm min-w-[1200px]">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
@@ -360,6 +396,7 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
@@ -388,6 +425,7 @@ const JobListPage: React.FC = () => {
                     <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{j.job_description_code_1 || '—'}</td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs">{extractJobSubtypeLabel(j)}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{j.resigned_employee_name || '—'}</td>
                     <td className="px-3 py-3">
                       {j.recruiter_name || j.screener_name ? (
