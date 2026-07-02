@@ -26,7 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, endOfMonth, startOfMonth } from 'date-fns';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, countUnassignedRecruiters, countUnassignedScreeners, matchesRecruiterFilter, matchesScreenerFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import DateRangeCalendarPicker, {
   type DateRangeYmd,
@@ -123,14 +123,34 @@ const SupervisorDashboard: React.FC = () => {
         result = filterUnitRequestsByDepartment(result, departmentFilter);
       }
       if (!skip.includes('recruiter') && recruiterFilter !== 'all') {
-        result = result.filter((j) => j.recruiter_name === recruiterFilter);
+        result = result.filter((j) => matchesRecruiterFilter(j, recruiterFilter));
       }
       if (!skip.includes('screener') && screenerFilter !== 'all') {
-        result = result.filter((j) => j.screener_name === screenerFilter);
+        result = result.filter((j) => matchesScreenerFilter(j, screenerFilter));
       }
       return result;
     },
     [dateRange, unitFilter, departmentFilter, recruiterFilter, screenerFilter],
+  );
+
+  const recruiterFilterScope = useMemo(
+    () => applyDashboardFilters(jobs, ['recruiter']),
+    [jobs, applyDashboardFilters],
+  );
+
+  const screenerFilterScope = useMemo(
+    () => applyDashboardFilters(jobs, ['screener']),
+    [jobs, applyDashboardFilters],
+  );
+
+  const unassignedRecruiterCount = useMemo(
+    () => countUnassignedRecruiters(recruiterFilterScope),
+    [recruiterFilterScope],
+  );
+
+  const unassignedScreenerCount = useMemo(
+    () => countUnassignedScreeners(screenerFilterScope),
+    [screenerFilterScope],
   );
 
   const filteredJobs = useMemo(() => applyDashboardFilters(jobs, []), [jobs, applyDashboardFilters]);
@@ -350,6 +370,9 @@ const SupervisorDashboard: React.FC = () => {
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 <option value="all">ทั้งหมด</option>
+                <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+                  {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
+                </option>
                 {recruiters.map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -365,6 +388,9 @@ const SupervisorDashboard: React.FC = () => {
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 <option value="all">ทั้งหมด</option>
+                <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+                  {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
+                </option>
                 {screeners.map((s) => (
                   <option key={s} value={s}>
                     {s}

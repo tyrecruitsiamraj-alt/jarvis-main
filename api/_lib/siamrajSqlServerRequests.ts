@@ -40,6 +40,8 @@ type SqlServerRequestRow = {
   fee_name: string | null;
   abs_customer_fine: number | null;
   contact_name: string | null;
+  contract_type_code: string | null;
+  contract_type_name: string | null;
 };
 
 function toIso(v: Date | string | null | undefined): string | null {
@@ -61,6 +63,13 @@ function getSqlFilters() {
     siteFrom: (process.env.SIAMRAJ_SQL_SITE_FROM || '_').trim(),
     siteTo: (process.env.SIAMRAJ_SQL_SITE_TO || 'Z').trim(),
   };
+}
+
+/** ไม่ดึงหน่วยงาน Cls = contract_type_code C (รถอย่างเดียว) — ปิดได้ด้วย SIAMRAJ_SQL_EXCLUDE_CONTRACT_TYPE_C=false */
+function excludeClsContractTypeWhere(alias = 'SS'): string {
+  const raw = (process.env.SIAMRAJ_SQL_EXCLUDE_CONTRACT_TYPE_C ?? 'true').trim().toLowerCase();
+  if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return '';
+  return `AND RTRIM(${alias}.contract_type_code) <> 'C'`;
 }
 
 function mapSqlServerRow(r: SqlServerRequestRow) {
@@ -88,6 +97,8 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     site_code: r.site_code || undefined,
     department_code: r.department_code?.trim() || undefined,
     department_name: r.department_name?.trim() || undefined,
+    contract_type_code: r.contract_type_code?.trim() || undefined,
+    contract_type_name: r.contract_type_name?.trim() || undefined,
     location_address: r.work_addr || r.site_name || r.site_code || '',
     request_action_code: r.request_action_code || undefined,
     request_action_name: r.request_action_name || undefined,
@@ -117,9 +128,14 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   };
 }
 
-/** ใบขอที่ยังไม่ปิด — ยังต้องหาคน (ไม่กรอง is_inform_all) */
+/** ใบขอที่ยังต้องหาคน — ยังไม่ Stop / ไม่มีเลขปิด CLS / ยังไม่มีเลขแจ้งเข้า */
 function openStaffingRequestWhere(alias = 'A'): string {
-  return `${alias}.status = 'A' AND ${alias}.is_stop = 'N'`;
+  return `
+    ${alias}.status = 'A'
+    AND ${alias}.is_stop = 'N'
+    AND (${alias}.stop_no IS NULL OR RTRIM(${alias}.stop_no) = '')
+    AND NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = ${alias}.request_no)
+  `.trim();
 }
 
 /** Query เต็มสำหรับดูรายละเอียดใบขอเดียว */
@@ -133,6 +149,8 @@ const BASE_SQL = `
     SS.site_name,
     RTRIM(SS.department_code) AS department_code,
     (SELECT TOP 1 D.department_name FROM ms_department D WHERE D.department_code = SS.department_code ORDER BY D.seq) AS department_name,
+    RTRIM(SS.contract_type_code) AS contract_type_code,
+    (SELECT TOP 1 CT.contract_type_name FROM st_ms_contract_type CT WHERE CT.contract_type_code = SS.contract_type_code) AS contract_type_name,
     A.status,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name,
     (SELECT z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no) AS customer_name,
@@ -179,7 +197,8 @@ const BASE_SQL_BY_ID = `${BASE_SQL}
 
 const SELECT_COLUMNS = `
   external_id, request_no, act_saleco_datetime, act_saleco_effective_date,
-  site_code, site_name, department_code, department_name, customer_name, status, staff_fullname, mobile_phone,
+  site_code, site_name, department_code, department_name, contract_type_code, contract_type_name,
+  customer_name, status, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
   resign_date, reason_main_name, work_addr, work_date, work_time, age, sex,
@@ -200,6 +219,7 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
   const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
   const extraWhere = mode === 'staffing_queue' ? staffingQueueExtraWhere() : '';
   const filters = getSqlFilters();
+  const clsExclude = excludeClsContractTypeWhere('SS');
 
   const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
     `
@@ -210,6 +230,7 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
       WHERE ${openStaffingRequestWhere()}
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
+        ${clsExclude}
         ${extraWhere}
       ORDER BY A.request_date DESC
     ),

@@ -12,6 +12,7 @@ import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteCell } from '@/components/jobs/UnitRequestNoteField';
+import SiamrajClsInfoBanner from '@/components/jobs/SiamrajClsInfoBanner';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   compareJobsByAssigneeThenAgeDaysDesc,
@@ -19,7 +20,7 @@ import {
   getJobRequestSubmittedDate,
 } from '@/lib/jobUrgency';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, countUnassignedRecruiters, countUnassignedScreeners, matchesRecruiterFilter, matchesScreenerFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import {
   departmentFilterOptions,
   filterUnitRequestsByDepartment,
@@ -104,14 +105,40 @@ const JobListPage: React.FC = () => {
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
   }, [subtypeScopedJobs]);
 
+  const recruiterFilterScope = useMemo(() => {
+    return subtypeScopedJobs.filter((j) => {
+      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+      if (!matchesScreenerFilter(j, screenerFilter)) return false;
+      return true;
+    });
+  }, [subtypeScopedJobs, unitFilter, screenerFilter]);
+
+  const screenerFilterScope = useMemo(() => {
+    return subtypeScopedJobs.filter((j) => {
+      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+      if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
+      return true;
+    });
+  }, [subtypeScopedJobs, unitFilter, recruiterFilter]);
+
+  const unassignedRecruiterCount = useMemo(
+    () => countUnassignedRecruiters(recruiterFilterScope),
+    [recruiterFilterScope],
+  );
+
+  const unassignedScreenerCount = useMemo(
+    () => countUnassignedScreeners(screenerFilterScope),
+    [screenerFilterScope],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
     return subtypeScopedJobs
       .filter((j) => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
-        if (recruiterFilter !== 'all' && j.recruiter_name !== recruiterFilter) return false;
-        if (screenerFilter !== 'all' && j.screener_name !== screenerFilter) return false;
+        if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
+        if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
@@ -193,6 +220,8 @@ const JobListPage: React.FC = () => {
             {loadError}
           </div>
         )}
+
+        {siamrajPrimary ? <SiamrajClsInfoBanner /> : null}
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
           <SearchField
@@ -280,6 +309,9 @@ const JobListPage: React.FC = () => {
               className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
+              <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+                {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
+              </option>
               {recruiters.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -299,6 +331,9 @@ const JobListPage: React.FC = () => {
               className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
+              <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+                {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
+              </option>
               {screeners.map((s) => (
                 <option key={s} value={s}>
                   {s}

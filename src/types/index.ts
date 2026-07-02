@@ -117,6 +117,9 @@ export interface JobRequest {
   site_code?: string;
   department_code?: string;
   department_name?: string;
+  /** ประเภทสัญญา Siamraj — C = Cls (รถอย่างเดียว) */
+  contract_type_code?: string;
+  contract_type_name?: string;
   position_units?: number;
   lastWorkingDay?: string;
   contact_phone?: string;

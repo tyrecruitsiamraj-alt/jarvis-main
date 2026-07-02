@@ -8,6 +8,7 @@ import { Users, Shield, Database, FileText, Palette, UserCog, HeartPulse, Globe 
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
+import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
 import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
@@ -372,22 +373,7 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'outboundIp' && <VercelOutboundIpTab />}
 
-        {activeTab === 'roles' && (
-          <div className="space-y-3">
-            {['admin', 'supervisor', 'staff'].map((role) => (
-              <div key={role} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
-                <div className="font-semibold text-foreground capitalize mb-2">{role}</div>
-                <div className="text-sm text-muted-foreground">
-                  {role === 'admin'
-                    ? 'เข้าถึงได้ทุกหน้า จัดการ users, settings และ master data'
-                    : role === 'supervisor'
-                      ? 'ดู Dashboard ได้ — กำหนดเจ้าหน้าที่สรรหา/คัดสรร และแก้ไขข้อมูลได้ (ยกเว้นหน้า Settings)'
-                      : 'ดู Dashboard และข้อมูลได้ — แก้ไขข้อมูลหรือกำหนดผู้รับผิดชอบไม่ได้ (เฉพาะ Supervisor ขึ้นไป)'}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {activeTab === 'roles' && <RolePermissionsTab />}
 
         {activeTab === 'reference' && (
           <div className="space-y-3">
