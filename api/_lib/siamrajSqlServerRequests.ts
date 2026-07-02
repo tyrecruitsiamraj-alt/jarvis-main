@@ -58,7 +58,6 @@ function getSqlFilters() {
     deptTo: (process.env.SIAMRAJ_SQL_DEPT_TO || 'Z').trim(),
     siteFrom: (process.env.SIAMRAJ_SQL_SITE_FROM || '_').trim(),
     siteTo: (process.env.SIAMRAJ_SQL_SITE_TO || 'Z').trim(),
-    yyyy: Number(process.env.SIAMRAJ_SQL_YEAR || new Date().getFullYear()),
   };
 }
 
@@ -193,7 +192,6 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
       WHERE A.status = 'A'
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
-        AND YEAR(A.request_date) = @yyyy
         ${extraWhere}
       ORDER BY A.request_date DESC
     ),
