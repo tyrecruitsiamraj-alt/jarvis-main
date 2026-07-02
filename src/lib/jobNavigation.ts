@@ -10,6 +10,10 @@ export function unitRequestPath(job: JobRequest): string {
   return `/jobs/${job.id}`;
 }
 
-export function navigateToUnitRequest(job: JobRequest, navigate: NavigateFunction): void {
-  navigate(unitRequestPath(job));
+export function navigateToUnitRequest(
+  job: JobRequest,
+  navigate: NavigateFunction,
+  options?: { returnTo?: string },
+): void {
+  navigate(unitRequestPath(job), options?.returnTo ? { state: { returnTo: options.returnTo } } : undefined);
 }

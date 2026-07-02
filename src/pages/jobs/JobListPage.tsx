@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import type { JobRequest } from '@/types';
@@ -26,13 +26,15 @@ import {
   extractJobSubtypeLabel,
   filterUnitRequestsByJobSubtype,
   jobSubtypeFilterOptions,
-  type SiamrajDepartmentFilter,
-  type SiamrajJobSubtypeFilter,
 } from '@/lib/siamrajUnitFilters';
-
-type JobListFilter = 'all' | 'active' | 'closed';
-
-const PAGE_SIZE = 20;
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { getTotalPages } from '@/lib/pagination';
+import {
+  buildJobListSearchParams,
+  jobListReturnTo,
+  mergeJobListState,
+  parseJobListSearchParams,
+} from '@/lib/jobListPageState';
 
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
@@ -49,17 +51,35 @@ function ageDaysLabel(job: JobRequest): string {
 
 const JobListPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
-  const [filter, setFilter] = useState<JobListFilter>('all');
-  const [search, setSearch] = useState('');
-  const [unitFilter, setUnitFilter] = useState<string>('all');
-  const [departmentFilter, setDepartmentFilter] = useState<SiamrajDepartmentFilter>('all');
-  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>('all');
-  const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
-  const [screenerFilter, setScreenerFilter] = useState<string>('all');
+
+  const listState = useMemo(() => parseJobListSearchParams(searchParams), [searchParams]);
+  const {
+    filter,
+    search,
+    unitFilter,
+    departmentFilter,
+    jobSubtypeFilter,
+    recruiterFilter,
+    screenerFilter,
+    page,
+    pageSize,
+  } = listState;
+
+  const returnTo = jobListReturnTo(location.pathname, location.search);
+
+  const updateListState = useCallback(
+    (patch: Partial<typeof listState>) => {
+      const next = mergeJobListState(listState, patch);
+      setSearchParams(buildJobListSearchParams(next), { replace: true });
+    },
+    [listState, setSearchParams],
+  );
+
   const [staffRosterRev, setStaffRosterRev] = useState(0);
   const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
-  const [page, setPage] = useState(1);
 
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
@@ -151,34 +171,30 @@ const JobListPage: React.FC = () => {
       .sort(compareJobsByAssigneeThenAgeDaysDesc);
   }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = getTotalPages(filtered.length, pageSize);
 
   const paginated = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, page]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filter, search, unitFilter, departmentFilter, jobSubtypeFilter, recruiterFilter, screenerFilter]);
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   useEffect(() => {
     if (jobSubtypeFilter === 'all') return;
     const stillValid = jobSubtypeOptions.some((o) => o.value === jobSubtypeFilter);
-    if (!stillValid) setJobSubtypeFilter('all');
-  }, [departmentFilter, jobSubtypeOptions, jobSubtypeFilter]);
+    if (!stillValid) updateListState({ jobSubtypeFilter: 'all' });
+  }, [departmentFilter, jobSubtypeOptions, jobSubtypeFilter, updateListState]);
 
   useEffect(() => {
     if (unitFilter === 'all') return;
-    if (!unitOptions.includes(unitFilter)) setUnitFilter('all');
-  }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter]);
+    if (!unitOptions.includes(unitFilter)) updateListState({ unitFilter: 'all' });
+  }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter, updateListState]);
 
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+    if (page > totalPages) updateListState({ page: totalPages });
+  }, [page, totalPages, updateListState]);
 
-  const pageFrom = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const pageTo = Math.min(page * PAGE_SIZE, filtered.length);
+  const pageFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageTo = Math.min(page * pageSize, filtered.length);
 
   const noteForJob = (j: JobRequest) => {
     const key = j.request_no || j.externalId || j.id;
@@ -226,7 +242,7 @@ const JobListPage: React.FC = () => {
             type="text"
             placeholder="ค้นหางาน..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => updateListState({ search: e.target.value })}
           />
 
           <div className="flex items-center gap-2 w-full sm:w-[280px] shrink-0">
@@ -236,7 +252,7 @@ const JobListPage: React.FC = () => {
             <select
               id="job-list-unit"
               value={unitFilter}
-              onChange={(e) => setUnitFilter(e.target.value)}
+              onChange={(e) => updateListState({ unitFilter: e.target.value })}
               className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
@@ -263,7 +279,7 @@ const JobListPage: React.FC = () => {
               <select
                 id="job-list-department"
                 value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
+                onChange={(e) => updateListState({ departmentFilter: e.target.value })}
                 className="jarvis-soft-field flex-1 min-w-0"
               >
                 {departmentOptions.map((o) => (
@@ -283,7 +299,7 @@ const JobListPage: React.FC = () => {
               <select
                 id="job-list-subtype"
                 value={jobSubtypeFilter}
-                onChange={(e) => setJobSubtypeFilter(e.target.value)}
+                onChange={(e) => updateListState({ jobSubtypeFilter: e.target.value })}
                 className="jarvis-soft-field flex-1 min-w-0"
               >
                 {jobSubtypeOptions.map((o) => (
@@ -302,7 +318,7 @@ const JobListPage: React.FC = () => {
             <select
               id="job-list-recruiter"
               value={recruiterFilter}
-              onChange={(e) => setRecruiterFilter(e.target.value)}
+              onChange={(e) => updateListState({ recruiterFilter: e.target.value })}
               className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
@@ -324,7 +340,7 @@ const JobListPage: React.FC = () => {
             <select
               id="job-list-screener"
               value={screenerFilter}
-              onChange={(e) => setScreenerFilter(e.target.value)}
+              onChange={(e) => updateListState({ screenerFilter: e.target.value })}
               className="jarvis-soft-field flex-1 min-w-0"
             >
               <option value="all">ทั้งหมด</option>
@@ -348,7 +364,7 @@ const JobListPage: React.FC = () => {
             ].map((f) => (
               <button
                 key={f.value}
-                onClick={() => setFilter(f.value)}
+                onClick={() => updateListState({ filter: f.value })}
                 className={cn(
                   'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
                   filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
@@ -370,7 +386,7 @@ const JobListPage: React.FC = () => {
               >
                 <button
                   type="button"
-                  onClick={() => navigateToUnitRequest(j, navigate)}
+                  onClick={() => navigateToUnitRequest(j, navigate, { returnTo })}
                   className="w-full text-left"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
@@ -460,7 +476,7 @@ const JobListPage: React.FC = () => {
                 {paginated.map((j) => (
                   <tr
                     key={j.id}
-                    onClick={() => navigateToUnitRequest(j, navigate)}
+                    onClick={() => navigateToUnitRequest(j, navigate, { returnTo })}
                     className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                   >
                     <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">{j.request_no || '—'}</td>
@@ -517,30 +533,17 @@ const JobListPage: React.FC = () => {
           </div>
         )}
 
-        {filtered.length > PAGE_SIZE ? (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-            <p className="text-xs text-muted-foreground">
-              หน้า {page} / {totalPages}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-4 py-2 rounded-full border border-border text-sm disabled:opacity-40"
-              >
-                ก่อนหน้า
-              </button>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-4 py-2 rounded-full border border-border text-sm disabled:opacity-40"
-              >
-                ถัดไป
-              </button>
-            </div>
-          </div>
+        {filtered.length > 0 ? (
+          <ListPaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            totalPages={totalPages}
+            pageFrom={pageFrom}
+            pageTo={pageTo}
+            onPageChange={(nextPage) => updateListState({ page: nextPage })}
+            onPageSizeChange={(nextSize) => updateListState({ pageSize: nextSize })}
+          />
         ) : null}
       </div>
     </div>

@@ -214,8 +214,16 @@ function staffingQueueExtraWhere(alias = 'A'): string {
   `;
 }
 
+/** จำนวนสูงสุดต่อครั้งเมื่อดึง feed ใบขอหน่วยงาน */
+export const SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT = 2000;
+
+function clampUnitRequestLimit(limit?: number): number {
+  const n = limit ?? 200;
+  return Math.min(Math.max(n, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
+}
+
 export async function listSiamrajSqlServerUnitRequests(options: { limit?: number; mode?: string }) {
-  const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+  const limit = clampUnitRequestLimit(options.limit);
   const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
   const extraWhere = mode === 'staffing_queue' ? staffingQueueExtraWhere() : '';
   const filters = getSqlFilters();

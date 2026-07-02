@@ -3,6 +3,7 @@ import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import {
   getSiamrajSqlServerUnitRequestById,
   listSiamrajSqlServerUnitRequests,
+  SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT,
 } from './siamrajSqlServerRequests.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 
@@ -209,7 +210,7 @@ export async function listSiamrajUnitRequests(options: { limit?: number; mode?: 
   const schema = getSiamrajSchema();
   if (!schema) return [];
 
-  const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+  const limit = Math.min(Math.max(options.limit ?? 200, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
   const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
   const where = mode === 'staffing_queue' ? staffingQueueWhere() : '1=1';
 

@@ -6,6 +6,7 @@ import { publishUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
+const UNIT_REQUESTS_FETCH_LIMIT = 2000;
 
 async function loadLiveJobs(): Promise<{
   jobs: JobRequest[];
@@ -16,7 +17,7 @@ async function loadLiveJobs(): Promise<{
   const meta = await fetchSiamrajFeedMeta();
 
   if (meta.enabled) {
-    const siamrajJobs = await fetchSiamrajUnitRequests(500);
+    const siamrajJobs = await fetchSiamrajUnitRequests(UNIT_REQUESTS_FETCH_LIMIT);
     return {
       jobs: enrichJobsWithUrgency(siamrajJobs),
       siamrajPrimary: true,
@@ -25,7 +26,7 @@ async function loadLiveJobs(): Promise<{
     };
   }
 
-  const r = await apiFetch('/api/jobs?limit=500', { cache: 'no-store' });
+  const r = await apiFetch(`/api/jobs?limit=${UNIT_REQUESTS_FETCH_LIMIT}`, { cache: 'no-store' });
   if (!r.ok) {
     throw new Error(
       r.status === 401

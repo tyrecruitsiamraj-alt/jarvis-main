@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -26,6 +26,8 @@ function Field({ label, value }: { label: string; value?: string | number | null
 const SiamrajUnitRequestDetailPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backPath = (location.state as { returnTo?: string } | null)?.returnTo ?? '/jobs/list';
   const { hasPermission } = useAuth();
   const canAssignStaff = hasPermission('supervisor');
 
@@ -95,7 +97,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
       <PageHeader
         title="รายละเอียดใบขอ"
         subtitle={data?.request_no || 'อ่านจาก Siamraj'}
-        backPath="/jobs"
+        backPath={backPath}
         actions={
           <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-blue-500/15 text-blue-700">
             <Database className="w-3.5 h-3.5" />

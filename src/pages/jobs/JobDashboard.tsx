@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import StatCard from '@/components/shared/StatCard';
@@ -17,6 +17,8 @@ import {
   jobSubtypeFilterOptions,
   type SiamrajJobSubtypeFilter,
 } from '@/lib/siamrajUnitFilters';
+import { loadJobDashboardFilters, saveJobDashboardFilters } from '@/lib/jobDashboardPageState';
+import { jobListReturnTo } from '@/lib/jobListPageState';
 
 type JobDialogItem = {
   id: string;
@@ -46,12 +48,20 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
 
 const JobDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = jobListReturnTo(location.pathname, location.search);
   const { jobs, loading, refreshing, siamrajPrimary, dbSource, loadError, refetch } = useUnitRequestsFeed();
-  const [unitFilter, setUnitFilter] = useState<string>('all');
-  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>('all');
+  const [unitFilter, setUnitFilter] = useState(() => loadJobDashboardFilters().unitFilter);
+  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>(
+    () => loadJobDashboardFilters().jobSubtypeFilter as SiamrajJobSubtypeFilter,
+  );
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [jobDialogTitle, setJobDialogTitle] = useState('');
   const [jobDialogItems, setJobDialogItems] = useState<JobDialogItem[]>([]);
+
+  useEffect(() => {
+    saveJobDashboardFilters({ unitFilter, jobSubtypeFilter });
+  }, [unitFilter, jobSubtypeFilter]);
 
   const unitOptions = useMemo(() => {
     const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
@@ -85,7 +95,7 @@ const JobDashboard: React.FC = () => {
   const closedCount = closedJobs.length;
   const activeCount = activeJobs.length;
 
-  const goToJob = (job: JobRequest) => navigateToUnitRequest(job, navigate);
+  const goToJob = (job: JobRequest) => navigateToUnitRequest(job, navigate, { returnTo });
 
   const openJobList = (title: string, list: JobRequest[]) => {
     setJobDialogTitle(`${title} (${list.length})`);
