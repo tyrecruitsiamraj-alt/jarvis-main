@@ -4,7 +4,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import DetailListDialog from '@/components/shared/DetailListDialog';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
-import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import {
   Briefcase,
   Zap,
@@ -38,10 +38,14 @@ import {
   extractDepartmentCode,
   extractDepartmentLabel,
   filterUnitRequestsByDepartment,
+  filterUnitRequestsByJobSubtype,
   departmentFilterOptions,
   departmentCounts,
   departmentLabelForCode,
+  formatJobSubtypeLabel,
+  jobSubtypeFilterOptions,
   type SiamrajDepartmentFilter,
+  type SiamrajJobSubtypeFilter,
 } from '@/lib/siamrajUnitFilters';
 
 type DetailDialogItem = {
@@ -67,6 +71,7 @@ const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [departmentFilter, setDepartmentFilter] = useState<SiamrajDepartmentFilter>('all');
+  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>('all');
   const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
   const [screenerFilter, setScreenerFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultMonthRange());
@@ -76,7 +81,7 @@ const SupervisorDashboard: React.FC = () => {
   const [dialogItems, setDialogItems] = useState<DetailDialogItem[]>([]);
   const [staffRosterRev, setStaffRosterRev] = useState(0);
 
-  const { jobs, loading: loadingJobs, refreshing, refetch } = useDemoAwareJobs();
+  const { jobs, loading: loadingJobs, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
   const today = new Date();
 
   useEffect(() => {
@@ -110,8 +115,13 @@ const SupervisorDashboard: React.FC = () => {
 
   const departmentOptions = useMemo(() => departmentFilterOptions(jobs), [jobs]);
 
+  const jobSubtypeOptions = useMemo(
+    () => (siamrajPrimary ? jobSubtypeFilterOptions(jobs) : []),
+    [jobs, siamrajPrimary],
+  );
+
   const applyDashboardFilters = useCallback(
-    (source: JobRequest[], skip: Array<'unit' | 'department' | 'recruiter' | 'screener' | 'date'>) => {
+    (source: JobRequest[], skip: Array<'unit' | 'department' | 'subtype' | 'recruiter' | 'screener' | 'date'>) => {
       let result = source;
       if (!skip.includes('date') && dateRange) {
         result = result.filter((j) => isYmdInRange(jobRequestDateYmd(j), dateRange));
@@ -122,6 +132,9 @@ const SupervisorDashboard: React.FC = () => {
       if (!skip.includes('department') && departmentFilter !== 'all') {
         result = filterUnitRequestsByDepartment(result, departmentFilter);
       }
+      if (!skip.includes('subtype') && jobSubtypeFilter !== 'all') {
+        result = filterUnitRequestsByJobSubtype(result, jobSubtypeFilter);
+      }
       if (!skip.includes('recruiter') && recruiterFilter !== 'all') {
         result = result.filter((j) => matchesRecruiterFilter(j, recruiterFilter));
       }
@@ -130,7 +143,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       return result;
     },
-    [dateRange, unitFilter, departmentFilter, recruiterFilter, screenerFilter],
+    [dateRange, unitFilter, departmentFilter, jobSubtypeFilter, recruiterFilter, screenerFilter],
   );
 
   const recruiterFilterScope = useMemo(
@@ -300,6 +313,7 @@ const SupervisorDashboard: React.FC = () => {
             departmentFilter !== 'all'
               ? `แผนก: ${departmentOptions.find((o) => o.value === departmentFilter)?.label.replace(/\s*\(\d+\)$/, '') ?? departmentFilter}`
               : null,
+            jobSubtypeFilter !== 'all' ? `ลักษณะงานย่อย: ${formatJobSubtypeLabel(jobSubtypeFilter)}` : null,
           ]
             .filter(Boolean)
             .join(' · ') || 'ภาพรวมสำหรับผู้บริหาร — งาน รายได้ และค่าปรับ (ตามฟิลเตอร์ด้านล่าง)'
@@ -358,24 +372,51 @@ const SupervisorDashboard: React.FC = () => {
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-center">
-            <div className="flex items-center gap-2 min-w-0">
-              <label htmlFor="dashboard-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-                แผนก
-              </label>
-              <select
-                id="dashboard-department"
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="jarvis-soft-field flex-1 min-w-0"
-              >
-                {departmentOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div
+            className={cn(
+              'grid gap-3 items-center',
+              siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
+            )}
+          >
+            {siamrajPrimary ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <label htmlFor="dashboard-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+                  แผนก
+                </label>
+                <select
+                  id="dashboard-department"
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="jarvis-soft-field flex-1 min-w-0"
+                >
+                  {departmentOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            {siamrajPrimary && jobSubtypeOptions.length > 1 ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <label htmlFor="dashboard-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
+                  ลักษณะงานย่อย
+                </label>
+                <select
+                  id="dashboard-subtype"
+                  value={jobSubtypeFilter}
+                  onChange={(e) => setJobSubtypeFilter(e.target.value)}
+                  className="jarvis-soft-field flex-1 min-w-0"
+                >
+                  {jobSubtypeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div className="flex items-center gap-2 min-w-0">
               <label htmlFor="dashboard-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
