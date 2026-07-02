@@ -5,6 +5,7 @@ import {
   createOAuthState,
   isAzureAdConfigured,
   sanitizeReturnPath,
+  azureAuthErrorRedirect,
 } from '../../_lib/azureAdAuth.js';
 import { sendError, handleApiError, sendRedirect, type ApiReq, type ApiRes } from '../../_lib/http.js';
 
@@ -26,7 +27,9 @@ export default async function azureAdStartHandler(req: ApiReq, res: ApiRes) {
   }
 
   if (!isAzureAdConfigured()) {
-    return sendError(res, 503, 'Service unavailable', 'Azure AD login is not configured');
+    const returnTo = sanitizeReturnPath(getQuery(req, 'returnTo') || '/login');
+    sendRedirect(res, azureAuthErrorRedirect('azure_not_configured', returnTo));
+    return;
   }
 
   try {

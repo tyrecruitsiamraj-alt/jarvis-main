@@ -13,11 +13,17 @@ export function MicrosoftLogo({ className }: { className?: string }) {
 
 type Props = {
   busy?: boolean;
+  microsoftLogin?: boolean;
   onMicrosoftLogin: () => void;
   error: string | null;
 };
 
-const CompanyEmailLoginGate: React.FC<Props> = ({ busy = false, onMicrosoftLogin, error }) => (
+const CompanyEmailLoginGate: React.FC<Props> = ({
+  busy = false,
+  microsoftLogin = false,
+  onMicrosoftLogin,
+  error,
+}) => (
   <>
     <h1 className="text-xl font-semibold mb-1 text-center text-foreground">ยินดีต้อนรับ</h1>
     <p className="text-sm text-muted-foreground mb-7 text-center">
@@ -26,7 +32,7 @@ const CompanyEmailLoginGate: React.FC<Props> = ({ busy = false, onMicrosoftLogin
 
     <button
       type="button"
-      disabled={busy}
+      disabled={busy || !microsoftLogin}
       onClick={onMicrosoftLogin}
       className="btn-primary w-full touch-manipulation min-h-[52px]"
     >

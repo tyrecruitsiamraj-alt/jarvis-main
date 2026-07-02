@@ -35,6 +35,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   domain: 'กรุณาใช้อีเมลบริษัทที่อนุญาตเท่านั้น',
   state: 'เซสชันหมดอายุ — กรุณาลองเข้าสู่ระบบอีกครั้ง',
   oauth: 'เข้าสู่ระบบ Microsoft ไม่สำเร็จ — ลองใหม่อีกครั้ง',
+  azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
 
 // ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
@@ -143,12 +144,12 @@ const LoginPage: React.FC = () => {
     setAuthMode('login');
     setError(null);
     setMagicLinkMsg(null);
-    if (emailLoginGate || authConfig?.microsoftLogin) {
-      setMicrosoftBusy(true);
-      signInWithMicrosoft('/');
+    if (!authConfig?.microsoftLogin) {
+      setError(AUTH_ERROR_MESSAGES.azure_not_configured);
       return;
     }
-    void sendCompanyEmailLink();
+    setMicrosoftBusy(true);
+    signInWithMicrosoft('/');
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -277,6 +278,7 @@ const LoginPage: React.FC = () => {
                 ) : (
                   <CompanyEmailLoginGate
                     busy={microsoftBusy}
+                    microsoftLogin={authConfig.microsoftLogin}
                     onMicrosoftLogin={handleMicrosoftLogin}
                     error={error}
                   />
