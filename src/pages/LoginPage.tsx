@@ -143,7 +143,7 @@ const LoginPage: React.FC = () => {
     setAuthMode('login');
     setError(null);
     setMagicLinkMsg(null);
-    if (authConfig?.microsoftLogin) {
+    if (emailLoginGate || authConfig?.microsoftLogin) {
       setMicrosoftBusy(true);
       signInWithMicrosoft('/');
       return;
@@ -247,56 +247,99 @@ const LoginPage: React.FC = () => {
 
   if (emailLoginGate) {
     return (
-      <main
-        className={cn('min-h-[100dvh] grid place-items-center px-6 py-10 jarvis-warm-bg', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
+      <div
+        className={cn('jarvis-warm-bg relative overflow-x-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
         style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
       >
-        <div className="w-full max-w-sm text-center space-y-4">
-          <div className="mb-6 flex justify-center">
-            <span className="inline-flex items-center gap-3 text-2xl">
-              <BrandMark size="lg" />
-              <span className="font-semibold tracking-tight text-foreground">
-                <BrandTitle />
-              </span>
-            </span>
-          </div>
+        <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-blue-orb opacity-40 blur-sm" aria-hidden />
+        <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-blue-orb opacity-25 blur-md" aria-hidden />
 
-          <div className="jarvis-frost p-8">
-            {authConfig === null ? (
-              <p className="text-sm text-muted-foreground text-center py-4">กำลังโหลด…</p>
-            ) : (
-              <CompanyEmailLoginGate
-                email={email}
-                onEmailChange={setEmail}
-                emailPlaceholder={emailPlaceholder}
-                companyEmailHint={authConfig.companyEmailHint}
-                magicLinkMsg={magicLinkMsg}
-                magicLinkBusy={magicLinkBusy}
-                microsoftLogin={authConfig.microsoftLogin}
-                companyEmailLogin={authConfig.companyEmailLogin}
-                microsoftBusy={microsoftBusy}
-                onMicrosoftLogin={handleMicrosoftLogin}
-                error={error}
-                onSubmit={handleMagicLink}
-              />
-            )}
-          </div>
+        <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center gap-6 overflow-y-auto p-4 py-8 sm:p-6 sm:py-10 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
+          <motion.div
+            initial={{ opacity: 0, x: -24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex w-full max-w-lg flex-col justify-center lg:max-w-md lg:flex-1 lg:my-auto"
+          >
+            <div className="w-full max-w-sm mx-auto text-center">
+              <div className="mb-10 flex justify-center">
+                <span className="inline-flex items-center gap-3 text-2xl">
+                  <BrandMark size="lg" />
+                  <span className="font-semibold tracking-tight text-foreground">
+                    <BrandTitle />
+                  </span>
+                </span>
+              </div>
 
-          <div className="jarvis-frost p-6 text-left">
-            <p className="text-sm font-semibold text-foreground">ดูประกาศรับสมัครพนักงาน</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              สมัครงานภายนอกผ่านบอร์ดประกาศรับสมัครของบริษัท
+              <div className="jarvis-frost p-8">
+                {authConfig === null ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">กำลังโหลด…</p>
+                ) : (
+                  <CompanyEmailLoginGate
+                    busy={microsoftBusy}
+                    onMicrosoftLogin={handleMicrosoftLogin}
+                    error={error}
+                  />
+                )}
+              </div>
+            </div>
+
+            <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
+              ต้องการสมัครงานภายนอก?{' '}
+              <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
+                ดูบอร์ดประกาศรับสมัคร
+              </Link>
             </p>
-            <Link
-              to="/apply"
-              className="jarvis-pill-btn mt-4 w-full min-h-[48px] px-6 py-3 text-sm touch-manipulation"
-            >
-              Join now
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
-          </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="hidden lg:flex w-full max-w-md flex-1 flex-col justify-center"
+          >
+            <div className="jarvis-frost relative min-h-[480px] overflow-hidden p-8 flex flex-col justify-between">
+              <div className="relative z-10">
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Today</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground leading-tight">{todayLabel}</p>
+              </div>
+
+              <div className="relative z-10 flex flex-1 items-center justify-center py-8">
+                <div className="relative flex items-center justify-center">
+                  <div
+                    className="absolute h-40 w-40 rounded-full opacity-25 blur-2xl"
+                    style={{ background: `hsl(${config.primaryHsl})` }}
+                    aria-hidden
+                  />
+                  <BrandMark size="hero" className="relative z-10" />
+                </div>
+              </div>
+
+              <div className="relative z-10 space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">ดูประกาศรับสมัครพนักงาน</p>
+                </div>
+                <Link
+                  to="/apply"
+                  className="jarvis-pill-btn w-full min-h-[48px] px-6 py-3 text-sm touch-manipulation"
+                >
+                  Join now
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </div>
+
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-blue-100/20" aria-hidden />
+            </div>
+
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              ต้องการสมัครงานภายนอก?{' '}
+              <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
+                ดูบอร์ดประกาศรับสมัคร
+              </Link>
+            </p>
+          </motion.div>
         </div>
-      </main>
+      </div>
     );
   }
 
