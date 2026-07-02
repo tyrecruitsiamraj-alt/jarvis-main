@@ -12,7 +12,6 @@ import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteCell } from '@/components/jobs/UnitRequestNoteField';
-import SiamrajClsInfoBanner from '@/components/jobs/SiamrajClsInfoBanner';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   compareJobsByAssigneeThenAgeDaysDesc,
@@ -220,8 +219,6 @@ const JobListPage: React.FC = () => {
             {loadError}
           </div>
         )}
-
-        {siamrajPrimary ? <SiamrajClsInfoBanner /> : null}
 
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
           <SearchField

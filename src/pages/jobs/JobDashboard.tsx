@@ -12,7 +12,6 @@ import { motion } from 'framer-motion';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { cn } from '@/lib/utils';
-import SiamrajClsInfoBanner from '@/components/jobs/SiamrajClsInfoBanner';
 import {
   filterUnitRequestsByJobSubtype,
   jobSubtypeFilterOptions,
@@ -134,8 +133,6 @@ const JobDashboard: React.FC = () => {
             {loadError}
           </div>
         )}
-
-        {siamrajPrimary && dbSource === 'sqlserver' ? <SiamrajClsInfoBanner /> : null}
 
         {!loading && (unitOptions.length > 0 || jobSubtypeOptions.length > 1) && (
           <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
