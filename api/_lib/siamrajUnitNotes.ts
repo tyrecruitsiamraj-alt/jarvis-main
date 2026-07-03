@@ -7,12 +7,14 @@ const MAX_NOTE_LENGTH = 2000;
 export type UnitNote = {
   request_no: string;
   note: string | null;
+  send_replacement: boolean | null;
   updated_at: string | null;
 };
 
 type Row = {
   request_no: string;
   note: string | null;
+  send_replacement: boolean | null;
   updated_at: string | Date | null;
 };
 
@@ -35,6 +37,7 @@ function mapRow(r: Row): UnitNote {
   return {
     request_no: r.request_no,
     note: r.note,
+    send_replacement: r.send_replacement ?? null,
     updated_at: toIso(r.updated_at),
   };
 }
@@ -43,7 +46,7 @@ export async function getUnitNote(requestNo: string): Promise<UnitNote | null> {
   const key = requestNo.trim();
   if (!key) return null;
   const { rows } = await dbQuery<Row>(
-    `select request_no, note, updated_at from ${table} where request_no = $1`,
+    `select request_no, note, send_replacement, updated_at from ${table} where request_no = $1`,
     [key],
   );
   return rows[0] ? mapRow(rows[0]) : null;
@@ -55,7 +58,7 @@ export async function getUnitNotesMap(requestNos: string[]): Promise<Map<string,
   if (keys.length === 0) return map;
 
   const { rows } = await dbQuery<Row>(
-    `select request_no, note, updated_at from ${table} where request_no = ANY($1::text[])`,
+    `select request_no, note, send_replacement, updated_at from ${table} where request_no = ANY($1::text[])`,
     [keys],
   );
   for (const r of rows) map.set(r.request_no, mapRow(r));
@@ -85,24 +88,29 @@ export async function listDistinctUnitNoteSuggestions(limit = 50): Promise<strin
 export async function upsertUnitNote(input: {
   requestNo: string;
   note?: unknown;
+  send_replacement?: boolean | null;
   userId?: string | null;
 }): Promise<UnitNote> {
   const key = input.requestNo.trim();
   if (!key) throw new Error('request_no is required');
 
-  const note = cleanNote(input.note);
+  const existing = await getUnitNote(key);
+  const note = input.note !== undefined ? cleanNote(input.note) : (existing?.note ?? null);
+  const sendReplacement =
+    input.send_replacement !== undefined ? input.send_replacement : (existing?.send_replacement ?? null);
 
   const { rows } = await dbQuery<Row>(
     `
-    insert into ${table} (request_no, note, updated_by_user_id, updated_at)
-    values ($1, $2, $3, now())
+    insert into ${table} (request_no, note, send_replacement, updated_by_user_id, updated_at)
+    values ($1, $2, $3, $4, now())
     on conflict (request_no) do update set
       note = excluded.note,
+      send_replacement = excluded.send_replacement,
       updated_by_user_id = excluded.updated_by_user_id,
       updated_at = now()
-    returning request_no, note, updated_at
+    returning request_no, note, send_replacement, updated_at
     `,
-    [key, note, input.userId ?? null],
+    [key, note, sendReplacement, input.userId ?? null],
   );
   return mapRow(rows[0]);
 }

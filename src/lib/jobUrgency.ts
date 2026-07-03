@@ -3,7 +3,10 @@ import type { JobRequest, JobUrgency } from '@/types';
 
 export const URGENCY_LEAD_DAYS = 7;
 
-export type UrgencyFilter = 'all' | 'urgent' | 'advance' | 'escalated';
+/** สถานะใบขอ — คำนวณจากวันที่กรอก vs วันที่ต้องการ */
+export type RequestStatusKind = 'retroactive' | 'urgent' | 'advance' | 'overdue';
+
+export type UrgencyFilter = 'all' | RequestStatusKind;
 
 export type NoteFilter = 'all' | 'has' | 'empty';
 
@@ -31,30 +34,36 @@ export const JOB_LIST_SORT_OPTIONS: { value: JobListSort; label: string }[] = [
 export const URGENCY_FILTER_OPTIONS: { value: UrgencyFilter; label: string; hint?: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   {
+    value: 'retroactive',
+    label: 'ฉุกเฉิน/ย้อนหลัง',
+    hint: 'วันที่ต้องการอยู่ก่อนวันที่กรอกใบขอ (ขอคนย้อนหลัง)',
+  },
+  {
     value: 'urgent',
     label: 'ฉุกเฉิน',
-    hint: 'วันที่ส่งถึงวันที่ต้องการน้อยกว่า 7 วัน',
+    hint: 'วันที่กรอกถึงวันที่ต้องการน้อยกว่า 7 วัน',
   },
   {
     value: 'advance',
     label: 'ล่วงหน้า',
-    hint: 'วันที่ส่งถึงวันที่ต้องการ 7 วันขึ้นไป',
+    hint: 'วันที่กรอกถึงวันที่ต้องการ 7 วันขึ้นไป และยังไม่เกินกำหนด',
   },
   {
-    value: 'escalated',
+    value: 'overdue',
     label: 'เกินกำหนด',
-    hint: 'เดิมเป็นล่วงหน้า แต่เหลือเวลาถึงวันที่ต้องการน้อยกว่า 7 วัน',
+    hint: 'เดิมเป็นล่วงหน้า แต่เลยวันที่ต้องการแล้วอย่างน้อย 1 วัน',
   },
 ];
 
 export type JobUrgencyMeta = {
-  urgency: JobUrgency;
-  /** วันที่ส่ง → วันที่ต้องการ (lead time ตอนส่ง) */
+  kind: RequestStatusKind;
+  /** วันที่ต้องการ − วันที่กรอก (ติดลบ = ย้อนหลัง) */
   leadDays: number;
   /** วันที่ต้องการ − วันนี้ */
   daysUntilRequired: number;
-  /** เริ่มเป็นล่วงหน้า แต่เหลือ < 7 วัน → ยกระดับเป็นฉุกเฉิน */
-  escalated: boolean;
+  /** วันนี้ − วันที่ต้องการ (≥ 1 = เลยกำหนดแล้ว) */
+  daysPastRequired: number;
+  wasAdvanceAtSubmit: boolean;
 };
 
 function parseJobDate(value?: string | null): Date | null {
@@ -67,15 +76,66 @@ function submittedDate(job: JobRequest): Date | null {
   return parseJobDate(job.submittedAt) ?? parseJobDate(job.created_at) ?? parseJobDate(job.request_date);
 }
 
+function todayStart(today = new Date()): Date {
+  return parseISO(today.toISOString().slice(0, 10));
+}
+
 export function getJobRequestSubmittedDate(job: JobRequest): Date | null {
   return submittedDate(job);
 }
 
+export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {
+  const submitted = submittedDate(job);
+  const required = parseJobDate(job.required_date);
+  const today0 = todayStart(today);
+
+  if (!submitted || !required) {
+    return {
+      kind: 'advance',
+      leadDays: URGENCY_LEAD_DAYS,
+      daysUntilRequired: 0,
+      daysPastRequired: 0,
+      wasAdvanceAtSubmit: true,
+    };
+  }
+
+  const leadDays = differenceInCalendarDays(required, submitted);
+  const daysUntilRequired = differenceInCalendarDays(required, today0);
+  const daysPastRequired = differenceInCalendarDays(today0, required);
+  const wasAdvanceAtSubmit = leadDays >= URGENCY_LEAD_DAYS;
+
+  if (leadDays < 0) {
+    return { kind: 'retroactive', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: false };
+  }
+
+  if (wasAdvanceAtSubmit && daysPastRequired >= 1) {
+    return { kind: 'overdue', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
+  }
+
+  if (leadDays < URGENCY_LEAD_DAYS) {
+    return { kind: 'urgent', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: false };
+  }
+
+  return { kind: 'advance', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
+}
+
+/** วันที่ใช้กับคอลัมน์「ผ่านมา」— ล่วงหน้ายังไม่นับ เกินกำหนดนับจากวันที่ต้องการ */
 export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
+  const meta = computeJobUrgency(job, today);
+  if (meta.kind === 'advance') return null;
+  if (meta.kind === 'overdue') return meta.daysPastRequired;
   const submitted = submittedDate(job);
   if (!submitted) return null;
-  const todayStart = parseISO(today.toISOString().slice(0, 10));
-  return differenceInCalendarDays(todayStart, submitted);
+  return differenceInCalendarDays(todayStart(today), submitted);
+}
+
+export function getJobRequestAgeLabel(job: JobRequest, today = new Date()): string {
+  const meta = computeJobUrgency(job, today);
+  if (meta.kind === 'advance') return 'ล่วงหน้าก่อน';
+  const days = getJobRequestAgeDays(job, today);
+  if (days == null) return '—';
+  if (days <= 0) return 'วันนี้';
+  return `${days} วัน`;
 }
 
 export function compareJobsByOldestRequestFirst(a: JobRequest, b: JobRequest): number {
@@ -98,7 +158,6 @@ export function compareJobsByAgeDaysDesc(a: JobRequest, b: JobRequest, today = n
   return compareJobsByOldestRequestFirst(a, b);
 }
 
-/** มีผู้รับผิดชอบก่อน แล้วเรียงตามวันที่ผ่านมา (มาก → น้อย) */
 export function compareJobsByAssigneeThenAgeDaysDesc(
   a: JobRequest,
   b: JobRequest,
@@ -134,6 +193,8 @@ export function compareJobsForListSort(
 
 export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, today = new Date()): boolean {
   if (filter === 'all') return true;
+  const meta = computeJobUrgency(job, today);
+  if (meta.kind === 'advance') return false;
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return false;
   switch (filter) {
@@ -152,44 +213,43 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
   }
 }
 
-export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {
-  const submitted = submittedDate(job);
-  const required = parseJobDate(job.required_date);
-  const todayStart = parseISO(today.toISOString().slice(0, 10));
-
-  const leadDays =
-    submitted && required ? differenceInCalendarDays(required, submitted) : URGENCY_LEAD_DAYS;
-  const daysUntilRequired = required ? differenceInCalendarDays(required, todayStart) : 0;
-
-  const baseUrgency: JobUrgency = leadDays < URGENCY_LEAD_DAYS ? 'urgent' : 'advance';
-  const escalated = baseUrgency === 'advance' && daysUntilRequired < URGENCY_LEAD_DAYS;
-  const urgency: JobUrgency = escalated ? 'urgent' : baseUrgency;
-
-  return { urgency, leadDays, daysUntilRequired, escalated };
+function urgencyBucket(meta: JobUrgencyMeta): JobUrgency {
+  return meta.kind === 'advance' ? 'advance' : 'urgent';
 }
 
 export function withComputedUrgency(job: JobRequest, today = new Date()): JobRequest {
   const meta = computeJobUrgency(job, today);
-  if (job.urgency === meta.urgency && !meta.escalated) return job;
-  return { ...job, urgency: meta.urgency };
+  const urgency = urgencyBucket(meta);
+  if (job.urgency === urgency) return job;
+  return { ...job, urgency };
 }
 
 export function enrichJobsWithUrgency(jobs: JobRequest[], today = new Date()): JobRequest[] {
   return jobs.map((j) => withComputedUrgency(j, today));
 }
 
+export function requestStatusLabel(kind: RequestStatusKind): string {
+  switch (kind) {
+    case 'retroactive':
+      return 'ฉุกเฉิน/ย้อนหลัง';
+    case 'urgent':
+      return 'ฉุกเฉิน';
+    case 'advance':
+      return 'ล่วงหน้า';
+    case 'overdue':
+      return 'เกินกำหนด';
+    default:
+      return kind;
+  }
+}
+
 export function urgencyDisplayLabel(meta: JobUrgencyMeta): string {
-  if (meta.escalated) return 'เกินกำหนด';
-  return meta.urgency === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า';
+  return requestStatusLabel(meta.kind);
 }
 
 export function matchesUrgencyFilter(job: JobRequest, filter: UrgencyFilter): boolean {
   if (filter === 'all') return true;
-  const meta = computeJobUrgency(job);
-  if (filter === 'escalated') return meta.escalated;
-  if (filter === 'urgent') return meta.urgency === 'urgent' && !meta.escalated;
-  if (filter === 'advance') return meta.urgency === 'advance';
-  return true;
+  return computeJobUrgency(job).kind === filter;
 }
 
 export function matchesNoteFilter(job: JobRequest, filter: NoteFilter): boolean {

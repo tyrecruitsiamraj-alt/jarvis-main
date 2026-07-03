@@ -60,6 +60,7 @@ async function attachNotes(items: unknown[]): Promise<void> {
       const n = map.get(keyOf(it));
       if (!n) continue;
       it.list_note = n.note;
+      it.send_replacement = n.send_replacement ?? null;
     }
   } catch {
     /* หมายเหตุเป็นข้อมูลเสริม */

@@ -35,7 +35,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const requestNo = getString(req.query?.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no query is required');
       const item = await getUnitNote(requestNo);
-      return res.status(200).json(item ?? { request_no: requestNo, note: null, updated_at: null });
+      return res.status(200).json(
+        item ?? { request_no: requestNo, note: null, send_replacement: null, updated_at: null },
+      );
     } catch (e) {
       return handleApiError(res, e, 'siamraj-unit-notes GET', { userId: req.user.sub });
     }
@@ -43,9 +45,6 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'POST' || method === 'PUT') {
     try {
-      const access = await checkFunctionAccess(req.user.role, 'unit_notes_edit');
-      if (!access.ok) return sendError(res, 403, 'Forbidden', access.message);
-
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
@@ -54,9 +53,29 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const requestNo = getString(body.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no is required');
 
+      const touchesNote = body.note !== undefined;
+      const touchesReplacement = body.send_replacement !== undefined;
+      if (!touchesNote && !touchesReplacement) {
+        return sendError(res, 400, 'Bad request', 'note or send_replacement is required');
+      }
+
+      if (touchesNote) {
+        const access = await checkFunctionAccess(req.user.role, 'unit_notes_edit');
+        if (!access.ok) return sendError(res, 403, 'Forbidden', access.message);
+      }
+
+      let sendReplacement: boolean | null | undefined;
+      if (touchesReplacement) {
+        const rawVal = body.send_replacement;
+        if (rawVal === null) sendReplacement = null;
+        else if (typeof rawVal === 'boolean') sendReplacement = rawVal;
+        else return sendError(res, 400, 'Bad request', 'send_replacement must be boolean or null');
+      }
+
       const item = await upsertUnitNote({
         requestNo,
-        note: body.note,
+        ...(touchesNote ? { note: body.note } : {}),
+        ...(touchesReplacement ? { send_replacement: sendReplacement ?? null } : {}),
         userId: req.user.sub,
       });
 
@@ -64,7 +83,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'siamraj_unit_note.upsert',
         entityType: 'siamraj_unit_note',
         entityId: requestNo,
-        after: { note: item.note },
+        after: { note: item.note, send_replacement: item.send_replacement },
       });
 
       return res.status(200).json(item);

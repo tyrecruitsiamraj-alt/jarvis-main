@@ -36,7 +36,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
 };
 
 const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
-const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'urgent', 'advance', 'escalated']);
+const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'retroactive', 'urgent', 'advance', 'overdue']);
 const NOTE_VALUES = new Set<NoteFilter>(['all', 'has', 'empty']);
 const AGE_DAYS_VALUES = new Set<AgeDaysFilter>(['all', 'today', '1-7', '8-14', '15-30', '30+']);
 const SORT_VALUES = new Set<JobListSort>(['assignee_age', 'age_desc', 'age_asc', 'newest', 'oldest']);
@@ -56,6 +56,8 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
   const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.trunc(pageRaw) : 1;
 
   const urgencyRaw = (params.get('urg') || JOB_LIST_DEFAULTS.urgencyFilter) as UrgencyFilter;
+  const urgencyNormalized =
+    (urgencyRaw as string) === 'escalated' ? ('overdue' as UrgencyFilter) : urgencyRaw;
   const noteRaw = (params.get('nf') || JOB_LIST_DEFAULTS.noteFilter) as NoteFilter;
   const ageRaw = (params.get('ag') || JOB_LIST_DEFAULTS.ageDaysFilter) as AgeDaysFilter;
   const sortRaw = (params.get('sort') || JOB_LIST_DEFAULTS.sort) as JobListSort;
@@ -68,7 +70,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     jobSubtypeFilter: params.get('st') || JOB_LIST_DEFAULTS.jobSubtypeFilter,
     recruiterFilter: params.get('r') || JOB_LIST_DEFAULTS.recruiterFilter,
     screenerFilter: params.get('sc') || JOB_LIST_DEFAULTS.screenerFilter,
-    urgencyFilter: URGENCY_VALUES.has(urgencyRaw) ? urgencyRaw : JOB_LIST_DEFAULTS.urgencyFilter,
+    urgencyFilter: URGENCY_VALUES.has(urgencyNormalized) ? urgencyNormalized : JOB_LIST_DEFAULTS.urgencyFilter,
     noteFilter: NOTE_VALUES.has(noteRaw) ? noteRaw : JOB_LIST_DEFAULTS.noteFilter,
     ageDaysFilter: AGE_DAYS_VALUES.has(ageRaw) ? ageRaw : JOB_LIST_DEFAULTS.ageDaysFilter,
     sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,

@@ -33,6 +33,8 @@ import DateRangeCalendarPicker, {
   isYmdInRange,
   jobRequestDateYmd,
 } from '@/components/shared/DateRangeCalendarPicker';
+import { FilterSelect } from '@/components/shared/FilterSelect';
+import { computeJobUrgency, getJobRequestAgeLabel, requestStatusLabel } from '@/lib/jobUrgency';
 import { toYmdLocal, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   extractDepartmentCode,
@@ -267,7 +269,7 @@ const SupervisorDashboard: React.FC = () => {
     const pen = j.total_penalty ?? 0;
     const sub = [
       `${extractDepartmentLabel(j)} • ${JOB_CATEGORY_LABELS[j.job_category]}`,
-      `${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'} • อายุใบขอ ${getAgeDays(j)} วัน`,
+      `${requestStatusLabel(computeJobUrgency(j).kind)} • ผ่านมา ${getJobRequestAgeLabel(j)}`,
       `รายได้ ${formatBaht(j.total_income ?? 0)}`,
       pen > 0 ? `ค่าปรับสะสม ${formatBaht(pen)}${j.days_without_worker ? ` • ขาดคน ${j.days_without_worker} วัน` : ''}` : null,
     ]
@@ -335,132 +337,108 @@ const SupervisorDashboard: React.FC = () => {
       <div className="px-4 md:px-6 space-y-6 pb-24 max-w-6xl mx-auto">
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูล…</div>}
 
-        {/* ฟิลเตอร์ — แยกแถวเหมือนหน้ารายการหน่วยงาน */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <label htmlFor="dashboard-date" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+        {/* ฟิลเตอร์ — responsive ทุก device */}
+        <div className="rounded-2xl border border-black/[0.06] bg-white/35 backdrop-blur-sm p-3 md:p-4 space-y-4">
+          <div className="flex flex-col lg:flex-row gap-3 lg:items-end">
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <label htmlFor="dashboard-date" className="text-xs text-muted-foreground leading-snug">
                 วันที่กรอก
               </label>
               <DateRangeCalendarPicker
                 triggerId="dashboard-date"
-                className="flex-1 min-w-0"
+                className="w-full min-w-0"
                 value={dateRange}
                 onChange={setDateRange}
               />
             </div>
 
             {unitOptions.length > 0 ? (
-              <div className="flex items-center gap-2 w-full sm:w-[280px] shrink-0">
-                <label htmlFor="dashboard-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-                  หน่วยงาน
-                </label>
-                <select
-                  id="dashboard-unit"
-                  value={unitFilter}
-                  onChange={(e) => setUnitFilter(e.target.value)}
-                  className="jarvis-soft-field flex-1 min-w-0"
-                >
-                  <option value="all">ทั้งหมด ({jobs.length})</option>
-                  {unitOptions.map((u) => (
-                    <option key={u} value={u}>
-                      {u} ({unitCounts.get(u) ?? 0})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterSelect
+                id="dashboard-unit"
+                label="หน่วยงาน"
+                value={unitFilter}
+                onChange={setUnitFilter}
+                className="w-full lg:w-72 shrink-0"
+              >
+                <option value="all">ทั้งหมด ({jobs.length})</option>
+                {unitOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {u} ({unitCounts.get(u) ?? 0})
+                  </option>
+                ))}
+              </FilterSelect>
             ) : null}
           </div>
 
           <div
             className={cn(
-              'grid gap-3 items-center',
+              'grid gap-3',
               siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
             )}
           >
             {siamrajPrimary ? (
-              <div className="flex items-center gap-2 min-w-0">
-                <label htmlFor="dashboard-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-                  แผนก
-                </label>
-                <select
-                  id="dashboard-department"
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="jarvis-soft-field flex-1 min-w-0"
-                >
-                  {departmentOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterSelect
+                id="dashboard-department"
+                label="แผนก"
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+              >
+                {departmentOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </FilterSelect>
             ) : null}
 
             {siamrajPrimary && jobSubtypeOptions.length > 1 ? (
-              <div className="flex items-center gap-2 min-w-0">
-                <label htmlFor="dashboard-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-                  ลักษณะงานย่อย
-                </label>
-                <select
-                  id="dashboard-subtype"
-                  value={jobSubtypeFilter}
-                  onChange={(e) => setJobSubtypeFilter(e.target.value)}
-                  className="jarvis-soft-field flex-1 min-w-0"
-                >
-                  {jobSubtypeOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterSelect
+                id="dashboard-subtype"
+                label="ลักษณะงานย่อย"
+                value={jobSubtypeFilter}
+                onChange={setJobSubtypeFilter}
+              >
+                {jobSubtypeOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </FilterSelect>
             ) : null}
 
-            <div className="flex items-center gap-2 min-w-0">
-              <label htmlFor="dashboard-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-                เจ้าหน้าที่สรรหา
-              </label>
-              <select
-                id="dashboard-recruiter"
-                value={recruiterFilter}
-                onChange={(e) => setRecruiterFilter(e.target.value)}
-                className="jarvis-soft-field flex-1 min-w-0"
-              >
-                <option value="all">ทั้งหมด</option>
-                <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-                  {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
+            <FilterSelect
+              id="dashboard-recruiter"
+              label="เจ้าหน้าที่สรรหา"
+              value={recruiterFilter}
+              onChange={setRecruiterFilter}
+            >
+              <option value="all">ทั้งหมด</option>
+              <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+                {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
+              </option>
+              {recruiters.map((r) => (
+                <option key={r} value={r}>
+                  {r}
                 </option>
-                {recruiters.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </FilterSelect>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <label htmlFor="dashboard-screener" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-                เจ้าหน้าที่คัดสรร
-              </label>
-              <select
-                id="dashboard-screener"
-                value={screenerFilter}
-                onChange={(e) => setScreenerFilter(e.target.value)}
-                className="jarvis-soft-field flex-1 min-w-0"
-              >
-                <option value="all">ทั้งหมด</option>
-                <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-                  {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
+            <FilterSelect
+              id="dashboard-screener"
+              label="เจ้าหน้าที่คัดสรร"
+              value={screenerFilter}
+              onChange={setScreenerFilter}
+            >
+              <option value="all">ทั้งหมด</option>
+              <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+                {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
+              </option>
+              {screeners.map((s) => (
+                <option key={s} value={s}>
+                  {s}
                 </option>
-                {screeners.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </FilterSelect>
           </div>
         </div>
 

@@ -164,6 +164,8 @@ export interface JobRequest {
   created_at: string;
   /** หมายเหตุจากรายการงานทั้งหมด (เก็บใน PostgreSQL สำหรับใบขอ Siamraj) */
   list_note?: string;
+  /** ส่งคนแทน (true) / ไม่ส่งคนแทน (false) — null = ยังไม่เลือก */
+  send_replacement?: boolean | null;
 }
 
 export interface JobAssignment {

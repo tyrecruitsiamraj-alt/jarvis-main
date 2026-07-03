@@ -99,10 +99,18 @@ const DateRangeCalendarPicker: React.FC<DateRangeCalendarPickerProps> = ({ value
           <button
             type="button"
             id={triggerId}
-            className="jarvis-soft-field w-full h-10 flex items-center gap-2 text-left text-sm min-w-0"
+            className="jarvis-soft-field w-full min-h-10 flex items-center gap-2 text-left text-sm min-w-0 py-2 leading-normal"
           >
             <CalendarIcon className="h-4 w-4 text-primary/70 shrink-0" />
-            <span className={cn('flex-1 truncate', !value && 'text-muted-foreground')}>{label}</span>
+            <span
+              className={cn(
+                'flex-1 min-w-0 leading-snug',
+                isMobile ? 'whitespace-normal break-words' : 'truncate',
+                !value && 'text-muted-foreground',
+              )}
+            >
+              {label}
+            </span>
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl border-border/80 shadow-lg" align="start">

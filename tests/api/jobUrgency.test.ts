@@ -1,0 +1,82 @@
+import { describe, it, expect } from 'vitest';
+import { computeJobUrgency, getJobRequestAgeLabel, matchesUrgencyFilter } from '../../src/lib/jobUrgency';
+import type { JobRequest } from '../../src/types';
+
+function job(partial: Partial<JobRequest>): JobRequest {
+  return {
+    id: 'test',
+    unit_name: 'Unit',
+    request_date: '2026-07-01',
+    required_date: '2026-07-10',
+    urgency: 'advance',
+    total_income: 0,
+    location_address: '',
+    job_type: 'central',
+    job_category: 'private',
+    penalty_per_day: 0,
+    days_without_worker: 0,
+    total_penalty: 0,
+    status: 'active',
+    created_at: '2026-07-01',
+    ...partial,
+  };
+}
+
+describe('computeJobUrgency', () => {
+  const today = new Date('2026-07-08T12:00:00');
+
+  it('retroactive when required before submitted', () => {
+    const meta = computeJobUrgency(
+      job({ submittedAt: '2026-07-03', required_date: '2026-07-02' }),
+      today,
+    );
+    expect(meta.kind).toBe('retroactive');
+  });
+
+  it('urgent when lead under 7 days', () => {
+    const meta = computeJobUrgency(
+      job({ submittedAt: '2026-07-01', required_date: '2026-07-05' }),
+      today,
+    );
+    expect(meta.kind).toBe('urgent');
+  });
+
+  it('advance when lead 7+ and not past required', () => {
+    const meta = computeJobUrgency(
+      job({ submittedAt: '2026-07-01', required_date: '2026-07-20' }),
+      today,
+    );
+    expect(meta.kind).toBe('advance');
+  });
+
+  it('overdue when was advance and past required by 1+ days', () => {
+    const meta = computeJobUrgency(
+      job({ submittedAt: '2026-06-01', required_date: '2026-07-05' }),
+      today,
+    );
+    expect(meta.kind).toBe('overdue');
+    expect(meta.daysPastRequired).toBeGreaterThanOrEqual(1);
+  });
+
+  it('age label shows ล่วงหน้าก่อน for advance', () => {
+    const label = getJobRequestAgeLabel(
+      job({ submittedAt: '2026-07-01', required_date: '2026-07-20' }),
+      today,
+    );
+    expect(label).toBe('ล่วงหน้าก่อน');
+  });
+
+  it('age label counts from required when overdue', () => {
+    const label = getJobRequestAgeLabel(
+      job({ submittedAt: '2026-06-01', required_date: '2026-07-05' }),
+      today,
+    );
+    expect(label).toBe('3 วัน');
+  });
+
+  it('filters by status kind', () => {
+    const retro = job({ submittedAt: '2026-07-03', required_date: '2026-07-02' });
+    expect(matchesUrgencyFilter(retro, 'retroactive')).toBe(true);
+    expect(matchesUrgencyFilter(retro, 'urgent')).toBe(false);
+  });
+});

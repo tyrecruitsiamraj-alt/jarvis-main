@@ -52,12 +52,19 @@ export async function fetchUnitNoteHistory(limit = 50): Promise<string[]> {
 }
 
 export async function saveUnitRequestNote(requestNo: string, note: string): Promise<void> {
+  await saveUnitRequestMeta(requestNo, { note: note.trim() || null });
+}
+
+export async function saveUnitRequestMeta(
+  requestNo: string,
+  payload: { note?: string | null; send_replacement?: boolean | null },
+): Promise<void> {
   const r = await apiFetch('/api/siamraj/unit-notes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request_no: requestNo, note: note.trim() || null }),
+    body: JSON.stringify({ request_no: requestNo, ...payload }),
   });
-  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกหมายเหตุไม่สำเร็จ'));
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกข้อมูลใบขอไม่สำเร็จ'));
 }
 
 export function unitRequestNoteKey(job: JobRequest): string {
