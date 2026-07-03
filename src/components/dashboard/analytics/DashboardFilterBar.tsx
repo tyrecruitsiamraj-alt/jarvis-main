@@ -69,7 +69,9 @@ const DashboardFilterBar: React.FC<Props> = ({
     >
       <div>
         <h2 className="text-sm font-semibold text-slate-900">ตัวกรอง</h2>
-        <p className="text-xs text-slate-500 mt-0.5">ช่วงเวลาและเงื่อนไขใบขอ</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          ช่วงเวลาและเงื่อนไขใบขอ · ตัวเลขแผนก/หน่วยงานตามช่วงวันที่กรอก
+        </p>
       </div>
 
       <div className="space-y-2">

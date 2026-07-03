@@ -311,7 +311,7 @@ function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): 
       id: 'total',
       label: 'งานทั้งหมด',
       value: curTotal,
-      description: 'ใบขอในช่วงที่เลือก',
+      description: 'ใบขอในช่วงวันที่ที่เลือก',
       trendPercent: trendPercent(curTotal, prevTotal),
     },
     {

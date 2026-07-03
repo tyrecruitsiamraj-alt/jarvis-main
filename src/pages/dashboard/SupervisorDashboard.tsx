@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import DashboardShell from '@/components/dashboard/analytics/DashboardShell';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
-import { useSiamrajUnitRequestFilters } from '@/hooks/useSiamrajUnitRequestFilters';
+import { useSiamrajUnitRequestFilters, filterUnitRequests } from '@/hooks/useSiamrajUnitRequestFilters';
 import {
   buildDashboardData,
   filterJobsByRequestDate,
@@ -42,7 +42,19 @@ const SupervisorDashboard: React.FC = () => {
   const [staffRosterRev, setStaffRosterRev] = useState(0);
 
   const { jobs, loading, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
-  const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
+
+  const period = useMemo(
+    () => resolvePeriodRange(periodPreset, dateRange ?? undefined),
+    [periodPreset, dateRange],
+  );
+
+  /** งานในช่วงวันที่ — ใช้ทั้ง filter sidebar และ KPI ให้ตัวเลขตรงกัน */
+  const dateScopedJobs = useMemo(
+    () => filterJobsByRequestDate(jobs, period.from, period.to),
+    [jobs, period.from, period.to],
+  );
+
+  const filterApi = useSiamrajUnitRequestFilters(dateScopedJobs, siamrajPrimary, unitFilters, staffRosterRev);
 
   useEffect(() => {
     saveDashboardFilters(filters);
@@ -86,11 +98,6 @@ const SupervisorDashboard: React.FC = () => {
     patchFilters({ periodPreset: preset });
   }, [patchFilters]);
 
-  const period = useMemo(
-    () => resolvePeriodRange(periodPreset, dateRange ?? undefined),
-    [periodPreset, dateRange],
-  );
-
   const jobById = useMemo(() => {
     const map = new Map<string, JobRequest>();
     for (const j of jobs) map.set(j.id, j);
@@ -101,14 +108,17 @@ const SupervisorDashboard: React.FC = () => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
     const unitFiltered = filterApi.filteredJobs;
-    const scoped = filterJobsByRequestDate(unitFiltered, period.from, period.to);
-    const previousScoped = filterJobsByRequestDate(unitFiltered, period.previousFrom, period.previousTo);
-    const built = buildDashboardData(scoped, previousScoped, period, filters);
+    const previousScoped = filterJobsByRequestDate(
+      filterUnitRequests(jobs, siamrajPrimary, unitFilters),
+      period.previousFrom,
+      period.previousTo,
+    );
+    const built = buildDashboardData(unitFiltered, previousScoped, period, filters);
     return {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [filterApi.filteredJobs, period, filters, sortKey, sortDir, jobs]);
+  }, [filterApi.filteredJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
