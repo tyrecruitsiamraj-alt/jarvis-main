@@ -108,9 +108,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   };
 
   const urgencyMeta = data ? computeJobUrgency(data) : null;
-  const urgencyHint = URGENCY_FILTER_OPTIONS.find((o) =>
-    urgencyMeta?.escalated ? o.value === 'escalated' : o.value === urgencyMeta?.urgency,
-  )?.hint;
+  const urgencyHint = URGENCY_FILTER_OPTIONS.find((o) => o.value === urgencyMeta?.kind)?.hint;
 
   return (
     <div>

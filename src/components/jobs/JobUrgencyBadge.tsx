@@ -15,8 +15,6 @@ function statusStyle(kind: JobUrgencyMeta['kind']): string {
       return 'text-destructive';
     case 'urgent':
       return 'text-destructive';
-    case 'overdue':
-      return 'text-warning';
     case 'advance':
       return 'text-info';
     default:
@@ -31,9 +29,7 @@ function statusHint(meta: JobUrgencyMeta): string {
     case 'urgent':
       return 'ฉุกเฉิน: วันที่กรอกถึงวันที่ต้องการน้อยกว่า 7 วัน';
     case 'advance':
-      return 'ล่วงหน้า: วันที่กรอกถึงวันที่ต้องการ 7 วันขึ้นไป และยังไม่เลยกำหนด';
-    case 'overdue':
-      return 'เกินกำหนด: เดิมเป็นล่วงหน้า แต่เลยวันที่ต้องการแล้วอย่างน้อย 1 วัน';
+      return 'ล่วงหน้า: วันที่กรอกถึงวันที่ต้องการ 7 วันขึ้นไป';
     default:
       return '';
   }
@@ -42,7 +38,7 @@ function statusHint(meta: JobUrgencyMeta): string {
 const JobUrgencyBadge: React.FC<Props> = ({ job, className, compact }) => {
   const meta = computeJobUrgency(job);
   const label = requestStatusLabel(meta.kind);
-  const hot = meta.kind === 'retroactive' || meta.kind === 'urgent' || meta.kind === 'overdue';
+  const hot = meta.kind === 'retroactive' || meta.kind === 'urgent';
 
   return (
     <span

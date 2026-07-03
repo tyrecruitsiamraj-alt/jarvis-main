@@ -49,12 +49,12 @@ describe('computeJobUrgency', () => {
     expect(meta.kind).toBe('advance');
   });
 
-  it('overdue when was advance and past required by 1+ days', () => {
+  it('advance when lead 7+ even if past required date', () => {
     const meta = computeJobUrgency(
       job({ submittedAt: '2026-06-01', required_date: '2026-07-05' }),
       today,
     );
-    expect(meta.kind).toBe('overdue');
+    expect(meta.kind).toBe('advance');
     expect(meta.daysPastRequired).toBeGreaterThanOrEqual(1);
   });
 
@@ -66,12 +66,12 @@ describe('computeJobUrgency', () => {
     expect(label).toBe('ล่วงหน้าก่อน');
   });
 
-  it('age label counts from required when overdue', () => {
+  it('age label shows ล่วงหน้าก่อน for advance past required', () => {
     const label = getJobRequestAgeLabel(
       job({ submittedAt: '2026-06-01', required_date: '2026-07-05' }),
       today,
     );
-    expect(label).toBe('3 วัน');
+    expect(label).toBe('ล่วงหน้าก่อน');
   });
 
   it('filters by status kind', () => {

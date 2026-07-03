@@ -4,7 +4,7 @@ import type { JobRequest, JobUrgency } from '@/types';
 export const URGENCY_LEAD_DAYS = 7;
 
 /** สถานะใบขอ — คำนวณจากวันที่กรอก vs วันที่ต้องการ */
-export type RequestStatusKind = 'retroactive' | 'urgent' | 'advance' | 'overdue';
+export type RequestStatusKind = 'retroactive' | 'urgent' | 'advance';
 
 export type UrgencyFilter = 'all' | RequestStatusKind;
 
@@ -46,12 +46,7 @@ export const URGENCY_FILTER_OPTIONS: { value: UrgencyFilter; label: string; hint
   {
     value: 'advance',
     label: 'ล่วงหน้า',
-    hint: 'วันที่กรอกถึงวันที่ต้องการ 7 วันขึ้นไป และยังไม่เกินกำหนด',
-  },
-  {
-    value: 'overdue',
-    label: 'เกินกำหนด',
-    hint: 'เดิมเป็นล่วงหน้า แต่เลยวันที่ต้องการแล้วอย่างน้อย 1 วัน',
+    hint: 'วันที่กรอกถึงวันที่ต้องการ 7 วันขึ้นไป',
   },
 ];
 
@@ -108,10 +103,6 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
     return { kind: 'retroactive', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: false };
   }
 
-  if (wasAdvanceAtSubmit && daysPastRequired >= 1) {
-    return { kind: 'overdue', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
-  }
-
   if (leadDays < URGENCY_LEAD_DAYS) {
     return { kind: 'urgent', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: false };
   }
@@ -119,11 +110,10 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
   return { kind: 'advance', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
 }
 
-/** วันที่ใช้กับคอลัมน์「ผ่านมา」— ล่วงหน้ายังไม่นับ เกินกำหนดนับจากวันที่ต้องการ */
+/** วันที่ใช้กับคอลัมน์「ผ่านมา」— ล่วงหน้ายังไม่นับ */
 export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
   const meta = computeJobUrgency(job, today);
   if (meta.kind === 'advance') return null;
-  if (meta.kind === 'overdue') return meta.daysPastRequired;
   const submitted = submittedDate(job);
   if (!submitted) return null;
   return differenceInCalendarDays(todayStart(today), submitted);
@@ -236,8 +226,6 @@ export function requestStatusLabel(kind: RequestStatusKind): string {
       return 'ฉุกเฉิน';
     case 'advance':
       return 'ล่วงหน้า';
-    case 'overdue':
-      return 'เกินกำหนด';
     default:
       return kind;
   }
