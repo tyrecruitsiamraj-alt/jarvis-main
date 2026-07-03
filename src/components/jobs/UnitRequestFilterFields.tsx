@@ -32,6 +32,7 @@ type Props = {
   idPrefix: string;
   showStatusTabs?: boolean;
   showUnitFilter?: boolean;
+  showNoteFilter?: boolean;
   className?: string;
 };
 
@@ -43,6 +44,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
   idPrefix,
   showStatusTabs = false,
   showUnitFilter = true,
+  showNoteFilter = true,
   className,
 }) => {
   const {
@@ -182,16 +184,18 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           ))}
         </FilterSelect>
 
-        <FilterSelect
-          id={`${idPrefix}-note`}
-          label="หมายเหตุ"
-          value={filters.noteFilter}
-          onChange={(v) => onChange({ noteFilter: v as NoteFilter })}
-        >
-          <option value="all">ทั้งหมด</option>
-          <option value="has">มีหมายเหตุ</option>
-          <option value="empty">ไม่มีหมายเหตุ</option>
-        </FilterSelect>
+        {showNoteFilter ? (
+          <FilterSelect
+            id={`${idPrefix}-note`}
+            label="หมายเหตุ"
+            value={filters.noteFilter}
+            onChange={(v) => onChange({ noteFilter: v as NoteFilter })}
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value="has">มีหมายเหตุ</option>
+            <option value="empty">ไม่มีหมายเหตุ</option>
+          </FilterSelect>
+        ) : null}
 
         <FilterSelect
           id={`${idPrefix}-age`}

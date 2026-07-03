@@ -313,6 +313,7 @@ const SupervisorDashboard: React.FC = () => {
             filters={filters}
             onChange={patchFilters}
             showStatusTabs
+            showNoteFilter={false}
             options={{
               departmentOptions: filterApi.departmentOptions,
               jobSubtypeOptions: filterApi.jobSubtypeOptions,
