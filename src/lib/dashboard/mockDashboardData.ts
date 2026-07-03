@@ -12,9 +12,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'success_rate', label: 'อัตราสำเร็จ', value: 50, description: '% ปิดงานจากทั้งหมด', trendPercent: 4, format: 'percent' },
   ],
   activityTrend: [
-    { date: '2026-07-01', resignations: 1, replacements: 1, newOpenings: 2 },
-    { date: '2026-07-02', resignations: 0, replacements: 2, newOpenings: 3 },
-    { date: '2026-07-03', resignations: 2, replacements: 1, newOpenings: 1 },
+    { date: '2026-05-01', label: 'พ.ค. 2026', resignations: 8, replacements: 5, newOpenings: 12 },
+    { date: '2026-06-01', label: 'มิ.ย. 2026', resignations: 11, replacements: 7, newOpenings: 15 },
+    { date: '2026-07-01', label: 'ก.ค. 2026', resignations: 4, replacements: 3, newOpenings: 6 },
   ],
   statusBreakdown: [
     { status: 'in_progress', label: 'กำลังดำเนินการ', count: 12, color: '#3b82f6' },

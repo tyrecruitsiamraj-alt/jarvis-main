@@ -1,5 +1,5 @@
 import {
-  addDays,
+  addMonths,
   differenceInCalendarDays,
   endOfMonth,
   endOfWeek,
@@ -334,23 +334,25 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string): Dashb
   for (const j of jobs) {
     const ymd = jobRequestDateYmd(j);
     if (!ymd || !inYmdRange(ymd, from, to)) continue;
-    if (isResignationRequest(j)) resignMap.set(ymd, (resignMap.get(ymd) ?? 0) + 1);
-    if (isReplacementRequest(j)) replaceMap.set(ymd, (replaceMap.get(ymd) ?? 0) + 1);
-    if (isNewOpeningRequest(j)) newMap.set(ymd, (newMap.get(ymd) ?? 0) + 1);
+    const month = ymd.slice(0, 7);
+    if (isResignationRequest(j)) resignMap.set(month, (resignMap.get(month) ?? 0) + 1);
+    if (isReplacementRequest(j)) replaceMap.set(month, (replaceMap.get(month) ?? 0) + 1);
+    if (isNewOpeningRequest(j)) newMap.set(month, (newMap.get(month) ?? 0) + 1);
   }
 
   const points: DashboardActivityTrendPoint[] = [];
-  let d = parseISO(from);
-  const end = parseISO(to);
-  while (d <= end) {
-    const ymd = toYmdLocal(d);
+  let d = parseISO(`${from.slice(0, 7)}-01`);
+  const endMonth = parseISO(`${to.slice(0, 7)}-01`);
+  while (d <= endMonth) {
+    const month = toYmdLocal(d).slice(0, 7);
     points.push({
-      date: ymd,
-      resignations: resignMap.get(ymd) ?? 0,
-      replacements: replaceMap.get(ymd) ?? 0,
-      newOpenings: newMap.get(ymd) ?? 0,
+      date: `${month}-01`,
+      label: format(d, 'MMM yyyy', { locale: th }),
+      resignations: resignMap.get(month) ?? 0,
+      replacements: replaceMap.get(month) ?? 0,
+      newOpenings: newMap.get(month) ?? 0,
     });
-    d = addDays(d, 1);
+    d = addMonths(d, 1);
   }
   return points;
 }

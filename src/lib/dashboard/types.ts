@@ -18,7 +18,9 @@ export type DashboardPeriodPreset =
 export type DashboardStatusFilter = 'all' | DashboardTaskStatus;
 
 export type DashboardActivityTrendPoint = {
+  /** anchor date YYYY-MM-01 */
   date: string;
+  label: string;
   resignations: number;
   replacements: number;
   newOpenings: number;

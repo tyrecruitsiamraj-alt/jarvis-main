@@ -58,10 +58,11 @@ describe('buildDashboardData', () => {
     const scoped = jobs;
     const data = buildDashboardData(scoped, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(3);
-    const day2 = data.activityTrend.find((p) => p.date === '2026-07-02');
-    expect(day2?.resignations).toBe(1);
-    expect(day2?.replacements).toBe(1);
-    expect(day2?.newOpenings).toBe(1);
+    const july = data.activityTrend.find((p) => p.date.startsWith('2026-07'));
+    expect(july?.resignations).toBe(1);
+    expect(july?.replacements).toBe(1);
+    expect(july?.newOpenings).toBe(2); // เปิดงานใหม่ + งานปิดในเดือนเดียวกัน
+    expect(data.activityTrend.every((p) => p.label.length > 0)).toBe(true);
   });
 
   it('filters work queue by search', () => {
