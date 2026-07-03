@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { User, UserRole } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
 import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
+import { clearJobUnitPageSession } from '@/lib/jobUnitSessionState';
 import { refreshWorkCalendarFromApi } from '@/lib/workCalendarStore';
 
 interface AuthContextType {
@@ -277,6 +278,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       /* still clear client state */
     }
     clearJobStaffApiCache();
+    clearJobUnitPageSession();
     setUser(null);
   }, []);
 

@@ -19,6 +19,7 @@ import {
 } from '@/lib/siamrajUnitFilters';
 import { loadJobDashboardFilters, saveJobDashboardFilters } from '@/lib/jobDashboardPageState';
 import { jobListReturnTo } from '@/lib/jobListPageState';
+import { loadJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
 
 type JobDialogItem = {
   id: string;
@@ -62,6 +63,10 @@ const JobDashboard: React.FC = () => {
   useEffect(() => {
     saveJobDashboardFilters({ unitFilter, jobSubtypeFilter });
   }, [unitFilter, jobSubtypeFilter]);
+
+  useEffect(() => {
+    saveUnitLastPath('/jobs');
+  }, []);
 
   const unitOptions = useMemo(() => {
     const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
@@ -217,7 +222,7 @@ const JobDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            onClick={() => navigate('/jobs/list')}
+            onClick={() => navigate(loadJobListLastUrl() || '/jobs/list')}
             className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-blue-300/50 text-center"
           >
             <Briefcase className="w-6 h-6 text-blue-600 mx-auto mb-1" />

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -14,9 +14,12 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
-  compareJobsByAssigneeThenAgeDaysDesc,
+  AGE_DAYS_FILTER_OPTIONS,
+  compareJobsForListSort,
   getJobRequestAgeDays,
   getJobRequestSubmittedDate,
+  JOB_LIST_SORT_OPTIONS,
+  matchesAgeDaysFilter,
   matchesNoteFilter,
   matchesUrgencyFilter,
   URGENCY_FILTER_OPTIONS,
@@ -38,6 +41,7 @@ import {
   mergeJobListState,
   parseJobListSearchParams,
 } from '@/lib/jobListPageState';
+import { loadJobListLastUrl, saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
 
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
@@ -69,6 +73,8 @@ const JobListPage: React.FC = () => {
     screenerFilter,
     urgencyFilter,
     noteFilter,
+    ageDaysFilter,
+    sort,
     page,
     pageSize,
   } = listState;
@@ -84,8 +90,23 @@ const JobListPage: React.FC = () => {
   );
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
+  const restoredListRef = useRef(false);
 
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
+
+  useEffect(() => {
+    saveUnitLastPath('/jobs/list');
+    if (location.search) {
+      saveJobListLastUrl(`${location.pathname}${location.search}`);
+      return;
+    }
+    if (restoredListRef.current) return;
+    const last = loadJobListLastUrl();
+    if (last && last.includes('?')) {
+      restoredListRef.current = true;
+      navigate(last, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     const fn = () => setStaffRosterRev((x) => x + 1);
@@ -164,6 +185,7 @@ const JobListPage: React.FC = () => {
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
         if (!matchesNoteFilter(j, noteFilter)) return false;
+        if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
@@ -174,8 +196,8 @@ const JobListPage: React.FC = () => {
             .toLowerCase()
             .includes(q),
       )
-      .sort(compareJobsByAssigneeThenAgeDaysDesc);
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, urgencyFilter, noteFilter]);
+      .sort((a, b) => compareJobsForListSort(a, b, sort));
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, urgencyFilter, noteFilter, ageDaysFilter, sort]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -357,7 +379,7 @@ const JobListPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="flex items-center gap-2 min-w-0">
             <label htmlFor="job-list-urgency" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
               ความเร่งด่วน
@@ -391,6 +413,42 @@ const JobListPage: React.FC = () => {
               <option value="empty">ไม่มีหมายเหตุ</option>
             </select>
           </div>
+
+          <div className="flex items-center gap-2 min-w-0">
+            <label htmlFor="job-list-age" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
+              วันผ่านมา
+            </label>
+            <select
+              id="job-list-age"
+              value={ageDaysFilter}
+              onChange={(e) => updateListState({ ageDaysFilter: e.target.value as typeof ageDaysFilter })}
+              className="jarvis-soft-field flex-1 min-w-0"
+            >
+              {AGE_DAYS_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 min-w-0 max-w-xl">
+          <label htmlFor="job-list-sort" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+            เรียงตาม
+          </label>
+          <select
+            id="job-list-sort"
+            value={sort}
+            onChange={(e) => updateListState({ sort: e.target.value as typeof sort })}
+            className="jarvis-soft-field flex-1 min-w-0"
+          >
+            {JOB_LIST_SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <p className="text-[11px] text-muted-foreground -mt-1">

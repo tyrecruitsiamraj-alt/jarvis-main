@@ -1,5 +1,5 @@
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
-import type { NoteFilter, UrgencyFilter } from '@/lib/jobUrgency';
+import type { AgeDaysFilter, JobListSort, NoteFilter, UrgencyFilter } from '@/lib/jobUrgency';
 
 export type JobListFilter = 'all' | 'active' | 'closed';
 
@@ -13,6 +13,8 @@ export type JobListPageState = {
   screenerFilter: string;
   urgencyFilter: UrgencyFilter;
   noteFilter: NoteFilter;
+  ageDaysFilter: AgeDaysFilter;
+  sort: JobListSort;
   page: number;
   pageSize: PageSizeOption;
 };
@@ -27,6 +29,8 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   screenerFilter: 'all',
   urgencyFilter: 'all',
   noteFilter: 'all',
+  ageDaysFilter: 'all',
+  sort: 'assignee_age',
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 };
@@ -34,6 +38,8 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
 const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
 const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'urgent', 'advance', 'escalated']);
 const NOTE_VALUES = new Set<NoteFilter>(['all', 'has', 'empty']);
+const AGE_DAYS_VALUES = new Set<AgeDaysFilter>(['all', 'today', '1-7', '8-14', '15-30', '30+']);
+const SORT_VALUES = new Set<JobListSort>(['assignee_age', 'age_desc', 'age_asc', 'newest', 'oldest']);
 
 function parsePageSize(raw: string | null): PageSizeOption {
   const n = Number(raw);
@@ -51,6 +57,8 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
 
   const urgencyRaw = (params.get('urg') || JOB_LIST_DEFAULTS.urgencyFilter) as UrgencyFilter;
   const noteRaw = (params.get('nf') || JOB_LIST_DEFAULTS.noteFilter) as NoteFilter;
+  const ageRaw = (params.get('ag') || JOB_LIST_DEFAULTS.ageDaysFilter) as AgeDaysFilter;
+  const sortRaw = (params.get('sort') || JOB_LIST_DEFAULTS.sort) as JobListSort;
 
   return {
     filter,
@@ -62,6 +70,8 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     screenerFilter: params.get('sc') || JOB_LIST_DEFAULTS.screenerFilter,
     urgencyFilter: URGENCY_VALUES.has(urgencyRaw) ? urgencyRaw : JOB_LIST_DEFAULTS.urgencyFilter,
     noteFilter: NOTE_VALUES.has(noteRaw) ? noteRaw : JOB_LIST_DEFAULTS.noteFilter,
+    ageDaysFilter: AGE_DAYS_VALUES.has(ageRaw) ? ageRaw : JOB_LIST_DEFAULTS.ageDaysFilter,
+    sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,
     page,
     pageSize: parsePageSize(params.get('ps')),
   };
@@ -78,6 +88,8 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   if (state.screenerFilter !== JOB_LIST_DEFAULTS.screenerFilter) params.set('sc', state.screenerFilter);
   if (state.urgencyFilter !== JOB_LIST_DEFAULTS.urgencyFilter) params.set('urg', state.urgencyFilter);
   if (state.noteFilter !== JOB_LIST_DEFAULTS.noteFilter) params.set('nf', state.noteFilter);
+  if (state.ageDaysFilter !== JOB_LIST_DEFAULTS.ageDaysFilter) params.set('ag', state.ageDaysFilter);
+  if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
   if (state.page > 1) params.set('p', String(state.page));
   if (state.pageSize !== JOB_LIST_DEFAULTS.pageSize) params.set('ps', String(state.pageSize));
   return params;
@@ -97,6 +109,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'screenerFilter',
   'urgencyFilter',
   'noteFilter',
+  'ageDaysFilter',
   'pageSize',
 ];
 

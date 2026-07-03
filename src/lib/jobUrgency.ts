@@ -7,6 +7,27 @@ export type UrgencyFilter = 'all' | 'urgent' | 'advance' | 'escalated';
 
 export type NoteFilter = 'all' | 'has' | 'empty';
 
+export type AgeDaysFilter = 'all' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
+
+export type JobListSort = 'assignee_age' | 'age_desc' | 'age_asc' | 'newest' | 'oldest';
+
+export const AGE_DAYS_FILTER_OPTIONS: { value: AgeDaysFilter; label: string }[] = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'today', label: 'วันนี้' },
+  { value: '1-7', label: '1–7 วัน' },
+  { value: '8-14', label: '8–14 วัน' },
+  { value: '15-30', label: '15–30 วัน' },
+  { value: '30+', label: '30 วันขึ้นไป' },
+];
+
+export const JOB_LIST_SORT_OPTIONS: { value: JobListSort; label: string }[] = [
+  { value: 'assignee_age', label: 'ผู้รับผิดชอบ · ผ่านมามากสุด' },
+  { value: 'age_desc', label: 'ผ่านมามาก → น้อย' },
+  { value: 'age_asc', label: 'ผ่านมาน้อย → มาก' },
+  { value: 'newest', label: 'กรอกใหม่สุด' },
+  { value: 'oldest', label: 'กรอกเก่าสุด' },
+];
+
 export const URGENCY_FILTER_OPTIONS: { value: UrgencyFilter; label: string; hint?: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   {
@@ -87,6 +108,48 @@ export function compareJobsByAssigneeThenAgeDaysDesc(
   const bAssigned = hasJobAssignee(b);
   if (aAssigned !== bAssigned) return aAssigned ? -1 : 1;
   return compareJobsByAgeDaysDesc(a, b, today);
+}
+
+export function compareJobsForListSort(
+  a: JobRequest,
+  b: JobRequest,
+  sort: JobListSort,
+  today = new Date(),
+): number {
+  switch (sort) {
+    case 'assignee_age':
+      return compareJobsByAssigneeThenAgeDaysDesc(a, b, today);
+    case 'age_desc':
+      return compareJobsByAgeDaysDesc(a, b, today);
+    case 'age_asc':
+      return -compareJobsByAgeDaysDesc(a, b, today);
+    case 'newest':
+      return compareJobsByOldestRequestFirst(b, a);
+    case 'oldest':
+      return compareJobsByOldestRequestFirst(a, b);
+    default:
+      return compareJobsByAssigneeThenAgeDaysDesc(a, b, today);
+  }
+}
+
+export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, today = new Date()): boolean {
+  if (filter === 'all') return true;
+  const days = getJobRequestAgeDays(job, today);
+  if (days == null) return false;
+  switch (filter) {
+    case 'today':
+      return days <= 0;
+    case '1-7':
+      return days >= 1 && days <= 7;
+    case '8-14':
+      return days >= 8 && days <= 14;
+    case '15-30':
+      return days >= 15 && days <= 30;
+    case '30+':
+      return days >= 30;
+    default:
+      return true;
+  }
 }
 
 export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {
