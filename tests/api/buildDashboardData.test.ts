@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   applyDashboardFilters,
   buildDashboardData,
+  isNewOpeningRequest,
+  isReplacementRequest,
   isResignationRequest,
   mapJobToTaskStatus,
   resolvePeriodRange,
@@ -29,7 +31,7 @@ function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
 }
 
 describe('buildDashboardData', () => {
-  it('counts resignation and replacement in monthly trend', () => {
+  it('builds activity trend for resignations, replacements, and new openings', () => {
     const jobs = [
       job({
         id: 'a',
@@ -41,28 +43,34 @@ describe('buildDashboardData', () => {
       job({
         id: 'b',
         unit_name: 'B',
+        request_date: '2026-07-02',
+        request_action_name: 'เปิดงานใหม่',
+      }),
+      job({
+        id: 'c',
+        unit_name: 'C',
         request_date: '2026-07-03',
         status: 'closed',
         closed_date: '2026-07-10',
       }),
     ];
-    const data = buildDashboardData(jobs, DEFAULT_DASHBOARD_FILTERS, {
-      now: new Date('2026-07-15'),
-    });
-    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(2);
-    expect(data.resignationTrend.some((m) => m.resignations >= 1 && m.replacements >= 1)).toBe(true);
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const scoped = jobs;
+    const data = buildDashboardData(scoped, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(3);
+    const day2 = data.activityTrend.find((p) => p.date === '2026-07-02');
+    expect(day2?.resignations).toBe(1);
+    expect(day2?.replacements).toBe(1);
+    expect(day2?.newOpenings).toBe(1);
   });
 
-  it('filters work queue by search and owner', () => {
+  it('filters work queue by search', () => {
     const jobs = [
       job({ id: '1', unit_name: 'Alpha', recruiter_name: 'Ann', request_date: '2026-07-01' }),
       job({ id: '2', unit_name: 'Beta', recruiter_name: 'Bob', request_date: '2026-07-02' }),
     ];
-    const data = buildDashboardData(
-      jobs,
-      { ...DEFAULT_DASHBOARD_FILTERS, ownerName: 'Ann', search: 'Alpha' },
-      { now: new Date('2026-07-15') },
-    );
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const data = buildDashboardData(jobs, [], period, { ...DEFAULT_DASHBOARD_FILTERS, search: 'Alpha' }, new Date('2026-07-15'));
     expect(data.workQueue).toHaveLength(1);
     expect(data.workQueue[0]?.unitName).toBe('Alpha');
   });
@@ -80,11 +88,11 @@ describe('buildDashboardData', () => {
   });
 });
 
-describe('isResignationRequest', () => {
-  it('detects resignation signals', () => {
+describe('request categories', () => {
+  it('detects resignation, replacement, and new opening', () => {
     expect(isResignationRequest(job({ unit_name: 'U', resigned_employee_name: 'A' }))).toBe(true);
-    expect(isResignationRequest(job({ unit_name: 'U', request_action_name: 'ลาออก' }))).toBe(true);
-    expect(isResignationRequest(job({ unit_name: 'U' }))).toBe(false);
+    expect(isReplacementRequest(job({ unit_name: 'U', send_replacement: true }))).toBe(true);
+    expect(isNewOpeningRequest(job({ unit_name: 'U', request_action_name: 'รับสมัครใหม่' }))).toBe(true);
   });
 });
 
@@ -97,14 +105,14 @@ describe('resolvePeriodRange', () => {
 });
 
 describe('applyDashboardFilters', () => {
-  it('filters by status', () => {
+  it('filters by queue status', () => {
     const items = [
       { id: '1', status: 'overdue' as const },
       { id: '2', status: 'completed' as const },
     ];
     const out = applyDashboardFilters(
       items as ReturnType<typeof buildDashboardData>['workQueue'],
-      { ...DEFAULT_DASHBOARD_FILTERS, status: 'overdue' },
+      { ...DEFAULT_DASHBOARD_FILTERS, queueStatus: 'overdue' },
     );
     expect(out).toHaveLength(1);
   });

@@ -17,20 +17,28 @@ import { computeJobUrgency } from '@/lib/jobUrgency';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import type {
+  DashboardActivityTrendPoint,
   DashboardData,
   DashboardFilters,
   DashboardKpi,
   DashboardPeriodPreset,
   DashboardRecruiterOverview,
-  DashboardResignationMonthly,
   DashboardSlaStatus,
   DashboardSortDir,
   DashboardSortKey,
   DashboardStatusBreakdown,
   DashboardTaskStatus,
-  DashboardTrendPoint,
   DashboardWorkItem,
 } from './types';
+
+export type PeriodRange = {
+  from: string;
+  to: string;
+  previousFrom: string;
+  previousTo: string;
+  label: string;
+  previousLabel: string;
+};
 
 export const DASHBOARD_STATUS_LABELS: Record<DashboardTaskStatus, string> = {
   pending: 'รอดำเนินการ',
@@ -52,14 +60,8 @@ export const DASHBOARD_STATUS_COLORS: Record<DashboardTaskStatus, string> = {
 
 export const DEFAULT_DASHBOARD_FILTERS: DashboardFilters = {
   periodPreset: 'this_month',
-  dateFrom: '',
-  dateTo: '',
-  status: 'all',
-  ownerName: '',
-  unitName: '',
   search: '',
-  departmentCode: 'all',
-  jobSubtype: 'all',
+  queueStatus: 'all',
 };
 
 function safeYmd(value?: string | null): string | null {
@@ -82,6 +84,19 @@ export function isResignationRequest(job: JobRequest): boolean {
       job.lastWorkingDay ||
       /ลาออก|resign/i.test(job.request_action_name || ''),
   );
+}
+
+/** เปลี่ยนตัว / ส่งคนแทน */
+export function isReplacementRequest(job: JobRequest): boolean {
+  return (
+    job.send_replacement === true ||
+    /เปลี่ยนตัว|ส่งคนแทน|แทน|replacement/i.test(job.request_action_name || '')
+  );
+}
+
+/** เปิดงานใหม่ (ไม่ใช่เคสลาออก) */
+export function isNewOpeningRequest(job: JobRequest): boolean {
+  return !isResignationRequest(job);
 }
 
 export function mapJobToTaskStatus(job: JobRequest, today = new Date()): DashboardTaskStatus {
@@ -168,15 +183,6 @@ export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWor
     isResignation: isResignationRequest(job),
   };
 }
-
-export type PeriodRange = {
-  from: string;
-  to: string;
-  previousFrom: string;
-  previousTo: string;
-  label: string;
-  previousLabel: string;
-};
 
 export function resolvePeriodRange(
   preset: DashboardPeriodPreset,
@@ -320,40 +326,31 @@ function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): 
   ];
 }
 
-function buildDailyTrend(
-  current: JobRequest[],
-  previous: JobRequest[],
-  from: string,
-  to: string,
-  previousFrom: string,
-): DashboardTrendPoint[] {
-  const curMap = new Map<string, number>();
-  const prevMap = new Map<string, number>();
+function buildActivityTrend(jobs: JobRequest[], from: string, to: string): DashboardActivityTrendPoint[] {
+  const resignMap = new Map<string, number>();
+  const replaceMap = new Map<string, number>();
+  const newMap = new Map<string, number>();
 
-  for (const j of current) {
+  for (const j of jobs) {
     const ymd = jobRequestDateYmd(j);
-    if (ymd) curMap.set(ymd, (curMap.get(ymd) ?? 0) + 1);
-  }
-  for (const j of previous) {
-    const ymd = jobRequestDateYmd(j);
-    if (ymd) prevMap.set(ymd, (prevMap.get(ymd) ?? 0) + 1);
+    if (!ymd || !inYmdRange(ymd, from, to)) continue;
+    if (isResignationRequest(j)) resignMap.set(ymd, (resignMap.get(ymd) ?? 0) + 1);
+    if (isReplacementRequest(j)) replaceMap.set(ymd, (replaceMap.get(ymd) ?? 0) + 1);
+    if (isNewOpeningRequest(j)) newMap.set(ymd, (newMap.get(ymd) ?? 0) + 1);
   }
 
-  const points: DashboardTrendPoint[] = [];
+  const points: DashboardActivityTrendPoint[] = [];
   let d = parseISO(from);
   const end = parseISO(to);
-  const prevStart = parseISO(previousFrom);
-  let i = 0;
   while (d <= end) {
     const ymd = toYmdLocal(d);
-    const prevYmd = toYmdLocal(addDays(prevStart, i));
     points.push({
       date: ymd,
-      current: curMap.get(ymd) ?? 0,
-      previous: prevMap.get(prevYmd) ?? 0,
+      resignations: resignMap.get(ymd) ?? 0,
+      replacements: replaceMap.get(ymd) ?? 0,
+      newOpenings: newMap.get(ymd) ?? 0,
     });
     d = addDays(d, 1);
-    i += 1;
   }
   return points;
 }
@@ -394,37 +391,13 @@ function buildRecruiterOverview(jobs: JobRequest[], today: Date): DashboardRecru
     .sort((a, b) => b.total - a.total);
 }
 
-function buildResignationTrend(jobs: JobRequest[]): DashboardResignationMonthly[] {
-  const map = new Map<string, { resignations: number; replacements: number }>();
-  for (const j of jobs) {
-    const ymd = jobRequestDateYmd(j);
-    if (!ymd) continue;
-    const month = ymd.slice(0, 7);
-    const row = map.get(month) ?? { resignations: 0, replacements: 0 };
-    if (isResignationRequest(j)) row.resignations += 1;
-    if (j.send_replacement === true) row.replacements += 1;
-    map.set(month, row);
-  }
-  return [...map.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6)
-    .map(([month, row]) => ({
-      month,
-      label: format(parseISO(`${month}-01`), 'MMM yyyy', { locale: th }),
-      resignations: row.resignations,
-      replacements: row.replacements,
-    }));
-}
-
 export function applyDashboardFilters(
   items: DashboardWorkItem[],
   filters: DashboardFilters,
 ): DashboardWorkItem[] {
   const q = filters.search.trim().toLowerCase();
   return items.filter((item) => {
-    if (filters.status !== 'all' && item.status !== filters.status) return false;
-    if (filters.ownerName && item.ownerName !== filters.ownerName) return false;
-    if (filters.unitName && item.unitName !== filters.unitName) return false;
+    if (filters.queueStatus !== 'all' && item.status !== filters.queueStatus) return false;
     if (!q) return true;
     const blob = [
       item.requestNo,
@@ -466,64 +439,23 @@ export function sortWorkQueue(
 }
 
 export function buildDashboardData(
-  allJobs: JobRequest[],
-  filters: DashboardFilters,
-  options?: { now?: Date; customRange?: { from: string; to: string } },
+  scopedJobs: JobRequest[],
+  previousScopedJobs: JobRequest[],
+  period: PeriodRange,
+  uiFilters: DashboardFilters,
+  today = new Date(),
 ): DashboardData {
-  const today = options?.now ?? new Date();
-  const period = resolvePeriodRange(
-    filters.periodPreset,
-    filters.periodPreset === 'custom'
-      ? { from: filters.dateFrom, to: filters.dateTo }
-      : options?.customRange,
-    today,
-  );
-
-  let scoped = filterJobsByRequestDate(allJobs, period.from, period.to);
-
-  if (filters.departmentCode !== 'all') {
-    scoped = scoped.filter((j) => (j.department_code || '') === filters.departmentCode);
-  }
-  if (filters.jobSubtype !== 'all') {
-    scoped = scoped.filter((j) => (j.job_description_code_1 || '') === filters.jobSubtype);
-  }
-
-  const previousScoped = filterJobsByRequestDate(allJobs, period.previousFrom, period.previousTo);
-
-  const workItems = scoped.map((j) => jobToWorkItem(j, today));
-  const filteredQueue = applyDashboardFilters(workItems, filters);
+  const workItems = scopedJobs.map((j) => jobToWorkItem(j, today));
+  const filteredQueue = applyDashboardFilters(workItems, uiFilters);
   const sortedQueue = sortWorkQueue(filteredQueue, 'priority', 'asc');
 
   return {
-    kpis: buildKpis(scoped, previousScoped, today),
-    trend: buildDailyTrend(scoped, previousScoped, period.from, period.to, period.previousFrom),
-    statusBreakdown: buildStatusBreakdown(scoped, today),
-    recruiterOverview: buildRecruiterOverview(scoped, today),
-    resignationTrend: buildResignationTrend(
-      filterJobsByRequestDate(allJobs, period.previousFrom, period.to).concat(scoped),
-    ),
+    kpis: buildKpis(scopedJobs, previousScopedJobs, today),
+    activityTrend: buildActivityTrend(scopedJobs, period.from, period.to),
+    statusBreakdown: buildStatusBreakdown(scopedJobs, today),
+    recruiterOverview: buildRecruiterOverview(scopedJobs, today),
     workQueue: sortedQueue,
     periodLabel: period.label,
     previousPeriodLabel: period.previousLabel,
   };
-}
-
-export function ownerOptionsFromJobs(jobs: JobRequest[]): { value: string; label: string; keywords?: string }[] {
-  const names = new Set<string>();
-  for (const j of jobs) {
-    const n = j.recruiter_name?.trim();
-    if (n) names.add(n);
-  }
-  return [...names]
-    .sort((a, b) => a.localeCompare(b, 'th'))
-    .map((name) => ({ value: name, label: name }));
-}
-
-export function unitOptionsFromJobs(jobs: JobRequest[]): { value: string; label: string }[] {
-  const names = new Set<string>();
-  for (const j of jobs) {
-    const n = j.unit_name?.trim();
-    if (n) names.add(n);
-  }
-  return [...names].sort((a, b) => a.localeCompare(b, 'th')).map((name) => ({ value: name, label: name }));
 }

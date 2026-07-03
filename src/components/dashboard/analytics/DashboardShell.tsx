@@ -1,7 +1,9 @@
 import React from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey } from '@/lib/dashboard/types';
+import type { DashboardData, DashboardFilters, DashboardPeriodPreset, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
+import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
@@ -9,12 +11,28 @@ import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardWorkQueueTable from './DashboardWorkQueueTable';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 
+type FilterOptions = {
+  departmentOptions: { value: string; label: string }[];
+  jobSubtypeOptions: { value: string; label: string }[];
+  unitOptions: string[];
+  recruiters: string[];
+  screeners: string[];
+  unassignedRecruiterCount: number;
+  unassignedScreenerCount: number;
+};
+
 type Props = {
   data: DashboardData;
   filters: DashboardFilters;
   onFiltersChange: (patch: Partial<DashboardFilters>) => void;
-  ownerOptions: { value: string; label: string; keywords?: string }[];
-  unitOptions: { value: string; label: string }[];
+  periodPreset: DashboardPeriodPreset;
+  onPeriodPreset: (preset: DashboardPeriodPreset) => void;
+  dateRange: DateRangeYmd | null;
+  onDateRangeChange: (range: DateRangeYmd | null) => void;
+  unitFilters: UnitRequestFilterState;
+  onUnitFiltersChange: (patch: Partial<UnitRequestFilterState>) => void;
+  siamrajPrimary: boolean;
+  filterOptions: FilterOptions;
   loading?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
@@ -30,8 +48,14 @@ const DashboardShell: React.FC<Props> = ({
   data,
   filters,
   onFiltersChange,
-  ownerOptions,
-  unitOptions,
+  periodPreset,
+  onPeriodPreset,
+  dateRange,
+  onDateRangeChange,
+  unitFilters,
+  onUnitFiltersChange,
+  siamrajPrimary,
+  filterOptions,
   loading,
   refreshing,
   onRefresh,
@@ -49,9 +73,7 @@ const DashboardShell: React.FC<Props> = ({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Analytics Dashboard</h1>
-              <p className="text-sm text-slate-500 mt-1">
-                ภาพรวมใบขอหน่วยงาน · {data.periodLabel}
-              </p>
+              <p className="text-sm text-slate-500 mt-1">ภาพรวมใบขอหน่วยงาน · {data.periodLabel}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
@@ -95,12 +117,18 @@ const DashboardShell: React.FC<Props> = ({
         {loading ? (
           <p className="text-sm text-slate-500 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
-              filters={filters}
-              onChange={onFiltersChange}
-              ownerOptions={ownerOptions}
-              unitOptions={unitOptions}
+              periodPreset={periodPreset}
+              onPeriodPreset={onPeriodPreset}
+              dateRange={dateRange}
+              onDateRangeChange={onDateRangeChange}
+              unitFilters={unitFilters}
+              onUnitFiltersChange={onUnitFiltersChange}
+              siamrajPrimary={siamrajPrimary}
+              filterOptions={filterOptions}
+              queueStatus={filters.queueStatus}
+              onQueueStatusChange={(queueStatus: DashboardStatusFilter) => onFiltersChange({ queueStatus })}
             />
 
             <div className="space-y-5 min-w-0">

@@ -15,11 +15,11 @@ import type { DashboardData } from '@/lib/dashboard/types';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 
 type Props = {
-  data: Pick<DashboardData, 'trend' | 'statusBreakdown' | 'resignationTrend' | 'periodLabel' | 'previousPeriodLabel'>;
+  data: Pick<DashboardData, 'activityTrend' | 'statusBreakdown' | 'periodLabel'>;
 };
 
 const DashboardChartSection: React.FC<Props> = ({ data }) => {
-  const trendData = data.trend.map((p) => ({
+  const activityData = data.activityTrend.map((p) => ({
     ...p,
     label: formatYmdDmyBe(p.date).slice(0, 5),
   }));
@@ -30,32 +30,25 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
     fill: s.color,
   }));
 
-  const resignData = data.resignationTrend.map((m) => ({
-    name: m.label,
-    ลาออก: m.resignations,
-    ส่งคนแทน: m.replacements,
-  }));
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
           <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-900">แนวโน้มงานรายวัน</h3>
-            <p className="text-xs text-slate-500">
-              {data.periodLabel} เทียบ {data.previousPeriodLabel}
-            </p>
+            <h3 className="text-sm font-semibold text-slate-900">แนวโน้มรายวัน — ลาออก / เปลี่ยนตัว / เปิดงานใหม่</h3>
+            <p className="text-xs text-slate-500">{data.periodLabel}</p>
           </div>
-          <div className="h-56">
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData}>
+              <LineChart data={activityData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="current" name="ช่วงนี้" stroke="#2563eb" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="previous" name="ช่วงก่อน" stroke="#94a3b8" strokeWidth={2} dot={false} strokeDasharray="4 4" />
+                <Line type="monotone" dataKey="resignations" name="ลาออก" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="replacements" name="เปลี่ยนตัว" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="newOpenings" name="เปิดงานใหม่" stroke="#22c55e" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -78,29 +71,37 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
 
-      {resignData.length > 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-900">ลาออก vs ส่งคนแทน (รายเดือน)</h3>
-            <p className="text-xs text-slate-500">ติดตามการเปลี่ยนตัวและความต้องการส่งคนแทน</p>
+            <h3 className="text-sm font-semibold text-slate-900">สรุปประเภทงานในช่วง</h3>
+            <p className="text-xs text-slate-500">รวมทั้งช่วงที่เลือก</p>
           </div>
-          <div className="h-52">
+          <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={resignData}>
+              <BarChart
+                data={[
+                  {
+                    name: 'รวม',
+                    ลาออก: activityData.reduce((s, p) => s + p.resignations, 0),
+                    เปลี่ยนตัว: activityData.reduce((s, p) => s + p.replacements, 0),
+                    เปิดงานใหม่: activityData.reduce((s, p) => s + p.newOpenings, 0),
+                  },
+                ]}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="ลาออก" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="ส่งคนแทน" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="เปลี่ยนตัว" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="เปิดงานใหม่" fill="#22c55e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 };

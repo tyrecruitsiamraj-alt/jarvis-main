@@ -11,10 +11,10 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'completed', label: 'สำเร็จ', value: 24, description: 'ปิดงานแล้ว', trendPercent: 18 },
     { id: 'success_rate', label: 'อัตราสำเร็จ', value: 50, description: '% ปิดงานจากทั้งหมด', trendPercent: 4, format: 'percent' },
   ],
-  trend: [
-    { date: '2026-07-01', current: 2, previous: 1 },
-    { date: '2026-07-02', current: 3, previous: 2 },
-    { date: '2026-07-03', current: 1, previous: 4 },
+  activityTrend: [
+    { date: '2026-07-01', resignations: 1, replacements: 1, newOpenings: 2 },
+    { date: '2026-07-02', resignations: 0, replacements: 2, newOpenings: 3 },
+    { date: '2026-07-03', resignations: 2, replacements: 1, newOpenings: 1 },
   ],
   statusBreakdown: [
     { status: 'in_progress', label: 'กำลังดำเนินการ', count: 12, color: '#3b82f6' },
@@ -24,11 +24,6 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   recruiterOverview: [
     { name: 'สมหญิง ใจดี', total: 14, completed: 8, overdue: 2, sharePercent: 29.2 },
     { name: 'วิชัย รักงาน', total: 11, completed: 6, overdue: 1, sharePercent: 22.9 },
-  ],
-  resignationTrend: [
-    { month: '2026-05', label: 'พ.ค. 2026', resignations: 8, replacements: 5 },
-    { month: '2026-06', label: 'มิ.ย. 2026', resignations: 11, replacements: 7 },
-    { month: '2026-07', label: 'ก.ค. 2026', resignations: 4, replacements: 3 },
   ],
   workQueue: [
     {

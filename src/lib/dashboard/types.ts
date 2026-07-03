@@ -17,18 +17,18 @@ export type DashboardPeriodPreset =
 
 export type DashboardStatusFilter = 'all' | DashboardTaskStatus;
 
+export type DashboardActivityTrendPoint = {
+  date: string;
+  resignations: number;
+  replacements: number;
+  newOpenings: number;
+};
+
 export type DashboardFilters = {
   periodPreset: DashboardPeriodPreset;
-  dateFrom: string;
-  dateTo: string;
-  status: DashboardStatusFilter;
-  /** recruiter name — empty = no filter */
-  ownerName: string;
-  /** unit name — empty = no filter */
-  unitName: string;
   search: string;
-  departmentCode: string;
-  jobSubtype: string;
+  /** filter work queue table by analytics status */
+  queueStatus: DashboardStatusFilter;
 };
 
 export type DashboardKpi = {
@@ -68,12 +68,6 @@ export type DashboardRecruiterOverview = {
   sharePercent: number;
 };
 
-export type DashboardTrendPoint = {
-  date: string;
-  current: number;
-  previous: number;
-};
-
 export type DashboardStatusBreakdown = {
   status: DashboardTaskStatus;
   label: string;
@@ -81,19 +75,21 @@ export type DashboardStatusBreakdown = {
   color: string;
 };
 
+export type DashboardTrendPoint = DashboardActivityTrendPoint;
+
 export type DashboardResignationMonthly = {
   month: string;
   label: string;
   resignations: number;
   replacements: number;
+  newOpenings: number;
 };
 
 export type DashboardData = {
   kpis: DashboardKpi[];
-  trend: DashboardTrendPoint[];
+  activityTrend: DashboardActivityTrendPoint[];
   statusBreakdown: DashboardStatusBreakdown[];
   recruiterOverview: DashboardRecruiterOverview[];
-  resignationTrend: DashboardResignationMonthly[];
   workQueue: DashboardWorkItem[];
   periodLabel: string;
   previousPeriodLabel: string;
