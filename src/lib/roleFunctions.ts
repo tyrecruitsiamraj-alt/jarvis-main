@@ -31,6 +31,8 @@ export type AppFunctionDef = {
   minimumRole: UserRole;
 };
 
+export type RoleFunctionMatrix = Record<UserRole, Record<AppFunctionId, boolean>>;
+
 /** ฟังก์ชันในระบบ — สิทธิ์ขั้นต่ำตาม api/_lib/rbac.ts */
 export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'dashboard', label: 'Dashboard / หน้าหลัก', group: 'ทั่วไป', minimumRole: 'staff' },
@@ -64,8 +66,44 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
 };
 
-export function roleHasFunction(role: UserRole, fn: AppFunctionDef): boolean {
+export function roleHasFunction(role: UserRole, fn: AppFunctionDef, matrix?: RoleFunctionMatrix | null): boolean {
+  if (matrix?.[role]?.[fn.id] !== undefined) return matrix[role][fn.id];
   return meetsMinimumRole(role, fn.minimumRole);
+}
+
+export function isFunctionEnabledForRole(
+  role: UserRole,
+  functionId: AppFunctionId,
+  matrix?: RoleFunctionMatrix | null,
+): boolean {
+  if (matrix?.[role]?.[functionId] !== undefined) return matrix[role][functionId];
+  const fn = APP_FUNCTIONS.find((f) => f.id === functionId);
+  if (!fn) return false;
+  return meetsMinimumRole(role, fn.minimumRole);
+}
+
+/** ใช้กับ route guard / bottom nav */
+export function primaryFunctionForPath(pathname: string): AppFunctionId | null {
+  const path = pathname.split('?')[0] ?? pathname;
+  if (path === '/settings' || path.startsWith('/settings/')) return 'settings_access';
+  if (path === '/admin') return 'users_manage';
+  if (path === '/dashboard') return 'dashboard';
+  if (path.startsWith('/matching')) return 'candidates_read';
+  if (path.startsWith('/jobs')) return 'unit_requests_read';
+  if (path.startsWith('/wl')) return 'work_calendar_read';
+  if (path.startsWith('/driver-care')) return 'driver_care_read';
+  return null;
+}
+
+export function buildDefaultMatrix(): RoleFunctionMatrix {
+  const matrix = {} as RoleFunctionMatrix;
+  for (const role of ROLE_ORDER) {
+    matrix[role] = {} as Record<AppFunctionId, boolean>;
+    for (const fn of APP_FUNCTIONS) {
+      matrix[role][fn.id] = meetsMinimumRole(role, fn.minimumRole);
+    }
+  }
+  return matrix;
 }
 
 export function functionGroups(): string[] {

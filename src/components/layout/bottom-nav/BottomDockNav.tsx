@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { DOCK_NAV_ITEMS, dockActiveIndex, type DockNavItem } from './dockNavConfig';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import './bottomDockNav.css';
 
 type Props = {
@@ -16,7 +17,10 @@ type Props = {
 const BottomDockNav: React.FC<Props> = ({ pathname, className, items }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const navItems = items ?? filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
+  const { isFunctionEnabled } = useRolePermissions();
+  const navItems = (items ?? filterByMinimumRole(DOCK_NAV_ITEMS, user?.role)).filter(
+    (item) => !item.functionId || isFunctionEnabled(item.functionId),
+  );
   const activeIndex = dockActiveIndex(pathname, navItems);
 
   return (

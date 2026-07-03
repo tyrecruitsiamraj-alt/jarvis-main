@@ -1,19 +1,21 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { canAccessPath, roleHomePath } from '@/lib/rbac';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import { roleHomePath } from '@/lib/rbac';
 
 /**
- * UX route guard — redirects to the user's role home when path requires a higher role.
+ * UX route guard — redirects when path requires a higher role or disabled function.
  * Security is enforced on the API; never rely on this alone.
  */
 const RequireRole: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const location = useLocation();
+  const { canAccessPathWithFunctions } = useRolePermissions();
 
   if (!user) return null;
 
-  if (canAccessPath(user.role, location.pathname)) {
+  if (canAccessPathWithFunctions(location.pathname, user.role)) {
     return <>{children}</>;
   }
 

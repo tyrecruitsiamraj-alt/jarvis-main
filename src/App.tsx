@@ -6,6 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { RolePermissionsProvider } from "@/contexts/RolePermissionsContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -101,7 +102,8 @@ const ProtectedRoutes = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <BrandingProvider>
+      <RolePermissionsProvider>
+        <BrandingProvider>
         <NotificationProvider>
           <TooltipProvider>
             <Toaster />
@@ -131,6 +133,7 @@ const App = () => (
           </TooltipProvider>
         </NotificationProvider>
       </BrandingProvider>
+      </RolePermissionsProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

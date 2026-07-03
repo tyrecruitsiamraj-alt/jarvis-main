@@ -259,51 +259,73 @@ const JobListPage: React.FC = () => {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-          <SearchField
-            wrapperClassName="flex-1 min-w-0"
-            type="text"
-            placeholder="ค้นหางาน..."
-            value={search}
-            onChange={(e) => updateListState({ search: e.target.value })}
-          />
+        <div className="rounded-2xl border border-black/[0.06] bg-white/35 backdrop-blur-sm p-3 md:p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchField
+              compact
+              wrapperClassName="w-full sm:w-48 shrink-0"
+              type="text"
+              placeholder="ค้นหา..."
+              value={search}
+              onChange={(e) => updateListState({ search: e.target.value })}
+            />
 
-          <div className="flex items-center gap-2 w-full sm:w-[280px] shrink-0">
-            <label htmlFor="job-list-unit" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-              หน่วยงาน
-            </label>
-            <select
-              id="job-list-unit"
-              value={unitFilter}
-              onChange={(e) => updateListState({ unitFilter: e.target.value })}
-              className="jarvis-soft-field flex-1 min-w-0"
-            >
-              <option value="all">ทั้งหมด</option>
-              {unitOptions.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
+            <div className="flex items-center gap-2 min-w-[180px] flex-1 sm:flex-none sm:w-52">
+              <label htmlFor="job-list-unit" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                หน่วยงาน
+              </label>
+              <select
+                id="job-list-unit"
+                value={unitFilter}
+                onChange={(e) => updateListState({ unitFilter: e.target.value })}
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
+              >
+                <option value="all">ทั้งหมด</option>
+                {unitOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-1 sm:ml-auto w-full sm:w-auto">
+              {[
+                { value: 'all' as const, label: 'ทั้งหมด' },
+                { value: 'active' as const, label: 'ดำเนินการ' },
+                { value: 'closed' as const, label: 'ปิดแล้ว' },
+              ].map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => updateListState({ filter: f.value })}
+                  className={cn(
+                    'px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap',
+                    filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-secondary/80 text-muted-foreground',
+                  )}
+                >
+                  {f.label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
-        </div>
 
-        <div
-          className={cn(
-            'grid gap-3 items-center',
-            siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
-          )}
-        >
+          <div
+            className={cn(
+              'grid gap-2 items-center',
+              siamrajPrimary ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4' : 'grid-cols-2',
+            )}
+          >
           {siamrajPrimary ? (
-            <div className="flex items-center gap-2 min-w-0">
-              <label htmlFor="job-list-department" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <label htmlFor="job-list-department" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-10">
                 แผนก
               </label>
               <select
                 id="job-list-department"
                 value={departmentFilter}
                 onChange={(e) => updateListState({ departmentFilter: e.target.value })}
-                className="jarvis-soft-field flex-1 min-w-0"
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
               >
                 {departmentOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -315,15 +337,15 @@ const JobListPage: React.FC = () => {
           ) : null}
 
           {siamrajPrimary ? (
-            <div className="flex items-center gap-2 min-w-0">
-              <label htmlFor="job-list-subtype" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-                ลักษณะงานย่อย
+            <div className="flex items-center gap-1.5 min-w-0">
+              <label htmlFor="job-list-subtype" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-[4.5rem]">
+                งานย่อย
               </label>
               <select
                 id="job-list-subtype"
                 value={jobSubtypeFilter}
                 onChange={(e) => updateListState({ jobSubtypeFilter: e.target.value })}
-                className="jarvis-soft-field flex-1 min-w-0"
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
               >
                 {jobSubtypeOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -334,15 +356,15 @@ const JobListPage: React.FC = () => {
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2 min-w-0">
-            <label htmlFor="job-list-recruiter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-              เจ้าหน้าที่สรรหา
+          <div className="flex items-center gap-1.5 min-w-0">
+            <label htmlFor="job-list-recruiter" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-[4.5rem]">
+              สรรหา
             </label>
             <select
               id="job-list-recruiter"
               value={recruiterFilter}
               onChange={(e) => updateListState({ recruiterFilter: e.target.value })}
-              className="jarvis-soft-field flex-1 min-w-0"
+              className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
             >
               <option value="all">ทั้งหมด</option>
               <option value={STAFF_ASSIGNEE_UNASSIGNED}>
@@ -356,15 +378,15 @@ const JobListPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-center gap-2 min-w-0">
-            <label htmlFor="job-list-screener" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-              เจ้าหน้าที่คัดสรร
+          <div className="flex items-center gap-1.5 min-w-0">
+            <label htmlFor="job-list-screener" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-[4.5rem]">
+              คัดสรร
             </label>
             <select
               id="job-list-screener"
               value={screenerFilter}
               onChange={(e) => updateListState({ screenerFilter: e.target.value })}
-              className="jarvis-soft-field flex-1 min-w-0"
+              className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
             >
               <option value="all">ทั้งหมด</option>
               <option value={STAFF_ASSIGNEE_UNASSIGNED}>
@@ -377,101 +399,80 @@ const JobListPage: React.FC = () => {
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <label htmlFor="job-list-urgency" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-              ความเร่งด่วน
-            </label>
-            <select
-              id="job-list-urgency"
-              value={urgencyFilter}
-              onChange={(e) => updateListState({ urgencyFilter: e.target.value as typeof urgencyFilter })}
-              className="jarvis-soft-field flex-1 min-w-0"
-            >
-              {URGENCY_FILTER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value} title={o.hint}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 min-w-0">
-            <label htmlFor="job-list-note-filter" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-              หมายเหตุ
-            </label>
-            <select
-              id="job-list-note-filter"
-              value={noteFilter}
-              onChange={(e) => updateListState({ noteFilter: e.target.value as typeof noteFilter })}
-              className="jarvis-soft-field flex-1 min-w-0"
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value="has">มีหมายเหตุ</option>
-              <option value="empty">ไม่มีหมายเหตุ</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2 min-w-0">
-            <label htmlFor="job-list-age" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-[5.5rem]">
-              วันผ่านมา
-            </label>
-            <select
-              id="job-list-age"
-              value={ageDaysFilter}
-              onChange={(e) => updateListState({ ageDaysFilter: e.target.value as typeof ageDaysFilter })}
-              className="jarvis-soft-field flex-1 min-w-0"
-            >
-              {AGE_DAYS_FILTER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 min-w-0 max-w-xl">
-          <label htmlFor="job-list-sort" className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-14">
-            เรียงตาม
-          </label>
-          <select
-            id="job-list-sort"
-            value={sort}
-            onChange={(e) => updateListState({ sort: e.target.value as typeof sort })}
-            className="jarvis-soft-field flex-1 min-w-0"
-          >
-            {JOB_LIST_SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <p className="text-[11px] text-muted-foreground -mt-1">
-          <strong>เกินกำหนด</strong> = ใบขอล่วงหน้าที่เหลือเวลาถึงวันที่ต้องการน้อยกว่า 7 วัน · แก้หมายเหตุได้ในหน้ารายละเอียดใบขอ
-        </p>
-
-        <div className="flex gap-1.5">
-            {[
-              { value: 'all' as const, label: 'ทั้งหมด' },
-              { value: 'active' as const, label: 'ดำเนินการ' },
-              { value: 'closed' as const, label: 'ปิดแล้ว' },
-            ].map((f) => (
-              <button
-                key={f.value}
-                onClick={() => updateListState({ filter: f.value })}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
-                  filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground',
-                )}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <label htmlFor="job-list-urgency" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-10">
+                ด่วน
+              </label>
+              <select
+                id="job-list-urgency"
+                value={urgencyFilter}
+                onChange={(e) => updateListState({ urgencyFilter: e.target.value as typeof urgencyFilter })}
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
               >
-                {f.label}
-              </button>
-            ))}
+                {URGENCY_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value} title={o.hint}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 min-w-0">
+              <label htmlFor="job-list-note-filter" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-[4.5rem]">
+                หมายเหตุ
+              </label>
+              <select
+                id="job-list-note-filter"
+                value={noteFilter}
+                onChange={(e) => updateListState({ noteFilter: e.target.value as typeof noteFilter })}
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
+              >
+                <option value="all">ทั้งหมด</option>
+                <option value="has">มีหมายเหตุ</option>
+                <option value="empty">ไม่มีหมายเหตุ</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 min-w-0">
+              <label htmlFor="job-list-age" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-[4.5rem]">
+                ผ่านมา
+              </label>
+              <select
+                id="job-list-age"
+                value={ageDaysFilter}
+                onChange={(e) => updateListState({ ageDaysFilter: e.target.value as typeof ageDaysFilter })}
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
+              >
+                {AGE_DAYS_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 min-w-0">
+              <label htmlFor="job-list-sort" className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 w-[4.5rem]">
+                เรียง
+              </label>
+              <select
+                id="job-list-sort"
+                value={sort}
+                onChange={(e) => updateListState({ sort: e.target.value as typeof sort })}
+                className="jarvis-soft-field flex-1 min-w-0 h-9 py-1.5 text-sm"
+              >
+                {JOB_LIST_SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            <strong>เกินกำหนด</strong> = ล่วงหน้าแต่เหลือ &lt; 7 วันถึงวันที่ต้องการ · แก้หมายเหตุได้ในหน้ารายละเอียด
+          </p>
         </div>
 
         {filtered.length === 0 && !loading ? (
