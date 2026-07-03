@@ -18,6 +18,7 @@ import {
 import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { UserRole } from '@/types';
+import { isValidEnglishName, sanitizeEnglishName } from '@/lib/englishName';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
@@ -129,6 +130,14 @@ const LoginPage: React.FC = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!isValidEnglishName(firstName)) {
+      setError('ชื่อต้องกรอกเป็นภาษาอังกฤษเท่านั้น (A–Z)');
+      return;
+    }
+    if (!isValidEnglishName(lastName)) {
+      setError('นามสกุลต้องกรอกเป็นภาษาอังกฤษเท่านั้น (A–Z)');
+      return;
+    }
     setSubmitting(true);
     try {
       const msg = await signUp({
@@ -335,29 +344,43 @@ const LoginPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="firstName" className="text-xs font-medium text-muted-foreground ml-1">
-                      ชื่อ
+                      ชื่อ (ภาษาอังกฤษ)
                     </Label>
                     <input
                       id="firstName"
                       name="givenName"
                       autoComplete="given-name"
+                      lang="en"
+                      inputMode="text"
+                      autoCapitalize="words"
+                      spellCheck={false}
+                      placeholder="John"
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={(e) => setFirstName(sanitizeEnglishName(e.target.value))}
                       required
+                      pattern="[A-Za-z]+([ '-][A-Za-z]+)*"
+                      title="กรอกเป็นภาษาอังกฤษเท่านั้น"
                       className="jarvis-soft-field min-h-[48px]"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="lastName" className="text-xs font-medium text-muted-foreground ml-1">
-                      นามสกุล
+                      นามสกุล (ภาษาอังกฤษ)
                     </Label>
                     <input
                       id="lastName"
                       name="familyName"
                       autoComplete="family-name"
+                      lang="en"
+                      inputMode="text"
+                      autoCapitalize="words"
+                      spellCheck={false}
+                      placeholder="Smith"
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={(e) => setLastName(sanitizeEnglishName(e.target.value))}
                       required
+                      pattern="[A-Za-z]+([ '-][A-Za-z]+)*"
+                      title="กรอกเป็นภาษาอังกฤษเท่านั้น"
                       className="jarvis-soft-field min-h-[48px]"
                     />
                   </div>

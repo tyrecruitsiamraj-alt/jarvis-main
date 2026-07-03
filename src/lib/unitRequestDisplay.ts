@@ -1,7 +1,18 @@
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 
-/** หัวข้อการ์ด — ตรงกับหน้ารายการหน่วยงาน (เลขที่ใบขอ หรือชื่อหน่วยงาน) */
+/** ชื่อหน่วยงานที่ติ๊กส่งคนแทน — ใช้ใน WL assignment */
+export function unitNamesForSendReplacement(jobs: JobRequest[]): string[] {
+  return Array.from(
+    new Set(
+      jobs
+        .filter((j) => j.send_replacement === true)
+        .map((j) => j.unit_name?.trim() ?? '')
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b, 'th'));
+}
+
 export function unitRequestCardTitle(job: JobRequest): string {
   return job.request_no?.trim() || job.unit_name || '—';
 }

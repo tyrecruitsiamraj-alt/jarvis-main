@@ -15,6 +15,7 @@ import {
   isCompanyEmail,
   isCompanyEmailLoginEnforced,
 } from '../../_lib/companyEmail.js';
+import { isValidEnglishName } from '../../_lib/englishName.js';
 
 const GENERIC_REGISTER_DISABLED =
   'การสมัครสมาชิกด้วยตนเองปิดใช้งาน — ติดต่อผู้ดูแลระบบเพื่อขอบัญชี';
@@ -64,6 +65,12 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
 
     if (!email || !password) {
       return sendError(res, 400, 'Bad request', 'email and password are required');
+    }
+    if (!isValidEnglishName(first_name ?? '')) {
+      return sendError(res, 400, 'Bad request', 'first_name must use English letters only');
+    }
+    if (!isValidEnglishName(last_name ?? '')) {
+      return sendError(res, 400, 'Bad request', 'last_name must use English letters only');
     }
     if (isCompanyEmailLoginEnforced() && !isCompanyEmail(email)) {
       return sendError(res, 400, 'Bad request', companyEmailRequiredMessage());

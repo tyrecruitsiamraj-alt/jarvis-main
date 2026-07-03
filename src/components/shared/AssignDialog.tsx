@@ -7,7 +7,8 @@ import type { SearchableSelectGroup } from '@/components/shared/SearchableSelect
 import { toast } from 'sonner';
 import { createWorkCalendarAssignment } from '@/lib/workCalendarStore';
 import { apiFetch } from '@/lib/apiFetch';
-import { parseJobsPayload } from '@/lib/jobCoords';
+import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { unitNamesForSendReplacement } from '@/lib/unitRequestDisplay';
 import type { ClientWorkplace, Employee, JobRequest } from '@/types';
 import { parseYmd, toYmdLocal, formatYmdDmyBe, buildDateRangeYmd } from '@/lib/dateTh';
 
@@ -31,7 +32,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const [saving, setSaving] = useState(false);
   const [apiEmployees, setApiEmployees] = useState<Employee[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
-  const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
+  const [apiUnitRequests, setApiUnitRequests] = useState<JobRequest[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const applyDateProp = (ymd: string) => {
@@ -61,14 +62,16 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
     Promise.all([
       apiFetch('/api/employees?limit=500').then(async (r) => (r.ok ? ((await r.json()) as Employee[]) : [])),
       apiFetch('/api/clients?active_only=1').then(async (r) => (r.ok ? ((await r.json()) as ClientWorkplace[]) : [])),
-      apiFetch('/api/jobs?limit=500').then(async (r) => (r.ok ? parseJobsPayload(await r.json()) : [])),
+      fetchSiamrajFeedMeta()
+        .then((meta) => (meta.enabled ? fetchSiamrajUnitRequests(500) : []))
+        .catch(() => [] as JobRequest[]),
     ])
-      .then(([emps, cls, jobs]) => {
+      .then(([emps, cls, unitRequests]) => {
         if (!cancelled) {
           setApiEmployees(Array.isArray(emps) ? emps : []);
           setApiClients(Array.isArray(cls) ? cls : []);
-          setApiJobs(Array.isArray(jobs) ? jobs : []);
-          if ((!emps || emps.length === 0) && (!cls || cls.length === 0) && (!jobs || jobs.length === 0)) {
+          setApiUnitRequests(Array.isArray(unitRequests) ? unitRequests : []);
+          if ((!emps || emps.length === 0) && (!cls || cls.length === 0) && (!unitRequests || unitRequests.length === 0)) {
             setLoadError('ยังไม่มีพนักงานหรือลูกค้าในระบบ — เพิ่มใน Employees / Clients (Admin) ก่อน');
           }
         }
@@ -78,7 +81,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
           setLoadError('โหลดข้อมูลไม่สำเร็จ');
           setApiEmployees([]);
           setApiClients([]);
-          setApiJobs([]);
+          setApiUnitRequests([]);
         }
       });
     return () => {
@@ -89,13 +92,10 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
   const activeEmployees = apiEmployees.filter((e) => e.status === 'active');
   const activeClients = apiClients.filter((c) => c.is_active !== false);
 
-  const fallbackUnitsFromJobs = Array.from(
-    new Set(
-      apiJobs
-        .map((j) => (typeof j.unit_name === 'string' ? j.unit_name.trim() : ''))
-        .filter(Boolean),
-    ),
-  ).sort((a, b) => a.localeCompare(b, 'th'));
+  const replacementUnits = useMemo(
+    () => unitNamesForSendReplacement(apiUnitRequests),
+    [apiUnitRequests],
+  );
 
   const employeeList = apiEmployees;
   const clientList = apiClients;
@@ -122,23 +122,23 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
         })),
       });
     }
-    if (fallbackUnitsFromJobs.length > 0) {
+    if (replacementUnits.length > 0) {
       groups.push({
-        heading: 'หน่วยงานจากงาน',
-        options: fallbackUnitsFromJobs.map((name) => ({
+        heading: 'หน่วยงาน (ส่งคนแทน)',
+        options: replacementUnits.map((name) => ({
           value: `unit:${name}`,
           label: name,
         })),
       });
     }
     return groups;
-  }, [activeClients, fallbackUnitsFromJobs]);
+  }, [activeClients, replacementUnits]);
 
   const handleAssign = async () => {
     const empId = employeeId || selectedEmployee;
     const emp = employeeList.find((e) => e.id === empId);
     const client = clientList.find((c) => c.id === selectedClient);
-    const fallbackUnit = fallbackUnitsFromJobs.find((u) => `unit:${u}` === selectedClient);
+    const fallbackUnit = replacementUnits.find((u) => `unit:${u}` === selectedClient);
     if (!emp || (!client && !fallbackUnit)) return;
 
     if (!parseYmd(startDate)) {
@@ -239,7 +239,7 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
               groups={clientOptions}
               placeholder="เลือกหน่วยงาน"
               searchPlaceholder="ค้นหาหน่วยงาน ลูกค้า..."
-              emptyText="ไม่พบหน่วยงาน"
+              emptyText="ไม่พบหน่วยงาน — ติ๊กส่งคนแทนในใบขอก่อน"
             />
           </div>
 
