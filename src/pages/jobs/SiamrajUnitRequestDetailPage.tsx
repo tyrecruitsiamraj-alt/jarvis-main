@@ -13,8 +13,9 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
+import UnitRequestReplacementToggle from '@/components/jobs/UnitRequestReplacementToggle';
 import type { JobRequest } from '@/types';
-import { Database, ExternalLink, Users, StickyNote } from 'lucide-react';
+import { Database, ExternalLink, Users, StickyNote, UserCheck } from 'lucide-react';
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   const display =
@@ -242,6 +243,22 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   </p>
                 </div>
               )}
+            </section>
+
+            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-blue-600" />
+                ส่งคนแทน
+              </h3>
+              <p className="text-xs text-muted-foreground">เลือกว่าใบขอนี้ส่งคนแทนหรือไม่ส่งคนแทน</p>
+              <UnitRequestReplacementToggle
+                job={data}
+                onSaved={(sendReplacement) => {
+                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                    old ? { ...old, send_replacement: sendReplacement } : old,
+                  );
+                }}
+              />
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">

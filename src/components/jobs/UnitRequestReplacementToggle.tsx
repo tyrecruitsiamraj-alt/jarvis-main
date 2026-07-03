@@ -40,19 +40,13 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact }
   const no = value === false;
 
   return (
-    <div
-      className={cn('flex flex-wrap gap-1', compact ? 'text-[10px]' : 'text-xs')}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-      role="group"
-      aria-label="ส่งคนแทน"
-    >
+    <div className={cn('flex flex-wrap gap-2', compact ? 'text-[10px]' : 'text-sm')}>
       <button
         type="button"
         disabled={saving}
         onClick={() => void persist(true)}
         className={cn(
-          'px-2 py-1 rounded-full border font-medium transition-colors disabled:opacity-50',
+          'px-3 py-2 rounded-full border font-medium transition-colors disabled:opacity-50',
           yes
             ? 'bg-primary text-primary-foreground border-primary'
             : 'bg-white/60 text-muted-foreground border-border/60 hover:border-primary/40',
@@ -65,7 +59,7 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact }
         disabled={saving}
         onClick={() => void persist(false)}
         className={cn(
-          'px-2 py-1 rounded-full border font-medium transition-colors disabled:opacity-50',
+          'px-3 py-2 rounded-full border font-medium transition-colors disabled:opacity-50',
           no
             ? 'bg-secondary text-foreground border-border'
             : 'bg-white/60 text-muted-foreground border-border/60 hover:border-border',
