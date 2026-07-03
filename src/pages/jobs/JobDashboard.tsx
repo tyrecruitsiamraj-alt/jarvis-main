@@ -83,11 +83,6 @@ const JobDashboard: React.FC = () => {
     if (!stillValid) patchFilters({ jobSubtypeFilter: 'all' });
   }, [filters.departmentFilter, filters.jobSubtypeFilter, filterApi.jobSubtypeOptions, patchFilters]);
 
-  useEffect(() => {
-    if (filters.unitFilter === 'all') return;
-    if (!filterApi.unitOptions.includes(filters.unitFilter)) patchFilters({ unitFilter: 'all' });
-  }, [filters.departmentFilter, filters.jobSubtypeFilter, filters.unitFilter, filterApi.unitOptions, patchFilters]);
-
   const closedJobs = useMemo(() => scopedJobs.filter((j) => j.status === 'closed'), [scopedJobs]);
   const activeJobs = useMemo(() => scopedJobs.filter((j) => j.status !== 'closed'), [scopedJobs]);
 
@@ -110,11 +105,9 @@ const JobDashboard: React.FC = () => {
   };
 
   const filterSummary =
-    filters.unitFilter !== 'all'
-      ? filters.unitFilter
-      : filters.departmentFilter !== 'all'
-        ? filterApi.departmentOptions.find((o) => o.value === filters.departmentFilter)?.label.replace(/\s*\(\d+\)$/, '')
-        : null;
+    filters.departmentFilter !== 'all'
+      ? filterApi.departmentOptions.find((o) => o.value === filters.departmentFilter)?.label.replace(/\s*\(\d+\)$/, '')
+      : null;
 
   return (
     <div>
@@ -161,7 +154,6 @@ const JobDashboard: React.FC = () => {
               options={{
                 departmentOptions: filterApi.departmentOptions,
                 jobSubtypeOptions: filterApi.jobSubtypeOptions,
-                unitOptions: filterApi.unitOptions,
                 recruiters: filterApi.recruiters,
                 screeners: filterApi.screeners,
                 unassignedRecruiterCount: filterApi.unassignedRecruiterCount,

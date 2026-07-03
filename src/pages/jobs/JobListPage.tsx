@@ -65,7 +65,6 @@ const JobListPage: React.FC = () => {
   const {
     filter,
     search,
-    unitFilter,
     departmentFilter,
     jobSubtypeFilter,
     recruiterFilter,
@@ -143,26 +142,13 @@ const JobListPage: React.FC = () => {
     [departmentScopedJobs, siamrajPrimary, jobSubtypeFilter],
   );
 
-  const unitOptions = useMemo(() => {
-    const set = new Set(subtypeScopedJobs.map((j) => j.unit_name).filter(Boolean));
-    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [subtypeScopedJobs]);
-
   const recruiterFilterScope = useMemo(() => {
-    return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
-      if (!matchesScreenerFilter(j, screenerFilter)) return false;
-      return true;
-    });
-  }, [subtypeScopedJobs, unitFilter, screenerFilter]);
+    return subtypeScopedJobs.filter((j) => matchesScreenerFilter(j, screenerFilter));
+  }, [subtypeScopedJobs, screenerFilter]);
 
   const screenerFilterScope = useMemo(() => {
-    return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
-      if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
-      return true;
-    });
-  }, [subtypeScopedJobs, unitFilter, recruiterFilter]);
+    return subtypeScopedJobs.filter((j) => matchesRecruiterFilter(j, recruiterFilter));
+  }, [subtypeScopedJobs, recruiterFilter]);
 
   const unassignedRecruiterCount = useMemo(
     () => countUnassignedRecruiters(recruiterFilterScope),
@@ -179,7 +165,6 @@ const JobListPage: React.FC = () => {
 
     return subtypeScopedJobs
       .filter((j) => {
-        if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
         if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
@@ -196,7 +181,7 @@ const JobListPage: React.FC = () => {
             .includes(q),
       )
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, urgencyFilter, noteFilter, ageDaysFilter, sort]);
+  }, [subtypeScopedJobs, filter, search, recruiterFilter, screenerFilter, urgencyFilter, noteFilter, ageDaysFilter, sort]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -210,11 +195,6 @@ const JobListPage: React.FC = () => {
     const stillValid = jobSubtypeOptions.some((o) => o.value === jobSubtypeFilter);
     if (!stillValid) updateListState({ jobSubtypeFilter: 'all' });
   }, [departmentFilter, jobSubtypeOptions, jobSubtypeFilter, updateListState]);
-
-  useEffect(() => {
-    if (unitFilter === 'all') return;
-    if (!unitOptions.includes(unitFilter)) updateListState({ unitFilter: 'all' });
-  }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter, updateListState]);
 
   useEffect(() => {
     if (page > totalPages) updateListState({ page: totalPages });
@@ -269,21 +249,6 @@ const JobListPage: React.FC = () => {
                 value={search}
                 onChange={(e) => updateListState({ search: e.target.value })}
               />
-
-              <FilterSelect
-                id="job-list-unit"
-                label="หน่วยงาน"
-                value={unitFilter}
-                onChange={(v) => updateListState({ unitFilter: v })}
-                className="w-full sm:flex-1 sm:min-w-[12rem] sm:max-w-xs"
-              >
-                <option value="all">ทั้งหมด</option>
-                {unitOptions.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </FilterSelect>
             </div>
 
             <div className="flex flex-wrap gap-1.5">

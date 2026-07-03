@@ -26,7 +26,6 @@ import {
 export type UnitRequestStatusFilter = 'all' | 'active' | 'closed';
 
 export type UnitRequestFilterState = {
-  unitFilter: string;
   departmentFilter: string;
   jobSubtypeFilter: string;
   recruiterFilter: string;
@@ -38,7 +37,6 @@ export type UnitRequestFilterState = {
 };
 
 export const UNIT_REQUEST_FILTER_DEFAULTS: UnitRequestFilterState = {
-  unitFilter: 'all',
   departmentFilter: 'all',
   jobSubtypeFilter: 'all',
   recruiterFilter: 'all',
@@ -76,7 +74,6 @@ export function filterUnitRequests(
   if (siamrajPrimary) list = filterUnitRequestsByJobSubtype(list, f.jobSubtypeFilter);
 
   return list.filter((j) => {
-    if (f.unitFilter !== 'all' && j.unit_name !== f.unitFilter) return false;
     if (!matchesRecruiterFilter(j, f.recruiterFilter)) return false;
     if (!matchesScreenerFilter(j, f.screenerFilter)) return false;
     if (!matchesUrgencyFilter(j, f.urgencyFilter)) return false;
@@ -117,11 +114,6 @@ export function useSiamrajUnitRequestFilters(
     [departmentScopedJobs, siamrajPrimary, filters.jobSubtypeFilter],
   );
 
-  const unitOptions = useMemo(() => {
-    const set = new Set(subtypeScopedJobs.map((j) => j.unit_name).filter(Boolean));
-    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [subtypeScopedJobs]);
-
   const recruiters = useMemo(() => {
     void staffRosterRev;
     return buildRecruiterNameOptions(jobs);
@@ -133,20 +125,12 @@ export function useSiamrajUnitRequestFilters(
   }, [staffRosterRev, jobs]);
 
   const recruiterFilterScope = useMemo(() => {
-    return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
-      if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
-      return true;
-    });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.screenerFilter]);
+    return subtypeScopedJobs.filter((j) => matchesScreenerFilter(j, filters.screenerFilter));
+  }, [subtypeScopedJobs, filters.screenerFilter]);
 
   const screenerFilterScope = useMemo(() => {
-    return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
-      if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
-      return true;
-    });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter]);
+    return subtypeScopedJobs.filter((j) => matchesRecruiterFilter(j, filters.recruiterFilter));
+  }, [subtypeScopedJobs, filters.recruiterFilter]);
 
   const unassignedRecruiterCount = useMemo(
     () => countUnassignedRecruiters(recruiterFilterScope),
@@ -166,7 +150,6 @@ export function useSiamrajUnitRequestFilters(
   return {
     departmentOptions,
     jobSubtypeOptions,
-    unitOptions,
     recruiters,
     screeners,
     unassignedRecruiterCount,

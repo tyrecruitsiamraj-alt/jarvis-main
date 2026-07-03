@@ -105,11 +105,6 @@ const SupervisorDashboard: React.FC = () => {
     if (!stillValid) patchFilters({ jobSubtypeFilter: 'all' });
   }, [filters.departmentFilter, filters.jobSubtypeFilter, filterApi.jobSubtypeOptions, patchFilters]);
 
-  useEffect(() => {
-    if (filters.unitFilter === 'all') return;
-    if (!filterApi.unitOptions.includes(filters.unitFilter)) patchFilters({ unitFilter: 'all' });
-  }, [filters.departmentFilter, filters.jobSubtypeFilter, filters.unitFilter, filterApi.unitOptions, patchFilters]);
-
   const filterByDate = useCallback(
     (source: JobRequest[]) => {
       if (!dateRange) return source;
@@ -124,7 +119,7 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const jobsScopedForUnitBreakdown = useMemo(
-    () => filterByDate(filterUnitRequests(jobs, siamrajPrimary, filters, { unitFilter: true })),
+    () => filterByDate(filterUnitRequests(jobs, siamrajPrimary, filters)),
     [jobs, siamrajPrimary, filters, filterByDate],
   );
 
@@ -267,7 +262,6 @@ const SupervisorDashboard: React.FC = () => {
         subtitle={
           [
             dateRange ? `วันที่กรอก: ${formatYmdDmyBe(dateRange.from)} – ${formatYmdDmyBe(dateRange.to)}` : null,
-            filters.unitFilter !== 'all' ? `หน่วยงาน: ${filters.unitFilter}` : null,
             filters.departmentFilter !== 'all'
               ? `แผนก: ${filterApi.departmentOptions.find((o) => o.value === filters.departmentFilter)?.label.replace(/\s*\(\d+\)$/, '') ?? filters.departmentFilter}`
               : null,
@@ -316,7 +310,6 @@ const SupervisorDashboard: React.FC = () => {
             options={{
               departmentOptions: filterApi.departmentOptions,
               jobSubtypeOptions: filterApi.jobSubtypeOptions,
-              unitOptions: filterApi.unitOptions,
               recruiters: filterApi.recruiters,
               screeners: filterApi.screeners,
               unassignedRecruiterCount: filterApi.unassignedRecruiterCount,
@@ -730,14 +723,8 @@ const SupervisorDashboard: React.FC = () => {
                         <button
                           key={unit}
                           type="button"
-                          onClick={() => {
-                            patchFilters({ unitFilter: unit });
-                            showJobList(`หน่วยงาน: ${unit}`, uJobs);
-                          }}
-                          className={cn(
-                            'w-full py-2 border-b border-border/30 last:border-0 hover:bg-secondary/30 rounded px-1 text-left',
-                            filters.unitFilter === unit && 'bg-blue-500/10',
-                          )}
+                          onClick={() => showJobList(`หน่วยงาน: ${unit}`, uJobs)}
+                          className="w-full py-2 border-b border-border/30 last:border-0 hover:bg-secondary/30 rounded px-1 text-left"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-medium text-foreground line-clamp-2">{unit}</span>

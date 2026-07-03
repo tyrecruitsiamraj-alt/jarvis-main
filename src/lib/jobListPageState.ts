@@ -6,7 +6,6 @@ export type JobListFilter = 'all' | 'active' | 'closed';
 export type JobListPageState = {
   filter: JobListFilter;
   search: string;
-  unitFilter: string;
   departmentFilter: string;
   jobSubtypeFilter: string;
   recruiterFilter: string;
@@ -22,7 +21,6 @@ export type JobListPageState = {
 export const JOB_LIST_DEFAULTS: JobListPageState = {
   filter: 'all',
   search: '',
-  unitFilter: 'all',
   departmentFilter: 'all',
   jobSubtypeFilter: 'all',
   recruiterFilter: 'all',
@@ -67,7 +65,6 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
   return {
     filter,
     search: params.get('q') ?? JOB_LIST_DEFAULTS.search,
-    unitFilter: params.get('u') || JOB_LIST_DEFAULTS.unitFilter,
     departmentFilter: params.get('d') || JOB_LIST_DEFAULTS.departmentFilter,
     jobSubtypeFilter: params.get('st') || JOB_LIST_DEFAULTS.jobSubtypeFilter,
     recruiterFilter: params.get('r') || JOB_LIST_DEFAULTS.recruiterFilter,
@@ -85,7 +82,6 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   const params = new URLSearchParams();
   if (state.filter !== JOB_LIST_DEFAULTS.filter) params.set('f', state.filter);
   if (state.search.trim()) params.set('q', state.search.trim());
-  if (state.unitFilter !== JOB_LIST_DEFAULTS.unitFilter) params.set('u', state.unitFilter);
   if (state.departmentFilter !== JOB_LIST_DEFAULTS.departmentFilter) params.set('d', state.departmentFilter);
   if (state.jobSubtypeFilter !== JOB_LIST_DEFAULTS.jobSubtypeFilter) params.set('st', state.jobSubtypeFilter);
   if (state.recruiterFilter !== JOB_LIST_DEFAULTS.recruiterFilter) params.set('r', state.recruiterFilter);
@@ -106,7 +102,6 @@ export function jobListReturnTo(pathname: string, search: string): string {
 const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'filter',
   'search',
-  'unitFilter',
   'departmentFilter',
   'jobSubtypeFilter',
   'recruiterFilter',
