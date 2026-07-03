@@ -1,5 +1,5 @@
 // ============ AUTH & USERS ============
-export type UserRole = 'admin' | 'supervisor' | 'staff';
+export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 export interface User {
   id: string;

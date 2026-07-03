@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 /** Matches frontend `UserRole` in src/types */
-export type UserRole = 'admin' | 'supervisor' | 'staff';
+export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 export const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'jarvis_auth';
 
@@ -52,7 +52,7 @@ export function verifyAuthToken(token: string): JwtUserPayload {
   const email = typeof o.email === 'string' ? o.email : '';
   const role = o.role;
   if (!sub || !email) throw new Error('Invalid token claims');
-  if (role !== 'admin' && role !== 'supervisor' && role !== 'staff') {
+  if (role !== 'admin' && role !== 'supervisor' && role !== 'staff' && role !== 'opl') {
     throw new Error('Invalid role in token');
   }
   return { sub, email, role };

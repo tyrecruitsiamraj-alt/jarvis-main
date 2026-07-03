@@ -52,4 +52,4 @@ async function meHandler(req: AuthedReq, res: ApiRes) {
   }
 }
 
-export default withAuth(meHandler, { roles: ['staff', 'supervisor', 'admin'] });
+export default withAuth(meHandler, { roles: ['opl', 'staff', 'supervisor', 'admin'] });

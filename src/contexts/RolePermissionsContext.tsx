@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  APP_FUNCTIONS,
   buildDefaultMatrix,
   isFunctionEnabledForRole,
   primaryFunctionForPath,
@@ -104,14 +103,13 @@ export function useRolePermissions(): RolePermissionsContextValue {
     return {
       matrix: buildDefaultMatrix(),
       loading: false,
-      isFunctionEnabled: (functionId, role) => {
-        const fn = APP_FUNCTIONS.find((f) => f.id === functionId);
-        if (!fn || !role) return false;
-        return meetsMinimumRole(role, fn.minimumRole);
-      },
+      isFunctionEnabled: (functionId, role) => isFunctionEnabledForRole(role!, functionId),
       canAccessPathWithFunctions: (pathname, role) => {
         if (!role) return false;
-        return meetsMinimumRole(role, minimumRoleForPath(pathname));
+        if (!meetsMinimumRole(role, minimumRoleForPath(pathname))) return false;
+        const fnId = primaryFunctionForPath(pathname);
+        if (fnId && !isFunctionEnabledForRole(role, fnId)) return false;
+        return true;
       },
       updateGrant: async () => {},
       savingKey: null,

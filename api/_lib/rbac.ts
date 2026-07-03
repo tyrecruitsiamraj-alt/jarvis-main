@@ -1,13 +1,24 @@
 import type { UserRole } from './auth.js';
 
-/** Role hierarchy — backend source of truth (admin > supervisor > staff). */
+/** Role hierarchy — backend source of truth (admin > supervisor > staff > opl). */
 export const ROLE_LEVEL: Record<UserRole, number> = {
-  admin: 3,
-  supervisor: 2,
-  staff: 1,
+  admin: 4,
+  supervisor: 3,
+  staff: 2,
+  opl: 1,
 };
 
+export function isReadOnlyRole(role: UserRole): boolean {
+  return role === 'opl';
+}
+
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
+  if (userRole === 'opl') {
+    return minimum === 'staff' || minimum === 'opl';
+  }
+  if (minimum === 'opl') {
+    return userRole === 'opl';
+  }
   return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minimum];
 }
 
@@ -121,6 +132,13 @@ export function checkApiAccess(
   method: string,
   hint?: string,
 ): { ok: true } | { ok: false; message: string } {
+  const m = method.toUpperCase();
+  const isRead = m === 'GET' || m === 'HEAD';
+
+  if (isReadOnlyRole(userRole) && !isRead) {
+    return { ok: false, message: 'Read-only role (opl)' };
+  }
+
   const minimum = minimumRoleFor(resource, method, hint);
   if (!meetsMinimumRole(userRole, minimum)) {
     return {

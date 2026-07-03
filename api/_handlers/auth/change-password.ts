@@ -82,4 +82,4 @@ async function changePasswordHandler(req: AuthedReq, res: ApiRes) {
   }
 }
 
-export default withAuth(changePasswordHandler, { roles: ['staff', 'supervisor', 'admin'] });
+export default withAuth(changePasswordHandler, { roles: ['opl', 'staff', 'supervisor', 'admin'] });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkApiAccess, meetsMinimumRole, minimumRoleFor } from '../../api/_lib/rbac';
+import { checkApiAccess, meetsMinimumRole, minimumRoleFor, isReadOnlyRole } from '../../api/_lib/rbac';
 import { canAccessPath, canAccessDashboard, canAssignJobStaff, canEditOperationalData, minimumRoleForPath, roleHomePath } from '../../src/lib/rbac';
 
 describe('api rbac matrix', () => {
@@ -12,6 +12,17 @@ describe('api rbac matrix', () => {
     expect(checkApiAccess('staff', 'jobs', 'GET').ok).toBe(true);
     expect(checkApiAccess('staff', 'candidates', 'POST').ok).toBe(true);
     expect(checkApiAccess('staff', 'candidates', 'PATCH').ok).toBe(false);
+  });
+
+  it('opl is read-only — GET allowed, mutations blocked', () => {
+    expect(isReadOnlyRole('opl')).toBe(true);
+    expect(checkApiAccess('opl', 'jobs', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'candidates', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'candidates', 'POST').ok).toBe(false);
+    expect(checkApiAccess('opl', 'jobs', 'POST').ok).toBe(false);
+    expect(checkApiAccess('opl', 'siamraj-unit-notes', 'POST').ok).toBe(false);
+    expect(checkApiAccess('opl', 'work-calendar', 'POST').ok).toBe(false);
+    expect(checkApiAccess('opl', 'driver-care', 'POST', 'log').ok).toBe(false);
   });
 
   it('supervisor cannot access admin settings APIs', () => {
@@ -48,14 +59,27 @@ describe('api rbac matrix', () => {
   it('role hierarchy', () => {
     expect(meetsMinimumRole('admin', 'staff')).toBe(true);
     expect(meetsMinimumRole('staff', 'admin')).toBe(false);
+    expect(meetsMinimumRole('opl', 'staff')).toBe(true);
+    expect(meetsMinimumRole('opl', 'supervisor')).toBe(false);
+    expect(meetsMinimumRole('staff', 'opl')).toBe(false);
   });
 });
 
 describe('frontend route rbac', () => {
   it('maps role homes', () => {
+    expect(roleHomePath('opl')).toBe('/opl');
     expect(roleHomePath('staff')).toBe('/staff');
     expect(roleHomePath('supervisor')).toBe('/supervisor');
     expect(roleHomePath('admin')).toBe('/admin');
+  });
+
+  it('opl can access staff-level read routes but not write-only paths', () => {
+    expect(canAccessPath('opl', '/settings')).toBe(false);
+    expect(canAccessPath('opl', '/dashboard')).toBe(true);
+    expect(canAccessPath('opl', '/wl/employees/add')).toBe(false);
+    expect(canAccessPath('opl', '/admin')).toBe(false);
+    expect(canAccessPath('opl', '/jobs')).toBe(true);
+    expect(canAccessPath('opl', '/matching/candidates')).toBe(true);
   });
 
   it('staff cannot access admin settings or supervisor-only routes', () => {
@@ -94,6 +118,7 @@ describe('frontend route rbac', () => {
     expect(canAccessDashboard(null)).toBe(false);
     expect(canAssignJobStaff('staff')).toBe(false);
     expect(canAssignJobStaff('supervisor')).toBe(true);
+    expect(canEditOperationalData('opl')).toBe(false);
     expect(canEditOperationalData('staff')).toBe(false);
     expect(canEditOperationalData('supervisor')).toBe(true);
   });

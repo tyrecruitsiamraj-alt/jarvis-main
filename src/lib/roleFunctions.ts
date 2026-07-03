@@ -58,17 +58,34 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'audit_logs', label: 'ดู Audit Log', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
 ];
 
-export const ROLE_ORDER: UserRole[] = ['staff', 'supervisor', 'admin'];
+export const OPL_READ_FUNCTIONS: ReadonlySet<AppFunctionId> = new Set([
+  'dashboard',
+  'candidates_read',
+  'jobs_read',
+  'unit_requests_read',
+  'employees_read',
+  'clients_read',
+  'work_calendar_read',
+  'driver_care_read',
+]);
+
+export const ROLE_ORDER: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  opl: 'OPL (อ่านอย่างเดียว)',
   staff: 'Staff',
   supervisor: 'Supervisor',
   admin: 'Admin',
 };
 
+function defaultEnabledForRole(role: UserRole, fn: AppFunctionDef): boolean {
+  if (role === 'opl') return OPL_READ_FUNCTIONS.has(fn.id);
+  return meetsMinimumRole(role, fn.minimumRole);
+}
+
 export function roleHasFunction(role: UserRole, fn: AppFunctionDef, matrix?: RoleFunctionMatrix | null): boolean {
   if (matrix?.[role]?.[fn.id] !== undefined) return matrix[role][fn.id];
-  return meetsMinimumRole(role, fn.minimumRole);
+  return defaultEnabledForRole(role, fn);
 }
 
 export function isFunctionEnabledForRole(
@@ -79,7 +96,7 @@ export function isFunctionEnabledForRole(
   if (matrix?.[role]?.[functionId] !== undefined) return matrix[role][functionId];
   const fn = APP_FUNCTIONS.find((f) => f.id === functionId);
   if (!fn) return false;
-  return meetsMinimumRole(role, fn.minimumRole);
+  return defaultEnabledForRole(role, fn);
 }
 
 /** ใช้กับ route guard / bottom nav */
@@ -100,7 +117,7 @@ export function buildDefaultMatrix(): RoleFunctionMatrix {
   for (const role of ROLE_ORDER) {
     matrix[role] = {} as Record<AppFunctionId, boolean>;
     for (const fn of APP_FUNCTIONS) {
-      matrix[role][fn.id] = meetsMinimumRole(role, fn.minimumRole);
+      matrix[role][fn.id] = defaultEnabledForRole(role, fn);
     }
   }
   return matrix;

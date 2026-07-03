@@ -137,7 +137,7 @@ export function withAuthDataRoute(
   return async (req: ApiReq, res: ApiRes) => {
     const m = (req.method || 'GET').toUpperCase();
     const isWrite = m === 'POST' || m === 'PUT' || m === 'PATCH' || m === 'DELETE';
-    const roles: UserRole[] = isWrite ? ['supervisor', 'admin'] : ['staff', 'supervisor', 'admin'];
+    const roles: UserRole[] = isWrite ? ['supervisor', 'admin'] : ['opl', 'staff', 'supervisor', 'admin'];
     const inner = withAuth(handler, { roles });
     return inner(req, res);
   };
@@ -150,7 +150,7 @@ export function withAuthStaffCreateSupervisorMutate(
   return async (req: ApiReq, res: ApiRes) => {
     const m = (req.method || 'GET').toUpperCase();
     const roles: UserRole[] =
-      m === 'PATCH' || m === 'PUT' || m === 'DELETE' ? ['supervisor', 'admin'] : ['staff', 'supervisor', 'admin'];
+      m === 'PATCH' || m === 'PUT' || m === 'DELETE' ? ['supervisor', 'admin'] : ['opl', 'staff', 'supervisor', 'admin'];
     const inner = withAuth(handler, { roles });
     return inner(req, res);
   };

@@ -1,7 +1,7 @@
 import type { User, UserRole } from '@/types';
 
 export function isUserRole(value: unknown): value is UserRole {
-  return value === 'admin' || value === 'supervisor' || value === 'staff';
+  return value === 'admin' || value === 'supervisor' || value === 'staff' || value === 'opl';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

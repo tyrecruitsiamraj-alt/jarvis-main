@@ -64,6 +64,7 @@ const ProtectedRoutes = () => {
       <RequireRole>
         <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/opl" element={<RoleHubPage role="opl" />} />
         <Route path="/staff" element={<RoleHubPage role="staff" />} />
         <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />
         <Route path="/admin" element={<RoleHubPage role="admin" />} />

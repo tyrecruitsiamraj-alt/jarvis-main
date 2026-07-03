@@ -31,11 +31,24 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
 };
 
 export const VALID_FUNCTION_IDS = new Set(Object.keys(FUNCTION_DEFAULT_MIN_ROLE));
-export const VALID_ROLES: UserRole[] = ['staff', 'supervisor', 'admin'];
+export const VALID_ROLES: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
+
+/** Keep in sync with src/lib/roleFunctions.ts */
+export const OPL_READ_FUNCTIONS = new Set([
+  'dashboard',
+  'candidates_read',
+  'jobs_read',
+  'unit_requests_read',
+  'employees_read',
+  'clients_read',
+  'work_calendar_read',
+  'driver_care_read',
+]);
 
 export type GrantOverride = { role: UserRole; function_id: string; enabled: boolean };
 
 export function defaultFunctionEnabled(role: UserRole, functionId: string): boolean {
+  if (role === 'opl') return OPL_READ_FUNCTIONS.has(functionId);
   const minimum = FUNCTION_DEFAULT_MIN_ROLE[functionId];
   if (!minimum) return false;
   return meetsMinimumRole(role, minimum);
@@ -123,7 +136,12 @@ export function canToggleGrant(
   functionId: string,
   enabled: boolean,
 ): { ok: true } | { ok: false; message: string } {
-  if (enabled) return { ok: true };
+  if (enabled) {
+    if (role === 'opl' && !OPL_READ_FUNCTIONS.has(functionId)) {
+      return { ok: false, message: 'OPL เปิดได้เฉพาะฟังก์ชันอ่านอย่างเดียว' };
+    }
+    return { ok: true };
+  }
   if (role === 'admin' && (functionId === 'settings_access' || functionId === 'users_manage')) {
     return { ok: false, message: 'ไม่สามารถปิดสิทธิ์ Settings / จัดการ Users ของ Admin ได้' };
   }

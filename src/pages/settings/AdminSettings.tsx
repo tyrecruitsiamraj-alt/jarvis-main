@@ -273,6 +273,7 @@ const AdminSettings: React.FC = () => {
                           <option value="admin">admin</option>
                           <option value="supervisor">supervisor</option>
                           <option value="staff">staff</option>
+                          <option value="opl">opl (อ่านอย่างเดียว)</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -341,6 +342,7 @@ const AdminSettings: React.FC = () => {
                       <option value="admin">admin</option>
                       <option value="supervisor">supervisor</option>
                       <option value="staff">staff</option>
+                      <option value="opl">opl (อ่านอย่างเดียว)</option>
                     </select>
 
                     <button

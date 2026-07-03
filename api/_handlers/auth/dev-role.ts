@@ -26,7 +26,7 @@ type UserRow = {
 };
 
 function isUserRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff';
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
 }
 
 function toUserResponse(row: UserRow) {
@@ -48,7 +48,7 @@ function toUserResponse(row: UserRow) {
 export default async function handler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'POST') {
-    return sendError(res, 405, 'Method not allowed', 'Use POST with JSON body { "role": "staff"|"supervisor"|"admin" }');
+    return sendError(res, 405, 'Method not allowed', 'Use POST with JSON body { "role": "opl"|"staff"|"supervisor"|"admin" }');
   }
 
   if (!isDevRoleLoginAllowed()) {
@@ -67,7 +67,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const body = raw as Record<string, unknown>;
     const role = body.role;
     if (!isUserRole(role)) {
-      return sendError(res, 400, 'Bad request', 'role must be admin, supervisor, or staff');
+      return sendError(res, 400, 'Bad request', 'role must be admin, supervisor, staff, or opl');
     }
 
     const { rows } = await dbQuery<UserRow>(

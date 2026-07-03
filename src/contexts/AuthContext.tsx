@@ -33,16 +33,17 @@ export const useAuth = () => {
 };
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
-  admin: 3,
-  supervisor: 2,
-  staff: 1,
+  admin: 4,
+  supervisor: 3,
+  staff: 2,
+  opl: 1,
 };
 
 function mapApiUser(raw: Record<string, unknown>): User | null {
   const id = typeof raw.id === 'string' ? raw.id : '';
   const email = typeof raw.email === 'string' ? raw.email : '';
   const role = raw.role;
-  if (!id || !email || (role !== 'admin' && role !== 'supervisor' && role !== 'staff')) {
+  if (!id || !email || (role !== 'admin' && role !== 'supervisor' && role !== 'staff' && role !== 'opl')) {
     return null;
   }
   return {

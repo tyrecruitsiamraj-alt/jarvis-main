@@ -6,12 +6,23 @@ import type { UserRole } from '@/types';
  */
 
 export const ROLE_LEVEL: Record<UserRole, number> = {
-  admin: 3,
-  supervisor: 2,
-  staff: 1,
+  admin: 4,
+  supervisor: 3,
+  staff: 2,
+  opl: 1,
 };
 
+export function isReadOnlyRole(role: UserRole): boolean {
+  return role === 'opl';
+}
+
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
+  if (userRole === 'opl') {
+    return minimum === 'staff' || minimum === 'opl';
+  }
+  if (minimum === 'opl') {
+    return userRole === 'opl';
+  }
   return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minimum];
 }
 
@@ -62,13 +73,13 @@ export function canAccessDashboard(userRole: UserRole | null | undefined): boole
 
 /** กำหนดเจ้าหน้าที่สรรหา / คัดสรร — Supervisor ขึ้นไป */
 export function canAssignJobStaff(userRole: UserRole | null | undefined): boolean {
-  if (!userRole) return false;
+  if (!userRole || isReadOnlyRole(userRole)) return false;
   return meetsMinimumRole(userRole, 'supervisor');
 }
 
-/** แก้ไขข้อมูลในระบบ — Supervisor ขึ้นไป (Staff อ่านอย่างเดียว) */
+/** แก้ไขข้อมูลในระบบ — Supervisor ขึ้นไป (Staff / OPL อ่านอย่างเดียว) */
 export function canEditOperationalData(userRole: UserRole | null | undefined): boolean {
-  if (!userRole) return false;
+  if (!userRole || isReadOnlyRole(userRole)) return false;
   return meetsMinimumRole(userRole, 'supervisor');
 }
 
@@ -87,13 +98,13 @@ export function filterByMinimumRole<T extends { minimumRole?: UserRole }>(
  * Supervisor: operational access แบบ admin — ยกเว้นหน้า /settings และ API ที่เกี่ยวกับ settings
  */
 export const PERMISSION_MATRIX = {
-  dashboard: { staff: 'read', supervisor: 'read', admin: 'read' },
-  candidates: { staff: 'create/read', supervisor: 'create/update/archive', admin: 'all' },
-  jobs: { staff: 'read', supervisor: 'create/update/assign staff', admin: 'all' },
-  employees: { staff: 'read limited', supervisor: 'create/update', admin: 'all' },
-  clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all' },
-  workCalendar: { staff: 'read + create entries', supervisor: 'manage team', admin: 'all' },
-  driverCare: { staff: 'read/action if assigned', supervisor: 'manage + recalc', admin: 'all' },
-  settings: { staff: 'none', supervisor: 'none', admin: 'all' },
-  auditLogs: { staff: 'none', supervisor: 'none', admin: 'all' },
+  dashboard: { staff: 'read', supervisor: 'read', admin: 'read', opl: 'read' },
+  candidates: { staff: 'create/read', supervisor: 'create/update/archive', admin: 'all', opl: 'read' },
+  jobs: { staff: 'read', supervisor: 'create/update/assign staff', admin: 'all', opl: 'read' },
+  employees: { staff: 'read limited', supervisor: 'create/update', admin: 'all', opl: 'read' },
+  clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all', opl: 'read' },
+  workCalendar: { staff: 'read + create entries', supervisor: 'manage team', admin: 'all', opl: 'read' },
+  driverCare: { staff: 'read/action if assigned', supervisor: 'manage + recalc', admin: 'all', opl: 'read' },
+  settings: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
+  auditLogs: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
 } as const;

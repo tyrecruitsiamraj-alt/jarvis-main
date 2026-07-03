@@ -36,7 +36,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const enabled = body.enabled;
 
       if (!VALID_ROLES.includes(role as UserRole)) {
-        return sendError(res, 400, 'Bad request', 'role must be staff/supervisor/admin');
+        return sendError(res, 400, 'Bad request', 'role must be opl/staff/supervisor/admin');
       }
       if (!VALID_FUNCTION_IDS.has(functionId)) {
         return sendError(res, 400, 'Bad request', 'Invalid functionId');

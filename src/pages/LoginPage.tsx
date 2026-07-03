@@ -436,8 +436,8 @@ const LoginPage: React.FC = () => {
                 <p className="text-xs font-medium text-orange-900 text-center">
                   Dev — เข้าเร็วตามสิทธิ์ (ไม่ต้องกรอกรหัส)
                 </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['staff', 'supervisor', 'admin'] as UserRole[]).map((role) => (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['opl', 'staff', 'supervisor', 'admin'] as UserRole[]).map((role) => (
                     <button
                       key={role}
                       type="button"

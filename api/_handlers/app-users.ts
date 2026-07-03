@@ -14,10 +14,10 @@ type UserRow = {
   is_active: boolean;
   created_at: string | Date;
 };
-type UserRole = 'admin' | 'supervisor' | 'staff';
+type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 function isRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff';
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
 }
 
 function toYmd(value: string | Date): string {
@@ -43,7 +43,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       if (!id) return sendError(res, 400, 'Bad request', 'id is required');
       if (role !== undefined && !isRole(role)) {
-        return sendError(res, 400, 'Bad request', 'role must be admin/supervisor/staff');
+        return sendError(res, 400, 'Bad request', 'role must be admin/supervisor/staff/opl');
       }
       if (is_active !== undefined && typeof is_active !== 'boolean') {
         return sendError(res, 400, 'Bad request', 'is_active must be boolean');
