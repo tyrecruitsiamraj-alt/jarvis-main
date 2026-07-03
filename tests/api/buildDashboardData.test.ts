@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyDashboardFilters,
   buildDashboardData,
+  classifyRequestActivity,
   isNewOpeningRequest,
   isReplacementRequest,
   isResignationRequest,
@@ -37,7 +38,7 @@ describe('buildDashboardData', () => {
         id: 'a',
         unit_name: 'A',
         request_date: '2026-07-02',
-        resigned_employee_name: 'X',
+        request_action_name: 'ลาออก',
         send_replacement: true,
       }),
       job({
@@ -60,8 +61,12 @@ describe('buildDashboardData', () => {
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(3);
     const july = data.activityTrend.find((p) => p.date.startsWith('2026-07'));
     expect(july?.resignations).toBe(1);
-    expect(july?.replacements).toBe(1);
-    expect(july?.newOpenings).toBe(2); // เปิดงานใหม่ + งานปิดในเดือนเดียวกัน
+    expect(july?.replacements).toBe(0);
+    expect(july?.newOpenings).toBe(2);
+    const periodTotal =
+      (july?.resignations ?? 0) + (july?.replacements ?? 0) + (july?.newOpenings ?? 0);
+    expect(periodTotal).toBe(3);
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(periodTotal);
     expect(data.activityTrend.every((p) => p.label.length > 0)).toBe(true);
   });
 
@@ -91,9 +96,15 @@ describe('buildDashboardData', () => {
 
 describe('request categories', () => {
   it('detects resignation, replacement, and new opening', () => {
-    expect(isResignationRequest(job({ unit_name: 'U', resigned_employee_name: 'A' }))).toBe(true);
-    expect(isReplacementRequest(job({ unit_name: 'U', send_replacement: true }))).toBe(true);
+    expect(isResignationRequest(job({ unit_name: 'U', request_action_name: 'ลาออก' }))).toBe(true);
+    expect(
+      isResignationRequest(job({ unit_name: 'U', readOnly: true, resigned_employee_name: 'A' })),
+    ).toBe(false);
+    expect(isReplacementRequest(job({ unit_name: 'U', request_action_name: 'เปลี่ยนตัว' }))).toBe(true);
     expect(isNewOpeningRequest(job({ unit_name: 'U', request_action_name: 'รับสมัครใหม่' }))).toBe(true);
+    expect(classifyRequestActivity(job({ unit_name: 'U', request_action_name: 'ลาออก' }))).toBe('resignation');
+    expect(classifyRequestActivity(job({ unit_name: 'U', request_action_name: 'เปลี่ยนตัว' }))).toBe('replacement');
+    expect(classifyRequestActivity(job({ unit_name: 'U', request_action_name: 'รับสมัครใหม่' }))).toBe('new_opening');
   });
 });
 

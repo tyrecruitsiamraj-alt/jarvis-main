@@ -18,6 +18,17 @@ type Props = {
 const DashboardChartSection: React.FC<Props> = ({ data }) => {
   const activityData = data.activityTrend;
 
+  const periodTotals = activityData.reduce(
+    (acc, p) => ({
+      resignations: acc.resignations + p.resignations,
+      replacements: acc.replacements + p.replacements,
+      newOpenings: acc.newOpenings + p.newOpenings,
+    }),
+    { resignations: 0, replacements: 0, newOpenings: 0 },
+  );
+  const activityTotal =
+    periodTotals.resignations + periodTotals.replacements + periodTotals.newOpenings;
+
   const statusData = data.statusBreakdown.map((s) => ({
     name: s.label,
     count: s.count,
@@ -31,6 +42,10 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-slate-900">แนวโน้มรายเดือน — ลาออก / เปลี่ยนตัว / เปิดงานใหม่</h3>
             <p className="text-xs text-slate-500">{data.periodLabel}</p>
+            <p className="text-xs text-slate-600 mt-1">
+              รวมช่วงที่เลือก {activityTotal} ใบ — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
+              {periodTotals.replacements} · เปิดงานใหม่ {periodTotals.newOpenings}
+            </p>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">

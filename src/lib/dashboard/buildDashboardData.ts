@@ -77,26 +77,46 @@ function ageDays(job: JobRequest, today = new Date()): number {
   return Number.isNaN(d.getTime()) ? 0 : differenceInCalendarDays(today, d);
 }
 
+function actionText(job: JobRequest): string {
+  return (job.request_action_name || '').trim();
+}
+
+function actionCode(job: JobRequest): string {
+  return (job.request_action_code || '').trim().toUpperCase();
+}
+
 export function isResignationRequest(job: JobRequest): boolean {
-  return Boolean(
-    job.resigned_employee_name?.trim() ||
-      job.resigned_first_name?.trim() ||
-      job.lastWorkingDay ||
-      /ลาออก|resign/i.test(job.request_action_name || ''),
-  );
+  const action = actionText(job);
+  if (/ลาออก|resign/i.test(action) || actionCode(job) === 'RESIGN') return true;
+  // Jarvis manual entries — ไม่ใช้ resigned_employee_name จาก Siamraj (map จาก staff_fullname ทุกใบ)
+  if (!job.readOnly) {
+    return Boolean(job.resigned_first_name?.trim() || job.resigned_last_name?.trim());
+  }
+  return false;
 }
 
 /** เปลี่ยนตัว / ส่งคนแทน */
 export function isReplacementRequest(job: JobRequest): boolean {
+  if (isResignationRequest(job)) return false;
+  const action = actionText(job);
   return (
     job.send_replacement === true ||
-    /เปลี่ยนตัว|ส่งคนแทน|แทน|replacement/i.test(job.request_action_name || '')
+    /เปลี่ยน|ส่งคนแทน|replacement/i.test(action)
   );
 }
 
-/** เปิดงานใหม่ (ไม่ใช่เคสลาออก) */
+/** เปิดงานใหม่ — งานที่ไม่ใช่ลาออกหรือเปลี่ยนตัว */
 export function isNewOpeningRequest(job: JobRequest): boolean {
-  return !isResignationRequest(job);
+  return !isResignationRequest(job) && !isReplacementRequest(job);
+}
+
+export type RequestActivityKind = 'resignation' | 'replacement' | 'new_opening';
+
+/** จำแนกแต่ละใบขอเป็นหนึ่งหมวด — ผลรวม 3 หมวด = งานทั้งหมด */
+export function classifyRequestActivity(job: JobRequest): RequestActivityKind {
+  if (isResignationRequest(job)) return 'resignation';
+  if (isReplacementRequest(job)) return 'replacement';
+  return 'new_opening';
 }
 
 export function mapJobToTaskStatus(job: JobRequest, today = new Date()): DashboardTaskStatus {
@@ -335,9 +355,10 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string): Dashb
     const ymd = jobRequestDateYmd(j);
     if (!ymd || !inYmdRange(ymd, from, to)) continue;
     const month = ymd.slice(0, 7);
-    if (isResignationRequest(j)) resignMap.set(month, (resignMap.get(month) ?? 0) + 1);
-    if (isReplacementRequest(j)) replaceMap.set(month, (replaceMap.get(month) ?? 0) + 1);
-    if (isNewOpeningRequest(j)) newMap.set(month, (newMap.get(month) ?? 0) + 1);
+    const kind = classifyRequestActivity(j);
+    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + 1);
+    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + 1);
+    else newMap.set(month, (newMap.get(month) ?? 0) + 1);
   }
 
   const points: DashboardActivityTrendPoint[] = [];
