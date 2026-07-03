@@ -15,7 +15,7 @@ import {
 import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dashboardPageState';
 import { exportWorkQueueCsv } from '@/lib/dashboard/exportWorkQueue';
 import { MOCK_DASHBOARD_DATA } from '@/lib/dashboard/mockDashboardData';
-import type { DashboardFilters, DashboardPeriodPreset, DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
+import type { DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
 import { toYmdLocal } from '@/lib/dateTh';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
@@ -36,7 +36,6 @@ const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<DashboardFilters>(() => loadDashboardFilters());
   const [unitFilters, setUnitFilters] = useState(() => loadSupervisorDashboardFilters());
-  const [periodPreset, setPeriodPreset] = useState<DashboardPeriodPreset>('this_month');
   const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultMonthRange());
   const [sortKey, setSortKey] = useState<DashboardSortKey>('priority');
   const [sortDir, setSortDir] = useState<DashboardSortDir>('asc');
@@ -45,8 +44,8 @@ const SupervisorDashboard: React.FC = () => {
   const { jobs, loading, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
 
   const period = useMemo(
-    () => resolvePeriodRange(periodPreset, dateRange ?? undefined),
-    [periodPreset, dateRange],
+    () => resolvePeriodRange('custom', dateRange ?? undefined),
+    [dateRange],
   );
 
   /** งานในช่วงวันที่ — ใช้ทั้ง filter sidebar และ KPI ให้ตัวเลขตรงกัน */
@@ -91,13 +90,6 @@ const SupervisorDashboard: React.FC = () => {
   const patchUnitFilters = useCallback((patch: Partial<typeof unitFilters>) => {
     setUnitFilters((prev) => ({ ...prev, ...patch }));
   }, []);
-
-  const applyPeriodPreset = useCallback((preset: DashboardPeriodPreset) => {
-    const period = resolvePeriodRange(preset);
-    setPeriodPreset(preset);
-    setDateRange({ from: period.from, to: period.to });
-    patchFilters({ periodPreset: preset });
-  }, [patchFilters]);
 
   const jobById = useMemo(() => {
     const map = new Map<string, JobRequest>();
@@ -154,16 +146,14 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const handleExport = useCallback(() => {
-    exportWorkQueueCsv(data.workQueue, `work-queue-${periodPreset}.csv`);
-  }, [data.workQueue, periodPreset]);
+    exportWorkQueueCsv(data.workQueue, `work-queue-${period.from}-${period.to}.csv`);
+  }, [data.workQueue, period.from, period.to]);
 
   return (
     <DashboardShell
       data={data}
       filters={filters}
       onFiltersChange={patchFilters}
-      periodPreset={periodPreset}
-      onPeriodPreset={applyPeriodPreset}
       dateRange={dateRange}
       onDateRangeChange={setDateRange}
       unitFilters={unitFilters}

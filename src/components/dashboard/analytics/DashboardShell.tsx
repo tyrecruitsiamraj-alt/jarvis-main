@@ -1,7 +1,7 @@
 import React from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardPeriodPreset, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -25,8 +25,6 @@ type Props = {
   data: DashboardData;
   filters: DashboardFilters;
   onFiltersChange: (patch: Partial<DashboardFilters>) => void;
-  periodPreset: DashboardPeriodPreset;
-  onPeriodPreset: (preset: DashboardPeriodPreset) => void;
   dateRange: DateRangeYmd | null;
   onDateRangeChange: (range: DateRangeYmd | null) => void;
   unitFilters: UnitRequestFilterState;
@@ -48,8 +46,6 @@ const DashboardShell: React.FC<Props> = ({
   data,
   filters,
   onFiltersChange,
-  periodPreset,
-  onPeriodPreset,
   dateRange,
   onDateRangeChange,
   unitFilters,
@@ -119,8 +115,6 @@ const DashboardShell: React.FC<Props> = ({
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
-              periodPreset={periodPreset}
-              onPeriodPreset={onPeriodPreset}
               dateRange={dateRange}
               onDateRangeChange={onDateRangeChange}
               unitFilters={unitFilters}

@@ -2,18 +2,10 @@ import React from 'react';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
-import type { DashboardPeriodPreset, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { DashboardStatusFilter } from '@/lib/dashboard/types';
 import { DASHBOARD_STATUS_LABELS } from '@/lib/dashboard/buildDashboardData';
 import type { DashboardTaskStatus } from '@/lib/dashboard/types';
 import { cn } from '@/lib/utils';
-
-const PERIOD_OPTIONS: { value: DashboardPeriodPreset; label: string }[] = [
-  { value: 'this_week', label: 'สัปดาห์นี้' },
-  { value: 'this_month', label: 'เดือนนี้' },
-  { value: 'last_week', label: 'สัปดาห์ที่แล้ว' },
-  { value: 'last_month', label: 'เดือนที่แล้ว' },
-  { value: 'custom', label: 'กำหนดเอง' },
-];
 
 const QUEUE_STATUS_OPTIONS: { value: DashboardStatusFilter; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ (ตาราง)' },
@@ -34,8 +26,6 @@ type FilterOptions = {
 };
 
 type Props = {
-  periodPreset: DashboardPeriodPreset;
-  onPeriodPreset: (preset: DashboardPeriodPreset) => void;
   dateRange: DateRangeYmd | null;
   onDateRangeChange: (range: DateRangeYmd | null) => void;
   unitFilters: UnitRequestFilterState;
@@ -48,8 +38,6 @@ type Props = {
 };
 
 const DashboardFilterBar: React.FC<Props> = ({
-  periodPreset,
-  onPeriodPreset,
   dateRange,
   onDateRangeChange,
   unitFilters,
@@ -74,27 +62,6 @@ const DashboardFilterBar: React.FC<Props> = ({
         </p>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-xs font-medium text-slate-600">ช่วงเวลา (ทางลัด)</label>
-        <div className="flex flex-wrap gap-1.5">
-          {PERIOD_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onPeriodPreset(opt.value)}
-              className={cn(
-                'rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
-                periodPreset === opt.value
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="space-y-1.5">
         <label htmlFor="dashboard-date-range" className="text-xs font-medium text-slate-600">
           วันที่กรอก
@@ -103,10 +70,7 @@ const DashboardFilterBar: React.FC<Props> = ({
           triggerId="dashboard-date-range"
           className="w-full"
           value={dateRange}
-          onChange={(range) => {
-            onDateRangeChange(range);
-            if (range) onPeriodPreset('custom');
-          }}
+          onChange={onDateRangeChange}
         />
       </div>
 
