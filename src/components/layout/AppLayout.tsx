@@ -120,7 +120,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       <main className="relative flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-[7.5rem] lg:pb-8 overflow-x-clip">
-        <div className="jarvis-page-orb top-0 right-4 h-48 w-48 opacity-[0.18] pointer-events-none hidden md:block" aria-hidden />
         {children}
       </main>
 
