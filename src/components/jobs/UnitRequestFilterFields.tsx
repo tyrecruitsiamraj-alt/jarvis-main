@@ -17,6 +17,7 @@ import type { UnitRequestFilterState, UnitRequestStatusFilter } from '@/hooks/us
 type FilterOptions = {
   departmentOptions: { value: string; label: string }[];
   jobSubtypeOptions: { value: string; label: string }[];
+  unitOptions: string[];
   recruiters: string[];
   screeners: string[];
   unassignedRecruiterCount: number;
@@ -30,6 +31,7 @@ type Props = {
   options: FilterOptions;
   idPrefix: string;
   showStatusTabs?: boolean;
+  showUnitFilter?: boolean;
   className?: string;
 };
 
@@ -40,11 +42,13 @@ const UnitRequestFilterFields: React.FC<Props> = ({
   options,
   idPrefix,
   showStatusTabs = false,
+  showUnitFilter = true,
   className,
 }) => {
   const {
     departmentOptions,
     jobSubtypeOptions,
+    unitOptions,
     recruiters,
     screeners,
     unassignedRecruiterCount,
@@ -110,6 +114,22 @@ const UnitRequestFilterFields: React.FC<Props> = ({
             {jobSubtypeOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
+              </option>
+            ))}
+          </FilterSelect>
+        ) : null}
+
+        {showUnitFilter && unitOptions.length > 0 ? (
+          <FilterSelect
+            id={`${idPrefix}-unit`}
+            label="หน่วยงาน"
+            value={filters.unitFilter}
+            onChange={(v) => onChange({ unitFilter: v })}
+          >
+            <option value="all">ทั้งหมด</option>
+            {unitOptions.map((u) => (
+              <option key={u} value={u}>
+                {u}
               </option>
             ))}
           </FilterSelect>

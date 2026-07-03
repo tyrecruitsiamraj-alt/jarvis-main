@@ -151,9 +151,11 @@ const JobDashboard: React.FC = () => {
               filters={filters}
               onChange={patchFilters}
               showStatusTabs
+              showUnitFilter={false}
               options={{
                 departmentOptions: filterApi.departmentOptions,
                 jobSubtypeOptions: filterApi.jobSubtypeOptions,
+                unitOptions: filterApi.unitOptions,
                 recruiters: filterApi.recruiters,
                 screeners: filterApi.screeners,
                 unassignedRecruiterCount: filterApi.unassignedRecruiterCount,
