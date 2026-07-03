@@ -13,7 +13,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
-import UnitRequestReplacementToggle from '@/components/jobs/UnitRequestReplacementToggle';
+import { UnitRequestReplacementDetail } from '@/components/jobs/UnitRequestReplacementToggle';
 import type { JobRequest } from '@/types';
 import { Database, ExternalLink, Users, StickyNote, UserCheck } from 'lucide-react';
 
@@ -251,7 +251,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 ส่งคนแทน
               </h3>
               <p className="text-xs text-muted-foreground">เลือกว่าใบขอนี้ส่งคนแทนหรือไม่ส่งคนแทน</p>
-              <UnitRequestReplacementToggle
+              <UnitRequestReplacementDetail
                 job={data}
                 onSaved={(sendReplacement) => {
                   queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>

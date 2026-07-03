@@ -3,8 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import DetailListDialog from '@/components/shared/DetailListDialog';
+import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import {
+  filterUnitRequests,
+  useSiamrajUnitRequestFilters,
+} from '@/hooks/useSiamrajUnitRequestFilters';
+import {
+  loadSupervisorDashboardFilters,
+  saveSupervisorDashboardFilters,
+} from '@/lib/supervisorDashboardPageState';
 import {
   Briefcase,
   Zap,
@@ -26,28 +35,20 @@ import {
 import { cn } from '@/lib/utils';
 import { differenceInDays, parseISO, endOfMonth, startOfMonth } from 'date-fns';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { buildRecruiterNameOptions, buildScreenerNameOptions, countUnassignedRecruiters, countUnassignedScreeners, matchesRecruiterFilter, matchesScreenerFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import DateRangeCalendarPicker, {
   type DateRangeYmd,
   isYmdInRange,
   jobRequestDateYmd,
 } from '@/components/shared/DateRangeCalendarPicker';
-import { FilterSelect } from '@/components/shared/FilterSelect';
 import { computeJobUrgency, getJobRequestAgeLabel, requestStatusLabel } from '@/lib/jobUrgency';
 import { toYmdLocal, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   extractDepartmentCode,
   extractDepartmentLabel,
-  filterUnitRequestsByDepartment,
-  filterUnitRequestsByJobSubtype,
-  departmentFilterOptions,
   departmentCounts,
   departmentLabelForCode,
   formatJobSubtypeLabel,
-  jobSubtypeFilterOptions,
-  type SiamrajDepartmentFilter,
-  type SiamrajJobSubtypeFilter,
 } from '@/lib/siamrajUnitFilters';
 
 type DetailDialogItem = {
@@ -71,11 +72,7 @@ function defaultMonthRange(): DateRangeYmd {
 
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [unitFilter, setUnitFilter] = useState<string>('all');
-  const [departmentFilter, setDepartmentFilter] = useState<SiamrajDepartmentFilter>('all');
-  const [jobSubtypeFilter, setJobSubtypeFilter] = useState<SiamrajJobSubtypeFilter>('all');
-  const [recruiterFilter, setRecruiterFilter] = useState<string>('all');
-  const [screenerFilter, setScreenerFilter] = useState<string>('all');
+  const [filters, setFilters] = useState(() => loadSupervisorDashboardFilters());
   const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultMonthRange());
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -83,8 +80,16 @@ const SupervisorDashboard: React.FC = () => {
   const [dialogItems, setDialogItems] = useState<DetailDialogItem[]>([]);
   const [staffRosterRev, setStaffRosterRev] = useState(0);
 
+  const patchFilters = useCallback((patch: Partial<typeof filters>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+  }, []);
+
   const { jobs, loading: loadingJobs, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
   const today = new Date();
+
+  useEffect(() => {
+    saveSupervisorDashboardFilters(filters);
+  }, [filters]);
 
   useEffect(() => {
     const fn = () => setStaffRosterRev((x) => x + 1);
@@ -92,95 +97,46 @@ const SupervisorDashboard: React.FC = () => {
     return () => window.removeEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
   }, []);
 
-  const recruiters = useMemo(() => {
-    void staffRosterRev;
-    return buildRecruiterNameOptions(jobs);
-  }, [staffRosterRev, jobs]);
-  const screeners = useMemo(() => {
-    void staffRosterRev;
-    return buildScreenerNameOptions(jobs);
-  }, [staffRosterRev, jobs]);
+  const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, filters, staffRosterRev);
 
-  const unitOptions = useMemo(() => {
-    const set = new Set(jobs.map((j) => j.unit_name).filter(Boolean));
-    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [jobs]);
+  useEffect(() => {
+    if (filters.jobSubtypeFilter === 'all') return;
+    const stillValid = filterApi.jobSubtypeOptions.some((o) => o.value === filters.jobSubtypeFilter);
+    if (!stillValid) patchFilters({ jobSubtypeFilter: 'all' });
+  }, [filters.departmentFilter, filters.jobSubtypeFilter, filterApi.jobSubtypeOptions, patchFilters]);
 
-  const unitCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const j of jobs) {
-      if (!j.unit_name) continue;
-      m.set(j.unit_name, (m.get(j.unit_name) ?? 0) + 1);
-    }
-    return m;
-  }, [jobs]);
+  useEffect(() => {
+    if (filters.unitFilter === 'all') return;
+    if (!filterApi.unitOptions.includes(filters.unitFilter)) patchFilters({ unitFilter: 'all' });
+  }, [filters.departmentFilter, filters.jobSubtypeFilter, filters.unitFilter, filterApi.unitOptions, patchFilters]);
 
-  const departmentOptions = useMemo(() => departmentFilterOptions(jobs), [jobs]);
-
-  const jobSubtypeOptions = useMemo(
-    () => (siamrajPrimary ? jobSubtypeFilterOptions(jobs) : []),
-    [jobs, siamrajPrimary],
-  );
-
-  const applyDashboardFilters = useCallback(
-    (source: JobRequest[], skip: Array<'unit' | 'department' | 'subtype' | 'recruiter' | 'screener' | 'date'>) => {
-      let result = source;
-      if (!skip.includes('date') && dateRange) {
-        result = result.filter((j) => isYmdInRange(jobRequestDateYmd(j), dateRange));
-      }
-      if (!skip.includes('unit') && unitFilter !== 'all') {
-        result = result.filter((j) => j.unit_name === unitFilter);
-      }
-      if (!skip.includes('department') && departmentFilter !== 'all') {
-        result = filterUnitRequestsByDepartment(result, departmentFilter);
-      }
-      if (!skip.includes('subtype') && jobSubtypeFilter !== 'all') {
-        result = filterUnitRequestsByJobSubtype(result, jobSubtypeFilter);
-      }
-      if (!skip.includes('recruiter') && recruiterFilter !== 'all') {
-        result = result.filter((j) => matchesRecruiterFilter(j, recruiterFilter));
-      }
-      if (!skip.includes('screener') && screenerFilter !== 'all') {
-        result = result.filter((j) => matchesScreenerFilter(j, screenerFilter));
-      }
-      return result;
+  const filterByDate = useCallback(
+    (source: JobRequest[]) => {
+      if (!dateRange) return source;
+      return source.filter((j) => isYmdInRange(jobRequestDateYmd(j), dateRange));
     },
-    [dateRange, unitFilter, departmentFilter, jobSubtypeFilter, recruiterFilter, screenerFilter],
+    [dateRange],
   );
 
-  const recruiterFilterScope = useMemo(
-    () => applyDashboardFilters(jobs, ['recruiter']),
-    [jobs, applyDashboardFilters],
+  const filteredJobs = useMemo(
+    () => filterByDate(filterApi.filteredJobs),
+    [filterApi.filteredJobs, filterByDate],
   );
 
-  const screenerFilterScope = useMemo(
-    () => applyDashboardFilters(jobs, ['screener']),
-    [jobs, applyDashboardFilters],
-  );
-
-  const unassignedRecruiterCount = useMemo(
-    () => countUnassignedRecruiters(recruiterFilterScope),
-    [recruiterFilterScope],
-  );
-
-  const unassignedScreenerCount = useMemo(
-    () => countUnassignedScreeners(screenerFilterScope),
-    [screenerFilterScope],
-  );
-
-  const filteredJobs = useMemo(() => applyDashboardFilters(jobs, []), [jobs, applyDashboardFilters]);
-
-  /** แยกตามหน่วยงาน — เคารพฟิลเตอร์อื่น ยกเว้นหน่วยงาน */
   const jobsScopedForUnitBreakdown = useMemo(
-    () => applyDashboardFilters(jobs, ['unit']),
-    [jobs, applyDashboardFilters],
+    () => filterByDate(filterUnitRequests(jobs, siamrajPrimary, filters, { unitFilter: true })),
+    [jobs, siamrajPrimary, filters, filterByDate],
   );
 
-  /** แยกตามแผนก — เคารพฟิลเตอร์อื่น ยกเว้นแผนก */
   const jobsScopedForDepartmentBreakdown = useMemo(
-    () => applyDashboardFilters(jobs, ['department']),
-    [jobs, applyDashboardFilters],
+    () => filterByDate(filterUnitRequests(jobs, siamrajPrimary, filters, { departmentFilter: true })),
+    [jobs, siamrajPrimary, filters, filterByDate],
   );
+
+  const unitBreakdownOptions = useMemo(() => {
+    const set = new Set(jobsScopedForUnitBreakdown.map((j) => j.unit_name).filter(Boolean));
+    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [jobsScopedForUnitBreakdown]);
 
   const departmentBreakdown = useMemo(() => {
     const counts = departmentCounts(jobsScopedForDepartmentBreakdown);
@@ -311,11 +267,11 @@ const SupervisorDashboard: React.FC = () => {
         subtitle={
           [
             dateRange ? `วันที่กรอก: ${formatYmdDmyBe(dateRange.from)} – ${formatYmdDmyBe(dateRange.to)}` : null,
-            unitFilter !== 'all' ? `หน่วยงาน: ${unitFilter}` : null,
-            departmentFilter !== 'all'
-              ? `แผนก: ${departmentOptions.find((o) => o.value === departmentFilter)?.label.replace(/\s*\(\d+\)$/, '') ?? departmentFilter}`
+            filters.unitFilter !== 'all' ? `หน่วยงาน: ${filters.unitFilter}` : null,
+            filters.departmentFilter !== 'all'
+              ? `แผนก: ${filterApi.departmentOptions.find((o) => o.value === filters.departmentFilter)?.label.replace(/\s*\(\d+\)$/, '') ?? filters.departmentFilter}`
               : null,
-            jobSubtypeFilter !== 'all' ? `ลักษณะงานย่อย: ${formatJobSubtypeLabel(jobSubtypeFilter)}` : null,
+            filters.jobSubtypeFilter !== 'all' ? `ลักษณะงานย่อย: ${formatJobSubtypeLabel(filters.jobSubtypeFilter)}` : null,
           ]
             .filter(Boolean)
             .join(' · ') || 'ภาพรวมสำหรับผู้บริหาร — งาน รายได้ และค่าปรับ (ตามฟิลเตอร์ด้านล่าง)'
@@ -339,107 +295,34 @@ const SupervisorDashboard: React.FC = () => {
 
         {/* ฟิลเตอร์ — responsive ทุก device */}
         <div className="rounded-2xl border border-black/[0.06] bg-white/35 backdrop-blur-sm p-3 md:p-4 space-y-4">
-          <div className="flex flex-col lg:flex-row gap-3 lg:items-end">
-            <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label htmlFor="dashboard-date" className="text-xs text-muted-foreground leading-snug">
-                วันที่กรอก
-              </label>
-              <DateRangeCalendarPicker
-                triggerId="dashboard-date"
-                className="w-full min-w-0"
-                value={dateRange}
-                onChange={setDateRange}
-              />
-            </div>
-
-            {unitOptions.length > 0 ? (
-              <FilterSelect
-                id="dashboard-unit"
-                label="หน่วยงาน"
-                value={unitFilter}
-                onChange={setUnitFilter}
-                className="w-full lg:w-72 shrink-0"
-              >
-                <option value="all">ทั้งหมด ({jobs.length})</option>
-                {unitOptions.map((u) => (
-                  <option key={u} value={u}>
-                    {u} ({unitCounts.get(u) ?? 0})
-                  </option>
-                ))}
-              </FilterSelect>
-            ) : null}
+          <div className="flex flex-col gap-1 min-w-0 max-w-md">
+            <label htmlFor="dashboard-date" className="text-xs text-muted-foreground leading-snug">
+              วันที่กรอก
+            </label>
+            <DateRangeCalendarPicker
+              triggerId="dashboard-date"
+              className="w-full min-w-0"
+              value={dateRange}
+              onChange={setDateRange}
+            />
           </div>
 
-          <div
-            className={cn(
-              'grid gap-3',
-              siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
-            )}
-          >
-            {siamrajPrimary ? (
-              <FilterSelect
-                id="dashboard-department"
-                label="แผนก"
-                value={departmentFilter}
-                onChange={setDepartmentFilter}
-              >
-                {departmentOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </FilterSelect>
-            ) : null}
-
-            {siamrajPrimary && jobSubtypeOptions.length > 1 ? (
-              <FilterSelect
-                id="dashboard-subtype"
-                label="ลักษณะงานย่อย"
-                value={jobSubtypeFilter}
-                onChange={setJobSubtypeFilter}
-              >
-                {jobSubtypeOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </FilterSelect>
-            ) : null}
-
-            <FilterSelect
-              id="dashboard-recruiter"
-              label="เจ้าหน้าที่สรรหา"
-              value={recruiterFilter}
-              onChange={setRecruiterFilter}
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-                {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
-              </option>
-              {recruiters.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </FilterSelect>
-
-            <FilterSelect
-              id="dashboard-screener"
-              label="เจ้าหน้าที่คัดสรร"
-              value={screenerFilter}
-              onChange={setScreenerFilter}
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-                {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
-              </option>
-              {screeners.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </FilterSelect>
-          </div>
+          <UnitRequestFilterFields
+            idPrefix="supervisor-dashboard"
+            siamrajPrimary={siamrajPrimary}
+            filters={filters}
+            onChange={patchFilters}
+            showStatusTabs
+            options={{
+              departmentOptions: filterApi.departmentOptions,
+              jobSubtypeOptions: filterApi.jobSubtypeOptions,
+              unitOptions: filterApi.unitOptions,
+              recruiters: filterApi.recruiters,
+              screeners: filterApi.screeners,
+              unassignedRecruiterCount: filterApi.unassignedRecruiterCount,
+              unassignedScreenerCount: filterApi.unassignedScreenerCount,
+            }}
+          />
         </div>
 
         {/* สรุป 3 บรรทัด — ผู้บริหารอ่านก่อน */}
@@ -665,12 +548,12 @@ const SupervisorDashboard: React.FC = () => {
                         key={code}
                         type="button"
                         onClick={() => {
-                          setDepartmentFilter(code);
+                          patchFilters({ departmentFilter: code });
                           showJobList(`แผนก: ${label}`, deptJobs);
                         }}
                         className={cn(
                           'jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 text-left hover:border-blue-300/50 transition-colors',
-                          departmentFilter === code && 'border-blue-400/60 bg-blue-500/10',
+                          filters.departmentFilter === code && 'border-blue-400/60 bg-blue-500/10',
                         )}
                       >
                         <p className="text-xs text-muted-foreground line-clamp-2">{label}</p>
@@ -708,10 +591,10 @@ const SupervisorDashboard: React.FC = () => {
                             key={code}
                             className={cn(
                               'border-b border-border/50 cursor-pointer hover:bg-secondary/20',
-                              departmentFilter === code && 'bg-blue-500/10',
+                              filters.departmentFilter === code && 'bg-blue-500/10',
                             )}
                             onClick={() => {
-                              setDepartmentFilter(code);
+                              patchFilters({ departmentFilter: code });
                               showJobList(`แผนก: ${label}`, items);
                             }}
                           >
@@ -837,10 +720,10 @@ const SupervisorDashboard: React.FC = () => {
               <SectionHeader id="units" title="แยกตามหน่วยงาน" icon={Briefcase} />
               {expandedSection === 'units' && (
                 <div className="mt-2 glass-card rounded-[1.5rem] p-4 border border-white/70 max-h-80 overflow-y-auto">
-                  {unitOptions.length === 0 ? (
+                  {unitBreakdownOptions.length === 0 ? (
                     <p className="text-xs text-muted-foreground">ยังไม่มีข้อมูลหน่วยงาน</p>
                   ) : (
-                    unitOptions.map((unit) => {
+                    unitBreakdownOptions.map((unit) => {
                       const uJobs = jobsScopedForUnitBreakdown.filter((j) => j.unit_name === unit);
                       const openCount = uJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled').length;
                       return (
@@ -848,12 +731,12 @@ const SupervisorDashboard: React.FC = () => {
                           key={unit}
                           type="button"
                           onClick={() => {
-                            setUnitFilter(unit);
+                            patchFilters({ unitFilter: unit });
                             showJobList(`หน่วยงาน: ${unit}`, uJobs);
                           }}
                           className={cn(
                             'w-full py-2 border-b border-border/30 last:border-0 hover:bg-secondary/30 rounded px-1 text-left',
-                            unitFilter === unit && 'bg-blue-500/10',
+                            filters.unitFilter === unit && 'bg-blue-500/10',
                           )}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -879,7 +762,7 @@ const SupervisorDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                   <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">เจ้าหน้าที่สรรหา</p>
-                    {recruiters.map((name) => {
+                    {filterApi.recruiters.map((name) => {
                       const rJobs = jobs.filter((j) => j.recruiter_name === name);
                       return (
                         <button
@@ -908,7 +791,7 @@ const SupervisorDashboard: React.FC = () => {
                   </div>
                   <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
                     <p className="text-xs font-medium text-muted-foreground mb-2">เจ้าหน้าที่คัดสรร</p>
-                    {screeners.map((name) => {
+                    {filterApi.screeners.map((name) => {
                       const sJobs = jobs.filter((j) => j.screener_name === name);
                       return (
                         <button

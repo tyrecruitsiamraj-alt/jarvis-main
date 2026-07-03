@@ -12,6 +12,7 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
+import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
@@ -488,9 +489,12 @@ const JobListPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between mt-2 text-xs">
+                  <div className="flex items-center justify-between mt-2 text-xs gap-2">
                     <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
-                    <JobUrgencyBadge job={j} />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <UnitRequestReplacementBadge value={j.send_replacement} compact />
+                      <JobUrgencyBadge job={j} />
+                    </div>
                   </div>
                 </button>
 
@@ -520,6 +524,7 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
                   <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะ</th>
@@ -565,6 +570,9 @@ const JobListPage: React.FC = () => {
                     </td>
                     <td className="px-3 py-2 max-w-[200px]">
                       <UnitRequestNotePreview note={j.list_note} />
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <UnitRequestReplacementBadge value={j.send_replacement} compact />
                     </td>
                     <td className="px-3 py-3 text-center">
                       <JobUrgencyBadge job={j} compact />

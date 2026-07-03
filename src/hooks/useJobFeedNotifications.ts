@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import type { JobRequest } from '@/types';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { subscribeUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { JOB_TYPE_LABELS } from '@/types';
+import type { JobRequest } from '@/types';
+import { diffUnitRequestFeedNotifications } from '@/lib/unitRequestFeedNotifications';
 
 export const MAX_NOTIFICATIONS = 50;
 
@@ -28,17 +29,11 @@ export function useJobFeedNotifications(): void {
     return subscribeUnitRequestsFeed((jobs, { loading }) => {
       if (loading) return;
 
-      const next = new Map(jobs.map((j) => [j.id, j.status]));
-      const prev = snapshotRef.current;
+      const { events, next } = diffUnitRequestFeedNotifications(snapshotRef.current, jobs);
 
-      if (prev === null) {
-        snapshotRef.current = next;
-        return;
-      }
-
-      for (const job of jobs) {
-        const before = prev.get(job.id);
-        if (before === undefined) {
+      for (const event of events) {
+        const job = event.job;
+        if (event.type === 'new_job') {
           addRef.current({
             type: 'new_job',
             jobId: job.id,
@@ -46,9 +41,7 @@ export function useJobFeedNotifications(): void {
             message: `${jobLabel(job)} — ${jobSubtitle(job)}`,
             link: unitRequestPath(job),
           });
-          continue;
-        }
-        if (before !== 'closed' && job.status === 'closed') {
+        } else {
           addRef.current({
             type: 'job_closed',
             jobId: job.id,

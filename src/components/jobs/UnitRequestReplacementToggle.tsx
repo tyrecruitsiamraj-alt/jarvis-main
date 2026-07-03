@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { JobRequest } from '@/types';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { saveUnitRequestMeta } from '@/lib/siamrajUnitRequestsApi';
 import { unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import { cn } from '@/lib/utils';
+import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 
 type Props = {
   job: JobRequest;
   onSaved?: (sendReplacement: boolean | null) => void;
   compact?: boolean;
+  readOnly?: boolean;
 };
 
-const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact }) => {
+const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, readOnly }) => {
   const [value, setValue] = useState<boolean | null | undefined>(job.send_replacement);
   const [saving, setSaving] = useState(false);
 
@@ -38,6 +41,10 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact }
 
   const yes = value === true;
   const no = value === false;
+
+  if (readOnly) {
+    return <UnitRequestReplacementBadge value={value} compact={compact} />;
+  }
 
   return (
     <div className={cn('flex flex-wrap gap-2', compact ? 'text-[10px]' : 'text-sm')}>
@@ -70,5 +77,27 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact }
     </div>
   );
 };
+
+export function UnitRequestReplacementDetail({
+  job,
+  onSaved,
+}: {
+  job: JobRequest;
+  onSaved?: (sendReplacement: boolean | null) => void;
+}) {
+  const { isFunctionEnabled } = useRolePermissions();
+  const readOnly = !isFunctionEnabled('unit_notes_edit');
+
+  return (
+    <div className="space-y-2">
+      <UnitRequestReplacementToggle job={job} onSaved={onSaved} readOnly={readOnly} />
+      {readOnly ? (
+        <p className="text-xs text-muted-foreground">
+          ไม่มีสิทธิ์แก้ไข — ติดต่อ Admin หรือดูที่ Settings → Role
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export default UnitRequestReplacementToggle;

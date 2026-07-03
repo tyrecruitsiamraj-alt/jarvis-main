@@ -1,26 +1,23 @@
+import {
+  UNIT_REQUEST_FILTER_DEFAULTS,
+  type UnitRequestFilterState,
+} from '@/hooks/useSiamrajUnitRequestFilters';
+
 const STORAGE_KEY = 'jarvis:job-dashboard-filters';
 
-export type JobDashboardFilters = {
-  unitFilter: string;
-  jobSubtypeFilter: string;
-};
-
-const DEFAULTS: JobDashboardFilters = {
-  unitFilter: 'all',
-  jobSubtypeFilter: 'all',
-};
+export type JobDashboardFilters = UnitRequestFilterState;
 
 export function loadJobDashboardFilters(): JobDashboardFilters {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULTS;
+    if (!raw) return { ...UNIT_REQUEST_FILTER_DEFAULTS };
     const parsed = JSON.parse(raw) as Partial<JobDashboardFilters>;
     return {
-      unitFilter: parsed.unitFilter || DEFAULTS.unitFilter,
-      jobSubtypeFilter: parsed.jobSubtypeFilter || DEFAULTS.jobSubtypeFilter,
+      ...UNIT_REQUEST_FILTER_DEFAULTS,
+      ...parsed,
     };
   } catch {
-    return DEFAULTS;
+    return { ...UNIT_REQUEST_FILTER_DEFAULTS };
   }
 }
 
