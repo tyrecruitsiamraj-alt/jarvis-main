@@ -43,7 +43,7 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'jobs_edit', label: 'แก้ไขงาน', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
   { id: 'jobs_assign_staff', label: 'กำหนดสรรหา / คัดสรร', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
   { id: 'unit_requests_read', label: 'ดูใบขอหน่วยงาน Siamraj', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
-  { id: 'unit_notes_edit', label: 'แก้ไขหมายเหตุใบขอ', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
+  { id: 'unit_notes_edit', label: 'แก้ไขหมายเหตุใบขอ', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
   { id: 'employees_read', label: 'ดูพนักงาน WL', group: 'WL', minimumRole: 'staff' },
   { id: 'employees_edit', label: 'เพิ่ม / แก้ไขพนักงาน WL', group: 'WL', minimumRole: 'supervisor' },
   { id: 'clients_read', label: 'ดูลูกค้า / สถานที่', group: 'ลูกค้า', minimumRole: 'staff' },

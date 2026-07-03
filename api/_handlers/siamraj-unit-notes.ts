@@ -12,6 +12,7 @@ import {
   upsertUnitNote,
   listDistinctUnitNoteSuggestions,
 } from '../_lib/siamrajUnitNotes.js';
+import { checkFunctionAccess } from '../_lib/roleFunctionGrants.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -42,6 +43,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'POST' || method === 'PUT') {
     try {
+      const access = await checkFunctionAccess(req.user.role, 'unit_notes_edit');
+      if (!access.ok) return sendError(res, 403, 'Forbidden', access.message);
+
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');

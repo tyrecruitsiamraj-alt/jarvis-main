@@ -15,7 +15,7 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   jobs_edit: 'supervisor',
   jobs_assign_staff: 'supervisor',
   unit_requests_read: 'staff',
-  unit_notes_edit: 'supervisor',
+  unit_notes_edit: 'staff',
   employees_read: 'staff',
   employees_edit: 'supervisor',
   clients_read: 'staff',
@@ -104,6 +104,20 @@ export async function upsertGrant(
 }
 
 /** Prevent admin from locking everyone out of Settings */
+export async function checkFunctionAccess(
+  role: UserRole,
+  functionId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!VALID_FUNCTION_IDS.has(functionId)) {
+    return { ok: false, message: 'Unknown function' };
+  }
+  const overrides = await loadGrantOverrides();
+  if (!effectiveFunctionEnabled(role, functionId, overrides)) {
+    return { ok: false, message: 'ฟังก์ชันนี้ถูกปิดสำหรับ role ของคุณ' };
+  }
+  return { ok: true };
+}
+
 export function canToggleGrant(
   role: UserRole,
   functionId: string,

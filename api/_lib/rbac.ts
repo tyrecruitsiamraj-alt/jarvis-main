@@ -108,8 +108,7 @@ export function minimumRoleFor(
       return 'supervisor';
 
     case 'siamraj-unit-notes':
-      if (isRead) return 'staff';
-      return 'supervisor';
+      return 'staff';
 
     default:
       return 'admin';

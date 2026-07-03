@@ -21,11 +21,11 @@ describe('api rbac matrix', () => {
     expect(checkApiAccess('admin', 'app-users', 'GET').ok).toBe(true);
   });
 
-  it('staff cannot assign recruiter/screener or edit unit notes', () => {
+  it('staff cannot assign recruiter/screener but can reach unit notes API (grant-gated on write)', () => {
     expect(checkApiAccess('staff', 'siamraj-unit-assignments', 'GET').ok).toBe(true);
     expect(checkApiAccess('staff', 'siamraj-unit-assignments', 'POST').ok).toBe(false);
     expect(checkApiAccess('supervisor', 'siamraj-unit-assignments', 'POST').ok).toBe(true);
-    expect(checkApiAccess('staff', 'siamraj-unit-notes', 'POST').ok).toBe(false);
+    expect(checkApiAccess('staff', 'siamraj-unit-notes', 'POST').ok).toBe(true);
     expect(checkApiAccess('supervisor', 'siamraj-unit-notes', 'POST').ok).toBe(true);
   });
 

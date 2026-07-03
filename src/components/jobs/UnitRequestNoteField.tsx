@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { cn } from '@/lib/utils';
 import {
   fetchUnitNoteHistory,
@@ -106,7 +106,7 @@ const UnitRequestNoteEditor: React.FC<BaseProps> = ({
           {error ? <span className="text-xs text-destructive">{error}</span> : null}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">กำหนดหมายเหตุได้เฉพาะ Supervisor ขึ้นไป</p>
+        <p className="text-xs text-muted-foreground">ไม่มีสิทธิ์แก้ไขหมายเหตุ — ติดต่อ Admin หรือดูที่ Settings → Role</p>
       )}
     </div>
   );
@@ -131,8 +131,8 @@ export function UnitRequestNoteDetail({
   job: { request_no?: string; externalId?: string; id: string; list_note?: string };
   onSaved?: (note: string) => void;
 }) {
-  const { hasPermission } = useAuth();
-  const readOnly = !hasPermission('supervisor');
+  const { isFunctionEnabled } = useRolePermissions();
+  const readOnly = !isFunctionEnabled('unit_notes_edit');
   const key = unitRequestNoteKey(job as Parameters<typeof unitRequestNoteKey>[0]);
   return (
     <UnitRequestNoteEditor
