@@ -427,11 +427,6 @@ const JobListPage: React.FC = () => {
             ))}
           </FilterSelect>
           </div>
-
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            <strong>เกินกำหนด</strong> = เดิมล่วงหน้า แต่เลยวันที่ต้องการแล้ว ·{' '}
-            <strong>ฉุกเฉิน/ย้อนหลัง</strong> = วันที่ต้องการอยู่ก่อนวันที่กรอก · คอลัมน์ผ่านมา: ล่วงหน้าแสดง「ล่วงหน้าก่อน」จนกว่าจะเลยกำหนด
-          </p>
         </div>
 
         {filtered.length === 0 && !loading ? (

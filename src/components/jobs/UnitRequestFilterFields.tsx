@@ -204,11 +204,6 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           ))}
         </FilterSelect>
       </div>
-
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        <strong>เกินกำหนด</strong> = เดิมล่วงหน้า แต่เลยวันที่ต้องการแล้ว ·{' '}
-        <strong>ฉุกเฉิน/ย้อนหลัง</strong> = วันที่ต้องการอยู่ก่อนวันที่กรอก
-      </p>
     </div>
   );
 };
