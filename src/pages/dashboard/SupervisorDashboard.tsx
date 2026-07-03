@@ -9,6 +9,7 @@ import {
   buildDashboardData,
   filterJobsByRequestDate,
   resolvePeriodRange,
+  resolveYearToDateTrendRange,
   sortWorkQueue,
 } from '@/lib/dashboard/buildDashboardData';
 import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dashboardPageState';
@@ -108,12 +109,20 @@ const SupervisorDashboard: React.FC = () => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
     const unitFiltered = filterApi.filteredJobs;
+    const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters);
+    const trendRange = resolveYearToDateTrendRange();
+    const trendJobs = filterJobsByRequestDate(unitFilteredAll, trendRange.from, trendRange.to);
     const previousScoped = filterJobsByRequestDate(
-      filterUnitRequests(jobs, siamrajPrimary, unitFilters),
+      unitFilteredAll,
       period.previousFrom,
       period.previousTo,
     );
-    const built = buildDashboardData(unitFiltered, previousScoped, period, filters);
+    const built = buildDashboardData(unitFiltered, previousScoped, period, filters, new Date(), {
+      jobs: trendJobs,
+      from: trendRange.from,
+      to: trendRange.to,
+      label: trendRange.label,
+    });
     return {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),

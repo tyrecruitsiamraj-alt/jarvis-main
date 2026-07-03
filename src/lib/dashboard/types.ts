@@ -95,6 +95,8 @@ export type DashboardData = {
   workQueue: DashboardWorkItem[];
   periodLabel: string;
   previousPeriodLabel: string;
+  /** ช่วงที่กราฟแนวโน้มรายเดือนอ้างอิง (มักเป็น ม.ค.–เดือนนี้) */
+  activityTrendLabel: string;
 };
 
 export type DashboardSortKey =

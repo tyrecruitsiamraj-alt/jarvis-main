@@ -8,6 +8,7 @@ import {
   isResignationRequest,
   mapJobToTaskStatus,
   resolvePeriodRange,
+  resolveYearToDateTrendRange,
 } from '../../src/lib/dashboard/buildDashboardData';
 import { DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
 import type { JobRequest } from '@/types';
@@ -70,6 +71,30 @@ describe('buildDashboardData', () => {
     expect(data.activityTrend.every((p) => p.label.length > 0)).toBe(true);
   });
 
+  it('builds year-to-date monthly trend separate from KPI period', () => {
+    const jobs = [
+      job({ id: 'jan', unit_name: 'A', request_date: '2026-01-15', request_action_name: 'ลาออก' }),
+      job({ id: 'feb', unit_name: 'B', request_date: '2026-02-10', request_action_name: 'เปลี่ยนตัว' }),
+      job({ id: 'jul', unit_name: 'C', request_date: '2026-07-02', request_action_name: 'เปิดงานใหม่' }),
+    ];
+    const now = new Date('2026-07-15');
+    const period = resolvePeriodRange('this_month', undefined, now);
+    const trend = resolveYearToDateTrendRange(now);
+    const scoped = jobs.filter((j) => j.request_date.startsWith('2026-07'));
+    const data = buildDashboardData(scoped, [], period, DEFAULT_DASHBOARD_FILTERS, now, {
+      jobs,
+      from: trend.from,
+      to: trend.to,
+      label: trend.label,
+    });
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(1);
+    expect(data.activityTrend).toHaveLength(7);
+    expect(data.activityTrend[0]?.resignations).toBe(1);
+    expect(data.activityTrend[1]?.replacements).toBe(1);
+    expect(data.activityTrend[6]?.newOpenings).toBe(1);
+    expect(data.activityTrendLabel).toBe(trend.label);
+  });
+
   it('filters work queue by search', () => {
     const jobs = [
       job({ id: '1', unit_name: 'Alpha', recruiter_name: 'Ann', request_date: '2026-07-01' }),
@@ -113,6 +138,14 @@ describe('resolvePeriodRange', () => {
     const p = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
     expect(p.from).toBe('2026-07-01');
     expect(p.to).toBe('2026-07-31');
+  });
+});
+
+describe('resolveYearToDateTrendRange', () => {
+  it('spans January through current month', () => {
+    const t = resolveYearToDateTrendRange(new Date('2026-07-15'));
+    expect(t.from).toBe('2026-01-01');
+    expect(t.to).toBe('2026-07-31');
   });
 });
 

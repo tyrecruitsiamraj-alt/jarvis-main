@@ -12,8 +12,12 @@ import {
 import type { DashboardData } from '@/lib/dashboard/types';
 
 type Props = {
-  data: Pick<DashboardData, 'activityTrend' | 'statusBreakdown' | 'periodLabel'>;
+  data: Pick<DashboardData, 'activityTrend' | 'statusBreakdown' | 'periodLabel' | 'activityTrendLabel'>;
 };
+
+function sumPoint(p: DashboardData['activityTrend'][number]) {
+  return p.resignations + p.replacements + p.newOpenings;
+}
 
 const DashboardChartSection: React.FC<Props> = ({ data }) => {
   const activityData = data.activityTrend;
@@ -29,6 +33,9 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
   const activityTotal =
     periodTotals.resignations + periodTotals.replacements + periodTotals.newOpenings;
 
+  const currentMonth = activityData.length > 0 ? activityData[activityData.length - 1] : null;
+  const previousMonth = activityData.length > 1 ? activityData[activityData.length - 2] : null;
+
   const statusData = data.statusBreakdown.map((s) => ({
     name: s.label,
     count: s.count,
@@ -41,11 +48,29 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-slate-900">แนวโน้มรายเดือน — ลาออก / เปลี่ยนตัว / เปิดงานใหม่</h3>
-            <p className="text-xs text-slate-500">{data.periodLabel}</p>
+            <p className="text-xs text-slate-500">{data.activityTrendLabel}</p>
             <p className="text-xs text-slate-600 mt-1">
-              รวมช่วงที่เลือก {activityTotal} ใบ — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
+              รวมปีนี้ {activityTotal} ใบ — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
               {periodTotals.replacements} · เปิดงานใหม่ {periodTotals.newOpenings}
             </p>
+            {currentMonth && previousMonth ? (
+              <p className="text-xs text-slate-500 mt-1">
+                {previousMonth.label}: {sumPoint(previousMonth)} ใบ → {currentMonth.label}:{' '}
+                {sumPoint(currentMonth)} ใบ
+                {sumPoint(previousMonth) > 0 ? (
+                  <>
+                    {' '}
+                    (
+                    {sumPoint(currentMonth) >= sumPoint(previousMonth) ? '+' : ''}
+                    {Math.round(
+                      ((sumPoint(currentMonth) - sumPoint(previousMonth)) / sumPoint(previousMonth)) *
+                        100,
+                    )}
+                    % จากเดือนที่แล้ว)
+                  </>
+                ) : null}
+              </p>
+            ) : null}
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -66,7 +91,7 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-slate-900">สัดส่วนสถานะงาน</h3>
-            <p className="text-xs text-slate-500">งานในช่วงที่เลือก</p>
+            <p className="text-xs text-slate-500">งานในช่วงที่เลือก · {data.periodLabel}</p>
           </div>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">

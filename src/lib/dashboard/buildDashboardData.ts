@@ -265,6 +265,20 @@ export function resolvePeriodRange(
   };
 }
 
+/** ช่วงแนวโน้มรายเดือน: ม.ค. ถึงสิ้นเดือนปัจจุบัน (เปรียบเทียบข้ามเดือน) */
+export function resolveYearToDateTrendRange(now = new Date()): {
+  from: string;
+  to: string;
+  label: string;
+} {
+  const fromDate = startOfMonth(new Date(now.getFullYear(), 0, 1));
+  const toDate = endOfMonth(now);
+  const from = toYmdLocal(fromDate);
+  const to = toYmdLocal(toDate);
+  const label = `${format(fromDate, 'MMM yyyy', { locale: th })} – ${format(toDate, 'MMM yyyy', { locale: th })}`;
+  return { from, to, label };
+}
+
 function inYmdRange(ymd: string, from: string, to: string): boolean {
   return ymd >= from && ymd <= to;
 }
@@ -346,6 +360,13 @@ function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): 
   ];
 }
 
+function monthTrendLabel(d: Date, from: string, to: string): string {
+  const sameYear = from.slice(0, 4) === to.slice(0, 4);
+  return sameYear
+    ? format(d, 'MMM', { locale: th })
+    : format(d, 'MMM yyyy', { locale: th });
+}
+
 function buildActivityTrend(jobs: JobRequest[], from: string, to: string): DashboardActivityTrendPoint[] {
   const resignMap = new Map<string, number>();
   const replaceMap = new Map<string, number>();
@@ -368,7 +389,7 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string): Dashb
     const month = toYmdLocal(d).slice(0, 7);
     points.push({
       date: `${month}-01`,
-      label: format(d, 'MMM yyyy', { locale: th }),
+      label: monthTrendLabel(d, from, to),
       resignations: resignMap.get(month) ?? 0,
       replacements: replaceMap.get(month) ?? 0,
       newOpenings: newMap.get(month) ?? 0,
@@ -461,24 +482,38 @@ export function sortWorkQueue(
   });
 }
 
+export type BuildDashboardTrendInput = {
+  jobs: JobRequest[];
+  from: string;
+  to: string;
+  label: string;
+};
+
 export function buildDashboardData(
   scopedJobs: JobRequest[],
   previousScopedJobs: JobRequest[],
   period: PeriodRange,
   uiFilters: DashboardFilters,
   today = new Date(),
+  trend?: BuildDashboardTrendInput,
 ): DashboardData {
   const workItems = scopedJobs.map((j) => jobToWorkItem(j, today));
   const filteredQueue = applyDashboardFilters(workItems, uiFilters);
   const sortedQueue = sortWorkQueue(filteredQueue, 'priority', 'asc');
 
+  const trendJobs = trend?.jobs ?? scopedJobs;
+  const trendFrom = trend?.from ?? period.from;
+  const trendTo = trend?.to ?? period.to;
+  const activityTrendLabel = trend?.label ?? period.label;
+
   return {
     kpis: buildKpis(scopedJobs, previousScopedJobs, today),
-    activityTrend: buildActivityTrend(scopedJobs, period.from, period.to),
+    activityTrend: buildActivityTrend(trendJobs, trendFrom, trendTo),
     statusBreakdown: buildStatusBreakdown(scopedJobs, today),
     recruiterOverview: buildRecruiterOverview(scopedJobs, today),
     workQueue: sortedQueue,
     periodLabel: period.label,
     previousPeriodLabel: period.previousLabel,
+    activityTrendLabel,
   };
 }
