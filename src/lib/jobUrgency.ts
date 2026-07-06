@@ -12,13 +12,14 @@ export type NoteFilter = 'all' | 'has' | 'empty';
 
 export type AgeDaysFilter = 'all' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
 
-export type AgeDaysDisplayBucket = '1-7' | '8-14' | '15-30' | '30+';
+export type AgeDaysDisplayBucket = '1-7' | '8-14' | '15-30' | '30+' | 'advance';
 
 export const AGE_DAYS_DISPLAY_BUCKETS: { id: AgeDaysDisplayBucket; label: string }[] = [
   { id: '1-7', label: '1–7 วัน' },
   { id: '8-14', label: '8–14 วัน' },
   { id: '15-30', label: '15–30 วัน' },
   { id: '30+', label: '30 วันขึ้นไป' },
+  { id: 'advance', label: 'ล่วงหน้า' },
 ];
 
 export type JobListSort = 'assignee_age' | 'age_desc' | 'age_asc' | 'newest' | 'oldest';
@@ -212,7 +213,31 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
   }
 }
 
-/** นับใบขอตามช่วงวันผ่านมา (ไม่รวมล่วงหน้า/วันนี้) — ใช้แสดงบน Dashboard */
+function matchesDashboardAgeBucket(
+  job: JobRequest,
+  bucket: AgeDaysDisplayBucket,
+  today = new Date(),
+): boolean {
+  const meta = computeJobUrgency(job, today);
+  if (bucket === 'advance') return meta.kind === 'advance';
+  if (meta.kind === 'advance') return false;
+  const days = getJobRequestAgeDays(job, today);
+  if (days == null) return false;
+  switch (bucket) {
+    case '1-7':
+      return days >= 0 && days <= 7;
+    case '8-14':
+      return days >= 8 && days <= 14;
+    case '15-30':
+      return days >= 15 && days <= 30;
+    case '30+':
+      return days >= 30;
+    default:
+      return false;
+  }
+}
+
+/** นับใบขอแยกช่วงวันผ่านมา + ล่วงหน้า — รวมแล้วเท่าจำนวนใบทั้งหมด */
 export function countAgeDaysBreakdown(
   jobs: JobRequest[],
   today = new Date(),
@@ -222,10 +247,11 @@ export function countAgeDaysBreakdown(
     '8-14': 0,
     '15-30': 0,
     '30+': 0,
+    advance: 0,
   };
   for (const j of jobs) {
     for (const bucket of AGE_DAYS_DISPLAY_BUCKETS) {
-      if (matchesAgeDaysFilter(j, bucket.id, today)) {
+      if (matchesDashboardAgeBucket(j, bucket.id, today)) {
         counts[bucket.id] += 1;
         break;
       }

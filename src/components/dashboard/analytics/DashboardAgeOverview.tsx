@@ -9,10 +9,12 @@ const DashboardAgeOverview: React.FC<Props> = ({ items }) => {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900">วันผ่านมา (ใบขอฉุกเฉิน/ย้อนหลัง)</h3>
-        <p className="text-xs text-slate-500">จำนวนใบขอตามช่วงวันที่กรอกมาแล้ว — ไม่รวมงานล่วงหน้า</p>
+        <h3 className="text-sm font-semibold text-slate-900">สถานะใบขอ / วันผ่านมา</h3>
+        <p className="text-xs text-slate-500">
+          รวมทุกช่องแล้วเท่าจำนวนใบทั้งหมด (1–7 วัน รวมงานที่กรอกวันนี้)
+        </p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {items.map((item) => (
           <div
             key={item.bucket}
