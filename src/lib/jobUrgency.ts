@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest, JobUrgency } from '@/types';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 
 export const URGENCY_LEAD_DAYS = 7;
 
@@ -213,16 +214,16 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
   }
 }
 
-function isBeforeRequiredDate(job: JobRequest, today = new Date()): boolean {
-  const required = parseJobDate(job.required_date);
-  if (!required) return false;
-  return differenceInCalendarDays(required, todayStart(today)) > 0;
-}
-
 function getDashboardElapsedDays(job: JobRequest, today = new Date()): number | null {
   const submitted = submittedDate(job);
   if (!submitted) return null;
   return differenceInCalendarDays(todayStart(today), submitted);
+}
+
+function isDashboardAdvanceBucket(job: JobRequest, today = new Date()): boolean {
+  const meta = computeJobUrgency(job, today);
+  if (meta.kind !== 'advance') return false;
+  return meta.daysUntilRequired > 0;
 }
 
 function matchesDashboardAgeBucket(
@@ -230,8 +231,8 @@ function matchesDashboardAgeBucket(
   bucket: AgeDaysDisplayBucket,
   today = new Date(),
 ): boolean {
-  if (bucket === 'advance') return isBeforeRequiredDate(job, today);
-  if (isBeforeRequiredDate(job, today)) return false;
+  if (bucket === 'advance') return isDashboardAdvanceBucket(job, today);
+  if (isDashboardAdvanceBucket(job, today)) return false;
   const days = getDashboardElapsedDays(job, today);
   if (days == null) return false;
   switch (bucket) {
@@ -248,7 +249,7 @@ function matchesDashboardAgeBucket(
   }
 }
 
-/** นับใบขอ: ล่วงหน้า = ยังไม่ถึงวันที่ต้องการ, ที่เหลือแบ่งตามวันผ่านมาตั้งแต่กรอก */
+/** นับตำแหน่งที่ต้องการ: ล่วงหน้า = สถานะตอนคีย์ (≥7 วัน) และยังไม่ถึงวันที่ต้องการ */
 export function countAgeDaysBreakdown(
   jobs: JobRequest[],
   today = new Date(),
@@ -263,7 +264,7 @@ export function countAgeDaysBreakdown(
   for (const j of jobs) {
     for (const bucket of AGE_DAYS_DISPLAY_BUCKETS) {
       if (matchesDashboardAgeBucket(j, bucket.id, today)) {
-        counts[bucket.id] += 1;
+        counts[bucket.id] += jobPositionUnits(j);
         break;
       }
     }

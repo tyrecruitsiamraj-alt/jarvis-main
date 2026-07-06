@@ -10,6 +10,7 @@ import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobSt
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
@@ -165,6 +166,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   value={data.submittedAt ? new Date(data.submittedAt).toLocaleString('th-TH') : undefined}
                 />
                 <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
+                <Field label="จำนวนที่ต้องการ" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
                 <Field label="ทำงานวันสุดท้าย" value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined} />
                 <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
                 <Field label="รหัสไซต์" value={data.site_code || data.unit_name} />

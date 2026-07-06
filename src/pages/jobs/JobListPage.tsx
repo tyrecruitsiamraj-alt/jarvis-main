@@ -15,6 +15,7 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
   AGE_DAYS_FILTER_OPTIONS,
   compareJobsForListSort,
@@ -468,6 +469,7 @@ const JobListPage: React.FC = () => {
                     <span>กรอกโดย: {j.submittedByName || '—'}</span>
                     <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
                     <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
+                    <span>จำนวนที่ต้องการ: {jobPositionUnits(j)} ตำแหน่ง</span>
                   </div>
 
                   <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
@@ -513,6 +515,7 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
@@ -543,6 +546,9 @@ const JobListPage: React.FC = () => {
                     <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{j.submittedByName || '—'}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatSubmittedDate(j)}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
+                    <td className="px-3 py-3 text-center text-foreground text-xs tabular-nums whitespace-nowrap">
+                      {jobPositionUnits(j)}
+                    </td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{j.job_description_code_1 || '—'}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{extractJobSubtypeLabel(j)}</td>

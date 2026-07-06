@@ -11,7 +11,7 @@ const DashboardAgeOverview: React.FC<Props> = ({ items }) => {
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-slate-900">สถานะใบขอ / วันผ่านมา</h3>
         <p className="text-xs text-slate-500">
-          ล่วงหน้า = ยังไม่ถึงวันที่ต้องการ · ช่องอื่นนับวันผ่านมาตั้งแต่กรอก (รวมแล้วเท่าทั้งหมด)
+          ล่วงหน้า = คีย์ล่วงหน้า (≥7 วัน) และยังไม่ถึงวันที่ต้องการ · ช่องอื่นนับตำแหน่งตามวันผ่านมา
         </p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -24,7 +24,7 @@ const DashboardAgeOverview: React.FC<Props> = ({ items }) => {
             <p className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">
               {item.count.toLocaleString('th-TH')}
             </p>
-            <p className="text-[11px] text-slate-400">ใบ</p>
+            <p className="text-[11px] text-slate-400">ตำแหน่ง</p>
           </div>
         ))}
       </div>

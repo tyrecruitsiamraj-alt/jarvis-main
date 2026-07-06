@@ -84,19 +84,19 @@ describe('computeJobUrgency', () => {
 describe('countAgeDaysBreakdown', () => {
   const today = new Date('2026-07-15');
 
-  it('puts jobs before required date in advance, others by elapsed days since submit', () => {
+  it('puts advance-at-key jobs before required date in advance bucket', () => {
     const jobs = [
-      job({ submittedAt: '2026-07-15', required_date: '2026-07-16' }), // still before required
-      job({ submittedAt: '2026-07-14', required_date: '2026-07-15' }), // required today, 1 day
-      job({ submittedAt: '2026-07-10', required_date: '2026-07-12' }), // past required, 5 days
-      job({ submittedAt: '2026-07-01', required_date: '2026-07-02' }), // past required, 14 days
-      job({ submittedAt: '2026-06-20', required_date: '2026-06-21' }), // past required, 25 days
-      job({ submittedAt: '2026-05-01', required_date: '2026-05-02' }), // past required, 30+
-      job({ submittedAt: '2026-07-01', required_date: '2026-08-01' }), // before required
+      job({ submittedAt: '2026-07-15', required_date: '2026-07-16' }), // urgent → 1-7
+      job({ submittedAt: '2026-07-14', required_date: '2026-07-15' }), // urgent → 1-7
+      job({ submittedAt: '2026-07-10', required_date: '2026-07-12' }), // urgent → 1-7
+      job({ submittedAt: '2026-07-01', required_date: '2026-07-02' }), // retro → 8-14
+      job({ submittedAt: '2026-06-20', required_date: '2026-06-21' }), // retro → 15-30
+      job({ submittedAt: '2026-05-01', required_date: '2026-05-02' }), // retro → 30+
+      job({ submittedAt: '2026-07-01', required_date: '2026-08-01' }), // advance → advance
     ];
     const counts = countAgeDaysBreakdown(jobs, today);
-    expect(counts.advance).toBe(2);
-    expect(counts['1-7']).toBe(2);
+    expect(counts.advance).toBe(1);
+    expect(counts['1-7']).toBe(3);
     expect(counts['8-14']).toBe(1);
     expect(counts['15-30']).toBe(1);
     expect(counts['30+']).toBe(1);
@@ -104,13 +104,13 @@ describe('countAgeDaysBreakdown', () => {
     expect(sum).toBe(jobs.length);
   });
 
-  it('counts urgent jobs as advance while required date is still in the future', () => {
+  it('counts urgent jobs in age buckets even before required date', () => {
     const counts = countAgeDaysBreakdown(
       [job({ submittedAt: '2026-07-12', required_date: '2026-07-18' })],
       today,
     );
-    expect(counts.advance).toBe(1);
-    expect(counts['1-7']).toBe(0);
+    expect(counts.advance).toBe(0);
+    expect(counts['1-7']).toBe(1);
   });
 
   it('moves former advance jobs into age buckets after required date passes', () => {
@@ -120,5 +120,13 @@ describe('countAgeDaysBreakdown', () => {
     );
     expect(counts.advance).toBe(0);
     expect(counts['30+']).toBe(1);
+  });
+
+  it('weights buckets by position_units', () => {
+    const counts = countAgeDaysBreakdown(
+      [job({ submittedAt: '2026-07-01', required_date: '2026-08-01', position_units: 6 })],
+      today,
+    );
+    expect(counts.advance).toBe(6);
   });
 });

@@ -18,6 +18,7 @@ import { loadJobDashboardFilters, saveJobDashboardFilters } from '@/lib/jobDashb
 import { jobListReturnTo } from '@/lib/jobListPageState';
 import { loadJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
+import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 
 type JobDialogItem = {
   id: string;
@@ -38,7 +39,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
   return {
     id: j.id,
     title: j.request_no ? `${j.unit_name} (${j.request_no})` : j.unit_name,
-    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)}`,
+    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)} • ${jobPositionUnits(j)} ตำแหน่ง`,
     badge,
     badgeVariant,
     onClick: () => onNavigate(j),
@@ -88,6 +89,9 @@ const JobDashboard: React.FC = () => {
 
   const closedCount = closedJobs.length;
   const activeCount = activeJobs.length;
+  const totalUnits = sumJobPositionUnits(scopedJobs);
+  const activeUnits = sumJobPositionUnits(activeJobs);
+  const closedUnits = sumJobPositionUnits(closedJobs);
 
   const goToJob = (job: JobRequest) => navigateToUnitRequest(job, navigate, { returnTo });
 
@@ -115,11 +119,13 @@ const JobDashboard: React.FC = () => {
         title="หน่วยงาน"
         subtitle={
           filterSummary
-            ? `${scopedJobs.length} ใบขอ · ${filterSummary}`
+            ? `${totalUnits} ตำแหน่ง · ${scopedJobs.length} ใบขอ · ${filterSummary}`
             : siamrajPrimary
-              ? dbSource === 'sqlserver'
-                ? 'อ่านใบขอจาก Siamraj SQL Server — อัปเดตเมื่อมีการคีย์'
-                : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
+              ? `${totalUnits} ตำแหน่ง · ${scopedJobs.length} ใบขอ · ${
+                  dbSource === 'sqlserver'
+                    ? 'อ่านใบขอจาก Siamraj SQL Server — อัปเดตเมื่อมีการคีย์'
+                    : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
+                }`
               : 'จัดการหน่วยงานและใบขอ'
         }
         actions={
@@ -168,24 +174,26 @@ const JobDashboard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard
             title="งานทั้งหมด"
-            value={scopedJobs.length}
+            value={totalUnits}
             icon={Briefcase}
             variant="primary"
+            subtitle={`${scopedJobs.length} ใบขอ`}
             onClick={() => openJobList('งานทั้งหมด', scopedJobs)}
           />
           <StatCard
             title="ดำเนินการ"
-            value={activeCount}
+            value={activeUnits}
             icon={ListTodo}
             variant="warning"
-            subtitle="ยังไม่ปิด"
+            subtitle={`${activeCount} ใบขอ · ยังไม่ปิด`}
             onClick={() => openJobList('ดำเนินการ', activeJobs)}
           />
           <StatCard
             title="ปิดแล้ว"
-            value={closedCount}
+            value={closedUnits}
             icon={CheckCircle}
             variant="success"
+            subtitle={`${closedCount} ใบขอ`}
             onClick={() => openJobList('ปิดแล้ว', closedJobs)}
           />
         </div>
@@ -241,7 +249,7 @@ const JobDashboard: React.FC = () => {
                       ? ` • อายุ ${j.age_range_min ?? '—'}–${j.age_range_max ?? '—'}`
                       : ''}
                     {j.resigned_employee_name ? ` • ลาออก: ${j.resigned_employee_name}` : ''}
-                    {` • ต้องการ ${formatYmdDmyBe(j.required_date)}`}
+                    {` • ต้องการ ${formatYmdDmyBe(j.required_date)} · ${jobPositionUnits(j)} ตำแหน่ง`}
                     {j.submittedByName ? ` • ส่งโดย ${j.submittedByName}` : ''}
                   </div>
                   {j.total_penalty > 0 && (
