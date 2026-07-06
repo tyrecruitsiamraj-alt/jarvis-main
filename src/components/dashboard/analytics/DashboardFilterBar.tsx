@@ -58,7 +58,7 @@ const DashboardFilterBar: React.FC<Props> = ({
       <div>
         <h2 className="text-sm font-semibold text-slate-900">ตัวกรอง</h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          ช่วงเวลาและเงื่อนไขใบขอ · ตัวเลขแผนก/หน่วยงานตามช่วงวันที่กรอก
+          เงื่อนไขเดียวกับหน้ารายการหน่วยงาน · กรองวันที่กรอกได้เพิ่มเติม
         </p>
       </div>
 
@@ -79,9 +79,10 @@ const DashboardFilterBar: React.FC<Props> = ({
         siamrajPrimary={siamrajPrimary}
         filters={unitFilters}
         onChange={onUnitFiltersChange}
-        showStatusTabs
+        showStatusTabs={false}
         showNoteFilter={false}
         showUnitFilter
+        layout="sidebar"
         options={filterOptions}
         className="!space-y-3"
       />
@@ -91,7 +92,7 @@ const DashboardFilterBar: React.FC<Props> = ({
         <select
           value={queueStatus}
           onChange={(e) => onQueueStatusChange(e.target.value as DashboardStatusFilter)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+          className="jarvis-filter-select w-full text-sm"
         >
           {QUEUE_STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>

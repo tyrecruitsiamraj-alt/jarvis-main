@@ -33,6 +33,7 @@ type Props = {
   showStatusTabs?: boolean;
   showUnitFilter?: boolean;
   showNoteFilter?: boolean;
+  layout?: 'default' | 'sidebar';
   className?: string;
 };
 
@@ -45,6 +46,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
   showStatusTabs = false,
   showUnitFilter = true,
   showNoteFilter = true,
+  layout = 'default',
   className,
 }) => {
   const {
@@ -56,6 +58,8 @@ const UnitRequestFilterFields: React.FC<Props> = ({
     unassignedRecruiterCount,
     unassignedScreenerCount,
   } = options;
+
+  const selectClassName = layout === 'sidebar' ? 'text-sm' : undefined;
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -88,7 +92,11 @@ const UnitRequestFilterFields: React.FC<Props> = ({
       <div
         className={cn(
           'grid gap-3',
-          siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
+          layout === 'sidebar'
+            ? 'grid-cols-1'
+            : siamrajPrimary
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              : 'grid-cols-1 sm:grid-cols-2',
         )}
       >
         {siamrajPrimary ? (
@@ -97,6 +105,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
             label="แผนก"
             value={filters.departmentFilter}
             onChange={(v) => onChange({ departmentFilter: v })}
+            selectClassName={selectClassName}
           >
             {departmentOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -112,6 +121,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
             label="ลักษณะงานย่อย"
             value={filters.jobSubtypeFilter}
             onChange={(v) => onChange({ jobSubtypeFilter: v })}
+            selectClassName={selectClassName}
           >
             {jobSubtypeOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -127,6 +137,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
             label="หน่วยงาน"
             value={filters.unitFilter}
             onChange={(v) => onChange({ unitFilter: v })}
+            selectClassName={selectClassName}
           >
             <option value="all">ทั้งหมด</option>
             {unitOptions.map((u) => (
@@ -142,6 +153,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           label="เจ้าหน้าที่สรรหา"
           value={filters.recruiterFilter}
           onChange={(v) => onChange({ recruiterFilter: v })}
+          selectClassName={selectClassName}
         >
           <option value="all">ทั้งหมด</option>
           <option value={STAFF_ASSIGNEE_UNASSIGNED}>
@@ -159,6 +171,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           label="เจ้าหน้าที่คัดสรร"
           value={filters.screenerFilter}
           onChange={(v) => onChange({ screenerFilter: v })}
+          selectClassName={selectClassName}
         >
           <option value="all">ทั้งหมด</option>
           <option value={STAFF_ASSIGNEE_UNASSIGNED}>
@@ -176,6 +189,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           label="สถานะใบขอ"
           value={filters.urgencyFilter}
           onChange={(v) => onChange({ urgencyFilter: v as UrgencyFilter })}
+          selectClassName={selectClassName}
         >
           {URGENCY_FILTER_OPTIONS.map((o) => (
             <option key={o.value} value={o.value} title={o.hint}>
@@ -190,6 +204,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
             label="หมายเหตุ"
             value={filters.noteFilter}
             onChange={(v) => onChange({ noteFilter: v as NoteFilter })}
+            selectClassName={selectClassName}
           >
             <option value="all">ทั้งหมด</option>
             <option value="has">มีหมายเหตุ</option>
@@ -202,6 +217,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           label="วันผ่านมา"
           value={filters.ageDaysFilter}
           onChange={(v) => onChange({ ageDaysFilter: v as AgeDaysFilter })}
+          selectClassName={selectClassName}
         >
           {AGE_DAYS_FILTER_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>

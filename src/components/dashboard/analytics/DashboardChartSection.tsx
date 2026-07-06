@@ -4,6 +4,8 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -74,16 +76,40 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={activityData}>
+              <LineChart data={activityData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="resignations" name="ลาออก" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="replacements" name="เปลี่ยนตัว" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="newOpenings" name="เปิดงานใหม่" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Line
+                  type="monotone"
+                  dataKey="resignations"
+                  name="ลาออก"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="replacements"
+                  name="เปลี่ยนตัว"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="newOpenings"
+                  name="เปิดงานใหม่"
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

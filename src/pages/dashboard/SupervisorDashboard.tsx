@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { endOfMonth, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import DashboardShell from '@/components/dashboard/analytics/DashboardShell';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
@@ -16,7 +15,6 @@ import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dash
 import { exportWorkQueueCsv } from '@/lib/dashboard/exportWorkQueue';
 import { MOCK_DASHBOARD_DATA } from '@/lib/dashboard/mockDashboardData';
 import type { DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
-import { toYmdLocal } from '@/lib/dateTh';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import {
@@ -27,16 +25,11 @@ import type { JobRequest } from '@/types';
 
 const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
 
-function defaultMonthRange(): DateRangeYmd {
-  const now = new Date();
-  return { from: toYmdLocal(startOfMonth(now)), to: toYmdLocal(endOfMonth(now)) };
-}
-
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<DashboardFilters>(() => loadDashboardFilters());
   const [unitFilters, setUnitFilters] = useState(() => loadSupervisorDashboardFilters());
-  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultMonthRange());
+  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(null);
   const [sortKey, setSortKey] = useState<DashboardSortKey>('priority');
   const [sortDir, setSortDir] = useState<DashboardSortDir>('asc');
   const [staffRosterRev, setStaffRosterRev] = useState(0);
@@ -44,17 +37,18 @@ const SupervisorDashboard: React.FC = () => {
   const { jobs, loading, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
 
   const period = useMemo(
-    () => resolvePeriodRange('custom', dateRange ?? undefined),
+    () => (dateRange ? resolvePeriodRange('custom', dateRange) : null),
     [dateRange],
   );
 
-  /** งานในช่วงวันที่ — ใช้ทั้ง filter sidebar และ KPI ให้ตัวเลขตรงกัน */
-  const dateScopedJobs = useMemo(
-    () => filterJobsByRequestDate(jobs, period.from, period.to),
-    [jobs, period.from, period.to],
-  );
+  /** ชุดข้อมูลเดียวกับหน้ารายการหน่วยงาน — ไม่กรองวันที่จนกว่าจะเลือกช่วงวันที่กรอก */
+  const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
 
-  const filterApi = useSiamrajUnitRequestFilters(dateScopedJobs, siamrajPrimary, unitFilters, staffRosterRev);
+  const scopedJobs = useMemo(() => {
+    const base = filterApi.filteredJobs;
+    if (!period) return base;
+    return filterJobsByRequestDate(base, period.from, period.to);
+  }, [filterApi.filteredJobs, period]);
 
   useEffect(() => {
     saveDashboardFilters(filters);
@@ -100,16 +94,14 @@ const SupervisorDashboard: React.FC = () => {
   const data = useMemo(() => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
-    const unitFiltered = filterApi.filteredJobs;
     const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters);
     const trendRange = resolveYearToDateTrendRange();
     const trendJobs = filterJobsByRequestDate(unitFilteredAll, trendRange.from, trendRange.to);
-    const previousScoped = filterJobsByRequestDate(
-      unitFilteredAll,
-      period.previousFrom,
-      period.previousTo,
-    );
-    const built = buildDashboardData(unitFiltered, previousScoped, period, filters, new Date(), {
+    const previousScoped =
+      period != null
+        ? filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo)
+        : [];
+    const built = buildDashboardData(scopedJobs, previousScoped, period, filters, new Date(), {
       jobs: trendJobs,
       from: trendRange.from,
       to: trendRange.to,
@@ -119,7 +111,7 @@ const SupervisorDashboard: React.FC = () => {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [filterApi.filteredJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
@@ -146,8 +138,8 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const handleExport = useCallback(() => {
-    exportWorkQueueCsv(data.workQueue, `work-queue-${period.from}-${period.to}.csv`);
-  }, [data.workQueue, period.from, period.to]);
+    exportWorkQueueCsv(data.workQueue, `work-queue-${period?.from ?? 'all'}-${period?.to ?? 'all'}.csv`);
+  }, [data.workQueue, period]);
 
   return (
     <DashboardShell

@@ -8,15 +8,29 @@ type FilterSelectProps = {
   onChange: (value: string) => void;
   children: React.ReactNode;
   className?: string;
+  selectClassName?: string;
 };
 
-export function FilterSelect({ id, label, value, onChange, children, className }: FilterSelectProps) {
+export function FilterSelect({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+  className,
+  selectClassName,
+}: FilterSelectProps) {
   return (
-    <div className={cn('flex flex-col gap-1 min-w-0', className)}>
+    <div className={cn('flex flex-col gap-1 min-w-0 w-full', className)}>
       <label htmlFor={id} className="text-xs text-muted-foreground leading-snug">
         {label}
       </label>
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="jarvis-filter-select">
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn('jarvis-filter-select w-full min-w-0', selectClassName)}
+      >
         {children}
       </select>
     </div>

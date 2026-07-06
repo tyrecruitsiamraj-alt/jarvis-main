@@ -325,7 +325,7 @@ function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): 
       id: 'total',
       label: 'งานทั้งหมด',
       value: curTotal,
-      description: 'ใบขอในช่วงวันที่ที่เลือก',
+      description: 'ใบขอตามตัวกรอง (เทียบหน้ารายการหน่วยงาน)',
       trendPercent: trendPercent(curTotal, prevTotal),
     },
     {
@@ -492,7 +492,7 @@ export type BuildDashboardTrendInput = {
 export function buildDashboardData(
   scopedJobs: JobRequest[],
   previousScopedJobs: JobRequest[],
-  period: PeriodRange,
+  period: PeriodRange | null,
   uiFilters: DashboardFilters,
   today = new Date(),
   trend?: BuildDashboardTrendInput,
@@ -501,10 +501,12 @@ export function buildDashboardData(
   const filteredQueue = applyDashboardFilters(workItems, uiFilters);
   const sortedQueue = sortWorkQueue(filteredQueue, 'priority', 'asc');
 
+  const periodLabel = period?.label ?? 'ทั้งหมดที่โหลด';
+  const previousPeriodLabel = period?.previousLabel ?? '—';
   const trendJobs = trend?.jobs ?? scopedJobs;
-  const trendFrom = trend?.from ?? period.from;
-  const trendTo = trend?.to ?? period.to;
-  const activityTrendLabel = trend?.label ?? period.label;
+  const trendFrom = trend?.from ?? period?.from ?? '1970-01-01';
+  const trendTo = trend?.to ?? period?.to ?? toYmdLocal(today);
+  const activityTrendLabel = trend?.label ?? periodLabel;
 
   return {
     kpis: buildKpis(scopedJobs, previousScopedJobs, today),
@@ -512,8 +514,8 @@ export function buildDashboardData(
     statusBreakdown: buildStatusBreakdown(scopedJobs, today),
     recruiterOverview: buildRecruiterOverview(scopedJobs, today),
     workQueue: sortedQueue,
-    periodLabel: period.label,
-    previousPeriodLabel: period.previousLabel,
+    periodLabel,
+    previousPeriodLabel,
     activityTrendLabel,
   };
 }

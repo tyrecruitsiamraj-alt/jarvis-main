@@ -113,7 +113,7 @@ const DashboardShell: React.FC<Props> = ({
         {loading ? (
           <p className="text-sm text-slate-500 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
               dateRange={dateRange}
               onDateRangeChange={onDateRangeChange}
