@@ -11,17 +11,18 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { DashboardData } from '@/lib/dashboard/types';
+import type { DashboardData, DashboardTaskStatus } from '@/lib/dashboard/types';
 
 type Props = {
   data: Pick<DashboardData, 'activityTrend' | 'statusBreakdown' | 'periodLabel' | 'activityTrendLabel'>;
+  onStatusClick?: (status: DashboardTaskStatus, label: string) => void;
 };
 
 function sumPoint(p: DashboardData['activityTrend'][number]) {
   return p.resignations + p.replacements + p.newOpenings;
 }
 
-const DashboardChartSection: React.FC<Props> = ({ data }) => {
+const DashboardChartSection: React.FC<Props> = ({ data, onStatusClick }) => {
   const activityData = data.activityTrend;
 
   const periodTotals = activityData.reduce(
@@ -42,6 +43,7 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
     name: s.label,
     count: s.count,
     fill: s.color,
+    status: s.status,
   }));
 
   return (
@@ -126,7 +128,16 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                 <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11, fill: '#64748b' }} />
                 <Tooltip />
-                <Bar dataKey="count" name="จำนวน" radius={[0, 4, 4, 0]} />
+                <Bar
+                  dataKey="count"
+                  name="จำนวน"
+                  radius={[0, 4, 4, 0]}
+                  cursor={onStatusClick ? 'pointer' : 'default'}
+                  onClick={(entry) => {
+                    const row = entry?.payload as (typeof statusData)[number] | undefined;
+                    if (row && onStatusClick) onStatusClick(row.status, row.name);
+                  }}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

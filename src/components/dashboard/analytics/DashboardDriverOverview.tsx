@@ -1,11 +1,13 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 import type { DashboardRecruiterOverview } from '@/lib/dashboard/types';
 
 type Props = {
   items: DashboardRecruiterOverview[];
+  onRecruiterClick?: (name: string) => void;
 };
 
-const DashboardDriverOverview: React.FC<Props> = ({ items }) => {
+const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick }) => {
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
@@ -22,7 +24,17 @@ const DashboardDriverOverview: React.FC<Props> = ({ items }) => {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {items.slice(0, 9).map((r) => (
-          <div key={r.name} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <button
+            key={r.name}
+            type="button"
+            onClick={() => onRecruiterClick?.(r.name)}
+            disabled={!onRecruiterClick}
+            className={cn(
+              'rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-left w-full transition-colors',
+              onRecruiterClick && 'hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer',
+              !onRecruiterClick && 'cursor-default',
+            )}
+          >
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold text-slate-900 truncate">{r.name}</p>
               <span className="text-xs font-medium text-slate-500 shrink-0">{r.sharePercent}%</span>
@@ -43,7 +55,7 @@ const DashboardDriverOverview: React.FC<Props> = ({ items }) => {
                 <p className="text-[10px] text-slate-500">ล่าช้า</p>
               </div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

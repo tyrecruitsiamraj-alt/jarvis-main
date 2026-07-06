@@ -226,7 +226,7 @@ function isDashboardAdvanceBucket(job: JobRequest, today = new Date()): boolean 
   return meta.daysUntilRequired > 0;
 }
 
-function matchesDashboardAgeBucket(
+export function matchesDashboardAgeBucket(
   job: JobRequest,
   bucket: AgeDaysDisplayBucket,
   today = new Date(),

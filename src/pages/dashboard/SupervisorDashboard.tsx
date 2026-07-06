@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardShell from '@/components/dashboard/analytics/DashboardShell';
+import DetailListDialog from '@/components/shared/DetailListDialog';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useSiamrajUnitRequestFilters, filterUnitRequests } from '@/hooks/useSiamrajUnitRequestFilters';
@@ -15,6 +16,13 @@ import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dash
 import { exportWorkQueueCsv } from '@/lib/dashboard/exportWorkQueue';
 import { MOCK_DASHBOARD_DATA } from '@/lib/dashboard/mockDashboardData';
 import type { DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
+import { jobToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
+import {
+  filterJobsForAgeBucket,
+  filterJobsForDashboardKpi,
+  filterJobsForRecruiter,
+  filterJobsForTaskStatus,
+} from '@/lib/dashboard/drillDownFilters';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import {
@@ -33,6 +41,11 @@ const SupervisorDashboard: React.FC = () => {
   const [sortKey, setSortKey] = useState<DashboardSortKey>('priority');
   const [sortDir, setSortDir] = useState<DashboardSortDir>('asc');
   const [staffRosterRev, setStaffRosterRev] = useState(0);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailDialogTitle, setDetailDialogTitle] = useState('');
+  const [detailDialogItems, setDetailDialogItems] = useState<ReturnType<typeof jobToDashboardDetailItem>[]>([]);
+
+  const RETURN_TO = '/dashboard';
 
   const { jobs, loading, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
 
@@ -91,9 +104,30 @@ const SupervisorDashboard: React.FC = () => {
 
   const jobById = useMemo(() => {
     const map = new Map<string, JobRequest>();
-    for (const j of jobs) map.set(j.id, j);
+    for (const j of jobs) {
+      map.set(j.id, j);
+      if (j.request_no?.trim()) map.set(j.request_no.trim(), j);
+      if (j.externalId?.trim()) map.set(j.externalId.trim(), j);
+    }
     return map;
   }, [jobs]);
+
+  const openJobList = useCallback(
+    (title: string, list: JobRequest[]) => {
+      if (DEMO_MODE) return;
+      setDetailDialogTitle(`${title} (${list.length})`);
+      setDetailDialogItems(
+        list.map((j) =>
+          jobToDashboardDetailItem(j, (job) => {
+            setDetailDialogOpen(false);
+            navigateToUnitRequest(job, navigate, { returnTo: RETURN_TO });
+          }),
+        ),
+      );
+      setDetailDialogOpen(true);
+    },
+    [navigate],
+  );
 
   const data = useMemo(() => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
@@ -131,14 +165,42 @@ const SupervisorDashboard: React.FC = () => {
 
   const handleView = useCallback(
     (item: DashboardWorkItem) => {
-      const job = jobById.get(item.id);
+      const job = jobById.get(item.id) ?? jobById.get(item.requestNo);
       if (job) {
-        navigateToUnitRequest(job, navigate);
+        openJobList(`${item.requestNo} · ${item.unitName}`, [job]);
         return;
       }
       if (DEMO_MODE) return;
     },
-    [jobById, navigate],
+    [jobById, openJobList],
+  );
+
+  const handleKpiClick = useCallback(
+    (kpiId: string, label: string) => {
+      openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
+    },
+    [openJobList, scopedJobs],
+  );
+
+  const handleAgeBucketClick = useCallback(
+    (bucket: Parameters<typeof filterJobsForAgeBucket>[1], label: string) => {
+      openJobList(`วันผ่านมา: ${label}`, filterJobsForAgeBucket(scopedJobs, bucket));
+    },
+    [openJobList, scopedJobs],
+  );
+
+  const handleStatusClick = useCallback(
+    (status: Parameters<typeof filterJobsForTaskStatus>[1], label: string) => {
+      openJobList(`สถานะ: ${label}`, filterJobsForTaskStatus(scopedJobs, status));
+    },
+    [openJobList, scopedJobs],
+  );
+
+  const handleRecruiterClick = useCallback(
+    (name: string) => {
+      openJobList(`ผู้รับผิดชอบ: ${name}`, filterJobsForRecruiter(scopedJobs, name));
+    },
+    [openJobList, scopedJobs],
   );
 
   const handleExport = useCallback(() => {
@@ -146,6 +208,7 @@ const SupervisorDashboard: React.FC = () => {
   }, [data.workQueue, period]);
 
   return (
+    <>
     <DashboardShell
       data={data}
       filters={filters}
@@ -175,7 +238,19 @@ const SupervisorDashboard: React.FC = () => {
       onSort={handleSort}
       onViewItem={handleView}
       onAssignItem={handleView}
+      onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
+      onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
+      onStatusClick={DEMO_MODE ? undefined : handleStatusClick}
+      onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}
     />
+    <DetailListDialog
+      open={detailDialogOpen}
+      onOpenChange={setDetailDialogOpen}
+      title={detailDialogTitle}
+      items={detailDialogItems}
+      emptyMessage="ไม่มีใบขอในกลุ่มนี้"
+    />
+  </>
   );
 };
 

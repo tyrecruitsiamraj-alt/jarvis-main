@@ -82,7 +82,11 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
               </tr>
             ) : (
               items.map((item) => (
-                <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                <tr
+                  key={item.id}
+                  className="border-b border-slate-100 hover:bg-slate-50/60 cursor-pointer"
+                  onClick={() => onView(item)}
+                >
                   <td className="px-3 py-3 align-top">
                     <p className="font-medium text-slate-900">{item.requestNo}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.unitName}</p>
@@ -107,7 +111,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                     {formatYmdDmyBe(item.updatedAt)}
                   </td>
                   <td className="px-3 py-3 align-top text-xs text-slate-700">{item.nextAction}</td>
-                  <td className="px-3 py-3 align-top">
+                  <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       <button
                         type="button"

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardStatusFilter, DashboardTaskStatus } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -43,6 +43,10 @@ type Props = {
   onSort: (key: DashboardSortKey) => void;
   onViewItem: (item: DashboardWorkItem) => void;
   onAssignItem?: (item: DashboardWorkItem) => void;
+  onKpiClick?: (kpiId: string, label: string) => void;
+  onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
+  onStatusClick?: (status: DashboardTaskStatus, label: string) => void;
+  onRecruiterClick?: (name: string) => void;
 };
 
 const DashboardShell: React.FC<Props> = ({
@@ -64,6 +68,10 @@ const DashboardShell: React.FC<Props> = ({
   onSort,
   onViewItem,
   onAssignItem,
+  onKpiClick,
+  onAgeBucketClick,
+  onStatusClick,
+  onRecruiterClick,
 }) => {
   return (
     <div className="min-h-full bg-slate-50 pb-24">
@@ -131,16 +139,21 @@ const DashboardShell: React.FC<Props> = ({
             <div className="space-y-5 min-w-0">
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 {data.kpis.map((kpi) => (
-                  <DashboardKpiCard key={kpi.id} kpi={kpi} />
+                  <DashboardKpiCard
+                    key={kpi.id}
+                    kpi={kpi}
+                    onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                  />
                 ))}
               </div>
 
               <DashboardAgeOverview
                 items={data.ageDaysBreakdown}
                 requestTotal={data.ageDaysRequestTotal}
+                onBucketClick={onAgeBucketClick}
               />
-              <DashboardChartSection data={data} />
-              <DashboardDriverOverview items={data.recruiterOverview} />
+              <DashboardChartSection data={data} onStatusClick={onStatusClick} />
+              <DashboardDriverOverview items={data.recruiterOverview} onRecruiterClick={onRecruiterClick} />
               <DashboardWorkQueueTable
                 items={data.workQueue}
                 sortKey={sortKey}
