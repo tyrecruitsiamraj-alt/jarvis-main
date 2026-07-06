@@ -60,9 +60,12 @@ const StaffJobBoardPage: React.FC = () => {
           onDistrictFilterChange={filters.setDistrictFilter}
           positionFilter={filters.positionFilter}
           onPositionFilterChange={filters.setPositionFilter}
+          subtypeFilter={filters.subtypeFilter}
+          onSubtypeFilterChange={filters.setSubtypeFilter}
           provinceOptions={filters.provinceOptions}
           districtOptions={filters.districtOptions}
           positionOptions={filters.positionOptions}
+          subtypeOptions={filters.subtypeOptions}
           loading={loading}
           searchPlaceholder="ค้นหาเลขที่ใบขอ, หน่วยงาน, ที่อยู่, ผู้รับผิดชอบ..."
         />

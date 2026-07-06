@@ -15,9 +15,12 @@ type Props = {
   onDistrictFilterChange: (v: string) => void;
   positionFilter: string;
   onPositionFilterChange: (v: string) => void;
+  subtypeFilter: string;
+  onSubtypeFilterChange: (v: string) => void;
   provinceOptions: readonly string[];
   districtOptions: readonly string[];
   positionOptions: readonly string[];
+  subtypeOptions: readonly string[];
   loading?: boolean;
   searchPlaceholder?: string;
 };
@@ -33,9 +36,12 @@ const JobBoardFilterBar: React.FC<Props> = ({
   onDistrictFilterChange,
   positionFilter,
   onPositionFilterChange,
+  subtypeFilter,
+  onSubtypeFilterChange,
   provinceOptions,
   districtOptions,
   positionOptions,
+  subtypeOptions,
   loading,
   searchPlaceholder = 'ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน...',
 }) => (
@@ -95,6 +101,14 @@ const JobBoardFilterBar: React.FC<Props> = ({
         onChange={onPositionFilterChange}
         options={positionOptions}
         disabled={loading || positionOptions.length === 0}
+      />
+      <LocationFilterSelect
+        label="ลักษณะงานย่อย"
+        placeholder="เลือกลักษณะงานย่อย"
+        value={subtypeFilter}
+        onChange={onSubtypeFilterChange}
+        options={subtypeOptions}
+        disabled={loading || subtypeOptions.length === 0}
       />
     </div>
   </>

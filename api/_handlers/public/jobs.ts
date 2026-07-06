@@ -25,6 +25,7 @@ type JobRow = {
   age_range_max: number | null;
   gender_requirement?: string | null;
   job_description_code_1?: string | null;
+  job_description_code_2?: string | null;
   vehicle_required: string | null;
   work_schedule: string | null;
   penalty_per_day: number;
@@ -66,6 +67,7 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     job_type: r.job_type,
     job_category: r.job_category,
     job_description_code_1: r.job_description_code_1 || undefined,
+    job_description_code_2: r.job_description_code_2 || undefined,
     age_range_min: r.age_range_min === null || r.age_range_min === undefined ? undefined : r.age_range_min,
     age_range_max: r.age_range_max === null || r.age_range_max === undefined ? undefined : r.age_range_max,
     gender_requirement: r.gender_requirement || undefined,

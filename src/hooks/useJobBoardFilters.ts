@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { districtMatchesFilter } from '@/lib/districtMatch';
 import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
@@ -19,6 +20,7 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
   const [provinceFilter, setProvinceFilter] = useState('');
   const [districtFilter, setDistrictFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState('');
+  const [subtypeFilter, setSubtypeFilter] = useState('');
   const [chip, setChip] = useState<JobBoardUrgencyChip>('all');
 
   const visible = useMemo(() => jobs.filter(isBoardVisibleJob), [jobs]);
@@ -35,6 +37,11 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
   }, [visible]);
 
+  const subtypeOptions = useMemo(() => {
+    const set = new Set(visible.map((j) => extractJobSubtypeLabel(j)));
+    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [visible]);
+
   useEffect(() => {
     if (!districtFilter) return;
     if (!districtOptions.includes(districtFilter)) setDistrictFilter('');
@@ -44,6 +51,11 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     if (!positionFilter) return;
     if (!positionOptions.includes(positionFilter)) setPositionFilter('');
   }, [positionFilter, positionOptions]);
+
+  useEffect(() => {
+    if (!subtypeFilter) return;
+    if (!subtypeOptions.includes(subtypeFilter)) setSubtypeFilter('');
+  }, [subtypeFilter, subtypeOptions]);
 
   const { filtered, usedRelatedFallback } = useMemo(() => {
     const q = normBoardSearch(search);
@@ -57,6 +69,7 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
         if (provinceFilter && jobProv !== provinceFilter) return false;
         if (districtFilter && !districtMatchesFilter(j.location_address, districtFilter)) return false;
         if (positionFilter && publicJobPositionLabel(j) !== positionFilter) return false;
+        if (subtypeFilter && extractJobSubtypeLabel(j) !== subtypeFilter) return false;
         return true;
       });
     if (!q) return { filtered: baseRows, usedRelatedFallback: false };
@@ -74,7 +87,7 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     if (related.length > 0) return { filtered: related, usedRelatedFallback: true };
 
     return { filtered: baseRows, usedRelatedFallback: true };
-  }, [visible, search, chip, provinceFilter, districtFilter, positionFilter]);
+  }, [visible, search, chip, provinceFilter, districtFilter, positionFilter, subtypeFilter]);
 
   const onProvinceFilterChange = useCallback((next: string) => {
     setProvinceFilter(next);
@@ -89,11 +102,14 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     setDistrictFilter,
     positionFilter,
     setPositionFilter,
+    subtypeFilter,
+    setSubtypeFilter,
     chip,
     setChip,
     provinceOptions,
     districtOptions,
     positionOptions,
+    subtypeOptions,
     onProvinceFilterChange,
     filtered,
     usedRelatedFallback,
