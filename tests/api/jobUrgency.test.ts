@@ -66,15 +66,23 @@ describe('computeJobUrgency', () => {
     expect(label).toBe('ล่วงหน้า');
   });
 
-  it('age label shows elapsed days for advance after required date passes', () => {
+  it('age label shows elapsed days from required date for advance after required passes', () => {
     const label = getJobRequestAgeLabel(
       job({ submittedAt: '2026-06-01', required_date: '2026-07-05' }),
       today,
     );
-    expect(label).toBe('37 วัน');
+    expect(label).toBe('3 วัน');
   });
 
-  it('opl6905030: advance key but required date passed shows elapsed days not ล่วงหน้า', () => {
+  it('urgent past required counts from required date not submit date', () => {
+    const label = getJobRequestAgeLabel(
+      job({ submittedAt: '2026-06-29', request_date: '2026-06-29', required_date: '2026-07-01' }),
+      new Date('2026-07-06T12:00:00+07:00'),
+    );
+    expect(label).toBe('5 วัน');
+  });
+
+  it('opl6905030: advance past required counts days since required date', () => {
     const label = getJobRequestAgeLabel(
       job({
         unit_name: 'opl6905030',
@@ -84,16 +92,23 @@ describe('computeJobUrgency', () => {
       }),
       new Date('2026-07-06T12:00:00+07:00'),
     );
-    expect(label).toBe('60 วัน');
+    expect(label).toBe('51 วัน');
   });
 
-  it('parses ISO timestamps in Bangkok calendar (not UTC slice)', () => {
-    // 2026-06-30 17:00 UTC = 2026-07-01 00:00 Bangkok — UTC slice would count 8 วัน
+  it('retroactive counts from submit date even when required has passed', () => {
+    const label = getJobRequestAgeLabel(
+      job({ submittedAt: '2026-07-03', required_date: '2026-07-02' }),
+      today,
+    );
+    expect(label).toBe('5 วัน');
+  });
+
+  it('parses ISO timestamps in Bangkok calendar for required-based age', () => {
     const label = getJobRequestAgeLabel(
       job({ submittedAt: '2026-06-30T17:00:00.000Z', required_date: '2026-07-05' }),
       new Date('2026-07-08T12:00:00+07:00'),
     );
-    expect(label).toBe('7 วัน');
+    expect(label).toBe('3 วัน');
   });
 
   it('filters by status kind', () => {
@@ -141,7 +156,7 @@ describe('countAgeDaysBreakdown', () => {
       today,
     );
     expect(counts.advance).toBe(0);
-    expect(counts['30+']).toBe(1);
+    expect(counts['8-14']).toBe(1);
   });
 
   it('counts one request per bucket regardless of position_units', () => {

@@ -108,6 +108,29 @@ export function isAdvanceBeforeRequiredDate(job: JobRequest, today = new Date())
   return meta.kind === 'advance' && meta.daysUntilRequired > 0;
 }
 
+/**
+ * วันผ่านมาสำหรับคอลัมน์「ผ่านมา」
+ * - ล่วงหน้า (ยังไม่ถึงวันที่ต้องการ): ไม่นับ (แสดง "ล่วงหน้า")
+ * - ล่วงหน้า + ฉุกเฉิน (ถึง/เลยวันที่ต้องการแล้ว): วันนี้ − วันที่ต้องการ
+ * - ฉุกเฉิน/ย้อนหลัง: วันนี้ − วันที่กรอก
+ */
+export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
+  if (isAdvanceBeforeRequiredDate(job, today)) return null;
+
+  const meta = computeJobUrgency(job, today);
+  const today0 = todayStart(today);
+
+  if (meta.kind === 'retroactive') {
+    const submitted = submittedDate(job);
+    if (!submitted) return null;
+    return differenceInCalendarDays(today0, submitted);
+  }
+
+  const required = parseJobDate(job.required_date);
+  if (!required) return null;
+  return Math.max(0, differenceInCalendarDays(today0, required));
+}
+
 export function getJobRequestSubmittedDate(job: JobRequest): Date | null {
   return submittedDate(job);
 }
@@ -141,14 +164,6 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
   }
 
   return { kind: 'advance', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
-}
-
-/** วันที่ใช้กับคอลัมน์「ผ่านมา」— ล่วงหน้าที่ยังไม่ถึงวันที่ต้องการยังไม่นับ */
-export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
-  if (isAdvanceBeforeRequiredDate(job, today)) return null;
-  const submitted = submittedDate(job);
-  if (!submitted) return null;
-  return differenceInCalendarDays(todayStart(today), submitted);
 }
 
 export function getJobRequestAgeLabel(job: JobRequest, today = new Date()): string {
