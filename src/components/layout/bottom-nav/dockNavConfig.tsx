@@ -19,7 +19,7 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
   { path: '/driver-care', label: 'Driver Care', icon: HeartPulse, functionId: 'driver_care_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
-  { path: '/jobs', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
+  { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },
   { path: '/settings', label: 'ตั้งค่า', icon: Settings, minimumRole: 'admin', functionId: 'settings_access' },
 ];
@@ -33,6 +33,7 @@ export function isDockPathActive(path: string, pathname: string): boolean {
     return p.startsWith('/matching');
   }
   if (path === '/driver-care') return p.startsWith('/driver-care');
+  if (path === '/jobs/list') return p.startsWith('/jobs');
   return p.startsWith(path);
 }
 

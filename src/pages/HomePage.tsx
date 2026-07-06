@@ -46,7 +46,7 @@ const menuItems: {
     accent: 'text-rose-700 bg-rose-500/12',
   },
   {
-    path: '/jobs',
+    path: '/jobs/list',
     label: 'หน่วยงาน',
     desc: 'จัดการใบขอและหน่วยงาน',
     icon: Briefcase,

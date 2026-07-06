@@ -27,7 +27,7 @@ const STAFF_LINKS: HubLink[] = [
 
 const SUPERVISOR_EXTRA: HubLink[] = [
   { path: '/matching', label: 'Matching', desc: 'จับคู่ผู้สมัครกับงาน', icon: Search, accent: 'text-blue-700 bg-blue-400/12', functionId: 'candidates_read' },
-  { path: '/jobs', label: 'แดชบอร์ดหน่วยงาน', desc: 'สรุปใบขอและหน่วยงาน', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12', functionId: 'unit_requests_read' },
+  { path: '/jobs/overview', label: 'แดชบอร์ดหน่วยงาน', desc: 'สรุปใบขอและหน่วยงาน', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12', functionId: 'unit_requests_read' },
 ];
 
 const ADMIN_EXTRA: HubLink[] = [

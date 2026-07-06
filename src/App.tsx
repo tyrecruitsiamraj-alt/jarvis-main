@@ -85,9 +85,10 @@ const ProtectedRoutes = () => {
         <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
         <Route path="/driver-care/actions" element={<DriverActionTracking />} />
         <Route path="/driver-care/resources" element={<DriverCareResources />} />
-        <Route path="/jobs" element={<JobDashboard />} />
+        <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
+        <Route path="/jobs/overview" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
-        <Route path="/jobs/add" element={<Navigate to="/jobs" replace />} />
+        <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
         <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
         <Route path="/jobs/:id" element={<JobDetailPage />} />
         <Route path="/dashboard" element={<SupervisorDashboard />} />

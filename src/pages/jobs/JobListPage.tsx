@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -44,7 +44,7 @@ import {
   mergeJobListState,
   parseJobListSearchParams,
 } from '@/lib/jobListPageState';
-import { loadJobListLastUrl, saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
+import { saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
 
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
@@ -90,23 +90,14 @@ const JobListPage: React.FC = () => {
   );
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
-  const restoredListRef = useRef(false);
-
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
   useEffect(() => {
     saveUnitLastPath('/jobs/list');
     if (location.search) {
       saveJobListLastUrl(`${location.pathname}${location.search}`);
-      return;
     }
-    if (restoredListRef.current) return;
-    const last = loadJobListLastUrl();
-    if (last && last.includes('?')) {
-      restoredListRef.current = true;
-      navigate(last, { replace: true });
-    }
-  }, [location.pathname, location.search, navigate]);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const fn = () => setStaffRosterRev((x) => x + 1);
@@ -227,7 +218,7 @@ const JobListPage: React.FC = () => {
   return (
     <div>
       <PageHeader
-        title="รายการงานทั้งหมด"
+        title="หน่วยงาน"
         subtitle={
           siamrajPrimary
             ? filtered.length > 0
@@ -237,7 +228,7 @@ const JobListPage: React.FC = () => {
               ? `${filtered.length} งาน · แสดง ${pageFrom}–${pageTo}`
               : '0 งาน'
         }
-        backPath="/jobs"
+        backPath="/"
         actions={
           <button
             type="button"

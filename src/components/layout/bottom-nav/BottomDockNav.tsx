@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { DOCK_NAV_ITEMS, dockActiveIndex, type DockNavItem } from './dockNavConfig';
-import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import './bottomDockNav.css';
 
@@ -35,7 +34,7 @@ const BottomDockNav: React.FC<Props> = ({ pathname, className, items }) => {
                 key={item.path}
                 type="button"
                 className={cn('bottom-dock__btn', active && 'bottom-dock__btn--active')}
-                onClick={() => navigate(item.path === '/jobs' ? resolveUnitNavPath() : item.path)}
+                onClick={() => navigate(item.path)}
                 aria-current={active ? 'page' : undefined}
                 aria-label={item.label}
               >
