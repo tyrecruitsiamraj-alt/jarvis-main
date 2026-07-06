@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import StatusBadge from '@/components/shared/StatusBadge';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import SearchField from '@/components/shared/SearchField';
@@ -443,7 +442,6 @@ const JobListPage: React.FC = () => {
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
                         ผ่านมา {ageDaysLabel(j)}
                       </span>
-                      <StatusBadge status={j.status} type="job" />
                     </div>
                   </div>
 
@@ -457,7 +455,6 @@ const JobListPage: React.FC = () => {
                   </div>
 
                   <div className="text-xs text-muted-foreground mt-1 grid gap-0.5">
-                    <span>กรอกโดย: {j.submittedByName || '—'}</span>
                     <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
                     <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
                     <span>จำนวนที่ต้องการ: {jobPositionUnits(j)} ตำแหน่ง</span>
@@ -497,13 +494,12 @@ const JobListPage: React.FC = () => {
           </div>
         ) : (
           <div className="glass-card rounded-xl border border-border overflow-x-auto">
-            <table className="w-full text-sm min-w-[1200px]">
+            <table className="w-full text-sm min-w-[1080px]">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผ่านมา</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
@@ -516,7 +512,6 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
                   <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะ</th>
                 </tr>
               </thead>
 
@@ -534,7 +529,6 @@ const JobListPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-foreground text-xs">{j.unit_name || '—'}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{j.submittedByName || '—'}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatSubmittedDate(j)}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
                     <td className="px-3 py-3 text-center text-foreground text-xs tabular-nums whitespace-nowrap">
@@ -570,9 +564,6 @@ const JobListPage: React.FC = () => {
                       <JobUrgencyBadge job={j} compact />
                     </td>
                     <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
-                    <td className="px-3 py-3 text-center">
-                      <StatusBadge status={j.status} type="job" />
-                    </td>
                   </tr>
                 ))}
               </tbody>
