@@ -35,48 +35,69 @@ const DetailListDialog: React.FC<DetailListDialogProps> = ({
   items,
   emptyMessage = 'ไม่มีข้อมูล',
 }) => {
+  const listScrolls = items.length > 4;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-foreground">{title}</DialogTitle>
+      <DialogContent
+        className={cn(
+          'flex flex-col gap-0 overflow-hidden p-0',
+          'w-[min(calc(100vw-1.25rem),44rem)] max-w-none',
+          listScrolls ? 'max-h-[min(92dvh,900px)]' : 'max-h-none',
+        )}
+      >
+        <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
+          <DialogTitle className="pr-8 text-base font-semibold leading-snug text-foreground sm:text-lg break-words">
+            {title}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             แสดงรายการรายละเอียดที่เลือก พร้อมข้อมูลสรุปและสถานะของแต่ละรายการ
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 mt-2">
+        <div
+          className={cn(
+            'px-5 py-4',
+            listScrolls && 'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+          )}
+        >
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">{emptyMessage}</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">{emptyMessage}</p>
           ) : (
-            items.map((item) => (
-              <div
-                key={item.id}
-                onClick={item.onClick}
-                className={cn(
-                  'rounded-2xl p-3 border border-white/70 bg-white/45 flex items-center justify-between gap-3',
-                  item.onClick && 'cursor-pointer hover:bg-white/70 transition-colors',
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-foreground text-sm truncate">{item.title}</div>
-                  {item.subtitle && (
-                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.subtitle}</div>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={item.onClick}
+                  className={cn(
+                    'flex flex-col gap-2 rounded-2xl border border-white/70 bg-white/45 p-3.5 sm:flex-row sm:items-start sm:justify-between',
+                    item.onClick && 'cursor-pointer transition-colors hover:bg-white/70',
                   )}
-                  {item.extra}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium leading-snug text-foreground break-words">
+                      {item.title}
+                    </div>
+                    {item.subtitle ? (
+                      <div className="mt-1 text-xs leading-relaxed text-muted-foreground break-words whitespace-normal">
+                        {item.subtitle}
+                      </div>
+                    ) : null}
+                    {item.extra}
+                  </div>
+                  {item.badge ? (
+                    <span
+                      className={cn(
+                        'shrink-0 self-start rounded-full px-2.5 py-1 text-xs font-medium',
+                        badgeStyles[item.badgeVariant || 'default'],
+                      )}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </div>
-                {item.badge && (
-                  <span
-                    className={cn(
-                      'text-xs px-2.5 py-1 rounded-full shrink-0 font-medium',
-                      badgeStyles[item.badgeVariant || 'default'],
-                    )}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </DialogContent>

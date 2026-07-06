@@ -248,16 +248,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       </div>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-md sm:max-w-lg border-border/80">
-          <DialogHeader>
-            <DialogTitle className="text-left text-lg pr-8">{selected ? unitRequestCardTitle(selected) : ''}</DialogTitle>
+        <DialogContent className="flex max-h-[min(92dvh,820px)] w-[min(calc(100vw-1.25rem),32rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
+          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
+            <DialogTitle className="pr-8 text-base font-semibold leading-snug sm:text-lg break-words">
+              {selected ? unitRequestCardTitle(selected) : ''}
+            </DialogTitle>
             <DialogDescription className="sr-only">
               รายละเอียดตำแหน่งงาน
             </DialogDescription>
           </DialogHeader>
           {selected && (
-            <div className="space-y-4 text-sm">
-              <div className="flex flex-wrap gap-2">
+            <>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 text-sm">
+                <div className="flex flex-wrap gap-2">
                 <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium">
                   {publicJobPositionLabel(selected)}
                 </span>
@@ -276,47 +279,49 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </span>
                 )}
               </div>
-              <dl className="grid gap-2 text-xs sm:text-sm">
+              <dl className="grid gap-0 text-xs sm:text-sm">
                 {isStaff && selected.request_no ? (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <div className="border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">เลขที่ใบขอ</dt>
-                    <dd className="font-mono text-right font-medium text-foreground">{selected.request_no}</dd>
+                    <dd className="mt-0.5 font-mono font-medium text-foreground">{selected.request_no}</dd>
                   </div>
                 ) : null}
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">สถานที่</dt>
-                  <dd className="text-right font-medium text-foreground max-w-[65%]">{selected.location_address}</dd>
+                  <dd className="mt-0.5 font-medium leading-relaxed text-foreground break-words">
+                    {selected.location_address}
+                  </dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">อำเภอ / เขต</dt>
-                  <dd className="text-right font-medium text-foreground max-w-[65%]">
+                  <dd className="mt-0.5 font-medium text-foreground break-words">
                     {displayDistrictLine(selected.location_address || '') ?? '—'}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">จังหวัด</dt>
-                  <dd className="text-right font-medium text-foreground max-w-[65%]">
+                  <dd className="mt-0.5 font-medium text-foreground break-words">
                     {inferProvinceFromAddress(selected.location_address || '') ?? '—'}
                   </dd>
                 </div>
                 {extractJobSubtypeLabel(selected) !== 'ไม่ระบุ' ? (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <div className="border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">ลักษณะงานย่อย</dt>
-                    <dd className="text-right font-medium text-foreground max-w-[65%]">
+                    <dd className="mt-0.5 font-medium text-foreground break-words">
                       {extractJobSubtypeLabel(selected)}
                     </dd>
                   </div>
                 ) : null}
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">รายได้รวม (โดยประมาณ)</dt>
                   <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString()}</dd>
                 </div>
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">วันที่ต้องการคน</dt>
                   <dd>{formatYmdDmyBe(selected.required_date)}</dd>
                 </div>
                 {(selected.age_range_min != null || selected.age_range_max != null) && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">ช่วงอายุ</dt>
                     <dd>
                       {selected.age_range_min ?? '—'} – {selected.age_range_max ?? '—'} ปี
@@ -324,31 +329,34 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 )}
                 {selected.gender_requirement && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">เพศ</dt>
                     <dd>{selected.gender_requirement}</dd>
                   </div>
                 )}
                 {selected.vehicle_required && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">รถที่ใช้</dt>
-                    <dd>{selected.vehicle_required}</dd>
+                    <dd className="text-right break-words">{selected.vehicle_required}</dd>
                   </div>
                 )}
                 {selected.work_schedule && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2">
+                  <div className="border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">เวลาทำงาน</dt>
-                    <dd className="text-right max-w-[60%]">{selected.work_schedule}</dd>
+                    <dd className="mt-0.5 break-words">{selected.work_schedule}</dd>
                   </div>
                 )}
                 {isStaff && staffAssigneeLine(selected) ? (
-                  <div className="flex justify-between gap-4 py-2">
-                    <dt className="text-muted-foreground shrink-0">ผู้รับผิดชอบ</dt>
-                    <dd className="text-right font-medium text-foreground max-w-[65%]">{staffAssigneeLine(selected)}</dd>
+                  <div className="py-2.5">
+                    <dt className="text-muted-foreground">ผู้รับผิดชอบ</dt>
+                    <dd className="mt-0.5 font-medium leading-relaxed text-foreground break-words">
+                      {staffAssigneeLine(selected)}
+                    </dd>
                   </div>
                 ) : null}
               </dl>
-              <div className="flex flex-col gap-2">
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 px-5 py-4">
                 {isStaff ? (
                   <button
                     type="button"
@@ -371,7 +379,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <ExternalLink className="h-4 w-4" />
                 </button>
               </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
