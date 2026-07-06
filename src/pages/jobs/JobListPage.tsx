@@ -27,7 +27,7 @@ import {
   URGENCY_FILTER_OPTIONS,
 } from '@/lib/jobUrgency';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { buildRecruiterNameOptions, buildScreenerNameOptions, countUnassignedRecruiters, countUnassignedScreeners, matchesRecruiterFilter, matchesScreenerFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, countUnassignedRecruiters, countUnassignedScreeners, countUnassignedOpls, matchesRecruiterFilter, matchesScreenerFilter, matchesOplFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import {
   departmentFilterOptions,
   filterUnitRequestsByDepartment,
@@ -70,6 +70,7 @@ const JobListPage: React.FC = () => {
     jobSubtypeFilter,
     recruiterFilter,
     screenerFilter,
+    oplFilter,
     urgencyFilter,
     noteFilter,
     ageDaysFilter,
@@ -114,6 +115,11 @@ const JobListPage: React.FC = () => {
     return buildScreenerNameOptions(jobs);
   }, [staffRosterRev, jobs]);
 
+  const opls = useMemo(() => {
+    void staffRosterRev;
+    return buildOplNameOptions(jobs);
+  }, [staffRosterRev, jobs]);
+
   const departmentOptions = useMemo(
     () => (siamrajPrimary ? departmentFilterOptions(jobs) : []),
     [jobs, siamrajPrimary],
@@ -143,17 +149,28 @@ const JobListPage: React.FC = () => {
     return subtypeScopedJobs.filter((j) => {
       if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
       if (!matchesScreenerFilter(j, screenerFilter)) return false;
+      if (!matchesOplFilter(j, oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, unitFilter, screenerFilter]);
+  }, [subtypeScopedJobs, unitFilter, screenerFilter, oplFilter]);
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
       if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
       if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
+      if (!matchesOplFilter(j, oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, unitFilter, recruiterFilter]);
+  }, [subtypeScopedJobs, unitFilter, recruiterFilter, oplFilter]);
+
+  const oplFilterScope = useMemo(() => {
+    return subtypeScopedJobs.filter((j) => {
+      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+      if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
+      if (!matchesScreenerFilter(j, screenerFilter)) return false;
+      return true;
+    });
+  }, [subtypeScopedJobs, unitFilter, recruiterFilter, screenerFilter]);
 
   const unassignedRecruiterCount = useMemo(
     () => countUnassignedRecruiters(recruiterFilterScope),
@@ -165,6 +182,11 @@ const JobListPage: React.FC = () => {
     [screenerFilterScope],
   );
 
+  const unassignedOplCount = useMemo(
+    () => countUnassignedOpls(oplFilterScope),
+    [oplFilterScope],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
@@ -173,6 +195,7 @@ const JobListPage: React.FC = () => {
         if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
         if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
+        if (!matchesOplFilter(j, oplFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
         if (!matchesNoteFilter(j, noteFilter)) return false;
         if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
@@ -182,12 +205,12 @@ const JobListPage: React.FC = () => {
       })
       .filter(
         (j) =>
-          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''}`
+          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
             .toLowerCase()
             .includes(q),
       )
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, urgencyFilter, noteFilter, ageDaysFilter, sort]);
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, ageDaysFilter, sort]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -368,6 +391,23 @@ const JobListPage: React.FC = () => {
           </FilterSelect>
 
           <FilterSelect
+            id="job-list-opl"
+            label="เจ้าหน้าที่ OPL"
+            value={oplFilter}
+            onChange={(v) => updateListState({ oplFilter: v })}
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+              {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedOplCount})
+            </option>
+            {opls.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
             id="job-list-urgency"
             label="สถานะใบขอ"
             value={urgencyFilter}
@@ -461,10 +501,11 @@ const JobListPage: React.FC = () => {
 
                   <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
 
-                  {(j.recruiter_name || j.screener_name) && (
+                  {(j.recruiter_name || j.screener_name || j.opl_name) && (
                     <div className="text-xs text-muted-foreground mt-1">
                       ผู้รับผิดชอบ:{' '}
                       {[
+                        j.opl_name ? `OPL ${j.opl_name}` : null,
                         j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
                         j.screener_name ? `คัดสรร ${j.screener_name}` : null,
                       ]
@@ -538,8 +579,12 @@ const JobListPage: React.FC = () => {
                     <td className="px-3 py-3 text-muted-foreground text-xs">{extractJobSubtypeLabel(j)}</td>
                     <td className="px-3 py-3 text-muted-foreground text-xs">{j.resigned_employee_name || '—'}</td>
                     <td className="px-3 py-3">
-                      {j.recruiter_name || j.screener_name ? (
+                      {j.recruiter_name || j.screener_name || j.opl_name ? (
                         <div className="text-xs leading-tight whitespace-nowrap">
+                          <div>
+                            <span className="text-muted-foreground">OPL </span>
+                            {j.opl_name || '—'}
+                          </div>
                           <div>
                             <span className="text-muted-foreground">สรรหา </span>
                             {j.recruiter_name || '—'}

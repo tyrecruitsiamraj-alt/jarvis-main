@@ -34,6 +34,7 @@ import driverCareRecalculateHandler from './driver-care-recalculate.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
+import siamrajOplImportHandler from './siamraj-opl-import.js';
 import outboundIpHandler from './diagnostics/outbound-ip.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
@@ -60,6 +61,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
   '/api/siamraj/unit-assignments': siamrajUnitAssignmentsHandler as ApiHandler,
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
+  '/api/siamraj/opl-import': siamrajOplImportHandler as ApiHandler,
   '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,

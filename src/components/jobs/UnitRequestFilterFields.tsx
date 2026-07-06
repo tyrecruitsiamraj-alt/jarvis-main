@@ -20,8 +20,10 @@ type FilterOptions = {
   unitOptions: string[];
   recruiters: string[];
   screeners: string[];
+  opls: string[];
   unassignedRecruiterCount: number;
   unassignedScreenerCount: number;
+  unassignedOplCount: number;
 };
 
 type Props = {
@@ -57,8 +59,10 @@ const UnitRequestFilterFields: React.FC<Props> = ({
     unitOptions,
     recruiters,
     screeners,
+    opls,
     unassignedRecruiterCount,
     unassignedScreenerCount,
+    unassignedOplCount,
   } = options;
 
   const selectClassName = layout === 'sidebar' ? 'text-sm' : undefined;
@@ -182,6 +186,24 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           {screeners.map((s) => (
             <option key={s} value={s}>
               {s}
+            </option>
+          ))}
+        </FilterSelect>
+
+        <FilterSelect
+          id={`${idPrefix}-opl`}
+          label="เจ้าหน้าที่ OPL"
+          value={filters.oplFilter}
+          onChange={(v) => onChange({ oplFilter: v })}
+          selectClassName={selectClassName}
+        >
+          <option value="all">ทั้งหมด</option>
+          <option value={STAFF_ASSIGNEE_UNASSIGNED}>
+            {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedOplCount})
+          </option>
+          {opls.map((n) => (
+            <option key={n} value={n}>
+              {n}
             </option>
           ))}
         </FilterSelect>

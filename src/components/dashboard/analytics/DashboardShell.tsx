@@ -18,8 +18,10 @@ type FilterOptions = {
   unitOptions: string[];
   recruiters: string[];
   screeners: string[];
+  opls: string[];
   unassignedRecruiterCount: number;
   unassignedScreenerCount: number;
+  unassignedOplCount: number;
 };
 
 type Props = {

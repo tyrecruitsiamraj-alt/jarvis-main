@@ -6,7 +6,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
-import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -47,6 +47,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
   const [recruiter, setRecruiter] = useState('');
   const [screener, setScreener] = useState('');
+  const [opl, setOpl] = useState('');
   const [rosterRev, setRosterRev] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -63,8 +64,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   useEffect(() => {
     setRecruiter(data?.recruiter_name ?? '');
     setScreener(data?.screener_name ?? '');
+    setOpl(data?.opl_name ?? '');
     setSaveMsg(null);
-  }, [data?.recruiter_name, data?.screener_name]);
+  }, [data?.recruiter_name, data?.screener_name, data?.opl_name]);
 
   const recruiterOptions = useMemo(() => {
     void rosterRev;
@@ -74,11 +76,16 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     void rosterRev;
     return buildScreenerNameOptions();
   }, [rosterRev]);
+  const oplOptions = useMemo(() => {
+    void rosterRev;
+    return buildOplNameOptions();
+  }, [rosterRev]);
 
   const requestNo = data?.request_no;
   const dirty =
     (recruiter.trim() || '') !== (data?.recruiter_name ?? '') ||
-    (screener.trim() || '') !== (data?.screener_name ?? '');
+    (screener.trim() || '') !== (data?.screener_name ?? '') ||
+    (opl.trim() || '') !== (data?.opl_name ?? '');
 
   const saveAssignment = async () => {
     const key = requestNo?.trim();
@@ -89,6 +96,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
       await saveSiamrajUnitAssignment(key, {
         recruiter_name: recruiter.trim() || null,
         screener_name: screener.trim() || null,
+        opl_name: opl.trim() || null,
       });
       queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
         old
@@ -96,6 +104,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               ...old,
               recruiter_name: recruiter.trim() || undefined,
               screener_name: screener.trim() || undefined,
+              opl_name: opl.trim() || undefined,
             }
           : old,
       );
@@ -218,6 +227,15 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       canManageRoster={false}
                       rosterRev={rosterRev}
                     />
+                    <RosterBackedStaffSelect
+                      role="opl"
+                      label="เจ้าหน้าที่ OPL"
+                      value={opl}
+                      onChange={setOpl}
+                      optionNames={oplOptions}
+                      canManageRoster={false}
+                      rosterRev={rosterRev}
+                    />
                   </div>
                   <div className="flex items-center gap-3">
                     <button
@@ -238,6 +256,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <div className="grid sm:grid-cols-2 gap-2">
                   <Field label="เจ้าหน้าที่สรรหา" value={data.recruiter_name} />
                   <Field label="เจ้าหน้าที่คัดสรร" value={data.screener_name} />
+                  <Field label="เจ้าหน้าที่ OPL" value={data.opl_name} />
                   <p className="sm:col-span-2 text-xs text-muted-foreground">
                     กำหนดผู้รับผิดชอบได้เฉพาะ Supervisor ขึ้นไป
                   </p>

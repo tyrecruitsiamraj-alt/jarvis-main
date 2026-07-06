@@ -152,6 +152,8 @@ export interface JobRequest {
   recruiter_name?: string;
   screener_id?: string;
   screener_name?: string;
+  /** เจ้าหน้าที่ OPL (แยกจากสรรหา/คัดสรร) */
+  opl_name?: string;
   age_range_min?: number;
   age_range_max?: number;
   vehicle_required?: string;

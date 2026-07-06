@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OplExcelImportPanel from '@/pages/settings/OplExcelImportPanel';
 import {
   JOB_STAFF_ROSTER_CHANGED_EVENT,
   getJobStaffApiCache,
@@ -7,7 +8,7 @@ import {
 } from '@/lib/jobStaffRemote';
 import { cn } from '@/lib/utils';
 
-type RosterKind = 'recruiter' | 'screener';
+type RosterKind = 'recruiter' | 'screener' | 'opl';
 
 function useRosterRev(): number {
   const [rev, setRev] = useState(0);
@@ -172,6 +173,10 @@ const JobStaffRosterTab: React.FC = () => {
     void rev;
     return getJobStaffApiCache()?.screeners ?? [];
   }, [rev]);
+  const opls = useMemo(() => {
+    void rev;
+    return getJobStaffApiCache()?.opls ?? [];
+  }, [rev]);
 
   useEffect(() => {
     void refreshJobStaffFromApi();
@@ -179,12 +184,14 @@ const JobStaffRosterTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <OplExcelImportPanel />
       <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
-        รายชื่อสรรหา/คัดสรรบันทึกในฐานข้อมูล การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
+        รายชื่อสรรหา/คัดสรร/OPL บันทึกในฐานข้อมูล การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
       </p>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <RosterSection kind="recruiter" title="เจ้าหน้าที่สรรหา" names={recruiters} />
         <RosterSection kind="screener" title="เจ้าหน้าที่คัดสรร" names={screeners} />
+        <RosterSection kind="opl" title="เจ้าหน้าที่ OPL" names={opls} />
       </div>
     </div>
   );

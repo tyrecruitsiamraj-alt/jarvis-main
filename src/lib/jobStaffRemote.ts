@@ -5,8 +5,10 @@ export const JOB_STAFF_ROSTER_CHANGED_EVENT = 'jarvis-job-staff-roster-changed';
 export type JobStaffApiState = {
   recruiters: string[];
   screeners: string[];
+  opls: string[];
   pickerExcludedRecruiters: string[];
   pickerExcludedScreeners: string[];
+  pickerExcludedOpls: string[];
 };
 
 let cache: JobStaffApiState | null = null;
@@ -33,8 +35,10 @@ function parseState(data: unknown): JobStaffApiState | null {
   return {
     recruiters: o.recruiters,
     screeners: o.screeners,
+    opls: isStringArray(o.opls) ? o.opls : [],
     pickerExcludedRecruiters: o.pickerExcludedRecruiters,
     pickerExcludedScreeners: o.pickerExcludedScreeners,
+    pickerExcludedOpls: isStringArray(o.pickerExcludedOpls) ? o.pickerExcludedOpls : [],
   };
 }
 
@@ -61,9 +65,9 @@ export function clearJobStaffApiCache(): void {
 }
 
 type MutateOp =
-  | { op: 'add'; role: 'recruiter' | 'screener'; name: string }
-  | { op: 'remove'; role: 'recruiter' | 'screener'; name: string }
-  | { op: 'rename'; role: 'recruiter' | 'screener'; oldName: string; newName: string };
+  | { op: 'add'; role: 'recruiter' | 'screener' | 'opl'; name: string }
+  | { op: 'remove'; role: 'recruiter' | 'screener' | 'opl'; name: string }
+  | { op: 'rename'; role: 'recruiter' | 'screener' | 'opl'; oldName: string; newName: string };
 
 export async function mutateJobStaffRemote(
   payload: MutateOp,

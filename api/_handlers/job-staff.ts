@@ -13,11 +13,12 @@ import { auditFromAuthed } from '../_lib/audit.js';
 const rosterTable = tableInAppSchema('job_staff_roster');
 const excludedTable = tableInAppSchema('job_staff_picker_excluded');
 const jobsTable = tableInAppSchema('jobs');
+const unitAssignmentsTable = tableInAppSchema('siamraj_unit_assignments');
 
-type Role = 'recruiter' | 'screener';
+type Role = 'recruiter' | 'screener' | 'opl';
 
 function isRole(v: unknown): v is Role {
-  return v === 'recruiter' || v === 'screener';
+  return v === 'recruiter' || v === 'screener' || v === 'opl';
 }
 
 function normName(s: string): string {
@@ -34,23 +35,29 @@ async function fetchState() {
 
   const recruiters: string[] = [];
   const screeners: string[] = [];
+  const opls: string[] = [];
   for (const r of rosterRows) {
     if (r.role === 'recruiter') recruiters.push(r.display_name);
     else if (r.role === 'screener') screeners.push(r.display_name);
+    else if (r.role === 'opl') opls.push(r.display_name);
   }
 
   const pickerExcludedRecruiters: string[] = [];
   const pickerExcludedScreeners: string[] = [];
+  const pickerExcludedOpls: string[] = [];
   for (const e of exRows) {
     if (e.role === 'recruiter') pickerExcludedRecruiters.push(e.name_norm);
     else if (e.role === 'screener') pickerExcludedScreeners.push(e.name_norm);
+    else if (e.role === 'opl') pickerExcludedOpls.push(e.name_norm);
   }
 
   return {
     recruiters,
     screeners,
+    opls,
     pickerExcludedRecruiters,
     pickerExcludedScreeners,
+    pickerExcludedOpls,
   };
 }
 
@@ -77,7 +84,7 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
       const role = body.role;
 
       if (!isRole(role)) {
-        return sendError(res, 400, 'Bad request', 'role must be recruiter or screener');
+        return sendError(res, 400, 'Bad request', 'role must be recruiter, screener, or opl');
       }
 
       if (op === 'add') {
@@ -172,11 +179,18 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
              and lower(trim(recruiter_name)) = lower(trim($2::text))`,
             [newName.trim(), oldName.trim()],
           );
-        } else {
+        } else if (role === 'screener') {
           await dbQuery(
             `update ${jobsTable} set screener_name = $1
              where screener_name is not null
              and lower(trim(screener_name)) = lower(trim($2::text))`,
+            [newName.trim(), oldName.trim()],
+          );
+        } else {
+          await dbQuery(
+            `update ${unitAssignmentsTable} set opl_name = $1
+             where opl_name is not null
+             and lower(trim(opl_name)) = lower(trim($2::text))`,
             [newName.trim(), oldName.trim()],
           );
         }

@@ -40,6 +40,16 @@ export function buildScreenerNameOptions(extraJobs?: JobRequest[]): string[] {
   return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
 }
 
+export function buildOplNameOptions(extraJobs?: JobRequest[]): string[] {
+  const fromJobs = (extraJobs ?? [])
+    .map((j) => j.opl_name)
+    .filter((n): n is string => Boolean(n?.trim()));
+  const api = getJobStaffApiCache();
+  const roster = api?.opls ?? [];
+  const ex = new Set((api?.pickerExcludedOpls ?? []).map((s) => s.toLowerCase()));
+  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+}
+
 export function nameListedInOptions(trimmed: string, options: string[]): boolean {
   const k = trimmed.toLowerCase();
   return options.some((o) => o.trim().toLowerCase() === k);
@@ -51,6 +61,10 @@ export function isRecruiterUnassigned(job: JobRequest): boolean {
 
 export function isScreenerUnassigned(job: JobRequest): boolean {
   return !job.screener_name?.trim();
+}
+
+export function isOplUnassigned(job: JobRequest): boolean {
+  return !job.opl_name?.trim();
 }
 
 export function matchesRecruiterFilter(job: JobRequest, filter: string): boolean {
@@ -65,10 +79,20 @@ export function matchesScreenerFilter(job: JobRequest, filter: string): boolean 
   return job.screener_name === filter;
 }
 
+export function matchesOplFilter(job: JobRequest, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === STAFF_ASSIGNEE_UNASSIGNED) return isOplUnassigned(job);
+  return job.opl_name === filter;
+}
+
 export function countUnassignedRecruiters(jobs: JobRequest[]): number {
   return jobs.filter(isRecruiterUnassigned).length;
 }
 
 export function countUnassignedScreeners(jobs: JobRequest[]): number {
   return jobs.filter(isScreenerUnassigned).length;
+}
+
+export function countUnassignedOpls(jobs: JobRequest[]): number {
+  return jobs.filter(isOplUnassigned).length;
 }

@@ -11,6 +11,7 @@ export type JobListPageState = {
   jobSubtypeFilter: string;
   recruiterFilter: string;
   screenerFilter: string;
+  oplFilter: string;
   urgencyFilter: UrgencyFilter;
   noteFilter: NoteFilter;
   ageDaysFilter: AgeDaysFilter;
@@ -27,6 +28,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   jobSubtypeFilter: 'all',
   recruiterFilter: 'all',
   screenerFilter: 'all',
+  oplFilter: 'all',
   urgencyFilter: 'all',
   noteFilter: 'all',
   ageDaysFilter: 'all',
@@ -72,6 +74,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     jobSubtypeFilter: params.get('st') || JOB_LIST_DEFAULTS.jobSubtypeFilter,
     recruiterFilter: params.get('r') || JOB_LIST_DEFAULTS.recruiterFilter,
     screenerFilter: params.get('sc') || JOB_LIST_DEFAULTS.screenerFilter,
+    oplFilter: params.get('opl') || JOB_LIST_DEFAULTS.oplFilter,
     urgencyFilter: URGENCY_VALUES.has(urgencyNormalized) ? urgencyNormalized : JOB_LIST_DEFAULTS.urgencyFilter,
     noteFilter: NOTE_VALUES.has(noteRaw) ? noteRaw : JOB_LIST_DEFAULTS.noteFilter,
     ageDaysFilter: AGE_DAYS_VALUES.has(ageRaw) ? ageRaw : JOB_LIST_DEFAULTS.ageDaysFilter,
@@ -90,6 +93,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   if (state.jobSubtypeFilter !== JOB_LIST_DEFAULTS.jobSubtypeFilter) params.set('st', state.jobSubtypeFilter);
   if (state.recruiterFilter !== JOB_LIST_DEFAULTS.recruiterFilter) params.set('r', state.recruiterFilter);
   if (state.screenerFilter !== JOB_LIST_DEFAULTS.screenerFilter) params.set('sc', state.screenerFilter);
+  if (state.oplFilter !== JOB_LIST_DEFAULTS.oplFilter) params.set('opl', state.oplFilter);
   if (state.urgencyFilter !== JOB_LIST_DEFAULTS.urgencyFilter) params.set('urg', state.urgencyFilter);
   if (state.noteFilter !== JOB_LIST_DEFAULTS.noteFilter) params.set('nf', state.noteFilter);
   if (state.ageDaysFilter !== JOB_LIST_DEFAULTS.ageDaysFilter) params.set('ag', state.ageDaysFilter);
@@ -111,6 +115,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'jobSubtypeFilter',
   'recruiterFilter',
   'screenerFilter',
+  'oplFilter',
   'urgencyFilter',
   'noteFilter',
   'ageDaysFilter',

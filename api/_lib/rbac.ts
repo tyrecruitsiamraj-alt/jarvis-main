@@ -41,6 +41,7 @@ export type ApiResource =
   | 'siamraj-unit-requests'
   | 'siamraj-unit-assignments'
   | 'siamraj-unit-notes'
+  | 'siamraj-opl-import'
   | 'diagnostics-outbound-ip';
 
 /**
@@ -120,6 +121,9 @@ export function minimumRoleFor(
 
     case 'siamraj-unit-notes':
       return 'staff';
+
+    case 'siamraj-opl-import':
+      return 'admin';
 
     default:
       return 'admin';

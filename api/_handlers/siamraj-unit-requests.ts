@@ -41,6 +41,7 @@ async function attachAssignments(items: unknown[]): Promise<void> {
       if (!a) continue;
       it.recruiter_name = a.recruiter_name;
       it.screener_name = a.screener_name;
+      it.opl_name = a.opl_name;
     }
   } catch {
     /* ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม */

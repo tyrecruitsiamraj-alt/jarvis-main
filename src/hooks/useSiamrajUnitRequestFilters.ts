@@ -17,10 +17,13 @@ import {
 import {
   buildRecruiterNameOptions,
   buildScreenerNameOptions,
+  buildOplNameOptions,
   countUnassignedRecruiters,
   countUnassignedScreeners,
+  countUnassignedOpls,
   matchesRecruiterFilter,
   matchesScreenerFilter,
+  matchesOplFilter,
 } from '@/lib/jobStaffNames';
 
 export type UnitRequestStatusFilter = 'all' | 'active' | 'closed';
@@ -31,6 +34,7 @@ export type UnitRequestFilterState = {
   jobSubtypeFilter: string;
   recruiterFilter: string;
   screenerFilter: string;
+  oplFilter: string;
   urgencyFilter: UrgencyFilter;
   noteFilter: NoteFilter;
   ageDaysFilter: AgeDaysFilter;
@@ -43,6 +47,7 @@ export const UNIT_REQUEST_FILTER_DEFAULTS: UnitRequestFilterState = {
   jobSubtypeFilter: 'all',
   recruiterFilter: 'all',
   screenerFilter: 'all',
+  oplFilter: 'all',
   urgencyFilter: 'all',
   noteFilter: 'all',
   ageDaysFilter: 'all',
@@ -79,6 +84,7 @@ export function filterUnitRequests(
     if (f.unitFilter !== 'all' && j.unit_name !== f.unitFilter) return false;
     if (!matchesRecruiterFilter(j, f.recruiterFilter)) return false;
     if (!matchesScreenerFilter(j, f.screenerFilter)) return false;
+    if (!matchesOplFilter(j, f.oplFilter)) return false;
     if (!matchesUrgencyFilter(j, f.urgencyFilter)) return false;
     if (!matchesNoteFilter(j, f.noteFilter)) return false;
     if (!matchesAgeDaysFilter(j, f.ageDaysFilter)) return false;
@@ -132,21 +138,37 @@ export function useSiamrajUnitRequestFilters(
     return buildScreenerNameOptions(jobs);
   }, [staffRosterRev, jobs]);
 
+  const opls = useMemo(() => {
+    void staffRosterRev;
+    return buildOplNameOptions(jobs);
+  }, [staffRosterRev, jobs]);
+
   const recruiterFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
       if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
       if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
+      if (!matchesOplFilter(j, filters.oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.screenerFilter]);
+  }, [subtypeScopedJobs, filters.unitFilter, filters.screenerFilter, filters.oplFilter]);
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
       if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
       if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
+      if (!matchesOplFilter(j, filters.oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter]);
+  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.oplFilter]);
+
+  const oplFilterScope = useMemo(() => {
+    return subtypeScopedJobs.filter((j) => {
+      if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
+      if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
+      if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
+      return true;
+    });
+  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.screenerFilter]);
 
   const unassignedRecruiterCount = useMemo(
     () => countUnassignedRecruiters(recruiterFilterScope),
@@ -156,6 +178,11 @@ export function useSiamrajUnitRequestFilters(
   const unassignedScreenerCount = useMemo(
     () => countUnassignedScreeners(screenerFilterScope),
     [screenerFilterScope],
+  );
+
+  const unassignedOplCount = useMemo(
+    () => countUnassignedOpls(oplFilterScope),
+    [oplFilterScope],
   );
 
   const filteredJobs = useMemo(
@@ -169,8 +196,10 @@ export function useSiamrajUnitRequestFilters(
     unitOptions,
     recruiters,
     screeners,
+    opls,
     unassignedRecruiterCount,
     unassignedScreenerCount,
+    unassignedOplCount,
     filteredJobs,
     subtypeScopedJobs,
     departmentScopedJobs,

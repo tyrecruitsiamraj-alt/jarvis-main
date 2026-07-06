@@ -34,7 +34,7 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
 /** บันทึกผู้รับผิดชอบ (สรรหา/คัดสรร) ของใบขอ Siamraj — เก็บใน PostgreSQL ฝั่ง Jarvis */
 export async function saveSiamrajUnitAssignment(
   requestNo: string,
-  payload: { recruiter_name?: string | null; screener_name?: string | null },
+  payload: { recruiter_name?: string | null; screener_name?: string | null; opl_name?: string | null },
 ): Promise<void> {
   const r = await apiFetch('/api/siamraj/unit-assignments', {
     method: 'POST',

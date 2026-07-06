@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { getJobStaffApiCache, mutateJobStaffRemote } from '@/lib/jobStaffRemote';
 
-type Role = 'recruiter' | 'screener';
+type Role = 'recruiter' | 'screener' | 'opl';
 
 export type RosterBackedStaffSelectProps = {
   role: Role;
@@ -31,7 +31,11 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
   const rosterOnly = useMemo(() => {
     void rosterRev;
     const c = getJobStaffApiCache();
-    return role === 'recruiter' ? (c?.recruiters ?? []) : (c?.screeners ?? []);
+    return role === 'recruiter'
+      ? (c?.recruiters ?? [])
+      : role === 'screener'
+        ? (c?.screeners ?? [])
+        : (c?.opls ?? []);
   }, [role, rosterRev]);
 
   const [addDraft, setAddDraft] = useState('');

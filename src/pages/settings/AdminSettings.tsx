@@ -36,7 +36,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'appearance', label: 'ธีม / โลโก้', icon: Palette, adminOnly: false },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
-  { id: 'jobStaff', label: 'สรรหา / คัดสรร', icon: UserCog, adminOnly: true },
+  { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
   { id: 'driverCare', label: 'Driver Care', icon: HeartPulse, adminOnly: true },
   { id: 'outboundIp', label: 'Vercel IP', icon: Globe, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },

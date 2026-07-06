@@ -164,8 +164,10 @@ const JobDashboard: React.FC = () => {
                 unitOptions: filterApi.unitOptions,
                 recruiters: filterApi.recruiters,
                 screeners: filterApi.screeners,
+                opls: filterApi.opls,
                 unassignedRecruiterCount: filterApi.unassignedRecruiterCount,
                 unassignedScreenerCount: filterApi.unassignedScreenerCount,
+                unassignedOplCount: filterApi.unassignedOplCount,
               }}
             />
           </div>

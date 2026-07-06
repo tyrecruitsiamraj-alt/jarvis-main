@@ -21,7 +21,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no query is required');
       const item = await getUnitAssignment(requestNo);
       return res.status(200).json(
-        item ?? { request_no: requestNo, recruiter_name: null, screener_name: null, updated_at: null },
+        item ?? {
+          request_no: requestNo,
+          recruiter_name: null,
+          screener_name: null,
+          opl_name: null,
+          updated_at: null,
+        },
       );
     } catch (e) {
       return handleApiError(res, e, 'siamraj-unit-assignments GET', { userId: req.user.sub });
@@ -42,6 +48,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         requestNo,
         recruiterName: body.recruiter_name,
         screenerName: body.screener_name,
+        oplName: body.opl_name,
         userId: req.user.sub,
       });
 
@@ -49,7 +56,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'siamraj_unit_assignment.upsert',
         entityType: 'siamraj_unit_assignment',
         entityId: requestNo,
-        after: { recruiter_name: item.recruiter_name, screener_name: item.screener_name },
+        after: {
+          recruiter_name: item.recruiter_name,
+          screener_name: item.screener_name,
+          opl_name: item.opl_name,
+        },
       });
 
       return res.status(200).json(item);
