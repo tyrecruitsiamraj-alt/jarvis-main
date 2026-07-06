@@ -52,7 +52,7 @@ const menuItems: {
   {
     path: '/jobs/board',
     label: 'บอร์ดงานเปิดรับ',
-    desc: 'มุมมองการ์ดงานที่เปิดรับสมัคร',
+    desc: 'มุมมองเดียวกับลิงก์สมัครงาน /apply',
     icon: LayoutGrid,
     accent: 'text-sky-700 bg-sky-500/12',
     functionId: 'unit_requests_read',
