@@ -18,6 +18,7 @@ import {
   computeJobUrgency,
   countAgeDaysBreakdown,
 } from '@/lib/jobUrgency';
+import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import type {
@@ -526,6 +527,7 @@ export function buildDashboardData(
     activityTrend: buildActivityTrend(trendJobs, trendFrom, trendTo),
     statusBreakdown: buildStatusBreakdown(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
+    ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),
     recruiterOverview: buildRecruiterOverview(scopedJobs, today),
     workQueue: sortedQueue,
     periodLabel,

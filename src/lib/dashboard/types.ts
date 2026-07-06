@@ -98,6 +98,8 @@ export type DashboardData = {
   activityTrend: DashboardActivityTrendPoint[];
   statusBreakdown: DashboardStatusBreakdown[];
   ageDaysBreakdown: DashboardAgeDaysBreakdown[];
+  /** จำนวนตำแหน่งที่ต้องการรวม (request_qty) — แยกจากจำนวนใบในกล่อง */
+  ageDaysPositionTotal: number;
   recruiterOverview: DashboardRecruiterOverview[];
   workQueue: DashboardWorkItem[];
   periodLabel: string;

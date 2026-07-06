@@ -33,6 +33,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { bucket: '15-30', label: '15–30 วัน', count: 9 },
     { bucket: '30+', label: '30 วันขึ้นไป', count: 4 },
   ],
+  ageDaysPositionTotal: 52,
   recruiterOverview: [
     { name: 'สมหญิง ใจดี', total: 14, completed: 8, overdue: 2, sharePercent: 29.2 },
     { name: 'วิชัย รักงาน', total: 11, completed: 6, overdue: 1, sharePercent: 22.9 },

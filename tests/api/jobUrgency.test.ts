@@ -122,11 +122,11 @@ describe('countAgeDaysBreakdown', () => {
     expect(counts['30+']).toBe(1);
   });
 
-  it('weights buckets by position_units', () => {
+  it('counts one request per bucket regardless of position_units', () => {
     const counts = countAgeDaysBreakdown(
       [job({ submittedAt: '2026-07-01', required_date: '2026-08-01', position_units: 6 })],
       today,
     );
-    expect(counts.advance).toBe(6);
+    expect(counts.advance).toBe(1);
   });
 });

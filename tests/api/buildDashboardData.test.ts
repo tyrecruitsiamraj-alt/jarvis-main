@@ -68,6 +68,8 @@ describe('buildDashboardData', () => {
       (july?.resignations ?? 0) + (july?.replacements ?? 0) + (july?.newOpenings ?? 0);
     expect(periodTotal).toBe(3);
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(periodTotal);
+    const bucketTotal = data.ageDaysBreakdown.reduce((s, b) => s + b.count, 0);
+    expect(bucketTotal).toBe(scoped.length);
     expect(data.activityTrend.every((p) => p.label.length > 0)).toBe(true);
   });
 
