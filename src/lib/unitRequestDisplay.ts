@@ -37,6 +37,11 @@ export function unitRequestSelectLabel(job: JobRequest): string {
   return action ? `${unit} · ${action}` : unit;
 }
 
+/** ป้ายตำแหน่งบนบอร์ดประกาศสาธารณะ */
+export function publicJobPositionLabel(job: JobRequest): string {
+  return job.job_description_code_1?.trim() || JOB_TYPE_LABELS[job.job_type] || 'อื่นๆ';
+}
+
 /** คำค้นหาแบบรวมฟิลด์หลัก */
 export function unitRequestSearchBlob(job: JobRequest): string {
   return [

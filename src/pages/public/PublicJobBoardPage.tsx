@@ -1,17 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
-import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { unitRequestCardSubtitle, unitRequestCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
-import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
-import { districtMatchesFilter } from '@/lib/districtMatch';
-import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
-import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
-import LocationFilterSelect from '@/components/public/LocationFilterSelect';
+import JobBoardFilterBar from '@/components/jobs/JobBoardFilterBar';
+import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   Dialog,
   DialogContent,
@@ -20,48 +17,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import SearchField from '@/components/shared/SearchField';
 import { MapPin, Sparkles, Briefcase, Calendar, Banknote, ExternalLink } from 'lucide-react';
 
 const SOWORK_APPLY_URL =
   (import.meta.env.VITE_SOWORK_APPLY_URL as string | undefined)?.trim() ||
   'https://s.siamrajathanee.dev/u/m82prvg2';
 
-type PublicFilter = 'all' | 'urgent';
-
-const isPublicVisible = (j: JobRequest) => j.status === 'open' || j.status === 'in_progress';
-
-function normSearch(s: string): string {
-  return s.normalize('NFC').toLowerCase().trim();
-}
-
-function searchTokens(input: string): string[] {
-  return normSearch(input)
-    .split(/[\s,./\-_|]+/u)
-    .map((t) => t.trim())
-    .filter((t) => t.length >= 2);
-}
-
-/** ให้คำว่า "กรุงเทพ" / "กทม" ค้นเจองานที่อยู่ กรุงเทพมหานคร */
-function jobSearchBlob(j: JobRequest): string {
-  const addr = j.location_address || '';
-  const prov = inferProvinceFromAddress(addr);
-  let extra = '';
-  if (prov === 'กรุงเทพมหานคร' || /กรุงเทพ|กทม\.?|bangkok/i.test(addr)) {
-    extra = ' กรุงเทพ กรุงเทพฯ กทม กทม. bangkok';
-  }
-  if (prov) extra += ` ${prov}`;
-  return normSearch(`${unitRequestSearchBlob(j)} ${addr}${extra}`);
-}
-
 const PublicJobBoardPage: React.FC = () => {
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [provinceFilter, setProvinceFilter] = useState('');
-  const [districtFilter, setDistrictFilter] = useState('');
-  const [chip, setChip] = useState<PublicFilter>('all');
   const [selected, setSelected] = useState<JobRequest | null>(null);
+  const filters = useJobBoardFilters(jobs);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,61 +54,9 @@ const PublicJobBoardPage: React.FC = () => {
     };
   }, []);
 
-  const visible = useMemo(() => {
-    return jobs.filter(isPublicVisible);
-  }, [jobs]);
-
-  const provinceOptions = THAI_PROVINCE_NAMES_SORTED;
-
-  const districtOptions = useMemo(() => {
-    if (!provinceFilter) return [];
-    return [...getDistrictOptionsForProvince(provinceFilter)];
-  }, [provinceFilter]);
-
-  useEffect(() => {
-    if (!districtFilter) return;
-    if (!districtOptions.includes(districtFilter)) setDistrictFilter('');
-  }, [districtFilter, districtOptions]);
-
-  const { filtered, usedRelatedFallback } = useMemo(() => {
-    const q = normSearch(search);
-    const baseRows = visible
-      .filter((j) => {
-        if (chip === 'urgent') return j.urgency === 'urgent';
-        return true;
-      })
-      .filter((j) => {
-        const jobProv = inferProvinceFromAddress(j.location_address);
-        if (provinceFilter && jobProv !== provinceFilter) return false;
-        if (districtFilter && !districtMatchesFilter(j.location_address, districtFilter)) return false;
-        return true;
-      });
-    if (!q) return { filtered: baseRows, usedRelatedFallback: false };
-
-    const exact = baseRows.filter((j) => jobSearchBlob(j).includes(q));
-    if (exact.length > 0) return { filtered: exact, usedRelatedFallback: false };
-
-    const tokens = searchTokens(search);
-    if (tokens.length === 0) return { filtered: baseRows, usedRelatedFallback: false };
-
-    const related = baseRows.filter((j) => {
-      const blob = jobSearchBlob(j);
-      return tokens.some((t) => blob.includes(t) || t.includes(blob));
-    });
-    if (related.length > 0) return { filtered: related, usedRelatedFallback: true };
-
-    // Same behavior as PreCheck fallback: if strict text match returns nothing, keep nearby rows.
-    return { filtered: baseRows, usedRelatedFallback: true };
-  }, [visible, search, chip, provinceFilter, districtFilter]);
-
   const openApply = () => {
     window.open(SOWORK_APPLY_URL, '_blank', 'noopener,noreferrer');
   };
-
-  const onProvinceFilterChange = useCallback((next: string) => {
-    setProvinceFilter(next);
-    setDistrictFilter('');
-  }, []);
 
   return (
     <div className="relative border-b border-white/50 bg-gradient-to-b from-blue-100/30 via-transparent to-transparent">
@@ -161,53 +75,22 @@ const PublicJobBoardPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="mt-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <SearchField
-            wrapperClassName="flex-1 max-w-xl"
-            placeholder="ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                { id: 'all' as const, label: 'ทั้งหมด' },
-                { id: 'urgent' as const, label: 'ด่วน' },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setChip(f.id)}
-                className={cn(
-                  'rounded-full px-4 py-2 text-xs font-semibold transition-all',
-                  chip === f.id
-                    ? 'jarvis-pill-btn px-4 py-2 text-xs shadow-md'
-                    : 'bg-white/55 text-secondary-foreground hover:bg-white/75 border border-white/80',
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative z-10 mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <LocationFilterSelect
-            label="จังหวัด"
-            placeholder="เลือกจังหวัด"
-            value={provinceFilter}
-            onChange={onProvinceFilterChange}
-            options={provinceOptions}
-            disabled={loading}
-          />
-          <LocationFilterSelect
-            label="อำเภอ / เขต"
-            placeholder={provinceFilter ? 'เลือกอำเภอ/เขต' : 'เลือกจังหวัดก่อน'}
-            value={districtFilter}
-            onChange={setDistrictFilter}
-            options={districtOptions}
-            disabled={loading || !provinceFilter}
+        <div className="relative z-10">
+          <JobBoardFilterBar
+            search={filters.search}
+            onSearchChange={filters.setSearch}
+            chip={filters.chip}
+            onChipChange={filters.setChip}
+            provinceFilter={filters.provinceFilter}
+            onProvinceFilterChange={filters.onProvinceFilterChange}
+            districtFilter={filters.districtFilter}
+            onDistrictFilterChange={filters.setDistrictFilter}
+            positionFilter={filters.positionFilter}
+            onPositionFilterChange={filters.setPositionFilter}
+            provinceOptions={filters.provinceOptions}
+            districtOptions={filters.districtOptions}
+            positionOptions={filters.positionOptions}
+            loading={loading}
           />
         </div>
 
@@ -215,13 +98,13 @@ const PublicJobBoardPage: React.FC = () => {
           <p className="mt-8 text-sm text-muted-foreground animate-pulse">กำลังโหลดประกาศงาน...</p>
         )}
 
-        {!loading && usedRelatedFallback && search.trim() && (
+        {!loading && filters.usedRelatedFallback && filters.search.trim() && (
           <p className="mt-3 text-xs text-muted-foreground">
             ไม่พบผลที่ตรงคำค้นทั้งหมด เลยแสดงงานที่ใกล้เคียงให้แทน
           </p>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && filters.filtered.length === 0 && (
           <div className="mt-12 jarvis-frost rounded-[1.5rem] border-dashed border-white/70 p-10 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
             <p className="font-medium text-foreground">ยังไม่มีตำแหน่งที่ตรงกับตัวกรอง</p>
@@ -230,7 +113,7 @@ const PublicJobBoardPage: React.FC = () => {
         )}
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-12">
-          {filtered.map((job) => (
+          {filters.filtered.map((job) => (
             <Card
               key={job.id}
               className="group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40"
@@ -256,7 +139,7 @@ const PublicJobBoardPage: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                    {job.job_description_code_1 || JOB_TYPE_LABELS[job.job_type]}
+                    {publicJobPositionLabel(job)}
                   </span>
                   {job.job_description_code_1 && job.job_type ? (
                     <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
@@ -334,7 +217,7 @@ const PublicJobBoardPage: React.FC = () => {
             <div className="space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium">
-                  {selected.job_description_code_1 || JOB_TYPE_LABELS[selected.job_type]}
+                  {publicJobPositionLabel(selected)}
                 </span>
                 {selected.job_description_code_1 ? (
                   <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">

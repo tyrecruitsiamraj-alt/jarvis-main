@@ -29,6 +29,7 @@ import MatchingPage from "@/pages/matching/MatchingPage";
 import PreCheckPage from "@/pages/matching/PreCheckPage";
 import JobDashboard from "@/pages/jobs/JobDashboard";
 import JobListPage from "@/pages/jobs/JobListPage";
+import StaffJobBoardPage from "@/pages/jobs/StaffJobBoardPage";
 import JobDetailPage from "@/pages/jobs/JobDetailPage";
 import SiamrajUnitRequestDetailPage from "@/pages/jobs/SiamrajUnitRequestDetailPage";
 import DriverCareOverview from "@/pages/driver-care/DriverCareOverview";
@@ -88,6 +89,7 @@ const ProtectedRoutes = () => {
         <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
         <Route path="/jobs/overview" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
+        <Route path="/jobs/board" element={<StaffJobBoardPage />} />
         <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
         <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
         <Route path="/jobs/:id" element={<JobDetailPage />} />

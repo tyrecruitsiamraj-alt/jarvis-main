@@ -9,9 +9,12 @@ import {
   Settings,
   HeartPulse,
   ArrowRight,
+  LayoutGrid,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import type { AppFunctionId } from '@/lib/roleFunctions';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { motion } from 'framer-motion';
 
@@ -23,6 +26,7 @@ const menuItems: {
   icon: LucideIcon;
   accent: string;
   adminOnly?: boolean;
+  functionId?: AppFunctionId;
 }[] = [
   {
     path: '/wl',
@@ -46,11 +50,20 @@ const menuItems: {
     accent: 'text-rose-700 bg-rose-500/12',
   },
   {
+    path: '/jobs/board',
+    label: 'บอร์ดงานเปิดรับ',
+    desc: 'มุมมองการ์ดงานที่เปิดรับสมัคร',
+    icon: LayoutGrid,
+    accent: 'text-sky-700 bg-sky-500/12',
+    functionId: 'unit_requests_read',
+  },
+  {
     path: '/jobs/list',
     label: 'หน่วยงาน',
     desc: 'จัดการใบขอและหน่วยงาน',
     icon: Briefcase,
     accent: 'text-blue-600 bg-blue-400/12',
+    functionId: 'unit_requests_read',
   },
   {
     path: '/matching/candidates',
@@ -79,8 +92,13 @@ const menuItems: {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
+  const { isFunctionEnabled } = useRolePermissions();
 
-  const filteredMenus = menuItems.filter((item) => !item.adminOnly || hasPermission('admin'));
+  const filteredMenus = menuItems.filter((item) => {
+    if (item.adminOnly && !hasPermission('admin')) return false;
+    if (item.functionId && !isFunctionEnabled(item.functionId)) return false;
+    return true;
+  });
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
