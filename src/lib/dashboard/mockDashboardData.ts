@@ -27,11 +27,11 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { status: 'overdue', label: 'ล่าช้า', count: 6, color: '#ef4444' },
   ],
   ageDaysBreakdown: [
+    { bucket: 'advance', label: 'ล่วงหน้า', count: 22 },
     { bucket: '1-7', label: '1–7 วัน', count: 18 },
     { bucket: '8-14', label: '8–14 วัน', count: 11 },
     { bucket: '15-30', label: '15–30 วัน', count: 9 },
     { bucket: '30+', label: '30 วันขึ้นไป', count: 4 },
-    { bucket: 'advance', label: 'ล่วงหน้า', count: 22 },
   ],
   recruiterOverview: [
     { name: 'สมหญิง ใจดี', total: 14, completed: 8, overdue: 2, sharePercent: 29.2 },

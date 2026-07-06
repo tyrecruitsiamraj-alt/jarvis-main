@@ -15,11 +15,11 @@ export type AgeDaysFilter = 'all' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
 export type AgeDaysDisplayBucket = '1-7' | '8-14' | '15-30' | '30+' | 'advance';
 
 export const AGE_DAYS_DISPLAY_BUCKETS: { id: AgeDaysDisplayBucket; label: string }[] = [
+  { id: 'advance', label: 'ล่วงหน้า' },
   { id: '1-7', label: '1–7 วัน' },
   { id: '8-14', label: '8–14 วัน' },
   { id: '15-30', label: '15–30 วัน' },
   { id: '30+', label: '30 วันขึ้นไป' },
-  { id: 'advance', label: 'ล่วงหน้า' },
 ];
 
 export type JobListSort = 'assignee_age' | 'age_desc' | 'age_asc' | 'newest' | 'oldest';
@@ -213,15 +213,26 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
   }
 }
 
+function isBeforeRequiredDate(job: JobRequest, today = new Date()): boolean {
+  const required = parseJobDate(job.required_date);
+  if (!required) return false;
+  return differenceInCalendarDays(required, todayStart(today)) > 0;
+}
+
+function getDashboardElapsedDays(job: JobRequest, today = new Date()): number | null {
+  const submitted = submittedDate(job);
+  if (!submitted) return null;
+  return differenceInCalendarDays(todayStart(today), submitted);
+}
+
 function matchesDashboardAgeBucket(
   job: JobRequest,
   bucket: AgeDaysDisplayBucket,
   today = new Date(),
 ): boolean {
-  const meta = computeJobUrgency(job, today);
-  if (bucket === 'advance') return meta.kind === 'advance';
-  if (meta.kind === 'advance') return false;
-  const days = getJobRequestAgeDays(job, today);
+  if (bucket === 'advance') return isBeforeRequiredDate(job, today);
+  if (isBeforeRequiredDate(job, today)) return false;
+  const days = getDashboardElapsedDays(job, today);
   if (days == null) return false;
   switch (bucket) {
     case '1-7':
@@ -237,7 +248,7 @@ function matchesDashboardAgeBucket(
   }
 }
 
-/** นับใบขอแยกช่วงวันผ่านมา + ล่วงหน้า — รวมแล้วเท่าจำนวนใบทั้งหมด */
+/** นับใบขอ: ล่วงหน้า = ยังไม่ถึงวันที่ต้องการ, ที่เหลือแบ่งตามวันผ่านมาตั้งแต่กรอก */
 export function countAgeDaysBreakdown(
   jobs: JobRequest[],
   today = new Date(),
