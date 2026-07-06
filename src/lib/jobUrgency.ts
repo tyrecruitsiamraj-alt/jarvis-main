@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest, JobUrgency } from '@/types';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 
 export const URGENCY_LEAD_DAYS = 7;
 
@@ -248,7 +249,7 @@ function matchesDashboardAgeBucket(
   }
 }
 
-/** นับใบขอต่อกล่อง — รวมแล้วเท่าจำนวนใบทั้งหมด (ล่วงหน้า = คีย์ ≥7 วัน และยังไม่ถึงวันที่ต้องการ) */
+/** นับตำแหน่งที่ต้องการต่อกล่อง — รวมแล้วเท่า KPI งานทั้งหมด */
 export function countAgeDaysBreakdown(
   jobs: JobRequest[],
   today = new Date(),
@@ -261,15 +262,16 @@ export function countAgeDaysBreakdown(
     advance: 0,
   };
   for (const j of jobs) {
+    const units = jobPositionUnits(j);
     let matched = false;
     for (const bucket of AGE_DAYS_DISPLAY_BUCKETS) {
       if (matchesDashboardAgeBucket(j, bucket.id, today)) {
-        counts[bucket.id] += 1;
+        counts[bucket.id] += units;
         matched = true;
         break;
       }
     }
-    if (!matched) counts['1-7'] += 1;
+    if (!matched) counts['1-7'] += units;
   }
   return counts;
 }

@@ -18,7 +18,7 @@ import {
   computeJobUrgency,
   countAgeDaysBreakdown,
 } from '@/lib/jobUrgency';
-import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
+import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import type {
@@ -310,7 +310,8 @@ function countByStatus(jobs: JobRequest[], today: Date): Record<DashboardTaskSta
     at_risk: 0,
   };
   for (const j of jobs) {
-    counts[mapJobToTaskStatus(j, today)] += 1;
+    const units = jobPositionUnits(j);
+    counts[mapJobToTaskStatus(j, today)] += units;
   }
   return counts;
 }
@@ -318,8 +319,8 @@ function countByStatus(jobs: JobRequest[], today: Date): Record<DashboardTaskSta
 function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): DashboardKpi[] {
   const cur = countByStatus(current, today);
   const prev = countByStatus(previous, today);
-  const curTotal = current.length;
-  const prevTotal = previous.length;
+  const curTotal = sumJobPositionUnits(current);
+  const prevTotal = sumJobPositionUnits(previous);
   const curOpen = cur.pending + cur.in_progress + cur.at_risk + cur.overdue;
   const prevOpen = prev.pending + prev.in_progress + prev.at_risk + prev.overdue;
   const successRate = curTotal ? Math.round((cur.completed / curTotal) * 1000) / 10 : 0;
@@ -330,35 +331,35 @@ function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): 
       id: 'total',
       label: 'งานทั้งหมด',
       value: curTotal,
-      description: 'ใบขอตามตัวกรอง (เทียบหน้ารายการหน่วยงาน)',
+      description: 'ตำแหน่งที่ต้องการตามตัวกรอง',
       trendPercent: trendPercent(curTotal, prevTotal),
     },
     {
       id: 'open',
       label: 'รอดำเนินการ',
       value: curOpen,
-      description: 'ยังไม่ปิด / ไม่ยกเลิก',
+      description: 'ตำแหน่งที่ยังไม่ปิด / ไม่ยกเลิก',
       trendPercent: trendPercent(curOpen, prevOpen),
     },
     {
       id: 'overdue',
       label: 'ล่าช้า',
       value: cur.overdue,
-      description: 'เกินกำหนดหรือค้างนาน',
+      description: 'ตำแหน่งที่เกินกำหนดหรือค้างนาน',
       trendPercent: trendPercent(cur.overdue, prev.overdue),
     },
     {
       id: 'completed',
       label: 'สำเร็จ',
       value: cur.completed,
-      description: 'ปิดงานแล้ว',
+      description: 'ตำแหน่งที่ปิดงานแล้ว',
       trendPercent: trendPercent(cur.completed, prev.completed),
     },
     {
       id: 'success_rate',
       label: 'อัตราสำเร็จ',
       value: successRate,
-      description: '% ปิดงานจากทั้งหมด',
+      description: '% ตำแหน่งที่ปิดจากทั้งหมด',
       trendPercent: trendPercent(successRate, prevSuccessRate),
       format: 'percent',
     },
@@ -421,14 +422,15 @@ function buildRecruiterOverview(jobs: JobRequest[], today: Date): DashboardRecru
   const map = new Map<string, { total: number; completed: number; overdue: number }>();
   for (const j of jobs) {
     const name = j.recruiter_name?.trim() || 'ยังไม่มอบหมาย';
+    const units = jobPositionUnits(j);
     const row = map.get(name) ?? { total: 0, completed: 0, overdue: 0 };
-    row.total += 1;
+    row.total += units;
     const st = mapJobToTaskStatus(j, today);
-    if (st === 'completed') row.completed += 1;
-    if (st === 'overdue') row.overdue += 1;
+    if (st === 'completed') row.completed += units;
+    if (st === 'overdue') row.overdue += units;
     map.set(name, row);
   }
-  const total = jobs.length || 1;
+  const total = sumJobPositionUnits(jobs) || 1;
   return [...map.entries()]
     .map(([name, row]) => ({
       name,
@@ -527,6 +529,7 @@ export function buildDashboardData(
     activityTrend: buildActivityTrend(trendJobs, trendFrom, trendTo),
     statusBreakdown: buildStatusBreakdown(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
+    ageDaysRequestTotal: scopedJobs.length,
     ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),
     recruiterOverview: buildRecruiterOverview(scopedJobs, today),
     workQueue: sortedQueue,

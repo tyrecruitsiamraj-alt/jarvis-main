@@ -6,7 +6,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   previousPeriodLabel: 'เดือนที่แล้ว',
   activityTrendLabel: 'ม.ค. 2026 – ก.ค. 2026',
   kpis: [
-    { id: 'total', label: 'งานทั้งหมด', value: 48, description: 'ใบขอในช่วงที่เลือก', trendPercent: 12 },
+    { id: 'total', label: 'งานทั้งหมด', value: 52, description: 'ตำแหน่งที่ต้องการตามตัวกรอง', trendPercent: 12 },
     { id: 'open', label: 'รอดำเนินการ', value: 21, description: 'ยังไม่ปิด / ไม่ยกเลิก', trendPercent: -5 },
     { id: 'overdue', label: 'ล่าช้า', value: 6, description: 'เกินกำหนดหรือค้างนาน', trendPercent: 2 },
     { id: 'completed', label: 'สำเร็จ', value: 24, description: 'ปิดงานแล้ว', trendPercent: 18 },
@@ -34,6 +34,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { bucket: '30+', label: '30 วันขึ้นไป', count: 4 },
   ],
   ageDaysPositionTotal: 52,
+  ageDaysRequestTotal: 48,
   recruiterOverview: [
     { name: 'สมหญิง ใจดี', total: 14, completed: 8, overdue: 2, sharePercent: 29.2 },
     { name: 'วิชัย รักงาน', total: 11, completed: 6, overdue: 1, sharePercent: 22.9 },

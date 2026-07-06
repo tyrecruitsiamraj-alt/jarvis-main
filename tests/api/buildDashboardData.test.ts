@@ -11,6 +11,7 @@ import {
   resolveYearToDateTrendRange,
 } from '../../src/lib/dashboard/buildDashboardData';
 import { DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
+import { sumJobPositionUnits } from '../../src/lib/jobPositionUnits';
 import type { JobRequest } from '@/types';
 
 function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
@@ -69,7 +70,8 @@ describe('buildDashboardData', () => {
     expect(periodTotal).toBe(3);
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(periodTotal);
     const bucketTotal = data.ageDaysBreakdown.reduce((s, b) => s + b.count, 0);
-    expect(bucketTotal).toBe(scoped.length);
+    expect(bucketTotal).toBe(sumJobPositionUnits(scoped));
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(sumJobPositionUnits(scoped));
     expect(data.activityTrend.every((p) => p.label.length > 0)).toBe(true);
   });
 
@@ -95,6 +97,20 @@ describe('buildDashboardData', () => {
     expect(data.activityTrend[1]?.replacements).toBe(1);
     expect(data.activityTrend[6]?.newOpenings).toBe(1);
     expect(data.activityTrendLabel).toBe(trend.label);
+  });
+
+  it('weights KPI and age buckets by position_units', () => {
+    const jobs = [
+      job({ id: 'a', unit_name: 'A', position_units: 3, request_date: '2026-07-01' }),
+      job({ id: 'b', unit_name: 'B', position_units: 2, request_date: '2026-07-02' }),
+    ];
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(5);
+    expect(data.ageDaysPositionTotal).toBe(5);
+    expect(data.ageDaysRequestTotal).toBe(2);
+    const bucketTotal = data.ageDaysBreakdown.reduce((s, b) => s + b.count, 0);
+    expect(bucketTotal).toBe(5);
   });
 
   it('filters work queue by search', () => {

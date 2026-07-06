@@ -133,7 +133,10 @@ const DashboardShell: React.FC<Props> = ({
                 ))}
               </div>
 
-              <DashboardAgeOverview items={data.ageDaysBreakdown} positionTotal={data.ageDaysPositionTotal} />
+              <DashboardAgeOverview
+                items={data.ageDaysBreakdown}
+                requestTotal={data.ageDaysRequestTotal}
+              />
               <DashboardChartSection data={data} />
               <DashboardDriverOverview items={data.recruiterOverview} />
               <DashboardWorkQueueTable

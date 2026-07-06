@@ -127,6 +127,16 @@ describe('countAgeDaysBreakdown', () => {
       [job({ submittedAt: '2026-07-01', required_date: '2026-08-01', position_units: 6 })],
       today,
     );
-    expect(counts.advance).toBe(1);
+    expect(counts.advance).toBe(6);
+  });
+
+  it('bucket position totals match sumJobPositionUnits', () => {
+    const jobs = [
+      job({ submittedAt: '2026-07-01', required_date: '2026-08-01', position_units: 3 }),
+      job({ submittedAt: '2026-07-10', required_date: '2026-07-12', position_units: 2 }),
+    ];
+    const counts = countAgeDaysBreakdown(jobs, today);
+    const sum = Object.values(counts).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(5);
   });
 });
