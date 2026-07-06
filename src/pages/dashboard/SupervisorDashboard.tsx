@@ -44,11 +44,15 @@ const SupervisorDashboard: React.FC = () => {
   /** ชุดข้อมูลเดียวกับหน้ารายการหน่วยงาน — ไม่กรองวันที่จนกว่าจะเลือกช่วงวันที่กรอก */
   const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
 
+  const jobsWithoutAgeFilter = useMemo(
+    () => filterUnitRequests(jobs, siamrajPrimary, unitFilters, { ageDaysFilter: true }),
+    [jobs, siamrajPrimary, unitFilters],
+  );
+
   const scopedJobs = useMemo(() => {
-    const base = filterApi.filteredJobs;
-    if (!period) return base;
-    return filterJobsByRequestDate(base, period.from, period.to);
-  }, [filterApi.filteredJobs, period]);
+    if (!period) return jobsWithoutAgeFilter;
+    return filterJobsByRequestDate(jobsWithoutAgeFilter, period.from, period.to);
+  }, [jobsWithoutAgeFilter, period]);
 
   useEffect(() => {
     saveDashboardFilters(filters);
@@ -94,7 +98,7 @@ const SupervisorDashboard: React.FC = () => {
   const data = useMemo(() => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
-    const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters);
+    const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters, { ageDaysFilter: true });
     const trendRange = resolveYearToDateTrendRange();
     const trendJobs = filterJobsByRequestDate(unitFilteredAll, trendRange.from, trendRange.to);
     const previousScoped =

@@ -81,6 +81,7 @@ const DashboardFilterBar: React.FC<Props> = ({
         onChange={onUnitFiltersChange}
         showStatusTabs={false}
         showNoteFilter={false}
+        showAgeDaysFilter={false}
         showUnitFilter
         layout="sidebar"
         options={filterOptions}

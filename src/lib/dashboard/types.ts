@@ -87,10 +87,17 @@ export type DashboardResignationMonthly = {
   newOpenings: number;
 };
 
+export type DashboardAgeDaysBreakdown = {
+  bucket: '1-7' | '8-14' | '15-30' | '30+';
+  label: string;
+  count: number;
+};
+
 export type DashboardData = {
   kpis: DashboardKpi[];
   activityTrend: DashboardActivityTrendPoint[];
   statusBreakdown: DashboardStatusBreakdown[];
+  ageDaysBreakdown: DashboardAgeDaysBreakdown[];
   recruiterOverview: DashboardRecruiterOverview[];
   workQueue: DashboardWorkItem[];
   periodLabel: string;

@@ -7,6 +7,7 @@ import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
+import DashboardAgeOverview from './DashboardAgeOverview';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardWorkQueueTable from './DashboardWorkQueueTable';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
@@ -132,6 +133,7 @@ const DashboardShell: React.FC<Props> = ({
                 ))}
               </div>
 
+              <DashboardAgeOverview items={data.ageDaysBreakdown} />
               <DashboardChartSection data={data} />
               <DashboardDriverOverview items={data.recruiterOverview} />
               <DashboardWorkQueueTable

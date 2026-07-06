@@ -13,7 +13,11 @@ import {
 } from 'date-fns';
 import { th } from 'date-fns/locale';
 import type { JobRequest } from '@/types';
-import { computeJobUrgency } from '@/lib/jobUrgency';
+import {
+  AGE_DAYS_DISPLAY_BUCKETS,
+  computeJobUrgency,
+  countAgeDaysBreakdown,
+} from '@/lib/jobUrgency';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import type {
@@ -489,6 +493,15 @@ export type BuildDashboardTrendInput = {
   label: string;
 };
 
+function buildAgeDaysBreakdown(jobs: JobRequest[], today: Date) {
+  const counts = countAgeDaysBreakdown(jobs, today);
+  return AGE_DAYS_DISPLAY_BUCKETS.map((b) => ({
+    bucket: b.id,
+    label: b.label,
+    count: counts[b.id],
+  }));
+}
+
 export function buildDashboardData(
   scopedJobs: JobRequest[],
   previousScopedJobs: JobRequest[],
@@ -512,6 +525,7 @@ export function buildDashboardData(
     kpis: buildKpis(scopedJobs, previousScopedJobs, today),
     activityTrend: buildActivityTrend(trendJobs, trendFrom, trendTo),
     statusBreakdown: buildStatusBreakdown(scopedJobs, today),
+    ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     recruiterOverview: buildRecruiterOverview(scopedJobs, today),
     workQueue: sortedQueue,
     periodLabel,

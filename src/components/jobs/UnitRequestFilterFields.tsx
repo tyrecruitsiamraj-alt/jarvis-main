@@ -33,6 +33,7 @@ type Props = {
   showStatusTabs?: boolean;
   showUnitFilter?: boolean;
   showNoteFilter?: boolean;
+  showAgeDaysFilter?: boolean;
   layout?: 'default' | 'sidebar';
   className?: string;
 };
@@ -46,6 +47,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
   showStatusTabs = false,
   showUnitFilter = true,
   showNoteFilter = true,
+  showAgeDaysFilter = true,
   layout = 'default',
   className,
 }) => {
@@ -212,19 +214,21 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           </FilterSelect>
         ) : null}
 
-        <FilterSelect
-          id={`${idPrefix}-age`}
-          label="วันผ่านมา"
-          value={filters.ageDaysFilter}
-          onChange={(v) => onChange({ ageDaysFilter: v as AgeDaysFilter })}
-          selectClassName={selectClassName}
-        >
-          {AGE_DAYS_FILTER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </FilterSelect>
+        {showAgeDaysFilter ? (
+          <FilterSelect
+            id={`${idPrefix}-age`}
+            label="วันผ่านมา"
+            value={filters.ageDaysFilter}
+            onChange={(v) => onChange({ ageDaysFilter: v as AgeDaysFilter })}
+            selectClassName={selectClassName}
+          >
+            {AGE_DAYS_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </FilterSelect>
+        ) : null}
       </div>
     </div>
   );

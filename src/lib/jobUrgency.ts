@@ -12,6 +12,15 @@ export type NoteFilter = 'all' | 'has' | 'empty';
 
 export type AgeDaysFilter = 'all' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
 
+export type AgeDaysDisplayBucket = '1-7' | '8-14' | '15-30' | '30+';
+
+export const AGE_DAYS_DISPLAY_BUCKETS: { id: AgeDaysDisplayBucket; label: string }[] = [
+  { id: '1-7', label: '1–7 วัน' },
+  { id: '8-14', label: '8–14 วัน' },
+  { id: '15-30', label: '15–30 วัน' },
+  { id: '30+', label: '30 วันขึ้นไป' },
+];
+
 export type JobListSort = 'assignee_age' | 'age_desc' | 'age_asc' | 'newest' | 'oldest';
 
 export const AGE_DAYS_FILTER_OPTIONS: { value: AgeDaysFilter; label: string }[] = [
@@ -201,6 +210,28 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
     default:
       return true;
   }
+}
+
+/** นับใบขอตามช่วงวันผ่านมา (ไม่รวมล่วงหน้า/วันนี้) — ใช้แสดงบน Dashboard */
+export function countAgeDaysBreakdown(
+  jobs: JobRequest[],
+  today = new Date(),
+): Record<AgeDaysDisplayBucket, number> {
+  const counts: Record<AgeDaysDisplayBucket, number> = {
+    '1-7': 0,
+    '8-14': 0,
+    '15-30': 0,
+    '30+': 0,
+  };
+  for (const j of jobs) {
+    for (const bucket of AGE_DAYS_DISPLAY_BUCKETS) {
+      if (matchesAgeDaysFilter(j, bucket.id, today)) {
+        counts[bucket.id] += 1;
+        break;
+      }
+    }
+  }
+  return counts;
 }
 
 function urgencyBucket(meta: JobUrgencyMeta): JobUrgency {
