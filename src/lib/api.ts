@@ -2,12 +2,16 @@ export async function readErrorMessage(response: Response, fallback: string) {
     if (response.status === 404) {
       return "API_NOT_READY";
     }
+
+    if (response.status === 413) {
+      return 'ไฟล์ใหญ่เกินไป — ติดต่อผู้ดูแลระบบเพื่ออัปเดต nginx client_max_body_size';
+    }
   
     const contentType = response.headers.get('content-type') || '';
   
     if (contentType.includes('application/json')) {
       const body = await response.json().catch(() => null);
-      return body?.error || body?.message || fallback;
+      return body?.message || body?.error || fallback;
     }
   
     const text = await response.text().catch(() => '');

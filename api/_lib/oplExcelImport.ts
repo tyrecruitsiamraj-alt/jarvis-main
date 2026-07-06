@@ -3,9 +3,8 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
-import { upsertUnitAssignment } from './siamrajUnitAssignments.js';
+import { bulkUpsertOplNames } from './siamrajUnitAssignments.js';
 
-const assignmentsTable = tableInAppSchema('siamraj_unit_assignments');
 const rosterTable = tableInAppSchema('job_staff_roster');
 
 export type OplImportResult = {
@@ -165,22 +164,10 @@ export async function runOplExcelImport(
 
   if (dryRun) return base;
 
-  let inserted = 0;
-  let updated = 0;
-
-  for (const row of assignments) {
-    const { rows: existing } = await dbQuery<{ request_no: string }>(
-      `select request_no from ${assignmentsTable} where request_no = $1`,
-      [row.request_no],
-    );
-    await upsertUnitAssignment({
-      requestNo: row.request_no,
-      oplName: row.opl_name,
-      userId: options?.userId ?? null,
-    });
-    if (existing[0]) updated += 1;
-    else inserted += 1;
-  }
+  const { inserted, updated } = await bulkUpsertOplNames(
+    assignments.map((row) => ({ requestNo: row.request_no, oplName: row.opl_name })),
+    options?.userId ?? null,
+  );
 
   await seedOplRoster(oplNames);
 

@@ -132,17 +132,40 @@ export async function upsertUnitAssignment(input: {
   return mapRow(rows[0]);
 }
 
-/** bulk import OPL — upsert opl_name ตาม request_no */
+/** bulk import OPL — upsert opl_name ตาม request_no (คงสรรหา/คัดสรรเดิม) */
 export async function bulkUpsertOplNames(
   items: Array<{ requestNo: string; oplName: string }>,
-): Promise<number> {
-  let n = 0;
-  for (const { requestNo, oplName } of items) {
-    const key = requestNo.trim();
-    const name = clean(oplName);
-    if (!key || !name) continue;
-    await upsertUnitAssignment({ requestNo: key, oplName: name });
-    n += 1;
-  }
-  return n;
+  userId?: string | null,
+): Promise<{ inserted: number; updated: number }> {
+  const cleaned = items
+    .map((i) => ({ requestNo: i.requestNo.trim(), oplName: clean(i.oplName) }))
+    .filter((i): i is { requestNo: string; oplName: string } => Boolean(i.requestNo && i.oplName));
+
+  if (cleaned.length === 0) return { inserted: 0, updated: 0 };
+
+  const requestNos = cleaned.map((i) => i.requestNo);
+  const oplNames = cleaned.map((i) => i.oplName);
+
+  const { rows: existing } = await dbQuery<{ request_no: string }>(
+    `select request_no from ${table} where request_no = any($1::text[])`,
+    [requestNos],
+  );
+  const existingSet = new Set(existing.map((r) => r.request_no));
+  const updated = cleaned.filter((i) => existingSet.has(i.requestNo)).length;
+  const inserted = cleaned.length - updated;
+
+  await dbQuery(
+    `
+    insert into ${table} (request_no, opl_name, updated_by_user_id, updated_at)
+    select r, o, $3, now()
+    from unnest($1::text[], $2::text[]) as u(r, o)
+    on conflict (request_no) do update set
+      opl_name = excluded.opl_name,
+      updated_by_user_id = excluded.updated_by_user_id,
+      updated_at = now()
+    `,
+    [requestNos, oplNames, userId ?? null],
+  );
+
+  return { inserted, updated };
 }

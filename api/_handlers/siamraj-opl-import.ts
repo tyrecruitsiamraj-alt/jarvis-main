@@ -1,12 +1,12 @@
 import {
   withRbac,
   sendError,
-  handleApiError,
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { logError } from '../_lib/logger.js';
 import { runOplExcelImport } from '../_lib/oplExcelImport.js';
 
 const MAX_BASE64_CHARS = 8 * 1024 * 1024;
@@ -62,7 +62,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     return res.status(200).json(result);
   } catch (e) {
-    return handleApiError(res, e, 'siamraj-opl-import POST', { userId: req.user.sub });
+    const detail = e instanceof Error ? e.message : String(e);
+    logError('siamraj-opl-import POST', { userId: req.user.sub, message: detail });
+
+    if (/opl_name|job_staff_roster_role_check|column .* does not exist/i.test(detail)) {
+      return sendError(
+        res,
+        500,
+        'Database migration required',
+        'ฐานข้อมูลยังไม่อัปเดต — รัน npm run db:migrate (migration 034–035) บนเซิร์ฟเวอร์',
+      );
+    }
+    if (/DB_HOST|SQL Server|Missing DB_/i.test(detail)) {
+      return sendError(res, 503, 'SQL Server unavailable', detail);
+    }
+    if (/ไม่พบคอลัมน์ site_code/i.test(detail)) {
+      return sendError(res, 400, 'Invalid Excel file', detail);
+    }
+
+    return sendError(res, 500, 'Import failed', detail);
   }
 }
 

@@ -39,4 +39,4 @@ jobs:
                       ./scripts/sync-env.sh .env JARVIS_DEV_ROLE_LOGIN "false"
                       ./scripts/sync-env.sh .env CORS_ALLOWED_ORIGINS "https://jarvis.siamrajathanee.dev,https://jarvis-main-tyteam.vercel.app,http://localhost:5173"
                       docker compose up -d --build
-                      docker compose exec -T app npm run db:migrate || true
+                      docker compose exec -T app npm run db:migrate
