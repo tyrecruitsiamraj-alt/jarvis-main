@@ -22,7 +22,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         type={type}
         className={cn(
           'jarvis-soft-field w-full pr-3 placeholder:text-muted-foreground',
-          compact ? 'h-10 min-h-10 py-2 pl-9 text-sm leading-normal' : '!pl-11 pr-4',
+          compact ? 'h-10 min-h-10 py-2 !pl-10 text-sm leading-normal' : '!pl-11 !pr-4',
           className,
         )}
         {...props}

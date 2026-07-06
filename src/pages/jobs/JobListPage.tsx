@@ -250,52 +250,38 @@ const JobListPage: React.FC = () => {
         )}
 
         <div className="rounded-2xl border border-black/[0.06] bg-white/35 backdrop-blur-sm p-3 md:p-4 space-y-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
-              <SearchField
-                compact
-                wrapperClassName="w-full sm:w-52 lg:w-56 shrink-0"
-                type="text"
-                placeholder="ค้นหา..."
-                value={search}
-                onChange={(e) => updateListState({ search: e.target.value })}
-              />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="job-list-search" className="text-xs text-muted-foreground leading-snug">
+              ค้นหา
+            </label>
+            <SearchField
+              id="job-list-search"
+              compact
+              type="text"
+              placeholder="เลขที่ใบขอ, หน่วยงาน, ผู้รับผิดชอบ..."
+              value={search}
+              onChange={(e) => updateListState({ search: e.target.value })}
+            />
+          </div>
 
-              <FilterSelect
-                id="job-list-unit"
-                label="หน่วยงาน"
-                value={unitFilter}
-                onChange={(v) => updateListState({ unitFilter: v })}
-                className="w-full sm:flex-1 sm:min-w-[12rem] sm:max-w-xs"
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { value: 'all' as const, label: 'ทั้งหมด' },
+              { value: 'active' as const, label: 'ดำเนินการ' },
+              { value: 'closed' as const, label: 'ปิดแล้ว' },
+            ].map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => updateListState({ filter: f.value })}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
+                  filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-secondary/80 text-muted-foreground',
+                )}
               >
-                <option value="all">ทั้งหมด</option>
-                {unitOptions.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </FilterSelect>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { value: 'all' as const, label: 'ทั้งหมด' },
-                { value: 'active' as const, label: 'ดำเนินการ' },
-                { value: 'closed' as const, label: 'ปิดแล้ว' },
-              ].map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => updateListState({ filter: f.value })}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
-                    filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-secondary/80 text-muted-foreground',
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+                {f.label}
+              </button>
+            ))}
           </div>
 
           <div
@@ -304,6 +290,19 @@ const JobListPage: React.FC = () => {
               siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
             )}
           >
+          <FilterSelect
+            id="job-list-unit"
+            label="หน่วยงาน"
+            value={unitFilter}
+            onChange={(v) => updateListState({ unitFilter: v })}
+          >
+            <option value="all">ทั้งหมด</option>
+            {unitOptions.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </FilterSelect>
           {siamrajPrimary ? (
             <FilterSelect
               id="job-list-department"
