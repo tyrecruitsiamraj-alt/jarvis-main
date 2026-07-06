@@ -6,6 +6,7 @@ import {
   SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT,
 } from './siamrajSqlServerRequests.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
+import { toBangkokYmd } from './businessDate.js';
 
 export type SiamrajDbSource = 'postgres' | 'sqlserver';
 
@@ -88,9 +89,7 @@ function toIso(v: string | Date | null | undefined): string | null {
 }
 
 function toYmd(v: string | Date | null | undefined): string {
-  const iso = toIso(v);
-  if (!iso) return '';
-  return iso.slice(0, 10);
+  return toBangkokYmd(v);
 }
 
 export function mapSiamrajRow(r: SiamrajUnitRequestRow) {

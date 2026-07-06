@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest, JobUrgency } from '@/types';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
+import { toYmdBangkok } from '@/lib/dateTh';
 
 export const URGENCY_LEAD_DAYS = 7;
 
@@ -72,18 +73,39 @@ export type JobUrgencyMeta = {
   wasAdvanceAtSubmit: boolean;
 };
 
-function parseJobDate(value?: string | null): Date | null {
+/** แปลงค่าวันที่เป็น YYYY-MM-DD ตามปฏิทินท้องถิ่น (ไม่ใช้ UTC slice) */
+function calendarYmdFromValue(value?: string | null): string | null {
   if (!value || typeof value !== 'string') return null;
-  const d = parseISO(value.slice(0, 10));
+  const t = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const d = parseISO(t);
+  if (Number.isNaN(d.getTime())) return null;
+  return toYmdBangkok(d);
+}
+
+function parseJobDate(value?: string | null): Date | null {
+  const ymd = calendarYmdFromValue(value);
+  if (!ymd) return null;
+  const d = parseISO(ymd);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function submittedDate(job: JobRequest): Date | null {
-  return parseJobDate(job.submittedAt) ?? parseJobDate(job.created_at) ?? parseJobDate(job.request_date);
+  return (
+    parseJobDate(job.submittedAt) ??
+    parseJobDate(job.request_date) ??
+    parseJobDate(job.created_at)
+  );
 }
 
 function todayStart(today = new Date()): Date {
-  return parseISO(today.toISOString().slice(0, 10));
+  return parseISO(toYmdBangkok(today));
+}
+
+/** คีย์ล่วงหน้า (≥7 วัน) และยังไม่ถึงวันที่ต้องการ — ยังไม่นับวันผ่านมา */
+export function isAdvanceBeforeRequiredDate(job: JobRequest, today = new Date()): boolean {
+  const meta = computeJobUrgency(job, today);
+  return meta.kind === 'advance' && meta.daysUntilRequired > 0;
 }
 
 export function getJobRequestSubmittedDate(job: JobRequest): Date | null {
@@ -121,18 +143,16 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
   return { kind: 'advance', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
 }
 
-/** วันที่ใช้กับคอลัมน์「ผ่านมา」— ล่วงหน้ายังไม่นับ */
+/** วันที่ใช้กับคอลัมน์「ผ่านมา」— ล่วงหน้าที่ยังไม่ถึงวันที่ต้องการยังไม่นับ */
 export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
-  const meta = computeJobUrgency(job, today);
-  if (meta.kind === 'advance') return null;
+  if (isAdvanceBeforeRequiredDate(job, today)) return null;
   const submitted = submittedDate(job);
   if (!submitted) return null;
   return differenceInCalendarDays(todayStart(today), submitted);
 }
 
 export function getJobRequestAgeLabel(job: JobRequest, today = new Date()): string {
-  const meta = computeJobUrgency(job, today);
-  if (meta.kind === 'advance') return 'ล่วงหน้าก่อน';
+  if (isAdvanceBeforeRequiredDate(job, today)) return 'ล่วงหน้า';
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return '—';
   if (days <= 0) return 'วันนี้';
@@ -194,8 +214,7 @@ export function compareJobsForListSort(
 
 export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, today = new Date()): boolean {
   if (filter === 'all') return true;
-  const meta = computeJobUrgency(job, today);
-  if (meta.kind === 'advance') return false;
+  if (isAdvanceBeforeRequiredDate(job, today)) return false;
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return false;
   switch (filter) {
@@ -215,15 +234,11 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
 }
 
 function getDashboardElapsedDays(job: JobRequest, today = new Date()): number | null {
-  const submitted = submittedDate(job);
-  if (!submitted) return null;
-  return differenceInCalendarDays(todayStart(today), submitted);
+  return getJobRequestAgeDays(job, today);
 }
 
 function isDashboardAdvanceBucket(job: JobRequest, today = new Date()): boolean {
-  const meta = computeJobUrgency(job, today);
-  if (meta.kind !== 'advance') return false;
-  return meta.daysUntilRequired > 0;
+  return isAdvanceBeforeRequiredDate(job, today);
 }
 
 export function matchesDashboardAgeBucket(

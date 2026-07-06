@@ -5,6 +5,7 @@ import {
   parseAgeRange,
   primaryJobRoleLabel,
 } from './siamrajJobMapping.js';
+import { toBangkokYmd } from './businessDate.js';
 
 type SqlServerRequestRow = {
   external_id: string;
@@ -52,9 +53,7 @@ function toIso(v: Date | string | null | undefined): string | null {
 }
 
 function toYmd(v: Date | string | null | undefined): string {
-  const iso = toIso(v);
-  if (!iso) return '';
-  return iso.slice(0, 10);
+  return toBangkokYmd(v);
 }
 
 function getSqlFilters() {

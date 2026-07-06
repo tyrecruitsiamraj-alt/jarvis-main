@@ -21,3 +21,12 @@ export function isValidYmd(value: string): boolean {
   const dt = new Date(Date.UTC(y!, m! - 1, d!));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d!;
 }
+
+/** แปลงค่าวันที่จาก DB/ISO เป็น YYYY-MM-DD ตามปฏิทินกรุงเทพ */
+export function toBangkokYmd(v: string | Date | null | undefined): string {
+  if (v == null) return '';
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return v.trim();
+  const d = v instanceof Date ? v : new Date(String(v));
+  if (Number.isNaN(d.getTime())) return '';
+  return bangkokBusinessDateYmd(d);
+}
