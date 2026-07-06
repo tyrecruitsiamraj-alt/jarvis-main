@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
+import { enrichJobsWithPenalty } from '@/lib/jobPenalty';
 import { publishUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
+import { getWorkCalendarSnapshot, subscribeWorkCalendar } from '@/lib/workCalendarStore';
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
@@ -60,7 +62,17 @@ export function useUnitRequestsFeed(): {
   const [readOnly, setReadOnly] = useState(false);
   const [dbSource, setDbSource] = useState<'postgres' | 'sqlserver' | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [calendarRev, setCalendarRev] = useState(0);
   const siamrajPrimaryRef = useRef(false);
+
+  const jobsWithPenalty = useMemo(() => {
+    void calendarRev;
+    return enrichJobsWithPenalty(jobs, getWorkCalendarSnapshot());
+  }, [jobs, calendarRev]);
+
+  useEffect(() => {
+    return subscribeWorkCalendar(() => setCalendarRev((n) => n + 1));
+  }, []);
 
   const refetch = useCallback(async () => {
     setRefreshing(true);
@@ -111,8 +123,8 @@ export function useUnitRequestsFeed(): {
   }, [siamrajPrimary]);
 
   useEffect(() => {
-    publishUnitRequestsFeed(jobs, loading);
-  }, [jobs, loading]);
+    publishUnitRequestsFeed(jobsWithPenalty, loading);
+  }, [jobsWithPenalty, loading]);
 
-  return { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
+  return { jobs: jobsWithPenalty, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
 }
