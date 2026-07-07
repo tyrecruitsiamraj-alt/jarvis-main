@@ -407,19 +407,6 @@ const JobListPage: React.FC = () => {
               siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
             )}
           >
-          <FilterSelect
-            id="job-list-unit"
-            label="หน่วยงาน"
-            value={unitFilter}
-            onChange={(v) => updateListState({ unitFilter: v })}
-          >
-            <option value="all">ทั้งหมด</option>
-            {unitOptions.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </FilterSelect>
           {siamrajPrimary ? (
             <FilterSelect
               id="job-list-department"
