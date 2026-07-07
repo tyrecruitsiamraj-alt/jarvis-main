@@ -21,22 +21,30 @@ function truncateLabel(name: string, max = 22): string {
   return `${name.slice(0, max - 1)}…`;
 }
 
+const BAR_ROW_PX = 30;
+const CHART_MIN_HEIGHT = 224;
+const CHART_MAX_HEIGHT = 720;
+
 const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onUnitClick }) => {
+  const activeUnits = useMemo(() => items.filter((u) => u.open > 0), [items]);
+
   const chartData = useMemo(
     () =>
-      items.slice(0, 12).map((u) => ({
+      activeUnits.map((u) => ({
         name: truncateLabel(u.name),
         fullName: u.name,
         open: u.open,
         total: u.total,
         overdue: u.overdue,
       })),
-    [items],
+    [activeUnits],
   );
 
-  const openTotal = useMemo(() => items.reduce((s, u) => s + u.open, 0), [items]);
+  const openTotal = useMemo(() => activeUnits.reduce((s, u) => s + u.open, 0), [activeUnits]);
 
-  if (items.length === 0) {
+  const chartHeight = Math.max(CHART_MIN_HEIGHT, chartData.length * BAR_ROW_PX + 48);
+
+  if (activeUnits.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
         <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามหน่วยงาน</h3>
@@ -53,11 +61,16 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onUni
           ตำแหน่งที่รอดำเนินการต่อหน่วยงาน · {periodLabel}
         </p>
         <p className="text-xs text-slate-600 mt-1">
-          รวมรอดำเนินการ {openTotal.toLocaleString('th-TH')} ตำแหน่ง · {items.length.toLocaleString('th-TH')} หน่วยงาน
+          รวมรอดำเนินการ {openTotal.toLocaleString('th-TH')} ตำแหน่ง ·{' '}
+          {activeUnits.length.toLocaleString('th-TH')} หน่วยงาน
         </p>
       </div>
-      <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">
+      <div
+        className="overflow-y-auto overflow-x-hidden rounded-lg border border-slate-100"
+        style={{ maxHeight: CHART_MAX_HEIGHT }}
+      >
+        <div style={{ height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
             <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
@@ -91,6 +104,7 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onUni
             />
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
