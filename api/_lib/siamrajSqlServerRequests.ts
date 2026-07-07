@@ -1,5 +1,9 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import {
+  openStaffingRequestWhereSql,
+  remainingOpenPositions,
+} from './siamrajStaffingOpen.js';
+import {
   formatGenderRequirement,
   inferJobTypeFromDescription,
   parseAgeRange,
@@ -30,6 +34,7 @@ type SqlServerRequestRow = {
   request_action_name: string | null;
   request_action_code: string | null;
   request_qty: number | null;
+  inform_qty: number | null;
   resign_date: Date | string | null;
   reason_main_name: string | null;
   work_addr: string | null;
@@ -95,7 +100,10 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     lastWorkingDay: toYmd(r.resign_date) || undefined,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
     site_code: r.site_code || undefined,
-    position_units: r.request_qty != null && r.request_qty > 0 ? r.request_qty : undefined,
+    position_units: (() => {
+      const remaining = remainingOpenPositions(r.request_qty, r.inform_qty);
+      return remaining > 0 ? remaining : undefined;
+    })(),
     department_code: r.department_code?.trim() || undefined,
     department_name: r.department_name?.trim() || undefined,
     contract_type_code: r.contract_type_code?.trim() || undefined,
@@ -129,14 +137,9 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   };
 }
 
-/** ใบขอที่ยังต้องหาคน — ยังไม่ Stop / ไม่มีเลขปิด CLS / ยังไม่มีเลขแจ้งเข้า */
+/** ใบขอที่ยังต้องหาคน — ยังไม่ Stop / ไม่มีเลขปิด CLS / ยังแจ้งเข้าไม่ครบ */
 function openStaffingRequestWhere(alias = 'A'): string {
-  return `
-    ${alias}.status = 'A'
-    AND ${alias}.is_stop = 'N'
-    AND (${alias}.stop_no IS NULL OR RTRIM(${alias}.stop_no) = '')
-    AND NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = ${alias}.request_no)
-  `.trim();
+  return openStaffingRequestWhereSql(alias);
 }
 
 /** Query เต็มสำหรับดูรายละเอียดใบขอเดียว */
@@ -165,6 +168,7 @@ const BASE_SQL = `
     (SELECT z.job_description_name FROM hr_ms_job_description_2 z WHERE z.job_description_code_2 = A.job_description_code_2) AS job_name2,
     A.request_code AS request_action_code,
     A.request_qty,
+    A.inform_qty,
     (SELECT z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = S.staff_id) AS staff_fullname,
     (SELECT z.resign_type_name FROM hr_ms_resign_type z WHERE z.resign_type_code = S.resign_type_code) AS reason_main_name,
@@ -202,7 +206,7 @@ const SELECT_COLUMNS = `
   site_code, site_name, department_code, department_name, contract_type_code, contract_type_name,
   customer_name, status, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
-  job_name1, job_name2, requester_name, request_action_name, request_action_code, request_qty,
+  job_name1, job_name2, requester_name, request_action_name, request_action_code, request_qty, inform_qty,
   reason_main_name, work_addr, work_date, work_time, age, sex,
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
 `;

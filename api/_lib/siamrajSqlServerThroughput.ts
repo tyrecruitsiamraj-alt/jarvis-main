@@ -1,5 +1,19 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { toBangkokYmd } from './businessDate.js';
+import {
+  informedPositionCount,
+  isOpenStaffingRow,
+  remainingOpenPositions,
+  requestPositionTotal,
+} from './siamrajStaffingOpen.js';
+
+export {
+  informedPositionCount,
+  isOpenStaffingRow,
+  openStaffingRequestWhereSql,
+  remainingOpenPositions,
+  requestPositionTotal,
+} from './siamrajStaffingOpen.js';
 
 export type SiamrajThroughputRecord = {
   requestDate: string;
@@ -11,12 +25,12 @@ export type SiamrajThroughputRecord = {
 type SqlThroughputRow = {
   request_date: Date | string | null;
   request_qty: number | null;
+  inform_qty: number | null;
   status: string | null;
   is_stop: string | null;
   stop_no: string | null;
   cancel_date: Date | string | null;
   stop_date: Date | string | null;
-  has_inform: number | boolean | null;
 };
 
 function getSqlFilters() {
@@ -40,39 +54,43 @@ function toYmd(v: Date | string | null | undefined): string | null {
   return ymd || null;
 }
 
-function positionUnits(qty: number | null | undefined): number {
-  return qty != null && qty > 0 ? qty : 1;
-}
-
-/** ใบขอที่ยังต้องหาคน — ตรงกับ feed หลัก */
-export function isOpenStaffingRow(row: {
-  status: string | null;
-  is_stop: string | null;
-  stop_no: string | null;
-  has_inform: number | boolean | null;
-}): boolean {
-  const status = (row.status || '').trim().toUpperCase();
-  const isStop = (row.is_stop || '').trim().toUpperCase();
-  const stopNo = (row.stop_no || '').trim();
-  const hasInform = row.has_inform === true || row.has_inform === 1;
-  return status === 'A' && isStop === 'N' && !stopNo && !hasInform;
-}
-
-function closureDateFromRow(row: SqlThroughputRow): string | null {
-  if (isOpenStaffingRow(row)) return null;
-  return toYmd(row.stop_date) || toYmd(row.cancel_date) || toYmd(row.request_date);
-}
-
-function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord | null {
+function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   const requestDate = toYmd(row.request_date);
-  if (!requestDate) return null;
+  if (!requestDate) return [];
+
+  const total = requestPositionTotal(row.request_qty);
+  const informed = informedPositionCount(row.inform_qty);
+  const remaining = remainingOpenPositions(row.request_qty, row.inform_qty);
   const isOpen = isOpenStaffingRow(row);
-  return {
-    requestDate,
-    closureDate: closureDateFromRow(row),
-    positionUnits: positionUnits(row.request_qty),
-    isOpen,
-  };
+  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
+  const out: SiamrajThroughputRecord[] = [];
+
+  if (informed > 0) {
+    out.push({
+      requestDate,
+      closureDate,
+      positionUnits: informed,
+      isOpen: false,
+    });
+  }
+
+  if (isOpen && remaining > 0) {
+    out.push({
+      requestDate,
+      closureDate: null,
+      positionUnits: remaining,
+      isOpen: true,
+    });
+  } else if (!isOpen && informed === 0) {
+    out.push({
+      requestDate,
+      closureDate,
+      positionUnits: total,
+      isOpen: false,
+    });
+  }
+
+  return out;
 }
 
 function isDateYmd(s: string): boolean {
@@ -97,15 +115,12 @@ export async function listSiamrajSqlServerThroughput(options: {
     SELECT
       A.request_date,
       A.request_qty,
+      A.inform_qty,
       A.status,
       A.is_stop,
       A.stop_no,
       A.cancel_date,
-      A.stop_date,
-      CASE
-        WHEN EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no) THEN 1
-        ELSE 0
-      END AS has_inform
+      A.stop_date
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
@@ -116,12 +131,7 @@ export async function listSiamrajSqlServerThroughput(options: {
         OR (A.stop_date IS NOT NULL AND CONVERT(date, A.stop_date) >= @fromDate AND CONVERT(date, A.stop_date) <= @toDate)
         OR (A.cancel_date IS NOT NULL AND CONVERT(date, A.cancel_date) >= @fromDate AND CONVERT(date, A.cancel_date) <= @toDate)
         OR (
-          EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
-          AND NOT (
-            A.status = 'A'
-            AND A.is_stop = 'N'
-            AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
-          )
+          ISNULL(A.inform_qty, 0) > 0
           AND CONVERT(date, A.request_date) >= @fromDate AND CONVERT(date, A.request_date) <= @toDate
         )
       )
@@ -129,5 +139,5 @@ export async function listSiamrajSqlServerThroughput(options: {
     { ...filters, fromDate: from, toDate: to },
   );
 
-  return rows.map(mapThroughputRow).filter((r): r is SiamrajThroughputRecord => r != null);
+  return rows.flatMap(mapThroughputRow);
 }
