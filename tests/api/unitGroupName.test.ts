@@ -18,6 +18,14 @@ describe('unitGroupName', () => {
     );
   });
 
+  it('merges company prefix and จำกัด variants', () => {
+    expect(unitOrganizationKey('บริษัท บำรุงราษฎร์ จำกัด')).toBe(
+      unitOrganizationKey('บำรุงราษฎร์'),
+    );
+    expect(unitOrganizationKey('บำรุงราษฎร์ จำกัด')).toBe(unitOrganizationKey('บำรุงราษฎร์'));
+    expect(unitOrganizationKey('บจก. บำรุงราษฎร์')).toBe(unitOrganizationKey('บำรุงราษฎร์'));
+  });
+
   it('normalizes whitespace and case', () => {
     expect(unitOrganizationKey('ธนาคาร  กรุงศรี')).toBe(unitOrganizationKey('ธนาคารกรุงศรี'));
   });
@@ -68,5 +76,17 @@ describe('buildDashboardData unit overview grouping', () => {
     const krungsri = data.unitOverview.filter((u) => u.name.includes('กรุงศรี'));
     expect(krungsri).toHaveLength(1);
     expect(krungsri[0]?.total).toBe(5);
+  });
+
+  it('merges จำกัด and plain company name', () => {
+    const jobs = [
+      job('บริษัท บำรุงราษฎร์ จำกัด', { position_units: 2 }),
+      job('บำรุงราษฎร์', { position_units: 3 }),
+    ];
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
+    const rows = data.unitOverview.filter((u) => u.name.includes('บำรุงราษ'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.total).toBe(5);
   });
 });

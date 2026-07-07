@@ -23,6 +23,7 @@ import {
   filterJobsForRecruiter,
   filterJobsForUnitName,
 } from '@/lib/dashboard/drillDownFilters';
+import { unitOrganizationKey } from '@/lib/unitGroupName';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import {
@@ -121,9 +122,10 @@ const SupervisorDashboard: React.FC = () => {
 
   useEffect(() => {
     if (unitFilters.unitFilter === 'all') return;
-    if (!filterApi.unitOptions.includes(unitFilters.unitFilter)) {
-      setUnitFilters((prev) => ({ ...prev, unitFilter: 'all' }));
-    }
+    const stillValid = filterApi.unitOptions.some(
+      (o) => unitOrganizationKey(o) === unitOrganizationKey(unitFilters.unitFilter),
+    );
+    if (!stillValid) setUnitFilters((prev) => ({ ...prev, unitFilter: 'all' }));
   }, [unitFilters.departmentFilter, unitFilters.jobSubtypeFilter, unitFilters.unitFilter, filterApi.unitOptions]);
 
   const patchFilters = useCallback((patch: Partial<DashboardFilters>) => {

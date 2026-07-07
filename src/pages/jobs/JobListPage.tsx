@@ -35,6 +35,11 @@ import {
   filterUnitRequestsByJobSubtype,
   jobSubtypeFilterOptions,
 } from '@/lib/siamrajUnitFilters';
+import {
+  groupedUnitFilterOptions,
+  matchesUnitOrganizationFilter,
+  unitOrganizationKey,
+} from '@/lib/unitGroupName';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages } from '@/lib/pagination';
 import {
@@ -140,14 +145,14 @@ const JobListPage: React.FC = () => {
     [departmentScopedJobs, siamrajPrimary, jobSubtypeFilter],
   );
 
-  const unitOptions = useMemo(() => {
-    const set = new Set(subtypeScopedJobs.map((j) => j.unit_name).filter(Boolean));
-    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [subtypeScopedJobs]);
+  const unitOptions = useMemo(
+    () => groupedUnitFilterOptions(subtypeScopedJobs),
+    [subtypeScopedJobs],
+  );
 
   const recruiterFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
       if (!matchesScreenerFilter(j, screenerFilter)) return false;
       if (!matchesOplFilter(j, oplFilter)) return false;
       return true;
@@ -156,7 +161,7 @@ const JobListPage: React.FC = () => {
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
       if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
       if (!matchesOplFilter(j, oplFilter)) return false;
       return true;
@@ -165,7 +170,7 @@ const JobListPage: React.FC = () => {
 
   const oplFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
       if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
       if (!matchesScreenerFilter(j, screenerFilter)) return false;
       return true;
@@ -207,7 +212,7 @@ const JobListPage: React.FC = () => {
 
     return subtypeScopedJobs
       .filter((j) => {
-        if (unitFilter !== 'all' && j.unit_name !== unitFilter) return false;
+        if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
         if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesOplFilter(j, oplFilter)) return false;
@@ -242,7 +247,11 @@ const JobListPage: React.FC = () => {
 
   useEffect(() => {
     if (unitFilter === 'all') return;
-    if (!unitOptions.includes(unitFilter)) updateListState({ unitFilter: 'all' });
+    if (unitFilter === 'all') return;
+    const stillValid = unitOptions.some(
+      (o) => unitOrganizationKey(o) === unitOrganizationKey(unitFilter),
+    );
+    if (!stillValid) updateListState({ unitFilter: 'all' });
   }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter, updateListState]);
 
   useEffect(() => {

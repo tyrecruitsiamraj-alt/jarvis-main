@@ -25,6 +25,10 @@ import {
   matchesScreenerFilter,
   matchesOplFilter,
 } from '@/lib/jobStaffNames';
+import {
+  groupedUnitFilterOptions,
+  matchesUnitOrganizationFilter,
+} from '@/lib/unitGroupName';
 
 export type UnitRequestStatusFilter = 'all' | 'active' | 'closed';
 
@@ -81,7 +85,7 @@ export function filterUnitRequests(
   if (siamrajPrimary) list = filterUnitRequestsByJobSubtype(list, f.jobSubtypeFilter);
 
   return list.filter((j) => {
-    if (f.unitFilter !== 'all' && j.unit_name !== f.unitFilter) return false;
+    if (f.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, f.unitFilter)) return false;
     if (!matchesRecruiterFilter(j, f.recruiterFilter)) return false;
     if (!matchesScreenerFilter(j, f.screenerFilter)) return false;
     if (!matchesOplFilter(j, f.oplFilter)) return false;
@@ -123,10 +127,10 @@ export function useSiamrajUnitRequestFilters(
     [departmentScopedJobs, siamrajPrimary, filters.jobSubtypeFilter],
   );
 
-  const unitOptions = useMemo(() => {
-    const set = new Set(subtypeScopedJobs.map((j) => j.unit_name).filter(Boolean));
-    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [subtypeScopedJobs]);
+  const unitOptions = useMemo(
+    () => groupedUnitFilterOptions(subtypeScopedJobs),
+    [subtypeScopedJobs],
+  );
 
   const recruiters = useMemo(() => {
     void staffRosterRev;
@@ -145,7 +149,7 @@ export function useSiamrajUnitRequestFilters(
 
   const recruiterFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
+      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter)) return false;
       if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
       if (!matchesOplFilter(j, filters.oplFilter)) return false;
       return true;
@@ -154,7 +158,7 @@ export function useSiamrajUnitRequestFilters(
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
+      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter)) return false;
       if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
       if (!matchesOplFilter(j, filters.oplFilter)) return false;
       return true;
@@ -163,7 +167,7 @@ export function useSiamrajUnitRequestFilters(
 
   const oplFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && j.unit_name !== filters.unitFilter) return false;
+      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter)) return false;
       if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
       if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
       return true;
