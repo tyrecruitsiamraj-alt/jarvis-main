@@ -8,14 +8,28 @@ describe('isOpenStaffingRow (feed)', () => {
     ).toBe(true);
   });
 
-  it('treats any informed request as closed on the board', () => {
+  it('keeps partial informs open on the board', () => {
+    expect(
+      isOpenStaffingRow({
+        status: 'A',
+        is_stop: 'N',
+        stop_no: null,
+        is_inform_all: 'N',
+        request_qty: 4,
+        inform_qty: 3,
+        has_inform: 1,
+      }),
+    ).toBe(true);
+  });
+
+  it('hides stale informs with zero inform_qty', () => {
     expect(
       isOpenStaffingRow({
         status: 'A',
         is_stop: 'N',
         stop_no: null,
         request_qty: 4,
-        inform_qty: 3,
+        inform_qty: 0,
         has_inform: 1,
       }),
     ).toBe(false);
@@ -24,12 +38,6 @@ describe('isOpenStaffingRow (feed)', () => {
   it('treats stopped requests as closed', () => {
     expect(
       isOpenStaffingRow({ status: 'A', is_stop: 'Y', stop_no: 'CLS001', request_qty: 1, inform_qty: 0 }),
-    ).toBe(false);
-  });
-
-  it('treats cancelled status as closed', () => {
-    expect(
-      isOpenStaffingRow({ status: 'C', is_stop: 'N', stop_no: null, request_qty: 1, inform_qty: 0 }),
     ).toBe(false);
   });
 });

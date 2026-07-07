@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   isOpenStaffingRow,
-  isOpenStaffingRowForRemaining,
   remainingOpenPositions,
 } from '../../api/_lib/siamrajStaffingOpen.js';
 
-describe('siamrajStaffingOpen feed filter', () => {
-  it('keeps requests without inform open', () => {
+describe('siamrajStaffingOpen feed', () => {
+  it('keeps requests without inform open with full remaining', () => {
     expect(
       isOpenStaffingRow({
         status: 'A',
@@ -16,26 +15,12 @@ describe('siamrajStaffingOpen feed filter', () => {
         inform_qty: 0,
       }),
     ).toBe(true);
+    expect(remainingOpenPositions(4, 0)).toBe(4);
   });
 
-  it('hides requests as soon as any inform exists', () => {
+  it('keeps partial informs like lm6905015 open with remaining only', () => {
     expect(
       isOpenStaffingRow({
-        status: 'A',
-        is_stop: 'N',
-        stop_no: null,
-        request_qty: 4,
-        inform_qty: 3,
-        has_inform: 1,
-      }),
-    ).toBe(false);
-  });
-});
-
-describe('siamrajStaffingOpen remaining throughput', () => {
-  it('keeps partial informs open with remaining positions', () => {
-    expect(
-      isOpenStaffingRowForRemaining({
         status: 'A',
         is_stop: 'N',
         stop_no: null,
@@ -50,13 +35,13 @@ describe('siamrajStaffingOpen remaining throughput', () => {
 
   it('hides fully informed requests', () => {
     expect(
-      isOpenStaffingRowForRemaining({
+      isOpenStaffingRow({
         status: 'A',
         is_stop: 'N',
         stop_no: null,
         is_inform_all: 'Y',
         request_qty: 4,
-        inform_qty: 3,
+        inform_qty: 4,
         has_inform: 1,
       }),
     ).toBe(false);
@@ -64,7 +49,7 @@ describe('siamrajStaffingOpen remaining throughput', () => {
 
   it('hides stale informs with inform_qty still zero', () => {
     expect(
-      isOpenStaffingRowForRemaining({
+      isOpenStaffingRow({
         status: 'A',
         is_stop: 'N',
         stop_no: null,

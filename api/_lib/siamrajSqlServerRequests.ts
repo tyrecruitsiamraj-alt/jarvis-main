@@ -1,6 +1,7 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import {
   openStaffingRequestWhereSql,
+  remainingOpenPositions,
 } from './siamrajStaffingOpen.js';
 import {
   formatGenderRequirement,
@@ -100,7 +101,10 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     lastWorkingDay: toYmd(r.resign_date) || undefined,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
     site_code: r.site_code || undefined,
-    position_units: r.request_qty != null && r.request_qty > 0 ? r.request_qty : undefined,
+    position_units: (() => {
+      const remaining = remainingOpenPositions(r.request_qty, r.inform_qty);
+      return remaining > 0 ? remaining : undefined;
+    })(),
     department_code: r.department_code?.trim() || undefined,
     department_name: r.department_name?.trim() || undefined,
     contract_type_code: r.contract_type_code?.trim() || undefined,
