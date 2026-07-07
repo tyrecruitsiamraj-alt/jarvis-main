@@ -9,6 +9,7 @@ export type JobListPageState = {
   unitFilter: string;
   departmentFilter: string;
   jobSubtypeFilter: string;
+  yearFilter: string;
   recruiterFilter: string;
   screenerFilter: string;
   oplFilter: string;
@@ -27,6 +28,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   unitFilter: 'all',
   departmentFilter: 'all',
   jobSubtypeFilter: 'all',
+  yearFilter: 'all',
   recruiterFilter: 'all',
   screenerFilter: 'all',
   oplFilter: 'all',
@@ -76,6 +78,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     unitFilter: params.get('u') || JOB_LIST_DEFAULTS.unitFilter,
     departmentFilter: params.get('d') || JOB_LIST_DEFAULTS.departmentFilter,
     jobSubtypeFilter: params.get('st') || JOB_LIST_DEFAULTS.jobSubtypeFilter,
+    yearFilter: params.get('y') || JOB_LIST_DEFAULTS.yearFilter,
     recruiterFilter: params.get('r') || JOB_LIST_DEFAULTS.recruiterFilter,
     screenerFilter: params.get('sc') || JOB_LIST_DEFAULTS.screenerFilter,
     oplFilter: params.get('opl') || JOB_LIST_DEFAULTS.oplFilter,
@@ -98,6 +101,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   if (state.unitFilter !== JOB_LIST_DEFAULTS.unitFilter) params.set('u', state.unitFilter);
   if (state.departmentFilter !== JOB_LIST_DEFAULTS.departmentFilter) params.set('d', state.departmentFilter);
   if (state.jobSubtypeFilter !== JOB_LIST_DEFAULTS.jobSubtypeFilter) params.set('st', state.jobSubtypeFilter);
+  if (state.yearFilter !== JOB_LIST_DEFAULTS.yearFilter) params.set('y', state.yearFilter);
   if (state.recruiterFilter !== JOB_LIST_DEFAULTS.recruiterFilter) params.set('r', state.recruiterFilter);
   if (state.screenerFilter !== JOB_LIST_DEFAULTS.screenerFilter) params.set('sc', state.screenerFilter);
   if (state.oplFilter !== JOB_LIST_DEFAULTS.oplFilter) params.set('opl', state.oplFilter);
@@ -123,6 +127,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'unitFilter',
   'departmentFilter',
   'jobSubtypeFilter',
+  'yearFilter',
   'recruiterFilter',
   'screenerFilter',
   'oplFilter',

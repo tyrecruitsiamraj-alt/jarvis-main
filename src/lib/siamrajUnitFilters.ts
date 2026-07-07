@@ -1,8 +1,53 @@
 import type { JobRequest } from '@/types';
+import { getJobRequestSubmittedDate } from '@/lib/jobUrgency';
 
 export function normalizeDepartmentCode(code?: string | null): string {
   const trimmed = (code || '').trim();
   return trimmed || '—';
+}
+
+export type SiamrajYearFilter = 'all' | string;
+
+/** ปีที่กรอกใบขอ (ค.ศ.) เป็น string เช่น "2026" — ไม่มีวันที่คืน '' */
+export function extractRequestYear(job: JobRequest): string {
+  const d = getJobRequestSubmittedDate(job);
+  return d ? String(d.getFullYear()) : '';
+}
+
+/** ค.ศ. → พ.ศ. สำหรับแสดงผล */
+export function formatYearLabelBe(gregorianYear: string): string {
+  const n = Number(gregorianYear);
+  if (!Number.isFinite(n) || n <= 0) return 'ไม่ระบุ';
+  return String(n + 543);
+}
+
+export function filterUnitRequestsByYear(
+  jobs: JobRequest[],
+  filter: SiamrajYearFilter,
+): JobRequest[] {
+  if (filter === 'all') return jobs;
+  return jobs.filter((j) => extractRequestYear(j) === filter);
+}
+
+export function yearFilterOptions(
+  jobs: JobRequest[],
+): { value: SiamrajYearFilter; label: string }[] {
+  const counts = new Map<string, number>();
+  for (const j of jobs) {
+    const year = extractRequestYear(j);
+    if (!year) continue;
+    counts.set(year, (counts.get(year) ?? 0) + 1);
+  }
+
+  const options: { value: SiamrajYearFilter; label: string }[] = [
+    { value: 'all', label: `ทุกปี (${jobs.length})` },
+  ];
+
+  for (const [year, count] of [...counts.entries()].sort((a, b) => Number(b[0]) - Number(a[0]))) {
+    options.push({ value: year, label: `${formatYearLabelBe(year)} (${count})` });
+  }
+
+  return options;
 }
 
 /** รหัสแผนก — ใช้เป็นค่า filter */
