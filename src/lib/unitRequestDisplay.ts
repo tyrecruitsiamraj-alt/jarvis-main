@@ -17,6 +17,11 @@ export function unitRequestCardTitle(job: JobRequest): string {
   return job.request_no?.trim() || job.unit_name || '—';
 }
 
+/** หัวข้อการ์ดบอร์ดรับสมัคร — โชว์ชื่อหน่วยงานก่อน */
+export function jobBoardCardTitle(job: JobRequest): string {
+  return job.unit_name?.trim() || job.request_no?.trim() || '—';
+}
+
 /** บรรทัดรองใต้หัวข้อ */
 export function unitRequestCardSubtitle(job: JobRequest): string {
   const parts: string[] = [];

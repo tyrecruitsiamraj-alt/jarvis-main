@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
-import { unitRequestCardSubtitle, unitRequestCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -78,21 +78,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
               ค้นหางานที่เหมาะกับคุณ
             </h1>
-            <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-              ดูตำแหน่งจากระบบ So Recruit แบบเรียลไทม์
-              {isStaff ? (
-                <>
-                  {' '}
-                  — มุมมองเดียวกับผู้สมัครที่{' '}
-                  <span className="font-medium text-foreground">/apply</span>
-                </>
-              ) : (
-                <>
-                  {' '}
-                  แล้วสมัครผ่านแอป <span className="font-medium text-foreground">SOWORK</span>
-                </>
-              )}
-            </p>
+            {!isStaff ? (
+              <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
+                เลือกตำแหน่งที่สนใจ แล้วสมัครผ่านแอป{' '}
+                <span className="font-medium text-foreground">SOWORK</span>
+              </p>
+            ) : null}
           </div>
           {isStaff && onRefresh ? (
             <button
@@ -160,13 +151,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
-                      {unitRequestCardTitle(job)}
+                      {jobBoardCardTitle(job)}
                     </h2>
                     {unitRequestCardSubtitle(job) ? (
                       <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{unitRequestCardSubtitle(job)}</p>
                     ) : null}
-                    {job.unit_name && job.request_no ? (
-                      <p className="mt-0.5 text-[11px] text-muted-foreground/80">{job.unit_name}</p>
+                    {isStaff && job.request_no?.trim() ? (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground/80 font-mono">{job.request_no.trim()}</p>
                     ) : null}
                   </div>
                   {job.urgency === 'urgent' && (
@@ -249,7 +240,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         <DialogContent className="flex max-h-[min(92dvh,820px)] w-[min(calc(100vw-1.25rem),32rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
           <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
             <DialogTitle className="pr-8 text-base font-semibold leading-snug sm:text-lg break-words">
-              {selected ? unitRequestCardTitle(selected) : ''}
+              {selected ? jobBoardCardTitle(selected) : ''}
             </DialogTitle>
             <DialogDescription className="sr-only">
               รายละเอียดตำแหน่งงาน
