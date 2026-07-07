@@ -87,7 +87,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           : null,
         postgresFallback: false,
         readOnly: true,
-        mode: process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all',
+        mode: process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue',
       });
     }
 

@@ -214,8 +214,8 @@ export async function listSiamrajUnitRequests(options: { limit?: number; mode?: 
   if (!schema) return [];
 
   const limit = Math.min(Math.max(options.limit ?? 200, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
-  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
-  const where = mode === 'staffing_queue' ? staffingQueueWhere() : '1=1';
+  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue').toLowerCase();
+  const where = mode === 'all' ? '1=1' : staffingQueueWhere();
 
   const { rows } = await dbQuery<SiamrajUnitRequestRow>(
     `SELECT ${BASE_SELECT}

@@ -11,6 +11,7 @@ import {
   primaryJobRoleLabel,
 } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
+import { boardStaffingRequestTypeWhereSql } from './siamrajBoardRequestTypes.js';
 import {
   extractRequestNoDigitSuffix,
   pickBestRequestNoCandidate,
@@ -220,12 +221,9 @@ const SELECT_COLUMNS = `
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
 `;
 
-function staffingQueueExtraWhere(alias = 'A'): string {
+function boardRequestTypeExtraWhere(alias = 'A'): string {
   return `
-    AND (
-      EXISTS (SELECT 1 FROM st_ms_request mr WHERE mr.request_code = ${alias}.request_code AND mr.request_name LIKE N'%ลาออก%')
-      OR EXISTS (SELECT 1 FROM st_ms_request mr WHERE mr.request_code = ${alias}.request_code AND mr.request_name LIKE N'%เปลี่ยน%')
-    )
+    AND ${boardStaffingRequestTypeWhereSql(alias)}
   `;
 }
 
@@ -239,8 +237,8 @@ function clampUnitRequestLimit(limit?: number): number {
 
 export async function listSiamrajSqlServerUnitRequests(options: { limit?: number; mode?: string }) {
   const limit = clampUnitRequestLimit(options.limit);
-  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
-  const extraWhere = mode === 'staffing_queue' ? staffingQueueExtraWhere() : '';
+  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue').toLowerCase();
+  const extraWhere = mode === 'all' ? '' : boardRequestTypeExtraWhere();
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
 
