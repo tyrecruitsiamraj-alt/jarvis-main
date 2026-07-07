@@ -19,6 +19,7 @@ import {
   countAgeDaysBreakdown,
 } from '@/lib/jobUrgency';
 import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
+import { pickUnitOrganizationDisplayName, unitOrganizationKey } from '@/lib/unitGroupName';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import type {
@@ -420,21 +421,23 @@ function buildStatusBreakdown(jobs: JobRequest[], today: Date): DashboardStatusB
 }
 
 function buildUnitOverview(jobs: JobRequest[], today: Date): DashboardUnitOverview[] {
-  const map = new Map<string, { total: number; open: number; overdue: number }>();
+  const map = new Map<string, { names: string[]; total: number; open: number; overdue: number }>();
   for (const j of jobs) {
-    const name = j.unit_name?.trim() || '—';
+    const rawName = j.unit_name?.trim() || '—';
+    const key = unitOrganizationKey(rawName);
     const units = jobPositionUnits(j);
-    const row = map.get(name) ?? { total: 0, open: 0, overdue: 0 };
+    const row = map.get(key) ?? { names: [], total: 0, open: 0, overdue: 0 };
+    row.names.push(rawName);
     row.total += units;
     const st = mapJobToTaskStatus(j, today);
     if (st !== 'completed' && st !== 'cancelled') row.open += units;
     if (st === 'overdue') row.overdue += units;
-    map.set(name, row);
+    map.set(key, row);
   }
   const totalAll = sumJobPositionUnits(jobs) || 1;
   return [...map.entries()]
-    .map(([name, row]) => ({
-      name,
+    .map(([, row]) => ({
+      name: pickUnitOrganizationDisplayName(row.names),
       total: row.total,
       open: row.open,
       overdue: row.overdue,

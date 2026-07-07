@@ -47,8 +47,11 @@ export function filterJobsForTaskStatus(
   return jobs.filter((j) => mapJobToTaskStatus(j, today) === status);
 }
 
+import { unitOrganizationKey } from '@/lib/unitGroupName';
+
 export function filterJobsForUnitName(jobs: JobRequest[], unitName: string): JobRequest[] {
-  return jobs.filter((j) => (j.unit_name?.trim() || '—') === unitName);
+  const key = unitOrganizationKey(unitName);
+  return jobs.filter((j) => unitOrganizationKey(j.unit_name) === key);
 }
 
 export function filterJobsForRecruiter(
