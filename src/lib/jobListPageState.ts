@@ -45,7 +45,7 @@ const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
 const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'retroactive', 'urgent', 'advance']);
 const NOTE_VALUES = new Set<NoteFilter>(['all', 'has', 'empty']);
 const REPLACEMENT_VALUES = new Set<ReplacementFilter>(['all', 'send', 'no_send', 'unset']);
-const AGE_DAYS_VALUES = new Set<AgeDaysFilter>(['all', 'today', '1-7', '8-14', '15-30', '30+']);
+const AGE_DAYS_VALUES = new Set<AgeDaysFilter>(['all', 'advance', 'today', '1-7', '8-14', '15-30', '30+']);
 const SORT_VALUES = new Set<JobListSort>(['assignee_age', 'age_desc', 'age_asc', 'newest', 'oldest']);
 
 function parsePageSize(raw: string | null): PageSizeOption {

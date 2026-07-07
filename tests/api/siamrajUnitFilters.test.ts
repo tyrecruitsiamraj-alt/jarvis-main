@@ -30,8 +30,8 @@ describe('siamrajUnitFilters counts', () => {
 
     const options = departmentFilterOptions(jobs);
     expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (3)');
-    expect(options.find((o) => o.value === 'LBD')?.label).toBe('Lbd (2)');
-    expect(options.find((o) => o.value === 'LBA')?.label).toBe('Lba (1)');
+    expect(options.find((o) => o.value === 'LBD')?.label).toBe('LBD (2)');
+    expect(options.find((o) => o.value === 'LBA')?.label).toBe('LBA (1)');
   });
 
   it('counts requests per job subtype, not position units', () => {

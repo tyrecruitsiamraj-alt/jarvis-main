@@ -20,7 +20,7 @@ export const REPLACEMENT_FILTER_OPTIONS: { value: ReplacementFilter; label: stri
   { value: 'unset', label: 'ยังไม่ระบุ' },
 ];
 
-export type AgeDaysFilter = 'all' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
+export type AgeDaysFilter = 'all' | 'advance' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
 
 export type AgeDaysDisplayBucket = '1-7' | '8-14' | '15-30' | '30+' | 'advance';
 
@@ -36,6 +36,7 @@ export type JobListSort = 'assignee_age' | 'age_desc' | 'age_asc' | 'newest' | '
 
 export const AGE_DAYS_FILTER_OPTIONS: { value: AgeDaysFilter; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
+  { value: 'advance', label: 'ล่วงหน้า' },
   { value: 'today', label: 'วันนี้' },
   { value: '1-7', label: '1–7 วัน' },
   { value: '8-14', label: '8–14 วัน' },
@@ -118,15 +119,19 @@ export function isAdvanceBeforeRequiredDate(job: JobRequest, today = new Date())
 
 /**
  * วันผ่านมาสำหรับคอลัมน์「ผ่านมา」
- * - ล่วงหน้า (ยังไม่ถึงวันที่ต้องการ): ไม่นับ (แสดง "ล่วงหน้า")
+ * - ล่วงหน้า (ยังไม่ถึงวันที่ต้องการ): นับจากวันที่กรอก
  * - ล่วงหน้า + ฉุกเฉิน (ถึง/เลยวันที่ต้องการแล้ว): วันนี้ − วันที่ต้องการ
  * - ฉุกเฉิน/ย้อนหลัง: วันนี้ − วันที่กรอก
  */
 export function getJobRequestAgeDays(job: JobRequest, today = new Date()): number | null {
-  if (isAdvanceBeforeRequiredDate(job, today)) return null;
-
   const meta = computeJobUrgency(job, today);
   const today0 = todayStart(today);
+
+  if (isAdvanceBeforeRequiredDate(job, today)) {
+    const submitted = submittedDate(job);
+    if (!submitted) return null;
+    return Math.max(0, differenceInCalendarDays(today0, submitted));
+  }
 
   if (meta.kind === 'retroactive') {
     const submitted = submittedDate(job);
@@ -175,7 +180,12 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
 }
 
 export function getJobRequestAgeLabel(job: JobRequest, today = new Date()): string {
-  if (isAdvanceBeforeRequiredDate(job, today)) return 'ล่วงหน้า';
+  if (isAdvanceBeforeRequiredDate(job, today)) {
+    const days = getJobRequestAgeDays(job, today);
+    if (days == null) return 'ล่วงหน้า';
+    if (days <= 0) return 'ล่วงหน้า';
+    return `ล่วงหน้า · ${days} วัน`;
+  }
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return '—';
   if (days <= 0) return 'วันนี้';
@@ -237,7 +247,7 @@ export function compareJobsForListSort(
 
 export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, today = new Date()): boolean {
   if (filter === 'all') return true;
-  if (isAdvanceBeforeRequiredDate(job, today)) return false;
+  if (filter === 'advance') return isAdvanceBeforeRequiredDate(job, today);
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return false;
   switch (filter) {

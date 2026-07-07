@@ -58,12 +58,12 @@ describe('computeJobUrgency', () => {
     expect(meta.daysPastRequired).toBeGreaterThanOrEqual(1);
   });
 
-  it('age label shows ล่วงหน้า for advance before required date', () => {
+  it('age label shows advance with days since submit before required date', () => {
     const label = getJobRequestAgeLabel(
       job({ submittedAt: '2026-07-01', required_date: '2026-07-20' }),
       today,
     );
-    expect(label).toBe('ล่วงหน้า');
+    expect(label).toBe('ล่วงหน้า · 7 วัน');
   });
 
   it('age label shows elapsed days from required date for advance after required passes', () => {

@@ -55,13 +55,11 @@ export function extractDepartmentCode(job: JobRequest): string {
   return normalizeDepartmentCode(job.department_code);
 }
 
-/** แสดงรหัสสั้น เช่น LBD → Lbd */
+/** แสดงรหัสแผนก — ตัวพิมพ์ใหญ่ เช่น LBD */
 export function formatDepartmentCodeDisplay(code: string): string {
   const c = code.trim();
   if (!c || c === '—') return 'ไม่ระบุ';
-  if (c.length <= 3) {
-    return c.charAt(0).toUpperCase() + c.slice(1).toLowerCase();
-  }
+  if (c.length <= 3) return c.toUpperCase();
   return c;
 }
 
