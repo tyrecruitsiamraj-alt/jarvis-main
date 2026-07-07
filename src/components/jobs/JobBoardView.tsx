@@ -65,29 +65,31 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   };
 
   return (
-    <div className="relative border-b border-white/50 bg-gradient-to-b from-blue-100/30 via-transparent to-transparent">
-      <div className="mx-auto max-w-6xl px-4 md:px-6 pt-6 pb-4 md:pt-10 md:pb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 mb-4">
+    <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
+      <div className="jarvis-page-orb -top-10 right-0 h-48 w-48 opacity-25" aria-hidden />
+
+      <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
+        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 mb-3">
               <Sparkles className="h-3.5 w-3.5" />
               {isStaff ? 'บอร์ดงานเปิดรับ · เจ้าหน้าที่' : 'บอร์ดประกาศรับสมัคร'}
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
               ค้นหางานที่เหมาะกับคุณ
             </h1>
-            <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
+            <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
               ดูตำแหน่งจากระบบ So Recruit แบบเรียลไทม์
               {isStaff ? (
                 <>
                   {' '}
-                  — มุมมองเดียวกับที่ผู้สมัครเห็นจากลิงก์{' '}
-                  <span className="text-foreground font-medium">/apply</span>
+                  — มุมมองเดียวกับผู้สมัครที่{' '}
+                  <span className="font-medium text-foreground">/apply</span>
                 </>
               ) : (
                 <>
                   {' '}
-                  จากนั้นสมัครผ่านแอป <span className="text-foreground font-medium">SOWORK</span> ตามลิงก์ด้านล่าง
+                  แล้วสมัครผ่านแอป <span className="font-medium text-foreground">SOWORK</span>
                 </>
               )}
             </p>
@@ -97,10 +99,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               type="button"
               onClick={() => void onRefresh()}
               disabled={loading || refreshing}
-              className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-white/80 bg-white/60 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/80 disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-white/80 bg-white/70 px-4 py-2.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-white disabled:opacity-50"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
-              รีเฟรช
+              รีเฟรชข้อมูล
             </button>
           ) : null}
         </div>
@@ -124,29 +126,31 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           subtypeOptions={filters.subtypeOptions}
           loading={loading}
           searchPlaceholder={searchPlaceholder}
+          resultCount={loading ? undefined : filters.filtered.length}
+          totalCount={loading ? undefined : filters.visibleCount}
         />
 
         {loadError ? <p className="mt-4 text-sm text-destructive">{loadError}</p> : null}
 
         {loading && (
-          <p className="mt-8 text-sm text-muted-foreground animate-pulse">กำลังโหลดประกาศงาน...</p>
+          <p className="mt-10 text-sm text-muted-foreground animate-pulse text-center">กำลังโหลดประกาศงาน...</p>
         )}
 
         {!loading && filters.usedRelatedFallback && filters.search.trim() && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            ไม่พบผลที่ตรงคำค้นทั้งหมด เลยแสดงงานที่ใกล้เคียงให้แทน
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            ไม่พบผลที่ตรงคำค้นทั้งหมด — แสดงงานที่ใกล้เคียงแทน
           </p>
         )}
 
         {!loading && filters.filtered.length === 0 && (
-          <div className="mt-12 jarvis-frost rounded-[1.5rem] border-dashed border-white/70 p-10 text-center">
+          <div className="mt-10 jarvis-frost rounded-[1.5rem] border border-dashed border-white/70 p-10 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
             <p className="font-medium text-foreground">ยังไม่มีตำแหน่งที่ตรงกับตัวกรอง</p>
-            <p className="mt-1 text-sm text-muted-foreground">ลองเปลี่ยนคำค้นหาหรือเลือก &quot;ทั้งหมด&quot;</p>
+            <p className="mt-1 text-sm text-muted-foreground">ลองเปลี่ยนคำค้นหาหรือกด &quot;ทั้งหมด&quot;</p>
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pb-12">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 pb-10">
           {filters.filtered.map((job) => (
             <Card
               key={job.id}
@@ -225,23 +229,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           ))}
         </div>
 
-        {!loading && isStaff && filters.visibleCount > 0 ? (
-          <p className="-mt-6 mb-8 text-center text-xs text-muted-foreground">
-            แสดง {filters.filtered.length} จาก {filters.visibleCount} งานที่เปิดรับ
-          </p>
-        ) : null}
-
-        <div className="mx-auto max-w-lg pb-16 text-center">
-          <p className="text-sm text-muted-foreground mb-3">พร้อมสมัครแล้ว?</p>
-          <button
-            type="button"
-            onClick={openApply}
-            className="jarvis-pill-btn inline-flex w-full sm:w-auto px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
-          >
-            ไปที่แอปสมัครงาน SOWORK
-            <ExternalLink className="h-4 w-4" />
-          </button>
-          <p className="mt-3 text-[11px] text-muted-foreground break-all">{SOWORK_APPLY_URL}</p>
+        <div className="mx-auto max-w-md pb-14 pt-2 text-center">
+          <div className="jarvis-frost rounded-2xl border border-white/70 px-6 py-8">
+            <p className="text-sm font-medium text-foreground">พร้อมสมัครแล้ว?</p>
+            <p className="mt-1 text-xs text-muted-foreground">เปิดแอป SOWORK เพื่อส่งใบสมัคร</p>
+            <button
+              type="button"
+              onClick={openApply}
+              className="jarvis-pill-btn mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            >
+              ไปที่แอปสมัครงาน SOWORK
+              <ExternalLink className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 

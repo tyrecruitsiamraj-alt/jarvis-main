@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 import SearchField from '@/components/shared/SearchField';
 import LocationFilterSelect from '@/components/public/LocationFilterSelect';
 import {
@@ -31,6 +31,8 @@ type Props = {
   subtypeOptions: readonly string[];
   loading?: boolean;
   searchPlaceholder?: string;
+  resultCount?: number;
+  totalCount?: number;
 };
 
 function countActiveFilters(
@@ -41,6 +43,27 @@ function countActiveFilters(
 ): number {
   return [province, district, position, subtype].filter(Boolean).length;
 }
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-200/70 bg-blue-50/90 py-1 pl-2.5 pr-1 text-xs font-medium text-blue-900">
+      <span className="truncate">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-blue-700/80 transition-colors hover:bg-blue-200/60 hover:text-blue-900"
+        aria-label={`ลบตัวกรอง ${label}`}
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
+const URGENCY_CHIPS = [
+  { id: 'all' as const, label: 'ทั้งหมด' },
+  { id: 'urgent' as const, label: 'ด่วน' },
+] as const;
 
 const JobBoardTopFilters: React.FC<Props> = ({
   search,
@@ -61,6 +84,8 @@ const JobBoardTopFilters: React.FC<Props> = ({
   subtypeOptions,
   loading,
   searchPlaceholder = 'ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน...',
+  resultCount,
+  totalCount,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = useMemo(
@@ -68,8 +93,15 @@ const JobBoardTopFilters: React.FC<Props> = ({
     [provinceFilter, districtFilter, positionFilter, subtypeFilter],
   );
 
+  const clearAllFilters = () => {
+    onProvinceFilterChange('');
+    onDistrictFilterChange('');
+    onPositionFilterChange('');
+    onSubtypeFilterChange('');
+  };
+
   const filterFields = (
-    <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <LocationFilterSelect
         label="จังหวัด"
         placeholder="เลือกจังหวัด"
@@ -105,103 +137,148 @@ const JobBoardTopFilters: React.FC<Props> = ({
     </div>
   );
 
+  const activeChips = (
+    <>
+      {provinceFilter ? (
+        <FilterChip label={`จังหวัด ${provinceFilter}`} onRemove={() => onProvinceFilterChange('')} />
+      ) : null}
+      {districtFilter ? (
+        <FilterChip label={`อำเภอ ${districtFilter}`} onRemove={() => onDistrictFilterChange('')} />
+      ) : null}
+      {positionFilter ? (
+        <FilterChip label={positionFilter} onRemove={() => onPositionFilterChange('')} />
+      ) : null}
+      {subtypeFilter ? (
+        <FilterChip label={subtypeFilter} onRemove={() => onSubtypeFilterChange('')} />
+      ) : null}
+    </>
+  );
+
   return (
     <>
-      <div className="sticky top-0 z-30 -mx-4 border-b border-white/60 bg-white/80 px-4 py-3 backdrop-blur-xl md:-mx-6 md:px-6">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <SearchField
-              wrapperClassName="flex-1 min-w-0"
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {(
-                [
-                  { id: 'all' as const, label: 'ทั้งหมด' },
-                  { id: 'urgent' as const, label: 'ด่วน' },
-                ] as const
-              ).map((f) => (
+      <div className="sticky top-0 z-30 mt-8">
+        <div className="jarvis-frost rounded-2xl border border-white/70 p-4 shadow-sm md:rounded-[1.25rem] md:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <SearchField
+                wrapperClassName="flex-1 min-w-0"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+              />
+
+              <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+                <div
+                  className="inline-flex rounded-xl border border-white/80 bg-white/55 p-1 shadow-sm"
+                  role="group"
+                  aria-label="ประเภทงาน"
+                >
+                  {URGENCY_CHIPS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => onChipChange(f.id)}
+                      className={cn(
+                        'rounded-lg px-4 py-2 text-xs font-semibold transition-all touch-manipulation min-w-[4.5rem]',
+                        chip === f.id
+                          ? 'bg-white text-blue-700 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
                 <button
-                  key={f.id}
                   type="button"
-                  onClick={() => onChipChange(f.id)}
+                  onClick={() => setSheetOpen(true)}
                   className={cn(
-                    'rounded-full px-4 py-2 text-xs font-semibold transition-all touch-manipulation',
-                    chip === f.id
-                      ? 'jarvis-pill-btn px-4 py-2 text-xs shadow-md'
-                      : 'bg-white/55 text-secondary-foreground hover:bg-white/75 border border-white/80',
+                    'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all touch-manipulation lg:hidden',
+                    activeFilterCount > 0
+                      ? 'border-blue-300/70 bg-blue-50 text-blue-800 shadow-sm'
+                      : 'border-white/80 bg-white/60 text-foreground hover:bg-white',
                   )}
                 >
-                  {f.label}
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  ตัวกรอง
+                  {activeFilterCount > 0 ? (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  ) : null}
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setSheetOpen(true)}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/60 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white touch-manipulation',
-                  activeFilterCount > 0 && 'border-blue-300/60 bg-blue-50/80 text-blue-800',
-                )}
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                เลือกตัวกรอง
-                {activeFilterCount > 0 ? (
-                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
-                    {activeFilterCount}
-                  </span>
-                ) : null}
-              </button>
+              </div>
             </div>
-          </div>
 
-          {activeFilterCount > 0 ? (
-            <div className="flex flex-wrap gap-1.5 text-[11px]">
-              {provinceFilter ? (
-                <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-blue-800">จ.{provinceFilter}</span>
-              ) : null}
-              {districtFilter ? (
-                <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-blue-800">อ.{districtFilter}</span>
-              ) : null}
-              {positionFilter ? (
-                <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-blue-800">{positionFilter}</span>
-              ) : null}
-              {subtypeFilter ? (
-                <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-blue-800">{subtypeFilter}</span>
-              ) : null}
-            </div>
-          ) : null}
+            <div className="hidden lg:block border-t border-white/60 pt-4">{filterFields}</div>
+
+            {activeFilterCount > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 border-t border-white/50 pt-3">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground shrink-0">
+                  กำลังกรอง
+                </span>
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">{activeChips}</div>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="shrink-0 text-xs font-medium text-blue-700 hover:underline underline-offset-2"
+                >
+                  ล้างทั้งหมด
+                </button>
+              </div>
+            ) : null}
+
+            {resultCount != null && !loading ? (
+              <p className="text-xs text-muted-foreground border-t border-white/40 pt-3">
+                พบ{' '}
+                <span className="font-semibold text-foreground">{resultCount.toLocaleString('th-TH')}</span>
+                {totalCount != null && totalCount !== resultCount ? (
+                  <>
+                    {' '}
+                    จาก {totalCount.toLocaleString('th-TH')} ตำแหน่ง
+                  </>
+                ) : (
+                  ' ตำแหน่ง'
+                )}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="top" className="max-h-[85dvh] overflow-y-auto rounded-b-2xl">
-          <SheetHeader className="text-left">
-            <SheetTitle>เลือกตัวกรองงาน</SheetTitle>
-            <SheetDescription>จังหวัด · อำเภอ · ตำแหน่ง · ลักษณะงานย่อย</SheetDescription>
-          </SheetHeader>
-          <div className="mt-6">{filterFields}</div>
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                onProvinceFilterChange('');
-                onDistrictFilterChange('');
-                onPositionFilterChange('');
-                onSubtypeFilterChange('');
-              }}
-              className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary"
-            >
-              ล้างตัวกรอง
-            </button>
-            <button
-              type="button"
-              onClick={() => setSheetOpen(false)}
-              className="jarvis-pill-btn justify-center px-6 py-2.5 text-sm font-semibold"
-            >
-              แสดงผลลัพธ์
-            </button>
+        <SheetContent side="top" className="max-h-[88dvh] overflow-y-auto rounded-b-[1.5rem] px-4 pb-6 pt-5 sm:px-6">
+          <div className="mx-auto w-full max-w-2xl">
+            <SheetHeader className="text-left space-y-1">
+              <SheetTitle className="text-lg">ตัวกรองงาน</SheetTitle>
+              <SheetDescription>เลือกพื้นที่และลักษณะงานที่สนใจ</SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-6">{filterFields}</div>
+
+            {activeFilterCount > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-1.5">{activeChips}</div>
+            ) : null}
+
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                disabled={activeFilterCount === 0}
+                className="rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-40"
+              >
+                ล้างตัวกรอง
+              </button>
+              <button
+                type="button"
+                onClick={() => setSheetOpen(false)}
+                className="jarvis-pill-btn justify-center px-6 py-3 text-sm font-semibold"
+              >
+                แสดงผลลัพธ์
+                {resultCount != null ? ` (${resultCount})` : ''}
+              </button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
