@@ -45,26 +45,7 @@ const legacyWhere = `
   AND NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
 `;
 
-const loosePartialWhere = `
-  A.status = 'A'
-  AND A.is_stop = 'N'
-  AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
-  AND ISNULL(A.inform_qty, 0) < ISNULL(NULLIF(A.request_qty, 0), 1)
-`;
-
-const remainingWhere = `
-  A.status = 'A'
-  AND A.is_stop = 'N'
-  AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
-  AND ISNULL(A.is_inform_all, 'N') <> 'Y'
-  AND (
-    NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
-    OR (
-      ISNULL(A.inform_qty, 0) > 0
-      AND ISNULL(A.inform_qty, 0) < ISNULL(NULLIF(A.request_qty, 0), 1)
-    )
-  )
-`.trim();
+const remainingWhere = legacyWhere;
 
 const sumRemaining = `
   SELECT
@@ -80,9 +61,8 @@ const sumRemaining = `
   WHERE ${remainingWhere}
 `;
 
-const [legacy, loose, remaining, remainingTotals] = await Promise.all([
+const [legacy, feed, remainingTotals] = await Promise.all([
   pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${legacyWhere}`),
-  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${loosePartialWhere}`),
   pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${remainingWhere}`),
   pool.request().query(sumRemaining),
 ]);
@@ -91,9 +71,8 @@ console.log(
   JSON.stringify(
     {
       legacy_no_inform: legacy.recordset[0].cnt,
-      loose_inform_qty_lt_request: loose.recordset[0].cnt,
-      remaining_filter: remaining.recordset[0].cnt,
-      remaining_positions_sum: remainingTotals.recordset[0].remaining_positions,
+      feed_open: feed.recordset[0].cnt,
+      feed_positions_sum: remainingTotals.recordset[0].remaining_positions,
     },
     null,
     2,
