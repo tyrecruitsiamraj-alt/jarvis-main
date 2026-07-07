@@ -29,6 +29,12 @@ import {
   loadSupervisorDashboardFilters,
   saveSupervisorDashboardFilters,
 } from '@/lib/supervisorDashboardPageState';
+import { fetchSiamrajThroughput } from '@/lib/siamrajUnitRequestsApi';
+import {
+  filterJobsForThroughput,
+  jobsToThroughputRecords,
+  type ThroughputRecord,
+} from '@/lib/dashboard/throughput';
 import type { JobRequest } from '@/types';
 
 const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
@@ -45,9 +51,35 @@ const SupervisorDashboard: React.FC = () => {
   const [detailDialogTitle, setDetailDialogTitle] = useState('');
   const [detailDialogItems, setDetailDialogItems] = useState<ReturnType<typeof jobToDashboardDetailItem>[]>([]);
 
+  const [throughputRecords, setThroughputRecords] = useState<ThroughputRecord[]>([]);
+
   const RETURN_TO = '/dashboard';
 
-  const { jobs, loading, refreshing, refetch, siamrajPrimary } = useUnitRequestsFeed();
+  const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource } = useUnitRequestsFeed();
+
+  useEffect(() => {
+    if (DEMO_MODE) {
+      setThroughputRecords([]);
+      return;
+    }
+    const trendRange = resolveYearToDateTrendRange();
+    if (siamrajPrimary && dbSource === 'sqlserver') {
+      let cancelled = false;
+      void fetchSiamrajThroughput(trendRange.from, trendRange.to)
+        .then((rows) => {
+          if (!cancelled) setThroughputRecords(rows);
+        })
+        .catch(() => {
+          if (!cancelled) setThroughputRecords([]);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    setThroughputRecords(
+      jobsToThroughputRecords(filterJobsForThroughput(jobs, trendRange.from, trendRange.to)),
+    );
+  }, [jobs, siamrajPrimary, dbSource, refreshing]);
 
   const period = useMemo(
     () => (dateRange ? resolvePeriodRange('custom', dateRange) : null),
@@ -144,12 +176,13 @@ const SupervisorDashboard: React.FC = () => {
       from: trendRange.from,
       to: trendRange.to,
       label: trendRange.label,
+      throughputRecords,
     });
     return {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {

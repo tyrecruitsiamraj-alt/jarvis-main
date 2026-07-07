@@ -24,6 +24,10 @@ export type DashboardActivityTrendPoint = {
   resignations: number;
   replacements: number;
   newOpenings: number;
+  /** ตำแหน่งที่ขอ (ตามเดือนที่กรอกใบขอ) */
+  requestedPositions?: number;
+  /** ตำแหน่งที่ปิดแล้วทุกประเภท (ตามเดือนที่ปิด) */
+  closedPositions?: number;
 };
 
 export type DashboardFilters = {

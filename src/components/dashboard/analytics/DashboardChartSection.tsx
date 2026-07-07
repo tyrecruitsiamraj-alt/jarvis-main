@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import type { DashboardData } from '@/lib/dashboard/types';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
+import DashboardThroughputChart from './DashboardThroughputChart';
 
 type Props = {
   data: Pick<DashboardData, 'activityTrend' | 'unitOverview' | 'periodLabel' | 'activityTrendLabel'>;
@@ -113,6 +114,8 @@ const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
           periodLabel={data.periodLabel}
           onUnitClick={onUnitClick}
         />
+
+        <DashboardThroughputChart data={data.activityTrend} periodLabel={data.activityTrendLabel} />
       </div>
     </div>
   );

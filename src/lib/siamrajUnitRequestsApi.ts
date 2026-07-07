@@ -31,6 +31,21 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
   return readJsonSafe<JobRequest>(r);
 }
 
+export type SiamrajThroughputRecord = {
+  requestDate: string;
+  closureDate: string | null;
+  positionUnits: number;
+  isOpen: boolean;
+};
+
+export async function fetchSiamrajThroughput(from: string, to: string): Promise<SiamrajThroughputRecord[]> {
+  const params = new URLSearchParams({ throughput: '1', from, to });
+  const r = await apiFetch(`/api/siamraj/unit-requests?${params}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดสถิติขอ/ปิดไม่สำเร็จ'));
+  const data = await readJsonSafe<SiamrajThroughputRecord[]>(r);
+  return Array.isArray(data) ? data : [];
+}
+
 /** บันทึกผู้รับผิดชอบ (สรรหา/คัดสรร) ของใบขอ Siamraj — เก็บใน PostgreSQL ฝั่ง Jarvis */
 export async function saveSiamrajUnitAssignment(
   requestNo: string,

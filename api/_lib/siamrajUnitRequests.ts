@@ -5,6 +5,10 @@ import {
   listSiamrajSqlServerUnitRequests,
   SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT,
 } from './siamrajSqlServerRequests.js';
+import {
+  listSiamrajSqlServerThroughput,
+  type SiamrajThroughputRecord,
+} from './siamrajSqlServerThroughput.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
 
@@ -246,4 +250,17 @@ export async function getSiamrajUnitRequestById(id: string) {
   );
 
   return rows[0] ? mapSiamrajRow(rows[0]) : null;
+}
+
+export type { SiamrajThroughputRecord };
+
+export async function listSiamrajThroughput(options: {
+  from: string;
+  to: string;
+}): Promise<SiamrajThroughputRecord[]> {
+  const source = getSiamrajDbSource();
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerThroughput(options);
+  }
+  return [];
 }

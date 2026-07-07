@@ -37,6 +37,12 @@ import type {
   DashboardTaskStatus,
   DashboardWorkItem,
 } from './types';
+import {
+  enrichActivityTrendWithThroughput,
+  filterJobsForThroughput,
+  jobsToThroughputRecords,
+  type ThroughputRecord,
+} from './throughput';
 
 export type PeriodRange = {
   from: string;
@@ -522,6 +528,7 @@ export type BuildDashboardTrendInput = {
   from: string;
   to: string;
   label: string;
+  throughputRecords?: ThroughputRecord[];
 };
 
 function buildAgeDaysBreakdown(jobs: JobRequest[], today: Date) {
@@ -551,10 +558,17 @@ export function buildDashboardData(
   const trendFrom = trend?.from ?? period?.from ?? '1970-01-01';
   const trendTo = trend?.to ?? period?.to ?? toYmdLocal(today);
   const activityTrendLabel = trend?.label ?? periodLabel;
+  const throughputRecords =
+    trend?.throughputRecords ??
+    jobsToThroughputRecords(filterJobsForThroughput(trendJobs, trendFrom, trendTo));
+  const activityTrend = enrichActivityTrendWithThroughput(
+    buildActivityTrend(trendJobs, trendFrom, trendTo),
+    throughputRecords,
+  );
 
   return {
     kpis: buildKpis(scopedJobs, previousScopedJobs, today),
-    activityTrend: buildActivityTrend(trendJobs, trendFrom, trendTo),
+    activityTrend,
     unitOverview: buildUnitOverview(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     ageDaysRequestTotal: scopedJobs.length,
