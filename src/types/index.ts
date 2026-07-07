@@ -28,6 +28,8 @@ export interface Employee {
   base_salary?: number;
   status: EmployeeStatus;
   position: string;
+  /** แผนก / BU เช่น LBD, LBA */
+  department_code?: string;
   join_date: string;
   address?: string;
   lat?: number;

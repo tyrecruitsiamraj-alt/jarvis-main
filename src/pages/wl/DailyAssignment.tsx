@@ -4,6 +4,9 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import AssignDialog from '@/components/shared/AssignDialog';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
+import WlBuSelector from '@/components/wl/WlBuSelector';
+import { useWlBu } from '@/hooks/useWlBu';
+import { countEmployeesByBu, employeeIdsForBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 import SearchField from '@/components/shared/SearchField';
 import { Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -16,17 +19,29 @@ import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceho
 const DailyAssignment: React.FC = () => {
   const workCalendar = useWorkCalendarEntries();
   const { employees: wlEmployees, loading: loadingEmps } = useWlEmployees();
+  const { selectedBu, setSelectedBu, buLabel } = useWlBu();
   const [selectedDate, setSelectedDate] = useState(() => toYmdLocal(new Date()));
   const [searchTerm, setSearchTerm] = useState('');
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; empId: string; empName: string }>({ open: false, empId: '', empName: '' });
   type WorkCalendarEntryWithEmployee = WorkCalendarEntry & { emp?: Employee };
   const [editDialog, setEditDialog] = useState<{ open: boolean; entry: WorkCalendarEntryWithEmployee | null }>({ open: false, entry: null });
 
-  const todayEntries = useMemo(
-    () => workCalendar.filter((w) => w.work_date === selectedDate),
-    [workCalendar, selectedDate],
+  const buCounts = useMemo(() => countEmployeesByBu(wlEmployees), [wlEmployees]);
+  const scopedEmployeeIds = useMemo(
+    () => employeeIdsForBu(wlEmployees, selectedBu),
+    [wlEmployees, selectedBu],
   );
-  const activeEmployees = wlEmployees.filter((e) => e.status === 'active');
+  const todayEntries = useMemo(
+    () =>
+      workCalendar.filter(
+        (w) => w.work_date === selectedDate && scopedEmployeeIds.has(w.employee_id),
+      ),
+    [workCalendar, selectedDate, scopedEmployeeIds],
+  );
+  const activeEmployees = useMemo(
+    () => filterEmployeesByBu(wlEmployees, selectedBu).filter((e) => e.status === 'active'),
+    [wlEmployees, selectedBu],
+  );
   const assignedIds = todayEntries.map(e => e.employee_id);
   const availableEmployees = activeEmployees.filter(e => !assignedIds.includes(e.id));
   const filteredAvailable = availableEmployees.filter(e =>
@@ -35,12 +50,18 @@ const DailyAssignment: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Daily Assignment" subtitle="ลงคนทำงานรายวัน" backPath="/wl" />
+      <PageHeader title="Daily Assignment" subtitle={`${buLabel} · ลงคนทำงานรายวัน`} backPath="/wl" />
       <ProductionDataPlaceholder title="Daily Assignment" />
       {loadingEmps ? (
         <div className="px-4 md:px-6 text-sm text-muted-foreground">กำลังโหลด…</div>
       ) : (
       <div className="px-4 md:px-6 space-y-4">
+        <WlBuSelector
+          selected={selectedBu}
+          onChange={setSelectedBu}
+          counts={buCounts}
+          variant="pills"
+        />
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">เลือกวันที่ (วัน / เดือน / ปี พ.ศ.)</label>
           <DateSelectDmyBe value={selectedDate} onChange={setSelectedDate} />

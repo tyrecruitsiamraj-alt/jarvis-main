@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import AssignDialog from '@/components/shared/AssignDialog';
+import WlBuSelector from '@/components/wl/WlBuSelector';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
+import { useWlBu } from '@/hooks/useWlBu';
+import { countEmployeesByBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 import { WorkCalendarEntry, WorkStatus, WORK_STATUS_COLORS, WORK_STATUS_LABELS } from '@/types';
 import { cn, shiftStartLabel } from '@/lib/utils';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -21,11 +24,16 @@ function isSunday(year: number, month: number, day: number): boolean {
 const MonthlyPlanner: React.FC = () => {
   const calendarEntries = useWorkCalendarEntries();
   const { employees: wlEmployees, loading } = useWlEmployees();
+  const { selectedBu, setSelectedBu, buLabel } = useWlBu();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; date: string; empId: string; empName: string }>({ open: false, date: '', empId: '', empName: '' });
   const [cellDetail, setCellDetail] = useState<{ open: boolean; entry: WorkCalendarEntry | null; empName: string }>({ open: false, entry: null, empName: '' });
 
-  const activeEmployees = wlEmployees.filter((e) => e.status === 'active');
+  const buCounts = useMemo(() => countEmployeesByBu(wlEmployees), [wlEmployees]);
+  const activeEmployees = useMemo(
+    () => filterEmployeesByBu(wlEmployees, selectedBu).filter((e) => e.status === 'active'),
+    [wlEmployees, selectedBu],
+  );
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -43,12 +51,19 @@ const MonthlyPlanner: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Monthly Work Planner" subtitle="วางแผนงานรายเดือน" backPath="/wl" />
+      <PageHeader title="Monthly Work Planner" subtitle={`${buLabel} · วางแผนงานรายเดือน`} backPath="/wl" />
       <ProductionDataPlaceholder title="Monthly Planner" />
       {loading ? (
         <div className="px-4 md:px-6 text-sm text-muted-foreground">กำลังโหลด…</div>
       ) : (
       <div className="px-4 md:px-6">
+        <WlBuSelector
+          selected={selectedBu}
+          onChange={setSelectedBu}
+          counts={buCounts}
+          variant="pills"
+          className="mb-4"
+        />
         <div className="flex items-center gap-3 mb-4">
           <button onClick={prevMonth} className="p-2 rounded-lg bg-secondary hover:bg-secondary/80"><ChevronLeft className="w-4 h-4" /></button>
           <span className="font-semibold text-foreground">{monthNames[month]} {year + 543}</span>
