@@ -8,7 +8,7 @@ import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
-import JobBoardFilterBar from '@/components/jobs/JobBoardFilterBar';
+import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   Dialog,
@@ -105,28 +105,26 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           ) : null}
         </div>
 
-        <div className="relative z-10">
-          <JobBoardFilterBar
-            search={filters.search}
-            onSearchChange={filters.setSearch}
-            chip={filters.chip}
-            onChipChange={filters.setChip}
-            provinceFilter={filters.provinceFilter}
-            onProvinceFilterChange={filters.onProvinceFilterChange}
-            districtFilter={filters.districtFilter}
-            onDistrictFilterChange={filters.setDistrictFilter}
-            positionFilter={filters.positionFilter}
-            onPositionFilterChange={filters.setPositionFilter}
-            subtypeFilter={filters.subtypeFilter}
-            onSubtypeFilterChange={filters.setSubtypeFilter}
-            provinceOptions={filters.provinceOptions}
-            districtOptions={filters.districtOptions}
-            positionOptions={filters.positionOptions}
-            subtypeOptions={filters.subtypeOptions}
-            loading={loading}
-            searchPlaceholder={searchPlaceholder}
-          />
-        </div>
+        <JobBoardTopFilters
+          search={filters.search}
+          onSearchChange={filters.setSearch}
+          chip={filters.chip}
+          onChipChange={filters.setChip}
+          provinceFilter={filters.provinceFilter}
+          onProvinceFilterChange={filters.onProvinceFilterChange}
+          districtFilter={filters.districtFilter}
+          onDistrictFilterChange={filters.setDistrictFilter}
+          positionFilter={filters.positionFilter}
+          onPositionFilterChange={filters.setPositionFilter}
+          subtypeFilter={filters.subtypeFilter}
+          onSubtypeFilterChange={filters.setSubtypeFilter}
+          provinceOptions={filters.provinceOptions}
+          districtOptions={filters.districtOptions}
+          positionOptions={filters.positionOptions}
+          subtypeOptions={filters.subtypeOptions}
+          loading={loading}
+          searchPlaceholder={searchPlaceholder}
+        />
 
         {loadError ? <p className="mt-4 text-sm text-destructive">{loadError}</p> : null}
 

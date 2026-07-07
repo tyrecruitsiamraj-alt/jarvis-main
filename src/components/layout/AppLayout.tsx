@@ -9,16 +9,20 @@ import NotificationPanel from '@/components/notifications/NotificationPanel';
 import JobNotificationWatcher from '@/components/notifications/JobNotificationWatcher';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import BottomDockNav from '@/components/layout/bottom-nav/BottomDockNav';
+import JobBoardHeaderMenu from '@/components/layout/JobBoardHeaderMenu';
 import { DOCK_NAV_ITEMS, isDockPathActive } from '@/components/layout/bottom-nav/dockNavConfig';
 import { filterByMinimumRole } from '@/lib/rbac';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
   const { config } = useBranding();
+  const { isFunctionEnabled } = useRolePermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
   const navItems = filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
+  const showJobBoardMenu = isFunctionEnabled('unit_requests_read');
 
   return (
     <div
@@ -59,6 +63,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </nav>
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
+          {showJobBoardMenu ? <JobBoardHeaderMenu /> : null}
           <NotificationPanel />
           <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[220px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
@@ -96,6 +101,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <BrandTitle className="text-base font-bold text-foreground truncate" />
         </button>
         <div className="flex items-center gap-1 shrink-0">
+          {showJobBoardMenu ? <JobBoardHeaderMenu /> : null}
           <NotificationPanel />
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}
