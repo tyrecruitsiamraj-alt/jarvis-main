@@ -153,32 +153,37 @@ const JobListPage: React.FC = () => {
     [subtypeScopedJobs],
   );
 
+  const unitScopeNames = useMemo(
+    () => subtypeScopedJobs.map((j) => j.unit_name),
+    [subtypeScopedJobs],
+  );
+
   const recruiterFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
+      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
       if (!matchesScreenerFilter(j, screenerFilter)) return false;
       if (!matchesOplFilter(j, oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, unitFilter, screenerFilter, oplFilter]);
+  }, [subtypeScopedJobs, unitFilter, screenerFilter, oplFilter, unitScopeNames]);
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
+      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
       if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
       if (!matchesOplFilter(j, oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, unitFilter, recruiterFilter, oplFilter]);
+  }, [subtypeScopedJobs, unitFilter, recruiterFilter, oplFilter, unitScopeNames]);
 
   const oplFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
+      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
       if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
       if (!matchesScreenerFilter(j, screenerFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, unitFilter, recruiterFilter, screenerFilter]);
+  }, [subtypeScopedJobs, unitFilter, recruiterFilter, screenerFilter, unitScopeNames]);
 
   const unassignedRecruiterCount = useMemo(
     () => countUnassignedRecruiters(recruiterFilterScope),
@@ -215,7 +220,7 @@ const JobListPage: React.FC = () => {
 
     return subtypeScopedJobs
       .filter((j) => {
-        if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter)) return false;
+        if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
         if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesOplFilter(j, oplFilter)) return false;
@@ -234,7 +239,7 @@ const JobListPage: React.FC = () => {
             .includes(q),
       )
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort]);
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { unitOrganizationKey, unitOrganizationLabel, pickUnitOrganizationDisplayName } from '../../src/lib/unitGroupName';
+import { unitOrganizationKey, unitOrganizationLabel, pickUnitOrganizationDisplayName, buildOrganizationKeyResolver } from '../../src/lib/unitGroupName';
 import { buildDashboardData } from '../../src/lib/dashboard/buildDashboardData';
 import { DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
 import { resolvePeriodRange } from '../../src/lib/dashboard/buildDashboardData';
@@ -42,6 +42,11 @@ describe('unitGroupName', () => {
         'ธนาคารกรุงศรี สาขาเชียงใหม่',
       ]),
     ).toBe('ธนาคารกรุงศรี');
+  });
+
+  it('merges truncated prefix with full organization name', () => {
+    const resolve = buildOrganizationKeyResolver(['บำรุงราษ', 'บริษัท บำรุงราษฎร์ จำกัด']);
+    expect(resolve('บำรุงราษ')).toBe(resolve('บริษัท บำรุงราษฎร์ จำกัด'));
   });
 });
 
@@ -88,5 +93,17 @@ describe('buildDashboardData unit overview grouping', () => {
     const rows = data.unitOverview.filter((u) => u.name.includes('บำรุงราษ'));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.total).toBe(5);
+  });
+
+  it('merges truncated บำรุงราษ with full บำรุงราษฎร์ name', () => {
+    const jobs = [
+      job('บำรุงราษ', { position_units: 4 }),
+      job('บริษัท บำรุงราษฎร์ จำกัด', { position_units: 6 }),
+    ];
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
+    const rows = data.unitOverview.filter((u) => u.name.includes('บำรุงราษ'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.total).toBe(10);
   });
 });

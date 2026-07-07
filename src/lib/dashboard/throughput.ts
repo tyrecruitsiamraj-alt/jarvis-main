@@ -85,10 +85,13 @@ export function enrichActivityTrendWithThroughput(
 
   return points.map((p) => {
     const month = p.date.slice(0, 7);
+    const requested = requestedMap.get(month) ?? 0;
+    const closed = closedMap.get(month) ?? 0;
     return {
       ...p,
-      requestedPositions: requestedMap.get(month) ?? 0,
-      closedPositions: closedMap.get(month) ?? 0,
+      requestedPositions: requested,
+      closedPositions: closed,
+      remainingPositions: requested - closed,
     };
   });
 }

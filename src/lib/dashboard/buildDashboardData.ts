@@ -19,7 +19,7 @@ import {
   countAgeDaysBreakdown,
 } from '@/lib/jobUrgency';
 import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
-import { pickUnitOrganizationDisplayName, unitOrganizationKey } from '@/lib/unitGroupName';
+import { pickUnitOrganizationDisplayName, buildOrganizationKeyResolver } from '@/lib/unitGroupName';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import type {
@@ -361,6 +361,7 @@ function buildKpis(
   const prevCloseRate = prevRequestedTotal
     ? Math.round((prevClosedTotal / prevRequestedTotal) * 1000) / 10
     : 0;
+  const closedExceedsRequested = Boolean(throughputCur && closedTotal > requestedTotal);
 
   return [
     {
@@ -368,7 +369,9 @@ function buildKpis(
       label: throughputCur ? 'ขอมา' : 'งานทั้งหมด',
       value: requestedTotal,
       description: throughputCur
-        ? 'ตำแหน่งที่กรอกใบขอในช่วงที่เลือก'
+        ? closedExceedsRequested
+          ? 'ตำแหน่งที่กรอกใบขอใหม่ในช่วงที่เลือก (ไม่รวม backlog เก่า)'
+          : 'ตำแหน่งที่กรอกใบขอในช่วงที่เลือก'
         : 'ตำแหน่งที่ต้องการตามตัวกรอง',
       trendPercent: trendPercent(requestedTotal, prevRequestedTotal),
     },
@@ -391,7 +394,9 @@ function buildKpis(
       label: 'ปิดใบขอ',
       value: closedTotal,
       description: throughputCur
-        ? 'ตำแหน่งที่ปิดแล้วทุกประเภทในช่วงที่เลือก'
+        ? closedExceedsRequested
+          ? 'รวมใบขอเก่าที่ปิดในช่วงนี้ — ปิดมากกว่าขอในรอบนี้ได้'
+          : 'ตำแหน่งที่ปิดแล้วทุกประเภทในช่วงที่เลือก'
         : 'ตำแหน่งที่ปิดงานแล้ว',
       trendPercent: trendPercent(closedTotal, prevClosedTotal),
     },
@@ -399,7 +404,9 @@ function buildKpis(
       id: 'success_rate',
       label: 'อัตราปิด',
       value: closeRate,
-      description: '% ปิดได้จากที่ขอในช่วงเดียวกัน',
+      description: closedExceedsRequested
+        ? 'เกิน 100% ได้ — นับปิดจาก backlog ที่ขอมาก่อนช่วงนี้'
+        : '% ปิดได้จากที่ขอในช่วงเดียวกัน',
       trendPercent: trendPercent(closeRate, prevCloseRate),
       format: 'percent',
     },
@@ -459,10 +466,11 @@ function buildStatusBreakdown(jobs: JobRequest[], today: Date): DashboardStatusB
 }
 
 function buildUnitOverview(jobs: JobRequest[], today: Date): DashboardUnitOverview[] {
+  const resolve = buildOrganizationKeyResolver(jobs.map((j) => j.unit_name));
   const map = new Map<string, { names: string[]; total: number; open: number; overdue: number }>();
   for (const j of jobs) {
     const rawName = j.unit_name?.trim() || '—';
-    const key = unitOrganizationKey(rawName);
+    const key = resolve(rawName);
     const units = jobPositionUnits(j);
     const row = map.get(key) ?? { names: [], total: 0, open: 0, overdue: 0 };
     row.names.push(rawName);

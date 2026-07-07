@@ -28,6 +28,8 @@ export type DashboardActivityTrendPoint = {
   requestedPositions?: number;
   /** ตำแหน่งที่ปิดแล้วทุกประเภท (ตามเดือนที่ปิด) */
   closedPositions?: number;
+  /** คงเหลือต่อเดือน = ขอ − ปิด (ติดลบได้ถ้าปิด backlog เก่า) */
+  remainingPositions?: number;
 };
 
 export type DashboardFilters = {

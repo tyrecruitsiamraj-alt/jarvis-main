@@ -14,5 +14,6 @@ describe('throughput', () => {
     ]);
     expect(enriched[0]?.requestedPositions).toBe(3);
     expect(enriched[0]?.closedPositions).toBe(4);
+    expect(enriched[0]?.remainingPositions).toBe(-1);
   });
 });

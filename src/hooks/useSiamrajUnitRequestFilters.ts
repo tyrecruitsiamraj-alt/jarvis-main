@@ -80,12 +80,13 @@ export function filterUnitRequests(
   omit?: OmitFilters,
 ): JobRequest[] {
   const f = effectiveFilters(filters, omit);
+  const unitScopeNames = jobs.map((j) => j.unit_name);
 
   let list = siamrajPrimary ? filterUnitRequestsByDepartment(jobs, f.departmentFilter) : jobs;
   if (siamrajPrimary) list = filterUnitRequestsByJobSubtype(list, f.jobSubtypeFilter);
 
   return list.filter((j) => {
-    if (f.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, f.unitFilter)) return false;
+    if (f.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, f.unitFilter, unitScopeNames)) return false;
     if (!matchesRecruiterFilter(j, f.recruiterFilter)) return false;
     if (!matchesScreenerFilter(j, f.screenerFilter)) return false;
     if (!matchesOplFilter(j, f.oplFilter)) return false;
@@ -147,32 +148,37 @@ export function useSiamrajUnitRequestFilters(
     return buildOplNameOptions(jobs);
   }, [staffRosterRev, jobs]);
 
+  const unitScopeNames = useMemo(
+    () => subtypeScopedJobs.map((j) => j.unit_name),
+    [subtypeScopedJobs],
+  );
+
   const recruiterFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter)) return false;
+      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
       if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
       if (!matchesOplFilter(j, filters.oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.screenerFilter, filters.oplFilter]);
+  }, [subtypeScopedJobs, filters.unitFilter, filters.screenerFilter, filters.oplFilter, unitScopeNames]);
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter)) return false;
+      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
       if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
       if (!matchesOplFilter(j, filters.oplFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.oplFilter]);
+  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.oplFilter, unitScopeNames]);
 
   const oplFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter)) return false;
+      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
       if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
       if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
       return true;
     });
-  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.screenerFilter]);
+  }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.screenerFilter, unitScopeNames]);
 
   const unassignedRecruiterCount = useMemo(
     () => countUnassignedRecruiters(recruiterFilterScope),
