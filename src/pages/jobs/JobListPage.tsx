@@ -23,7 +23,9 @@ import {
   JOB_LIST_SORT_OPTIONS,
   matchesAgeDaysFilter,
   matchesNoteFilter,
+  matchesReplacementFilter,
   matchesUrgencyFilter,
+  REPLACEMENT_FILTER_OPTIONS,
   URGENCY_FILTER_OPTIONS,
 } from '@/lib/jobUrgency';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
@@ -78,6 +80,7 @@ const JobListPage: React.FC = () => {
     oplFilter,
     urgencyFilter,
     noteFilter,
+    replacementFilter,
     ageDaysFilter,
     sort,
     page,
@@ -217,8 +220,9 @@ const JobListPage: React.FC = () => {
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesOplFilter(j, oplFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
-        if (!matchesNoteFilter(j, noteFilter)) return false;
-        if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
+      if (!matchesNoteFilter(j, noteFilter)) return false;
+      if (!matchesReplacementFilter(j, replacementFilter)) return false;
+      if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
@@ -230,7 +234,7 @@ const JobListPage: React.FC = () => {
             .includes(q),
       )
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, ageDaysFilter, sort]);
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -453,6 +457,19 @@ const JobListPage: React.FC = () => {
             <option value="all">ทั้งหมด</option>
             <option value="has">มีหมายเหตุ</option>
             <option value="empty">ไม่มีหมายเหตุ</option>
+          </FilterSelect>
+
+          <FilterSelect
+            id="job-list-replacement-filter"
+            label="ส่งคนแทน"
+            value={replacementFilter}
+            onChange={(v) => updateListState({ replacementFilter: v as typeof replacementFilter })}
+          >
+            {REPLACEMENT_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </FilterSelect>
 
           <FilterSelect

@@ -41,6 +41,7 @@ import {
   enrichActivityTrendWithThroughput,
   filterJobsForThroughput,
   jobsToThroughputRecords,
+  sumThroughputInRange,
   type ThroughputRecord,
 } from './throughput';
 
@@ -56,7 +57,7 @@ export type PeriodRange = {
 export const DASHBOARD_STATUS_LABELS: Record<DashboardTaskStatus, string> = {
   pending: 'รอดำเนินการ',
   in_progress: 'กำลังดำเนินการ',
-  completed: 'สำเร็จ',
+  completed: 'ปิดใบขอ',
   overdue: 'ล่าช้า',
   cancelled: 'ยกเลิก',
   at_risk: 'เสี่ยงล่าช้า',
@@ -324,23 +325,52 @@ function countByStatus(jobs: JobRequest[], today: Date): Record<DashboardTaskSta
   return counts;
 }
 
-function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): DashboardKpi[] {
+function buildKpis(
+  current: JobRequest[],
+  previous: JobRequest[],
+  today: Date,
+  throughput?: {
+    records: ThroughputRecord[];
+    from: string;
+    to: string;
+    previousFrom: string;
+    previousTo: string;
+  },
+): DashboardKpi[] {
   const cur = countByStatus(current, today);
   const prev = countByStatus(previous, today);
   const curTotal = sumJobPositionUnits(current);
   const prevTotal = sumJobPositionUnits(previous);
   const curOpen = cur.pending + cur.in_progress + cur.at_risk + cur.overdue;
   const prevOpen = prev.pending + prev.in_progress + prev.at_risk + prev.overdue;
-  const successRate = curTotal ? Math.round((cur.completed / curTotal) * 1000) / 10 : 0;
-  const prevSuccessRate = prevTotal ? Math.round((prev.completed / prevTotal) * 1000) / 10 : 0;
+
+  const throughputCur = throughput
+    ? sumThroughputInRange(throughput.records, throughput.from, throughput.to)
+    : null;
+  const throughputPrev = throughput
+    ? sumThroughputInRange(throughput.records, throughput.previousFrom, throughput.previousTo)
+    : null;
+
+  const requestedTotal = throughputCur?.requested ?? curTotal;
+  const prevRequestedTotal = throughputPrev?.requested ?? prevTotal;
+  const closedTotal = throughputCur?.closed ?? cur.completed;
+  const prevClosedTotal = throughputPrev?.closed ?? prev.completed;
+  const closeRate = requestedTotal
+    ? Math.round((closedTotal / requestedTotal) * 1000) / 10
+    : 0;
+  const prevCloseRate = prevRequestedTotal
+    ? Math.round((prevClosedTotal / prevRequestedTotal) * 1000) / 10
+    : 0;
 
   return [
     {
       id: 'total',
-      label: 'งานทั้งหมด',
-      value: curTotal,
-      description: 'ตำแหน่งที่ต้องการตามตัวกรอง',
-      trendPercent: trendPercent(curTotal, prevTotal),
+      label: throughputCur ? 'ขอมา' : 'งานทั้งหมด',
+      value: requestedTotal,
+      description: throughputCur
+        ? 'ตำแหน่งที่กรอกใบขอในช่วงที่เลือก'
+        : 'ตำแหน่งที่ต้องการตามตัวกรอง',
+      trendPercent: trendPercent(requestedTotal, prevRequestedTotal),
     },
     {
       id: 'open',
@@ -358,17 +388,19 @@ function buildKpis(current: JobRequest[], previous: JobRequest[], today: Date): 
     },
     {
       id: 'completed',
-      label: 'สำเร็จ',
-      value: cur.completed,
-      description: 'ตำแหน่งที่ปิดงานแล้ว',
-      trendPercent: trendPercent(cur.completed, prev.completed),
+      label: 'ปิดใบขอ',
+      value: closedTotal,
+      description: throughputCur
+        ? 'ตำแหน่งที่ปิดแล้วทุกประเภทในช่วงที่เลือก'
+        : 'ตำแหน่งที่ปิดงานแล้ว',
+      trendPercent: trendPercent(closedTotal, prevClosedTotal),
     },
     {
       id: 'success_rate',
-      label: 'อัตราสำเร็จ',
-      value: successRate,
-      description: '% ตำแหน่งที่ปิดจากทั้งหมด',
-      trendPercent: trendPercent(successRate, prevSuccessRate),
+      label: 'อัตราปิด',
+      value: closeRate,
+      description: '% ปิดได้จากที่ขอในช่วงเดียวกัน',
+      trendPercent: trendPercent(closeRate, prevCloseRate),
       format: 'percent',
     },
   ];
@@ -566,8 +598,19 @@ export function buildDashboardData(
     throughputRecords,
   );
 
+  const kpiThroughput =
+    throughputRecords.length > 0
+      ? {
+          records: throughputRecords,
+          from: period?.from ?? trendFrom,
+          to: period?.to ?? trendTo,
+          previousFrom: period?.previousFrom ?? trendFrom,
+          previousTo: period?.previousTo ?? trendTo,
+        }
+      : undefined;
+
   return {
-    kpis: buildKpis(scopedJobs, previousScopedJobs, today),
+    kpis: buildKpis(scopedJobs, previousScopedJobs, today, kpiThroughput),
     activityTrend,
     unitOverview: buildUnitOverview(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),

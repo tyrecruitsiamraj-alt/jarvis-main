@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, Settings, HeartPulse } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, HeartPulse } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 
@@ -21,7 +21,6 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },
-  { path: '/settings', label: 'ตั้งค่า', icon: Settings, minimumRole: 'admin', functionId: 'settings_access' },
 ];
 
 export function isDockPathActive(path: string, pathname: string): boolean {

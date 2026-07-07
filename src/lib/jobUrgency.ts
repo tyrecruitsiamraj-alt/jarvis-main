@@ -11,6 +11,14 @@ export type RequestStatusKind = 'retroactive' | 'urgent' | 'advance';
 export type UrgencyFilter = 'all' | RequestStatusKind;
 
 export type NoteFilter = 'all' | 'has' | 'empty';
+export type ReplacementFilter = 'all' | 'send' | 'no_send' | 'unset';
+
+export const REPLACEMENT_FILTER_OPTIONS: { value: ReplacementFilter; label: string }[] = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'send', label: 'ส่งคนแทน' },
+  { value: 'no_send', label: 'ไม่ส่งคนแทน' },
+  { value: 'unset', label: 'ยังไม่ระบุ' },
+];
 
 export type AgeDaysFilter = 'all' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
 
@@ -348,4 +356,11 @@ export function matchesNoteFilter(job: JobRequest, filter: NoteFilter): boolean 
   if (filter === 'has') return note.length > 0;
   if (filter === 'empty') return note.length === 0;
   return true;
+}
+
+export function matchesReplacementFilter(job: JobRequest, filter: ReplacementFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'send') return job.send_replacement === true;
+  if (filter === 'no_send') return job.send_replacement === false;
+  return job.send_replacement == null;
 }

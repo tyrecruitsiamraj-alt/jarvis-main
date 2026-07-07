@@ -9,8 +9,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'total', label: 'งานทั้งหมด', value: 52, description: 'ตำแหน่งที่ต้องการตามตัวกรอง', trendPercent: 12 },
     { id: 'open', label: 'รอดำเนินการ', value: 21, description: 'ยังไม่ปิด / ไม่ยกเลิก', trendPercent: -5 },
     { id: 'overdue', label: 'ล่าช้า', value: 6, description: 'เกินกำหนดหรือค้างนาน', trendPercent: 2 },
-    { id: 'completed', label: 'สำเร็จ', value: 24, description: 'ปิดงานแล้ว', trendPercent: 18 },
-    { id: 'success_rate', label: 'อัตราสำเร็จ', value: 50, description: '% ปิดงานจากทั้งหมด', trendPercent: 4, format: 'percent' },
+    { id: 'completed', label: 'ปิดใบขอ', value: 24, description: 'ตำแหน่งที่ปิดแล้วทุกประเภท', trendPercent: 18 },
+    { id: 'success_rate', label: 'อัตราปิด', value: 50, description: '% ปิดได้จากที่ขอ', trendPercent: 4, format: 'percent' },
   ],
   activityTrend: [
     { date: '2026-01-01', label: 'ม.ค.', resignations: 6, replacements: 4, newOpenings: 9, requestedPositions: 22, closedPositions: 18 },

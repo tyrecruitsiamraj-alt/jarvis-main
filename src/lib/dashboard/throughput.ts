@@ -51,6 +51,22 @@ export function filterJobsForThroughput(jobs: JobRequest[], from: string, to: st
   });
 }
 
+export function sumThroughputInRange(
+  records: ThroughputRecord[],
+  from: string,
+  to: string,
+): { requested: number; closed: number } {
+  let requested = 0;
+  let closed = 0;
+  for (const r of records) {
+    if (inYmdRange(r.requestDate, from, to)) requested += r.positionUnits;
+    if (!r.isOpen && r.closureDate && inYmdRange(r.closureDate, from, to)) {
+      closed += r.positionUnits;
+    }
+  }
+  return { requested, closed };
+}
+
 export function enrichActivityTrendWithThroughput(
   points: DashboardActivityTrendPoint[],
   records: ThroughputRecord[],

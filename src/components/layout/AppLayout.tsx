@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, UserCircle } from 'lucide-react';
+import { KeyRound, LogOut, Settings, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
@@ -23,6 +23,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const shellBg = getAppShellBackgroundStyle(config);
   const navItems = filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
   const showJobBoardMenu = isFunctionEnabled('unit_requests_read');
+  const showSettings = isFunctionEnabled('settings_access');
 
   return (
     <div
@@ -68,14 +69,39 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
           <NotificationPanel />
-          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[220px]">
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0">{user?.role}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0 capitalize">{user?.role}</span>
+            {showSettings ? (
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors shrink-0',
+                  location.pathname.startsWith('/settings')
+                    ? 'border-blue-300 bg-blue-500/12 text-blue-700'
+                    : 'border-white/80 bg-white/70 text-muted-foreground hover:text-foreground hover:bg-white',
+                )}
+              >
+                <Settings className="h-3.5 w-3.5" aria-hidden />
+                ตั้งค่า
+              </button>
+            ) : null}
           </div>
           <div className="flex xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70">
             <UserCircle className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-medium text-blue-700 uppercase">{user?.role}</span>
+            {showSettings ? (
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className="p-1 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-blue-500/12 touch-manipulation"
+                aria-label="ตั้งค่า"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            ) : null}
           </div>
           <button
             type="button"
