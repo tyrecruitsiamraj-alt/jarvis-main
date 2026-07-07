@@ -109,13 +109,13 @@ const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
           </div>
         </div>
 
+        <DashboardThroughputChart data={data.activityTrend} periodLabel={data.activityTrendLabel} />
+
         <DashboardUnitOverviewChart
           items={data.unitOverview}
           periodLabel={data.periodLabel}
           onUnitClick={onUnitClick}
         />
-
-        <DashboardThroughputChart data={data.activityTrend} periodLabel={data.activityTrendLabel} />
       </div>
     </div>
   );
