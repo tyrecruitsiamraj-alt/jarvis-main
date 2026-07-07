@@ -46,7 +46,7 @@ const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick }) =
               </div>
               <div>
                 <p className="text-lg font-semibold text-emerald-600 tabular-nums">{r.completed}</p>
-                <p className="text-[10px] text-slate-500">สำเร็จ</p>
+                <p className="text-[10px] text-slate-500">ปิดงาน</p>
               </div>
               <div>
                 <p className={r.overdue > 0 ? 'text-lg font-semibold text-red-600 tabular-nums' : 'text-lg font-semibold text-slate-900 tabular-nums'}>
