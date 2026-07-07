@@ -11,6 +11,10 @@ import {
   primaryJobRoleLabel,
 } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
+import {
+  extractRequestNoDigitSuffix,
+  pickBestRequestNoCandidate,
+} from './siamrajRequestNo.js';
 
 type SqlServerRequestRow = {
   external_id: string;
@@ -203,7 +207,7 @@ const BASE_SQL_LIST = `${BASE_SQL}
 `;
 
 const BASE_SQL_BY_ID = `${BASE_SQL}
-  WHERE A.status = 'A'
+  WHERE 1 = 1
 `;
 
 const SELECT_COLUMNS = `
@@ -269,20 +273,44 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
   return rows.map(mapSqlServerRow);
 }
 
-export async function getSiamrajSqlServerUnitRequestById(requestNo: string) {
-  const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
+async function fetchSqlServerUnitRequestRows(
+  extraWhere: string,
+  params: Record<string, unknown>,
+): Promise<Array<SqlServerRequestRow & { rn: number }>> {
+  return siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
     `
     WITH base AS (
       ${BASE_SQL_BY_ID}
-      AND UPPER(RTRIM(A.request_no)) = UPPER(RTRIM(@requestNo))
+      ${extraWhere}
     )
-    SELECT TOP 1
+    SELECT
       ${SELECT_COLUMNS}
     FROM base
     WHERE rn = 1
   `,
-    { requestNo },
+    params,
   );
+}
 
-  return rows[0] ? mapSqlServerRow(rows[0]) : null;
+export async function getSiamrajSqlServerUnitRequestById(requestNo: string) {
+  const trimmed = requestNo.trim();
+  if (!trimmed) return null;
+
+  const exact = await fetchSqlServerUnitRequestRows(
+    `AND UPPER(RTRIM(A.request_no)) = UPPER(RTRIM(@requestNo))`,
+    { requestNo: trimmed },
+  );
+  if (exact.length > 0) {
+    return mapSqlServerRow(exact[0]);
+  }
+
+  const digits = extractRequestNoDigitSuffix(trimmed);
+  if (!digits || digits === trimmed) return null;
+
+  const suffixMatches = await fetchSqlServerUnitRequestRows(
+    `AND UPPER(RTRIM(A.request_no)) LIKE '%' + @digits`,
+    { digits },
+  );
+  const best = pickBestRequestNoCandidate(suffixMatches, trimmed);
+  return best ? mapSqlServerRow(best) : null;
 }

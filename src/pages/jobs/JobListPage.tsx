@@ -44,6 +44,7 @@ import {
 } from '@/lib/unitGroupName';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
 import {
   buildJobListSearchParams,
@@ -63,7 +64,7 @@ function ageDaysLabel(job: JobRequest): string {
   return getJobRequestAgeLabel(job);
 }
 
-const SIAMRAJ_REQUEST_NO_RE = /^[a-z]{2}\d{4,}$/i;
+const SIAMRAJ_REQUEST_NO_RE = /^[a-z]{2,4}\d{4,}$/i;
 
 function looksLikeSiamrajRequestNo(value: string): boolean {
   return SIAMRAJ_REQUEST_NO_RE.test(value.trim());
@@ -252,7 +253,7 @@ const JobListPage: React.FC = () => {
     const pool = (() => {
       if (!lookupJob || !q) return subtypeScopedJobs;
       const lookupNo = (lookupJob.request_no || '').toLowerCase();
-      if (!lookupNo.includes(q) && !q.includes(lookupNo)) return subtypeScopedJobs;
+      if (!requestNoMatchesSearch(q, lookupJob.request_no)) return subtypeScopedJobs;
       if (subtypeScopedJobs.some((j) => (j.request_no || '').toLowerCase() === lookupNo)) {
         return subtypeScopedJobs;
       }
@@ -273,12 +274,12 @@ const JobListPage: React.FC = () => {
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
       })
-      .filter(
-        (j) =>
-          `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
-            .toLowerCase()
-            .includes(q),
-      )
+      .filter((j) => {
+        if (requestNoMatchesSearch(q, j.request_no)) return true;
+        return `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
+          .toLowerCase()
+          .includes(q);
+      })
       .sort((a, b) => compareJobsForListSort(a, b, sort));
   }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
 

@@ -20,13 +20,13 @@ describe('siamrajStaffingOpen feed', () => {
     expect(remainingOpenPositionsFromRow({ request_qty: 4, effective_inform_qty: 0 })).toBe(4);
   });
 
-  it('keeps partial informs like lm6905015 when inform_qty is synced', () => {
+  it('keeps partial informs like LBM6905015 when inform_qty is synced', () => {
     expect(
       isOpenStaffingRow({
         status: 'A',
         is_stop: 'N',
         stop_no: null,
-        is_inform_all: 'N',
+        is_inform_all: 'P',
         request_qty: 4,
         inform_qty: 3,
         effective_inform_qty: 3,
