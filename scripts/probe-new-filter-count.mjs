@@ -20,6 +20,11 @@ function parseEnvFile(filePath) {
 
 const env = { ...parseEnvFile('.env'), ...parseEnvFile('.env.local') };
 const host = env.DB_HOST || '';
+if (!host) {
+  console.error('No DB_HOST in .env / .env.local');
+  process.exit(1);
+}
+
 const comma = host.lastIndexOf(',');
 const server = comma > 0 ? host.slice(0, comma) : host;
 const port = comma > 0 ? Number(host.slice(comma + 1)) : Number(env.DB_PORT || 1433);
@@ -33,25 +38,66 @@ const pool = await sql.connect({
   options: { encrypt: false, trustServerCertificate: true },
 });
 
-const newWhere = `
+const legacyWhere = `
   A.status = 'A'
   AND A.is_stop = 'N'
   AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
   AND NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
 `;
 
-const [newCount, oldCount, withInform, withStopNo] = await Promise.all([
-  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${newWhere}`),
-  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE A.status = 'A' AND A.is_stop = 'N'`),
-  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE A.status = 'A' AND A.is_stop = 'N' AND EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)`),
-  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE A.status = 'A' AND A.is_stop = 'N' AND A.stop_no IS NOT NULL AND RTRIM(A.stop_no) <> ''`),
+const loosePartialWhere = `
+  A.status = 'A'
+  AND A.is_stop = 'N'
+  AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
+  AND ISNULL(A.inform_qty, 0) < ISNULL(NULLIF(A.request_qty, 0), 1)
+`;
+
+const remainingWhere = `
+  A.status = 'A'
+  AND A.is_stop = 'N'
+  AND (A.stop_no IS NULL OR RTRIM(A.stop_no) = '')
+  AND ISNULL(A.is_inform_all, 'N') <> 'Y'
+  AND (
+    NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
+    OR (
+      ISNULL(A.inform_qty, 0) > 0
+      AND ISNULL(A.inform_qty, 0) < ISNULL(NULLIF(A.request_qty, 0), 1)
+    )
+  )
+`.trim();
+
+const sumRemaining = `
+  SELECT
+    COUNT(*) AS request_count,
+    SUM(
+      CASE
+        WHEN NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no)
+          THEN ISNULL(NULLIF(A.request_qty, 0), 1)
+        ELSE ISNULL(NULLIF(A.request_qty, 0), 1) - ISNULL(A.inform_qty, 0)
+      END
+    ) AS remaining_positions
+  FROM st_request_head A
+  WHERE ${remainingWhere}
+`;
+
+const [legacy, loose, remaining, remainingTotals] = await Promise.all([
+  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${legacyWhere}`),
+  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${loosePartialWhere}`),
+  pool.request().query(`SELECT COUNT(*) AS cnt FROM st_request_head A WHERE ${remainingWhere}`),
+  pool.request().query(sumRemaining),
 ]);
 
-console.log(JSON.stringify({
-  new_filter: newCount.recordset[0].cnt,
-  old_filter: oldCount.recordset[0].cnt,
-  excluded_has_inform: withInform.recordset[0].cnt,
-  excluded_has_stop_no: withStopNo.recordset[0].cnt,
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      legacy_no_inform: legacy.recordset[0].cnt,
+      loose_inform_qty_lt_request: loose.recordset[0].cnt,
+      remaining_filter: remaining.recordset[0].cnt,
+      remaining_positions_sum: remainingTotals.recordset[0].remaining_positions,
+    },
+    null,
+    2,
+  ),
+);
 
 await pool.close();
