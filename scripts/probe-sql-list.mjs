@@ -23,7 +23,7 @@ const openStaffingRequestWhere = (alias = 'A') => `
     ${alias}.status = 'A'
     AND ${alias}.is_stop = 'N'
     AND (${alias}.stop_no IS NULL OR RTRIM(${alias}.stop_no) = '')
-    AND ISNULL(${alias}.inform_qty, 0) < ISNULL(NULLIF(${alias}.request_qty, 0), 1)
+    AND NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = ${alias}.request_no)
   `.trim();
 
 const BASE_SQL = `
