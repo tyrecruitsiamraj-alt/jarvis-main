@@ -11,7 +11,10 @@ import {
   primaryJobRoleLabel,
 } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
-import { boardStaffingRequestTypeWhereSql } from './siamrajBoardRequestTypes.js';
+import {
+  boardStaffingRequestTypeWhereSql,
+  excludeInternalReplacementRoleWhereSql,
+} from './siamrajBoardRequestTypes.js';
 import {
   extractRequestNoDigitSuffix,
   pickBestRequestNoCandidate,
@@ -224,6 +227,7 @@ const SELECT_COLUMNS = `
 function boardRequestTypeExtraWhere(alias = 'A'): string {
   return `
     AND ${boardStaffingRequestTypeWhereSql(alias)}
+    AND ${excludeInternalReplacementRoleWhereSql(alias)}
   `;
 }
 
