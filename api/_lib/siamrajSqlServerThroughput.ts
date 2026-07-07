@@ -1,18 +1,22 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { toBangkokYmd } from './businessDate.js';
 import {
-  informedPositionCount,
+  effectiveInformedCount,
+  effectiveInformQtySql,
   isOpenStaffingRowForRemaining,
-  remainingOpenPositions,
+  remainingOpenPositionsFromRow,
   requestPositionTotal,
 } from './siamrajStaffingOpen.js';
 
 export {
+  effectiveInformedCount,
+  effectiveInformQtySql,
   informedPositionCount,
   isOpenStaffingRow,
   isOpenStaffingRowForRemaining,
   openStaffingRequestWhereSql,
   remainingOpenPositions,
+  remainingOpenPositionsFromRow,
   requestPositionTotal,
 } from './siamrajStaffingOpen.js';
 
@@ -28,6 +32,7 @@ type SqlThroughputRow = {
   request_qty: number | null;
   inform_qty: number | null;
   is_inform_all: string | null;
+  effective_inform_qty: number | null;
   status: string | null;
   is_stop: string | null;
   stop_no: string | null;
@@ -62,8 +67,8 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   if (!requestDate) return [];
 
   const total = requestPositionTotal(row.request_qty);
-  const informed = informedPositionCount(row.inform_qty);
-  const remaining = remainingOpenPositions(row.request_qty, row.inform_qty);
+  const informed = effectiveInformedCount(row);
+  const remaining = remainingOpenPositionsFromRow(row);
   const isOpen = isOpenStaffingRowForRemaining(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
   const out: SiamrajThroughputRecord[] = [];
@@ -120,6 +125,7 @@ export async function listSiamrajSqlServerThroughput(options: {
       A.request_qty,
       A.inform_qty,
       A.is_inform_all,
+      ${effectiveInformQtySql('A')} AS effective_inform_qty,
       A.status,
       A.is_stop,
       A.stop_no,

@@ -5,7 +5,8 @@ export type StaffingOpenRow = {
   is_inform_all?: string | null;
   request_qty?: number | null;
   inform_qty?: number | null;
-  /** legacy throughput rows */
+  /** จาก SQL — inform_qty หรือนับจาก st_inform_head */
+  effective_inform_qty?: number | null;
   has_inform?: number | boolean | null;
 };
 
@@ -17,6 +18,14 @@ export function informedPositionCount(qty: number | null | undefined): number {
   return qty != null && qty > 0 ? qty : 0;
 }
 
+/** นับแจ้งเข้าแล้ว — ใช้ inform_qty ก่อน ไม่มีก็ใช้ effective จาก SQL */
+export function effectiveInformedCount(row: StaffingOpenRow): number {
+  if (row.effective_inform_qty != null && row.effective_inform_qty >= 0) {
+    return row.effective_inform_qty;
+  }
+  return informedPositionCount(row.inform_qty);
+}
+
 export function remainingOpenPositions(
   requestQty: number | null | undefined,
   informQty: number | null | undefined,
@@ -24,16 +33,33 @@ export function remainingOpenPositions(
   return Math.max(requestPositionTotal(requestQty) - informedPositionCount(informQty), 0);
 }
 
+export function remainingOpenPositionsFromRow(row: StaffingOpenRow): number {
+  return Math.max(requestPositionTotal(row.request_qty) - effectiveInformedCount(row), 0);
+}
+
 function hasInformDocument(row: StaffingOpenRow): boolean {
   return row.has_inform === true || row.has_inform === 1;
 }
 
-/** ใบขอที่ยังต้องหาคน — ไม่มีแจ้งเข้า หรือแจ้งเข้าบางส่วนที่ inform_qty อัปเดตแล้ว */
+/** SQL: inform_qty ถ้ามี ไม่งั้นนับจำนวน st_inform_head */
+export function effectiveInformQtySql(alias = 'A'): string {
+  return `(
+    CASE
+      WHEN ISNULL(${alias}.inform_qty, 0) > 0 THEN ${alias}.inform_qty
+      ELSE (
+        SELECT COUNT(*)
+        FROM st_inform_head IH
+        WHERE IH.request_no = ${alias}.request_no
+      )
+    END
+  )`;
+}
+
+/** ใบขอที่ยังต้องหาคน — ไม่มีแจ้งเข้า หรือแจ้งเข้าบางส่วน */
 export function isOpenStaffingRow(row: StaffingOpenRow): boolean {
   return isOpenStaffingRowForRemaining(row);
 }
 
-/** ใบขอที่ยังมีตำแหน่งคงเหลือ */
 export function isOpenStaffingRowForRemaining(row: StaffingOpenRow): boolean {
   const status = (row.status || '').trim().toUpperCase();
   const isStop = (row.is_stop || '').trim().toUpperCase();
@@ -44,15 +70,15 @@ export function isOpenStaffingRowForRemaining(row: StaffingOpenRow): boolean {
   if (informAll === 'Y') return false;
 
   const total = requestPositionTotal(row.request_qty);
-  const informed = informedPositionCount(row.inform_qty);
+  const informed = effectiveInformedCount(row);
 
   if (!hasInformDocument(row) && informed === 0) return true;
   if (informed > 0 && informed < total) return true;
   return false;
 }
 
-/** SQL filter — ตรงกับ isOpenStaffingRow (ไม่ดึง inform_qty=0 ที่มี inform แล้ว) */
 export function openStaffingRequestWhereSql(alias = 'A'): string {
+  const informed = effectiveInformQtySql(alias);
   return `
     ${alias}.status = 'A'
     AND ${alias}.is_stop = 'N'
@@ -61,8 +87,8 @@ export function openStaffingRequestWhereSql(alias = 'A'): string {
     AND (
       NOT EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = ${alias}.request_no)
       OR (
-        ISNULL(${alias}.inform_qty, 0) > 0
-        AND ISNULL(${alias}.inform_qty, 0) < ISNULL(NULLIF(${alias}.request_qty, 0), 1)
+        ${informed} > 0
+        AND ${informed} < ISNULL(NULLIF(${alias}.request_qty, 0), 1)
       )
     )
   `.trim();

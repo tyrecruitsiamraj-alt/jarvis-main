@@ -43,6 +43,7 @@ import {
   unitOrganizationKey,
 } from '@/lib/unitGroupName';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { getTotalPages } from '@/lib/pagination';
 import {
   buildJobListSearchParams,
@@ -60,6 +61,12 @@ function formatSubmittedDate(job: JobRequest): string {
 
 function ageDaysLabel(job: JobRequest): string {
   return getJobRequestAgeLabel(job);
+}
+
+const SIAMRAJ_REQUEST_NO_RE = /^[a-z]{2}\d{4,}$/i;
+
+function looksLikeSiamrajRequestNo(value: string): boolean {
+  return SIAMRAJ_REQUEST_NO_RE.test(value.trim());
 }
 
 const JobListPage: React.FC = () => {
@@ -98,6 +105,7 @@ const JobListPage: React.FC = () => {
   );
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
+  const [lookupJob, setLookupJob] = useState<JobRequest | null>(null);
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
   useEffect(() => {
@@ -112,6 +120,29 @@ const JobListPage: React.FC = () => {
     window.addEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
     return () => window.removeEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
   }, []);
+
+  useEffect(() => {
+    if (!siamrajPrimary) {
+      setLookupJob(null);
+      return;
+    }
+    const q = search.trim();
+    if (!looksLikeSiamrajRequestNo(q)) {
+      setLookupJob(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchSiamrajUnitRequest(q)
+      .then((job) => {
+        if (!cancelled) setLookupJob(job);
+      })
+      .catch(() => {
+        if (!cancelled) setLookupJob(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [search, siamrajPrimary]);
 
   const recruiters = useMemo(() => {
     void staffRosterRev;
@@ -218,7 +249,17 @@ const JobListPage: React.FC = () => {
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    return subtypeScopedJobs
+    const pool = (() => {
+      if (!lookupJob || !q) return subtypeScopedJobs;
+      const lookupNo = (lookupJob.request_no || '').toLowerCase();
+      if (!lookupNo.includes(q) && !q.includes(lookupNo)) return subtypeScopedJobs;
+      if (subtypeScopedJobs.some((j) => (j.request_no || '').toLowerCase() === lookupNo)) {
+        return subtypeScopedJobs;
+      }
+      return [...subtypeScopedJobs, lookupJob];
+    })();
+
+    return pool
       .filter((j) => {
         if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
         if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
@@ -239,7 +280,7 @@ const JobListPage: React.FC = () => {
             .includes(q),
       )
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames]);
+  }, [subtypeScopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
