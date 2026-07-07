@@ -42,10 +42,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <BrandTitle className="text-lg font-bold text-foreground truncate max-w-[200px] xl:max-w-none" />
           </button>
           <nav className="flex items-center gap-0.5 xl:gap-1 flex-wrap min-w-0" aria-label="เมนูหลัก">
-            {navItems.map((item) => {
+            {navItems.flatMap((item) => {
               const Icon = item.icon;
               const active = isDockPathActive(item.path, location.pathname);
-              return (
+              const button = (
                 <button
                   key={item.path}
                   type="button"
@@ -59,11 +59,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <span className="whitespace-nowrap">{item.label}</span>
                 </button>
               );
+              if (item.path === '/jobs/list' && showJobBoardMenu) {
+                return [button, <JobBoardHeaderMenu key="job-board-nav" variant="nav" />];
+              }
+              return [button];
             })}
           </nav>
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
-          {showJobBoardMenu ? <JobBoardHeaderMenu /> : null}
           <NotificationPanel />
           <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[220px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
@@ -101,7 +104,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <BrandTitle className="text-base font-bold text-foreground truncate" />
         </button>
         <div className="flex items-center gap-1 shrink-0">
-          {showJobBoardMenu ? <JobBoardHeaderMenu /> : null}
+          {showJobBoardMenu ? <JobBoardHeaderMenu variant="compact" /> : null}
           <NotificationPanel />
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}

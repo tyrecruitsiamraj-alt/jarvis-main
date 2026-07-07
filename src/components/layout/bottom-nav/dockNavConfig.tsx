@@ -33,7 +33,10 @@ export function isDockPathActive(path: string, pathname: string): boolean {
     return p.startsWith('/matching');
   }
   if (path === '/driver-care') return p.startsWith('/driver-care');
-  if (path === '/jobs/list') return p.startsWith('/jobs');
+  if (path === '/jobs/list') {
+    if (p === '/jobs/board' || p.startsWith('/jobs/board/')) return false;
+    return p.startsWith('/jobs');
+  }
   return p.startsWith(path);
 }
 
