@@ -64,7 +64,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
 
   const urgencyRaw = (params.get('urg') || JOB_LIST_DEFAULTS.urgencyFilter) as UrgencyFilter;
   const urgencyNormalized =
-    urgencyRaw === 'overdue' || (urgencyRaw as string) === 'escalated'
+    (urgencyRaw as string) === 'overdue' || (urgencyRaw as string) === 'escalated'
       ? ('advance' as UrgencyFilter)
       : urgencyRaw;
   const noteRaw = (params.get('nf') || JOB_LIST_DEFAULTS.noteFilter) as NoteFilter;

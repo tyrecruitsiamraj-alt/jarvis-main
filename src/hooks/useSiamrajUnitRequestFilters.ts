@@ -67,7 +67,7 @@ function effectiveFilters(
   if (!omit) return filters;
   const next = { ...filters };
   for (const key of Object.keys(omit) as (keyof UnitRequestFilterState)[]) {
-    if (omit[key]) next[key] = UNIT_REQUEST_FILTER_DEFAULTS[key];
+    if (omit[key]) (next as Record<string, unknown>)[key] = UNIT_REQUEST_FILTER_DEFAULTS[key];
   }
   return next;
 }

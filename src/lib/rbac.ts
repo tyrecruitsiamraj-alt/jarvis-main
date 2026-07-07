@@ -18,10 +18,9 @@ export function isReadOnlyRole(role: UserRole): boolean {
 
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
   if (userRole === 'opl') {
+    // OPL = ผู้ชมอ่านอย่างเดียว: ผ่านเฉพาะสิ่งที่ต้องการขั้นต่ำ staff/opl
+    // (ขอบเขตหน้าที่เปิดให้ดูจริงคุมด้วย OPL_READ_FUNCTIONS ใน roleFunctions.ts)
     return minimum === 'staff' || minimum === 'opl';
-  }
-  if (minimum === 'opl') {
-    return userRole === 'opl';
   }
   return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minimum];
 }
