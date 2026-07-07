@@ -1,7 +1,7 @@
 import React from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardStatusFilter, DashboardTaskStatus } from '@/lib/dashboard/types';
+import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -45,7 +45,7 @@ type Props = {
   onAssignItem?: (item: DashboardWorkItem) => void;
   onKpiClick?: (kpiId: string, label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
-  onStatusClick?: (status: DashboardTaskStatus, label: string) => void;
+  onUnitClick?: (unitName: string) => void;
   onRecruiterClick?: (name: string) => void;
 };
 
@@ -70,7 +70,7 @@ const DashboardShell: React.FC<Props> = ({
   onAssignItem,
   onKpiClick,
   onAgeBucketClick,
-  onStatusClick,
+  onUnitClick,
   onRecruiterClick,
 }) => {
   return (
@@ -150,9 +150,10 @@ const DashboardShell: React.FC<Props> = ({
               <DashboardAgeOverview
                 items={data.ageDaysBreakdown}
                 requestTotal={data.ageDaysRequestTotal}
+                positionTotal={data.ageDaysPositionTotal}
                 onBucketClick={onAgeBucketClick}
               />
-              <DashboardChartSection data={data} onStatusClick={onStatusClick} />
+              <DashboardChartSection data={data} onUnitClick={onUnitClick} />
               <DashboardDriverOverview items={data.recruiterOverview} onRecruiterClick={onRecruiterClick} />
               <DashboardWorkQueueTable
                 items={data.workQueue}

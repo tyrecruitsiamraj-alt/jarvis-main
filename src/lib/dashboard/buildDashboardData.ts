@@ -28,6 +28,7 @@ import type {
   DashboardKpi,
   DashboardPeriodPreset,
   DashboardRecruiterOverview,
+  DashboardUnitOverview,
   DashboardSlaStatus,
   DashboardSortDir,
   DashboardSortKey,
@@ -418,7 +419,31 @@ function buildStatusBreakdown(jobs: JobRequest[], today: Date): DashboardStatusB
     .sort((a, b) => b.count - a.count);
 }
 
-function buildRecruiterOverview(jobs: JobRequest[], today: Date): DashboardRecruiterOverview[] {
+function buildUnitOverview(jobs: JobRequest[], today: Date): DashboardUnitOverview[] {
+  const map = new Map<string, { total: number; open: number; overdue: number }>();
+  for (const j of jobs) {
+    const name = j.unit_name?.trim() || '—';
+    const units = jobPositionUnits(j);
+    const row = map.get(name) ?? { total: 0, open: 0, overdue: 0 };
+    row.total += units;
+    const st = mapJobToTaskStatus(j, today);
+    if (st !== 'completed' && st !== 'cancelled') row.open += units;
+    if (st === 'overdue') row.overdue += units;
+    map.set(name, row);
+  }
+  const totalAll = sumJobPositionUnits(jobs) || 1;
+  return [...map.entries()]
+    .map(([name, row]) => ({
+      name,
+      total: row.total,
+      open: row.open,
+      overdue: row.overdue,
+      sharePercent: Math.round((row.total / totalAll) * 1000) / 10,
+    }))
+    .sort((a, b) => b.open - a.open || b.total - a.total || a.name.localeCompare(b.name, 'th'));
+}
+
+export function buildRecruiterOverview(jobs: JobRequest[], today: Date): DashboardRecruiterOverview[] {
   const map = new Map<string, { total: number; completed: number; overdue: number }>();
   for (const j of jobs) {
     const name = j.recruiter_name?.trim() || 'ยังไม่มอบหมาย';
@@ -527,7 +552,7 @@ export function buildDashboardData(
   return {
     kpis: buildKpis(scopedJobs, previousScopedJobs, today),
     activityTrend: buildActivityTrend(trendJobs, trendFrom, trendTo),
-    statusBreakdown: buildStatusBreakdown(scopedJobs, today),
+    unitOverview: buildUnitOverview(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     ageDaysRequestTotal: scopedJobs.length,
     ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),

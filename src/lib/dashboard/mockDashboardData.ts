@@ -21,10 +21,10 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { date: '2026-06-01', label: 'มิ.ย.', resignations: 11, replacements: 7, newOpenings: 15 },
     { date: '2026-07-01', label: 'ก.ค.', resignations: 4, replacements: 3, newOpenings: 6 },
   ],
-  statusBreakdown: [
-    { status: 'in_progress', label: 'กำลังดำเนินการ', count: 12, color: '#3b82f6' },
-    { status: 'completed', label: 'สำเร็จ', count: 24, color: '#22c55e' },
-    { status: 'overdue', label: 'ล่าช้า', count: 6, color: '#ef4444' },
+  unitOverview: [
+    { name: 'ธนาคารกรุงศรี', total: 18, open: 9, overdue: 2, sharePercent: 34.6 },
+    { name: 'ศูนย์การค้าเซ็นทรัล', total: 14, open: 6, overdue: 1, sharePercent: 26.9 },
+    { name: 'ไทยพาณิชย์ สำนักงานใหญ่', total: 11, open: 4, overdue: 0, sharePercent: 21.2 },
   ],
   ageDaysBreakdown: [
     { bucket: 'advance', label: 'ล่วงหน้า', count: 22 },

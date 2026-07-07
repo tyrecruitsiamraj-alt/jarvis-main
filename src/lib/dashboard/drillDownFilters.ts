@@ -47,6 +47,10 @@ export function filterJobsForTaskStatus(
   return jobs.filter((j) => mapJobToTaskStatus(j, today) === status);
 }
 
+export function filterJobsForUnitName(jobs: JobRequest[], unitName: string): JobRequest[] {
+  return jobs.filter((j) => (j.unit_name?.trim() || '—') === unitName);
+}
+
 export function filterJobsForRecruiter(
   jobs: JobRequest[],
   recruiterName: string,

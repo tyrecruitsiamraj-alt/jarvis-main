@@ -96,3 +96,15 @@ export function countUnassignedScreeners(jobs: JobRequest[]): number {
 export function countUnassignedOpls(jobs: JobRequest[]): number {
   return jobs.filter(isOplUnassigned).length;
 }
+
+type StaffNameField = 'recruiter_name' | 'screener_name' | 'opl_name';
+
+export function countJobsByStaffName(jobs: JobRequest[], field: StaffNameField): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const j of jobs) {
+    const name = j[field]?.trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return counts;
+}

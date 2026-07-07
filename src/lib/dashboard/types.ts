@@ -70,6 +70,15 @@ export type DashboardRecruiterOverview = {
   sharePercent: number;
 };
 
+/** ภาระงานรวมตามชื่อหน่วยงาน/ลูกค้า (unit_name) */
+export type DashboardUnitOverview = {
+  name: string;
+  total: number;
+  open: number;
+  overdue: number;
+  sharePercent: number;
+};
+
 export type DashboardStatusBreakdown = {
   status: DashboardTaskStatus;
   label: string;
@@ -96,7 +105,7 @@ export type DashboardAgeDaysBreakdown = {
 export type DashboardData = {
   kpis: DashboardKpi[];
   activityTrend: DashboardActivityTrendPoint[];
-  statusBreakdown: DashboardStatusBreakdown[];
+  unitOverview: DashboardUnitOverview[];
   ageDaysBreakdown: DashboardAgeDaysBreakdown[];
   /** จำนวนใบขอรวม (สำหรับอ้างอิงคู่กับตำแหน่ง) */
   ageDaysRequestTotal: number;

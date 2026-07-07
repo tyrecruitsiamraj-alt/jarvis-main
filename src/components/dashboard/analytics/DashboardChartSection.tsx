@@ -1,7 +1,5 @@
 import React from 'react';
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Legend,
   Line,
@@ -11,18 +9,19 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { DashboardData, DashboardTaskStatus } from '@/lib/dashboard/types';
+import type { DashboardData } from '@/lib/dashboard/types';
+import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 
 type Props = {
-  data: Pick<DashboardData, 'activityTrend' | 'statusBreakdown' | 'periodLabel' | 'activityTrendLabel'>;
-  onStatusClick?: (status: DashboardTaskStatus, label: string) => void;
+  data: Pick<DashboardData, 'activityTrend' | 'unitOverview' | 'periodLabel' | 'activityTrendLabel'>;
+  onUnitClick?: (unitName: string) => void;
 };
 
 function sumPoint(p: DashboardData['activityTrend'][number]) {
   return p.resignations + p.replacements + p.newOpenings;
 }
 
-const DashboardChartSection: React.FC<Props> = ({ data, onStatusClick }) => {
+const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
   const activityData = data.activityTrend;
 
   const periodTotals = activityData.reduce(
@@ -38,13 +37,6 @@ const DashboardChartSection: React.FC<Props> = ({ data, onStatusClick }) => {
 
   const currentMonth = activityData.length > 0 ? activityData[activityData.length - 1] : null;
   const previousMonth = activityData.length > 1 ? activityData[activityData.length - 2] : null;
-
-  const statusData = data.statusBreakdown.map((s) => ({
-    name: s.label,
-    count: s.count,
-    fill: s.color,
-    status: s.status,
-  }));
 
   return (
     <div className="space-y-4">
@@ -116,32 +108,11 @@ const DashboardChartSection: React.FC<Props> = ({ data, onStatusClick }) => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-900">สัดส่วนสถานะงาน</h3>
-            <p className="text-xs text-slate-500">งานในช่วงที่เลือก · {data.periodLabel}</p>
-          </div>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={statusData} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                <YAxis type="category" dataKey="name" width={96} tick={{ fontSize: 11, fill: '#64748b' }} />
-                <Tooltip />
-                <Bar
-                  dataKey="count"
-                  name="จำนวน"
-                  radius={[0, 4, 4, 0]}
-                  cursor={onStatusClick ? 'pointer' : 'default'}
-                  onClick={(entry) => {
-                    const row = entry?.payload as (typeof statusData)[number] | undefined;
-                    if (row && onStatusClick) onStatusClick(row.status, row.name);
-                  }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <DashboardUnitOverviewChart
+          items={data.unitOverview}
+          periodLabel={data.periodLabel}
+          onUnitClick={onUnitClick}
+        />
       </div>
     </div>
   );

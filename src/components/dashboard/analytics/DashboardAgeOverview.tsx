@@ -5,10 +5,11 @@ import type { DashboardAgeDaysBreakdown } from '@/lib/dashboard/types';
 type Props = {
   items: DashboardAgeDaysBreakdown[];
   requestTotal: number;
+  positionTotal: number;
   onBucketClick?: (bucket: DashboardAgeDaysBreakdown['bucket'], label: string) => void;
 };
 
-const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, onBucketClick }) => {
+const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTotal, onBucketClick }) => {
   const bucketTotal = useMemo(
     () => items.reduce((sum, item) => sum + item.count, 0),
     [items],
@@ -20,7 +21,8 @@ const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, onBucketCl
         <h3 className="text-sm font-semibold text-slate-900">สถานะใบขอ / วันผ่านมา</h3>
         <p className="text-xs text-slate-500">
           ล่วงหน้า = คีย์ล่วงหน้า (≥7 วัน) และยังไม่ถึงวันที่ต้องการ · รวมกล่อง{' '}
-          {bucketTotal.toLocaleString('th-TH')} ตำแหน่ง ({requestTotal.toLocaleString('th-TH')} ใบขอ)
+          {bucketTotal.toLocaleString('th-TH')} ตำแหน่ง ({requestTotal.toLocaleString('th-TH')} ใบขอ · KPI{' '}
+          {positionTotal.toLocaleString('th-TH')} ตำแหน่ง)
         </p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

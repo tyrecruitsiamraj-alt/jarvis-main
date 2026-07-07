@@ -1,4 +1,5 @@
 import type { JobRequest } from '@/types';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 
 export function normalizeDepartmentCode(code?: string | null): string {
   const trimmed = (code || '').trim();
@@ -43,7 +44,7 @@ export function departmentCounts(jobs: JobRequest[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const j of jobs) {
     const code = extractDepartmentCode(j);
-    counts.set(code, (counts.get(code) ?? 0) + 1);
+    counts.set(code, (counts.get(code) ?? 0) + jobPositionUnits(j));
   }
   return counts;
 }
@@ -54,7 +55,7 @@ export function departmentFilterOptions(
   const counts = departmentCounts(jobs);
 
   const options: { value: SiamrajDepartmentFilter; label: string }[] = [
-    { value: 'all', label: `ทั้งหมด (${jobs.length})` },
+    { value: 'all', label: `ทั้งหมด (${jobs.reduce((s, j) => s + jobPositionUnits(j), 0)})` },
   ];
 
   for (const [code, count] of [...counts.entries()].sort(
@@ -98,7 +99,7 @@ export function jobSubtypeCounts(jobs: JobRequest[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const j of jobs) {
     const key = extractJobSubtypeKey(j);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    counts.set(key, (counts.get(key) ?? 0) + jobPositionUnits(j));
   }
   return counts;
 }
@@ -109,7 +110,7 @@ export function jobSubtypeFilterOptions(
   const counts = jobSubtypeCounts(jobs);
 
   const options: { value: SiamrajJobSubtypeFilter; label: string }[] = [
-    { value: 'all', label: `ทั้งหมด (${jobs.length})` },
+    { value: 'all', label: `ทั้งหมด (${jobs.reduce((s, j) => s + jobPositionUnits(j), 0)})` },
   ];
 
   for (const [key, count] of [...counts.entries()].sort(

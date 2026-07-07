@@ -21,7 +21,7 @@ import {
   filterJobsForAgeBucket,
   filterJobsForDashboardKpi,
   filterJobsForRecruiter,
-  filterJobsForTaskStatus,
+  filterJobsForUnitName,
 } from '@/lib/dashboard/drillDownFilters';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
@@ -189,9 +189,9 @@ const SupervisorDashboard: React.FC = () => {
     [openJobList, scopedJobs],
   );
 
-  const handleStatusClick = useCallback(
-    (status: Parameters<typeof filterJobsForTaskStatus>[1], label: string) => {
-      openJobList(`สถานะ: ${label}`, filterJobsForTaskStatus(scopedJobs, status));
+  const handleUnitClick = useCallback(
+    (unitName: string) => {
+      openJobList(`หน่วยงาน: ${unitName}`, filterJobsForUnitName(scopedJobs, unitName));
     },
     [openJobList, scopedJobs],
   );
@@ -240,7 +240,7 @@ const SupervisorDashboard: React.FC = () => {
       onAssignItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
-      onStatusClick={DEMO_MODE ? undefined : handleStatusClick}
+      onUnitClick={DEMO_MODE ? undefined : handleUnitClick}
       onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}
     />
     <DetailListDialog

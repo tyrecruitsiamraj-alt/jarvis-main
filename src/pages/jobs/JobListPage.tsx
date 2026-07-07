@@ -27,7 +27,7 @@ import {
   URGENCY_FILTER_OPTIONS,
 } from '@/lib/jobUrgency';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, countUnassignedRecruiters, countUnassignedScreeners, countUnassignedOpls, matchesRecruiterFilter, matchesScreenerFilter, matchesOplFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, countJobsByStaffName, countUnassignedRecruiters, countUnassignedScreeners, countUnassignedOpls, matchesRecruiterFilter, matchesScreenerFilter, matchesOplFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import {
   departmentFilterOptions,
   filterUnitRequestsByDepartment,
@@ -184,6 +184,21 @@ const JobListPage: React.FC = () => {
 
   const unassignedOplCount = useMemo(
     () => countUnassignedOpls(oplFilterScope),
+    [oplFilterScope],
+  );
+
+  const recruiterCounts = useMemo(
+    () => countJobsByStaffName(recruiterFilterScope, 'recruiter_name'),
+    [recruiterFilterScope],
+  );
+
+  const screenerCounts = useMemo(
+    () => countJobsByStaffName(screenerFilterScope, 'screener_name'),
+    [screenerFilterScope],
+  );
+
+  const oplCounts = useMemo(
+    () => countJobsByStaffName(oplFilterScope, 'opl_name'),
     [oplFilterScope],
   );
 
@@ -368,7 +383,7 @@ const JobListPage: React.FC = () => {
             </option>
             {recruiters.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {r} ({recruiterCounts.get(r) ?? 0})
               </option>
             ))}
           </FilterSelect>
@@ -385,7 +400,7 @@ const JobListPage: React.FC = () => {
             </option>
             {screeners.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {s} ({screenerCounts.get(s) ?? 0})
               </option>
             ))}
           </FilterSelect>
@@ -402,7 +417,7 @@ const JobListPage: React.FC = () => {
             </option>
             {opls.map((n) => (
               <option key={n} value={n}>
-                {n}
+                {n} ({oplCounts.get(n) ?? 0})
               </option>
             ))}
           </FilterSelect>
