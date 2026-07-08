@@ -9,6 +9,7 @@ import {
   listSiamrajSqlServerThroughput,
   type SiamrajThroughputRecord,
 } from './siamrajSqlServerThroughput.js';
+import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
 
@@ -261,6 +262,19 @@ export async function listSiamrajThroughput(options: {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {
     return listSiamrajSqlServerThroughput(options);
+  }
+  return [];
+}
+
+/** รายการใบขอที่ปิด/แจ้งเข้าในช่วง — สำหรับ drill-down การ์ด "ปิดใบขอ" (เลขตรงกับ throughput) */
+export async function listSiamrajClosedRequests(options: {
+  from: string;
+  to: string;
+  limit?: number;
+}) {
+  const source = getSiamrajDbSource();
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerClosedRequests(options);
   }
   return [];
 }

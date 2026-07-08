@@ -24,13 +24,14 @@ import {
   filterJobsForUnitName,
 } from '@/lib/dashboard/drillDownFilters';
 import { unitOrganizationKey } from '@/lib/unitGroupName';
+import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import {
   loadSupervisorDashboardFilters,
   saveSupervisorDashboardFilters,
 } from '@/lib/supervisorDashboardPageState';
-import { fetchSiamrajThroughput } from '@/lib/siamrajUnitRequestsApi';
+import { fetchSiamrajThroughput, fetchSiamrajClosedRequests } from '@/lib/siamrajUnitRequestsApi';
 import {
   filterJobsForThroughput,
   jobsToThroughputRecords,
@@ -149,7 +150,9 @@ const SupervisorDashboard: React.FC = () => {
   const openJobList = useCallback(
     (title: string, list: JobRequest[]) => {
       if (DEMO_MODE) return;
-      setDetailDialogTitle(`${title} (${list.length})`);
+      // ตัวเลขหลัก = จำนวนคน/ตำแหน่ง (ให้ตรงกับการ์ดสรุป) + จำนวนใบขอในวงเล็บ
+      const positions = sumJobPositionUnits(list);
+      setDetailDialogTitle(`${title} (${positions.toLocaleString()} คน · ${list.length.toLocaleString()} ใบขอ)`);
       setDetailDialogItems(
         list.map((j) =>
           jobToDashboardDetailItem(j, (job) => {
@@ -211,10 +214,22 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const handleKpiClick = useCallback(
-    (kpiId: string, label: string) => {
+    async (kpiId: string, label: string) => {
+      // การ์ด "ปิดใบขอ"/"อัตราปิด" นับจาก throughput (รวม backlog/ปิดแล้ว) — feed หลักมีแต่ใบที่ยังเปิด
+      // จึงต้องดึงรายการใบที่ปิดในช่วงเดียวกันมาโชว์ ให้เลขตรงกับการ์ด (ไม่งั้น "ปิดแล้วหายไป")
+      if ((kpiId === 'completed' || kpiId === 'success_rate') && siamrajPrimary && dbSource === 'sqlserver') {
+        const range = period ?? resolveYearToDateTrendRange();
+        try {
+          const closed = await fetchSiamrajClosedRequests(range.from, range.to);
+          openJobList(label, closed);
+        } catch {
+          openJobList(label, []);
+        }
+        return;
+      }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, scopedJobs],
+    [openJobList, scopedJobs, siamrajPrimary, dbSource, period],
   );
 
   const handleAgeBucketClick = useCallback(

@@ -46,6 +46,15 @@ export async function fetchSiamrajThroughput(from: string, to: string): Promise<
   return Array.isArray(data) ? data : [];
 }
 
+/** รายการใบขอที่ปิด/แจ้งเข้าในช่วง — สำหรับ drill-down การ์ด "ปิดใบขอ" (position_units = จำนวนที่ปิด) */
+export async function fetchSiamrajClosedRequests(from: string, to: string): Promise<JobRequest[]> {
+  const params = new URLSearchParams({ closed: '1', from, to });
+  const r = await apiFetch(`/api/siamraj/unit-requests?${params}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดรายการใบขอที่ปิดไม่สำเร็จ'));
+  const data = await readJsonSafe<JobRequest[]>(r);
+  return Array.isArray(data) ? data : [];
+}
+
 /** บันทึกผู้รับผิดชอบ (สรรหา/คัดสรร) ของใบขอ Siamraj — เก็บใน PostgreSQL ฝั่ง Jarvis */
 export async function saveSiamrajUnitAssignment(
   requestNo: string,

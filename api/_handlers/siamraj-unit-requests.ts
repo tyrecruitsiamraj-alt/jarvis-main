@@ -11,6 +11,7 @@ import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
   listSiamrajThroughput,
+  listSiamrajClosedRequests,
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
@@ -120,6 +121,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
       const items = await listSiamrajThroughput({ from, to });
+      return res.status(200).json(items);
+    }
+
+    if (getQuery(req, 'closed') === '1') {
+      const from = getQuery(req, 'from');
+      const to = getQuery(req, 'to');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
+      }
+      const items = await listSiamrajClosedRequests({ from, to });
+      await attachAssignments(items);
+      await attachNotes(items);
       return res.status(200).json(items);
     }
 
