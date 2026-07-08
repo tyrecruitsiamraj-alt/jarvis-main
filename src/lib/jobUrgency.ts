@@ -118,6 +118,15 @@ export function isAdvanceBeforeRequiredDate(job: JobRequest, today = new Date())
 }
 
 /**
+ * ช่อง「ผ่านมา」แสดง 'ล่วงหน้า' เมื่อยังไม่ถึงวันที่ต้องการ
+ * (ทั้งล่วงหน้าและฉุกเฉิน แต่ไม่รวมย้อนหลังที่นับจากวันที่กรอก)
+ */
+export function isBeforeRequiredForAge(job: JobRequest, today = new Date()): boolean {
+  const meta = computeJobUrgency(job, today);
+  return meta.kind !== 'retroactive' && meta.daysUntilRequired > 0;
+}
+
+/**
  * วันผ่านมาสำหรับคอลัมน์「ผ่านมา」
  * - ล่วงหน้า (ยังไม่ถึงวันที่ต้องการ): นับจากวันที่กรอก
  * - ล่วงหน้า + ฉุกเฉิน (ถึง/เลยวันที่ต้องการแล้ว): วันนี้ − วันที่ต้องการ
@@ -187,9 +196,8 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
  *     · ถึง/เลยวันที่ต้องการ: นับจากวันที่ต้องการ
  */
 export function getJobRequestAgeLabel(job: JobRequest, today = new Date()): string {
-  const meta = computeJobUrgency(job, today);
-  // ย้อนหลัง (วันที่ต้องการอยู่ก่อนวันที่กรอกแล้ว) นับจากวันที่กรอกเสมอ
-  if (meta.kind !== 'retroactive' && meta.daysUntilRequired > 0) return 'ล่วงหน้า';
+  // ยังไม่ถึงวันที่ต้องการ → ล่วงหน้า (ย้อนหลังนับจากวันที่กรอกเสมอ)
+  if (isBeforeRequiredForAge(job, today)) return 'ล่วงหน้า';
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return '—';
   return `${days} วัน`;
@@ -250,7 +258,10 @@ export function compareJobsForListSort(
 
 export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, today = new Date()): boolean {
   if (filter === 'all') return true;
-  if (filter === 'advance') return isAdvanceBeforeRequiredDate(job, today);
+  const beforeRequired = isBeforeRequiredForAge(job, today);
+  if (filter === 'advance') return beforeRequired;
+  // ใบที่ยังไม่ถึงวันที่ต้องการถือเป็น "ล่วงหน้า" เท่านั้น ไม่เข้ากล่องตัวเลข/วันนี้
+  if (beforeRequired) return false;
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return false;
   switch (filter) {

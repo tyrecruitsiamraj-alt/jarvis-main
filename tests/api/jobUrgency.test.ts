@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeJobUrgency, countAgeDaysBreakdown, getJobRequestAgeLabel, matchesUrgencyFilter } from '../../src/lib/jobUrgency';
+import { computeJobUrgency, countAgeDaysBreakdown, getJobRequestAgeLabel, matchesAgeDaysFilter, matchesUrgencyFilter } from '../../src/lib/jobUrgency';
 import type { JobRequest } from '../../src/types';
 
 function job(partial: Partial<JobRequest>): JobRequest {
@@ -131,6 +131,25 @@ describe('computeJobUrgency', () => {
     const retro = job({ submittedAt: '2026-07-03', required_date: '2026-07-02' });
     expect(matchesUrgencyFilter(retro, 'retroactive')).toBe(true);
     expect(matchesUrgencyFilter(retro, 'urgent')).toBe(false);
+  });
+});
+
+describe('matchesAgeDaysFilter', () => {
+  const today = new Date('2026-07-08T12:00:00+07:00');
+
+  it('วันนี้ filter excludes before-required (ล่วงหน้า) jobs', () => {
+    const advance = job({ submittedAt: '2026-07-08', request_date: '2026-07-08', required_date: '2026-07-20' });
+    const urgent = job({ submittedAt: '2026-07-08', request_date: '2026-07-08', required_date: '2026-07-13' });
+    expect(matchesAgeDaysFilter(advance, 'today', today)).toBe(false);
+    expect(matchesAgeDaysFilter(urgent, 'today', today)).toBe(false);
+    expect(matchesAgeDaysFilter(advance, 'advance', today)).toBe(true);
+    expect(matchesAgeDaysFilter(urgent, 'advance', today)).toBe(true);
+  });
+
+  it('วันนี้ filter matches jobs due today', () => {
+    const dueToday = job({ submittedAt: '2026-07-05', request_date: '2026-07-05', required_date: '2026-07-08' });
+    expect(matchesAgeDaysFilter(dueToday, 'today', today)).toBe(true);
+    expect(matchesAgeDaysFilter(dueToday, 'advance', today)).toBe(false);
   });
 });
 
