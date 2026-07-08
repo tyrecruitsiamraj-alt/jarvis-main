@@ -492,7 +492,11 @@ function buildUnitOverview(jobs: JobRequest[], today: Date): DashboardUnitOvervi
     .sort((a, b) => b.open - a.open || b.total - a.total || a.name.localeCompare(b.name, 'th'));
 }
 
-export function buildRecruiterOverview(jobs: JobRequest[], today: Date): DashboardRecruiterOverview[] {
+export function buildRecruiterOverview(
+  jobs: JobRequest[],
+  today: Date,
+  closedJobs: JobRequest[] = [],
+): DashboardRecruiterOverview[] {
   const map = new Map<string, { total: number; completed: number; overdue: number }>();
   for (const j of jobs) {
     const name = j.recruiter_name?.trim() || 'ยังไม่มอบหมาย';
@@ -504,7 +508,17 @@ export function buildRecruiterOverview(jobs: JobRequest[], today: Date): Dashboa
     if (st === 'overdue') row.overdue += units;
     map.set(name, row);
   }
-  const total = sumJobPositionUnits(jobs) || 1;
+  // ใบขอที่ปิดแล้วอยู่คนละ feed จาก open — รวมยอดปิดต่อผู้รับผิดชอบเข้ามาด้วย
+  for (const j of closedJobs) {
+    const name = j.recruiter_name?.trim() || 'ยังไม่มอบหมาย';
+    const units = jobPositionUnits(j);
+    const row = map.get(name) ?? { total: 0, completed: 0, overdue: 0 };
+    row.total += units;
+    row.completed += units;
+    map.set(name, row);
+  }
+  const total =
+    (sumJobPositionUnits(jobs) + sumJobPositionUnits(closedJobs)) || 1;
   return [...map.entries()]
     .map(([name, row]) => ({
       name,
@@ -587,6 +601,7 @@ export function buildDashboardData(
   uiFilters: DashboardFilters,
   today = new Date(),
   trend?: BuildDashboardTrendInput,
+  closedJobs: JobRequest[] = [],
 ): DashboardData {
   const workItems = scopedJobs.map((j) => jobToWorkItem(j, today));
   const filteredQueue = applyDashboardFilters(workItems, uiFilters);
@@ -624,7 +639,7 @@ export function buildDashboardData(
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     ageDaysRequestTotal: scopedJobs.length,
     ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),
-    recruiterOverview: buildRecruiterOverview(scopedJobs, today),
+    recruiterOverview: buildRecruiterOverview(scopedJobs, today, closedJobs),
     workQueue: sortedQueue,
     periodLabel,
     previousPeriodLabel,

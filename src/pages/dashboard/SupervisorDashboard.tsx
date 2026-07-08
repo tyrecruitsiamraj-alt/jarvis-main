@@ -54,6 +54,7 @@ const SupervisorDashboard: React.FC = () => {
   const [detailDialogItems, setDetailDialogItems] = useState<ReturnType<typeof jobToDashboardDetailItem>[]>([]);
 
   const [throughputRecords, setThroughputRecords] = useState<ThroughputRecord[]>([]);
+  const [closedJobs, setClosedJobs] = useState<JobRequest[]>([]);
 
   const RETURN_TO = '/dashboard';
 
@@ -87,6 +88,29 @@ const SupervisorDashboard: React.FC = () => {
     () => (dateRange ? resolvePeriodRange('custom', dateRange) : null),
     [dateRange],
   );
+
+  useEffect(() => {
+    if (DEMO_MODE) {
+      setClosedJobs([]);
+      return;
+    }
+    if (!(siamrajPrimary && dbSource === 'sqlserver')) {
+      setClosedJobs([]);
+      return;
+    }
+    const range = period ?? resolveYearToDateTrendRange();
+    let cancelled = false;
+    void fetchSiamrajClosedRequests(range.from, range.to)
+      .then((rows) => {
+        if (!cancelled) setClosedJobs(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setClosedJobs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [siamrajPrimary, dbSource, period, refreshing]);
 
   /** ชุดข้อมูลเดียวกับหน้ารายการหน่วยงาน — ไม่กรองวันที่จนกว่าจะเลือกช่วงวันที่กรอก */
   const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
@@ -176,18 +200,32 @@ const SupervisorDashboard: React.FC = () => {
       period != null
         ? filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo)
         : [];
-    const built = buildDashboardData(scopedJobs, previousScoped, period, filters, new Date(), {
-      jobs: trendJobs,
-      from: trendRange.from,
-      to: trendRange.to,
-      label: trendRange.label,
-      throughputRecords,
+    // ใบขอที่ปิดแล้ว — กรองด้วยฟิลเตอร์หน่วยงานชุดเดียวกัน (ข้ามฟิลเตอร์สถานะ/อายุที่ไม่เกี่ยวกับใบปิด)
+    const scopedClosedJobs = filterUnitRequests(closedJobs, siamrajPrimary, unitFilters, {
+      statusFilter: true,
+      ageDaysFilter: true,
+      urgencyFilter: true,
     });
+    const built = buildDashboardData(
+      scopedJobs,
+      previousScoped,
+      period,
+      filters,
+      new Date(),
+      {
+        jobs: trendJobs,
+        from: trendRange.from,
+        to: trendRange.to,
+        label: trendRange.label,
+        throughputRecords,
+      },
+      scopedClosedJobs,
+    );
     return {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, closedJobs]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
