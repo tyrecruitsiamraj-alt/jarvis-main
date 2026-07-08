@@ -58,12 +58,12 @@ describe('computeJobUrgency', () => {
     expect(meta.daysPastRequired).toBeGreaterThanOrEqual(1);
   });
 
-  it('age label shows advance with days since submit before required date', () => {
+  it('age label shows only ล่วงหน้า before required date', () => {
     const label = getJobRequestAgeLabel(
       job({ submittedAt: '2026-07-01', required_date: '2026-07-20' }),
       today,
     );
-    expect(label).toBe('ล่วงหน้า · 7 วัน');
+    expect(label).toBe('ล่วงหน้า');
   });
 
   it('age label shows elapsed days from required date for advance after required passes', () => {
@@ -95,12 +95,28 @@ describe('computeJobUrgency', () => {
     expect(label).toBe('51 วัน');
   });
 
-  it('retroactive counts from submit date even when required has passed', () => {
+  it('retroactive counts from submit date (กรอกวันนี้ = 0, +1 ทุกวัน)', () => {
     const label = getJobRequestAgeLabel(
       job({ submittedAt: '2026-07-03', required_date: '2026-07-02' }),
       today,
     );
     expect(label).toBe('5 วัน');
+  });
+
+  it('retroactive submitted today shows 0 วัน', () => {
+    const label = getJobRequestAgeLabel(
+      job({ submittedAt: '2026-07-08', request_date: '2026-07-08', required_date: '2026-07-05' }),
+      new Date('2026-07-08T12:00:00+07:00'),
+    );
+    expect(label).toBe('0 วัน');
+  });
+
+  it('shows ล่วงหน้า for urgent request before required date', () => {
+    const label = getJobRequestAgeLabel(
+      job({ submittedAt: '2026-07-08', request_date: '2026-07-08', required_date: '2026-07-13' }),
+      new Date('2026-07-08T12:00:00+07:00'),
+    );
+    expect(label).toBe('ล่วงหน้า');
   });
 
   it('parses ISO timestamps in Bangkok calendar for required-based age', () => {

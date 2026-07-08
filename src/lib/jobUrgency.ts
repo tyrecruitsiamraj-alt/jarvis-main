@@ -179,16 +179,19 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
   return { kind: 'advance', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
 }
 
+/**
+ * คอลัมน์「ผ่านมา」— มีแค่ 2 แบบ (แยกจากช่องสถานะใบขอ):
+ * - ยังไม่ถึงวันที่ต้องการ (ล่วงหน้า/ฉุกเฉินที่ยังไม่ถึงวัน) → 'ล่วงหน้า'
+ * - อื่น ๆ → จำนวนวัน:
+ *     · ย้อนหลัง: นับจากวันที่กรอก (กรอกวันนี้ = 0 วัน, +1 ทุกวัน)
+ *     · ถึง/เลยวันที่ต้องการ: นับจากวันที่ต้องการ
+ */
 export function getJobRequestAgeLabel(job: JobRequest, today = new Date()): string {
-  if (isAdvanceBeforeRequiredDate(job, today)) {
-    const days = getJobRequestAgeDays(job, today);
-    if (days == null) return 'ล่วงหน้า';
-    if (days <= 0) return 'ล่วงหน้า';
-    return `ล่วงหน้า · ${days} วัน`;
-  }
+  const meta = computeJobUrgency(job, today);
+  // ย้อนหลัง (วันที่ต้องการอยู่ก่อนวันที่กรอกแล้ว) นับจากวันที่กรอกเสมอ
+  if (meta.kind !== 'retroactive' && meta.daysUntilRequired > 0) return 'ล่วงหน้า';
   const days = getJobRequestAgeDays(job, today);
   if (days == null) return '—';
-  if (days <= 0) return 'วันนี้';
   return `${days} วัน`;
 }
 
