@@ -29,6 +29,7 @@ import type {
   DashboardKpi,
   DashboardPeriodPreset,
   DashboardRecruiterOverview,
+  DashboardResponsibleRole,
   DashboardUnitOverview,
   DashboardSlaStatus,
   DashboardSortDir,
@@ -497,35 +498,55 @@ export function buildRecruiterOverview(
   today: Date,
   closedJobs: JobRequest[] = [],
 ): DashboardRecruiterOverview[] {
-  const map = new Map<string, { total: number; completed: number; overdue: number }>();
-  for (const j of jobs) {
-    const name = j.recruiter_name?.trim() || 'ยังไม่มอบหมาย';
-    const units = jobPositionUnits(j);
-    const row = map.get(name) ?? { total: 0, completed: 0, overdue: 0 };
+  type Row = {
+    name: string;
+    role: DashboardResponsibleRole;
+    total: number;
+    completed: number;
+    overdue: number;
+  };
+  const map = new Map<string, Row>();
+
+  const add = (
+    role: DashboardResponsibleRole,
+    rawName: string | undefined,
+    units: number,
+    flags: { completed?: boolean; overdue?: boolean },
+  ) => {
+    const name = rawName?.trim() || 'ยังไม่มอบหมาย';
+    const key = `${role}:${name}`;
+    const row = map.get(key) ?? { name, role, total: 0, completed: 0, overdue: 0 };
     row.total += units;
+    if (flags.completed) row.completed += units;
+    if (flags.overdue) row.overdue += units;
+    map.set(key, row);
+  };
+
+  for (const j of jobs) {
+    const units = jobPositionUnits(j);
     const st = mapJobToTaskStatus(j, today);
-    if (st === 'completed') row.completed += units;
-    if (st === 'overdue') row.overdue += units;
-    map.set(name, row);
+    const flags = { completed: st === 'completed', overdue: st === 'overdue' };
+    add('recruiter', j.recruiter_name, units, flags);
+    add('screener', j.screener_name, units, flags);
   }
   // ใบขอที่ปิดแล้วอยู่คนละ feed จาก open — รวมยอดปิดต่อผู้รับผิดชอบเข้ามาด้วย
   for (const j of closedJobs) {
-    const name = j.recruiter_name?.trim() || 'ยังไม่มอบหมาย';
     const units = jobPositionUnits(j);
-    const row = map.get(name) ?? { total: 0, completed: 0, overdue: 0 };
-    row.total += units;
-    row.completed += units;
-    map.set(name, row);
+    add('recruiter', j.recruiter_name, units, { completed: true });
+    add('screener', j.screener_name, units, { completed: true });
   }
-  const total =
-    (sumJobPositionUnits(jobs) + sumJobPositionUnits(closedJobs)) || 1;
-  return [...map.entries()]
-    .map(([name, row]) => ({
-      name,
+
+  const roleTotals: Record<DashboardResponsibleRole, number> = { recruiter: 0, screener: 0 };
+  for (const row of map.values()) roleTotals[row.role] += row.total;
+
+  return [...map.values()]
+    .map((row) => ({
+      name: row.name,
+      role: row.role,
       total: row.total,
       completed: row.completed,
       overdue: row.overdue,
-      sharePercent: Math.round((row.total / total) * 1000) / 10,
+      sharePercent: Math.round((row.total / (roleTotals[row.role] || 1)) * 1000) / 10,
     }))
     .sort((a, b) => b.total - a.total);
 }

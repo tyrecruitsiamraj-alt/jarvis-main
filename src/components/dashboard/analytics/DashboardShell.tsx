@@ -1,7 +1,7 @@
 import React from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -46,7 +46,7 @@ type Props = {
   onKpiClick?: (kpiId: string, label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
   onUnitClick?: (unitName: string) => void;
-  onRecruiterClick?: (name: string) => void;
+  onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
 };
 
 const DashboardShell: React.FC<Props> = ({

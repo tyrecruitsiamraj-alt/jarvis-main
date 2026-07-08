@@ -58,8 +58,12 @@ export function filterJobsForUnitName(jobs: JobRequest[], unitName: string): Job
 export function filterJobsForRecruiter(
   jobs: JobRequest[],
   recruiterName: string,
+  role: 'recruiter' | 'screener' = 'recruiter',
 ): JobRequest[] {
-  return jobs.filter((j) => (j.recruiter_name?.trim() || 'ยังไม่มอบหมาย') === recruiterName);
+  return jobs.filter((j) => {
+    const field = role === 'screener' ? j.screener_name : j.recruiter_name;
+    return (field?.trim() || 'ยังไม่มอบหมาย') === recruiterName;
+  });
 }
 
 export function filterJobsForActivity(

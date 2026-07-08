@@ -285,8 +285,9 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const handleRecruiterClick = useCallback(
-    (name: string) => {
-      openJobList(`ผู้รับผิดชอบ: ${name}`, filterJobsForRecruiter(scopedJobs, name));
+    (name: string, role: 'recruiter' | 'screener') => {
+      const roleLabel = role === 'screener' ? 'คัดสรร' : 'สรรหา';
+      openJobList(`${roleLabel}: ${name}`, filterJobsForRecruiter(scopedJobs, name, role));
     },
     [openJobList, scopedJobs],
   );

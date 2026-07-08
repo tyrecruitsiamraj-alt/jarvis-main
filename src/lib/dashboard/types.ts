@@ -68,8 +68,11 @@ export type DashboardWorkItem = {
   isResignation: boolean;
 };
 
+export type DashboardResponsibleRole = 'recruiter' | 'screener';
+
 export type DashboardRecruiterOverview = {
   name: string;
+  role: DashboardResponsibleRole;
   total: number;
   completed: number;
   overdue: number;

@@ -36,8 +36,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   ageDaysPositionTotal: 52,
   ageDaysRequestTotal: 48,
   recruiterOverview: [
-    { name: 'สมหญิง ใจดี', total: 14, completed: 8, overdue: 2, sharePercent: 29.2 },
-    { name: 'วิชัย รักงาน', total: 11, completed: 6, overdue: 1, sharePercent: 22.9 },
+    { name: 'สมหญิง ใจดี', role: 'recruiter', total: 14, completed: 8, overdue: 2, sharePercent: 29.2 },
+    { name: 'วิชัย รักงาน', role: 'recruiter', total: 11, completed: 6, overdue: 1, sharePercent: 22.9 },
+    { name: 'อรทัย คัดสรร', role: 'screener', total: 12, completed: 7, overdue: 1, sharePercent: 26.1 },
   ],
   workQueue: [
     {
