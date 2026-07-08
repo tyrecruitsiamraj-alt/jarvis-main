@@ -211,7 +211,7 @@ const BASE_SQL_LIST = `${BASE_SQL}
 `;
 
 const BASE_SQL_BY_ID = `${BASE_SQL}
-  WHERE 1 = 1
+  WHERE ${openStaffingRequestWhere()}
 `;
 
 const SELECT_COLUMNS = `
