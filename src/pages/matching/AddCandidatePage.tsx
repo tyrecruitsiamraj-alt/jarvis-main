@@ -3,6 +3,12 @@ import { apiFetch } from '@/lib/apiFetch';
 import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import PageHeader from '@/components/shared/PageHeader';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+
+function safeReturnTo(path: string | null, fallback: string): string {
+  if (!path) return fallback;
+  if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/api/')) return fallback;
+  return path;
+}
 import { toast } from 'sonner';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import type { DrivingResult, Gender, YesNo } from '@/types';
@@ -40,6 +46,7 @@ const AddCandidatePage: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const backPath = safeReturnTo(searchParams.get('returnTo'), '/matching/candidates');
 
   useEffect(() => {
     const first = searchParams.get('first_name') || '';
@@ -140,7 +147,7 @@ const AddCandidatePage: React.FC = () => {
         );
         return;
       }
-      navigate('/matching/candidates');
+      navigate(backPath);
     } catch (e) {
       if (e instanceof TypeError) {
         setError(apiUnreachableHint());
@@ -154,7 +161,7 @@ const AddCandidatePage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="เพิ่มผู้สมัครใหม่" backPath="/matching/candidates" />
+      <PageHeader title="เพิ่มผู้สมัครใหม่" backPath={backPath} />
 
       <div className="px-4 md:px-6">
         <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
@@ -419,7 +426,7 @@ const AddCandidatePage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => navigate('/matching/candidates')}
+              onClick={() => navigate(backPath)}
               className="px-6 py-2.5 rounded-lg bg-secondary text-foreground font-medium text-sm"
             >
               ยกเลิก

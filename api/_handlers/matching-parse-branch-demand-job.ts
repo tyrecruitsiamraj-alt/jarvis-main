@@ -35,12 +35,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const parserInput = buildErpBranchDemandInput(job);
-    const branchMatches = await buildBranchMatchingSuggestions({ jobId });
+    const parsed = parseErpBranchDemand(parserInput);
+
+    const includeMatches = getQuery(req, 'matches') === '1';
+    let branch_matches: Awaited<ReturnType<typeof buildBranchMatchingSuggestions>>['branches'] = [];
+    if (includeMatches) {
+      const poolRaw = getQuery(req, 'poolSize');
+      const poolSize = poolRaw ? Number(poolRaw) : 200;
+      const branchMatches = await buildBranchMatchingSuggestions({
+        jobId,
+        limit: Number.isFinite(poolSize) ? poolSize : 200,
+      });
+      branch_matches = branchMatches?.branches || [];
+    }
+
     return res.status(200).json({
       jobId: job.id,
       parser_input: parserInput,
-      parsed: parseErpBranchDemand(parserInput),
-      branch_matches: branchMatches?.branches || [],
+      parsed,
+      branch_matches,
     });
   } catch (e) {
     return handleApiError(res, e, 'matching-parse-branch-demand-job');

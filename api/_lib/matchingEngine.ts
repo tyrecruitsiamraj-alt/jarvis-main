@@ -318,17 +318,29 @@ function sortByProximityThenScore(a: MatchingSuggestion, b: MatchingSuggestion):
   return b.candidate.created_at.localeCompare(a.candidate.created_at);
 }
 
+/** จำนวนคนที่ดึงจาก iRecruit เพื่อคะแนน — แยกจาก limit ของผลที่คืน */
+const DEFAULT_CANDIDATE_POOL = 500;
+
 export async function buildMatchingSuggestions(options: {
   jobId: string;
   owner?: string;
+  /** จำนวนผลลัพธ์สูงสุดที่คืน (ไม่ใช่ขนาด pool) */
   limit?: number;
+  /** ขนาด pool จาก iRecruit (default 500) */
+  poolSize?: number;
 }): Promise<MatchingSuggestionsResult | null> {
   const job = (await getSiamrajUnitRequestById(options.jobId)) as MatchableJob | null;
   if (!job) return null;
 
+  const resultLimit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+  const poolSize = Math.min(
+    Math.max(options.poolSize ?? DEFAULT_CANDIDATE_POOL, resultLimit),
+    1000,
+  );
+
   const candidates = await listRecruitRegistrations({
     owner: options.owner,
-    limit: Math.max(options.limit ?? 200, 1),
+    limit: poolSize,
   });
   const hints = roleHintsForJob(job);
 
@@ -336,7 +348,8 @@ export async function buildMatchingSuggestions(options: {
     .map((candidate) => scoreCandidateForJob(job, candidate, hints))
     // ตัดคนไกลออกถ้าไม่ได้อะไรจากพื้นที่เลย
     .filter((item) => item.proximity_rank <= 3 && item.score > 0)
-    .sort(sortByProximityThenScore);
+    .sort(sortByProximityThenScore)
+    .slice(0, resultLimit);
 
   return {
     job: job as Record<string, unknown>,
@@ -373,9 +386,10 @@ export async function buildBranchMatchingSuggestions(options: {
     };
   }
 
+  const poolSize = Math.min(Math.max(options.limit ?? DEFAULT_CANDIDATE_POOL, 1), 1000);
   const candidates = await listRecruitRegistrations({
     owner: options.owner,
-    limit: Math.max(options.limit ?? 200, 1),
+    limit: poolSize,
   });
   const hints = roleHintsForJob(job);
 

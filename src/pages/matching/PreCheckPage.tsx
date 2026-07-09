@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -13,6 +13,8 @@ import { haversineKm } from '@/lib/geo';
 import { jobLatLng } from '@/lib/jobCoords';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { navigateToUnitRequest } from '@/lib/jobNavigation';
+import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import { Input } from '@/components/ui/input';
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
@@ -77,8 +79,15 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function preCheckReturnPath(jobId?: string | null): string {
+  return jobId
+    ? `/matching/pre-check?jobId=${encodeURIComponent(jobId)}`
+    : '/matching/pre-check';
+}
+
 const PreCheckPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [erpSearchQuery, setErpSearchQuery] = useState('');
   const [placeQuery, setPlaceQuery] = useState('');
   const [latText, setLatText] = useState('');
@@ -96,7 +105,9 @@ const PreCheckPage: React.FC = () => {
   const [matchingError, setMatchingError] = useState<string | null>(null);
   const [matchingData, setMatchingData] = useState<MatchingSuggestionsPayload | null>(null);
   const [jobMatchCounts, setJobMatchCounts] = useState<Record<string, number>>({});
+  const [jobMatchCountsLoading, setJobMatchCountsLoading] = useState(false);
   const [branchParseLoading, setBranchParseLoading] = useState(false);
+  const [branchMatchesLoading, setBranchMatchesLoading] = useState(false);
   const [branchParseData, setBranchParseData] = useState<ParsedBranchDemandPayload | null>(null);
 
   const openCandidatePrefill = (candidate: MatchingSuggestion['candidate']) => {
@@ -110,7 +121,7 @@ const PreCheckPage: React.FC = () => {
     if (candidate.district_name) params.set('district', candidate.district_name);
     if (candidate.location_label) params.set('location_label', candidate.location_label);
     if (candidate.job_name_th) params.set('job_name', candidate.job_name_th);
-    setJobDetail(null);
+    params.set('returnTo', preCheckReturnPath(jobDetail?.id));
     navigate(`/matching/candidates/add?${params.toString()}`);
   };
 
@@ -131,6 +142,24 @@ const PreCheckPage: React.FC = () => {
   }, []);
 
   const allJobs = feedJobs;
+
+  const closeJobDetail = () => {
+    setJobDetail(null);
+    if (searchParams.get('jobId')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('jobId');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // กลับจากหน้าเพิ่มผู้สมัคร — เปิด dialog ใบงานเดิมตาม jobId ใน URL
+  useEffect(() => {
+    const jobId = searchParams.get('jobId');
+    if (!jobId) return;
+    const job = allJobs.find((j) => j.id === jobId);
+    if (job) setJobDetail(job);
+  }, [searchParams, allJobs]);
+
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
@@ -299,14 +328,17 @@ const PreCheckPage: React.FC = () => {
     const rowsToFetch = filteredRows.slice(0, 30);
     if (rowsToFetch.length === 0) {
       setJobMatchCounts({});
+      setJobMatchCountsLoading(false);
       return;
     }
 
     let cancelled = false;
+    setJobMatchCountsLoading(true);
     Promise.all(
       rowsToFetch.map(async ({ job }) => {
         try {
-          const r = await apiFetch(`/api/matching/suggestions?jobId=${encodeURIComponent(job.id)}&limit=10`);
+          // limit = จำนวนผลที่โชว์บนการ์ด; pool ฝั่ง API ดึงแยก (ไม่ผูกกับ limit นี้อีกแล้ว)
+          const r = await apiFetch(`/api/matching/suggestions?jobId=${encodeURIComponent(job.id)}&limit=20`);
           if (!r.ok) return [job.id, 0] as const;
           const data = (await r.json()) as MatchingSuggestionsPayload;
           return [job.id, data.suggestions.length] as const;
@@ -317,6 +349,7 @@ const PreCheckPage: React.FC = () => {
     ).then((entries) => {
       if (cancelled) return;
       setJobMatchCounts(Object.fromEntries(entries));
+      setJobMatchCountsLoading(false);
     });
 
     return () => {
@@ -347,6 +380,7 @@ const PreCheckPage: React.FC = () => {
       setMatchingError(null);
       setMatchingData(null);
       setBranchParseLoading(false);
+      setBranchMatchesLoading(false);
       setBranchParseData(null);
       return;
     }
@@ -384,19 +418,44 @@ const PreCheckPage: React.FC = () => {
   useEffect(() => {
     if (!jobDetail) return;
     let cancelled = false;
-    setBranchParseLoading(true);
-    setBranchParseData(null);
 
-    apiFetch(`/api/matching/parse-branch-demand-job?jobId=${encodeURIComponent(jobDetail.id)}`)
+    // แยกสาขาทันทีฝั่ง UI (ไม่รอ API / iRecruit)
+    const parserInput = buildErpBranchDemandInput(jobDetail);
+    const parsed = parseErpBranchDemand(parserInput);
+    setBranchParseData({
+      parser_input: parserInput,
+      parsed,
+      branch_matches: [],
+    });
+    setBranchParseLoading(false);
+    setBranchMatchesLoading(parsed.items.length > 0);
+
+    if (parsed.items.length === 0) {
+      setBranchMatchesLoading(false);
+      return;
+    }
+
+    apiFetch(
+      `/api/matching/parse-branch-demand-job?jobId=${encodeURIComponent(jobDetail.id)}&matches=1&poolSize=200`,
+    )
       .then(async (r) => {
         if (!r.ok) return null;
         return (await r.json()) as ParsedBranchDemandPayload;
       })
       .then((data) => {
-        if (!cancelled) setBranchParseData(data);
+        if (!cancelled && data?.branch_matches) {
+          setBranchParseData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  branch_matches: data.branch_matches,
+                }
+              : prev,
+          );
+        }
       })
       .finally(() => {
-        if (!cancelled) setBranchParseLoading(false);
+        if (!cancelled) setBranchMatchesLoading(false);
       });
 
     return () => {
@@ -615,8 +674,19 @@ const PreCheckPage: React.FC = () => {
                       : 'คะแนนงานเบื้องต้นจากความด่วน'}
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                    ตรง {jobMatchCounts[j.id] ?? 0} คน
+                  <div
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-xs font-semibold',
+                      jobMatchCountsLoading && jobMatchCounts[j.id] == null
+                        ? 'border-slate-200 bg-slate-50 text-slate-500'
+                        : (jobMatchCounts[j.id] ?? 0) > 0
+                          ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                          : 'border-amber-100 bg-amber-50 text-amber-700',
+                    )}
+                  >
+                    {jobMatchCountsLoading && jobMatchCounts[j.id] == null
+                      ? 'กำลังนับ…'
+                      : `ตรง ${jobMatchCounts[j.id] ?? 0} คน`}
                   </div>
                   <div className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                     {score} คะแนน
@@ -641,7 +711,7 @@ const PreCheckPage: React.FC = () => {
         </div>
       </div>
 
-      <Dialog open={!!jobDetail} onOpenChange={(o) => !o && setJobDetail(null)}>
+      <Dialog open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-foreground">รายละเอียดงาน</DialogTitle>
@@ -695,6 +765,9 @@ const PreCheckPage: React.FC = () => {
                         <p className="text-xs text-muted-foreground">
                           ใช้ข้อความ: {branchParseData.parser_input}
                         </p>
+                        {branchMatchesLoading ? (
+                          <p className="text-xs text-blue-600">กำลังจับคู่ผู้สมัครตามสาขา…</p>
+                        ) : null}
                         <div className="space-y-2">
                           {branchParseData.parsed.items.map((item, idx) => {
                             const branchMatch = branchParseData.branch_matches?.find(
@@ -948,8 +1021,10 @@ const PreCheckPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setJobDetail(null);
-                        navigate(`/jobs/${jobDetail.id}`);
+                        if (!jobDetail) return;
+                        navigateToUnitRequest(jobDetail, navigate, {
+                          returnTo: preCheckReturnPath(jobDetail.id),
+                        });
                       }}
                       className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium"
                     >
