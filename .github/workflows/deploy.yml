@@ -20,7 +20,7 @@ jobs:
                   host: ${{ secrets.SSH_HOST }}
                   username: ${{ secrets.SSH_USERNAME }}
                   password: ${{ secrets.SSH_PASSWORD }}
-                  port: ${{ secrets.SSH_yVGCXuBGm57HHVYGy7fPORT || 22 }}
+                  port: ${{ secrets.SSH_PORT || 22 }}
                   command_timeout: 90m
                   script: |
                       cd jarvis-main
