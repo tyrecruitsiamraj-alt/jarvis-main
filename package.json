@@ -13,8 +13,8 @@
     "db:ping:mssql": "node scripts/mssql-ping.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrate:status": "node scripts/migrate.mjs --status",
+    "import:opl": "node scripts/import-opl-assignments.mjs",
     "db:seed": "node scripts/seed.mjs",
-    "db:seed:demo": "tsx scripts/seed-demo-data.ts",
     "db:seed:driver-care": "tsx scripts/seed-driver-care-demo.ts",
     "deploy:vercel": "vercel deploy --prod --yes",
     "build": "vite build",
@@ -22,7 +22,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:readiness": "vitest run tests/api"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -79,6 +80,7 @@
     "tailwindcss-animate": "^1.0.7",
     "thai-data": "^3.0.2",
     "vaul": "^0.9.9",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {

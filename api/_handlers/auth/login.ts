@@ -1,42 +1,26 @@
 import { dbQuery } from '../../_lib/postgres.js';
 import {
-  signAuthToken,
-  buildSetCookieHeader,
   verifyPassword,
   getJwtSecret,
+  type UserRole,
 } from '../../_lib/auth.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
-import type { UserRole } from '../../_lib/auth.js';
+import { rateLimitOrReject } from '../../_lib/rateLimit.js';
+import { auditFromAnonymous } from '../../_lib/audit.js';
+import {
+  companyEmailRequiredMessage,
+  isCompanyEmail,
+  isCompanyEmailLoginEnforced,
+} from '../../_lib/companyEmail.js';
+import { issueAuthSession, type AuthUserRow } from '../../_lib/authSession.js';
 
-type UserRow = {
-  id: string;
-  email: string;
+type UserRow = AuthUserRow & {
   password_hash: string;
-  role: UserRole;
-  full_name: string;
-  is_active: boolean;
-  created_at: string | Date;
 };
 
 function isUserRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff';
-}
-
-function toUserResponse(row: UserRow) {
-  const created =
-    row.created_at instanceof Date
-      ? row.created_at.toISOString().slice(0, 10)
-      : String(row.created_at).slice(0, 10);
-  return {
-    id: row.id,
-    username: row.email,
-    full_name: row.full_name || row.email,
-    email: row.email,
-    role: row.role,
-    is_active: row.is_active,
-    created_at: created,
-  };
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
 }
 
 export default async function handler(req: ApiReq, res: ApiRes) {
@@ -49,6 +33,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     return sendError(res, 503, 'Service unavailable', 'AUTH_JWT_SECRET is not configured');
   }
 
+  if (!rateLimitOrReject(req, res, 'auth:login', 10, 15 * 60 * 1000)) return;
+
   try {
     const raw = await readJsonBody(req);
     if (typeof raw !== 'object' || raw === null) {
@@ -59,6 +45,10 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const password = getString(body.password);
     if (!email || !password) {
       return sendError(res, 400, 'Bad request', 'email and password are required');
+    }
+
+    if (isCompanyEmailLoginEnforced() && !isCompanyEmail(email)) {
+      return sendError(res, 400, 'Bad request', companyEmailRequiredMessage());
     }
 
     const { rows } = await dbQuery<UserRow>(
@@ -73,26 +63,36 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
     const row = rows[0];
     if (!row || !isUserRole(row.role)) {
+      await auditFromAnonymous(req, { userName: email }, {
+        action: 'auth.login.failed',
+        entityType: 'auth',
+        entityId: 'login',
+        after: { reason: 'invalid_credentials' },
+      });
       return sendError(res, 401, 'Unauthorized', 'Invalid email or password');
     }
     if (!row.is_active) {
+      await auditFromAnonymous(req, { userId: row.id, userName: email, userRole: row.role }, {
+        action: 'auth.login.failed',
+        entityType: 'auth',
+        entityId: row.id,
+        after: { reason: 'account_disabled' },
+      });
       return sendError(res, 403, 'Forbidden', 'Account is disabled');
     }
 
     const ok = await verifyPassword(password, row.password_hash);
     if (!ok) {
+      await auditFromAnonymous(req, { userId: row.id, userName: email, userRole: row.role }, {
+        action: 'auth.login.failed',
+        entityType: 'auth',
+        entityId: row.id,
+        after: { reason: 'invalid_credentials' },
+      });
       return sendError(res, 401, 'Unauthorized', 'Invalid email or password');
     }
 
-    const ttl = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 1800) || 1800;
-    const token = signAuthToken({
-      sub: row.id,
-      email: row.email,
-      role: row.role,
-    });
-
-    res.setHeader?.('Set-Cookie', buildSetCookieHeader(token, ttl));
-    return res.status(200).json({ user: toUserResponse(row), token });
+    await issueAuthSession(req, res, row, 'auth.login.success');
   } catch (e) {
     return handleApiError(res, e, 'auth/login');
   }

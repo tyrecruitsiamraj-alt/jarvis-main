@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Candidate, CANDIDATE_STATUS_LABELS } from '@/types';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
-import { useDemoAwareCandidates } from '@/hooks/useDemoAwareCandidates';
+import { useCandidates } from '@/hooks/useCandidates';
 import { haversineKm } from '@/lib/geo';
+import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSelectLabel } from '@/lib/unitRequestDisplay';
 
 type CandidateWithMatchScore = Candidate & { distance: number | null; matchScore: number };
 
@@ -19,7 +20,7 @@ const radiusOptions = [10, 15, 20];
 const MatchingPage: React.FC = () => {
   const navigate = useNavigate();
   const { jobs, loading: loadingJobs } = useDemoAwareJobs();
-  const { candidates, loading: loadingCandidates } = useDemoAwareCandidates();
+  const { candidates, loading: loadingCandidates } = useCandidates();
   const [selectedJob, setSelectedJob] = useState('');
   const [radius, setRadius] = useState(15);
   const [statusFilter, setStatusFilter] = useState<string>('inprocess');
@@ -60,8 +61,10 @@ const MatchingPage: React.FC = () => {
     () =>
       jobs.map((j) => ({
         value: j.id,
-        label: j.unit_name,
-        keywords: [j.location_address, j.job_type, j.job_category].filter(Boolean).join(' '),
+        label: unitRequestSelectLabel(j),
+        keywords: [j.location_address, j.request_no, j.request_action_name, j.job_type, j.job_category]
+          .filter(Boolean)
+          .join(' '),
       })),
     [jobs],
   );
@@ -75,8 +78,8 @@ const MatchingPage: React.FC = () => {
         )}
         <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-4">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-orange-500/12 flex items-center justify-center shrink-0">
-              <SlidersHorizontal className="w-4 h-4 text-orange-600" />
+            <div className="w-9 h-9 rounded-xl bg-blue-500/12 flex items-center justify-center shrink-0">
+              <SlidersHorizontal className="w-4 h-4 text-blue-600" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-foreground">ตั้งค่าการจับคู่</h2>
@@ -107,8 +110,8 @@ const MatchingPage: React.FC = () => {
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                       radius === r
-                        ? 'bg-orange-600 text-white shadow-sm'
-                        : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-orange-300/50',
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-blue-300/50',
                     )}
                   >
                     {r} กม.
@@ -133,13 +136,13 @@ const MatchingPage: React.FC = () => {
         </div>
 
         <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
-          <Search className="w-4 h-4 text-orange-600 shrink-0" />
+          <Search className="w-4 h-4 text-blue-600 shrink-0" />
           <p className="text-sm text-muted-foreground">
             พบผู้สมัคร{' '}
-            <span className="text-orange-600 font-bold tabular-nums">{matched.length}</span> คน
+            <span className="text-blue-600 font-bold tabular-nums">{matched.length}</span> คน
             <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
             {job ? (
-              <span className="hidden sm:inline text-muted-foreground"> · {job.unit_name}</span>
+              <span className="hidden sm:inline text-muted-foreground"> · {unitRequestCardTitle(job)}</span>
             ) : null}
           </p>
         </div>
@@ -147,18 +150,18 @@ const MatchingPage: React.FC = () => {
         <div className="space-y-3">
           {matched.length === 0 && !loadingJobs && !loadingCandidates ? (
             <div className="glass-card rounded-[1.5rem] p-8 border border-white/70 text-center text-muted-foreground">
-              <Search className="w-8 h-8 text-orange-400/60 mx-auto mb-2" />
+              <Search className="w-8 h-8 text-blue-400/60 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground">ไม่พบผู้สมัครในรัศมีที่เลือก</p>
               <p className="text-xs mt-1">ลองขยายรัศมีหรือเปลี่ยนสถานะผู้สมัคร</p>
             </div>
           ) : null}
           {matched.map((c) => (
-            <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-orange-300/50 transition-colors">
+            <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-blue-300/50 transition-colors">
               <div className="flex items-center justify-between mb-2">
                 <button
                   type="button"
                   onClick={() => setCandidateDetail(c)}
-                  className="font-semibold text-orange-600 text-sm hover:underline text-left"
+                  className="font-semibold text-blue-600 text-sm hover:underline text-left"
                 >
                   {formatCandidateDisplayName(c)}
                 </button>
@@ -192,13 +195,13 @@ const MatchingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                  className="px-3 py-1.5 rounded-lg bg-orange-500/12 text-orange-600 text-xs"
+                  className="px-3 py-1.5 rounded-lg bg-blue-500/12 text-blue-600 text-xs"
                 >
                   ดูรายละเอียด
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 rounded-full bg-white/50 border border-white/70 text-muted-foreground text-xs hover:border-orange-300/50"
+                  className="px-3 py-1.5 rounded-full bg-white/50 border border-white/70 text-muted-foreground text-xs hover:border-blue-300/50"
                 >
                   อัปเดตสถานะ
                 </button>
@@ -217,8 +220,8 @@ const MatchingPage: React.FC = () => {
           {candidateDetail && (
             <div className="space-y-3 mt-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-orange-500/15 flex items-center justify-center">
-                  <User className="w-5 h-5 text-orange-600" />
+                <div className="w-10 h-10 rounded-full bg-blue-500/15 flex items-center justify-center">
+                  <User className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
                   <div className="font-bold text-foreground">{formatCandidateDisplayName(candidateDetail)}</div>

@@ -11,9 +11,7 @@ RUN npm ci
 COPY . .
 
 # VITE_ variables ต้องส่งตอน build เพราะ Vite อบลงใน bundle
-ARG VITE_DEMO_MODE=false
 ARG VITE_DEV_ROLE_ENTRY=false
-ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
 ENV VITE_DEV_ROLE_ENTRY=$VITE_DEV_ROLE_ENTRY
 
 RUN npm run build
@@ -33,6 +31,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # API server source
 COPY --from=builder /app/api        ./api
 COPY --from=builder /app/server     ./server
+COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/tsconfig*.json ./
 COPY --from=builder /app/package.json   ./
 

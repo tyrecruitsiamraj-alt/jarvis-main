@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -13,16 +13,9 @@ import SearchField from '@/components/shared/SearchField';
 import { Plus, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  DEMO_CANDIDATES_CHANGED_EVENT,
-  getCandidates,
-  hydrateCandidateStaffing,
-  setDemoCandidateStaffingTrack,
-} from '@/lib/demoStorage';
-import { mergeCandidateSources, getMergedCandidatesInitial } from '@/lib/mergeCandidates';
-import { CANDIDATE_STAFFING_OPTIONS } from '@/lib/candidateStaffing';
+import { hydrateCandidateStaffing, CANDIDATE_STAFFING_OPTIONS } from '@/lib/candidateStaffing';
+import { mergeCandidateSources } from '@/lib/mergeCandidates';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 
 const statusFilters: { value: CandidateStatus | 'all'; label: string }[] = [
@@ -59,19 +52,11 @@ const CandidatesPage: React.FC = () => {
   });
   const [search, setSearch] = useState('');
 
-  const [candidates, setCandidates] = useState<Candidate[]>(getMergedCandidatesInitial());
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const apiCandidatesRef = useRef<Candidate[]>([]);
 
   const applyStaffingTrack = async (c: Candidate, track: CandidateStaffingTrack) => {
-    if (isDemoMode()) {
-      setDemoCandidateStaffingTrack(c.id, track);
-      setCandidates((prev) =>
-        prev.map((x) => (x.id === c.id ? hydrateCandidateStaffing({ ...x, staffing_track: track }) : x)),
-      );
-      return;
-    }
     try {
       const r = await apiFetch('/api/candidates', {
         method: 'PATCH',
@@ -89,14 +74,6 @@ const CandidatesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isDemoMode()) {
-      apiCandidatesRef.current = [];
-      setCandidates(mergeCandidateSources([], getCandidates()));
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -111,14 +88,12 @@ const CandidatesPage: React.FC = () => {
       .then((data) => {
         if (cancelled) return;
         const arr = Array.isArray(data) ? data : [];
-        apiCandidatesRef.current = arr;
-        setCandidates(mergeCandidateSources(arr, getCandidates()));
+        setCandidates(mergeCandidateSources(arr));
       })
       .catch(() => {
         if (cancelled) return;
-        apiCandidatesRef.current = [];
-        setCandidates(mergeCandidateSources([], getCandidates()));
-        setError(null);
+        setCandidates([]);
+        setError('โหลดรายชื่อผู้สมัครไม่สำเร็จ — ลองใหม่อีกครั้ง');
       })
       .finally(() => {
         if (cancelled) return;
@@ -128,14 +103,6 @@ const CandidatesPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    if (!isDemoMode()) return;
-    const sync = () =>
-      setCandidates(mergeCandidateSources(apiCandidatesRef.current, getCandidates()));
-    window.addEventListener(DEMO_CANDIDATES_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(DEMO_CANDIDATES_CHANGED_EVENT, sync);
   }, []);
 
   useEffect(() => {
@@ -218,8 +185,8 @@ const CandidatesPage: React.FC = () => {
                 className={cn(
                   'rounded-lg border p-3 text-left transition-colors',
                   filter === st
-                    ? 'border-primary bg-orange-500/12 shadow-sm'
-                    : 'border-border bg-secondary/25 hover:border-primary/35 hover:bg-orange-50/40',
+                    ? 'border-primary bg-blue-500/12 shadow-sm'
+                    : 'border-border bg-secondary/25 hover:border-primary/35 hover:bg-blue-50/40',
                 )}
               >
                 <div className="text-[11px] font-medium text-muted-foreground leading-snug">
@@ -267,7 +234,7 @@ const CandidatesPage: React.FC = () => {
                 <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                    className="font-semibold text-foreground text-sm hover:text-orange-600"
+                    className="font-semibold text-foreground text-sm hover:text-blue-600"
                   >
                     {formatCandidateDisplayName(c)}
                   </button>
@@ -295,7 +262,7 @@ const CandidatesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-orange-600">Risk: {c.risk_percentage}%</span>
+                  <span className="text-xs text-blue-600">Risk: {c.risk_percentage}%</span>
 
                   <div className="flex gap-2">
                     <a href={`tel:${c.phone}`} className="p-1.5 rounded-lg bg-success/10 text-success">
@@ -305,7 +272,7 @@ const CandidatesPage: React.FC = () => {
                     {hasPermission('supervisor') && (
                       <button
                         onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                        className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600"
+                        className="text-xs px-2 py-1 rounded bg-blue-500/12 text-blue-600"
                       >
                         มอบหมายงาน
                       </button>
@@ -339,7 +306,7 @@ const CandidatesPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                        className="font-medium text-foreground hover:text-orange-600"
+                        className="font-medium text-foreground hover:text-blue-600"
                       >
                         {formatCandidateDisplayName(c)}
                       </button>
@@ -388,7 +355,7 @@ const CandidatesPage: React.FC = () => {
                       {hasPermission('supervisor') && (
                         <button
                           onClick={() => navigate(`/matching/candidates/${c.id}`)}
-                          className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600 hover:bg-orange-500/15"
+                          className="text-xs px-2 py-1 rounded bg-blue-500/12 text-blue-600 hover:bg-blue-500/15"
                         >
                           มอบหมายงาน
                         </button>

@@ -2,11 +2,18 @@ import type { NavigateFunction } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { isSiamrajJob, siamrajExternalId } from '@/lib/siamrajUnitRequestsApi';
 
-export function navigateToUnitRequest(job: JobRequest, navigate: NavigateFunction): void {
+export function unitRequestPath(job: JobRequest): string {
   const externalId = siamrajExternalId(job);
   if (isSiamrajJob(job) && externalId) {
-    navigate(`/jobs/siamraj/${externalId}`);
-    return;
+    return `/jobs/siamraj/${externalId}`;
   }
-  navigate(`/jobs/${job.id}`);
+  return `/jobs/${job.id}`;
+}
+
+export function navigateToUnitRequest(
+  job: JobRequest,
+  navigate: NavigateFunction,
+  options?: { returnTo?: string },
+): void {
+  navigate(unitRequestPath(job), options?.returnTo ? { state: { returnTo: options.returnTo } } : undefined);
 }

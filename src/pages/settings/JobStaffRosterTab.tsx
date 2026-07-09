@@ -1,20 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { isDemoMode } from '@/lib/demoMode';
+import OplExcelImportPanel from '@/pages/settings/OplExcelImportPanel';
 import {
-  addRecruiterToRoster,
-  addScreenerToRoster,
-  getRecruitersRoster,
-  getScreenersRoster,
   JOB_STAFF_ROSTER_CHANGED_EVENT,
-  removeRecruiterFromRoster,
-  removeScreenerFromRoster,
-  renameRecruiterRoster,
-  renameScreenerRoster,
-} from '@/lib/demoStorage';
-import { getJobStaffApiCache, mutateJobStaffRemote, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
+  getJobStaffApiCache,
+  mutateJobStaffRemote,
+  refreshJobStaffFromApi,
+} from '@/lib/jobStaffRemote';
 import { cn } from '@/lib/utils';
 
-type RosterKind = 'recruiter' | 'screener';
+type RosterKind = 'recruiter' | 'screener' | 'opl';
 
 function useRosterRev(): number {
   const [rev, setRev] = useState(0);
@@ -38,18 +32,11 @@ function RosterSection({
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-
   const [busy, setBusy] = useState(false);
 
   const add = async () => {
     const t = draft.trim();
     if (!t || busy) return;
-    if (isDemoMode()) {
-      if (kind === 'recruiter') addRecruiterToRoster(t);
-      else addScreenerToRoster(t);
-      setDraft('');
-      return;
-    }
     setBusy(true);
     const res = await mutateJobStaffRemote({ op: 'add', role: kind, name: t });
     setBusy(false);
@@ -60,11 +47,6 @@ function RosterSection({
   const remove = async (name: string) => {
     if (!window.confirm(`ลบ «${name}» ออกจากรายการ?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงในประวัติตามเดิม`)) return;
     if (busy) return;
-    if (isDemoMode()) {
-      if (kind === 'recruiter') removeRecruiterFromRoster(name);
-      else removeScreenerFromRoster(name);
-      return;
-    }
     setBusy(true);
     const res = await mutateJobStaffRemote({ op: 'remove', role: kind, name });
     setBusy(false);
@@ -79,12 +61,6 @@ function RosterSection({
   const saveEdit = async (original: string) => {
     const t = editValue.trim();
     if (!t || busy) return;
-    if (isDemoMode()) {
-      if (kind === 'recruiter') renameRecruiterRoster(original, t);
-      else renameScreenerRoster(original, t);
-      setEditing(null);
-      return;
-    }
     setBusy(true);
     const res = await mutateJobStaffRemote({
       op: 'rename',
@@ -146,7 +122,7 @@ function RosterSection({
                 <button
                   type="button"
                   onClick={() => startEdit(name)}
-                  className="text-xs px-2 py-1 rounded bg-secondary text-orange-600 hover:underline"
+                  className="text-xs px-2 py-1 rounded bg-secondary text-blue-600 hover:underline"
                 >
                   เปลี่ยนชื่อ
                 </button>
@@ -191,30 +167,31 @@ const JobStaffRosterTab: React.FC = () => {
   const rev = useRosterRev();
   const recruiters = useMemo(() => {
     void rev;
-    if (isDemoMode()) return getRecruitersRoster();
     return getJobStaffApiCache()?.recruiters ?? [];
   }, [rev]);
   const screeners = useMemo(() => {
     void rev;
-    if (isDemoMode()) return getScreenersRoster();
     return getJobStaffApiCache()?.screeners ?? [];
+  }, [rev]);
+  const opls = useMemo(() => {
+    void rev;
+    return getJobStaffApiCache()?.opls ?? [];
   }, [rev]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
     void refreshJobStaffFromApi();
   }, []);
 
   return (
     <div className="space-y-4">
-      {!isDemoMode() && (
-        <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
-          โหมด API: รายชื่อสรรหา/คัดสรรบันทึกในฐานข้อมูล การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
-        </p>
-      )}
-      <div className="grid gap-4 md:grid-cols-2">
+      <OplExcelImportPanel />
+      <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
+        รายชื่อสรรหา/คัดสรร/OPL บันทึกในฐานข้อมูล การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
+      </p>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <RosterSection kind="recruiter" title="เจ้าหน้าที่สรรหา" names={recruiters} />
         <RosterSection kind="screener" title="เจ้าหน้าที่คัดสรร" names={screeners} />
+        <RosterSection kind="opl" title="เจ้าหน้าที่ OPL" names={opls} />
       </div>
     </div>
   );

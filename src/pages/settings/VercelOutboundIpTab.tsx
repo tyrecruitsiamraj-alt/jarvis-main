@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { cn } from '@/lib/utils';
 import { Copy, Database, Globe, RefreshCw, ShieldAlert } from 'lucide-react';
-import { isDemoMode } from '@/lib/demoMode';
 
 export type OutboundIpCheck = {
   checkedAt: string;
@@ -72,7 +71,6 @@ function formatTh(iso: string): string {
 }
 
 const VercelOutboundIpTab: React.FC = () => {
-  const demo = isDemoMode();
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +82,6 @@ const VercelOutboundIpTab: React.FC = () => {
   const allKnownIps = useMemo(() => registry.map((r) => r.ip).sort(), [registry]);
 
   const loadHistory = useCallback(async () => {
-    if (demo) return;
     setHistoryLoading(true);
     try {
       const r = await apiFetch('/api/diagnostics/outbound-ip?mode=history&limit=50', { cache: 'no-store' });
@@ -102,13 +99,9 @@ const VercelOutboundIpTab: React.FC = () => {
     } finally {
       setHistoryLoading(false);
     }
-  }, [demo]);
+  }, []);
 
   const runCheck = useCallback(async () => {
-    if (demo) {
-      setError('โหมดสาธิต — รันเช็กบน Production (Vercel) หลัง login จริง');
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
@@ -126,14 +119,12 @@ const VercelOutboundIpTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [demo, loadHistory]);
+  }, [loadHistory]);
 
   useEffect(() => {
-    if (!demo) {
-      void loadHistory();
-      void runCheck();
-    }
-  }, [demo, loadHistory, runCheck]);
+    void loadHistory();
+    void runCheck();
+  }, [loadHistory, runCheck]);
 
   const copyIps = async () => {
     const text = allKnownIps.join('\n');
@@ -153,7 +144,7 @@ const VercelOutboundIpTab: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Globe className="w-4 h-4 text-orange-600" />
+              <Globe className="w-4 h-4 text-blue-600" />
               IP ขาออก (Outbound) สำหรับ Firewall Allowlist
             </h3>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -164,7 +155,7 @@ const VercelOutboundIpTab: React.FC = () => {
           <button
             type="button"
             onClick={() => void runCheck()}
-            disabled={loading || demo}
+            disabled={loading}
             className="jarvis-pill-btn px-4 py-2 text-sm shrink-0 disabled:opacity-50"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
@@ -193,7 +184,7 @@ const VercelOutboundIpTab: React.FC = () => {
       </div>
 
       {latest && latest.targets.mssql.configured ? (
-        <section className="rounded-xl border-2 border-orange-400/40 bg-orange-500/10 p-4 space-y-2">
+        <section className="rounded-xl border-2 border-blue-400/40 bg-blue-500/10 p-4 space-y-2">
           <p className="text-sm font-semibold text-foreground">Allowlist สำหรับ MSSQL ของคุณ</p>
           <p className="text-xs font-mono text-muted-foreground">
             {latest.targets.mssql.host}:{latest.targets.mssql.port} → {latest.targets.mssql.database}
@@ -258,7 +249,7 @@ const VercelOutboundIpTab: React.FC = () => {
       <section className="glass-card rounded-xl border border-border p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Database className="w-4 h-4 text-orange-600" />
+            <Database className="w-4 h-4 text-blue-600" />
             IP ที่เคย Connect (เก็บใน Database)
           </h4>
           {allKnownIps.length > 0 ? (

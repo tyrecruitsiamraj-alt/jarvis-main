@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { mockUsers, mockAuditLogs } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
@@ -9,9 +8,10 @@ import { Users, Shield, Database, FileText, Palette, UserCog, HeartPulse, Globe 
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
+import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
 import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
-import { isDemoMode } from '@/lib/demoMode';
+import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 
 type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare' | 'outboundIp';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
@@ -36,7 +36,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'appearance', label: 'ธีม / โลโก้', icon: Palette, adminOnly: false },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
-  { id: 'jobStaff', label: 'สรรหา / คัดสรร', icon: UserCog, adminOnly: true },
+  { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
   { id: 'driverCare', label: 'Driver Care', icon: HeartPulse, adminOnly: true },
   { id: 'outboundIp', label: 'Vercel IP', icon: Globe, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
@@ -46,7 +46,6 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
 const AdminSettings: React.FC = () => {
   const { hasPermission, user } = useAuth();
   const canAdmin = hasPermission('admin');
-  const demo = isDemoMode();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const initialTab: SettingsTab =
@@ -73,12 +72,15 @@ const AdminSettings: React.FC = () => {
   const [newRefValue, setNewRefValue] = useState('');
 
   useEffect(() => {
-    if (!canAdmin || demo) return;
+    if (!canAdmin) return;
     if (activeTab === 'users') {
       setUsersLoading(true);
       apiFetch('/api/app-users')
-        .then(async (r) => (r.ok ? ((await r.json()) as User[]) : []))
-        .then((d) => setApiUsers(Array.isArray(d) ? d : []))
+        .then(async (r) => {
+          if (!r.ok) return [];
+          return parseAppUserList(await r.json());
+        })
+        .then((d) => setApiUsers(d))
         .catch(() => setApiUsers([]))
         .finally(() => setUsersLoading(false));
     }
@@ -90,7 +92,7 @@ const AdminSettings: React.FC = () => {
         .catch(() => setApiAuditLogs([]))
         .finally(() => setAuditLoading(false));
     }
-  }, [canAdmin, activeTab, demo]);
+  }, [canAdmin, activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'users') return;
@@ -99,7 +101,6 @@ const AdminSettings: React.FC = () => {
   }, [activeTab]);
 
   const updateUser = async (id: string, patch: { role?: User['role']; is_active?: boolean }) => {
-    if (demo) return;
     setSavingUserId(id);
     setUserActionError('');
     setUserActionOk('');
@@ -119,8 +120,12 @@ const AdminSettings: React.FC = () => {
         setUserActionError(msg);
         return;
       }
-      const updated = body as User;
-      setApiUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      const updated = parseAppUser(body);
+      if (!updated) {
+        setUserActionError('รูปแบบข้อมูลผู้ใช้จากเซิร์ฟเวอร์ไม่ถูกต้อง');
+        return;
+      }
+      setApiUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
       setUserActionOk('บันทึกสิทธิ์ผู้ใช้เรียบร้อย');
     } catch {
       setUserActionError('เกิดข้อผิดพลาดระหว่างอัปเดตสิทธิ์ผู้ใช้');
@@ -212,57 +217,10 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'appearance' && <BrandingAppearanceTab />}
 
         {activeTab === 'users' &&
-          (demo ? (
-            <div className="glass-card rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-secondary/30">
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อ</th>
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">Username</th>
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
-                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockUsers.map((u) => (
-                    <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
-                      <td className="px-4 py-3 font-medium text-foreground">{u.full_name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            u.role === 'admin'
-                              ? 'bg-destructive/15 text-destructive'
-                              : u.role === 'supervisor'
-                                ? 'bg-warning/15 text-warning'
-                                : 'bg-info/15 text-info',
-                          )}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            u.is_active ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {u.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : usersLoading ? (
+          (usersLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
           ) : (
-            <div className="glass-card rounded-xl border border-border overflow-hidden">
+            <div className="glass-card rounded-xl border border-border overflow-x-auto">
               {userActionError ? (
                 <div className="mx-4 mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {userActionError}
@@ -302,7 +260,8 @@ const AdminSettings: React.FC = () => {
                           value={u.role}
                           disabled={savingUserId === u.id}
                           onChange={(e) => {
-                            const next = e.target.value as User['role'];
+                            const next = e.target.value;
+                            if (!isUserRole(next)) return;
                             if (next === u.role) return;
                             void updateUser(u.id, { role: next });
                           }}
@@ -314,6 +273,7 @@ const AdminSettings: React.FC = () => {
                           <option value="admin">admin</option>
                           <option value="supervisor">supervisor</option>
                           <option value="staff">staff</option>
+                          <option value="opl">opl (อ่านอย่างเดียว)</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -342,7 +302,7 @@ const AdminSettings: React.FC = () => {
             </div>
           ))}
 
-        {activeTab === 'users' && !demo && !usersLoading && (
+        {activeTab === 'users' && !usersLoading && (
           <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
             <div className="text-sm font-semibold text-foreground">จัดการสิทธิ์ผู้ใช้</div>
             {userActionError ? (
@@ -369,7 +329,8 @@ const AdminSettings: React.FC = () => {
                       value={u.role}
                       disabled={savingUserId === u.id}
                       onChange={(e) => {
-                        const next = e.target.value as User['role'];
+                        const next = e.target.value;
+                        if (!isUserRole(next)) return;
                         if (next === u.role) return;
                         void updateUser(u.id, { role: next });
                       }}
@@ -381,6 +342,7 @@ const AdminSettings: React.FC = () => {
                       <option value="admin">admin</option>
                       <option value="supervisor">supervisor</option>
                       <option value="staff">staff</option>
+                      <option value="opl">opl (อ่านอย่างเดียว)</option>
                     </select>
 
                     <button
@@ -413,22 +375,7 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'outboundIp' && <VercelOutboundIpTab />}
 
-        {activeTab === 'roles' && (
-          <div className="space-y-3">
-            {['admin', 'supervisor', 'staff'].map((role) => (
-              <div key={role} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
-                <div className="font-semibold text-foreground capitalize mb-2">{role}</div>
-                <div className="text-sm text-muted-foreground">
-                  {role === 'admin'
-                    ? 'เข้าถึงได้ทุกหน้า จัดการ users, permissions, master data, dashboard, settings — แก้รายชื่อเจ้าหน้าที่สรรหา/คัดสรรได้ที่แท็บสรรหา / คัดสรร'
-                    : role === 'supervisor'
-                      ? 'แก้ไขข้อมูลพนักงาน หน่วยงาน แผนงาน สถานะ matching ดู dashboard (ไม่มีสิทธิ์ Settings)'
-                      : 'ใช้งานเฉพาะหน้าที่ได้รับมอบหมาย ดู dashboard ได้แต่แก้ไขไม่ได้'}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {activeTab === 'roles' && <RolePermissionsTab />}
 
         {activeTab === 'reference' && (
           <div className="space-y-3">
@@ -444,7 +391,7 @@ const AdminSettings: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => openReferenceEditor(cat)}
-                    className="text-xs px-2 py-1 rounded bg-orange-500/12 text-orange-600 hover:bg-orange-500/15"
+                    className="text-xs px-2 py-1 rounded bg-blue-500/12 text-blue-600 hover:bg-blue-500/15"
                   >
                     จัดการ
                   </button>
@@ -505,34 +452,7 @@ const AdminSettings: React.FC = () => {
         )}
 
         {activeTab === 'audit' &&
-          (demo ? (
-            <div className="space-y-2">
-              {mockAuditLogs.map((log) => (
-                <div key={log.id} className="glass-card rounded-lg p-3 border border-border">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-foreground">{log.user_name}</span>
-                    <span className="text-[10px] text-muted-foreground">{log.timestamp}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <span
-                      className={cn(
-                        'px-1.5 py-0.5 rounded mr-1',
-                        log.action === 'CREATE'
-                          ? 'bg-success/15 text-success'
-                          : log.action === 'UPDATE'
-                            ? 'bg-warning/15 text-warning'
-                            : 'bg-destructive/15 text-destructive',
-                      )}
-                    >
-                      {log.action}
-                    </span>
-                    {log.entity_type} • {log.new_value}
-                    {log.old_value && <span className="text-muted-foreground/60"> (เดิม: {log.old_value})</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : auditLoading ? (
+          (auditLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลด audit log…</p>
           ) : apiAuditLogs.length === 0 ? (
             <p className="text-sm text-muted-foreground glass-card rounded-[1.5rem] p-4 border border-white/70">

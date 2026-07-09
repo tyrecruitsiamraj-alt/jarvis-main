@@ -6,10 +6,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { RolePermissionsProvider } from "@/contexts/RolePermissionsContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
+import MagicLinkVerifyPage from "@/pages/MagicLinkVerifyPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import HomePage from "@/pages/HomePage";
 import WLDashboard from "@/pages/wl/WLDashboard";
 import MonthlyPlanner from "@/pages/wl/MonthlyPlanner";
@@ -26,8 +29,8 @@ import MatchingPage from "@/pages/matching/MatchingPage";
 import PreCheckPage from "@/pages/matching/PreCheckPage";
 import JobDashboard from "@/pages/jobs/JobDashboard";
 import JobListPage from "@/pages/jobs/JobListPage";
+import StaffJobBoardPage from "@/pages/jobs/StaffJobBoardPage";
 import JobDetailPage from "@/pages/jobs/JobDetailPage";
-import AddJobPage from "@/pages/jobs/AddJobPage";
 import SiamrajUnitRequestDetailPage from "@/pages/jobs/SiamrajUnitRequestDetailPage";
 import DriverCareOverview from "@/pages/driver-care/DriverCareOverview";
 import DriverRiskList from "@/pages/driver-care/DriverRiskList";
@@ -38,6 +41,7 @@ import AdminSettings from "@/pages/settings/AdminSettings";
 import ChangePasswordPage from "@/pages/ChangePasswordPage";
 import NotFound from "./pages/NotFound";
 import RoleHubPage from "./pages/RoleHubPage";
+import RequireRole from "@/components/auth/RequireRole";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +51,7 @@ const ProtectedRoutes = () => {
     return (
       <div className="jarvis-warm-bg min-h-screen flex items-center justify-center text-muted-foreground text-sm">
         <div className="jarvis-frost px-8 py-6 text-center">
-          <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-orange-400/40 border-t-orange-500 animate-spin" aria-hidden />
+          <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-blue-400/40 border-t-blue-500 animate-spin" aria-hidden />
           กำลังโหลด session…
         </div>
       </div>
@@ -58,8 +62,10 @@ const ProtectedRoutes = () => {
   }
   return (
     <AppLayout>
-      <Routes>
+      <RequireRole>
+        <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/opl" element={<RoleHubPage role="opl" />} />
         <Route path="/staff" element={<RoleHubPage role="staff" />} />
         <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />
         <Route path="/admin" element={<RoleHubPage role="admin" />} />
@@ -80,16 +86,19 @@ const ProtectedRoutes = () => {
         <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
         <Route path="/driver-care/actions" element={<DriverActionTracking />} />
         <Route path="/driver-care/resources" element={<DriverCareResources />} />
-        <Route path="/jobs" element={<JobDashboard />} />
+        <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
+        <Route path="/jobs/overview" element={<JobDashboard />} />
         <Route path="/jobs/list" element={<JobListPage />} />
-        <Route path="/jobs/add" element={<AddJobPage />} />
+        <Route path="/jobs/board" element={<StaffJobBoardPage />} />
+        <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
         <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
         <Route path="/jobs/:id" element={<JobDetailPage />} />
         <Route path="/dashboard" element={<SupervisorDashboard />} />
         <Route path="/settings" element={<AdminSettings />} />
         <Route path="/account/change-password" element={<ChangePasswordPage />} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </RequireRole>
     </AppLayout>
   );
 };
@@ -97,7 +106,8 @@ const ProtectedRoutes = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <BrandingProvider>
+      <RolePermissionsProvider>
+        <BrandingProvider>
         <NotificationProvider>
           <TooltipProvider>
             <Toaster />
@@ -119,12 +129,15 @@ const App = () => (
                 />
                 <Route path="/careers" element={<Navigate to="/apply" replace />} />
                 <Route path="/mapwork" element={<Navigate to="/apply" replace />} />
+                <Route path="/auth/magic-link" element={<MagicLinkVerifyPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/*" element={<ProtectedRoutes />} />
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
         </NotificationProvider>
       </BrandingProvider>
+      </RolePermissionsProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

@@ -5,7 +5,7 @@ import type {
   DriverActionTrackingItem,
   DriverActionUpdateInput,
   DriverCareOverviewResponse,
-  DriverRiskListItem,
+  DriverRiskListResponse,
 } from '@/types/driverCare';
 
 function buildDriverCareUrl(
@@ -31,10 +31,10 @@ export async function fetchDriverRiskList(filters: {
   supervisor?: string;
   actionStatus?: string;
   search?: string;
-}): Promise<DriverRiskListItem[]> {
+}): Promise<DriverRiskListResponse> {
   const r = await apiFetch(buildDriverCareUrl('risk-list', filters));
   if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดรายชื่อความเสี่ยงไม่สำเร็จ'));
-  return readJsonSafe<DriverRiskListItem[]>(r);
+  return readJsonSafe<DriverRiskListResponse>(r);
 }
 
 export async function fetchDriverActions(filters: {
@@ -55,11 +55,14 @@ export async function fetchDriverActions(filters: {
   return readJsonSafe<DriverActionTrackingItem[]>(r);
 }
 
-export async function recalculateDriverCareRisk(): Promise<number> {
-  const r = await apiFetch('/api/driver-care?action=recalculate', { method: 'POST' });
+export async function recalculateDriverCareRisk(scoreDate?: string): Promise<{ recalculated: number; scoreDate: string }> {
+  const r = await apiFetch('/api/driver-care/recalculate', {
+    method: 'POST',
+    body: JSON.stringify(scoreDate ? { scoreDate } : {}),
+  });
   if (!r.ok) throw new Error(await readErrorMessage(r, 'คำนวณความเสี่ยงใหม่ไม่สำเร็จ'));
-  const data = await readJsonSafe<{ recalculated?: number }>(r);
-  return data.recalculated ?? 0;
+  const data = await readJsonSafe<{ recalculated?: number; scoreDate?: string }>(r);
+  return { recalculated: data.recalculated ?? 0, scoreDate: data.scoreDate ?? '' };
 }
 
 export async function logDriverAction(input: DriverActionLogInput): Promise<string> {

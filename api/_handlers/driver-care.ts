@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthDataRoute,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,14 +8,23 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import {
-  ensureTodayRiskScores,
-  recalculateRiskScores,
   riskT,
   actionT,
   empT,
   wcT,
 } from '../_lib/driverCareRisk.js';
+import {
+  resolveReadScoreDate,
+  emptyOverviewPayload,
+} from '../_lib/driverCareRead.js';
+import { bangkokBusinessDateYmd } from '../_lib/businessDate.js';
+import {
+  parseActionLogInput,
+  parseActionUpdateInput,
+} from '../_lib/driverCareActionValidation.js';
+import { DomainError } from '../_lib/domainErrors.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const skillT = tableInAppSchema('driver_care_skill');
 const knowledgeT = tableInAppSchema('driver_care_knowledge');
@@ -26,7 +35,7 @@ function getQuery(req: AuthedReq, key: string): string {
 }
 
 function todayYmd(): string {
-  return new Date().toISOString().slice(0, 10);
+  return bangkokBusinessDateYmd();
 }
 
 function isOverdue(nextFollowUp: string | null, status: string): boolean {
@@ -65,7 +74,8 @@ async function getOverview(scoreDate: string) {
   );
   const { rows: overdueRows } = await dbQuery<{ cnt: string }>(
     `select count(*)::text as cnt from ${actionT}
-     where status <> 'closed' and next_follow_up_date < current_date`,
+     where status <> 'closed' and next_follow_up_date < $1::date`,
+    [todayYmd()],
   );
 
   metrics.pendingAction = Number(statusRows.find((s) => s.status === 'pending')?.cnt || 0);
@@ -228,7 +238,8 @@ async function getActions(filters: Record<string, string>) {
     where.push(`coalesce(a.action_by_name, '') ilike $${params.length}`);
   }
   if (filters.overdueOnly === '1') {
-    where.push(`a.status <> 'closed' and a.next_follow_up_date < current_date`);
+    params.push(todayYmd());
+    where.push(`a.status <> 'closed' and a.next_follow_up_date < $${params.length}::date`);
   }
 
   const { rows } = await dbQuery<{
@@ -451,20 +462,28 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   try {
     if (method === 'GET') {
-      const scoreDate = await ensureTodayRiskScores();
+      const requestedScoreDate = getQuery(req, 'scoreDate') || undefined;
+      const readMeta = await resolveReadScoreDate(requestedScoreDate);
+
       if (view === 'overview') {
-        return res.status(200).json(await getOverview(scoreDate));
+        if (!readMeta.scoreDate) {
+          return res.status(200).json(emptyOverviewPayload(readMeta));
+        }
+        const overview = await getOverview(readMeta.scoreDate);
+        return res.status(200).json({ ...readMeta, ...overview });
       }
       if (view === 'risk-list') {
-        return res.status(200).json(
-          await getRiskList(scoreDate, {
-            riskLevel: getQuery(req, 'riskLevel'),
-            site: getQuery(req, 'site'),
-            supervisor: getQuery(req, 'supervisor'),
-            actionStatus: getQuery(req, 'actionStatus'),
-            search: getQuery(req, 'search'),
-          }),
-        );
+        if (!readMeta.scoreDate) {
+          return res.status(200).json({ ...readMeta, items: [] });
+        }
+        const items = await getRiskList(readMeta.scoreDate, {
+          riskLevel: getQuery(req, 'riskLevel'),
+          site: getQuery(req, 'site'),
+          supervisor: getQuery(req, 'supervisor'),
+          actionStatus: getQuery(req, 'actionStatus'),
+          search: getQuery(req, 'search'),
+        });
+        return res.status(200).json({ ...readMeta, items });
       }
       if (view === 'actions') {
         return res.status(200).json(
@@ -485,29 +504,27 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 400, 'Bad request', 'view required: overview | risk-list | actions | skills | knowledge');
     }
 
-    if (method === 'POST' && action === 'recalculate') {
-      const count = await recalculateRiskScores();
-      return res.status(200).json({ ok: true, recalculated: count });
-    }
-
     if (method === 'POST' && action === 'log') {
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
       }
-      const b = raw as Record<string, unknown>;
-      const employeeId = getString(b.employeeId);
-      const riskScoreId = getString(b.riskScoreId) || null;
-      const actionType = getString(b.actionType);
-      const contactStatus = getString(b.contactStatus) || 'contacted';
-      const issueFound = getString(b.issueFound);
-      const actionTaken = getString(b.actionTaken);
-      const result = getString(b.result);
-      const status = getString(b.status) || 'pending';
-      const nextFollowUp = getString(b.nextFollowUpDate) || null;
+      let validated;
+      try {
+        validated = parseActionLogInput(raw as Record<string, unknown>);
+      } catch (e) {
+        if (e instanceof DomainError) {
+          return sendError(res, e.statusCode, e.errorLabel, e.message);
+        }
+        throw e;
+      }
 
-      if (!employeeId || !actionType || !issueFound || !actionTaken || !result) {
-        return sendError(res, 400, 'Bad request', 'Missing required fields');
+      const { rows: empCheck } = await dbQuery<{ id: string }>(
+        `select id from ${empT} where id = $1::uuid and status = 'active' limit 1`,
+        [validated.employeeId],
+      );
+      if (!empCheck[0]) {
+        return sendError(res, 400, 'Bad request', 'employeeId not found or inactive');
       }
 
       const { rows } = await dbQuery<{ id: string }>(
@@ -518,20 +535,29 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ) values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10::date, $11, now())
         returning id`,
         [
-          riskScoreId,
-          employeeId,
+          validated.riskScoreId,
+          validated.employeeId,
           req.user.sub,
           req.user.email || 'User',
-          actionType,
-          contactStatus,
-          issueFound,
-          actionTaken,
-          result,
-          nextFollowUp,
-          status,
+          validated.actionType,
+          validated.contactStatus,
+          validated.issueFound,
+          validated.actionTaken,
+          validated.result,
+          validated.nextFollowUpDate,
+          validated.status,
         ],
       );
-      return res.status(201).json({ ok: true, id: rows[0]?.id });
+      const actionId = rows[0]?.id;
+      if (actionId) {
+        await auditFromAuthed(req, {
+          action: 'driver_care.action.log',
+          entityType: 'driver_care_action',
+          entityId: actionId,
+          after: { employeeId: validated.employeeId, actionType: validated.actionType, status: validated.status },
+        });
+      }
+      return res.status(201).json({ ok: true, id: actionId });
     }
 
     if (method === 'POST' && action === 'save-skill') {
@@ -541,6 +567,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       const saved = await saveSkill(req, raw as Record<string, unknown>);
       if (!saved) return sendError(res, 400, 'Bad request', 'title required');
+      await auditFromAuthed(req, {
+        action: 'driver_care.skill.save',
+        entityType: 'driver_care_skill',
+        entityId: String((saved as { id?: string }).id || 'skill'),
+        after: saved,
+      });
       return res.status(200).json(saved);
     }
 
@@ -551,6 +583,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       const saved = await saveKnowledge(req, raw as Record<string, unknown>);
       if (!saved) return sendError(res, 400, 'Bad request', 'title required');
+      await auditFromAuthed(req, {
+        action: 'driver_care.knowledge.save',
+        entityType: 'driver_care_knowledge',
+        entityId: String((saved as { id?: string }).id || 'knowledge'),
+        after: saved,
+      });
       return res.status(200).json(saved);
     }
 
@@ -567,6 +605,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         [id],
       );
       if (!rows[0]) return sendError(res, 404, 'Not found', 'Record not found');
+      await auditFromAuthed(req, {
+        action: action === 'delete-skill' ? 'driver_care.skill.archive' : 'driver_care.knowledge.archive',
+        entityType: action === 'delete-skill' ? 'driver_care_skill' : 'driver_care_knowledge',
+        entityId: rows[0].id,
+        before: { id },
+        after: { is_active: false },
+      });
       return res.status(200).json({ ok: true, id: rows[0].id });
     }
 
@@ -575,15 +620,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
       }
-      const b = raw as Record<string, unknown>;
-      const id = getString(b.id);
-      if (!id) return sendError(res, 400, 'Bad request', 'id required');
-
-      const status = b.status !== undefined ? getString(b.status) : undefined;
-      const result = b.result !== undefined ? getString(b.result) : undefined;
-      const actionTaken = b.actionTaken !== undefined ? getString(b.actionTaken) : undefined;
-      const nextFollowUp =
-        b.nextFollowUpDate === null ? null : b.nextFollowUpDate !== undefined ? getString(b.nextFollowUpDate) : undefined;
+      let validated;
+      try {
+        validated = parseActionUpdateInput(raw as Record<string, unknown>);
+      } catch (e) {
+        if (e instanceof DomainError) {
+          return sendError(res, e.statusCode, e.errorLabel, e.message);
+        }
+        throw e;
+      }
 
       const { rows } = await dbQuery<{ id: string }>(
         `update ${actionT} set
@@ -595,9 +640,26 @@ async function handler(req: AuthedReq, res: ApiRes) {
           updated_at = now()
          where id = $1::uuid
          returning id`,
-        [id, status || null, result || null, actionTaken || null, nextFollowUp === undefined ? '__skip__' : nextFollowUp],
+        [
+          validated.id,
+          validated.status || null,
+          validated.result || null,
+          validated.actionTaken || null,
+          validated.nextFollowUpDate === undefined ? '__skip__' : validated.nextFollowUpDate,
+        ],
       );
       if (!rows[0]) return sendError(res, 404, 'Not found', 'Action not found');
+      await auditFromAuthed(req, {
+        action: 'driver_care.action.update',
+        entityType: 'driver_care_action',
+        entityId: rows[0].id,
+        after: {
+          status: validated.status,
+          result: validated.result,
+          actionTaken: validated.actionTaken,
+          nextFollowUp: validated.nextFollowUpDate,
+        },
+      });
       return res.status(200).json({ ok: true, id: rows[0].id });
     }
 
@@ -607,4 +669,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
 }
 
-export default withAuthDataRoute(handler);
+export default withRbac(handler, 'driver-care', {
+  hintFromReq: (req) => {
+    const v = req.query?.action;
+    return typeof v === 'string' ? v.trim() : undefined;
+  },
+});

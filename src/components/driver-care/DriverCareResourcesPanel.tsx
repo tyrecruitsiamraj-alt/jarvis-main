@@ -198,7 +198,7 @@ const DriverCareResourcesPanel: React.FC = () => {
           onClick={() => setTab('knowledge')}
           className={cn(
             'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors',
-            tab === 'knowledge' ? 'bg-orange-500 text-white' : 'bg-white/60 text-muted-foreground',
+            tab === 'knowledge' ? 'bg-blue-500 text-white' : 'bg-white/60 text-muted-foreground',
           )}
         >
           <BookOpen className="w-4 h-4" />
@@ -209,7 +209,7 @@ const DriverCareResourcesPanel: React.FC = () => {
           onClick={() => setTab('skills')}
           className={cn(
             'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors',
-            tab === 'skills' ? 'bg-orange-500 text-white' : 'bg-white/60 text-muted-foreground',
+            tab === 'skills' ? 'bg-blue-500 text-white' : 'bg-white/60 text-muted-foreground',
           )}
         >
           <Brain className="w-4 h-4" />
@@ -233,7 +233,7 @@ const DriverCareResourcesPanel: React.FC = () => {
                 if (items.length === 0) return null;
                 return (
                   <div key={cat}>
-                    <p className="text-xs font-medium text-orange-700 mb-2">
+                    <p className="text-xs font-medium text-blue-700 mb-2">
                       {DRIVER_CARE_KNOWLEDGE_CATEGORY_LABELS[cat]}
                     </p>
                     <div className="space-y-2">
@@ -246,7 +246,7 @@ const DriverCareResourcesPanel: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => startEditKnowledge(k)}
-                              className="font-medium text-left text-foreground hover:text-orange-700"
+                              className="font-medium text-left text-foreground hover:text-blue-700"
                             >
                               {k.title}
                             </button>
@@ -269,7 +269,7 @@ const DriverCareResourcesPanel: React.FC = () => {
                               href={k.fileUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-orange-600 mt-2 hover:underline"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 mt-2 hover:underline"
                             >
                               <ExternalLink className="w-3 h-3" />
                               {k.fileName || 'เปิดไฟล์'}
@@ -373,7 +373,7 @@ const DriverCareResourcesPanel: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => startEditSkill(s)}
-                        className="font-medium text-left hover:text-orange-700"
+                        className="font-medium text-left hover:text-blue-700"
                       >
                         {s.title}
                       </button>
@@ -388,7 +388,7 @@ const DriverCareResourcesPanel: React.FC = () => {
                         </button>
                       ) : null}
                     </div>
-                    <p className="text-[10px] text-orange-700 mt-0.5">
+                    <p className="text-[10px] text-blue-700 mt-0.5">
                       {DRIVER_CARE_SKILL_CATEGORY_LABELS[s.category as DriverCareSkillCategory]}
                     </p>
                     {s.description ? (

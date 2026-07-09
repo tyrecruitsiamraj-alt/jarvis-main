@@ -1,5 +1,9 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { bangkokBusinessDateYmd, bangkokNoonDate } from './businessDate.js';
+import { DomainError } from './domainErrors.js';
+
+export const DRIVER_CARE_RULE_VERSION = 'v1';
 
 const empT = tableInAppSchema('employees');
 const incomeT = tableInAppSchema('driver_income_monthly');
@@ -226,6 +230,7 @@ function latestSite(wcRows: WcRow[]): string {
   return sorted.find((r) => r.client_name)?.client_name?.trim() || '—';
 }
 
+/** Active employees matching driver position filter — no fallback to all employees. */
 export async function fetchDriverEmployees(): Promise<EmployeeRow[]> {
   const { rows } = await dbQuery<EmployeeRow>(
     `select id, employee_code, first_name, last_name, position, status
@@ -239,16 +244,7 @@ export async function fetchDriverEmployees(): Promise<EmployeeRow[]> {
        )
      order by employee_code asc`,
   );
-  if (rows.length > 0) return rows;
-
-  const { rows: fallback } = await dbQuery<EmployeeRow>(
-    `select id, employee_code, first_name, last_name, position, status
-     from ${empT}
-     where status = 'active'
-     order by created_at desc
-     limit 50`,
-  );
-  return fallback;
+  return rows;
 }
 
 export async function computeRiskForEmployee(emp: EmployeeRow, today = new Date()): Promise<RiskComponents & { siteName: string }> {
@@ -318,19 +314,28 @@ export async function computeRiskForEmployee(emp: EmployeeRow, today = new Date(
 }
 
 export async function recalculateRiskScores(scoreDate?: string): Promise<number> {
-  const today = scoreDate || new Date().toISOString().slice(0, 10);
+  const today = scoreDate || bangkokBusinessDateYmd();
   const drivers = await fetchDriverEmployees();
+  if (drivers.length === 0) {
+    throw new DomainError(
+      400,
+      'No drivers found',
+      'ไม่พบพนักงานคนขับจากตัวกรอง position — ตรวจสอบ master employees',
+    );
+  }
+
+  const anchor = bangkokNoonDate(today);
   let count = 0;
 
   for (const emp of drivers) {
-    const risk = await computeRiskForEmployee(emp, new Date(`${today}T12:00:00`));
+    const risk = await computeRiskForEmployee(emp, anchor);
     await dbQuery(
       `insert into ${riskT} (
         score_date, employee_id,
         income_risk_score, leave_risk_score, attendance_risk_score,
         assignment_risk_score, complaint_risk_score, pattern_risk_score,
         total_risk_score, risk_level, main_reason, recommended_action, rule_version, updated_at
-      ) values ($1::date, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'v1', now())
+      ) values ($1::date, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
       on conflict (employee_id, score_date) do update set
         income_risk_score = excluded.income_risk_score,
         leave_risk_score = excluded.leave_risk_score,
@@ -356,6 +361,7 @@ export async function recalculateRiskScores(scoreDate?: string): Promise<number>
         risk.level,
         risk.mainReason,
         risk.recommendedAction,
+        DRIVER_CARE_RULE_VERSION,
       ],
     );
     count += 1;
@@ -385,7 +391,7 @@ export async function recalculateRiskScores(scoreDate?: string): Promise<number>
 
   if (hotSites.size > 0) {
     for (const emp of drivers) {
-      const risk = await computeRiskForEmployee(emp, new Date(`${today}T12:00:00`));
+      const risk = await computeRiskForEmployee(emp, anchor);
       if (!hotSites.has(risk.siteName)) continue;
       const assignment = 10;
       const total = cap(risk.income + risk.leave + risk.attendance + assignment + risk.complaint + risk.pattern, 100);
@@ -400,18 +406,6 @@ export async function recalculateRiskScores(scoreDate?: string): Promise<number>
   }
 
   return count;
-}
-
-export async function ensureTodayRiskScores(): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
-  const { rows } = await dbQuery<{ cnt: string }>(
-    `select count(*)::text as cnt from ${riskT} where score_date = $1::date`,
-    [today],
-  );
-  if (Number(rows[0]?.cnt || 0) === 0) {
-    await recalculateRiskScores(today);
-  }
-  return today;
 }
 
 export { riskT, actionT, empT, wcT };

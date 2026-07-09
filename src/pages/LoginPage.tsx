@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
@@ -17,13 +17,38 @@ import {
 } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import type { UserRole } from '@/types';
+import { isValidEnglishName, sanitizeEnglishName } from '@/lib/englishName';
+
+type AuthConfig = {
+  companyEmailLogin: boolean;
+  microsoftLogin: boolean;
+  emailLoginGate: boolean;
+  companyEmailRequired: boolean;
+  allowedDomains: string[];
+  companyEmailHint: string | null;
+};
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  no_account: 'บัญชี Microsoft นี้ยังไม่ได้ลงทะเบียนในระบบ — ติดต่อผู้ดูแล',
+  disabled: 'บัญชีนี้ถูกปิดใช้งาน',
+  domain: 'กรุณาใช้อีเมลบริษัทที่อนุญาตเท่านั้น',
+  state: 'เซสชันหมดอายุ — กรุณาลองเข้าสู่ระบบอีกครั้ง',
+  oauth: 'เข้าสู่ระบบ Microsoft ไม่สำเร็จ — ลองใหม่อีกครั้ง',
+  azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
+};
+
+// ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
+const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { signIn, signUp, signInWithDevRole } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +67,37 @@ const LoginPage: React.FC = () => {
     return d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }, []);
 
+  useEffect(() => {
+    const code = searchParams.get('auth_error');
+    if (!code) return;
+    setError(AUTH_ERROR_MESSAGES[code] || 'เข้าสู่ระบบไม่สำเร็จ');
+    const next = new URLSearchParams(searchParams);
+    next.delete('auth_error');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await apiFetch('/api/auth/config');
+        if (!r.ok || cancelled) return;
+        const data = (await r.json()) as AuthConfig;
+        if (!cancelled) setAuthConfig(data);
+      } catch {
+        /* optional config */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const emailPlaceholder = useMemo(() => {
+    const domain = authConfig?.allowedDomains?.[0];
+    return domain ? `name@${domain}` : 'your@email.com';
+  }, [authConfig]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -57,9 +113,31 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleDevRole = async (role: UserRole) => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const msg = await signInWithDevRole(role);
+      if (msg) setError(msg);
+      else navigate('/', { replace: true });
+    } catch {
+      setError('เข้าสู่ระบบด้วยสิทธิ์ไม่สำเร็จ — ตรวจสอบว่า API ทำงานและ JARVIS_DEV_ROLE_LOGIN=true');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!isValidEnglishName(firstName)) {
+      setError('ชื่อต้องกรอกเป็นภาษาอังกฤษเท่านั้น (A–Z)');
+      return;
+    }
+    if (!isValidEnglishName(lastName)) {
+      setError('นามสกุลต้องกรอกเป็นภาษาอังกฤษเท่านั้น (A–Z)');
+      return;
+    }
     setSubmitting(true);
     try {
       const msg = await signUp({
@@ -72,11 +150,16 @@ const LoginPage: React.FC = () => {
         setError(msg);
         return;
       }
-      setAuthMode('login');
-      setFirstName('');
-      setLastName('');
-      setPassword('');
-      setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
+      const loginMsg = await signIn(email, password);
+      if (loginMsg) {
+        setAuthMode('login');
+        setFirstName('');
+        setLastName('');
+        setPassword('');
+        setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
+        return;
+      }
+      navigate('/', { replace: true });
     } finally {
       setSubmitting(false);
     }
@@ -123,8 +206,8 @@ const LoginPage: React.FC = () => {
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
       {/* ambient orbs */}
-      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-orange-orb opacity-40 blur-sm" aria-hidden />
-      <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-orange-orb opacity-25 blur-md" aria-hidden />
+      <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 jarvis-blue-orb opacity-40 blur-sm" aria-hidden />
+      <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-blue-orb opacity-25 blur-md" aria-hidden />
 
       <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center gap-6 overflow-y-auto p-4 py-8 sm:p-6 sm:py-10 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
         {/* Left — glass login */}
@@ -145,6 +228,10 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
+            {authConfig === null ? (
+              <p className="text-sm text-muted-foreground text-center py-6">กำลังโหลด…</p>
+            ) : (
+              <>
             <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
               <button
                 type="button"
@@ -182,7 +269,7 @@ const LoginPage: React.FC = () => {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-xs font-medium text-muted-foreground ml-1">
-                    Email
+                    Username
                   </Label>
                   <input
                     id="email"
@@ -190,9 +277,13 @@ const LoginPage: React.FC = () => {
                     autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    placeholder={emailPlaceholder}
                     required
                     className="jarvis-soft-field min-h-[48px]"
                   />
+                  {authConfig?.companyEmailHint ? (
+                    <p className="text-[11px] text-muted-foreground ml-1">{authConfig.companyEmailHint}</p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2 ml-1">
@@ -201,7 +292,7 @@ const LoginPage: React.FC = () => {
                     </Label>
                     <button
                       type="button"
-                      className="text-xs font-medium text-orange-600 hover:underline underline-offset-4 touch-manipulation"
+                      className="text-xs font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation"
                       onClick={() => {
                         setForgotEmail(email);
                         setForgotMsg(null);
@@ -253,29 +344,43 @@ const LoginPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="firstName" className="text-xs font-medium text-muted-foreground ml-1">
-                      ชื่อ
+                      ชื่อ (ภาษาอังกฤษ)
                     </Label>
                     <input
                       id="firstName"
                       name="givenName"
                       autoComplete="given-name"
+                      lang="en"
+                      inputMode="text"
+                      autoCapitalize="words"
+                      spellCheck={false}
+                      placeholder="John"
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={(e) => setFirstName(sanitizeEnglishName(e.target.value))}
                       required
+                      pattern="[A-Za-z]+([ '-][A-Za-z]+)*"
+                      title="กรอกเป็นภาษาอังกฤษเท่านั้น"
                       className="jarvis-soft-field min-h-[48px]"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="lastName" className="text-xs font-medium text-muted-foreground ml-1">
-                      นามสกุล
+                      นามสกุล (ภาษาอังกฤษ)
                     </Label>
                     <input
                       id="lastName"
                       name="familyName"
                       autoComplete="family-name"
+                      lang="en"
+                      inputMode="text"
+                      autoCapitalize="words"
+                      spellCheck={false}
+                      placeholder="Smith"
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={(e) => setLastName(sanitizeEnglishName(e.target.value))}
                       required
+                      pattern="[A-Za-z]+([ '-][A-Za-z]+)*"
+                      title="กรอกเป็นภาษาอังกฤษเท่านั้น"
                       className="jarvis-soft-field min-h-[48px]"
                     />
                   </div>
@@ -293,6 +398,9 @@ const LoginPage: React.FC = () => {
                     required
                     className="jarvis-soft-field min-h-[48px]"
                   />
+                  {authConfig?.companyEmailHint ? (
+                    <p className="text-[11px] text-muted-foreground ml-1">{authConfig.companyEmailHint}</p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="passwordRegister" className="text-xs font-medium text-muted-foreground ml-1">
@@ -346,18 +454,33 @@ const LoginPage: React.FC = () => {
               </p>
             ) : null}
 
-            <button
-              type="button"
-              disabled
-              className="w-full rounded-full border border-white/40 bg-white/40 px-4 py-3 text-sm text-muted-foreground opacity-60 cursor-not-allowed"
-            >
-              Sign in with Microsoft (Coming Soon)
-            </button>
+            {devRoleEntryEnabled ? (
+              <div className="space-y-2 rounded-2xl border border-dashed border-orange-300/60 bg-orange-50/40 p-3">
+                <p className="text-xs font-medium text-orange-900 text-center">
+                  Dev — เข้าเร็วตามสิทธิ์ (ไม่ต้องกรอกรหัส)
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['opl', 'staff', 'supervisor', 'admin'] as UserRole[]).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => void handleDevRole(role)}
+                      className="rounded-full border border-orange-200 bg-white/80 px-2 py-2 text-[11px] font-semibold capitalize text-orange-900 hover:bg-white disabled:opacity-50"
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+              </>
+            )}
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
             ต้องการสมัครงานภายนอก?{' '}
-            <Link to="/apply" className="font-medium text-orange-600 hover:underline underline-offset-4 touch-manipulation">
+            <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
               ดูบอร์ดประกาศรับสมัคร
             </Link>
           </p>
@@ -400,12 +523,12 @@ const LoginPage: React.FC = () => {
               </Link>
             </div>
 
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-orange-100/20" aria-hidden />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-blue-100/20" aria-hidden />
           </div>
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
             ต้องการสมัครงานภายนอก?{' '}
-            <Link to="/apply" className="font-medium text-orange-600 hover:underline underline-offset-4 touch-manipulation">
+            <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
               ดูบอร์ดประกาศรับสมัคร
             </Link>
           </p>
@@ -417,7 +540,7 @@ const LoginPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle>ลืมรหัสผ่าน</DialogTitle>
             <DialogDescription>
-              กรอกอีเมลที่ใช้ลงทะเบียน แล้วระบบจะสร้างรหัสชั่วคราวใหม่ให้ทันที
+              กรอกอีเมลที่ใช้ลงทะเบียน ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปทางอีเมล
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitForgot} className="space-y-3">

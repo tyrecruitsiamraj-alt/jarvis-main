@@ -1,26 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { mockJobRequests, mockClients } from '@/data/mockData';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, Building2, ClipboardCheck, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
-import { getJobs } from '@/lib/demoStorage';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { haversineKm } from '@/lib/geo';
-import { jobLatLng, parseJobsPayload, mergeJobsForPrecheck } from '@/lib/jobCoords';
+import { jobLatLng } from '@/lib/jobCoords';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { Input } from '@/components/ui/input';
-
-function mergePreCheckJobs(): JobRequest[] {
-  const map = new Map<string, JobRequest>();
-  [...mockJobRequests, ...getJobs()].forEach((j) => map.set(j.id, j));
-  return [...map.values()];
-}
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null };
 type Center = { lat: number; lng: number; label: string };
@@ -37,58 +30,30 @@ const PreCheckPage: React.FC = () => {
   const [projectFilter, setProjectFilter] = useState('');
   const [radius, setRadius] = useState(10);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
-  const [apiJobs, setApiJobs] = useState<JobRequest[]>([]);
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(() => !isDemoMode());
-  const [jobsLoadError, setJobsLoadError] = useState('');
+  const { jobs: feedJobs, loading: loadingJobs, loadError: jobsLoadError, refetch: refetchJobs } = useUnitRequestsFeed();
   const [searching, setSearching] = useState(false);
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
   const [appliedTextQuery, setAppliedTextQuery] = useState('');
 
   useEffect(() => {
-    if (isDemoMode()) return;
     let cancelled = false;
-    setLoadingJobs(true);
-    setJobsLoadError('');
-    Promise.all([apiFetch('/api/jobs?limit=500'), apiFetch('/api/clients?active_only=1')])
-      .then(async ([jobsRes, clientsRes]) => {
-        const jobsJson = jobsRes.ok ? ((await jobsRes.json()) as unknown) : [];
+    apiFetch('/api/clients?active_only=1')
+      .then(async (clientsRes) => {
         const clientsJson = clientsRes.ok ? ((await clientsRes.json()) as unknown) : [];
         if (cancelled) return;
-        if (!jobsRes.ok) {
-          setJobsLoadError(
-            jobsRes.status === 401
-              ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่เพื่อโหลดรายการงาน'
-              : `โหลดรายการงานไม่สำเร็จ (HTTP ${jobsRes.status})`,
-          );
-          setApiJobs([]);
-        } else {
-          setApiJobs(parseJobsPayload(jobsJson));
-        }
         setApiClients(Array.isArray(clientsJson) ? (clientsJson as ClientWorkplace[]) : []);
       })
       .catch(() => {
-        if (!cancelled) {
-          setApiJobs([]);
-          setApiClients([]);
-          setJobsLoadError('โหลดรายการงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingJobs(false);
+        if (!cancelled) setApiClients([]);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const usingSampleJobsFallback = !isDemoMode() && !loadingJobs && apiJobs.length === 0;
-
-  const allJobs = useMemo(() => {
-    if (isDemoMode()) return mergePreCheckJobs();
-    return mergeJobsForPrecheck(apiJobs, mergePreCheckJobs());
-  }, [apiJobs]);
+  const allJobs = feedJobs;
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
@@ -197,9 +162,7 @@ const PreCheckPage: React.FC = () => {
     }
 
     if (appliedTextQuery) {
-      const byText = rowsBase.filter((j) =>
-        `${j.unit_name} ${j.location_address}`.toLowerCase().includes(appliedTextQuery),
-      );
+      const byText = rowsBase.filter((j) => unitRequestSearchBlob(j).includes(appliedTextQuery));
       if (byText.length > 0) rowsBase = byText;
     }
 
@@ -242,8 +205,7 @@ const PreCheckPage: React.FC = () => {
   }, [precheckResult.fallbackFromRadius]);
 
   const getClientInfo = (jobName: string): ClientWorkplace | undefined => {
-    const list = isDemoMode() ? mockClients : apiClients;
-    return list.find((c) => c.name === jobName);
+    return apiClients.find((c) => c.name === jobName);
   };
 
   const detailDistance = (() => {
@@ -329,8 +291,8 @@ const PreCheckPage: React.FC = () => {
                       className={cn(
                         'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                         radius === r
-                          ? 'bg-orange-600 text-white shadow-sm'
-                          : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-orange-300/50',
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-blue-300/50',
                       )}
                     >
                       {r} กม.
@@ -347,8 +309,8 @@ const PreCheckPage: React.FC = () => {
 
           <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-orange-500/12 flex items-center justify-center shrink-0">
-                <Navigation className="w-4 h-4 text-orange-600" />
+              <div className="w-9 h-9 rounded-xl bg-blue-500/12 flex items-center justify-center shrink-0">
+                <Navigation className="w-4 h-4 text-blue-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground">แผนที่</h3>
@@ -358,7 +320,7 @@ const PreCheckPage: React.FC = () => {
             {appliedCenter ? (
               <div className="space-y-2">
                 <div className="text-xs text-muted-foreground rounded-xl bg-white/40 border border-white/70 px-3 py-2">
-                  <MapPin className="w-3 h-3 inline mr-1 text-orange-600" />
+                  <MapPin className="w-3 h-3 inline mr-1 text-blue-600" />
                   {appliedCenter.label}
                 </div>
                 <iframe
@@ -370,7 +332,7 @@ const PreCheckPage: React.FC = () => {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-white/70 bg-white/30 p-8 text-center">
-                <MapPin className="w-8 h-8 text-orange-400/50 mx-auto mb-2" />
+                <MapPin className="w-8 h-8 text-blue-400/50 mx-auto mb-2" />
                 <p className="text-sm font-medium text-foreground">ยังไม่มีตำแหน่งบนแผนที่</p>
                 <p className="mt-1 text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัครแล้วกดค้นหา</p>
               </div>
@@ -385,48 +347,17 @@ const PreCheckPage: React.FC = () => {
             <button
               type="button"
               className="shrink-0 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
-              onClick={() => {
-                if (isDemoMode()) return;
-                setJobsLoadError('');
-                setLoadingJobs(true);
-                void Promise.all([apiFetch('/api/jobs?limit=500'), apiFetch('/api/clients?active_only=1')])
-                  .then(async ([jobsRes, clientsRes]) => {
-                    if (!jobsRes.ok) {
-                      setJobsLoadError(
-                        jobsRes.status === 401
-                          ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่เพื่อโหลดรายการงาน'
-                          : `โหลดรายการงานไม่สำเร็จ (HTTP ${jobsRes.status})`,
-                      );
-                      setApiJobs([]);
-                    } else {
-                      const raw = (await jobsRes.json()) as unknown;
-                      setApiJobs(parseJobsPayload(raw));
-                      setJobsLoadError('');
-                    }
-                    const clientsJson = clientsRes.ok ? ((await clientsRes.json()) as unknown) : [];
-                    setApiClients(Array.isArray(clientsJson) ? (clientsJson as ClientWorkplace[]) : []);
-                  })
-                  .catch(() => {
-                    setApiJobs([]);
-                    setJobsLoadError('โหลดรายการงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
-                  })
-                  .finally(() => setLoadingJobs(false));
-              }}
+              onClick={() => void refetchJobs()}
             >
               โหลดใหม่
             </button>
           </div>
         ) : null}
-        {usingSampleJobsFallback ? (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-ยังไม่มีงานจากเซิร์ฟเวอร์ — รวมงานตัวอย่างไว้ในรายการด้านล่างเพื่อให้ค้นหาได้ทันที
-          </div>
-        ) : null}
         <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-orange-600 shrink-0" />
+          <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
           <p className="text-sm text-muted-foreground">
             งานที่เหมาะสม{' '}
-            <span className="text-orange-600 font-bold tabular-nums">{filteredRows.length}</span> รายการ
+            <span className="text-blue-600 font-bold tabular-nums">{filteredRows.length}</span> รายการ
             {appliedCenter ? (
               <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
             ) : null}
@@ -449,10 +380,15 @@ const PreCheckPage: React.FC = () => {
               tabIndex={0}
               onClick={() => setJobDetail(j)}
               onKeyDown={(e) => e.key === 'Enter' && setJobDetail(j)}
-              className="glass-card rounded-[1.5rem] p-4 border border-white/70 cursor-pointer hover:border-orange-300/50 transition-colors"
+              className="glass-card rounded-[1.5rem] p-4 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold text-orange-600 text-sm">{j.unit_name}</div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-blue-600 text-sm">{unitRequestCardTitle(j)}</div>
+                  {unitRequestCardSubtitle(j) ? (
+                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{unitRequestCardSubtitle(j)}</div>
+                  ) : null}
+                </div>
                 <span
                   className={cn(
                     'text-xs px-2 py-0.5 rounded-full',
@@ -492,12 +428,15 @@ const PreCheckPage: React.FC = () => {
               return (
                 <div className="space-y-3 mt-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-orange-500/15 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-orange-600" />
+                    <div className="w-10 h-10 rounded-full bg-blue-500/15 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <div className="font-bold text-foreground">{jobDetail.unit_name}</div>
-                      <div className="text-xs text-muted-foreground">{jobDetail.location_address}</div>
+                      <div className="font-bold text-foreground">{unitRequestCardTitle(jobDetail)}</div>
+                      {unitRequestCardSubtitle(jobDetail) ? (
+                        <div className="text-xs text-muted-foreground mt-0.5">{unitRequestCardSubtitle(jobDetail)}</div>
+                      ) : null}
+                      <div className="text-xs text-muted-foreground mt-1">{jobDetail.location_address}</div>
                     </div>
                   </div>
                   {detailDistance !== null ? (

@@ -57,6 +57,7 @@ const users = [
   { email: "admin@example.com", role: "admin", full_name: "Admin User" },
   { email: "supervisor@example.com", role: "supervisor", full_name: "Supervisor User" },
   { email: "staff@example.com", role: "staff", full_name: "Staff User" },
+  { email: "opl@example.com", role: "opl", full_name: "OPL User" },
 ];
 
 const pool = new pg.Pool({

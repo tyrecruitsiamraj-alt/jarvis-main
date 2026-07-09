@@ -1,10 +1,8 @@
-import { mockWorkCalendar } from '@/data/mockData';
 import type { WorkCalendarEntry } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
-import { isDemoMode } from '@/lib/demoMode';
 import { useSyncExternalStore } from 'react';
 
-let entries: WorkCalendarEntry[] = [...mockWorkCalendar];
+let entries: WorkCalendarEntry[] = [];
 const listeners = new Set<() => void>();
 
 export const WORK_CALENDAR_CHANGED_EVENT = 'jarvis-work-calendar-changed';
@@ -37,7 +35,6 @@ function isEntryArray(v: unknown): v is WorkCalendarEntry[] {
 
 /** โหลดตารางงานจาก API (ช่วงวันที่เริ่มต้น ±60 / +120 วัน) */
 export async function refreshWorkCalendarFromApi(): Promise<void> {
-  if (isDemoMode()) return;
   try {
     const r = await apiFetch('/api/work-calendar');
     if (!r.ok) return;
@@ -78,27 +75,6 @@ export type CreateWorkCalendarPayload = {
 export async function createWorkCalendarAssignment(
   payload: CreateWorkCalendarPayload,
 ): Promise<{ ok: boolean; entry?: WorkCalendarEntry; message?: string }> {
-  if (isDemoMode()) {
-    const now = new Date().toISOString();
-    const entry: WorkCalendarEntry = {
-      id: crypto.randomUUID(),
-      employee_id: payload.employee_id,
-      work_date: payload.work_date,
-      client_id: payload.client_id,
-      client_name: payload.client_name,
-      shift: payload.shift,
-      status: payload.status ?? 'normal_work',
-      income: payload.income,
-      cost: payload.cost,
-      issue_reason: payload.issue_reason,
-      notes: payload.notes,
-      created_at: now,
-      updated_at: now,
-    };
-    addWorkCalendarEntry(entry);
-    return { ok: true, entry };
-  }
-
   const r = await apiFetch('/api/work-calendar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

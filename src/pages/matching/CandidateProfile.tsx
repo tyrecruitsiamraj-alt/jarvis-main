@@ -4,15 +4,12 @@ import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { CandidateEditDialog } from '@/components/candidates/CandidateEditDialog';
-import { mockCandidates, mockCandidateInterviews, mockCandidateWorkHistory } from '@/data/mockData';
+import { hydrateCandidateStaffing, candidateStaffingLabel } from '@/lib/candidateStaffing';
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
 import { User, Phone, MapPin, AlertTriangle, Briefcase, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
-import { candidateStaffingLabel } from '@/lib/candidateStaffing';
-import { getCandidates, hydrateCandidateStaffing } from '@/lib/demoStorage';
 import { wlEmployeeIdFromCandidateId } from '@/lib/wlFromCandidate';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Candidate, CandidateInterview, CandidateWorkHistory } from '@/types';
@@ -31,14 +28,6 @@ const CandidateProfile: React.FC = () => {
   useEffect(() => {
     if (!id) {
       setCandidate(null);
-      setLoading(false);
-      return;
-    }
-    if (isDemoMode()) {
-      const fromLocal = getCandidates().find((c) => c.id === id);
-      const fromMock = mockCandidates.find((c) => c.id === id);
-      const raw = fromLocal ?? fromMock ?? null;
-      setCandidate(raw ? hydrateCandidateStaffing(raw) : null);
       setLoading(false);
       return;
     }
@@ -64,7 +53,7 @@ const CandidateProfile: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!id || isDemoMode()) {
+    if (!id) {
       setApiInterviews([]);
       setApiWorkHistory([]);
       return;
@@ -88,12 +77,8 @@ const CandidateProfile: React.FC = () => {
     };
   }, [id]);
 
-  const interviews = isDemoMode()
-    ? mockCandidateInterviews.filter((i) => i.candidate_id === id)
-    : apiInterviews;
-  const workHistory = isDemoMode()
-    ? mockCandidateWorkHistory.filter((w) => w.candidate_id === id)
-    : apiWorkHistory;
+  const interviews = apiInterviews;
+  const workHistory = apiWorkHistory;
 
   if (loading) return <div className="p-6 text-muted-foreground">กำลังโหลดข้อมูลผู้สมัคร...</div>;
   if (!candidate) return <div className="p-6 text-muted-foreground">ไม่พบข้อมูลผู้สมัคร</div>;
@@ -129,8 +114,8 @@ const CandidateProfile: React.FC = () => {
       <div className="px-4 md:px-6 space-y-6">
         <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-orange-500/15 flex items-center justify-center">
-              <User className="w-6 h-6 text-orange-600" />
+            <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
+              <User className="w-6 h-6 text-blue-600" />
             </div>
             <div className="flex-1">
               <div className="font-bold text-foreground">{formatCandidateDisplayName(candidate)}</div>
@@ -273,7 +258,7 @@ const CandidateProfile: React.FC = () => {
                   <span
                     className={cn(
                       'text-xs px-2 py-0.5 rounded-full',
-                      w.work_type === 'start' ? 'bg-primary/15 text-orange-600' : 'bg-warning/15 text-warning',
+                      w.work_type === 'start' ? 'bg-primary/15 text-blue-600' : 'bg-warning/15 text-warning',
                     )}
                   >
                     {w.work_type === 'start' ? 'เริ่มงาน' : 'แทนงาน'}

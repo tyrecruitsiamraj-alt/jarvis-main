@@ -1,23 +1,32 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { DOCK_NAV_ITEMS, dockActiveIndex } from './dockNavConfig';
+import { useAuth } from '@/contexts/AuthContext';
+import { filterByMinimumRole } from '@/lib/rbac';
+import { DOCK_NAV_ITEMS, dockActiveIndex, type DockNavItem } from './dockNavConfig';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import './bottomDockNav.css';
 
 type Props = {
   pathname: string;
   className?: string;
+  items?: DockNavItem[];
 };
 
-const BottomDockNav: React.FC<Props> = ({ pathname, className }) => {
+const BottomDockNav: React.FC<Props> = ({ pathname, className, items }) => {
   const navigate = useNavigate();
-  const activeIndex = dockActiveIndex(pathname);
+  const { user } = useAuth();
+  const { isFunctionEnabled } = useRolePermissions();
+  const navItems = (items ?? filterByMinimumRole(DOCK_NAV_ITEMS, user?.role)).filter(
+    (item) => !item.functionId || isFunctionEnabled(item.functionId),
+  );
+  const activeIndex = dockActiveIndex(pathname, navItems);
 
   return (
     <nav className={cn('bottom-dock', className)} aria-label="เมนูหลัก">
       <div className="bottom-dock__inner">
         <div className="bottom-dock__track">
-          {DOCK_NAV_ITEMS.map((item, i) => {
+          {navItems.map((item, i) => {
             const Icon = item.icon;
             const active = i === activeIndex;
             return (

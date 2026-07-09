@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { DEMO_JOBS_CHANGED_EVENT, getJobs } from '@/lib/demoStorage';
-import { isDemoMode } from '@/lib/demoMode';
-import { mergeJobSources } from '@/lib/mergeJobs';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { fetchSiamrajFeedMeta, fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
+import { enrichJobsWithPenalty } from '@/lib/jobPenalty';
+import { publishUnitRequestsFeed } from '@/lib/jobFeedBroadcast';
+import { getWorkCalendarSnapshot, subscribeWorkCalendar } from '@/lib/workCalendarStore';
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
-
-function readMergedDemoJobs(): JobRequest[] {
-  return mergeJobSources([], getJobs());
-}
+const UNIT_REQUESTS_FETCH_LIMIT = 2000;
 
 async function loadLiveJobs(): Promise<{
   jobs: JobRequest[];
@@ -22,7 +19,7 @@ async function loadLiveJobs(): Promise<{
   const meta = await fetchSiamrajFeedMeta();
 
   if (meta.enabled) {
-    const siamrajJobs = await fetchSiamrajUnitRequests(200);
+    const siamrajJobs = await fetchSiamrajUnitRequests(UNIT_REQUESTS_FETCH_LIMIT);
     return {
       jobs: enrichJobsWithUrgency(siamrajJobs),
       siamrajPrimary: true,
@@ -31,8 +28,15 @@ async function loadLiveJobs(): Promise<{
     };
   }
 
-  const r = await apiFetch('/api/jobs?limit=500', { cache: 'no-store' });
-  const data = r.ok ? ((await r.json()) as JobRequest[]) : [];
+  const r = await apiFetch(`/api/jobs?limit=${UNIT_REQUESTS_FETCH_LIMIT}`, { cache: 'no-store' });
+  if (!r.ok) {
+    throw new Error(
+      r.status === 401
+        ? 'เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่'
+        : 'โหลดรายการงานไม่สำเร็จ',
+    );
+  }
+  const data = (await r.json()) as JobRequest[];
   return {
     jobs: Array.isArray(data) ? data : [],
     siamrajPrimary: false,
@@ -51,22 +55,26 @@ export function useUnitRequestsFeed(): {
   loadError: string | null;
   refetch: () => Promise<void>;
 } {
-  const [jobs, setJobs] = useState<JobRequest[]>(() => (isDemoMode() ? readMergedDemoJobs() : []));
-  const [loading, setLoading] = useState(!isDemoMode());
+  const [jobs, setJobs] = useState<JobRequest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [siamrajPrimary, setSiamrajPrimary] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
   const [dbSource, setDbSource] = useState<'postgres' | 'sqlserver' | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [calendarRev, setCalendarRev] = useState(0);
   const siamrajPrimaryRef = useRef(false);
 
-  const refetch = useCallback(async () => {
-    if (isDemoMode()) {
-      setJobs(readMergedDemoJobs());
-      setLoadError(null);
-      return;
-    }
+  const jobsWithPenalty = useMemo(() => {
+    void calendarRev;
+    return enrichJobsWithPenalty(jobs, getWorkCalendarSnapshot());
+  }, [jobs, calendarRev]);
 
+  useEffect(() => {
+    return subscribeWorkCalendar(() => setCalendarRev((n) => n + 1));
+  }, []);
+
+  const refetch = useCallback(async () => {
     setRefreshing(true);
     try {
       const result = await loadLiveJobs();
@@ -78,7 +86,11 @@ export function useUnitRequestsFeed(): {
       setLoadError(null);
     } catch (e) {
       setJobs([]);
-      setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลหน่วยงานไม่สำเร็จ');
+      setLoadError(
+        e instanceof Error && e.message
+          ? e.message
+          : 'โหลดข้อมูลหน่วยงานไม่สำเร็จ — ลองใหม่อีกครั้ง',
+      );
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -86,22 +98,10 @@ export function useUnitRequestsFeed(): {
   }, []);
 
   useEffect(() => {
-    if (isDemoMode()) {
-      const load = () => setJobs(readMergedDemoJobs());
-      load();
-      setLoading(false);
-      setSiamrajPrimary(false);
-      setReadOnly(false);
-      window.addEventListener(DEMO_JOBS_CHANGED_EVENT, load);
-      return () => window.removeEventListener(DEMO_JOBS_CHANGED_EVENT, load);
-    }
-
     void refetch();
   }, [refetch]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
-
     const onVisible = () => {
       if (document.visibilityState === 'visible') void refetch();
     };
@@ -110,8 +110,6 @@ export function useUnitRequestsFeed(): {
   }, [refetch]);
 
   useEffect(() => {
-    if (isDemoMode()) return;
-
     const id = window.setInterval(() => {
       if (!siamrajPrimaryRef.current) return;
       void refetch();
@@ -124,11 +122,9 @@ export function useUnitRequestsFeed(): {
     siamrajPrimaryRef.current = siamrajPrimary;
   }, [siamrajPrimary]);
 
-  return { jobs, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
-}
+  useEffect(() => {
+    publishUnitRequestsFeed(jobsWithPenalty, loading);
+  }, [jobsWithPenalty, loading]);
 
-/** @deprecated use useUnitRequestsFeed */
-export function useDemoAwareJobs() {
-  const { jobs, loading, refetch, refreshing } = useUnitRequestsFeed();
-  return { jobs, loading, refetch, refreshing };
+  return { jobs: jobsWithPenalty, loading, refreshing, siamrajPrimary, readOnly, dbSource, loadError, refetch };
 }

@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuth,
+  withRbac,
   sendError,
   handleApiError,
   type ApiReq,
@@ -9,6 +9,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const table = tableInAppSchema('app_branding');
 
@@ -103,6 +104,13 @@ async function putBranding(req: AuthedReq, res: ApiRes): Promise<void> {
       [JSON.stringify(sanitized)],
     );
 
+    await auditFromAuthed(req, {
+      action: 'branding.update',
+      entityType: 'branding',
+      entityId: 'default',
+      after: sanitized,
+    });
+
     res.status(200).json({ ok: true, config: sanitized });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -118,7 +126,7 @@ async function putBranding(req: AuthedReq, res: ApiRes): Promise<void> {
   }
 }
 
-const adminPut = withAuth(putBranding, { roles: ['admin'] });
+const adminPut = withRbac(putBranding, 'branding');
 
 export default async function brandingHandler(req: ApiReq, res: ApiRes): Promise<void> {
   const m = (req.method || 'GET').toUpperCase();

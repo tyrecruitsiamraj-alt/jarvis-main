@@ -1,5 +1,5 @@
 // ============ AUTH & USERS ============
-export type UserRole = 'admin' | 'supervisor' | 'staff';
+export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 export interface User {
   id: string;
@@ -28,6 +28,8 @@ export interface Employee {
   base_salary?: number;
   status: EmployeeStatus;
   position: string;
+  /** แผนก / BU เช่น LBD, LBA */
+  department_code?: string;
   join_date: string;
   address?: string;
   lat?: number;
@@ -115,6 +117,11 @@ export interface JobRequest {
   request_action_code?: string;
   request_action_name?: string;
   site_code?: string;
+  department_code?: string;
+  department_name?: string;
+  /** ประเภทสัญญา Siamraj — C = Cls (รถอย่างเดียว) */
+  contract_type_code?: string;
+  contract_type_name?: string;
   position_units?: number;
   lastWorkingDay?: string;
   contact_phone?: string;
@@ -122,8 +129,10 @@ export interface JobRequest {
   siamraj_status?: string;
   need_staff?: boolean;
   staff_title_code?: string;
+  staff_title_name?: string;
   job_description_code_1?: string;
   job_description_code_2?: string;
+  gender_requirement?: string;
   request_no?: string;
   resigned_title_prefix?: string;
   resigned_first_name?: string;
@@ -145,6 +154,8 @@ export interface JobRequest {
   recruiter_name?: string;
   screener_id?: string;
   screener_name?: string;
+  /** เจ้าหน้าที่ OPL (แยกจากสรรหา/คัดสรร) */
+  opl_name?: string;
   age_range_min?: number;
   age_range_max?: number;
   vehicle_required?: string;
@@ -155,6 +166,10 @@ export interface JobRequest {
   status: JobStatus;
   closed_date?: string;
   created_at: string;
+  /** หมายเหตุจากรายการงานทั้งหมด (เก็บใน PostgreSQL สำหรับใบขอ Siamraj) */
+  list_note?: string;
+  /** ส่งคนแทน (true) / ไม่ส่งคนแทน (false) — null = ยังไม่เลือก */
+  send_replacement?: boolean | null;
 }
 
 export interface JobAssignment {

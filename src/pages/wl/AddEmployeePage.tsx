@@ -6,6 +6,7 @@ import { reverseGeocodeLatLng, parseGoogleMapsUrl } from '@/lib/googleMaps';
 import { apiFetch } from '@/lib/apiFetch';
 import { toYmdLocal } from '@/lib/dateTh';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
+import { WL_BU_CODES, loadWlBu, type WlBuCode } from '@/lib/wlBuState';
 
 const AddEmployeePage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const AddEmployeePage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<EmployeeStatus>('active');
   const [position, setPosition] = useState('');
+  const [departmentCode, setDepartmentCode] = useState<WlBuCode>(() => loadWlBu() ?? 'LBD');
   const [joinDate, setJoinDate] = useState(() => toYmdLocal(new Date()));
 
   const [locationMode, setLocationMode] = useState<'manual' | 'google' | 'latlong'>('manual');
@@ -105,6 +107,7 @@ const AddEmployeePage: React.FC = () => {
     if (!ln) return setFormError('กรุณากรอกนามสกุล');
     if (!p) return setFormError('กรุณากรอกเบอร์โทร');
     if (!pos) return setFormError('กรุณากรอกตำแหน่ง');
+    if (!departmentCode) return setFormError('กรุณาเลือก BU');
     if (!joinDate) return setFormError('กรุณาเลือกวันเริ่มงาน');
 
     setSaving(true);
@@ -117,6 +120,7 @@ const AddEmployeePage: React.FC = () => {
         phone: p,
         status,
         position: pos,
+        department_code: departmentCode,
         join_date: joinDate,
         address: manualAddress.trim() || undefined,
         lat: parsedLatLng?.lat,
@@ -212,6 +216,20 @@ const AddEmployeePage: React.FC = () => {
                 <option value="active">ใช้งาน</option>
                 <option value="inactive">ไม่ใช้งาน</option>
                 <option value="suspended">ระงับ</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">BU *</label>
+              <select
+                value={departmentCode}
+                onChange={(e) => setDepartmentCode(e.target.value as WlBuCode)}
+                className="jarvis-soft-field"
+              >
+                {WL_BU_CODES.map((bu) => (
+                  <option key={bu} value={bu}>
+                    {bu}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

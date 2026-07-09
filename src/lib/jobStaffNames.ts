@@ -1,15 +1,10 @@
-import { mockJobRequests } from '@/data/mockData';
 import type { JobRequest } from '@/types';
-import {
-  filterRecruiterNamesForStaffDropdown,
-  filterScreenerNamesForStaffDropdown,
-  getJobs,
-  getRecruitersRoster,
-  getScreenersRoster,
-} from '@/lib/demoStorage';
 import { getJobStaffApiCache } from '@/lib/jobStaffRemote';
-import { isDemoMode } from '@/lib/demoMode';
-import { mergeJobSources } from '@/lib/mergeJobs';
+
+/** ค่า filter สำหรับงานที่ยังไม่ได้กำหนดเจ้าหน้าที่ */
+export const STAFF_ASSIGNEE_UNASSIGNED = '__unassigned__';
+
+export const STAFF_ASSIGNEE_UNASSIGNED_LABEL = 'ยังไม่ถูก Assign';
 
 function uniqueSorted(names: string[]): string[] {
   const m = new Map<string, string>();
@@ -22,27 +17,13 @@ function uniqueSorted(names: string[]): string[] {
   return [...m.values()].sort((a, b) => a.localeCompare(b, 'th'));
 }
 
-function jobsForStaffNames(extraJobs?: JobRequest[]): JobRequest[] {
-  if (extraJobs && extraJobs.length > 0) return extraJobs;
-  return mergeJobSources([], getJobs());
-}
-
 /**
- * @param extraJobs ถ้าโหมด API แนะนำส่งรายการงานจาก `/api/jobs` เพื่อดึงชื่อสรรหาจากงานจริง (ไม่ใช่แค่ localStorage)
+ * @param extraJobs แนะนำส่งรายการงานจาก `/api/jobs` เพื่อดึงชื่อสรรหาจากงานจริง
  */
 export function buildRecruiterNameOptions(extraJobs?: JobRequest[]): string[] {
-  const merged = jobsForStaffNames(extraJobs);
-  const fromJobs = merged.map((j) => j.recruiter_name).filter((n): n is string => Boolean(n?.trim()));
-  const fromMock = isDemoMode()
-    ? (mockJobRequests.map((j) => j.recruiter_name).filter(Boolean) as string[])
-    : [];
-
-  if (isDemoMode()) {
-    return filterRecruiterNamesForStaffDropdown(
-      uniqueSorted([...getRecruitersRoster(), ...fromMock, ...fromJobs]),
-    );
-  }
-
+  const fromJobs = (extraJobs ?? [])
+    .map((j) => j.recruiter_name)
+    .filter((n): n is string => Boolean(n?.trim()));
   const api = getJobStaffApiCache();
   const roster = api?.recruiters ?? [];
   const ex = new Set((api?.pickerExcludedRecruiters ?? []).map((s) => s.toLowerCase()));
@@ -50,25 +31,80 @@ export function buildRecruiterNameOptions(extraJobs?: JobRequest[]): string[] {
 }
 
 export function buildScreenerNameOptions(extraJobs?: JobRequest[]): string[] {
-  const merged = jobsForStaffNames(extraJobs);
-  const fromJobs = merged.map((j) => j.screener_name).filter((n): n is string => Boolean(n?.trim()));
-  const fromMock = isDemoMode()
-    ? (mockJobRequests.map((j) => j.screener_name).filter(Boolean) as string[])
-    : [];
-
-  if (isDemoMode()) {
-    return filterScreenerNamesForStaffDropdown(
-      uniqueSorted([...getScreenersRoster(), ...fromMock, ...fromJobs]),
-    );
-  }
-
+  const fromJobs = (extraJobs ?? [])
+    .map((j) => j.screener_name)
+    .filter((n): n is string => Boolean(n?.trim()));
   const api = getJobStaffApiCache();
   const roster = api?.screeners ?? [];
   const ex = new Set((api?.pickerExcludedScreeners ?? []).map((s) => s.toLowerCase()));
   return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
 }
 
+export function buildOplNameOptions(extraJobs?: JobRequest[]): string[] {
+  const fromJobs = (extraJobs ?? [])
+    .map((j) => j.opl_name)
+    .filter((n): n is string => Boolean(n?.trim()));
+  const api = getJobStaffApiCache();
+  const roster = api?.opls ?? [];
+  const ex = new Set((api?.pickerExcludedOpls ?? []).map((s) => s.toLowerCase()));
+  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+}
+
 export function nameListedInOptions(trimmed: string, options: string[]): boolean {
   const k = trimmed.toLowerCase();
   return options.some((o) => o.trim().toLowerCase() === k);
+}
+
+export function isRecruiterUnassigned(job: JobRequest): boolean {
+  return !job.recruiter_name?.trim();
+}
+
+export function isScreenerUnassigned(job: JobRequest): boolean {
+  return !job.screener_name?.trim();
+}
+
+export function isOplUnassigned(job: JobRequest): boolean {
+  return !job.opl_name?.trim();
+}
+
+export function matchesRecruiterFilter(job: JobRequest, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === STAFF_ASSIGNEE_UNASSIGNED) return isRecruiterUnassigned(job);
+  return job.recruiter_name === filter;
+}
+
+export function matchesScreenerFilter(job: JobRequest, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === STAFF_ASSIGNEE_UNASSIGNED) return isScreenerUnassigned(job);
+  return job.screener_name === filter;
+}
+
+export function matchesOplFilter(job: JobRequest, filter: string): boolean {
+  if (filter === 'all') return true;
+  if (filter === STAFF_ASSIGNEE_UNASSIGNED) return isOplUnassigned(job);
+  return job.opl_name === filter;
+}
+
+export function countUnassignedRecruiters(jobs: JobRequest[]): number {
+  return jobs.filter(isRecruiterUnassigned).length;
+}
+
+export function countUnassignedScreeners(jobs: JobRequest[]): number {
+  return jobs.filter(isScreenerUnassigned).length;
+}
+
+export function countUnassignedOpls(jobs: JobRequest[]): number {
+  return jobs.filter(isOplUnassigned).length;
+}
+
+type StaffNameField = 'recruiter_name' | 'screener_name' | 'opl_name';
+
+export function countJobsByStaffName(jobs: JobRequest[], field: StaffNameField): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const j of jobs) {
+    const name = j[field]?.trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return counts;
 }

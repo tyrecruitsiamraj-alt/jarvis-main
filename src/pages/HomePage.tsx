@@ -9,9 +9,12 @@ import {
   Settings,
   HeartPulse,
   ArrowRight,
+  LayoutGrid,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import type { AppFunctionId } from '@/lib/roleFunctions';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { motion } from 'framer-motion';
 
@@ -23,13 +26,14 @@ const menuItems: {
   icon: LucideIcon;
   accent: string;
   adminOnly?: boolean;
+  functionId?: AppFunctionId;
 }[] = [
   {
     path: '/wl',
     label: 'WL',
     desc: 'บริหารกำลังคน / ปฏิทินงาน',
     icon: CalendarDays,
-    accent: 'text-orange-500 bg-orange-500/10',
+    accent: 'text-blue-500 bg-blue-500/10',
   },
   {
     path: '/matching',
@@ -46,11 +50,20 @@ const menuItems: {
     accent: 'text-rose-700 bg-rose-500/12',
   },
   {
-    path: '/jobs',
+    path: '/jobs/board',
+    label: 'บอร์ดงานเปิดรับ',
+    desc: 'มุมมองเดียวกับลิงก์สมัครงาน /apply',
+    icon: LayoutGrid,
+    accent: 'text-sky-700 bg-sky-500/12',
+    functionId: 'unit_requests_read',
+  },
+  {
+    path: '/jobs/list',
     label: 'หน่วยงาน',
     desc: 'จัดการใบขอและหน่วยงาน',
     icon: Briefcase,
-    accent: 'text-orange-600 bg-orange-400/12',
+    accent: 'text-blue-600 bg-blue-400/12',
+    functionId: 'unit_requests_read',
   },
   {
     path: '/matching/candidates',
@@ -79,8 +92,13 @@ const menuItems: {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
+  const { isFunctionEnabled } = useRolePermissions();
 
-  const filteredMenus = menuItems.filter((item) => !item.adminOnly || hasPermission('admin'));
+  const filteredMenus = menuItems.filter((item) => {
+    if (item.adminOnly && !hasPermission('admin')) return false;
+    if (item.functionId && !isFunctionEnabled(item.functionId)) return false;
+    return true;
+  });
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
@@ -89,7 +107,7 @@ const HomePage: React.FC = () => {
     <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 px-4 sm:px-5 md:px-6 lg:px-8 py-6 md:py-8">
       {/* subtle orb accent */}
       <div
-        className="pointer-events-none absolute -top-8 right-0 h-40 w-40 jarvis-orange-orb opacity-30 blur-sm"
+        className="pointer-events-none absolute -top-8 right-0 h-40 w-40 jarvis-blue-orb opacity-30 blur-sm"
         aria-hidden
       />
 
@@ -115,17 +133,9 @@ const HomePage: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/jobs')}
-            className="jarvis-pill-btn shrink-0 self-start sm:self-center px-6 py-3 text-sm touch-manipulation"
-          >
-            สร้างงานใหม่
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </button>
         </div>
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-orange-100/25"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-blue-100/25"
           aria-hidden
         />
       </motion.div>
@@ -158,7 +168,7 @@ const HomePage: React.FC = () => {
             {item.desc ? (
               <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{item.desc}</div>
             ) : null}
-            <div className="mt-4 flex items-center gap-1 text-xs font-medium text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="mt-4 flex items-center gap-1 text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
               เปิด
               <ArrowRight className="h-3 w-3" aria-hidden />
             </div>

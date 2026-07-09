@@ -1,12 +1,13 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthDataRoute,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 type EmployeeRow = {
   id: string;
@@ -29,6 +30,7 @@ type EmployeeRow = {
   total_cost: number;
   total_issues: number;
   base_salary?: number | null;
+  department_code?: string | null;
   avatar_url: string | null;
   created_at: string | Date;
 };
@@ -86,6 +88,7 @@ function toEmployeeResponse(row: EmployeeRow) {
     total_cost: row.total_cost,
     total_issues: row.total_issues,
     ...(row.base_salary != null && row.base_salary > 0 ? { base_salary: row.base_salary } : {}),
+    ...(row.department_code?.trim() ? { department_code: row.department_code.trim().toUpperCase() } : {}),
     avatar_url: row.avatar_url || undefined,
     created_at: toIsoString(row.created_at),
   };
@@ -177,6 +180,7 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       const total_cost = parseIntOrNull(raw.total_cost) ?? 0;
       const total_issues = parseIntOrNull(raw.total_issues) ?? 0;
       const avatar_url = getString(raw.avatar_url);
+      const department_code = getString(raw.department_code)?.toUpperCase() || null;
 
       const { rows } = await dbQuery<EmployeeRow>(
         `
@@ -186,7 +190,7 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
             address, lat, lng,
             reliability_score, utilization_rate,
             total_days_worked, total_income, total_cost, total_issues,
-            avatar_url
+            department_code, avatar_url
           )
           values (
             $1, $2, $3, $4,
@@ -194,7 +198,7 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
             $9, $10, $11,
             $12, $13,
             $14, $15, $16, $17,
-            $18
+            $18, $19
           )
           returning *
         `,
@@ -216,12 +220,20 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
           total_income,
           total_cost,
           total_issues,
+          department_code,
           avatar_url,
         ],
       );
 
       if (rows.length === 0) return sendError(res, 500, 'Failed to create employee');
-      return res.status(201).json(toEmployeeResponse(rows[0]));
+      const created = rows[0];
+      await auditFromAuthed(req, {
+        action: 'employee.create',
+        entityType: 'employee',
+        entityId: created.id,
+        after: toEmployeeResponse(created),
+      });
+      return res.status(201).json(toEmployeeResponse(created));
     } catch (e) {
       return handleApiError(res, e, 'employees POST', { userId: req.user.sub });
     }
@@ -282,6 +294,10 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       const total_issues =
         raw.total_issues !== undefined ? parseIntOrNull(raw.total_issues) ?? cur.total_issues : cur.total_issues;
       const avatar_url = raw.avatar_url !== undefined ? getString(raw.avatar_url) : cur.avatar_url;
+      const department_code =
+        raw.department_code !== undefined
+          ? getString(raw.department_code)?.toUpperCase() || null
+          : cur.department_code;
 
       if (!employee_code || !first_name || !last_name || !phone || !position) {
         return sendError(res, 400, 'Bad request', 'Invalid field values after merge');
@@ -295,7 +311,7 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
           address = $10, lat = $11, lng = $12,
           reliability_score = $13, utilization_rate = $14,
           total_days_worked = $15, total_income = $16, total_cost = $17, total_issues = $18,
-          avatar_url = $19
+          department_code = $19, avatar_url = $20
         where id = $1
         returning *
       `,
@@ -318,12 +334,20 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
           total_income,
           total_cost,
           total_issues,
+          department_code,
           avatar_url,
         ],
       );
 
       const updated = rows[0];
       if (!updated) return sendError(res, 500, 'Failed to update employee');
+      await auditFromAuthed(req, {
+        action: 'employee.update',
+        entityType: 'employee',
+        entityId: id,
+        before: toEmployeeResponse(cur),
+        after: toEmployeeResponse(updated),
+      });
       return res.status(200).json(toEmployeeResponse(updated));
     } catch (e) {
       return handleApiError(res, e, 'employees PATCH', { userId: req.user.sub });
@@ -334,12 +358,30 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getString(req.query?.id);
       if (!id) return sendError(res, 400, 'Bad request', 'Query id is required');
-      const { rows } = await dbQuery<{ id: string }>(
-        `delete from jarvis_rm.employees where id = $1 returning id`,
+
+      const { rows: curRows } = await dbQuery<EmployeeRow>(
+        `select * from jarvis_rm.employees where id = $1 limit 1`,
         [id],
       );
-      if (rows.length === 0) return sendError(res, 404, 'Not found', 'Employee not found');
-      return res.status(200).json({ ok: true, id: rows[0].id });
+      const cur = curRows[0];
+      if (!cur) return sendError(res, 404, 'Not found', 'Employee not found');
+
+      // Soft archive — deactivate instead of hard delete.
+      const { rows } = await dbQuery<EmployeeRow>(
+        `update jarvis_rm.employees set status = 'inactive' where id = $1 returning *`,
+        [id],
+      );
+      const archived = rows[0];
+      if (!archived) return sendError(res, 500, 'Failed to archive employee');
+
+      await auditFromAuthed(req, {
+        action: 'employee.archive',
+        entityType: 'employee',
+        entityId: id,
+        before: toEmployeeResponse(cur),
+        after: toEmployeeResponse(archived),
+      });
+      return res.status(200).json({ ok: true, id: archived.id, archived: true });
     } catch (e) {
       return handleApiError(res, e, 'employees DELETE', { userId: req.user.sub });
     }
@@ -348,4 +390,4 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuthDataRoute(employeesHandler);
+export default withRbac(employeesHandler, 'employees');

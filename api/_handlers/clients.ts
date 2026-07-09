@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuth,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const tbl = tableInAppSchema('client_workplaces');
 
@@ -86,8 +87,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
   }
 
-  if (req.user.role !== 'admin') {
-    return sendError(res, 403, 'Forbidden', 'Only administrators can modify clients');
+  if (method !== 'GET' && method !== 'POST' && method !== 'PATCH') {
+    return sendError(res, 405, 'Method not allowed');
   }
 
   if (method === 'POST') {
@@ -141,6 +142,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to create client');
+      await auditFromAuthed(req, {
+        action: 'client.create',
+        entityType: 'client',
+        entityId: row.id,
+        after: toClient(row),
+      });
       return res.status(201).json(toClient(row));
     } catch (e) {
       return handleApiError(res, e, 'clients POST', { userId: req.user.sub });
@@ -222,6 +229,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to update');
+      await auditFromAuthed(req, {
+        action: 'client.update',
+        entityType: 'client',
+        entityId: id,
+        before: toClient(cur),
+        after: toClient(row),
+      });
       return res.status(200).json(toClient(row));
     } catch (e) {
       return handleApiError(res, e, 'clients PATCH', { userId: req.user.sub });
@@ -231,4 +245,4 @@ async function handler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuth(handler);
+export default withRbac(handler, 'clients');

@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
 /** Matches frontend `UserRole` in src/types */
-export type UserRole = 'admin' | 'supervisor' | 'staff';
+export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 export const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'jarvis_auth';
 
@@ -12,9 +12,14 @@ export function getJwtSecret(): string | null {
 }
 
 export function isProductionLike(): boolean {
-  // ใช้เฉพาะ Vercel production (หรือบังคับผ่าน env) เพื่อหลีกเลี่ยงเคส local/preview ที่ตั้ง NODE_ENV=production
-  // แล้ว cookie ถูกทำเครื่องหมาย `Secure` ทำให้เบราว์เซอร์ไม่ส่ง cookie กลับไปบน http
-  return process.env.VERCEL_ENV === 'production' || process.env.AUTH_COOKIE_SECURE === 'true';
+  const publicUrl = (process.env.APP_PUBLIC_URL || '').trim();
+  const httpsProd =
+    process.env.NODE_ENV === 'production' && publicUrl.startsWith('https://');
+  return (
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.AUTH_COOKIE_SECURE === 'true' ||
+    httpsProd
+  );
 }
 
 export type JwtUserPayload = {
@@ -47,7 +52,7 @@ export function verifyAuthToken(token: string): JwtUserPayload {
   const email = typeof o.email === 'string' ? o.email : '';
   const role = o.role;
   if (!sub || !email) throw new Error('Invalid token claims');
-  if (role !== 'admin' && role !== 'supervisor' && role !== 'staff') {
+  if (role !== 'admin' && role !== 'supervisor' && role !== 'staff' && role !== 'opl') {
     throw new Error('Invalid role in token');
   }
   return { sub, email, role };

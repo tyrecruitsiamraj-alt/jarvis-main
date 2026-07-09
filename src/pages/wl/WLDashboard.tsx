@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, CalendarPlus, Calendar, Users, BarChart3 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
 import DetailListDialog from '@/components/shared/DetailListDialog';
+import WlBuSelector from '@/components/wl/WlBuSelector';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
+import { useWlBu } from '@/hooks/useWlBu';
+import { countEmployeesByBu, employeeIdsForBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 import { WORK_STATUS_LABELS } from '@/types';
 import { motion } from 'framer-motion';
 import ProductionDataPlaceholder from '@/components/shared/ProductionDataPlaceholder';
@@ -38,13 +41,25 @@ const WLDashboard: React.FC = () => {
   const navigate = useNavigate();
   const calendarEntries = useWorkCalendarEntries();
   const { employees: wlEmployees } = useWlEmployees();
+  const { selectedBu, setSelectedBu, buLabel } = useWlBu();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState('');
   const [dialogItems, setDialogItems] = useState<DetailDialogItem[]>([]);
 
-  const activeEmployees = wlEmployees.filter((e) => e.status === 'active');
+  const buCounts = useMemo(() => countEmployeesByBu(wlEmployees), [wlEmployees]);
+  const scopedEmployees = useMemo(
+    () => filterEmployeesByBu(wlEmployees, selectedBu),
+    [wlEmployees, selectedBu],
+  );
+  const scopedEmployeeIds = useMemo(
+    () => employeeIdsForBu(wlEmployees, selectedBu),
+    [wlEmployees, selectedBu],
+  );
+  const activeEmployees = scopedEmployees.filter((e) => e.status === 'active');
   const todayStr = formatLocalYmd(new Date());
-  const todayEntries = calendarEntries.filter((w) => w.work_date === todayStr);
+  const todayEntries = calendarEntries.filter(
+    (w) => w.work_date === todayStr && scopedEmployeeIds.has(w.employee_id),
+  );
   const workingToday = todayEntries.filter((w) => w.status === 'normal_work' || w.status === 'late');
   const issueToday = todayEntries.filter((w) =>
     ['cancel_by_employee', 'no_show', 'cancel_by_client'].includes(w.status),
@@ -74,7 +89,7 @@ const WLDashboard: React.FC = () => {
     setDialogTitle(`ทำงานวันนี้ (${workingToday.length} คน)`);
     setDialogItems(
       workingToday.map((w) => {
-        const emp = wlEmployees.find((e) => e.id === w.employee_id);
+        const emp = scopedEmployees.find((e) => e.id === w.employee_id);
         return {
           id: w.id,
           title: `${emp?.first_name || ''} ${emp?.last_name || ''}`,
@@ -97,7 +112,7 @@ const WLDashboard: React.FC = () => {
     setDialogTitle(`ปัญหาวันนี้ (${issueToday.length} คน)`);
     setDialogItems(
       issueToday.map((w) => {
-        const emp = wlEmployees.find((e) => e.id === w.employee_id);
+        const emp = scopedEmployees.find((e) => e.id === w.employee_id);
         return {
           id: w.id,
           title: `${emp?.first_name || ''} ${emp?.last_name || ''}`,
@@ -136,9 +151,17 @@ const WLDashboard: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="WL Module" subtitle="บริหารกำลังคนและปฏิทินงาน" />
+      <PageHeader title="WL Module" subtitle={`${buLabel} · บริหารกำลังคนและปฏิทินงาน`} />
       <ProductionDataPlaceholder title="สรุป WL / ปฏิทิน" />
       <div className="px-4 md:px-6 space-y-6">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground mb-3">เลือก BU</h3>
+          <WlBuSelector
+            selected={selectedBu}
+            onChange={setSelectedBu}
+            counts={buCounts}
+          />
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
             title="พนักงานทั้งหมด"
@@ -179,7 +202,7 @@ const WLDashboard: React.FC = () => {
               onClick={() => navigate(item.path)}
               className="jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left touch-manipulation"
             >
-              <item.icon className="w-6 h-6 text-orange-600 mb-2" />
+              <item.icon className="w-6 h-6 text-blue-600 mb-2" />
               <div className="font-semibold text-foreground text-sm">{item.label}</div>
               <div className="text-xs text-muted-foreground">{item.desc}</div>
             </motion.button>

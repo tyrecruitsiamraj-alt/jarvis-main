@@ -1,12 +1,13 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthStaffCreateSupervisorMutate,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 type JobRow = {
   id: string;
@@ -285,7 +286,14 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
       );
 
       if (rows.length === 0) return sendError(res, 500, 'Failed to create job');
-      return res.status(201).json(toJobResponse(rows[0]));
+      const created = rows[0];
+      await auditFromAuthed(req, {
+        action: 'job.create',
+        entityType: 'job',
+        entityId: created.id,
+        after: toJobResponse(created),
+      });
+      return res.status(201).json(toJobResponse(created));
     } catch (e) {
       return handleApiError(res, e, 'jobs POST', { userId: req.user.sub });
     }
@@ -447,6 +455,13 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
 
       const updated = rows[0];
       if (!updated) return sendError(res, 500, 'Failed to update job');
+      await auditFromAuthed(req, {
+        action: 'job.update',
+        entityType: 'job',
+        entityId: id,
+        before: toJobResponse(cur),
+        after: toJobResponse(updated),
+      });
       return res.status(200).json(toJobResponse(updated));
     } catch (e) {
       return handleApiError(res, e, 'jobs PATCH', { userId: req.user.sub });
@@ -457,12 +472,30 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getString(req.query?.id);
       if (!id) return sendError(res, 400, 'Bad request', 'Query id is required');
-      const { rows } = await dbQuery<{ id: string }>(
-        `delete from jarvis_rm.jobs where id = $1 returning id`,
+
+      const { rows: curRows } = await dbQuery<JobRow>(
+        `select * from jarvis_rm.jobs where id = $1 limit 1`,
         [id],
       );
-      if (rows.length === 0) return sendError(res, 404, 'Not found', 'Job not found');
-      return res.status(200).json({ ok: true, id: rows[0].id });
+      const cur = curRows[0];
+      if (!cur) return sendError(res, 404, 'Not found', 'Job not found');
+
+      // Soft archive — cancel job instead of hard delete (preserves assignments).
+      const { rows } = await dbQuery<JobRow>(
+        `update jarvis_rm.jobs set status = 'cancelled' where id = $1 returning *`,
+        [id],
+      );
+      const archived = rows[0];
+      if (!archived) return sendError(res, 500, 'Failed to archive job');
+
+      await auditFromAuthed(req, {
+        action: 'job.archive',
+        entityType: 'job',
+        entityId: id,
+        before: toJobResponse(cur),
+        after: toJobResponse(archived),
+      });
+      return res.status(200).json({ ok: true, id: archived.id, archived: true });
     } catch (e) {
       return handleApiError(res, e, 'jobs DELETE', { userId: req.user.sub });
     }
@@ -471,4 +504,4 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuthStaffCreateSupervisorMutate(jobsHandler);
+export default withRbac(jobsHandler, 'jobs');

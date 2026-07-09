@@ -22,6 +22,16 @@ export function toYmdLocal(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** YYYY-MM-DD ตามปฏิทินกรุงเทพ (ใช้กับคำนวณวันธุรกิจ) */
+export function toYmdBangkok(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
 export function parseYmd(ymd: string | undefined | null): { y: number; m: number; d: number } | null {
   if (!ymd || typeof ymd !== 'string') return null;
   const m = ymd.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);

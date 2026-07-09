@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthDataRoute,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const tbl = tableInAppSchema('training_records');
 
@@ -96,6 +97,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to create');
+      await auditFromAuthed(req, {
+        action: 'training_record.create',
+        entityType: 'training_record',
+        entityId: row.id,
+        after: toRow(row),
+      });
       return res.status(201).json(toRow(row));
     } catch (e) {
       return handleApiError(res, e, 'training-records POST', { userId: req.user.sub });
@@ -105,4 +112,4 @@ async function handler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuthDataRoute(handler);
+export default withRbac(handler, 'training-records');

@@ -4,9 +4,7 @@ import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import PageHeader from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { isConfiguredDemoMode } from '@/lib/demoMode';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
-import { createCandidate } from '@/lib/demoStorage';
 import type { DrivingResult, Gender, YesNo } from '@/types';
 import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
 
@@ -94,18 +92,6 @@ const AddCandidatePage: React.FC = () => {
       first_work_date: firstWorkDate || undefined,
     };
 
-    if (isConfiguredDemoMode()) {
-      setSaving(true);
-      try {
-        createCandidate(payload);
-        toast.success('บันทึกผู้สมัครแล้ว (โหมดสาธิต — เก็บในเครื่องนี้)');
-        navigate('/matching/candidates');
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
-
     try {
       setSaving(true);
       const r = await apiFetch('/api/candidates', {
@@ -127,7 +113,7 @@ const AddCandidatePage: React.FC = () => {
         setError(
           fromApi ||
             (r.status === 401
-              ? 'ไม่มี session (Missing auth cookie) — ล็อกอินด้วยอีเมล/รหัสผ่าน หรือตั้ง VITE_DEMO_MODE=true แล้วรัน dev ใหม่เพื่อบันทึกแบบสาธิต'
+              ? 'ไม่มี session (Missing auth cookie) — ล็อกอินด้วยอีเมล/รหัสผ่าน'
               : `บันทึกไม่สำเร็จ (HTTP ${r.status}) — ตรวจสอบ PostgreSQL และตาราง jarvis_rm.candidates`),
         );
         return;

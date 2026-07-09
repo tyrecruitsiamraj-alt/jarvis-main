@@ -1,12 +1,12 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuth,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
-import { readJsonBody, getString } from '../_lib/body.js';
+import { getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 
 const tbl = tableInAppSchema('audit_logs');
@@ -20,6 +20,10 @@ type Row = {
   entity_id: string;
   old_value: string | null;
   new_value: string | null;
+  request_id: string | null;
+  user_role: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
   created_at: string | Date;
 };
 
@@ -34,11 +38,15 @@ function toLog(row: Row) {
     id: row.id,
     user_id: row.user_id ?? '',
     user_name: row.user_name,
+    user_role: row.user_role ?? undefined,
     action: row.action,
     entity_type: row.entity_type,
     entity_id: row.entity_id,
     old_value: row.old_value ?? undefined,
     new_value: row.new_value ?? undefined,
+    request_id: row.request_id ?? undefined,
+    ip_address: row.ip_address ?? undefined,
+    user_agent: row.user_agent ?? undefined,
     timestamp: toIso(row.created_at),
   };
 }
@@ -49,10 +57,6 @@ const parseLimit = (q: unknown): number => {
 };
 
 async function handler(req: AuthedReq, res: ApiRes) {
-  if (req.user.role !== 'admin') {
-    return sendError(res, 403, 'Forbidden', 'Only administrators can access audit logs');
-  }
-
   const method = (req.method || 'GET').toUpperCase();
 
   if (method === 'GET') {
@@ -68,50 +72,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
   }
 
+  // Audit logs are server-written only — clients cannot create audit events.
   if (method === 'POST') {
-    try {
-      const raw = await readJsonBody(req);
-      if (typeof raw !== 'object' || raw === null) {
-        return sendError(res, 400, 'Bad request', 'Invalid JSON body');
-      }
-      const b = raw as Record<string, unknown>;
-      const action = getString(b.action);
-      const entity_type = getString(b.entity_type);
-      const entity_id = getString(b.entity_id);
-      if (!action || !entity_type || !entity_id) {
-        return sendError(res, 400, 'Bad request', 'action, entity_type, entity_id required');
-      }
-      const user_name =
-        typeof b.user_name === 'string' && b.user_name.trim()
-          ? b.user_name.trim()
-          : req.user.email || 'user';
-      const uuidRe =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      const bodyUid = getString(b.user_id);
-      const user_id = uuidRe.test(bodyUid) ? bodyUid : uuidRe.test(req.user.sub) ? req.user.sub : null;
-      const old_value =
-        typeof b.old_value === 'string' && b.old_value.trim() ? b.old_value.trim() : null;
-      const new_value =
-        typeof b.new_value === 'string' && b.new_value.trim() ? b.new_value.trim() : null;
-
-      const { rows } = await dbQuery<Row>(
-        `
-        insert into ${tbl} (user_id, user_name, action, entity_type, entity_id, old_value, new_value)
-        values ($1, $2, $3, $4, $5, $6, $7)
-        returning *
-      `,
-        [user_id, user_name, action, entity_type, entity_id, old_value, new_value],
-      );
-
-      const row = rows[0];
-      if (!row) return sendError(res, 500, 'Failed to write log');
-      return res.status(201).json(toLog(row));
-    } catch (e) {
-      return handleApiError(res, e, 'audit-logs POST', { userId: req.user.sub });
-    }
+    return sendError(
+      res,
+      403,
+      'Forbidden',
+      'Audit logs are written by the server on successful mutations',
+    );
   }
 
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuth(handler);
+export default withRbac(handler, 'audit-logs');

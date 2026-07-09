@@ -31,6 +31,70 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
   return readJsonSafe<JobRequest>(r);
 }
 
+export type SiamrajThroughputRecord = {
+  requestDate: string;
+  closureDate: string | null;
+  positionUnits: number;
+  isOpen: boolean;
+};
+
+export async function fetchSiamrajThroughput(from: string, to: string): Promise<SiamrajThroughputRecord[]> {
+  const params = new URLSearchParams({ throughput: '1', from, to });
+  const r = await apiFetch(`/api/siamraj/unit-requests?${params}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดสถิติขอ/ปิดไม่สำเร็จ'));
+  const data = await readJsonSafe<SiamrajThroughputRecord[]>(r);
+  return Array.isArray(data) ? data : [];
+}
+
+/** รายการใบขอที่ปิด/แจ้งเข้าในช่วง — สำหรับ drill-down การ์ด "ปิดใบขอ" (position_units = จำนวนที่ปิด) */
+export async function fetchSiamrajClosedRequests(from: string, to: string): Promise<JobRequest[]> {
+  const params = new URLSearchParams({ closed: '1', from, to });
+  const r = await apiFetch(`/api/siamraj/unit-requests?${params}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดรายการใบขอที่ปิดไม่สำเร็จ'));
+  const data = await readJsonSafe<JobRequest[]>(r);
+  return Array.isArray(data) ? data : [];
+}
+
+/** บันทึกผู้รับผิดชอบ (สรรหา/คัดสรร) ของใบขอ Siamraj — เก็บใน PostgreSQL ฝั่ง Jarvis */
+export async function saveSiamrajUnitAssignment(
+  requestNo: string,
+  payload: { recruiter_name?: string | null; screener_name?: string | null; opl_name?: string | null },
+): Promise<void> {
+  const r = await apiFetch('/api/siamraj/unit-assignments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_no: requestNo, ...payload }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกผู้รับผิดชอบไม่สำเร็จ'));
+}
+
+export async function fetchUnitNoteHistory(limit = 50): Promise<string[]> {
+  const r = await apiFetch(`/api/siamraj/unit-notes?history=1&limit=${limit}`, { cache: 'no-store' });
+  if (!r.ok) return [];
+  const data = await readJsonSafe<{ items?: string[] }>(r);
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+export async function saveUnitRequestNote(requestNo: string, note: string): Promise<void> {
+  await saveUnitRequestMeta(requestNo, { note: note.trim() || null });
+}
+
+export async function saveUnitRequestMeta(
+  requestNo: string,
+  payload: { note?: string | null; send_replacement?: boolean | null },
+): Promise<void> {
+  const r = await apiFetch('/api/siamraj/unit-notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_no: requestNo, ...payload }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกข้อมูลใบขอไม่สำเร็จ'));
+}
+
+export function unitRequestNoteKey(job: JobRequest): string {
+  return (job.request_no || job.externalId || job.id).trim();
+}
+
 export function isSiamrajJob(job: JobRequest): boolean {
   return job.source === 'siamraj' || job.id.startsWith('siamraj:') || job.id.startsWith('siamraj-sql:');
 }

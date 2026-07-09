@@ -19,6 +19,7 @@ export type BrandingConfig = {
 const KEY = 'so_recruit_branding_v1';
 const LEGACY_BRANDING_KEY = 'jarvis_branding_v1';
 const DEFAULT_LOGO_PATH = '/so-work-logo.png';
+const DEFAULT_FAVICON_PATH = '/favicon.png';
 
 export const DEFAULT_BRANDING: BrandingConfig = {
   appName: 'So Recruit',
@@ -132,10 +133,35 @@ export function hslComponentsToHex(hsl: string): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+export function faviconHrefForBranding(logoDataUrl: string | null): string {
+  const logo = (logoDataUrl || DEFAULT_LOGO_PATH).trim() || DEFAULT_LOGO_PATH;
+  if (logo === DEFAULT_LOGO_PATH) return DEFAULT_FAVICON_PATH;
+  return logo;
+}
+
 export function applyBrandingToDocument(c: BrandingConfig): void {
   if (typeof document === 'undefined') return;
   const name = (c.appName || DEFAULT_BRANDING.appName).trim() || DEFAULT_BRANDING.appName;
   document.title = name;
+
+  const faviconHref = faviconHrefForBranding(c.logoDataUrl);
+  const appleIconHref = (c.logoDataUrl || DEFAULT_LOGO_PATH).trim() || DEFAULT_LOGO_PATH;
+  let iconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!iconLink) {
+    iconLink = document.createElement('link');
+    iconLink.rel = 'icon';
+    document.head.appendChild(iconLink);
+  }
+  iconLink.href = faviconHref;
+  iconLink.type = faviconHref.startsWith('data:') ? 'image/png' : faviconHref.endsWith('.png') ? 'image/png' : 'image/x-icon';
+
+  let appleLink = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+  if (!appleLink) {
+    appleLink = document.createElement('link');
+    appleLink.rel = 'apple-touch-icon';
+    document.head.appendChild(appleLink);
+  }
+  appleLink.href = appleIconHref;
 
   const root = document.documentElement;
 

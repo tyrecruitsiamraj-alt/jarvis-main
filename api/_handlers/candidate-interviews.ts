@@ -1,6 +1,6 @@
 import { dbQuery } from '../_lib/postgres.js';
 import {
-  withAuthDataRoute,
+  withRbac,
   sendError,
   handleApiError,
   type ApiRes,
@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { auditFromAuthed } from '../_lib/audit.js';
 
 const tbl = tableInAppSchema('candidate_interviews');
 
@@ -102,6 +103,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to create');
+      await auditFromAuthed(req, {
+        action: 'candidate_interview.create',
+        entityType: 'candidate_interview',
+        entityId: row.id,
+        after: toRow(row),
+      });
       return res.status(201).json(toRow(row));
     } catch (e) {
       return handleApiError(res, e, 'candidate-interviews POST', { userId: req.user.sub });
@@ -153,6 +160,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       const row = rows[0];
       if (!row) return sendError(res, 500, 'Failed to update');
+      await auditFromAuthed(req, {
+        action: 'candidate_interview.update',
+        entityType: 'candidate_interview',
+        entityId: id,
+        before: toRow(cur),
+        after: toRow(row),
+      });
       return res.status(200).json(toRow(row));
     } catch (e) {
       return handleApiError(res, e, 'candidate-interviews PATCH', { userId: req.user.sub });
@@ -163,8 +177,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getString(req.query?.id);
       if (!id) return sendError(res, 400, 'Bad request', 'id query required');
+
+      // PRODUCTION_BLOCKER: hard delete — add deleted_at / is_active column in a future migration.
+      const { rows: curRows } = await dbQuery<Row>(`select * from ${tbl} where id = $1 limit 1`, [id]);
+      const cur = curRows[0];
+      if (!cur) return sendError(res, 404, 'Not found');
+
       const { rows } = await dbQuery<{ id: string }>(`delete from ${tbl} where id = $1 returning id`, [id]);
       if (rows.length === 0) return sendError(res, 404, 'Not found');
+
+      await auditFromAuthed(req, {
+        action: 'candidate_interview.delete',
+        entityType: 'candidate_interview',
+        entityId: id,
+        before: toRow(cur),
+      });
       return res.status(200).json({ ok: true, id: rows[0].id });
     } catch (e) {
       return handleApiError(res, e, 'candidate-interviews DELETE', { userId: req.user.sub });
@@ -174,4 +201,4 @@ async function handler(req: AuthedReq, res: ApiRes) {
   return sendError(res, 405, 'Method not allowed');
 }
 
-export default withAuthDataRoute(handler);
+export default withRbac(handler, 'candidate-interviews');

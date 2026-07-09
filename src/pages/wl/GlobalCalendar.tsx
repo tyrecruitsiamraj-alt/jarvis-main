@@ -2,6 +2,9 @@ import React, { useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { useWorkCalendarEntries } from '@/lib/workCalendarStore';
 import { useWlEmployees } from '@/hooks/useWlEmployees';
+import WlBuSelector from '@/components/wl/WlBuSelector';
+import { useWlBu } from '@/hooks/useWlBu';
+import { countEmployeesByBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 import { WORK_STATUS_COLORS } from '@/types';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -18,6 +21,7 @@ function formatLocalYmd(d: Date): string {
 const GlobalCalendar: React.FC = () => {
   const workCalendar = useWorkCalendarEntries();
   const { employees: wlEmployees, loading } = useWlEmployees();
+  const { selectedBu, setSelectedBu, buLabel } = useWlBu();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 3);
@@ -34,7 +38,11 @@ const GlobalCalendar: React.FC = () => {
     [startDate],
   );
 
-  const activeEmployees = wlEmployees.filter((e) => e.status === 'active');
+  const buCounts = useMemo(() => countEmployeesByBu(wlEmployees), [wlEmployees]);
+  const activeEmployees = useMemo(
+    () => filterEmployeesByBu(wlEmployees, selectedBu).filter((e) => e.status === 'active'),
+    [wlEmployees, selectedBu],
+  );
   const todayYmd = formatLocalYmd(new Date());
 
   const getEntry = (empId: string, date: Date) => {
@@ -52,12 +60,19 @@ const GlobalCalendar: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Global Planning Calendar" subtitle="ตาราง Matrix พนักงาน × วันที่" backPath="/wl" />
+      <PageHeader title="Global Planning Calendar" subtitle={`${buLabel} · ตาราง Matrix พนักงาน × วันที่`} backPath="/wl" />
       <ProductionDataPlaceholder title="Global Calendar" />
       {loading ? (
         <div className="px-4 md:px-6 text-sm text-muted-foreground">กำลังโหลดพนักงาน…</div>
       ) : (
       <div className="px-4 md:px-6">
+        <WlBuSelector
+          selected={selectedBu}
+          onChange={setSelectedBu}
+          counts={buCounts}
+          variant="pills"
+          className="mb-4"
+        />
         <div className="flex items-center gap-3 mb-4">
           <button type="button" onClick={() => offsetWeek(-1)} className="p-2 rounded-lg bg-secondary"><ChevronLeft className="w-4 h-4" /></button>
           <span className="text-sm font-medium text-foreground">

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,12 +7,13 @@ import SearchField from '@/components/shared/SearchField';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { DEMO_CANDIDATES_CHANGED_EVENT, getCandidates, getEmployees } from '@/lib/demoStorage';
 import { mergeCandidateSources } from '@/lib/mergeCandidates';
 import { combineWlEmployeeList } from '@/lib/wlEmployeeList';
 import { readJsonSafe } from '@/lib/api';
-import { isDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
+import WlBuSelector from '@/components/wl/WlBuSelector';
+import { useWlBu } from '@/hooks/useWlBu';
+import { countEmployeesByBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 
 const statusFilters: { value: EmployeeStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -27,24 +28,13 @@ const WLEmployees: React.FC = () => {
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<EmployeeStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  const { selectedBu, setSelectedBu, buLabel } = useWlBu();
 
-  const [employees, setEmployees] = useState<Employee[]>(() =>
-    combineWlEmployeeList([], getEmployees(), mergeCandidateSources([], getCandidates())),
-  );
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const apiEmpRef = useRef<Employee[]>([]);
-  const apiCandRef = useRef<Candidate[]>([]);
 
   useEffect(() => {
-    if (isDemoMode()) {
-      const cand = mergeCandidateSources([], getCandidates());
-      setEmployees(combineWlEmployeeList([], getEmployees(), cand));
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -54,20 +44,14 @@ const WLEmployees: React.FC = () => {
         const eData = er.ok ? await readJsonSafe<Employee[]>(er) : [];
         const cData = cr.ok ? ((await cr.json()) as Candidate[]) : [];
         if (cancelled) return;
-        apiEmpRef.current = Array.isArray(eData) ? eData : [];
-        apiCandRef.current = Array.isArray(cData) ? cData : [];
-        const cand = mergeCandidateSources(apiCandRef.current, getCandidates());
-        setEmployees(combineWlEmployeeList(apiEmpRef.current, getEmployees(), cand));
+        const cand = mergeCandidateSources(Array.isArray(cData) ? cData : []);
+        setEmployees(combineWlEmployeeList(Array.isArray(eData) ? eData : [], cand));
         setError(null);
       })
       .catch(() => {
         if (cancelled) return;
-        apiEmpRef.current = [];
-        apiCandRef.current = [];
-        setEmployees(
-          combineWlEmployeeList([], getEmployees(), mergeCandidateSources([], getCandidates())),
-        );
-        setError(null);
+        setEmployees([]);
+        setError('โหลดรายชื่อพนักงานไม่สำเร็จ — ลองใหม่อีกครั้ง');
       })
       .finally(() => {
         if (cancelled) return;
@@ -79,31 +63,23 @@ const WLEmployees: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!isDemoMode()) return;
-    const onCand = () => {
-      const cand = mergeCandidateSources([], getCandidates());
-      setEmployees(combineWlEmployeeList([], getEmployees(), cand));
-    };
-    window.addEventListener(DEMO_CANDIDATES_CHANGED_EVENT, onCand);
-    return () => window.removeEventListener(DEMO_CANDIDATES_CHANGED_EVENT, onCand);
-  }, []);
+  const buCounts = useMemo(() => countEmployeesByBu(employees), [employees]);
 
   const filtered = useMemo(() => {
-    return employees
+    return filterEmployeesByBu(employees, selectedBu)
       .filter((e) => filter === 'all' || e.status === filter)
       .filter((e) =>
         `${e.first_name} ${e.last_name} ${e.employee_code} ${e.position}`
           .toLowerCase()
           .includes(search.toLowerCase()),
       );
-  }, [employees, filter, search]);
+  }, [employees, selectedBu, filter, search]);
 
   return (
     <div>
       <PageHeader
         title="พนักงาน WL"
-        subtitle={`${filtered.length} คน`}
+        subtitle={`${buLabel} · ${filtered.length} คน`}
         backPath="/wl"
         actions={
           hasPermission('supervisor') ? (
@@ -120,6 +96,13 @@ const WLEmployees: React.FC = () => {
       <div className="px-4 md:px-6 space-y-4">
         {loading && <div className="text-sm text-muted-foreground">กำลังโหลดพนักงาน...</div>}
         {error && <div className="text-sm text-destructive">เกิดข้อผิดพลาด: {error}</div>}
+
+        <WlBuSelector
+          selected={selectedBu}
+          onChange={setSelectedBu}
+          counts={buCounts}
+          variant="pills"
+        />
 
         <div className="flex flex-col md:flex-row gap-3">
           <SearchField
@@ -153,7 +136,7 @@ const WLEmployees: React.FC = () => {
               <button
                 key={emp.id}
                 onClick={() => navigate(`/wl/employees/${emp.id}`)}
-                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-orange-300/50 transition-all"
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">
@@ -194,6 +177,7 @@ const WLEmployees: React.FC = () => {
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">รหัส</th>
+                  <th className="px-4 py-3 text-left text-muted-foreground font-medium">BU</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อ-สกุล</th>
                   <th className="px-4 py-3 text-left text-muted-foreground font-medium">ตำแหน่ง</th>
                   <th className="px-4 py-3 text-center text-muted-foreground font-medium">Reliability</th>
@@ -210,6 +194,7 @@ const WLEmployees: React.FC = () => {
                     className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                   >
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{emp.employee_code}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{emp.department_code || '—'}</td>
                     <td className="px-4 py-3 font-medium text-foreground">
                       {emp.first_name} {emp.last_name}
                     </td>

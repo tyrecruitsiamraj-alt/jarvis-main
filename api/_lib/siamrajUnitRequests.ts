@@ -3,7 +3,15 @@ import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import {
   getSiamrajSqlServerUnitRequestById,
   listSiamrajSqlServerUnitRequests,
+  SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT,
 } from './siamrajSqlServerRequests.js';
+import {
+  listSiamrajSqlServerThroughput,
+  type SiamrajThroughputRecord,
+} from './siamrajSqlServerThroughput.js';
+import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
+import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
+import { toBangkokYmd } from './businessDate.js';
 
 export type SiamrajDbSource = 'postgres' | 'sqlserver';
 
@@ -86,14 +94,14 @@ function toIso(v: string | Date | null | undefined): string | null {
 }
 
 function toYmd(v: string | Date | null | undefined): string {
-  const iso = toIso(v);
-  if (!iso) return '';
-  return iso.slice(0, 10);
+  return toBangkokYmd(v);
 }
 
 export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
   const reasonParts = [r.reason_main_name, r.reason_sub_name].filter(Boolean);
   const vehicleParts = [r.vehicle_type_name, r.vehicle_remark].filter(Boolean);
+  const roleLabel = primaryJobRoleLabel(r.job_description_code_1, r.staff_title_code, r.job_description_code_1);
+  const jobType = inferJobTypeFromDescription(r.job_description_code_1, r.job_description_code_2, r.staff_title_code);
 
   return {
     id: `siamraj:${r.act_saleco_id}`,
@@ -121,13 +129,13 @@ export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
     siamraj_status: r.status || undefined,
     need_staff: r.act_saleco_need_staff ?? undefined,
     staff_title_code: r.staff_title_code || undefined,
-    job_description_code_1: r.job_description_code_1 || undefined,
+    job_description_code_1: roleLabel || r.job_description_code_1 || undefined,
     job_description_code_2: r.job_description_code_2 || undefined,
     request_date: toYmd(r.act_saleco_datetime) || new Date().toISOString().slice(0, 10),
     created_at: toIso(r.act_saleco_datetime) || new Date().toISOString(),
     urgency: 'advance' as const,
     total_income: 0,
-    job_type: 'central' as const,
+    job_type: jobType,
     job_category: 'private' as const,
     penalty_per_day: 0,
     days_without_worker: 0,
@@ -206,9 +214,9 @@ export async function listSiamrajUnitRequests(options: { limit?: number; mode?: 
   const schema = getSiamrajSchema();
   if (!schema) return [];
 
-  const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
-  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'all').toLowerCase();
-  const where = mode === 'staffing_queue' ? staffingQueueWhere() : '1=1';
+  const limit = Math.min(Math.max(options.limit ?? 200, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
+  const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue').toLowerCase();
+  const where = mode === 'all' ? '1=1' : staffingQueueWhere();
 
   const { rows } = await dbQuery<SiamrajUnitRequestRow>(
     `SELECT ${BASE_SELECT}
@@ -243,4 +251,30 @@ export async function getSiamrajUnitRequestById(id: string) {
   );
 
   return rows[0] ? mapSiamrajRow(rows[0]) : null;
+}
+
+export type { SiamrajThroughputRecord };
+
+export async function listSiamrajThroughput(options: {
+  from: string;
+  to: string;
+}): Promise<SiamrajThroughputRecord[]> {
+  const source = getSiamrajDbSource();
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerThroughput(options);
+  }
+  return [];
+}
+
+/** รายการใบขอที่ปิด/แจ้งเข้าในช่วง — สำหรับ drill-down การ์ด "ปิดใบขอ" (เลขตรงกับ throughput) */
+export async function listSiamrajClosedRequests(options: {
+  from: string;
+  to: string;
+  limit?: number;
+}) {
+  const source = getSiamrajDbSource();
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerClosedRequests(options);
+  }
+  return [];
 }

@@ -1,13 +1,5 @@
-type Res = {
-  status: (code: number) => {
-    json: (body: unknown) => void;
-  };
-};
-
-type Req = {
-  method?: string;
-  query?: Record<string, unknown>;
-};
+import type { ApiReq, ApiRes } from '../_lib/http.js';
+import { rateLimitOrReject } from '../_lib/rateLimit.js';
 
 function toNumberOrNull(v: unknown): number | null {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
@@ -67,9 +59,11 @@ async function nominatimReverse(lat: number, lng: number): Promise<string | null
   return data.display_name || null;
 }
 
-export default async function handler(req: Req, res: Res) {
+export default async function handler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  if (!rateLimitOrReject(req, res, 'geocode', 60, 60 * 1000)) return;
 
   const q = req.query ?? {};
   const addressQuery = firstString(q, 'address');

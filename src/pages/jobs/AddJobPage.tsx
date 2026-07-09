@@ -2,11 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import type { JobCategory, JobRequest, JobType } from '@/types';
-import { createJob, JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/demoStorage';
+import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions } from '@/lib/jobStaffNames';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { useAuth } from '@/contexts/AuthContext';
-import { isConfiguredDemoMode } from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import { toYmdLocal } from '@/lib/dateTh';
@@ -79,7 +78,7 @@ function buildWorkScheduleString(
 const AddJobPage: React.FC = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const canManageStaffRoster = hasPermission('admin');
+  const canManageStaffRoster = hasPermission('supervisor');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -101,11 +100,11 @@ const AddJobPage: React.FC = () => {
 
   const recruiterOptions = useMemo(() => {
     void staffRosterRev;
-    return buildRecruiterNameOptions(isConfiguredDemoMode() ? undefined : staffJobs);
+    return buildRecruiterNameOptions(staffJobs);
   }, [staffRosterRev, staffJobs]);
   const screenerOptions = useMemo(() => {
     void staffRosterRev;
-    return buildScreenerNameOptions(isConfiguredDemoMode() ? undefined : staffJobs);
+    return buildScreenerNameOptions(staffJobs);
   }, [staffRosterRev, staffJobs]);
 
   useEffect(() => {
@@ -115,7 +114,6 @@ const AddJobPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isConfiguredDemoMode()) return;
     let cancelled = false;
     apiFetch('/api/jobs?limit=500')
       .then(async (r) => (r.ok ? ((await r.json()) as JobRequest[]) : []))
@@ -247,38 +245,6 @@ const AddJobPage: React.FC = () => {
       work_schedule: workSchedule,
       penalty_per_day: Math.trunc(penaltyNum),
     };
-
-    if (isConfiguredDemoMode()) {
-      setSaving(true);
-      try {
-        createJob({
-          request_no: payload.request_no,
-          resigned_title_prefix: payload.resigned_title_prefix,
-          resigned_first_name: payload.resigned_first_name,
-          resigned_last_name: payload.resigned_last_name,
-          resigned_reason: payload.resigned_reason,
-          unit_name: payload.unit_name,
-          request_date: payload.request_date,
-          required_date: payload.required_date,
-          urgency: payload.urgency,
-          total_income: payload.total_income,
-          location_address: payload.location_address,
-          job_type: payload.job_type,
-          job_category: payload.job_category,
-          recruiter_name: payload.recruiter_name,
-          screener_name: payload.screener_name,
-          age_range_min: payload.age_range_min,
-          age_range_max: payload.age_range_max,
-          vehicle_required: payload.vehicle_required,
-          work_schedule: payload.work_schedule,
-          penalty_per_day: payload.penalty_per_day,
-        });
-        navigate('/jobs/list');
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
 
     try {
       setSaving(true);

@@ -1,23 +1,17 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User, UserRole } from '@/types';
-import { mockUsers } from '@/data/mockData';
-import {
-  isDemoMode,
-  isConfiguredDemoMode,
-  enableRuntimeDemo,
-  clearRuntimeDemoFlag,
-} from '@/lib/demoMode';
 import { apiFetch } from '@/lib/apiFetch';
 import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
+import { clearJobUnitPageSession } from '@/lib/jobUnitSessionState';
 import { refreshWorkCalendarFromApi } from '@/lib/workCalendarStore';
-
-const DEMO_STORAGE_KEY = 'jarvis_user_role';
-const AUTH_TOKEN_STORAGE_KEY = 'jarvis_auth_token';
 
 interface AuthContextType {
   user: User | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signInWithDevRole: (role: UserRole) => Promise<string | null>;
+  requestMagicLink: (email: string) => Promise<string | null>;
+  signInWithMicrosoft: (returnTo?: string) => void;
+  verifyMagicLink: (token: string) => Promise<string | null>;
   signUp: (payload: {
     email: string;
     password: string;
@@ -39,41 +33,17 @@ export const useAuth = () => {
 };
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
-  admin: 3,
-  supervisor: 2,
-  staff: 1,
+  admin: 4,
+  supervisor: 3,
+  staff: 2,
+  opl: 1,
 };
-
-function isStoredRole(s: string | null): s is UserRole {
-  return s === 'admin' || s === 'supervisor' || s === 'staff';
-}
-
-function userForDemoRole(role: UserRole): User | null {
-  if (isDemoMode()) {
-    return mockUsers.find((u) => u.role === role) ?? null;
-  }
-  const name = (import.meta.env.VITE_APP_OPERATOR_NAME as string | undefined)?.trim() || 'Operator';
-  const idByRole: Record<UserRole, string> = {
-    admin: 'local-admin',
-    supervisor: 'local-supervisor',
-    staff: 'local-staff',
-  };
-  return {
-    id: idByRole[role],
-    username: role,
-    full_name: name,
-    email: '',
-    role,
-    is_active: true,
-    created_at: new Date().toISOString().slice(0, 10),
-  };
-}
 
 function mapApiUser(raw: Record<string, unknown>): User | null {
   const id = typeof raw.id === 'string' ? raw.id : '';
   const email = typeof raw.email === 'string' ? raw.email : '';
   const role = raw.role;
-  if (!id || !email || (role !== 'admin' && role !== 'supervisor' && role !== 'staff')) {
+  if (!id || !email || (role !== 'admin' && role !== 'supervisor' && role !== 'staff' && role !== 'opl')) {
     return null;
   }
   return {
@@ -91,22 +61,10 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    if (!isDemoMode()) return null;
-    const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-    if (saved && isStoredRole(saved)) {
-      return userForDemoRole(saved);
-    }
-    return null;
-  });
-  const [bootstrapping, setBootstrapping] = useState(() => !isDemoMode());
+  const [user, setUser] = useState<User | null>(null);
+  const [bootstrapping, setBootstrapping] = useState(true);
 
   useEffect(() => {
-    if (isDemoMode()) {
-      setBootstrapping(false);
-      return;
-    }
-
     let cancelled = false;
     (async () => {
       try {
@@ -115,23 +73,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!r.ok) {
           if (r.status === 401 || r.status === 403) {
             setUser(null);
-            localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
             clearJobStaffApiCache();
             return;
           }
-          enableRuntimeDemo();
           clearJobStaffApiCache();
-          const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-          if (saved && isStoredRole(saved)) {
-            setUser(userForDemoRole(saved) ?? null);
-          } else {
-            setUser(null);
-          }
+          setUser(null);
           return;
         }
         const data = (await r.json()) as { user?: Record<string, unknown> };
         const u = data.user ? mapApiUser(data.user) : null;
-        clearRuntimeDemoFlag();
         setUser(u);
         if (u) {
           void refreshJobStaffFromApi();
@@ -139,14 +89,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else clearJobStaffApiCache();
       } catch {
         if (!cancelled) {
-          enableRuntimeDemo();
           clearJobStaffApiCache();
-          const saved = localStorage.getItem(DEMO_STORAGE_KEY);
-          if (saved && isStoredRole(saved)) {
-            setUser(userForDemoRole(saved) ?? null);
-          } else {
-            setUser(null);
-          }
+          setUser(null);
         }
       } finally {
         if (!cancelled) setBootstrapping(false);
@@ -183,13 +127,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : 'Sign in failed';
       return msg;
     }
-    if (typeof data.token === 'string' && data.token.trim()) {
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token.trim());
-    }
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
-    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -221,13 +161,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : 'เข้าสู่ระบบด้วยสิทธิ์ไม่สำเร็จ';
       return msg;
     }
-    if (typeof data.token === 'string' && data.token.trim()) {
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token.trim());
+    const rawUser = data.user as Record<string, unknown> | undefined;
+    const u = rawUser ? mapApiUser(rawUser) : null;
+    if (!u) return 'Invalid response from server';
+    setUser(u);
+    void refreshJobStaffFromApi();
+    void refreshWorkCalendarFromApi();
+    return null;
+  }, []);
+
+  const requestMagicLink = useCallback(async (email: string): Promise<string | null> => {
+    let r: Response;
+    try {
+      r = await apiFetch('/api/auth/magic-link', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim() }),
+      });
+    } catch {
+      return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — รัน npm run dev ให้ API ทำงานพร้อมหน้าเว็บ';
+    }
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await r.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    if (!r.ok) {
+      return (
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.error === 'string' && data.error) ||
+        'ส่งลิงก์เข้าสู่ระบบไม่สำเร็จ'
+      );
+    }
+    return null;
+  }, []);
+
+  const signInWithMicrosoft = useCallback((returnTo = '/') => {
+    const safe =
+      returnTo.startsWith('/') && !returnTo.startsWith('//') && !returnTo.startsWith('/api/')
+        ? returnTo
+        : '/';
+    window.location.assign(`/api/auth/azure-ad/start?returnTo=${encodeURIComponent(safe)}`);
+  }, []);
+
+  const verifyMagicLink = useCallback(async (token: string): Promise<string | null> => {
+    let r: Response;
+    try {
+      r = await apiFetch('/api/auth/magic-link-verify', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
+    } catch {
+      return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+    }
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await r.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    if (!r.ok) {
+      return (
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.error === 'string' && data.error) ||
+        'ลิงก์เข้าสู่ระบบไม่ถูกต้องหรือหมดอายุแล้ว'
+      );
     }
     const rawUser = data.user as Record<string, unknown> | undefined;
     const u = rawUser ? mapApiUser(rawUser) : null;
     if (!u) return 'Invalid response from server';
-    clearRuntimeDemoFlag();
     setUser(u);
     void refreshJobStaffFromApi();
     void refreshWorkCalendarFromApi();
@@ -271,21 +273,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const logout = useCallback(async () => {
-    const configuredDemo = isConfiguredDemoMode();
-    clearRuntimeDemoFlag();
-    if (configuredDemo) {
-      setUser(null);
-      localStorage.removeItem(DEMO_STORAGE_KEY);
-      localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-      return;
-    }
     try {
       await apiFetch('/api/auth/logout', { method: 'POST', body: '{}' });
     } catch {
       /* still clear client state */
     }
-    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     clearJobStaffApiCache();
+    clearJobUnitPageSession();
     setUser(null);
   }, []);
 
@@ -305,6 +299,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         signIn,
         signInWithDevRole,
+        requestMagicLink,
+        signInWithMicrosoft,
+        verifyMagicLink,
         signUp,
         logout,
         hasPermission,
