@@ -97,8 +97,8 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   const jobType = inferJobTypeFromDescription(r.job_name1, r.job_name2, r.staff_title_name, r.job_description_code_1);
 
   return {
-    id: `siamraj-sql:${r.external_id}`,
-    externalId: r.external_id,
+    id: `siamraj-sql:${(r.external_id || '').trim()}`,
+    externalId: (r.external_id || '').trim(),
     source: 'siamraj' as const,
     readOnly: true,
     request_no: (r.request_no || '').trim(),

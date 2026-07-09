@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -13,7 +13,7 @@ import { haversineKm } from '@/lib/geo';
 import { jobLatLng } from '@/lib/jobCoords';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
-import { navigateToUnitRequest } from '@/lib/jobNavigation';
+import { unitRequestPath } from '@/lib/jobNavigation';
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import { Input } from '@/components/ui/input';
 
@@ -1018,18 +1018,16 @@ const PreCheckPage: React.FC = () => {
                         Call Client
                       </a>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!jobDetail) return;
-                        navigateToUnitRequest(jobDetail, navigate, {
-                          returnTo: preCheckReturnPath(jobDetail.id),
-                        });
-                      }}
-                      className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium"
-                    >
-                      View Job
-                    </button>
+                    {jobDetail ? (
+                      <Link
+                        to={unitRequestPath(jobDetail)}
+                        state={{ returnTo: preCheckReturnPath(jobDetail.id) }}
+                        onClick={() => setJobDetail(null)}
+                        className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium inline-block"
+                      >
+                        ดูใบงาน
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               );
