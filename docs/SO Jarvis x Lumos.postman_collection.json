@@ -1,0 +1,540 @@
+{
+  "info": {
+    "_postman_id": "7c9d3d5b-901b-40f8-b3e1-06423e71f937",
+    "name": "SO Jarvis x Lumos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "13994863"
+  },
+  "item": [
+    {
+      "name": "AI Interview",
+      "item": [
+        {
+          "name": "Get Candidates",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "Dm2W9Pe9eOubFNE5LJg6UF7z6d3SnZG249bOZYIhI0pRfX5dMi",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://jarvis.siamrajathanee.dev/api/lumos/interview/candidates",
+              "protocol": "https",
+              "host": [
+                "jarvis",
+                "siamrajathanee",
+                "dev"
+              ],
+              "path": [
+                "api",
+                "lumos",
+                "interview",
+                "candidates"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Get Candidates",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://jarvis.siamrajathanee.dev/api/lumos/interview/candidates",
+                  "protocol": "https",
+                  "host": [
+                    "jarvis",
+                    "siamrajathanee",
+                    "dev"
+                  ],
+                  "path": [
+                    "api",
+                    "lumos",
+                    "interview",
+                    "candidates"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Date",
+                  "value": "Thu, 09 Jul 2026 03:12:07 GMT"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Access-Control-Allow-Headers",
+                  "value": "Content-Type, Cookie"
+                },
+                {
+                  "key": "Access-Control-Allow-Methods",
+                  "value": "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                },
+                {
+                  "key": "Content-Encoding",
+                  "value": "gzip"
+                },
+                {
+                  "key": "Server",
+                  "value": "cloudflare"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Accept-Encoding"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Cf-Cache-Status",
+                  "value": "DYNAMIC"
+                },
+                {
+                  "key": "Report-To",
+                  "value": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=axOLt9s7F%2FD7vgvao6%2BaGlCgk5vsJSdf4BmFJ0hmHFp5WHnIItOOGJOYHhVcPS5TN9NdEiWoCKgkjTXCZpcaycvxnRtIfFTKus2AFZ7lTonqabo%2F5NOTVe8pQ8zHBr73UBnwWxE3399sqCQ1\"}]}"
+                },
+                {
+                  "key": "Nel",
+                  "value": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}"
+                },
+                {
+                  "key": "CF-RAY",
+                  "value": "a184252cfe9cc826-SIN"
+                },
+                {
+                  "key": "alt-svc",
+                  "value": "h3=\":443\"; ma=86400"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"ok\": true,\n    \"data\": [\n        {\n            \"client_candidate_id\": \"cli-cand-8821\",\n            \"client_interview_id\": \"cli-int-0042\",\n            \"candidate_name\": \"สมชาย ใจดี\",\n            \"phone\": \"+66812345678\",\n            \"position\": \"Senior Backend Engineer\",\n            \"scheduled_at\": \"2026-07-10T10:00:00+07:00\",\n            \"questions\": [\n                \"เล่าประสบการณ์การทำงานกับ Python ให้ฟังหน่อยครับ\",\n                \"คาดหวังเงินเดือนเท่าไหร่ครับ\",\n                \"ทำไมถึงอยากร่วมงานกับบริษัทเราครับ\"\n            ],\n            \"type\": \"phone\",\n            \"language\": \"th\",\n            \"tone\": \"professional\",\n            \"skills\": [\n                \"Python\",\n                \"FastAPI\",\n                \"PostgreSQL\"\n            ],\n            \"experience\": [\n                {\n                    \"company\": \"Acme Corp\",\n                    \"position\": \"Backend Engineer\",\n                    \"period\": \"2022-2025\",\n                    \"responsibilities\": \"Built and maintained payment services\",\n                    \"salary\": \"60000\",\n                    \"level\": \"Senior\",\n                    \"business_type\": \"Fintech\"\n                }\n            ],\n            \"education\": [\n                {\n                    \"institution\": \"Chulalongkorn University\",\n                    \"degree\": \"Bachelor's\",\n                    \"faculty\": \"Engineering\",\n                    \"major\": \"Computer Engineering\",\n                    \"gpa\": \"3.5\",\n                    \"year_ce\": 2020\n                }\n            ]\n        },\n        {\n            \"client_candidate_id\": \"cli-cand-9034\",\n            \"client_interview_id\": \"cli-int-0043\",\n            \"candidate_name\": \"วิภาวี รักงาน\",\n            \"phone\": \"+66891234567\",\n            \"position\": \"HR Coordinator\",\n            \"scheduled_at\": \"2026-07-10T14:00:00+07:00\",\n            \"questions\": [\n                \"เล่าประสบการณ์ด้าน HR ให้ฟังหน่อยค่ะ\",\n                \"คาดหวังเงินเดือนเท่าไหร่คะ\",\n                \"สามารถเริ่มงานได้เมื่อไหร่คะ\"\n            ],\n            \"type\": \"phone\",\n            \"language\": \"th\",\n            \"tone\": \"friendly\",\n            \"skills\": [\n                \"HR Management\",\n                \"Recruitment\",\n                \"Payroll\"\n            ],\n            \"experience\": [\n                {\n                    \"company\": \"HR Solutions Co.\",\n                    \"position\": \"HR Officer\",\n                    \"period\": \"2021-2024\",\n                    \"responsibilities\": \"Recruitment and employee relations\",\n                    \"salary\": \"35000\",\n                    \"level\": \"Junior\",\n                    \"business_type\": \"HR Consulting\"\n                }\n            ],\n            \"education\": [\n                {\n                    \"institution\": \"Thammasat University\",\n                    \"degree\": \"Bachelor's\",\n                    \"faculty\": \"Commerce and Accountancy\",\n                    \"major\": \"Human Resource Management\",\n                    \"gpa\": \"3.2\",\n                    \"year_ce\": 2021\n                }\n            ]\n        }\n    ],\n    \"total\": 2\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Interview Result",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "Dm2W9Pe9eOubFNE5LJg6UF7z6d3SnZG249bOZYIhI0pRfX5dMi",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"interview_id\": \"8f3e2c1a-9b7d-4e5f-a123-1234567890ab\",\n    \"client_candidate_id\": \"cli-cand-8821\",\n    \"candidate_name\": \"สมชาย ใจดี\",\n    \"position\": \"Senior Backend Engineer\",\n    \"type\": \"phone\",\n    \"status\": \"เสร็จสิ้น\",\n    \"outcome\": \"completed\",\n    \"scheduled_at\": \"2026-07-10T10:00:00+07:00\",\n    \"phone\": \"+66812345678\",\n    \"language\": \"th\",\n    \"tone\": \"professional\",\n    \"questions\": [\"เล่าประสบการณ์ Python\"],\n    \"ai_score\": 82,\n    \"summary\": \"ผู้สมัครมีประสบการณ์ตรงและตอบคำถามได้ชัดเจน\",\n    \"strengths\": [\"Python เชี่ยวชาญ\", \"สื่อสารดี\"],\n    \"concerns\": [\"คาดหวังเงินเดือนสูงกว่างบ\"],\n    \"score_rationale\": \"ทักษะตรงกับตำแหน่ง 90% ประสบการณ์เพียงพอ\",\n    \"confidence\": \"high\",\n    \"failure_reason\": null,\n    \"transcript\": [\n      { \"role\": \"agent\", \"text\": \"สวัสดีครับ ขอสัมภาษณ์เบื้องต้นนะครับ\" },\n      { \"role\": \"candidate\", \"text\": \"สวัสดีค่ะ ยินดีค่ะ\" }\n    ],\n    \"recording_url\": \"https://storage.lumos.ai/recordings/8f3e2c1a.mp3\",\n    \"call_attempts\": 1,\n    \"ended_reason\": null,\n    \"duration_min\": 7\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://jarvis.siamrajathanee.dev/api/lumos/interview/results",
+              "protocol": "https",
+              "host": [
+                "jarvis",
+                "siamrajathanee",
+                "dev"
+              ],
+              "path": [
+                "api",
+                "lumos",
+                "interview",
+                "results"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Update Interview Result",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"interview_id\": \"8f3e2c1a-9b7d-4e5f-a123-1234567890ab\",\n    \"client_candidate_id\": \"cli-cand-8821\",\n    \"candidate_name\": \"สมชาย ใจดี\",\n    \"position\": \"Senior Backend Engineer\",\n    \"type\": \"phone\",\n    \"status\": \"เสร็จสิ้น\",\n    \"outcome\": \"completed\",\n    \"scheduled_at\": \"2026-07-10T10:00:00+07:00\",\n    \"phone\": \"+66812345678\",\n    \"language\": \"th\",\n    \"tone\": \"professional\",\n    \"questions\": [\"เล่าประสบการณ์ Python\"],\n    \"ai_score\": 82,\n    \"summary\": \"ผู้สมัครมีประสบการณ์ตรงและตอบคำถามได้ชัดเจน\",\n    \"strengths\": [\"Python เชี่ยวชาญ\", \"สื่อสารดี\"],\n    \"concerns\": [\"คาดหวังเงินเดือนสูงกว่างบ\"],\n    \"score_rationale\": \"ทักษะตรงกับตำแหน่ง 90% ประสบการณ์เพียงพอ\",\n    \"confidence\": \"high\",\n    \"failure_reason\": null,\n    \"transcript\": [\n      { \"role\": \"agent\", \"text\": \"สวัสดีครับ ขอสัมภาษณ์เบื้องต้นนะครับ\" },\n      { \"role\": \"candidate\", \"text\": \"สวัสดีค่ะ ยินดีค่ะ\" }\n    ],\n    \"recording_url\": \"https://storage.lumos.ai/recordings/8f3e2c1a.mp3\",\n    \"call_attempts\": 1,\n    \"ended_reason\": null,\n    \"duration_min\": 7\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "https://jarvis.siamrajathanee.dev/api/lumos/interview/results",
+                  "protocol": "https",
+                  "host": [
+                    "jarvis",
+                    "siamrajathanee",
+                    "dev"
+                  ],
+                  "path": [
+                    "api",
+                    "lumos",
+                    "interview",
+                    "results"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Date",
+                  "value": "Thu, 09 Jul 2026 03:14:23 GMT"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Access-Control-Allow-Headers",
+                  "value": "Content-Type, Cookie"
+                },
+                {
+                  "key": "Access-Control-Allow-Methods",
+                  "value": "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                },
+                {
+                  "key": "Server",
+                  "value": "cloudflare"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Cf-Cache-Status",
+                  "value": "DYNAMIC"
+                },
+                {
+                  "key": "Report-To",
+                  "value": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=xHQnKkPeF8i2vsvj%2FJ946FPb9x2UvvFb1aUQptN0JCPya0e7Y4Xj%2BBYm93AaZtxYfYCUX5P0SuafU4xSeurGtqG8hU%2BzBFsfvX%2BS5%2BR%2FKCoDt8VRcDxgHfNmS7YVnj1kWNEMwAMdCkMU09C0\"}]}"
+                },
+                {
+                  "key": "Nel",
+                  "value": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}"
+                },
+                {
+                  "key": "Content-Encoding",
+                  "value": "br"
+                },
+                {
+                  "key": "CF-RAY",
+                  "value": "a1842881ff74fd2b-SIN"
+                },
+                {
+                  "key": "alt-svc",
+                  "value": "h3=\":443\"; ma=86400"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"ok\": true,\n    \"received\": 1,\n    \"message\": \"Interview results accepted\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI Reminder",
+      "item": [
+        {
+          "name": "Get Reminder Contacts",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "Dm2W9Pe9eOubFNE5LJg6UF7z6d3SnZG249bOZYIhI0pRfX5dMi",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://jarvis.siamrajathanee.dev/api/lumos/reminder/contacts",
+              "protocol": "https",
+              "host": [
+                "jarvis",
+                "siamrajathanee",
+                "dev"
+              ],
+              "path": [
+                "api",
+                "lumos",
+                "reminder",
+                "contacts"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Get Reminder Contacts",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://jarvis.siamrajathanee.dev/api/lumos/reminder/contacts",
+                  "protocol": "https",
+                  "host": [
+                    "jarvis",
+                    "siamrajathanee",
+                    "dev"
+                  ],
+                  "path": [
+                    "api",
+                    "lumos",
+                    "reminder",
+                    "contacts"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Date",
+                  "value": "Thu, 09 Jul 2026 03:15:46 GMT"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Access-Control-Allow-Headers",
+                  "value": "Content-Type, Cookie"
+                },
+                {
+                  "key": "Access-Control-Allow-Methods",
+                  "value": "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                },
+                {
+                  "key": "Content-Encoding",
+                  "value": "gzip"
+                },
+                {
+                  "key": "Server",
+                  "value": "cloudflare"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Accept-Encoding"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Cf-Cache-Status",
+                  "value": "DYNAMIC"
+                },
+                {
+                  "key": "Report-To",
+                  "value": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=7CKv63PyI%2FzsYBiMdCFZwg%2FNuW7ms61g8kbC86W57QR4FjGml1gFY9%2F6EeyYFHQEaPKmm%2Bzo8V14%2BPh08T6Tc6ZCd%2BJdfERutrMRlGCgHbVgbFUGRFKSOuq%2BiuSMtKqULSlKmGA93ksX9PMp\"}]}"
+                },
+                {
+                  "key": "Nel",
+                  "value": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}"
+                },
+                {
+                  "key": "CF-RAY",
+                  "value": "a1842a84d84e7b3a-BKK"
+                },
+                {
+                  "key": "alt-svc",
+                  "value": "h3=\":443\"; ma=86400"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"ok\": true,\n    \"data\": [\n        {\n            \"client_contact_id\": \"cli-emp-551\",\n            \"recipient_name\": \"คุณสมหญิง\",\n            \"recipient_phone\": \"+66898765432\",\n            \"title\": \"นัดสัมภาษณ์พรุ่งนี้\",\n            \"language\": \"th\",\n            \"tone\": \"professional\",\n            \"steps\": [\n                {\n                    \"type\": \"remind\",\n                    \"message\": \"แจ้งเตือนนัดสัมภาษณ์พรุ่งนี้ 10:00 น.\",\n                    \"scheduled_at\": \"2026-07-10T14:00:00+07:00\"\n                },\n                {\n                    \"type\": \"follow_up\",\n                    \"message\": \"ติดตามยืนยันการเข้าสัมภาษณ์\",\n                    \"scheduled_at\": \"2026-07-10T18:00:00+07:00\"\n                }\n            ]\n        },\n        {\n            \"client_contact_id\": \"cli-emp-552\",\n            \"recipient_name\": \"คุณประสิทธิ์\",\n            \"recipient_phone\": \"+66876543210\",\n            \"title\": \"ยืนยันวันเริ่มงาน\",\n            \"language\": \"th\",\n            \"tone\": \"professional\",\n            \"steps\": [\n                {\n                    \"type\": \"confirmation\",\n                    \"message\": \"ยืนยันวันเริ่มงาน 15 กรกฎาคม 2569\",\n                    \"scheduled_at\": \"2026-07-11T10:00:00+07:00\"\n                }\n            ]\n        }\n    ],\n    \"total\": 2\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Reminder Result",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "Dm2W9Pe9eOubFNE5LJg6UF7z6d3SnZG249bOZYIhI0pRfX5dMi",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"plan_id\": \"5c2a9e10-3f4b-4a2c-9d1e-abcdef012345\",\n    \"step_id\": \"d1e2f3a4-5b6c-7d8e-9f01-234567890abc\",\n    \"client_contact_id\": \"cli-emp-551\",\n    \"title\": \"นัดสัมภาษณ์พรุ่งนี้\",\n    \"recipient_name\": \"คุณสมหญิง\",\n    \"recipient_phone\": \"+66898765432\",\n    \"step_position\": 0,\n    \"step_type\": \"remind\",\n    \"message\": \"แจ้งเตือนนัดสัมภาษณ์พรุ่งนี้ 10:00 น.\",\n    \"scheduled_at\": \"2026-07-10T14:00:00+07:00\",\n    \"language\": \"th\",\n    \"tone\": \"professional\",\n    \"status\": \"completed\",\n    \"outcome\": \"confirmed\",\n    \"summary\": \"ผู้รับสายยืนยันว่าจะเข้าร่วมสัมภาษณ์ตามเวลานัด\",\n    \"transcript\": [\n      { \"role\": \"agent\", \"text\": \"สวัสดีค่ะ ขอแจ้งเตือนนัดสัมภาษณ์พรุ่งนี้ 10:00 น.\" },\n      { \"role\": \"candidate\", \"text\": \"รับทราบค่ะ\" }\n    ],\n    \"recording_url\": \"https://storage.lumos.ai/recordings/d1e2f3a4.mp3\",\n    \"call_attempts\": 1,\n    \"ended_reason\": null,\n    \"plan_status\": \"completed\",\n    \"stop_early\": true\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://jarvis.siamrajathanee.dev/api/lumos/reminder/results",
+              "protocol": "https",
+              "host": [
+                "jarvis",
+                "siamrajathanee",
+                "dev"
+              ],
+              "path": [
+                "api",
+                "lumos",
+                "reminder",
+                "results"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Update Reminder Result",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"plan_id\": \"5c2a9e10-3f4b-4a2c-9d1e-abcdef012345\",\n    \"step_id\": \"d1e2f3a4-5b6c-7d8e-9f01-234567890abc\",\n    \"client_contact_id\": \"cli-emp-551\",\n    \"title\": \"นัดสัมภาษณ์พรุ่งนี้\",\n    \"recipient_name\": \"คุณสมหญิง\",\n    \"recipient_phone\": \"+66898765432\",\n    \"step_position\": 0,\n    \"step_type\": \"remind\",\n    \"message\": \"แจ้งเตือนนัดสัมภาษณ์พรุ่งนี้ 10:00 น.\",\n    \"scheduled_at\": \"2026-07-10T14:00:00+07:00\",\n    \"language\": \"th\",\n    \"tone\": \"professional\",\n    \"status\": \"completed\",\n    \"outcome\": \"confirmed\",\n    \"summary\": \"ผู้รับสายยืนยันว่าจะเข้าร่วมสัมภาษณ์ตามเวลานัด\",\n    \"transcript\": [\n      { \"role\": \"agent\", \"text\": \"สวัสดีค่ะ ขอแจ้งเตือนนัดสัมภาษณ์พรุ่งนี้ 10:00 น.\" },\n      { \"role\": \"candidate\", \"text\": \"รับทราบค่ะ\" }\n    ],\n    \"recording_url\": \"https://storage.lumos.ai/recordings/d1e2f3a4.mp3\",\n    \"call_attempts\": 1,\n    \"ended_reason\": null,\n    \"plan_status\": \"completed\",\n    \"stop_early\": true\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "https://jarvis.siamrajathanee.dev/api/lumos/reminder/results",
+                  "protocol": "https",
+                  "host": [
+                    "jarvis",
+                    "siamrajathanee",
+                    "dev"
+                  ],
+                  "path": [
+                    "api",
+                    "lumos",
+                    "reminder",
+                    "results"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Date",
+                  "value": "Thu, 09 Jul 2026 03:18:25 GMT"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                },
+                {
+                  "key": "Access-Control-Allow-Headers",
+                  "value": "Content-Type, Cookie"
+                },
+                {
+                  "key": "Access-Control-Allow-Methods",
+                  "value": "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                },
+                {
+                  "key": "Server",
+                  "value": "cloudflare"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Cf-Cache-Status",
+                  "value": "DYNAMIC"
+                },
+                {
+                  "key": "Report-To",
+                  "value": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=8%2BiAjXI1EfEmFlg2gmQPSg1%2FSnOaG4koq7KvQ7d11Afyvcr%2Bi6FSouIoywD4rtvruXk4Y%2Ffg8YRDS%2BTs%2FxqlAZV2PbUuF2TNoW76Lih8vcFQGx0JvqvcuX%2Fl6FrbgH1jMeigVlyN1NUnwa%2FW\"}]}"
+                },
+                {
+                  "key": "Nel",
+                  "value": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}"
+                },
+                {
+                  "key": "Content-Encoding",
+                  "value": "br"
+                },
+                {
+                  "key": "CF-RAY",
+                  "value": "a1842e69090b5037-SIN"
+                },
+                {
+                  "key": "alt-svc",
+                  "value": "h3=\":443\"; ma=86400"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"ok\": true,\n    \"received\": 1,\n    \"message\": \"Reminder results accepted\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

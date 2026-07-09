@@ -30,7 +30,7 @@ LUMOS_API_KEY=your-secret-key-here
 | Environment | URL |
 |-------------|-----|
 | Local dev   | `http://localhost:9000` |
-| Production  | `https://your-domain.com` |
+| Production  | `https://jarvis.siamrajathanee.dev` |
 
 ---
 
