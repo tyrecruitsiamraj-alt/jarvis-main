@@ -72,7 +72,7 @@ export async function saveUnitRequestNote(requestNo: string, note: string): Prom
 
 export async function saveUnitRequestMeta(
   requestNo: string,
-  payload: { note?: string | null; send_replacement?: boolean | null },
+  payload: { note?: string | null; send_replacement?: boolean | null; parser_override_text?: string | null },
 ): Promise<void> {
   const r = await apiFetch('/api/siamraj/unit-notes', {
     method: 'POST',

@@ -63,6 +63,7 @@ async function attachNotes(items: unknown[]): Promise<void> {
       if (!n) continue;
       it.list_note = n.note;
       it.send_replacement = n.send_replacement ?? null;
+      it.parser_override_text = n.parser_override_text ?? null;
     }
   } catch {
     /* หมายเหตุเป็นข้อมูลเสริม */

@@ -16,6 +16,9 @@ import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } 
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { saveUnitRequestMeta, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
 type Center = { lat: number; lng: number; label: string };
@@ -53,6 +56,8 @@ type ParsedBranchDemandItem = {
   branch_name_clean: string;
   requested_qty: number;
   confidence: number;
+  district_hint: string | null;
+  province_hint: string | null;
 };
 type ParsedBranchDemandPayload = {
   parser_input: string;
@@ -60,6 +65,7 @@ type ParsedBranchDemandPayload = {
     org_name: string | null;
     items: ParsedBranchDemandItem[];
     unparsed_segments: string[];
+    parser_status: 'high_confidence' | 'fallback' | 'none';
   };
   branch_matches?: Array<{
     branch_name_clean: string;
@@ -77,6 +83,23 @@ function isLikelyThailandCoord(lat: number, lng: number): boolean {
 
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function isLikelyBranchSplitCandidate(text: string): boolean {
+  return /จำนวน\s*\d+\s*คน|และ|and|Fashion\s*Island|Promenade|สิงห์คอมเพล็กซ์/i.test(text);
+}
+
+function formatMatchReasons(reasons: string[]): { primary: string | null; supporting: string[] } {
+  const cleaned = [...new Set(reasons.map((reason) => reason.trim()).filter(Boolean))];
+  if (cleaned.length === 0) return { primary: null, supporting: [] };
+
+  const positives = cleaned.filter((reason) => !/ไม่ตรง|ไม่ผ่าน|ห่างพื้นที่งาน/.test(reason));
+  const negatives = cleaned.filter((reason) => /ไม่ตรง|ไม่ผ่าน|ห่างพื้นที่งาน/.test(reason));
+  const ordered = [...positives, ...negatives];
+  return {
+    primary: ordered[0] || null,
+    supporting: ordered.slice(1, 4),
+  };
 }
 
 function preCheckReturnPath(jobId?: string | null): string {
@@ -109,6 +132,9 @@ const PreCheckPage: React.FC = () => {
   const [branchParseLoading, setBranchParseLoading] = useState(false);
   const [branchMatchesLoading, setBranchMatchesLoading] = useState(false);
   const [branchParseData, setBranchParseData] = useState<ParsedBranchDemandPayload | null>(null);
+  const [branchParserOverride, setBranchParserOverride] = useState('');
+  const [savingBranchOverride, setSavingBranchOverride] = useState(false);
+  const [branchOverrideMsg, setBranchOverrideMsg] = useState<string | null>(null);
 
   const openCandidatePrefill = (candidate: MatchingSuggestion['candidate']) => {
     const params = new URLSearchParams();
@@ -382,6 +408,9 @@ const PreCheckPage: React.FC = () => {
       setBranchParseLoading(false);
       setBranchMatchesLoading(false);
       setBranchParseData(null);
+      setBranchParserOverride('');
+      setSavingBranchOverride(false);
+      setBranchOverrideMsg(null);
       return;
     }
 
@@ -416,11 +445,16 @@ const PreCheckPage: React.FC = () => {
   }, [jobDetail]);
 
   useEffect(() => {
+    setBranchParserOverride((jobDetail?.parser_override_text || '').trim());
+    setBranchOverrideMsg(null);
+  }, [jobDetail?.id, jobDetail?.parser_override_text]);
+
+  useEffect(() => {
     if (!jobDetail) return;
     let cancelled = false;
 
     // แยกสาขาทันทีฝั่ง UI (ไม่รอ API / iRecruit)
-    const parserInput = buildErpBranchDemandInput(jobDetail);
+    const parserInput = branchParserOverride.trim() || buildErpBranchDemandInput(jobDetail);
     const parsed = parseErpBranchDemand(parserInput);
     setBranchParseData({
       parser_input: parserInput,
@@ -435,9 +469,14 @@ const PreCheckPage: React.FC = () => {
       return;
     }
 
-    apiFetch(
-      `/api/matching/parse-branch-demand-job?jobId=${encodeURIComponent(jobDetail.id)}&matches=1&poolSize=200`,
-    )
+    const query = new URLSearchParams({
+      jobId: jobDetail.id,
+      matches: '1',
+      poolSize: '200',
+    });
+    if (branchParserOverride.trim()) query.set('text', branchParserOverride.trim());
+
+    apiFetch(`/api/matching/parse-branch-demand-job?${query.toString()}`)
       .then(async (r) => {
         if (!r.ok) return null;
         return (await r.json()) as ParsedBranchDemandPayload;
@@ -461,7 +500,46 @@ const PreCheckPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [jobDetail]);
+  }, [branchParserOverride, jobDetail]);
+
+  const branchParserStatusMeta = useMemo(() => {
+    const status = branchParseData?.parsed.parser_status;
+    if (status === 'high_confidence') {
+      return { label: 'มั่นใจสูง', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    }
+    if (status === 'fallback') {
+      return { label: 'fallback/เดา', className: 'border-amber-200 bg-amber-50 text-amber-700' };
+    }
+    return { label: 'ยังไม่แตกสาขา', className: 'border-slate-200 bg-slate-50 text-slate-600' };
+  }, [branchParseData?.parsed.parser_status]);
+  const shouldShowBranchOverrideEditor = useMemo(() => {
+    if (!jobDetail || !branchParseData) return false;
+    if ((jobDetail.parser_override_text || '').trim()) return true;
+    const parserInput = branchParseData.parser_input || '';
+    if (!isLikelyBranchSplitCandidate(parserInput)) return false;
+    return branchParseData.parsed.parser_status !== 'high_confidence';
+  }, [branchParseData, jobDetail]);
+
+  const saveBranchParserOverride = async () => {
+    if (!jobDetail) return;
+    const requestNo = unitRequestNoteKey(jobDetail);
+    if (!requestNo) {
+      setBranchOverrideMsg('ใบงานนี้ไม่มี request key สำหรับบันทึก override');
+      return;
+    }
+    setSavingBranchOverride(true);
+    setBranchOverrideMsg(null);
+    try {
+      const nextOverride = branchParserOverride.trim() || null;
+      await saveUnitRequestMeta(requestNo, { parser_override_text: nextOverride });
+      setJobDetail((prev) => (prev ? { ...prev, parser_override_text: nextOverride } : prev));
+      setBranchOverrideMsg(nextOverride ? 'บันทึกข้อความ override ถาวรแล้ว' : 'ลบข้อความ override ถาวรแล้ว');
+    } catch (e) {
+      setBranchOverrideMsg(e instanceof Error ? e.message : 'บันทึก override ไม่สำเร็จ');
+    } finally {
+      setSavingBranchOverride(false);
+    }
+  };
 
   return (
     <div>
@@ -757,14 +835,53 @@ const PreCheckPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
-                    <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
+                      <Badge variant="outline" className={branchParserStatusMeta.className}>
+                        {branchParserStatusMeta.label}
+                      </Badge>
+                    </div>
+                    {shouldShowBranchOverrideEditor ? (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground">แก้ข้อความ ERP เอง (override ชั่วคราว)</label>
+                        <Textarea
+                          value={branchParserOverride}
+                          onChange={(e) => setBranchParserOverride(e.target.value)}
+                          placeholder={branchParseData?.parser_input || 'ถ้าวางข้อความเอง ระบบจะใช้ข้อความนี้แทนการ parse อัตโนมัติ'}
+                          className="min-h-[84px] bg-white/70"
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-muted-foreground">
+                            ใช้สำหรับเคส ERP แปลกๆ ก่อนทำ manual override ถาวรในระบบ
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {branchParserOverride.trim() ? (
+                              <button
+                                type="button"
+                                onClick={() => setBranchParserOverride('')}
+                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                              >
+                                กลับไปใช้ข้อความเดิม
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => void saveBranchParserOverride()}
+                              disabled={savingBranchOverride}
+                              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                            >
+                              {savingBranchOverride ? 'กำลังบันทึก…' : 'บันทึกเป็นค่าเริ่มต้น'}
+                            </button>
+                          </div>
+                        </div>
+                        {branchOverrideMsg ? <p className="text-[11px] text-muted-foreground">{branchOverrideMsg}</p> : null}
+                      </div>
+                    ) : null}
                     {branchParseLoading ? (
                       <p className="text-xs text-muted-foreground">กำลังวิเคราะห์ข้อความจากใบงาน…</p>
                     ) : branchParseData?.parsed.items?.length ? (
                       <>
-                        <p className="text-xs text-muted-foreground">
-                          ใช้ข้อความ: {branchParseData.parser_input}
-                        </p>
+                        <p className="text-xs text-muted-foreground">ใช้ข้อความ: {branchParseData.parser_input}</p>
                         {branchMatchesLoading ? (
                           <p className="text-xs text-blue-600">กำลังจับคู่ผู้สมัครตามสาขา…</p>
                         ) : null}
@@ -791,6 +908,11 @@ const PreCheckPage: React.FC = () => {
                                   <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                                     ตรง {branchMatch?.matched_count ?? 0} คน
                                   </span>
+                                  {item.district_hint ? (
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700">
+                                      เขต/อำเภอ: {item.district_hint}
+                                    </span>
+                                  ) : null}
                                 </div>
                                 {branchMatch && branchMatch.suggestions.length > 0 ? (
                                   <div className="space-y-1.5">
@@ -804,6 +926,10 @@ const PreCheckPage: React.FC = () => {
                                           key={`${item.branch_name_clean}-${fullName}-${sidx}`}
                                           className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2"
                                         >
+                                          {(() => {
+                                            const reasonInfo = formatMatchReasons(suggestion.reasons);
+                                            return (
+                                              <>
                                           <div className="flex items-start justify-between gap-2">
                                             <button
                                               type="button"
@@ -820,18 +946,27 @@ const PreCheckPage: React.FC = () => {
                                             {suggestion.candidate.location_label || 'ไม่ระบุพื้นที่'}
                                             {suggestion.candidate.age !== null ? ` · อายุ ${suggestion.candidate.age}` : ''}
                                           </div>
-                                          {suggestion.reasons.length > 0 ? (
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                              {suggestion.reasons.slice(0, 3).map((reason) => (
-                                                <span
-                                                  key={reason}
-                                                  className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600"
-                                                >
-                                                  {reason}
-                                                </span>
-                                              ))}
+                                          {reasonInfo.primary ? (
+                                            <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                                              <p className="text-[10px] font-semibold text-slate-700">เหตุผลที่แนะนำ</p>
+                                              <p className="mt-0.5 text-[11px] text-slate-700">{reasonInfo.primary}</p>
+                                              {reasonInfo.supporting.length > 0 ? (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                  {reasonInfo.supporting.map((reason) => (
+                                                    <span
+                                                      key={reason}
+                                                      className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600"
+                                                    >
+                                                      {reason}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              ) : null}
                                             </div>
                                           ) : null}
+                                              </>
+                                            );
+                                          })()}
                                         </div>
                                       );
                                     })}
@@ -843,6 +978,11 @@ const PreCheckPage: React.FC = () => {
                             );
                           })}
                         </div>
+                        {branchParseData.parsed.parser_status === 'fallback' ? (
+                          <div className="text-xs text-amber-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            เคสนี้ระบบแยกแบบ fallback/เดาได้ ควรตรวจชื่อสาขาและจำนวนคนก่อนใช้งานจริง
+                          </div>
+                        ) : null}
                         {branchParseData.parsed.unparsed_segments.length > 0 ? (
                           <div className="text-xs text-amber-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                             ยังแยกไม่สำเร็จบางส่วน: {branchParseData.parsed.unparsed_segments.join(' | ')}
@@ -956,6 +1096,10 @@ const PreCheckPage: React.FC = () => {
                                   : 'bg-slate-50 text-slate-700 border-slate-100';
                             return (
                               <div key={`${fullName}-${idx}`} className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                                {(() => {
+                                  const reasonInfo = formatMatchReasons(item.reasons);
+                                  return (
+                                    <>
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
                                     <button
@@ -978,16 +1122,24 @@ const PreCheckPage: React.FC = () => {
                                     </p>
                                   </div>
                                 </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {item.reasons.map((reason) => (
-                                    <span
-                                      key={reason}
-                                      className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700"
-                                    >
-                                      {reason}
-                                    </span>
-                                  ))}
-                                </div>
+                                {reasonInfo.primary ? (
+                                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2">
+                                    <p className="text-[11px] font-semibold text-blue-700">เหตุผลที่แนะนำ</p>
+                                    <p className="mt-0.5 text-xs text-blue-800">{reasonInfo.primary}</p>
+                                    {reasonInfo.supporting.length > 0 ? (
+                                      <div className="mt-1 flex flex-wrap gap-1.5">
+                                        {reasonInfo.supporting.map((reason) => (
+                                          <span
+                                            key={reason}
+                                            className="rounded-full border border-blue-100 bg-white px-2 py-0.5 text-[11px] text-blue-700"
+                                          >
+                                            {reason}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : null}
                                 <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                                   {item.candidate.phone_number ? <span>โทร: {item.candidate.phone_number}</span> : null}
                                   {item.candidate.age !== null ? <span>อายุ: {item.candidate.age}</span> : null}
@@ -1002,6 +1154,9 @@ const PreCheckPage: React.FC = () => {
                                     ดู/ลงข้อมูลต่อ
                                   </button>
                                 </div>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             );
                           })

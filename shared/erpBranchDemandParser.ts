@@ -16,6 +16,7 @@ export type ParsedBranchDemandResult = {
   org_name: string | null;
   items: ParsedBranchDemandItem[];
   unparsed_segments: string[];
+  parser_status: 'high_confidence' | 'fallback' | 'none';
 };
 
 export function buildErpBranchDemandInput(job: {
@@ -65,23 +66,38 @@ function normalizeDemandText(raw: string): string {
   );
 }
 
+const KNOWN_ORGS = [
+  'บริษัท บุญรอดบริวเวอรี่ จำกัด',
+  'บ.บุญรอดบริวเวอรี่',
+  'บุญรอดบริวเวอรี่',
+  'การประปานครหลวง',
+  'การไฟฟ้านครหลวง',
+  'การไฟฟ้าส่วนภูมิภาค',
+  'ธนาคารกรุงศรีอยุธยา',
+  'ธนาคารกรุงศรี',
+  'กรุงศรี',
+];
+
+/** ข้อความอธิบายพื้นที่กว้าง — ไม่ใช่หลายสาขา */
+function isBroadAreaText(text: string): boolean {
+  return (
+    /และปริมณฑล/i.test(text) ||
+    /พระราม\s*\d+\s+และกรุงเทพ/i.test(text) ||
+    /กรุงเทพ(?:มหานคร|ฯ)?\s+และ\s+ปริมณฑล/i.test(text)
+  );
+}
+
 function detectOrgName(text: string): string | null {
-  const known = [
-    'บริษัท บุญรอดบริวเวอรี่ จำกัด',
-    'บ.บุญรอดบริวเวอรี่',
-    'บุญรอดบริวเวอรี่',
-    'การประปานครหลวง',
-    'การไฟฟ้านครหลวง',
-    'การไฟฟ้าส่วนภูมิภาค',
-    'ธนาคารกรุงศรีอยุธยา',
-    'ธนาคารกรุงศรี',
-    'กรุงศรี',
-  ];
-  for (const org of known) {
+  for (const org of KNOWN_ORGS) {
     if (text.includes(org)) return org;
   }
-  const m = text.match(/^(.+?)\s+(?:สาขา|บริการ\s*\d+|ปฏิบัติงาน|ที่\s|\S+\s+\d+\s*คน)/);
-  return m?.[1]?.trim() || null;
+  const m = text.match(/^(.+?)\s+(?:สาขา|บริการ\s*\d+|ปฏิบัติงาน\s*ที่)/i);
+  const candidate = m?.[1]?.trim();
+  if (!candidate) return null;
+  if (/^(บริษัท|บ\.|ห้าง|ธนาคาร)/i.test(candidate) || /จำกัด|มหาชน/.test(candidate)) {
+    return candidate;
+  }
+  return null;
 }
 
 function extractDistrictHint(text: string): string | null {
@@ -104,6 +120,7 @@ function cleanPlaceName(raw: string, orgName: string | null): string {
   }
   // ตัดชื่อองค์กรย่อที่ติดมากับที่อยู่
   out = out
+    .replace(/บริษัท\s+[^,]+จำกัด(?:\s*\(มหาชน\))?/gi, ' ')
     .replace(/บ\.?\s*บุญรอดบริวเวอรี่(?:\s*จก\.?)?/gi, ' ')
     .replace(/บุญรอดบริวเวอรี่(?:\s*จก\.?)?/gi, ' ')
     .replace(/^จก\.?-?\s*/i, '')
@@ -186,12 +203,25 @@ function parseSegment(segment: string, orgName: string | null): ParsedBranchDema
  * และ: "Fashion Island และ Promenade มีนบุรี"
  */
 function splitMultiLocations(text: string): string[] {
+  if (isBroadAreaText(text)) return [text];
+
   // ก่อนอื่น ถ้ามี pattern จำนวน X คน และ ...
   if (/จำนวน\s*\d+\s*คน\s+และ\s+/i.test(text)) {
     return text
       .split(/\s+และ\s+/i)
       .map((s) => normalizeWhitespace(s))
       .filter(Boolean);
+  }
+
+  // ปฏิบัติงานที่ A และ B (ไม่มีจำนวนคน) — ก่อน landmark split
+  if (/ปฏิบัติงาน\s*ที่.+และ.+/i.test(text)) {
+    const focus = normalizeWhitespace(text.replace(/^.*ปฏิบัติงาน\s*ที่\s*/i, ''));
+    if (focus && focus !== text) {
+      return focus
+        .split(/\s+และ\s+/i)
+        .map((s) => normalizeWhitespace(s))
+        .filter(Boolean);
+    }
   }
 
   // Fashion Island และ Promenade ...
@@ -203,7 +233,7 @@ function splitMultiLocations(text: string): string[] {
   }
 
   // comma-separated สาขา list
-  if (text.includes(',')) {
+  if (text.includes(',') && !isBroadAreaText(text)) {
     return text
       .split(',')
       .map((s) => normalizeWhitespace(s))
@@ -216,10 +246,22 @@ function splitMultiLocations(text: string): string[] {
 function parseAndJoinSharedLocation(items: ParsedBranchDemandItem[], sharedTail: string): ParsedBranchDemandItem[] {
   // ใช้เมื่อFashion Island และ Promenade มีนบุรี — ส่วนหลังไม่มี qty ให้กระจาย qty = 1 และที่ตั้งร่วม
   if (items.length > 0) return items;
-  const parts = sharedTail
+  if (isBroadAreaText(sharedTail)) return [];
+
+  const orgName = detectOrgName(sharedTail);
+  let parts = sharedTail
     .split(/\s+และ\s+/i)
     .map((s) => normalizeWhitespace(s))
     .filter(Boolean);
+
+  const operatingFocus = normalizeWhitespace(sharedTail.replace(/^.*ปฏิบัติงาน\s*ที่\s*/i, ''));
+  if (/ปฏิบัติงาน\s*ที่/i.test(sharedTail) && operatingFocus.includes(' และ ')) {
+    parts = operatingFocus
+      .split(/\s+และ\s+/i)
+      .map((s) => normalizeWhitespace(s))
+      .filter(Boolean);
+  }
+
   if (parts.length < 2) return [];
 
   // ส่วนท้ายของ part สุดท้ายอาจเป็นที่ตั้งร่วม เช่น "Promenade มีนบุรี กรุงเทพฯ"
@@ -235,10 +277,11 @@ function parseAndJoinSharedLocation(items: ParsedBranchDemandItem[], sharedTail:
       name = normalizeWhitespace(part.replace(locationTail, ''));
     }
     const full = normalizeWhitespace([name, locationTail].filter(Boolean).join(' '));
+    const clean = lookalikeFixes(cleanPlaceName(full || name, orgName));
     return {
-      org_name: null,
+      org_name: orgName,
       branch_name_raw: full || name,
-      branch_name_clean: lookalikeFixes(cleanPlaceName(full || name, null)),
+      branch_name_clean: clean || lookalikeFixes(name),
       requested_qty: 1,
       confidence: 65,
       district_hint: extractDistrictHint(full) || (locationTail.includes('มีนบุรี') ? 'มีนบุรี' : null),
@@ -270,7 +313,7 @@ export function parseErpBranchDemand(raw: string): ParsedBranchDemandResult {
   }
 
   // fallback: Fashion Island และ Promenade โดยไม่มี "จำนวน X คน"
-  if (items.length === 0 && /\sและ\s/i.test(normalized)) {
+  if (items.length === 0 && /\sและ\s/i.test(normalized) && !isBroadAreaText(normalized)) {
     const joined = parseAndJoinSharedLocation([], normalized);
     if (joined.length > 0) {
       return {
@@ -279,6 +322,7 @@ export function parseErpBranchDemand(raw: string): ParsedBranchDemandResult {
         org_name: orgName,
         items: joined,
         unparsed_segments: [],
+        parser_status: 'fallback',
       };
     }
   }
@@ -299,9 +343,17 @@ export function parseErpBranchDemand(raw: string): ParsedBranchDemandResult {
         org_name: orgName,
         items: rebuilt,
         unparsed_segments: [],
+        parser_status: 'high_confidence',
       };
     }
   }
+
+  const parser_status: ParsedBranchDemandResult['parser_status'] =
+    items.length === 0
+      ? 'none'
+      : items.every((item) => item.confidence >= 80) && unparsed.length === 0
+        ? 'high_confidence'
+        : 'fallback';
 
   return {
     raw_text: raw,
@@ -309,5 +361,6 @@ export function parseErpBranchDemand(raw: string): ParsedBranchDemandResult {
     org_name: orgName,
     items,
     unparsed_segments: unparsed,
+    parser_status,
   };
 }

@@ -170,6 +170,8 @@ export interface JobRequest {
   list_note?: string;
   /** ส่งคนแทน (true) / ไม่ส่งคนแทน (false) — null = ยังไม่เลือก */
   send_replacement?: boolean | null;
+  /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
+  parser_override_text?: string | null;
 }
 
 export interface JobAssignment {

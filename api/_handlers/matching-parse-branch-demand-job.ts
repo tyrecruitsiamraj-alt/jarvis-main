@@ -34,7 +34,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบงาน ERP');
     }
 
-    const parserInput = buildErpBranchDemandInput(job);
+    const parserInput = getQuery(req, 'text').trim() || buildErpBranchDemandInput(job);
     const parsed = parseErpBranchDemand(parserInput);
 
     const includeMatches = getQuery(req, 'matches') === '1';
