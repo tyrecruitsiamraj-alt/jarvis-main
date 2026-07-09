@@ -32,7 +32,7 @@ function getQuery(req: AuthedReq, key: string): string {
 async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
-    String(it.request_no || it.externalId || it.id || '').trim();
+    String(it.externalId || it.request_no || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -53,7 +53,7 @@ async function attachAssignments(items: unknown[]): Promise<void> {
 async function attachNotes(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
-    String(it.request_no || it.externalId || it.id || '').trim();
+    String(it.externalId || it.request_no || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;

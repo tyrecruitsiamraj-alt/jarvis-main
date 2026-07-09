@@ -75,7 +75,7 @@ describe('buildDashboardData', () => {
     expect(data.activityTrend.every((p) => p.label.length > 0)).toBe(true);
   });
 
-  it('builds year-to-date monthly trend separate from KPI period', () => {
+  it('builds activity trend for selected period only', () => {
     const jobs = [
       job({ id: 'jan', unit_name: 'A', request_date: '2026-01-15', request_action_name: 'ลาออก' }),
       job({ id: 'feb', unit_name: 'B', request_date: '2026-02-10', request_action_name: 'เปลี่ยนตัว' }),
@@ -83,20 +83,17 @@ describe('buildDashboardData', () => {
     ];
     const now = new Date('2026-07-15');
     const period = resolvePeriodRange('this_month', undefined, now);
-    const trend = resolveYearToDateTrendRange(now);
     const scoped = jobs.filter((j) => j.request_date.startsWith('2026-07'));
     const data = buildDashboardData(scoped, [], period, DEFAULT_DASHBOARD_FILTERS, now, {
-      jobs,
-      from: trend.from,
-      to: trend.to,
-      label: trend.label,
+      jobs: scoped,
+      from: period.from,
+      to: period.to,
+      label: period.label,
     });
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(1);
-    expect(data.activityTrend).toHaveLength(7);
-    expect(data.activityTrend[0]?.resignations).toBe(1);
-    expect(data.activityTrend[1]?.replacements).toBe(1);
-    expect(data.activityTrend[6]?.newOpenings).toBe(1);
-    expect(data.activityTrendLabel).toBe(trend.label);
+    expect(data.activityTrend).toHaveLength(1);
+    expect(data.activityTrend[0]?.newOpenings).toBe(1);
+    expect(data.activityTrendLabel).toBe(period.label);
   });
 
   it('weights KPI and age buckets by position_units', () => {

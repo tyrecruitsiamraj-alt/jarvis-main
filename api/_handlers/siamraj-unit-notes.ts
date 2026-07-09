@@ -72,6 +72,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         else return sendError(res, 400, 'Bad request', 'send_replacement must be boolean or null');
       }
 
+      const before = await getUnitNote(requestNo);
+
       const item = await upsertUnitNote({
         requestNo,
         ...(touchesNote ? { note: body.note } : {}),
@@ -83,6 +85,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'siamraj_unit_note.upsert',
         entityType: 'siamraj_unit_note',
         entityId: requestNo,
+        before: before
+          ? { note: before.note, send_replacement: before.send_replacement }
+          : null,
         after: { note: item.note, send_replacement: item.send_replacement },
       });
 

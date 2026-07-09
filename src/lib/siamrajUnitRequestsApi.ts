@@ -92,7 +92,7 @@ export async function saveUnitRequestMeta(
 }
 
 export function unitRequestNoteKey(job: JobRequest): string {
-  return (job.request_no || job.externalId || job.id).trim();
+  return (job.externalId || job.request_no || job.id).trim();
 }
 
 export function isSiamrajJob(job: JobRequest): boolean {

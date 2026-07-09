@@ -6,12 +6,12 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   previousPeriodLabel: 'เดือนที่แล้ว',
   activityTrendLabel: 'ม.ค. 2026 – ก.ค. 2026',
   kpis: [
-    { id: 'total', label: 'งานทั้งหมด', value: 52, description: 'ตำแหน่งที่ต้องการตามตัวกรอง', trendPercent: 12 },
-    { id: 'open', label: 'รอดำเนินการ', value: 21, description: 'ยังไม่ปิด / ไม่ยกเลิก', trendPercent: -5 },
-    { id: 'overdue', label: 'ล่าช้า', value: 6, description: 'เกินกำหนดหรือค้างนาน', trendPercent: 2 },
-    { id: 'completed', label: 'ปิดใบขอ', value: 24, description: 'ตำแหน่งที่ปิดแล้วทุกประเภท', trendPercent: 18 },
-    { id: 'success_rate', label: 'อัตราปิด', value: 50, description: '% ปิดได้จากที่ขอ', trendPercent: 4, format: 'percent' },
+    { id: 'total', label: 'งานทั้งหมด', value: 52, description: 'ตำแหน่งที่ขอในช่วง', trendPercent: 12 },
+    { id: 'completed', label: 'ปิดได้', value: 24, description: 'ตำแหน่งที่ปิดแล้วในช่วง', trendPercent: 18 },
+    { id: 'remaining', label: 'เหลือหาอีก', value: 28, description: 'ตำแหน่งคงเหลือจากใบขอในช่วง', trendPercent: -5 },
+    { id: 'success_rate', label: 'อัตราสำเร็จ', value: 46.2, description: '% ปิดได้เทียบขอมาในช่วง', trendPercent: 4, format: 'percent' },
   ],
+  closedBreakdown: { samePeriod: 18, backlog: 6 },
   activityTrend: [
     { date: '2026-01-01', label: 'ม.ค.', resignations: 6, replacements: 4, newOpenings: 9, requestedPositions: 22, closedPositions: 18 },
     { date: '2026-02-01', label: 'ก.พ.', resignations: 7, replacements: 5, newOpenings: 10, requestedPositions: 24, closedPositions: 20 },

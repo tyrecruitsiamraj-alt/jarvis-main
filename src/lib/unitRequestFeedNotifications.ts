@@ -6,7 +6,7 @@ export type FeedNotificationEvent =
 
 /** คีย์คงที่สำหรับเทียบ feed — ใช้เลขที่ใบขอก่อน id */
 export function unitRequestFeedKey(job: JobRequest): string {
-  return String(job.request_no || job.externalId || job.id || '').trim();
+  return String(job.externalId || job.request_no || job.id || '').trim();
 }
 
 /**

@@ -4,8 +4,14 @@ import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DashboardStatusFilter } from '@/lib/dashboard/types';
 import { DASHBOARD_STATUS_LABELS } from '@/lib/dashboard/buildDashboardData';
+import { resolvePeriodRange } from '@/lib/dashboard/buildDashboardData';
 import type { DashboardTaskStatus } from '@/lib/dashboard/types';
 import { cn } from '@/lib/utils';
+
+const PERIOD_PRESETS = [
+  { id: 'this_month' as const, label: 'เดือนนี้' },
+  { id: 'last_month' as const, label: 'เดือนก่อน' },
+];
 
 const QUEUE_STATUS_OPTIONS: { value: DashboardStatusFilter; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ (ตาราง)' },
@@ -50,6 +56,20 @@ const DashboardFilterBar: React.FC<Props> = ({
   onQueueStatusChange,
   className,
 }) => {
+  const applyPreset = (preset: 'this_month' | 'last_month') => {
+    const p = resolvePeriodRange(preset);
+    onDateRangeChange({ from: p.from, to: p.to });
+  };
+
+  const activePreset = (() => {
+    if (!dateRange) return null;
+    for (const preset of PERIOD_PRESETS) {
+      const p = resolvePeriodRange(preset.id);
+      if (dateRange.from === p.from && dateRange.to === p.to) return preset.id;
+    }
+    return null;
+  })();
+
   return (
     <aside
       className={cn(
@@ -65,15 +85,33 @@ const DashboardFilterBar: React.FC<Props> = ({
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="dashboard-date-range" className="text-xs font-medium text-slate-600">
-          วันที่กรอก
-        </label>
+        <label className="text-xs font-medium text-slate-600">ช่วงเวลา</label>
+        <div className="flex gap-2">
+          {PERIOD_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => applyPreset(preset.id)}
+              className={cn(
+                'flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
+                activePreset === preset.id
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <DateRangeCalendarPicker
           triggerId="dashboard-date-range"
           className="w-full"
           value={dateRange}
           onChange={onDateRangeChange}
         />
+        <p className="text-[11px] text-slate-500">
+          ย้อนหลังนับวันที่กรอก · ฉุกเฉิน/ล่วงหน้านับวันที่ต้องการ
+        </p>
       </div>
 
       <UnitRequestFilterFields

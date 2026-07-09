@@ -1,9 +1,35 @@
 import { isOpenStaffingRowForRemaining, type StaffingOpenRow } from './siamrajStaffingOpen.js';
 
+const DIGITS_ONLY_REQUEST_NO = /^\d{5,}$/;
+
 /** ส่วนตัวเลขท้ายเลขใบขอ เช่น LBM6905015 → 6905015 */
 export function extractRequestNoDigitSuffix(value: string): string | null {
   const m = value.trim().match(/\d{5,}$/);
   return m ? m[0] : null;
+}
+
+/**
+ * ดึง prefix จาก site_code เช่น 67LBDL0324 → LBD
+ * ใช้เมื่อ request_no ใน Siamraj เก็บแค่ตัวเลข
+ */
+export function extractSiteCodeRequestPrefix(siteCode?: string | null): string | null {
+  const s = (siteCode || '').trim();
+  const m = s.match(/^\d{2}([A-Za-z]+)L/i);
+  return m?.[1]?.toUpperCase() || null;
+}
+
+/** แสดงเลขใบขอให้มี prefix ภาษาอังกฤษเมื่อ DB เก็บแค่ตัวเลข */
+export function normalizeSiamrajRequestNoForDisplay(
+  raw: string,
+  hints?: { siteCode?: string | null; departmentCode?: string | null },
+): string {
+  const t = raw.trim();
+  if (!t || !DIGITS_ONLY_REQUEST_NO.test(t)) return t;
+  const fromSite = extractSiteCodeRequestPrefix(hints?.siteCode);
+  if (fromSite) return `${fromSite}${t}`;
+  const dept = (hints?.departmentCode || '').trim().toUpperCase();
+  if (dept.length >= 2 && dept.length <= 4) return `${dept}${t}`;
+  return t;
 }
 
 export function requestNoMatchesLookup(query: string, requestNo: string): boolean {

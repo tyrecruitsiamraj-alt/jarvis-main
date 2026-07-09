@@ -5,6 +5,7 @@ import type { DashboardData, DashboardFilters, DashboardResponsibleRole, Dashboa
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
+import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardAgeOverview from './DashboardAgeOverview';
@@ -137,7 +138,7 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {data.kpis.map((kpi) => (
                   <DashboardKpiCard
                     key={kpi.id}
@@ -146,6 +147,13 @@ const DashboardShell: React.FC<Props> = ({
                   />
                 ))}
               </div>
+
+              {data.closedBreakdown ? (
+                <DashboardClosedBreakdownCard
+                  breakdown={data.closedBreakdown}
+                  closedTotal={data.kpis.find((k) => k.id === 'completed')?.value ?? 0}
+                />
+              ) : null}
 
               <DashboardAgeOverview
                 items={data.ageDaysBreakdown}

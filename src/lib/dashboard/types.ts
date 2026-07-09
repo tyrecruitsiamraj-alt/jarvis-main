@@ -30,6 +30,8 @@ export type DashboardActivityTrendPoint = {
   closedPositions?: number;
   /** คงเหลือต่อเดือน = ขอ − ปิด (ติดลบได้ถ้าปิด backlog เก่า) */
   remainingPositions?: number;
+  /** อัตราสำเร็จรายเดือน = ปิด / ขอ (%) */
+  closeRatePercent?: number | null;
 };
 
 export type DashboardFilters = {
@@ -111,6 +113,11 @@ export type DashboardAgeDaysBreakdown = {
   count: number;
 };
 
+export type DashboardClosedBreakdown = {
+  samePeriod: number;
+  backlog: number;
+};
+
 export type DashboardData = {
   kpis: DashboardKpi[];
   activityTrend: DashboardActivityTrendPoint[];
@@ -120,6 +127,8 @@ export type DashboardData = {
   ageDaysRequestTotal: number;
   /** จำนวนตำแหน่งที่ต้องการรวม — ตรงกับ KPI และผลรวมกล่อง */
   ageDaysPositionTotal: number;
+  /** แยกยอดปิดในช่วง: ขอในช่วง vs backlog */
+  closedBreakdown?: DashboardClosedBreakdown;
   recruiterOverview: DashboardRecruiterOverview[];
   workQueue: DashboardWorkItem[];
   periodLabel: string;

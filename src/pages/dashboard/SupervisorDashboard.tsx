@@ -7,9 +7,9 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useSiamrajUnitRequestFilters, filterUnitRequests } from '@/hooks/useSiamrajUnitRequestFilters';
 import {
   buildDashboardData,
+  defaultDashboardDateRange,
   filterJobsByRequestDate,
   resolvePeriodRange,
-  resolveYearToDateTrendRange,
   sortWorkQueue,
 } from '@/lib/dashboard/buildDashboardData';
 import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dashboardPageState';
@@ -45,7 +45,7 @@ const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<DashboardFilters>(() => loadDashboardFilters());
   const [unitFilters, setUnitFilters] = useState(() => loadSupervisorDashboardFilters());
-  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(null);
+  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultDashboardDateRange());
   const [sortKey, setSortKey] = useState<DashboardSortKey>('priority');
   const [sortDir, setSortDir] = useState<DashboardSortDir>('asc');
   const [staffRosterRev, setStaffRosterRev] = useState(0);
@@ -60,15 +60,20 @@ const SupervisorDashboard: React.FC = () => {
 
   const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource } = useUnitRequestsFeed();
 
+  const period = useMemo(
+    () => resolvePeriodRange('custom', dateRange ?? defaultDashboardDateRange()),
+    [dateRange],
+  );
+
   useEffect(() => {
     if (DEMO_MODE) {
       setThroughputRecords([]);
       return;
     }
-    const trendRange = resolveYearToDateTrendRange();
+    const range = period;
     if (siamrajPrimary && dbSource === 'sqlserver') {
       let cancelled = false;
-      void fetchSiamrajThroughput(trendRange.from, trendRange.to)
+      void fetchSiamrajThroughput(range.previousFrom, range.to)
         .then((rows) => {
           if (!cancelled) setThroughputRecords(rows);
         })
@@ -80,14 +85,9 @@ const SupervisorDashboard: React.FC = () => {
       };
     }
     setThroughputRecords(
-      jobsToThroughputRecords(filterJobsForThroughput(jobs, trendRange.from, trendRange.to)),
+      jobsToThroughputRecords(filterJobsForThroughput(jobs, range.previousFrom, range.to)),
     );
-  }, [jobs, siamrajPrimary, dbSource, refreshing]);
-
-  const period = useMemo(
-    () => (dateRange ? resolvePeriodRange('custom', dateRange) : null),
-    [dateRange],
-  );
+  }, [jobs, siamrajPrimary, dbSource, refreshing, period]);
 
   useEffect(() => {
     if (DEMO_MODE) {
@@ -98,7 +98,7 @@ const SupervisorDashboard: React.FC = () => {
       setClosedJobs([]);
       return;
     }
-    const range = period ?? resolveYearToDateTrendRange();
+    const range = period;
     let cancelled = false;
     void fetchSiamrajClosedRequests(range.from, range.to)
       .then((rows) => {
@@ -121,7 +121,6 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const scopedJobs = useMemo(() => {
-    if (!period) return jobsWithoutAgeFilter;
     return filterJobsByRequestDate(jobsWithoutAgeFilter, period.from, period.to);
   }, [jobsWithoutAgeFilter, period]);
 
@@ -194,12 +193,8 @@ const SupervisorDashboard: React.FC = () => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
     const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters, { ageDaysFilter: true });
-    const trendRange = resolveYearToDateTrendRange();
-    const trendJobs = filterJobsByRequestDate(unitFilteredAll, trendRange.from, trendRange.to);
-    const previousScoped =
-      period != null
-        ? filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo)
-        : [];
+    const trendJobs = filterJobsByRequestDate(unitFilteredAll, period.from, period.to);
+    const previousScoped = filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo);
     // ใบขอที่ปิดแล้ว — กรองด้วยฟิลเตอร์หน่วยงานชุดเดียวกัน (ข้ามฟิลเตอร์สถานะ/อายุที่ไม่เกี่ยวกับใบปิด)
     const scopedClosedJobs = filterUnitRequests(closedJobs, siamrajPrimary, unitFilters, {
       statusFilter: true,
@@ -214,9 +209,9 @@ const SupervisorDashboard: React.FC = () => {
       new Date(),
       {
         jobs: trendJobs,
-        from: trendRange.from,
-        to: trendRange.to,
-        label: trendRange.label,
+        from: period.from,
+        to: period.to,
+        label: period.label,
         throughputRecords,
       },
       scopedClosedJobs,
@@ -256,9 +251,8 @@ const SupervisorDashboard: React.FC = () => {
       // การ์ด "ปิดใบขอ"/"อัตราปิด" นับจาก throughput (รวม backlog/ปิดแล้ว) — feed หลักมีแต่ใบที่ยังเปิด
       // จึงต้องดึงรายการใบที่ปิดในช่วงเดียวกันมาโชว์ ให้เลขตรงกับการ์ด (ไม่งั้น "ปิดแล้วหายไป")
       if ((kpiId === 'completed' || kpiId === 'success_rate') && siamrajPrimary && dbSource === 'sqlserver') {
-        const range = period ?? resolveYearToDateTrendRange();
         try {
-          const closed = await fetchSiamrajClosedRequests(range.from, range.to);
+          const closed = await fetchSiamrajClosedRequests(period.from, period.to);
           openJobList(label, closed);
         } catch {
           openJobList(label, []);

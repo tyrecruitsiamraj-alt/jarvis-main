@@ -16,13 +16,9 @@ export function filterJobsForDashboardKpi(
   switch (kpiId) {
     case 'total':
       return jobs;
+    case 'remaining':
     case 'open':
-      return jobs.filter((j) => {
-        const st = mapJobToTaskStatus(j, today);
-        return st === 'pending' || st === 'in_progress' || st === 'at_risk' || st === 'overdue';
-      });
-    case 'overdue':
-      return jobs.filter((j) => mapJobToTaskStatus(j, today) === 'overdue');
+      return jobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
     case 'completed':
     case 'success_rate':
       return jobs.filter((j) => mapJobToTaskStatus(j, today) === 'completed');

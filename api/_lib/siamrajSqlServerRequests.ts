@@ -17,6 +17,7 @@ import {
 } from './siamrajBoardRequestTypes.js';
 import {
   extractRequestNoDigitSuffix,
+  normalizeSiamrajRequestNoForDisplay,
   pickBestRequestNoCandidate,
 } from './siamrajRequestNo.js';
 
@@ -96,12 +97,18 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   const genderRequirement = formatGenderRequirement(r.sex);
   const jobType = inferJobTypeFromDescription(r.job_name1, r.job_name2, r.staff_title_name, r.job_description_code_1);
 
+  const rawRequestNo = (r.request_no || '').trim();
+  const requestNo = normalizeSiamrajRequestNoForDisplay(rawRequestNo, {
+    siteCode: r.site_code,
+    departmentCode: r.department_code,
+  });
+
   return {
-    id: `siamraj-sql:${r.external_id}`,
-    externalId: r.external_id,
+    id: `siamraj-sql:${rawRequestNo}`,
+    externalId: rawRequestNo,
     source: 'siamraj' as const,
     readOnly: true,
-    request_no: (r.request_no || '').trim(),
+    request_no: requestNo,
     submittedByName: r.requester_name?.trim() || undefined,
     submittedAt: toIso(r.act_saleco_datetime) || undefined,
     required_date:

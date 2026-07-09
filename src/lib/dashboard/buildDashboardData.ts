@@ -22,6 +22,7 @@ import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
 import { pickUnitOrganizationDisplayName, buildOrganizationKeyResolver } from '@/lib/unitGroupName';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
+import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
 import type {
   DashboardActivityTrendPoint,
   DashboardData,
@@ -298,11 +299,17 @@ function inYmdRange(ymd: string, from: string, to: string): boolean {
   return ymd >= from && ymd <= to;
 }
 
-export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: string): JobRequest[] {
+export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: string, today = new Date()): JobRequest[] {
   return jobs.filter((j) => {
-    const ymd = jobRequestDateYmd(j);
+    const ymd = effectiveRequestDateYmd(j, today);
     return ymd ? inYmdRange(ymd, from, to) : false;
   });
+}
+
+/** ช่วงวันที่เริ่มต้นสำหรับ Dashboard — เดือนนี้ */
+export function defaultDashboardDateRange(now = new Date()): { from: string; to: string } {
+  const p = resolvePeriodRange('this_month', undefined, now);
+  return { from: p.from, to: p.to };
 }
 
 function trendPercent(current: number, previous: number): number | null {
@@ -338,12 +345,14 @@ function buildKpis(
     previousTo: string;
   },
 ): DashboardKpi[] {
-  const cur = countByStatus(current, today);
-  const prev = countByStatus(previous, today);
   const curTotal = sumJobPositionUnits(current);
   const prevTotal = sumJobPositionUnits(previous);
-  const curOpen = cur.pending + cur.in_progress + cur.at_risk + cur.overdue;
-  const prevOpen = prev.pending + prev.in_progress + prev.at_risk + prev.overdue;
+  const curRemaining = current
+    .filter((j) => j.status !== 'closed' && j.status !== 'cancelled')
+    .reduce((sum, j) => sum + jobPositionUnits(j), 0);
+  const prevRemaining = previous
+    .filter((j) => j.status !== 'closed' && j.status !== 'cancelled')
+    .reduce((sum, j) => sum + jobPositionUnits(j), 0);
 
   const throughputCur = throughput
     ? sumThroughputInRange(throughput.records, throughput.from, throughput.to)
@@ -354,60 +363,51 @@ function buildKpis(
 
   const requestedTotal = throughputCur?.requested ?? curTotal;
   const prevRequestedTotal = throughputPrev?.requested ?? prevTotal;
-  const closedTotal = throughputCur?.closed ?? cur.completed;
-  const prevClosedTotal = throughputPrev?.closed ?? prev.completed;
+  const closedTotal = throughputCur?.closed ?? 0;
+  const prevClosedTotal = throughputPrev?.closed ?? 0;
+  const remainingTotal = throughputCur?.remaining ?? curRemaining;
+  const prevRemainingTotal = throughputPrev?.remaining ?? prevRemaining;
   const closeRate = requestedTotal
     ? Math.round((closedTotal / requestedTotal) * 1000) / 10
     : 0;
   const prevCloseRate = prevRequestedTotal
     ? Math.round((prevClosedTotal / prevRequestedTotal) * 1000) / 10
     : 0;
-  const closedExceedsRequested = Boolean(throughputCur && closedTotal > requestedTotal);
+  const closedBacklog = throughputCur?.closedBacklog ?? 0;
 
   return [
     {
       id: 'total',
-      label: throughputCur ? 'ขอมา' : 'งานทั้งหมด',
+      label: 'งานทั้งหมด',
       value: requestedTotal,
       description: throughputCur
-        ? closedExceedsRequested
-          ? 'ตำแหน่งที่กรอกใบขอใหม่ในช่วงที่เลือก (ไม่รวม backlog เก่า)'
-          : 'ตำแหน่งที่กรอกใบขอในช่วงที่เลือก'
-        : 'ตำแหน่งที่ต้องการตามตัวกรอง',
+        ? 'ตำแหน่งที่ขอในช่วง (ย้อนหลัง=วันที่กรอก · ฉุกเฉิน/ล่วงหน้า=วันที่ต้องการ)'
+        : 'ตำแหน่งคงเหลือตามตัวกรอง',
       trendPercent: trendPercent(requestedTotal, prevRequestedTotal),
     },
     {
-      id: 'open',
-      label: 'รอดำเนินการ',
-      value: curOpen,
-      description: 'ตำแหน่งที่ยังไม่ปิด / ไม่ยกเลิก',
-      trendPercent: trendPercent(curOpen, prevOpen),
-    },
-    {
-      id: 'overdue',
-      label: 'ล่าช้า',
-      value: cur.overdue,
-      description: 'ตำแหน่งที่เกินกำหนดหรือค้างนาน',
-      trendPercent: trendPercent(cur.overdue, prev.overdue),
-    },
-    {
       id: 'completed',
-      label: 'ปิดใบขอ',
+      label: 'ปิดได้',
       value: closedTotal,
       description: throughputCur
-        ? closedExceedsRequested
-          ? 'รวมใบขอเก่าที่ปิดในช่วงนี้ — ปิดมากกว่าขอในรอบนี้ได้'
-          : 'ตำแหน่งที่ปิดแล้วทุกประเภทในช่วงที่เลือก'
+        ? closedBacklog > 0
+          ? `รวม backlog เก่าที่ปิดในช่วงนี้ ${closedBacklog.toLocaleString('th-TH')} ตำแหน่ง`
+          : 'ตำแหน่งที่ปิดแล้วในช่วงที่เลือก'
         : 'ตำแหน่งที่ปิดงานแล้ว',
       trendPercent: trendPercent(closedTotal, prevClosedTotal),
     },
     {
+      id: 'remaining',
+      label: 'เหลือหาอีก',
+      value: remainingTotal,
+      description: 'ตำแหน่งคงเหลือจากใบขอในช่วงที่ยังเปิดอยู่',
+      trendPercent: trendPercent(remainingTotal, prevRemainingTotal),
+    },
+    {
       id: 'success_rate',
-      label: 'อัตราปิด',
+      label: 'อัตราสำเร็จ',
       value: closeRate,
-      description: closedExceedsRequested
-        ? 'เกิน 100% ได้ — นับปิดจาก backlog ที่ขอมาก่อนช่วงนี้'
-        : '% ปิดได้จากที่ขอในช่วงเดียวกัน',
+      description: '% ปิดได้เทียบขอมาในช่วงเดียวกัน',
       trendPercent: trendPercent(closeRate, prevCloseRate),
       format: 'percent',
     },
@@ -421,13 +421,13 @@ function monthTrendLabel(d: Date, from: string, to: string): string {
     : format(d, 'MMM yyyy', { locale: th });
 }
 
-function buildActivityTrend(jobs: JobRequest[], from: string, to: string): DashboardActivityTrendPoint[] {
+function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today = new Date()): DashboardActivityTrendPoint[] {
   const resignMap = new Map<string, number>();
   const replaceMap = new Map<string, number>();
   const newMap = new Map<string, number>();
 
   for (const j of jobs) {
-    const ymd = jobRequestDateYmd(j);
+    const ymd = effectiveRequestDateYmd(j, today);
     if (!ymd || !inYmdRange(ymd, from, to)) continue;
     const month = ymd.slice(0, 7);
     const kind = classifyRequestActivity(j);
@@ -638,19 +638,27 @@ export function buildDashboardData(
     trend?.throughputRecords ??
     jobsToThroughputRecords(filterJobsForThroughput(trendJobs, trendFrom, trendTo));
   const activityTrend = enrichActivityTrendWithThroughput(
-    buildActivityTrend(trendJobs, trendFrom, trendTo),
+    buildActivityTrend(trendJobs, trendFrom, trendTo, today),
     throughputRecords,
   );
 
   const kpiThroughput =
-    throughputRecords.length > 0
+    throughputRecords.length > 0 && period
       ? {
           records: throughputRecords,
-          from: period?.from ?? trendFrom,
-          to: period?.to ?? trendTo,
-          previousFrom: period?.previousFrom ?? trendFrom,
-          previousTo: period?.previousTo ?? trendTo,
+          from: period.from,
+          to: period.to,
+          previousFrom: period.previousFrom,
+          previousTo: period.previousTo,
         }
+      : undefined;
+
+  const closedBreakdown =
+    kpiThroughput != null
+      ? (() => {
+          const s = sumThroughputInRange(kpiThroughput.records, kpiThroughput.from, kpiThroughput.to);
+          return { samePeriod: s.closedSamePeriod, backlog: s.closedBacklog };
+        })()
       : undefined;
 
   return {
@@ -660,6 +668,7 @@ export function buildDashboardData(
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     ageDaysRequestTotal: scopedJobs.length,
     ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),
+    closedBreakdown,
     recruiterOverview: buildRecruiterOverview(scopedJobs, today, closedJobs),
     workQueue: sortedQueue,
     periodLabel,

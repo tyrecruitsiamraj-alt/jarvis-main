@@ -82,13 +82,14 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   }, [rosterRev]);
 
   const requestNo = data?.request_no;
+  const requestKey = (data?.externalId || data?.request_no)?.trim();
   const dirty =
     (recruiter.trim() || '') !== (data?.recruiter_name ?? '') ||
     (screener.trim() || '') !== (data?.screener_name ?? '') ||
     (opl.trim() || '') !== (data?.opl_name ?? '');
 
   const saveAssignment = async () => {
-    const key = requestNo?.trim();
+    const key = requestKey;
     if (!key || saving) return;
     setSaving(true);
     setSaveMsg(null);
@@ -241,13 +242,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => void saveAssignment()}
-                      disabled={saving || !requestNo?.trim() || !dirty}
+                      disabled={saving || !requestKey || !dirty}
                       className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
                     >
                       {saving ? 'กำลังบันทึก…' : 'บันทึกผู้รับผิดชอบ'}
                     </button>
                     {saveMsg && <span className="text-xs text-muted-foreground">{saveMsg}</span>}
-                    {!requestNo && (
+                    {!requestKey && (
                       <span className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกไม่ได้</span>
                     )}
                   </div>

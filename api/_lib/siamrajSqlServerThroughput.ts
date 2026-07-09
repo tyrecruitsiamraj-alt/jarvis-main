@@ -29,6 +29,7 @@ export type SiamrajThroughputRecord = {
 
 type SqlThroughputRow = {
   request_date: Date | string | null;
+  want_date_from: Date | string | null;
   request_qty: number | null;
   inform_qty: number | null;
   is_inform_all: string | null;
@@ -62,20 +63,42 @@ function toYmd(v: Date | string | null | undefined): string | null {
   return ymd || null;
 }
 
+function effectiveRequestDateSql(alias = 'A'): string {
+  return `(
+    CASE
+      WHEN ${alias}.want_date_from IS NOT NULL
+        AND CONVERT(date, ${alias}.want_date_from) < CONVERT(date, ${alias}.request_date)
+        THEN CONVERT(date, ${alias}.request_date)
+      WHEN ${alias}.want_date_from IS NOT NULL
+        THEN CONVERT(date, ${alias}.want_date_from)
+      ELSE CONVERT(date, ${alias}.request_date)
+    END
+  )`;
+}
+
+function effectiveRequestDateYmdFromRow(row: SqlThroughputRow): string | null {
+  const submit = toYmd(row.request_date);
+  const required = toYmd(row.want_date_from);
+  if (!submit) return required;
+  if (!required) return submit;
+  if (required < submit) return submit;
+  return required;
+}
+
 function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
-  const requestDate = toYmd(row.request_date);
-  if (!requestDate) return [];
+  const effectiveRequestDate = effectiveRequestDateYmdFromRow(row);
+  if (!effectiveRequestDate) return [];
 
   const total = requestPositionTotal(row.request_qty);
   const informed = effectiveInformedCount(row);
   const remaining = remainingOpenPositionsFromRow(row);
   const isOpen = isOpenStaffingRowForRemaining(row);
-  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
+  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || effectiveRequestDate;
   const out: SiamrajThroughputRecord[] = [];
 
   if (informed > 0) {
     out.push({
-      requestDate,
+      requestDate: effectiveRequestDate,
       closureDate,
       positionUnits: informed,
       isOpen: false,
@@ -84,14 +107,14 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
 
   if (isOpen && remaining > 0) {
     out.push({
-      requestDate,
+      requestDate: effectiveRequestDate,
       closureDate: null,
       positionUnits: remaining,
       isOpen: true,
     });
   } else if (!isOpen && informed === 0) {
     out.push({
-      requestDate,
+      requestDate: effectiveRequestDate,
       closureDate,
       positionUnits: total,
       isOpen: false,
@@ -118,10 +141,12 @@ export async function listSiamrajSqlServerThroughput(options: {
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
 
+  const effDate = effectiveRequestDateSql('A');
   const rows = await siamrajSqlQuery<SqlThroughputRow>(
     `
     SELECT
       A.request_date,
+      A.want_date_from,
       A.request_qty,
       A.inform_qty,
       A.is_inform_all,
@@ -141,12 +166,12 @@ export async function listSiamrajSqlServerThroughput(options: {
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
       AND (
-        CONVERT(date, A.request_date) >= @fromDate AND CONVERT(date, A.request_date) <= @toDate
+        ${effDate} >= @fromDate AND ${effDate} <= @toDate
         OR (A.stop_date IS NOT NULL AND CONVERT(date, A.stop_date) >= @fromDate AND CONVERT(date, A.stop_date) <= @toDate)
         OR (A.cancel_date IS NOT NULL AND CONVERT(date, A.cancel_date) >= @fromDate AND CONVERT(date, A.cancel_date) <= @toDate)
         OR (
           ISNULL(A.inform_qty, 0) > 0
-          AND CONVERT(date, A.request_date) >= @fromDate AND CONVERT(date, A.request_date) <= @toDate
+          AND ${effDate} >= @fromDate AND ${effDate} <= @toDate
         )
       )
   `,

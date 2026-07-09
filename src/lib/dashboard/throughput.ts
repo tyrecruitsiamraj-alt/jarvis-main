@@ -1,6 +1,6 @@
 import type { JobRequest } from '@/types';
+import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
-import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import type { DashboardActivityTrendPoint } from '@/lib/dashboard/types';
 
 export type ThroughputRecord = {
@@ -8,6 +8,19 @@ export type ThroughputRecord = {
   closureDate: string | null;
   positionUnits: number;
   isOpen: boolean;
+};
+
+export type ThroughputSummary = {
+  /** ตำแหน่งที่ขอในช่วง (รวมทุกส่วนของใบขอ) */
+  requested: number;
+  /** ตำแหน่งที่ปิดในช่วง */
+  closed: number;
+  /** ตำแหน่งคงเหลือจากใบขอในช่วง */
+  remaining: number;
+  /** ปิดในช่วง + ขอในช่วง */
+  closedSamePeriod: number;
+  /** ปิดในช่วง + ขอก่อนช่วง (backlog) */
+  closedBacklog: number;
 };
 
 function safeYmd(value?: string | null): string | null {
@@ -20,10 +33,10 @@ function inYmdRange(ymd: string, from: string, to: string): boolean {
   return ymd >= from && ymd <= to;
 }
 
-export function jobsToThroughputRecords(jobs: JobRequest[]): ThroughputRecord[] {
+export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()): ThroughputRecord[] {
   const out: ThroughputRecord[] = [];
   for (const j of jobs) {
-    const requestDate = jobRequestDateYmd(j);
+    const requestDate = effectiveRequestDateYmd(j, today);
     if (!requestDate) continue;
     const isOpen = j.status !== 'closed' && j.status !== 'cancelled';
     const closureDate =
@@ -38,9 +51,14 @@ export function jobsToThroughputRecords(jobs: JobRequest[]): ThroughputRecord[] 
   return out;
 }
 
-export function filterJobsForThroughput(jobs: JobRequest[], from: string, to: string): JobRequest[] {
+export function filterJobsForThroughput(
+  jobs: JobRequest[],
+  from: string,
+  to: string,
+  today = new Date(),
+): JobRequest[] {
   return jobs.filter((j) => {
-    const rd = jobRequestDateYmd(j);
+    const rd = effectiveRequestDateYmd(j, today);
     const cd =
       j.status === 'closed' || j.status === 'cancelled'
         ? safeYmd(j.closed_date) || rd
@@ -55,16 +73,27 @@ export function sumThroughputInRange(
   records: ThroughputRecord[],
   from: string,
   to: string,
-): { requested: number; closed: number } {
+): ThroughputSummary {
   let requested = 0;
   let closed = 0;
+  let remaining = 0;
+  let closedSamePeriod = 0;
+  let closedBacklog = 0;
+
   for (const r of records) {
-    if (inYmdRange(r.requestDate, from, to)) requested += r.positionUnits;
+    const inRequestPeriod = inYmdRange(r.requestDate, from, to);
+    if (inRequestPeriod) {
+      requested += r.positionUnits;
+      if (r.isOpen) remaining += r.positionUnits;
+    }
     if (!r.isOpen && r.closureDate && inYmdRange(r.closureDate, from, to)) {
       closed += r.positionUnits;
+      if (inRequestPeriod) closedSamePeriod += r.positionUnits;
+      else closedBacklog += r.positionUnits;
     }
   }
-  return { requested, closed };
+
+  return { requested, closed, remaining, closedSamePeriod, closedBacklog };
 }
 
 export function enrichActivityTrendWithThroughput(
@@ -87,11 +116,14 @@ export function enrichActivityTrendWithThroughput(
     const month = p.date.slice(0, 7);
     const requested = requestedMap.get(month) ?? 0;
     const closed = closedMap.get(month) ?? 0;
+    const closeRatePercent =
+      requested > 0 ? Math.round((closed / requested) * 1000) / 10 : null;
     return {
       ...p,
       requestedPositions: requested,
       closedPositions: closed,
       remainingPositions: requested - closed,
+      closeRatePercent,
     };
   });
 }
