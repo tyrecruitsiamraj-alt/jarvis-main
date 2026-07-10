@@ -110,6 +110,27 @@ describe('buildDashboardData', () => {
     expect(bucketTotal).toBe(5);
   });
 
+  it('remaining KPI counts all open positions, not only period-scoped requests', () => {
+    const jobs = [
+      job({ id: 'old', unit_name: 'A', position_units: 52, request_date: '2026-05-01', required_date: '2026-05-01' }),
+      job({ id: 'new', unit_name: 'B', position_units: 45, request_date: '2026-07-02', required_date: '2026-07-20' }),
+    ];
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const scoped = jobs.filter((j) => j.request_date.startsWith('2026-07'));
+    const data = buildDashboardData(
+      scoped,
+      [],
+      period,
+      DEFAULT_DASHBOARD_FILTERS,
+      new Date('2026-07-15'),
+      undefined,
+      [],
+      jobs,
+    );
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(45);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(97);
+  });
+
   it('filters work queue by search', () => {
     const jobs = [
       job({ id: '1', unit_name: 'Alpha', recruiter_name: 'Ann', request_date: '2026-07-01' }),

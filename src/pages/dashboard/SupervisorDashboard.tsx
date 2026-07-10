@@ -215,12 +215,13 @@ const SupervisorDashboard: React.FC = () => {
         throughputRecords,
       },
       scopedClosedJobs,
+      jobsWithoutAgeFilter,
     );
     return {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, closedJobs]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, closedJobs, jobsWithoutAgeFilter]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
@@ -259,9 +260,13 @@ const SupervisorDashboard: React.FC = () => {
         }
         return;
       }
+      if (kpiId === 'remaining') {
+        openJobList(label, filterJobsForDashboardKpi(jobsWithoutAgeFilter, kpiId));
+        return;
+      }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, scopedJobs, siamrajPrimary, dbSource, period],
+    [openJobList, scopedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period],
   );
 
   const handleAgeBucketClick = useCallback(

@@ -333,9 +333,16 @@ function countByStatus(jobs: JobRequest[], today: Date): Record<DashboardTaskSta
   return counts;
 }
 
+function sumOpenRemainingPositions(jobs: JobRequest[]): number {
+  return jobs
+    .filter((j) => j.status !== 'closed' && j.status !== 'cancelled')
+    .reduce((sum, j) => sum + jobPositionUnits(j), 0);
+}
+
 function buildKpis(
   current: JobRequest[],
   previous: JobRequest[],
+  openJobs: JobRequest[],
   today: Date,
   throughput?: {
     records: ThroughputRecord[];
@@ -347,12 +354,7 @@ function buildKpis(
 ): DashboardKpi[] {
   const curTotal = sumJobPositionUnits(current);
   const prevTotal = sumJobPositionUnits(previous);
-  const curRemaining = current
-    .filter((j) => j.status !== 'closed' && j.status !== 'cancelled')
-    .reduce((sum, j) => sum + jobPositionUnits(j), 0);
-  const prevRemaining = previous
-    .filter((j) => j.status !== 'closed' && j.status !== 'cancelled')
-    .reduce((sum, j) => sum + jobPositionUnits(j), 0);
+  const remainingTotal = sumOpenRemainingPositions(openJobs);
 
   const throughputCur = throughput
     ? sumThroughputInRange(throughput.records, throughput.from, throughput.to)
@@ -365,8 +367,6 @@ function buildKpis(
   const prevRequestedTotal = throughputPrev?.requested ?? prevTotal;
   const closedTotal = throughputCur?.closed ?? 0;
   const prevClosedTotal = throughputPrev?.closed ?? 0;
-  const remainingTotal = throughputCur?.remaining ?? curRemaining;
-  const prevRemainingTotal = throughputPrev?.remaining ?? prevRemaining;
   const closeRate = requestedTotal
     ? Math.round((closedTotal / requestedTotal) * 1000) / 10
     : 0;
@@ -400,8 +400,8 @@ function buildKpis(
       id: 'remaining',
       label: 'เหลือหาอีก',
       value: remainingTotal,
-      description: 'ตำแหน่งคงเหลือจากใบขอในช่วงที่ยังเปิดอยู่',
-      trendPercent: trendPercent(remainingTotal, prevRemainingTotal),
+      description: 'ตำแหน่งคงเหลือที่ยังเปิดอยู่ทั้งหมด (ตามตัวกรอง · ไม่กรองช่วงวันที่)',
+      trendPercent: null,
     },
     {
       id: 'success_rate',
@@ -623,7 +623,9 @@ export function buildDashboardData(
   today = new Date(),
   trend?: BuildDashboardTrendInput,
   closedJobs: JobRequest[] = [],
+  openJobs?: JobRequest[],
 ): DashboardData {
+  const openJobSet = openJobs ?? scopedJobs;
   const workItems = scopedJobs.map((j) => jobToWorkItem(j, today));
   const filteredQueue = applyDashboardFilters(workItems, uiFilters);
   const sortedQueue = sortWorkQueue(filteredQueue, 'priority', 'asc');
@@ -662,7 +664,7 @@ export function buildDashboardData(
       : undefined;
 
   return {
-    kpis: buildKpis(scopedJobs, previousScopedJobs, today, kpiThroughput),
+    kpis: buildKpis(scopedJobs, previousScopedJobs, openJobSet, today, kpiThroughput),
     activityTrend,
     unitOverview: buildUnitOverview(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
