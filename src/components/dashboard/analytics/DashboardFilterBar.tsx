@@ -1,11 +1,42 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DashboardStatusFilter } from '@/lib/dashboard/types';
 import { DASHBOARD_STATUS_LABELS } from '@/lib/dashboard/buildDashboardData';
+import { resolvePeriodRange } from '@/lib/dashboard/buildDashboardData';
 import type { DashboardTaskStatus } from '@/lib/dashboard/types';
+import { THAI_MONTHS, ceToBeYear, toYmdLocal } from '@/lib/dateTh';
 import { cn } from '@/lib/utils';
+
+const PERIOD_PRESETS = [
+  { id: 'all' as const, label: 'ทั้งหมด' },
+  { id: 'this_month' as const, label: 'เดือนนี้' },
+  { id: 'last_month' as const, label: 'เดือนก่อน' },
+];
+
+const MONTH_OPTIONS_COUNT = 24;
+
+type MonthOption = { key: string; label: string; from: string; to: string };
+
+function buildMonthOptions(now = new Date()): MonthOption[] {
+  const options: MonthOption[] = [];
+  for (let i = 0; i < MONTH_OPTIONS_COUNT; i += 1) {
+    const d = subMonths(now, i);
+    const from = toYmdLocal(startOfMonth(d));
+    const to = toYmdLocal(endOfMonth(d));
+    const monthLabel = THAI_MONTHS[d.getMonth()]?.label ?? String(d.getMonth() + 1);
+    const yearBe = ceToBeYear(d.getFullYear());
+    options.push({
+      key: from.slice(0, 7),
+      label: `${monthLabel} ${yearBe}`,
+      from,
+      to,
+    });
+  }
+  return options;
+}
 
 const QUEUE_STATUS_OPTIONS: { value: DashboardStatusFilter; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ (ตาราง)' },
@@ -50,6 +81,42 @@ const DashboardFilterBar: React.FC<Props> = ({
   onQueueStatusChange,
   className,
 }) => {
+  const monthOptions = useMemo(() => buildMonthOptions(), []);
+
+  const applyPreset = (preset: 'all' | 'this_month' | 'last_month') => {
+    if (preset === 'all') {
+      onDateRangeChange(null);
+      return;
+    }
+    const p = resolvePeriodRange(preset);
+    onDateRangeChange({ from: p.from, to: p.to });
+  };
+
+  const applyMonth = (monthKey: string) => {
+    if (!monthKey) {
+      onDateRangeChange(null);
+      return;
+    }
+    const option = monthOptions.find((m) => m.key === monthKey);
+    if (!option) return;
+    onDateRangeChange({ from: option.from, to: option.to });
+  };
+
+  const activePreset = (() => {
+    if (!dateRange) return 'all';
+    for (const preset of PERIOD_PRESETS) {
+      if (preset.id === 'all') continue;
+      const p = resolvePeriodRange(preset.id);
+      if (dateRange.from === p.from && dateRange.to === p.to) return preset.id;
+    }
+    return null;
+  })();
+
+  const selectedMonthKey =
+    dateRange != null
+      ? (monthOptions.find((m) => m.from === dateRange.from && m.to === dateRange.to)?.key ?? '')
+      : '';
+
   return (
     <aside
       className={cn(
@@ -59,15 +126,41 @@ const DashboardFilterBar: React.FC<Props> = ({
     >
       <div>
         <h2 className="text-sm font-semibold text-slate-900">ตัวกรอง</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          เงื่อนไขเดียวกับหน้ารายการหน่วยงาน · กรองวันที่กรอกได้เพิ่มเติม
-        </p>
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="dashboard-date-range" className="text-xs font-medium text-slate-600">
-          วันที่กรอก
-        </label>
+        <label className="text-xs font-medium text-slate-600">ช่วงเวลา</label>
+        <div className="flex flex-wrap gap-2">
+          {PERIOD_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => applyPreset(preset.id)}
+              className={cn(
+                'flex-1 min-w-[4.5rem] rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
+                activePreset === preset.id
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <select
+          id="dashboard-month-select"
+          value={selectedMonthKey}
+          onChange={(e) => applyMonth(e.target.value)}
+          className="jarvis-filter-select w-full text-sm"
+          aria-label="เลือกเดือน"
+        >
+          <option value="">เลือกเดือน…</option>
+          {monthOptions.map((m) => (
+            <option key={m.key} value={m.key}>
+              {m.label}
+            </option>
+          ))}
+        </select>
         <DateRangeCalendarPicker
           triggerId="dashboard-date-range"
           className="w-full"

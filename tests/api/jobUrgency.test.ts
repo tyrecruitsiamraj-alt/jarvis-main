@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeJobUrgency, countAgeDaysBreakdown, getJobRequestAgeLabel, matchesAgeDaysFilter, matchesUrgencyFilter } from '../../src/lib/jobUrgency';
+import { computeJobUrgency, countAgeDaysBreakdown, effectiveRequestDateYmd, getJobRequestAgeLabel, matchesAgeDaysFilter, matchesUrgencyFilter } from '../../src/lib/jobUrgency';
 import type { JobRequest } from '../../src/types';
 
 function job(partial: Partial<JobRequest>): JobRequest {
@@ -210,5 +210,19 @@ describe('countAgeDaysBreakdown', () => {
     const counts = countAgeDaysBreakdown(jobs, today);
     const sum = Object.values(counts).reduce((a, b) => a + b, 0);
     expect(sum).toBe(5);
+  });
+});
+
+describe('effectiveRequestDateYmd', () => {
+  it('uses submit date for retroactive requests', () => {
+    const j = job({ submittedAt: '2026-07-10', required_date: '2026-07-05' });
+    expect(effectiveRequestDateYmd(j)).toBe('2026-07-10');
+  });
+
+  it('uses required date for urgent and advance requests', () => {
+    const urgent = job({ submittedAt: '2026-07-01', required_date: '2026-07-05' });
+    const advance = job({ submittedAt: '2026-07-01', required_date: '2026-08-01' });
+    expect(effectiveRequestDateYmd(urgent)).toBe('2026-07-05');
+    expect(effectiveRequestDateYmd(advance)).toBe('2026-08-01');
   });
 });

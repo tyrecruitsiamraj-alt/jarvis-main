@@ -44,6 +44,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const requestNo = getString(body.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no is required');
 
+      const before = await getUnitAssignment(requestNo);
+
       const item = await upsertUnitAssignment({
         requestNo,
         recruiterName: body.recruiter_name,
@@ -56,6 +58,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'siamraj_unit_assignment.upsert',
         entityType: 'siamraj_unit_assignment',
         entityId: requestNo,
+        before: before
+          ? {
+              recruiter_name: before.recruiter_name,
+              screener_name: before.screener_name,
+              opl_name: before.opl_name,
+            }
+          : null,
         after: {
           recruiter_name: item.recruiter_name,
           screener_name: item.screener_name,

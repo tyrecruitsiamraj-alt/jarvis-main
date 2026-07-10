@@ -43,9 +43,26 @@ function stripBranchAndLegalSuffix(name: string): string {
   return n;
 }
 
+/** ตัดคำนำหน้าธนาคาร/ธ. ที่ทำให้ชื่อเดียวกันไม่รวมกลุ่ม */
+function stripBankingPrefixes(name: string): string {
+  let n = name.trim();
+  let prev = '';
+  while (n !== prev) {
+    prev = n;
+    n = n
+      .replace(/^ธนาคาร(?=\s)/u, '')
+      .replace(/^ธนาคาร(?=[ก-๙A-Za-z])/u, '')
+      .replace(/^ธ\.(?=\s)/u, '')
+      .replace(/^ธ\.(?=[ก-๙A-Za-z])/u, '')
+      .trim();
+  }
+  return n;
+}
+
 /** คีย์รวมกลุ่ม — ไม่สนช่องว่าง ตัวพิมพ์ จำกัด หรือคำว่า บริษัท */
 function compactOrganizationKey(name: string): string {
-  return stripBranchAndLegalSuffix(name).replace(/\s+/g, '').toLowerCase();
+  const base = stripBankingPrefixes(stripBranchAndLegalSuffix(name));
+  return base.replace(/\s+/g, '').toLowerCase();
 }
 
 /** คีย์รวมกลุ่มหน่วยงาน/ลูกค้า */
@@ -111,7 +128,7 @@ export function buildOrganizationKeyResolver(
 export function unitOrganizationLabel(name?: string | null): string {
   const raw = cleanUnitName(name ?? '');
   if (!raw || raw === '—') return '—';
-  const base = stripBranchAndLegalSuffix(raw);
+  const base = stripBankingPrefixes(stripBranchAndLegalSuffix(raw));
   return base || raw;
 }
 

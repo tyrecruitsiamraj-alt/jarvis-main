@@ -107,6 +107,22 @@ function submittedDate(job: JobRequest): Date | null {
   );
 }
 
+function submittedDateYmd(job: JobRequest): string | null {
+  const d = submittedDate(job);
+  return d ? toYmdBangkok(d) : null;
+}
+
+/** วันอ้างอิง「ขอมา」— ย้อนหลังใช้วันที่กรอก · ฉุกเฉิน/ล่วงหน้าใช้วันที่ต้องการ */
+export function effectiveRequestDateYmd(job: JobRequest, today = new Date()): string | null {
+  const submitYmd = submittedDateYmd(job);
+  const requiredYmd = calendarYmdFromValue(job.required_date);
+  if (!submitYmd) return requiredYmd;
+  if (!requiredYmd) return submitYmd;
+  const meta = computeJobUrgency(job, today);
+  if (meta.kind === 'retroactive') return submitYmd;
+  return requiredYmd;
+}
+
 function todayStart(today = new Date()): Date {
   return parseISO(toYmdBangkok(today));
 }

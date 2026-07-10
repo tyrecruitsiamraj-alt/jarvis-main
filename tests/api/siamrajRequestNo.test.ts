@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractRequestNoDigitSuffix,
+  normalizeSiamrajRequestNoForDisplay,
   pickBestRequestNoCandidate,
   requestNoMatchesLookup,
 } from '../../api/_lib/siamrajRequestNo.js';
@@ -44,5 +45,23 @@ describe('siamrajRequestNo lookup', () => {
       'lm6905015',
     );
     expect(best?.request_no).toBe('LBM6905015');
+  });
+
+  it('normalizes digit-only request numbers using site_code prefix', () => {
+    expect(
+      normalizeSiamrajRequestNoForDisplay('6907001', {
+        siteCode: '67LBDL0324',
+        departmentCode: 'LBD',
+      }),
+    ).toBe('LBD6907001');
+    expect(normalizeSiamrajRequestNoForDisplay('OPL6907001', { siteCode: '67LBDL0230' })).toBe(
+      'OPL6907001',
+    );
+  });
+
+  it('falls back to department code when site_code has no prefix', () => {
+    expect(
+      normalizeSiamrajRequestNoForDisplay('6907001', { departmentCode: 'LBA' }),
+    ).toBe('LBA6907001');
   });
 });

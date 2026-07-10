@@ -16,12 +16,16 @@ const SLA_STYLES: Record<DashboardSlaStatus, string> = {
   on_track: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   at_risk: 'bg-amber-50 text-amber-800 border-amber-200',
   breached: 'bg-red-50 text-red-700 border-red-200',
+  closed_on_time: 'bg-sky-50 text-sky-700 border-sky-200',
+  closed_late: 'bg-orange-50 text-orange-800 border-orange-200',
 };
 
 const SLA_LABELS: Record<DashboardSlaStatus, string> = {
   on_track: 'On track',
   at_risk: 'At risk',
   breached: 'Breached',
+  closed_on_time: 'Closed on time',
+  closed_late: 'Closed late',
 };
 
 export function DashboardStatusBadge({ status }: { status: DashboardTaskStatus }) {

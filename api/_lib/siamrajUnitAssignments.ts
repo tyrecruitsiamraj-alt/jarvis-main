@@ -9,6 +9,8 @@ export type UnitAssignment = {
   screener_name: string | null;
   opl_name: string | null;
   updated_at: string | null;
+  updated_by_user_id?: string | null;
+  updated_by_name?: string | null;
 };
 
 type Row = {
@@ -17,9 +19,23 @@ type Row = {
   screener_name: string | null;
   opl_name: string | null;
   updated_at: string | Date | null;
+  updated_by_user_id?: string | null;
+  updated_by_name?: string | null;
 };
 
-const SELECT_COLS = 'request_no, recruiter_name, screener_name, opl_name, updated_at';
+const usersTable = tableInAppSchema('users');
+
+const selectCols = `
+  a.request_no,
+  a.recruiter_name,
+  a.screener_name,
+  a.opl_name,
+  a.updated_at,
+  a.updated_by_user_id,
+  coalesce(nullif(trim(u.full_name), ''), u.email) as updated_by_name
+`;
+
+const userJoin = `left join ${usersTable} u on u.id = a.updated_by_user_id`;
 
 function toIso(v: string | Date | null): string | null {
   if (v == null) return null;
@@ -39,6 +55,8 @@ function mapRow(r: Row): UnitAssignment {
     screener_name: r.screener_name,
     opl_name: r.opl_name,
     updated_at: toIso(r.updated_at),
+    updated_by_user_id: r.updated_by_user_id ?? null,
+    updated_by_name: r.updated_by_name ?? null,
   };
 }
 
@@ -47,7 +65,12 @@ export async function getUnitAssignment(requestNo: string): Promise<UnitAssignme
   const key = requestNo.trim();
   if (!key) return null;
   const { rows } = await dbQuery<Row>(
-    `select ${SELECT_COLS} from ${table} where request_no = $1`,
+    `
+    select ${selectCols}
+    from ${table} a
+    ${userJoin}
+    where a.request_no = $1
+    `,
     [key],
   );
   return rows[0] ? mapRow(rows[0]) : null;
@@ -62,7 +85,12 @@ export async function getUnitAssignmentsMap(
   if (keys.length === 0) return map;
 
   const { rows } = await dbQuery<Row>(
-    `select ${SELECT_COLS} from ${table} where request_no = ANY($1::text[])`,
+    `
+    select ${selectCols}
+    from ${table} a
+    ${userJoin}
+    where a.request_no = ANY($1::text[])
+    `,
     [keys],
   );
   for (const r of rows) map.set(r.request_no, mapRow(r));
@@ -89,16 +117,20 @@ export async function upsertUnitAssignment(input: {
   const opl = hasOpl ? clean(input.oplName) : null;
 
   const { rows: existing } = await dbQuery<Row>(
-    `select ${SELECT_COLS} from ${table} where request_no = $1`,
+    `
+    select ${selectCols}
+    from ${table} a
+    ${userJoin}
+    where a.request_no = $1
+    `,
     [key],
   );
 
   if (!existing[0]) {
-    const { rows } = await dbQuery<Row>(
+    await dbQuery(
       `
       insert into ${table} (request_no, recruiter_name, screener_name, opl_name, updated_by_user_id, updated_at)
       values ($1, $2, $3, $4, $5, now())
-      returning ${SELECT_COLS}
       `,
       [
         key,
@@ -108,7 +140,7 @@ export async function upsertUnitAssignment(input: {
         input.userId ?? null,
       ],
     );
-    return mapRow(rows[0]);
+    return (await getUnitAssignment(key))!;
   }
 
   const cur = existing[0];
@@ -116,7 +148,7 @@ export async function upsertUnitAssignment(input: {
   const nextScreener = hasScreener ? screener : cur.screener_name;
   const nextOpl = hasOpl ? opl : cur.opl_name;
 
-  const { rows } = await dbQuery<Row>(
+  await dbQuery(
     `
     update ${table}
     set recruiter_name = $2,
@@ -125,11 +157,10 @@ export async function upsertUnitAssignment(input: {
         updated_by_user_id = $5,
         updated_at = now()
     where request_no = $1
-    returning ${SELECT_COLS}
     `,
     [key, nextRecruiter, nextScreener, nextOpl, input.userId ?? null],
   );
-  return mapRow(rows[0]);
+  return (await getUnitAssignment(key))!;
 }
 
 /** bulk import OPL — upsert opl_name ตาม request_no (คงสรรหา/คัดสรรเดิม) */

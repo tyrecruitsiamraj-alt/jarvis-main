@@ -36,6 +36,11 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
       <p className="text-xs font-medium text-slate-500">{kpi.label}</p>
       <p className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">
         {kpi.format === 'percent' ? `${kpi.value}%` : kpi.value.toLocaleString('th-TH')}
+        {kpi.secondaryCount != null ? (
+          <span className="ml-1.5 text-sm font-normal text-slate-500">
+            · {kpi.secondaryCount.toLocaleString('th-TH')} {kpi.secondaryLabel ?? 'ใบขอ'}
+          </span>
+        ) : null}
       </p>
       <p className="mt-1 text-xs text-slate-500">{kpi.description}</p>
       {trend != null ? (

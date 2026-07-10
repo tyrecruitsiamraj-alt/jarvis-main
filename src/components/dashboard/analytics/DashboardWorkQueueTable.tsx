@@ -12,6 +12,7 @@ type Props = {
   onSort: (key: DashboardSortKey) => void;
   onView: (item: DashboardWorkItem) => void;
   onAssign?: (item: DashboardWorkItem) => void;
+  hideHeader?: boolean;
 };
 
 function SortBtn({
@@ -41,42 +42,44 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
   onSort,
   onView,
   onAssign,
+  hideHeader = false,
 }) => {
   const toggle = (key: DashboardSortKey) => onSort(key);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-900">งานที่ต้องติดตาม</h3>
-        <p className="text-xs text-slate-500">{items.length} รายการ — เรียงตามความสำคัญ</p>
-      </div>
+      {!hideHeader ? (
+        <div className="px-4 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900">งานที่ต้องติดตาม</h3>
+          <p className="text-xs text-slate-500">{items.length} รายการ — เรียงตามความสำคัญ</p>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs text-slate-500">
               <th className="px-3 py-2.5 font-medium">
                 <SortBtn label="ใบงาน" active={sortKey === 'createdAt'} dir={sortDir} onClick={() => toggle('createdAt')} />
               </th>
-              <th className="px-3 py-2.5 font-medium">ปลายทาง</th>
-              <th className="px-3 py-2.5 font-medium">
-                <SortBtn label="ผู้รับผิดชอบ" active={sortKey === 'ownerName'} dir={sortDir} onClick={() => toggle('ownerName')} />
-              </th>
+              <th className="px-3 py-2.5 font-medium">ขอมา</th>
+              <th className="px-3 py-2.5 font-medium">หาได้แล้ว</th>
+              <th className="px-3 py-2.5 font-medium">ยกเลิก</th>
+              <th className="px-3 py-2.5 font-medium">เหลือหา</th>
+              <th className="px-3 py-2.5 font-medium">ประเภท</th>
               <th className="px-3 py-2.5 font-medium">
                 <SortBtn label="สถานะ" active={sortKey === 'status'} dir={sortDir} onClick={() => toggle('status')} />
               </th>
               <th className="px-3 py-2.5 font-medium">SLA</th>
-              <th className="px-3 py-2.5 font-medium">
-                <SortBtn label="อัปเดต" active={sortKey === 'updatedAt'} dir={sortDir} onClick={() => toggle('updatedAt')} />
-              </th>
-              <th className="px-3 py-2.5 font-medium">Next Action</th>
+              <th className="px-3 py-2.5 font-medium">ครบ SLA</th>
+              <th className="px-3 py-2.5 font-medium">เกิน</th>
               <th className="px-3 py-2.5 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={11} className="px-4 py-10 text-center text-slate-500">
                   ไม่พบงานตามเงื่อนไขที่เลือก
                 </td>
               </tr>
@@ -90,27 +93,27 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                   <td className="px-3 py-3 align-top">
                     <p className="font-medium text-slate-900">{item.requestNo}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.unitName}</p>
-                    {item.isResignation ? (
-                      <p className="text-[10px] text-amber-700 mt-1">ลาออก{item.resignedName ? `: ${item.resignedName}` : ''}</p>
-                    ) : null}
+                    <p className="text-[10px] text-slate-400 mt-0.5">{item.lifecycleKind}</p>
+                    <p className="text-[10px] text-slate-400">{item.requestAction || item.requestKind}</p>
                   </td>
-                  <td className="px-3 py-3 align-top text-xs text-slate-600 max-w-[180px]">
-                    <span className="line-clamp-2">{item.destination}</span>
-                  </td>
-                  <td className="px-3 py-3 align-top text-xs text-slate-700">
-                    <p>{item.ownerName}</p>
-                    {item.screenerName !== '—' ? <p className="text-slate-500 mt-0.5">คัดสรร: {item.screenerName}</p> : null}
-                  </td>
+                  <td className="px-3 py-3 align-top tabular-nums text-xs">{item.requestPositions}</td>
+                  <td className="px-3 py-3 align-top tabular-nums text-xs text-emerald-700">{item.filledPositions}</td>
+                  <td className="px-3 py-3 align-top tabular-nums text-xs text-slate-600">{item.cancelledPositions}</td>
+                  <td className="px-3 py-3 align-top tabular-nums text-xs font-medium">{item.remainingPositions}</td>
+                  <td className="px-3 py-3 align-top text-xs text-slate-600">{item.requestKind}</td>
                   <td className="px-3 py-3 align-top">
                     <DashboardStatusBadge status={item.status} />
+                    <p className="text-[10px] text-slate-500 mt-1">{item.controlStatus}</p>
                   </td>
                   <td className="px-3 py-3 align-top">
                     <DashboardSlaBadge status={item.slaStatus} />
                   </td>
                   <td className="px-3 py-3 align-top text-xs text-slate-600 whitespace-nowrap">
-                    {formatYmdDmyBe(item.updatedAt)}
+                    {item.slaDueDate ? formatYmdDmyBe(item.slaDueDate) : '—'}
                   </td>
-                  <td className="px-3 py-3 align-top text-xs text-slate-700">{item.nextAction}</td>
+                  <td className="px-3 py-3 align-top text-xs tabular-nums text-red-600">
+                    {item.daysOverdue > 0 ? item.daysOverdue : '—'}
+                  </td>
                   <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       <button

@@ -5,8 +5,10 @@ import {
   effectiveInformQtySql,
   isOpenStaffingRowForRemaining,
   requestPositionTotal,
+  staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
+import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
 
 /**
  * รายการใบขอที่ "ปิด/แจ้งเข้าแล้ว" ในช่วงวันที่ — ให้ drill-down การ์ด "ปิดใบขอ" เห็นของจริง
@@ -77,12 +79,17 @@ function mapClosedRow(r: ClosedRow) {
     r.staff_title_name,
     r.job_description_code_1,
   );
-  const requestNo = (r.request_no || '').trim();
+  const rawRequestNo = (r.request_no || '').trim();
+  const requestNo = normalizeSiamrajRequestNoForDisplay(rawRequestNo, {
+    siteCode: r.site_code,
+    departmentCode: r.department_code,
+  });
+  const breakdown = staffingPositionBreakdown(r);
   const closureYmd = toYmd(r.stop_date) || toYmd(r.cancel_date) || toYmd(r.request_date);
 
   return {
-    id: `siamraj-sql:${requestNo}`,
-    externalId: requestNo,
+    id: `siamraj-sql:${rawRequestNo}`,
+    externalId: rawRequestNo,
     source: 'siamraj' as const,
     readOnly: true,
     request_no: requestNo,
@@ -91,6 +98,10 @@ function mapClosedRow(r: ClosedRow) {
     department_code: r.department_code?.trim() || undefined,
     location_address: r.site_name || r.site_code || '',
     position_units: closedPositionCount(r),
+    request_positions: breakdown.requestPositions,
+    filled_positions: breakdown.filledPositions,
+    cancelled_positions: breakdown.cancelledPositions,
+    cancel_date: toYmd(r.cancel_date) || undefined,
     status: 'closed' as const,
     siamraj_status: r.status || undefined,
     request_action_code: r.request_action_code || undefined,

@@ -3,6 +3,7 @@ import {
   openStaffingRequestWhereSql,
   remainingOpenPositionsFromRow,
   effectiveInformQtySql,
+  staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 import {
   formatGenderRequirement,
@@ -17,6 +18,7 @@ import {
 } from './siamrajBoardRequestTypes.js';
 import {
   extractRequestNoDigitSuffix,
+  normalizeSiamrajRequestNoForDisplay,
   pickBestRequestNoCandidate,
 } from './siamrajRequestNo.js';
 
@@ -96,12 +98,19 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   const genderRequirement = formatGenderRequirement(r.sex);
   const jobType = inferJobTypeFromDescription(r.job_name1, r.job_name2, r.staff_title_name, r.job_description_code_1);
 
+  const rawRequestNo = (r.request_no || '').trim();
+  const requestNo = normalizeSiamrajRequestNoForDisplay(rawRequestNo, {
+    siteCode: r.site_code,
+    departmentCode: r.department_code,
+  });
+  const breakdown = staffingPositionBreakdown(r);
+
   return {
-    id: `siamraj-sql:${r.external_id}`,
-    externalId: r.external_id,
+    id: `siamraj-sql:${rawRequestNo}`,
+    externalId: rawRequestNo,
     source: 'siamraj' as const,
     readOnly: true,
-    request_no: (r.request_no || '').trim(),
+    request_no: requestNo,
     submittedByName: r.requester_name?.trim() || undefined,
     submittedAt: toIso(r.act_saleco_datetime) || undefined,
     required_date:
@@ -111,10 +120,10 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     lastWorkingDay: toYmd(r.resign_date) || undefined,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
     site_code: r.site_code || undefined,
-    position_units: (() => {
-      const remaining = remainingOpenPositionsFromRow(r);
-      return remaining > 0 ? remaining : undefined;
-    })(),
+    position_units: breakdown.remainingPositions > 0 ? breakdown.remainingPositions : undefined,
+    request_positions: breakdown.requestPositions,
+    filled_positions: breakdown.filledPositions,
+    cancelled_positions: breakdown.cancelledPositions,
     department_code: r.department_code?.trim() || undefined,
     department_name: r.department_name?.trim() || undefined,
     contract_type_code: r.contract_type_code?.trim() || undefined,

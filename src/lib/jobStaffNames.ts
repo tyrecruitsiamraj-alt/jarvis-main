@@ -1,4 +1,5 @@
 import type { JobRequest } from '@/types';
+import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { getJobStaffApiCache } from '@/lib/jobStaffRemote';
 
 /** ค่า filter สำหรับงานที่ยังไม่ได้กำหนดเจ้าหน้าที่ */
@@ -86,15 +87,15 @@ export function matchesOplFilter(job: JobRequest, filter: string): boolean {
 }
 
 export function countUnassignedRecruiters(jobs: JobRequest[]): number {
-  return jobs.filter(isRecruiterUnassigned).length;
+  return jobs.filter(isRecruiterUnassigned).reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
 export function countUnassignedScreeners(jobs: JobRequest[]): number {
-  return jobs.filter(isScreenerUnassigned).length;
+  return jobs.filter(isScreenerUnassigned).reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
 export function countUnassignedOpls(jobs: JobRequest[]): number {
-  return jobs.filter(isOplUnassigned).length;
+  return jobs.filter(isOplUnassigned).reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
 type StaffNameField = 'recruiter_name' | 'screener_name' | 'opl_name';
@@ -104,7 +105,7 @@ export function countJobsByStaffName(jobs: JobRequest[], field: StaffNameField):
   for (const j of jobs) {
     const name = j[field]?.trim();
     if (!name) continue;
-    counts.set(name, (counts.get(name) ?? 0) + 1);
+    counts.set(name, (counts.get(name) ?? 0) + jobPositionUnits(j));
   }
   return counts;
 }

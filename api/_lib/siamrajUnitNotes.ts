@@ -9,6 +9,8 @@ export type UnitNote = {
   note: string | null;
   send_replacement: boolean | null;
   updated_at: string | null;
+  updated_by_user_id?: string | null;
+  updated_by_name?: string | null;
 };
 
 type Row = {
@@ -16,6 +18,8 @@ type Row = {
   note: string | null;
   send_replacement?: boolean | null;
   updated_at: string | Date | null;
+  updated_by_user_id?: string | null;
+  updated_by_name?: string | null;
 };
 
 let sendReplacementColumn: boolean | null = null;
@@ -66,17 +70,39 @@ function mapRow(r: Row, withReplacement: boolean): UnitNote {
     note: r.note,
     send_replacement: withReplacement ? (r.send_replacement ?? null) : null,
     updated_at: toIso(r.updated_at),
+    updated_by_user_id: r.updated_by_user_id ?? null,
+    updated_by_name: r.updated_by_name ?? null,
   };
+}
+
+const userJoin = `
+  left join ${tableInAppSchema('users')} u on u.id = n.updated_by_user_id
+`;
+
+function selectCols(withReplacement: boolean): string {
+  const base = `
+    n.request_no,
+    n.note,
+    n.updated_at,
+    n.updated_by_user_id,
+    coalesce(nullif(trim(u.full_name), ''), u.email) as updated_by_name
+  `;
+  return withReplacement ? `${base}, n.send_replacement` : base;
 }
 
 export async function getUnitNote(requestNo: string): Promise<UnitNote | null> {
   const key = requestNo.trim();
   if (!key) return null;
   const withReplacement = await hasSendReplacementColumn();
-  const cols = withReplacement
-    ? 'request_no, note, send_replacement, updated_at'
-    : 'request_no, note, updated_at';
-  const { rows } = await dbQuery<Row>(`select ${cols} from ${table} where request_no = $1`, [key]);
+  const { rows } = await dbQuery<Row>(
+    `
+    select ${selectCols(withReplacement)}
+    from ${table} n
+    ${userJoin}
+    where n.request_no = $1
+    `,
+    [key],
+  );
   return rows[0] ? mapRow(rows[0], withReplacement) : null;
 }
 
@@ -86,10 +112,15 @@ export async function getUnitNotesMap(requestNos: string[]): Promise<Map<string,
   if (keys.length === 0) return map;
 
   const withReplacement = await hasSendReplacementColumn();
-  const cols = withReplacement
-    ? 'request_no, note, send_replacement, updated_at'
-    : 'request_no, note, updated_at';
-  const { rows } = await dbQuery<Row>(`select ${cols} from ${table} where request_no = ANY($1::text[])`, [keys]);
+  const { rows } = await dbQuery<Row>(
+    `
+    select ${selectCols(withReplacement)}
+    from ${table} n
+    ${userJoin}
+    where n.request_no = ANY($1::text[])
+    `,
+    [keys],
+  );
   for (const r of rows) map.set(r.request_no, mapRow(r, withReplacement));
   return map;
 }
@@ -134,7 +165,7 @@ export async function upsertUnitNote(input: {
         : null;
 
   if (withReplacement) {
-    const { rows } = await dbQuery<Row>(
+    await dbQuery(
       `
       insert into ${table} (request_no, note, send_replacement, updated_by_user_id, updated_at)
       values ($1, $2, $3, $4, now())
@@ -143,14 +174,13 @@ export async function upsertUnitNote(input: {
         send_replacement = excluded.send_replacement,
         updated_by_user_id = excluded.updated_by_user_id,
         updated_at = now()
-      returning request_no, note, send_replacement, updated_at
       `,
       [key, note, sendReplacement, input.userId ?? null],
     );
-    return mapRow(rows[0], true);
+    return (await getUnitNote(key))!;
   }
 
-  const { rows } = await dbQuery<Row>(
+  await dbQuery(
     `
     insert into ${table} (request_no, note, updated_by_user_id, updated_at)
     values ($1, $2, $3, now())
@@ -158,9 +188,8 @@ export async function upsertUnitNote(input: {
       note = excluded.note,
       updated_by_user_id = excluded.updated_by_user_id,
       updated_at = now()
-    returning request_no, note, updated_at
     `,
     [key, note, input.userId ?? null],
   );
-  return mapRow(rows[0], false);
+  return (await getUnitNote(key))!;
 }

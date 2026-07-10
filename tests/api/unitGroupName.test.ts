@@ -31,7 +31,7 @@ describe('unitGroupName', () => {
   });
 
   it('label strips branch for display', () => {
-    expect(unitOrganizationLabel('ธนาคารกรุงศรี สำนักงานใหญ่')).toBe('ธนาคารกรุงศรี');
+    expect(unitOrganizationLabel('ธนาคารกรุงศรี สำนักงานใหญ่')).toBe('กรุงศรี');
   });
 
   it('pick display name prefers common short label', () => {
@@ -41,7 +41,12 @@ describe('unitGroupName', () => {
         'ธนาคารกรุงศรี',
         'ธนาคารกรุงศรี สาขาเชียงใหม่',
       ]),
-    ).toBe('ธนาคารกรุงศรี');
+    ).toBe('กรุงศรี');
+  });
+
+  it('merges bank prefix variants', () => {
+    expect(unitOrganizationKey('ธนาคารกรุงศรี')).toBe(unitOrganizationKey('กรุงศรี'));
+    expect(unitOrganizationKey('ธ.กรุงเทพ')).toBe(unitOrganizationKey('กรุงเทพ'));
   });
 
   it('merges truncated prefix with full organization name', () => {

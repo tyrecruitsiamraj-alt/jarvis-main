@@ -3,6 +3,7 @@ import {
   effectiveInformedCount,
   isOpenStaffingRow,
   remainingOpenPositionsFromRow,
+  staffingPositionBreakdown,
 } from '../../api/_lib/siamrajStaffingOpen.js';
 
 describe('siamrajStaffingOpen feed', () => {
@@ -64,5 +65,20 @@ describe('siamrajStaffingOpen feed', () => {
         has_inform: 1,
       }),
     ).toBe(false);
+  });
+
+  it('splits partial fill vs cancelled remaining on stopped row', () => {
+    const breakdown = staffingPositionBreakdown({
+      status: 'S',
+      is_stop: 'Y',
+      stop_no: '1',
+      request_qty: 5,
+      inform_qty: 2,
+      effective_inform_qty: 2,
+    });
+    expect(breakdown.requestPositions).toBe(5);
+    expect(breakdown.filledPositions).toBe(2);
+    expect(breakdown.cancelledPositions).toBe(3);
+    expect(breakdown.remainingPositions).toBe(0);
   });
 });
