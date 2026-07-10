@@ -115,8 +115,11 @@ describe('buildDashboardData', () => {
       job({ id: 'new', unit_name: 'B', position_units: 45, request_date: '2026-07-02', required_date: '2026-07-20' }),
     ];
     const data = buildDashboardData(jobs, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, [], jobs);
-    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(97);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(97);
+    expect(data.kpis.find((k) => k.id === 'total_workload')?.value).toBe(97);
+    expect(data.kpis.map((k) => k.id)).toEqual(['total_workload', 'remaining', 'sla_risk']);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.description).toContain('ใบเปิดทั้งหมด');
+    expect(data.flowView).toBeUndefined();
     expect(data.periodLabel).toBe('ทั้งหมดที่โหลด');
   });
 

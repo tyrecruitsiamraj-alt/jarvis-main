@@ -410,6 +410,49 @@ function sumOpenRemainingPositions(jobs: JobRequest[]): number {
     .reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
+/** สรุปโหมดทั้งหมด — ไม่มีงวด: เหลือหา = ใบเปิดทั้งหมด (ตรงหน้ารายการหน่วยงาน) */
+function buildAllOpenControlSummary(remaining: {
+  remainingPositions: number;
+  remainingRequests: number;
+}): DashboardRequestControlSummary {
+  const { remainingPositions, remainingRequests } = remaining;
+  return {
+    carriedOverPositions: remainingPositions,
+    carriedOverRequests: remainingRequests,
+    newRequestPositions: 0,
+    newRequestRequests: 0,
+    totalWorkloadPositions: remainingPositions,
+    totalWorkloadRequests: remainingRequests,
+    filledPositionsThisPeriod: 0,
+    filledPositionsFromOldRequests: 0,
+    filledPositionsFromCurrentMonthRequests: 0,
+    fullyClosedPositionsThisPeriod: 0,
+    fullyClosedRequestsThisPeriod: 0,
+    partialRequests: 0,
+    partialPositions: 0,
+    cancelledPositionsThisPeriod: 0,
+    cancelledRequestsThisPeriod: 0,
+    remainingPositions,
+    remainingRequests,
+    endingBacklogPositions: remainingPositions,
+    endingBacklogRequests: remainingRequests,
+    startingBacklogPositions: remainingPositions,
+    netBacklogChange: 0,
+    resignationRequestPositions: 0,
+    fillRatePercent: 0,
+    fullCloseRatePercent: 0,
+    fullClosureRatePercent: 0,
+    backlogBurnRatePercent: 0,
+    newDemandAbsorptionRatePercent: 0,
+    resignationPressureRatio: 0,
+    cancellationRatePercent: 0,
+    fulfilledRequestsTouchedThisPeriod: 0,
+    resolvedRequestsThisPeriod: 0,
+    resolvedPositionsThisPeriod: 0,
+    resolutionRatePercent: 0,
+  };
+}
+
 /** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบขอที่เข้ามาในงวดนั้น */
 function resolveRemainingKpi(
   openJobs: JobRequest[],
@@ -444,11 +487,13 @@ function buildControlTowerKpis(
   return [
     {
       id: 'total_workload',
-      label: 'ภาระงานรวม',
+      label: periodLabel ? 'ภาระงานรวม' : 'ใบเปิดทั้งหมด',
       value: summary.totalWorkloadPositions,
       secondaryCount: summary.totalWorkloadRequests,
       secondaryLabel: 'ใบขอ',
-      description: posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests),
+      description: periodLabel
+        ? posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests)
+        : `ตรงหน้ารายการหน่วยงาน · ${posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests)}`,
       trendPercent: null,
     },
     {
@@ -494,8 +539,8 @@ function buildControlTowerKpis(
       secondaryCount: summary.remainingRequests,
       secondaryLabel: 'ใบขอ',
       description: periodLabel
-        ? `ใบขอใน${periodLabel} ที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`
-        : `ทั้งหมดที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`,
+        ? `ใบขอในงวดที่เลือกที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`
+        : `ใบเปิดทั้งหมดที่ยังต้องหา (ตรงหน้ารายการหน่วยงาน) · ${posReq(summary.remainingPositions, summary.remainingRequests)}`,
       trendPercent: null,
     },
     {
@@ -908,7 +953,7 @@ export function buildDashboardData(
     ? mapSummaryV3ToDashboard(summaryV3)
     : period
       ? buildRequestControlSummary(controlRecords, periodFrom, periodTo, throughputRecords)
-      : undefined;
+      : buildAllOpenControlSummary(remainingKpi);
 
   if (requestControlSummary && ledgerStates.length > 0) {
     const resignationPositions = ledgerStates
@@ -950,11 +995,15 @@ export function buildDashboardData(
   const slaSummary = ledgerStates.length > 0 ? mapSlaSummaryFromStates(ledgerStates) : buildSlaSummary(controlRecords);
   const lifecycleTrend = buildLifecycleTrend(controlRecords, trendFrom, trendTo, throughputRecords);
   const lifecycleInsights = buildLifecycleInsights(lifecycleTrend);
-  const flowViewBase = summaryV3
-    ? mapFlowV3(summaryV3)
-    : requestControlSummary
-      ? buildFlowView(requestControlSummary)
-      : undefined;
+  /** โหมดทั้งหมด = สต็อกใบเปิด ไม่ใช่สมการงวด — ไม่โชว์ flow / insight งวด */
+  const flowViewBase =
+    period == null
+      ? undefined
+      : summaryV3
+        ? mapFlowV3(summaryV3)
+        : requestControlSummary
+          ? buildFlowView(requestControlSummary)
+          : undefined;
   const flowView =
     flowViewBase && requestControlSummary
       ? {
@@ -962,27 +1011,22 @@ export function buildDashboardData(
           endingBacklogPositions: remainingKpi.remainingPositions,
         }
       : flowViewBase;
-  const executiveInsights = requestControlSummary
-    ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
-    : undefined;
+  const executiveInsights =
+    period && requestControlSummary
+      ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
+      : undefined;
   const priorityWorkQueue = buildPriorityWorkQueue(
     applyDashboardFilters(workItems, uiFilters),
     controlRecords,
     period?.from ?? null,
   );
 
-  const kpis =
-    requestControlSummary != null
-      ? buildControlTowerKpis(requestControlSummary, slaSummary, period?.label ?? null)
-      : buildKpis(
-          scopedJobs,
-          previousScopedJobs,
-          openJobSet,
-          today,
-          period != null,
-          closedJobs,
-          kpiThroughput,
-        );
+  const allOpenKpiIds = new Set(['total_workload', 'remaining', 'sla_risk']);
+  const kpis = buildControlTowerKpis(
+    requestControlSummary,
+    slaSummary,
+    period?.label ?? null,
+  ).filter((kpi) => (period ? true : allOpenKpiIds.has(kpi.id)));
 
   return {
     kpis,
