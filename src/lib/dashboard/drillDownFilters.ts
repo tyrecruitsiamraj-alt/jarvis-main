@@ -68,6 +68,7 @@ export function filterRecordsForControlKpi(
     case 'new_requests':
       return fresh;
     case 'filled':
+    case 'fulfilled':
       return filterRecordsFilledInPeriod(records, from, to);
     case 'fully_closed':
       return filterRecordsFullyClosedInPeriod(records, from, to);

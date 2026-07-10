@@ -305,7 +305,7 @@ const SupervisorDashboard: React.FC = () => {
   const handleKpiClick = useCallback(
     (kpiId: string, label: string) => {
       const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
-      if (range && ['total_workload', 'new_requests', 'filled', 'fully_closed', 'partial', 'cancelled', 'remaining'].includes(kpiId)) {
+      if (range && ['total_workload', 'new_requests', 'fulfilled', 'filled', 'fully_closed', 'partial', 'cancelled', 'remaining', 'sla_risk', 'backlog_change'].includes(kpiId)) {
         openControlList(label, filterRecordsForControlKpi(controlRecords, kpiId, range));
         return;
       }

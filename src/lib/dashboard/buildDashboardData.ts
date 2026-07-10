@@ -60,6 +60,17 @@ import {
   buildSlaSummary,
 } from './buildRequestControlSummaries';
 import { buildPriorityWorkQueue } from './priorityWorkQueue';
+import {
+  buildRequestStates,
+  computeRequestControlSummaryV3,
+} from './requestControlLedger';
+import {
+  mapFlowV3,
+  mapFulfillmentBreakdownV3,
+  mapSlaSummaryFromStates,
+  mapSummaryV3ToDashboard,
+  statesToRequestControlRecords,
+} from './requestControlBridge';
 import { classifyLifecycleKind, lifecycleKindLabel } from './lifecycle';
 import {
   jobToRequestControlRecord,
@@ -400,14 +411,21 @@ function sumOpenRemainingPositions(jobs: JobRequest[]): number {
     .reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
-function buildControlTowerKpis(summary: DashboardRequestControlSummary): DashboardKpi[] {
+function buildControlTowerKpis(
+  summary: DashboardRequestControlSummary,
+  slaSummary?: { atRisk: number; breached: number },
+): DashboardKpi[] {
   const posReq = (positions: number, requests: number) =>
     `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
+  const qualitySuffix =
+    summary.dataQualityMode && summary.dataQualityMode !== 'event_based'
+      ? ' · ประมาณการจากสถานะล่าสุด'
+      : '';
 
   return [
     {
       id: 'total_workload',
-      label: 'ภาระงานรวมเดือนนี้',
+      label: 'ภาระงานรวม',
       value: summary.totalWorkloadPositions,
       secondaryCount: summary.totalWorkloadRequests,
       secondaryLabel: 'ใบขอ',
@@ -416,7 +434,7 @@ function buildControlTowerKpis(summary: DashboardRequestControlSummary): Dashboa
     },
     {
       id: 'new_requests',
-      label: 'ขอใหม่เดือนนี้',
+      label: 'ขอใหม่งวดนี้',
       value: summary.newRequestPositions,
       secondaryCount: summary.newRequestRequests,
       secondaryLabel: 'ใบขอ',
@@ -424,15 +442,17 @@ function buildControlTowerKpis(summary: DashboardRequestControlSummary): Dashboa
       trendPercent: null,
     },
     {
-      id: 'filled',
-      label: 'ปิดได้/หาได้แล้วเดือนนี้',
+      id: 'fulfilled',
+      label: 'หาได้แล้ว',
       value: summary.filledPositionsThisPeriod,
-      description: `อัตราปิดได้ ${summary.fillRatePercent}% ของภาระงาน`,
+      secondaryCount: summary.fulfilledRequestsTouchedThisPeriod,
+      secondaryLabel: 'ใบขอที่มีความคืบหน้า',
+      description: `อัตราหาได้ ${summary.fillRatePercent}% ของภาระงาน${qualitySuffix}`,
       trendPercent: null,
     },
     {
       id: 'fully_closed',
-      label: 'ปิดครบใบขอเดือนนี้',
+      label: 'ปิดครบใบขอ',
       value: summary.fullyClosedRequestsThisPeriod,
       secondaryCount: summary.fullyClosedPositionsThisPeriod,
       secondaryLabel: 'ตำแหน่ง',
@@ -440,17 +460,8 @@ function buildControlTowerKpis(summary: DashboardRequestControlSummary): Dashboa
       trendPercent: null,
     },
     {
-      id: 'partial',
-      label: 'Partial / ยังไม่จบ',
-      value: summary.partialPositions,
-      secondaryCount: summary.partialRequests,
-      secondaryLabel: 'ใบขอ',
-      description: posReq(summary.partialPositions, summary.partialRequests),
-      trendPercent: null,
-    },
-    {
       id: 'cancelled',
-      label: 'ยกเลิกเดือนนี้',
+      label: 'ยกเลิก',
       value: summary.cancelledPositionsThisPeriod,
       secondaryCount: summary.cancelledRequestsThisPeriod,
       secondaryLabel: 'ใบขอ',
@@ -460,10 +471,31 @@ function buildControlTowerKpis(summary: DashboardRequestControlSummary): Dashboa
     {
       id: 'remaining',
       label: 'เหลือหา',
-      value: summary.remainingPositions,
+      value: summary.endingBacklogPositions ?? summary.remainingPositions,
       secondaryCount: summary.remainingRequests,
       secondaryLabel: 'ใบขอ',
-      description: posReq(summary.remainingPositions, summary.remainingRequests),
+      description: posReq(summary.endingBacklogPositions ?? summary.remainingPositions, summary.remainingRequests),
+      trendPercent: null,
+    },
+    {
+      id: 'sla_risk',
+      label: 'SLA เสี่ยง/เกิน',
+      value: (slaSummary?.atRisk ?? 0) + (slaSummary?.breached ?? 0),
+      secondaryCount: slaSummary?.breached,
+      secondaryLabel: 'เกิน SLA',
+      description: `เสี่ยง ${slaSummary?.atRisk ?? 0} · เกิน ${slaSummary?.breached ?? 0} ใบขอ`,
+      trendPercent: null,
+    },
+    {
+      id: 'backlog_change',
+      label: 'Backlog เพิ่ม/ลด',
+      value: summary.netBacklogChange,
+      description:
+        summary.netBacklogChange > 0
+          ? `เพิ่ม ${summary.netBacklogChange} ตำแหน่ง`
+          : summary.netBacklogChange < 0
+            ? `ลด ${Math.abs(summary.netBacklogChange)} ตำแหน่ง`
+            : 'คงที่เทียบต้นงวด',
       trendPercent: null,
     },
   ];
@@ -832,13 +864,37 @@ export function buildDashboardData(
       : undefined;
 
   const mergedJobs = mergeRequestControlJobs(openJobSet, closedJobs);
-  const controlRecords = jobsToRequestControlRecords(mergedJobs, today);
   const periodFrom = period?.from ?? trendFrom;
   const periodTo = period?.to ?? trendTo;
 
-  const requestControlSummary = period
-    ? buildRequestControlSummary(controlRecords, periodFrom, periodTo, throughputRecords)
-    : undefined;
+  const ledgerStates = period ? buildRequestStates(mergedJobs, periodFrom, periodTo, today) : [];
+  const summaryV3 = period ? computeRequestControlSummaryV3(ledgerStates, periodFrom, periodTo) : null;
+  const controlRecords =
+    ledgerStates.length > 0
+      ? statesToRequestControlRecords(ledgerStates)
+      : jobsToRequestControlRecords(mergedJobs, today);
+
+  let requestControlSummary = summaryV3
+    ? mapSummaryV3ToDashboard(summaryV3)
+    : period
+      ? buildRequestControlSummary(controlRecords, periodFrom, periodTo, throughputRecords)
+      : undefined;
+
+  if (requestControlSummary && ledgerStates.length > 0) {
+    const resignationPositions = ledgerStates
+      .filter((s) => s.contributesToNewDemand || s.contributesToStartingBacklog)
+      .filter((s) => s.lifecycleKind === 'resignation')
+      .reduce((sum, s) => sum + s.requestPositions, 0);
+    requestControlSummary = {
+      ...requestControlSummary,
+      resignationRequestPositions: resignationPositions,
+      resignationPressureRatio:
+        requestControlSummary.totalWorkloadPositions > 0
+          ? Math.round((resignationPositions / requestControlSummary.totalWorkloadPositions) * 1000) / 10
+          : 0,
+    };
+  }
+
   const requestCohortSummary = period
     ? buildRequestCohortSummary(controlRecords, periodFrom, periodTo)
     : undefined;
@@ -848,13 +904,19 @@ export function buildDashboardData(
   const fullyClosedCohortSummary = period
     ? buildFullyClosedCohortSummary(controlRecords, periodFrom, periodTo)
     : undefined;
-  const fulfillmentBreakdown = period
-    ? buildFulfillmentBreakdown(controlRecords, periodFrom, periodTo, throughputRecords)
-    : undefined;
-  const slaSummary = buildSlaSummary(controlRecords);
+  const fulfillmentBreakdown = summaryV3
+    ? mapFulfillmentBreakdownV3(summaryV3)
+    : period
+      ? buildFulfillmentBreakdown(controlRecords, periodFrom, periodTo, throughputRecords)
+      : undefined;
+  const slaSummary = ledgerStates.length > 0 ? mapSlaSummaryFromStates(ledgerStates) : buildSlaSummary(controlRecords);
   const lifecycleTrend = buildLifecycleTrend(controlRecords, trendFrom, trendTo, throughputRecords);
   const lifecycleInsights = buildLifecycleInsights(lifecycleTrend);
-  const flowView = requestControlSummary ? buildFlowView(requestControlSummary) : undefined;
+  const flowView = summaryV3
+    ? mapFlowV3(summaryV3)
+    : requestControlSummary
+      ? buildFlowView(requestControlSummary)
+      : undefined;
   const executiveInsights = requestControlSummary
     ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
     : undefined;
@@ -864,9 +926,27 @@ export function buildDashboardData(
     period?.from ?? null,
   );
 
+  const dataQualitySummary =
+    summaryV3 && summaryV3.dataQualityMode !== 'event_based'
+      ? {
+          mode: summaryV3.dataQualityMode,
+          message:
+            summaryV3.dataQualityMode === 'snapshot_fallback'
+              ? 'ตัวเลขหาได้แล้ว/ยกเลิกรายเดือนเป็นประมาณการจากสถานะล่าสุด — ไม่มีวันที่แจ้งเข้า'
+              : 'ข้อมูลบางส่วนใช้ snapshot fallback',
+          reconciliationDiff: summaryV3.reconciliation.diff,
+        }
+      : summaryV3?.reconciliation.diff
+        ? {
+            mode: summaryV3.dataQualityMode,
+            message: summaryV3.reconciliation.diffReason,
+            reconciliationDiff: summaryV3.reconciliation.diff,
+          }
+        : undefined;
+
   const kpis =
     requestControlSummary != null
-      ? buildControlTowerKpis(requestControlSummary)
+      ? buildControlTowerKpis(requestControlSummary, slaSummary)
       : buildKpis(
           scopedJobs,
           previousScopedJobs,
@@ -896,6 +976,7 @@ export function buildDashboardData(
     flowView,
     executiveInsights,
     priorityWorkQueue,
+    dataQualitySummary,
     recruiterOverview: buildRecruiterOverview(scopedJobs, today, closedJobs),
     workQueue: sortedQueue,
     periodLabel,

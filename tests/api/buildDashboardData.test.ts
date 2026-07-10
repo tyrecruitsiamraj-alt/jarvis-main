@@ -186,7 +186,7 @@ describe('buildDashboardData', () => {
       jobs.filter((j) => j.status === 'closed'),
     );
     expect(data.closedBreakdown).toEqual({ samePeriod: 2, backlog: 3 });
-    expect(data.kpis.find((k) => k.id === 'filled')?.value).toBeGreaterThanOrEqual(2);
+    expect(data.kpis.find((k) => k.id === 'fulfilled' || k.id === 'filled')?.value).toBeGreaterThanOrEqual(2);
     expect(data.fulfillmentBreakdown).toBeDefined();
   });
 
@@ -208,7 +208,7 @@ describe('buildDashboardData', () => {
     ];
     const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, closed);
     expect(data.kpis.find((k) => k.id === 'fully_closed')?.value).toBe(1);
-    expect(data.kpis.find((k) => k.id === 'fully_closed')?.label).toBe('ปิดครบใบขอเดือนนี้');
+    expect(data.kpis.find((k) => k.id === 'fully_closed')?.label).toBe('ปิดครบใบขอ');
   });
 
   it('filters work queue by search', () => {

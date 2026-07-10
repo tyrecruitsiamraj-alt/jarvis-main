@@ -93,8 +93,10 @@ const DashboardShell: React.FC<Props> = ({
         <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-4 space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Demand–Fulfillment–Backlog Control Tower</h1>
-              <p className="text-sm text-slate-500 mt-1">Dashboard คุมใบขอ · {data.periodLabel}</p>
+              <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Request Control Tower</h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Demand · Fulfillment · Resolution · Backlog · SLA · Lifecycle · {data.periodLabel}
+              </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
@@ -151,7 +153,7 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
-              <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
                 {data.kpis.map((kpi) => (
                   <DashboardKpiCard
                     key={kpi.id}
@@ -160,6 +162,15 @@ const DashboardShell: React.FC<Props> = ({
                   />
                 ))}
               </div>
+
+              {data.dataQualitySummary ? (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {data.dataQualitySummary.message}
+                  {data.dataQualitySummary.reconciliationDiff
+                    ? ` (สมการ backlog ต่าง ${data.dataQualitySummary.reconciliationDiff} ตำแหน่ง)`
+                    : null}
+                </div>
+              ) : null}
 
               {data.flowView ? (
                 <DashboardFlowViewCard
@@ -183,7 +194,7 @@ const DashboardShell: React.FC<Props> = ({
               {data.fulfillmentBreakdown ? (
                 <DashboardClosedBreakdownCard
                   breakdown={data.fulfillmentBreakdown}
-                  filledTotal={data.kpis.find((k) => k.id === 'filled')?.value ?? 0}
+                  filledTotal={data.kpis.find((k) => k.id === 'fulfilled' || k.id === 'filled')?.value ?? 0}
                   fullyClosedTotal={data.kpis.find((k) => k.id === 'fully_closed')?.value ?? 0}
                   onFilledClick={onFilledBreakdownClick}
                   onFullyClosedClick={onFullyClosedBreakdownClick}

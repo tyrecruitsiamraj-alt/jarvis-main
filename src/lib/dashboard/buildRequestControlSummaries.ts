@@ -190,19 +190,19 @@ export function buildFulfillmentCohortSummary(
   const rows = [
     {
       id: 'requested_this_period_filled_this_period' as const,
-      label: 'ขอเดือนนี้ ปิดได้เดือนนี้',
+      label: 'ขอเดือนนี้ หาได้เดือนนี้',
       filledPositions: sumPositions(samePeriod, (r) => r.filledPositions),
       requestCount: samePeriod.length,
     },
     {
       id: 'requested_before_period_filled_this_period' as const,
-      label: 'ขอเดือนเก่า ปิดได้เดือนนี้',
+      label: 'ขอเดือนเก่า หาได้เดือนนี้',
       filledPositions: sumPositions(backlogFilled, (r) => r.filledPositions),
       requestCount: backlogFilled.length,
     },
     {
       id: 'total_filled_this_period' as const,
-      label: 'รวมปิดได้/หาได้แล้วเดือนนี้',
+      label: 'รวมหาได้แล้วเดือนนี้',
       filledPositions:
         throughputRecords
           .filter((r) => r.kind === 'filled' && r.closureDate && inYmdRange(r.closureDate, from, to))
@@ -476,7 +476,7 @@ export function buildExecutiveInsights(
 
   if (summary.filledPositionsThisPeriod > 0) {
     sentences.push(
-      `ทีมปิดได้/หาได้แล้ว ${summary.filledPositionsThisPeriod.toLocaleString('th-TH')} ตำแหน่ง แต่ปิดครบใบขอได้เพียง ${summary.fullyClosedRequestsThisPeriod.toLocaleString('th-TH')} ใบ`,
+      `ทีมหาได้แล้ว ${summary.filledPositionsThisPeriod.toLocaleString('th-TH')} ตำแหน่ง แต่ปิดครบใบขอได้เพียง ${summary.fullyClosedRequestsThisPeriod.toLocaleString('th-TH')} ใบ`,
     );
   }
 

@@ -67,7 +67,7 @@ const DashboardFlowViewCard: React.FC<Props> = ({ flow, summary, onSegmentClick 
           <FlowStep label="ขอใหม่" value={flow.newRequestPositions} operator="+" accent="border-sky-200 bg-sky-50" onClick={click?.('new_requests', 'ขอใหม่เดือนนี้')} />
           <FlowStep label="ภาระงานรวม" value={flow.totalWorkloadPositions} operator="=" accent="border-violet-200 bg-violet-50" onClick={click?.('total_workload', 'ภาระงานรวมเดือนนี้')} />
           <ArrowRight className="h-4 w-4 text-slate-300 shrink-0 hidden sm:block" />
-          <FlowStep label="ปิดได้" value={flow.filledPositions} operator="−" accent="border-emerald-200 bg-emerald-50" onClick={click?.('filled', 'ปิดได้/หาได้แล้วเดือนนี้')} />
+          <FlowStep label="หาได้แล้ว" value={flow.filledPositions} operator="−" accent="border-emerald-200 bg-emerald-50" onClick={click?.('fulfilled', 'หาได้แล้ว')} />
           <FlowStep label="ยกเลิก" value={flow.cancelledPositions} operator="−" accent="border-rose-200 bg-rose-50" onClick={click?.('cancelled', 'ยกเลิกเดือนนี้')} />
           <FlowStep label="Backlog ปลายเดือน" value={flow.endingBacklogPositions} operator="=" accent="border-slate-300 bg-slate-100" onClick={click?.('remaining', 'เหลือหา')} />
         </div>

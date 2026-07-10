@@ -94,6 +94,10 @@ export type DashboardWorkItem = {
   lifecycleKind: string;
   requestKind: string;
   controlStatus: string;
+  dataQuality?: string;
+  requestActionName?: string;
+  siteCode?: string;
+  fullClosureSlaStatus?: string;
 };
 
 export type DashboardResponsibleRole = 'recruiter' | 'screener';
@@ -169,6 +173,8 @@ export type DashboardRequestControlSummary = {
   cancelledRequestsThisPeriod: number;
   remainingPositions: number;
   remainingRequests: number;
+  endingBacklogPositions?: number;
+  endingBacklogRequests?: number;
   startingBacklogPositions: number;
   endingBacklogPositions: number;
   netBacklogChange: number;
@@ -181,6 +187,14 @@ export type DashboardRequestControlSummary = {
   newDemandAbsorptionRatePercent: number;
   resignationPressureRatio: number;
   cancellationRatePercent: number;
+  /** v3 — ใบขอที่มีการหาได้ในงวด */
+  fulfilledRequestsTouchedThisPeriod?: number;
+  resolvedRequestsThisPeriod?: number;
+  resolvedPositionsThisPeriod?: number;
+  resolutionRatePercent?: number;
+  dataQualityMode?: 'event_based' | 'snapshot_fallback' | 'mixed' | 'insufficient';
+  reconciliationDiff?: number;
+  reconciliationNote?: string;
 };
 
 export type DashboardFlowView = {
@@ -191,6 +205,8 @@ export type DashboardFlowView = {
   cancelledPositions: number;
   endingBacklogPositions: number;
   netBacklogChange: number;
+  reconciliationDiff?: number;
+  dataQualityMode?: 'event_based' | 'snapshot_fallback' | 'mixed' | 'insufficient';
 };
 
 export type DashboardSlaHighlight = {
@@ -210,8 +226,10 @@ export type DashboardCohortRow = {
   requestPositions: number;
   requestCount: number;
   filledPositions: number;
+  cancelledPositions?: number;
   remainingPositions: number;
   fullyClosedRequests: number;
+  resolvedRequests?: number;
   partialRequests: number;
   cancelledRequests: number;
 };
@@ -291,6 +309,11 @@ export type DashboardData = {
   flowView?: DashboardFlowView;
   executiveInsights?: DashboardExecutiveInsights;
   priorityWorkQueue: DashboardWorkItem[];
+  dataQualitySummary?: {
+    mode: 'event_based' | 'snapshot_fallback' | 'mixed' | 'insufficient';
+    message?: string;
+    reconciliationDiff?: number;
+  };
   recruiterOverview: DashboardRecruiterOverview[];
   workQueue: DashboardWorkItem[];
   periodLabel: string;

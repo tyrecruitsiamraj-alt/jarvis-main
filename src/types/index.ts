@@ -130,6 +130,18 @@ export interface JobRequest {
   /** จำนวนที่ยกเลิก */
   cancelled_positions?: number;
   cancel_date?: string;
+  /** วันที่แจ้งเข้าล่าสุด — จาก st_inform_head.inform_date เมื่อมี */
+  inform_date?: string;
+  /** fulfillment events สำหรับ ledger (ถ้ามีจาก SQL) */
+  fulfillment_events?: Array<{
+    eventDate?: string | null;
+    eventType: 'informed' | 'cancelled';
+    positionQty: number;
+    sourceTable?: string;
+    sourceId?: string;
+    isDateReliable?: boolean;
+    reliabilityNote?: string;
+  }>;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;
