@@ -9,6 +9,7 @@ import type { DashboardTaskStatus } from '@/lib/dashboard/types';
 import { cn } from '@/lib/utils';
 
 const PERIOD_PRESETS = [
+  { id: 'all' as const, label: 'ทั้งหมด' },
   { id: 'this_month' as const, label: 'เดือนนี้' },
   { id: 'last_month' as const, label: 'เดือนก่อน' },
 ];
@@ -56,14 +57,19 @@ const DashboardFilterBar: React.FC<Props> = ({
   onQueueStatusChange,
   className,
 }) => {
-  const applyPreset = (preset: 'this_month' | 'last_month') => {
+  const applyPreset = (preset: 'all' | 'this_month' | 'last_month') => {
+    if (preset === 'all') {
+      onDateRangeChange(null);
+      return;
+    }
     const p = resolvePeriodRange(preset);
     onDateRangeChange({ from: p.from, to: p.to });
   };
 
   const activePreset = (() => {
-    if (!dateRange) return null;
+    if (!dateRange) return 'all';
     for (const preset of PERIOD_PRESETS) {
+      if (preset.id === 'all') continue;
       const p = resolvePeriodRange(preset.id);
       if (dateRange.from === p.from && dateRange.to === p.to) return preset.id;
     }
@@ -86,14 +92,14 @@ const DashboardFilterBar: React.FC<Props> = ({
 
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-slate-600">ช่วงเวลา</label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {PERIOD_PRESETS.map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => applyPreset(preset.id)}
               className={cn(
-                'flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
+                'flex-1 min-w-[4.5rem] rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
                 activePreset === preset.id
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',

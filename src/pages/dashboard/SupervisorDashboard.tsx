@@ -10,6 +10,7 @@ import {
   defaultDashboardDateRange,
   filterJobsByRequestDate,
   resolvePeriodRange,
+  resolveYearToDateTrendRange,
   sortWorkQueue,
 } from '@/lib/dashboard/buildDashboardData';
 import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dashboardPageState';
@@ -61,19 +62,29 @@ const SupervisorDashboard: React.FC = () => {
   const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource } = useUnitRequestsFeed();
 
   const period = useMemo(
-    () => resolvePeriodRange('custom', dateRange ?? defaultDashboardDateRange()),
+    () => (dateRange ? resolvePeriodRange('custom', dateRange) : null),
     [dateRange],
   );
+
+  const throughputRange = useMemo(() => {
+    if (period) return { from: period.previousFrom, to: period.to };
+    const ytd = resolveYearToDateTrendRange();
+    return { from: ytd.from, to: ytd.to };
+  }, [period]);
 
   useEffect(() => {
     if (DEMO_MODE) {
       setThroughputRecords([]);
       return;
     }
-    const range = period;
+    const range = throughputRange;
+    if (!period) {
+      setThroughputRecords(jobsToThroughputRecords(jobs));
+      return;
+    }
     if (siamrajPrimary && dbSource === 'sqlserver') {
       let cancelled = false;
-      void fetchSiamrajThroughput(range.previousFrom, range.to)
+      void fetchSiamrajThroughput(range.from, range.to)
         .then((rows) => {
           if (!cancelled) setThroughputRecords(rows);
         })
@@ -85,12 +96,16 @@ const SupervisorDashboard: React.FC = () => {
       };
     }
     setThroughputRecords(
-      jobsToThroughputRecords(filterJobsForThroughput(jobs, range.previousFrom, range.to)),
+      jobsToThroughputRecords(filterJobsForThroughput(jobs, range.from, range.to)),
     );
-  }, [jobs, siamrajPrimary, dbSource, refreshing, period]);
+  }, [jobs, siamrajPrimary, dbSource, refreshing, period, throughputRange]);
 
   useEffect(() => {
     if (DEMO_MODE) {
+      setClosedJobs([]);
+      return;
+    }
+    if (!period) {
       setClosedJobs([]);
       return;
     }
@@ -121,6 +136,7 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const scopedJobs = useMemo(() => {
+    if (!period) return jobsWithoutAgeFilter;
     return filterJobsByRequestDate(jobsWithoutAgeFilter, period.from, period.to);
   }, [jobsWithoutAgeFilter, period]);
 
@@ -193,8 +209,13 @@ const SupervisorDashboard: React.FC = () => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
     const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters, { ageDaysFilter: true });
-    const trendJobs = filterJobsByRequestDate(unitFilteredAll, period.from, period.to);
-    const previousScoped = filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo);
+    const trendRange = period ?? resolveYearToDateTrendRange();
+    const trendJobs = period
+      ? filterJobsByRequestDate(unitFilteredAll, period.from, period.to)
+      : unitFilteredAll;
+    const previousScoped = period
+      ? filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo)
+      : [];
     // ใบขอที่ปิดแล้ว — กรองด้วยฟิลเตอร์หน่วยงานชุดเดียวกัน (ข้ามฟิลเตอร์สถานะ/อายุที่ไม่เกี่ยวกับใบปิด)
     const scopedClosedJobs = filterUnitRequests(closedJobs, siamrajPrimary, unitFilters, {
       statusFilter: true,
@@ -209,9 +230,9 @@ const SupervisorDashboard: React.FC = () => {
       new Date(),
       {
         jobs: trendJobs,
-        from: period.from,
-        to: period.to,
-        label: period.label,
+        from: trendRange.from,
+        to: trendRange.to,
+        label: trendRange.label,
         throughputRecords,
       },
       scopedClosedJobs,
@@ -251,7 +272,7 @@ const SupervisorDashboard: React.FC = () => {
     async (kpiId: string, label: string) => {
       // การ์ด "ปิดใบขอ"/"อัตราปิด" นับจาก throughput (รวม backlog/ปิดแล้ว) — feed หลักมีแต่ใบที่ยังเปิด
       // จึงต้องดึงรายการใบที่ปิดในช่วงเดียวกันมาโชว์ ให้เลขตรงกับการ์ด (ไม่งั้น "ปิดแล้วหายไป")
-      if ((kpiId === 'completed' || kpiId === 'success_rate') && siamrajPrimary && dbSource === 'sqlserver') {
+      if ((kpiId === 'completed' || kpiId === 'success_rate') && period && siamrajPrimary && dbSource === 'sqlserver') {
         try {
           const closed = await fetchSiamrajClosedRequests(period.from, period.to);
           openJobList(label, closed);
@@ -261,7 +282,8 @@ const SupervisorDashboard: React.FC = () => {
         return;
       }
       if (kpiId === 'remaining') {
-        openJobList(label, filterJobsForDashboardKpi(jobsWithoutAgeFilter, kpiId));
+        const list = period ? scopedJobs : jobsWithoutAgeFilter;
+        openJobList(label, filterJobsForDashboardKpi(list, kpiId));
         return;
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));

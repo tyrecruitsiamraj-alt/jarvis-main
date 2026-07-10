@@ -110,7 +110,18 @@ describe('buildDashboardData', () => {
     expect(bucketTotal).toBe(5);
   });
 
-  it('remaining KPI counts all open positions, not only period-scoped requests', () => {
+  it('remaining KPI counts all open positions when no period is selected', () => {
+    const jobs = [
+      job({ id: 'old', unit_name: 'A', position_units: 52, request_date: '2026-05-01', required_date: '2026-05-01' }),
+      job({ id: 'new', unit_name: 'B', position_units: 45, request_date: '2026-07-02', required_date: '2026-07-20' }),
+    ];
+    const data = buildDashboardData(jobs, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, [], jobs);
+    expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(97);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(97);
+    expect(data.periodLabel).toBe('ทั้งหมดที่โหลด');
+  });
+
+  it('remaining KPI counts period-scoped open when a period is selected', () => {
     const jobs = [
       job({ id: 'old', unit_name: 'A', position_units: 52, request_date: '2026-05-01', required_date: '2026-05-01' }),
       job({ id: 'new', unit_name: 'B', position_units: 45, request_date: '2026-07-02', required_date: '2026-07-20' }),
@@ -128,7 +139,7 @@ describe('buildDashboardData', () => {
       jobs,
     );
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(45);
-    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(97);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(45);
   });
 
   it('filters work queue by search', () => {

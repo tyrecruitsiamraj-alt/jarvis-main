@@ -344,6 +344,7 @@ function buildKpis(
   previous: JobRequest[],
   openJobs: JobRequest[],
   today: Date,
+  hasPeriod: boolean,
   throughput?: {
     records: ThroughputRecord[];
     from: string;
@@ -354,7 +355,6 @@ function buildKpis(
 ): DashboardKpi[] {
   const curTotal = sumJobPositionUnits(current);
   const prevTotal = sumJobPositionUnits(previous);
-  const remainingTotal = sumOpenRemainingPositions(openJobs);
 
   const throughputCur = throughput
     ? sumThroughputInRange(throughput.records, throughput.from, throughput.to)
@@ -374,6 +374,12 @@ function buildKpis(
     ? Math.round((prevClosedTotal / prevRequestedTotal) * 1000) / 10
     : 0;
   const closedBacklog = throughputCur?.closedBacklog ?? 0;
+  const remainingTotal = hasPeriod
+    ? (throughputCur?.remaining ?? sumOpenRemainingPositions(current))
+    : sumOpenRemainingPositions(openJobs);
+  const prevRemainingTotal = hasPeriod
+    ? (throughputPrev?.remaining ?? sumOpenRemainingPositions(previous))
+    : null;
 
   return [
     {
@@ -382,7 +388,9 @@ function buildKpis(
       value: requestedTotal,
       description: throughputCur
         ? 'ตำแหน่งที่ขอในช่วง (ย้อนหลัง=วันที่กรอก · ฉุกเฉิน/ล่วงหน้า=วันที่ต้องการ)'
-        : 'ตำแหน่งคงเหลือตามตัวกรอง',
+        : hasPeriod
+          ? 'ตำแหน่งคงเหลือตามตัวกรองในช่วงที่เลือก'
+          : 'ตำแหน่งที่โหลดทั้งหมดตามตัวกรอง',
       trendPercent: trendPercent(requestedTotal, prevRequestedTotal),
     },
     {
@@ -400,8 +408,12 @@ function buildKpis(
       id: 'remaining',
       label: 'เหลือหาอีก',
       value: remainingTotal,
-      description: 'ตำแหน่งคงเหลือที่ยังเปิดอยู่ทั้งหมด (ตามตัวกรอง · ไม่กรองช่วงวันที่)',
-      trendPercent: null,
+      description: hasPeriod
+        ? 'ตำแหน่งคงเหลือจากใบขอในช่วงที่ยังเปิดอยู่'
+        : 'ตำแหน่งคงเหลือที่ยังเปิดอยู่ทั้งหมด (ตามตัวกรอง)',
+      trendPercent: hasPeriod && prevRemainingTotal != null
+        ? trendPercent(remainingTotal, prevRemainingTotal)
+        : null,
     },
     {
       id: 'success_rate',
@@ -664,7 +676,7 @@ export function buildDashboardData(
       : undefined;
 
   return {
-    kpis: buildKpis(scopedJobs, previousScopedJobs, openJobSet, today, kpiThroughput),
+    kpis: buildKpis(scopedJobs, previousScopedJobs, openJobSet, today, period != null, kpiThroughput),
     activityTrend,
     unitOverview: buildUnitOverview(scopedJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
