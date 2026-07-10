@@ -44,6 +44,10 @@ import {
   lumosReminderContactsHandler,
   lumosReminderResultsHandler,
 } from './lumos-reminder.js';
+import recruitRegistrationsHandler from './recruit-registrations.js';
+import matchingSuggestionsHandler from './matching-suggestions.js';
+import matchingParseBranchDemandHandler from './matching-parse-branch-demand.js';
+import matchingParseBranchDemandJobHandler from './matching-parse-branch-demand-job.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -77,6 +81,10 @@ export const apiRoutes: Record<string, ApiHandler> = {
   // AI Reminder (Lumos ↔ SO)
   '/api/lumos/reminder/contacts': lumosReminderContactsHandler as ApiHandler,
   '/api/lumos/reminder/results': lumosReminderResultsHandler as ApiHandler,
+  '/api/recruit-registrations': recruitRegistrationsHandler as ApiHandler,
+  '/api/matching/suggestions': matchingSuggestionsHandler as ApiHandler,
+  '/api/matching/parse-branch-demand': matchingParseBranchDemandHandler as ApiHandler,
+  '/api/matching/parse-branch-demand-job': matchingParseBranchDemandJobHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,

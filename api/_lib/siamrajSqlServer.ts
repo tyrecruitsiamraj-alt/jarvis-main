@@ -60,7 +60,7 @@ export async function getSiamrajSqlServerPool(): Promise<sql.ConnectionPool> {
   }
 
   try {
-    const pool = await sql.connect({
+    const pool = new sql.ConnectionPool({
       user: cfg.user,
       password: cfg.password,
       server: cfg.server,
@@ -74,6 +74,7 @@ export async function getSiamrajSqlServerPool(): Promise<sql.ConnectionPool> {
       connectionTimeout: 30000,
       requestTimeout: 60000,
     });
+    await pool.connect();
 
     globalForMssql.__jarvisMssqlPool = pool;
     return pool;

@@ -30,7 +30,8 @@ function Field({ label, value }: { label: string; value?: string | number | null
 }
 
 const SiamrajUnitRequestDetailPage: React.FC = () => {
-  const { id = '' } = useParams();
+  const { id: rawId = '' } = useParams();
+  const id = decodeURIComponent(rawId).trim();
   const navigate = useNavigate();
   const location = useLocation();
   const backPath = (location.state as { returnTo?: string } | null)?.returnTo ?? '/jobs/list';

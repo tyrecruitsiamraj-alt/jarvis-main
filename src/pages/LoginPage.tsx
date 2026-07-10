@@ -29,6 +29,15 @@ type AuthConfig = {
   companyEmailHint: string | null;
 };
 
+const DEFAULT_AUTH_CONFIG: AuthConfig = {
+  companyEmailLogin: false,
+  microsoftLogin: false,
+  emailLoginGate: false,
+  companyEmailRequired: false,
+  allowedDomains: [],
+  companyEmailHint: null,
+};
+
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   no_account: 'บัญชี Microsoft นี้ยังไม่ได้ลงทะเบียนในระบบ — ติดต่อผู้ดูแล',
   disabled: 'บัญชีนี้ถูกปิดใช้งาน',
@@ -81,11 +90,15 @@ const LoginPage: React.FC = () => {
     (async () => {
       try {
         const r = await apiFetch('/api/auth/config');
-        if (!r.ok || cancelled) return;
+        if (cancelled) return;
+        if (!r.ok) {
+          setAuthConfig(DEFAULT_AUTH_CONFIG);
+          return;
+        }
         const data = (await r.json()) as AuthConfig;
         if (!cancelled) setAuthConfig(data);
       } catch {
-        /* optional config */
+        if (!cancelled) setAuthConfig(DEFAULT_AUTH_CONFIG);
       }
     })();
     return () => {

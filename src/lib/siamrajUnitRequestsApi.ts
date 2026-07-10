@@ -81,7 +81,7 @@ export async function saveUnitRequestNote(requestNo: string, note: string): Prom
 
 export async function saveUnitRequestMeta(
   requestNo: string,
-  payload: { note?: string | null; send_replacement?: boolean | null },
+  payload: { note?: string | null; send_replacement?: boolean | null; parser_override_text?: string | null },
 ): Promise<void> {
   const r = await apiFetch('/api/siamraj/unit-notes', {
     method: 'POST',
@@ -100,8 +100,11 @@ export function isSiamrajJob(job: JobRequest): boolean {
 }
 
 export function siamrajExternalId(job: JobRequest): string | null {
-  if (job.externalId) return job.externalId;
-  if (job.id.startsWith('siamraj-sql:')) return job.id.slice('siamraj-sql:'.length);
-  if (job.id.startsWith('siamraj:')) return job.id.slice('siamraj:'.length);
+  const fromExternal = job.externalId?.trim();
+  if (fromExternal) return fromExternal;
+  const fromRequestNo = job.request_no?.trim();
+  if (fromRequestNo && isSiamrajJob(job)) return fromRequestNo;
+  if (job.id.startsWith('siamraj-sql:')) return job.id.slice('siamraj-sql:'.length).trim();
+  if (job.id.startsWith('siamraj:')) return job.id.slice('siamraj:'.length).trim();
   return null;
 }
