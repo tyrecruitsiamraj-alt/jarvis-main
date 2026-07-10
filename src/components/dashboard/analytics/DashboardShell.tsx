@@ -95,7 +95,7 @@ const DashboardShell: React.FC<Props> = ({
             <div>
               <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Request Control Tower</h1>
               <p className="text-sm text-slate-500 mt-1">
-                Demand · Fulfillment · Resolution · Backlog · SLA · Lifecycle · {data.periodLabel}
+                ความต้องการ · หาได้แล้ว · จบงาน · งานค้าง · SLA · ประเภทใบขอ · {data.periodLabel}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
@@ -167,7 +167,7 @@ const DashboardShell: React.FC<Props> = ({
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   {data.dataQualitySummary.message}
                   {data.dataQualitySummary.reconciliationDiff
-                    ? ` (สมการ backlog ต่าง ${data.dataQualitySummary.reconciliationDiff} ตำแหน่ง)`
+                    ? ` (สมการงานค้างต่าง ${data.dataQualitySummary.reconciliationDiff} ตำแหน่ง)`
                     : null}
                 </div>
               ) : null}

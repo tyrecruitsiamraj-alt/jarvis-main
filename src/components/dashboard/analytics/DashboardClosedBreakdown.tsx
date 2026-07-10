@@ -39,22 +39,22 @@ const DashboardClosedBreakdownCard: React.FC<Props> = ({
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm space-y-4">
       {filledTotal > 0 ? (
         <div>
-          <p className="text-xs font-medium text-slate-600">ปิดได้/หาได้แล้วเดือนนี้</p>
+          <p className="text-xs font-medium text-slate-600">หาได้แล้วในงวดนี้</p>
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {cell(
-              'ขอเดือนนี้ ปิดได้เดือนนี้',
+              'ของวดนี้ หาได้งวดนี้',
               breakdown.filledSamePeriod,
               'bg-emerald-50 text-emerald-900',
               onFilledClick
-                ? () => onFilledClick('same', 'ขอเดือนนี้ ปิดได้เดือนนี้')
+                ? () => onFilledClick('same', 'ของวดนี้ หาได้งวดนี้')
                 : undefined,
             )}
             {cell(
-              'ขอเดือนเก่า ปิดได้เดือนนี้',
+              'งานค้างเก่า หาได้งวดนี้',
               breakdown.filledBacklog,
               'bg-slate-50 text-slate-900',
               onFilledClick
-                ? () => onFilledClick('backlog', 'ขอเดือนเก่า ปิดได้เดือนนี้')
+                ? () => onFilledClick('backlog', 'งานค้างเก่า หาได้งวดนี้')
                 : undefined,
             )}
           </div>
@@ -63,22 +63,22 @@ const DashboardClosedBreakdownCard: React.FC<Props> = ({
 
       {fullyClosedTotal > 0 ? (
         <div>
-          <p className="text-xs font-medium text-slate-600">ปิดครบใบขอเดือนนี้</p>
+          <p className="text-xs font-medium text-slate-600">ปิดครบใบขอในงวดนี้</p>
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {cell(
-              'ขอเดือนนี้ ปิดครบเดือนนี้',
+              'ของวดนี้ ปิดครบงวดนี้',
               breakdown.fullyClosedSamePeriod,
               'bg-blue-50 text-blue-900',
               onFullyClosedClick
-                ? () => onFullyClosedClick('same', 'ขอเดือนนี้ ปิดครบเดือนนี้')
+                ? () => onFullyClosedClick('same', 'ของวดนี้ ปิดครบงวดนี้')
                 : undefined,
             )}
             {cell(
-              'ขอเดือนเก่า ปิดครบเดือนนี้',
+              'งานค้างเก่า ปิดครบงวดนี้',
               breakdown.fullyClosedBacklog,
               'bg-indigo-50 text-indigo-900',
               onFullyClosedClick
-                ? () => onFullyClosedClick('backlog', 'ขอเดือนเก่า ปิดครบเดือนนี้')
+                ? () => onFullyClosedClick('backlog', 'งานค้างเก่า ปิดครบงวดนี้')
                 : undefined,
             )}
           </div>

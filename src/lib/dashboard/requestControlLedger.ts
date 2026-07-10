@@ -561,7 +561,7 @@ export function buildBacklogReconciliation(summary: RequestControlSummaryV3): Ba
     diff,
     diffReason:
       diff !== 0
-        ? 'ข้อมูล event ไม่ครบหรือใช้ snapshot fallback ทำให้สมการ backlog ไม่ลงตัว'
+        ? 'ข้อมูล event ไม่ครบหรือใช้ snapshot fallback ทำให้สมการงานค้างไม่ลงตัว'
         : undefined,
   };
 }

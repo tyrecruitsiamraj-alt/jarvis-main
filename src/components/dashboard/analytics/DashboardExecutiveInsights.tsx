@@ -14,7 +14,7 @@ const DashboardExecutiveInsightsCard: React.FC<Props> = ({ insights }) => {
       <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
         <Lightbulb className="h-4 w-4 text-amber-500" />
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Executive Insights</h3>
+          <h3 className="text-sm font-semibold text-slate-900">สรุปผู้บริหาร</h3>
           <p className="text-xs text-slate-500">สรุปอัตโนมัติสำหรับผู้บริหาร</p>
         </div>
       </div>

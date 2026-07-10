@@ -19,7 +19,7 @@ const DashboardPriorityQueue: React.FC<Props> = ({ items, onView }) => {
         <div>
           <h3 className="text-sm font-semibold text-slate-900">ต้องแก้วันนี้</h3>
           <p className="text-xs text-slate-600">
-            {items.length} ใบขอ — เรียงตาม SLA breach → เสี่ยง → ฉุกเฉิน/ย้อนหลัง → คงเหลือมาก → backlog เก่า
+            {items.length} ใบขอ — เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → คงเหลือมาก → งานค้างเก่า
           </p>
         </div>
       </div>

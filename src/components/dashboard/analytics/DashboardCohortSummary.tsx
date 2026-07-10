@@ -8,17 +8,17 @@ type Props = {
 
 const DashboardCohortSummaryCard: React.FC<Props> = ({ summary, onRowClick }) => (
   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-    <p className="text-xs font-medium text-slate-600">ใบขอเก่าค้างมา vs ใบขอใหม่เดือนนี้</p>
+    <p className="text-xs font-medium text-slate-600">ยอดค้างจากงวดก่อน vs ขอใหม่งวดนี้</p>
     <div className="mt-2 overflow-x-auto">
       <table className="w-full min-w-[520px] text-xs">
         <thead>
           <tr className="text-slate-500 border-b border-slate-100">
             <th className="text-left py-2 font-medium">กลุ่ม</th>
             <th className="text-right py-2 font-medium">ขอมา</th>
-            <th className="text-right py-2 font-medium">ปิดได้</th>
-            <th className="text-right py-2 font-medium">เหลือ</th>
+            <th className="text-right py-2 font-medium">หาได้แล้ว</th>
+            <th className="text-right py-2 font-medium">เหลือหา</th>
             <th className="text-right py-2 font-medium">ปิดครบ</th>
-            <th className="text-right py-2 font-medium">Partial</th>
+            <th className="text-right py-2 font-medium">บางส่วน</th>
             <th className="text-right py-2 font-medium">ยกเลิก</th>
           </tr>
         </thead>

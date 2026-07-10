@@ -160,7 +160,7 @@ export function buildRequestCohortSummary(
   const backlog = filterRecordsCarriedOver(records, from);
   const fresh = filterRecordsByEffectiveDate(records, from, to);
   const rows = [
-    cohortRow('backlog_from_previous_period', 'ใบขอเก่าค้างมา', backlog),
+    cohortRow('backlog_from_previous_period', 'ยอดค้างจากงวดก่อน', backlog),
     cohortRow('new_this_period', 'ใบขอใหม่เดือนนี้', fresh),
     cohortRow('total', 'รวมภาระงาน', [...backlog, ...fresh]),
   ];
@@ -190,13 +190,13 @@ export function buildFulfillmentCohortSummary(
   const rows = [
     {
       id: 'requested_this_period_filled_this_period' as const,
-      label: 'ขอเดือนนี้ หาได้เดือนนี้',
+      label: 'ของวดนี้ หาได้งวดนี้',
       filledPositions: sumPositions(samePeriod, (r) => r.filledPositions),
       requestCount: samePeriod.length,
     },
     {
       id: 'requested_before_period_filled_this_period' as const,
-      label: 'ขอเดือนเก่า หาได้เดือนนี้',
+      label: 'งานค้างเก่า หาได้งวดนี้',
       filledPositions: sumPositions(backlogFilled, (r) => r.filledPositions),
       requestCount: backlogFilled.length,
     },
@@ -226,13 +226,13 @@ export function buildFullyClosedCohortSummary(
   const rows = [
     {
       id: 'requested_this_period_fully_closed_this_period' as const,
-      label: 'ขอเดือนนี้ ปิดครบเดือนนี้',
+      label: 'ของวดนี้ ปิดครบงวดนี้',
       requestCount: samePeriod.length,
       positionCount: sumPositions(samePeriod, (r) => r.requestPositions),
     },
     {
       id: 'requested_before_period_fully_closed_this_period' as const,
-      label: 'ขอเดือนเก่า ปิดครบเดือนนี้',
+      label: 'งานค้างเก่า ปิดครบงวดนี้',
       requestCount: backlogClosed.length,
       positionCount: sumPositions(backlogClosed, (r) => r.requestPositions),
     },
@@ -399,11 +399,11 @@ export function buildLifecycleInsights(
   }
 
   if (totals.filled > 0 && totals.fullyClosed < totals.filled) {
-    insights.push('ปิดได้เยอะ แต่ปิดครบใบขอยังน้อย — มี Partial ค้าง');
+    insights.push('หาได้แล้วเยอะ แต่ปิดครบใบขอยังน้อย — มีงานหาได้บางส่วนค้าง');
   }
 
   if (totals.filled > totals.requested && totals.requested > 0) {
-    insights.push('ปิดได้เยอะจาก backlog เดือนเก่า');
+    insights.push('หาได้แล้วเยอะจากงานค้างเดือนเก่า');
   }
 
   let streak = 0;
@@ -458,14 +458,14 @@ export function buildExecutiveInsights(
 
   if (summary.netBacklogChange > 0) {
     sentences.push(
-      `Backlog เพิ่มขึ้น ${summary.netBacklogChange.toLocaleString('th-TH')} ตำแหน่ง เทียบต้นเดือน`,
+      `งานค้างเพิ่มขึ้น ${summary.netBacklogChange.toLocaleString('th-TH')} ตำแหน่ง เทียบต้นงวด`,
     );
   } else if (summary.netBacklogChange < 0) {
     sentences.push(
-      `Backlog ลดลง ${Math.abs(summary.netBacklogChange).toLocaleString('th-TH')} ตำแหน่ง เทียบต้นเดือน`,
+      `งานค้างลดลง ${Math.abs(summary.netBacklogChange).toLocaleString('th-TH')} ตำแหน่ง เทียบต้นงวด`,
     );
   } else if (summary.totalWorkloadPositions > 0) {
-    sentences.push('Backlog คงที่เทียบต้นเดือน');
+    sentences.push('งานค้างคงที่เทียบต้นงวด');
   }
 
   if (summary.totalWorkloadPositions > 0) {
@@ -482,15 +482,15 @@ export function buildExecutiveInsights(
 
   if (summary.filledPositionsFromOldRequests > 0 && summary.filledPositionsThisPeriod > 0) {
     const share = pct(summary.filledPositionsFromOldRequests, summary.filledPositionsThisPeriod);
-    sentences.push(`การปิด backlog เก่าช่วย ${share}% ของการปิดได้เดือนนี้`);
+    sentences.push(`การหางานค้างเก่าช่วย ${share}% ของการหาได้ในงวดนี้`);
   }
 
   if (summary.fillRatePercent > 40 && summary.fullClosureRatePercent < 30) {
-    sentences.push('ปิดได้เยอะ แต่ปิดครบใบขอยังน้อย — มี Partial ค้าง');
+    sentences.push('หาได้แล้วเยอะ แต่ปิดครบใบขอยังน้อย — มีงานหาได้บางส่วนค้าง');
   }
 
   if (summary.netBacklogChange > 0 && summary.filledPositionsThisPeriod > summary.newRequestPositions) {
-    sentences.push('ปิดได้เยอะ แต่ backlog ยังเพิ่มจากความต้องการใหม่');
+    sentences.push('หาได้แล้วเยอะ แต่งานค้างยังเพิ่มจากความต้องการใหม่');
   }
 
   const unitHighlight = topSlaBreachHighlight(records, 'unit', (r) => r.unitName);

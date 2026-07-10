@@ -59,9 +59,9 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                 <SortBtn label="ใบงาน" active={sortKey === 'createdAt'} dir={sortDir} onClick={() => toggle('createdAt')} />
               </th>
               <th className="px-3 py-2.5 font-medium">ขอมา</th>
-              <th className="px-3 py-2.5 font-medium">ปิดได้</th>
+              <th className="px-3 py-2.5 font-medium">หาได้แล้ว</th>
               <th className="px-3 py-2.5 font-medium">ยกเลิก</th>
-              <th className="px-3 py-2.5 font-medium">เหลือ</th>
+              <th className="px-3 py-2.5 font-medium">เหลือหา</th>
               <th className="px-3 py-2.5 font-medium">ประเภท</th>
               <th className="px-3 py-2.5 font-medium">
                 <SortBtn label="สถานะ" active={sortKey === 'status'} dir={sortDir} onClick={() => toggle('status')} />

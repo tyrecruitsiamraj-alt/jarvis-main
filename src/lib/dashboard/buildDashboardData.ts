@@ -488,7 +488,7 @@ function buildControlTowerKpis(
     },
     {
       id: 'backlog_change',
-      label: 'Backlog เพิ่ม/ลด',
+      label: 'งานค้าง เพิ่ม/ลด',
       value: summary.netBacklogChange,
       description:
         summary.netBacklogChange > 0
@@ -566,7 +566,7 @@ function buildKpis(
       value: closedTotal,
       description: throughputCur
         ? closedBacklog > 0
-          ? `รวม backlog เก่าที่ปิดในช่วงนี้ ${closedBacklog.toLocaleString('th-TH')} ตำแหน่ง`
+          ? `รวมงานค้างเก่าที่หาได้ในงวดนี้ ${closedBacklog.toLocaleString('th-TH')} ตำแหน่ง`
           : 'ตำแหน่งที่ปิดแล้วในช่วงที่เลือก'
         : closedFromFeed > 0
           ? 'ตำแหน่งที่ปิดแล้วจากรายการในช่วง'
