@@ -1,12 +1,37 @@
 import type { JobRequest } from '@/types';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
-import { matchesDashboardAgeBucket } from '@/lib/jobUrgency';
+import { effectiveRequestDateYmd, matchesDashboardAgeBucket } from '@/lib/jobUrgency';
 import {
   classifyRequestActivity,
   mapJobToTaskStatus,
   type RequestActivityKind,
 } from '@/lib/dashboard/buildDashboardData';
+import { buildOrganizationKeyResolver } from '@/lib/unitGroupName';
 import type { DashboardAgeDaysBreakdown, DashboardTaskStatus } from '@/lib/dashboard/types';
+
+function safeYmd(value?: string | null): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const ymd = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+}
+
+function inYmdRange(ymd: string, from: string, to: string): boolean {
+  return ymd >= from && ymd <= to;
+}
+
+/** ใบขอที่ปิดในช่วง — ใช้ drill-down การ์ด "ปิดใบงาน" ให้ตรงกับ throughput */
+export function filterJobsClosedInPeriod(
+  jobs: JobRequest[],
+  from: string,
+  to: string,
+  today = new Date(),
+): JobRequest[] {
+  return jobs.filter((j) => {
+    if (j.status !== 'closed' && j.status !== 'cancelled') return false;
+    const closureDate = safeYmd(j.closed_date) || effectiveRequestDateYmd(j, today);
+    return closureDate ? inYmdRange(closureDate, from, to) : false;
+  });
+}
 
 export function filterJobsForDashboardKpi(
   jobs: JobRequest[],
@@ -42,8 +67,6 @@ export function filterJobsForTaskStatus(
 ): JobRequest[] {
   return jobs.filter((j) => mapJobToTaskStatus(j, today) === status);
 }
-
-import { buildOrganizationKeyResolver } from '@/lib/unitGroupName';
 
 export function filterJobsForUnitName(jobs: JobRequest[], unitName: string): JobRequest[] {
   const resolve = buildOrganizationKeyResolver([...jobs.map((j) => j.unit_name), unitName]);

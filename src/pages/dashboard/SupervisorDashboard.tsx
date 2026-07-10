@@ -19,6 +19,7 @@ import { MOCK_DASHBOARD_DATA } from '@/lib/dashboard/mockDashboardData';
 import type { DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
 import { jobToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
 import {
+  filterJobsClosedInPeriod,
   filterJobsForAgeBucket,
   filterJobsForDashboardKpi,
   filterJobsForRecruiter,
@@ -136,6 +137,16 @@ const SupervisorDashboard: React.FC = () => {
     return filterJobsByRequestDate(jobsWithoutAgeFilter, period.from, period.to);
   }, [jobsWithoutAgeFilter, period]);
 
+  const scopedClosedJobs = useMemo(
+    () =>
+      filterUnitRequests(closedJobs, siamrajPrimary, unitFilters, {
+        statusFilter: true,
+        ageDaysFilter: true,
+        urgencyFilter: true,
+      }),
+    [closedJobs, siamrajPrimary, unitFilters],
+  );
+
   useEffect(() => {
     saveDashboardFilters(filters);
   }, [filters]);
@@ -212,12 +223,6 @@ const SupervisorDashboard: React.FC = () => {
     const previousScoped = period
       ? filterJobsByRequestDate(unitFilteredAll, period.previousFrom, period.previousTo)
       : [];
-    // ใบขอที่ปิดแล้ว — กรองด้วยฟิลเตอร์หน่วยงานชุดเดียวกัน (ข้ามฟิลเตอร์สถานะ/อายุที่ไม่เกี่ยวกับใบปิด)
-    const scopedClosedJobs = filterUnitRequests(closedJobs, siamrajPrimary, unitFilters, {
-      statusFilter: true,
-      ageDaysFilter: true,
-      urgencyFilter: true,
-    });
     const built = buildDashboardData(
       scopedJobs,
       previousScoped,
@@ -239,7 +244,7 @@ const SupervisorDashboard: React.FC = () => {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, closedJobs, jobsWithoutAgeFilter]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, scopedClosedJobs, jobsWithoutAgeFilter]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
@@ -266,17 +271,14 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const handleKpiClick = useCallback(
-    async (kpiId: string, label: string) => {
-      // การ์ด "ปิดใบขอ"/"อัตราปิด" นับจาก throughput (รวม backlog/ปิดแล้ว) — feed หลักมีแต่ใบที่ยังเปิด
-      // จึงต้องดึงรายการใบที่ปิดในช่วงเดียวกันมาโชว์ ให้เลขตรงกับการ์ด (ไม่งั้น "ปิดแล้วหายไป")
-      if ((kpiId === 'completed' || kpiId === 'success_rate') && siamrajPrimary && dbSource === 'sqlserver') {
-        const range = period ?? resolveYearToDateTrendRange();
-        try {
-          const closed = await fetchSiamrajClosedRequests(range.from, range.to);
-          openJobList(label, closed);
-        } catch {
-          openJobList(label, []);
+    (kpiId: string, label: string) => {
+      if (kpiId === 'completed' || kpiId === 'success_rate') {
+        if (siamrajPrimary && dbSource === 'sqlserver') {
+          openJobList(label, scopedClosedJobs);
+          return;
         }
+        const range = period ?? resolveYearToDateTrendRange();
+        openJobList(label, filterJobsClosedInPeriod(jobsWithoutAgeFilter, range.from, range.to));
         return;
       }
       if (kpiId === 'remaining') {
@@ -286,7 +288,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, scopedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period],
+    [openJobList, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period],
   );
 
   const handleAgeBucketClick = useCallback(

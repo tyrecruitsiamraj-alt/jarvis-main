@@ -12,6 +12,8 @@ import {
 } from '../../src/lib/dashboard/buildDashboardData';
 import { DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
 import { sumJobPositionUnits } from '../../src/lib/jobPositionUnits';
+import { jobsToThroughputRecords } from '../../src/lib/dashboard/throughput';
+import { filterJobsClosedInPeriod } from '../../src/lib/dashboard/drillDownFilters';
 import type { JobRequest } from '@/types';
 
 function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
@@ -140,6 +142,49 @@ describe('buildDashboardData', () => {
     );
     expect(data.kpis.find((k) => k.id === 'total')?.value).toBe(45);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(45);
+  });
+
+  it('exposes closed breakdown from throughput records', () => {
+    const jobs = [
+      job({
+        id: 'same',
+        unit_name: 'A',
+        position_units: 2,
+        status: 'closed',
+        request_date: '2026-07-02',
+        required_date: '2026-07-20',
+        closed_date: '2026-07-10',
+      }),
+      job({
+        id: 'backlog',
+        unit_name: 'B',
+        position_units: 3,
+        status: 'closed',
+        request_date: '2026-06-20',
+        required_date: '2026-06-20',
+        closed_date: '2026-07-05',
+      }),
+      job({ id: 'open', unit_name: 'C', position_units: 1, request_date: '2026-07-03', required_date: '2026-07-20' }),
+    ];
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const scoped = jobs.filter((j) => j.request_date.startsWith('2026-07'));
+    const records = jobsToThroughputRecords(jobs);
+    const data = buildDashboardData(
+      scoped,
+      [],
+      period,
+      DEFAULT_DASHBOARD_FILTERS,
+      new Date('2026-07-15'),
+      {
+        jobs: scoped,
+        from: period.from,
+        to: period.to,
+        label: period.label,
+        throughputRecords: records,
+      },
+    );
+    expect(data.closedBreakdown).toEqual({ samePeriod: 2, backlog: 3 });
+    expect(data.kpis.find((k) => k.id === 'completed')?.value).toBe(5);
   });
 
   it('uses closed jobs feed when throughput closed is zero', () => {

@@ -21,7 +21,7 @@ function job(partial: Partial<JobRequest> & Pick<JobRequest, 'id'>): JobRequest 
 }
 
 describe('siamrajUnitFilters counts', () => {
-  it('counts requests per department, not position units', () => {
+  it('counts position units per department', () => {
     const jobs = [
       job({ id: '1', department_code: 'LBD', position_units: 4 }),
       job({ id: '2', department_code: 'LBD', position_units: 2 }),
@@ -29,19 +29,19 @@ describe('siamrajUnitFilters counts', () => {
     ];
 
     const options = departmentFilterOptions(jobs);
-    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (3)');
-    expect(options.find((o) => o.value === 'LBD')?.label).toBe('LBD (2)');
+    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (7)');
+    expect(options.find((o) => o.value === 'LBD')?.label).toBe('LBD (6)');
     expect(options.find((o) => o.value === 'LBA')?.label).toBe('LBA (1)');
   });
 
-  it('counts requests per job subtype, not position units', () => {
+  it('counts position units per job subtype', () => {
     const jobs = [
       job({ id: '1', job_description_code_2: 'พขร.', position_units: 3 }),
       job({ id: '2', job_description_code_2: 'พขร.', position_units: 1 }),
     ];
 
     const options = jobSubtypeFilterOptions(jobs);
-    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (2)');
-    expect(options.find((o) => o.value === 'พขร.')?.label).toBe('พขร. (2)');
+    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (4)');
+    expect(options.find((o) => o.value === 'พขร.')?.label).toBe('พขร. (4)');
   });
 });
