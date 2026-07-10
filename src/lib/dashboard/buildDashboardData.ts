@@ -723,7 +723,7 @@ export function buildRecruiterOverview(
     role: DashboardResponsibleRole;
     total: number;
     completed: number;
-    overdue: number;
+    remaining: number;
   };
   const map = new Map<string, Row>();
 
@@ -731,21 +731,29 @@ export function buildRecruiterOverview(
     role: DashboardResponsibleRole,
     rawName: string | undefined,
     units: number,
-    flags: { completed?: boolean; overdue?: boolean },
+    flags: { completed?: boolean; remaining?: boolean },
   ) => {
     const name = rawName?.trim() || 'ยังไม่มอบหมาย';
     const key = `${role}:${name}`;
-    const row = map.get(key) ?? { name, role, total: 0, completed: 0, overdue: 0 };
+    const row = map.get(key) ?? { name, role, total: 0, completed: 0, remaining: 0 };
     row.total += units;
     if (flags.completed) row.completed += units;
-    if (flags.overdue) row.overdue += units;
+    if (flags.remaining) row.remaining += units;
     map.set(key, row);
   };
 
   for (const j of jobs) {
     const units = jobPositionUnits(j);
     const st = mapJobToTaskStatus(j, today);
-    const flags = { completed: st === 'completed', overdue: st === 'overdue' };
+    if (st === 'cancelled') {
+      add('recruiter', j.recruiter_name, units, {});
+      add('screener', j.screener_name, units, {});
+      continue;
+    }
+    const flags =
+      st === 'completed'
+        ? { completed: true as const }
+        : { remaining: true as const };
     add('recruiter', j.recruiter_name, units, flags);
     add('screener', j.screener_name, units, flags);
   }
@@ -765,10 +773,10 @@ export function buildRecruiterOverview(
       role: row.role,
       total: row.total,
       completed: row.completed,
-      overdue: row.overdue,
+      remaining: row.remaining,
       sharePercent: Math.round((row.total / (roleTotals[row.role] || 1)) * 1000) / 10,
     }))
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => b.remaining - a.remaining || b.total - a.total);
 }
 
 export function applyDashboardFilters(

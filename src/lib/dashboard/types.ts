@@ -107,7 +107,8 @@ export type DashboardRecruiterOverview = {
   role: DashboardResponsibleRole;
   total: number;
   completed: number;
-  overdue: number;
+  /** ตำแหน่งที่ยังต้องหา (คงเหลือ) */
+  remaining: number;
   sharePercent: number;
 };
 
