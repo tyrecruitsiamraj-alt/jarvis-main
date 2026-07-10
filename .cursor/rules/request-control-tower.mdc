@@ -1,0 +1,42 @@
+---
+description: Request Control Tower project rules
+globs: "**/*"
+alwaysApply: false
+---
+
+# Request Control Tower Rules
+
+Use these rules when working on staffing request dashboards, Request Control Tower, SLA, backlog, fulfillment, cancellation, lifecycle trend, root cause ranking, or related dashboard code.
+
+Before editing:
+
+* Read CLAUDE.md.
+* Read skills/request-control-tower-advisor/SKILL.md.
+* Read relevant reference files.
+
+Core rules:
+
+* Never mix หาได้แล้ว with ปิดครบใบขอ.
+* Never count cancelled positions as fulfilled.
+* Never treat จบงานแล้ว as always equal to ปิดครบใบขอ.
+* Never silently treat snapshot inform_qty as exact monthly fulfillment.
+* If event date is missing, mark affected metrics as snapshot_fallback.
+* Always preserve existing dashboard behavior unless explicitly asked to replace it.
+* Prefer parallel layer over direct rewrite.
+* Keep old dashboard behind feature flag until verified.
+* Always include unit tests for calculation changes.
+* Always update 09-editing-map.md if new internal files are added.
+
+Safe architecture:
+
+* parallel calculation layer
+* feature flag
+* adapter
+* read-only API
+* backward-compatible types
+* preview route
+* unit tests
+* reconciliation
+
+Core equation:
+ยอดค้างต้นงวด + ขอใหม่ - หาได้แล้ว - ยกเลิก = เหลือหา
