@@ -77,7 +77,11 @@ export function filterRecordsForControlKpi(
     case 'cancelled':
       return filterRecordsCancelledInPeriod(records, from, to);
     case 'remaining':
-      return records.filter((r) => r.remainingPositions > 0);
+      return filterRecordsByEffectiveDate(
+        records.filter((r) => r.remainingPositions > 0),
+        from,
+        to,
+      );
     case 'completed':
     case 'success_rate':
       return filterRecordsFilledInPeriod(records, from, to);

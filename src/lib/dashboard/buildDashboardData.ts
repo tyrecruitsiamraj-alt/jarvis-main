@@ -411,21 +411,29 @@ function sumOpenRemainingPositions(jobs: JobRequest[]): number {
     .reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
-/** ตำแหน่งคงเหลือจากใบเปิด — สอดคล้อง KPI โหมดทั้งหมดและหน้ารายการหน่วยงาน */
-function liveRemainingFromOpenJobs(jobs: JobRequest[]): {
-  remainingPositions: number;
-  remainingRequests: number;
-} {
-  const openJobs = jobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบขอที่เข้ามาในงวดนั้น */
+function resolveRemainingKpi(
+  openJobs: JobRequest[],
+  period: PeriodRange | null,
+  today: Date,
+): { remainingPositions: number; remainingRequests: number } {
+  let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+  if (period) {
+    jobs = jobs.filter((j) => {
+      const ymd = effectiveRequestDateYmd(j, today);
+      return ymd ? inYmdRange(ymd, period.from, period.to) : false;
+    });
+  }
   return {
-    remainingPositions: sumOpenRemainingPositions(openJobs),
-    remainingRequests: jobsToRequestControlRecords(openJobs).length,
+    remainingPositions: sumOpenRemainingPositions(jobs),
+    remainingRequests: jobsToRequestControlRecords(jobs).length,
   };
 }
 
 function buildControlTowerKpis(
   summary: DashboardRequestControlSummary,
   slaSummary?: { atRisk: number; breached: number },
+  periodLabel?: string | null,
 ): DashboardKpi[] {
   const posReq = (positions: number, requests: number) =>
     `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
@@ -486,7 +494,9 @@ function buildControlTowerKpis(
       value: summary.remainingPositions,
       secondaryCount: summary.remainingRequests,
       secondaryLabel: 'ใบขอ',
-      description: posReq(summary.remainingPositions, summary.remainingRequests),
+      description: periodLabel
+        ? `ใบขอใน${periodLabel} ที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`
+        : `ทั้งหมดที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`,
       trendPercent: null,
     },
     {
@@ -878,7 +888,7 @@ export function buildDashboardData(
   const mergedJobs = mergeRequestControlJobs(openJobSet, closedJobs);
   const periodFrom = period?.from ?? trendFrom;
   const periodTo = period?.to ?? trendTo;
-  const liveRemaining = liveRemainingFromOpenJobs(openJobSet);
+  const remainingKpi = resolveRemainingKpi(openJobSet, period, today);
 
   const ledgerStates = period ? buildRequestStates(mergedJobs, periodFrom, periodTo, today) : [];
   const summaryV3 = period ? computeRequestControlSummaryV3(ledgerStates, periodFrom, periodTo) : null;
@@ -911,8 +921,8 @@ export function buildDashboardData(
   if (requestControlSummary) {
     requestControlSummary = {
       ...requestControlSummary,
-      remainingPositions: liveRemaining.remainingPositions,
-      remainingRequests: liveRemaining.remainingRequests,
+      remainingPositions: remainingKpi.remainingPositions,
+      remainingRequests: remainingKpi.remainingRequests,
     };
   }
 
@@ -942,8 +952,7 @@ export function buildDashboardData(
     flowViewBase && requestControlSummary
       ? {
           ...flowViewBase,
-          endingBacklogPositions: liveRemaining.remainingPositions,
-          netBacklogChange: liveRemaining.remainingPositions - flowViewBase.startingBacklogPositions,
+          endingBacklogPositions: remainingKpi.remainingPositions,
         }
       : flowViewBase;
   const executiveInsights = requestControlSummary
@@ -957,7 +966,7 @@ export function buildDashboardData(
 
   const kpis =
     requestControlSummary != null
-      ? buildControlTowerKpis(requestControlSummary, slaSummary)
+      ? buildControlTowerKpis(requestControlSummary, slaSummary, period?.label ?? null)
       : buildKpis(
           scopedJobs,
           previousScopedJobs,
