@@ -102,6 +102,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
       closureDate,
       positionUnits: informed,
       isOpen: false,
+      kind: 'filled',
     });
   }
 
@@ -111,6 +112,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
       closureDate: null,
       positionUnits: remaining,
       isOpen: true,
+      kind: 'remaining',
     });
   } else if (!isOpen && informed === 0) {
     out.push({
@@ -118,6 +120,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
       closureDate,
       positionUnits: total,
       isOpen: false,
+      kind: 'cancelled',
     });
   }
 

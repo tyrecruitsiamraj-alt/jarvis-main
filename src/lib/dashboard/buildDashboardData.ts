@@ -38,6 +38,7 @@ import type {
   DashboardStatusBreakdown,
   DashboardTaskStatus,
   DashboardWorkItem,
+  DashboardRequestControlSummary,
 } from './types';
 import {
   enrichActivityTrendWithThroughput,
@@ -46,6 +47,29 @@ import {
   sumThroughputInRange,
   type ThroughputRecord,
 } from './throughput';
+import {
+  buildExecutiveInsights,
+  buildFlowView,
+  buildFulfillmentBreakdown,
+  buildFullyClosedCohortSummary,
+  buildFulfillmentCohortSummary,
+  buildLifecycleInsights,
+  buildLifecycleTrend,
+  buildRequestCohortSummary,
+  buildRequestControlSummary,
+  buildSlaSummary,
+} from './buildRequestControlSummaries';
+import { buildPriorityWorkQueue } from './priorityWorkQueue';
+import { classifyLifecycleKind, lifecycleKindLabel } from './lifecycle';
+import {
+  jobToRequestControlRecord,
+  jobsToRequestControlRecords,
+  mergeRequestControlJobs,
+  REQUEST_CONTROL_STATUS_LABELS,
+  type RequestControlStatus,
+} from '@/lib/requestControl';
+import type { SlaStatus } from '@/lib/jobSla';
+import { URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 
 export type PeriodRange = {
   from: string;
@@ -197,17 +221,44 @@ function nextActionFor(job: JobRequest, status: DashboardTaskStatus): string {
   return 'ดูรายละเอียด';
 }
 
+function controlStatusToDashboardStatus(
+  controlStatus: RequestControlStatus,
+  slaStatus: SlaStatus | undefined,
+  job: JobRequest,
+  today: Date,
+): DashboardTaskStatus {
+  if (slaStatus === 'breached') return 'overdue';
+  if (slaStatus === 'at_risk') return 'at_risk';
+  switch (controlStatus) {
+    case 'fully_closed':
+      return 'completed';
+    case 'cancelled_full':
+    case 'partially_filled_cancelled_remaining':
+      return 'cancelled';
+    case 'partial':
+      return 'in_progress';
+    case 'open':
+    default:
+      return mapJobToTaskStatus(job, today);
+  }
+}
+
+function requestKindLabel(kind: string): string {
+  return URGENCY_FILTER_OPTIONS.find((o) => o.value === kind)?.label ?? kind;
+}
+
 export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWorkItem {
-  const status = mapJobToTaskStatus(job, today);
+  const rec = jobToRequestControlRecord(job, today);
+  const status = controlStatusToDashboardStatus(rec.controlStatus, rec.slaStatus, job, today);
   return {
     id: job.id,
-    requestNo: job.request_no?.trim() || job.externalId || job.id,
+    requestNo: rec.requestNo,
     unitName: job.unit_name || '—',
     destination: job.location_address || '—',
     ownerName: job.recruiter_name?.trim() || '—',
     screenerName: job.screener_name?.trim() || '—',
     status,
-    slaStatus: mapJobToSlaStatus(job, today),
+    slaStatus: rec.slaStatus ?? mapJobToSlaStatus(job, today),
     priority: priorityScore(status),
     requestDate: jobRequestDateYmd(job) || job.created_at?.slice(0, 10) || '',
     requiredDate: safeYmd(job.required_date) || '',
@@ -217,6 +268,16 @@ export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWor
     sendReplacement: job.send_replacement ?? null,
     resignedName: job.resigned_employee_name?.trim() || '',
     isResignation: isResignationRequest(job),
+    requestPositions: rec.requestPositions,
+    filledPositions: rec.filledPositions,
+    cancelledPositions: rec.cancelledPositions,
+    remainingPositions: rec.remainingPositions,
+    effectiveRequestDate: rec.effectiveRequestDate,
+    slaDueDate: rec.slaDueDate ?? '',
+    daysOverdue: rec.daysOverdue ?? 0,
+    lifecycleKind: lifecycleKindLabel(rec.lifecycleKind, rec.requestActionName),
+    requestKind: requestKindLabel(rec.requestKind),
+    controlStatus: REQUEST_CONTROL_STATUS_LABELS[rec.controlStatus],
   };
 }
 
@@ -339,6 +400,75 @@ function sumOpenRemainingPositions(jobs: JobRequest[]): number {
     .reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
+function buildControlTowerKpis(summary: DashboardRequestControlSummary): DashboardKpi[] {
+  const posReq = (positions: number, requests: number) =>
+    `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
+
+  return [
+    {
+      id: 'total_workload',
+      label: 'ภาระงานรวมเดือนนี้',
+      value: summary.totalWorkloadPositions,
+      secondaryCount: summary.totalWorkloadRequests,
+      secondaryLabel: 'ใบขอ',
+      description: posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests),
+      trendPercent: null,
+    },
+    {
+      id: 'new_requests',
+      label: 'ขอใหม่เดือนนี้',
+      value: summary.newRequestPositions,
+      secondaryCount: summary.newRequestRequests,
+      secondaryLabel: 'ใบขอ',
+      description: posReq(summary.newRequestPositions, summary.newRequestRequests),
+      trendPercent: null,
+    },
+    {
+      id: 'filled',
+      label: 'ปิดได้/หาได้แล้วเดือนนี้',
+      value: summary.filledPositionsThisPeriod,
+      description: `อัตราปิดได้ ${summary.fillRatePercent}% ของภาระงาน`,
+      trendPercent: null,
+    },
+    {
+      id: 'fully_closed',
+      label: 'ปิดครบใบขอเดือนนี้',
+      value: summary.fullyClosedRequestsThisPeriod,
+      secondaryCount: summary.fullyClosedPositionsThisPeriod,
+      secondaryLabel: 'ตำแหน่ง',
+      description: `อัตราปิดครบ ${summary.fullClosureRatePercent}% ของใบขอ`,
+      trendPercent: null,
+    },
+    {
+      id: 'partial',
+      label: 'Partial / ยังไม่จบ',
+      value: summary.partialPositions,
+      secondaryCount: summary.partialRequests,
+      secondaryLabel: 'ใบขอ',
+      description: posReq(summary.partialPositions, summary.partialRequests),
+      trendPercent: null,
+    },
+    {
+      id: 'cancelled',
+      label: 'ยกเลิกเดือนนี้',
+      value: summary.cancelledPositionsThisPeriod,
+      secondaryCount: summary.cancelledRequestsThisPeriod,
+      secondaryLabel: 'ใบขอ',
+      description: `อัตรายกเลิก ${summary.cancellationRatePercent}% ของภาระงาน`,
+      trendPercent: null,
+    },
+    {
+      id: 'remaining',
+      label: 'เหลือหา',
+      value: summary.remainingPositions,
+      secondaryCount: summary.remainingRequests,
+      secondaryLabel: 'ใบขอ',
+      description: posReq(summary.remainingPositions, summary.remainingRequests),
+      trendPercent: null,
+    },
+  ];
+}
+
 function buildKpis(
   current: JobRequest[],
   previous: JobRequest[],
@@ -443,16 +573,21 @@ function monthTrendLabel(d: Date, from: string, to: string): string {
 function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today = new Date()): DashboardActivityTrendPoint[] {
   const resignMap = new Map<string, number>();
   const replaceMap = new Map<string, number>();
-  const newMap = new Map<string, number>();
+  const increaseMap = new Map<string, number>();
+  const newSiteMap = new Map<string, number>();
+  const otherMap = new Map<string, number>();
 
   for (const j of jobs) {
     const ymd = effectiveRequestDateYmd(j, today);
     if (!ymd || !inYmdRange(ymd, from, to)) continue;
     const month = ymd.slice(0, 7);
-    const kind = classifyRequestActivity(j);
-    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + 1);
-    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + 1);
-    else newMap.set(month, (newMap.get(month) ?? 0) + 1);
+    const units = jobPositionUnits(j);
+    const kind = classifyLifecycleKind(j);
+    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + units);
+    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + units);
+    else if (kind === 'increase_headcount') increaseMap.set(month, (increaseMap.get(month) ?? 0) + units);
+    else if (kind === 'new_site') newSiteMap.set(month, (newSiteMap.get(month) ?? 0) + units);
+    else otherMap.set(month, (otherMap.get(month) ?? 0) + units);
   }
 
   const points: DashboardActivityTrendPoint[] = [];
@@ -460,12 +595,17 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today 
   const endMonth = parseISO(`${to.slice(0, 7)}-01`);
   while (d <= endMonth) {
     const month = toYmdLocal(d).slice(0, 7);
+    const increase = increaseMap.get(month) ?? 0;
+    const newSite = newSiteMap.get(month) ?? 0;
+    const other = otherMap.get(month) ?? 0;
     points.push({
       date: `${month}-01`,
       label: monthTrendLabel(d, from, to),
       resignations: resignMap.get(month) ?? 0,
       replacements: replaceMap.get(month) ?? 0,
-      newOpenings: newMap.get(month) ?? 0,
+      newOpenings: increase + newSite + other,
+      increaseHeadcount: increase,
+      newSite,
     });
     d = addMonths(d, 1);
   }
@@ -691,22 +831,71 @@ export function buildDashboardData(
         })()
       : undefined;
 
+  const mergedJobs = mergeRequestControlJobs(openJobSet, closedJobs);
+  const controlRecords = jobsToRequestControlRecords(mergedJobs, today);
+  const periodFrom = period?.from ?? trendFrom;
+  const periodTo = period?.to ?? trendTo;
+
+  const requestControlSummary = period
+    ? buildRequestControlSummary(controlRecords, periodFrom, periodTo, throughputRecords)
+    : undefined;
+  const requestCohortSummary = period
+    ? buildRequestCohortSummary(controlRecords, periodFrom, periodTo)
+    : undefined;
+  const fulfillmentCohortSummary = period
+    ? buildFulfillmentCohortSummary(controlRecords, periodFrom, periodTo, throughputRecords)
+    : undefined;
+  const fullyClosedCohortSummary = period
+    ? buildFullyClosedCohortSummary(controlRecords, periodFrom, periodTo)
+    : undefined;
+  const fulfillmentBreakdown = period
+    ? buildFulfillmentBreakdown(controlRecords, periodFrom, periodTo, throughputRecords)
+    : undefined;
+  const slaSummary = buildSlaSummary(controlRecords);
+  const lifecycleTrend = buildLifecycleTrend(controlRecords, trendFrom, trendTo, throughputRecords);
+  const lifecycleInsights = buildLifecycleInsights(lifecycleTrend);
+  const flowView = requestControlSummary ? buildFlowView(requestControlSummary) : undefined;
+  const executiveInsights = requestControlSummary
+    ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
+    : undefined;
+  const priorityWorkQueue = buildPriorityWorkQueue(
+    applyDashboardFilters(workItems, uiFilters),
+    controlRecords,
+    period?.from ?? null,
+  );
+
+  const kpis =
+    requestControlSummary != null
+      ? buildControlTowerKpis(requestControlSummary)
+      : buildKpis(
+          scopedJobs,
+          previousScopedJobs,
+          openJobSet,
+          today,
+          period != null,
+          closedJobs,
+          kpiThroughput,
+        );
+
   return {
-    kpis: buildKpis(
-      scopedJobs,
-      previousScopedJobs,
-      openJobSet,
-      today,
-      period != null,
-      closedJobs,
-      kpiThroughput,
-    ),
+    kpis,
     activityTrend,
     unitOverview: buildUnitOverview(openJobSet, today, unitScopeNames),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     ageDaysRequestTotal: scopedJobs.length,
     ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),
     closedBreakdown,
+    fulfillmentBreakdown,
+    requestControlSummary,
+    requestCohortSummary,
+    fulfillmentCohortSummary,
+    fullyClosedCohortSummary,
+    slaSummary,
+    lifecycleTrend,
+    lifecycleInsights,
+    flowView,
+    executiveInsights,
+    priorityWorkQueue,
     recruiterOverview: buildRecruiterOverview(scopedJobs, today, closedJobs),
     workQueue: sortedQueue,
     periodLabel,

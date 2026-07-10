@@ -4,8 +4,13 @@ import { cn } from '@/lib/utils';
 import type { DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
+import DashboardFlowViewCard from './DashboardFlowView';
+import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
+import DashboardPriorityQueue from './DashboardPriorityQueue';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
+import DashboardCohortSummaryCard from './DashboardCohortSummary';
+import DashboardSlaSummaryCard from './DashboardSlaSummary';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardAgeOverview from './DashboardAgeOverview';
@@ -45,6 +50,10 @@ type Props = {
   onViewItem: (item: DashboardWorkItem) => void;
   onAssignItem?: (item: DashboardWorkItem) => void;
   onKpiClick?: (kpiId: string, label: string) => void;
+  onCohortClick?: (rowId: string, label: string) => void;
+  onSlaClick?: (bucket: string, label: string) => void;
+  onFilledBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
+  onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
   onUnitClick?: (unitName: string) => void;
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
@@ -70,6 +79,10 @@ const DashboardShell: React.FC<Props> = ({
   onViewItem,
   onAssignItem,
   onKpiClick,
+  onCohortClick,
+  onSlaClick,
+  onFilledBreakdownClick,
+  onFullyClosedBreakdownClick,
   onAgeBucketClick,
   onUnitClick,
   onRecruiterClick,
@@ -80,8 +93,8 @@ const DashboardShell: React.FC<Props> = ({
         <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-4 space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Analytics Dashboard</h1>
-              <p className="text-sm text-slate-500 mt-1">ภาพรวมใบขอหน่วยงาน · {data.periodLabel}</p>
+              <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Demand–Fulfillment–Backlog Control Tower</h1>
+              <p className="text-sm text-slate-500 mt-1">Dashboard คุมใบขอ · {data.periodLabel}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
@@ -138,7 +151,7 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
                 {data.kpis.map((kpi) => (
                   <DashboardKpiCard
                     key={kpi.id}
@@ -148,11 +161,48 @@ const DashboardShell: React.FC<Props> = ({
                 ))}
               </div>
 
-              {data.closedBreakdown ? (
-                <DashboardClosedBreakdownCard
-                  breakdown={data.closedBreakdown}
-                  closedTotal={data.kpis.find((k) => k.id === 'completed')?.value ?? 0}
+              {data.flowView ? (
+                <DashboardFlowViewCard
+                  flow={data.flowView}
+                  summary={data.requestControlSummary}
+                  onSegmentClick={onKpiClick}
                 />
+              ) : null}
+
+              {data.executiveInsights ? (
+                <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
+              ) : null}
+
+              {data.requestCohortSummary ? (
+                <DashboardCohortSummaryCard
+                  summary={data.requestCohortSummary}
+                  onRowClick={onCohortClick}
+                />
+              ) : null}
+
+              {data.fulfillmentBreakdown ? (
+                <DashboardClosedBreakdownCard
+                  breakdown={data.fulfillmentBreakdown}
+                  filledTotal={data.kpis.find((k) => k.id === 'filled')?.value ?? 0}
+                  fullyClosedTotal={data.kpis.find((k) => k.id === 'fully_closed')?.value ?? 0}
+                  onFilledClick={onFilledBreakdownClick}
+                  onFullyClosedClick={onFullyClosedBreakdownClick}
+                />
+              ) : data.closedBreakdown ? (
+                <DashboardClosedBreakdownCard
+                  breakdown={{
+                    filledSamePeriod: data.closedBreakdown.samePeriod,
+                    filledBacklog: data.closedBreakdown.backlog,
+                    fullyClosedSamePeriod: 0,
+                    fullyClosedBacklog: 0,
+                  }}
+                  filledTotal={data.kpis.find((k) => k.id === 'completed')?.value ?? 0}
+                  fullyClosedTotal={0}
+                />
+              ) : null}
+
+              {data.slaSummary ? (
+                <DashboardSlaSummaryCard summary={data.slaSummary} onBucketClick={onSlaClick} />
               ) : null}
 
               <DashboardAgeOverview
@@ -163,6 +213,9 @@ const DashboardShell: React.FC<Props> = ({
               />
               <DashboardChartSection data={data} onUnitClick={onUnitClick} />
               <DashboardDriverOverview items={data.recruiterOverview} onRecruiterClick={onRecruiterClick} />
+              {data.priorityWorkQueue.length > 0 ? (
+                <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
+              ) : null}
               <DashboardWorkQueueTable
                 items={data.workQueue}
                 sortKey={sortKey}

@@ -18,7 +18,7 @@ type Props = {
 
 const SERIES_LABELS: Record<string, string> = {
   requested: 'ขอมา (ตำแหน่ง)',
-  closed: 'ปิดแล้ว (ตำแหน่ง)',
+  closed: 'ปิดได้/หาได้แล้ว (ตำแหน่ง)',
   closeRate: 'อัตราสำเร็จ (%)',
 };
 
@@ -61,7 +61,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
           ตำแหน่งคงเหลือ · ย้อนหลัง=วันที่กรอก · ฉุกเฉิน/ล่วงหน้า=วันที่ต้องการ · {periodLabel}
         </p>
         <p className="text-xs text-slate-600 mt-1">
-          รวมช่วง ขอ {totals.requested.toLocaleString('th-TH')} · ปิด{' '}
+          รวมช่วง ขอ {totals.requested.toLocaleString('th-TH')} · ปิดได้{' '}
           {totals.closed.toLocaleString('th-TH')} · อัตราสำเร็จ {overallRate}%
         </p>
       </div>

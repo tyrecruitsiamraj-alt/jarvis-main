@@ -1,31 +1,89 @@
 import React from 'react';
-import type { DashboardClosedBreakdown } from '@/lib/dashboard/types';
+import type { DashboardFulfillmentBreakdown } from '@/lib/dashboard/types';
 
 type Props = {
-  breakdown: DashboardClosedBreakdown;
-  closedTotal: number;
+  breakdown: DashboardFulfillmentBreakdown;
+  filledTotal: number;
+  fullyClosedTotal: number;
+  onFilledClick?: (segment: 'same' | 'backlog', label: string) => void;
+  onFullyClosedClick?: (segment: 'same' | 'backlog', label: string) => void;
 };
 
-const DashboardClosedBreakdownCard: React.FC<Props> = ({ breakdown, closedTotal }) => {
-  if (closedTotal <= 0) return null;
+const DashboardClosedBreakdownCard: React.FC<Props> = ({
+  breakdown,
+  filledTotal,
+  fullyClosedTotal,
+  onFilledClick,
+  onFullyClosedClick,
+}) => {
+  if (filledTotal <= 0 && fullyClosedTotal <= 0) return null;
+
+  const cell = (
+    label: string,
+    value: number,
+    className: string,
+    onClick?: () => void,
+  ) => (
+    <button
+      type="button"
+      disabled={!onClick}
+      onClick={onClick}
+      className={`rounded-lg px-3 py-2 text-left w-full ${className} ${onClick ? 'hover:opacity-90' : ''}`}
+    >
+      <p className="text-xs opacity-90">{label}</p>
+      <p className="text-lg font-semibold tabular-nums">{value.toLocaleString('th-TH')}</p>
+    </button>
+  );
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-medium text-slate-600">รายละเอียดปิดใบงานในช่วง</p>
-      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="rounded-lg bg-emerald-50 px-3 py-2">
-          <p className="text-xs text-emerald-800">ขอในช่วง + ปิดในช่วง</p>
-          <p className="text-lg font-semibold text-emerald-900 tabular-nums">
-            {breakdown.samePeriod.toLocaleString('th-TH')}
-          </p>
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm space-y-4">
+      {filledTotal > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-slate-600">ปิดได้/หาได้แล้วเดือนนี้</p>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {cell(
+              'ขอเดือนนี้ ปิดได้เดือนนี้',
+              breakdown.filledSamePeriod,
+              'bg-emerald-50 text-emerald-900',
+              onFilledClick
+                ? () => onFilledClick('same', 'ขอเดือนนี้ ปิดได้เดือนนี้')
+                : undefined,
+            )}
+            {cell(
+              'ขอเดือนเก่า ปิดได้เดือนนี้',
+              breakdown.filledBacklog,
+              'bg-slate-50 text-slate-900',
+              onFilledClick
+                ? () => onFilledClick('backlog', 'ขอเดือนเก่า ปิดได้เดือนนี้')
+                : undefined,
+            )}
+          </div>
         </div>
-        <div className="rounded-lg bg-slate-50 px-3 py-2">
-          <p className="text-xs text-slate-600">ขอก่อนช่วง + ปิดในช่วง (backlog)</p>
-          <p className="text-lg font-semibold text-slate-900 tabular-nums">
-            {breakdown.backlog.toLocaleString('th-TH')}
-          </p>
+      ) : null}
+
+      {fullyClosedTotal > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-slate-600">ปิดครบใบขอเดือนนี้</p>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {cell(
+              'ขอเดือนนี้ ปิดครบเดือนนี้',
+              breakdown.fullyClosedSamePeriod,
+              'bg-blue-50 text-blue-900',
+              onFullyClosedClick
+                ? () => onFullyClosedClick('same', 'ขอเดือนนี้ ปิดครบเดือนนี้')
+                : undefined,
+            )}
+            {cell(
+              'ขอเดือนเก่า ปิดครบเดือนนี้',
+              breakdown.fullyClosedBacklog,
+              'bg-indigo-50 text-indigo-900',
+              onFullyClosedClick
+                ? () => onFullyClosedClick('backlog', 'ขอเดือนเก่า ปิดครบเดือนนี้')
+                : undefined,
+            )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 };

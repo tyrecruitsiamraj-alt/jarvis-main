@@ -5,6 +5,7 @@ import {
   effectiveInformQtySql,
   isOpenStaffingRowForRemaining,
   requestPositionTotal,
+  staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
@@ -83,6 +84,7 @@ function mapClosedRow(r: ClosedRow) {
     siteCode: r.site_code,
     departmentCode: r.department_code,
   });
+  const breakdown = staffingPositionBreakdown(r);
   const closureYmd = toYmd(r.stop_date) || toYmd(r.cancel_date) || toYmd(r.request_date);
 
   return {
@@ -96,6 +98,10 @@ function mapClosedRow(r: ClosedRow) {
     department_code: r.department_code?.trim() || undefined,
     location_address: r.site_name || r.site_code || '',
     position_units: closedPositionCount(r),
+    request_positions: breakdown.requestPositions,
+    filled_positions: breakdown.filledPositions,
+    cancelled_positions: breakdown.cancelledPositions,
+    cancel_date: toYmd(r.cancel_date) || undefined,
     status: 'closed' as const,
     siamraj_status: r.status || undefined,
     request_action_code: r.request_action_code || undefined,

@@ -77,6 +77,33 @@ export function isOpenStaffingRowForRemaining(row: StaffingOpenRow): boolean {
   return false;
 }
 
+export type StaffingPositionBreakdown = {
+  requestPositions: number;
+  filledPositions: number;
+  cancelledPositions: number;
+  remainingPositions: number;
+};
+
+/** แยกตำแหน่งขอ / หาได้ / ยกเลิก / เหลือ — ห้ามรวมยกเลิกเข้ากับปิดครบ */
+export function staffingPositionBreakdown(row: StaffingOpenRow): StaffingPositionBreakdown {
+  const requestPositions = requestPositionTotal(row.request_qty);
+  const filledPositions = Math.min(effectiveInformedCount(row), requestPositions);
+  const isOpen = isOpenStaffingRowForRemaining(row);
+
+  let cancelledPositions = 0;
+  if (!isOpen) {
+    const unfilled = requestPositions - filledPositions;
+    if (filledPositions === 0) {
+      cancelledPositions = requestPositions;
+    } else if (unfilled > 0) {
+      cancelledPositions = unfilled;
+    }
+  }
+
+  const remainingPositions = Math.max(requestPositions - filledPositions - cancelledPositions, 0);
+  return { requestPositions, filledPositions, cancelledPositions, remainingPositions };
+}
+
 export function openStaffingRequestWhereSql(alias = 'A'): string {
   const informed = effectiveInformQtySql(alias);
   return `

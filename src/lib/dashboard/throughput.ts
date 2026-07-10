@@ -8,6 +8,7 @@ export type ThroughputRecord = {
   closureDate: string | null;
   positionUnits: number;
   isOpen: boolean;
+  kind?: 'filled' | 'cancelled' | 'remaining';
 };
 
 export type ThroughputSummary = {
@@ -86,7 +87,7 @@ export function sumThroughputInRange(
       requested += r.positionUnits;
       if (r.isOpen) remaining += r.positionUnits;
     }
-    if (!r.isOpen && r.closureDate && inYmdRange(r.closureDate, from, to)) {
+    if (!r.isOpen && r.closureDate && inYmdRange(r.closureDate, from, to) && r.kind !== 'cancelled') {
       closed += r.positionUnits;
       if (inRequestPeriod) closedSamePeriod += r.positionUnits;
       else closedBacklog += r.positionUnits;
@@ -106,7 +107,7 @@ export function enrichActivityTrendWithThroughput(
   for (const r of records) {
     const reqMonth = r.requestDate.slice(0, 7);
     requestedMap.set(reqMonth, (requestedMap.get(reqMonth) ?? 0) + r.positionUnits);
-    if (!r.isOpen && r.closureDate) {
+    if (!r.isOpen && r.closureDate && r.kind !== 'cancelled') {
       const closeMonth = r.closureDate.slice(0, 7);
       closedMap.set(closeMonth, (closedMap.get(closeMonth) ?? 0) + r.positionUnits);
     }
@@ -122,6 +123,7 @@ export function enrichActivityTrendWithThroughput(
       ...p,
       requestedPositions: requested,
       closedPositions: closed,
+      filledPositions: closed,
       remainingPositions: requested - closed,
       closeRatePercent,
     };

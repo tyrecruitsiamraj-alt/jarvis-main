@@ -3,6 +3,7 @@ import {
   openStaffingRequestWhereSql,
   remainingOpenPositionsFromRow,
   effectiveInformQtySql,
+  staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 import {
   formatGenderRequirement,
@@ -102,6 +103,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     siteCode: r.site_code,
     departmentCode: r.department_code,
   });
+  const breakdown = staffingPositionBreakdown(r);
 
   return {
     id: `siamraj-sql:${rawRequestNo}`,
@@ -118,10 +120,10 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     lastWorkingDay: toYmd(r.resign_date) || undefined,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
     site_code: r.site_code || undefined,
-    position_units: (() => {
-      const remaining = remainingOpenPositionsFromRow(r);
-      return remaining > 0 ? remaining : undefined;
-    })(),
+    position_units: breakdown.remainingPositions > 0 ? breakdown.remainingPositions : undefined,
+    request_positions: breakdown.requestPositions,
+    filled_positions: breakdown.filledPositions,
+    cancelled_positions: breakdown.cancelledPositions,
     department_code: r.department_code?.trim() || undefined,
     department_name: r.department_name?.trim() || undefined,
     contract_type_code: r.contract_type_code?.trim() || undefined,

@@ -8,6 +8,14 @@ import {
 } from '@/lib/dashboard/buildDashboardData';
 import { buildOrganizationKeyResolver } from '@/lib/unitGroupName';
 import type { DashboardAgeDaysBreakdown, DashboardTaskStatus } from '@/lib/dashboard/types';
+import type { RequestControlRecord } from '@/lib/requestControl';
+import {
+  filterRecordsByEffectiveDate,
+  filterRecordsCancelledInPeriod,
+  filterRecordsCarriedOver,
+  filterRecordsFilledInPeriod,
+  filterRecordsFullyClosedInPeriod,
+} from '@/lib/requestControl';
 
 function safeYmd(value?: string | null): string | null {
   if (!value || typeof value !== 'string') return null;
@@ -31,6 +39,94 @@ export function filterJobsClosedInPeriod(
     const closureDate = safeYmd(j.closed_date) || effectiveRequestDateYmd(j, today);
     return closureDate ? inYmdRange(closureDate, from, to) : false;
   });
+}
+
+export function recordsToJobs(records: RequestControlRecord[]): JobRequest[] {
+  return records.map((r) => r.job);
+}
+
+export function filterRecordsForControlKpi(
+  records: RequestControlRecord[],
+  kpiId: string,
+  period: { from: string; to: string } | null,
+): RequestControlRecord[] {
+  if (!period) {
+    switch (kpiId) {
+      case 'remaining':
+        return records.filter((r) => r.remainingPositions > 0);
+      default:
+        return records;
+    }
+  }
+  const { from, to } = period;
+  const backlog = filterRecordsCarriedOver(records, from);
+  const fresh = filterRecordsByEffectiveDate(records, from, to);
+
+  switch (kpiId) {
+    case 'total_workload':
+      return [...backlog, ...fresh];
+    case 'new_requests':
+      return fresh;
+    case 'filled':
+      return filterRecordsFilledInPeriod(records, from, to);
+    case 'fully_closed':
+      return filterRecordsFullyClosedInPeriod(records, from, to);
+    case 'partial':
+      return records.filter((r) => r.isPartial);
+    case 'cancelled':
+      return filterRecordsCancelledInPeriod(records, from, to);
+    case 'remaining':
+      return records.filter((r) => r.remainingPositions > 0);
+    case 'completed':
+    case 'success_rate':
+      return filterRecordsFilledInPeriod(records, from, to);
+    case 'total':
+      return filterRecordsByEffectiveDate(records, from, to);
+    default:
+      return records;
+  }
+}
+
+export function filterRecordsForCohort(
+  records: RequestControlRecord[],
+  rowId: string,
+  period: { from: string; to: string },
+): RequestControlRecord[] {
+  const { from, to } = period;
+  if (rowId === 'backlog_from_previous_period') return filterRecordsCarriedOver(records, from);
+  if (rowId === 'new_this_period') return filterRecordsByEffectiveDate(records, from, to);
+  return [...filterRecordsCarriedOver(records, from), ...filterRecordsByEffectiveDate(records, from, to)];
+}
+
+export function filterRecordsForSlaBucket(
+  records: RequestControlRecord[],
+  bucket: string,
+): RequestControlRecord[] {
+  return records.filter((r) => r.slaStatus === bucket);
+}
+
+export function filterRecordsForFilledBreakdown(
+  records: RequestControlRecord[],
+  segment: 'same' | 'backlog',
+  period: { from: string; to: string },
+): RequestControlRecord[] {
+  const filled = filterRecordsFilledInPeriod(records, period.from, period.to);
+  if (segment === 'same') {
+    return filled.filter((r) => inYmdRange(r.effectiveRequestDate, period.from, period.to));
+  }
+  return filled.filter((r) => r.effectiveRequestDate < period.from);
+}
+
+export function filterRecordsForFullyClosedBreakdown(
+  records: RequestControlRecord[],
+  segment: 'same' | 'backlog',
+  period: { from: string; to: string },
+): RequestControlRecord[] {
+  const closed = filterRecordsFullyClosedInPeriod(records, period.from, period.to);
+  if (segment === 'same') {
+    return closed.filter((r) => inYmdRange(r.effectiveRequestDate, period.from, period.to));
+  }
+  return closed.filter((r) => r.effectiveRequestDate < period.from);
 }
 
 export function filterJobsForDashboardKpi(

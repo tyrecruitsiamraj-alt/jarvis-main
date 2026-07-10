@@ -123,6 +123,13 @@ export interface JobRequest {
   contract_type_code?: string;
   contract_type_name?: string;
   position_units?: number;
+  /** จำนวนที่ขอทั้งใบ (request_qty) */
+  request_positions?: number;
+  /** จำนวนที่หาได้/แจ้งเข้าแล้ว */
+  filled_positions?: number;
+  /** จำนวนที่ยกเลิก */
+  cancelled_positions?: number;
+  cancel_date?: string;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;

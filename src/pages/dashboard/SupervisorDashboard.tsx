@@ -24,7 +24,17 @@ import {
   filterJobsForDashboardKpi,
   filterJobsForRecruiter,
   filterJobsForUnitName,
+  filterRecordsForCohort,
+  filterRecordsForControlKpi,
+  filterRecordsForFilledBreakdown,
+  filterRecordsForFullyClosedBreakdown,
+  filterRecordsForSlaBucket,
 } from '@/lib/dashboard/drillDownFilters';
+import {
+  jobsToRequestControlRecords,
+  mergeRequestControlJobs,
+} from '@/lib/requestControl';
+import { controlRecordToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
 import { unitOrganizationKey } from '@/lib/unitGroupName';
 import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
@@ -147,6 +157,11 @@ const SupervisorDashboard: React.FC = () => {
     [closedJobs, siamrajPrimary, unitFilters],
   );
 
+  const controlRecords = useMemo(() => {
+    const merged = mergeRequestControlJobs(jobsWithoutAgeFilter, scopedClosedJobs);
+    return jobsToRequestControlRecords(merged);
+  }, [jobsWithoutAgeFilter, scopedClosedJobs]);
+
   useEffect(() => {
     saveDashboardFilters(filters);
   }, [filters]);
@@ -196,12 +211,29 @@ const SupervisorDashboard: React.FC = () => {
   const openJobList = useCallback(
     (title: string, list: JobRequest[]) => {
       if (DEMO_MODE) return;
-      // ตัวเลขหลัก = จำนวนคน/ตำแหน่ง (ให้ตรงกับการ์ดสรุป) + จำนวนใบขอในวงเล็บ
       const positions = sumJobPositionUnits(list);
       setDetailDialogTitle(`${title} (${positions.toLocaleString()} คน · ${list.length.toLocaleString()} ใบขอ)`);
       setDetailDialogItems(
         list.map((j) =>
           jobToDashboardDetailItem(j, (job) => {
+            setDetailDialogOpen(false);
+            navigateToUnitRequest(job, navigate, { returnTo: RETURN_TO });
+          }),
+        ),
+      );
+      setDetailDialogOpen(true);
+    },
+    [navigate],
+  );
+
+  const openControlList = useCallback(
+    (title: string, list: ReturnType<typeof jobsToRequestControlRecords>) => {
+      if (DEMO_MODE) return;
+      const positions = list.reduce((s, r) => s + r.requestPositions, 0);
+      setDetailDialogTitle(`${title} (${positions.toLocaleString()} คน · ${list.length.toLocaleString()} ใบขอ)`);
+      setDetailDialogItems(
+        list.map((r) =>
+          controlRecordToDashboardDetailItem(r, (job) => {
             setDetailDialogOpen(false);
             navigateToUnitRequest(job, navigate, { returnTo: RETURN_TO });
           }),
@@ -272,13 +304,18 @@ const SupervisorDashboard: React.FC = () => {
 
   const handleKpiClick = useCallback(
     (kpiId: string, label: string) => {
-      if (kpiId === 'completed' || kpiId === 'success_rate') {
+      const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
+      if (range && ['total_workload', 'new_requests', 'filled', 'fully_closed', 'partial', 'cancelled', 'remaining'].includes(kpiId)) {
+        openControlList(label, filterRecordsForControlKpi(controlRecords, kpiId, range));
+        return;
+      }
+      if (kpiId === 'completed' || kpiId === 'success_rate' || kpiId === 'filled') {
         if (siamrajPrimary && dbSource === 'sqlserver') {
           openJobList(label, scopedClosedJobs);
           return;
         }
-        const range = period ?? resolveYearToDateTrendRange();
-        openJobList(label, filterJobsClosedInPeriod(jobsWithoutAgeFilter, range.from, range.to));
+        const ytd = period ?? resolveYearToDateTrendRange();
+        openJobList(label, filterJobsClosedInPeriod(jobsWithoutAgeFilter, ytd.from, ytd.to));
         return;
       }
       if (kpiId === 'remaining') {
@@ -288,7 +325,38 @@ const SupervisorDashboard: React.FC = () => {
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period],
+    [openJobList, openControlList, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
+  );
+
+  const handleCohortClick = useCallback(
+    (rowId: string, label: string) => {
+      if (!period) return;
+      openControlList(label, filterRecordsForCohort(controlRecords, rowId, period));
+    },
+    [openControlList, controlRecords, period],
+  );
+
+  const handleSlaClick = useCallback(
+    (bucket: string, label: string) => {
+      openControlList(`SLA: ${label}`, filterRecordsForSlaBucket(controlRecords, bucket));
+    },
+    [openControlList, controlRecords],
+  );
+
+  const handleFilledBreakdownClick = useCallback(
+    (segment: 'same' | 'backlog', label: string) => {
+      if (!period) return;
+      openControlList(label, filterRecordsForFilledBreakdown(controlRecords, segment, period));
+    },
+    [openControlList, controlRecords, period],
+  );
+
+  const handleFullyClosedBreakdownClick = useCallback(
+    (segment: 'same' | 'backlog', label: string) => {
+      if (!period) return;
+      openControlList(label, filterRecordsForFullyClosedBreakdown(controlRecords, segment, period));
+    },
+    [openControlList, controlRecords, period],
   );
 
   const handleAgeBucketClick = useCallback(
@@ -349,6 +417,10 @@ const SupervisorDashboard: React.FC = () => {
       onViewItem={handleView}
       onAssignItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
+      onCohortClick={DEMO_MODE ? undefined : handleCohortClick}
+      onSlaClick={DEMO_MODE ? undefined : handleSlaClick}
+      onFilledBreakdownClick={DEMO_MODE ? undefined : handleFilledBreakdownClick}
+      onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
       onUnitClick={DEMO_MODE ? undefined : handleUnitClick}
       onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}

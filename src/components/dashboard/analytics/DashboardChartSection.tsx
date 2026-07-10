@@ -14,7 +14,10 @@ import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardThroughputChart from './DashboardThroughputChart';
 
 type Props = {
-  data: Pick<DashboardData, 'activityTrend' | 'unitOverview' | 'periodLabel' | 'activityTrendLabel'>;
+  data: Pick<
+    DashboardData,
+    'activityTrend' | 'unitOverview' | 'periodLabel' | 'activityTrendLabel' | 'lifecycleInsights'
+  >;
   onUnitClick?: (unitName: string) => void;
 };
 
@@ -44,12 +47,19 @@ const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
           <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-900">แนวโน้มรายเดือน — ลาออก / เปลี่ยนตัว / เปิดงานใหม่</h3>
+            <h3 className="text-sm font-semibold text-slate-900">แนวโน้มรายเดือน — ลาออก / เปลี่ยนตัว / เพิ่มอัตรา / เปิดไซต์</h3>
             <p className="text-xs text-slate-500">{data.activityTrendLabel}</p>
             <p className="text-xs text-slate-600 mt-1">
               รวมปีนี้ {activityTotal} ใบ — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
               {periodTotals.replacements} · เปิดงานใหม่ {periodTotals.newOpenings}
             </p>
+            {data.lifecycleInsights && data.lifecycleInsights.length > 0 ? (
+              <ul className="text-xs text-slate-600 mt-2 space-y-0.5 list-disc list-inside">
+                {data.lifecycleInsights.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
             {currentMonth && previousMonth ? (
               <p className="text-xs text-slate-500 mt-1">
                 {previousMonth.label}: {sumPoint(previousMonth)} ใบ → {currentMonth.label}:{' '}
@@ -97,12 +107,30 @@ const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
                 />
                 <Line
                   type="monotone"
-                  dataKey="newOpenings"
-                  name="เปิดงานใหม่"
+                  dataKey="increaseHeadcount"
+                  name="เพิ่มอัตรา"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="newSite"
+                  name="เปิดไซต์"
                   stroke="#22c55e"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="newOpenings"
+                  name="อื่นๆ"
+                  stroke="#94a3b8"
+                  strokeWidth={1}
+                  strokeDasharray="4 4"
+                  dot={false}
                 />
               </LineChart>
             </ResponsiveContainer>

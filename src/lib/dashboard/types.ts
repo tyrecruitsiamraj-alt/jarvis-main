@@ -6,7 +6,12 @@ export type DashboardTaskStatus =
   | 'cancelled'
   | 'at_risk';
 
-export type DashboardSlaStatus = 'on_track' | 'at_risk' | 'breached';
+export type DashboardSlaStatus =
+  | 'on_track'
+  | 'at_risk'
+  | 'breached'
+  | 'closed_on_time'
+  | 'closed_late';
 
 export type DashboardPeriodPreset =
   | 'this_week'
@@ -24,13 +29,21 @@ export type DashboardActivityTrendPoint = {
   resignations: number;
   replacements: number;
   newOpenings: number;
+  increaseHeadcount?: number;
+  newSite?: number;
   /** ตำแหน่งที่ขอ (ตามเดือนที่กรอกใบขอ) */
   requestedPositions?: number;
-  /** ตำแหน่งที่ปิดแล้วทุกประเภท (ตามเดือนที่ปิด) */
+  /** ตำแหน่งที่ปิดได้/หาได้แล้ว (ตามเดือนที่ปิด) */
   closedPositions?: number;
-  /** คงเหลือต่อเดือน = ขอ − ปิด (ติดลบได้ถ้าปิด backlog เก่า) */
+  /** ตำแหน่งที่ปิดได้/หาได้แล้ว */
+  filledPositions?: number;
+  /** ใบขอที่ปิดครบ */
+  fullyClosedRequests?: number;
+  /** ตำแหน่งที่ยกเลิก */
+  cancelledPositions?: number;
+  /** คงเหลือต่อเดือน */
   remainingPositions?: number;
-  /** อัตราสำเร็จรายเดือน = ปิด / ขอ (%) */
+  /** อัตราสำเร็จรายเดือน = ปิดได้ / ขอ (%) */
   closeRatePercent?: number | null;
 };
 
@@ -48,6 +61,9 @@ export type DashboardKpi = {
   description: string;
   trendPercent: number | null;
   format?: 'number' | 'percent';
+  /** จำนวนใบขอรอง — แสดงคู่กับตำแหน่งหลัก */
+  secondaryCount?: number;
+  secondaryLabel?: string;
 };
 
 export type DashboardWorkItem = {
@@ -68,6 +84,16 @@ export type DashboardWorkItem = {
   sendReplacement: boolean | null;
   resignedName: string;
   isResignation: boolean;
+  requestPositions: number;
+  filledPositions: number;
+  cancelledPositions: number;
+  remainingPositions: number;
+  effectiveRequestDate: string;
+  slaDueDate: string;
+  daysOverdue: number;
+  lifecycleKind: string;
+  requestKind: string;
+  controlStatus: string;
 };
 
 export type DashboardResponsibleRole = 'recruiter' | 'screener';
@@ -118,22 +144,157 @@ export type DashboardClosedBreakdown = {
   backlog: number;
 };
 
+export type DashboardFulfillmentBreakdown = {
+  filledSamePeriod: number;
+  filledBacklog: number;
+  fullyClosedSamePeriod: number;
+  fullyClosedBacklog: number;
+};
+
+export type DashboardRequestControlSummary = {
+  carriedOverPositions: number;
+  carriedOverRequests: number;
+  newRequestPositions: number;
+  newRequestRequests: number;
+  totalWorkloadPositions: number;
+  totalWorkloadRequests: number;
+  filledPositionsThisPeriod: number;
+  filledPositionsFromOldRequests: number;
+  filledPositionsFromCurrentMonthRequests: number;
+  fullyClosedPositionsThisPeriod: number;
+  fullyClosedRequestsThisPeriod: number;
+  partialRequests: number;
+  partialPositions: number;
+  cancelledPositionsThisPeriod: number;
+  cancelledRequestsThisPeriod: number;
+  remainingPositions: number;
+  remainingRequests: number;
+  startingBacklogPositions: number;
+  endingBacklogPositions: number;
+  netBacklogChange: number;
+  resignationRequestPositions: number;
+  fillRatePercent: number;
+  fullCloseRatePercent: number;
+  /** alias — fullClosureRatePercent = fullyClosedRequests / totalWorkloadRequests */
+  fullClosureRatePercent: number;
+  backlogBurnRatePercent: number;
+  newDemandAbsorptionRatePercent: number;
+  resignationPressureRatio: number;
+  cancellationRatePercent: number;
+};
+
+export type DashboardFlowView = {
+  startingBacklogPositions: number;
+  newRequestPositions: number;
+  totalWorkloadPositions: number;
+  filledPositions: number;
+  cancelledPositions: number;
+  endingBacklogPositions: number;
+  netBacklogChange: number;
+};
+
+export type DashboardSlaHighlight = {
+  kind: 'unit' | 'owner';
+  name: string;
+  breachCount: number;
+};
+
+export type DashboardExecutiveInsights = {
+  sentences: string[];
+  slaHighlights: DashboardSlaHighlight[];
+};
+
+export type DashboardCohortRow = {
+  id: 'backlog_from_previous_period' | 'new_this_period' | 'total';
+  label: string;
+  requestPositions: number;
+  requestCount: number;
+  filledPositions: number;
+  remainingPositions: number;
+  fullyClosedRequests: number;
+  partialRequests: number;
+  cancelledRequests: number;
+};
+
+export type DashboardRequestCohortSummary = {
+  rows: DashboardCohortRow[];
+};
+
+export type DashboardFulfillmentCohortRow = {
+  id:
+    | 'requested_this_period_filled_this_period'
+    | 'requested_before_period_filled_this_period'
+    | 'total_filled_this_period';
+  label: string;
+  filledPositions: number;
+  requestCount: number;
+};
+
+export type DashboardFulfillmentCohortSummary = {
+  rows: DashboardFulfillmentCohortRow[];
+};
+
+export type DashboardFullyClosedCohortRow = {
+  id:
+    | 'requested_this_period_fully_closed_this_period'
+    | 'requested_before_period_fully_closed_this_period'
+    | 'total_fully_closed_this_period';
+  label: string;
+  requestCount: number;
+  positionCount: number;
+};
+
+export type DashboardFullyClosedCohortSummary = {
+  rows: DashboardFullyClosedCohortRow[];
+};
+
+export type DashboardSlaSummary = {
+  onTrack: number;
+  atRisk: number;
+  breached: number;
+  closedOnTime: number;
+  closedLate: number;
+  breachRatePercent: number;
+};
+
+export type DashboardLifecycleTrendPoint = {
+  date: string;
+  label: string;
+  resignation: number;
+  replacement: number;
+  increaseHeadcount: number;
+  newSite: number;
+  other: number;
+  requestedPositions: number;
+  filledPositions: number;
+  fullyClosedRequests: number;
+  cancelledPositions: number;
+  remainingPositions: number;
+};
+
 export type DashboardData = {
   kpis: DashboardKpi[];
   activityTrend: DashboardActivityTrendPoint[];
   unitOverview: DashboardUnitOverview[];
   ageDaysBreakdown: DashboardAgeDaysBreakdown[];
-  /** จำนวนใบขอรวม (สำหรับอ้างอิงคู่กับตำแหน่ง) */
   ageDaysRequestTotal: number;
-  /** จำนวนตำแหน่งที่ต้องการรวม — ตรงกับ KPI และผลรวมกล่อง */
   ageDaysPositionTotal: number;
-  /** แยกยอดปิดในช่วง: ขอในช่วง vs backlog */
   closedBreakdown?: DashboardClosedBreakdown;
+  fulfillmentBreakdown?: DashboardFulfillmentBreakdown;
+  requestControlSummary?: DashboardRequestControlSummary;
+  requestCohortSummary?: DashboardRequestCohortSummary;
+  fulfillmentCohortSummary?: DashboardFulfillmentCohortSummary;
+  fullyClosedCohortSummary?: DashboardFullyClosedCohortSummary;
+  slaSummary?: DashboardSlaSummary;
+  lifecycleTrend?: DashboardLifecycleTrendPoint[];
+  lifecycleInsights?: string[];
+  flowView?: DashboardFlowView;
+  executiveInsights?: DashboardExecutiveInsights;
+  priorityWorkQueue: DashboardWorkItem[];
   recruiterOverview: DashboardRecruiterOverview[];
   workQueue: DashboardWorkItem[];
   periodLabel: string;
   previousPeriodLabel: string;
-  /** ช่วงที่กราฟแนวโน้มรายเดือนอ้างอิง (มักเป็น ม.ค.–เดือนนี้) */
   activityTrendLabel: string;
 };
 
