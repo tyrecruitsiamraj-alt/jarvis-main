@@ -11,8 +11,8 @@ Use these rules when working on staffing request dashboards, Request Control Tow
 Before editing:
 
 * Read CLAUDE.md.
-* Read skills/request-control-tower-advisor/SKILL.md.
-* Read relevant reference files.
+* Read .claude/skills/request-control-tower-advisor/SKILL.md.
+* Read relevant reference files under .claude/skills/request-control-tower-advisor/references/.
 
 Core rules:
 

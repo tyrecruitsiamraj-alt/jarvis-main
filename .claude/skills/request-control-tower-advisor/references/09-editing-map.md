@@ -6,7 +6,7 @@ Use this file to know where to change the inside logic later.
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
+* .claude/.claude/skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
 * .cursor/rules/request-control-tower.mdc
 
 Future code:
@@ -19,7 +19,7 @@ Future code:
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/03-request-ledger-logic.md
+* .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
 Future code:
 
@@ -31,7 +31,7 @@ Future code:
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/04-sla-rules.md
+* .claude/skills/request-control-tower-advisor/references/04-sla-rules.md
 
 Future code:
 
@@ -41,7 +41,7 @@ Future code:
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/03-request-ledger-logic.md
+* .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
 Future code:
 
@@ -51,7 +51,7 @@ Future code:
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/03-request-ledger-logic.md
+* .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
 Future code:
 
@@ -62,7 +62,7 @@ Future code:
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/05-ui-design-rules.md
+* .claude/skills/request-control-tower-advisor/references/05-ui-design-rules.md
 
 Future code:
 
@@ -72,7 +72,7 @@ Future code:
 
 Edit documentation:
 
-* skills/request-control-tower-advisor/references/06-safe-implementation-rules.md
+* .claude/skills/request-control-tower-advisor/references/06-safe-implementation-rules.md
 * .cursor/rules/request-control-tower.mdc
 
 Future code:
@@ -84,19 +84,19 @@ Future code:
 
 Edit:
 
-* skills/request-control-tower-advisor/references/07-cursor-prompt-patterns.md
+* .claude/skills/request-control-tower-advisor/references/07-cursor-prompt-patterns.md
 
 ## Redteam / SWOT / pre-mortem checklist
 
 Edit:
 
-* skills/request-control-tower-advisor/references/08-redteam-premortem-checklist.md
+* .claude/skills/request-control-tower-advisor/references/08-redteam-premortem-checklist.md
 
 ## SQL mapping changes
 
 Edit documentation first:
 
-* skills/request-control-tower-advisor/references/03-request-ledger-logic.md
+* .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
 Future code:
 

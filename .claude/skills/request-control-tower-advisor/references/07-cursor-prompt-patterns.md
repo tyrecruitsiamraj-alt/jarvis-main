@@ -2,7 +2,7 @@
 
 Use this prompt pattern for implementation:
 
-Read CLAUDE.md and all files in skills/request-control-tower-advisor before making changes.
+Read CLAUDE.md and all files in .claude/skills/request-control-tower-advisor before making changes.
 
 Implement Request Control Tower using:
 

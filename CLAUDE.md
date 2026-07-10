@@ -2,13 +2,16 @@
 
 When working on the Request Control Tower, staffing request dashboard, SLA dashboard, backlog dashboard, fulfillment logic, cancellation logic, lifecycle trend, root cause ranking, or any related Cursor/Claude implementation task, always read the following files first:
 
-1. skills/request-control-tower-advisor/SKILL.md
-2. skills/request-control-tower-advisor/references/01-business-context.md
-3. skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
-4. skills/request-control-tower-advisor/references/03-request-ledger-logic.md
-5. skills/request-control-tower-advisor/references/04-sla-rules.md
-6. skills/request-control-tower-advisor/references/06-safe-implementation-rules.md
-7. skills/request-control-tower-advisor/references/09-editing-map.md
+1. .claude/skills/request-control-tower-advisor/SKILL.md
+2. .claude/skills/request-control-tower-advisor/references/01-business-context.md
+3. .claude/skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
+4. .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
+5. .claude/skills/request-control-tower-advisor/references/04-sla-rules.md
+6. .claude/skills/request-control-tower-advisor/references/06-safe-implementation-rules.md
+7. .claude/skills/request-control-tower-advisor/references/09-editing-map.md
+
+> **Claude Code discovery:** project skills must live under `.claude/skills/` (not repo-root `skills/`).  
+> A short pointer remains at `skills/request-control-tower-advisor/README.md`.
 
 Core non-negotiable rules:
 
