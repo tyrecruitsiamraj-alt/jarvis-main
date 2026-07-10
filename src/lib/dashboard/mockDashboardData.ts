@@ -7,7 +7,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   activityTrendLabel: 'ม.ค. 2026 – ก.ค. 2026',
   kpis: [
     { id: 'total', label: 'งานทั้งหมด', value: 52, description: 'ตำแหน่งที่ขอในช่วง', trendPercent: 12 },
-    { id: 'completed', label: 'ปิดได้', value: 24, description: 'ตำแหน่งที่ปิดแล้วในช่วง', trendPercent: 18 },
+    { id: 'completed', label: 'ปิดใบงาน', value: 24, description: 'ตำแหน่งที่ปิดแล้วในช่วง', trendPercent: 18 },
     { id: 'remaining', label: 'เหลือหาอีก', value: 28, description: 'ตำแหน่งคงเหลือจากใบขอในช่วง', trendPercent: -5 },
     { id: 'success_rate', label: 'อัตราสำเร็จ', value: 46.2, description: '% ปิดได้เทียบขอมาในช่วง', trendPercent: 4, format: 'percent' },
   ],

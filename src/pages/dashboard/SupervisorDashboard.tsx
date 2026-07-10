@@ -105,15 +105,11 @@ const SupervisorDashboard: React.FC = () => {
       setClosedJobs([]);
       return;
     }
-    if (!period) {
-      setClosedJobs([]);
-      return;
-    }
     if (!(siamrajPrimary && dbSource === 'sqlserver')) {
       setClosedJobs([]);
       return;
     }
-    const range = period;
+    const range = period ?? resolveYearToDateTrendRange();
     let cancelled = false;
     void fetchSiamrajClosedRequests(range.from, range.to)
       .then((rows) => {
@@ -237,6 +233,7 @@ const SupervisorDashboard: React.FC = () => {
       },
       scopedClosedJobs,
       jobsWithoutAgeFilter,
+      jobs.map((j) => j.unit_name),
     );
     return {
       ...built,
@@ -272,9 +269,10 @@ const SupervisorDashboard: React.FC = () => {
     async (kpiId: string, label: string) => {
       // การ์ด "ปิดใบขอ"/"อัตราปิด" นับจาก throughput (รวม backlog/ปิดแล้ว) — feed หลักมีแต่ใบที่ยังเปิด
       // จึงต้องดึงรายการใบที่ปิดในช่วงเดียวกันมาโชว์ ให้เลขตรงกับการ์ด (ไม่งั้น "ปิดแล้วหายไป")
-      if ((kpiId === 'completed' || kpiId === 'success_rate') && period && siamrajPrimary && dbSource === 'sqlserver') {
+      if ((kpiId === 'completed' || kpiId === 'success_rate') && siamrajPrimary && dbSource === 'sqlserver') {
+        const range = period ?? resolveYearToDateTrendRange();
         try {
-          const closed = await fetchSiamrajClosedRequests(period.from, period.to);
+          const closed = await fetchSiamrajClosedRequests(range.from, range.to);
           openJobList(label, closed);
         } catch {
           openJobList(label, []);

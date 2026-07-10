@@ -345,6 +345,7 @@ function buildKpis(
   openJobs: JobRequest[],
   today: Date,
   hasPeriod: boolean,
+  closedJobs: JobRequest[] = [],
   throughput?: {
     records: ThroughputRecord[];
     from: string;
@@ -365,7 +366,11 @@ function buildKpis(
 
   const requestedTotal = throughputCur?.requested ?? curTotal;
   const prevRequestedTotal = throughputPrev?.requested ?? prevTotal;
-  const closedTotal = throughputCur?.closed ?? 0;
+  const closedFromFeed = sumJobPositionUnits(closedJobs);
+  const closedTotal =
+    closedFromFeed > 0
+      ? closedFromFeed
+      : (throughputCur?.closed ?? 0);
   const prevClosedTotal = throughputPrev?.closed ?? 0;
   const closeRate = requestedTotal
     ? Math.round((closedTotal / requestedTotal) * 1000) / 10
@@ -395,13 +400,15 @@ function buildKpis(
     },
     {
       id: 'completed',
-      label: 'ปิดได้',
+      label: 'ปิดใบงาน',
       value: closedTotal,
       description: throughputCur
         ? closedBacklog > 0
           ? `รวม backlog เก่าที่ปิดในช่วงนี้ ${closedBacklog.toLocaleString('th-TH')} ตำแหน่ง`
           : 'ตำแหน่งที่ปิดแล้วในช่วงที่เลือก'
-        : 'ตำแหน่งที่ปิดงานแล้ว',
+        : closedFromFeed > 0
+          ? 'ตำแหน่งที่ปิดแล้วจากรายการในช่วง'
+          : 'ตำแหน่งที่ปิดงานแล้ว',
       trendPercent: trendPercent(closedTotal, prevClosedTotal),
     },
     {
@@ -478,8 +485,15 @@ function buildStatusBreakdown(jobs: JobRequest[], today: Date): DashboardStatusB
     .sort((a, b) => b.count - a.count);
 }
 
-function buildUnitOverview(jobs: JobRequest[], today: Date): DashboardUnitOverview[] {
-  const resolve = buildOrganizationKeyResolver(jobs.map((j) => j.unit_name));
+function buildUnitOverview(
+  jobs: JobRequest[],
+  today: Date,
+  organizationScopeNames: Array<string | null | undefined> = [],
+): DashboardUnitOverview[] {
+  const resolve = buildOrganizationKeyResolver([
+    ...jobs.map((j) => j.unit_name),
+    ...organizationScopeNames,
+  ]);
   const map = new Map<string, { names: string[]; total: number; open: number; overdue: number }>();
   for (const j of jobs) {
     const rawName = j.unit_name?.trim() || '—';
@@ -636,8 +650,10 @@ export function buildDashboardData(
   trend?: BuildDashboardTrendInput,
   closedJobs: JobRequest[] = [],
   openJobs?: JobRequest[],
+  organizationScopeNames?: Array<string | null | undefined>,
 ): DashboardData {
   const openJobSet = openJobs ?? scopedJobs;
+  const unitScopeNames = organizationScopeNames ?? openJobSet.map((j) => j.unit_name);
   const workItems = scopedJobs.map((j) => jobToWorkItem(j, today));
   const filteredQueue = applyDashboardFilters(workItems, uiFilters);
   const sortedQueue = sortWorkQueue(filteredQueue, 'priority', 'asc');
@@ -676,9 +692,17 @@ export function buildDashboardData(
       : undefined;
 
   return {
-    kpis: buildKpis(scopedJobs, previousScopedJobs, openJobSet, today, period != null, kpiThroughput),
+    kpis: buildKpis(
+      scopedJobs,
+      previousScopedJobs,
+      openJobSet,
+      today,
+      period != null,
+      closedJobs,
+      kpiThroughput,
+    ),
     activityTrend,
-    unitOverview: buildUnitOverview(scopedJobs, today),
+    unitOverview: buildUnitOverview(openJobSet, today, unitScopeNames),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
     ageDaysRequestTotal: scopedJobs.length,
     ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),

@@ -11,7 +11,7 @@ const DashboardClosedBreakdownCard: React.FC<Props> = ({ breakdown, closedTotal 
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-medium text-slate-600">รายละเอียดปิดได้ในช่วง</p>
+      <p className="text-xs font-medium text-slate-600">รายละเอียดปิดใบงานในช่วง</p>
       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="rounded-lg bg-emerald-50 px-3 py-2">
           <p className="text-xs text-emerald-800">ขอในช่วง + ปิดในช่วง</p>

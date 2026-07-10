@@ -142,6 +142,24 @@ describe('buildDashboardData', () => {
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(45);
   });
 
+  it('uses closed jobs feed when throughput closed is zero', () => {
+    const jobs = [job({ id: 'a', unit_name: 'A', position_units: 2, request_date: '2026-07-01' })];
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const closed = [
+      job({
+        id: 'c1',
+        unit_name: 'A',
+        position_units: 5,
+        status: 'closed',
+        closed_date: '2026-07-10',
+        request_date: '2026-07-01',
+      }),
+    ];
+    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, closed);
+    expect(data.kpis.find((k) => k.id === 'completed')?.value).toBe(5);
+    expect(data.kpis.find((k) => k.id === 'completed')?.label).toBe('ปิดใบงาน');
+  });
+
   it('filters work queue by search', () => {
     const jobs = [
       job({ id: '1', unit_name: 'Alpha', recruiter_name: 'Ann', request_date: '2026-07-01' }),
