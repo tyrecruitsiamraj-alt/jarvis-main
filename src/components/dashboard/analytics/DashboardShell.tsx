@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
@@ -14,7 +14,8 @@ import DashboardSlaSummaryCard from './DashboardSlaSummary';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardAgeOverview from './DashboardAgeOverview';
-import DashboardDriverOverview from './DashboardDriverOverview';
+import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
+import DashboardExpandablePanel from './DashboardExpandablePanel';
 import DashboardWorkQueueTable from './DashboardWorkQueueTable';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 
@@ -87,6 +88,12 @@ const DashboardShell: React.FC<Props> = ({
   onUnitClick,
   onRecruiterClick,
 }) => {
+  const [showUnitOverview, setShowUnitOverview] = useState(false);
+  const [showWorkQueue, setShowWorkQueue] = useState(false);
+
+  const activeUnitCount = data.unitOverview.filter((u) => u.open > 0).length;
+  const unitOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
+
   return (
     <div className="min-h-full bg-slate-50 pb-24">
       <div className="border-b border-slate-200 bg-white">
@@ -94,9 +101,6 @@ const DashboardShell: React.FC<Props> = ({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Request Control Tower</h1>
-              <p className="text-sm text-slate-500 mt-1">
-                ความต้องการ · หาได้แล้ว · จบงาน · งานค้าง · SLA · ประเภทใบขอ · {data.periodLabel}
-              </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
@@ -163,15 +167,6 @@ const DashboardShell: React.FC<Props> = ({
                 ))}
               </div>
 
-              {data.dataQualitySummary ? (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  {data.dataQualitySummary.message}
-                  {data.dataQualitySummary.reconciliationDiff
-                    ? ` (สมการงานค้างต่าง ${data.dataQualitySummary.reconciliationDiff} ตำแหน่ง)`
-                    : null}
-                </div>
-              ) : null}
-
               {data.flowView ? (
                 <DashboardFlowViewCard
                   flow={data.flowView}
@@ -222,19 +217,47 @@ const DashboardShell: React.FC<Props> = ({
                 positionTotal={data.ageDaysPositionTotal}
                 onBucketClick={onAgeBucketClick}
               />
-              <DashboardChartSection data={data} onUnitClick={onUnitClick} />
-              <DashboardDriverOverview items={data.recruiterOverview} onRecruiterClick={onRecruiterClick} />
+              <DashboardChartSection
+                data={data}
+                recruiterOverview={data.recruiterOverview}
+                onRecruiterClick={onRecruiterClick}
+              />
+              <DashboardExpandablePanel
+                title="ภาระงานตามหน่วยงาน"
+                subtitle={
+                  activeUnitCount > 0
+                    ? `${unitOpenTotal.toLocaleString('th-TH')} ตำแหน่ง · ${activeUnitCount.toLocaleString('th-TH')} หน่วยงาน · กดเพื่อดู`
+                    : 'กดเพื่อดูรายละเอียด'
+                }
+                open={showUnitOverview}
+                onOpenChange={setShowUnitOverview}
+              >
+                <DashboardUnitOverviewChart
+                  items={data.unitOverview}
+                  periodLabel={data.periodLabel}
+                  onUnitClick={onUnitClick}
+                  hideHeader
+                />
+              </DashboardExpandablePanel>
               {data.priorityWorkQueue.length > 0 ? (
                 <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
               ) : null}
-              <DashboardWorkQueueTable
-                items={data.workQueue}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={onSort}
-                onView={onViewItem}
-                onAssign={onAssignItem}
-              />
+              <DashboardExpandablePanel
+                title="งานที่ต้องติดตาม"
+                subtitle={`${data.workQueue.length.toLocaleString('th-TH')} รายการ — กดเพื่อดู`}
+                open={showWorkQueue}
+                onOpenChange={setShowWorkQueue}
+              >
+                <DashboardWorkQueueTable
+                  items={data.workQueue}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  onView={onViewItem}
+                  onAssign={onAssignItem}
+                  hideHeader
+                />
+              </DashboardExpandablePanel>
             </div>
           </div>
         )}

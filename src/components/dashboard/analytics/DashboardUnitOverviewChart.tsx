@@ -14,6 +14,7 @@ type Props = {
   items: DashboardUnitOverview[];
   periodLabel: string;
   onUnitClick?: (unitName: string) => void;
+  hideHeader?: boolean;
 };
 
 function truncateLabel(name: string, max = 22): string {
@@ -25,7 +26,7 @@ const BAR_ROW_PX = 30;
 const CHART_MIN_HEIGHT = 224;
 const CHART_MAX_HEIGHT = 720;
 
-const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onUnitClick }) => {
+const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onUnitClick, hideHeader = false }) => {
   const activeUnits = useMemo(() => items.filter((u) => u.open > 0), [items]);
 
   const chartData = useMemo(
@@ -47,24 +48,28 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onUni
   if (activeUnits.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-        <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามหน่วยงาน</h3>
-        <p className="mt-2 text-sm text-slate-500">ยังไม่มีข้อมูลหน่วยงานในช่วงที่เลือก</p>
+        {!hideHeader ? <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามหน่วยงาน</h3> : null}
+        <p className={hideHeader ? 'text-sm text-slate-500' : 'mt-2 text-sm text-slate-500'}>
+          ยังไม่มีข้อมูลหน่วยงานในช่วงที่เลือก
+        </p>
       </div>
     );
   }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามหน่วยงาน</h3>
-        <p className="text-xs text-slate-500">
-          ตำแหน่งที่รอดำเนินการต่อหน่วยงาน · {periodLabel}
-        </p>
-        <p className="text-xs text-slate-600 mt-1">
-          รวมรอดำเนินการ {openTotal.toLocaleString('th-TH')} ตำแหน่ง ·{' '}
-          {activeUnits.length.toLocaleString('th-TH')} หน่วยงาน
-        </p>
-      </div>
+      {!hideHeader ? (
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามหน่วยงาน</h3>
+          <p className="text-xs text-slate-500">
+            ตำแหน่งที่รอดำเนินการต่อหน่วยงาน · {periodLabel}
+          </p>
+          <p className="text-xs text-slate-600 mt-1">
+            รวมรอดำเนินการ {openTotal.toLocaleString('th-TH')} ตำแหน่ง ·{' '}
+            {activeUnits.length.toLocaleString('th-TH')} หน่วยงาน
+          </p>
+        </div>
+      ) : null}
       <div
         className="overflow-y-auto overflow-x-hidden rounded-lg border border-slate-100"
         style={{ maxHeight: CHART_MAX_HEIGHT }}

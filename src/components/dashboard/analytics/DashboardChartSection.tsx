@@ -9,23 +9,21 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { DashboardData } from '@/lib/dashboard/types';
-import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
+import type { DashboardData, DashboardRecruiterOverview, DashboardResponsibleRole } from '@/lib/dashboard/types';
 import DashboardThroughputChart from './DashboardThroughputChart';
+import DashboardDriverOverview from './DashboardDriverOverview';
 
 type Props = {
-  data: Pick<
-    DashboardData,
-    'activityTrend' | 'unitOverview' | 'periodLabel' | 'activityTrendLabel' | 'lifecycleInsights'
-  >;
-  onUnitClick?: (unitName: string) => void;
+  data: Pick<DashboardData, 'activityTrend' | 'activityTrendLabel' | 'lifecycleInsights'>;
+  recruiterOverview: DashboardRecruiterOverview[];
+  onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
 };
 
 function sumPoint(p: DashboardData['activityTrend'][number]) {
   return p.resignations + p.replacements + p.newOpenings;
 }
 
-const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
+const DashboardChartSection: React.FC<Props> = ({ data, recruiterOverview, onRecruiterClick }) => {
   const activityData = data.activityTrend;
 
   const periodTotals = activityData.reduce(
@@ -139,11 +137,9 @@ const DashboardChartSection: React.FC<Props> = ({ data, onUnitClick }) => {
 
         <DashboardThroughputChart data={data.activityTrend} periodLabel={data.activityTrendLabel} />
 
-        <DashboardUnitOverviewChart
-          items={data.unitOverview}
-          periodLabel={data.periodLabel}
-          onUnitClick={onUnitClick}
-        />
+        <div className="xl:col-span-2">
+          <DashboardDriverOverview items={recruiterOverview} onRecruiterClick={onRecruiterClick} />
+        </div>
       </div>
     </div>
   );

@@ -471,10 +471,10 @@ function buildControlTowerKpis(
     {
       id: 'remaining',
       label: 'เหลือหา',
-      value: summary.endingBacklogPositions ?? summary.remainingPositions,
+      value: summary.remainingPositions,
       secondaryCount: summary.remainingRequests,
       secondaryLabel: 'ใบขอ',
-      description: posReq(summary.endingBacklogPositions ?? summary.remainingPositions, summary.remainingRequests),
+      description: posReq(summary.remainingPositions, summary.remainingRequests),
       trendPercent: null,
     },
     {
@@ -926,24 +926,6 @@ export function buildDashboardData(
     period?.from ?? null,
   );
 
-  const dataQualitySummary =
-    summaryV3 && summaryV3.dataQualityMode !== 'event_based'
-      ? {
-          mode: summaryV3.dataQualityMode,
-          message:
-            summaryV3.dataQualityMode === 'snapshot_fallback'
-              ? 'ตัวเลขหาได้แล้ว/ยกเลิกรายเดือนเป็นประมาณการจากสถานะล่าสุด — ไม่มีวันที่แจ้งเข้า'
-              : 'ข้อมูลบางส่วนใช้ snapshot fallback',
-          reconciliationDiff: summaryV3.reconciliation.diff,
-        }
-      : summaryV3?.reconciliation.diff
-        ? {
-            mode: summaryV3.dataQualityMode,
-            message: summaryV3.reconciliation.diffReason,
-            reconciliationDiff: summaryV3.reconciliation.diff,
-          }
-        : undefined;
-
   const kpis =
     requestControlSummary != null
       ? buildControlTowerKpis(requestControlSummary, slaSummary)
@@ -976,7 +958,6 @@ export function buildDashboardData(
     flowView,
     executiveInsights,
     priorityWorkQueue,
-    dataQualitySummary,
     recruiterOverview: buildRecruiterOverview(scopedJobs, today, closedJobs),
     workQueue: sortedQueue,
     periodLabel,

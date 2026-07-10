@@ -12,6 +12,7 @@ type Props = {
   onSort: (key: DashboardSortKey) => void;
   onView: (item: DashboardWorkItem) => void;
   onAssign?: (item: DashboardWorkItem) => void;
+  hideHeader?: boolean;
 };
 
 function SortBtn({
@@ -41,15 +42,18 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
   onSort,
   onView,
   onAssign,
+  hideHeader = false,
 }) => {
   const toggle = (key: DashboardSortKey) => onSort(key);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-900">งานที่ต้องติดตาม</h3>
-        <p className="text-xs text-slate-500">{items.length} รายการ — เรียงตามความสำคัญ</p>
-      </div>
+      {!hideHeader ? (
+        <div className="px-4 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900">งานที่ต้องติดตาม</h3>
+          <p className="text-xs text-slate-500">{items.length} รายการ — เรียงตามความสำคัญ</p>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1200px] text-sm">

@@ -85,9 +85,6 @@ const DashboardFilterBar: React.FC<Props> = ({
     >
       <div>
         <h2 className="text-sm font-semibold text-slate-900">ตัวกรอง</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          เงื่อนไขเดียวกับหน้ารายการหน่วยงาน · กรองวันที่กรอกได้เพิ่มเติม
-        </p>
       </div>
 
       <div className="space-y-1.5">
@@ -115,9 +112,6 @@ const DashboardFilterBar: React.FC<Props> = ({
           value={dateRange}
           onChange={onDateRangeChange}
         />
-        <p className="text-[11px] text-slate-500">
-          ย้อนหลังนับวันที่กรอก · ฉุกเฉิน/ล่วงหน้านับวันที่ต้องการ
-        </p>
       </div>
 
       <UnitRequestFilterFields

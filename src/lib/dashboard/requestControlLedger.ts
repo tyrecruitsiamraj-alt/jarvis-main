@@ -131,6 +131,9 @@ export type RequestControlSummaryV3 = {
   cancelledPositionsThisPeriodFromCurrent: number;
   endingBacklogPositions: number;
   endingBacklogRequests: number;
+  /** ตำแหน่งคงเหลือจากสถานะล่าสุด (สอดคล้องกับหน้ารายการหน่วยงาน) */
+  snapshotRemainingPositions: number;
+  snapshotRemainingRequests: number;
   partialRequests: number;
   partialPositions: number;
   fillRatePercent: number;
@@ -630,6 +633,10 @@ export function computeRequestControlSummaryV3(
     (s) => s.effectiveRequestDate && s.effectiveRequestDate <= to && s.endingRemainingPositions > 0,
   ).length;
 
+  const snapshotRemainingStates = states.filter((s) => s.remainingPositions > 0);
+  const snapshotRemainingPositions = snapshotRemainingStates.reduce((sum, s) => sum + s.remainingPositions, 0);
+  const snapshotRemainingRequests = snapshotRemainingStates.length;
+
   const partialStates = states.filter((s) => s.status === 'partial');
   const partialRequests = partialStates.length;
   const partialPositions = partialStates.reduce((s, r) => s + r.remainingPositions, 0);
@@ -674,6 +681,8 @@ export function computeRequestControlSummaryV3(
     cancelledPositionsThisPeriodFromCurrent,
     endingBacklogPositions,
     endingBacklogRequests,
+    snapshotRemainingPositions,
+    snapshotRemainingRequests,
     partialRequests,
     partialPositions,
     fillRatePercent: pct(fulfilledPositionsThisPeriod, totalWorkloadPositions),
