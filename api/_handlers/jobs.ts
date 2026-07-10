@@ -123,7 +123,7 @@ function toJobResponse(row: JobRow) {
 }
 
 function parseLimitOffset(query: Record<string, unknown> | undefined): { limit: number; offset: number } {
-  const limit = Math.min(500, Math.max(1, parseIntOrNull(query?.limit) ?? 100));
+  const limit = Math.min(2000, Math.max(1, parseIntOrNull(query?.limit) ?? 100));
   const offset = Math.max(0, parseIntOrNull(query?.offset) ?? 0);
   return { limit, offset };
 }

@@ -45,6 +45,7 @@ import {
   unitOrganizationKey,
 } from '@/lib/unitGroupName';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
@@ -359,7 +360,6 @@ const JobListPage: React.FC = () => {
       />
 
       <div className="px-4 md:px-6 space-y-4">
-        {loading && <div className="text-sm text-muted-foreground">กำลังโหลดงาน...</div>}
         {loadError && (
           <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
             {loadError}
@@ -568,10 +568,85 @@ const JobListPage: React.FC = () => {
           </div>
         </div>
 
-        {filtered.length === 0 && !loading ? (
+        {loading ? (
+          isMobile ? (
+            // ─── Mobile skeleton cards ───────────────────────────────────────
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-3 w-48" />
+                  <Skeleton className="h-3 w-40" />
+                  <div className="grid grid-cols-2 gap-1 pt-1">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // ─── Desktop skeleton table ──────────────────────────────────────
+            <div className="glass-card rounded-xl border border-border overflow-x-auto">
+              <table className="w-full text-sm min-w-[1080px]">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/30">
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผ่านมา</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
+                    <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border/50">
+                      <td className="px-3 py-3"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-36" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-3 py-3 text-center"><Skeleton className="h-3 w-6 mx-auto" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-24" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-24" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-3 py-3 space-y-1">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-20" />
+                      </td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
+                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
+                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-16 rounded-full mx-auto" /></td>
+                      <td className="px-3 py-3 text-right"><Skeleton className="h-3 w-16 ml-auto" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : filtered.length === 0 ? (
           <div className="text-sm text-muted-foreground py-8 text-center">ไม่พบใบขอ</div>
         ) : isMobile ? (
-          <div className="space-y-3">
+          <div className={cn('space-y-3', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
             {paginated.map((j) => (
               <div
                 key={j.id}
@@ -642,7 +717,7 @@ const JobListPage: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="glass-card rounded-xl border border-border overflow-x-auto">
+          <div className={cn('glass-card rounded-xl border border-border overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
             <table className="w-full text-sm min-w-[1080px]">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
