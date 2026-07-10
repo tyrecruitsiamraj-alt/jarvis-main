@@ -77,8 +77,9 @@ export function filterRecordsForControlKpi(
     case 'cancelled':
       return filterRecordsCancelledInPeriod(records, from, to);
     case 'remaining':
+      // ใช้ใบเปิดตาม effective date — ไม่ใช้ controlRecords ที่อาจถูกใบปิดทับแล้วเหลือ 0
       return filterRecordsByEffectiveDate(
-        records.filter((r) => r.remainingPositions > 0),
+        records.filter((r) => r.remainingPositions > 0 && r.job?.status !== 'closed' && r.job?.status !== 'cancelled'),
         from,
         to,
       );
@@ -151,6 +152,22 @@ export function filterJobsForDashboardKpi(
     default:
       return jobs;
   }
+}
+
+/** เหลือหา — ชุดเดียวกับ KPI: ใบเปิด · ถ้างวดมี = เฉพาะใบที่เข้ามาในงวด */
+export function filterJobsForRemainingKpi(
+  openJobs: JobRequest[],
+  period: { from: string; to: string } | null,
+  today = new Date(),
+): JobRequest[] {
+  let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+  if (period) {
+    jobs = jobs.filter((j) => {
+      const ymd = effectiveRequestDateYmd(j, today);
+      return ymd ? inYmdRange(ymd, period.from, period.to) : false;
+    });
+  }
+  return jobs;
 }
 
 export function filterJobsForAgeBucket(

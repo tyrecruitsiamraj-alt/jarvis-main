@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterJobsClosedInPeriod } from '../../src/lib/dashboard/drillDownFilters';
+import { filterJobsClosedInPeriod, filterJobsForRemainingKpi } from '../../src/lib/dashboard/drillDownFilters';
 import type { JobRequest } from '@/types';
 
 function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
@@ -52,5 +52,30 @@ describe('filterJobsClosedInPeriod', () => {
     ];
     const list = filterJobsClosedInPeriod(jobs, '2026-07-01', '2026-07-31');
     expect(list.map((j) => j.id).sort()).toEqual(['backlog', 'same']);
+  });
+});
+
+describe('filterJobsForRemainingKpi', () => {
+  it('returns all open jobs when no period', () => {
+    const jobs = [
+      job({ id: 'a', unit_name: 'A', position_units: 2, request_date: '2026-05-01', required_date: '2026-05-01' }),
+      job({ id: 'b', unit_name: 'B', position_units: 3, request_date: '2026-07-02', required_date: '2026-07-20' }),
+      job({ id: 'c', unit_name: 'C', status: 'closed', position_units: 9, request_date: '2026-07-01', required_date: '2026-07-01' }),
+    ];
+    const list = filterJobsForRemainingKpi(jobs, null, new Date('2026-07-15'));
+    expect(list.map((j) => j.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('scopes open jobs to selected period by effective request date', () => {
+    const jobs = [
+      job({ id: 'old', unit_name: 'A', position_units: 52, request_date: '2026-05-01', required_date: '2026-05-01' }),
+      job({ id: 'new', unit_name: 'B', position_units: 45, request_date: '2026-07-02', required_date: '2026-07-20' }),
+    ];
+    const list = filterJobsForRemainingKpi(
+      jobs,
+      { from: '2026-07-01', to: '2026-07-31' },
+      new Date('2026-07-15'),
+    );
+    expect(list.map((j) => j.id)).toEqual(['new']);
   });
 });

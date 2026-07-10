@@ -22,6 +22,7 @@ import {
   filterJobsClosedInPeriod,
   filterJobsForAgeBucket,
   filterJobsForDashboardKpi,
+  filterJobsForRemainingKpi,
   filterJobsForRecruiter,
   filterJobsForUnitName,
   filterRecordsForCohort,
@@ -305,7 +306,14 @@ const SupervisorDashboard: React.FC = () => {
   const handleKpiClick = useCallback(
     (kpiId: string, label: string) => {
       const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
-      if (range && ['total_workload', 'new_requests', 'fulfilled', 'filled', 'fully_closed', 'partial', 'cancelled', 'remaining', 'sla_risk', 'backlog_change'].includes(kpiId)) {
+
+      // เหลือหา: ใช้ใบเปิดชุดเดียวกับ KPI (ไม่ผ่าน controlRecords)
+      if (kpiId === 'remaining') {
+        openJobList(label, filterJobsForRemainingKpi(jobsWithoutAgeFilter, range));
+        return;
+      }
+
+      if (range && ['total_workload', 'new_requests', 'fulfilled', 'filled', 'fully_closed', 'partial', 'cancelled', 'sla_risk', 'backlog_change'].includes(kpiId)) {
         openControlList(label, filterRecordsForControlKpi(controlRecords, kpiId, range));
         return;
       }
@@ -316,11 +324,6 @@ const SupervisorDashboard: React.FC = () => {
         }
         const ytd = period ?? resolveYearToDateTrendRange();
         openJobList(label, filterJobsClosedInPeriod(jobsWithoutAgeFilter, ytd.from, ytd.to));
-        return;
-      }
-      if (kpiId === 'remaining') {
-        const list = period ? scopedJobs : jobsWithoutAgeFilter;
-        openJobList(label, filterJobsForDashboardKpi(list, kpiId));
         return;
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
