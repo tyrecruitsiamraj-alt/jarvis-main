@@ -378,10 +378,9 @@ export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: st
   });
 }
 
-/** ช่วงวันที่เริ่มต้นสำหรับ Dashboard — เดือนนี้ */
-export function defaultDashboardDateRange(now = new Date()): { from: string; to: string } {
-  const p = resolvePeriodRange('this_month', undefined, now);
-  return { from: p.from, to: p.to };
+/** ช่วงวันที่เริ่มต้นสำหรับ Dashboard — ทั้งหมด (ไม่จำกัดเดือน) ให้เหลือหาตรงหน้ารายการหน่วยงาน */
+export function defaultDashboardDateRange(_now = new Date()): { from: string; to: string } | null {
+  return null;
 }
 
 function trendPercent(current: number, previous: number): number | null {

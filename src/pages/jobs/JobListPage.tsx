@@ -8,7 +8,7 @@ import { FilterSelect } from '@/components/shared/FilterSelect';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
-import { navigateToUnitRequest } from '@/lib/jobNavigation';
+import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNavigation';
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
@@ -56,6 +56,24 @@ import {
 } from '@/lib/jobListPageState';
 import { saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
 
+const OPEN_IN_NEW_TAB_KEY = 'jarvis.unitRequest.openInNewTab';
+
+function loadOpenInNewTabPref(): boolean {
+  try {
+    return localStorage.getItem(OPEN_IN_NEW_TAB_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveOpenInNewTabPref(value: boolean) {
+  try {
+    localStorage.setItem(OPEN_IN_NEW_TAB_KEY, value ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
   if (!d) return '—';
@@ -99,6 +117,15 @@ const JobListPage: React.FC = () => {
   } = listState;
 
   const returnTo = jobListReturnTo(location.pathname, location.search);
+  const [openInNewTab, setOpenInNewTab] = useState(loadOpenInNewTabPref);
+
+  const openJob = useCallback(
+    (job: JobRequest, e?: { metaKey: boolean; ctrlKey: boolean; button: number; altKey?: boolean }) => {
+      const newTab = openInNewTab || (e ? shouldOpenInNewTabFromEvent(e) : false);
+      navigateToUnitRequest(job, navigate, { returnTo, openInNewTab: newTab });
+    },
+    [navigate, returnTo, openInNewTab],
+  );
 
   const updateListState = useCallback(
     (patch: Partial<typeof listState>) => {
@@ -401,6 +428,21 @@ const JobListPage: React.FC = () => {
             ))}
           </div>
 
+          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="rounded border-border"
+              checked={openInNewTab}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setOpenInNewTab(next);
+                saveOpenInNewTabPref(next);
+              }}
+            />
+            เปิดใบขอในแท็บใหม่
+            <span className="text-[10px] text-muted-foreground/80">(หรือ Ctrl/⌘+คลิก)</span>
+          </label>
+
           <div
             className={cn(
               'grid gap-3',
@@ -579,7 +621,7 @@ const JobListPage: React.FC = () => {
               >
                 <button
                   type="button"
-                  onClick={() => navigateToUnitRequest(j, navigate, { returnTo })}
+                  onClick={(e) => openJob(j, e)}
                   className="w-full text-left"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
@@ -668,7 +710,13 @@ const JobListPage: React.FC = () => {
                 {paginated.map((j) => (
                   <tr
                     key={j.id}
-                    onClick={() => navigateToUnitRequest(j, navigate, { returnTo })}
+                    onClick={(e) => openJob(j, e)}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        openJob(j, e);
+                      }
+                    }}
                     className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                   >
                     <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">{j.request_no || '—'}</td>
