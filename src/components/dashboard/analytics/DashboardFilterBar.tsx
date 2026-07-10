@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
@@ -6,6 +7,7 @@ import type { DashboardStatusFilter } from '@/lib/dashboard/types';
 import { DASHBOARD_STATUS_LABELS } from '@/lib/dashboard/buildDashboardData';
 import { resolvePeriodRange } from '@/lib/dashboard/buildDashboardData';
 import type { DashboardTaskStatus } from '@/lib/dashboard/types';
+import { THAI_MONTHS, ceToBeYear, toYmdLocal } from '@/lib/dateTh';
 import { cn } from '@/lib/utils';
 
 const PERIOD_PRESETS = [
@@ -13,6 +15,28 @@ const PERIOD_PRESETS = [
   { id: 'this_month' as const, label: 'เดือนนี้' },
   { id: 'last_month' as const, label: 'เดือนก่อน' },
 ];
+
+const MONTH_OPTIONS_COUNT = 24;
+
+type MonthOption = { key: string; label: string; from: string; to: string };
+
+function buildMonthOptions(now = new Date()): MonthOption[] {
+  const options: MonthOption[] = [];
+  for (let i = 0; i < MONTH_OPTIONS_COUNT; i += 1) {
+    const d = subMonths(now, i);
+    const from = toYmdLocal(startOfMonth(d));
+    const to = toYmdLocal(endOfMonth(d));
+    const monthLabel = THAI_MONTHS[d.getMonth()]?.label ?? String(d.getMonth() + 1);
+    const yearBe = ceToBeYear(d.getFullYear());
+    options.push({
+      key: from.slice(0, 7),
+      label: `${monthLabel} ${yearBe}`,
+      from,
+      to,
+    });
+  }
+  return options;
+}
 
 const QUEUE_STATUS_OPTIONS: { value: DashboardStatusFilter; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ (ตาราง)' },
@@ -57,6 +81,8 @@ const DashboardFilterBar: React.FC<Props> = ({
   onQueueStatusChange,
   className,
 }) => {
+  const monthOptions = useMemo(() => buildMonthOptions(), []);
+
   const applyPreset = (preset: 'all' | 'this_month' | 'last_month') => {
     if (preset === 'all') {
       onDateRangeChange(null);
@@ -64,6 +90,16 @@ const DashboardFilterBar: React.FC<Props> = ({
     }
     const p = resolvePeriodRange(preset);
     onDateRangeChange({ from: p.from, to: p.to });
+  };
+
+  const applyMonth = (monthKey: string) => {
+    if (!monthKey) {
+      onDateRangeChange(null);
+      return;
+    }
+    const option = monthOptions.find((m) => m.key === monthKey);
+    if (!option) return;
+    onDateRangeChange({ from: option.from, to: option.to });
   };
 
   const activePreset = (() => {
@@ -75,6 +111,11 @@ const DashboardFilterBar: React.FC<Props> = ({
     }
     return null;
   })();
+
+  const selectedMonthKey =
+    dateRange != null
+      ? (monthOptions.find((m) => m.from === dateRange.from && m.to === dateRange.to)?.key ?? '')
+      : '';
 
   return (
     <aside
@@ -106,6 +147,20 @@ const DashboardFilterBar: React.FC<Props> = ({
             </button>
           ))}
         </div>
+        <select
+          id="dashboard-month-select"
+          value={selectedMonthKey}
+          onChange={(e) => applyMonth(e.target.value)}
+          className="jarvis-filter-select w-full text-sm"
+          aria-label="เลือกเดือน"
+        >
+          <option value="">เลือกเดือน…</option>
+          {monthOptions.map((m) => (
+            <option key={m.key} value={m.key}>
+              {m.label}
+            </option>
+          ))}
+        </select>
         <DateRangeCalendarPicker
           triggerId="dashboard-date-range"
           className="w-full"
