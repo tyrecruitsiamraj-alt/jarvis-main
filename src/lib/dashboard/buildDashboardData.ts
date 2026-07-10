@@ -411,6 +411,18 @@ function sumOpenRemainingPositions(jobs: JobRequest[]): number {
     .reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
 
+/** ตำแหน่งคงเหลือจากใบเปิด — สอดคล้อง KPI โหมดทั้งหมดและหน้ารายการหน่วยงาน */
+function liveRemainingFromOpenJobs(jobs: JobRequest[]): {
+  remainingPositions: number;
+  remainingRequests: number;
+} {
+  const openJobs = jobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+  return {
+    remainingPositions: sumOpenRemainingPositions(openJobs),
+    remainingRequests: jobsToRequestControlRecords(openJobs).length,
+  };
+}
+
 function buildControlTowerKpis(
   summary: DashboardRequestControlSummary,
   slaSummary?: { atRisk: number; breached: number },
@@ -866,6 +878,7 @@ export function buildDashboardData(
   const mergedJobs = mergeRequestControlJobs(openJobSet, closedJobs);
   const periodFrom = period?.from ?? trendFrom;
   const periodTo = period?.to ?? trendTo;
+  const liveRemaining = liveRemainingFromOpenJobs(openJobSet);
 
   const ledgerStates = period ? buildRequestStates(mergedJobs, periodFrom, periodTo, today) : [];
   const summaryV3 = period ? computeRequestControlSummaryV3(ledgerStates, periodFrom, periodTo) : null;
@@ -895,6 +908,14 @@ export function buildDashboardData(
     };
   }
 
+  if (requestControlSummary) {
+    requestControlSummary = {
+      ...requestControlSummary,
+      remainingPositions: liveRemaining.remainingPositions,
+      remainingRequests: liveRemaining.remainingRequests,
+    };
+  }
+
   const requestCohortSummary = period
     ? buildRequestCohortSummary(controlRecords, periodFrom, periodTo)
     : undefined;
@@ -912,11 +933,19 @@ export function buildDashboardData(
   const slaSummary = ledgerStates.length > 0 ? mapSlaSummaryFromStates(ledgerStates) : buildSlaSummary(controlRecords);
   const lifecycleTrend = buildLifecycleTrend(controlRecords, trendFrom, trendTo, throughputRecords);
   const lifecycleInsights = buildLifecycleInsights(lifecycleTrend);
-  const flowView = summaryV3
+  const flowViewBase = summaryV3
     ? mapFlowV3(summaryV3)
     : requestControlSummary
       ? buildFlowView(requestControlSummary)
       : undefined;
+  const flowView =
+    flowViewBase && requestControlSummary
+      ? {
+          ...flowViewBase,
+          endingBacklogPositions: liveRemaining.remainingPositions,
+          netBacklogChange: liveRemaining.remainingPositions - flowViewBase.startingBacklogPositions,
+        }
+      : flowViewBase;
   const executiveInsights = requestControlSummary
     ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
     : undefined;
