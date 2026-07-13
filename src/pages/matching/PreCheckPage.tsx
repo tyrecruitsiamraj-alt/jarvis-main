@@ -108,6 +108,25 @@ function preCheckReturnPath(jobId?: string | null): string {
     : '/matching/pre-check';
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await fn(items[current]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 const PreCheckPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -351,7 +370,7 @@ const PreCheckPage: React.FC = () => {
   const filteredRows = precheckResult.rows;
 
   useEffect(() => {
-    const rowsToFetch = filteredRows.slice(0, 30);
+    const rowsToFetch = filteredRows.slice(0, 12);
     if (rowsToFetch.length === 0) {
       setJobMatchCounts({});
       setJobMatchCountsLoading(false);
@@ -360,19 +379,21 @@ const PreCheckPage: React.FC = () => {
 
     let cancelled = false;
     setJobMatchCountsLoading(true);
-    Promise.all(
-      rowsToFetch.map(async ({ job }) => {
-        try {
-          // limit = จำนวนผลที่โชว์บนการ์ด; pool ฝั่ง API ดึงแยก (ไม่ผูกกับ limit นี้อีกแล้ว)
-          const r = await apiFetch(`/api/matching/suggestions?jobId=${encodeURIComponent(job.id)}&limit=20`);
-          if (!r.ok) return [job.id, 0] as const;
-          const data = (await r.json()) as MatchingSuggestionsPayload;
-          return [job.id, data.suggestions.length] as const;
-        } catch {
-          return [job.id, 0] as const;
-        }
-      }),
-    ).then((entries) => {
+    mapWithConcurrency(rowsToFetch, 3, async ({ job }) => {
+      try {
+        const params = new URLSearchParams({
+          jobId: job.id,
+          limit: '20',
+          poolSize: '120',
+        });
+        const r = await apiFetch(`/api/matching/suggestions?${params.toString()}`);
+        if (!r.ok) return [job.id, 0] as const;
+        const data = (await r.json()) as MatchingSuggestionsPayload;
+        return [job.id, data.suggestions.length] as const;
+      } catch {
+        return [job.id, 0] as const;
+      }
+    }).then((entries) => {
       if (cancelled) return;
       setJobMatchCounts(Object.fromEntries(entries));
       setJobMatchCountsLoading(false);
@@ -419,7 +440,12 @@ const PreCheckPage: React.FC = () => {
     setMatchingError(null);
     setMatchingData(null);
 
-    apiFetch(`/api/matching/suggestions?jobId=${encodeURIComponent(jobDetail.id)}&limit=10`)
+    const detailParams = new URLSearchParams({
+      jobId: jobDetail.id,
+      limit: '10',
+      poolSize: '200',
+    });
+    apiFetch(`/api/matching/suggestions?${detailParams.toString()}`)
       .then(async (r) => {
         if (!r.ok) {
           const data = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };

@@ -319,7 +319,7 @@ function sortByProximityThenScore(a: MatchingSuggestion, b: MatchingSuggestion):
 }
 
 /** จำนวนคนที่ดึงจาก iRecruit เพื่อคะแนน — แยกจาก limit ของผลที่คืน */
-const DEFAULT_CANDIDATE_POOL = 500;
+const DEFAULT_CANDIDATE_POOL = 200;
 
 export async function buildMatchingSuggestions(options: {
   jobId: string;

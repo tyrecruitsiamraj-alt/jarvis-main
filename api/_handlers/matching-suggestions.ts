@@ -34,8 +34,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const owner = getQuery(req, 'owner') || undefined;
     const limitRaw = getQuery(req, 'limit');
     const limit = limitRaw ? Number(limitRaw) : 200;
+    const poolRaw = getQuery(req, 'poolSize') || getQuery(req, 'pool_size');
+    const poolSize = poolRaw ? Number(poolRaw) : undefined;
 
-    const result = await buildMatchingSuggestions({ jobId, owner, limit });
+    const result = await buildMatchingSuggestions({
+      jobId,
+      owner,
+      limit,
+      poolSize: Number.isFinite(poolSize as number) ? (poolSize as number) : undefined,
+    });
     if (!result) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
     }
