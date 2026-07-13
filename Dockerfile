@@ -30,6 +30,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # API server source
 COPY --from=builder /app/api        ./api
+COPY --from=builder /app/shared     ./shared
 COPY --from=builder /app/server     ./server
 COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/migrations ./migrations
