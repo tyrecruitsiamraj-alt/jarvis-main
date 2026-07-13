@@ -124,7 +124,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? data.message
           : typeof data.error === 'string'
             ? data.error
-            : 'Sign in failed';
+            : r.status >= 500
+              ? `เซิร์ฟเวอร์ API ล้ม (HTTP ${r.status}) — ไม่ใช่รหัสผิด ตรวจ Vercel/โดเมน`
+              : `Sign in failed (HTTP ${r.status})`;
       return msg;
     }
     const rawUser = data.user as Record<string, unknown> | undefined;
