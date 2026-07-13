@@ -123,25 +123,6 @@ export interface JobRequest {
   contract_type_code?: string;
   contract_type_name?: string;
   position_units?: number;
-  /** จำนวนที่ขอทั้งใบ (request_qty) */
-  request_positions?: number;
-  /** จำนวนที่หาได้/แจ้งเข้าแล้ว */
-  filled_positions?: number;
-  /** จำนวนที่ยกเลิก */
-  cancelled_positions?: number;
-  cancel_date?: string;
-  /** วันที่แจ้งเข้าล่าสุด — จาก st_inform_head.inform_date เมื่อมี */
-  inform_date?: string;
-  /** fulfillment events สำหรับ ledger (ถ้ามีจาก SQL) */
-  fulfillment_events?: Array<{
-    eventDate?: string | null;
-    eventType: 'informed' | 'cancelled';
-    positionQty: number;
-    sourceTable?: string;
-    sourceId?: string;
-    isDateReliable?: boolean;
-    reliabilityNote?: string;
-  }>;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;
@@ -189,6 +170,8 @@ export interface JobRequest {
   list_note?: string;
   /** ส่งคนแทน (true) / ไม่ส่งคนแทน (false) — null = ยังไม่เลือก */
   send_replacement?: boolean | null;
+  /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
+  parser_override_text?: string | null;
 }
 
 export interface JobAssignment {
@@ -267,7 +250,6 @@ export interface AuditLog {
   id: string;
   user_id: string;
   user_name: string;
-  user_role?: string;
   action: string;
   entity_type: string;
   entity_id: string;

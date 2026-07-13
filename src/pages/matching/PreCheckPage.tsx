@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -13,17 +13,124 @@ import { haversineKm } from '@/lib/geo';
 import { jobLatLng } from '@/lib/jobCoords';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { unitRequestPath } from '@/lib/jobNavigation';
+import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { saveUnitRequestMeta, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 
-type PreCheckRow = { job: JobRequest; distanceKm: number | null };
+type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
 type Center = { lat: number; lng: number; label: string };
+type MatchingSuggestion = {
+  score: number;
+  level: 'high' | 'medium' | 'low';
+  reasons: string[];
+  candidate: {
+    first_name: string | null;
+    last_name: string | null;
+    phone_number: string | null;
+    age: number | null;
+    sex: string | null;
+    province_name: string | null;
+    district_name: string | null;
+    job_name_th: string | null;
+    process_status_name: string;
+    created_at: string;
+    location_label: string | null;
+  };
+};
+type MatchingSuggestionsPayload = {
+  criteria: {
+    roleHints: string[];
+    genderRequirement: string | null;
+    ageMin: number | null;
+    ageMax: number | null;
+  };
+  totalCandidates: number;
+  suggestions: MatchingSuggestion[];
+};
+type ParsedBranchDemandItem = {
+  org_name: string | null;
+  branch_name_raw: string;
+  branch_name_clean: string;
+  requested_qty: number;
+  confidence: number;
+  district_hint: string | null;
+  province_hint: string | null;
+};
+type ParsedBranchDemandPayload = {
+  parser_input: string;
+  parsed: {
+    org_name: string | null;
+    items: ParsedBranchDemandItem[];
+    unparsed_segments: string[];
+    parser_status: 'high_confidence' | 'fallback' | 'none';
+  };
+  branch_matches?: Array<{
+    branch_name_clean: string;
+    branch_name_raw: string;
+    requested_qty: number;
+    confidence: number;
+    matched_count: number;
+    suggestions: MatchingSuggestion[];
+  }>;
+};
 
 function isLikelyThailandCoord(lat: number, lng: number): boolean {
   return lat >= 4 && lat <= 22.5 && lng >= 96 && lng <= 106.5;
 }
 
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function isLikelyBranchSplitCandidate(text: string): boolean {
+  return /จำนวน\s*\d+\s*คน|และ|and|Fashion\s*Island|Promenade|สิงห์คอมเพล็กซ์/i.test(text);
+}
+
+function formatMatchReasons(reasons: string[]): { primary: string | null; supporting: string[] } {
+  const cleaned = [...new Set(reasons.map((reason) => reason.trim()).filter(Boolean))];
+  if (cleaned.length === 0) return { primary: null, supporting: [] };
+
+  const positives = cleaned.filter((reason) => !/ไม่ตรง|ไม่ผ่าน|ห่างพื้นที่งาน/.test(reason));
+  const negatives = cleaned.filter((reason) => /ไม่ตรง|ไม่ผ่าน|ห่างพื้นที่งาน/.test(reason));
+  const ordered = [...positives, ...negatives];
+  return {
+    primary: ordered[0] || null,
+    supporting: ordered.slice(1, 4),
+  };
+}
+
+function preCheckReturnPath(jobId?: string | null): string {
+  return jobId
+    ? `/matching/pre-check?jobId=${encodeURIComponent(jobId)}`
+    : '/matching/pre-check';
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await fn(items[current]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 const PreCheckPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [erpSearchQuery, setErpSearchQuery] = useState('');
   const [placeQuery, setPlaceQuery] = useState('');
   const [latText, setLatText] = useState('');
   const [lngText, setLngText] = useState('');
@@ -36,6 +143,32 @@ const PreCheckPage: React.FC = () => {
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
   const [appliedTextQuery, setAppliedTextQuery] = useState('');
+  const [matchingLoading, setMatchingLoading] = useState(false);
+  const [matchingError, setMatchingError] = useState<string | null>(null);
+  const [matchingData, setMatchingData] = useState<MatchingSuggestionsPayload | null>(null);
+  const [jobMatchCounts, setJobMatchCounts] = useState<Record<string, number>>({});
+  const [jobMatchCountsLoading, setJobMatchCountsLoading] = useState(false);
+  const [branchParseLoading, setBranchParseLoading] = useState(false);
+  const [branchMatchesLoading, setBranchMatchesLoading] = useState(false);
+  const [branchParseData, setBranchParseData] = useState<ParsedBranchDemandPayload | null>(null);
+  const [branchParserOverride, setBranchParserOverride] = useState('');
+  const [savingBranchOverride, setSavingBranchOverride] = useState(false);
+  const [branchOverrideMsg, setBranchOverrideMsg] = useState<string | null>(null);
+
+  const openCandidatePrefill = (candidate: MatchingSuggestion['candidate']) => {
+    const params = new URLSearchParams();
+    if (candidate.first_name) params.set('first_name', candidate.first_name);
+    if (candidate.last_name) params.set('last_name', candidate.last_name);
+    if (candidate.phone_number) params.set('phone', candidate.phone_number);
+    if (candidate.age !== null) params.set('age', String(candidate.age));
+    if (candidate.sex) params.set('sex', candidate.sex);
+    if (candidate.province_name) params.set('province', candidate.province_name);
+    if (candidate.district_name) params.set('district', candidate.district_name);
+    if (candidate.location_label) params.set('location_label', candidate.location_label);
+    if (candidate.job_name_th) params.set('job_name', candidate.job_name_th);
+    params.set('returnTo', preCheckReturnPath(jobDetail?.id));
+    navigate(`/matching/candidates/add?${params.toString()}`);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +187,24 @@ const PreCheckPage: React.FC = () => {
   }, []);
 
   const allJobs = feedJobs;
+
+  const closeJobDetail = () => {
+    setJobDetail(null);
+    if (searchParams.get('jobId')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('jobId');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  // กลับจากหน้าเพิ่มผู้สมัคร — เปิด dialog ใบงานเดิมตาม jobId ใน URL
+  useEffect(() => {
+    const jobId = searchParams.get('jobId');
+    if (!jobId) return;
+    const job = allJobs.find((j) => j.id === jobId);
+    if (job) setJobDetail(job);
+  }, [searchParams, allJobs]);
+
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     [allJobs],
@@ -143,10 +294,6 @@ const PreCheckPage: React.FC = () => {
   };
 
   const precheckResult = useMemo(() => {
-    if (!appliedCenter && !appliedTextQuery) {
-      return { rows: [] as PreCheckRow[], fallbackFromRadius: false };
-    }
-
     const isOpenish = (j: JobRequest) => j.status === 'open' || j.status === 'in_progress';
     let activeRows = allJobs.filter(isOpenish);
     if (activeRows.length === 0) {
@@ -159,6 +306,12 @@ const PreCheckPage: React.FC = () => {
     if (projectFilter) {
       const byProject = rowsBase.filter((j) => j.unit_name === projectFilter);
       if (byProject.length > 0) rowsBase = byProject;
+    }
+
+    const erpQuery = erpSearchQuery.trim().toLowerCase();
+    if (erpQuery) {
+      const byErpQuery = rowsBase.filter((j) => unitRequestSearchBlob(j).includes(erpQuery));
+      rowsBase = byErpQuery;
     }
 
     if (appliedTextQuery) {
@@ -174,11 +327,29 @@ const PreCheckPage: React.FC = () => {
       if (appliedCenter && jl && isLikelyThailandCoord(jl.lat, jl.lng)) {
         distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, jl.lat, jl.lng);
       }
-      return { job: j, distanceKm };
+      const searchMatched = Boolean(erpQuery || appliedTextQuery);
+      const baseScore = (() => {
+        if (distanceKm !== null) {
+          // ใกล้มากได้คะแนนสูง และให้โบนัสงานด่วนเล็กน้อย
+          return clampScore(100 - distanceKm * 4 + (j.urgency === 'urgent' ? 8 : 0));
+        }
+        if (appliedCenter) {
+          return j.urgency === 'urgent' ? 55 : 40;
+        }
+        if (searchMatched) {
+          return j.urgency === 'urgent' ? 85 : 72;
+        }
+        return j.urgency === 'urgent' ? 80 : 60;
+      })();
+      return { job: j, distanceKm, score: baseScore };
     });
 
     const sortRows = (rows: PreCheckRow[]) =>
       [...rows].sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.job.urgency !== b.job.urgency) {
+          return a.job.urgency === 'urgent' ? -1 : 1;
+        }
         const da = a.distanceKm;
         const db = b.distanceKm;
         if (da !== null && db !== null) return da - db;
@@ -194,9 +365,44 @@ const PreCheckPage: React.FC = () => {
 
     // If radius is too strict and no rows match, show nearest rows anyway.
     return { rows: sortRows(rowsAll), fallbackFromRadius: true };
-  }, [appliedCenter, appliedTextQuery, allJobs, projectFilter, radius]);
+  }, [appliedCenter, appliedTextQuery, allJobs, erpSearchQuery, projectFilter, radius]);
 
   const filteredRows = precheckResult.rows;
+
+  useEffect(() => {
+    const rowsToFetch = filteredRows.slice(0, 12);
+    if (rowsToFetch.length === 0) {
+      setJobMatchCounts({});
+      setJobMatchCountsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setJobMatchCountsLoading(true);
+    mapWithConcurrency(rowsToFetch, 3, async ({ job }) => {
+      try {
+        const params = new URLSearchParams({
+          jobId: job.id,
+          limit: '20',
+          poolSize: '120',
+        });
+        const r = await apiFetch(`/api/matching/suggestions?${params.toString()}`);
+        if (!r.ok) return [job.id, 0] as const;
+        const data = (await r.json()) as MatchingSuggestionsPayload;
+        return [job.id, data.suggestions.length] as const;
+      } catch {
+        return [job.id, 0] as const;
+      }
+    }).then((entries) => {
+      if (cancelled) return;
+      setJobMatchCounts(Object.fromEntries(entries));
+      setJobMatchCountsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredRows]);
 
   useEffect(() => {
     if (precheckResult.fallbackFromRadius) {
@@ -215,6 +421,152 @@ const PreCheckPage: React.FC = () => {
     return haversineKm(appliedCenter.lat, appliedCenter.lng, jl.lat, jl.lng);
   })();
 
+  useEffect(() => {
+    if (!jobDetail) {
+      setMatchingLoading(false);
+      setMatchingError(null);
+      setMatchingData(null);
+      setBranchParseLoading(false);
+      setBranchMatchesLoading(false);
+      setBranchParseData(null);
+      setBranchParserOverride('');
+      setSavingBranchOverride(false);
+      setBranchOverrideMsg(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMatchingLoading(true);
+    setMatchingError(null);
+    setMatchingData(null);
+
+    const detailParams = new URLSearchParams({
+      jobId: jobDetail.id,
+      limit: '10',
+      poolSize: '200',
+    });
+    apiFetch(`/api/matching/suggestions?${detailParams.toString()}`)
+      .then(async (r) => {
+        if (!r.ok) {
+          const data = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+          throw new Error(data.detail || data.error || 'โหลดรายชื่อแนะนำไม่สำเร็จ');
+        }
+        return (await r.json()) as MatchingSuggestionsPayload;
+      })
+      .then((data) => {
+        if (!cancelled) setMatchingData(data);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setMatchingError(e instanceof Error ? e.message : 'โหลดรายชื่อแนะนำไม่สำเร็จ');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setMatchingLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [jobDetail]);
+
+  useEffect(() => {
+    setBranchParserOverride((jobDetail?.parser_override_text || '').trim());
+    setBranchOverrideMsg(null);
+  }, [jobDetail?.id, jobDetail?.parser_override_text]);
+
+  useEffect(() => {
+    if (!jobDetail) return;
+    let cancelled = false;
+
+    // แยกสาขาทันทีฝั่ง UI (ไม่รอ API / iRecruit)
+    const parserInput = branchParserOverride.trim() || buildErpBranchDemandInput(jobDetail);
+    const parsed = parseErpBranchDemand(parserInput);
+    setBranchParseData({
+      parser_input: parserInput,
+      parsed,
+      branch_matches: [],
+    });
+    setBranchParseLoading(false);
+    setBranchMatchesLoading(parsed.items.length > 0);
+
+    if (parsed.items.length === 0) {
+      setBranchMatchesLoading(false);
+      return;
+    }
+
+    const query = new URLSearchParams({
+      jobId: jobDetail.id,
+      matches: '1',
+      poolSize: '200',
+    });
+    if (branchParserOverride.trim()) query.set('text', branchParserOverride.trim());
+
+    apiFetch(`/api/matching/parse-branch-demand-job?${query.toString()}`)
+      .then(async (r) => {
+        if (!r.ok) return null;
+        return (await r.json()) as ParsedBranchDemandPayload;
+      })
+      .then((data) => {
+        if (!cancelled && data?.branch_matches) {
+          setBranchParseData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  branch_matches: data.branch_matches,
+                }
+              : prev,
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBranchMatchesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [branchParserOverride, jobDetail]);
+
+  const branchParserStatusMeta = useMemo(() => {
+    const status = branchParseData?.parsed.parser_status;
+    if (status === 'high_confidence') {
+      return { label: 'มั่นใจสูง', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    }
+    if (status === 'fallback') {
+      return { label: 'fallback/เดา', className: 'border-amber-200 bg-amber-50 text-amber-700' };
+    }
+    return { label: 'ยังไม่แตกสาขา', className: 'border-slate-200 bg-slate-50 text-slate-600' };
+  }, [branchParseData?.parsed.parser_status]);
+  const shouldShowBranchOverrideEditor = useMemo(() => {
+    if (!jobDetail || !branchParseData) return false;
+    if ((jobDetail.parser_override_text || '').trim()) return true;
+    const parserInput = branchParseData.parser_input || '';
+    if (!isLikelyBranchSplitCandidate(parserInput)) return false;
+    return branchParseData.parsed.parser_status !== 'high_confidence';
+  }, [branchParseData, jobDetail]);
+
+  const saveBranchParserOverride = async () => {
+    if (!jobDetail) return;
+    const requestNo = unitRequestNoteKey(jobDetail);
+    if (!requestNo) {
+      setBranchOverrideMsg('ใบงานนี้ไม่มี request key สำหรับบันทึก override');
+      return;
+    }
+    setSavingBranchOverride(true);
+    setBranchOverrideMsg(null);
+    try {
+      const nextOverride = branchParserOverride.trim() || null;
+      await saveUnitRequestMeta(requestNo, { parser_override_text: nextOverride });
+      setJobDetail((prev) => (prev ? { ...prev, parser_override_text: nextOverride } : prev));
+      setBranchOverrideMsg(nextOverride ? 'บันทึกข้อความ override ถาวรแล้ว' : 'ลบข้อความ override ถาวรแล้ว');
+    } catch (e) {
+      setBranchOverrideMsg(e instanceof Error ? e.message : 'บันทึก override ไม่สำเร็จ');
+    } finally {
+      setSavingBranchOverride(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
@@ -227,8 +579,18 @@ const PreCheckPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground">ค้นหาตำแหน่งผู้สมัคร</h3>
-                <p className="text-xs text-muted-foreground">พิมพ์ที่อยู่แล้วกดค้นหา — ระบบจะเรียงงานใกล้สุดก่อน</p>
+                <p className="text-xs text-muted-foreground">เลือกงานจาก ERP ได้เลย หรือพิมพ์ที่อยู่ผู้สมัครเพื่อเรียงงานใกล้สุดก่อน</p>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">ค้นหา site / หน่วยงาน / สถานที่ทำงานจาก ERP</label>
+              <SearchField
+                type="text"
+                placeholder='เช่น "กรุงศรี", "พระราม 3", "บางนา", "site A"'
+                value={erpSearchQuery}
+                onChange={(e) => setErpSearchQuery(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -356,7 +718,7 @@ const PreCheckPage: React.FC = () => {
         <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
           <p className="text-sm text-muted-foreground">
-            งานที่เหมาะสม{' '}
+            {appliedCenter || appliedTextQuery ? 'งานที่ใกล้/เกี่ยวข้อง' : 'งานเปิดจาก ERP'}{' '}
             <span className="text-blue-600 font-bold tabular-nums">{filteredRows.length}</span> รายการ
             {appliedCenter ? (
               <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
@@ -365,15 +727,24 @@ const PreCheckPage: React.FC = () => {
         </div>
 
         <div className="space-y-3">
-          {!appliedCenter && !appliedTextQuery && (
-            <div className="glass-card rounded-[1.5rem] p-8 border border-white/70 text-center">
-              <ClipboardCheck className="w-8 h-8 text-amber-500/50 mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">เริ่มจากที่อยู่ผู้สมัคร</p>
-              <p className="text-xs text-muted-foreground mt-1">พิมพ์ที่อยู่แล้วกดค้นหาเพื่อดูงานใกล้เคียง</p>
+          {!appliedCenter && !appliedTextQuery && filteredRows.length > 0 && (
+            <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
+              <p className="text-sm font-medium text-foreground">รายการด้านล่างคือใบงานเปิดจาก ERP</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                เรียงงานด่วนขึ้นก่อน และสามารถกดเข้าไปดูรายละเอียดพร้อมรายชื่อคนที่ระบบแนะนำได้
+              </p>
             </div>
           )}
 
-          {filteredRows.map(({ job: j, distanceKm }) => (
+          {!appliedCenter && !appliedTextQuery && filteredRows.length === 0 && (
+            <div className="glass-card rounded-[1.5rem] p-8 border border-white/70 text-center">
+              <ClipboardCheck className="w-8 h-8 text-amber-500/50 mx-auto mb-2" />
+              <p className="text-sm font-medium text-foreground">ยังไม่พบใบงาน</p>
+              <p className="text-xs text-muted-foreground mt-1">ลองค้นหาด้วย site, หน่วยงาน หรือสถานที่ทำงานจาก ERP</p>
+            </div>
+          )}
+
+          {filteredRows.map(({ job: j, distanceKm, score }) => (
             <div
               key={j.id}
               role="button"
@@ -398,6 +769,34 @@ const PreCheckPage: React.FC = () => {
                   {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
                 </span>
               </div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">
+                  {appliedCenter
+                    ? 'คะแนนงานจากระยะทางและความด่วน'
+                    : erpSearchQuery || appliedTextQuery
+                      ? 'คะแนนงานจากความเกี่ยวข้องและความด่วน'
+                      : 'คะแนนงานเบื้องต้นจากความด่วน'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-xs font-semibold',
+                      jobMatchCountsLoading && jobMatchCounts[j.id] == null
+                        ? 'border-slate-200 bg-slate-50 text-slate-500'
+                        : (jobMatchCounts[j.id] ?? 0) > 0
+                          ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                          : 'border-amber-100 bg-amber-50 text-amber-700',
+                    )}
+                  >
+                    {jobMatchCountsLoading && jobMatchCounts[j.id] == null
+                      ? 'กำลังนับ…'
+                      : `ตรง ${jobMatchCounts[j.id] ?? 0} คน`}
+                  </div>
+                  <div className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    {score} คะแนน
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="w-3 h-3" /> {j.location_address}
               </div>
@@ -416,8 +815,8 @@ const PreCheckPage: React.FC = () => {
         </div>
       </div>
 
-      <Dialog open={!!jobDetail} onOpenChange={(o) => !o && setJobDetail(null)}>
-        <DialogContent className="max-w-md">
+      <Dialog open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-foreground">รายละเอียดงาน</DialogTitle>
             <DialogDescription className="sr-only">รายละเอียดงานและหน่วยงาน</DialogDescription>
@@ -426,7 +825,7 @@ const PreCheckPage: React.FC = () => {
             (() => {
               const client = getClientInfo(jobDetail.unit_name);
               return (
-                <div className="space-y-3 mt-2">
+                <div className="space-y-3 mt-2 max-h-[72vh] overflow-y-auto pr-1">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-blue-500/15 flex items-center justify-center">
                       <Building2 className="w-5 h-5 text-blue-600" />
@@ -438,6 +837,189 @@ const PreCheckPage: React.FC = () => {
                       ) : null}
                       <div className="text-xs text-muted-foreground mt-1">{jobDetail.location_address}</div>
                     </div>
+                  </div>
+                  <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-blue-600" />
+                      <p className="text-sm font-semibold text-foreground">สถานที่ทำงาน</p>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground shrink-0">หน่วยงาน</span>
+                        <span className="text-right text-foreground">{jobDetail.unit_name || '-'}</span>
+                      </div>
+                      {jobDetail.site_code ? (
+                        <div className="flex justify-between gap-3">
+                          <span className="text-muted-foreground shrink-0">Site Code</span>
+                          <span className="text-right text-foreground">{jobDetail.site_code}</span>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground shrink-0">ที่อยู่ปฏิบัติงาน</span>
+                        <span className="text-right text-foreground">{jobDetail.location_address || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
+                      <Badge variant="outline" className={branchParserStatusMeta.className}>
+                        {branchParserStatusMeta.label}
+                      </Badge>
+                    </div>
+                    {shouldShowBranchOverrideEditor ? (
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground">แก้ข้อความ ERP เอง (override ชั่วคราว)</label>
+                        <Textarea
+                          value={branchParserOverride}
+                          onChange={(e) => setBranchParserOverride(e.target.value)}
+                          placeholder={branchParseData?.parser_input || 'ถ้าวางข้อความเอง ระบบจะใช้ข้อความนี้แทนการ parse อัตโนมัติ'}
+                          className="min-h-[84px] bg-white/70"
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-muted-foreground">
+                            ใช้สำหรับเคส ERP แปลกๆ ก่อนทำ manual override ถาวรในระบบ
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {branchParserOverride.trim() ? (
+                              <button
+                                type="button"
+                                onClick={() => setBranchParserOverride('')}
+                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                              >
+                                กลับไปใช้ข้อความเดิม
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => void saveBranchParserOverride()}
+                              disabled={savingBranchOverride}
+                              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                            >
+                              {savingBranchOverride ? 'กำลังบันทึก…' : 'บันทึกเป็นค่าเริ่มต้น'}
+                            </button>
+                          </div>
+                        </div>
+                        {branchOverrideMsg ? <p className="text-[11px] text-muted-foreground">{branchOverrideMsg}</p> : null}
+                      </div>
+                    ) : null}
+                    {branchParseLoading ? (
+                      <p className="text-xs text-muted-foreground">กำลังวิเคราะห์ข้อความจากใบงาน…</p>
+                    ) : branchParseData?.parsed.items?.length ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">ใช้ข้อความ: {branchParseData.parser_input}</p>
+                        {branchMatchesLoading ? (
+                          <p className="text-xs text-blue-600">กำลังจับคู่ผู้สมัครตามสาขา…</p>
+                        ) : null}
+                        <div className="space-y-2">
+                          {branchParseData.parsed.items.map((item, idx) => {
+                            const branchMatch = branchParseData.branch_matches?.find(
+                              (b) =>
+                                b.branch_name_clean === item.branch_name_clean &&
+                                b.requested_qty === item.requested_qty,
+                            );
+                            return (
+                              <div key={`${item.branch_name_clean}-${idx}`} className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 space-y-2">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-foreground">{item.branch_name_clean}</p>
+                                    <p className="text-xs text-muted-foreground">ต้นฉบับ: {item.branch_name_raw}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-semibold text-blue-700">ต้องการ {item.requested_qty} คน</p>
+                                    <p className="text-[11px] text-muted-foreground">มั่นใจ {item.confidence}%</p>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                    ตรง {branchMatch?.matched_count ?? 0} คน
+                                  </span>
+                                  {item.district_hint ? (
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700">
+                                      เขต/อำเภอ: {item.district_hint}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {branchMatch && branchMatch.suggestions.length > 0 ? (
+                                  <div className="space-y-1.5">
+                                    {branchMatch.suggestions.slice(0, 3).map((suggestion, sidx) => {
+                                      const fullName =
+                                        [suggestion.candidate.first_name, suggestion.candidate.last_name]
+                                          .filter(Boolean)
+                                          .join(' ') || 'ไม่ระบุชื่อ';
+                                      return (
+                                        <div
+                                          key={`${item.branch_name_clean}-${fullName}-${sidx}`}
+                                          className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2"
+                                        >
+                                          {(() => {
+                                            const reasonInfo = formatMatchReasons(suggestion.reasons);
+                                            return (
+                                              <>
+                                          <div className="flex items-start justify-between gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => openCandidatePrefill(suggestion.candidate)}
+                                              className="text-left text-xs font-medium text-blue-700 hover:underline"
+                                            >
+                                              {fullName}
+                                            </button>
+                                            <span className="text-[11px] rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
+                                              {suggestion.score} คะแนน
+                                            </span>
+                                          </div>
+                                          <div className="text-[11px] text-muted-foreground mt-1">
+                                            {suggestion.candidate.location_label || 'ไม่ระบุพื้นที่'}
+                                            {suggestion.candidate.age !== null ? ` · อายุ ${suggestion.candidate.age}` : ''}
+                                          </div>
+                                          {reasonInfo.primary ? (
+                                            <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                                              <p className="text-[10px] font-semibold text-slate-700">เหตุผลที่แนะนำ</p>
+                                              <p className="mt-0.5 text-[11px] text-slate-700">{reasonInfo.primary}</p>
+                                              {reasonInfo.supporting.length > 0 ? (
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                  {reasonInfo.supporting.map((reason) => (
+                                                    <span
+                                                      key={reason}
+                                                      className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600"
+                                                    >
+                                                      {reason}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              ) : null}
+                                            </div>
+                                          ) : null}
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-muted-foreground">ยังไม่เจอคนที่ตรงกับสาขานี้</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {branchParseData.parsed.parser_status === 'fallback' ? (
+                          <div className="text-xs text-amber-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            เคสนี้ระบบแยกแบบ fallback/เดาได้ ควรตรวจชื่อสาขาและจำนวนคนก่อนใช้งานจริง
+                          </div>
+                        ) : null}
+                        {branchParseData.parsed.unparsed_segments.length > 0 ? (
+                          <div className="text-xs text-amber-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            ยังแยกไม่สำเร็จบางส่วน: {branchParseData.parsed.unparsed_segments.join(' | ')}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        ยังไม่พบรูปแบบหลายสาขาจากข้อความของใบงานนี้
+                      </p>
+                    )}
                   </div>
                   {detailDistance !== null ? (
                     <p className="text-xs text-muted-foreground">
@@ -495,6 +1077,119 @@ const PreCheckPage: React.FC = () => {
                       </>
                     )}
                   </div>
+                  <div className="border-t border-border pt-3">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">คนที่ระบบแนะนำ</p>
+                        <p className="text-xs text-muted-foreground">
+                          ใช้กติกาเบื้องต้นจากตำแหน่งงาน เพศ อายุ และจังหวัด/อำเภอ
+                        </p>
+                      </div>
+                      {matchingData ? (
+                        <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2 py-1 border border-blue-100">
+                          เจอ {matchingData.suggestions.length} / {matchingData.totalCandidates}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {matchingLoading ? (
+                      <div className="text-xs text-muted-foreground">กำลังหารายชื่อที่แนะนำ…</div>
+                    ) : matchingError ? (
+                      <div className="text-xs text-destructive rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+                        {matchingError}
+                      </div>
+                    ) : matchingData ? (
+                      <div className="space-y-2">
+                        <div className="text-xs text-muted-foreground rounded-lg bg-white/40 border border-white/70 px-3 py-2">
+                          เงื่อนไข: {matchingData.criteria.roleHints.join(', ') || '—'}
+                          {matchingData.criteria.genderRequirement ? ` • เพศ ${matchingData.criteria.genderRequirement}` : ''}
+                          {matchingData.criteria.ageMin !== null || matchingData.criteria.ageMax !== null
+                            ? ` • อายุ ${matchingData.criteria.ageMin ?? '—'}-${matchingData.criteria.ageMax ?? '—'}`
+                            : ''}
+                        </div>
+                        {matchingData.suggestions.length === 0 ? (
+                          <div className="text-xs text-muted-foreground rounded-lg border border-dashed border-white/70 px-3 py-3">
+                            ยังไม่เจอคนที่เข้าเงื่อนไขเบื้องต้นสำหรับใบงานนี้
+                          </div>
+                        ) : (
+                          matchingData.suggestions.map((item, idx) => {
+                            const fullName = [item.candidate.first_name, item.candidate.last_name].filter(Boolean).join(' ') || 'ไม่ระบุชื่อ';
+                            const levelClass =
+                              item.level === 'high'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : item.level === 'medium'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                  : 'bg-slate-50 text-slate-700 border-slate-100';
+                            return (
+                              <div key={`${fullName}-${idx}`} className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
+                                {(() => {
+                                  const reasonInfo = formatMatchReasons(item.reasons);
+                                  return (
+                                    <>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <button
+                                      type="button"
+                                      onClick={() => openCandidatePrefill(item.candidate)}
+                                      className="text-left text-sm font-medium text-blue-600 hover:underline underline-offset-2"
+                                    >
+                                      {fullName}
+                                    </button>
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.candidate.job_name_th || 'ไม่ระบุตำแหน่ง'} • {item.candidate.location_label || 'ไม่ระบุพื้นที่'}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={cn('inline-flex rounded-full border px-2 py-1 text-xs font-medium', levelClass)}>
+                                      {item.score} คะแนน
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                      {item.candidate.process_status_name}
+                                    </p>
+                                  </div>
+                                </div>
+                                {reasonInfo.primary ? (
+                                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2">
+                                    <p className="text-[11px] font-semibold text-blue-700">เหตุผลที่แนะนำ</p>
+                                    <p className="mt-0.5 text-xs text-blue-800">{reasonInfo.primary}</p>
+                                    {reasonInfo.supporting.length > 0 ? (
+                                      <div className="mt-1 flex flex-wrap gap-1.5">
+                                        {reasonInfo.supporting.map((reason) => (
+                                          <span
+                                            key={reason}
+                                            className="rounded-full border border-blue-100 bg-white px-2 py-0.5 text-[11px] text-blue-700"
+                                          >
+                                            {reason}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                                  {item.candidate.phone_number ? <span>โทร: {item.candidate.phone_number}</span> : null}
+                                  {item.candidate.age !== null ? <span>อายุ: {item.candidate.age}</span> : null}
+                                  {item.candidate.sex ? <span>เพศ: {item.candidate.sex}</span> : null}
+                                </div>
+                                <div className="pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openCandidatePrefill(item.candidate)}
+                                    className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                                  >
+                                    ดู/ลงข้อมูลต่อ
+                                  </button>
+                                </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="flex gap-2 pt-2">
                     {client?.contact_phone && (
                       <a
@@ -504,16 +1199,16 @@ const PreCheckPage: React.FC = () => {
                         Call Client
                       </a>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setJobDetail(null);
-                        navigate(`/jobs/${jobDetail.id}`);
-                      }}
-                      className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium"
-                    >
-                      View Job
-                    </button>
+                    {jobDetail ? (
+                      <Link
+                        to={unitRequestPath(jobDetail)}
+                        state={{ returnTo: preCheckReturnPath(jobDetail.id) }}
+                        onClick={() => setJobDetail(null)}
+                        className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium inline-block"
+                      >
+                        ดูใบงาน
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               );

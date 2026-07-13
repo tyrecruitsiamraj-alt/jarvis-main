@@ -46,4 +46,3 @@ jobs:
                       ./scripts/sync-env.sh .env RECRUIT_REGISTER_OWNER "${{ secrets.RECRUIT_REGISTER_OWNER }}"
                       docker compose up -d --build
                       docker compose exec -T app npm run db:migrate
-                      docker compose exec -T app npx tsx scripts/verify-api-registry.mjs

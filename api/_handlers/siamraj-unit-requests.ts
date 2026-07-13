@@ -11,7 +11,6 @@ import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
   listSiamrajThroughput,
-  listSiamrajClosedRequests,
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
@@ -32,7 +31,7 @@ function getQuery(req: AuthedReq, key: string): string {
 async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
-    String(it.externalId || it.request_no || it.id || '').trim();
+    String(it.request_no || it.externalId || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -53,7 +52,7 @@ async function attachAssignments(items: unknown[]): Promise<void> {
 async function attachNotes(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
-    String(it.externalId || it.request_no || it.id || '').trim();
+    String(it.request_no || it.externalId || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -64,6 +63,7 @@ async function attachNotes(items: unknown[]): Promise<void> {
       if (!n) continue;
       it.list_note = n.note;
       it.send_replacement = n.send_replacement ?? null;
+      it.parser_override_text = n.parser_override_text ?? null;
     }
   } catch {
     /* หมายเหตุเป็นข้อมูลเสริม */
@@ -121,18 +121,6 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
       const items = await listSiamrajThroughput({ from, to });
-      return res.status(200).json(items);
-    }
-
-    if (getQuery(req, 'closed') === '1') {
-      const from = getQuery(req, 'from');
-      const to = getQuery(req, 'to');
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-        return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
-      }
-      const items = await listSiamrajClosedRequests({ from, to });
-      await attachAssignments(items);
-      await attachNotes(items);
       return res.status(200).json(items);
     }
 
