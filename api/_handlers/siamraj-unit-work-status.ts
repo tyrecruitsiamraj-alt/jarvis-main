@@ -75,7 +75,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json(item);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/กรุณากรอก|must be|invalid status/i.test(msg)) {
+      if (/กรุณากรอก|must be|invalid status|บันทึกสถานะทำงานไม่สำเร็จ|บันทึกไม่สำเร็จ/i.test(msg)) {
         return sendError(res, 400, 'Bad request', msg);
       }
       return handleApiError(res, e, 'siamraj-unit-work-status POST', { userId: req.user.sub });
