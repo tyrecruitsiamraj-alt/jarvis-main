@@ -30,9 +30,9 @@ function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
 
 describe('unitRequestWorkStatus', () => {
   it('resolves labels and optional date titles', () => {
-    expect(UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform).toBe('รอแจ้งเข้า');
-    expect(UNIT_REQUEST_WORK_STATUS_DATE_LABELS.waiting_interview).toContain('สัมภาษณ์');
-    expect(isUnitRequestWorkStatus('waiting_start')).toBe(true);
+    expect(UNIT_REQUEST_WORK_STATUS_LABELS.evaluating).toBe('เริ่มประเมิน');
+    expect(UNIT_REQUEST_WORK_STATUS_DATE_LABELS.evaluating).toContain('ประเมิน');
+    expect(isUnitRequestWorkStatus('evaluating')).toBe(true);
     expect(resolveUnitRequestWorkStatus(null)).toBe('in_progress');
     expect(formatWorkPersonName('สมชาย', 'ใจดี')).toBe('สมชาย ใจดี');
   });

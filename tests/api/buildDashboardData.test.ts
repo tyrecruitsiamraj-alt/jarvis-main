@@ -142,6 +142,7 @@ describe('buildDashboardData', () => {
     expect(data.workStatusKpis.map((k) => k.id)).toEqual([
       'work_status_total',
       'work_status_in_progress',
+      'work_status_evaluating',
       'work_status_waiting_inform',
       'work_status_waiting_interview',
       'work_status_waiting_start',

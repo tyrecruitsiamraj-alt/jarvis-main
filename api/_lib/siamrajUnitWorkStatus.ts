@@ -5,6 +5,7 @@ const table = tableInAppSchema('siamraj_unit_work_status');
 
 export const UNIT_REQUEST_WORK_STATUSES = [
   'in_progress',
+  'evaluating',
   'waiting_inform',
   'waiting_interview',
   'waiting_start',

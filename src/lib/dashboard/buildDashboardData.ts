@@ -234,6 +234,7 @@ function nextActionFor(job: JobRequest, status: DashboardTaskStatus): string {
   if (!job.screener_name?.trim()) return 'มอบหมายคัดสรร';
   if (job.send_replacement == null && isResignationRequest(job)) return 'ระบุส่งคนแทน';
   const work = resolveUnitRequestWorkStatus(job.work_status);
+  if (work === 'evaluating') return 'เริ่ม/ตามประเมิน';
   if (work === 'waiting_inform') return 'ติดตามแจ้งเข้า';
   if (work === 'waiting_interview') return 'นัด/ตามสัมภาษณ์';
   if (work === 'waiting_start') return 'ตามผลสัมภาษณ์/เริ่มงาน';
@@ -507,6 +508,7 @@ function resolveOpenJobsForStockKpi(
 function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
   const counts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
+    evaluating: 0,
     waiting_inform: 0,
     waiting_interview: 0,
     waiting_start: 0,
@@ -531,10 +533,11 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
       id: 'work_status_total',
       label: 'ทั้งหมด',
       value: total,
-      description: `${scopeHint} · ผลรวม 4 สถานะ = ${total.toLocaleString('th-TH')} ใบ`,
+      description: `${scopeHint} · ผลรวมสถานะทำงาน = ${total.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },
     leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
+    leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
     leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
     leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
     leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),

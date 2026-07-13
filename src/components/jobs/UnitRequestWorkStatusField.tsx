@@ -43,11 +43,13 @@ export function UnitRequestWorkStatusBadge({
   const tone =
     resolved === 'in_progress'
       ? 'bg-amber-500/12 text-amber-800 border-amber-300/40'
-      : resolved === 'waiting_inform'
-        ? 'bg-sky-500/12 text-sky-800 border-sky-300/40'
-        : resolved === 'waiting_interview'
-          ? 'bg-violet-500/12 text-violet-800 border-violet-300/40'
-          : 'bg-emerald-500/12 text-emerald-800 border-emerald-300/40';
+      : resolved === 'evaluating'
+        ? 'bg-orange-500/12 text-orange-800 border-orange-300/40'
+        : resolved === 'waiting_inform'
+          ? 'bg-sky-500/12 text-sky-800 border-sky-300/40'
+          : resolved === 'waiting_interview'
+            ? 'bg-violet-500/12 text-violet-800 border-violet-300/40'
+            : 'bg-emerald-500/12 text-emerald-800 border-emerald-300/40';
 
   return (
     <span

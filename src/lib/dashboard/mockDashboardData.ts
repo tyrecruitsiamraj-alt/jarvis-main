@@ -88,8 +88,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'remaining', label: 'คงเหลือ', value: 25, secondaryCount: 11, secondaryLabel: 'ใบขอ', description: '25 ตำแหน่ง · 11 ใบขอ', trendPercent: null },
   ],
   workStatusKpis: [
-    { id: 'work_status_total', label: 'ทั้งหมด', value: 20, description: 'ผลรวม 4 สถานะ = 20 ใบ', trendPercent: null },
-    { id: 'work_status_in_progress', label: 'กำลังดำเนินการสรรหา', value: 11, description: '11 จาก 20 ใบ', trendPercent: null },
+    { id: 'work_status_total', label: 'ทั้งหมด', value: 20, description: 'ผลรวมสถานะทำงาน = 20 ใบ', trendPercent: null },
+    { id: 'work_status_in_progress', label: 'กำลังดำเนินการสรรหา', value: 9, description: '9 จาก 20 ใบ', trendPercent: null },
+    { id: 'work_status_evaluating', label: 'เริ่มประเมิน', value: 2, description: '2 จาก 20 ใบ', trendPercent: null },
     { id: 'work_status_waiting_inform', label: 'รอแจ้งเข้า', value: 3, description: '3 จาก 20 ใบ', trendPercent: null },
     { id: 'work_status_waiting_interview', label: 'รอสัมภาษณ์', value: 4, description: '4 จาก 20 ใบ', trendPercent: null },
     { id: 'work_status_waiting_start', label: 'รอเริ่มงาน/รอผลสัมภาษณ์', value: 2, description: '2 จาก 20 ใบ', trendPercent: null },
