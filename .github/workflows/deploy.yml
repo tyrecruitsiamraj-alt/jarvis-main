@@ -38,5 +38,12 @@ jobs:
                       ./scripts/sync-env.sh .env VITE_DEV_ROLE_ENTRY "false"
                       ./scripts/sync-env.sh .env JARVIS_DEV_ROLE_LOGIN "false"
                       ./scripts/sync-env.sh .env CORS_ALLOWED_ORIGINS "https://jarvis.siamrajathanee.dev,https://jarvis-main-tyteam.vercel.app,http://localhost:5173"
+                      ./scripts/sync-env.sh .env IRECRUIT_DB_HOST "${{ secrets.IRECRUIT_DB_HOST }}"
+                      ./scripts/sync-env.sh .env IRECRUIT_DB_PORT "${{ secrets.IRECRUIT_DB_PORT }}"
+                      ./scripts/sync-env.sh .env IRECRUIT_DB_USER "${{ secrets.IRECRUIT_DB_USER }}"
+                      ./scripts/sync-env.sh .env IRECRUIT_DB_PASSWORD "${{ secrets.IRECRUIT_DB_PASSWORD }}"
+                      ./scripts/sync-env.sh .env IRECRUIT_DB_NAME "${{ secrets.IRECRUIT_DB_NAME }}"
+                      ./scripts/sync-env.sh .env RECRUIT_REGISTER_OWNER "${{ secrets.RECRUIT_REGISTER_OWNER }}"
                       docker compose up -d --build
                       docker compose exec -T app npm run db:migrate
+                      docker compose exec -T app npx tsx -e "import { apiRoutes } from './api/_handlers/registry.ts'; if (!apiRoutes['/api/matching/suggestions']) throw new Error('matching route missing'); console.log('api registry ok');"
