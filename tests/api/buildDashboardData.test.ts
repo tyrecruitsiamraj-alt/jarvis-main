@@ -147,8 +147,11 @@ describe('buildDashboardData', () => {
       'work_status_waiting_interview',
       'work_status_waiting_start',
     ]);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(2);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(2);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(62);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(62);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(
+      data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value,
+    );
     const statusSum = data.workStatusKpis
       .filter((k) => k.id !== 'work_status_total')
       .reduce((s, k) => s + k.value, 0);

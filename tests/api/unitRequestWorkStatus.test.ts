@@ -58,17 +58,40 @@ describe('unitRequestWorkStatus', () => {
     expect(item.nextAction).toBe('นัด/ตามสัมภาษณ์');
   });
 
-  it('work status KPIs count requests and sum to total', () => {
+  it('work status KPIs count remaining positions and sum to total', () => {
     const jobs = [
-      job({ id: 'a', unit_name: 'A', work_status: 'waiting_inform' }),
-      job({ id: 'b', unit_name: 'B', work_status: 'waiting_interview' }),
-      job({ id: 'c', unit_name: 'C' }),
+      job({
+        id: 'a',
+        unit_name: 'A',
+        work_status: 'waiting_inform',
+        request_positions: 5,
+        filled_positions: 2,
+        cancelled_positions: 0,
+        position_units: 3,
+      }),
+      job({
+        id: 'b',
+        unit_name: 'B',
+        work_status: 'waiting_interview',
+        request_positions: 4,
+        filled_positions: 0,
+        cancelled_positions: 0,
+        position_units: 4,
+      }),
+      job({
+        id: 'c',
+        unit_name: 'C',
+        request_positions: 2,
+        filled_positions: 0,
+        cancelled_positions: 0,
+        position_units: 2,
+      }),
     ];
     const data = buildDashboardData(jobs, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, [], jobs);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(3);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_inform')?.value).toBe(1);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_interview')?.value).toBe(1);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(1);
-    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBeGreaterThan(0);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(9);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_inform')?.value).toBe(3);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_interview')?.value).toBe(4);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(2);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(9);
   });
 });

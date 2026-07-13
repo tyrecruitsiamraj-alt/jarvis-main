@@ -504,7 +504,7 @@ function resolveOpenJobsForStockKpi(
   return jobs;
 }
 
-/** KPI สถานะทำงาน (นับใบ): ทั้งหมด = ผลรวม 4 สถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก */
+/** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก */
 function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
   const counts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
@@ -513,10 +513,21 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     waiting_interview: 0,
     waiting_start: 0,
   };
+  const requestCounts: Record<UnitRequestWorkStatus, number> = {
+    in_progress: 0,
+    evaluating: 0,
+    waiting_inform: 0,
+    waiting_interview: 0,
+    waiting_start: 0,
+  };
   for (const j of jobs) {
-    counts[resolveUnitRequestWorkStatus(j.work_status)] += 1;
+    const status = resolveUnitRequestWorkStatus(j.work_status);
+    const units = positionBreakdownFromJob(j).remainingPositions;
+    counts[status] += units;
+    requestCounts[status] += 1;
   }
-  const total = jobs.length;
+  const total = Object.values(counts).reduce((s, n) => s + n, 0);
+  const totalRequests = jobs.length;
   const scopeHint = periodLabel
     ? `ใบเปิดในงวดที่เลือก`
     : `ใบเปิดทั้งหมด (ตรงหน้ารายการหน่วยงาน)`;
@@ -524,7 +535,9 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     id,
     label,
     value: counts[status],
-    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} จาก ${total.toLocaleString('th-TH')} ใบ`,
+    secondaryCount: requestCounts[status],
+    secondaryLabel: 'ใบขอ',
+    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} อัตรา · ${requestCounts[status].toLocaleString('th-TH')} ใบ`,
     trendPercent: null,
   });
 
@@ -533,7 +546,9 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
       id: 'work_status_total',
       label: 'ทั้งหมด',
       value: total,
-      description: `${scopeHint} · ผลรวมสถานะทำงาน = ${total.toLocaleString('th-TH')} ใบ`,
+      secondaryCount: totalRequests,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },
     leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),

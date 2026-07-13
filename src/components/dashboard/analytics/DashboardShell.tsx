@@ -168,7 +168,7 @@ const DashboardShell: React.FC<Props> = ({
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-2">สถานะทำงาน (นับใบ)</p>
+                  <p className="text-xs font-medium text-slate-500 mb-2">สถานะทำงาน (นับอัตรา)</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                     {(data.workStatusKpis ?? []).map((kpi) => (
                       <DashboardKpiCard
