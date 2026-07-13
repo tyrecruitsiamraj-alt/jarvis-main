@@ -91,6 +91,31 @@ export async function saveUnitRequestMeta(
   if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกข้อมูลใบขอไม่สำเร็จ'));
 }
 
+export type UnitWorkStatusPayload = {
+  status: string;
+  person_first_name?: string | null;
+  person_last_name?: string | null;
+  status_date?: string | null;
+};
+
+export type UnitWorkStatusRecord = UnitWorkStatusPayload & {
+  request_no: string;
+  updated_at: string | null;
+};
+
+export async function saveUnitRequestWorkStatus(
+  requestNo: string,
+  payload: UnitWorkStatusPayload,
+): Promise<UnitWorkStatusRecord> {
+  const r = await apiFetch('/api/siamraj/unit-work-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_no: requestNo, ...payload }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกสถานะทำงานไม่สำเร็จ'));
+  return readJsonSafe<UnitWorkStatusRecord>(r);
+}
+
 export function unitRequestNoteKey(job: JobRequest): string {
   return (job.externalId || job.request_no || job.id).trim();
 }

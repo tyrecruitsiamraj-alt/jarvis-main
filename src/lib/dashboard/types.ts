@@ -98,6 +98,11 @@ export type DashboardWorkItem = {
   requestActionName?: string;
   siteCode?: string;
   fullClosureSlaStatus?: string;
+  /** สถานะทำงาน Jarvis (pipeline) */
+  workStatus?: string;
+  workStatusLabel?: string;
+  workPersonName?: string;
+  workStatusDate?: string;
 };
 
 export type DashboardResponsibleRole = 'recruiter' | 'screener';
@@ -293,6 +298,8 @@ export type DashboardLifecycleTrendPoint = {
 
 export type DashboardData = {
   kpis: DashboardKpi[];
+  /** นับใบตามสถานะทำงาน (คู่กับ KPI ตำแหน่ง — คงเหลือแยกต่างหาก) */
+  workStatusKpis: DashboardKpi[];
   activityTrend: DashboardActivityTrendPoint[];
   unitOverview: DashboardUnitOverview[];
   ageDaysBreakdown: DashboardAgeDaysBreakdown[];

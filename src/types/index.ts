@@ -1,3 +1,5 @@
+import type { UnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
+
 // ============ AUTH & USERS ============
 export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
@@ -178,6 +180,11 @@ export interface JobRequest {
   send_replacement?: boolean | null;
   /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
   parser_override_text?: string | null;
+  work_status?: UnitRequestWorkStatus | null;
+  work_person_first_name?: string | null;
+  work_person_last_name?: string | null;
+  /** วันที่ตามสถานะ (YMD) — แจ้งเข้า / นัดสัมภาษณ์ / เริ่มงาน */
+  work_status_date?: string | null;
 }
 
 export interface JobAssignment {

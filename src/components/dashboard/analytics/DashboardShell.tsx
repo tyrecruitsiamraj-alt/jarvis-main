@@ -153,14 +153,31 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {data.kpis.map((kpi) => (
-                  <DashboardKpiCard
-                    key={kpi.id}
-                    kpi={kpi}
-                    onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
-                  />
-                ))}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-2">สต็อกตำแหน่ง</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {data.kpis.map((kpi) => (
+                      <DashboardKpiCard
+                        key={kpi.id}
+                        kpi={kpi}
+                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-2">สถานะทำงาน (นับใบ)</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                    {(data.workStatusKpis ?? []).map((kpi) => (
+                      <DashboardKpiCard
+                        key={kpi.id}
+                        kpi={kpi}
+                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <DashboardChartSection data={data} />

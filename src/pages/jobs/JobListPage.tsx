@@ -13,6 +13,7 @@ import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
+import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
@@ -653,7 +654,7 @@ const JobListPage: React.FC = () => {
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                     <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
                     <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
                   </tr>
                 </thead>
@@ -749,6 +750,12 @@ const JobListPage: React.FC = () => {
                     <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
+                      <UnitRequestWorkStatusBadge
+                        status={j.work_status}
+                        firstName={j.work_person_first_name}
+                        lastName={j.work_person_last_name}
+                        compact
+                      />
                       <JobUrgencyBadge job={j} />
                     </div>
                   </div>
@@ -781,7 +788,7 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
                   <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
                 </tr>
               </thead>
@@ -842,7 +849,15 @@ const JobListPage: React.FC = () => {
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <JobUrgencyBadge job={j} compact />
+                      <div className="inline-flex flex-col items-center gap-1">
+                        <UnitRequestWorkStatusBadge
+                          status={j.work_status}
+                          firstName={j.work_person_first_name}
+                          lastName={j.work_person_last_name}
+                          compact
+                        />
+                        <JobUrgencyBadge job={j} compact />
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
                   </tr>

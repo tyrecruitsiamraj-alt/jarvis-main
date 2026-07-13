@@ -38,6 +38,7 @@ import {
 import { controlRecordToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
 import { unitOrganizationKey } from '@/lib/unitGroupName';
 import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
+import { resolveUnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import {
@@ -339,6 +340,26 @@ const SupervisorDashboard: React.FC = () => {
           stockJobs.filter((j) => (j.cancelled_positions ?? 0) > 0),
         );
         return;
+      }
+
+      if (kpiId.startsWith('work_status_')) {
+        const statusMap: Record<string, string | null> = {
+          work_status_total: null,
+          work_status_in_progress: 'in_progress',
+          work_status_waiting_inform: 'waiting_inform',
+          work_status_waiting_interview: 'waiting_interview',
+          work_status_waiting_start: 'waiting_start',
+        };
+        const target = statusMap[kpiId];
+        if (kpiId in statusMap) {
+          openJobList(
+            label,
+            target == null
+              ? stockJobs
+              : stockJobs.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target),
+          );
+          return;
+        }
       }
 
       if (range && ['total_workload', 'new_requests', 'fulfilled', 'filled', 'fully_closed', 'partial', 'sla_risk', 'backlog_change'].includes(kpiId)) {

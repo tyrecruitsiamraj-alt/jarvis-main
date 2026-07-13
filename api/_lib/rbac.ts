@@ -41,6 +41,7 @@ export type ApiResource =
   | 'siamraj-unit-requests'
   | 'siamraj-unit-assignments'
   | 'siamraj-unit-notes'
+  | 'siamraj-unit-work-status'
   | 'siamraj-opl-import'
   | 'recruit-registrations'
   | 'matching-suggestions'
@@ -123,6 +124,9 @@ export function minimumRoleFor(
       return 'supervisor';
 
     case 'siamraj-unit-notes':
+      return 'staff';
+
+    case 'siamraj-unit-work-status':
       return 'staff';
 
     case 'siamraj-opl-import':

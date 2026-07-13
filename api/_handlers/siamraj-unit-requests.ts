@@ -16,6 +16,7 @@ import {
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
+import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -70,6 +71,28 @@ async function attachNotes(items: unknown[]): Promise<void> {
   }
 }
 
+async function attachWorkStatus(items: unknown[]): Promise<void> {
+  const list = items as Array<Record<string, unknown>>;
+  const keyOf = (it: Record<string, unknown>) =>
+    String(it.request_no || it.externalId || it.id || '').trim();
+  try {
+    const keys = list.map(keyOf).filter(Boolean);
+    if (keys.length === 0) return;
+    const map = await getUnitWorkStatusMap(keys);
+    if (map.size === 0) return;
+    for (const it of list) {
+      const w = map.get(keyOf(it));
+      if (!w) continue;
+      it.work_status = w.status;
+      it.work_person_first_name = w.person_first_name;
+      it.work_person_last_name = w.person_last_name;
+      it.work_status_date = w.status_date;
+    }
+  } catch {
+    /* สถานะทำงานเป็นข้อมูลเสริม */
+  }
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
@@ -111,6 +134,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!item) return sendError(res, 404, 'Not found', 'ไม่พบใบขอ');
       await attachAssignments([item]);
       await attachNotes([item]);
+      await attachWorkStatus([item]);
       return res.status(200).json(item);
     }
 
@@ -129,6 +153,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const items = await listSiamrajUnitRequests({ limit, mode });
     await attachAssignments(items);
     await attachNotes(items);
+    await attachWorkStatus(items);
     return res.status(200).json(items);
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');

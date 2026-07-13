@@ -72,6 +72,12 @@ import {
 } from './requestControlBridge';
 import { classifyLifecycleKind, lifecycleKindLabel } from './lifecycle';
 import {
+  formatWorkPersonName,
+  resolveUnitRequestWorkStatus,
+  UNIT_REQUEST_WORK_STATUS_LABELS,
+  type UnitRequestWorkStatus,
+} from '@/lib/unitRequestWorkStatus';
+import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
   mergeRequestControlJobs,
@@ -227,6 +233,10 @@ function nextActionFor(job: JobRequest, status: DashboardTaskStatus): string {
   if (!job.recruiter_name?.trim()) return 'มอบหมายสรรหา';
   if (!job.screener_name?.trim()) return 'มอบหมายคัดสรร';
   if (job.send_replacement == null && isResignationRequest(job)) return 'ระบุส่งคนแทน';
+  const work = resolveUnitRequestWorkStatus(job.work_status);
+  if (work === 'waiting_inform') return 'ติดตามแจ้งเข้า';
+  if (work === 'waiting_interview') return 'นัด/ตามสัมภาษณ์';
+  if (work === 'waiting_start') return 'ตามผลสัมภาษณ์/เริ่มงาน';
   if (status === 'overdue') return 'ติดตามด่วน';
   if (status === 'at_risk') return 'ติดตามความคืบหน้า';
   return 'ดูรายละเอียด';
@@ -261,6 +271,7 @@ function requestKindLabel(kind: string): string {
 export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWorkItem {
   const rec = jobToRequestControlRecord(job, today);
   const status = controlStatusToDashboardStatus(rec.controlStatus, rec.slaStatus, job, today);
+  const workStatus = resolveUnitRequestWorkStatus(job.work_status);
   return {
     id: job.id,
     requestNo: rec.requestNo,
@@ -289,6 +300,10 @@ export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWor
     lifecycleKind: lifecycleKindLabel(rec.lifecycleKind, rec.requestActionName),
     requestKind: requestKindLabel(rec.requestKind),
     controlStatus: REQUEST_CONTROL_STATUS_LABELS[rec.controlStatus],
+    workStatus,
+    workStatusLabel: UNIT_REQUEST_WORK_STATUS_LABELS[workStatus],
+    workPersonName: formatWorkPersonName(job.work_person_first_name, job.work_person_last_name),
+    workStatusDate: job.work_status_date?.slice(0, 10) || '',
   };
 }
 
@@ -486,6 +501,44 @@ function resolveOpenJobsForStockKpi(
     });
   }
   return jobs;
+}
+
+/** KPI สถานะทำงาน (นับใบ): ทั้งหมด = ผลรวม 4 สถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก */
+function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
+  const counts: Record<UnitRequestWorkStatus, number> = {
+    in_progress: 0,
+    waiting_inform: 0,
+    waiting_interview: 0,
+    waiting_start: 0,
+  };
+  for (const j of jobs) {
+    counts[resolveUnitRequestWorkStatus(j.work_status)] += 1;
+  }
+  const total = jobs.length;
+  const scopeHint = periodLabel
+    ? `ใบเปิดในงวดที่เลือก`
+    : `ใบเปิดทั้งหมด (ตรงหน้ารายการหน่วยงาน)`;
+  const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
+    id,
+    label,
+    value: counts[status],
+    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} จาก ${total.toLocaleString('th-TH')} ใบ`,
+    trendPercent: null,
+  });
+
+  return [
+    {
+      id: 'work_status_total',
+      label: 'ทั้งหมด',
+      value: total,
+      description: `${scopeHint} · ผลรวม 4 สถานะ = ${total.toLocaleString('th-TH')} ใบ`,
+      trendPercent: null,
+    },
+    leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
+    leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
+    leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
+    leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
+  ];
 }
 
 /** KPI ชุดสั้น: ใบขอทั้งหมด / ปิดใบขอ / ยกเลิก / คงเหลือ (ตำแหน่ง) */
@@ -1009,9 +1062,11 @@ export function buildDashboardData(
 
   const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
   const kpis = buildStockKpis(stockJobs, period?.label ?? null);
+  const workStatusKpis = buildWorkStatusKpis(stockJobs, period?.label ?? null);
 
   return {
     kpis,
+    workStatusKpis,
     activityTrend,
     unitOverview: buildUnitOverview(openJobSet, today, unitScopeNames),
     ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
