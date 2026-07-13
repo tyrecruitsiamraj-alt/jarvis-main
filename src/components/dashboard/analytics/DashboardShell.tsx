@@ -7,6 +7,7 @@ import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
+import DashboardAgeOverview from './DashboardAgeOverview';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
@@ -179,6 +180,13 @@ const DashboardShell: React.FC<Props> = ({
                   </div>
                 </div>
               </div>
+
+              <DashboardAgeOverview
+                items={data.ageDaysBreakdown}
+                requestTotal={data.ageDaysRequestTotal}
+                positionTotal={data.ageDaysPositionTotal}
+                onBucketClick={onAgeBucketClick}
+              />
 
               <DashboardChartSection data={data} />
               <DashboardExpandablePanel

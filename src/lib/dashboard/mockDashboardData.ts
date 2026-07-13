@@ -127,11 +127,11 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { name: 'ศูนย์การค้าเซ็นทรัล', total: 14, open: 6, overdue: 1, sharePercent: 26.9 },
     { name: 'ไทยพาณิชย์ สำนักงานใหญ่', total: 11, open: 4, overdue: 0, sharePercent: 21.2 },
   ],
-  ageDaysBreakdown: [
+    ageDaysBreakdown: [
     { bucket: 'advance', label: 'ล่วงหน้า', count: 22 },
     { bucket: '1-7', label: '1–7 วัน', count: 18 },
-    { bucket: '8-14', label: '8–14 วัน', count: 11 },
-    { bucket: '15-30', label: '15–30 วัน', count: 9 },
+    { bucket: '8-15', label: '8–15 วัน', count: 11 },
+    { bucket: '16-30', label: '16–30 วัน', count: 9 },
     { bucket: '30+', label: '30 วันขึ้นไป', count: 4 },
   ],
   ageDaysPositionTotal: 52,

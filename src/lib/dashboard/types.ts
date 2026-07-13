@@ -144,7 +144,7 @@ export type DashboardResignationMonthly = {
 };
 
 export type DashboardAgeDaysBreakdown = {
-  bucket: '1-7' | '8-14' | '15-30' | '30+' | 'advance';
+  bucket: '1-7' | '8-15' | '16-30' | '30+' | 'advance';
   label: string;
   count: number;
 };

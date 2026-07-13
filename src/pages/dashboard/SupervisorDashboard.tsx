@@ -413,9 +413,11 @@ const SupervisorDashboard: React.FC = () => {
 
   const handleAgeBucketClick = useCallback(
     (bucket: Parameters<typeof filterJobsForAgeBucket>[1], label: string) => {
-      openJobList(`วันผ่านมา: ${label}`, filterJobsForAgeBucket(scopedJobs, bucket));
+      const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
+      const stockJobs = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range);
+      openJobList(`วันผ่านมา: ${label}`, filterJobsForAgeBucket(stockJobs, bucket));
     },
-    [openJobList, scopedJobs],
+    [openJobList, jobsWithoutAgeFilter, period, dateRange],
   );
 
   const handleUnitClick = useCallback(

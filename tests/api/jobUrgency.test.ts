@@ -161,16 +161,16 @@ describe('countAgeDaysBreakdown', () => {
       job({ submittedAt: '2026-07-15', required_date: '2026-07-16' }), // urgent → 1-7
       job({ submittedAt: '2026-07-14', required_date: '2026-07-15' }), // urgent → 1-7
       job({ submittedAt: '2026-07-10', required_date: '2026-07-12' }), // urgent → 1-7
-      job({ submittedAt: '2026-07-01', required_date: '2026-07-02' }), // retro → 8-14
-      job({ submittedAt: '2026-06-20', required_date: '2026-06-21' }), // retro → 15-30
+      job({ submittedAt: '2026-07-01', required_date: '2026-07-02' }), // retro → 8-15
+      job({ submittedAt: '2026-06-20', required_date: '2026-06-21' }), // retro → 16-30
       job({ submittedAt: '2026-05-01', required_date: '2026-05-02' }), // retro → 30+
       job({ submittedAt: '2026-07-01', required_date: '2026-08-01' }), // advance → advance
     ];
     const counts = countAgeDaysBreakdown(jobs, today);
     expect(counts.advance).toBe(1);
     expect(counts['1-7']).toBe(3);
-    expect(counts['8-14']).toBe(1);
-    expect(counts['15-30']).toBe(1);
+    expect(counts['8-15']).toBe(1);
+    expect(counts['16-30']).toBe(1);
     expect(counts['30+']).toBe(1);
     const sum = Object.values(counts).reduce((a, b) => a + b, 0);
     expect(sum).toBe(jobs.length);
@@ -191,7 +191,7 @@ describe('countAgeDaysBreakdown', () => {
       today,
     );
     expect(counts.advance).toBe(0);
-    expect(counts['8-14']).toBe(1);
+    expect(counts['8-15']).toBe(1);
   });
 
   it('counts one request per bucket regardless of position_units', () => {
