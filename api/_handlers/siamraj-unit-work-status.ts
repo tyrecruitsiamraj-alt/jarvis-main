@@ -56,6 +56,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 400, 'Bad request', 'status is invalid');
       }
 
+      const before = await getUnitWorkStatus(requestNo);
       const item = await upsertUnitWorkStatus({
         requestNo,
         status: body.status,
@@ -69,6 +70,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'siamraj_unit_work_status.upsert',
         entityType: 'siamraj_unit_work_status',
         entityId: requestNo,
+        before,
         after: item,
       });
 

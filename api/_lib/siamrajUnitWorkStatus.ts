@@ -2,6 +2,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 
 const table = tableInAppSchema('siamraj_unit_work_status');
+const historyTable = tableInAppSchema('siamraj_unit_work_status_history');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const UNIT_REQUEST_WORK_STATUSES = [
@@ -131,6 +132,93 @@ async function ensureWorkStatusTable(): Promise<void> {
   await dbQuery(`
     create index if not exists siamraj_unit_work_status_updated_at_idx on ${table} (updated_at desc)
   `);
+  await ensureWorkStatusHistoryTable();
+}
+
+async function ensureWorkStatusHistoryTable(): Promise<void> {
+  await dbQuery(`
+    create table if not exists ${historyTable} (
+      id bigserial primary key,
+      request_no text not null,
+      status text not null,
+      person_first_name text null,
+      person_last_name text null,
+      status_date date null,
+      previous_status text null,
+      previous_person_first_name text null,
+      previous_person_last_name text null,
+      previous_status_date date null,
+      updated_by_user_id uuid null,
+      created_at timestamptz not null default now()
+    )
+  `);
+  await dbQuery(`
+    create index if not exists siamraj_unit_work_status_history_request_no_idx
+      on ${historyTable} (request_no, created_at desc)
+  `);
+}
+
+async function appendWorkStatusHistory(input: {
+  requestNo: string;
+  next: UnitWorkStatusRow;
+  previous: UnitWorkStatusRow | null;
+  userId: string | null;
+}): Promise<void> {
+  try {
+    await dbQuery(
+      `insert into ${historyTable} (
+         request_no, status, person_first_name, person_last_name, status_date,
+         previous_status, previous_person_first_name, previous_person_last_name, previous_status_date,
+         updated_by_user_id, created_at
+       ) values (
+         $1, $2, $3, $4, $5::date,
+         $6, $7, $8, $9::date,
+         $10, now()
+       )`,
+      [
+        input.requestNo,
+        input.next.status,
+        input.next.person_first_name,
+        input.next.person_last_name,
+        input.next.status_date,
+        input.previous?.status ?? null,
+        input.previous?.person_first_name ?? null,
+        input.previous?.person_last_name ?? null,
+        input.previous?.status_date ?? null,
+        input.userId,
+      ],
+    );
+  } catch (e) {
+    if (isMissingTable(e)) {
+      await ensureWorkStatusHistoryTable();
+      await dbQuery(
+        `insert into ${historyTable} (
+           request_no, status, person_first_name, person_last_name, status_date,
+           previous_status, previous_person_first_name, previous_person_last_name, previous_status_date,
+           updated_by_user_id, created_at
+         ) values (
+           $1, $2, $3, $4, $5::date,
+           $6, $7, $8, $9::date,
+           $10, now()
+         )`,
+        [
+          input.requestNo,
+          input.next.status,
+          input.next.person_first_name,
+          input.next.person_last_name,
+          input.next.status_date,
+          input.previous?.status ?? null,
+          input.previous?.person_first_name ?? null,
+          input.previous?.person_last_name ?? null,
+          input.previous?.status_date ?? null,
+          input.userId,
+        ],
+      );
+      return;
+    }
+    // ประวัติเป็นข้อมูลเสริม — ไม่ให้ทำให้บันทึกหลักล่ม
+    console.error('siamraj_unit_work_status_history.append_failed', e);
+  }
 }
 
 export async function getUnitWorkStatus(requestNo: string): Promise<UnitWorkStatusRow | null> {
@@ -195,6 +283,7 @@ export async function upsertUnitWorkStatus(input: {
 
   const userId = asUserId(input.userId ?? null);
   const params = [requestNo, input.status, first, last, statusDate, userId] as const;
+  const previous = await getUnitWorkStatus(requestNo);
 
   const runInsert = () =>
     dbQuery<Row>(
@@ -212,10 +301,21 @@ export async function upsertUnitWorkStatus(input: {
       [...params],
     );
 
+  const finish = async (row: Row): Promise<UnitWorkStatusRow> => {
+    const next = mapRow(row);
+    await appendWorkStatusHistory({
+      requestNo,
+      next,
+      previous,
+      userId,
+    });
+    return next;
+  };
+
   try {
     const rows = await runInsert();
     if (!rows[0]) throw new Error('upsert failed');
-    return mapRow(rows[0]);
+    return finish(rows[0]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/invalid input syntax for type uuid/i.test(msg)) {
@@ -226,7 +326,7 @@ export async function upsertUnitWorkStatus(input: {
         await ensureWorkStatusTable();
         const rows = await runInsert();
         if (!rows[0]) throw new Error('upsert failed');
-        return mapRow(rows[0]);
+        return finish(rows[0]);
       } catch (e2) {
         const msg2 = e2 instanceof Error ? e2.message : String(e2);
         throw new Error(
