@@ -46,4 +46,4 @@ jobs:
                       ./scripts/sync-env.sh .env RECRUIT_REGISTER_OWNER "${{ secrets.RECRUIT_REGISTER_OWNER }}"
                       docker compose up -d --build
                       docker compose exec -T app npm run db:migrate
-                      docker compose exec -T app npx tsx -e "import { apiRoutes } from './api/_handlers/registry.ts'; if (!apiRoutes['/api/matching/suggestions']) throw new Error('matching route missing'); console.log('api registry ok');"
+                      docker compose exec -T app npx tsx scripts/verify-api-registry.mjs
