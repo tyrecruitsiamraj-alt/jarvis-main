@@ -15,6 +15,7 @@ import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardAgeOverview from './DashboardAgeOverview';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
+import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
 import DashboardWorkQueueTable from './DashboardWorkQueueTable';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
@@ -89,10 +90,12 @@ const DashboardShell: React.FC<Props> = ({
   onRecruiterClick,
 }) => {
   const [showUnitOverview, setShowUnitOverview] = useState(false);
+  const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
   const [showWorkQueue, setShowWorkQueue] = useState(false);
 
   const activeUnitCount = data.unitOverview.filter((u) => u.open > 0).length;
   const unitOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
+  const recruiterRemainingTotal = data.recruiterOverview.reduce((sum, r) => sum + r.remaining, 0);
 
   return (
     <div className="min-h-full bg-slate-50 pb-24">
@@ -217,11 +220,23 @@ const DashboardShell: React.FC<Props> = ({
                 positionTotal={data.ageDaysPositionTotal}
                 onBucketClick={onAgeBucketClick}
               />
-              <DashboardChartSection
-                data={data}
-                recruiterOverview={data.recruiterOverview}
-                onRecruiterClick={onRecruiterClick}
-              />
+              <DashboardChartSection data={data} />
+              <DashboardExpandablePanel
+                title="ภาระงานตามผู้รับผิดชอบ"
+                subtitle={
+                  data.recruiterOverview.length > 0
+                    ? `${data.recruiterOverview.length.toLocaleString('th-TH')} คน · คงเหลือ ${recruiterRemainingTotal.toLocaleString('th-TH')} · กดเพื่อดู`
+                    : 'กดเพื่อดูรายละเอียด'
+                }
+                open={showRecruiterOverview}
+                onOpenChange={setShowRecruiterOverview}
+              >
+                <DashboardDriverOverview
+                  items={data.recruiterOverview}
+                  onRecruiterClick={onRecruiterClick}
+                  hideHeader
+                />
+              </DashboardExpandablePanel>
               <DashboardExpandablePanel
                 title="ภาระงานตามหน่วยงาน"
                 subtitle={
