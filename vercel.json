@@ -3,7 +3,8 @@
   "version": 2,
   "functions": {
     "api/[[...path]].ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "shared/**"
     }
   },
   "routes": [
