@@ -123,6 +123,12 @@ export interface JobRequest {
   contract_type_code?: string;
   contract_type_name?: string;
   position_units?: number;
+  /** จำนวนตำแหน่งที่ขอมา (Siamraj request_qty) */
+  request_positions?: number;
+  /** จำนวนที่หาได้แล้ว / แจ้งเข้า */
+  filled_positions?: number;
+  /** จำนวนที่ยกเลิก / ปิดค้าง */
+  cancelled_positions?: number;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;

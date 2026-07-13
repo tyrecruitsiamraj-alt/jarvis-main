@@ -176,7 +176,23 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   value={data.submittedAt ? new Date(data.submittedAt).toLocaleString('th-TH') : undefined}
                 />
                 <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
-                <Field label="จำนวนที่ต้องการ" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
+                <Field
+                  label="ขอมา"
+                  value={
+                    data.request_positions != null && data.request_positions > 0
+                      ? `${data.request_positions.toLocaleString('th-TH')} ตำแหน่ง`
+                      : undefined
+                  }
+                />
+                <Field
+                  label="หาได้แล้ว"
+                  value={
+                    data.filled_positions != null
+                      ? `${data.filled_positions.toLocaleString('th-TH')} ตำแหน่ง`
+                      : undefined
+                  }
+                />
+                <Field label="คงเหลือ (ต้องหา)" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
                 <Field label="ทำงานวันสุดท้าย" value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined} />
                 <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
                 <Field label="รหัสไซต์" value={data.site_code || data.unit_name} />

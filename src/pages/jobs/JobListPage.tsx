@@ -645,7 +645,7 @@ const JobListPage: React.FC = () => {
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">คงเหลือ</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
@@ -722,7 +722,12 @@ const JobListPage: React.FC = () => {
                   <div className="text-xs text-muted-foreground mt-1 grid gap-0.5">
                     <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
                     <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
-                    <span>จำนวนที่ต้องการ: {jobPositionUnits(j)} ตำแหน่ง</span>
+                    <span>
+                      ตำแหน่ง: ขอ {j.request_positions ?? jobPositionUnits(j)}
+                      {j.filled_positions != null ? ` · หาได้ ${j.filled_positions}` : ''}
+                      {' · คงเหลือ '}
+                      {jobPositionUnits(j)}
+                    </span>
                   </div>
 
                   <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
@@ -768,7 +773,7 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">คงเหลือ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>

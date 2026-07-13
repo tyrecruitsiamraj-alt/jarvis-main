@@ -62,7 +62,9 @@ export function isOpenStaffingRow(row: StaffingOpenRow): boolean {
 
 export function isOpenStaffingRowForRemaining(row: StaffingOpenRow): boolean {
   const status = (row.status || '').trim().toUpperCase();
-  const isStop = (row.is_stop || '').trim().toUpperCase();
+  // ค่าว่าง/null = ยังไม่ Stop (open feed เคย omit คอลัมน์นี้แล้วถูกตีเป็นยกเลิกผิด)
+  const isStopRaw = (row.is_stop ?? 'N').toString().trim().toUpperCase();
+  const isStop = isStopRaw === '' ? 'N' : isStopRaw;
   const stopNo = (row.stop_no || '').trim();
   if (status !== 'A' || isStop !== 'N' || stopNo) return false;
 
