@@ -105,11 +105,9 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
   });
   const breakdown = staffingPositionBreakdown(r);
 
-  const externalId = (r.external_id || rawRequestNo).trim();
-
   return {
-    id: `siamraj-sql:${externalId}`,
-    externalId,
+    id: `siamraj-sql:${rawRequestNo}`,
+    externalId: rawRequestNo,
     source: 'siamraj' as const,
     readOnly: true,
     request_no: requestNo,

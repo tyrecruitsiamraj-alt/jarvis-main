@@ -31,7 +31,6 @@
     "useDefineForClassFields": true
   },
   "include": [
-    "src",
-    "shared"
+    "src"
   ]
 }

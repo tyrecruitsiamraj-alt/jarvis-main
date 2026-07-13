@@ -42,9 +42,6 @@ export type ApiResource =
   | 'siamraj-unit-assignments'
   | 'siamraj-unit-notes'
   | 'siamraj-opl-import'
-  | 'recruit-registrations'
-  | 'matching-suggestions'
-  | 'matching-parse-branch-demand'
   | 'diagnostics-outbound-ip';
 
 /**
@@ -127,11 +124,6 @@ export function minimumRoleFor(
 
     case 'siamraj-opl-import':
       return 'admin';
-
-    case 'recruit-registrations':
-    case 'matching-suggestions':
-    case 'matching-parse-branch-demand':
-      return 'staff';
 
     default:
       return 'admin';

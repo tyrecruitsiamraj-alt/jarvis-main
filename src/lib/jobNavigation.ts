@@ -5,9 +5,9 @@ import { isSiamrajJob, siamrajExternalId } from '@/lib/siamrajUnitRequestsApi';
 export function unitRequestPath(job: JobRequest): string {
   const externalId = siamrajExternalId(job);
   if (isSiamrajJob(job) && externalId) {
-    return `/jobs/siamraj/${encodeURIComponent(externalId)}`;
+    return `/jobs/siamraj/${externalId}`;
   }
-  return `/jobs/${encodeURIComponent(job.id)}`;
+  return `/jobs/${job.id}`;
 }
 
 export type OpenUnitRequestOptions = {

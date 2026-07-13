@@ -18,7 +18,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { unitRequestCardSubtitle, unitRequestCardTitle } from '@/lib/unitRequestDisplay';
-import { navigateToUnitRequest } from '@/lib/jobNavigation';
 
 const TOP_N = 10;
 
@@ -121,8 +120,8 @@ const MatchingDashboard: React.FC = () => {
     },
   ];
 
-  const openJob = (job: JobRequest) => {
-    navigateToUnitRequest(job, navigate, { returnTo: '/matching' });
+  const openJob = (id: string) => {
+    navigate(`/jobs/${id}`);
   };
 
   return (
@@ -215,7 +214,7 @@ const MatchingDashboard: React.FC = () => {
                 {urgentTop.length === 0 ? (
                   <p className="text-xs text-muted-foreground">ไม่มีงานด่วน</p>
                 ) : (
-                  urgentTop.map((job) => <JobRow key={job.id} job={job} onOpen={() => openJob(job)} />)
+                  urgentTop.map((job) => <JobRow key={job.id} job={job} onOpen={() => openJob(job.id)} />)
                 )}
               </div>
             </div>
@@ -225,7 +224,7 @@ const MatchingDashboard: React.FC = () => {
                 {nearDueTop.length === 0 ? (
                   <p className="text-xs text-muted-foreground">ไม่มีงานที่เปิดอยู่</p>
                 ) : (
-                  nearDueTop.map((job) => <JobRow key={job.id} job={job} onOpen={() => openJob(job)} />)
+                  nearDueTop.map((job) => <JobRow key={job.id} job={job} onOpen={() => openJob(job.id)} />)
                 )}
               </div>
             </div>
@@ -241,7 +240,7 @@ const MatchingDashboard: React.FC = () => {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
             {allJobsSorted.map((job) => (
-              <JobRow key={job.id} job={job} onOpen={() => { setAllJobsOpen(false); openJob(job); }} />
+              <JobRow key={job.id} job={job} onOpen={() => { setAllJobsOpen(false); openJob(job.id); }} />
             ))}
           </div>
           <div className="text-[10px] text-muted-foreground pt-2 border-t border-border">

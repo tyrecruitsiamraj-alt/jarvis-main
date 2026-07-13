@@ -1,14 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import PageHeader from '@/components/shared/PageHeader';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-
-function safeReturnTo(path: string | null, fallback: string): string {
-  if (!path) return fallback;
-  if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/api/')) return fallback;
-  return path;
-}
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import type { DrivingResult, Gender, YesNo } from '@/types';
@@ -16,7 +10,6 @@ import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
 
 const AddCandidatePage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   const [titlePrefix, setTitlePrefix] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -46,28 +39,6 @@ const AddCandidatePage: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const backPath = safeReturnTo(searchParams.get('returnTo'), '/matching/candidates');
-
-  useEffect(() => {
-    const first = searchParams.get('first_name') || '';
-    const last = searchParams.get('last_name') || '';
-    const phoneQuery = searchParams.get('phone') || '';
-    const ageQuery = searchParams.get('age') || '';
-    const sex = (searchParams.get('sex') || '').trim().toUpperCase();
-    const provinceQuery = searchParams.get('province') || '';
-    const districtQuery = searchParams.get('district') || '';
-
-    if (first) setFirstName(first);
-    if (last) setLastName(last);
-    if (phoneQuery) setPhone(phoneQuery);
-    if (ageQuery) setAge(ageQuery);
-    if (provinceQuery) setProvince(provinceQuery);
-    if (districtQuery) setDistrict(districtQuery);
-
-    if (sex === 'M' || sex === 'MALE') setGender('male');
-    else if (sex === 'F' || sex === 'FEMALE') setGender('female');
-    else if (sex) setGender('other');
-  }, [searchParams]);
 
   const fullAddress = useMemo(() => {
     return [
@@ -147,7 +118,7 @@ const AddCandidatePage: React.FC = () => {
         );
         return;
       }
-      navigate(backPath);
+      navigate('/matching/candidates');
     } catch (e) {
       if (e instanceof TypeError) {
         setError(apiUnreachableHint());
@@ -161,18 +132,11 @@ const AddCandidatePage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="เพิ่มผู้สมัครใหม่" backPath={backPath} />
+      <PageHeader title="เพิ่มผู้สมัครใหม่" backPath="/matching/candidates" />
 
       <div className="px-4 md:px-6">
         <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
           {error && <div className="text-sm text-destructive">{error}</div>}
-          {(searchParams.get('first_name') || searchParams.get('phone') || searchParams.get('location_label')) && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2 text-xs text-blue-700">
-              ดึงข้อมูลเบื้องต้นมาจาก iRecruit แล้ว กรุณาตรวจสอบและกรอกข้อมูลเพิ่มเติมก่อนบันทึก
-              {searchParams.get('location_label') ? ` • พื้นที่: ${searchParams.get('location_label')}` : ''}
-              {searchParams.get('job_name') ? ` • งานเดิม: ${searchParams.get('job_name')}` : ''}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -426,7 +390,7 @@ const AddCandidatePage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => navigate(backPath)}
+              onClick={() => navigate('/matching/candidates')}
               className="px-6 py-2.5 rounded-lg bg-secondary text-foreground font-medium text-sm"
             >
               ยกเลิก
