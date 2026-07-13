@@ -59,7 +59,6 @@ import {
   buildRequestControlSummary,
   buildSlaSummary,
 } from './buildRequestControlSummaries';
-import { buildPriorityWorkQueue } from './priorityWorkQueue';
 import {
   buildRequestStates,
   computeRequestControlSummaryV3,
@@ -76,6 +75,7 @@ import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
   mergeRequestControlJobs,
+  positionBreakdownFromJob,
   REQUEST_CONTROL_STATUS_LABELS,
   type RequestControlStatus,
 } from '@/lib/requestControl';
@@ -472,96 +472,86 @@ function resolveRemainingKpi(
   };
 }
 
-function buildControlTowerKpis(
-  summary: DashboardRequestControlSummary,
-  slaSummary?: { atRisk: number; breached: number },
-  periodLabel?: string | null,
-): DashboardKpi[] {
+/** ใบเปิดในสต็อก KPI — ทั้งหมด หรือเฉพาะใบที่เข้ามาในงวด */
+function resolveOpenJobsForStockKpi(
+  openJobs: JobRequest[],
+  period: PeriodRange | null,
+  today: Date,
+): JobRequest[] {
+  let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+  if (period) {
+    jobs = jobs.filter((j) => {
+      const ymd = effectiveRequestDateYmd(j, today);
+      return ymd ? inYmdRange(ymd, period.from, period.to) : false;
+    });
+  }
+  return jobs;
+}
+
+/** KPI ชุดสั้น: ใบขอทั้งหมด / ปิดใบขอ / ยกเลิก / คงเหลือ (ตำแหน่ง) */
+function buildStockKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
+  let requestPositions = 0;
+  let filledPositions = 0;
+  let cancelledPositions = 0;
+  let remainingPositions = 0;
+  let requestCount = 0;
+  let filledRequestCount = 0;
+  let cancelledRequestCount = 0;
+  let remainingRequestCount = 0;
+
+  for (const j of jobs) {
+    const b = positionBreakdownFromJob(j);
+    requestPositions += b.requestPositions;
+    filledPositions += b.filledPositions;
+    cancelledPositions += b.cancelledPositions;
+    remainingPositions += b.remainingPositions;
+    requestCount += 1;
+    if (b.filledPositions > 0) filledRequestCount += 1;
+    if (b.cancelledPositions > 0) cancelledRequestCount += 1;
+    if (b.remainingPositions > 0) remainingRequestCount += 1;
+  }
+
   const posReq = (positions: number, requests: number) =>
     `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
-  const qualitySuffix =
-    summary.dataQualityMode && summary.dataQualityMode !== 'event_based'
-      ? ' · ประมาณการจากสถานะล่าสุด'
-      : '';
+  const scopeHint = periodLabel
+    ? `ใบขอในงวดที่เลือก`
+    : `ใบเปิดทั้งหมด (ตรงหน้ารายการหน่วยงาน)`;
 
   return [
     {
-      id: 'total_workload',
-      label: periodLabel ? 'ภาระงานรวม' : 'ใบเปิดทั้งหมด',
-      value: summary.totalWorkloadPositions,
-      secondaryCount: summary.totalWorkloadRequests,
+      id: 'total_requests',
+      label: 'ใบขอทั้งหมด',
+      value: requestPositions,
+      secondaryCount: requestCount,
       secondaryLabel: 'ใบขอ',
-      description: periodLabel
-        ? posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests)
-        : `ตรงหน้ารายการหน่วยงาน · ${posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests)}`,
+      description: `${scopeHint} · ${posReq(requestPositions, requestCount)}`,
       trendPercent: null,
     },
     {
-      id: 'new_requests',
-      label: 'ขอใหม่งวดนี้',
-      value: summary.newRequestPositions,
-      secondaryCount: summary.newRequestRequests,
-      secondaryLabel: 'ใบขอ',
-      description: posReq(summary.newRequestPositions, summary.newRequestRequests),
-      trendPercent: null,
-    },
-    {
-      id: 'fulfilled',
-      label: 'หาได้แล้ว',
-      value: summary.filledPositionsThisPeriod,
-      secondaryCount: summary.fulfilledRequestsTouchedThisPeriod,
-      secondaryLabel: 'ใบขอที่มีความคืบหน้า',
-      description: `อัตราหาได้ ${summary.fillRatePercent}% ของภาระงาน${qualitySuffix}`,
-      trendPercent: null,
-    },
-    {
-      id: 'fully_closed',
-      label: 'ปิดครบใบขอ',
-      value: summary.fullyClosedRequestsThisPeriod,
-      secondaryCount: summary.fullyClosedPositionsThisPeriod,
-      secondaryLabel: 'ตำแหน่ง',
-      description: `อัตราปิดครบ ${summary.fullClosureRatePercent}% ของใบขอ`,
+      id: 'closed',
+      label: 'ปิดใบขอ',
+      value: filledPositions,
+      secondaryCount: filledRequestCount,
+      secondaryLabel: 'ใบขอที่มีการหาได้',
+      description: `หาได้แล้ว · ${posReq(filledPositions, filledRequestCount)}`,
       trendPercent: null,
     },
     {
       id: 'cancelled',
       label: 'ยกเลิก',
-      value: summary.cancelledPositionsThisPeriod,
-      secondaryCount: summary.cancelledRequestsThisPeriod,
+      value: cancelledPositions,
+      secondaryCount: cancelledRequestCount,
       secondaryLabel: 'ใบขอ',
-      description: `อัตรายกเลิก ${summary.cancellationRatePercent}% ของภาระงาน`,
+      description: posReq(cancelledPositions, cancelledRequestCount),
       trendPercent: null,
     },
     {
       id: 'remaining',
-      label: 'เหลือหา',
-      value: summary.remainingPositions,
-      secondaryCount: summary.remainingRequests,
+      label: 'คงเหลือ',
+      value: remainingPositions,
+      secondaryCount: remainingRequestCount,
       secondaryLabel: 'ใบขอ',
-      description: periodLabel
-        ? `ใบขอในงวดที่เลือกที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`
-        : `ใบเปิดทั้งหมดที่ยังต้องหา (ตรงหน้ารายการหน่วยงาน) · ${posReq(summary.remainingPositions, summary.remainingRequests)}`,
-      trendPercent: null,
-    },
-    {
-      id: 'sla_risk',
-      label: 'SLA เสี่ยง/เกิน',
-      value: (slaSummary?.atRisk ?? 0) + (slaSummary?.breached ?? 0),
-      secondaryCount: slaSummary?.breached,
-      secondaryLabel: 'เกิน SLA',
-      description: `เสี่ยง ${slaSummary?.atRisk ?? 0} · เกิน ${slaSummary?.breached ?? 0} ใบขอ`,
-      trendPercent: null,
-    },
-    {
-      id: 'backlog_change',
-      label: 'งานค้าง เพิ่ม/ลด',
-      value: summary.netBacklogChange,
-      description:
-        summary.netBacklogChange > 0
-          ? `เพิ่ม ${summary.netBacklogChange} ตำแหน่ง`
-          : summary.netBacklogChange < 0
-            ? `ลด ${Math.abs(summary.netBacklogChange)} ตำแหน่ง`
-            : 'คงที่เทียบต้นงวด',
+      description: `${scopeHint} ที่ยังต้องหา · ${posReq(remainingPositions, remainingRequestCount)}`,
       trendPercent: null,
     },
   ];
@@ -1015,18 +1005,10 @@ export function buildDashboardData(
     period && requestControlSummary
       ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
       : undefined;
-  const priorityWorkQueue = buildPriorityWorkQueue(
-    applyDashboardFilters(workItems, uiFilters),
-    controlRecords,
-    period?.from ?? null,
-  );
+  const priorityWorkQueue: DashboardWorkItem[] = [];
 
-  const allOpenKpiIds = new Set(['total_workload', 'remaining', 'sla_risk']);
-  const kpis = buildControlTowerKpis(
-    requestControlSummary,
-    slaSummary,
-    period?.label ?? null,
-  ).filter((kpi) => (period ? true : allOpenKpiIds.has(kpi.id)));
+  const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
+  const kpis = buildStockKpis(stockJobs, period?.label ?? null);
 
   return {
     kpis,

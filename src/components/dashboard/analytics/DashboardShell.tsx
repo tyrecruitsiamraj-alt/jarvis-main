@@ -4,16 +4,9 @@ import { cn } from '@/lib/utils';
 import type { DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
-import DashboardFlowViewCard from './DashboardFlowView';
-import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
-import DashboardPriorityQueue from './DashboardPriorityQueue';
 import DashboardFilterBar from './DashboardFilterBar';
-import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
-import DashboardCohortSummaryCard from './DashboardCohortSummary';
-import DashboardSlaSummaryCard from './DashboardSlaSummary';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
-import DashboardAgeOverview from './DashboardAgeOverview';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
@@ -160,7 +153,7 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
-              <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {data.kpis.map((kpi) => (
                   <DashboardKpiCard
                     key={kpi.id}
@@ -170,56 +163,6 @@ const DashboardShell: React.FC<Props> = ({
                 ))}
               </div>
 
-              {data.flowView ? (
-                <DashboardFlowViewCard
-                  flow={data.flowView}
-                  summary={data.requestControlSummary}
-                  onSegmentClick={onKpiClick}
-                />
-              ) : null}
-
-              {data.executiveInsights ? (
-                <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
-              ) : null}
-
-              {data.requestCohortSummary ? (
-                <DashboardCohortSummaryCard
-                  summary={data.requestCohortSummary}
-                  onRowClick={onCohortClick}
-                />
-              ) : null}
-
-              {data.fulfillmentBreakdown ? (
-                <DashboardClosedBreakdownCard
-                  breakdown={data.fulfillmentBreakdown}
-                  filledTotal={data.kpis.find((k) => k.id === 'fulfilled' || k.id === 'filled')?.value ?? 0}
-                  fullyClosedTotal={data.kpis.find((k) => k.id === 'fully_closed')?.value ?? 0}
-                  onFilledClick={onFilledBreakdownClick}
-                  onFullyClosedClick={onFullyClosedBreakdownClick}
-                />
-              ) : data.closedBreakdown ? (
-                <DashboardClosedBreakdownCard
-                  breakdown={{
-                    filledSamePeriod: data.closedBreakdown.samePeriod,
-                    filledBacklog: data.closedBreakdown.backlog,
-                    fullyClosedSamePeriod: 0,
-                    fullyClosedBacklog: 0,
-                  }}
-                  filledTotal={data.kpis.find((k) => k.id === 'completed')?.value ?? 0}
-                  fullyClosedTotal={0}
-                />
-              ) : null}
-
-              {data.slaSummary ? (
-                <DashboardSlaSummaryCard summary={data.slaSummary} onBucketClick={onSlaClick} />
-              ) : null}
-
-              <DashboardAgeOverview
-                items={data.ageDaysBreakdown}
-                requestTotal={data.ageDaysRequestTotal}
-                positionTotal={data.ageDaysPositionTotal}
-                onBucketClick={onAgeBucketClick}
-              />
               <DashboardChartSection data={data} />
               <DashboardExpandablePanel
                 title="ภาระงานตามผู้รับผิดชอบ"
@@ -254,9 +197,6 @@ const DashboardShell: React.FC<Props> = ({
                   hideHeader
                 />
               </DashboardExpandablePanel>
-              {data.priorityWorkQueue.length > 0 ? (
-                <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
-              ) : null}
               <DashboardExpandablePanel
                 title="งานที่ต้องติดตาม"
                 subtitle={`${data.workQueue.length.toLocaleString('th-TH')} รายการ — กดเพื่อดู`}

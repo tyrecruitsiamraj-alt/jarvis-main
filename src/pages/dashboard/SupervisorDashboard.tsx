@@ -306,14 +306,42 @@ const SupervisorDashboard: React.FC = () => {
   const handleKpiClick = useCallback(
     (kpiId: string, label: string) => {
       const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
+      const stockJobs = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range);
 
-      // เหลือหา: ใช้ใบเปิดชุดเดียวกับ KPI (ไม่ผ่าน controlRecords)
-      if (kpiId === 'remaining') {
-        openJobList(label, filterJobsForRemainingKpi(jobsWithoutAgeFilter, range));
+      if (kpiId === 'remaining' || kpiId === 'total_requests') {
+        openJobList(
+          label,
+          kpiId === 'remaining'
+            ? stockJobs.filter((j) => {
+                const rem = j.position_units ?? 0;
+                const req = j.request_positions;
+                if (req != null && j.filled_positions != null) {
+                  return Math.max(req - (j.filled_positions ?? 0) - (j.cancelled_positions ?? 0), 0) > 0;
+                }
+                return rem > 0 || j.status === 'open' || j.status === 'in_progress';
+              })
+            : stockJobs,
+        );
         return;
       }
 
-      if (range && ['total_workload', 'new_requests', 'fulfilled', 'filled', 'fully_closed', 'partial', 'cancelled', 'sla_risk', 'backlog_change'].includes(kpiId)) {
+      if (kpiId === 'closed') {
+        openJobList(
+          label,
+          stockJobs.filter((j) => (j.filled_positions ?? 0) > 0),
+        );
+        return;
+      }
+
+      if (kpiId === 'cancelled') {
+        openJobList(
+          label,
+          stockJobs.filter((j) => (j.cancelled_positions ?? 0) > 0),
+        );
+        return;
+      }
+
+      if (range && ['total_workload', 'new_requests', 'fulfilled', 'filled', 'fully_closed', 'partial', 'sla_risk', 'backlog_change'].includes(kpiId)) {
         openControlList(label, filterRecordsForControlKpi(controlRecords, kpiId, range));
         return;
       }
