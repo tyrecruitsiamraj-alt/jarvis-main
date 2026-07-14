@@ -72,7 +72,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<UserRow>(
       `
-      select id, email, role, full_name, is_active, created_at
+      select id, email, role, full_name, is_active, created_at, department_code
       from ${usersTable}
       where role = $1 and is_active = true
       order by created_at asc

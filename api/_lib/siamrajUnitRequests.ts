@@ -12,6 +12,8 @@ import {
 import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
+import { jobAllowedByDepartmentScope } from './departmentScope.js';
+import type { DepartmentScope } from './departmentScope.js';
 
 export type SiamrajDbSource = 'postgres' | 'sqlserver';
 
@@ -203,7 +205,11 @@ function staffingQueueWhere(): string {
   `;
 }
 
-export async function listSiamrajUnitRequests(options: { limit?: number; mode?: string }) {
+export async function listSiamrajUnitRequests(options: {
+  limit?: number;
+  mode?: string;
+  departmentScope?: DepartmentScope;
+}) {
   const source = getSiamrajDbSource();
   if (!source) return [];
 
@@ -227,30 +233,42 @@ export async function listSiamrajUnitRequests(options: { limit?: number; mode?: 
     [limit],
   );
 
-  return rows.map(mapSiamrajRow);
+  const mapped = rows.map(mapSiamrajRow);
+  const scope = options.departmentScope;
+  if (!scope || scope.mode === 'all') return mapped;
+  return mapped.filter((j) => jobAllowedByDepartmentScope(j, scope));
 }
 
-export async function getSiamrajUnitRequestById(id: string) {
+export async function getSiamrajUnitRequestById(
+  id: string,
+  departmentScope?: DepartmentScope,
+) {
   const source = getSiamrajDbSource();
   if (!source) return null;
 
-  if (source === 'sqlserver') {
-    return getSiamrajSqlServerUnitRequestById(normalizeLookupId(id));
+  let item =
+    source === 'sqlserver'
+      ? await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id))
+      : null;
+
+  if (source !== 'sqlserver') {
+    const schema = getSiamrajSchema();
+    if (!schema) return null;
+
+    const lookupId = normalizeLookupId(id);
+    const { rows } = await dbQuery<SiamrajUnitRequestRow>(
+      `SELECT ${BASE_SELECT}
+       ${buildFromClause(schema)}
+       WHERE h.act_saleco_id::text = $1 OR h.request_no = $1
+       LIMIT 1`,
+      [lookupId],
+    );
+    item = rows[0] ? mapSiamrajRow(rows[0]) : null;
   }
 
-  const schema = getSiamrajSchema();
-  if (!schema) return null;
-
-  const lookupId = normalizeLookupId(id);
-  const { rows } = await dbQuery<SiamrajUnitRequestRow>(
-    `SELECT ${BASE_SELECT}
-     ${buildFromClause(schema)}
-     WHERE h.act_saleco_id::text = $1 OR h.request_no = $1
-     LIMIT 1`,
-    [lookupId],
-  );
-
-  return rows[0] ? mapSiamrajRow(rows[0]) : null;
+  if (!item) return null;
+  if (departmentScope && !jobAllowedByDepartmentScope(item, departmentScope)) return null;
+  return item;
 }
 
 export type { SiamrajThroughputRecord };
@@ -258,6 +276,7 @@ export type { SiamrajThroughputRecord };
 export async function listSiamrajThroughput(options: {
   from: string;
   to: string;
+  departmentScope?: DepartmentScope;
 }): Promise<SiamrajThroughputRecord[]> {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {
@@ -271,6 +290,7 @@ export async function listSiamrajClosedRequests(options: {
   from: string;
   to: string;
   limit?: number;
+  departmentScope?: DepartmentScope;
 }) {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {

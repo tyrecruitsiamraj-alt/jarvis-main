@@ -19,6 +19,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { isValidEnglishName, sanitizeEnglishName } from '@/lib/englishName';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
@@ -56,6 +57,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [departmentCode, setDepartmentCode] = useState('');
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotBusy, setForgotBusy] = useState(false);
@@ -138,6 +140,10 @@ const LoginPage: React.FC = () => {
       setError('นามสกุลต้องกรอกเป็นภาษาอังกฤษเท่านั้น (A–Z)');
       return;
     }
+    if (!departmentCode) {
+      setError('กรุณาเลือกแผนก');
+      return;
+    }
     setSubmitting(true);
     try {
       const msg = await signUp({
@@ -145,6 +151,7 @@ const LoginPage: React.FC = () => {
         password,
         first_name: firstName,
         last_name: lastName,
+        department_code: departmentCode,
       });
       if (msg) {
         setError(msg);
@@ -155,6 +162,7 @@ const LoginPage: React.FC = () => {
         setAuthMode('login');
         setFirstName('');
         setLastName('');
+        setDepartmentCode('');
         setPassword('');
         setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
         return;
@@ -403,6 +411,28 @@ const LoginPage: React.FC = () => {
                   ) : null}
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="departmentRegister" className="text-xs font-medium text-muted-foreground ml-1">
+                    แผนก <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="departmentRegister"
+                    value={departmentCode}
+                    onChange={(e) => setDepartmentCode(e.target.value)}
+                    required
+                    className="jarvis-soft-field min-h-[48px] w-full"
+                  >
+                    <option value="">— เลือกแผนก —</option>
+                    {APP_DEPARTMENT_CODES.map((code) => (
+                      <option key={code} value={code}>
+                        {code}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground ml-1">
+                    จะเห็นใบขอเฉพาะแผนกนี้ — Admin แก้ไขให้ได้ภายหลัง
+                  </p>
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="passwordRegister" className="text-xs font-medium text-muted-foreground ml-1">
                     Password (ขั้นต่ำ 8 ตัวอักษร)
                   </Label>
@@ -435,7 +465,7 @@ const LoginPage: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground ml-1">
-                  สมัครใหม่ได้รับสิทธิ์ Staff อัตโนมัติ — ไม่มีตัวเลือกบทบาท
+                  สมัครใหม่ได้รับสิทธิ์ Staff — ต้องเลือกแผนกก่อนใช้งาน
                 </p>
                 <button
                   type="submit"

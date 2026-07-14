@@ -1,6 +1,10 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { toBangkokYmd } from './businessDate.js';
 import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
+import {
+  sqlServerDepartmentScopeClause,
+  type DepartmentScope,
+} from './departmentScope.js';
 
 export {
   effectiveInformedCount,
@@ -122,6 +126,7 @@ function isDateYmd(s: string): boolean {
 export async function listSiamrajSqlServerThroughput(options: {
   from: string;
   to: string;
+  departmentScope?: DepartmentScope;
 }): Promise<SiamrajThroughputRecord[]> {
   const { from, to } = options;
   if (!isDateYmd(from) || !isDateYmd(to)) {
@@ -130,6 +135,7 @@ export async function listSiamrajSqlServerThroughput(options: {
 
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
+  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
 
   const openDate = effectiveRequestDateSql('A');
   // สรุป inform เฉพาะใบในช่วง — เลี่ยง correlated COUNT ต่อแถว และเลี่ยงสแกน inform ทั้งตาราง
@@ -168,10 +174,11 @@ export async function listSiamrajSqlServerThroughput(options: {
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
+      ${deptScope.sql}
       AND ${openDate} >= @fromDate
       AND ${openDate} <= @toDate
   `,
-    { ...filters, fromDate: from, toDate: to },
+    { ...filters, fromDate: from, toDate: to, ...deptScope.params },
   );
 
   return rows.flatMap(mapThroughputRow);

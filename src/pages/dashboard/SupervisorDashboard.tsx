@@ -5,6 +5,7 @@ import DetailListDialog from '@/components/shared/DetailListDialog';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useSiamrajUnitRequestFilters, filterUnitRequests } from '@/hooks/useSiamrajUnitRequestFilters';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   buildDashboardData,
   defaultDashboardDateRange,
@@ -58,6 +59,10 @@ const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
 
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  /** admin เห็นทุกแผนก · คนอื่นที่มี department_code ถูกล็อกแผนก */
+  const lockedDepartmentCode =
+    user?.role !== 'admin' ? user?.department_code?.trim().toUpperCase() || null : null;
   const [filters, setFilters] = useState<DashboardFilters>(() => loadDashboardFilters());
   const [unitFilters, setUnitFilters] = useState(() => loadSupervisorDashboardFilters());
   const [dateRange, setDateRange] = useState<DateRangeYmd | null>(() => defaultDashboardDateRange());
@@ -74,6 +79,15 @@ const SupervisorDashboard: React.FC = () => {
   const RETURN_TO = '/dashboard';
 
   const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource } = useUnitRequestsFeed();
+
+  useEffect(() => {
+    if (!lockedDepartmentCode) return;
+    setUnitFilters((prev) =>
+      prev.departmentFilter === lockedDepartmentCode
+        ? prev
+        : { ...prev, departmentFilter: lockedDepartmentCode },
+    );
+  }, [lockedDepartmentCode]);
 
   const period = useMemo(
     () => (dateRange ? resolvePeriodRange('custom', dateRange) : null),
@@ -469,6 +483,7 @@ const SupervisorDashboard: React.FC = () => {
       unitFilters={unitFilters}
       onUnitFiltersChange={patchUnitFilters}
       siamrajPrimary={siamrajPrimary}
+      lockedDepartmentCode={lockedDepartmentCode}
       filterOptions={{
         departmentOptions: filterApi.departmentOptions,
         jobSubtypeOptions: filterApi.jobSubtypeOptions,

@@ -47,6 +47,7 @@ type Props = {
   filterOptions: FilterOptions;
   queueStatus: DashboardStatusFilter;
   onQueueStatusChange: (status: DashboardStatusFilter) => void;
+  lockedDepartmentCode?: string | null;
   className?: string;
 };
 
@@ -77,6 +78,7 @@ const DashboardFilterBar: React.FC<Props> = ({
   filterOptions,
   queueStatus,
   onQueueStatusChange,
+  lockedDepartmentCode = null,
   className,
 }) => {
   const now = useMemo(() => new Date(), []);
@@ -221,6 +223,7 @@ const DashboardFilterBar: React.FC<Props> = ({
         showNoteFilter={false}
         showAgeDaysFilter={false}
         showUnitFilter
+        lockedDepartmentCode={lockedDepartmentCode}
         layout="sidebar"
         options={filterOptions}
         className="!space-y-3"

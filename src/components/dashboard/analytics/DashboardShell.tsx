@@ -36,6 +36,7 @@ type Props = {
   onUnitFiltersChange: (patch: Partial<UnitRequestFilterState>) => void;
   siamrajPrimary: boolean;
   filterOptions: FilterOptions;
+  lockedDepartmentCode?: string | null;
   loading?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
@@ -65,6 +66,7 @@ const DashboardShell: React.FC<Props> = ({
   onUnitFiltersChange,
   siamrajPrimary,
   filterOptions,
+  lockedDepartmentCode = null,
   loading,
   refreshing,
   onRefresh,
@@ -151,6 +153,7 @@ const DashboardShell: React.FC<Props> = ({
               filterOptions={filterOptions}
               queueStatus={filters.queueStatus}
               onQueueStatusChange={(queueStatus: DashboardStatusFilter) => onFiltersChange({ queueStatus })}
+              lockedDepartmentCode={lockedDepartmentCode}
             />
 
             <div className="space-y-5 min-w-0">

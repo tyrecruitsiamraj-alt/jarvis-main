@@ -51,7 +51,7 @@ async function magicLinkVerifyHandler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<AuthUserRow>(
       `
-      select id, email, role, full_name, is_active, created_at
+      select id, email, role, full_name, is_active, created_at, department_code
       from users
       where id = $1
       limit 1

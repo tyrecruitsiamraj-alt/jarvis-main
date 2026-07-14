@@ -17,7 +17,9 @@ interface AuthContextType {
     password: string;
     first_name: string;
     last_name: string;
+    department_code: string;
   }) => Promise<string | null>;
+  setMyDepartment: (department_code: string) => Promise<string | null>;
   logout: () => void | Promise<void>;
   hasPermission: (requiredRole: UserRole | UserRole[]) => boolean;
   isAuthenticated: boolean;
@@ -57,6 +59,9 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
       typeof raw.created_at === 'string'
         ? raw.created_at.slice(0, 10)
         : new Date().toISOString().slice(0, 10),
+    ...(typeof raw.department_code === 'string' && raw.department_code.trim()
+      ? { department_code: raw.department_code.trim().toUpperCase() }
+      : {}),
   };
 }
 
@@ -244,6 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: string;
       first_name: string;
       last_name: string;
+      department_code: string;
     }): Promise<string | null> => {
       const r = await apiFetch('/api/auth/register', {
         method: 'POST',
@@ -252,6 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password: payload.password,
           first_name: payload.first_name.trim(),
           last_name: payload.last_name.trim(),
+          department_code: payload.department_code.trim().toUpperCase(),
         }),
       });
       let data: Record<string, unknown> = {};
@@ -273,6 +280,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     [],
   );
+
+  const setMyDepartment = useCallback(async (department_code: string): Promise<string | null> => {
+    const r = await apiFetch('/api/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ department_code: department_code.trim().toUpperCase() }),
+    });
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await r.json()) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
+    if (!r.ok) {
+      return (
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.error === 'string' && data.error) ||
+        'บันทึกแผนกไม่สำเร็จ'
+      );
+    }
+    const rawUser = data.user as Record<string, unknown> | undefined;
+    const u = rawUser ? mapApiUser(rawUser) : null;
+    if (!u) return 'Invalid response from server';
+    setUser(u);
+    return null;
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -305,6 +337,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithMicrosoft,
         verifyMagicLink,
         signUp,
+        setMyDepartment,
         logout,
         hasPermission,
         isAuthenticated: !!user,

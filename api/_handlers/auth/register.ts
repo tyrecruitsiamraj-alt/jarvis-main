@@ -16,6 +16,7 @@ import {
   isCompanyEmailLoginEnforced,
 } from '../../_lib/companyEmail.js';
 import { isValidEnglishName } from '../../_lib/englishName.js';
+import { isAllowedDepartmentCode } from '../../_lib/departmentScope.js';
 
 const GENERIC_REGISTER_DISABLED =
   'การสมัครสมาชิกด้วยตนเองปิดใช้งาน — ติดต่อผู้ดูแลระบบเพื่อขอบัญชี';
@@ -47,7 +48,13 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
     const first_name = getString(body.first_name);
     const last_name = getString(body.last_name);
     const legacyFull = getString(body.full_name);
+    const department_code_raw = getString(body.department_code);
     const role: UserRole = 'staff';
+
+    if (!isAllowedDepartmentCode(department_code_raw)) {
+      return sendError(res, 400, 'Bad request', 'ต้องเลือกแผนก (LBD หรือ LBA)');
+    }
+    const department_code = department_code_raw.trim().toUpperCase();
 
     let full_name: string;
     if (first_name && last_name) {
@@ -87,13 +94,14 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
       full_name: string;
       is_active: boolean;
       created_at: string | Date;
+      department_code: string | null;
     }>(
       `
-      insert into users (email, password_hash, role, full_name)
-      values (lower($1::text), $2, $3, $4)
-      returning id, email, role, full_name, is_active, created_at
+      insert into users (email, password_hash, role, full_name, department_code)
+      values (lower($1::text), $2, $3, $4, $5)
+      returning id, email, role, full_name, is_active, created_at, department_code
     `,
-      [email, password_hash, role, full_name],
+      [email, password_hash, role, full_name, department_code],
     );
 
     const row = rows[0];
@@ -106,6 +114,7 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
         full_name: row.full_name,
         role: row.role,
         is_active: row.is_active,
+        department_code: row.department_code?.trim().toUpperCase() || department_code,
         created_at:
           row.created_at instanceof Date
             ? row.created_at.toISOString().slice(0, 10)

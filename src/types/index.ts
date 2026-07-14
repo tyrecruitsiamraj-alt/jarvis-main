@@ -12,6 +12,8 @@ export interface User {
   avatar_url?: string;
   is_active: boolean;
   created_at: string;
+  /** แผนกที่ล็อกสิทธิ์เห็นใบขอ เช่น LBD — ไม่มี = เห็นทุกแผนก (admin มักว่าง) */
+  department_code?: string;
 }
 
 // ============ EMPLOYEES (WL) ============

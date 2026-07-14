@@ -36,6 +36,8 @@ type Props = {
   showUnitFilter?: boolean;
   showNoteFilter?: boolean;
   showAgeDaysFilter?: boolean;
+  /** ถ้ามีค่า — ล็อกตัวกรองแผนกให้อยู่แผนกนี้ (ซ่อนตัวเลือกอื่น) */
+  lockedDepartmentCode?: string | null;
   layout?: 'default' | 'sidebar';
   className?: string;
 };
@@ -50,6 +52,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
   showUnitFilter = true,
   showNoteFilter = true,
   showAgeDaysFilter = true,
+  lockedDepartmentCode = null,
   layout = 'default',
   className,
 }) => {
@@ -108,16 +111,24 @@ const UnitRequestFilterFields: React.FC<Props> = ({
         {siamrajPrimary ? (
           <FilterSelect
             id={`${idPrefix}-department`}
-            label="แผนก"
-            value={filters.departmentFilter}
-            onChange={(v) => onChange({ departmentFilter: v })}
+            label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก'}
+            value={lockedDepartmentCode || filters.departmentFilter}
+            onChange={(v) => {
+              if (lockedDepartmentCode) return;
+              onChange({ departmentFilter: v });
+            }}
+            disabled={Boolean(lockedDepartmentCode)}
             selectClassName={selectClassName}
           >
-            {departmentOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
+            {lockedDepartmentCode ? (
+              <option value={lockedDepartmentCode}>{lockedDepartmentCode}</option>
+            ) : (
+              departmentOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))
+            )}
           </FilterSelect>
         ) : null}
 

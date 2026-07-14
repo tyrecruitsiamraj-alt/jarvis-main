@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
@@ -97,13 +98,17 @@ const JobListPage: React.FC = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  /** admin เห็นทุกแผนก · คนอื่นที่มี department_code ถูกล็อกแผนก */
+  const lockedDepartmentCode =
+    user?.role !== 'admin' ? user?.department_code?.trim().toUpperCase() || null : null;
 
   const listState = useMemo(() => parseJobListSearchParams(searchParams), [searchParams]);
   const {
     filter,
     search,
     unitFilter,
-    departmentFilter,
+    departmentFilter: departmentFilterRaw,
     jobSubtypeFilter,
     yearFilter,
     recruiterFilter,
@@ -117,6 +122,7 @@ const JobListPage: React.FC = () => {
     page,
     pageSize,
   } = listState;
+  const departmentFilter = lockedDepartmentCode || departmentFilterRaw;
 
   const returnTo = jobListReturnTo(location.pathname, location.search);
   const [openInNewTab, setOpenInNewTab] = useState(loadOpenInNewTabPref);
@@ -453,15 +459,23 @@ const JobListPage: React.FC = () => {
           {siamrajPrimary ? (
             <FilterSelect
               id="job-list-department"
-              label="แผนก"
+              label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก'}
               value={departmentFilter}
-              onChange={(v) => updateListState({ departmentFilter: v })}
+              disabled={Boolean(lockedDepartmentCode)}
+              onChange={(v) => {
+                if (lockedDepartmentCode) return;
+                updateListState({ departmentFilter: v });
+              }}
             >
-              {departmentOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
+              {lockedDepartmentCode ? (
+                <option value={lockedDepartmentCode}>{lockedDepartmentCode}</option>
+              ) : (
+                departmentOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))
+              )}
             </FilterSelect>
           ) : null}
 

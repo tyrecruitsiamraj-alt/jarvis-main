@@ -9,6 +9,7 @@ type FilterSelectProps = {
   children: React.ReactNode;
   className?: string;
   selectClassName?: string;
+  disabled?: boolean;
 };
 
 export function FilterSelect({
@@ -19,6 +20,7 @@ export function FilterSelect({
   children,
   className,
   selectClassName,
+  disabled = false,
 }: FilterSelectProps) {
   return (
     <div className={cn('flex flex-col gap-1 min-w-0 w-full', className)}>
@@ -28,8 +30,13 @@ export function FilterSelect({
       <select
         id={id}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className={cn('jarvis-filter-select w-full min-w-0', selectClassName)}
+        className={cn(
+          'jarvis-filter-select w-full min-w-0',
+          disabled && 'opacity-70 cursor-not-allowed',
+          selectClassName,
+        )}
       >
         {children}
       </select>

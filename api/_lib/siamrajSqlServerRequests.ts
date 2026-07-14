@@ -20,6 +20,10 @@ import {
   normalizeSiamrajRequestNoForDisplay,
   pickBestRequestNoCandidate,
 } from './siamrajRequestNo.js';
+import {
+  sqlServerDepartmentScopeClause,
+  type DepartmentScope,
+} from './departmentScope.js';
 
 type SqlServerRequestRow = {
   external_id: string;
@@ -265,12 +269,17 @@ function clampUnitRequestLimit(limit?: number): number {
   return Math.min(Math.max(n, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
 }
 
-export async function listSiamrajSqlServerUnitRequests(options: { limit?: number; mode?: string }) {
+export async function listSiamrajSqlServerUnitRequests(options: {
+  limit?: number;
+  mode?: string;
+  departmentScope?: DepartmentScope;
+}) {
   const limit = clampUnitRequestLimit(options.limit);
   const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue').toLowerCase();
   const extraWhere = mode === 'all' ? '' : boardRequestTypeExtraWhere();
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
+  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
 
   const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
     `
@@ -282,6 +291,7 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
         ${clsExclude}
+        ${deptScope.sql}
         ${extraWhere}
       ORDER BY A.request_date DESC
     ),
@@ -295,7 +305,7 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
     WHERE rn = 1
     ORDER BY act_saleco_datetime DESC
   `,
-    { limit, ...filters },
+    { limit, ...filters, ...deptScope.params },
   );
 
   return rows.map(mapSqlServerRow);

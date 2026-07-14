@@ -100,7 +100,10 @@ const AdminSettings: React.FC = () => {
     setUserActionOk('');
   }, [activeTab]);
 
-  const updateUser = async (id: string, patch: { role?: User['role']; is_active?: boolean }) => {
+  const updateUser = async (
+    id: string,
+    patch: { role?: User['role']; is_active?: boolean; department_code?: string | null },
+  ) => {
     setSavingUserId(id);
     setUserActionError('');
     setUserActionOk('');
@@ -238,6 +241,7 @@ const AdminSettings: React.FC = () => {
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">Username</th>
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">แผนก</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Actions</th>
                   </tr>
@@ -245,7 +249,7 @@ const AdminSettings: React.FC = () => {
                 <tbody>
                   {apiUsers.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                         ยังไม่มีผู้ใช้ (หรือโหลดไม่สำเร็จ)
                       </td>
                     </tr>
@@ -274,6 +278,27 @@ const AdminSettings: React.FC = () => {
                           <option value="supervisor">supervisor</option>
                           <option value="staff">staff</option>
                           <option value="opl">opl (อ่านอย่างเดียว)</option>
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <select
+                          value={u.department_code || ''}
+                          disabled={savingUserId === u.id}
+                          onChange={(e) => {
+                            const next = e.target.value.trim().toUpperCase() || null;
+                            const cur = u.department_code || null;
+                            if (next === cur) return;
+                            void updateUser(u.id, { department_code: next });
+                          }}
+                          className={cn(
+                            'rounded-md border border-border bg-secondary px-2 py-1 text-xs min-w-[5.5rem]',
+                            savingUserId === u.id && 'opacity-60',
+                          )}
+                          title="ล็อกให้เห็นใบขอเฉพาะแผนกนี้ (ว่าง = บังคับให้ผู้ใช้เลือกตอนเข้าครั้งแรก)"
+                        >
+                          <option value="">ยังไม่ตั้ง</option>
+                          <option value="LBD">LBD</option>
+                          <option value="LBA">LBA</option>
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -343,6 +368,26 @@ const AdminSettings: React.FC = () => {
                       <option value="supervisor">supervisor</option>
                       <option value="staff">staff</option>
                       <option value="opl">opl (อ่านอย่างเดียว)</option>
+                    </select>
+
+                    <select
+                      value={u.department_code || ''}
+                      disabled={savingUserId === u.id}
+                      onChange={(e) => {
+                        const next = e.target.value.trim().toUpperCase() || null;
+                        const cur = u.department_code || null;
+                        if (next === cur) return;
+                        void updateUser(u.id, { department_code: next });
+                      }}
+                      className={cn(
+                        'rounded-md border border-border bg-secondary px-2 py-1 text-xs min-w-[5.5rem]',
+                        savingUserId === u.id && 'opacity-60',
+                      )}
+                      title="ล็อกให้เห็นใบขอเฉพาะแผนกนี้ (ว่าง = บังคับให้ผู้ใช้เลือกตอนเข้าครั้งแรก)"
+                    >
+                      <option value="">ยังไม่ตั้ง</option>
+                      <option value="LBD">LBD</option>
+                      <option value="LBA">LBA</option>
                     </select>
 
                     <button

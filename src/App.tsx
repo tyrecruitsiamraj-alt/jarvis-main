@@ -13,6 +13,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import MagicLinkVerifyPage from "@/pages/MagicLinkVerifyPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import RequireDepartment from "@/components/auth/RequireDepartment";
 import HomePage from "@/pages/HomePage";
 import WLDashboard from "@/pages/wl/WLDashboard";
 import MonthlyPlanner from "@/pages/wl/MonthlyPlanner";
@@ -61,45 +62,47 @@ const ProtectedRoutes = () => {
     return <LoginPage />;
   }
   return (
-    <AppLayout>
-      <RequireRole>
-        <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/opl" element={<RoleHubPage role="opl" />} />
-        <Route path="/staff" element={<RoleHubPage role="staff" />} />
-        <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />
-        <Route path="/admin" element={<RoleHubPage role="admin" />} />
-        <Route path="/wl" element={<WLDashboard />} />
-        <Route path="/wl/monthly-planner" element={<MonthlyPlanner />} />
-        <Route path="/wl/daily-assignment" element={<DailyAssignment />} />
-        <Route path="/wl/global-calendar" element={<GlobalCalendar />} />
-        <Route path="/wl/employees" element={<WLEmployees />} />
-        <Route path="/wl/employees/add" element={<AddEmployeePage />} />
-        <Route path="/wl/employees/:id" element={<EmployeeProfile />} />
-        <Route path="/matching" element={<MatchingDashboard />} />
-        <Route path="/matching/candidates" element={<CandidatesPage />} />
-        <Route path="/matching/candidates/add" element={<AddCandidatePage />} />
-        <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
-        <Route path="/matching/match" element={<MatchingPage />} />
-        <Route path="/matching/pre-check" element={<PreCheckPage />} />
-        <Route path="/driver-care" element={<DriverCareOverview />} />
-        <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
-        <Route path="/driver-care/actions" element={<DriverActionTracking />} />
-        <Route path="/driver-care/resources" element={<DriverCareResources />} />
-        <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
-        <Route path="/jobs/overview" element={<JobDashboard />} />
-        <Route path="/jobs/list" element={<JobListPage />} />
-        <Route path="/jobs/board" element={<StaffJobBoardPage />} />
-        <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
-        <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
-        <Route path="/jobs/:id" element={<JobDetailPage />} />
-        <Route path="/dashboard" element={<SupervisorDashboard />} />
-        <Route path="/settings" element={<AdminSettings />} />
-        <Route path="/account/change-password" element={<ChangePasswordPage />} />
-        <Route path="*" element={<NotFound />} />
-        </Routes>
-      </RequireRole>
-    </AppLayout>
+    <RequireDepartment>
+      <AppLayout>
+        <RequireRole>
+          <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/opl" element={<RoleHubPage role="opl" />} />
+          <Route path="/staff" element={<RoleHubPage role="staff" />} />
+          <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />
+          <Route path="/admin" element={<RoleHubPage role="admin" />} />
+          <Route path="/wl" element={<WLDashboard />} />
+          <Route path="/wl/monthly-planner" element={<MonthlyPlanner />} />
+          <Route path="/wl/daily-assignment" element={<DailyAssignment />} />
+          <Route path="/wl/global-calendar" element={<GlobalCalendar />} />
+          <Route path="/wl/employees" element={<WLEmployees />} />
+          <Route path="/wl/employees/add" element={<AddEmployeePage />} />
+          <Route path="/wl/employees/:id" element={<EmployeeProfile />} />
+          <Route path="/matching" element={<MatchingDashboard />} />
+          <Route path="/matching/candidates" element={<CandidatesPage />} />
+          <Route path="/matching/candidates/add" element={<AddCandidatePage />} />
+          <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
+          <Route path="/matching/match" element={<MatchingPage />} />
+          <Route path="/matching/pre-check" element={<PreCheckPage />} />
+          <Route path="/driver-care" element={<DriverCareOverview />} />
+          <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
+          <Route path="/driver-care/actions" element={<DriverActionTracking />} />
+          <Route path="/driver-care/resources" element={<DriverCareResources />} />
+          <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
+          <Route path="/jobs/overview" element={<JobDashboard />} />
+          <Route path="/jobs/list" element={<JobListPage />} />
+          <Route path="/jobs/board" element={<StaffJobBoardPage />} />
+          <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
+          <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
+          <Route path="/jobs/:id" element={<JobDetailPage />} />
+          <Route path="/dashboard" element={<SupervisorDashboard />} />
+          <Route path="/settings" element={<AdminSettings />} />
+          <Route path="/account/change-password" element={<ChangePasswordPage />} />
+          <Route path="*" element={<NotFound />} />
+          </Routes>
+        </RequireRole>
+      </AppLayout>
+    </RequireDepartment>
   );
 };
 
