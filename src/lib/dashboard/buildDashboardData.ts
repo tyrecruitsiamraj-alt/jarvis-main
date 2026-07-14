@@ -557,14 +557,15 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
   for (const j of jobs) {
     const status = resolveUnitRequestWorkStatus(j.work_status);
     const units = positionBreakdownFromJob(j).remainingPositions;
+    if (units <= 0) continue;
     counts[status] += units;
     requestCounts[status] += 1;
   }
   const total = Object.values(counts).reduce((s, n) => s + n, 0);
-  const totalRequests = jobs.length;
+  const totalRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
   const scopeHint = periodLabel
-    ? `ใบเปิดในงวดที่เลือก`
-    : `ใบเปิดทั้งหมด (ตรงหน้ารายการหน่วยงาน)`;
+    ? `คงเหลือในช่วงที่เลือก`
+    : `คงเหลือในช่วงแนวโน้ม`;
   const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
     id,
     label,
@@ -582,7 +583,96 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
       value: total,
       secondaryCount: totalRequests,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
+      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ (= การ์ดคงเหลือ)`,
+      trendPercent: null,
+    },
+    leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
+    leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
+    leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
+    leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
+    leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
+  ];
+}
+
+/**
+ * นับสถานะทำงานจากชุดคงเหลือเดียวกับ KPI คงเหลือ (throughput)
+ * ใบที่ไม่อยู่ใน feed → ถือเป็น in_progress
+ */
+function buildWorkStatusKpisFromCohortRemaining(
+  records: ThroughputRecord[],
+  jobs: JobRequest[],
+  from: string,
+  to: string,
+  scopeHint: string,
+): DashboardKpi[] {
+  const statusByNo = new Map<string, UnitRequestWorkStatus | null | undefined>();
+  for (const j of jobs) {
+    const no = (j.request_no || j.externalId || '').trim();
+    if (!no) continue;
+    statusByNo.set(no, j.work_status);
+    const raw = (j.externalId || '').trim();
+    if (raw && raw !== no) statusByNo.set(raw, j.work_status);
+  }
+
+  const remainingByNo = new Map<string, number>();
+  let orphanUnits = 0;
+  for (const r of records) {
+    if (r.requestDate < from || r.requestDate > to) continue;
+    const kind = r.kind ?? (r.isOpen ? 'remaining' : 'filled');
+    if (kind !== 'remaining' || r.positionUnits <= 0) continue;
+    const no = r.requestNo?.trim();
+    if (no) {
+      remainingByNo.set(no, (remainingByNo.get(no) ?? 0) + r.positionUnits);
+    } else {
+      orphanUnits += r.positionUnits;
+    }
+  }
+
+  const counts: Record<UnitRequestWorkStatus, number> = {
+    in_progress: 0,
+    evaluating: 0,
+    waiting_inform: 0,
+    waiting_interview: 0,
+    waiting_start: 0,
+  };
+  const requestCounts: Record<UnitRequestWorkStatus, number> = {
+    in_progress: 0,
+    evaluating: 0,
+    waiting_inform: 0,
+    waiting_interview: 0,
+    waiting_start: 0,
+  };
+
+  for (const [no, units] of remainingByNo) {
+    const status = resolveUnitRequestWorkStatus(statusByNo.get(no));
+    counts[status] += units;
+    requestCounts[status] += 1;
+  }
+  if (orphanUnits > 0) {
+    counts.in_progress += orphanUnits;
+    requestCounts.in_progress += 1;
+  }
+
+  const total = Object.values(counts).reduce((s, n) => s + n, 0);
+  const totalRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
+  const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
+    id,
+    label,
+    value: counts[status],
+    secondaryCount: requestCounts[status],
+    secondaryLabel: 'ใบขอ',
+    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} อัตรา · ${requestCounts[status].toLocaleString('th-TH')} ใบ`,
+    trendPercent: null,
+  });
+
+  return [
+    {
+      id: 'work_status_total',
+      label: 'ทั้งหมด',
+      value: total,
+      secondaryCount: totalRequests,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ (= การ์ดคงเหลือ)`,
       trendPercent: null,
     },
     leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
@@ -1124,7 +1214,16 @@ export function buildDashboardData(
     cohortStock != null
       ? buildStockKpisFromCohort(cohortStock, stockScopeHint)
       : buildStockKpis(stockJobs, period?.label ?? null);
-  const workStatusKpis = buildWorkStatusKpis(stockJobs, period?.label ?? null);
+  const workStatusKpis =
+    throughputRecords.length > 0
+      ? buildWorkStatusKpisFromCohortRemaining(
+          throughputRecords,
+          openJobSet,
+          periodFrom,
+          periodTo,
+          stockScopeHint,
+        )
+      : buildWorkStatusKpis(stockJobs, period?.label ?? null);
 
   return {
     kpis,
