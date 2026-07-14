@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { MapPin, Building2, ClipboardCheck, Navigation } from 'lucide-react';
+import { MapPin, Building2, ClipboardCheck, Navigation, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
@@ -19,6 +19,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { saveUnitRequestMeta, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
+import IrecruitMatchPanel from '@/components/matching/IrecruitMatchPanel';
+import CandidateSpecPanel from '@/components/matching/CandidateSpecPanel';
+import {
+  type IrecruitMatchResult,
+  type IrecruitCandidateMatch,
+} from '@/lib/irecruitMatchTypes';
+import type { CandidateSpecAnalysis } from '@/lib/candidateSpecTypes';
+import { distributeIrecruitMatchesToBranches } from '@/lib/distributeIrecruitToBranches';
+import { matchTierEmoji, matchTierLabel } from '@/lib/irecruitMatchTypes';
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
 type Center = { lat: number; lng: number; label: string };
@@ -67,14 +76,6 @@ type ParsedBranchDemandPayload = {
     unparsed_segments: string[];
     parser_status: 'high_confidence' | 'fallback' | 'none';
   };
-  branch_matches?: Array<{
-    branch_name_clean: string;
-    branch_name_raw: string;
-    requested_qty: number;
-    confidence: number;
-    matched_count: number;
-    suggestions: MatchingSuggestion[];
-  }>;
 };
 
 function isLikelyThailandCoord(lat: number, lng: number): boolean {
@@ -149,11 +150,51 @@ const PreCheckPage: React.FC = () => {
   const [jobMatchCounts, setJobMatchCounts] = useState<Record<string, number>>({});
   const [jobMatchCountsLoading, setJobMatchCountsLoading] = useState(false);
   const [branchParseLoading, setBranchParseLoading] = useState(false);
-  const [branchMatchesLoading, setBranchMatchesLoading] = useState(false);
   const [branchParseData, setBranchParseData] = useState<ParsedBranchDemandPayload | null>(null);
   const [branchParserOverride, setBranchParserOverride] = useState('');
   const [savingBranchOverride, setSavingBranchOverride] = useState(false);
   const [branchOverrideMsg, setBranchOverrideMsg] = useState<string | null>(null);
+  const [jobMatchById, setJobMatchById] = useState<Record<string, IrecruitMatchResult>>({});
+  const [jobMatchLoadingId, setJobMatchLoadingId] = useState<string | null>(null);
+  const [jobMatchErrorById, setJobMatchErrorById] = useState<Record<string, string>>({});
+
+  const fetchIrecruitMatch = async (jobId: string, refresh = false) => {
+    setJobMatchLoadingId(jobId);
+    setJobMatchErrorById((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+    try {
+      const params = new URLSearchParams({ jobId });
+      if (refresh) params.set('refresh', '1');
+      const r = await apiFetch(`/api/matching/irecruit-candidates?${params.toString()}`);
+      if (!r.ok) {
+        const data = (await r.json().catch(() => ({}))) as { message?: string; detail?: string; error?: string };
+        const msg = data.message || data.detail || data.error || `ค้นหาผู้สมัครไม่สำเร็จ (HTTP ${r.status})`;
+        throw new Error(msg);
+      }
+      const data = (await r.json()) as IrecruitMatchResult;
+      setJobMatchById((prev) => ({ ...prev, [jobId]: data }));
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : 'ค้นหาผู้สมัครไม่สำเร็จ';
+      const hint =
+        raw === 'fetch failed'
+          ? 'เชื่อมต่อ API ไม่ได้ — ตรวจสอบว่า npm run dev ยังรันอยู่ หรือ Ollama/iRecruit เข้าถึงได้'
+          : raw;
+      setJobMatchErrorById((prev) => ({ ...prev, [jobId]: hint }));
+    } finally {
+      setJobMatchLoadingId((current) => (current === jobId ? null : current));
+    }
+  };
+
+  // เปิดรายละเอียดงาน + ค้นหาผู้สมัครที่ตรงให้อัตโนมัติ (คลิกเดียว ไม่ต้องกดวิเคราะห์ก่อน)
+  const openJobAndFindCandidates = (j: JobRequest) => {
+    setJobDetail(j);
+    if (!jobMatchById[j.id] && jobMatchLoadingId !== j.id) {
+      void fetchIrecruitMatch(j.id);
+    }
+  };
 
   const openCandidatePrefill = (candidate: MatchingSuggestion['candidate']) => {
     const params = new URLSearchParams();
@@ -166,6 +207,24 @@ const PreCheckPage: React.FC = () => {
     if (candidate.district_name) params.set('district', candidate.district_name);
     if (candidate.location_label) params.set('location_label', candidate.location_label);
     if (candidate.job_name_th) params.set('job_name', candidate.job_name_th);
+    params.set('returnTo', preCheckReturnPath(jobDetail?.id));
+    navigate(`/matching/candidates/add?${params.toString()}`);
+  };
+
+  const openIrecruitPrefill = (match: IrecruitCandidateMatch) => {
+    const [first, ...rest] = match.full_name.trim().split(/\s+/);
+    const params = new URLSearchParams();
+    if (first) params.set('first_name', first);
+    if (rest.length) params.set('last_name', rest.join(' '));
+    if (match.phone_number) params.set('phone', match.phone_number);
+    if (match.age != null) params.set('age', String(match.age));
+    if (match.sex) params.set('sex', match.sex);
+    if (match.province_name) params.set('province', match.province_name);
+    if (match.district_name) params.set('district', match.district_name);
+    if (match.location_label) params.set('location_label', match.location_label);
+    if (match.position_name || match.job_name_th) {
+      params.set('job_name', match.position_name || match.job_name_th || '');
+    }
     params.set('returnTo', preCheckReturnPath(jobDetail?.id));
     navigate(`/matching/candidates/add?${params.toString()}`);
   };
@@ -202,7 +261,7 @@ const PreCheckPage: React.FC = () => {
     const jobId = searchParams.get('jobId');
     if (!jobId) return;
     const job = allJobs.find((j) => j.id === jobId);
-    if (job) setJobDetail(job);
+    if (job) openJobAndFindCandidates(job);
   }, [searchParams, allJobs]);
 
   const projectOptions = useMemo(
@@ -427,7 +486,6 @@ const PreCheckPage: React.FC = () => {
       setMatchingError(null);
       setMatchingData(null);
       setBranchParseLoading(false);
-      setBranchMatchesLoading(false);
       setBranchParseData(null);
       setBranchParserOverride('');
       setSavingBranchOverride(false);
@@ -477,56 +535,28 @@ const PreCheckPage: React.FC = () => {
 
   useEffect(() => {
     if (!jobDetail) return;
-    let cancelled = false;
 
-    // แยกสาขาทันทีฝั่ง UI (ไม่รอ API / iRecruit)
+    // แยกสาขาทันทีฝั่ง UI — ไม่เรียก API match ต่อสาขา (ใช้ผล AI ระดับใบขอกระจายแทน)
     const parserInput = branchParserOverride.trim() || buildErpBranchDemandInput(jobDetail);
     const parsed = parseErpBranchDemand(parserInput);
     setBranchParseData({
       parser_input: parserInput,
       parsed,
-      branch_matches: [],
     });
     setBranchParseLoading(false);
-    setBranchMatchesLoading(parsed.items.length > 0);
-
-    if (parsed.items.length === 0) {
-      setBranchMatchesLoading(false);
-      return;
-    }
-
-    const query = new URLSearchParams({
-      jobId: jobDetail.id,
-      matches: '1',
-      poolSize: '200',
-    });
-    if (branchParserOverride.trim()) query.set('text', branchParserOverride.trim());
-
-    apiFetch(`/api/matching/parse-branch-demand-job?${query.toString()}`)
-      .then(async (r) => {
-        if (!r.ok) return null;
-        return (await r.json()) as ParsedBranchDemandPayload;
-      })
-      .then((data) => {
-        if (!cancelled && data?.branch_matches) {
-          setBranchParseData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  branch_matches: data.branch_matches,
-                }
-              : prev,
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setBranchMatchesLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [branchParserOverride, jobDetail]);
+
+  /** ทางเลือก A: กระจายผล iRecruit ระดับใบขอ → แต่ละสาขา ตามเขต/จังหวัด (ไม่เรียก AI เพิ่ม) */
+  const branchDistributions = useMemo(() => {
+    const items = branchParseData?.parsed.items;
+    if (!jobDetail || !items?.length) return [];
+    const matchResult = jobMatchById[jobDetail.id];
+    if (!matchResult?.matches?.length) return [];
+    return distributeIrecruitMatchesToBranches(matchResult.matches, items, {
+      perBranchLimit: 5,
+      maxProximityRank: 3,
+    });
+  }, [branchParseData?.parsed.items, jobDetail, jobMatchById]);
 
   const branchParserStatusMeta = useMemo(() => {
     const status = branchParseData?.parsed.parser_status;
@@ -749,8 +779,8 @@ const PreCheckPage: React.FC = () => {
               key={j.id}
               role="button"
               tabIndex={0}
-              onClick={() => setJobDetail(j)}
-              onKeyDown={(e) => e.key === 'Enter' && setJobDetail(j)}
+              onClick={() => openJobAndFindCandidates(j)}
+              onKeyDown={(e) => e.key === 'Enter' && openJobAndFindCandidates(j)}
               className="glass-card rounded-[1.5rem] p-4 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
@@ -810,13 +840,27 @@ const PreCheckPage: React.FC = () => {
                   <span className="text-warning">งานนี้ไม่มีพิกัด</span>
                 ) : null}
               </div>
+              <div className="mt-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => openJobAndFindCandidates(j)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  {jobMatchById[j.id]
+                    ? `ดูผู้สมัครที่ตรง (${jobMatchById[j.id].matches.length})`
+                    : jobMatchLoadingId === j.id
+                      ? 'กำลังค้นหา…'
+                      : 'ค้นหาผู้สมัครที่ตรง'}
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
       <Dialog open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-hidden">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-foreground">รายละเอียดงาน</DialogTitle>
             <DialogDescription className="sr-only">รายละเอียดงานและหน่วยงาน</DialogDescription>
@@ -860,6 +904,30 @@ const PreCheckPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  {jobDetail ? (
+                    <>
+                      <CandidateSpecPanel
+                        mode="full"
+                        loading={jobMatchLoadingId === jobDetail.id && !jobMatchById[jobDetail.id]?.analysis}
+                        error={
+                          jobMatchErrorById[jobDetail.id] && !jobMatchById[jobDetail.id]?.analysis
+                            ? jobMatchErrorById[jobDetail.id]
+                            : null
+                        }
+                        analysis={(jobMatchById[jobDetail.id]?.analysis as CandidateSpecAnalysis | undefined) || null}
+                        onAnalyze={() => void fetchIrecruitMatch(jobDetail.id)}
+                        onRefresh={() => void fetchIrecruitMatch(jobDetail.id, true)}
+                      />
+                      <IrecruitMatchPanel
+                        loading={jobMatchLoadingId === jobDetail.id}
+                        error={jobMatchErrorById[jobDetail.id] || null}
+                        result={jobMatchById[jobDetail.id] || null}
+                        onMatch={() => void fetchIrecruitMatch(jobDetail.id)}
+                        onRefresh={() => void fetchIrecruitMatch(jobDetail.id, true)}
+                        onPrefill={openIrecruitPrefill}
+                      />
+                    </>
+                  ) : null}
                   <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
@@ -908,12 +976,15 @@ const PreCheckPage: React.FC = () => {
                     ) : branchParseData?.parsed.items?.length ? (
                       <>
                         <p className="text-xs text-muted-foreground">ใช้ข้อความ: {branchParseData.parser_input}</p>
-                        {branchMatchesLoading ? (
-                          <p className="text-xs text-blue-600">กำลังจับคู่ผู้สมัครตามสาขา…</p>
+                        <p className="text-[11px] text-slate-600">
+                          กระจายจากผล AI ระดับใบขอ ตามเขต/จังหวัดผู้สมัคร (ไม่เรียก AI เพิ่ม)
+                        </p>
+                        {jobMatchLoadingId === jobDetail.id && !jobMatchById[jobDetail.id] ? (
+                          <p className="text-xs text-blue-600">รอผลแมทระดับใบขอเพื่อกระจายเข้าสาขา…</p>
                         ) : null}
                         <div className="space-y-2">
                           {branchParseData.parsed.items.map((item, idx) => {
-                            const branchMatch = branchParseData.branch_matches?.find(
+                            const branchMatch = branchDistributions.find(
                               (b) =>
                                 b.branch_name_clean === item.branch_name_clean &&
                                 b.requested_qty === item.requested_qty,
@@ -932,73 +1003,57 @@ const PreCheckPage: React.FC = () => {
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                    ตรง {branchMatch?.matched_count ?? 0} คน
+                                    ใกล้สาขานี้ {branchMatch?.matches.length ?? 0} คน
                                   </span>
                                   {item.district_hint ? (
                                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700">
                                       เขต/อำเภอ: {item.district_hint}
                                     </span>
                                   ) : null}
+                                  {item.province_hint ? (
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700">
+                                      จังหวัด: {item.province_hint}
+                                    </span>
+                                  ) : null}
                                 </div>
-                                {branchMatch && branchMatch.suggestions.length > 0 ? (
+                                {branchMatch && branchMatch.matches.length > 0 ? (
                                   <div className="space-y-1.5">
-                                    {branchMatch.suggestions.slice(0, 3).map((suggestion, sidx) => {
-                                      const fullName =
-                                        [suggestion.candidate.first_name, suggestion.candidate.last_name]
-                                          .filter(Boolean)
-                                          .join(' ') || 'ไม่ระบุชื่อ';
-                                      return (
-                                        <div
-                                          key={`${item.branch_name_clean}-${fullName}-${sidx}`}
-                                          className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2"
-                                        >
-                                          {(() => {
-                                            const reasonInfo = formatMatchReasons(suggestion.reasons);
-                                            return (
-                                              <>
-                                          <div className="flex items-start justify-between gap-2">
-                                            <button
-                                              type="button"
-                                              onClick={() => openCandidatePrefill(suggestion.candidate)}
-                                              className="text-left text-xs font-medium text-blue-700 hover:underline"
-                                            >
-                                              {fullName}
-                                            </button>
-                                            <span className="text-[11px] rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
-                                              {suggestion.score} คะแนน
-                                            </span>
-                                          </div>
-                                          <div className="text-[11px] text-muted-foreground mt-1">
-                                            {suggestion.candidate.location_label || 'ไม่ระบุพื้นที่'}
-                                            {suggestion.candidate.age !== null ? ` · อายุ ${suggestion.candidate.age}` : ''}
-                                          </div>
-                                          {reasonInfo.primary ? (
-                                            <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                                              <p className="text-[10px] font-semibold text-slate-700">เหตุผลที่แนะนำ</p>
-                                              <p className="mt-0.5 text-[11px] text-slate-700">{reasonInfo.primary}</p>
-                                              {reasonInfo.supporting.length > 0 ? (
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                  {reasonInfo.supporting.map((reason) => (
-                                                    <span
-                                                      key={reason}
-                                                      className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600"
-                                                    >
-                                                      {reason}
-                                                    </span>
-                                                  ))}
-                                                </div>
-                                              ) : null}
-                                            </div>
-                                          ) : null}
-                                              </>
-                                            );
-                                          })()}
+                                    {branchMatch.matches.slice(0, Math.max(3, item.requested_qty)).map((suggestion) => (
+                                      <div
+                                        key={`${item.branch_name_clean}-${suggestion.id}`}
+                                        className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => openIrecruitPrefill(suggestion)}
+                                            className="text-left text-xs font-medium text-blue-700 hover:underline"
+                                          >
+                                            {matchTierEmoji(suggestion.tier)} {suggestion.full_name}
+                                          </button>
+                                          <span className="text-[11px] rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
+                                            {matchTierLabel(suggestion.tier)}
+                                          </span>
                                         </div>
-                                      );
-                                    })}
+                                        <div className="text-[11px] text-muted-foreground mt-1">
+                                          {suggestion.location_label || 'ไม่ระบุพื้นที่'}
+                                          {suggestion.age !== null ? ` · อายุ ${suggestion.age}` : ''}
+                                          {suggestion.phone_number ? ` · ${suggestion.phone_number}` : ''}
+                                        </div>
+                                        <div className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                                          <p className="text-[10px] font-semibold text-slate-700">เหตุผลใกล้สาขานี้</p>
+                                          <p className="mt-0.5 text-[11px] text-slate-700">{suggestion.proximity_reason}</p>
+                                          {suggestion.reason ? (
+                                            <p className="mt-0.5 text-[11px] text-slate-600 italic">AI: {suggestion.reason}</p>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
+                                ) : jobMatchById[jobDetail.id] ? (
+                                  <p className="text-[11px] text-muted-foreground">ยังไม่เจอคนที่ใกล้สาขานี้จาก shortlist ใบขอ</p>
                                 ) : (
-                                  <p className="text-[11px] text-muted-foreground">ยังไม่เจอคนที่ตรงกับสาขานี้</p>
+                                  <p className="text-[11px] text-muted-foreground">กดค้นหาผู้สมัครที่ตรงก่อน แล้วจะกระจายให้สาขานี้</p>
                                 )}
                               </div>
                             );

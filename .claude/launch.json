@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev:vite"],
       "port": 8080,
       "autoPort": true
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "api:local"],
+      "port": 3000
     }
   ]
 }

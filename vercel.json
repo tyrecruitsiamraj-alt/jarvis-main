@@ -4,7 +4,7 @@
   "functions": {
     "api/[[...path]].ts": {
       "maxDuration": 60,
-      "includeFiles": "shared/**"
+      "includeFiles": "shared/**,skills/**"
     }
   },
   "routes": [
