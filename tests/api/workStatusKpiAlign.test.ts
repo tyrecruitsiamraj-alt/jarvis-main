@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDashboardData, DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
+import { buildDashboardData, DEFAULT_DASHBOARD_FILTERS, resolvePeriodRange } from '../../src/lib/dashboard/buildDashboardData';
 import type { JobRequest } from '../../src/types';
 
 function job(partial: Partial<JobRequest> & Pick<JobRequest, 'id' | 'request_no'>): JobRequest {
@@ -25,7 +25,7 @@ function job(partial: Partial<JobRequest> & Pick<JobRequest, 'id' | 'request_no'
 }
 
 describe('work status KPIs align with remaining', () => {
-  it('totals match cohort remaining rates and request count', () => {
+  it('All mode: remaining and work-status use full open stock (ที่ต้องหา)', () => {
     const openJobs = [
       job({
         id: '1',
@@ -61,7 +61,7 @@ describe('work status KPIs align with remaining', () => {
         throughputRecords: [
           { requestNo: 'R001', requestDate: '2026-06-01', closureDate: null, positionUnits: 2, isOpen: true, kind: 'remaining' },
           { requestNo: 'R002', requestDate: '2026-06-05', closureDate: null, positionUnits: 1, isOpen: true, kind: 'remaining' },
-          // ใบมีคงเหลือใน SQL แต่ไม่อยู่ใน feed เปิด → ยังต้องนับ และ default in_progress
+          // ใบนอก feed ไม่นับในโหมดทั้งหมด (นับจากใบเปิดจริง)
           { requestNo: 'R003', requestDate: '2026-06-10', closureDate: null, positionUnits: 3, isOpen: true, kind: 'remaining' },
           { requestNo: 'R004', requestDate: '2026-05-01', closureDate: '2026-05-20', positionUnits: 5, isOpen: false, kind: 'filled' },
         ],
@@ -70,16 +70,48 @@ describe('work status KPIs align with remaining', () => {
 
     const remaining = data.kpis.find((k) => k.id === 'remaining');
     const workTotal = data.workStatusKpis?.find((k) => k.id === 'work_status_total');
-    expect(remaining?.value).toBe(6);
-    expect(remaining?.secondaryCount).toBe(3);
-    expect(workTotal?.value).toBe(6);
-    expect(workTotal?.secondaryCount).toBe(3);
+    expect(remaining?.value).toBe(3);
+    expect(remaining?.secondaryCount).toBe(2);
+    expect(workTotal?.value).toBe(3);
+    expect(workTotal?.secondaryCount).toBe(2);
+  });
 
-    const waiting = data.workStatusKpis?.find((k) => k.id === 'work_status_waiting_inform');
-    const evaluating = data.workStatusKpis?.find((k) => k.id === 'work_status_evaluating');
-    const inProgress = data.workStatusKpis?.find((k) => k.id === 'work_status_in_progress');
-    expect(waiting?.value).toBe(2);
-    expect(evaluating?.value).toBe(1);
-    expect(inProgress?.value).toBe(3);
+  it('Month mode: remaining and work-status follow request-month cohort', () => {
+    const openJobs = [
+      job({
+        id: '1',
+        request_no: 'R-001',
+        externalId: 'R001',
+        work_status: 'waiting_inform',
+        request_date: '2026-06-01',
+        request_positions: 2,
+        filled_positions: 0,
+        cancelled_positions: 0,
+      }),
+    ];
+    const period = resolvePeriodRange('custom', { from: '2026-06-01', to: '2026-06-30' });
+
+    const data = buildDashboardData(
+      openJobs,
+      [],
+      period,
+      DEFAULT_DASHBOARD_FILTERS,
+      new Date('2026-07-14T00:00:00.000Z'),
+      {
+        jobs: openJobs,
+        from: period.from,
+        to: period.to,
+        label: period.label,
+        throughputRecords: [
+          { requestNo: 'R001', requestDate: '2026-06-01', closureDate: null, positionUnits: 2, isOpen: true, kind: 'remaining' },
+          { requestNo: 'R003', requestDate: '2026-06-10', closureDate: null, positionUnits: 3, isOpen: true, kind: 'remaining' },
+        ],
+      },
+    );
+
+    const remaining = data.kpis.find((k) => k.id === 'remaining');
+    const workTotal = data.workStatusKpis?.find((k) => k.id === 'work_status_total');
+    expect(remaining?.value).toBe(5);
+    expect(workTotal?.value).toBe(5);
   });
 });
