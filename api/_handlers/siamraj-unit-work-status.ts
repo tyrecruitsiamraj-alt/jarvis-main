@@ -35,6 +35,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           person_first_name: null,
           person_last_name: null,
           status_date: null,
+          persons: [],
           updated_at: null,
         },
       );
@@ -60,6 +61,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const item = await upsertUnitWorkStatus({
         requestNo,
         status: body.status,
+        persons: body.persons,
         person_first_name: body.person_first_name,
         person_last_name: body.person_last_name,
         status_date: body.status_date,

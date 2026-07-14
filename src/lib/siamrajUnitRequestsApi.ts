@@ -91,8 +91,15 @@ export async function saveUnitRequestMeta(
   if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกข้อมูลใบขอไม่สำเร็จ'));
 }
 
+export type UnitWorkStatusPersonPayload = {
+  first_name: string;
+  last_name: string;
+  status_date?: string | null;
+};
+
 export type UnitWorkStatusPayload = {
   status: string;
+  persons?: UnitWorkStatusPersonPayload[];
   person_first_name?: string | null;
   person_last_name?: string | null;
   status_date?: string | null;
@@ -100,6 +107,7 @@ export type UnitWorkStatusPayload = {
 
 export type UnitWorkStatusRecord = UnitWorkStatusPayload & {
   request_no: string;
+  persons?: UnitWorkStatusPersonPayload[];
   updated_at: string | null;
 };
 

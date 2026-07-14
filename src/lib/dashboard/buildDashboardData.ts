@@ -72,7 +72,7 @@ import {
 } from './requestControlBridge';
 import { classifyLifecycleKind, lifecycleKindLabel } from './lifecycle';
 import {
-  formatWorkPersonName,
+  formatWorkPersonsSummary,
   resolveUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
   type UnitRequestWorkStatus,
@@ -303,7 +303,11 @@ export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWor
     controlStatus: REQUEST_CONTROL_STATUS_LABELS[rec.controlStatus],
     workStatus,
     workStatusLabel: UNIT_REQUEST_WORK_STATUS_LABELS[workStatus],
-    workPersonName: formatWorkPersonName(job.work_person_first_name, job.work_person_last_name),
+    workPersonName: formatWorkPersonsSummary(
+      job.work_persons,
+      job.work_person_first_name,
+      job.work_person_last_name,
+    ),
     workStatusDate: job.work_status_date?.slice(0, 10) || '',
   };
 }

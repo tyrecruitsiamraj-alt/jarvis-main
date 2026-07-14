@@ -754,6 +754,7 @@ const JobListPage: React.FC = () => {
                         status={j.work_status}
                         firstName={j.work_person_first_name}
                         lastName={j.work_person_last_name}
+                        persons={j.work_persons}
                         compact
                       />
                       <JobUrgencyBadge job={j} />
@@ -854,6 +855,7 @@ const JobListPage: React.FC = () => {
                           status={j.work_status}
                           firstName={j.work_person_first_name}
                           lastName={j.work_person_last_name}
+                          persons={j.work_persons}
                           compact
                         />
                         <JobUrgencyBadge job={j} compact />

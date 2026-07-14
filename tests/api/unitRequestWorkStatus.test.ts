@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatWorkPersonName,
+  formatWorkPersonsSummary,
   isUnitRequestWorkStatus,
   resolveUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_DATE_LABELS,
@@ -35,6 +36,15 @@ describe('unitRequestWorkStatus', () => {
     expect(isUnitRequestWorkStatus('evaluating')).toBe(true);
     expect(resolveUnitRequestWorkStatus(null)).toBe('in_progress');
     expect(formatWorkPersonName('สมชาย', 'ใจดี')).toBe('สมชาย ใจดี');
+  });
+
+  it('summarizes multiple work persons', () => {
+    expect(
+      formatWorkPersonsSummary([
+        { first_name: 'Ann', last_name: 'A' },
+        { first_name: 'Bob', last_name: 'B' },
+      ]),
+    ).toBe('Ann A และอีก 1 คน');
   });
 
   it('maps work status onto dashboard work items', () => {

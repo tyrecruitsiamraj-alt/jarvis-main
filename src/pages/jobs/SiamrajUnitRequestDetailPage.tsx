@@ -153,6 +153,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 status={data.work_status}
                 firstName={data.work_person_first_name}
                 lastName={data.work_person_last_name}
+                persons={data.work_persons}
               />
               <JobUrgencyBadge job={data} />
               {urgencyHint ? (
@@ -290,28 +291,17 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <ClipboardList className="w-4 h-4 text-blue-600" />
-                สถานะทำงาน
+                <StickyNote className="w-4 h-4 text-blue-600" />
+                หมายเหตุ
               </h3>
-              <p className="text-xs text-muted-foreground">
-                เก็บในฐานข้อมูล Jarvis สำหรับติดตามงานและ Dashboard — ไม่แก้สถานะบน Siamraj
-              </p>
-              {requestKey ? (
-                <UnitRequestWorkStatusEditor
-                  requestKey={requestKey}
-                  initialStatus={data.work_status}
-                  initialFirstName={data.work_person_first_name}
-                  initialLastName={data.work_person_last_name}
-                  initialStatusDate={data.work_status_date}
-                  onSaved={(next) => {
-                    queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
-                      old ? { ...old, ...next } : old,
-                    );
-                  }}
-                />
-              ) : (
-                <p className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกสถานะไม่ได้</p>
-              )}
+              <UnitRequestNoteDetail
+                job={data}
+                onSaved={(note) => {
+                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                    old ? { ...old, list_note: note || undefined } : old,
+                  );
+                }}
+              />
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
@@ -332,17 +322,29 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <StickyNote className="w-4 h-4 text-blue-600" />
-                หมายเหตุ
+                <ClipboardList className="w-4 h-4 text-blue-600" />
+                สถานะทำงาน
               </h3>
-              <UnitRequestNoteDetail
-                job={data}
-                onSaved={(note) => {
-                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
-                    old ? { ...old, list_note: note || undefined } : old,
-                  );
-                }}
-              />
+              <p className="text-xs text-muted-foreground">
+                เก็บในฐานข้อมูล Jarvis สำหรับติดตามงานและ Dashboard — ไม่แก้สถานะบน Siamraj
+              </p>
+              {requestKey ? (
+                <UnitRequestWorkStatusEditor
+                  requestKey={requestKey}
+                  initialStatus={data.work_status}
+                  initialFirstName={data.work_person_first_name}
+                  initialLastName={data.work_person_last_name}
+                  initialStatusDate={data.work_status_date}
+                  initialPersons={data.work_persons}
+                  onSaved={(next) => {
+                    queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                      old ? { ...old, ...next } : old,
+                    );
+                  }}
+                />
+              ) : (
+                <p className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกสถานะไม่ได้</p>
+              )}
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">

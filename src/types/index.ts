@@ -185,6 +185,8 @@ export interface JobRequest {
   work_person_last_name?: string | null;
   /** วันที่ตามสถานะ (YMD) — แจ้งเข้า / นัดสัมภาษณ์ / เริ่มงาน */
   work_status_date?: string | null;
+  /** รายชื่อคนในสถานะทำงาน (หลายคนต่อใบได้) */
+  work_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
 }
 
 export interface JobAssignment {

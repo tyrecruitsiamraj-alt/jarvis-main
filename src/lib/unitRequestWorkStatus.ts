@@ -46,3 +46,20 @@ export function formatWorkPersonName(
 ): string {
   return [first?.trim(), last?.trim()].filter(Boolean).join(' ');
 }
+
+export function formatWorkPersonsSummary(
+  persons?: Array<{ first_name?: string | null; last_name?: string | null }> | null,
+  firstName?: string | null,
+  lastName?: string | null,
+): string {
+  const list =
+    persons && persons.length > 0
+      ? persons
+      : firstName || lastName
+        ? [{ first_name: firstName, last_name: lastName }]
+        : [];
+  if (list.length === 0) return '';
+  const first = formatWorkPersonName(list[0]?.first_name, list[0]?.last_name);
+  if (list.length === 1) return first;
+  return `${first} และอีก ${list.length - 1} คน`;
+}
