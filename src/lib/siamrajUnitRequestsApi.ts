@@ -36,6 +36,7 @@ export type SiamrajThroughputRecord = {
   closureDate: string | null;
   positionUnits: number;
   isOpen: boolean;
+  kind?: 'filled' | 'cancelled' | 'remaining';
 };
 
 export async function fetchSiamrajThroughput(from: string, to: string): Promise<SiamrajThroughputRecord[]> {

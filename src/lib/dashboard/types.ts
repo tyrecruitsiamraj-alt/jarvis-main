@@ -31,17 +31,17 @@ export type DashboardActivityTrendPoint = {
   newOpenings: number;
   increaseHeadcount?: number;
   newSite?: number;
-  /** ตำแหน่งที่ขอ (ตามเดือนที่กรอกใบขอ) */
+  /** ตำแหน่งที่ขอ (ตามเดือนที่เปิดใบ — ไม่หายเมื่อปิดแล้ว) */
   requestedPositions?: number;
-  /** ตำแหน่งที่ปิดได้/หาได้แล้ว (ตามเดือนที่ปิด) */
+  /** ตำแหน่งที่ปิดได้/หาได้แล้ว (ตามเดือนที่เปิดใบ · สถานะปัจจุบัน) */
   closedPositions?: number;
   /** ตำแหน่งที่ปิดได้/หาได้แล้ว */
   filledPositions?: number;
   /** ใบขอที่ปิดครบ */
   fullyClosedRequests?: number;
-  /** ตำแหน่งที่ยกเลิก */
+  /** ตำแหน่งที่ยกเลิก (ตามเดือนที่เปิดใบ · สถานะปัจจุบัน) */
   cancelledPositions?: number;
-  /** คงเหลือต่อเดือน */
+  /** คงเหลือต่อเดือน (เข้ามา − ปิด − ยกเลิก · สถานะปัจจุบัน) */
   remainingPositions?: number;
   /** อัตราสำเร็จรายเดือน = ปิดได้ / ขอ (%) */
   closeRatePercent?: number | null;

@@ -40,12 +40,18 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <DashboardThroughputChart data={data.activityTrend} periodLabel={data.activityTrendLabel} />
+
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
           <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-900">แนวโน้มรายเดือน — ลาออก / เปลี่ยนตัว / เพิ่มอัตรา / เปิดไซต์</h3>
-            <p className="text-xs text-slate-500">{data.activityTrendLabel}</p>
+            <h3 className="text-sm font-semibold text-slate-900">
+              ประเภทใบขอคงเหลือ — ลาออก / เปลี่ยนตัว / เพิ่มอัตรา / เปิดไซต์
+            </h3>
+            <p className="text-xs text-slate-500">
+              นับจากใบที่ยังเปิดอยู่ แยกตามประเภท · {data.activityTrendLabel}
+            </p>
             <p className="text-xs text-slate-600 mt-1">
-              รวมปีนี้ {activityTotal} ใบ — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
+              รวม {activityTotal} อัตรา — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
               {periodTotals.replacements} · เปิดงานใหม่ {periodTotals.newOpenings}
             </p>
             {data.lifecycleInsights && data.lifecycleInsights.length > 0 ? (
@@ -57,8 +63,8 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
             ) : null}
             {currentMonth && previousMonth ? (
               <p className="text-xs text-slate-500 mt-1">
-                {previousMonth.label}: {sumPoint(previousMonth)} ใบ → {currentMonth.label}:{' '}
-                {sumPoint(currentMonth)} ใบ
+                {previousMonth.label}: {sumPoint(previousMonth)} → {currentMonth.label}:{' '}
+                {sumPoint(currentMonth)}
                 {sumPoint(previousMonth) > 0 ? (
                   <>
                     {' '}
@@ -118,21 +124,10 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
                   dot={{ r: 3 }}
                   activeDot={{ r: 5 }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="newOpenings"
-                  name="อื่นๆ"
-                  stroke="#94a3b8"
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                  dot={false}
-                />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
-
-        <DashboardThroughputChart data={data.activityTrend} periodLabel={data.activityTrendLabel} />
       </div>
     </div>
   );

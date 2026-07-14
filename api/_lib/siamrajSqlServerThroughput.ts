@@ -1,12 +1,6 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { toBangkokYmd } from './businessDate.js';
-import {
-  effectiveInformedCount,
-  effectiveInformQtySql,
-  isOpenStaffingRowForRemaining,
-  remainingOpenPositionsFromRow,
-  requestPositionTotal,
-} from './siamrajStaffingOpen.js';
+import { effectiveInformQtySql, staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 
 export {
   effectiveInformedCount,
@@ -18,6 +12,7 @@ export {
   remainingOpenPositions,
   remainingOpenPositionsFromRow,
   requestPositionTotal,
+  staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 
 export type SiamrajThroughputRecord = {
@@ -25,6 +20,7 @@ export type SiamrajThroughputRecord = {
   closureDate: string | null;
   positionUnits: number;
   isOpen: boolean;
+  kind?: 'filled' | 'cancelled' | 'remaining';
 };
 
 type SqlThroughputRow = {
@@ -89,38 +85,35 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   const effectiveRequestDate = effectiveRequestDateYmdFromRow(row);
   if (!effectiveRequestDate) return [];
 
-  const total = requestPositionTotal(row.request_qty);
-  const informed = effectiveInformedCount(row);
-  const remaining = remainingOpenPositionsFromRow(row);
-  const isOpen = isOpenStaffingRowForRemaining(row);
+  const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || effectiveRequestDate;
   const out: SiamrajThroughputRecord[] = [];
 
-  if (informed > 0) {
+  if (breakdown.filledPositions > 0) {
     out.push({
       requestDate: effectiveRequestDate,
       closureDate,
-      positionUnits: informed,
+      positionUnits: breakdown.filledPositions,
       isOpen: false,
       kind: 'filled',
     });
   }
-
-  if (isOpen && remaining > 0) {
-    out.push({
-      requestDate: effectiveRequestDate,
-      closureDate: null,
-      positionUnits: remaining,
-      isOpen: true,
-      kind: 'remaining',
-    });
-  } else if (!isOpen && informed === 0) {
+  if (breakdown.cancelledPositions > 0) {
     out.push({
       requestDate: effectiveRequestDate,
       closureDate,
-      positionUnits: total,
+      positionUnits: breakdown.cancelledPositions,
       isOpen: false,
       kind: 'cancelled',
+    });
+  }
+  if (breakdown.remainingPositions > 0) {
+    out.push({
+      requestDate: effectiveRequestDate,
+      closureDate: null,
+      positionUnits: breakdown.remainingPositions,
+      isOpen: true,
+      kind: 'remaining',
     });
   }
 

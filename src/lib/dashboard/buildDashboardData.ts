@@ -387,6 +387,34 @@ export function resolveYearToDateTrendRange(now = new Date()): {
   return { from, to, label };
 }
 
+/**
+ * โหมดทั้งหมด: กว้างพอให้ครอบคลุมใบเปิดใน feed
+ * (คงเหลือรวมรายเดือน = การ์ดคงเหลือ เมื่อชุดใบตรงกัน)
+ */
+export function resolveOpenStockTrendRange(
+  openJobs: JobRequest[],
+  now = new Date(),
+): {
+  from: string;
+  to: string;
+  label: string;
+} {
+  const ytd = resolveYearToDateTrendRange(now);
+  let earliest = ytd.from;
+  for (const j of openJobs) {
+    const ymd = effectiveRequestDateYmd(j, now);
+    if (ymd && ymd < earliest) earliest = `${ymd.slice(0, 7)}-01`;
+  }
+  if (earliest >= ytd.from) return ytd;
+  const fromDate = parseISO(earliest);
+  const toDate = parseISO(ytd.to);
+  return {
+    from: earliest,
+    to: ytd.to,
+    label: `${format(fromDate, 'MMM yyyy', { locale: th })} – ${format(toDate, 'MMM yyyy', { locale: th })}`,
+  };
+}
+
 function inYmdRange(ymd: string, from: string, to: string): boolean {
   return ymd >= from && ymd <= to;
 }

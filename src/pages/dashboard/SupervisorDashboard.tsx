@@ -10,6 +10,7 @@ import {
   defaultDashboardDateRange,
   filterJobsByRequestDate,
   resolvePeriodRange,
+  resolveOpenStockTrendRange,
   resolveYearToDateTrendRange,
   sortWorkQueue,
 } from '@/lib/dashboard/buildDashboardData';
@@ -81,9 +82,19 @@ const SupervisorDashboard: React.FC = () => {
 
   const throughputRange = useMemo(() => {
     if (period) return { from: period.previousFrom, to: period.to };
-    const ytd = resolveYearToDateTrendRange();
-    return { from: ytd.from, to: ytd.to };
-  }, [period]);
+    return resolveOpenStockTrendRange(jobs);
+  }, [period, jobs]);
+
+  const trendMeta = useMemo(() => {
+    if (period) {
+      return {
+        from: period.from,
+        to: period.to,
+        label: period.label,
+      };
+    }
+    return resolveOpenStockTrendRange(jobs);
+  }, [period, jobs]);
 
   useEffect(() => {
     if (DEMO_MODE) {
@@ -91,10 +102,6 @@ const SupervisorDashboard: React.FC = () => {
       return;
     }
     const range = throughputRange;
-    if (!period) {
-      setThroughputRecords(jobsToThroughputRecords(jobs));
-      return;
-    }
     if (siamrajPrimary && dbSource === 'sqlserver') {
       let cancelled = false;
       void fetchSiamrajThroughput(range.from, range.to)
@@ -122,7 +129,7 @@ const SupervisorDashboard: React.FC = () => {
       setClosedJobs([]);
       return;
     }
-    const range = period ?? resolveYearToDateTrendRange();
+    const range = period ?? resolveOpenStockTrendRange(jobs);
     let cancelled = false;
     void fetchSiamrajClosedRequests(range.from, range.to)
       .then((rows) => {
@@ -134,7 +141,7 @@ const SupervisorDashboard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [siamrajPrimary, dbSource, period, refreshing]);
+  }, [siamrajPrimary, dbSource, period, refreshing, jobs]);
 
   /** ชุดข้อมูลเดียวกับหน้ารายการหน่วยงาน — ไม่กรองวันที่จนกว่าจะเลือกช่วงวันที่กรอก */
   const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
@@ -250,7 +257,7 @@ const SupervisorDashboard: React.FC = () => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
     const unitFilteredAll = filterUnitRequests(jobs, siamrajPrimary, unitFilters, { ageDaysFilter: true });
-    const trendRange = period ?? resolveYearToDateTrendRange();
+    const trendRange = trendMeta;
     const trendJobs = period
       ? filterJobsByRequestDate(unitFilteredAll, period.from, period.to)
       : unitFilteredAll;
@@ -278,7 +285,7 @@ const SupervisorDashboard: React.FC = () => {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, scopedClosedJobs, jobsWithoutAgeFilter]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
