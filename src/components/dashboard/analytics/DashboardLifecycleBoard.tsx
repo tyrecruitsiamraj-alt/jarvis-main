@@ -1,5 +1,5 @@
-import React from 'react';
-import type { LifecycleBoardSummary } from '@/lib/dashboard/lifecycle';
+import React, { useMemo } from 'react';
+import type { LifecycleBoardSummary, LifecycleBoardRow } from '@/lib/dashboard/lifecycle';
 import { LIFECYCLE_KIND_LABELS } from '@/lib/dashboard/lifecycle';
 
 type Props = {
@@ -23,6 +23,37 @@ function cell(bucket: { positions: number; requests: number }) {
   );
 }
 
+function kindShareLine(row: LifecycleBoardRow, showOther: boolean): string {
+  const parts = [
+    `ลาออก ${fmt(row.resignation.positions)}`,
+    `เปลี่ยนตัว ${fmt(row.replacement.positions)}`,
+    `เพิ่มอัตรา ${fmt(row.increaseHeadcount.positions)}`,
+    `เปิดไซต์ ${fmt(row.newSite.positions)}`,
+  ];
+  if (showOther) parts.push(`อื่นๆ ${fmt(row.other.positions)}`);
+  return parts.join(' · ');
+}
+
+function weakestFillLabel(board: LifecycleBoardSummary): string | null {
+  const entries: { label: string; pct: number }[] = [];
+  const add = (label: string, kind: keyof typeof board.fillRateByKind, requested: number) => {
+    const pct = board.fillRateByKind[kind];
+    if (pct == null || requested <= 0) return;
+    entries.push({ label, pct });
+  };
+  const req = board.rows.find((r) => r.id === 'requested');
+  if (!req) return null;
+  add('ลาออก', 'resignation', req.resignation.positions);
+  add('เปลี่ยนตัว', 'replacement', req.replacement.positions);
+  add('เพิ่มอัตรา', 'increase_headcount', req.increaseHeadcount.positions);
+  add('เปิดไซต์', 'new_site', req.newSite.positions);
+  if (req.other.positions > 0) add('อื่นๆ', 'other', req.other.positions);
+  if (entries.length === 0) return null;
+  entries.sort((a, b) => a.pct - b.pct);
+  const weak = entries[0]!;
+  return `${weak.label} ปิดได้ช้าสุด (${weak.pct}%)`;
+}
+
 const COLS: { key: 'total' | 'resignation' | 'replacement' | 'increaseHeadcount' | 'newSite' | 'other'; label: string }[] = [
   { key: 'total', label: 'รวม' },
   { key: 'resignation', label: LIFECYCLE_KIND_LABELS.resignation },
@@ -33,28 +64,71 @@ const COLS: { key: 'total' | 'resignation' | 'replacement' | 'increaseHeadcount'
 ];
 
 const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
-  const remainingRow = board.rows.find((r) => r.id === 'remaining');
   const showOther = board.rows.some((r) => r.other.positions > 0 || r.other.requests > 0);
   const cols = showOther ? COLS : COLS.filter((c) => c.key !== 'other');
 
+  const summary = useMemo(() => {
+    const requested = board.rows.find((r) => r.id === 'requested');
+    const filled = board.rows.find((r) => r.id === 'filled');
+    const cancelled = board.rows.find((r) => r.id === 'cancelled');
+    const remaining = board.rows.find((r) => r.id === 'remaining');
+    if (!requested || !filled || !cancelled || !remaining) return null;
+
+    const inPos = requested.total.positions;
+    const closedPos = filled.total.positions;
+    const cancelPos = cancelled.total.positions;
+    const remPos = remaining.total.positions;
+    const fillPct = inPos > 0 ? Math.round((closedPos / inPos) * 1000) / 10 : null;
+    const stillOpenPct = inPos > 0 ? Math.round((remPos / inPos) * 1000) / 10 : null;
+    const weak = weakestFillLabel(board);
+
+    return {
+      inPos,
+      closedPos,
+      cancelPos,
+      remPos,
+      fillPct,
+      stillOpenPct,
+      weak,
+      intakeByType: kindShareLine(requested, showOther),
+      remainingByType: kindShareLine(remaining, showOther),
+    };
+  }, [board, showOther]);
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900">Life Cycle ตามประเภทใบขอ</h3>
-        <p className="text-xs text-slate-500 mt-0.5">
-          ใช้ชุดเดียวกับสรุปอัตรา · เข้ามา/ปิดแล้ว/ยกเลิกจาก cohort · คงเหลือจากคิวเปิด · {periodLabel}
-        </p>
-        {remainingRow ? (
-          <p className="text-xs text-slate-600 mt-1">
-            คงเหลือรวม {fmt(remainingRow.total.positions)} อัตรา (= การ์ดคงเหลือ) — ลาออก{' '}
-            {fmt(remainingRow.resignation.positions)} · เปลี่ยนตัว {fmt(remainingRow.replacement.positions)} · เพิ่มอัตรา{' '}
-            {fmt(remainingRow.increaseHeadcount.positions)} · เปิดไซต์ {fmt(remainingRow.newSite.positions)}
-            {showOther ? ` · อื่นๆ ${fmt(remainingRow.other.positions)}` : ''}
+      <div className="mb-3 space-y-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">Life Cycle ตามประเภทใบขอ</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            มุมวิเคราะห์: เข้ามาเท่าไหร่ → ปิด/ยกเลิกไปแล้วเท่าไหร่ → คงเหลือยังหาอยู่เท่าไหร่ · แยกตามประเภท · {periodLabel}
           </p>
+        </div>
+
+        {summary ? (
+          <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 space-y-1.5">
+            <p className="text-xs text-slate-800 font-medium">
+              ข้อสรุป {periodLabel}: เข้ามา{' '}
+              <span className="tabular-nums">{fmt(summary.inPos)}</span> · ปิดแล้ว{' '}
+              <span className="tabular-nums">{fmt(summary.closedPos)}</span>
+              {summary.fillPct != null ? ` (${summary.fillPct}%)` : ''} · ยกเลิก{' '}
+              <span className="tabular-nums">{fmt(summary.cancelPos)}</span> · คงเหลือหาอยู่{' '}
+              <span className="tabular-nums text-amber-900">{fmt(summary.remPos)}</span>
+              {summary.stillOpenPct != null ? ` (~${summary.stillOpenPct}% ของที่เข้ามา)` : ''}
+            </p>
+            <p className="text-[11px] text-slate-600">
+              เข้ามาแยกประเภท — {summary.intakeByType}
+            </p>
+            <p className="text-[11px] text-slate-600">
+              คงเหลือแยกประเภท (= การ์ดคงเหลือ) — {summary.remainingByType}
+            </p>
+            {summary.weak ? (
+              <p className="text-[11px] text-slate-600">
+                อ่าน % ปิดได้: ประเภทไหนต่ำ = ปิดช้า/ค้างนาน · ตอนนี้{summary.weak}
+              </p>
+            ) : null}
+          </div>
         ) : null}
-        <p className="text-[11px] text-slate-500 mt-1">
-          คอลัมน์รวมของเข้ามา/ปิดแล้ว/ยกเลิก ต้องเท่าการ์ดสรุปอัตรา · คงเหลือเท่าการ์ดคงเหลือ
-        </p>
       </div>
 
       <div className="overflow-x-auto -mx-1">
