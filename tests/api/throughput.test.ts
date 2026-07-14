@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enrichActivityTrendWithThroughput, sumCohortStockByRequestDate, sumThroughputInRange } from '../../src/lib/dashboard/throughput';
+import { enrichActivityTrendWithThroughput, applyOpenQueueRemainingToActivityTrend, sumCohortStockByRequestDate, sumThroughputInRange } from '../../src/lib/dashboard/throughput';
 import type { DashboardActivityTrendPoint } from '../../src/lib/dashboard/types';
 
 describe('throughput', () => {
@@ -47,6 +47,57 @@ describe('throughput', () => {
     expect(after[0]?.requestedPositions).toBe(60);
     expect(after[0]?.filledPositions).toBe(40);
     expect(after[0]?.remainingPositions).toBe(20);
+  });
+
+  it('overlays remaining from open staffing queue only', () => {
+    const points: DashboardActivityTrendPoint[] = [
+      { date: '2026-06-01', label: 'มิ.ย.', resignations: 0, replacements: 0, newOpenings: 0, remainingPositions: 300 },
+      { date: '2026-07-01', label: 'ก.ค.', resignations: 0, replacements: 0, newOpenings: 0, remainingPositions: 0 },
+    ];
+    const overlay = applyOpenQueueRemainingToActivityTrend(points, [
+      {
+        id: 'a',
+        job_type: 'thai_executive',
+        job_category: 'private',
+        status: 'open',
+        urgency: 'advance',
+        total_income: 0,
+        location_address: 'Bangkok',
+        penalty_per_day: 0,
+        days_without_worker: 0,
+        total_penalty: 0,
+        request_date: '2026-06-10',
+        required_date: '2026-06-10',
+        created_at: '2026-06-10',
+        unit_name: 'A',
+        request_positions: 10,
+        filled_positions: 4,
+        cancelled_positions: 0,
+        position_units: 6,
+      },
+      {
+        id: 'b',
+        job_type: 'thai_executive',
+        job_category: 'private',
+        status: 'open',
+        urgency: 'advance',
+        total_income: 0,
+        location_address: 'Bangkok',
+        penalty_per_day: 0,
+        days_without_worker: 0,
+        total_penalty: 0,
+        request_date: '2026-07-02',
+        required_date: '2026-07-02',
+        created_at: '2026-07-02',
+        unit_name: 'B',
+        request_positions: 5,
+        filled_positions: 0,
+        cancelled_positions: 0,
+        position_units: 5,
+      },
+    ] as never);
+    expect(overlay[0]?.remainingPositions).toBe(6);
+    expect(overlay[1]?.remainingPositions).toBe(5);
   });
 
   it('splits closed into same-period vs backlog by closure date', () => {

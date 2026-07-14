@@ -289,3 +289,28 @@ export function enrichActivityTrendWithThroughput(
     };
   });
 }
+
+/**
+ * ทับเส้นคงเหลือด้วยอัตราจากคิวเปิด (เท่าการ์ดคงเหลือ)
+ * — ไม่ใช้ remaining จาก throughput ที่รวมใบนอก staffing queue
+ */
+export function applyOpenQueueRemainingToActivityTrend(
+  points: DashboardActivityTrendPoint[],
+  openRemainingJobs: JobRequest[],
+): DashboardActivityTrendPoint[] {
+  const remainingMap = new Map<string, number>();
+  for (const j of openRemainingJobs) {
+    if (j.status === 'closed' || j.status === 'cancelled') continue;
+    const rem = positionBreakdownFromJob(j).remainingPositions;
+    if (rem <= 0) continue;
+    const ymd = safeYmd(j.request_date) || safeYmd(j.submittedAt) || effectiveRequestDateYmd(j);
+    if (!ymd) continue;
+    const month = ymd.slice(0, 7);
+    remainingMap.set(month, (remainingMap.get(month) ?? 0) + rem);
+  }
+
+  return points.map((p) => ({
+    ...p,
+    remainingPositions: remainingMap.get(p.date.slice(0, 7)) ?? 0,
+  }));
+}

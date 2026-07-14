@@ -42,6 +42,7 @@ import type {
 } from './types';
 import {
   enrichActivityTrendWithThroughput,
+  applyOpenQueueRemainingToActivityTrend,
   filterJobsForThroughput,
   jobsToThroughputRecords,
   sumThroughputInRange,
@@ -1021,7 +1022,7 @@ export function buildDashboardData(
     trend?.throughputRecords ??
     jobsToThroughputRecords(filterJobsForThroughput(trendJobs, trendFrom, trendTo));
   const activityJobs = period ? trendJobs : openJobSet;
-  const activityTrend = enrichActivityTrendWithThroughput(
+  let activityTrend = enrichActivityTrendWithThroughput(
     buildActivityTrend(activityJobs, trendFrom, trendTo, today),
     throughputRecords,
   );
@@ -1144,6 +1145,8 @@ export function buildDashboardData(
     openRemainingPositions += positionBreakdownFromJob(j).remainingPositions;
   }
   const openRemainingRequests = openRemainingJobs.length;
+
+  activityTrend = applyOpenQueueRemainingToActivityTrend(activityTrend, openRemainingJobs);
 
   const kpis =
     cohortStock != null

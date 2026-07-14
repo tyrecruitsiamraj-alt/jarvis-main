@@ -57,13 +57,14 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
           แนวโน้มรายเดือน — เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ
         </h3>
         <p className="text-xs text-slate-500">
-          นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · ปิด/ยกเลิก/คงเหลืออัปเดตตามสถานะปัจจุบัน · ยอดเข้ามาไม่หาย ·{' '}
+          นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · เข้ามา/ปิด/ยกเลิกจาก cohort · คงเหลือ = ใบเปิดที่ต้องหา (เท่าการ์ดคงเหลือ) ·{' '}
           {periodLabel}
         </p>
         <p className="text-xs text-slate-600 mt-1">
           รวมช่วง เข้ามา {totals.requested.toLocaleString('th-TH')} · ปิดแล้ว{' '}
           {totals.filled.toLocaleString('th-TH')} · ยกเลิก {totals.cancelled.toLocaleString('th-TH')} ·
           คงเหลือ {totals.remaining.toLocaleString('th-TH')}
+          {totals.remaining > 0 ? ' (= การ์ดคงเหลือ)' : ''}
         </p>
       </div>
       <div className="h-64">
