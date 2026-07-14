@@ -38,6 +38,9 @@ export type SiamrajThroughputRecord = {
   positionUnits: number;
   isOpen: boolean;
   kind?: 'filled' | 'cancelled' | 'remaining';
+  requestActionName?: string;
+  requestActionCode?: string;
+  lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
 };
 
 export async function fetchSiamrajThroughput(from: string, to: string): Promise<SiamrajThroughputRecord[]> {

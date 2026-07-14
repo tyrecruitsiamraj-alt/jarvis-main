@@ -73,7 +73,7 @@ import {
   mapSummaryV3ToDashboard,
   statesToRequestControlRecords,
 } from './requestControlBridge';
-import { classifyLifecycleKind, lifecycleKindLabel, buildLifecycleBoardSummary } from './lifecycle';
+import { classifyLifecycleKind, lifecycleKindLabel, buildLifecycleBoardFromStockSources } from './lifecycle';
 import {
   formatWorkPersonsSummary,
   resolveUnitRequestWorkStatus,
@@ -1175,10 +1175,12 @@ export function buildDashboardData(
 
   const workStatusKpis = buildWorkStatusKpis(openRemainingJobs, period?.label ?? null);
 
-  const lifecycleCohortJobs = period
-    ? filterJobsByRequestDate(mergedJobs, periodFrom, periodTo, today)
-    : mergedJobs;
-  const lifecycleBoard = buildLifecycleBoardSummary(lifecycleCohortJobs, openRemainingJobs);
+  const lifecycleBoard = buildLifecycleBoardFromStockSources({
+    throughputRecords,
+    from: periodFrom,
+    to: periodTo,
+    remainingJobs: openRemainingJobs,
+  });
 
   return {
     kpis,

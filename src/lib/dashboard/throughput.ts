@@ -10,6 +10,10 @@ export type ThroughputRecord = {
   positionUnits: number;
   isOpen: boolean;
   kind?: 'filled' | 'cancelled' | 'remaining';
+  requestActionName?: string;
+  requestActionCode?: string;
+  /** ค่าจาก classifyLifecycleKind / classifyLifecycleKindFromAction */
+  lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
 };
 
 export type ThroughputSummary = {
@@ -78,6 +82,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         positionUnits: b.filledPositions,
         isOpen: false,
         kind: 'filled',
+        requestActionName: j.request_action_name,
+        requestActionCode: j.request_action_code,
       });
     }
     if (b.cancelledPositions > 0) {
@@ -88,6 +94,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         positionUnits: b.cancelledPositions,
         isOpen: false,
         kind: 'cancelled',
+        requestActionName: j.request_action_name,
+        requestActionCode: j.request_action_code,
       });
     }
     if (b.remainingPositions > 0) {
@@ -98,6 +106,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         positionUnits: b.remainingPositions,
         isOpen: true,
         kind: 'remaining',
+        requestActionName: j.request_action_name,
+        requestActionCode: j.request_action_code,
       });
     }
   }

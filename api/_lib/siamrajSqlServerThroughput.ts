@@ -26,6 +26,9 @@ export type SiamrajThroughputRecord = {
   positionUnits: number;
   isOpen: boolean;
   kind?: 'filled' | 'cancelled' | 'remaining';
+  requestActionName?: string;
+  requestActionCode?: string;
+  lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
 };
 
 type SqlThroughputRow = {
@@ -42,6 +45,8 @@ type SqlThroughputRow = {
   cancel_date: Date | string | null;
   stop_date: Date | string | null;
   has_inform: number | boolean | null;
+  request_action_code: string | null;
+  request_action_name: string | null;
 };
 
 function getSqlFilters() {
@@ -82,6 +87,10 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   const requestNo = (row.request_no || '').trim() || undefined;
   const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
+  const requestActionCode = (row.request_action_code || '').trim() || undefined;
+  const requestActionName = (row.request_action_name || '').trim() || undefined;
+  const lifecycleKind = classifyActionToLifecycle(requestActionName, requestActionCode);
+  const meta = { requestActionName, requestActionCode, lifecycleKind };
   const out: SiamrajThroughputRecord[] = [];
 
   if (breakdown.filledPositions > 0) {
@@ -92,6 +101,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
       positionUnits: breakdown.filledPositions,
       isOpen: false,
       kind: 'filled',
+      ...meta,
     });
   }
   if (breakdown.cancelledPositions > 0) {
@@ -102,6 +112,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
       positionUnits: breakdown.cancelledPositions,
       isOpen: false,
       kind: 'cancelled',
+      ...meta,
     });
   }
   if (breakdown.remainingPositions > 0) {
@@ -112,10 +123,24 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
       positionUnits: breakdown.remainingPositions,
       isOpen: true,
       kind: 'remaining',
+      ...meta,
     });
   }
 
   return out;
+}
+
+function classifyActionToLifecycle(
+  actionName?: string,
+  actionCode?: string,
+): SiamrajThroughputRecord['lifecycleKind'] {
+  const action = (actionName || '').trim();
+  const code = (actionCode || '').trim().toUpperCase();
+  if (/ลาออก|resign/i.test(action) || code === 'RESIGN') return 'resignation';
+  if (/เปลี่ยนตัว|replacement/i.test(action) || code === 'REPLACE') return 'replacement';
+  if (/เพิ่มอัตรา/i.test(action)) return 'increase_headcount';
+  if (/เปิดไซต์/i.test(action)) return 'new_site';
+  return 'other';
 }
 
 function isDateYmd(s: string): boolean {
@@ -160,7 +185,9 @@ export async function listSiamrajSqlServerThroughput(options: {
       CASE
         WHEN ISNULL(A.inform_qty, 0) > 0 OR ISNULL(IH.inform_cnt, 0) > 0 THEN 1
         ELSE 0
-      END AS has_inform
+      END AS has_inform,
+      A.request_code AS request_action_code,
+      (SELECT TOP 1 z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
     LEFT JOIN (

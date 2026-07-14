@@ -42,7 +42,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-slate-900">Life Cycle ตามประเภทใบขอ</h3>
         <p className="text-xs text-slate-500 mt-0.5">
-          เข้ามา / ปิดได้ / ยกเลิก / คงเหลือ · นับอัตราและจำนวนใบ · {periodLabel}
+          ใช้ชุดเดียวกับสรุปอัตรา · เข้ามา/ปิดแล้ว/ยกเลิกจาก cohort · คงเหลือจากคิวเปิด · {periodLabel}
         </p>
         {remainingRow ? (
           <p className="text-xs text-slate-600 mt-1">
@@ -52,6 +52,9 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
             {showOther ? ` · อื่นๆ ${fmt(remainingRow.other.positions)}` : ''}
           </p>
         ) : null}
+        <p className="text-[11px] text-slate-500 mt-1">
+          คอลัมน์รวมของเข้ามา/ปิดแล้ว/ยกเลิก ต้องเท่าการ์ดสรุปอัตรา · คงเหลือเท่าการ์ดคงเหลือ
+        </p>
       </div>
 
       <div className="overflow-x-auto -mx-1">

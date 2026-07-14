@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildLifecycleBoardSummary } from '../../src/lib/dashboard/lifecycle';
+import { buildLifecycleBoardFromStockSources } from '../../src/lib/dashboard/lifecycle';
+import type { ThroughputRecord } from '../../src/lib/dashboard/throughput';
+import { sumCohortStockByRequestDate } from '../../src/lib/dashboard/throughput';
 import type { JobRequest } from '@/types';
 
 function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
@@ -21,54 +23,92 @@ function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
   };
 }
 
-describe('buildLifecycleBoardSummary', () => {
-  it('splits intake filled cancelled remaining by lifecycle kind', () => {
-    const open = [
+describe('buildLifecycleBoardFromStockSources', () => {
+  it('matches cohort stock totals for เข้ามา/ปิดแล้ว/ยกเลิก and open remaining for คงเหลือ', () => {
+    const records: ThroughputRecord[] = [
+      {
+        requestNo: 'A',
+        requestDate: '2026-03-01',
+        closureDate: null,
+        positionUnits: 10,
+        isOpen: false,
+        kind: 'filled',
+        requestActionName: 'ลาออก',
+        lifecycleKind: 'resignation',
+      },
+      {
+        requestNo: 'A',
+        requestDate: '2026-03-01',
+        closureDate: null,
+        positionUnits: 6,
+        isOpen: true,
+        kind: 'remaining',
+        requestActionName: 'ลาออก',
+        lifecycleKind: 'resignation',
+      },
+      {
+        requestNo: 'B',
+        requestDate: '2026-04-01',
+        closureDate: null,
+        positionUnits: 5,
+        isOpen: false,
+        kind: 'cancelled',
+        requestActionName: 'เปลี่ยนตัว',
+        lifecycleKind: 'replacement',
+      },
+      {
+        requestNo: 'C',
+        requestDate: '2026-05-01',
+        closureDate: null,
+        positionUnits: 3,
+        isOpen: false,
+        kind: 'filled',
+        requestActionName: 'เพิ่มอัตรา',
+        lifecycleKind: 'increase_headcount',
+      },
+      {
+        requestNo: 'D',
+        requestDate: '2025-12-01',
+        closureDate: null,
+        positionUnits: 99,
+        isOpen: false,
+        kind: 'cancelled',
+        requestActionName: 'ลาออก',
+        lifecycleKind: 'resignation',
+      },
+    ];
+    const remainingJobs = [
       job({
-        id: 'r1',
+        id: 'A',
+        request_no: 'A',
         unit_name: 'A',
         request_action_name: 'ลาออก',
-        request_positions: 10,
-        filled_positions: 4,
+        request_positions: 16,
+        filled_positions: 10,
         cancelled_positions: 0,
         position_units: 6,
-      }),
-      job({
-        id: 'p1',
-        unit_name: 'B',
-        request_action_name: 'เปลี่ยนตัว',
-        request_positions: 5,
-        filled_positions: 0,
-        cancelled_positions: 0,
-        position_units: 5,
+        request_date: '2026-03-01',
       }),
     ];
-    const closed = [
-      job({
-        id: 'c1',
-        unit_name: 'C',
-        status: 'closed',
-        request_action_name: 'เพิ่มอัตรา',
-        request_positions: 3,
-        filled_positions: 3,
-        cancelled_positions: 0,
-        position_units: 0,
-        closed_date: '2026-07-10',
-      }),
-    ];
-    const board = buildLifecycleBoardSummary([...open, ...closed], open);
+    const from = '2026-01-01';
+    const to = '2026-12-31';
+    const cohort = sumCohortStockByRequestDate(records, from, to);
+    const board = buildLifecycleBoardFromStockSources({
+      throughputRecords: records,
+      from,
+      to,
+      remainingJobs,
+    });
     const requested = board.rows.find((r) => r.id === 'requested')!;
     const filled = board.rows.find((r) => r.id === 'filled')!;
+    const cancelled = board.rows.find((r) => r.id === 'cancelled')!;
     const remaining = board.rows.find((r) => r.id === 'remaining')!;
-    expect(requested.total.positions).toBe(18);
-    expect(requested.resignation.positions).toBe(10);
-    expect(requested.replacement.positions).toBe(5);
-    expect(requested.increaseHeadcount.positions).toBe(3);
-    expect(filled.total.positions).toBe(7);
+    expect(requested.total.positions).toBe(cohort.requestPositions);
+    expect(filled.total.positions).toBe(cohort.filledPositions);
+    expect(cancelled.total.positions).toBe(cohort.cancelledPositions);
+    expect(remaining.total.positions).toBe(6);
+    expect(requested.resignation.positions).toBe(16);
+    expect(cancelled.replacement.positions).toBe(5);
     expect(filled.increaseHeadcount.positions).toBe(3);
-    expect(remaining.total.positions).toBe(11);
-    expect(remaining.resignation.positions).toBe(6);
-    expect(remaining.replacement.positions).toBe(5);
-    expect(board.fillRateByKind.increase_headcount).toBe(100);
   });
 });

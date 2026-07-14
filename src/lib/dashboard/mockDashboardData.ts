@@ -132,7 +132,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       },
       {
         id: 'filled',
-        label: 'ปิดได้ (หาได้แล้ว)',
+        label: 'ปิดแล้ว',
         total: { positions: 24, requests: 12 },
         resignation: { positions: 8, requests: 4 },
         replacement: { positions: 7, requests: 3 },
@@ -152,7 +152,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       },
       {
         id: 'remaining',
-        label: 'คงเหลือ (ที่ต้องหา)',
+        label: 'คงเหลือ',
         total: { positions: 25, requests: 11 },
         resignation: { positions: 9, requests: 4 },
         replacement: { positions: 6, requests: 3 },
