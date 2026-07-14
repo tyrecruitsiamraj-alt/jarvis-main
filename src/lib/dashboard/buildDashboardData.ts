@@ -683,8 +683,8 @@ function buildWorkStatusKpisFromCohortRemaining(
   ];
 }
 
-/** KPI ชุดสั้น: ใบขอทั้งหมด / ปิดใบขอ / ยกเลิก / คงเหลือ (ตำแหน่ง) */
-function buildStockKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
+/** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
+function buildStockKpis(jobs: JobRequest[], _periodLabel?: string | null): DashboardKpi[] {
   let requestPositions = 0;
   let filledPositions = 0;
   let cancelledPositions = 0;
@@ -708,23 +708,20 @@ function buildStockKpis(jobs: JobRequest[], periodLabel?: string | null): Dashbo
 
   const posReq = (positions: number, requests: number) =>
     `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
-  const scopeHint = periodLabel
-    ? `ใบขอในงวดที่เลือก`
-    : `ใบเปิดทั้งหมด (ตรงหน้ารายการหน่วยงาน)`;
 
   return [
     {
       id: 'total_requests',
-      label: 'ใบขอทั้งหมด',
+      label: 'เข้ามา',
       value: requestPositions,
       secondaryCount: requestCount,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ${posReq(requestPositions, requestCount)}`,
+      description: `อัตราที่ขอ · ${posReq(requestPositions, requestCount)}`,
       trendPercent: null,
     },
     {
       id: 'closed',
-      label: 'ปิดใบขอ',
+      label: 'ปิดแล้ว',
       value: filledPositions,
       secondaryCount: filledRequestCount,
       secondaryLabel: 'ใบขอที่มีการหาได้',
@@ -746,7 +743,7 @@ function buildStockKpis(jobs: JobRequest[], periodLabel?: string | null): Dashbo
       value: remainingPositions,
       secondaryCount: remainingRequestCount,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} ที่ยังต้องหา · ${posReq(remainingPositions, remainingRequestCount)}`,
+      description: `ยังต้องหา · ${posReq(remainingPositions, remainingRequestCount)} · เข้ามา − ปิดแล้ว − ยกเลิก`,
       trendPercent: null,
     },
   ];

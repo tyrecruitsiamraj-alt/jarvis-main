@@ -156,7 +156,23 @@ const DashboardShell: React.FC<Props> = ({
             <div className="space-y-5 min-w-0">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-2">สต็อกตำแหน่ง</p>
+                  <p className="text-xs font-medium text-slate-500 mb-1">สรุปอัตราในช่วงที่เลือก</p>
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    เข้ามา − ปิดแล้ว − ยกเลิก = คงเหลือ
+                    {(() => {
+                      const intake = data.kpis.find((k) => k.id === 'total_requests')?.value ?? 0;
+                      const closed = data.kpis.find((k) => k.id === 'closed')?.value ?? 0;
+                      const cancelled = data.kpis.find((k) => k.id === 'cancelled')?.value ?? 0;
+                      const remaining = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
+                      return (
+                        <>
+                          {' '}
+                          · ตอนนี้ {intake.toLocaleString('th-TH')} − {closed.toLocaleString('th-TH')} −{' '}
+                          {cancelled.toLocaleString('th-TH')} = {remaining.toLocaleString('th-TH')}
+                        </>
+                      );
+                    })()}
+                  </p>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {data.kpis.map((kpi) => (
                       <DashboardKpiCard

@@ -198,7 +198,7 @@ export function sumCohortStockByRequestDate(
 
 export function buildStockKpisFromCohort(
   summary: CohortStockSummary,
-  scopeHint: string,
+  _scopeHint: string,
 ): DashboardKpi[] {
   const posReq = (positions: number, requests: number) =>
     `${positions.toLocaleString('th-TH')} อัตรา · ${requests.toLocaleString('th-TH')} ใบขอ`;
@@ -206,16 +206,16 @@ export function buildStockKpisFromCohort(
   return [
     {
       id: 'total_requests',
-      label: 'ใบขอทั้งหมด',
+      label: 'เข้ามา',
       value: summary.requestPositions,
       secondaryCount: summary.requestCount,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ${posReq(summary.requestPositions, summary.requestCount)}`,
+      description: `อัตราที่ขอในช่วง · ${posReq(summary.requestPositions, summary.requestCount)} · ไม่หายเมื่อปิด/ยกเลิก`,
       trendPercent: null,
     },
     {
       id: 'closed',
-      label: 'ปิดใบขอ',
+      label: 'ปิดแล้ว',
       value: summary.filledPositions,
       secondaryCount: summary.filledRequestCount,
       secondaryLabel: 'ใบขอที่มีการหาได้',
@@ -237,7 +237,7 @@ export function buildStockKpisFromCohort(
       value: summary.remainingPositions,
       secondaryCount: summary.remainingRequestCount,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} ที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequestCount)}`,
+      description: `ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequestCount)} · เข้ามา − ปิดแล้ว − ยกเลิก`,
       trendPercent: null,
     },
   ];
