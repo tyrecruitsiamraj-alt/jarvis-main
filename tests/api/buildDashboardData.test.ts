@@ -222,6 +222,10 @@ describe('buildDashboardData', () => {
     );
     expect(lifecycleRemaining).toBe(6);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(6);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(6);
+    expect(data.unitOverview.reduce((s, u) => s + u.open, 0)).toBe(6);
+    expect(data.lifecycleBoard?.rows.find((r) => r.id === 'remaining')?.total.positions).toBe(6);
+    expect(data.lifecycleBoard?.rows.find((r) => r.id === 'remaining')?.resignation.positions).toBe(6);
   });
 
   it('remaining KPI reflects open positions in selected period only', () => {

@@ -72,7 +72,7 @@ import {
   mapSummaryV3ToDashboard,
   statesToRequestControlRecords,
 } from './requestControlBridge';
-import { classifyLifecycleKind, lifecycleKindLabel } from './lifecycle';
+import { classifyLifecycleKind, lifecycleKindLabel, buildLifecycleBoardSummary } from './lifecycle';
 import {
   formatWorkPersonsSummary,
   resolveUnitRequestWorkStatus,
@@ -568,97 +568,8 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
   const total = Object.values(counts).reduce((s, n) => s + n, 0);
   const totalRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
   const scopeHint = periodLabel
-    ? `คงเหลือในช่วงที่เลือก`
-    : `คงเหลือในช่วงแนวโน้ม`;
-  const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
-    id,
-    label,
-    value: counts[status],
-    secondaryCount: requestCounts[status],
-    secondaryLabel: 'ใบขอ',
-    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} อัตรา · ${requestCounts[status].toLocaleString('th-TH')} ใบ`,
-    trendPercent: null,
-  });
-
-  return [
-    {
-      id: 'work_status_total',
-      label: 'ทั้งหมด',
-      value: total,
-      secondaryCount: totalRequests,
-      secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ (= การ์ดคงเหลือ)`,
-      trendPercent: null,
-    },
-    leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
-    leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
-    leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
-    leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
-    leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
-  ];
-}
-
-/**
- * นับสถานะทำงานจากชุดคงเหลือเดียวกับ KPI คงเหลือ (throughput)
- * ใบที่ไม่อยู่ใน feed → ถือเป็น in_progress
- */
-function buildWorkStatusKpisFromCohortRemaining(
-  records: ThroughputRecord[],
-  jobs: JobRequest[],
-  from: string,
-  to: string,
-  scopeHint: string,
-): DashboardKpi[] {
-  const statusByNo = new Map<string, UnitRequestWorkStatus | null | undefined>();
-  for (const j of jobs) {
-    const no = (j.request_no || j.externalId || '').trim();
-    if (!no) continue;
-    statusByNo.set(no, j.work_status);
-    const raw = (j.externalId || '').trim();
-    if (raw && raw !== no) statusByNo.set(raw, j.work_status);
-  }
-
-  const remainingByNo = new Map<string, number>();
-  let orphanUnits = 0;
-  for (const r of records) {
-    if (r.requestDate < from || r.requestDate > to) continue;
-    const kind = r.kind ?? (r.isOpen ? 'remaining' : 'filled');
-    if (kind !== 'remaining' || r.positionUnits <= 0) continue;
-    const no = r.requestNo?.trim();
-    if (no) {
-      remainingByNo.set(no, (remainingByNo.get(no) ?? 0) + r.positionUnits);
-    } else {
-      orphanUnits += r.positionUnits;
-    }
-  }
-
-  const counts: Record<UnitRequestWorkStatus, number> = {
-    in_progress: 0,
-    evaluating: 0,
-    waiting_inform: 0,
-    waiting_interview: 0,
-    waiting_start: 0,
-  };
-  const requestCounts: Record<UnitRequestWorkStatus, number> = {
-    in_progress: 0,
-    evaluating: 0,
-    waiting_inform: 0,
-    waiting_interview: 0,
-    waiting_start: 0,
-  };
-
-  for (const [no, units] of remainingByNo) {
-    const status = resolveUnitRequestWorkStatus(statusByNo.get(no));
-    counts[status] += units;
-    requestCounts[status] += 1;
-  }
-  if (orphanUnits > 0) {
-    counts.in_progress += orphanUnits;
-    requestCounts.in_progress += 1;
-  }
-
-  const total = Object.values(counts).reduce((s, n) => s + n, 0);
-  const totalRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
+    ? `เท่าการ์ดคงเหลือในช่วงที่เลือก`
+    : `เท่าการ์ดคงเหลือ`;
   const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
     id,
     label,
@@ -926,25 +837,27 @@ function buildUnitOverview(
   ]);
   const map = new Map<string, { names: string[]; total: number; open: number; overdue: number }>();
   for (const j of jobs) {
+    const rem = positionBreakdownFromJob(j).remainingPositions;
+    if (rem <= 0) continue;
+    if (j.status === 'closed' || j.status === 'cancelled') continue;
     const rawName = j.unit_name?.trim() || '—';
     const key = resolve(rawName);
-    const units = jobPositionUnits(j);
     const row = map.get(key) ?? { names: [], total: 0, open: 0, overdue: 0 };
     row.names.push(rawName);
-    row.total += units;
+    row.total += rem;
+    row.open += rem;
     const st = mapJobToTaskStatus(j, today);
-    if (st !== 'completed' && st !== 'cancelled') row.open += units;
-    if (st === 'overdue') row.overdue += units;
+    if (st === 'overdue') row.overdue += rem;
     map.set(key, row);
   }
-  const totalAll = sumJobPositionUnits(jobs) || 1;
+  const totalAll = [...map.values()].reduce((s, r) => s + r.open, 0) || 1;
   return [...map.entries()]
     .map(([, row]) => ({
       name: pickUnitOrganizationDisplayName(row.names),
       total: row.total,
       open: row.open,
       overdue: row.overdue,
-      sharePercent: Math.round((row.total / totalAll) * 1000) / 10,
+      sharePercent: Math.round((row.open / totalAll) * 1000) / 10,
     }))
     .sort((a, b) => b.open - a.open || b.total - a.total || a.name.localeCompare(b.name, 'th'));
 }
@@ -1257,22 +1170,18 @@ export function buildDashboardData(
         )
       : buildStockKpis(stockJobs, period?.label ?? null);
 
-  const workStatusKpis =
-    period && throughputRecords.length > 0
-      ? buildWorkStatusKpisFromCohortRemaining(
-          throughputRecords,
-          openJobSet,
-          periodFrom,
-          periodTo,
-          stockScopeHint,
-        )
-      : buildWorkStatusKpis(openRemainingJobs, period?.label ?? null);
+  const workStatusKpis = buildWorkStatusKpis(openRemainingJobs, period?.label ?? null);
+
+  const lifecycleCohortJobs = period
+    ? filterJobsByRequestDate(mergedJobs, periodFrom, periodTo, today)
+    : mergedJobs;
+  const lifecycleBoard = buildLifecycleBoardSummary(lifecycleCohortJobs, openRemainingJobs);
 
   return {
     kpis,
     workStatusKpis,
     activityTrend,
-    unitOverview: buildUnitOverview(openJobSet, today, unitScopeNames),
+    unitOverview: buildUnitOverview(openRemainingJobs, today, unitScopeNames),
     ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),
     ageDaysRequestTotal: (period ? stockJobs : openRemainingJobs).length,
     ageDaysPositionTotal: period
@@ -1287,6 +1196,7 @@ export function buildDashboardData(
     slaSummary,
     lifecycleTrend,
     lifecycleInsights,
+    lifecycleBoard,
     flowView,
     executiveInsights,
     priorityWorkQueue,

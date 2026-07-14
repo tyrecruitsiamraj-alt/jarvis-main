@@ -235,7 +235,7 @@ const DashboardShell: React.FC<Props> = ({
                 title="ภาระงานตามหน่วยงาน"
                 subtitle={
                   activeUnitCount > 0
-                    ? `${unitOpenTotal.toLocaleString('th-TH')} ตำแหน่ง · ${activeUnitCount.toLocaleString('th-TH')} หน่วยงาน · กดเพื่อดู`
+                    ? `คงเหลือ ${unitOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeUnitCount.toLocaleString('th-TH')} หน่วยงาน · กดเพื่อดู`
                     : 'กดเพื่อดูรายละเอียด'
                 }
                 open={showUnitOverview}

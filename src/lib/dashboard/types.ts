@@ -1,3 +1,5 @@
+import type { LifecycleBoardSummary } from './lifecycle';
+
 export type DashboardTaskStatus =
   | 'pending'
   | 'in_progress'
@@ -5,7 +7,6 @@ export type DashboardTaskStatus =
   | 'overdue'
   | 'cancelled'
   | 'at_risk';
-
 export type DashboardSlaStatus =
   | 'on_track'
   | 'at_risk'
@@ -316,6 +317,8 @@ export type DashboardData = {
   slaSummary?: DashboardSlaSummary;
   lifecycleTrend?: DashboardLifecycleTrendPoint[];
   lifecycleInsights?: string[];
+  /** สรุป Life Cycle: เข้ามา/ปิดได้/ยกเลิก/คงเหลือ แยกประเภทใบขอ */
+  lifecycleBoard?: LifecycleBoardSummary;
   flowView?: DashboardFlowView;
   executiveInsights?: DashboardExecutiveInsights;
   priorityWorkQueue: DashboardWorkItem[];
