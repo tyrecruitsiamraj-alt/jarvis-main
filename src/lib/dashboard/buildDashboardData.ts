@@ -1207,12 +1207,41 @@ export function buildDashboardData(
     throughputRecords.length > 0
       ? sumCohortStockByRequestDate(throughputRecords, periodFrom, periodTo)
       : null;
+
+  /** โหมดทั้งหมด: คงเหลือ = ที่ต้องหาจริงจากใบเปิดทั้งหมด (ไม่จำกัดแค่ cohort ในช่วงแนวโน้ม) */
+  const openRemainingJobs = (period ? stockJobs : openJobSet).filter((j) => {
+    if (j.status === 'closed' || j.status === 'cancelled') return false;
+    return positionBreakdownFromJob(j).remainingPositions > 0;
+  });
+  let openRemainingPositions = 0;
+  for (const j of openRemainingJobs) {
+    openRemainingPositions += positionBreakdownFromJob(j).remainingPositions;
+  }
+  const openRemainingRequests = openRemainingJobs.length;
+
   const kpis =
     cohortStock != null
-      ? buildStockKpisFromCohort(cohortStock, stockScopeHint)
+      ? buildStockKpisFromCohort(
+          period
+            ? cohortStock
+            : {
+                ...cohortStock,
+                remainingPositions: openRemainingPositions,
+                remainingRequestCount: openRemainingRequests,
+              },
+          stockScopeHint,
+        ).map((kpi) =>
+          !period && kpi.id === 'remaining'
+            ? {
+                ...kpi,
+                description: `อัตราที่ยังต้องหาจากใบเปิดทั้งหมด · ${openRemainingPositions.toLocaleString('th-TH')} อัตรา · ${openRemainingRequests.toLocaleString('th-TH')} ใบขอ`,
+              }
+            : kpi,
+        )
       : buildStockKpis(stockJobs, period?.label ?? null);
+
   const workStatusKpis =
-    throughputRecords.length > 0
+    period && throughputRecords.length > 0
       ? buildWorkStatusKpisFromCohortRemaining(
           throughputRecords,
           openJobSet,
@@ -1220,16 +1249,18 @@ export function buildDashboardData(
           periodTo,
           stockScopeHint,
         )
-      : buildWorkStatusKpis(stockJobs, period?.label ?? null);
+      : buildWorkStatusKpis(openRemainingJobs, period?.label ?? null);
 
   return {
     kpis,
     workStatusKpis,
     activityTrend,
     unitOverview: buildUnitOverview(openJobSet, today, unitScopeNames),
-    ageDaysBreakdown: buildAgeDaysBreakdown(stockJobs, today),
-    ageDaysRequestTotal: stockJobs.length,
-    ageDaysPositionTotal: sumJobPositionUnits(stockJobs),
+    ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),
+    ageDaysRequestTotal: (period ? stockJobs : openRemainingJobs).length,
+    ageDaysPositionTotal: period
+      ? stockJobs.reduce((sum, j) => sum + positionBreakdownFromJob(j).remainingPositions, 0)
+      : openRemainingPositions,
     closedBreakdown,
     fulfillmentBreakdown,
     requestControlSummary,
