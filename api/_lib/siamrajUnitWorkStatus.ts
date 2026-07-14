@@ -164,6 +164,18 @@ async function appendWorkStatusHistory(input: {
   previous: UnitWorkStatusRow | null;
   userId: string | null;
 }): Promise<void> {
+  const params = [
+    input.requestNo,
+    input.next.status,
+    input.next.person_first_name,
+    input.next.person_last_name,
+    input.next.status_date,
+    input.previous?.status ?? null,
+    input.previous?.person_first_name ?? null,
+    input.previous?.person_last_name ?? null,
+    input.previous?.status_date ?? null,
+    input.userId,
+  ];
   try {
     await dbQuery(
       `insert into ${historyTable} (
@@ -175,45 +187,27 @@ async function appendWorkStatusHistory(input: {
          $6, $7, $8, $9::date,
          $10, now()
        )`,
-      [
-        input.requestNo,
-        input.next.status,
-        input.next.person_first_name,
-        input.next.person_last_name,
-        input.next.status_date,
-        input.previous?.status ?? null,
-        input.previous?.person_first_name ?? null,
-        input.previous?.person_last_name ?? null,
-        input.previous?.status_date ?? null,
-        input.userId,
-      ],
+      params,
     );
   } catch (e) {
     if (isMissingTable(e)) {
-      await ensureWorkStatusHistoryTable();
-      await dbQuery(
-        `insert into ${historyTable} (
-           request_no, status, person_first_name, person_last_name, status_date,
-           previous_status, previous_person_first_name, previous_person_last_name, previous_status_date,
-           updated_by_user_id, created_at
-         ) values (
-           $1, $2, $3, $4, $5::date,
-           $6, $7, $8, $9::date,
-           $10, now()
-         )`,
-        [
-          input.requestNo,
-          input.next.status,
-          input.next.person_first_name,
-          input.next.person_last_name,
-          input.next.status_date,
-          input.previous?.status ?? null,
-          input.previous?.person_first_name ?? null,
-          input.previous?.person_last_name ?? null,
-          input.previous?.status_date ?? null,
-          input.userId,
-        ],
-      );
+      try {
+        await ensureWorkStatusHistoryTable();
+        await dbQuery(
+          `insert into ${historyTable} (
+             request_no, status, person_first_name, person_last_name, status_date,
+             previous_status, previous_person_first_name, previous_person_last_name, previous_status_date,
+             updated_by_user_id, created_at
+           ) values (
+             $1, $2, $3, $4, $5::date,
+             $6, $7, $8, $9::date,
+             $10, now()
+           )`,
+          params,
+        );
+      } catch (e2) {
+        console.error('siamraj_unit_work_status_history.append_failed_after_ensure', e2);
+      }
       return;
     }
     // ประวัติเป็นข้อมูลเสริม — ไม่ให้ทำให้บันทึกหลักล่ม
@@ -225,7 +219,7 @@ export async function getUnitWorkStatus(requestNo: string): Promise<UnitWorkStat
   const key = requestNo.trim();
   if (!key) return null;
   try {
-    const rows = await dbQuery<Row>(
+    const { rows } = await dbQuery<Row>(
       `select request_no, status, person_first_name, person_last_name, status_date, updated_at
        from ${table} where request_no = $1`,
       [key],
@@ -242,7 +236,7 @@ export async function getUnitWorkStatusMap(requestNos: string[]): Promise<Map<st
   const map = new Map<string, UnitWorkStatusRow>();
   if (keys.length === 0) return map;
   try {
-    const rows = await dbQuery<Row>(
+    const { rows } = await dbQuery<Row>(
       `select request_no, status, person_first_name, person_last_name, status_date, updated_at
        from ${table} where request_no = any($1::text[])`,
       [keys],
@@ -285,8 +279,8 @@ export async function upsertUnitWorkStatus(input: {
   const params = [requestNo, input.status, first, last, statusDate, userId] as const;
   const previous = await getUnitWorkStatus(requestNo);
 
-  const runInsert = () =>
-    dbQuery<Row>(
+  const runInsert = async (): Promise<Row> => {
+    const { rows } = await dbQuery<Row>(
       `insert into ${table} (
          request_no, status, person_first_name, person_last_name, status_date, updated_by_user_id, updated_at
        ) values ($1, $2, $3, $4, $5::date, $6, now())
@@ -300,6 +294,9 @@ export async function upsertUnitWorkStatus(input: {
        returning request_no, status, person_first_name, person_last_name, status_date, updated_at`,
       [...params],
     );
+    if (!rows[0]) throw new Error('upsert failed');
+    return rows[0];
+  };
 
   const finish = async (row: Row): Promise<UnitWorkStatusRow> => {
     const next = mapRow(row);
@@ -313,9 +310,7 @@ export async function upsertUnitWorkStatus(input: {
   };
 
   try {
-    const rows = await runInsert();
-    if (!rows[0]) throw new Error('upsert failed');
-    return finish(rows[0]);
+    return finish(await runInsert());
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/invalid input syntax for type uuid/i.test(msg)) {
@@ -324,9 +319,7 @@ export async function upsertUnitWorkStatus(input: {
     if (isMissingTable(e) || isCheckViolation(e)) {
       try {
         await ensureWorkStatusTable();
-        const rows = await runInsert();
-        if (!rows[0]) throw new Error('upsert failed');
-        return finish(rows[0]);
+        return finish(await runInsert());
       } catch (e2) {
         const msg2 = e2 instanceof Error ? e2.message : String(e2);
         throw new Error(
