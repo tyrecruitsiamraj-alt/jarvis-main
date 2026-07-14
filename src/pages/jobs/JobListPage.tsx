@@ -638,7 +638,7 @@ const JobListPage: React.FC = () => {
           ) : (
             // ─── Desktop skeleton table ──────────────────────────────────────
             <div className="glass-card rounded-xl border border-border overflow-x-auto">
-              <table className="w-full text-sm min-w-[1080px]">
+              <table className="w-full text-sm min-w-[1000px]">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
@@ -655,7 +655,6 @@ const JobListPage: React.FC = () => {
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                     <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
                     <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
-                    <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -679,7 +678,6 @@ const JobListPage: React.FC = () => {
                       <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
                       <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
                       <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-16 rounded-full mx-auto" /></td>
-                      <td className="px-3 py-3 text-right"><Skeleton className="h-3 w-16 ml-auto" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -746,8 +744,7 @@ const JobListPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between mt-2 text-xs gap-2">
-                    <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
+                  <div className="flex items-center justify-end mt-2 text-xs gap-2">
                     <div className="flex items-center gap-1.5 shrink-0">
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
                       <UnitRequestWorkStatusBadge
@@ -773,7 +770,7 @@ const JobListPage: React.FC = () => {
           </div>
         ) : (
           <div className={cn('glass-card rounded-xl border border-border overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
-            <table className="w-full text-sm min-w-[1080px]">
+            <table className="w-full text-sm min-w-[1000px]">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
@@ -790,7 +787,6 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
-                  <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
                 </tr>
               </thead>
 
@@ -861,7 +857,6 @@ const JobListPage: React.FC = () => {
                         <JobUrgencyBadge job={j} compact />
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
