@@ -62,40 +62,28 @@ function toYmd(v: Date | string | null | undefined): string | null {
 }
 
 function effectiveRequestDateSql(alias = 'A'): string {
-  return `(
-    CASE
-      WHEN ${alias}.want_date_from IS NOT NULL
-        AND CONVERT(date, ${alias}.want_date_from) < CONVERT(date, ${alias}.request_date)
-        THEN CONVERT(date, ${alias}.request_date)
-      WHEN ${alias}.want_date_from IS NOT NULL
-        THEN CONVERT(date, ${alias}.want_date_from)
-      ELSE CONVERT(date, ${alias}.request_date)
-    END
-  )`;
+  /** วันที่เปิดใบสำหรับ cohort รายเดือน = วันที่กรอกใบ (request_date) */
+  return `CONVERT(date, ${alias}.request_date)`;
 }
 
-function effectiveRequestDateYmdFromRow(row: SqlThroughputRow): string | null {
-  const submit = toYmd(row.request_date);
-  const required = toYmd(row.want_date_from);
-  if (!submit) return required;
-  if (!required) return submit;
-  if (required < submit) return submit;
-  return required;
+function requestOpenDateYmdFromRow(row: SqlThroughputRow): string | null {
+  return toYmd(row.request_date) || toYmd(row.want_date_from);
 }
 
 function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
-  const effectiveRequestDate = effectiveRequestDateYmdFromRow(row);
-  if (!effectiveRequestDate) return [];
+  /** เดือนที่「เข้ามา」= วันที่เปิด/กรอกใบ ไม่ใช่ want_date_from */
+  const requestDate = requestOpenDateYmdFromRow(row);
+  if (!requestDate) return [];
 
   const requestNo = (row.request_no || '').trim() || undefined;
   const breakdown = staffingPositionBreakdown(row);
-  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || effectiveRequestDate;
+  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
   const out: SiamrajThroughputRecord[] = [];
 
   if (breakdown.filledPositions > 0) {
     out.push({
       requestNo,
-      requestDate: effectiveRequestDate,
+      requestDate,
       closureDate,
       positionUnits: breakdown.filledPositions,
       isOpen: false,
@@ -105,7 +93,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   if (breakdown.cancelledPositions > 0) {
     out.push({
       requestNo,
-      requestDate: effectiveRequestDate,
+      requestDate,
       closureDate,
       positionUnits: breakdown.cancelledPositions,
       isOpen: false,
@@ -115,7 +103,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   if (breakdown.remainingPositions > 0) {
     out.push({
       requestNo,
-      requestDate: effectiveRequestDate,
+      requestDate,
       closureDate: null,
       positionUnits: breakdown.remainingPositions,
       isOpen: true,

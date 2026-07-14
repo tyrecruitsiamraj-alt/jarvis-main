@@ -1204,8 +1204,8 @@ export function buildDashboardData(
 
   const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
   const stockScopeHint = period
-    ? `ใบขอที่เปิดในช่วงที่เลือก (รวมปิด/ยกเลิกแล้ว)`
-    : `ใบขอที่เปิดในช่วงแนวโน้ม (รวมปิด/ยกเลิกแล้ว)`;
+    ? `ใบขอที่กรอกในช่วงที่เลือก (รวมปิด/ยกเลิกแล้ว)`
+    : `ใบขอที่กรอกในช่วงแนวโน้ม (รวมปิด/ยกเลิกแล้ว)`;
   const cohortStock =
     throughputRecords.length > 0
       ? sumCohortStockByRequestDate(throughputRecords, periodFrom, periodTo)

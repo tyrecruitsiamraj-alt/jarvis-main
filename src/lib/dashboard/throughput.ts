@@ -55,7 +55,11 @@ function resolveKind(r: ThroughputRecord): 'filled' | 'cancelled' | 'remaining' 
 export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()): ThroughputRecord[] {
   const out: ThroughputRecord[] = [];
   for (const j of jobs) {
-    const requestDate = effectiveRequestDateYmd(j, today);
+    // เดือนที่เข้ามา = วันที่กรอก/เปิดใบ ไม่ใช่ effective/want date
+    const requestDate =
+      safeYmd(j.request_date) ||
+      safeYmd(j.submittedAt) ||
+      effectiveRequestDateYmd(j, today);
     if (!requestDate) continue;
     const requestNo = (j.request_no || j.externalId || j.id || '').trim() || undefined;
     const b = positionBreakdownFromJob(j);
