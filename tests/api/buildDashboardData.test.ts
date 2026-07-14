@@ -141,7 +141,8 @@ describe('buildDashboardData', () => {
     expect(data.kpis.find((k) => k.id === 'cancelled')?.value).toBe(0);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(62);
     expect(data.kpis.find((k) => k.id === 'remaining')?.label).toBe('คงเหลือ');
-    const lifecycleRemaining = data.activityTrend.reduce(
+    /** คอลัมน์ประเภท = แตกยอดเข้ามา (ไม่ใช่คงเหลือ) */
+    const intakeByType = data.activityTrend.reduce(
       (s, p) =>
         s +
         p.resignations +
@@ -151,8 +152,9 @@ describe('buildDashboardData', () => {
         (p.other ?? 0),
       0,
     );
-    expect(lifecycleRemaining).toBe(62);
-    expect(data.activityTrend.find((p) => p.date.startsWith('2026-05'))?.resignations).toBe(17);
+    expect(intakeByType).toBe(97);
+    expect(data.activityTrend.find((p) => p.date.startsWith('2026-05'))?.resignations).toBe(52);
+    expect(data.activityTrend.find((p) => p.date.startsWith('2026-05'))?.requestedPositions).toBe(52);
     expect(data.activityTrend.find((p) => p.date.startsWith('2026-07'))?.replacements).toBe(45);
     expect(data.workStatusKpis.map((k) => k.id)).toEqual([
       'work_status_total',
@@ -210,7 +212,7 @@ describe('buildDashboardData', () => {
       to: period.to,
       label: period.label,
     });
-    const lifecycleRemaining = data.activityTrend.reduce(
+    const intakeByType = data.activityTrend.reduce(
       (s, p) =>
         s +
         p.resignations +
@@ -220,7 +222,7 @@ describe('buildDashboardData', () => {
         (p.other ?? 0),
       0,
     );
-    expect(lifecycleRemaining).toBe(6);
+    expect(intakeByType).toBe(10);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(6);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(6);
     expect(data.unitOverview.reduce((s, u) => s + u.open, 0)).toBe(6);

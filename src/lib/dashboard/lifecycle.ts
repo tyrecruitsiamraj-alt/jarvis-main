@@ -31,9 +31,9 @@ export function classifyLifecycleKindFromAction(
   const action = (actionName || '').trim();
   const code = (actionCode || '').trim().toUpperCase();
   if (/ลาออก|resign/i.test(action) || code === 'RESIGN') return 'resignation';
-  if (/เปลี่ยนตัว|replacement/i.test(action) || code === 'REPLACE') return 'replacement';
-  if (/เพิ่มอัตรา/i.test(action)) return 'increase_headcount';
-  if (/เปิดไซต์/i.test(action)) return 'new_site';
+  if (/เปลี่ยนตัว|replacement|ทดแทน/i.test(action) || code === 'REPLACE') return 'replacement';
+  if (/เพิ่มอัตรา|เพิ่มคน/i.test(action) || code === 'ADD' || code === 'INCREASE') return 'increase_headcount';
+  if (/เปิดไซต์|เปิดไซท์|newsites?/i.test(action) || code === 'SITE' || code === 'NEWSITE') return 'new_site';
   return 'other';
 }
 

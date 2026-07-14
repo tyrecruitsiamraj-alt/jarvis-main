@@ -84,6 +84,14 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         kind: 'filled',
         requestActionName: j.request_action_name,
         requestActionCode: j.request_action_code,
+        lifecycleKind: resolveLifecycleKind({
+          requestDate,
+          closureDate: closedYmd,
+          positionUnits: b.filledPositions,
+          isOpen: false,
+          requestActionName: j.request_action_name,
+          requestActionCode: j.request_action_code,
+        }),
       });
     }
     if (b.cancelledPositions > 0) {
@@ -96,6 +104,14 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         kind: 'cancelled',
         requestActionName: j.request_action_name,
         requestActionCode: j.request_action_code,
+        lifecycleKind: resolveLifecycleKind({
+          requestDate,
+          closureDate: closedYmd,
+          positionUnits: b.cancelledPositions,
+          isOpen: false,
+          requestActionName: j.request_action_name,
+          requestActionCode: j.request_action_code,
+        }),
       });
     }
     if (b.remainingPositions > 0) {
@@ -108,6 +124,14 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         kind: 'remaining',
         requestActionName: j.request_action_name,
         requestActionCode: j.request_action_code,
+        lifecycleKind: resolveLifecycleKind({
+          requestDate,
+          closureDate: null,
+          positionUnits: b.remainingPositions,
+          isOpen: true,
+          requestActionName: j.request_action_name,
+          requestActionCode: j.request_action_code,
+        }),
       });
     }
   }
@@ -256,6 +280,7 @@ export function buildStockKpisFromCohort(
 /**
  * กราฟรายเดือนแบบ cohort ตามเดือนที่เปิดใบ:
  * เข้ามาคงที่ · ปิด/ยกเลิก/คงเหลืออัปเดตตามสถานะปัจจุบัน
+ * resignations/replacements/... = แตกยอด「เข้ามา」ตามประเภท (= รวมต้องเท่า requestedPositions)
  */
 export function enrichActivityTrendWithThroughput(
   points: DashboardActivityTrendPoint[],
@@ -265,10 +290,36 @@ export function enrichActivityTrendWithThroughput(
   const filledMap = new Map<string, number>();
   const cancelledMap = new Map<string, number>();
   const remainingMap = new Map<string, number>();
+  const intakeByType = new Map<
+    string,
+    {
+      resignation: number;
+      replacement: number;
+      increase_headcount: number;
+      new_site: number;
+      other: number;
+    }
+  >();
+
+  const ensureType = (month: string) => {
+    const cur = intakeByType.get(month) ?? {
+      resignation: 0,
+      replacement: 0,
+      increase_headcount: 0,
+      new_site: 0,
+      other: 0,
+    };
+    intakeByType.set(month, cur);
+    return cur;
+  };
 
   for (const r of records) {
     const reqMonth = r.requestDate.slice(0, 7);
     requestedMap.set(reqMonth, (requestedMap.get(reqMonth) ?? 0) + r.positionUnits);
+    const life = resolveLifecycleKind(r);
+    const typed = ensureType(reqMonth);
+    typed[life] += r.positionUnits;
+
     const kind = resolveKind(r);
     if (kind === 'filled') {
       filledMap.set(reqMonth, (filledMap.get(reqMonth) ?? 0) + r.positionUnits);
@@ -286,10 +337,23 @@ export function enrichActivityTrendWithThroughput(
     const cancelled = cancelledMap.get(month) ?? 0;
     const remaining =
       remainingMap.get(month) ?? Math.max(0, requested - filled - cancelled);
+    const typed = intakeByType.get(month) ?? {
+      resignation: 0,
+      replacement: 0,
+      increase_headcount: 0,
+      new_site: 0,
+      other: 0,
+    };
     const closeRatePercent =
       requested > 0 ? Math.round((filled / requested) * 1000) / 10 : null;
     return {
       ...p,
+      resignations: typed.resignation,
+      replacements: typed.replacement,
+      increaseHeadcount: typed.increase_headcount,
+      newSite: typed.new_site,
+      other: typed.other,
+      newOpenings: typed.increase_headcount + typed.new_site + typed.other,
       requestedPositions: requested,
       closedPositions: filled,
       filledPositions: filled,
@@ -298,6 +362,35 @@ export function enrichActivityTrendWithThroughput(
       closeRatePercent,
     };
   });
+}
+
+function resolveLifecycleKind(
+  r: ThroughputRecord,
+): 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other' {
+  const raw = (r.lifecycleKind || '').trim();
+  if (
+    raw === 'resignation' ||
+    raw === 'replacement' ||
+    raw === 'increase_headcount' ||
+    raw === 'new_site' ||
+    raw === 'other'
+  ) {
+    return raw;
+  }
+  /** กันค่าไทย/ชื่อคอลัมน์ที่ส่งมาผิดรูปแบบ — ไม่ให้ typed[unknown] หลุดจากยอด */
+  if (raw === 'ลาออก' || raw === 'resignations') return 'resignation';
+  if (raw === 'เปลี่ยนตัว' || raw === 'replacements') return 'replacement';
+  if (raw === 'เพิ่มอัตรา' || raw === 'increaseHeadcount') return 'increase_headcount';
+  if (raw === 'เปิดไซต์' || raw === 'newSite') return 'new_site';
+  if (raw === 'อื่นๆ') return 'other';
+
+  const action = (r.requestActionName || '').trim();
+  const code = (r.requestActionCode || '').trim().toUpperCase();
+  if (/ลาออก|resign/i.test(action) || code === 'RESIGN') return 'resignation';
+  if (/เปลี่ยนตัว|replacement|ทดแทน/i.test(action) || code === 'REPLACE') return 'replacement';
+  if (/เพิ่มอัตรา|เพิ่มคน/i.test(action) || code === 'ADD' || code === 'INCREASE') return 'increase_headcount';
+  if (/เปิดไซต์|เปิดไซท์|newsites?/i.test(action) || code === 'SITE' || code === 'NEWSITE') return 'new_site';
+  return 'other';
 }
 
 /**

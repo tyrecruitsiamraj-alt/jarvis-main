@@ -21,7 +21,8 @@ function fmt(n: number): string {
   return n.toLocaleString('th-TH');
 }
 
-function remByType(p: DashboardActivityTrendPoint) {
+/** แตกยอดเข้ามาตามประเภท — รวมต้องเท่า requestedPositions */
+function intakeByType(p: DashboardActivityTrendPoint) {
   return {
     resignation: p.resignations ?? 0,
     replacement: p.replacements ?? 0,
@@ -31,8 +32,8 @@ function remByType(p: DashboardActivityTrendPoint) {
   };
 }
 
-function remTotal(p: DashboardActivityTrendPoint): number {
-  const t = remByType(p);
+function intakeTypeTotal(p: DashboardActivityTrendPoint): number {
+  const t = intakeByType(p);
   return t.resignation + t.replacement + t.increaseHeadcount + t.newSite + t.other;
 }
 
@@ -44,7 +45,8 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
           (p.requestedPositions ?? 0) > 0 ||
           (p.filledPositions ?? p.closedPositions ?? 0) > 0 ||
           (p.cancelledPositions ?? 0) > 0 ||
-          remTotal(p) > 0,
+          (p.remainingPositions ?? 0) > 0 ||
+          intakeTypeTotal(p) > 0,
       ),
     [data],
   );
@@ -52,17 +54,17 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
   const totals = useMemo(() => {
     return months.reduce(
       (acc, p) => {
-        const rem = remByType(p);
+        const intake = intakeByType(p);
         return {
           requested: acc.requested + (p.requestedPositions ?? 0),
           filled: acc.filled + (p.filledPositions ?? p.closedPositions ?? 0),
           cancelled: acc.cancelled + (p.cancelledPositions ?? 0),
-          remaining: acc.remaining + remTotal(p),
-          resignation: acc.resignation + rem.resignation,
-          replacement: acc.replacement + rem.replacement,
-          increaseHeadcount: acc.increaseHeadcount + rem.increaseHeadcount,
-          newSite: acc.newSite + rem.newSite,
-          other: acc.other + rem.other,
+          remaining: acc.remaining + (p.remainingPositions ?? 0),
+          resignation: acc.resignation + intake.resignation,
+          replacement: acc.replacement + intake.replacement,
+          increaseHeadcount: acc.increaseHeadcount + intake.increaseHeadcount,
+          newSite: acc.newSite + intake.newSite,
+          other: acc.other + intake.other,
         };
       },
       {
@@ -79,6 +81,13 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
     );
   }, [months]);
 
+  const typeGrandTotal =
+    totals.resignation +
+    totals.replacement +
+    totals.increaseHeadcount +
+    totals.newSite +
+    totals.other;
+
   const chartData = useMemo(
     () =>
       months.map((p) => ({
@@ -88,9 +97,6 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
         increaseHeadcount: p.increaseHeadcount ?? 0,
         newSite: p.newSite ?? 0,
         other: p.other ?? 0,
-        requested: p.requestedPositions ?? 0,
-        filled: p.filledPositions ?? p.closedPositions ?? 0,
-        remaining: remTotal(p),
       })),
     [months],
   );
@@ -101,25 +107,23 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
       `${scopeLabel}: เข้ามา ${fmt(totals.requested)} · ปิดแล้ว ${fmt(totals.filled)} · ยกเลิก ${fmt(totals.cancelled)} · คงเหลือ ${fmt(totals.remaining)} อัตรา`,
     );
     lines.push(
-      `คงเหลือแยกประเภทใน${scopeLabel} — ลาออก ${fmt(totals.resignation)} · เปลี่ยนตัว ${fmt(totals.replacement)} · เพิ่มอัตรา ${fmt(totals.increaseHeadcount)} · เปิดไซต์ ${fmt(totals.newSite)}` +
-        (totals.other > 0 ? ` · อื่นๆ ${fmt(totals.other)}` : ''),
+      `เข้ามาแยกประเภท — ลาออก ${fmt(totals.resignation)} · เปลี่ยนตัว ${fmt(totals.replacement)} · เพิ่มอัตรา ${fmt(totals.increaseHeadcount)} · เปิดไซต์ ${fmt(totals.newSite)} · อื่นๆ ${fmt(totals.other)}` +
+        ` → รวม ${fmt(typeGrandTotal)}${typeGrandTotal === totals.requested ? ' = เข้ามา' : ` (ควรเท่าเข้ามา ${fmt(totals.requested)})`}`,
     );
     if (months.length > 0) {
-      const peakRem = [...months].sort((a, b) => remTotal(b) - remTotal(a))[0]!;
       const peakIn = [...months].sort(
         (a, b) => (b.requestedPositions ?? 0) - (a.requestedPositions ?? 0),
       )[0]!;
-      if (remTotal(peakRem) > 0) {
-        lines.push(`เดือนที่คงเหลือสูงสุดในช่วงนี้: ${peakRem.label} (${fmt(remTotal(peakRem))} อัตรา)`);
-      }
       if ((peakIn.requestedPositions ?? 0) > 0) {
-        lines.push(`เดือนที่เข้ามามากสุดในช่วงนี้: ${peakIn.label} (${fmt(peakIn.requestedPositions ?? 0)} อัตรา)`);
+        const t = intakeByType(peakIn);
+        lines.push(
+          `เดือนที่เข้ามามากสุด: ${peakIn.label} เข้ามา ${fmt(peakIn.requestedPositions ?? 0)}` +
+            ` = ลาออก ${fmt(t.resignation)} + เปลี่ยนตัว ${fmt(t.replacement)} + เพิ่มอัตรา ${fmt(t.increaseHeadcount)} + เปิดไซต์ ${fmt(t.newSite)} + อื่นๆ ${fmt(t.other)}`,
+        );
       }
     }
     return lines;
-  }, [months, scopeLabel, totals]);
-
-  const showOther = totals.other > 0;
+  }, [months, scopeLabel, totals, typeGrandTotal]);
 
   if (months.length === 0) {
     return (
@@ -139,7 +143,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
         <p className="text-xs text-slate-500 mt-0.5">
-          แยกตามเดือนที่กรอกใบ · คงเหลือ = อัตราที่ยังต้องหา (แยกประเภท) · สรุปตาม {scopeLabel}
+          คอลัมน์ลาออก–อื่นๆ = แตกยอด「เข้ามา」ของเดือนนั้น · คงเหลือแยกต่างหาก · สรุปตาม {scopeLabel}
         </p>
         <ul className="text-xs text-slate-700 mt-2 space-y-0.5 list-disc list-inside">
           {summaries.map((line) => (
@@ -149,7 +153,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
       </div>
 
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full min-w-[44rem] text-xs border-collapse">
+        <table className="w-full min-w-[48rem] text-xs border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-slate-500">
               <th className="text-left font-medium px-2 py-2 whitespace-nowrap">เดือน</th>
@@ -161,32 +165,39 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เปลี่ยนตัว</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เพิ่มอัตรา</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เปิดไซต์</th>
-              {showOther ? (
-                <th className="text-right font-medium px-2 py-2 whitespace-nowrap">อื่นๆ</th>
-              ) : null}
+              <th className="text-right font-medium px-2 py-2 whitespace-nowrap">อื่นๆ</th>
+              <th className="text-right font-medium px-2 py-2 whitespace-nowrap">รวมประเภท</th>
             </tr>
           </thead>
           <tbody>
             {months.map((p) => {
-              const rem = remByType(p);
+              const intake = intakeByType(p);
+              const requested = p.requestedPositions ?? 0;
+              const typeSum = intakeTypeTotal(p);
+              const mismatch = typeSum !== requested;
               return (
                 <tr key={p.date} className="border-b border-slate-100">
                   <td className="px-2 py-2 font-medium text-slate-800 whitespace-nowrap">{p.label}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{fmt(p.requestedPositions ?? 0)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold">{fmt(requested)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">
                     {fmt(p.filledPositions ?? p.closedPositions ?? 0)}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums">{fmt(p.cancelledPositions ?? 0)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-semibold text-amber-800">
-                    {fmt(remTotal(p))}
+                  <td className="px-2 py-2 text-right tabular-nums text-amber-800">
+                    {fmt(p.remainingPositions ?? 0)}
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{fmt(rem.resignation)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{fmt(rem.replacement)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{fmt(rem.increaseHeadcount)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{fmt(rem.newSite)}</td>
-                  {showOther ? (
-                    <td className="px-2 py-2 text-right tabular-nums">{fmt(rem.other)}</td>
-                  ) : null}
+                  <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.resignation)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.replacement)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.increaseHeadcount)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.newSite)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.other)}</td>
+                  <td
+                    className={`px-2 py-2 text-right tabular-nums font-semibold ${
+                      mismatch ? 'text-rose-700' : 'text-emerald-800'
+                    }`}
+                  >
+                    {fmt(typeSum)}
+                  </td>
                 </tr>
               );
             })}
@@ -204,16 +215,24 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
                 {fmt(totals.increaseHeadcount)}
               </td>
               <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.newSite)}</td>
-              {showOther ? (
-                <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.other)}</td>
-              ) : null}
+              <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.other)}</td>
+              <td
+                className={`px-2 py-2.5 text-right tabular-nums font-semibold ${
+                  typeGrandTotal !== totals.requested ? 'text-rose-700' : 'text-emerald-800'
+                }`}
+              >
+                {fmt(typeGrandTotal)}
+              </td>
             </tr>
           </tbody>
         </table>
+        <p className="text-[11px] text-slate-500 mt-1.5 px-1">
+          คอลัมน์「รวมประเภท」ต้องเท่า「เข้ามา」ทุกเดือน · คงเหลือไม่ใช่ผลรวมของคอลัมน์ประเภท
+        </p>
       </div>
 
       <div>
-        <p className="text-xs font-medium text-slate-600 mb-2">แนวโน้มคงเหลือแยกประเภท (รายเดือน)</p>
+        <p className="text-xs font-medium text-slate-600 mb-2">แนวโน้มเข้ามาแยกประเภท (รายเดือน)</p>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -231,9 +250,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               <Line type="monotone" dataKey="replacements" name="เปลี่ยนตัว" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="increaseHeadcount" name="เพิ่มอัตรา" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="newSite" name="เปิดไซต์" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
-              {showOther ? (
-                <Line type="monotone" dataKey="other" name="อื่นๆ" stroke="#64748b" strokeWidth={2} dot={{ r: 3 }} />
-              ) : null}
+              <Line type="monotone" dataKey="other" name="อื่นๆ" stroke="#64748b" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

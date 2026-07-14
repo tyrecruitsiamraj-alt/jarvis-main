@@ -10,24 +10,36 @@ describe('throughput', () => {
     ];
     const enriched = enrichActivityTrendWithThroughput(points, [
       // มิ.ย. เข้า 60 · ปิดรวม 30 (บางส่วนปิดใน ก.ค.) · ยกเลิก 20 · คงเหลือ 10
-      { requestDate: '2026-06-05', closureDate: '2026-06-20', positionUnits: 20, isOpen: false, kind: 'filled' },
-      { requestDate: '2026-06-08', closureDate: '2026-07-05', positionUnits: 10, isOpen: false, kind: 'filled' },
-      { requestDate: '2026-06-05', closureDate: '2026-06-20', positionUnits: 20, isOpen: false, kind: 'cancelled' },
-      { requestDate: '2026-06-05', closureDate: null, positionUnits: 10, isOpen: true, kind: 'remaining' },
+      { requestDate: '2026-06-05', closureDate: '2026-06-20', positionUnits: 20, isOpen: false, kind: 'filled', requestActionName: 'ลาออก' },
+      { requestDate: '2026-06-08', closureDate: '2026-07-05', positionUnits: 10, isOpen: false, kind: 'filled', requestActionName: 'เปลี่ยนตัว' },
+      { requestDate: '2026-06-05', closureDate: '2026-06-20', positionUnits: 20, isOpen: false, kind: 'cancelled', requestActionName: 'เพิ่มอัตรา' },
+      { requestDate: '2026-06-05', closureDate: null, positionUnits: 10, isOpen: true, kind: 'remaining', requestActionName: 'เปิดไซต์' },
       // ก.ค. เข้า 40 · ปิด 20 · ยกเลิก 0 · คงเหลือ 20 (ปิดของมิ.ย. ไม่ไปโผล่ใน ก.ค.)
-      { requestDate: '2026-07-02', closureDate: '2026-07-10', positionUnits: 20, isOpen: false, kind: 'filled' },
-      { requestDate: '2026-07-03', closureDate: null, positionUnits: 20, isOpen: true, kind: 'remaining' },
+      { requestDate: '2026-07-02', closureDate: '2026-07-10', positionUnits: 20, isOpen: false, kind: 'filled', requestActionName: 'ลาออก' },
+      { requestDate: '2026-07-03', closureDate: null, positionUnits: 20, isOpen: true, kind: 'remaining', requestActionName: 'ลาออก' },
     ]);
 
     expect(enriched[0]?.requestedPositions).toBe(60);
     expect(enriched[0]?.filledPositions).toBe(30);
     expect(enriched[0]?.cancelledPositions).toBe(20);
     expect(enriched[0]?.remainingPositions).toBe(10);
+    expect(enriched[0]?.resignations).toBe(20);
+    expect(enriched[0]?.replacements).toBe(10);
+    expect(enriched[0]?.increaseHeadcount).toBe(20);
+    expect(enriched[0]?.newSite).toBe(10);
+    expect(
+      (enriched[0]?.resignations ?? 0) +
+        (enriched[0]?.replacements ?? 0) +
+        (enriched[0]?.increaseHeadcount ?? 0) +
+        (enriched[0]?.newSite ?? 0) +
+        (enriched[0]?.other ?? 0),
+    ).toBe(enriched[0]?.requestedPositions);
 
     expect(enriched[1]?.requestedPositions).toBe(40);
     expect(enriched[1]?.filledPositions).toBe(20);
     expect(enriched[1]?.cancelledPositions).toBe(0);
     expect(enriched[1]?.remainingPositions).toBe(20);
+    expect(enriched[1]?.resignations).toBe(40);
   });
 
   it('keeps intake fixed while remaining drops when more of the cohort is filled', () => {
@@ -134,5 +146,48 @@ describe('throughput', () => {
     expect(summary.cancelledPositions).toBe(1);
     expect(summary.remainingPositions).toBe(3);
     expect(summary.requestCount).toBe(3);
+  });
+
+  it('maps Thai/odd lifecycleKind labels into intake buckets so types sum to requested', () => {
+    const points: DashboardActivityTrendPoint[] = [
+      { date: '2026-01-01', label: 'ม.ค.', resignations: 0, replacements: 0, newOpenings: 0 },
+    ];
+    const enriched = enrichActivityTrendWithThroughput(points, [
+      {
+        requestDate: '2026-01-10',
+        closureDate: null,
+        positionUnits: 100,
+        isOpen: true,
+        kind: 'remaining',
+        lifecycleKind: 'ลาออก' as never,
+      },
+      {
+        requestDate: '2026-01-12',
+        closureDate: '2026-01-20',
+        positionUnits: 50,
+        isOpen: false,
+        kind: 'filled',
+        requestActionName: 'เปลี่ยนตัว',
+      },
+      {
+        requestDate: '2026-01-15',
+        closureDate: null,
+        positionUnits: 76,
+        isOpen: true,
+        kind: 'remaining',
+        requestActionName: 'ประเภทแปลกๆ',
+      },
+    ]);
+    expect(enriched[0]?.requestedPositions).toBe(226);
+    expect(enriched[0]?.resignations).toBe(100);
+    expect(enriched[0]?.replacements).toBe(50);
+    expect(enriched[0]?.other).toBe(76);
+    expect(
+      (enriched[0]?.resignations ?? 0) +
+        (enriched[0]?.replacements ?? 0) +
+        (enriched[0]?.increaseHeadcount ?? 0) +
+        (enriched[0]?.newSite ?? 0) +
+        (enriched[0]?.other ?? 0),
+    ).toBe(226);
   });
 });

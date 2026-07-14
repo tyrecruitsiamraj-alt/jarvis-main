@@ -27,12 +27,13 @@ export type DashboardActivityTrendPoint = {
   /** anchor date YYYY-MM-01 */
   date: string;
   label: string;
+  /** แตกยอดเข้ามาตามประเภท (รวม resignations+…+other ต้องเท่า requestedPositions) */
   resignations: number;
   replacements: number;
   newOpenings: number;
   increaseHeadcount?: number;
   newSite?: number;
-  /** คงเหลือประเภท "อื่นๆ" (นอกลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์) */
+  /** เข้ามาประเภท "อื่นๆ" (นอกลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์) */
   other?: number;
   /** ตำแหน่งที่ขอ (ตามเดือนที่เปิดใบ — ไม่หายเมื่อปิดแล้ว) */
   requestedPositions?: number;

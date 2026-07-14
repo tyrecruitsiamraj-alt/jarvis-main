@@ -73,7 +73,7 @@ import {
   mapSummaryV3ToDashboard,
   statesToRequestControlRecords,
 } from './requestControlBridge';
-import { classifyLifecycleKind, lifecycleKindLabel, buildLifecycleBoardFromStockSources } from './lifecycle';
+import { lifecycleKindLabel, buildLifecycleBoardFromStockSources } from './lifecycle';
 import {
   formatWorkPersonsSummary,
   resolveUnitRequestWorkStatus,
@@ -767,47 +767,23 @@ function monthTrendLabel(d: Date, from: string, to: string): string {
 }
 
 function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today = new Date()): DashboardActivityTrendPoint[] {
-  const resignMap = new Map<string, number>();
-  const replaceMap = new Map<string, number>();
-  const increaseMap = new Map<string, number>();
-  const newSiteMap = new Map<string, number>();
-  const otherMap = new Map<string, number>();
-
-  for (const j of jobs) {
-    if (j.status === 'closed' || j.status === 'cancelled') continue;
-    const rem = positionBreakdownFromJob(j).remainingPositions;
-    if (rem <= 0) continue;
-    const ymd =
-      safeYmd(j.request_date) ||
-      safeYmd(j.submittedAt) ||
-      effectiveRequestDateYmd(j, today);
-    if (!ymd || !inYmdRange(ymd, from, to)) continue;
-    const month = ymd.slice(0, 7);
-    const kind = classifyLifecycleKind(j);
-    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + rem);
-    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + rem);
-    else if (kind === 'increase_headcount') increaseMap.set(month, (increaseMap.get(month) ?? 0) + rem);
-    else if (kind === 'new_site') newSiteMap.set(month, (newSiteMap.get(month) ?? 0) + rem);
-    else otherMap.set(month, (otherMap.get(month) ?? 0) + rem);
-  }
-
+  void jobs;
+  void today;
+  /** โครงรายเดือนว่าง — เติมเข้ามา/ปิด/คงเหลือ + แตกประเภทจาก throughput ใน enrichActivityTrendWithThroughput */
   const points: DashboardActivityTrendPoint[] = [];
   let d = parseISO(`${from.slice(0, 7)}-01`);
   const endMonth = parseISO(`${to.slice(0, 7)}-01`);
   while (d <= endMonth) {
     const month = toYmdLocal(d).slice(0, 7);
-    const increase = increaseMap.get(month) ?? 0;
-    const newSite = newSiteMap.get(month) ?? 0;
-    const other = otherMap.get(month) ?? 0;
     points.push({
       date: `${month}-01`,
       label: monthTrendLabel(d, from, to),
-      resignations: resignMap.get(month) ?? 0,
-      replacements: replaceMap.get(month) ?? 0,
-      newOpenings: increase + newSite + other,
-      increaseHeadcount: increase,
-      newSite,
-      other,
+      resignations: 0,
+      replacements: 0,
+      newOpenings: 0,
+      increaseHeadcount: 0,
+      newSite: 0,
+      other: 0,
     });
     d = addMonths(d, 1);
   }
