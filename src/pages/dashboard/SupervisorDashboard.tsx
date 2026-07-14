@@ -81,7 +81,8 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const throughputRange = useMemo(() => {
-    if (period) return { from: period.previousFrom, to: period.to };
+    // ดึงตามช่วงที่เลือก (ไม่ใช้ previous) เพื่อให้ cohort เดือนนั้นครบรวมใบที่ปิดแล้ว
+    if (period) return { from: period.from, to: period.to };
     return resolveOpenStockTrendRange(jobs);
   }, [period, jobs]);
 

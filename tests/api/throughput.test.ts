@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enrichActivityTrendWithThroughput, sumThroughputInRange } from '../../src/lib/dashboard/throughput';
+import { enrichActivityTrendWithThroughput, sumCohortStockByRequestDate, sumThroughputInRange } from '../../src/lib/dashboard/throughput';
 import type { DashboardActivityTrendPoint } from '../../src/lib/dashboard/types';
 
 describe('throughput', () => {
@@ -65,5 +65,23 @@ describe('throughput', () => {
     expect(summary.remaining).toBe(1);
     expect(summary.closedSamePeriod).toBe(2);
     expect(summary.closedBacklog).toBe(3);
+  });
+
+  it('sums cohort stock KPIs by request date including closed/cancelled', () => {
+    const summary = sumCohortStockByRequestDate(
+      [
+        { requestNo: 'A', requestDate: '2026-01-10', closureDate: '2026-01-20', positionUnits: 2, isOpen: false, kind: 'filled' },
+        { requestNo: 'B', requestDate: '2026-01-12', closureDate: '2026-02-01', positionUnits: 1, isOpen: false, kind: 'cancelled' },
+        { requestNo: 'C', requestDate: '2026-01-15', closureDate: null, positionUnits: 3, isOpen: true, kind: 'remaining' },
+        { requestNo: 'D', requestDate: '2026-02-01', closureDate: null, positionUnits: 9, isOpen: true, kind: 'remaining' },
+      ],
+      '2026-01-01',
+      '2026-01-31',
+    );
+    expect(summary.requestPositions).toBe(6);
+    expect(summary.filledPositions).toBe(2);
+    expect(summary.cancelledPositions).toBe(1);
+    expect(summary.remainingPositions).toBe(3);
+    expect(summary.requestCount).toBe(3);
   });
 });

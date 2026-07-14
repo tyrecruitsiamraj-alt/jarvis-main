@@ -45,6 +45,8 @@ import {
   filterJobsForThroughput,
   jobsToThroughputRecords,
   sumThroughputInRange,
+  sumCohortStockByRequestDate,
+  buildStockKpisFromCohort,
   type ThroughputRecord,
 } from './throughput';
 import {
@@ -1111,7 +1113,17 @@ export function buildDashboardData(
   const priorityWorkQueue: DashboardWorkItem[] = [];
 
   const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
-  const kpis = buildStockKpis(stockJobs, period?.label ?? null);
+  const stockScopeHint = period
+    ? `ใบขอที่เปิดในช่วงที่เลือก (รวมปิด/ยกเลิกแล้ว)`
+    : `ใบขอที่เปิดในช่วงแนวโน้ม (รวมปิด/ยกเลิกแล้ว)`;
+  const cohortStock =
+    throughputRecords.length > 0
+      ? sumCohortStockByRequestDate(throughputRecords, periodFrom, periodTo)
+      : null;
+  const kpis =
+    cohortStock != null
+      ? buildStockKpisFromCohort(cohortStock, stockScopeHint)
+      : buildStockKpis(stockJobs, period?.label ?? null);
   const workStatusKpis = buildWorkStatusKpis(stockJobs, period?.label ?? null);
 
   return {

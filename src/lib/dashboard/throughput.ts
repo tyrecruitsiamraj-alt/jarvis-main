@@ -1,9 +1,10 @@
 import type { JobRequest } from '@/types';
 import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
 import { positionBreakdownFromJob } from '@/lib/requestControl';
-import type { DashboardActivityTrendPoint } from '@/lib/dashboard/types';
+import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/types';
 
 export type ThroughputRecord = {
+  requestNo?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;
@@ -22,6 +23,17 @@ export type ThroughputSummary = {
   closedSamePeriod: number;
   /** ปิดในช่วง + ขอก่อนช่วง (backlog) */
   closedBacklog: number;
+};
+
+export type CohortStockSummary = {
+  requestPositions: number;
+  filledPositions: number;
+  cancelledPositions: number;
+  remainingPositions: number;
+  requestCount: number;
+  filledRequestCount: number;
+  cancelledRequestCount: number;
+  remainingRequestCount: number;
 };
 
 function safeYmd(value?: string | null): string | null {
@@ -45,6 +57,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
   for (const j of jobs) {
     const requestDate = effectiveRequestDateYmd(j, today);
     if (!requestDate) continue;
+    const requestNo = (j.request_no || j.externalId || j.id || '').trim() || undefined;
     const b = positionBreakdownFromJob(j);
     const closureDate =
       b.remainingPositions === 0
@@ -55,6 +68,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
 
     if (b.filledPositions > 0) {
       out.push({
+        requestNo,
         requestDate,
         closureDate: closedYmd,
         positionUnits: b.filledPositions,
@@ -64,6 +78,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     }
     if (b.cancelledPositions > 0) {
       out.push({
+        requestNo,
         requestDate,
         closureDate: closedYmd,
         positionUnits: b.cancelledPositions,
@@ -73,6 +88,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     }
     if (b.remainingPositions > 0) {
       out.push({
+        requestNo,
         requestDate,
         closureDate: null,
         positionUnits: b.remainingPositions,
@@ -128,6 +144,99 @@ export function sumThroughputInRange(
   }
 
   return { requested, closed, remaining, closedSamePeriod, closedBacklog };
+}
+
+/** cohort ตามเดือน/ช่วงที่เปิดใบ — รวมปิดแล้ว (ไม่ใช่แค่ใบเปิดใน feed) */
+export function sumCohortStockByRequestDate(
+  records: ThroughputRecord[],
+  from: string,
+  to: string,
+): CohortStockSummary {
+  let requestPositions = 0;
+  let filledPositions = 0;
+  let cancelledPositions = 0;
+  let remainingPositions = 0;
+  const all = new Set<string>();
+  const filledIds = new Set<string>();
+  const cancelledIds = new Set<string>();
+  const remainingIds = new Set<string>();
+
+  for (const r of records) {
+    if (!inYmdRange(r.requestDate, from, to)) continue;
+    const kind = resolveKind(r);
+    requestPositions += r.positionUnits;
+    const id = r.requestNo?.trim();
+    if (id) all.add(id);
+
+    if (kind === 'filled') {
+      filledPositions += r.positionUnits;
+      if (id) filledIds.add(id);
+    } else if (kind === 'cancelled') {
+      cancelledPositions += r.positionUnits;
+      if (id) cancelledIds.add(id);
+    } else {
+      remainingPositions += r.positionUnits;
+      if (id) remainingIds.add(id);
+    }
+  }
+
+  return {
+    requestPositions,
+    filledPositions,
+    cancelledPositions,
+    remainingPositions,
+    requestCount: all.size,
+    filledRequestCount: filledIds.size,
+    cancelledRequestCount: cancelledIds.size,
+    remainingRequestCount: remainingIds.size,
+  };
+}
+
+export function buildStockKpisFromCohort(
+  summary: CohortStockSummary,
+  scopeHint: string,
+): DashboardKpi[] {
+  const posReq = (positions: number, requests: number) =>
+    `${positions.toLocaleString('th-TH')} อัตรา · ${requests.toLocaleString('th-TH')} ใบขอ`;
+
+  return [
+    {
+      id: 'total_requests',
+      label: 'ใบขอทั้งหมด',
+      value: summary.requestPositions,
+      secondaryCount: summary.requestCount,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} · ${posReq(summary.requestPositions, summary.requestCount)}`,
+      trendPercent: null,
+    },
+    {
+      id: 'closed',
+      label: 'ปิดใบขอ',
+      value: summary.filledPositions,
+      secondaryCount: summary.filledRequestCount,
+      secondaryLabel: 'ใบขอที่มีการหาได้',
+      description: `หาได้แล้ว · ${posReq(summary.filledPositions, summary.filledRequestCount)}`,
+      trendPercent: null,
+    },
+    {
+      id: 'cancelled',
+      label: 'ยกเลิก',
+      value: summary.cancelledPositions,
+      secondaryCount: summary.cancelledRequestCount,
+      secondaryLabel: 'ใบขอ',
+      description: posReq(summary.cancelledPositions, summary.cancelledRequestCount),
+      trendPercent: null,
+    },
+    {
+      id: 'remaining',
+      label: 'คงเหลือ',
+      value: summary.remainingPositions,
+      secondaryCount: summary.remainingRequestCount,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} ที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequestCount)}`,
+      trendPercent: null,
+    },
+  ];
 }
 
 /**

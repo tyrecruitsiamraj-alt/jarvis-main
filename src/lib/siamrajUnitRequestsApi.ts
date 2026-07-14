@@ -32,6 +32,7 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
 }
 
 export type SiamrajThroughputRecord = {
+  requestNo?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;

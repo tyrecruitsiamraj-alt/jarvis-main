@@ -16,6 +16,7 @@ export {
 } from './siamrajStaffingOpen.js';
 
 export type SiamrajThroughputRecord = {
+  requestNo?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;
@@ -24,6 +25,7 @@ export type SiamrajThroughputRecord = {
 };
 
 type SqlThroughputRow = {
+  request_no: string | null;
   request_date: Date | string | null;
   want_date_from: Date | string | null;
   request_qty: number | null;
@@ -85,12 +87,14 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   const effectiveRequestDate = effectiveRequestDateYmdFromRow(row);
   if (!effectiveRequestDate) return [];
 
+  const requestNo = (row.request_no || '').trim() || undefined;
   const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || effectiveRequestDate;
   const out: SiamrajThroughputRecord[] = [];
 
   if (breakdown.filledPositions > 0) {
     out.push({
+      requestNo,
       requestDate: effectiveRequestDate,
       closureDate,
       positionUnits: breakdown.filledPositions,
@@ -100,6 +104,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   }
   if (breakdown.cancelledPositions > 0) {
     out.push({
+      requestNo,
       requestDate: effectiveRequestDate,
       closureDate,
       positionUnits: breakdown.cancelledPositions,
@@ -109,6 +114,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   }
   if (breakdown.remainingPositions > 0) {
     out.push({
+      requestNo,
       requestDate: effectiveRequestDate,
       closureDate: null,
       positionUnits: breakdown.remainingPositions,
@@ -124,7 +130,7 @@ function isDateYmd(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-/** ดึงใบขอในช่วงวันที่ (วันที่กรอก หรือวันที่ปิด) สำหรับกราฟขอ vs ปิด */
+/** ดึงใบขอตามวันที่เปิดใบในงวด — สำหรับ cohort เข้ามา/ปิด/ยกเลิก/คงเหลือ */
 export async function listSiamrajSqlServerThroughput(options: {
   from: string;
   to: string;
@@ -141,6 +147,7 @@ export async function listSiamrajSqlServerThroughput(options: {
   const rows = await siamrajSqlQuery<SqlThroughputRow>(
     `
     SELECT
+      A.request_no,
       A.request_date,
       A.want_date_from,
       A.request_qty,
@@ -161,15 +168,8 @@ export async function listSiamrajSqlServerThroughput(options: {
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
-      AND (
-        ${effDate} >= @fromDate AND ${effDate} <= @toDate
-        OR (A.stop_date IS NOT NULL AND CONVERT(date, A.stop_date) >= @fromDate AND CONVERT(date, A.stop_date) <= @toDate)
-        OR (A.cancel_date IS NOT NULL AND CONVERT(date, A.cancel_date) >= @fromDate AND CONVERT(date, A.cancel_date) <= @toDate)
-        OR (
-          ISNULL(A.inform_qty, 0) > 0
-          AND ${effDate} >= @fromDate AND ${effDate} <= @toDate
-        )
-      )
+      AND ${effDate} >= @fromDate
+      AND ${effDate} <= @toDate
   `,
     { ...filters, fromDate: from, toDate: to },
   );
