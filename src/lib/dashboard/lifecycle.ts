@@ -29,11 +29,36 @@ export function classifyLifecycleKindFromAction(
   actionCode?: string | null,
 ): LifecycleKind {
   const action = (actionName || '').trim();
-  const code = (actionCode || '').trim().toUpperCase();
-  if (/ลาออก|resign/i.test(action) || code === 'RESIGN') return 'resignation';
-  if (/เปลี่ยนตัว|replacement|ทดแทน/i.test(action) || code === 'REPLACE') return 'replacement';
-  if (/เพิ่มอัตรา|เพิ่มคน/i.test(action) || code === 'ADD' || code === 'INCREASE') return 'increase_headcount';
-  if (/เปิดไซต์|เปิดไซท์|newsites?/i.test(action) || code === 'SITE' || code === 'NEWSITE') return 'new_site';
+  const codeRaw = (actionCode || '').trim();
+  const code = codeRaw.toUpperCase();
+  /** รหัสจริงจาก st_ms_request — อ้างอิงชื่อไทยด้านล่าง */
+  switch (codeRaw) {
+    case '001':
+      return 'new_site'; // เปิดไซด์
+    case '002':
+    case '003':
+      return 'increase_headcount'; // เพิ่มอัตรา(คน) / เพิ่มตำแหน่ง
+    case '004':
+      return 'replacement'; // เปลี่ยนคน
+    case '005':
+    case '006':
+    case '013':
+    case '014':
+      return 'resignation'; // ลาออก / พ้นสภาพ / ลาบวช / ลาคลอด
+    default:
+      break;
+  }
+  if (/ลาออก|พ้นสภาพ|ลาคลอด|ลาบวช|resign/i.test(action) || code === 'RESIGN') return 'resignation';
+  /** ERP ใช้「เปลี่ยนคน」· UI เรียกเปลี่ยนตัว */
+  if (/เปลี่ยนคน|เปลี่ยนตัว|ส่งคนแทน|replacement|ทดแทน/i.test(action) || code === 'REPLACE') {
+    return 'replacement';
+  }
+  if (/เพิ่มอัตรา|เพิ่มคน|เพิ่มตำแหน่ง/i.test(action) || code === 'ADD' || code === 'INCREASE') {
+    return 'increase_headcount';
+  }
+  if (/เปิดไซต์|เปิดไซท์|เปิดไซด์/i.test(action) || code === 'SITE' || code === 'NEWSITE') {
+    return 'new_site';
+  }
   return 'other';
 }
 
@@ -153,8 +178,18 @@ function rowFromKinds(
 }
 
 function resolveRecordKind(r: ThroughputRecord): LifecycleKind {
-  if (r.lifecycleKind) return r.lifecycleKind;
-  return classifyLifecycleKindFromAction(r.requestActionName, r.requestActionCode);
+  /** รหัส/ชื่อจาก ERP เป็นหลัก — อย่าเชื่อ lifecycleKind=other จากชุดเก่า */
+  const fromAction = classifyLifecycleKindFromAction(r.requestActionName, r.requestActionCode);
+  if (fromAction !== 'other') return fromAction;
+  if (
+    r.lifecycleKind === 'resignation' ||
+    r.lifecycleKind === 'replacement' ||
+    r.lifecycleKind === 'increase_headcount' ||
+    r.lifecycleKind === 'new_site'
+  ) {
+    return r.lifecycleKind;
+  }
+  return 'other';
 }
 
 function resolveRecordFlow(r: ThroughputRecord): 'filled' | 'cancelled' | 'remaining' {

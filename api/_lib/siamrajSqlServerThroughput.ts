@@ -135,11 +135,34 @@ function classifyActionToLifecycle(
   actionCode?: string,
 ): SiamrajThroughputRecord['lifecycleKind'] {
   const action = (actionName || '').trim();
-  const code = (actionCode || '').trim().toUpperCase();
-  if (/ลาออก|resign/i.test(action) || code === 'RESIGN') return 'resignation';
-  if (/เปลี่ยนตัว|replacement|ทดแทน/i.test(action) || code === 'REPLACE') return 'replacement';
-  if (/เพิ่มอัตรา|เพิ่มคน/i.test(action) || code === 'ADD' || code === 'INCREASE') return 'increase_headcount';
-  if (/เปิดไซต์|เปิดไซท์|newsites?/i.test(action) || code === 'SITE' || code === 'NEWSITE') return 'new_site';
+  const codeRaw = (actionCode || '').trim();
+  const code = codeRaw.toUpperCase();
+  switch (codeRaw) {
+    case '001':
+      return 'new_site';
+    case '002':
+    case '003':
+      return 'increase_headcount';
+    case '004':
+      return 'replacement';
+    case '005':
+    case '006':
+    case '013':
+    case '014':
+      return 'resignation';
+    default:
+      break;
+  }
+  if (/ลาออก|พ้นสภาพ|ลาคลอด|ลาบวช|resign/i.test(action) || code === 'RESIGN') return 'resignation';
+  if (/เปลี่ยนคน|เปลี่ยนตัว|ส่งคนแทน|replacement|ทดแทน/i.test(action) || code === 'REPLACE') {
+    return 'replacement';
+  }
+  if (/เพิ่มอัตรา|เพิ่มคน|เพิ่มตำแหน่ง/i.test(action) || code === 'ADD' || code === 'INCREASE') {
+    return 'increase_headcount';
+  }
+  if (/เปิดไซต์|เปิดไซท์|เปิดไซด์/i.test(action) || code === 'SITE' || code === 'NEWSITE') {
+    return 'new_site';
+  }
   return 'other';
 }
 
