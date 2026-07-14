@@ -67,6 +67,34 @@ describe('siamrajStaffingOpen feed', () => {
     ).toBe(false);
   });
 
+  it('treats SQL Server string counts like "0" as numeric open remaining', () => {
+    expect(
+      isOpenStaffingRow({
+        status: 'A',
+        is_stop: 'N',
+        stop_no: null,
+        is_inform_all: 'N',
+        request_qty: '1',
+        inform_qty: '0',
+        effective_inform_qty: '0',
+        has_inform: 0,
+      }),
+    ).toBe(true);
+    const breakdown = staffingPositionBreakdown({
+      status: 'A',
+      is_stop: 'N',
+      stop_no: null,
+      is_inform_all: 'N',
+      request_qty: '1',
+      inform_qty: '0',
+      effective_inform_qty: '0',
+      has_inform: '0',
+    });
+    expect(breakdown.cancelledPositions).toBe(0);
+    expect(breakdown.remainingPositions).toBe(1);
+    expect(effectiveInformedCount({ inform_qty: 0, effective_inform_qty: '0' })).toBe(0);
+  });
+
   it('keeps remaining for partial fill like LBM6903001 (38 request, 35 informed)', () => {
     const breakdown = staffingPositionBreakdown({
       status: 'A',

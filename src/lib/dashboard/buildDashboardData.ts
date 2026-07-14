@@ -428,8 +428,12 @@ function inYmdRange(ymd: string, from: string, to: string): boolean {
 }
 
 export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: string, today = new Date()): JobRequest[] {
+  void today;
   return jobs.filter((j) => {
-    const ymd = effectiveRequestDateYmd(j, today);
+    const ymd =
+      safeYmd(j.request_date) ||
+      safeYmd(j.submittedAt) ||
+      effectiveRequestDateYmd(j, today);
     return ymd ? inYmdRange(ymd, from, to) : false;
   });
 }
@@ -509,7 +513,7 @@ function buildAllOpenControlSummary(remaining: {
   };
 }
 
-/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบขอที่เข้ามาในงวดนั้น */
+/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบที่กรอกในช่วง (request_date) */
 function resolveRemainingKpi(
   openJobs: JobRequest[],
   period: PeriodRange | null,
@@ -517,18 +521,15 @@ function resolveRemainingKpi(
 ): { remainingPositions: number; remainingRequests: number } {
   let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
   if (period) {
-    jobs = jobs.filter((j) => {
-      const ymd = effectiveRequestDateYmd(j, today);
-      return ymd ? inYmdRange(ymd, period.from, period.to) : false;
-    });
+    jobs = filterJobsByRequestDate(jobs, period.from, period.to, today);
   }
   return {
-    remainingPositions: sumOpenRemainingPositions(jobs),
-    remainingRequests: jobsToRequestControlRecords(jobs).length,
+    remainingPositions: jobs.reduce((sum, j) => sum + positionBreakdownFromJob(j).remainingPositions, 0),
+    remainingRequests: jobs.filter((j) => positionBreakdownFromJob(j).remainingPositions > 0).length,
   };
 }
 
-/** ใบเปิดในสต็อก KPI — ทั้งหมด หรือเฉพาะใบที่เข้ามาในงวด */
+/** ใบเปิดในสต็อก KPI — ทั้งหมด หรือเฉพาะใบที่กรอกในช่วง (request_date) */
 function resolveOpenJobsForStockKpi(
   openJobs: JobRequest[],
   period: PeriodRange | null,
@@ -536,10 +537,7 @@ function resolveOpenJobsForStockKpi(
 ): JobRequest[] {
   let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
   if (period) {
-    jobs = jobs.filter((j) => {
-      const ymd = effectiveRequestDateYmd(j, today);
-      return ymd ? inYmdRange(ymd, period.from, period.to) : false;
-    });
+    jobs = filterJobsByRequestDate(jobs, period.from, period.to, today);
   }
   return jobs;
 }
@@ -867,7 +865,10 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today 
     if (j.status === 'closed' || j.status === 'cancelled') continue;
     const rem = positionBreakdownFromJob(j).remainingPositions;
     if (rem <= 0) continue;
-    const ymd = effectiveRequestDateYmd(j, today);
+    const ymd =
+      safeYmd(j.request_date) ||
+      safeYmd(j.submittedAt) ||
+      effectiveRequestDateYmd(j, today);
     if (!ymd || !inYmdRange(ymd, from, to)) continue;
     const month = ymd.slice(0, 7);
     const kind = classifyLifecycleKind(j);
@@ -1234,13 +1235,12 @@ export function buildDashboardData(
   const kpis =
     cohortStock != null
       ? buildStockKpisFromCohort(
-          period
-            ? cohortStock
-            : {
-                ...cohortStock,
-                remainingPositions: openRemainingPositions,
-                remainingRequestCount: openRemainingRequests,
-              },
+          {
+            ...cohortStock,
+            /** คงเหลือ = ที่ต้องหาจากใบเปิดจริง (ไม่ใช้ยอด remaining จาก throughput ที่รวมใบนอกคิว) */
+            remainingPositions: openRemainingPositions,
+            remainingRequestCount: openRemainingRequests,
+          },
           stockScopeHint,
         ).map((kpi) =>
           !period && kpi.id === 'remaining'
@@ -1248,7 +1248,12 @@ export function buildDashboardData(
                 ...kpi,
                 description: `อัตราที่ยังต้องหาจากใบเปิดทั้งหมด · ${openRemainingPositions.toLocaleString('th-TH')} อัตรา · ${openRemainingRequests.toLocaleString('th-TH')} ใบขอ`,
               }
-            : kpi,
+            : period && kpi.id === 'remaining'
+              ? {
+                  ...kpi,
+                  description: `อัตราที่ยังต้องหาจากใบเปิดที่กรอกในช่วง · ${openRemainingPositions.toLocaleString('th-TH')} อัตรา · ${openRemainingRequests.toLocaleString('th-TH')} ใบขอ`,
+                }
+              : kpi,
         )
       : buildStockKpis(stockJobs, period?.label ?? null);
 
