@@ -1,6 +1,6 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { toBangkokYmd } from './businessDate.js';
-import { effectiveInformQtySql, staffingPositionBreakdown } from './siamrajStaffingOpen.js';
+import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 
 export {
   effectiveInformedCount,
@@ -131,7 +131,8 @@ export async function listSiamrajSqlServerThroughput(options: {
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
 
-  const effDate = effectiveRequestDateSql('A');
+  const openDate = effectiveRequestDateSql('A');
+  // สรุป inform เฉพาะใบในช่วง — เลี่ยง correlated COUNT ต่อแถว และเลี่ยงสแกน inform ทั้งตาราง
   const rows = await siamrajSqlQuery<SqlThroughputRow>(
     `
     SELECT
@@ -141,23 +142,34 @@ export async function listSiamrajSqlServerThroughput(options: {
       A.request_qty,
       A.inform_qty,
       A.is_inform_all,
-      ${effectiveInformQtySql('A')} AS effective_inform_qty,
+      CASE
+        WHEN ISNULL(A.inform_qty, 0) > 0 THEN A.inform_qty
+        ELSE ISNULL(IH.inform_cnt, 0)
+      END AS effective_inform_qty,
       A.status,
       A.is_stop,
       A.stop_no,
       A.cancel_date,
       A.stop_date,
       CASE
-        WHEN EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no) THEN 1
+        WHEN ISNULL(A.inform_qty, 0) > 0 OR ISNULL(IH.inform_cnt, 0) > 0 THEN 1
         ELSE 0
       END AS has_inform
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
+    LEFT JOIN (
+      SELECT IH.request_no, COUNT_BIG(*) AS inform_cnt
+      FROM st_inform_head IH
+      INNER JOIN st_request_head A2 ON A2.request_no = IH.request_no
+      WHERE CONVERT(date, A2.request_date) >= @fromDate
+        AND CONVERT(date, A2.request_date) <= @toDate
+      GROUP BY IH.request_no
+    ) IH ON IH.request_no = A.request_no
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
-      AND ${effDate} >= @fromDate
-      AND ${effDate} <= @toDate
+      AND ${openDate} >= @fromDate
+      AND ${openDate} <= @toDate
   `,
     { ...filters, fromDate: from, toDate: to },
   );

@@ -97,29 +97,35 @@ const SupervisorDashboard: React.FC = () => {
     return resolveOpenStockTrendRange(jobs);
   }, [period, jobs]);
 
+  const throughputFrom = throughputRange.from;
+  const throughputTo = throughputRange.to;
+
   useEffect(() => {
     if (DEMO_MODE) {
       setThroughputRecords([]);
       return;
     }
-    const range = throughputRange;
-    if (siamrajPrimary && dbSource === 'sqlserver') {
-      let cancelled = false;
-      void fetchSiamrajThroughput(range.from, range.to)
-        .then((rows) => {
-          if (!cancelled) setThroughputRecords(rows);
-        })
-        .catch(() => {
-          if (!cancelled) setThroughputRecords([]);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
+    if (!(siamrajPrimary && dbSource === 'sqlserver')) return;
+    let cancelled = false;
+    void fetchSiamrajThroughput(throughputFrom, throughputTo)
+      .then((rows) => {
+        if (!cancelled) setThroughputRecords(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setThroughputRecords([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [siamrajPrimary, dbSource, throughputFrom, throughputTo]);
+
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    if (siamrajPrimary && dbSource === 'sqlserver') return;
     setThroughputRecords(
-      jobsToThroughputRecords(filterJobsForThroughput(jobs, range.from, range.to)),
+      jobsToThroughputRecords(filterJobsForThroughput(jobs, throughputFrom, throughputTo)),
     );
-  }, [jobs, siamrajPrimary, dbSource, refreshing, period, throughputRange]);
+  }, [jobs, siamrajPrimary, dbSource, throughputFrom, throughputTo]);
 
   useEffect(() => {
     if (DEMO_MODE) {
@@ -130,9 +136,13 @@ const SupervisorDashboard: React.FC = () => {
       setClosedJobs([]);
       return;
     }
-    const range = period ?? resolveOpenStockTrendRange(jobs);
+    // โหมดทั้งหมดใช้ throughput เป็นหลัก — ไม่ดึง closed ชุดใหญ่ซ้ำ
+    if (!period) {
+      setClosedJobs([]);
+      return;
+    }
     let cancelled = false;
-    void fetchSiamrajClosedRequests(range.from, range.to)
+    void fetchSiamrajClosedRequests(period.from, period.to)
       .then((rows) => {
         if (!cancelled) setClosedJobs(rows);
       })
@@ -142,7 +152,7 @@ const SupervisorDashboard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [siamrajPrimary, dbSource, period, refreshing, jobs]);
+  }, [siamrajPrimary, dbSource, period]);
 
   /** ชุดข้อมูลเดียวกับหน้ารายการหน่วยงาน — ไม่กรองวันที่จนกว่าจะเลือกช่วงวันที่กรอก */
   const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
