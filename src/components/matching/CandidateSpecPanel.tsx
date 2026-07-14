@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import {
   type CandidateSpecAnalysis,
   adjacentTierEmoji,
@@ -159,16 +158,8 @@ export default function CandidateSpecPanel({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
 
-  if (loading) {
-    return (
-      <div className={cn('rounded-xl border border-violet-200/70 bg-violet-50/40 px-3 py-3', mode === 'full' && 'space-y-2')}>
-        <div className="flex items-center gap-2 text-sm text-violet-700">
-          <Sparkles className="h-4 w-4 animate-pulse" />
-          <span>AI กำลังวิเคราะห์สเปคผู้สมัคร… (อาจใช้เวลา 1–3 นาที)</span>
-        </div>
-      </div>
-    );
-  }
+  // ระหว่างรอ AI วิเคราะห์: ไม่โชว์การ์ด loading ใด ๆ (ตามที่ตกลง)
+  if (loading) return null;
 
   if (error) {
     return (
