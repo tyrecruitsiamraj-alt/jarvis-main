@@ -56,6 +56,10 @@ function monthRangeFromParts(month: number, yearCe: number): DateRangeYmd {
   return { from: toYmdLocal(startOfMonth(d)), to: toYmdLocal(endOfMonth(d)) };
 }
 
+function yearRangeFromParts(yearCe: number): DateRangeYmd {
+  return { from: `${yearCe}-01-01`, to: `${yearCe}-12-31` };
+}
+
 /** ถ้าช่วงวันที่ตรงทั้งเดือน → คืน { month, yearCe } ไม่เช่นนั้น null */
 function parseFullMonthSelection(range: DateRangeYmd | null): { month: number; yearCe: number } | null {
   if (!range?.from || !range?.to) return null;
@@ -67,6 +71,17 @@ function parseFullMonthSelection(range: DateRangeYmd | null): { month: number; y
   const expected = monthRangeFromParts(month, yearCe);
   if (range.from !== expected.from || range.to !== expected.to) return null;
   return { month, yearCe };
+}
+
+/** ถ้าช่วงวันที่ตรงทั้งปี ค.ศ. → คืน yearCe */
+function parseFullYearSelection(range: DateRangeYmd | null): number | null {
+  if (!range?.from || !range?.to) return null;
+  const fromParts = range.from.match(/^(\d{4})-01-01$/);
+  const toParts = range.to.match(/^(\d{4})-12-31$/);
+  if (!fromParts || !toParts) return null;
+  const yearCe = Number(fromParts[1]);
+  if (!yearCe || yearCe !== Number(toParts[1])) return null;
+  return yearCe;
 }
 
 const DashboardFilterBar: React.FC<Props> = ({
@@ -88,8 +103,13 @@ const DashboardFilterBar: React.FC<Props> = ({
   }, [now]);
 
   const fullMonth = parseFullMonthSelection(dateRange);
+  const fullYearCe = fullMonth ? null : parseFullYearSelection(dateRange);
   const selectedMonth = fullMonth?.month ? String(fullMonth.month) : '';
-  const selectedYearBe = fullMonth ? String(ceToBeYear(fullMonth.yearCe)) : '';
+  const selectedYearBe = fullMonth
+    ? String(ceToBeYear(fullMonth.yearCe))
+    : fullYearCe
+      ? String(ceToBeYear(fullYearCe))
+      : '';
 
   const applyPreset = (preset: 'all' | 'this_month' | 'last_month') => {
     if (preset === 'all') {
@@ -100,18 +120,28 @@ const DashboardFilterBar: React.FC<Props> = ({
     onDateRangeChange({ from: p.from, to: p.to });
   };
 
+  /** เลือกปีอย่างเดียว = ทั้งปี · มีเดือน+ปี = เดือนนั้น · ไม่มีปี = ทั้งหมด */
   const applyMonthYear = (monthStr: string, yearBeStr: string) => {
-    if (!monthStr || !yearBeStr) {
+    if (!yearBeStr) {
       onDateRangeChange(null);
+      return;
+    }
+    const yearBe = Number(yearBeStr);
+    if (!yearBe) {
+      onDateRangeChange(null);
+      return;
+    }
+    const yearCe = yearBe - 543;
+    if (!monthStr) {
+      onDateRangeChange(yearRangeFromParts(yearCe));
       return;
     }
     const month = Number(monthStr);
-    const yearBe = Number(yearBeStr);
-    if (!month || month < 1 || month > 12 || !yearBe) {
-      onDateRangeChange(null);
+    if (!month || month < 1 || month > 12) {
+      onDateRangeChange(yearRangeFromParts(yearCe));
       return;
     }
-    onDateRangeChange(monthRangeFromParts(month, yearBe - 543));
+    onDateRangeChange(monthRangeFromParts(month, yearCe));
   };
 
   const activePreset = (() => {
@@ -166,12 +196,12 @@ const DashboardFilterBar: React.FC<Props> = ({
                 const month = e.target.value;
                 const yearBe =
                   selectedYearBe || String(ceToBeYear(now.getFullYear()));
-                applyMonthYear(month, month ? yearBe : '');
+                applyMonthYear(month, yearBe);
               }}
               className="jarvis-filter-select w-full text-sm"
               aria-label="เลือกเดือน"
             >
-              <option value="">เดือน…</option>
+              <option value="">ทั้งปี</option>
               {THAI_MONTHS.map((m) => (
                 <option key={m.value} value={String(m.value)}>
                   {m.label}
@@ -188,8 +218,7 @@ const DashboardFilterBar: React.FC<Props> = ({
               value={selectedYearBe}
               onChange={(e) => {
                 const yearBe = e.target.value;
-                const month = selectedMonth || String(now.getMonth() + 1);
-                applyMonthYear(yearBe ? month : '', yearBe);
+                applyMonthYear(yearBe ? selectedMonth : '', yearBe);
               }}
               className="jarvis-filter-select w-full text-sm"
               aria-label="เลือกปี"
@@ -205,6 +234,9 @@ const DashboardFilterBar: React.FC<Props> = ({
               })}
             </select>
           </div>
+          <p className="text-[11px] text-slate-500 col-span-2">
+            เลือกเฉพาะปี = ดูทั้งปี · เลือกเดือน+ปี = เฉพาะเดือนนั้น
+          </p>
         </div>
         <DateRangeCalendarPicker
           triggerId="dashboard-date-range"

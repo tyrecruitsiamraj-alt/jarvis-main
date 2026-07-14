@@ -17,7 +17,13 @@ type Props = {
 };
 
 function sumPoint(p: DashboardData['activityTrend'][number]) {
-  return p.resignations + p.replacements + p.newOpenings;
+  return (
+    p.resignations +
+    p.replacements +
+    (p.increaseHeadcount ?? 0) +
+    (p.newSite ?? 0) +
+    (p.other ?? 0)
+  );
 }
 
 const DashboardChartSection: React.FC<Props> = ({ data }) => {
@@ -27,12 +33,18 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
     (acc, p) => ({
       resignations: acc.resignations + p.resignations,
       replacements: acc.replacements + p.replacements,
-      newOpenings: acc.newOpenings + p.newOpenings,
+      increaseHeadcount: acc.increaseHeadcount + (p.increaseHeadcount ?? 0),
+      newSite: acc.newSite + (p.newSite ?? 0),
+      other: acc.other + (p.other ?? 0),
     }),
-    { resignations: 0, replacements: 0, newOpenings: 0 },
+    { resignations: 0, replacements: 0, increaseHeadcount: 0, newSite: 0, other: 0 },
   );
   const activityTotal =
-    periodTotals.resignations + periodTotals.replacements + periodTotals.newOpenings;
+    periodTotals.resignations +
+    periodTotals.replacements +
+    periodTotals.increaseHeadcount +
+    periodTotals.newSite +
+    periodTotals.other;
 
   const currentMonth = activityData.length > 0 ? activityData[activityData.length - 1] : null;
   const previousMonth = activityData.length > 1 ? activityData[activityData.length - 2] : null;
@@ -48,11 +60,14 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
               ประเภทใบขอคงเหลือ — ลาออก / เปลี่ยนตัว / เพิ่มอัตรา / เปิดไซต์
             </h3>
             <p className="text-xs text-slate-500">
-              นับจากใบที่ยังเปิดอยู่ แยกตามประเภท · {data.activityTrendLabel}
+              นับอัตราคงเหลือจากใบที่ยังเปิดอยู่ แยกตามประเภท · รวมต้องเท่าการ์ดคงเหลือ ·{' '}
+              {data.activityTrendLabel}
             </p>
             <p className="text-xs text-slate-600 mt-1">
               รวม {activityTotal} อัตรา — ลาออก {periodTotals.resignations} · เปลี่ยนตัว{' '}
-              {periodTotals.replacements} · เปิดงานใหม่ {periodTotals.newOpenings}
+              {periodTotals.replacements} · เพิ่มอัตรา {periodTotals.increaseHeadcount} · เปิดไซต์{' '}
+              {periodTotals.newSite}
+              {periodTotals.other > 0 ? ` · อื่นๆ ${periodTotals.other}` : ''}
             </p>
             {data.lifecycleInsights && data.lifecycleInsights.length > 0 ? (
               <ul className="text-xs text-slate-600 mt-2 space-y-0.5 list-disc list-inside">
@@ -124,6 +139,17 @@ const DashboardChartSection: React.FC<Props> = ({ data }) => {
                   dot={{ r: 3 }}
                   activeDot={{ r: 5 }}
                 />
+                {periodTotals.other > 0 ? (
+                  <Line
+                    type="monotone"
+                    dataKey="other"
+                    name="อื่นๆ"
+                    stroke="#64748b"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                ) : null}
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -365,12 +365,18 @@ export function resolvePeriodRange(
   const label = `${format(fromDate, 'd MMM yyyy', { locale: th })} – ${format(toDate, 'd MMM yyyy', { locale: th })}`;
   const previousLabel = `${format(previousFromDate, 'd MMM yyyy', { locale: th })} – ${format(previousToDate, 'd MMM yyyy', { locale: th })}`;
 
+  const fullYearLabel = (() => {
+    if (from !== `${fromDate.getFullYear()}-01-01`) return null;
+    if (to !== `${fromDate.getFullYear()}-12-31`) return null;
+    return `ปี ${fromDate.getFullYear() + 543}`;
+  })();
+
   return {
     from,
     to,
     previousFrom: toYmdLocal(previousFromDate),
     previousTo: toYmdLocal(previousToDate),
-    label,
+    label: fullYearLabel ?? label,
     previousLabel,
   };
 }
@@ -858,16 +864,18 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today 
   const otherMap = new Map<string, number>();
 
   for (const j of jobs) {
+    if (j.status === 'closed' || j.status === 'cancelled') continue;
+    const rem = positionBreakdownFromJob(j).remainingPositions;
+    if (rem <= 0) continue;
     const ymd = effectiveRequestDateYmd(j, today);
     if (!ymd || !inYmdRange(ymd, from, to)) continue;
     const month = ymd.slice(0, 7);
-    const units = jobPositionUnits(j);
     const kind = classifyLifecycleKind(j);
-    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + units);
-    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + units);
-    else if (kind === 'increase_headcount') increaseMap.set(month, (increaseMap.get(month) ?? 0) + units);
-    else if (kind === 'new_site') newSiteMap.set(month, (newSiteMap.get(month) ?? 0) + units);
-    else otherMap.set(month, (otherMap.get(month) ?? 0) + units);
+    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + rem);
+    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + rem);
+    else if (kind === 'increase_headcount') increaseMap.set(month, (increaseMap.get(month) ?? 0) + rem);
+    else if (kind === 'new_site') newSiteMap.set(month, (newSiteMap.get(month) ?? 0) + rem);
+    else otherMap.set(month, (otherMap.get(month) ?? 0) + rem);
   }
 
   const points: DashboardActivityTrendPoint[] = [];
@@ -886,6 +894,7 @@ function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today 
       newOpenings: increase + newSite + other,
       increaseHeadcount: increase,
       newSite,
+      other,
     });
     d = addMonths(d, 1);
   }
@@ -1089,14 +1098,17 @@ export function buildDashboardData(
   const periodLabel = period?.label ?? 'ทั้งหมดที่โหลด';
   const previousPeriodLabel = period?.previousLabel ?? '—';
   const trendJobs = trend?.jobs ?? scopedJobs;
-  const trendFrom = trend?.from ?? period?.from ?? '1970-01-01';
-  const trendTo = trend?.to ?? period?.to ?? toYmdLocal(today);
-  const activityTrendLabel = trend?.label ?? periodLabel;
+  const openStockTrend =
+    !trend && !period ? resolveOpenStockTrendRange(openJobSet, today) : null;
+  const trendFrom = trend?.from ?? period?.from ?? openStockTrend?.from ?? toYmdLocal(today);
+  const trendTo = trend?.to ?? period?.to ?? openStockTrend?.to ?? toYmdLocal(today);
+  const activityTrendLabel = trend?.label ?? openStockTrend?.label ?? periodLabel;
   const throughputRecords =
     trend?.throughputRecords ??
     jobsToThroughputRecords(filterJobsForThroughput(trendJobs, trendFrom, trendTo));
+  const activityJobs = period ? trendJobs : openJobSet;
   const activityTrend = enrichActivityTrendWithThroughput(
-    buildActivityTrend(trendJobs, trendFrom, trendTo, today),
+    buildActivityTrend(activityJobs, trendFrom, trendTo, today),
     throughputRecords,
   );
 

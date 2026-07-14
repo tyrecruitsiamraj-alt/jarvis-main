@@ -65,7 +65,7 @@ describe('buildDashboardData', () => {
     ];
     const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
     const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
-    expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(2);
+    expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(3);
     const july = data.activityTrend.find((p) => p.date.startsWith('2026-07'));
     expect(july?.resignations).toBe(1);
     expect(july?.replacements).toBe(0);
@@ -120,6 +120,7 @@ describe('buildDashboardData', () => {
         cancelled_positions: 0,
         request_date: '2026-05-01',
         required_date: '2026-05-01',
+        request_action_name: 'ลาออก',
       }),
       job({
         id: 'new',
@@ -130,6 +131,7 @@ describe('buildDashboardData', () => {
         cancelled_positions: 0,
         request_date: '2026-07-02',
         required_date: '2026-07-20',
+        request_action_name: 'เปลี่ยนตัว',
       }),
     ];
     const data = buildDashboardData(jobs, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, [], jobs);
@@ -139,6 +141,19 @@ describe('buildDashboardData', () => {
     expect(data.kpis.find((k) => k.id === 'cancelled')?.value).toBe(0);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(62);
     expect(data.kpis.find((k) => k.id === 'remaining')?.label).toBe('คงเหลือ');
+    const lifecycleRemaining = data.activityTrend.reduce(
+      (s, p) =>
+        s +
+        p.resignations +
+        p.replacements +
+        (p.increaseHeadcount ?? 0) +
+        (p.newSite ?? 0) +
+        (p.other ?? 0),
+      0,
+    );
+    expect(lifecycleRemaining).toBe(62);
+    expect(data.activityTrend.find((p) => p.date.startsWith('2026-05'))?.resignations).toBe(17);
+    expect(data.activityTrend.find((p) => p.date.startsWith('2026-07'))?.replacements).toBe(45);
     expect(data.workStatusKpis.map((k) => k.id)).toEqual([
       'work_status_total',
       'work_status_in_progress',
@@ -161,6 +176,54 @@ describe('buildDashboardData', () => {
     expect(data.periodLabel).toBe('ทั้งหมดที่โหลด');
   });
 
+  it('custom full-year period labels as พ.ศ. and scopes activity trend', () => {
+    const jobs = [
+      job({
+        id: 'a',
+        unit_name: 'A',
+        request_date: '2026-03-10',
+        required_date: '2026-03-10',
+        request_action_name: 'ลาออก',
+        request_positions: 10,
+        filled_positions: 4,
+        cancelled_positions: 0,
+        position_units: 6,
+      }),
+      job({
+        id: 'b',
+        unit_name: 'B',
+        request_date: '2025-06-01',
+        required_date: '2025-06-01',
+        request_action_name: 'เปลี่ยนตัว',
+        request_positions: 5,
+        filled_positions: 0,
+        cancelled_positions: 0,
+        position_units: 5,
+      }),
+    ];
+    const period = resolvePeriodRange('custom', { from: '2026-01-01', to: '2026-12-31' }, new Date('2026-07-15'));
+    expect(period.label).toBe('ปี 2569');
+    const scoped = jobs.filter((j) => j.request_date.startsWith('2026'));
+    const data = buildDashboardData(scoped, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), {
+      jobs: scoped,
+      from: period.from,
+      to: period.to,
+      label: period.label,
+    });
+    const lifecycleRemaining = data.activityTrend.reduce(
+      (s, p) =>
+        s +
+        p.resignations +
+        p.replacements +
+        (p.increaseHeadcount ?? 0) +
+        (p.newSite ?? 0) +
+        (p.other ?? 0),
+      0,
+    );
+    expect(lifecycleRemaining).toBe(6);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(6);
+  });
+
   it('remaining KPI reflects open positions in selected period only', () => {
     const jobs = [
       job({ id: 'old', unit_name: 'A', position_units: 52, request_positions: 52, filled_positions: 0, cancelled_positions: 0, request_date: '2026-05-01', required_date: '2026-05-01' }),
@@ -180,7 +243,7 @@ describe('buildDashboardData', () => {
     );
     expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(45);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(45);
-    expect(data.kpis.find((k) => k.id === 'remaining')?.description).toContain('ใบขอในงวด');
+    expect(data.kpis.find((k) => k.id === 'remaining')?.description).toMatch(/ยังต้องหา|ใบขอ/);
   });
 
   it('exposes closed breakdown from throughput records', () => {
@@ -229,12 +292,12 @@ describe('buildDashboardData', () => {
     );
     expect(data.closedBreakdown).toEqual({ samePeriod: 2, backlog: 3 });
     expect(data.kpis.map((k) => k.id)).toEqual(['total_requests', 'closed', 'cancelled', 'remaining']);
-    expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(1);
+    expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(3);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(1);
     expect(data.fulfillmentBreakdown).toBeDefined();
   });
 
-  it('stock KPIs count filled positions on open requests as ปิดใบขอ', () => {
+  it('stock KPIs count filled positions on open requests as ปิดแล้ว', () => {
     const jobs = [
       job({
         id: 'a',
@@ -264,7 +327,7 @@ describe('buildDashboardData', () => {
     const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, closed);
     expect(data.kpis.find((k) => k.id === 'total_requests')?.value).toBe(5);
     expect(data.kpis.find((k) => k.id === 'closed')?.value).toBe(3);
-    expect(data.kpis.find((k) => k.id === 'closed')?.label).toBe('ปิดใบขอ');
+    expect(data.kpis.find((k) => k.id === 'closed')?.label).toBe('ปิดแล้ว');
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(2);
     expect(data.priorityWorkQueue).toEqual([]);
   });

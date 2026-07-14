@@ -31,6 +31,8 @@ export type DashboardActivityTrendPoint = {
   newOpenings: number;
   increaseHeadcount?: number;
   newSite?: number;
+  /** คงเหลือประเภท "อื่นๆ" (นอกลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์) */
+  other?: number;
   /** ตำแหน่งที่ขอ (ตามเดือนที่เปิดใบ — ไม่หายเมื่อปิดแล้ว) */
   requestedPositions?: number;
   /** ตำแหน่งที่ปิดได้/หาได้แล้ว (ตามเดือนที่เปิดใบ · สถานะปัจจุบัน) */
