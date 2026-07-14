@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
+import { endOfMonth, startOfMonth } from 'date-fns';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
@@ -16,27 +16,7 @@ const PERIOD_PRESETS = [
   { id: 'last_month' as const, label: 'เดือนก่อน' },
 ];
 
-const MONTH_OPTIONS_COUNT = 24;
-
-type MonthOption = { key: string; label: string; from: string; to: string };
-
-function buildMonthOptions(now = new Date()): MonthOption[] {
-  const options: MonthOption[] = [];
-  for (let i = 0; i < MONTH_OPTIONS_COUNT; i += 1) {
-    const d = subMonths(now, i);
-    const from = toYmdLocal(startOfMonth(d));
-    const to = toYmdLocal(endOfMonth(d));
-    const monthLabel = THAI_MONTHS[d.getMonth()]?.label ?? String(d.getMonth() + 1);
-    const yearBe = ceToBeYear(d.getFullYear());
-    options.push({
-      key: from.slice(0, 7),
-      label: `${monthLabel} ${yearBe}`,
-      from,
-      to,
-    });
-  }
-  return options;
-}
+const YEAR_OPTIONS_COUNT = 6;
 
 const QUEUE_STATUS_OPTIONS: { value: DashboardStatusFilter; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ (ตาราง)' },
@@ -70,6 +50,24 @@ type Props = {
   className?: string;
 };
 
+function monthRangeFromParts(month: number, yearCe: number): DateRangeYmd {
+  const d = new Date(yearCe, month - 1, 1);
+  return { from: toYmdLocal(startOfMonth(d)), to: toYmdLocal(endOfMonth(d)) };
+}
+
+/** ถ้าช่วงวันที่ตรงทั้งเดือน → คืน { month, yearCe } ไม่เช่นนั้น null */
+function parseFullMonthSelection(range: DateRangeYmd | null): { month: number; yearCe: number } | null {
+  if (!range?.from || !range?.to) return null;
+  const fromParts = range.from.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!fromParts) return null;
+  const yearCe = Number(fromParts[1]);
+  const month = Number(fromParts[2]);
+  if (!yearCe || month < 1 || month > 12) return null;
+  const expected = monthRangeFromParts(month, yearCe);
+  if (range.from !== expected.from || range.to !== expected.to) return null;
+  return { month, yearCe };
+}
+
 const DashboardFilterBar: React.FC<Props> = ({
   dateRange,
   onDateRangeChange,
@@ -81,7 +79,15 @@ const DashboardFilterBar: React.FC<Props> = ({
   onQueueStatusChange,
   className,
 }) => {
-  const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const now = useMemo(() => new Date(), []);
+  const yearOptionsCe = useMemo(() => {
+    const current = now.getFullYear();
+    return Array.from({ length: YEAR_OPTIONS_COUNT }, (_, i) => current - i);
+  }, [now]);
+
+  const fullMonth = parseFullMonthSelection(dateRange);
+  const selectedMonth = fullMonth?.month ? String(fullMonth.month) : '';
+  const selectedYearBe = fullMonth ? String(ceToBeYear(fullMonth.yearCe)) : '';
 
   const applyPreset = (preset: 'all' | 'this_month' | 'last_month') => {
     if (preset === 'all') {
@@ -92,14 +98,18 @@ const DashboardFilterBar: React.FC<Props> = ({
     onDateRangeChange({ from: p.from, to: p.to });
   };
 
-  const applyMonth = (monthKey: string) => {
-    if (!monthKey) {
+  const applyMonthYear = (monthStr: string, yearBeStr: string) => {
+    if (!monthStr || !yearBeStr) {
       onDateRangeChange(null);
       return;
     }
-    const option = monthOptions.find((m) => m.key === monthKey);
-    if (!option) return;
-    onDateRangeChange({ from: option.from, to: option.to });
+    const month = Number(monthStr);
+    const yearBe = Number(yearBeStr);
+    if (!month || month < 1 || month > 12 || !yearBe) {
+      onDateRangeChange(null);
+      return;
+    }
+    onDateRangeChange(monthRangeFromParts(month, yearBe - 543));
   };
 
   const activePreset = (() => {
@@ -111,11 +121,6 @@ const DashboardFilterBar: React.FC<Props> = ({
     }
     return null;
   })();
-
-  const selectedMonthKey =
-    dateRange != null
-      ? (monthOptions.find((m) => m.from === dateRange.from && m.to === dateRange.to)?.key ?? '')
-      : '';
 
   return (
     <aside
@@ -147,20 +152,58 @@ const DashboardFilterBar: React.FC<Props> = ({
             </button>
           ))}
         </div>
-        <select
-          id="dashboard-month-select"
-          value={selectedMonthKey}
-          onChange={(e) => applyMonth(e.target.value)}
-          className="jarvis-filter-select w-full text-sm"
-          aria-label="เลือกเดือน"
-        >
-          <option value="">เลือกเดือน…</option>
-          {monthOptions.map((m) => (
-            <option key={m.key} value={m.key}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label htmlFor="dashboard-month-select" className="text-[11px] text-slate-500">
+              เดือน
+            </label>
+            <select
+              id="dashboard-month-select"
+              value={selectedMonth}
+              onChange={(e) => {
+                const month = e.target.value;
+                const yearBe =
+                  selectedYearBe || String(ceToBeYear(now.getFullYear()));
+                applyMonthYear(month, month ? yearBe : '');
+              }}
+              className="jarvis-filter-select w-full text-sm"
+              aria-label="เลือกเดือน"
+            >
+              <option value="">เดือน…</option>
+              {THAI_MONTHS.map((m) => (
+                <option key={m.value} value={String(m.value)}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="dashboard-year-select" className="text-[11px] text-slate-500">
+              ปี (พ.ศ.)
+            </label>
+            <select
+              id="dashboard-year-select"
+              value={selectedYearBe}
+              onChange={(e) => {
+                const yearBe = e.target.value;
+                const month = selectedMonth || String(now.getMonth() + 1);
+                applyMonthYear(yearBe ? month : '', yearBe);
+              }}
+              className="jarvis-filter-select w-full text-sm"
+              aria-label="เลือกปี"
+            >
+              <option value="">ปี…</option>
+              {yearOptionsCe.map((y) => {
+                const be = ceToBeYear(y);
+                return (
+                  <option key={y} value={String(be)}>
+                    {be}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
         <DateRangeCalendarPicker
           triggerId="dashboard-date-range"
           className="w-full"
