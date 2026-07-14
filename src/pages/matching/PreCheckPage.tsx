@@ -3,9 +3,8 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { MapPin, Building2, ClipboardCheck, Navigation, Users } from 'lucide-react';
+import { MapPin, ClipboardCheck, Navigation, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
@@ -21,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { saveUnitRequestMeta, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import ScoredCandidateCard from '@/components/matching/ScoredCandidateCard';
+import MatchLoadingBar from '@/components/matching/MatchLoadingBar';
 import { inferProvinceFromAddress, inferDistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import {
   type IrecruitMatchResult,
@@ -156,7 +156,6 @@ const PreCheckPage: React.FC = () => {
   const [jobMatchById, setJobMatchById] = useState<Record<string, IrecruitMatchResult>>({});
   const [jobMatchLoadingId, setJobMatchLoadingId] = useState<string | null>(null);
   const [jobMatchErrorById, setJobMatchErrorById] = useState<Record<string, string>>({});
-  const [irecruitDrawerOpen, setIrecruitDrawerOpen] = useState(false);
 
   const fetchIrecruitMatch = async (jobId: string, refresh = false) => {
     setJobMatchLoadingId(jobId);
@@ -191,8 +190,6 @@ const PreCheckPage: React.FC = () => {
   // เปิดรายละเอียดงาน + ค้นหาผู้สมัครที่ตรงให้อัตโนมัติ (คลิกเดียว ไม่ต้องกดวิเคราะห์ก่อน)
   const openJobAndFindCandidates = (j: JobRequest) => {
     setJobDetail(j);
-    // เปิด drawer แยกตามโซนทันทีที่กดดูงาน (ไม่ต้องกดปุ่มซ้ำ)
-    setIrecruitDrawerOpen(true);
     if (!jobMatchById[j.id] && jobMatchLoadingId !== j.id) {
       void fetchIrecruitMatch(j.id);
     }
@@ -251,7 +248,6 @@ const PreCheckPage: React.FC = () => {
 
   const closeJobDetail = () => {
     setJobDetail(null);
-    setIrecruitDrawerOpen(false);
     if (searchParams.get('jobId')) {
       const next = new URLSearchParams(searchParams);
       next.delete('jobId');
@@ -893,28 +889,26 @@ const PreCheckPage: React.FC = () => {
         </div>
       </div>
 
-      <Dialog open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">รายละเอียดงาน</DialogTitle>
-            <DialogDescription className="sr-only">รายละเอียดงานและหน่วยงาน</DialogDescription>
-          </DialogHeader>
+      <Sheet open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-foreground">รายละเอียดงาน</SheetTitle>
+            <SheetDescription className="sr-only">รายละเอียดงาน หน่วยงาน และผู้สมัครที่แมท</SheetDescription>
+          </SheetHeader>
           {jobDetail &&
             (() => {
               const client = getClientInfo(jobDetail.unit_name);
               return (
-                <div className="space-y-3 mt-2 max-h-[72vh] overflow-y-auto pr-1">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/15 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-foreground">{unitRequestCardTitle(jobDetail)}</div>
-                      {unitRequestCardSubtitle(jobDetail) ? (
-                        <div className="text-xs text-muted-foreground mt-0.5">{unitRequestCardSubtitle(jobDetail)}</div>
-                      ) : null}
-                      <div className="text-xs text-muted-foreground mt-1">{jobDetail.location_address}</div>
-                    </div>
+                <div className="mt-4 space-y-3">
+                  <div className="flex justify-end">
+                    <Link
+                      to={unitRequestPath(jobDetail)}
+                      state={{ returnTo: preCheckReturnPath(jobDetail.id) }}
+                      onClick={() => setJobDetail(null)}
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      ดูใบขอ →
+                    </Link>
                   </div>
                   <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                     <div className="flex items-center gap-2">
@@ -938,41 +932,55 @@ const PreCheckPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  {jobDetail ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIrecruitDrawerOpen(true);
-                        if (!jobMatchById[jobDetail.id] && jobMatchLoadingId !== jobDetail.id) {
-                          void fetchIrecruitMatch(jobDetail.id);
-                        }
-                      }}
-                      className="w-full flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2.5 text-left transition-colors hover:bg-blue-100/70"
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium text-blue-700">
-                        <Users className="h-4 w-4" />
-                        ดูผู้สมัครจาก iRecruit · แยกตามโซน
-                      </span>
-                      <span className="text-xs text-blue-600">
-                        {jobMatchLoadingId === jobDetail.id
-                          ? 'กำลังค้นหา…'
-                          : jobMatchErrorById[jobDetail.id]
-                            ? 'ลองใหม่'
-                            : jobMatchById[jobDetail.id]
-                              ? `${jobMatchById[jobDetail.id].matches.length} คน →`
-                              : 'เปิด →'}
-                      </span>
-                    </button>
-                  ) : null}
-                  <Sheet open={irecruitDrawerOpen} onOpenChange={setIrecruitDrawerOpen}>
-                    <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl overflow-y-auto">
-                      <SheetHeader>
-                        <SheetTitle>ผู้สมัคร iRecruit · แยกตามโซน</SheetTitle>
-                        <SheetDescription>
-                          ผู้สมัครที่ AI แมทกับใบขอนี้ — ใบงานหลายสาขาจะแยกตามโซนให้อัตโนมัติ
-                        </SheetDescription>
-                      </SheetHeader>
-                      <div className="mt-4">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground">{unitRequestCardTitle(jobDetail)}</p>
+                          {jobDetail.request_no ? (
+                            <span className="shrink-0 text-[11px] rounded-full border border-blue-200 bg-white px-2 py-0.5 text-blue-700">
+                              {jobDetail.request_no}
+                            </span>
+                          ) : null}
+                        </div>
+                        {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
+                          .filter((v) => v && v !== 'ไม่ระบุ')
+                          .length ? (
+                          <p className="text-xs text-foreground">
+                            ตำแหน่ง:{' '}
+                            {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
+                              .filter((v) => v && v !== 'ไม่ระบุ')
+                              .join(' · ')}
+                          </p>
+                        ) : null}
+                        {jobDetail.location_address ? (
+                          <p className="text-xs text-muted-foreground">📍 {jobDetail.location_address}</p>
+                        ) : null}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                            เพศที่ต้องการ: {jobDetail.gender_requirement || 'ไม่ระบุ'}
+                          </span>
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                            อายุ:{' '}
+                            {jobDetail.age_range_min != null || jobDetail.age_range_max != null
+                              ? `${jobDetail.age_range_min ?? '—'}–${jobDetail.age_range_max ?? '—'}`
+                              : 'ไม่ระบุ'}
+                          </span>
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                            ต้องการ: {formatYmdDmyBe(jobDetail.required_date)}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                              jobDetail.urgency === 'urgent'
+                                ? 'border-red-200 bg-red-50 text-red-700'
+                                : 'border-sky-200 bg-sky-50 text-sky-700',
+                            )}
+                          >
+                            {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
                         {branchParseData?.parsed.items?.length ? (
                       <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
@@ -1033,7 +1041,7 @@ const PreCheckPage: React.FC = () => {
                           </p>
                         ) : null}
                         {jobMatchLoadingId === jobDetail.id && !jobMatchById[jobDetail.id] ? (
-                          <p className="text-xs text-blue-600">รอผลแมทระดับใบขอเพื่อกระจายเข้าสาขา…</p>
+                          <MatchLoadingBar label="รอผลแมทระดับใบขอเพื่อกระจายเข้าสาขา… (อาจใช้เวลา 1–3 นาที)" />
                         ) : null}
                         <div className="space-y-2">
                           {branchParseData.parsed.items.map((item, idx) => {
@@ -1139,7 +1147,7 @@ const PreCheckPage: React.FC = () => {
                               ผู้สมัครที่แมทกับใบขอนี้
                             </p>
                             {jobMatchLoadingId === jobDetail.id ? (
-                              <p className="text-xs text-muted-foreground">กำลังค้นหาผู้สมัครจาก iRecruit…</p>
+                              <MatchLoadingBar label="กำลังค้นหาผู้สมัครจาก iRecruit… (อาจใช้เวลา 1–3 นาที)" />
                             ) : jobMatchErrorById[jobDetail.id] ? (
                               <div className="space-y-2">
                                 <p className="text-xs text-destructive">
@@ -1175,8 +1183,6 @@ const PreCheckPage: React.FC = () => {
                           </div>
                         )}
                       </div>
-                    </SheetContent>
-                  </Sheet>
                   {detailDistance !== null ? (
                     <p className="text-xs text-muted-foreground">
                       Distance from selected point: <span className="font-medium text-foreground">{detailDistance.toFixed(1)} km</span>
@@ -1346,31 +1352,21 @@ const PreCheckPage: React.FC = () => {
                       </div>
                     ) : null}
                   </div>
-                  <div className="flex gap-2 pt-2">
-                    {client?.contact_phone && (
+                  {client?.contact_phone ? (
+                    <div className="flex gap-2 pt-2">
                       <a
                         href={`tel:${client.contact_phone}`}
                         className="flex-1 text-center py-2 rounded-lg bg-success text-white text-sm font-medium"
                       >
                         Call Client
                       </a>
-                    )}
-                    {jobDetail ? (
-                      <Link
-                        to={unitRequestPath(jobDetail)}
-                        state={{ returnTo: preCheckReturnPath(jobDetail.id) }}
-                        onClick={() => setJobDetail(null)}
-                        className="flex-1 text-center py-2 jarvis-pill-btn text-sm font-medium inline-block"
-                      >
-                        ดูใบงาน
-                      </Link>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
               );
             })()}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
