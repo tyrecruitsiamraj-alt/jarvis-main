@@ -6,7 +6,7 @@ import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } fr
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
-import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
@@ -279,6 +279,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <dt className="text-muted-foreground">สถานที่</dt>
                   <dd className="mt-0.5 font-medium leading-relaxed text-foreground break-words">
                     {selected.location_address}
+                  </dd>
+                </div>
+                <div className="border-b border-border/60 py-2.5">
+                  <dt className="text-muted-foreground">ตำบล / แขวง</dt>
+                  <dd className="mt-0.5 font-medium text-foreground break-words">
+                    {inferSubdistrictFromAddress(selected.location_address || '') ?? '—'}
                   </dd>
                 </div>
                 <div className="border-b border-border/60 py-2.5">

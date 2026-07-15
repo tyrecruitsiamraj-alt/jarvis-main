@@ -80,6 +80,17 @@ function toYmd(v: Date | string | null | undefined): string {
   return toBangkokYmd(v);
 }
 
+/** เว้นวรรคหน้าคำนำหน้าที่อยู่ — ให้ filter จังหวัด/อำเภอ/ตำบลจับได้ */
+function normalizeSiamrajWorkAddress(raw: string | null | undefined): string {
+  const s = (raw || '').toString().normalize('NFC').replace(/\u00a0/g, ' ').trim();
+  if (!s) return '';
+  return s
+    .replace(/(ตำบล|แขวง|อำเภอ\/เขต|อำเภอ|เขต|จังหวัด|จ\.|ต\.|อ\.)/gu, ' $1')
+    .replace(/\s*([:：])\s*/gu, '$1 ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function getSqlFilters() {
   return {
     deptFrom: (process.env.SIAMRAJ_SQL_DEPT_FROM || '_').trim(),
@@ -146,7 +157,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     department_name: r.department_name?.trim() || undefined,
     contract_type_code: r.contract_type_code?.trim() || undefined,
     contract_type_name: r.contract_type_name?.trim() || undefined,
-    location_address: r.work_addr || r.site_name || r.site_code || '',
+    location_address: normalizeSiamrajWorkAddress(r.work_addr) || r.site_name || r.site_code || '',
     request_action_code: r.request_action_code || undefined,
     request_action_name: r.request_action_name || undefined,
     resigned_employee_name: r.staff_fullname?.trim() || undefined,
@@ -199,7 +210,12 @@ const BASE_SQL = `
     A.stop_no,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name,
     (SELECT z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no) AS customer_name,
-    B.work_place1 + '' + COALESCE(B.work_place2, '') + '' + COALESCE(B.work_place3, '') AS work_addr,
+    CONCAT_WS(
+      N' ',
+      NULLIF(LTRIM(RTRIM(B.work_place1)), N''),
+      NULLIF(LTRIM(RTRIM(B.work_place2)), N''),
+      NULLIF(LTRIM(RTRIM(B.work_place3)), N'')
+    ) AS work_addr,
     A.staff_title_code,
     A.job_description_code_1,
     A.job_description_code_2,

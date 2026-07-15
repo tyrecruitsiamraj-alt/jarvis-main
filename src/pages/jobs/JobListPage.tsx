@@ -51,6 +51,7 @@ import {
   matchesUnitOrganizationFilter,
   unitOrganizationKey,
 } from '@/lib/unitGroupName';
+import { cleanedAddressSummary } from '@/lib/districtMatch';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
@@ -767,7 +768,32 @@ const JobListPage: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    {(() => {
+                      const loc = cleanedAddressSummary(j.location_address || '');
+                      if (loc.line) {
+                        return (
+                          <>
+                            <div className="text-foreground/80">
+                              {[
+                                loc.province ? `จ.${loc.province}` : null,
+                                loc.district
+                                  ? loc.district.startsWith('เขต') || loc.district.startsWith('อำเภอ')
+                                    ? loc.district
+                                    : `อ.${loc.district}`
+                                  : null,
+                                loc.subdistrict || null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </div>
+                            <div className="line-clamp-2">{j.location_address}</div>
+                          </>
+                        );
+                      }
+                      return <div className="line-clamp-2">{j.location_address || '—'}</div>;
+                    })()}
+                  </div>
 
                   {(j.recruiter_name || j.screener_name || j.opl_name) && (
                     <div className="text-xs text-muted-foreground mt-1">
