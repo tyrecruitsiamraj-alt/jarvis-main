@@ -700,8 +700,10 @@ const PreCheckPage: React.FC = () => {
             }
           : prev,
       );
-      setEditMsg('บันทึกการแก้ไขถาวรแล้ว');
+      setEditMsg('บันทึกแล้ว — กำลังค้นหาผู้สมัครใหม่…');
       setEditOpen(false);
+      // ค้นหาผู้สมัครใหม่อัตโนมัติด้วยเกณฑ์ที่แก้ (refresh ข้าม cache)
+      void fetchIrecruitMatch(jobDetail.id, true);
     } catch (e) {
       setEditMsg(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
