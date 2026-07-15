@@ -156,6 +156,16 @@ const PreCheckPage: React.FC = () => {
   const [jobMatchById, setJobMatchById] = useState<Record<string, IrecruitMatchResult>>({});
   const [jobMatchLoadingId, setJobMatchLoadingId] = useState<string | null>(null);
   const [jobMatchErrorById, setJobMatchErrorById] = useState<Record<string, string>>({});
+  // แก้ไขใบขอ (อายุ/เพศ/สาขา) — persist
+  const [editOpen, setEditOpen] = useState(false);
+  const [editAgeMin, setEditAgeMin] = useState('');
+  const [editAgeMax, setEditAgeMax] = useState('');
+  const [editGender, setEditGender] = useState('');
+  const [editBranches, setEditBranches] = useState<
+    Array<{ branch_name_clean: string; requested_qty: number; district_hint: string; province_hint: string }>
+  >([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editMsg, setEditMsg] = useState<string | null>(null);
 
   const fetchIrecruitMatch = async (jobId: string, refresh = false) => {
     setJobMatchLoadingId(jobId);
@@ -535,6 +545,30 @@ const PreCheckPage: React.FC = () => {
   useEffect(() => {
     if (!jobDetail) return;
 
+    // ถ้าผู้ใช้แก้สาขาเองไว้ (persist) ใช้ค่านั้นแทนการ parse จาก ERP
+    const overrideBranches = jobDetail.field_overrides?.branches;
+    if (overrideBranches && overrideBranches.length) {
+      setBranchParseData({
+        parser_input: '(แก้ไขสาขาเอง)',
+        parsed: {
+          org_name: null,
+          items: overrideBranches.map((b) => ({
+            org_name: null,
+            branch_name_raw: b.branch_name_clean,
+            branch_name_clean: b.branch_name_clean,
+            requested_qty: b.requested_qty,
+            confidence: 100,
+            district_hint: b.district_hint,
+            province_hint: b.province_hint,
+          })),
+          unparsed_segments: [],
+          parser_status: 'high_confidence',
+        },
+      });
+      setBranchParseLoading(false);
+      return;
+    }
+
     // แยกสาขาทันทีฝั่ง UI — ไม่เรียก API match ต่อสาขา (ใช้ผล AI ระดับใบขอกระจายแทน)
     const parserInput = branchParserOverride.trim() || buildErpBranchDemandInput(jobDetail);
     const parsed = parseErpBranchDemand(parserInput);
@@ -605,6 +639,75 @@ const PreCheckPage: React.FC = () => {
     if (!isLikelyBranchSplitCandidate(parserInput)) return false;
     return branchParseData.parsed.parser_status !== 'high_confidence';
   }, [branchParseData, jobDetail]);
+
+  // เปิด/ปิด ฟอร์มแก้ไขใบขอ — โหลดค่าเริ่มจาก jobDetail + สาขาที่กำลังแสดง
+  const toggleEditJob = () => {
+    if (editOpen) {
+      setEditOpen(false);
+      return;
+    }
+    setEditAgeMin(jobDetail?.age_range_min != null ? String(jobDetail.age_range_min) : '');
+    setEditAgeMax(jobDetail?.age_range_max != null ? String(jobDetail.age_range_max) : '');
+    setEditGender(jobDetail?.gender_requirement || '');
+    setEditBranches(
+      (branchParseData?.parsed.items || []).map((it) => ({
+        branch_name_clean: it.branch_name_clean,
+        requested_qty: it.requested_qty,
+        district_hint: it.district_hint || '',
+        province_hint: it.province_hint || '',
+      })),
+    );
+    setEditMsg(null);
+    setEditOpen(true);
+  };
+
+  const saveFieldOverrides = async () => {
+    if (!jobDetail) return;
+    const requestNo = unitRequestNoteKey(jobDetail);
+    if (!requestNo) {
+      setEditMsg('ใบงานนี้ไม่มี request key สำหรับบันทึก');
+      return;
+    }
+    setSavingEdit(true);
+    setEditMsg(null);
+    try {
+      const ageMin = editAgeMin.trim() === '' ? null : Number(editAgeMin);
+      const ageMax = editAgeMax.trim() === '' ? null : Number(editAgeMax);
+      const branches = editBranches
+        .map((b) => ({
+          branch_name_clean: b.branch_name_clean.trim(),
+          requested_qty: Math.max(0, Math.floor(Number(b.requested_qty) || 0)),
+          district_hint: b.district_hint.trim() || null,
+          province_hint: b.province_hint.trim() || null,
+        }))
+        .filter((b) => b.branch_name_clean);
+      const fieldOverrides = {
+        age_min: ageMin,
+        age_max: ageMax,
+        gender: editGender.trim() || null,
+        branches: branches.length ? branches : null,
+      };
+      await saveUnitRequestMeta(requestNo, { field_overrides: fieldOverrides });
+      setJobDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              age_range_min: ageMin ?? undefined,
+              age_range_max: ageMax ?? undefined,
+              gender_requirement: editGender.trim() || undefined,
+              field_overrides: fieldOverrides,
+              branch_override: fieldOverrides.branches,
+            }
+          : prev,
+      );
+      setEditMsg('บันทึกการแก้ไขถาวรแล้ว');
+      setEditOpen(false);
+    } catch (e) {
+      setEditMsg(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const saveBranchParserOverride = async () => {
     if (!jobDetail) return;
@@ -980,6 +1083,130 @@ const PreCheckPage: React.FC = () => {
                         </div>
                       </div>
 
+                      <div className="mt-3 rounded-xl border border-violet-200/70 bg-violet-50/30 px-3 py-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-violet-900">แก้ไขใบขอ (บันทึกถาวร)</p>
+                          <button
+                            type="button"
+                            onClick={toggleEditJob}
+                            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50"
+                          >
+                            {editOpen ? 'ยกเลิก' : 'แก้ไข อายุ/เพศ/สาขา'}
+                          </button>
+                        </div>
+                        {editOpen ? (
+                          <div className="space-y-2.5 pt-1">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="w-12 text-muted-foreground">อายุ</span>
+                              <Input
+                                value={editAgeMin}
+                                onChange={(e) => setEditAgeMin(e.target.value.replace(/[^0-9]/g, ''))}
+                                placeholder="ต่ำสุด"
+                                className="w-20 bg-white/80"
+                              />
+                              <span>–</span>
+                              <Input
+                                value={editAgeMax}
+                                onChange={(e) => setEditAgeMax(e.target.value.replace(/[^0-9]/g, ''))}
+                                placeholder="สูงสุด"
+                                className="w-20 bg-white/80"
+                              />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="w-12 text-muted-foreground">เพศ</span>
+                              <select
+                                value={editGender}
+                                onChange={(e) => setEditGender(e.target.value)}
+                                className="rounded-md border border-input bg-white/80 px-2 py-1.5 text-sm"
+                              >
+                                <option value="">ไม่ระบุ</option>
+                                <option value="ชาย">ชาย</option>
+                                <option value="หญิง">หญิง</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">สาขา (ชื่อ / จำนวนคน / เขต-อำเภอ)</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditBranches((prev) => [
+                                      ...prev,
+                                      { branch_name_clean: '', requested_qty: 1, district_hint: '', province_hint: '' },
+                                    ])
+                                  }
+                                  className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50"
+                                >
+                                  + เพิ่มสาขา
+                                </button>
+                              </div>
+                              {editBranches.map((b, i) => (
+                                <div key={i} className="flex flex-wrap items-center gap-1.5">
+                                  <Input
+                                    value={b.branch_name_clean}
+                                    onChange={(e) =>
+                                      setEditBranches((prev) =>
+                                        prev.map((x, xi) => (xi === i ? { ...x, branch_name_clean: e.target.value } : x)),
+                                      )
+                                    }
+                                    placeholder="ชื่อสาขา"
+                                    className="flex-1 min-w-[110px] bg-white/80"
+                                  />
+                                  <Input
+                                    value={String(b.requested_qty)}
+                                    onChange={(e) =>
+                                      setEditBranches((prev) =>
+                                        prev.map((x, xi) =>
+                                          xi === i
+                                            ? { ...x, requested_qty: Number(e.target.value.replace(/[^0-9]/g, '')) || 0 }
+                                            : x,
+                                        ),
+                                      )
+                                    }
+                                    placeholder="จำนวน"
+                                    className="w-16 bg-white/80"
+                                  />
+                                  <Input
+                                    value={b.district_hint}
+                                    onChange={(e) =>
+                                      setEditBranches((prev) =>
+                                        prev.map((x, xi) => (xi === i ? { ...x, district_hint: e.target.value } : x)),
+                                      )
+                                    }
+                                    placeholder="เขต/อำเภอ"
+                                    className="w-28 bg-white/80"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditBranches((prev) => prev.filter((_, xi) => xi !== i))}
+                                    className="rounded-full border border-red-200 bg-white px-2 py-1 text-[11px] text-red-600 hover:bg-red-50"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => void saveFieldOverrides()}
+                                disabled={savingEdit}
+                                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+                              >
+                                {savingEdit ? 'กำลังบันทึก…' : 'บันทึกถาวร'}
+                              </button>
+                              {editMsg ? <span className="text-[11px] text-muted-foreground">{editMsg}</span> : null}
+                            </div>
+                          </div>
+                        ) : editMsg ? (
+                          <p className="text-[11px] text-emerald-700">{editMsg}</p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            แก้ช่วงอายุ เพศ หรือสาขาที่แตก แล้วบันทึกถาวร (มีผลต่อการให้คะแนน/กระจายผู้สมัคร)
+                          </p>
+                        )}
+                      </div>
+
                       <div className="mt-3">
                         {branchParseData?.parsed.items?.length ? (
                       <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
@@ -1189,40 +1416,6 @@ const PreCheckPage: React.FC = () => {
                     </p>
                   ) : null}
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Job Type</span>
-                      <span>{JOB_TYPE_LABELS[jobDetail.job_type as keyof typeof JOB_TYPE_LABELS]}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Category</span>
-                      <span>{JOB_CATEGORY_LABELS[jobDetail.job_category as keyof typeof JOB_CATEGORY_LABELS]}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Urgency</span>
-                      <span className={jobDetail.urgency === 'urgent' ? 'text-destructive' : 'text-info'}>
-                        {jobDetail.urgency === 'urgent' ? 'Urgent' : 'Advance'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Income</span>
-                      <span className="text-success font-medium">{jobDetail.total_income.toLocaleString()} THB</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Required Date</span>
-                      <span>{formatYmdDmyBe(jobDetail.required_date)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Penalty / day</span>
-                      <span className="text-destructive">{jobDetail.penalty_per_day.toLocaleString()} THB</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Recruiter</span>
-                      <span>{jobDetail.recruiter_name || '-'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Screener</span>
-                      <span>{jobDetail.screener_name || '-'}</span>
-                    </div>
                     {client && (
                       <>
                         <div className="border-t border-border pt-2 mt-2" />
