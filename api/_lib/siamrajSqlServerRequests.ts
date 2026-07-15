@@ -210,12 +210,24 @@ const BASE_SQL = `
     A.stop_no,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name,
     (SELECT z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no) AS customer_name,
-    CONCAT_WS(
-      N' ',
-      NULLIF(LTRIM(RTRIM(B.work_place1)), N''),
-      NULLIF(LTRIM(RTRIM(B.work_place2)), N''),
-      NULLIF(LTRIM(RTRIM(B.work_place3)), N'')
-    ) AS work_addr,
+    LTRIM(RTRIM(
+      ISNULL(NULLIF(LTRIM(RTRIM(B.work_place1)), N''), N'') +
+      CASE
+        WHEN NULLIF(LTRIM(RTRIM(B.work_place1)), N'') IS NOT NULL
+         AND NULLIF(LTRIM(RTRIM(B.work_place2)), N'') IS NOT NULL
+        THEN N' ' ELSE N''
+      END +
+      ISNULL(NULLIF(LTRIM(RTRIM(B.work_place2)), N''), N'') +
+      CASE
+        WHEN (
+          NULLIF(LTRIM(RTRIM(B.work_place1)), N'') IS NOT NULL
+          OR NULLIF(LTRIM(RTRIM(B.work_place2)), N'') IS NOT NULL
+        )
+         AND NULLIF(LTRIM(RTRIM(B.work_place3)), N'') IS NOT NULL
+        THEN N' ' ELSE N''
+      END +
+      ISNULL(NULLIF(LTRIM(RTRIM(B.work_place3)), N''), N'')
+    )) AS work_addr,
     A.staff_title_code,
     A.job_description_code_1,
     A.job_description_code_2,
