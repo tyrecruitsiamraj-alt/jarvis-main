@@ -49,6 +49,8 @@ import {
   lumosReminderContactsHandler,
   lumosReminderResultsHandler,
 } from './lumos-reminder.js';
+import matchingCandidateSpecHandler from './matching-candidate-spec.js';
+import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -86,6 +88,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/lumos/interview/results': lumosInterviewResultsHandler as ApiHandler,
   '/api/lumos/reminder/contacts': lumosReminderContactsHandler as ApiHandler,
   '/api/lumos/reminder/results': lumosReminderResultsHandler as ApiHandler,
+  '/api/matching/candidate-spec': matchingCandidateSpecHandler as ApiHandler,
+  '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,

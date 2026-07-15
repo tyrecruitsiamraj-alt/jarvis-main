@@ -67,6 +67,15 @@ async function attachNotes(items: unknown[]): Promise<void> {
       it.list_note = n.note;
       it.send_replacement = n.send_replacement ?? null;
       it.parser_override_text = n.parser_override_text ?? null;
+      // apply field overrides ที่ผู้ใช้แก้เอง (persist) ทับค่าจาก ERP
+      const fo = n.field_overrides;
+      if (fo) {
+        if (fo.age_min !== undefined) it.age_range_min = fo.age_min;
+        if (fo.age_max !== undefined) it.age_range_max = fo.age_max;
+        if (fo.gender !== undefined && fo.gender !== null) it.gender_requirement = fo.gender;
+        if (fo.branches !== undefined) it.branch_override = fo.branches;
+        it.field_overrides = fo;
+      }
     }
   } catch {
     /* หมายเหตุเป็นข้อมูลเสริม */

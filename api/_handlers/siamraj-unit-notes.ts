@@ -56,11 +56,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const touchesNote = body.note !== undefined;
       const touchesReplacement = body.send_replacement !== undefined;
       const touchesParserOverride = body.parser_override_text !== undefined;
-      if (!touchesNote && !touchesReplacement && !touchesParserOverride) {
-        return sendError(res, 400, 'Bad request', 'note, send_replacement or parser_override_text is required');
+      const touchesFieldOverrides = body.field_overrides !== undefined;
+      if (!touchesNote && !touchesReplacement && !touchesParserOverride && !touchesFieldOverrides) {
+        return sendError(
+          res,
+          400,
+          'Bad request',
+          'note, send_replacement, parser_override_text or field_overrides is required',
+        );
       }
 
-      if (touchesNote || touchesParserOverride) {
+      if (touchesNote || touchesParserOverride || touchesFieldOverrides) {
         const access = await checkFunctionAccess(req.user.role, 'unit_notes_edit');
         if (!access.ok) return sendError(res, 403, 'Forbidden', access.message);
       }
@@ -78,6 +84,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ...(touchesNote ? { note: body.note } : {}),
         ...(touchesReplacement ? { send_replacement: sendReplacement ?? null } : {}),
         ...(touchesParserOverride ? { parser_override_text: body.parser_override_text } : {}),
+        ...(touchesFieldOverrides ? { field_overrides: body.field_overrides } : {}),
         userId: req.user.sub,
       });
 
@@ -89,6 +96,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           note: item.note,
           send_replacement: item.send_replacement,
           parser_override_text: item.parser_override_text,
+          field_overrides: item.field_overrides,
         },
       });
 

@@ -189,6 +189,25 @@ export interface JobRequest {
   work_status_date?: string | null;
   /** รายชื่อคนในสถานะทำงาน (หลายคนต่อใบได้) */
   work_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
+  /** สาขาที่ผู้ใช้แก้เอง (persist) — ใช้แทนผลแตกสาขาจาก ERP */
+  branch_override?: Array<{
+    branch_name_clean: string;
+    requested_qty: number;
+    district_hint: string | null;
+    province_hint: string | null;
+  }> | null;
+  /** override ฟิลด์ใบขอที่ผู้ใช้แก้เอง (อายุ/เพศ/สาขา) */
+  field_overrides?: {
+    age_min?: number | null;
+    age_max?: number | null;
+    gender?: string | null;
+    branches?: Array<{
+      branch_name_clean: string;
+      requested_qty: number;
+      district_hint: string | null;
+      province_hint: string | null;
+    }> | null;
+  } | null;
 }
 
 export interface JobAssignment {
