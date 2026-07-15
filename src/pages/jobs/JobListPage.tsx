@@ -15,6 +15,11 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
+import {
+  resolveUnitRequestWorkStatus,
+  UNIT_REQUEST_WORK_STATUS_LABELS,
+  UNIT_REQUEST_WORK_STATUS_OPTIONS,
+} from '@/lib/unitRequestWorkStatus';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
@@ -115,6 +120,7 @@ const JobListPage: React.FC = () => {
     screenerFilter,
     oplFilter,
     urgencyFilter,
+    workStatusFilter,
     noteFilter,
     replacementFilter,
     ageDaysFilter,
@@ -149,9 +155,7 @@ const JobListPage: React.FC = () => {
 
   useEffect(() => {
     saveUnitLastPath('/jobs/list');
-    if (location.search) {
-      saveJobListLastUrl(`${location.pathname}${location.search}`);
-    }
+    saveJobListLastUrl(`${location.pathname}${location.search}`);
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -315,6 +319,12 @@ const JobListPage: React.FC = () => {
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesOplFilter(j, oplFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
+        if (
+          workStatusFilter !== 'all' &&
+          resolveUnitRequestWorkStatus(j.work_status) !== workStatusFilter
+        ) {
+          return false;
+        }
       if (!matchesNoteFilter(j, noteFilter)) return false;
       if (!matchesReplacementFilter(j, replacementFilter)) return false;
       if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
@@ -329,7 +339,7 @@ const JobListPage: React.FC = () => {
           .includes(q);
       })
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -569,6 +579,20 @@ const JobListPage: React.FC = () => {
             {URGENCY_FILTER_OPTIONS.map((o) => (
               <option key={o.value} value={o.value} title={o.hint}>
                 {o.label}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
+            id="job-list-work-status"
+            label="สถานะทำงาน"
+            value={workStatusFilter}
+            onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
+          >
+            <option value="all">ทั้งหมด</option>
+            {UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {UNIT_REQUEST_WORK_STATUS_LABELS[status]}
               </option>
             ))}
           </FilterSelect>
