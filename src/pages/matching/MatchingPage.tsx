@@ -20,6 +20,7 @@ import {
   type ProposalStatus,
 } from '@/lib/candidateProposalsApi';
 import { CheckCircle2 } from 'lucide-react';
+import { classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 
 /** "คนของเรา" — ผ่านสัมภาษณ์แล้ว รอลงงาน (จาก board) แมทกับใบขอด้วย AI */
 type BoardCandidateMatch = {
@@ -51,18 +52,16 @@ function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label
   return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60' };
 }
 
-const KW_STOP = new Set(['พนักงาน', 'เจ้าหน้าที่', 'งาน', 'ทั่วไป', 'ไม่ระบุ', 'ระบุ']);
-/** คีย์เวิร์ดตำแหน่งจากใบขอ (สำหรับนับเบื้องต้นแบบไม่เรียก AI) */
-function jobKeywords(j: JobRequest): string[] {
+/** ข้อความตำแหน่งจากใบขอ (รวม job description + staff title) สำหรับ classify family */
+function jobTitleText(j: JobRequest): string {
   const pick = (k: keyof JobRequest) => {
     const v = j[k];
     const s = v == null ? '' : String(v).trim();
-    return s && s !== 'ไม่ระบุ' ? s.toLowerCase() : '';
+    return s && s !== 'ไม่ระบุ' ? s : '';
   };
-  const raw = [pick('job_description_code_1'), pick('job_description_code_2'), pick('staff_title_name')]
+  return [pick('job_description_code_1'), pick('job_description_code_2'), pick('staff_title_name')]
     .filter(Boolean)
     .join(' ');
-  return [...new Set(raw.split(/[\s/(),\-–—|]+/).map((t) => t.trim()).filter((t) => t.length >= 3 && !KW_STOP.has(t)))];
 }
 
 const MatchingPage: React.FC = () => {
@@ -184,18 +183,22 @@ const MatchingPage: React.FC = () => {
       });
   }, [jobs, search, urgentOnly, unitFilter]);
 
-  // นับ "คนของเราน่าจะตรง" ต่อใบขอแบบเบา (keyword overlap สกิล — ไม่เรียก AI) โชว์ตั้งแต่หน้าแรก
+  // นับ "คนของเราน่าจะตรง" ต่อใบขอแบบเบา (ไม่เรียก AI) โชว์ตั้งแต่หน้าแรก
+  // #6 แม่นขึ้น: classify ใบขอเข้า job family ก่อน แล้วนับผู้สมัครที่สกิลอยู่ family เดียวกัน
+  //   (แทน keyword ดิบที่ over-count จากคำกว้าง ๆ) — fallback เป็น keyword overlap ถ้า classify ไม่ได้
   const quickCounts = useMemo(() => {
     const out: Record<string, number> = {};
     if (pool.length === 0) return out;
     const poolText = pool.map((c) => `${c.job1_name || ''} ${c.job2_name || ''}`.toLowerCase());
     for (const j of rows) {
-      const kws = jobKeywords(j);
-      if (kws.length === 0) {
-        out[j.id] = 0;
+      const title = jobTitleText(j);
+      const family = classifyJobFamily(title);
+      if (family) {
+        out[j.id] = poolText.filter((t) => candidateMatchesFamily(t, family)).length;
         continue;
       }
-      out[j.id] = poolText.filter((t) => kws.some((k) => t.includes(k))).length;
+      const kws = fallbackKeywords(title);
+      out[j.id] = kws.length === 0 ? 0 : poolText.filter((t) => kws.some((k) => t.includes(k))).length;
     }
     return out;
   }, [rows, pool]);
