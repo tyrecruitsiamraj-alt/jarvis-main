@@ -130,6 +130,7 @@ const App = () => (
                     </PublicApplyLayout>
                   }
                 />
+                <Route path="/apply/driver" element={<Navigate to="/apply?pos=ขับรถ" replace />} />
                 <Route path="/careers" element={<Navigate to="/apply" replace />} />
                 <Route path="/mapwork" element={<Navigate to="/apply" replace />} />
                 <Route path="/auth/magic-link" element={<MagicLinkVerifyPage />} />

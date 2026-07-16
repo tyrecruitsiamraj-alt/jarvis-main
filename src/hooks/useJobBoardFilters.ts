@@ -12,16 +12,38 @@ import {
   jobBoardSearchBlob,
   normBoardSearch,
 } from '@/lib/jobBoardSearch';
+import {
+  DRIVING_POSITION_LABEL,
+  jobMatchesPositionFilter,
+} from '@/lib/jobBoardPositionPreset';
 
 export type JobBoardUrgencyChip = 'all' | 'urgent';
 
-export function useJobBoardFilters(jobs: JobRequest[]) {
+export type JobBoardFilterOptions = {
+  /** ค่าเริ่มต้นตำแหน่งจากลิงก์ เช่น งานขับรถ */
+  initialPosition?: string;
+  /** ล็อกไม่ให้เปลี่ยน/ล้างตำแหน่ง */
+  lockPosition?: boolean;
+  /** กรองแบบกลุ่มงานขับรถ (พขร / ขับรถ / valet) */
+  drivingPositionGroup?: boolean;
+};
+
+export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterOptions) {
+  const initialPosition = options?.initialPosition ?? '';
+  const lockPosition = Boolean(options?.lockPosition && initialPosition);
+  const drivingPositionGroup = Boolean(options?.drivingPositionGroup);
+
   const [search, setSearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('');
   const [districtFilter, setDistrictFilter] = useState('');
-  const [positionFilter, setPositionFilter] = useState('');
+  const [positionFilter, setPositionFilter] = useState(initialPosition);
   const [subtypeFilter, setSubtypeFilter] = useState('');
   const [chip, setChip] = useState<JobBoardUrgencyChip>('all');
+
+  useEffect(() => {
+    if (!initialPosition) return;
+    setPositionFilter(initialPosition);
+  }, [initialPosition]);
 
   const visible = useMemo(() => jobs.filter(isBoardVisibleJob), [jobs]);
 
@@ -34,8 +56,11 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
 
   const positionOptions = useMemo(() => {
     const set = new Set(visible.map((j) => publicJobPositionLabel(j)));
+    if (drivingPositionGroup || positionFilter === DRIVING_POSITION_LABEL) {
+      set.add(DRIVING_POSITION_LABEL);
+    }
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [visible]);
+  }, [visible, drivingPositionGroup, positionFilter]);
 
   const subtypeOptions = useMemo(() => {
     const set = new Set(visible.map((j) => extractJobSubtypeLabel(j)));
@@ -49,8 +74,10 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
 
   useEffect(() => {
     if (!positionFilter) return;
+    if (lockPosition) return;
+    if (positionFilter === DRIVING_POSITION_LABEL) return;
     if (!positionOptions.includes(positionFilter)) setPositionFilter('');
-  }, [positionFilter, positionOptions]);
+  }, [positionFilter, positionOptions, lockPosition]);
 
   useEffect(() => {
     if (!subtypeFilter) return;
@@ -68,7 +95,13 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
         const jobProv = inferProvinceFromAddress(j.location_address);
         if (provinceFilter && jobProv !== provinceFilter) return false;
         if (districtFilter && !districtMatchesFilter(j.location_address, districtFilter)) return false;
-        if (positionFilter && publicJobPositionLabel(j) !== positionFilter) return false;
+        if (
+          !jobMatchesPositionFilter(j, positionFilter, {
+            isDrivingGroup: drivingPositionGroup || positionFilter === DRIVING_POSITION_LABEL,
+          })
+        ) {
+          return false;
+        }
         if (subtypeFilter && extractJobSubtypeLabel(j) !== subtypeFilter) return false;
         return true;
       });
@@ -87,12 +120,29 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     if (related.length > 0) return { filtered: related, usedRelatedFallback: true };
 
     return { filtered: baseRows, usedRelatedFallback: true };
-  }, [visible, search, chip, provinceFilter, districtFilter, positionFilter, subtypeFilter]);
+  }, [
+    visible,
+    search,
+    chip,
+    provinceFilter,
+    districtFilter,
+    positionFilter,
+    subtypeFilter,
+    drivingPositionGroup,
+  ]);
 
   const onProvinceFilterChange = useCallback((next: string) => {
     setProvinceFilter(next);
     setDistrictFilter('');
   }, []);
+
+  const onPositionFilterChange = useCallback(
+    (next: string) => {
+      if (lockPosition) return;
+      setPositionFilter(next);
+    },
+    [lockPosition],
+  );
 
   return {
     search,
@@ -101,7 +151,7 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     districtFilter,
     setDistrictFilter,
     positionFilter,
-    setPositionFilter,
+    setPositionFilter: onPositionFilterChange,
     subtypeFilter,
     setSubtypeFilter,
     chip,
@@ -114,5 +164,6 @@ export function useJobBoardFilters(jobs: JobRequest[]) {
     filtered,
     usedRelatedFallback,
     visibleCount: visible.length,
+    lockPosition,
   };
 }
