@@ -63,9 +63,16 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
   }, [visible, drivingPositionGroup, positionFilter]);
 
   const subtypeOptions = useMemo(() => {
-    const set = new Set(visible.map((j) => extractJobSubtypeLabel(j)));
+    const scope = positionFilter
+      ? visible.filter((j) =>
+          jobMatchesPositionFilter(j, positionFilter, {
+            isDrivingGroup: drivingPositionGroup || positionFilter === DRIVING_POSITION_LABEL,
+          }),
+        )
+      : visible;
+    const set = new Set(scope.map((j) => extractJobSubtypeLabel(j)));
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
-  }, [visible]);
+  }, [visible, positionFilter, drivingPositionGroup]);
 
   useEffect(() => {
     if (!districtFilter) return;
