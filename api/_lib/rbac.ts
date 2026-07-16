@@ -14,10 +14,8 @@ export function isReadOnlyRole(role: UserRole): boolean {
 
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
   if (userRole === 'opl') {
+    // OPL = read-only viewer: only pass routes/APIs whose minimum is staff or opl
     return minimum === 'staff' || minimum === 'opl';
-  }
-  if (minimum === 'opl') {
-    return userRole === 'opl';
   }
   return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minimum];
 }
