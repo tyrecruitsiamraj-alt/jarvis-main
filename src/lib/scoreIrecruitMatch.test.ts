@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { genderVerdict, ageVerdict, scoreMatch } from './scoreIrecruitMatch';
+import { genderVerdict, ageVerdict, scoreMatch, describeScoreBreakdown } from './scoreIrecruitMatch';
 
 describe('genderVerdict', () => {
   it('na when job does not require a gender', () => {
@@ -71,5 +71,20 @@ describe('scoreMatch', () => {
     const s = scoreMatch({ sex: 'm', age: 30 }, {}, { rank: 2, reason: 'จังหวัดตรง' });
     // only area applies: earned 20 / total 40 -> 50%
     expect(s).toMatchObject({ percent: 50, gender: 'na', age: 'na' });
+  });
+});
+
+describe('describeScoreBreakdown', () => {
+  it('lists area/gender/age lines for hover tooltip', () => {
+    const s = scoreMatch(
+      { sex: 'm', age: 30 },
+      { gender_requirement: 'ชาย', age_range_min: 20, age_range_max: 40 },
+      { rank: 0, reason: 'ใกล้เขตจุดงาน' },
+    );
+    const lines = describeScoreBreakdown(s);
+    expect(lines[0]).toContain('100%');
+    expect(lines.some((l) => l.includes('พื้นที่') && l.includes('ใกล้เขตจุดงาน'))).toBe(true);
+    expect(lines.some((l) => l.includes('เพศ') && l.includes('ตรงเกณฑ์'))).toBe(true);
+    expect(lines.some((l) => l.includes('อายุ') && l.includes('ตรงเกณฑ์'))).toBe(true);
   });
 });

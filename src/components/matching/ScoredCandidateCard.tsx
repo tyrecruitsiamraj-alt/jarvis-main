@@ -2,15 +2,21 @@ import { useState } from 'react';
 import { Phone, MessageCircle, ArrowLeft, UserPlus } from 'lucide-react';
 import type { IrecruitCandidateMatch } from '@/lib/irecruitMatchTypes';
 import { matchTierEmoji, matchTierLabel } from '@/lib/irecruitMatchTypes';
-import { scoreMatch, type CriterionVerdict, type JobCriteria } from '@/lib/scoreIrecruitMatch';
+import {
+  describeScoreBreakdown,
+  scoreMatch,
+  type CriterionVerdict,
+  type JobCriteria,
+} from '@/lib/scoreIrecruitMatch';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type Props = {
   match: IrecruitCandidateMatch;
   job: JobCriteria;
   /** proximity ของผู้สมัครต่อโซนนี้ (มาจากการกระจายเข้าสาขา) */
   area: { rank: number; reason: string };
-  onPrefill?: (match: IrecruitCandidateMatch) => void;
+  onPrefill?: (match: IrecruitCandidateMatch, why?: string) => void;
 };
 
 function scoreColor(percent: number): string {
@@ -45,9 +51,54 @@ function verdictRowClass(v: CriterionVerdict): string {
   return 'text-slate-500';
 }
 
+function ScorePercentBadge({
+  percent,
+  breakdown,
+}: {
+  percent: number;
+  breakdown: string[];
+}) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              'shrink-0 cursor-help rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums',
+              scoreColor(percent),
+            )}
+          >
+            {percent}%
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="max-w-[260px] space-y-1 p-2.5 text-left">
+          <p className="text-[11px] font-semibold">องค์ประกอบคะแนน</p>
+          <ul className="space-y-0.5 text-[11px] leading-snug">
+            {breakdown.map((line) => (
+              <li key={line}>• {line}</li>
+            ))}
+          </ul>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function ScoredCandidateCard({ match, job, area, onPrefill }: Props) {
   const [showWhy, setShowWhy] = useState(false);
   const score = scoreMatch(match, job, area);
+  const breakdown = describeScoreBreakdown(score);
+
+  // สรุปเหตุผลที่เลือกโทร/เสนอคนนี้ — ส่งไปเติมในฟอร์มเพิ่มผู้สมัคร
+  const buildWhy = () =>
+    [
+      `${matchTierLabel(match.tier)} (คะแนน ${score.percent}%)`,
+      ...breakdown.slice(1),
+      `ตำแหน่งที่สมัคร: ${match.position_name || match.job_name_th || '-'}`,
+      match.reason ? `เหตุผล AI: ${match.reason}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
   // ---------- หน้า "ทำไมเป็นคนนี้ + จะโทร" ----------
   if (showWhy) {
@@ -61,9 +112,7 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
           >
             <ArrowLeft className="h-3 w-3" /> ย้อนกลับ
           </button>
-          <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums', scoreColor(score.percent))}>
-            {score.percent}%
-          </span>
+          <ScorePercentBadge percent={score.percent} breakdown={breakdown} />
         </div>
 
         <p className="text-sm font-semibold text-foreground">
@@ -106,10 +155,10 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
           {onPrefill ? (
             <button
               type="button"
-              onClick={() => onPrefill(match)}
+              onClick={() => onPrefill(match, buildWhy())}
               className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
             >
-              <UserPlus className="h-3.5 w-3.5" /> เพิ่มผู้สมัคร
+              <UserPlus className="h-3.5 w-3.5" /> เพิ่มรายละเอียดผู้สมัคร
             </button>
           ) : null}
         </div>
@@ -124,9 +173,7 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
         <p className="text-sm font-semibold text-blue-700">
           {matchTierEmoji(match.tier)} {match.full_name}
         </p>
-        <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-bold tabular-nums', scoreColor(score.percent))}>
-          {score.percent}%
-        </span>
+        <ScorePercentBadge percent={score.percent} breakdown={breakdown} />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -147,7 +194,7 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
         {match.location_label ? ` · ${match.location_label}` : ''}
       </div>
 
-      <div className="pt-0.5">
+      <div className="flex flex-wrap gap-1.5 pt-0.5">
         <button
           type="button"
           onClick={() => setShowWhy(true)}
@@ -155,6 +202,15 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
         >
           <Phone className="h-3 w-3" /> สนใจ / จะโทร
         </button>
+        {onPrefill ? (
+          <button
+            type="button"
+            onClick={() => onPrefill(match, buildWhy())}
+            className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+          >
+            <UserPlus className="h-3 w-3" /> เพิ่มรายละเอียดผู้สมัคร
+          </button>
+        ) : null}
       </div>
     </div>
   );
