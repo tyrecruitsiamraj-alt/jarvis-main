@@ -438,9 +438,16 @@ const MatchingPage: React.FC = () => {
                 <p className="text-xs text-destructive">{boardErrorById[jobDetail.id]}</p>
               ) : boardMatchById[jobDetail.id] ? (
                 boardMatchById[jobDetail.id].matches.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    ยังไม่มีคนของเราที่สกิลตรงกับใบขอนี้ — ลองหาผู้สมัครใหม่ที่หน้า Pre-Check
-                  </p>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-4 space-y-2.5 text-center">
+                    <p className="text-xs text-foreground">ยังไม่มีคนของเราที่สกิลตรงกับใบขอนี้</p>
+                    <Link
+                      to={`/matching/pre-check?jobId=${encodeURIComponent(jobDetail.id)}`}
+                      state={{ returnTo: '/matching/match' }}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                    >
+                      <Search className="h-3.5 w-3.5" /> หาผู้สมัครใหม่จาก iRecruit
+                    </Link>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {boardMatchById[jobDetail.id].matches
@@ -497,6 +504,32 @@ const MatchingPage: React.FC = () => {
                         </button>
                       );
                     })}
+                    {/* #2 คนของเราไม่พอ → หาต่อจาก iRecruit */}
+                    {(() => {
+                      const greenCount = boardMatchById[jobDetail.id].matches.filter((m) => m.tier === 'green').length;
+                      const enough = greenCount > 0;
+                      return (
+                        <div
+                          className={cn(
+                            'flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5',
+                            enough ? 'border-slate-200 bg-white/50' : 'border-amber-200 bg-amber-50/60',
+                          )}
+                        >
+                          <p className="text-[11px] text-muted-foreground">
+                            {enough
+                              ? 'ยังไม่พอ? หาเพิ่มจากฐานผู้สมัคร iRecruit'
+                              : 'ยังไม่มีคนของเราที่ลงได้ทันที — ลองหาจาก iRecruit'}
+                          </p>
+                          <Link
+                            to={`/matching/pre-check?jobId=${encodeURIComponent(jobDetail.id)}`}
+                            state={{ returnTo: '/matching/match' }}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700"
+                          >
+                            หา iRecruit ต่อ <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )
               ) : null}
