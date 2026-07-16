@@ -29,6 +29,7 @@ import azureAdStartHandler from './auth/azure-ad-start.js';
 import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
 import brandingHandler from './branding.js';
+import appFeedbackHandler from './app-feedback.js';
 import driverCareHandler from './driver-care.js';
 import driverCareRecalculateHandler from './driver-care-recalculate.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
@@ -91,6 +92,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/candidate-spec': matchingCandidateSpecHandler as ApiHandler,
   '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
+  '/api/app-feedback': appFeedbackHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
   '/api/auth/dev-role': devRoleHandler as ApiHandler,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, Settings, UserCircle } from 'lucide-react';
+import { KeyRound, LogOut, Settings, UserCircle, MessageSquarePlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
@@ -105,6 +105,15 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
           <button
             type="button"
+            onClick={() => navigate('/feedback')}
+            className="p-2.5 rounded-full text-muted-foreground hover:text-teal-700 hover:bg-teal-500/12 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="ส่งคำขอ / แจ้งบัค"
+            title="ส่งคำขอ / แจ้งบัค"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('/account/change-password')}
             className="p-2.5 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-white/60 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="เปลี่ยนรหัสผ่าน"
@@ -135,6 +144,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}
           </span>
+          <button
+            type="button"
+            onClick={() => navigate('/feedback')}
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-teal-700 hover:bg-teal-500/12 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="ส่งคำขอ / แจ้งบัค"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+          </button>
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}

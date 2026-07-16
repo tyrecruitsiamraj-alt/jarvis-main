@@ -48,7 +48,8 @@ export type ApiResource =
   | 'matching-parse-branch-demand'
   | 'matching-candidate-spec'
   | 'matching-irecruit-candidates'
-  | 'diagnostics-outbound-ip';
+  | 'diagnostics-outbound-ip'
+  | 'app-feedback';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -141,6 +142,11 @@ export function minimumRoleFor(
     case 'matching-irecruit-candidates':
       return 'staff';
 
+    case 'app-feedback':
+      // ทุกคนที่ login แล้วส่งคำขอได้ (รวม OPL); จัดการสถานะ = supervisor+
+      if (isRead || m === 'POST') return 'opl';
+      return 'supervisor';
+
     default:
       return 'admin';
   }
@@ -156,7 +162,10 @@ export function checkApiAccess(
   const isRead = m === 'GET' || m === 'HEAD';
 
   if (isReadOnlyRole(userRole) && !isRead) {
-    return { ok: false, message: 'Read-only role (opl)' };
+    // OPL ส่งคำขอ/แจ้งบัคได้
+    if (!(resource === 'app-feedback' && m === 'POST')) {
+      return { ok: false, message: 'Read-only role (opl)' };
+    }
   }
 
   const minimum = minimumRoleFor(resource, method, hint);
