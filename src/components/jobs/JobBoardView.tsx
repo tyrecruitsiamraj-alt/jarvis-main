@@ -319,7 +319,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">รายได้รวม (โดยประมาณ)</dt>
+                  <dt className="text-muted-foreground">ฐานเงินเดือน</dt>
                   <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString()}</dd>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
