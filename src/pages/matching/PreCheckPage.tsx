@@ -27,6 +27,12 @@ import {
   type IrecruitCandidateMatch,
 } from '@/lib/irecruitMatchTypes';
 import { distributeIrecruitMatchesToBranches } from '@/lib/distributeIrecruitToBranches';
+import {
+  saveProposal,
+  listProposalsForJob,
+  proposalKey,
+  type ProposalStatus,
+} from '@/lib/candidateProposalsApi';
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
 type Center = { lat: number; lng: number; label: string };
@@ -101,6 +107,9 @@ const PreCheckPage: React.FC = () => {
   >([]);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editMsg, setEditMsg] = useState<string | null>(null);
+  // การเสนอ/จองตัว/ลงงาน iRecruit — สถานะล่าสุดต่อผู้สมัคร (คีย์ = source#ref)
+  const [proposedByKey, setProposedByKey] = useState<Record<string, ProposalStatus>>({});
+  const [proposingKey, setProposingKey] = useState<string | null>(null);
 
   const fetchIrecruitMatch = async (jobId: string, refresh = false) => {
     setJobMatchLoadingId(jobId);
@@ -138,7 +147,55 @@ const PreCheckPage: React.FC = () => {
     if (!jobMatchById[j.id] && jobMatchLoadingId !== j.id) {
       void fetchIrecruitMatch(j.id);
     }
+    void listProposalsForJob(j.id).then((items) => {
+      setProposedByKey((prev) => {
+        const next = { ...prev };
+        for (const p of items) next[proposalKey(p.source, p.candidate_ref)] = p.status;
+        return next;
+      });
+    });
   };
+
+  // บันทึกการเสนอ/จองตัว/ลงงานผู้สมัคร iRecruit ลง DB (พร้อมเหตุผลที่เลือกโทร)
+  const proposeIrecruit = async (
+    match: IrecruitCandidateMatch,
+    status: ProposalStatus,
+    why?: string,
+  ) => {
+    if (!jobDetail) return;
+    const key = proposalKey('irecruit', match.id);
+    setProposingKey(key);
+    try {
+      const reason =
+        [why?.trim(), jobDetail.request_no ? `จากใบขอ ${jobDetail.request_no}` : '']
+          .filter(Boolean)
+          .join('\n') || null;
+      const saved = await saveProposal({
+        jobId: jobDetail.id,
+        requestNo: jobDetail.request_no,
+        source: 'irecruit',
+        candidateRef: match.id,
+        candidateName: match.full_name,
+        candidatePhone: match.phone_number,
+        candidatePosition: match.position_name || match.job_name_th || null,
+        tier: match.tier,
+        reason,
+        status,
+      });
+      setProposedByKey((prev) => ({ ...prev, [key]: saved.status }));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+    } finally {
+      setProposingKey((cur) => (cur === key ? null : cur));
+    }
+  };
+
+  // props ปุ่มจองตัว/ลงงานต่อการ์ดผู้สมัคร iRecruit
+  const proposeProps = (m: IrecruitCandidateMatch) => ({
+    onPropose: proposeIrecruit,
+    proposalStatus: proposedByKey[proposalKey('irecruit', m.id)] ?? null,
+    proposalBusy: proposingKey === proposalKey('irecruit', m.id),
+  });
 
   const openIrecruitPrefill = (match: IrecruitCandidateMatch, why?: string) => {
     const [first, ...rest] = match.full_name.trim().split(/\s+/);
@@ -1173,6 +1230,7 @@ const PreCheckPage: React.FC = () => {
                                         job={jobDetail}
                                         area={{ rank: suggestion.proximity_rank, reason: suggestion.proximity_reason }}
                                         onPrefill={openIrecruitPrefill}
+                                        {...proposeProps(suggestion)}
                                       />
                                     ))}
                                   </div>
@@ -1206,6 +1264,7 @@ const PreCheckPage: React.FC = () => {
                                       : 'ไม่ระบุพื้นที่',
                                   }}
                                   onPrefill={openIrecruitPrefill}
+                                  {...proposeProps(suggestion)}
                                 />
                               ))}
                             </div>
@@ -1247,6 +1306,7 @@ const PreCheckPage: React.FC = () => {
                                     job={jobDetail}
                                     area={{ rank: suggestion.proximity_rank, reason: suggestion.proximity_reason }}
                                     onPrefill={openIrecruitPrefill}
+                                    {...proposeProps(suggestion)}
                                   />
                                 ))}
                               </div>

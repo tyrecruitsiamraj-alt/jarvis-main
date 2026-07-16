@@ -12,6 +12,14 @@ import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } 
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { apiFetch } from '@/lib/apiFetch';
+import {
+  saveProposal,
+  listProposalsForJob,
+  proposalKey,
+  proposalStatusLabel,
+  type ProposalStatus,
+} from '@/lib/candidateProposalsApi';
+import { CheckCircle2 } from 'lucide-react';
 
 /** "คนของเรา" — ผ่านสัมภาษณ์แล้ว รอลงงาน (จาก board) แมทกับใบขอด้วย AI */
 type BoardCandidateMatch = {
@@ -71,6 +79,10 @@ const MatchingPage: React.FC = () => {
   const [pool, setPool] = useState<Array<{ card_id: number; job1_name: string | null; job2_name: string | null }>>([]);
   // ดูรายละเอียดพนักงานของเรา
   const [candDetail, setCandDetail] = useState<BoardCandidateMatch | null>(null);
+  // การเสนอ/จองตัว/ลงงาน — สถานะล่าสุดต่อผู้สมัคร (คีย์ = source#ref) ต่อใบขอที่เปิดอยู่
+  const [proposedByKey, setProposedByKey] = useState<Record<string, ProposalStatus>>({});
+  const [proposingKey, setProposingKey] = useState<string | null>(null);
+  const [proposeError, setProposeError] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?pool=1')
@@ -105,10 +117,44 @@ const MatchingPage: React.FC = () => {
     }
   };
 
-  // เปิดใบขอ → หาคนของเราอัตโนมัติ
+  // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอที่เคยบันทึก
   const openJob = (j: JobRequest) => {
     setJobDetail(j);
+    setProposeError(null);
     if (!boardMatchById[j.id] && boardLoadingId !== j.id) void fetchBoardMatch(j.id);
+    void listProposalsForJob(j.id).then((items) => {
+      setProposedByKey((prev) => {
+        const next = { ...prev };
+        for (const p of items) next[proposalKey(p.source, p.candidate_ref)] = p.status;
+        return next;
+      });
+    });
+  };
+
+  // บันทึกการเสนอ/จองตัว/ลงงาน "คนของเรา" (board) ลง DB
+  const proposeBoard = async (job: JobRequest, m: BoardCandidateMatch, status: ProposalStatus) => {
+    const key = proposalKey('board', m.card_id);
+    setProposingKey(key);
+    setProposeError(null);
+    try {
+      const saved = await saveProposal({
+        jobId: job.id,
+        requestNo: job.request_no,
+        source: 'board',
+        candidateRef: m.card_id,
+        candidateName: m.full_name,
+        candidatePhone: m.mobile,
+        candidatePosition: [m.job1_name, m.job2_name].filter(Boolean).join(' / ') || null,
+        tier: m.tier,
+        reason: m.reason,
+        status,
+      });
+      setProposedByKey((prev) => ({ ...prev, [key]: saved.status }));
+    } catch (e) {
+      setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+    } finally {
+      setProposingKey((cur) => (cur === key ? null : cur));
+    }
   };
 
   const unitOptions = useMemo(
@@ -486,6 +532,46 @@ const MatchingPage: React.FC = () => {
               ) : (
                 <p className="text-xs text-muted-foreground">ไม่มีเบอร์โทรในระบบ</p>
               )}
+
+              {/* จองตัว / ลงงาน — บันทึกการเสนอลง DB */}
+              {jobDetail ? (
+                (() => {
+                  const key = proposalKey('board', candDetail.card_id);
+                  const current = proposedByKey[key];
+                  const busy = proposingKey === key;
+                  return (
+                    <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-violet-900">เสนอคนนี้ให้ใบขอ</p>
+                        {current ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(current)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void proposeBoard(jobDetail, candDetail, 'reserved')}
+                          className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                        >
+                          {busy ? 'กำลังบันทึก…' : current === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void proposeBoard(jobDetail, candDetail, 'placed')}
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {busy ? 'กำลังบันทึก…' : current === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+                        </button>
+                      </div>
+                      {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
+                    </div>
+                  );
+                })()
+              ) : null}
             </div>
           ) : null}
         </DialogContent>

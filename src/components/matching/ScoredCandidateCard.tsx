@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Phone, MessageCircle, ArrowLeft, UserPlus } from 'lucide-react';
+import { Phone, MessageCircle, ArrowLeft, UserPlus, CheckCircle2 } from 'lucide-react';
 import type { IrecruitCandidateMatch } from '@/lib/irecruitMatchTypes';
 import { matchTierEmoji, matchTierLabel } from '@/lib/irecruitMatchTypes';
+import { proposalStatusLabel, type ProposalStatus } from '@/lib/candidateProposalsApi';
 import {
   describeScoreBreakdown,
   scoreMatch,
@@ -17,6 +18,12 @@ type Props = {
   /** proximity ของผู้สมัครต่อโซนนี้ (มาจากการกระจายเข้าสาขา) */
   area: { rank: number; reason: string };
   onPrefill?: (match: IrecruitCandidateMatch, why?: string) => void;
+  /** บันทึกการเสนอ/จองตัว/ลงงานลง DB — why = เหตุผลที่เลือกโทร */
+  onPropose?: (match: IrecruitCandidateMatch, status: ProposalStatus, why?: string) => void;
+  /** สถานะการเสนอล่าสุดของผู้สมัครนี้ต่อใบขอ (ถ้าเคยเสนอ) */
+  proposalStatus?: ProposalStatus | null;
+  /** กำลังบันทึกการเสนอของผู้สมัครนี้อยู่ */
+  proposalBusy?: boolean;
 };
 
 function scoreColor(percent: number): string {
@@ -84,7 +91,15 @@ function ScorePercentBadge({
   );
 }
 
-export default function ScoredCandidateCard({ match, job, area, onPrefill }: Props) {
+export default function ScoredCandidateCard({
+  match,
+  job,
+  area,
+  onPrefill,
+  onPropose,
+  proposalStatus,
+  proposalBusy,
+}: Props) {
   const [showWhy, setShowWhy] = useState(false);
   const score = scoreMatch(match, job, area);
   const breakdown = describeScoreBreakdown(score);
@@ -99,6 +114,33 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
     ]
       .filter(Boolean)
       .join('\n');
+
+  // ปุ่มจองตัว/ลงงาน — ใช้ซ้ำทั้งหน้าข้อมูลและหน้า "ทำไมเป็นคนนี้"
+  const proposeButtons = onPropose ? (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {proposalStatus ? (
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+          <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(proposalStatus)}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        disabled={proposalBusy}
+        onClick={() => onPropose(match, 'reserved', buildWhy())}
+        className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+      >
+        {proposalBusy ? 'บันทึก…' : proposalStatus === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+      </button>
+      <button
+        type="button"
+        disabled={proposalBusy}
+        onClick={() => onPropose(match, 'placed', buildWhy())}
+        className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {proposalBusy ? 'บันทึก…' : proposalStatus === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+      </button>
+    </div>
+  ) : null;
 
   // ---------- หน้า "ทำไมเป็นคนนี้ + จะโทร" ----------
   if (showWhy) {
@@ -162,6 +204,7 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
             </button>
           ) : null}
         </div>
+        {proposeButtons}
       </div>
     );
   }
@@ -212,6 +255,7 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
           </button>
         ) : null}
       </div>
+      {proposeButtons}
     </div>
   );
 }

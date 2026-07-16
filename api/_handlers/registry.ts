@@ -53,6 +53,7 @@ import {
 import matchingCandidateSpecHandler from './matching-candidate-spec.js';
 import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js';
 import matchingBoardCandidatesHandler from './matching-board-candidates.js';
+import matchingProposalsHandler from './matching-proposals.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -93,6 +94,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/candidate-spec': matchingCandidateSpecHandler as ApiHandler,
   '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
   '/api/matching/board-candidates': matchingBoardCandidatesHandler as ApiHandler,
+  '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/app-feedback': appFeedbackHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
