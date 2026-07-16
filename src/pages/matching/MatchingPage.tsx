@@ -19,8 +19,14 @@ import {
   proposalStatusLabel,
   type ProposalStatus,
 } from '@/lib/candidateProposalsApi';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, UserPlus } from 'lucide-react';
 import { classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
+import {
+  type IrecruitCandidateMatch,
+  type IrecruitMatchResult,
+  matchTierEmoji,
+  matchTierLabel,
+} from '@/lib/irecruitMatchTypes';
 
 /** "คนของเรา" — ผ่านสัมภาษณ์แล้ว รอลงงาน (จาก board) แมทกับใบขอด้วย AI */
 type BoardCandidateMatch = {
@@ -74,6 +80,10 @@ const MatchingPage: React.FC = () => {
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
   const [boardErrorById, setBoardErrorById] = useState<Record<string, string>>({});
+  // #2 (ยุบ) — หาผู้สมัคร iRecruit + เสนอในหน้า match เลย (ไม่ต้องไป pre-check)
+  const [irMatchById, setIrMatchById] = useState<Record<string, IrecruitMatchResult>>({});
+  const [irLoadingId, setIrLoadingId] = useState<string | null>(null);
+  const [irErrorById, setIrErrorById] = useState<Record<string, string>>({});
   // pool เบา ๆ สำหรับนับ "คนของเราน่าจะตรง" บนการ์ดตั้งแต่หน้าแรก (ไม่เรียก AI)
   const [pool, setPool] = useState<Array<{ card_id: number; job1_name: string | null; job2_name: string | null }>>([]);
   // ดูรายละเอียดพนักงานของเรา
@@ -188,6 +198,61 @@ const MatchingPage: React.FC = () => {
         candidatePosition: [m.job1_name, m.job2_name].filter(Boolean).join(' / ') || null,
         tier: m.tier,
         reason: m.reason,
+        status,
+      });
+      setProposedByKey((prev) => ({ ...prev, [key]: saved.status }));
+    } catch (e) {
+      setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+    } finally {
+      setProposingKey((cur) => (cur === key ? null : cur));
+    }
+  };
+
+  // ค้นหาผู้สมัครจากฐาน iRecruit สำหรับใบขอนี้ (inline ในหน้า match)
+  const fetchIrecruit = async (jobId: string, refresh = false) => {
+    setIrLoadingId(jobId);
+    setIrErrorById((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+    try {
+      const params = new URLSearchParams({ jobId });
+      if (refresh) params.set('refresh', '1');
+      const r = await apiFetch(`/api/matching/irecruit-candidates?${params.toString()}`);
+      if (!r.ok) {
+        const data = (await r.json().catch(() => ({}))) as { message?: string; detail?: string; error?: string };
+        throw new Error(data.message || data.detail || data.error || `ค้นหาไม่สำเร็จ (HTTP ${r.status})`);
+      }
+      const data = (await r.json()) as IrecruitMatchResult;
+      setIrMatchById((prev) => ({ ...prev, [jobId]: data }));
+    } catch (e) {
+      setIrErrorById((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ' }));
+    } finally {
+      setIrLoadingId((current) => (current === jobId ? null : current));
+    }
+  };
+
+  // บันทึกการเสนอ/จองตัว/ลงงานผู้สมัคร iRecruit ลง DB (พร้อมเหตุผล)
+  const proposeIrecruit = async (job: JobRequest, m: IrecruitCandidateMatch, status: ProposalStatus) => {
+    const key = proposalKey('irecruit', m.id);
+    setProposingKey(key);
+    setProposeError(null);
+    try {
+      const reason =
+        [m.reason?.trim(), job.request_no ? `จากใบขอ ${job.request_no}` : '']
+          .filter(Boolean)
+          .join('\n') || null;
+      const saved = await saveProposal({
+        jobId: job.id,
+        requestNo: job.request_no,
+        source: 'irecruit',
+        candidateRef: m.id,
+        candidateName: m.full_name,
+        candidatePhone: m.phone_number,
+        candidatePosition: m.position_name || m.job_name_th || null,
+        tier: m.tier,
+        reason,
         status,
       });
       setProposedByKey((prev) => ({ ...prev, [key]: saved.status }));
@@ -526,16 +591,9 @@ const MatchingPage: React.FC = () => {
                 <p className="text-xs text-destructive">{boardErrorById[jobDetail.id]}</p>
               ) : boardMatchById[jobDetail.id] ? (
                 boardMatchById[jobDetail.id].matches.length === 0 ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-4 space-y-2.5 text-center">
-                    <p className="text-xs text-foreground">ยังไม่มีคนของเราที่สกิลตรงกับใบขอนี้</p>
-                    <Link
-                      to={`/matching/pre-check?jobId=${encodeURIComponent(jobDetail.id)}`}
-                      state={{ returnTo: '/matching/match' }}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-                    >
-                      <Search className="h-3.5 w-3.5" /> หาผู้สมัครใหม่จาก iRecruit
-                    </Link>
-                  </div>
+                  <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3 text-xs text-foreground">
+                    ยังไม่มีคนของเราที่สกิลตรงกับใบขอนี้ — ลองหาจากฐาน iRecruit ด้านล่าง แล้วเสนอได้เลย
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {boardMatchById[jobDetail.id].matches
@@ -592,34 +650,124 @@ const MatchingPage: React.FC = () => {
                         </button>
                       );
                     })}
-                    {/* #2 คนของเราไม่พอ → หาต่อจาก iRecruit */}
-                    {(() => {
-                      const greenCount = boardMatchById[jobDetail.id].matches.filter((m) => m.tier === 'green').length;
-                      const enough = greenCount > 0;
-                      return (
-                        <div
-                          className={cn(
-                            'flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5',
-                            enough ? 'border-slate-200 bg-white/50' : 'border-amber-200 bg-amber-50/60',
-                          )}
-                        >
-                          <p className="text-[11px] text-muted-foreground">
-                            {enough
-                              ? 'ยังไม่พอ? หาเพิ่มจากฐานผู้สมัคร iRecruit'
-                              : 'ยังไม่มีคนของเราที่ลงได้ทันที — ลองหาจาก iRecruit'}
-                          </p>
-                          <Link
-                            to={`/matching/pre-check?jobId=${encodeURIComponent(jobDetail.id)}`}
-                            state={{ returnTo: '/matching/match' }}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700"
-                          >
-                            หา iRecruit ต่อ <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )
+              ) : null}
+
+              {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
+              {boardMatchById[jobDetail.id] && !boardErrorById[jobDetail.id] ? (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-blue-900">
+                      {irMatchById[jobDetail.id]
+                        ? `ผู้สมัครจากฐาน iRecruit → เสนอ ${irMatchById[jobDetail.id].matches.length}`
+                        : 'ไม่พอ? หาผู้สมัครจากฐาน iRecruit'}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={irLoadingId === jobDetail.id}
+                      onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {irLoadingId === jobDetail.id ? (
+                        'กำลังค้นหา…'
+                      ) : irMatchById[jobDetail.id] ? (
+                        <>
+                          <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+                        </>
+                      ) : (
+                        <>
+                          <Search className="h-3 w-3" /> ค้นหา iRecruit
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {irLoadingId === jobDetail.id ? (
+                    <p className="text-[11px] text-blue-700">กำลังค้นหาผู้สมัครจาก iRecruit… (อาจใช้ 1–3 นาที)</p>
+                  ) : irErrorById[jobDetail.id] ? (
+                    <p className="text-[11px] text-destructive">{irErrorById[jobDetail.id]}</p>
+                  ) : irMatchById[jobDetail.id] ? (
+                    irMatchById[jobDetail.id].matches.length === 0 ? (
+                      <p className="text-[11px] text-muted-foreground">ไม่พบผู้สมัครที่ใกล้เคียงในฐาน iRecruit</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {irMatchById[jobDetail.id].matches
+                          .filter((m) => !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]))
+                          .map((m) => {
+                            const key = proposalKey('irecruit', m.id);
+                            const proposed = proposedByKey[key];
+                            const busy = proposingKey === key;
+                            return (
+                              <div
+                                key={m.id}
+                                className={cn(
+                                  'rounded-xl border border-white/70 bg-white/70 px-3 py-2 space-y-1',
+                                  proposed ? 'opacity-70' : '',
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-semibold text-blue-700">
+                                    {matchTierEmoji(m.tier)} {m.full_name}
+                                  </span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    {proposed ? (
+                                      <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                        <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed)}
+                                      </span>
+                                    ) : null}
+                                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500">
+                                      {matchTierLabel(m.tier)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                                  <span>{m.position_name || m.job_name_th || 'ไม่ระบุตำแหน่ง'}</span>
+                                  {m.location_label ? <span>{m.location_label}</span> : null}
+                                  {m.age != null ? <span>อายุ {m.age}</span> : null}
+                                  {m.phone_number ? (
+                                    <a
+                                      href={`tel:${m.phone_number}`}
+                                      className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline"
+                                    >
+                                      <Phone className="h-3 w-3" /> {m.phone_number}
+                                    </a>
+                                  ) : null}
+                                </div>
+                                {m.reason ? (
+                                  <p className="text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p>
+                                ) : null}
+                                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void proposeIrecruit(jobDetail, m, 'reserved')}
+                                    className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                                  >
+                                    <UserPlus className="h-3 w-3" />
+                                    {busy ? 'บันทึก…' : proposed === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => void proposeIrecruit(jobDetail, m, 'placed')}
+                                    className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                  >
+                                    {busy ? 'บันทึก…' : proposed === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วกดจองตัว/ลงงานได้เลยในหน้านี้
+                    </p>
+                  )}
+                  {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
+                </div>
               ) : null}
             </div>
           ) : null}
