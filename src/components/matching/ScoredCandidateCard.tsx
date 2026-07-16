@@ -10,7 +10,7 @@ type Props = {
   job: JobCriteria;
   /** proximity ของผู้สมัครต่อโซนนี้ (มาจากการกระจายเข้าสาขา) */
   area: { rank: number; reason: string };
-  onPrefill?: (match: IrecruitCandidateMatch) => void;
+  onPrefill?: (match: IrecruitCandidateMatch, why?: string) => void;
 };
 
 function scoreColor(percent: number): string {
@@ -48,6 +48,19 @@ function verdictRowClass(v: CriterionVerdict): string {
 export default function ScoredCandidateCard({ match, job, area, onPrefill }: Props) {
   const [showWhy, setShowWhy] = useState(false);
   const score = scoreMatch(match, job, area);
+
+  // สรุปเหตุผลที่เลือกโทร/เสนอคนนี้ — ส่งไปเติมในฟอร์มเพิ่มผู้สมัคร
+  const buildWhy = () =>
+    [
+      `${matchTierLabel(match.tier)} (คะแนน ${score.percent}%)`,
+      `ตำแหน่งที่สมัคร: ${match.position_name || match.job_name_th || '-'}`,
+      `พื้นที่: ${area.reason}`,
+      score.gender !== 'na' ? `เพศ: ${score.gender === 'pass' ? 'ตรงเกณฑ์' : 'ไม่ตรงเกณฑ์'}` : '',
+      score.age !== 'na' ? `อายุ: ${score.age === 'pass' ? 'ตรงเกณฑ์' : 'ไม่ตรงเกณฑ์'}` : '',
+      match.reason ? `AI: ${match.reason}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
   // ---------- หน้า "ทำไมเป็นคนนี้ + จะโทร" ----------
   if (showWhy) {
@@ -106,7 +119,7 @@ export default function ScoredCandidateCard({ match, job, area, onPrefill }: Pro
           {onPrefill ? (
             <button
               type="button"
-              onClick={() => onPrefill(match)}
+              onClick={() => onPrefill(match, buildWhy())}
               className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
             >
               <UserPlus className="h-3.5 w-3.5" /> เพิ่มผู้สมัคร

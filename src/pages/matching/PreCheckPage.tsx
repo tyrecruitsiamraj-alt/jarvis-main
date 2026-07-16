@@ -220,7 +220,7 @@ const PreCheckPage: React.FC = () => {
     navigate(`/matching/candidates/add?${params.toString()}`);
   };
 
-  const openIrecruitPrefill = (match: IrecruitCandidateMatch) => {
+  const openIrecruitPrefill = (match: IrecruitCandidateMatch, why?: string) => {
     const [first, ...rest] = match.full_name.trim().split(/\s+/);
     const params = new URLSearchParams();
     if (first) params.set('first_name', first);
@@ -234,6 +234,14 @@ const PreCheckPage: React.FC = () => {
     if (match.position_name || match.job_name_th) {
       params.set('job_name', match.position_name || match.job_name_th || '');
     }
+    // เหตุผลที่เลือกโทร/เสนอคนนี้ + อ้างอิงใบขอที่มา
+    const reason = [
+      why?.trim(),
+      jobDetail?.request_no ? `จากใบขอ ${jobDetail.request_no}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    if (reason) params.set('reason', reason);
     params.set('returnTo', preCheckReturnPath(jobDetail?.id));
     navigate(`/matching/candidates/add?${params.toString()}`);
   };
@@ -916,77 +924,82 @@ const PreCheckPage: React.FC = () => {
               tabIndex={0}
               onClick={() => openJobAndFindCandidates(j)}
               onKeyDown={(e) => e.key === 'Enter' && openJobAndFindCandidates(j)}
-              className="glass-card rounded-[1.5rem] p-4 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors"
+              className="glass-card rounded-2xl px-3 py-2.5 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors"
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold text-blue-600 text-sm">{unitRequestCardTitle(j)}</div>
+                  <div className="font-semibold text-blue-600 text-sm truncate">{unitRequestCardTitle(j)}</div>
                   {unitRequestCardSubtitle(j) ? (
-                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{unitRequestCardSubtitle(j)}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
                   ) : null}
+                  <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{j.location_address}</span>
+                    {distanceKm !== null ? (
+                      <span className="shrink-0 text-foreground font-medium">· ~{distanceKm.toFixed(1)} กม.</span>
+                    ) : null}
+                  </div>
                 </div>
-                <span
-                  className={cn(
-                    'text-xs px-2 py-0.5 rounded-full',
-                    j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info',
-                  )}
-                >
-                  {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
-                </span>
-              </div>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">
-                  {appliedCenter
-                    ? 'คะแนนงานจากระยะทางและความด่วน'
-                    : erpSearchQuery || appliedTextQuery
-                      ? 'คะแนนงานจากความเกี่ยวข้องและความด่วน'
-                      : 'คะแนนงานเบื้องต้นจากความด่วน'}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span
                     className={cn(
-                      'rounded-full border px-2.5 py-1 text-xs font-semibold',
-                      jobMatchCountsLoading && jobMatchCounts[j.id] == null
-                        ? 'border-slate-200 bg-slate-50 text-slate-500'
-                        : (jobMatchCounts[j.id] ?? 0) > 0
-                          ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                          : 'border-amber-100 bg-amber-50 text-amber-700',
+                      'text-[10px] px-2 py-0.5 rounded-full',
+                      j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info',
                     )}
                   >
-                    {jobMatchCountsLoading && jobMatchCounts[j.id] == null
-                      ? 'กำลังนับ…'
-                      : `ตรง ${jobMatchCounts[j.id] ?? 0} คน`}
-                  </div>
-                  <div className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                    {score} คะแนน
+                    {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span
+                      title="จำนวนผู้สมัคร iRecruit ที่ตำแหน่งใกล้เคียงกับใบขอนี้"
+                      className={cn(
+                        'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                        jobMatchCountsLoading && jobMatchCounts[j.id] == null
+                          ? 'border-slate-200 bg-slate-50 text-slate-500'
+                          : (jobMatchCounts[j.id] ?? 0) > 0
+                            ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                            : 'border-amber-100 bg-amber-50 text-amber-700',
+                      )}
+                    >
+                      {jobMatchCountsLoading && jobMatchCounts[j.id] == null
+                        ? '…'
+                        : `ตรง ${jobMatchCounts[j.id] ?? 0}`}
+                    </span>
+                    <span
+                      title={
+                        distanceKm !== null
+                          ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความใกล้จากจุดที่ค้นหา (ยิ่งใกล้ยิ่งสูง) + โบนัสงานด่วน`
+                          : appliedCenter
+                            ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความด่วน (งานนี้ไม่มีพิกัด เทียบระยะทางไม่ได้)`
+                            : erpSearchQuery || appliedTextQuery
+                              ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความเกี่ยวข้องกับคำค้น + ความด่วน`
+                              : `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความด่วนของงาน (${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'})`
+                      }
+                      className="cursor-help rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
+                    >
+                      {score} คะแนน
+                    </span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="w-3 h-3" /> {j.location_address}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
-                <span>
-                  Income: {j.total_income.toLocaleString()} THB • Required: {formatYmdDmyBe(j.required_date)}
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-muted-foreground truncate">
+                  {j.total_income.toLocaleString()} บาท · {formatYmdDmyBe(j.required_date)}
                 </span>
-                {distanceKm !== null ? (
-                  <span className="text-foreground font-medium">~{distanceKm.toFixed(1)} กม. (ใกล้สุดก่อน)</span>
-                ) : appliedCenter ? (
-                  <span className="text-warning">งานนี้ไม่มีพิกัด</span>
-                ) : null}
-              </div>
-              <div className="mt-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <button
                   type="button"
-                  onClick={() => openJobAndFindCandidates(j)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openJobAndFindCandidates(j);
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
                 >
-                  <Users className="h-3.5 w-3.5" />
+                  <Users className="h-3 w-3" />
                   {jobMatchById[j.id]
-                    ? `ดูผู้สมัครที่ตรง (${jobMatchById[j.id].matches.length})`
+                    ? `ผู้สมัคร (${jobMatchById[j.id].matches.length})`
                     : jobMatchLoadingId === j.id
                       ? 'กำลังค้นหา…'
-                      : 'ค้นหาผู้สมัครที่ตรง'}
+                      : 'ค้นหาผู้สมัคร'}
                 </button>
               </div>
             </div>

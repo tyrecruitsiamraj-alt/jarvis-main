@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/apiFetch';
 import { apiUnreachableHint } from '@/lib/apiUnreachableHint';
 import PageHeader from '@/components/shared/PageHeader';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import type { DrivingResult, Gender, YesNo } from '@/types';
@@ -10,13 +10,21 @@ import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
 
 const AddCandidatePage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // กลับไปหน้าเดิมที่มาจาก (เช่น pre-check พร้อมเปิด drawer ใบขอเดิม) — ถ้าไม่มีใช้รายชื่อผู้สมัคร
+  const returnTo = searchParams.get('returnTo') || '/matching/candidates';
+  // เหตุผลที่เลือกโทร/เสนอผู้สมัครคนนี้ (ส่งมาจากหน้าแมทผู้สมัคร)
+  const selectionReason = searchParams.get('reason') || '';
 
   const [titlePrefix, setTitlePrefix] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [age, setAge] = useState<string>('');
-  const [gender, setGender] = useState<Gender>('male');
+  const [firstName, setFirstName] = useState(() => searchParams.get('first_name') || '');
+  const [lastName, setLastName] = useState(() => searchParams.get('last_name') || '');
+  const [phone, setPhone] = useState(() => searchParams.get('phone') || '');
+  const [age, setAge] = useState<string>(() => searchParams.get('age') || '');
+  const [gender, setGender] = useState<Gender>(() => {
+    const s = (searchParams.get('sex') || '').trim().toLowerCase();
+    return s === 'f' || s === 'female' || s === 'หญิง' ? 'female' : 'male';
+  });
 
   const [drinkingUi, setDrinkingUi] = useState<'ไม่ดื่ม' | 'ดื่ม'>('ไม่ดื่ม');
   const [smokingUi, setSmokingUi] = useState<'ไม่สูบ' | 'สูบ'>('ไม่สูบ');
@@ -29,8 +37,8 @@ const AddCandidatePage: React.FC = () => {
   const [village, setVillage] = useState('');
   const [road, setRoad] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
-  const [district, setDistrict] = useState('');
-  const [province, setProvince] = useState('');
+  const [district, setDistrict] = useState(() => searchParams.get('district') || '');
+  const [province, setProvince] = useState(() => searchParams.get('province') || '');
   const [postalCode, setPostalCode] = useState('');
 
   const [applicationDate, setApplicationDate] = useState('');
@@ -118,7 +126,7 @@ const AddCandidatePage: React.FC = () => {
         );
         return;
       }
-      navigate('/matching/candidates');
+      navigate(returnTo);
     } catch (e) {
       if (e instanceof TypeError) {
         setError(apiUnreachableHint());
@@ -132,11 +140,18 @@ const AddCandidatePage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="เพิ่มผู้สมัครใหม่" backPath="/matching/candidates" />
+      <PageHeader title="เพิ่มผู้สมัครใหม่" backPath={returnTo} />
 
       <div className="px-4 md:px-6">
         <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
           {error && <div className="text-sm text-destructive">{error}</div>}
+
+          {selectionReason ? (
+            <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2.5">
+              <p className="text-xs font-semibold text-sky-900">เหตุผลที่เลือกโทร/เสนอผู้สมัครคนนี้</p>
+              <p className="mt-1 whitespace-pre-wrap text-xs text-sky-800 leading-relaxed">{selectionReason}</p>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -390,7 +405,7 @@ const AddCandidatePage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => navigate('/matching/candidates')}
+              onClick={() => navigate(returnTo)}
               className="px-6 py-2.5 rounded-lg bg-secondary text-foreground font-medium text-sm"
             >
               ยกเลิก
