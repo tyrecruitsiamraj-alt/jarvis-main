@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
+import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 import { motion } from 'framer-motion';
 
 const menuItems: {
@@ -153,7 +154,9 @@ const HomePage: React.FC = () => {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            onClick={() => navigate(item.path)}
+            onClick={() =>
+              navigate(item.path === '/jobs/list' ? resolveUnitNavPath() : item.path)
+            }
             className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-6 group touch-manipulation"
           >
             <div

@@ -21,7 +21,7 @@ import {
 import type { JobRequest } from '@/types';
 import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 
-import { loadJobListLastUrl } from '@/lib/jobUnitSessionState';
+import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   const display =
@@ -38,10 +38,10 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const backPath =
-    (location.state as { returnTo?: string } | null)?.returnTo ||
-    loadJobListLastUrl() ||
-    '/jobs/list';
+  const backPath = resolveUnitDetailBackPath({
+    stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+    search: location.search,
+  });
   const { hasPermission } = useAuth();
   const canAssignStaff = hasPermission('supervisor');
 

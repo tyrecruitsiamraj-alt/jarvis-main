@@ -1,6 +1,7 @@
 import type { NavigateFunction } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { isSiamrajJob, siamrajExternalId } from '@/lib/siamrajUnitRequestsApi';
+import { saveJobListLastUrl, sanitizeUnitReturnTo } from '@/lib/jobUnitSessionState';
 
 export function unitRequestPath(job: JobRequest): string {
   const externalId = siamrajExternalId(job);
@@ -32,10 +33,18 @@ export function navigateToUnitRequest(
   options?: OpenUnitRequestOptions,
 ): void {
   const path = unitRequestPath(job);
+  const returnTo = sanitizeUnitReturnTo(options?.returnTo);
+
+  if (returnTo?.startsWith('/jobs/list')) {
+    saveJobListLastUrl(returnTo);
+  }
+
   if (options?.openInNewTab) {
-    const url = `${window.location.origin}${path}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const url = new URL(path, window.location.origin);
+    if (returnTo) url.searchParams.set('returnTo', returnTo);
+    window.open(url.toString(), '_blank', 'noopener,noreferrer');
     return;
   }
-  navigate(path, options?.returnTo ? { state: { returnTo: options.returnTo } } : undefined);
+
+  navigate(path, returnTo ? { state: { returnTo } } : undefined);
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { loadJobListLastUrl } from '@/lib/jobUnitSessionState';
+import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import {
@@ -116,10 +116,10 @@ function editFormToJob(base: JobRequest, f: JobEditForm): JobRequest {
 const JobDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  const backPath =
-    (location.state as { returnTo?: string } | null)?.returnTo ||
-    loadJobListLastUrl() ||
-    '/jobs/list';
+  const backPath = resolveUnitDetailBackPath({
+    stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+    search: location.search,
+  });
   const { hasPermission } = useAuth();
   const [job, setJob] = useState<JobRequest | null>(null);
   const [loading, setLoading] = useState(false);
