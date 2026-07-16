@@ -110,6 +110,8 @@ const PreCheckPage: React.FC = () => {
   // การเสนอ/จองตัว/ลงงาน iRecruit — สถานะล่าสุดต่อผู้สมัคร (คีย์ = source#ref)
   const [proposedByKey, setProposedByKey] = useState<Record<string, ProposalStatus>>({});
   const [proposingKey, setProposingKey] = useState<string | null>(null);
+  // #3 กันเสนอซ้ำ — ซ่อนผู้สมัครที่เสนอ/จอง/ลงแล้ว
+  const [hideProposedIrecruit, setHideProposedIrecruit] = useState(false);
 
   const fetchIrecruitMatch = async (jobId: string, refresh = false) => {
     setJobMatchLoadingId(jobId);
@@ -196,6 +198,12 @@ const PreCheckPage: React.FC = () => {
     proposalStatus: proposedByKey[proposalKey('irecruit', m.id)] ?? null,
     proposalBusy: proposingKey === proposalKey('irecruit', m.id),
   });
+
+  // #3 กันเสนอซ้ำ — filter ผู้สมัครที่เสนอแล้วออกเมื่อเปิด toggle
+  const isProposed = (m: IrecruitCandidateMatch) =>
+    Boolean(proposedByKey[proposalKey('irecruit', m.id)]);
+  const filterProposed = <T extends IrecruitCandidateMatch>(list: T[]): T[] =>
+    hideProposedIrecruit ? list.filter((m) => !isProposed(m)) : list;
 
   const openIrecruitPrefill = (match: IrecruitCandidateMatch, why?: string) => {
     const [first, ...rest] = match.full_name.trim().split(/\s+/);
@@ -1127,11 +1135,30 @@ const PreCheckPage: React.FC = () => {
                       <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
+                      <div className="flex items-center gap-1.5">
+                      {(() => {
+                        const proposedCount = (jobMatchById[jobDetail.id]?.matches ?? []).filter(isProposed).length;
+                        return proposedCount > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setHideProposedIrecruit((v) => !v)}
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                              hideProposedIrecruit
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                            )}
+                          >
+                            {hideProposedIrecruit ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
+                          </button>
+                        ) : null;
+                      })()}
                       {branchParserStatusMeta ? (
                         <Badge variant="outline" className={branchParserStatusMeta.className}>
                           {branchParserStatusMeta.label}
                         </Badge>
                       ) : null}
+                      </div>
                     </div>
                     {shouldShowBranchOverrideEditor ? (
                       <div className="space-y-2">
@@ -1223,7 +1250,7 @@ const PreCheckPage: React.FC = () => {
                                 </div>
                                 {branchMatch && branchMatch.matches.length > 0 ? (
                                   <div className="space-y-1.5">
-                                    {branchMatch.matches.slice(0, Math.max(3, item.requested_qty)).map((suggestion) => (
+                                    {filterProposed(branchMatch.matches).slice(0, Math.max(3, item.requested_qty)).map((suggestion) => (
                                       <ScoredCandidateCard
                                         key={`${item.branch_name_clean}-${suggestion.id}`}
                                         match={suggestion}
@@ -1252,7 +1279,7 @@ const PreCheckPage: React.FC = () => {
                               AI แมทได้ แต่พื้นที่ไม่ตรงสาขาใดในใบนี้ — ใช้ประกอบการพิจารณา
                             </p>
                             <div className="space-y-1.5">
-                              {unassignedMatches.slice(0, 20).map((suggestion) => (
+                              {filterProposed(unassignedMatches).slice(0, 20).map((suggestion) => (
                                 <ScoredCandidateCard
                                   key={`unassigned-${suggestion.id}`}
                                   match={suggestion}
@@ -1279,9 +1306,28 @@ const PreCheckPage: React.FC = () => {
                       </div>
                         ) : (
                           <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
-                            <p className="text-sm font-semibold text-foreground">
-                              ผู้สมัครที่แมทกับใบขอนี้
-                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-foreground">
+                                ผู้สมัครที่แมทกับใบขอนี้
+                              </p>
+                              {(() => {
+                                const proposedCount = (jobMatchById[jobDetail.id]?.matches ?? []).filter(isProposed).length;
+                                return proposedCount > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setHideProposedIrecruit((v) => !v)}
+                                    className={cn(
+                                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                      hideProposedIrecruit
+                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                                    )}
+                                  >
+                                    {hideProposedIrecruit ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
+                                  </button>
+                                ) : null;
+                              })()}
+                            </div>
                             {jobMatchLoadingId === jobDetail.id ? (
                               <MatchLoadingBar label="กำลังค้นหาผู้สมัครจาก iRecruit… (อาจใช้เวลา 1–3 นาที)" />
                             ) : jobMatchErrorById[jobDetail.id] ? (
@@ -1299,7 +1345,7 @@ const PreCheckPage: React.FC = () => {
                               </div>
                             ) : singleZoneMatches.length > 0 ? (
                               <div className="space-y-1.5">
-                                {singleZoneMatches.map((suggestion) => (
+                                {filterProposed(singleZoneMatches).map((suggestion) => (
                                   <ScoredCandidateCard
                                     key={suggestion.id}
                                     match={suggestion}

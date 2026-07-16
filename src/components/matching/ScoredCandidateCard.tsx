@@ -215,6 +215,11 @@ export default function ScoredCandidateCard({
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold text-blue-700">
           {matchTierEmoji(match.tier)} {match.full_name}
+          {proposalStatus ? (
+            <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-emerald-700">
+              <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposalStatus)}
+            </span>
+          ) : null}
         </p>
         <ScorePercentBadge percent={score.percent} breakdown={breakdown} />
       </div>

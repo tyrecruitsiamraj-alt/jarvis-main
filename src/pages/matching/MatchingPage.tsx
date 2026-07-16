@@ -83,6 +83,8 @@ const MatchingPage: React.FC = () => {
   const [proposedByKey, setProposedByKey] = useState<Record<string, ProposalStatus>>({});
   const [proposingKey, setProposingKey] = useState<string | null>(null);
   const [proposeError, setProposeError] = useState<string | null>(null);
+  // #3 กันเสนอซ้ำ — ซ่อนคนที่เสนอ/จอง/ลงแล้ว
+  const [hideProposed, setHideProposed] = useState(false);
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?pool=1')
@@ -400,13 +402,34 @@ const MatchingPage: React.FC = () => {
                     ? `AI แมทสกิล · จาก pool ${boardMatchById[jobDetail.id].pool_size} คน → เสนอ ${boardMatchById[jobDetail.id].matches.length}`
                     : 'ผู้สมัครที่พร้อมลงงานทันที'}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => void fetchBoardMatch(jobDetail.id, true)}
-                  className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50"
-                >
-                  <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {(() => {
+                    const proposedCount = (boardMatchById[jobDetail.id]?.matches ?? []).filter(
+                      (m) => proposedByKey[proposalKey('board', m.card_id)],
+                    ).length;
+                    return proposedCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setHideProposed((v) => !v)}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                          hideProposed
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                        )}
+                      >
+                        {hideProposed ? `แสดงทั้งหมด` : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
+                      </button>
+                    ) : null;
+                  })()}
+                  <button
+                    type="button"
+                    onClick={() => void fetchBoardMatch(jobDetail.id, true)}
+                    className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50"
+                  >
+                    <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+                  </button>
+                </div>
               </div>
 
               {boardLoadingId === jobDetail.id ? (
@@ -420,23 +443,37 @@ const MatchingPage: React.FC = () => {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {boardMatchById[jobDetail.id].matches.map((m) => {
+                    {boardMatchById[jobDetail.id].matches
+                      .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
+                      .map((m) => {
                       const meta = boardTierMeta(m.tier);
+                      const proposed = proposedByKey[proposalKey('board', m.card_id)];
                       return (
                         <button
                           type="button"
                           key={m.card_id}
                           onClick={() => setCandDetail(m)}
-                          className={cn('w-full text-left rounded-xl border px-3 py-2 transition hover:brightness-[0.98]', meta.cls)}
+                          className={cn(
+                            'w-full text-left rounded-xl border px-3 py-2 transition hover:brightness-[0.98]',
+                            meta.cls,
+                            proposed ? 'opacity-70' : '',
+                          )}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold text-foreground">
                               {meta.icon} {m.full_name}
                               {m.nick_name ? ` (${m.nick_name})` : ''}
                             </span>
-                            <span className="shrink-0 rounded-full border border-white/80 bg-white/80 px-2 py-0.5 text-[10px] text-slate-600">
-                              {meta.label}
-                            </span>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {proposed ? (
+                                <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                  <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed)}
+                                </span>
+                              ) : null}
+                              <span className="rounded-full border border-white/80 bg-white/80 px-2 py-0.5 text-[10px] text-slate-600">
+                                {meta.label}
+                              </span>
+                            </div>
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                             <span>สกิล: {[m.job1_name, m.job2_name].filter(Boolean).join(' / ') || 'ไม่ระบุ'}</span>
