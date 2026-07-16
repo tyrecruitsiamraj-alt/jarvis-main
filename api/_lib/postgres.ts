@@ -30,12 +30,14 @@ function getOrCreatePool(): Pool {
     max: process.env.PG_MAX ? Number(process.env.PG_MAX) : 10,
   });
 
-  const schema = getPgSchema();
-  if (schema) {
-    pool.on('connect', (client) => {
-      void client.query(`SET search_path TO "${schema}"`);
+  // ตั้ง search_path แบบ synchronous ก่อนปล่อย connection ให้ query — กัน race กับ query แรก
+  pool.on('connect', (client) => {
+    const schema = getPgSchema();
+    if (!schema) return;
+    client.query(`SET search_path TO "${schema}"`).catch(() => {
+      /* ignore — queries use qualified table names where critical */
     });
-  }
+  });
 
   globalForPg.__jarvisPgPool.pool = pool;
   return pool;

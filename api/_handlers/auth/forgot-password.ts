@@ -13,6 +13,9 @@ import { auditFromAnonymous } from '../../_lib/audit.js';
 import { sendEmail, isPostmarkConfigured } from '../../_lib/postmark.js';
 import { buildAuthUrl, buildPasswordResetEmail } from '../../_lib/emailTemplates.js';
 import { logInfo, logError } from '../../_lib/logger.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 const GENERIC_FORGOT_MESSAGE =
   'หากมีบัญชีอีเมลนี้ในระบบ เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลของคุณ';
@@ -38,7 +41,7 @@ async function forgotPasswordHandler(req: ApiReq, res: ApiRes) {
     const lookup = await dbQuery<{ id: string; is_active: boolean }>(
       `
       select id, is_active
-      from users
+      from ${usersTable}
       where lower(email) = lower($1)
       limit 1
     `,

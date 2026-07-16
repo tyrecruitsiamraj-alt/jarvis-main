@@ -12,6 +12,7 @@ import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
 import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
+import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
 type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare' | 'outboundIp';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
@@ -297,8 +298,11 @@ const AdminSettings: React.FC = () => {
                           title="ล็อกให้เห็นใบขอเฉพาะแผนกนี้ (ว่าง = บังคับให้ผู้ใช้เลือกตอนเข้าครั้งแรก)"
                         >
                           <option value="">ยังไม่ตั้ง</option>
-                          <option value="LBD">LBD</option>
-                          <option value="LBA">LBA</option>
+                          {APP_DEPARTMENT_CODES.map((code) => (
+                            <option key={code} value={code}>
+                              {code}
+                            </option>
+                          ))}
                         </select>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -386,8 +390,11 @@ const AdminSettings: React.FC = () => {
                       title="ล็อกให้เห็นใบขอเฉพาะแผนกนี้ (ว่าง = บังคับให้ผู้ใช้เลือกตอนเข้าครั้งแรก)"
                     >
                       <option value="">ยังไม่ตั้ง</option>
-                      <option value="LBD">LBD</option>
-                      <option value="LBA">LBA</option>
+                      {APP_DEPARTMENT_CODES.map((code) => (
+                        <option key={code} value={code}>
+                          {code}
+                        </option>
+                      ))}
                     </select>
 
                     <button

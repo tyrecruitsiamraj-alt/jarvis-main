@@ -52,7 +52,7 @@ export function rateLimitOrReject(
   if (result.allowed) return true;
   res.status(429).json({
     error: 'Too many requests',
-    message: 'ลองใหม่อีกครั้งในภายหลัง',
+    message: `คำขอจากเครือข่ายนี้ถี่เกินไป — รอ ${result.retryAfterSec} วินาทีแล้วลองใหม่ (ออฟฟิศใช้ IP ร่วมกันได้)`,
     retryAfterSec: result.retryAfterSec,
   });
   return false;

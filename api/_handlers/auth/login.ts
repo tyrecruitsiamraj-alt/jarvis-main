@@ -14,6 +14,9 @@ import {
   isCompanyEmailLoginEnforced,
 } from '../../_lib/companyEmail.js';
 import { issueAuthSession, type AuthUserRow } from '../../_lib/authSession.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 type UserRow = AuthUserRow & {
   password_hash: string;
@@ -33,8 +36,6 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     return sendError(res, 503, 'Service unavailable', 'AUTH_JWT_SECRET is not configured');
   }
 
-  if (!rateLimitOrReject(req, res, 'auth:login', 10, 15 * 60 * 1000)) return;
-
   try {
     const raw = await readJsonBody(req);
     if (typeof raw !== 'object' || raw === null) {
@@ -47,6 +48,10 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       return sendError(res, 400, 'Bad request', 'email and password are required');
     }
 
+    // ต่ออีเมล (กัน brute force) + เพดาน IP สูงสำหรับออฟฟิศ NAT
+    if (!rateLimitOrReject(req, res, `auth:login:user:${email}`, 30, 15 * 60 * 1000)) return;
+    if (!rateLimitOrReject(req, res, 'auth:login:office', 500, 15 * 60 * 1000)) return;
+
     if (isCompanyEmailLoginEnforced() && !isCompanyEmail(email)) {
       return sendError(res, 400, 'Bad request', companyEmailRequiredMessage());
     }
@@ -54,7 +59,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const { rows } = await dbQuery<UserRow>(
       `
       select id, email, password_hash, role, full_name, is_active, created_at, department_code
-      from users
+      from ${usersTable}
       where lower(email) = lower($1)
       limit 1
     `,
