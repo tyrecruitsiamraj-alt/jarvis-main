@@ -14,6 +14,7 @@ export type AuthUserRow = {
   full_name: string;
   is_active: boolean;
   created_at: string | Date;
+  department_code?: string | null;
 };
 
 export function toUserResponse(row: AuthUserRow) {
@@ -21,6 +22,7 @@ export function toUserResponse(row: AuthUserRow) {
     row.created_at instanceof Date
       ? row.created_at.toISOString().slice(0, 10)
       : String(row.created_at).slice(0, 10);
+  const department_code = (row.department_code || '').trim().toUpperCase() || undefined;
   return {
     id: row.id,
     username: row.email,
@@ -29,6 +31,7 @@ export function toUserResponse(row: AuthUserRow) {
     role: row.role,
     is_active: row.is_active,
     created_at: created,
+    ...(department_code ? { department_code } : {}),
   };
 }
 

@@ -53,7 +53,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<UserRow>(
       `
-      select id, email, password_hash, role, full_name, is_active, created_at
+      select id, email, password_hash, role, full_name, is_active, created_at, department_code
       from users
       where lower(email) = lower($1)
       limit 1

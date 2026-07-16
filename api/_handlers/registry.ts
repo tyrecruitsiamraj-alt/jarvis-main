@@ -34,12 +34,21 @@ import driverCareRecalculateHandler from './driver-care-recalculate.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
+import siamrajUnitWorkStatusHandler from './siamraj-unit-work-status.js';
 import siamrajOplImportHandler from './siamraj-opl-import.js';
 import outboundIpHandler from './diagnostics/outbound-ip.js';
 import recruitRegistrationsHandler from './recruit-registrations.js';
 import matchingSuggestionsHandler from './matching-suggestions.js';
 import matchingParseBranchDemandHandler from './matching-parse-branch-demand.js';
 import matchingParseBranchDemandJobHandler from './matching-parse-branch-demand-job.js';
+import {
+  lumosInterviewCandidatesHandler,
+  lumosInterviewResultsHandler,
+} from './lumos-interview.js';
+import {
+  lumosReminderContactsHandler,
+  lumosReminderResultsHandler,
+} from './lumos-reminder.js';
 import matchingCandidateSpecHandler from './matching-candidate-spec.js';
 import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js';
 
@@ -67,12 +76,18 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
   '/api/siamraj/unit-assignments': siamrajUnitAssignmentsHandler as ApiHandler,
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
+  '/api/siamraj/unit-work-status': siamrajUnitWorkStatusHandler as ApiHandler,
   '/api/siamraj/opl-import': siamrajOplImportHandler as ApiHandler,
   '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   '/api/recruit-registrations': recruitRegistrationsHandler as ApiHandler,
   '/api/matching/suggestions': matchingSuggestionsHandler as ApiHandler,
   '/api/matching/parse-branch-demand': matchingParseBranchDemandHandler as ApiHandler,
   '/api/matching/parse-branch-demand-job': matchingParseBranchDemandJobHandler as ApiHandler,
+  // AI Interview / Reminder (Lumos ↔ SO) — Lumos calls in with LUMOS_API_KEY
+  '/api/lumos/interview/candidates': lumosInterviewCandidatesHandler as ApiHandler,
+  '/api/lumos/interview/results': lumosInterviewResultsHandler as ApiHandler,
+  '/api/lumos/reminder/contacts': lumosReminderContactsHandler as ApiHandler,
+  '/api/lumos/reminder/results': lumosReminderResultsHandler as ApiHandler,
   '/api/matching/candidate-spec': matchingCandidateSpecHandler as ApiHandler,
   '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,

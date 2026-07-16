@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, HeartPulse, ArrowRight } from 'lucide-react';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import type { AppFunctionId } from '@/lib/roleFunctions';
+import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 
 export type HubRole = 'opl' | 'staff' | 'supervisor' | 'admin';
 
@@ -66,7 +67,9 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              onClick={() => navigate(item.path)}
+              onClick={() =>
+                navigate(item.path === '/jobs/list' ? resolveUnitNavPath() : item.path)
+              }
               className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-6 group touch-manipulation"
             >
               <div className={`w-11 h-11 rounded-2xl ${item.accent} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}>

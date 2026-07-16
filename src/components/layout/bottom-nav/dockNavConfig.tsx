@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, HeartPulse } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
+import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 
 export type DockNavItem = {
   path: string;
@@ -22,6 +23,12 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },
 ];
+
+/** path ที่ควร navigate เมื่อกดเมนู (หน่วยงาน เก็บ filter+หน้าไว้ใน session) */
+export function resolveDockNavTarget(path: string): string {
+  if (path === '/jobs/list') return resolveUnitNavPath();
+  return path;
+}
 
 export function isDockPathActive(path: string, pathname: string): boolean {
   const p = pathname;

@@ -1,3 +1,5 @@
+import type { UnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
+
 // ============ AUTH & USERS ============
 export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
@@ -10,6 +12,8 @@ export interface User {
   avatar_url?: string;
   is_active: boolean;
   created_at: string;
+  /** แผนกที่ล็อกสิทธิ์เห็นใบขอ เช่น LBD — ไม่มี = เห็นทุกแผนก (admin มักว่าง) */
+  department_code?: string;
 }
 
 // ============ EMPLOYEES (WL) ============
@@ -123,6 +127,12 @@ export interface JobRequest {
   contract_type_code?: string;
   contract_type_name?: string;
   position_units?: number;
+  /** จำนวนตำแหน่งที่ขอมา (Siamraj request_qty) */
+  request_positions?: number;
+  /** จำนวนที่หาได้แล้ว / แจ้งเข้า */
+  filled_positions?: number;
+  /** จำนวนที่ยกเลิก / ปิดค้าง */
+  cancelled_positions?: number;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;
@@ -172,6 +182,13 @@ export interface JobRequest {
   send_replacement?: boolean | null;
   /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
   parser_override_text?: string | null;
+  work_status?: UnitRequestWorkStatus | null;
+  work_person_first_name?: string | null;
+  work_person_last_name?: string | null;
+  /** วันที่ตามสถานะ (YMD) — แจ้งเข้า / นัดสัมภาษณ์ / เริ่มงาน */
+  work_status_date?: string | null;
+  /** รายชื่อคนในสถานะทำงาน (หลายคนต่อใบได้) */
+  work_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
   /** สาขาที่ผู้ใช้แก้เอง (persist) — ใช้แทนผลแตกสาขาจาก ERP */
   branch_override?: Array<{
     branch_name_clean: string;

@@ -9,6 +9,10 @@ import {
 } from './siamrajStaffingOpen.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
+import {
+  sqlServerDepartmentScopeClause,
+  type DepartmentScope,
+} from './departmentScope.js';
 
 /**
  * รายการใบขอที่ "ปิด/แจ้งเข้าแล้ว" ในช่วงวันที่ — ให้ drill-down การ์ด "ปิดใบขอ" เห็นของจริง
@@ -134,12 +138,14 @@ export async function listSiamrajSqlServerClosedRequests(options: {
   from: string;
   to: string;
   limit?: number;
+  departmentScope?: DepartmentScope;
 }): Promise<ReturnType<typeof mapClosedRow>[]> {
   const { from, to } = options;
   if (!isDateYmd(from) || !isDateYmd(to)) throw new Error('from/to must be YYYY-MM-DD');
   const limit = Math.min(Math.max(options.limit ?? 3000, 1), 5000);
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
+  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
 
   const rows = await siamrajSqlQuery<ClosedRow>(
     `
@@ -174,10 +180,11 @@ export async function listSiamrajSqlServerClosedRequests(options: {
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
+      ${deptScope.sql}
       AND CONVERT(date, COALESCE(A.stop_date, A.cancel_date, A.request_date)) BETWEEN @fromDate AND @toDate
     ORDER BY COALESCE(A.stop_date, A.cancel_date, A.request_date) DESC
     `,
-    { ...filters, fromDate: from, toDate: to, limit },
+    { ...filters, fromDate: from, toDate: to, limit, ...deptScope.params },
   );
 
   // เก็บเฉพาะใบที่มีตำแหน่งปิดจริง (ตรงนิยาม throughput)

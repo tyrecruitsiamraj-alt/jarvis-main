@@ -80,7 +80,7 @@ export default async function azureAdCallbackHandler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<AuthUserRow & { azure_oid: string | null }>(
       `
-      select id, email, role, full_name, is_active, created_at, azure_oid
+      select id, email, role, full_name, is_active, created_at, azure_oid, department_code
       from users
       where azure_oid = $1 or lower(email) = lower($2)
       order by case when azure_oid = $1 then 0 else 1 end

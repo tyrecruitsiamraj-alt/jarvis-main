@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
 import {
@@ -114,6 +115,11 @@ function editFormToJob(base: JobRequest, f: JobEditForm): JobRequest {
 
 const JobDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const backPath = resolveUnitDetailBackPath({
+    stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+    search: location.search,
+  });
   const { hasPermission } = useAuth();
   const [job, setJob] = useState<JobRequest | null>(null);
   const [loading, setLoading] = useState(false);
@@ -390,7 +396,7 @@ const JobDetailPage: React.FC = () => {
     <div>
       <PageHeader
         title={job.unit_name}
-        backPath="/jobs/list"
+        backPath={backPath}
         actions={
           hasPermission('supervisor') ? (
             <button

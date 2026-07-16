@@ -10,7 +10,7 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import BottomDockNav from '@/components/layout/bottom-nav/BottomDockNav';
 import JobBoardHeaderMenu from '@/components/layout/JobBoardHeaderMenu';
-import { DOCK_NAV_ITEMS, isDockPathActive } from '@/components/layout/bottom-nav/dockNavConfig';
+import { DOCK_NAV_ITEMS, isDockPathActive, resolveDockNavTarget } from '@/components/layout/bottom-nav/dockNavConfig';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 
@@ -50,7 +50,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <button
                   key={item.path}
                   type="button"
-                  onClick={() => navigate(item.path)}
+                  onClick={() => navigate(resolveDockNavTarget(item.path))}
                   className={cn(
                     'flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all touch-manipulation',
                     active ? 'bg-blue-500/12 text-blue-700' : 'text-muted-foreground hover:text-foreground hover:bg-white/50',

@@ -42,9 +42,12 @@ import type {
 } from './types';
 import {
   enrichActivityTrendWithThroughput,
+  applyOpenQueueRemainingToActivityTrend,
   filterJobsForThroughput,
   jobsToThroughputRecords,
   sumThroughputInRange,
+  sumCohortStockByRequestDate,
+  buildStockKpisFromCohort,
   type ThroughputRecord,
 } from './throughput';
 import {
@@ -59,7 +62,6 @@ import {
   buildRequestControlSummary,
   buildSlaSummary,
 } from './buildRequestControlSummaries';
-import { buildPriorityWorkQueue } from './priorityWorkQueue';
 import {
   buildRequestStates,
   computeRequestControlSummaryV3,
@@ -71,11 +73,18 @@ import {
   mapSummaryV3ToDashboard,
   statesToRequestControlRecords,
 } from './requestControlBridge';
-import { classifyLifecycleKind, lifecycleKindLabel } from './lifecycle';
+import { lifecycleKindLabel, buildLifecycleBoardFromStockSources } from './lifecycle';
+import {
+  formatWorkPersonsSummary,
+  resolveUnitRequestWorkStatus,
+  UNIT_REQUEST_WORK_STATUS_LABELS,
+  type UnitRequestWorkStatus,
+} from '@/lib/unitRequestWorkStatus';
 import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
   mergeRequestControlJobs,
+  positionBreakdownFromJob,
   REQUEST_CONTROL_STATUS_LABELS,
   type RequestControlStatus,
 } from '@/lib/requestControl';
@@ -227,6 +236,11 @@ function nextActionFor(job: JobRequest, status: DashboardTaskStatus): string {
   if (!job.recruiter_name?.trim()) return 'มอบหมายสรรหา';
   if (!job.screener_name?.trim()) return 'มอบหมายคัดสรร';
   if (job.send_replacement == null && isResignationRequest(job)) return 'ระบุส่งคนแทน';
+  const work = resolveUnitRequestWorkStatus(job.work_status);
+  if (work === 'evaluating') return 'เริ่ม/ตามประเมิน';
+  if (work === 'waiting_inform') return 'ติดตามแจ้งเข้า';
+  if (work === 'waiting_interview') return 'นัด/ตามสัมภาษณ์';
+  if (work === 'waiting_start') return 'ตามผลสัมภาษณ์/เริ่มงาน';
   if (status === 'overdue') return 'ติดตามด่วน';
   if (status === 'at_risk') return 'ติดตามความคืบหน้า';
   return 'ดูรายละเอียด';
@@ -261,6 +275,7 @@ function requestKindLabel(kind: string): string {
 export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWorkItem {
   const rec = jobToRequestControlRecord(job, today);
   const status = controlStatusToDashboardStatus(rec.controlStatus, rec.slaStatus, job, today);
+  const workStatus = resolveUnitRequestWorkStatus(job.work_status);
   return {
     id: job.id,
     requestNo: rec.requestNo,
@@ -289,6 +304,14 @@ export function jobToWorkItem(job: JobRequest, today = new Date()): DashboardWor
     lifecycleKind: lifecycleKindLabel(rec.lifecycleKind, rec.requestActionName),
     requestKind: requestKindLabel(rec.requestKind),
     controlStatus: REQUEST_CONTROL_STATUS_LABELS[rec.controlStatus],
+    workStatus,
+    workStatusLabel: UNIT_REQUEST_WORK_STATUS_LABELS[workStatus],
+    workPersonName: formatWorkPersonsSummary(
+      job.work_persons,
+      job.work_person_first_name,
+      job.work_person_last_name,
+    ),
+    workStatusDate: job.work_status_date?.slice(0, 10) || '',
   };
 }
 
@@ -343,12 +366,18 @@ export function resolvePeriodRange(
   const label = `${format(fromDate, 'd MMM yyyy', { locale: th })} – ${format(toDate, 'd MMM yyyy', { locale: th })}`;
   const previousLabel = `${format(previousFromDate, 'd MMM yyyy', { locale: th })} – ${format(previousToDate, 'd MMM yyyy', { locale: th })}`;
 
+  const fullYearLabel = (() => {
+    if (from !== `${fromDate.getFullYear()}-01-01`) return null;
+    if (to !== `${fromDate.getFullYear()}-12-31`) return null;
+    return `ปี ${fromDate.getFullYear() + 543}`;
+  })();
+
   return {
     from,
     to,
     previousFrom: toYmdLocal(previousFromDate),
     previousTo: toYmdLocal(previousToDate),
-    label,
+    label: fullYearLabel ?? label,
     previousLabel,
   };
 }
@@ -367,13 +396,45 @@ export function resolveYearToDateTrendRange(now = new Date()): {
   return { from, to, label };
 }
 
+/**
+ * โหมดทั้งหมด: กว้างพอให้ครอบคลุมใบเปิดใน feed
+ * (คงเหลือรวมรายเดือน = การ์ดคงเหลือ เมื่อชุดใบตรงกัน)
+ */
+export function resolveOpenStockTrendRange(
+  openJobs: JobRequest[],
+  now = new Date(),
+): {
+  from: string;
+  to: string;
+  label: string;
+} {
+  const ytd = resolveYearToDateTrendRange(now);
+  let earliest = ytd.from;
+  for (const j of openJobs) {
+    const ymd = effectiveRequestDateYmd(j, now);
+    if (ymd && ymd < earliest) earliest = `${ymd.slice(0, 7)}-01`;
+  }
+  if (earliest >= ytd.from) return ytd;
+  const fromDate = parseISO(earliest);
+  const toDate = parseISO(ytd.to);
+  return {
+    from: earliest,
+    to: ytd.to,
+    label: `${format(fromDate, 'MMM yyyy', { locale: th })} – ${format(toDate, 'MMM yyyy', { locale: th })}`,
+  };
+}
+
 function inYmdRange(ymd: string, from: string, to: string): boolean {
   return ymd >= from && ymd <= to;
 }
 
 export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: string, today = new Date()): JobRequest[] {
+  void today;
   return jobs.filter((j) => {
-    const ymd = effectiveRequestDateYmd(j, today);
+    const ymd =
+      safeYmd(j.request_date) ||
+      safeYmd(j.submittedAt) ||
+      effectiveRequestDateYmd(j, today);
     return ymd ? inYmdRange(ymd, from, to) : false;
   });
 }
@@ -453,7 +514,7 @@ function buildAllOpenControlSummary(remaining: {
   };
 }
 
-/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบขอที่เข้ามาในงวดนั้น */
+/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบที่กรอกในช่วง (request_date) */
 function resolveRemainingKpi(
   openJobs: JobRequest[],
   period: PeriodRange | null,
@@ -461,107 +522,144 @@ function resolveRemainingKpi(
 ): { remainingPositions: number; remainingRequests: number } {
   let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
   if (period) {
-    jobs = jobs.filter((j) => {
-      const ymd = effectiveRequestDateYmd(j, today);
-      return ymd ? inYmdRange(ymd, period.from, period.to) : false;
-    });
+    jobs = filterJobsByRequestDate(jobs, period.from, period.to, today);
   }
   return {
-    remainingPositions: sumOpenRemainingPositions(jobs),
-    remainingRequests: jobsToRequestControlRecords(jobs).length,
+    remainingPositions: jobs.reduce((sum, j) => sum + positionBreakdownFromJob(j).remainingPositions, 0),
+    remainingRequests: jobs.filter((j) => positionBreakdownFromJob(j).remainingPositions > 0).length,
   };
 }
 
-function buildControlTowerKpis(
-  summary: DashboardRequestControlSummary,
-  slaSummary?: { atRisk: number; breached: number },
-  periodLabel?: string | null,
-): DashboardKpi[] {
-  const posReq = (positions: number, requests: number) =>
-    `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
-  const qualitySuffix =
-    summary.dataQualityMode && summary.dataQualityMode !== 'event_based'
-      ? ' · ประมาณการจากสถานะล่าสุด'
-      : '';
+/** ใบเปิดในสต็อก KPI — ทั้งหมด หรือเฉพาะใบที่กรอกในช่วง (request_date) */
+function resolveOpenJobsForStockKpi(
+  openJobs: JobRequest[],
+  period: PeriodRange | null,
+  today: Date,
+): JobRequest[] {
+  let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
+  if (period) {
+    jobs = filterJobsByRequestDate(jobs, period.from, period.to, today);
+  }
+  return jobs;
+}
+
+/** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก */
+function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
+  const counts: Record<UnitRequestWorkStatus, number> = {
+    in_progress: 0,
+    evaluating: 0,
+    waiting_inform: 0,
+    waiting_interview: 0,
+    waiting_start: 0,
+  };
+  const requestCounts: Record<UnitRequestWorkStatus, number> = {
+    in_progress: 0,
+    evaluating: 0,
+    waiting_inform: 0,
+    waiting_interview: 0,
+    waiting_start: 0,
+  };
+  for (const j of jobs) {
+    const status = resolveUnitRequestWorkStatus(j.work_status);
+    const units = positionBreakdownFromJob(j).remainingPositions;
+    if (units <= 0) continue;
+    counts[status] += units;
+    requestCounts[status] += 1;
+  }
+  const total = Object.values(counts).reduce((s, n) => s + n, 0);
+  const totalRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
+  const scopeHint = periodLabel
+    ? `เท่าการ์ดคงเหลือในช่วงที่เลือก`
+    : `เท่าการ์ดคงเหลือ`;
+  const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
+    id,
+    label,
+    value: counts[status],
+    secondaryCount: requestCounts[status],
+    secondaryLabel: 'ใบขอ',
+    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} อัตรา · ${requestCounts[status].toLocaleString('th-TH')} ใบ`,
+    trendPercent: null,
+  });
 
   return [
     {
-      id: 'total_workload',
-      label: periodLabel ? 'ภาระงานรวม' : 'ใบเปิดทั้งหมด',
-      value: summary.totalWorkloadPositions,
-      secondaryCount: summary.totalWorkloadRequests,
+      id: 'work_status_total',
+      label: 'ทั้งหมด',
+      value: total,
+      secondaryCount: totalRequests,
       secondaryLabel: 'ใบขอ',
-      description: periodLabel
-        ? posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests)
-        : `ตรงหน้ารายการหน่วยงาน · ${posReq(summary.totalWorkloadPositions, summary.totalWorkloadRequests)}`,
+      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ (= การ์ดคงเหลือ)`,
       trendPercent: null,
     },
+    leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
+    leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
+    leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
+    leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
+    leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
+  ];
+}
+
+/** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
+function buildStockKpis(jobs: JobRequest[], _periodLabel?: string | null): DashboardKpi[] {
+  let requestPositions = 0;
+  let filledPositions = 0;
+  let cancelledPositions = 0;
+  let remainingPositions = 0;
+  let requestCount = 0;
+  let filledRequestCount = 0;
+  let cancelledRequestCount = 0;
+  let remainingRequestCount = 0;
+
+  for (const j of jobs) {
+    const b = positionBreakdownFromJob(j);
+    requestPositions += b.requestPositions;
+    filledPositions += b.filledPositions;
+    cancelledPositions += b.cancelledPositions;
+    remainingPositions += b.remainingPositions;
+    requestCount += 1;
+    if (b.filledPositions > 0) filledRequestCount += 1;
+    if (b.cancelledPositions > 0) cancelledRequestCount += 1;
+    if (b.remainingPositions > 0) remainingRequestCount += 1;
+  }
+
+  const posReq = (positions: number, requests: number) =>
+    `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
+
+  return [
     {
-      id: 'new_requests',
-      label: 'ขอใหม่งวดนี้',
-      value: summary.newRequestPositions,
-      secondaryCount: summary.newRequestRequests,
+      id: 'total_requests',
+      label: 'เข้ามา',
+      value: requestPositions,
+      secondaryCount: requestCount,
       secondaryLabel: 'ใบขอ',
-      description: posReq(summary.newRequestPositions, summary.newRequestRequests),
+      description: `อัตราที่ขอ · ${posReq(requestPositions, requestCount)}`,
       trendPercent: null,
     },
     {
-      id: 'fulfilled',
-      label: 'หาได้แล้ว',
-      value: summary.filledPositionsThisPeriod,
-      secondaryCount: summary.fulfilledRequestsTouchedThisPeriod,
-      secondaryLabel: 'ใบขอที่มีความคืบหน้า',
-      description: `อัตราหาได้ ${summary.fillRatePercent}% ของภาระงาน${qualitySuffix}`,
-      trendPercent: null,
-    },
-    {
-      id: 'fully_closed',
-      label: 'ปิดครบใบขอ',
-      value: summary.fullyClosedRequestsThisPeriod,
-      secondaryCount: summary.fullyClosedPositionsThisPeriod,
-      secondaryLabel: 'ตำแหน่ง',
-      description: `อัตราปิดครบ ${summary.fullClosureRatePercent}% ของใบขอ`,
+      id: 'closed',
+      label: 'ปิดแล้ว',
+      value: filledPositions,
+      secondaryCount: filledRequestCount,
+      secondaryLabel: 'ใบขอที่มีการหาได้',
+      description: `หาได้แล้ว · ${posReq(filledPositions, filledRequestCount)}`,
       trendPercent: null,
     },
     {
       id: 'cancelled',
       label: 'ยกเลิก',
-      value: summary.cancelledPositionsThisPeriod,
-      secondaryCount: summary.cancelledRequestsThisPeriod,
+      value: cancelledPositions,
+      secondaryCount: cancelledRequestCount,
       secondaryLabel: 'ใบขอ',
-      description: `อัตรายกเลิก ${summary.cancellationRatePercent}% ของภาระงาน`,
+      description: posReq(cancelledPositions, cancelledRequestCount),
       trendPercent: null,
     },
     {
       id: 'remaining',
-      label: 'เหลือหา',
-      value: summary.remainingPositions,
-      secondaryCount: summary.remainingRequests,
+      label: 'คงเหลือ',
+      value: remainingPositions,
+      secondaryCount: remainingRequestCount,
       secondaryLabel: 'ใบขอ',
-      description: periodLabel
-        ? `ใบขอในงวดที่เลือกที่ยังต้องหา · ${posReq(summary.remainingPositions, summary.remainingRequests)}`
-        : `ใบเปิดทั้งหมดที่ยังต้องหา (ตรงหน้ารายการหน่วยงาน) · ${posReq(summary.remainingPositions, summary.remainingRequests)}`,
-      trendPercent: null,
-    },
-    {
-      id: 'sla_risk',
-      label: 'SLA เสี่ยง/เกิน',
-      value: (slaSummary?.atRisk ?? 0) + (slaSummary?.breached ?? 0),
-      secondaryCount: slaSummary?.breached,
-      secondaryLabel: 'เกิน SLA',
-      description: `เสี่ยง ${slaSummary?.atRisk ?? 0} · เกิน ${slaSummary?.breached ?? 0} ใบขอ`,
-      trendPercent: null,
-    },
-    {
-      id: 'backlog_change',
-      label: 'งานค้าง เพิ่ม/ลด',
-      value: summary.netBacklogChange,
-      description:
-        summary.netBacklogChange > 0
-          ? `เพิ่ม ${summary.netBacklogChange} ตำแหน่ง`
-          : summary.netBacklogChange < 0
-            ? `ลด ${Math.abs(summary.netBacklogChange)} ตำแหน่ง`
-            : 'คงที่เทียบต้นงวด',
+      description: `ยังต้องหา · ${posReq(remainingPositions, remainingRequestCount)} · เข้ามา − ปิดแล้ว − ยกเลิก`,
       trendPercent: null,
     },
   ];
@@ -669,41 +767,23 @@ function monthTrendLabel(d: Date, from: string, to: string): string {
 }
 
 function buildActivityTrend(jobs: JobRequest[], from: string, to: string, today = new Date()): DashboardActivityTrendPoint[] {
-  const resignMap = new Map<string, number>();
-  const replaceMap = new Map<string, number>();
-  const increaseMap = new Map<string, number>();
-  const newSiteMap = new Map<string, number>();
-  const otherMap = new Map<string, number>();
-
-  for (const j of jobs) {
-    const ymd = effectiveRequestDateYmd(j, today);
-    if (!ymd || !inYmdRange(ymd, from, to)) continue;
-    const month = ymd.slice(0, 7);
-    const units = jobPositionUnits(j);
-    const kind = classifyLifecycleKind(j);
-    if (kind === 'resignation') resignMap.set(month, (resignMap.get(month) ?? 0) + units);
-    else if (kind === 'replacement') replaceMap.set(month, (replaceMap.get(month) ?? 0) + units);
-    else if (kind === 'increase_headcount') increaseMap.set(month, (increaseMap.get(month) ?? 0) + units);
-    else if (kind === 'new_site') newSiteMap.set(month, (newSiteMap.get(month) ?? 0) + units);
-    else otherMap.set(month, (otherMap.get(month) ?? 0) + units);
-  }
-
+  void jobs;
+  void today;
+  /** โครงรายเดือนว่าง — เติมเข้ามา/ปิด/คงเหลือ + แตกประเภทจาก throughput ใน enrichActivityTrendWithThroughput */
   const points: DashboardActivityTrendPoint[] = [];
   let d = parseISO(`${from.slice(0, 7)}-01`);
   const endMonth = parseISO(`${to.slice(0, 7)}-01`);
   while (d <= endMonth) {
     const month = toYmdLocal(d).slice(0, 7);
-    const increase = increaseMap.get(month) ?? 0;
-    const newSite = newSiteMap.get(month) ?? 0;
-    const other = otherMap.get(month) ?? 0;
     points.push({
       date: `${month}-01`,
       label: monthTrendLabel(d, from, to),
-      resignations: resignMap.get(month) ?? 0,
-      replacements: replaceMap.get(month) ?? 0,
-      newOpenings: increase + newSite + other,
-      increaseHeadcount: increase,
-      newSite,
+      resignations: 0,
+      replacements: 0,
+      newOpenings: 0,
+      increaseHeadcount: 0,
+      newSite: 0,
+      other: 0,
     });
     d = addMonths(d, 1);
   }
@@ -734,25 +814,27 @@ function buildUnitOverview(
   ]);
   const map = new Map<string, { names: string[]; total: number; open: number; overdue: number }>();
   for (const j of jobs) {
+    const rem = positionBreakdownFromJob(j).remainingPositions;
+    if (rem <= 0) continue;
+    if (j.status === 'closed' || j.status === 'cancelled') continue;
     const rawName = j.unit_name?.trim() || '—';
     const key = resolve(rawName);
-    const units = jobPositionUnits(j);
     const row = map.get(key) ?? { names: [], total: 0, open: 0, overdue: 0 };
     row.names.push(rawName);
-    row.total += units;
+    row.total += rem;
+    row.open += rem;
     const st = mapJobToTaskStatus(j, today);
-    if (st !== 'completed' && st !== 'cancelled') row.open += units;
-    if (st === 'overdue') row.overdue += units;
+    if (st === 'overdue') row.overdue += rem;
     map.set(key, row);
   }
-  const totalAll = sumJobPositionUnits(jobs) || 1;
+  const totalAll = [...map.values()].reduce((s, r) => s + r.open, 0) || 1;
   return [...map.entries()]
     .map(([, row]) => ({
       name: pickUnitOrganizationDisplayName(row.names),
       total: row.total,
       open: row.open,
       overdue: row.overdue,
-      sharePercent: Math.round((row.total / totalAll) * 1000) / 10,
+      sharePercent: Math.round((row.open / totalAll) * 1000) / 10,
     }))
     .sort((a, b) => b.open - a.open || b.total - a.total || a.name.localeCompare(b.name, 'th'));
 }
@@ -907,14 +989,17 @@ export function buildDashboardData(
   const periodLabel = period?.label ?? 'ทั้งหมดที่โหลด';
   const previousPeriodLabel = period?.previousLabel ?? '—';
   const trendJobs = trend?.jobs ?? scopedJobs;
-  const trendFrom = trend?.from ?? period?.from ?? '1970-01-01';
-  const trendTo = trend?.to ?? period?.to ?? toYmdLocal(today);
-  const activityTrendLabel = trend?.label ?? periodLabel;
+  const openStockTrend =
+    !trend && !period ? resolveOpenStockTrendRange(openJobSet, today) : null;
+  const trendFrom = trend?.from ?? period?.from ?? openStockTrend?.from ?? toYmdLocal(today);
+  const trendTo = trend?.to ?? period?.to ?? openStockTrend?.to ?? toYmdLocal(today);
+  const activityTrendLabel = trend?.label ?? openStockTrend?.label ?? periodLabel;
   const throughputRecords =
     trend?.throughputRecords ??
     jobsToThroughputRecords(filterJobsForThroughput(trendJobs, trendFrom, trendTo));
-  const activityTrend = enrichActivityTrendWithThroughput(
-    buildActivityTrend(trendJobs, trendFrom, trendTo, today),
+  const activityJobs = period ? trendJobs : openJobSet;
+  let activityTrend = enrichActivityTrendWithThroughput(
+    buildActivityTrend(activityJobs, trendFrom, trendTo, today),
     throughputRecords,
   );
 
@@ -1015,26 +1100,74 @@ export function buildDashboardData(
     period && requestControlSummary
       ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
       : undefined;
-  const priorityWorkQueue = buildPriorityWorkQueue(
-    applyDashboardFilters(workItems, uiFilters),
-    controlRecords,
-    period?.from ?? null,
-  );
+  const priorityWorkQueue: DashboardWorkItem[] = [];
 
-  const allOpenKpiIds = new Set(['total_workload', 'remaining', 'sla_risk']);
-  const kpis = buildControlTowerKpis(
-    requestControlSummary,
-    slaSummary,
-    period?.label ?? null,
-  ).filter((kpi) => (period ? true : allOpenKpiIds.has(kpi.id)));
+  const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
+  const stockScopeHint = period
+    ? `ใบขอที่กรอกในช่วงที่เลือก (รวมปิด/ยกเลิกแล้ว)`
+    : `ใบขอที่กรอกในช่วงแนวโน้ม (รวมปิด/ยกเลิกแล้ว)`;
+  const cohortStock =
+    throughputRecords.length > 0
+      ? sumCohortStockByRequestDate(throughputRecords, periodFrom, periodTo)
+      : null;
+
+  /** โหมดทั้งหมด: คงเหลือ = ที่ต้องหาจริงจากใบเปิดทั้งหมด (ไม่จำกัดแค่ cohort ในช่วงแนวโน้ม) */
+  const openRemainingJobs = (period ? stockJobs : openJobSet).filter((j) => {
+    if (j.status === 'closed' || j.status === 'cancelled') return false;
+    return positionBreakdownFromJob(j).remainingPositions > 0;
+  });
+  let openRemainingPositions = 0;
+  for (const j of openRemainingJobs) {
+    openRemainingPositions += positionBreakdownFromJob(j).remainingPositions;
+  }
+  const openRemainingRequests = openRemainingJobs.length;
+
+  activityTrend = applyOpenQueueRemainingToActivityTrend(activityTrend, openRemainingJobs);
+
+  const kpis =
+    cohortStock != null
+      ? buildStockKpisFromCohort(
+          {
+            ...cohortStock,
+            /** คงเหลือ = ที่ต้องหาจากใบเปิดจริง (ไม่ใช้ยอด remaining จาก throughput ที่รวมใบนอกคิว) */
+            remainingPositions: openRemainingPositions,
+            remainingRequestCount: openRemainingRequests,
+          },
+          stockScopeHint,
+        ).map((kpi) =>
+          !period && kpi.id === 'remaining'
+            ? {
+                ...kpi,
+                description: `อัตราที่ยังต้องหาจากใบเปิดทั้งหมด · ${openRemainingPositions.toLocaleString('th-TH')} อัตรา · ${openRemainingRequests.toLocaleString('th-TH')} ใบขอ`,
+              }
+            : period && kpi.id === 'remaining'
+              ? {
+                  ...kpi,
+                  description: `อัตราที่ยังต้องหาจากใบเปิดที่กรอกในช่วง · ${openRemainingPositions.toLocaleString('th-TH')} อัตรา · ${openRemainingRequests.toLocaleString('th-TH')} ใบขอ`,
+                }
+              : kpi,
+        )
+      : buildStockKpis(stockJobs, period?.label ?? null);
+
+  const workStatusKpis = buildWorkStatusKpis(openRemainingJobs, period?.label ?? null);
+
+  const lifecycleBoard = buildLifecycleBoardFromStockSources({
+    throughputRecords,
+    from: periodFrom,
+    to: periodTo,
+    remainingJobs: openRemainingJobs,
+  });
 
   return {
     kpis,
+    workStatusKpis,
     activityTrend,
-    unitOverview: buildUnitOverview(openJobSet, today, unitScopeNames),
-    ageDaysBreakdown: buildAgeDaysBreakdown(scopedJobs, today),
-    ageDaysRequestTotal: scopedJobs.length,
-    ageDaysPositionTotal: sumJobPositionUnits(scopedJobs),
+    unitOverview: buildUnitOverview(openRemainingJobs, today, unitScopeNames),
+    ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),
+    ageDaysRequestTotal: (period ? stockJobs : openRemainingJobs).length,
+    ageDaysPositionTotal: period
+      ? stockJobs.reduce((sum, j) => sum + positionBreakdownFromJob(j).remainingPositions, 0)
+      : openRemainingPositions,
     closedBreakdown,
     fulfillmentBreakdown,
     requestControlSummary,
@@ -1044,6 +1177,7 @@ export function buildDashboardData(
     slaSummary,
     lifecycleTrend,
     lifecycleInsights,
+    lifecycleBoard,
     flowView,
     executiveInsights,
     priorityWorkQueue,
