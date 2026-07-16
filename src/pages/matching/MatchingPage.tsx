@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -84,6 +84,9 @@ const MatchingPage: React.FC = () => {
   const [proposeError, setProposeError] = useState<string | null>(null);
   // #3 กันเสนอซ้ำ — ซ่อนคนที่เสนอ/จอง/ลงแล้ว
   const [hideProposed, setHideProposed] = useState(false);
+  // #5 pre-warm AI งานด่วนเบื้องหลัง
+  const [prewarming, setPrewarming] = useState(false);
+  const prewarmStartedRef = useRef(false);
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?pool=1')
@@ -93,6 +96,43 @@ const MatchingPage: React.FC = () => {
       })
       .catch(() => {});
   }, []);
+
+  // #5 pre-warm AI แมทงานด่วนล่วงหน้าเบื้องหลัง (~30วิ/ใบ) — เปิดใบด่วนแล้วผลพร้อมทันที
+  // ทำแบบระวัง: เฉพาะงานด่วนที่ใกล้ครบกำหนดสุด, ทีละใบ, จำกัดจำนวน, ข้ามใบที่มีผล/เคยอุ่นแล้ว
+  const PREWARM_LIMIT = 3;
+  useEffect(() => {
+    // รันครั้งเดียวเมื่อ jobs โหลดเสร็จ (กัน re-run จาก jobs อ้างอิงใหม่ทุก render)
+    if (prewarmStartedRef.current || jobs.length === 0) return;
+    prewarmStartedRef.current = true;
+    let cancelled = false;
+    const targets = jobs
+      .filter((j) => j.urgency === 'urgent')
+      .slice()
+      .sort((a, b) => (a.required_date || '').localeCompare(b.required_date || ''))
+      .slice(0, PREWARM_LIMIT);
+    if (targets.length === 0) return;
+
+    const run = async () => {
+      setPrewarming(true);
+      for (const j of targets) {
+        if (cancelled) break;
+        try {
+          const r = await apiFetch(`/api/matching/board-candidates?jobId=${encodeURIComponent(j.id)}`);
+          if (!r.ok) continue;
+          const data = (await r.json()) as BoardMatchResult;
+          if (!cancelled) setBoardMatchById((prev) => (prev[j.id] ? prev : { ...prev, [j.id]: data }));
+        } catch {
+          /* เงียบ — เป็นการอุ่นเครื่องเบื้องหลัง */
+        }
+      }
+      if (!cancelled) setPrewarming(false);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs.length]);
 
   const fetchBoardMatch = async (jobId: string, refresh = false) => {
     setBoardLoadingId(jobId);
@@ -290,6 +330,11 @@ const MatchingPage: React.FC = () => {
             {loadingJobs ? ' · กำลังโหลด…' : ''}
           </p>
           <p className="text-xs text-muted-foreground">· เรียงงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง</p>
+          {prewarming ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+              <RefreshCw className="h-2.5 w-2.5 animate-spin" /> อุ่นเครื่อง AI งานด่วนล่วงหน้า…
+            </span>
+          ) : null}
         </div>
 
         {/* การ์ดรวมใบขอ */}
