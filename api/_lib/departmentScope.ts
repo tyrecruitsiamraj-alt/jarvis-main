@@ -5,24 +5,7 @@ import type { UserRole } from './auth.js';
 const usersTable = tableInAppSchema('users');
 
 /** แผนกที่ล็อกสิทธิ์ใบขอหน่วยงาน (ต้อง sync กับ src/lib/departmentCodes.ts) */
-export const APP_DEPARTMENT_CODES = [
-  'LBD',
-  'LBA',
-  'LBF',
-  'LBH',
-  'LBM',
-  'LBP',
-  'LCA',
-  'LCB',
-  'LCC',
-  'LCD',
-  'LCE',
-  'LCG',
-  'LCP',
-  'LDD',
-  'LDH',
-  'LAH',
-] as const;
+export const APP_DEPARTMENT_CODES = ['SN', 'DS', 'LM', 'LBA', 'LBD'] as const;
 export type AppDepartmentCode = (typeof APP_DEPARTMENT_CODES)[number];
 
 export type DepartmentScope =
