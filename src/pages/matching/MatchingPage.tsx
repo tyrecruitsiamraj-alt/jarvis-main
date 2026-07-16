@@ -200,6 +200,21 @@ const MatchingPage: React.FC = () => {
     return out;
   }, [rows, pool]);
 
+  // #4 dashboard เล็ก — ใบขอด่วน: พร้อมลง (มีคนของเรา) vs ยังไม่มีคน
+  // ใช้ผล AI ที่ยืนยันแล้ว (boardMatchById) ถ้ามี ไม่งั้น fallback เป็น quick count (สกิล, ยังไม่ AI)
+  const urgentSummary = useMemo(() => {
+    const urgent = rows.filter((j) => j.urgency === 'urgent');
+    let ready = 0;
+    let confirmedCount = 0;
+    for (const j of urgent) {
+      const confirmed = boardMatchById[j.id]?.matches.length;
+      if (confirmed != null) confirmedCount++;
+      const hasPeople = confirmed != null ? confirmed > 0 : (quickCounts[j.id] ?? 0) > 0;
+      if (hasPeople) ready++;
+    }
+    return { total: urgent.length, ready, none: urgent.length - ready, confirmedCount };
+  }, [rows, quickCounts, boardMatchById]);
+
   const closeJob = () => setJobDetail(null);
 
   return (
@@ -240,6 +255,31 @@ const MatchingPage: React.FC = () => {
             emptyText="ไม่พบหน่วยงาน"
           />
         </div>
+
+        {/* #4 สรุปงานด่วน: พร้อมลง vs ยังไม่มีคนของเรา */}
+        {urgentSummary.total > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="glass-card rounded-2xl border border-red-200/70 bg-red-50/50 px-3 py-2.5 text-center">
+              <div className="text-lg font-bold tabular-nums text-red-600">{urgentSummary.total}</div>
+              <div className="text-[11px] text-muted-foreground">ใบขอด่วน</div>
+            </div>
+            <div className="glass-card rounded-2xl border border-emerald-200/70 bg-emerald-50/50 px-3 py-2.5 text-center">
+              <div className="text-lg font-bold tabular-nums text-emerald-600">{urgentSummary.ready}</div>
+              <div className="text-[11px] text-muted-foreground">น่าจะมีคนของเรา</div>
+            </div>
+            <div className="glass-card rounded-2xl border border-amber-200/70 bg-amber-50/50 px-3 py-2.5 text-center">
+              <div className="text-lg font-bold tabular-nums text-amber-600">{urgentSummary.none}</div>
+              <div className="text-[11px] text-muted-foreground">ยังไม่มีคน</div>
+            </div>
+          </div>
+        ) : null}
+        {urgentSummary.total > 0 ? (
+          <p className="px-1 text-[11px] text-muted-foreground">
+            {urgentSummary.confirmedCount > 0
+              ? `ยืนยันด้วย AI แล้ว ${urgentSummary.confirmedCount} ใบ · ที่เหลือประมาณจากสกิล (กดใบขอเพื่อให้ AI คัดจริง)`
+              : 'ประมาณการจากสกิล (ยังไม่ผ่าน AI) — กดใบขอเพื่อให้ AI คัดจริง'}
+          </p>
+        ) : null}
 
         <div className="flex items-center gap-2 px-1">
           <p className="text-sm text-muted-foreground">
