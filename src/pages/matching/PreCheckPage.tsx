@@ -30,34 +30,6 @@ import { distributeIrecruitMatchesToBranches } from '@/lib/distributeIrecruitToB
 
 type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
 type Center = { lat: number; lng: number; label: string };
-type MatchingSuggestion = {
-  score: number;
-  level: 'high' | 'medium' | 'low';
-  reasons: string[];
-  candidate: {
-    first_name: string | null;
-    last_name: string | null;
-    phone_number: string | null;
-    age: number | null;
-    sex: string | null;
-    province_name: string | null;
-    district_name: string | null;
-    job_name_th: string | null;
-    process_status_name: string;
-    created_at: string;
-    location_label: string | null;
-  };
-};
-type MatchingSuggestionsPayload = {
-  criteria: {
-    roleHints: string[];
-    genderRequirement: string | null;
-    ageMin: number | null;
-    ageMax: number | null;
-  };
-  totalCandidates: number;
-  suggestions: MatchingSuggestion[];
-};
 type ParsedBranchDemandItem = {
   org_name: string | null;
   branch_name_raw: string;
@@ -89,42 +61,10 @@ function isLikelyBranchSplitCandidate(text: string): boolean {
   return /จำนวน\s*\d+\s*คน|และ|and|Fashion\s*Island|Promenade|สิงห์คอมเพล็กซ์/i.test(text);
 }
 
-function formatMatchReasons(reasons: string[]): { primary: string | null; supporting: string[] } {
-  const cleaned = [...new Set(reasons.map((reason) => reason.trim()).filter(Boolean))];
-  if (cleaned.length === 0) return { primary: null, supporting: [] };
-
-  const positives = cleaned.filter((reason) => !/ไม่ตรง|ไม่ผ่าน|ห่างพื้นที่งาน/.test(reason));
-  const negatives = cleaned.filter((reason) => /ไม่ตรง|ไม่ผ่าน|ห่างพื้นที่งาน/.test(reason));
-  const ordered = [...positives, ...negatives];
-  return {
-    primary: ordered[0] || null,
-    supporting: ordered.slice(1, 4),
-  };
-}
-
 function preCheckReturnPath(jobId?: string | null): string {
   return jobId
     ? `/matching/pre-check?jobId=${encodeURIComponent(jobId)}`
     : '/matching/pre-check';
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  if (items.length === 0) return [];
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (nextIndex < items.length) {
-      const current = nextIndex;
-      nextIndex += 1;
-      results[current] = await fn(items[current]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
 }
 
 const PreCheckPage: React.FC = () => {
@@ -143,11 +83,6 @@ const PreCheckPage: React.FC = () => {
   const [hint, setHint] = useState('');
   const [appliedCenter, setAppliedCenter] = useState<Center | null>(null);
   const [appliedTextQuery, setAppliedTextQuery] = useState('');
-  const [matchingLoading, setMatchingLoading] = useState(false);
-  const [matchingError, setMatchingError] = useState<string | null>(null);
-  const [matchingData, setMatchingData] = useState<MatchingSuggestionsPayload | null>(null);
-  const [jobMatchCounts, setJobMatchCounts] = useState<Record<string, number>>({});
-  const [jobMatchCountsLoading, setJobMatchCountsLoading] = useState(false);
   const [branchParseLoading, setBranchParseLoading] = useState(false);
   const [branchParseData, setBranchParseData] = useState<ParsedBranchDemandPayload | null>(null);
   const [branchParserOverride, setBranchParserOverride] = useState('');
@@ -203,21 +138,6 @@ const PreCheckPage: React.FC = () => {
     if (!jobMatchById[j.id] && jobMatchLoadingId !== j.id) {
       void fetchIrecruitMatch(j.id);
     }
-  };
-
-  const openCandidatePrefill = (candidate: MatchingSuggestion['candidate']) => {
-    const params = new URLSearchParams();
-    if (candidate.first_name) params.set('first_name', candidate.first_name);
-    if (candidate.last_name) params.set('last_name', candidate.last_name);
-    if (candidate.phone_number) params.set('phone', candidate.phone_number);
-    if (candidate.age !== null) params.set('age', String(candidate.age));
-    if (candidate.sex) params.set('sex', candidate.sex);
-    if (candidate.province_name) params.set('province', candidate.province_name);
-    if (candidate.district_name) params.set('district', candidate.district_name);
-    if (candidate.location_label) params.set('location_label', candidate.location_label);
-    if (candidate.job_name_th) params.set('job_name', candidate.job_name_th);
-    params.set('returnTo', preCheckReturnPath(jobDetail?.id));
-    navigate(`/matching/candidates/add?${params.toString()}`);
   };
 
   const openIrecruitPrefill = (match: IrecruitCandidateMatch, why?: string) => {
@@ -446,41 +366,6 @@ const PreCheckPage: React.FC = () => {
   const filteredRows = precheckResult.rows;
 
   useEffect(() => {
-    const rowsToFetch = filteredRows.slice(0, 12);
-    if (rowsToFetch.length === 0) {
-      setJobMatchCounts({});
-      setJobMatchCountsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setJobMatchCountsLoading(true);
-    mapWithConcurrency(rowsToFetch, 3, async ({ job }) => {
-      try {
-        const params = new URLSearchParams({
-          jobId: job.id,
-          limit: '20',
-          poolSize: '120',
-        });
-        const r = await apiFetch(`/api/matching/suggestions?${params.toString()}`);
-        if (!r.ok) return [job.id, 0] as const;
-        const data = (await r.json()) as MatchingSuggestionsPayload;
-        return [job.id, data.suggestions.length] as const;
-      } catch {
-        return [job.id, 0] as const;
-      }
-    }).then((entries) => {
-      if (cancelled) return;
-      setJobMatchCounts(Object.fromEntries(entries));
-      setJobMatchCountsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [filteredRows]);
-
-  useEffect(() => {
     if (precheckResult.fallbackFromRadius) {
       setHint('ไม่เจอผลตรงเงื่อนไขทั้งหมด — แสดงงานที่ใกล้หรือเกี่ยวข้องที่สุดแทน');
     }
@@ -499,50 +384,12 @@ const PreCheckPage: React.FC = () => {
 
   useEffect(() => {
     if (!jobDetail) {
-      setMatchingLoading(false);
-      setMatchingError(null);
-      setMatchingData(null);
       setBranchParseLoading(false);
       setBranchParseData(null);
       setBranchParserOverride('');
       setSavingBranchOverride(false);
       setBranchOverrideMsg(null);
-      return;
     }
-
-    let cancelled = false;
-    setMatchingLoading(true);
-    setMatchingError(null);
-    setMatchingData(null);
-
-    const detailParams = new URLSearchParams({
-      jobId: jobDetail.id,
-      limit: '10',
-      poolSize: '200',
-    });
-    apiFetch(`/api/matching/suggestions?${detailParams.toString()}`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const data = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
-          throw new Error(data.detail || data.error || 'โหลดรายชื่อแนะนำไม่สำเร็จ');
-        }
-        return (await r.json()) as MatchingSuggestionsPayload;
-      })
-      .then((data) => {
-        if (!cancelled) setMatchingData(data);
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setMatchingError(e instanceof Error ? e.message : 'โหลดรายชื่อแนะนำไม่สำเร็จ');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setMatchingLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, [jobDetail]);
 
   useEffect(() => {
@@ -635,10 +482,8 @@ const PreCheckPage: React.FC = () => {
     if (status === 'high_confidence') {
       return { label: 'มั่นใจสูง', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
     }
-    if (status === 'fallback') {
-      return { label: 'fallback/เดา', className: 'border-amber-200 bg-amber-50 text-amber-700' };
-    }
-    return { label: 'ยังไม่แตกสาขา', className: 'border-slate-200 bg-slate-50 text-slate-600' };
+    // ไม่โชว์ป้าย fallback/เดา — เงียบไว้ให้ดูผลสาขาอย่างเดียว
+    return null;
   }, [branchParseData?.parsed.parser_status]);
   const shouldShowBranchOverrideEditor = useMemo(() => {
     if (!jobDetail || !branchParseData) return false;
@@ -904,7 +749,7 @@ const PreCheckPage: React.FC = () => {
             <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
               <p className="text-sm font-medium text-foreground">รายการด้านล่างคือใบงานเปิดจาก ERP</p>
               <p className="text-xs text-muted-foreground mt-1">
-                เรียงงานด่วนขึ้นก่อน และสามารถกดเข้าไปดูรายละเอียดพร้อมรายชื่อคนที่ระบบแนะนำได้
+                เรียงงานด่วนขึ้นก่อน กดเข้าไปดูรายละเอียดและผู้สมัครที่ AI แนะนำได้
               </p>
             </div>
           )}
@@ -950,21 +795,19 @@ const PreCheckPage: React.FC = () => {
                     {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
                   </span>
                   <div className="flex items-center gap-1">
-                    <span
-                      title="จำนวนผู้สมัคร iRecruit ที่ตำแหน่งใกล้เคียงกับใบขอนี้"
-                      className={cn(
-                        'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                        jobMatchCountsLoading && jobMatchCounts[j.id] == null
-                          ? 'border-slate-200 bg-slate-50 text-slate-500'
-                          : (jobMatchCounts[j.id] ?? 0) > 0
+                    {jobMatchById[j.id] ? (
+                      <span
+                        title="จำนวนผู้สมัครที่ AI แมทจาก iRecruit"
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                          jobMatchById[j.id].matches.length > 0
                             ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                             : 'border-amber-100 bg-amber-50 text-amber-700',
-                      )}
-                    >
-                      {jobMatchCountsLoading && jobMatchCounts[j.id] == null
-                        ? '…'
-                        : `ตรง ${jobMatchCounts[j.id] ?? 0}`}
-                    </span>
+                        )}
+                      >
+                        AI {jobMatchById[j.id].matches.length}
+                      </span>
+                    ) : null}
                     <span
                       title={
                         distanceKm !== null
@@ -1227,9 +1070,11 @@ const PreCheckPage: React.FC = () => {
                       <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-foreground">แตกสาขาจากข้อความ ERP</p>
-                      <Badge variant="outline" className={branchParserStatusMeta.className}>
-                        {branchParserStatusMeta.label}
-                      </Badge>
+                      {branchParserStatusMeta ? (
+                        <Badge variant="outline" className={branchParserStatusMeta.className}>
+                          {branchParserStatusMeta.label}
+                        </Badge>
+                      ) : null}
                     </div>
                     {shouldShowBranchOverrideEditor ? (
                       <div className="space-y-2">
@@ -1366,16 +1211,6 @@ const PreCheckPage: React.FC = () => {
                             </div>
                           </div>
                         ) : null}
-                        {branchParseData.parsed.parser_status === 'fallback' ? (
-                          <div className="text-xs text-amber-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            เคสนี้ระบบแยกแบบ fallback/เดาได้ ควรตรวจชื่อสาขาและจำนวนคนก่อนใช้งานจริง
-                          </div>
-                        ) : null}
-                        {branchParseData.parsed.unparsed_segments.length > 0 ? (
-                          <div className="text-xs text-amber-700 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            ยังแยกไม่สำเร็จบางส่วน: {branchParseData.parsed.unparsed_segments.join(' | ')}
-                          </div>
-                        ) : null}
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground">
@@ -1446,119 +1281,6 @@ const PreCheckPage: React.FC = () => {
                         </div>
                       </>
                     )}
-                  </div>
-                  <div className="border-t border-border pt-3">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">คนที่ระบบแนะนำ</p>
-                        <p className="text-xs text-muted-foreground">
-                          ใช้กติกาเบื้องต้นจากตำแหน่งงาน เพศ อายุ และจังหวัด/อำเภอ
-                        </p>
-                      </div>
-                      {matchingData ? (
-                        <span className="text-xs rounded-full bg-blue-50 text-blue-700 px-2 py-1 border border-blue-100">
-                          เจอ {matchingData.suggestions.length} / {matchingData.totalCandidates}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {matchingLoading ? (
-                      <div className="text-xs text-muted-foreground">กำลังหารายชื่อที่แนะนำ…</div>
-                    ) : matchingError ? (
-                      <div className="text-xs text-destructive rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
-                        {matchingError}
-                      </div>
-                    ) : matchingData ? (
-                      <div className="space-y-2">
-                        <div className="text-xs text-muted-foreground rounded-lg bg-white/40 border border-white/70 px-3 py-2">
-                          เงื่อนไข: {matchingData.criteria.roleHints.join(', ') || '—'}
-                          {matchingData.criteria.genderRequirement ? ` • เพศ ${matchingData.criteria.genderRequirement}` : ''}
-                          {matchingData.criteria.ageMin !== null || matchingData.criteria.ageMax !== null
-                            ? ` • อายุ ${matchingData.criteria.ageMin ?? '—'}-${matchingData.criteria.ageMax ?? '—'}`
-                            : ''}
-                        </div>
-                        {matchingData.suggestions.length === 0 ? (
-                          <div className="text-xs text-muted-foreground rounded-lg border border-dashed border-white/70 px-3 py-3">
-                            ยังไม่เจอคนที่เข้าเงื่อนไขเบื้องต้นสำหรับใบงานนี้
-                          </div>
-                        ) : (
-                          matchingData.suggestions.map((item, idx) => {
-                            const fullName = [item.candidate.first_name, item.candidate.last_name].filter(Boolean).join(' ') || 'ไม่ระบุชื่อ';
-                            const levelClass =
-                              item.level === 'high'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                : item.level === 'medium'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                  : 'bg-slate-50 text-slate-700 border-slate-100';
-                            return (
-                              <div key={`${fullName}-${idx}`} className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
-                                {(() => {
-                                  const reasonInfo = formatMatchReasons(item.reasons);
-                                  return (
-                                    <>
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <button
-                                      type="button"
-                                      onClick={() => openCandidatePrefill(item.candidate)}
-                                      className="text-left text-sm font-medium text-blue-600 hover:underline underline-offset-2"
-                                    >
-                                      {fullName}
-                                    </button>
-                                    <p className="text-xs text-muted-foreground">
-                                      {item.candidate.job_name_th || 'ไม่ระบุตำแหน่ง'} • {item.candidate.location_label || 'ไม่ระบุพื้นที่'}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className={cn('inline-flex rounded-full border px-2 py-1 text-xs font-medium', levelClass)}>
-                                      {item.score} คะแนน
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground mt-1">
-                                      {item.candidate.process_status_name}
-                                    </p>
-                                  </div>
-                                </div>
-                                {reasonInfo.primary ? (
-                                  <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2">
-                                    <p className="text-[11px] font-semibold text-blue-700">เหตุผลที่แนะนำ</p>
-                                    <p className="mt-0.5 text-xs text-blue-800">{reasonInfo.primary}</p>
-                                    {reasonInfo.supporting.length > 0 ? (
-                                      <div className="mt-1 flex flex-wrap gap-1.5">
-                                        {reasonInfo.supporting.map((reason) => (
-                                          <span
-                                            key={reason}
-                                            className="rounded-full border border-blue-100 bg-white px-2 py-0.5 text-[11px] text-blue-700"
-                                          >
-                                            {reason}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                ) : null}
-                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
-                                  {item.candidate.phone_number ? <span>โทร: {item.candidate.phone_number}</span> : null}
-                                  {item.candidate.age !== null ? <span>อายุ: {item.candidate.age}</span> : null}
-                                  {item.candidate.sex ? <span>เพศ: {item.candidate.sex}</span> : null}
-                                </div>
-                                <div className="pt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => openCandidatePrefill(item.candidate)}
-                                    className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                                  >
-                                    ดู/ลงข้อมูลต่อ
-                                  </button>
-                                </div>
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    ) : null}
                   </div>
                   {client?.contact_phone ? (
                     <div className="flex gap-2 pt-2">

@@ -39,7 +39,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
 
-// ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
+// ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์ — ไม่โชว์บนหน้า login
 const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {

@@ -86,3 +86,33 @@ export function scoreMatch(
   const percent = total > 0 ? Math.round((earned / total) * 100) : 0;
   return { percent, gender, age, areaRank: rank, areaLabel: area.reason };
 }
+
+function verdictLabel(v: CriterionVerdict): string {
+  if (v === 'pass') return 'ตรงเกณฑ์';
+  if (v === 'fail') return 'ไม่ตรงเกณฑ์';
+  return 'ไม่นับ (ใบขอไม่ระบุ / ไม่มีข้อมูล)';
+}
+
+/** ข้อความอธิบายองค์ประกอบคะแนน % — ใช้โชว์ตอนชี้เมาส์ที่สกอร์ */
+export function describeScoreBreakdown(score: MatchCriteriaScore): string[] {
+  const areaPts = AREA_SCORE_BY_RANK[Math.max(0, Math.min(4, score.areaRank))] ?? 0;
+  const lines = [
+    `คะแนนรวม ${score.percent}%`,
+    `พื้นที่ (${areaPts}/${WEIGHT_AREA}): ${score.areaLabel}`,
+  ];
+  if (score.gender !== 'na') {
+    lines.push(
+      `เพศ (${score.gender === 'pass' ? WEIGHT_GENDER : 0}/${WEIGHT_GENDER}): ${verdictLabel(score.gender)}`,
+    );
+  } else {
+    lines.push(`เพศ: ${verdictLabel('na')}`);
+  }
+  if (score.age !== 'na') {
+    lines.push(
+      `อายุ (${score.age === 'pass' ? WEIGHT_AGE : 0}/${WEIGHT_AGE}): ${verdictLabel(score.age)}`,
+    );
+  } else {
+    lines.push(`อายุ: ${verdictLabel('na')}`);
+  }
+  return lines;
+}
