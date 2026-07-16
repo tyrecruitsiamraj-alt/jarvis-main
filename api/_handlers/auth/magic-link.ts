@@ -17,6 +17,9 @@ import {
   isCompanyEmail,
 } from '../../_lib/companyEmail.js';
 import { logError } from '../../_lib/logger.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 const GENERIC_MAGIC_LINK_MESSAGE =
   'หากมีบัญชีอีเมลบริษัทนี้ในระบบ เราได้ส่งลิงก์เข้าสู่ระบบไปแล้ว กรุณาตรวจสอบอีเมลของคุณ';
@@ -59,7 +62,7 @@ async function magicLinkHandler(req: ApiReq, res: ApiRes) {
     const lookup = await dbQuery<{ id: string; is_active: boolean }>(
       `
       select id, is_active
-      from users
+      from ${usersTable}
       where lower(email) = lower($1)
       limit 1
     `,

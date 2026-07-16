@@ -9,6 +9,9 @@ import {
 } from '../../_lib/http.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
 import { auditFromAuthed } from '../../_lib/audit.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 type UserRow = {
   id: string;
@@ -44,7 +47,7 @@ async function changePasswordHandler(req: AuthedReq, res: ApiRes) {
     const { rows } = await dbQuery<UserRow>(
       `
       select id, password_hash, is_active
-      from users
+      from ${usersTable}
       where id = $1
       limit 1
     `,
@@ -63,7 +66,7 @@ async function changePasswordHandler(req: AuthedReq, res: ApiRes) {
     const nextHash = await hashPassword(newPassword);
     await dbQuery(
       `
-      update users
+      update ${usersTable}
       set password_hash = $1
       where id = $2
     `,

@@ -40,6 +40,7 @@ import DriverCareResources from "@/pages/driver-care/DriverCareResources";
 import SupervisorDashboard from "@/pages/dashboard/SupervisorDashboard";
 import AdminSettings from "@/pages/settings/AdminSettings";
 import ChangePasswordPage from "@/pages/ChangePasswordPage";
+import FeedbackPage from "@/pages/feedback/FeedbackPage";
 import NotFound from "./pages/NotFound";
 import RoleHubPage from "./pages/RoleHubPage";
 import RequireRole from "@/components/auth/RequireRole";
@@ -98,6 +99,7 @@ const ProtectedRoutes = () => {
           <Route path="/dashboard" element={<SupervisorDashboard />} />
           <Route path="/settings" element={<AdminSettings />} />
           <Route path="/account/change-password" element={<ChangePasswordPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="*" element={<NotFound />} />
           </Routes>
         </RequireRole>

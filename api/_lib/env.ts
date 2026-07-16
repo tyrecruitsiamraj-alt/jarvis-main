@@ -113,7 +113,14 @@ export function isPgSslEnabled(): boolean {
  * ใช้ PGSCHEMA หรือ DATABASE_SCHEMA
  */
 export function getPgSchema(): string | null {
-  const s = (process.env.PGSCHEMA || process.env.DATABASE_SCHEMA || '').trim();
+  let s = (process.env.PGSCHEMA || process.env.DATABASE_SCHEMA || '').trim();
+  // Vercel / .env บางทีใส่ค่าเป็น "jarvis_rm" รวมเครื่องหมายคำพูด — ต้องถอดออก
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
   if (!s) return null;
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(s)) return null;
   return s;

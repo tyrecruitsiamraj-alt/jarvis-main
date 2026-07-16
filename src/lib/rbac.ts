@@ -45,6 +45,7 @@ const ROUTE_RULES: RouteRule[] = [
   { match: (p) => p === '/settings' || p.startsWith('/settings/'), minimumRole: 'admin', note: 'settings' },
   { match: (p) => p === '/supervisor', minimumRole: 'supervisor', note: 'supervisor hub' },
   { match: (p) => p === '/wl/employees/add', minimumRole: 'supervisor', note: 'create employee' },
+  { match: (p) => p === '/feedback' || p.startsWith('/feedback/'), minimumRole: 'opl', note: 'app feedback' },
 ];
 
 export function minimumRoleForPath(pathname: string): UserRole {

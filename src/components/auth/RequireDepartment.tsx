@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -69,7 +69,7 @@ const RequireDepartment: React.FC<{ children: React.ReactNode }> = ({ children }
               <option value="">— เลือกแผนก —</option>
               {APP_DEPARTMENT_CODES.map((code) => (
                 <option key={code} value={code}>
-                  {code}
+                  {APP_DEPARTMENT_LABELS[code]}
                 </option>
               ))}
             </select>

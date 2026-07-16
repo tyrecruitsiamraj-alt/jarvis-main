@@ -14,10 +14,8 @@ export function isReadOnlyRole(role: UserRole): boolean {
 
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
   if (userRole === 'opl') {
+    // OPL = read-only viewer: only pass routes/APIs whose minimum is staff or opl
     return minimum === 'staff' || minimum === 'opl';
-  }
-  if (minimum === 'opl') {
-    return userRole === 'opl';
   }
   return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minimum];
 }
@@ -49,7 +47,8 @@ export type ApiResource =
   | 'matching-candidate-spec'
   | 'matching-irecruit-candidates'
   | 'matching-board-candidates'
-  | 'diagnostics-outbound-ip';
+  | 'diagnostics-outbound-ip'
+  | 'app-feedback';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -143,6 +142,11 @@ export function minimumRoleFor(
     case 'matching-board-candidates':
       return 'staff';
 
+    case 'app-feedback':
+      // ทุกคนที่ login แล้วส่งคำขอได้ (รวม OPL); จัดการสถานะ = supervisor+
+      if (isRead || m === 'POST') return 'opl';
+      return 'supervisor';
+
     default:
       return 'admin';
   }
@@ -158,7 +162,10 @@ export function checkApiAccess(
   const isRead = m === 'GET' || m === 'HEAD';
 
   if (isReadOnlyRole(userRole) && !isRead) {
-    return { ok: false, message: 'Read-only role (opl)' };
+    // OPL ส่งคำขอ/แจ้งบัคได้
+    if (!(resource === 'app-feedback' && m === 'POST')) {
+      return { ok: false, message: 'Read-only role (opl)' };
+    }
   }
 
   const minimum = minimumRoleFor(resource, method, hint);

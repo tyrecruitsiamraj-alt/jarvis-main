@@ -691,9 +691,9 @@ const JobListPage: React.FC = () => {
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
                     <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -714,9 +714,9 @@ const JobListPage: React.FC = () => {
                         <Skeleton className="h-3 w-20" />
                         <Skeleton className="h-3 w-20" />
                       </td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
-                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
                       <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-16 rounded-full mx-auto" /></td>
+                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -848,9 +848,9 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                 </tr>
               </thead>
 
@@ -903,12 +903,6 @@ const JobListPage: React.FC = () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 max-w-[200px]">
-                      <UnitRequestNotePreview note={j.list_note} />
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <UnitRequestReplacementBadge value={j.send_replacement} compact />
-                    </td>
                     <td className="px-3 py-3 text-center">
                       <div className="inline-flex flex-col items-center gap-1">
                         <UnitRequestWorkStatusBadge
@@ -920,6 +914,12 @@ const JobListPage: React.FC = () => {
                         />
                         <JobUrgencyBadge job={j} compact />
                       </div>
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <UnitRequestReplacementBadge value={j.send_replacement} compact />
+                    </td>
+                    <td className="px-3 py-2 max-w-[200px]">
+                      <UnitRequestNotePreview note={j.list_note} />
                     </td>
                   </tr>
                 ))}

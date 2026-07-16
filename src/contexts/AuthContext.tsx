@@ -276,6 +276,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               : 'Register failed';
         return msg;
       }
+      const rawUser = data.user as Record<string, unknown> | undefined;
+      const u = rawUser ? mapApiUser(rawUser) : null;
+      if (u) {
+        setUser(u);
+        void refreshJobStaffFromApi();
+        void refreshWorkCalendarFromApi();
+      }
       return null;
     },
     [],

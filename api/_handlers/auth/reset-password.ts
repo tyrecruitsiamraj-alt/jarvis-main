@@ -10,6 +10,9 @@ import { readJsonBody, getString } from '../../_lib/body.js';
 import { consumePasswordResetToken } from '../../_lib/passwordReset.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 async function resetPasswordHandler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'POST').toUpperCase();
@@ -43,7 +46,7 @@ async function resetPasswordHandler(req: ApiReq, res: ApiRes) {
     const password_hash = await hashPassword(newPassword);
     await dbQuery(
       `
-      update users
+      update ${usersTable}
       set password_hash = $1, updated_at = now()
       where id = $2 and is_active = true
     `,

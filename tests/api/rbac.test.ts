@@ -61,7 +61,18 @@ describe('api rbac matrix', () => {
     expect(meetsMinimumRole('staff', 'admin')).toBe(false);
     expect(meetsMinimumRole('opl', 'staff')).toBe(true);
     expect(meetsMinimumRole('opl', 'supervisor')).toBe(false);
-    expect(meetsMinimumRole('staff', 'opl')).toBe(false);
+    expect(meetsMinimumRole('staff', 'opl')).toBe(true);
+    expect(meetsMinimumRole('supervisor', 'opl')).toBe(true);
+  });
+
+  it('app-feedback: all logged-in roles can read/submit; only supervisor+ manages status', () => {
+    expect(checkApiAccess('staff', 'app-feedback', 'GET').ok).toBe(true);
+    expect(checkApiAccess('staff', 'app-feedback', 'POST').ok).toBe(true);
+    expect(checkApiAccess('staff', 'app-feedback', 'PATCH').ok).toBe(false);
+    expect(checkApiAccess('opl', 'app-feedback', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'app-feedback', 'POST').ok).toBe(true);
+    expect(checkApiAccess('opl', 'app-feedback', 'PATCH').ok).toBe(false);
+    expect(checkApiAccess('supervisor', 'app-feedback', 'PATCH').ok).toBe(true);
   });
 });
 
@@ -109,6 +120,9 @@ describe('frontend route rbac', () => {
     expect(minimumRoleForPath('/settings')).toBe('admin');
     expect(minimumRoleForPath('/dashboard')).toBe('staff');
     expect(minimumRoleForPath('/matching/candidates')).toBe('staff');
+    expect(minimumRoleForPath('/feedback')).toBe('opl');
+    expect(canAccessPath('staff', '/feedback')).toBe(true);
+    expect(canAccessPath('opl', '/feedback')).toBe(true);
   });
 
   it('dashboard and edit/assign helpers', () => {

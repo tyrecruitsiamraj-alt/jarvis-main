@@ -19,7 +19,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { isValidEnglishName, sanitizeEnglishName } from '@/lib/englishName';
-import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
@@ -155,16 +155,6 @@ const LoginPage: React.FC = () => {
       });
       if (msg) {
         setError(msg);
-        return;
-      }
-      const loginMsg = await signIn(email, password);
-      if (loginMsg) {
-        setAuthMode('login');
-        setFirstName('');
-        setLastName('');
-        setDepartmentCode('');
-        setPassword('');
-        setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
         return;
       }
       navigate('/', { replace: true });
@@ -424,7 +414,7 @@ const LoginPage: React.FC = () => {
                     <option value="">— เลือกแผนก —</option>
                     {APP_DEPARTMENT_CODES.map((code) => (
                       <option key={code} value={code}>
-                        {code}
+                        {APP_DEPARTMENT_LABELS[code]}
                       </option>
                     ))}
                   </select>
