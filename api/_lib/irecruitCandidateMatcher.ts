@@ -11,6 +11,7 @@ import {
   getCachedCandidateSpec,
   type CandidateSpecAnalysis,
 } from './candidateSpecAnalyzer.js';
+import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
 
 export type IrecruitCandidateMatch = {
   id: number;
@@ -138,7 +139,8 @@ function buildMatchPrompt(
 - green = ตำแหน่งตรงหรือใกล้มาก (อยู่ Job Family เดียวกัน/adjacent tier เขียว) เสนอได้ทันที
 - yellow = พอเป็นไปได้ แต่ต้องเช็ค/เทรนเพิ่ม (adjacent เหลือง)
 - red = ห่างไกล คนละสายงาน — ใส่เฉพาะถ้าจำเป็น
-ห้ามแต่งข้อมูลผู้สมัครที่ไม่ได้ให้มา ตอบ JSON เท่านั้น`;
+ถ้าผู้สมัครสกิลคนละสายงานกับใบขอชัดเจน (เช่น คนขับรถ กับ งานอ่านมาตร/ธุรการ/ช่างเทคนิค) ห้ามฝืนให้ tier green/yellow เด็ดขาด ต้องให้เป็น red หรือไม่ใส่ในผลลัพธ์เลย
+ในเหตุผล (reason) ห้ามระบุรายละเอียดที่ไม่ได้อยู่ในข้อมูลที่ให้มา (เช่น ประเภทรถ ยี่ห้อ รุ่น ใบรับรอง) ใช้ได้เฉพาะฟิลด์ที่ให้จริง: ตำแหน่งที่สมัคร/เพศ/อายุ/ใบขับขี่/พื้นที่ ตอบ JSON เท่านั้น`;
 
   const cand = shortlist
     .map((c, i) => {
@@ -225,17 +227,10 @@ export async function matchIrecruitCandidatesForJob(
     .map((c) => ({ c, s: prescore(c, terms, jobTitle) }))
     .sort((a, b) => b.s - a.s);
 
-  const withScore = scored.filter((x) => x.s > 0).slice(0, SHORTLIST_SIZE);
-  // ถ้ามีคนตรงน้อยกว่าครึ่ง เติมด้วยคนล่าสุดให้ AI ได้ตัวเลือกกว้างขึ้น
-  const shortlistItems =
-    withScore.length >= Math.floor(SHORTLIST_SIZE / 2)
-      ? withScore
-      : [
-          ...withScore,
-          ...scored
-            .filter((x) => x.s === 0)
-            .slice(0, SHORTLIST_SIZE - withScore.length),
-        ];
+  // family ของใบขอ (จาก AI candidate-spec ถ้ามี ไม่งั้น classify จากชื่อตำแหน่ง) — กันเติม shortlist ข้าม family
+  // เช่น ค้นด้วยคีย์เวิร์ดไม่เจอใครเลย fallback เป็นคนล่าสุด ต้องไม่ฝืนส่งคนละสายงานให้ AI เลือก
+  const family = isJobFamilyCode(spec.job_family_code) ? spec.job_family_code : classifyJobFamily(jobTitle);
+  const shortlistItems = selectShortlist(scored, SHORTLIST_SIZE, family, candidateText);
   const shortlist = shortlistItems.map((x) => x.c);
   const scoreById = new Map(shortlistItems.map((x) => [x.c.id, x.s]));
 
@@ -264,6 +259,7 @@ export async function matchIrecruitCandidatesForJob(
         format: 'json',
         think: false,
         timeoutMs: 180_000,
+        temperature: 0.15,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },

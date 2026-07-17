@@ -44,6 +44,41 @@ function escapeControlCharsInStrings(text: string): string {
   return out;
 }
 
+/**
+ * ตัดขยะท้ายข้อความออก (เช่น ``` ปิด code fence, วงเล็บปิดเกิน) —
+ * สแกนหาตำแหน่งที่ object ชั้นนอกสุดปิดสมบูรณ์ครั้งแรก (depth กลับเป็น 0) แล้วตัดทิ้งส่วนที่เหลือ
+ * ต่างจาก closeTruncatedJson ที่ "เติม" วงเล็บที่ขาด — ฟังก์ชันนี้ "ตัด" ตัวอักษรเกินที่โมเดลใส่มาเผลอ
+ */
+function extractBalancedObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null; // ไม่เคยปิดสนิท (โดนตัดกลางทาง) — ปล่อยให้ closeTruncatedJson จัดการแทน
+}
+
 /** output โดนตัด → ปิด string ที่ค้าง + เติม ]/} ที่ขาด */
 function closeTruncatedJson(text: string): string {
   const stack: string[] = [];
@@ -82,9 +117,11 @@ function closeTruncatedJson(text: string): string {
  */
 export function parseLenientJson<T = Record<string, unknown>>(text: string): T {
   const trimmed = text.trim();
-  const candidates = [trimmed, trimmed.match(/\{[\s\S]*\}/)?.[0]].filter(
-    (c): c is string => Boolean(c),
-  );
+  const candidates = [
+    trimmed,
+    extractBalancedObject(trimmed),
+    trimmed.match(/\{[\s\S]*\}/)?.[0],
+  ].filter((c): c is string => Boolean(c));
   for (const candidate of candidates) {
     const ctrl = escapeControlCharsInStrings(candidate);
     const escaped = repairJsonEscapes(ctrl);

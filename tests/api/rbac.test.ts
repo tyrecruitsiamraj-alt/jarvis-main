@@ -65,6 +65,15 @@ describe('api rbac matrix', () => {
     expect(meetsMinimumRole('supervisor', 'opl')).toBe(true);
   });
 
+  it('matching-proposals and matching-job-postings: staff can read/write, opl is read-only', () => {
+    expect(checkApiAccess('staff', 'matching-proposals', 'POST').ok).toBe(true);
+    expect(checkApiAccess('staff', 'matching-proposals', 'PATCH').ok).toBe(true);
+    expect(checkApiAccess('opl', 'matching-proposals', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'matching-proposals', 'POST').ok).toBe(false);
+    expect(checkApiAccess('staff', 'matching-job-postings', 'POST').ok).toBe(true);
+    expect(checkApiAccess('opl', 'matching-job-postings', 'PATCH').ok).toBe(false);
+  });
+
   it('app-feedback: all logged-in roles can read/submit; only supervisor+ manages status', () => {
     expect(checkApiAccess('staff', 'app-feedback', 'GET').ok).toBe(true);
     expect(checkApiAccess('staff', 'app-feedback', 'POST').ok).toBe(true);

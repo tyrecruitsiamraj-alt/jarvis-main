@@ -7,6 +7,7 @@ import {
   getCachedCandidateSpec,
   type CandidateSpecAnalysis,
 } from './candidateSpecAnalyzer.js';
+import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -114,7 +115,8 @@ function buildMatchPrompt(
 - green = สกิลตรงหรือใกล้มาก ลงงานได้ทันที
 - yellow = พอเป็นไปได้ ต้องเช็ค (สกิลข้างเคียง/พื้นที่ไกล/เงินเดือนขอสูงกว่า)
 - red = ห่างไกล — ใส่เฉพาะถ้าจำเป็น
-ห้ามแต่งข้อมูลที่ไม่ได้ให้มา ตอบ JSON เท่านั้น`;
+ถ้าคนในรายชื่อสกิลคนละสายงานกับใบขอชัดเจน (เช่น คนขับรถ กับ งานอ่านมาตร/ธุรการ/ช่างเทคนิค) ห้ามฝืนให้ tier green/yellow เด็ดขาด ต้องให้เป็น red หรือไม่ใส่ในผลลัพธ์เลย
+ในเหตุผล (reason) ห้ามระบุรายละเอียดที่ไม่ได้อยู่ในข้อมูลที่ให้มา (เช่น ประเภทรถ ยี่ห้อ รุ่น ใบรับรอง) ใช้ได้เฉพาะฟิลด์ที่ให้จริง: สกิล/เพศ/อายุ/เงินเดือนขอ/พื้นที่ ตอบ JSON เท่านั้น`;
 
   const income = job.total_income != null ? Number(job.total_income) : null;
   const cand = shortlist
@@ -191,11 +193,10 @@ export async function matchBoardCandidatesForJob(
     .map((c) => ({ c, s: prescore(c, terms, jobTitle) }))
     .sort((a, b) => b.s - a.s);
 
-  const withScore = scored.filter((x) => x.s > 0).slice(0, SHORTLIST_SIZE);
-  const shortlistItems =
-    withScore.length >= Math.floor(SHORTLIST_SIZE / 2)
-      ? withScore
-      : [...withScore, ...scored.filter((x) => x.s === 0).slice(0, SHORTLIST_SIZE - withScore.length)];
+  // family ของใบขอ (จาก AI candidate-spec ถ้ามี ไม่งั้น classify จากชื่อตำแหน่ง) — กันเติม shortlist ข้าม family
+  // เช่น pool เป็นคนขับรถทั้งหมด แต่ใบขอเป็นงานอ่านมาตร/ธุรการ ต้องไม่ฝืนส่งคนขับรถให้ AI เลือก
+  const family = isJobFamilyCode(spec.job_family_code) ? spec.job_family_code : classifyJobFamily(jobTitle);
+  const shortlistItems = selectShortlist(scored, SHORTLIST_SIZE, family, candidateText);
   const shortlist = shortlistItems.map((x) => x.c);
   const scoreById = new Map(shortlistItems.map((x) => [x.c.card_id, x.s]));
 
@@ -221,6 +222,7 @@ export async function matchBoardCandidatesForJob(
         format: 'json',
         think: false,
         timeoutMs: 180_000,
+        temperature: 0.15,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
