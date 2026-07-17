@@ -18,6 +18,11 @@ describe('classifyJobFamily / candidateMatchesFamily (backend)', () => {
     expect(candidateMatchesFamily('ขับรถ / รถผู้บริหารต่างชาติ', 'C')).toBe(true);
   });
 
+  it('classifies data-entry into D and waste collection into F (gap found in family sweep)', () => {
+    expect(classifyJobFamily('พนักงาน บันทึกข้อมูล')).toBe('D');
+    expect(classifyJobFamily('พนักงาน ขนขยะ')).toBe('F');
+  });
+
   it('isJobFamilyCode validates AI-returned family codes', () => {
     expect(isJobFamilyCode('D')).toBe(true);
     expect(isJobFamilyCode('?')).toBe(false);

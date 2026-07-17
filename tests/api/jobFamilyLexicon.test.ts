@@ -33,6 +33,11 @@ describe('classifyJobFamily', () => {
     expect(classifyJobFamily('พนักงานต้อนรับ ประชาสัมพันธ์')).toBe('A');
   });
 
+  it('classifies data-entry into D and waste collection into F (gap found in family sweep)', () => {
+    expect(classifyJobFamily('พนักงาน บันทึกข้อมูล')).toBe('D');
+    expect(classifyJobFamily('พนักงาน ขนขยะ')).toBe('F');
+  });
+
   it('returns null when the title carries no family signal', () => {
     expect(classifyJobFamily('พนักงาน ทั่วไป')).toBeNull();
     expect(classifyJobFamily('')).toBeNull();
