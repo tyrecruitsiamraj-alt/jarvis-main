@@ -259,6 +259,7 @@ export async function matchIrecruitCandidatesForJob(
         format: 'json',
         think: false,
         timeoutMs: 180_000,
+        temperature: 0.15,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },

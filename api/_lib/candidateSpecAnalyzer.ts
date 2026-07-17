@@ -243,6 +243,8 @@ export async function analyzeCandidateSpecForJob(
       format: 'json',
       timeoutMs: 180_000,
       think: false,
+      // ต่ำ = classify job family สม่ำเสมอขึ้นระหว่างรอบ retry (ลดเคสได้คำตอบต่างกันเมื่อ parse รอบแรกพัง)
+      temperature: 0.15,
       messages,
     });
 

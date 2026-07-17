@@ -55,6 +55,8 @@ export async function ollamaChat(options: {
   timeoutMs?: number;
   numCtx?: number;
   think?: boolean;
+  /** ต่ำ = ตอบสม่ำเสมอขึ้นในแต่ละครั้ง — ใช้กับงาน classify/JSON ที่ต้องการความนิ่ง (ไม่ใช่งานสร้างสรรค์) */
+  temperature?: number;
 }): Promise<string> {
   const cfg = getOllamaConfig();
   if (!cfg) {
@@ -75,7 +77,10 @@ export async function ollamaChat(options: {
         messages: options.messages,
         stream: false,
         // ค่า default ของ Ollama คือ num_ctx 4096 — prompt ยาว (skill references) จะโดนตัดเงียบ ๆ จนโมเดลตอบว่าง
-        options: { num_ctx: options.numCtx ?? defaultNumCtx() },
+        options: {
+          num_ctx: options.numCtx ?? defaultNumCtx(),
+          ...(options.temperature === undefined ? {} : { temperature: options.temperature }),
+        },
         ...(options.think === undefined ? {} : { think: options.think }),
         ...(options.format === 'json' ? { format: 'json' } : {}),
       }),
