@@ -126,6 +126,7 @@ const ReservationsPage: React.FC = () => {
                   </h3>
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     {it.candidate_position ? <span>{it.candidate_position}</span> : null}
+                    {it.branch_name ? <span className="font-medium text-blue-700">สาขา: {it.branch_name}</span> : null}
                     {it.candidate_phone ? (
                       <a href={`tel:${it.candidate_phone}`} className="inline-flex items-center gap-1 text-sky-700 hover:underline">
                         <Phone className="h-3 w-3" /> {it.candidate_phone}

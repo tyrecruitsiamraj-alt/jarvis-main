@@ -191,10 +191,18 @@ export interface JobRequest {
   work_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
   /** สาขาที่ผู้ใช้แก้เอง (persist) — ใช้แทนผลแตกสาขาจาก ERP */
   branch_override?: Array<{
+    branch_id?: string;
     branch_name_clean: string;
+    address_raw?: string | null;
+    road?: string | null;
+    subdistrict?: string | null;
     requested_qty: number;
     district_hint: string | null;
     province_hint: string | null;
+    postal_code?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
   }> | null;
   /** override ฟิลด์ใบขอที่ผู้ใช้แก้เอง (อายุ/เพศ/สาขา) */
   field_overrides?: {
@@ -202,10 +210,18 @@ export interface JobRequest {
     age_max?: number | null;
     gender?: string | null;
     branches?: Array<{
+      branch_id?: string;
       branch_name_clean: string;
+      address_raw?: string | null;
+      road?: string | null;
+      subdistrict?: string | null;
       requested_qty: number;
       district_hint: string | null;
       province_hint: string | null;
+      postal_code?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+      geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
     }> | null;
   } | null;
 }

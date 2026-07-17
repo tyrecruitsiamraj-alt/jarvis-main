@@ -85,10 +85,18 @@ export async function saveUnitRequestNote(requestNo: string, note: string): Prom
 }
 
 export type UnitBranchOverride = {
+  branch_id?: string;
   branch_name_clean: string;
+  address_raw?: string | null;
+  road?: string | null;
+  subdistrict?: string | null;
   requested_qty: number;
   district_hint: string | null;
   province_hint: string | null;
+  postal_code?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
 };
 export type UnitFieldOverrides = {
   age_min?: number | null;

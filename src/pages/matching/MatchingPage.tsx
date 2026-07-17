@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, Clock3, LoaderCircle } from 'lucide-react';
@@ -50,11 +50,22 @@ import {
   jobPostingStatusLabel,
   type JobPostingRequest,
 } from '@/lib/jobPostingRequestsApi';
+import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
+import {
+  distributeIrecruitMatchesToBranches,
+  type BranchDemandItem,
+} from '@/lib/distributeIrecruitToBranches';
+import {
+  saveUnitRequestMeta,
+  unitRequestNoteKey,
+  type UnitBranchOverride,
+} from '@/lib/siamrajUnitRequestsApi';
 
 /** สถานะการเสนอ + id แถวจริงใน DB (ไว้ยกเลิก) — คีย์ = source#ref */
 type ProposedRef = {
   id: string;
   status: ProposalStatus;
+  branchName: string | null;
   proposedByName: string | null;
   reason: string | null;
   updatedAt: string;
@@ -91,7 +102,78 @@ type BoardMatchResult = {
 };
 
 type MatchTier = BoardCandidateMatch['tier'];
+type IrecruitDisplayRow =
+  | { kind: 'branch'; key: string; branch: BranchDemandItem; candidateCount: number }
+  | {
+      kind: 'candidate';
+      key: string;
+      match: IrecruitCandidateMatch;
+      branchId: string | null;
+      branchName: string | null;
+    };
 const MATCHING_AI_PREWARM_ENABLED = import.meta.env.VITE_MATCHING_AI_PREWARM_ENABLED === 'true';
+
+function branchDemandItems(job: JobRequest): BranchDemandItem[] {
+  const overrides = job.field_overrides?.branches;
+  if (overrides?.length) {
+    return overrides.map((branch, index) => ({
+      ...branch,
+      branch_id: branch.branch_id || `branch-${index + 1}`,
+      branch_name_clean: branch.branch_name_clean,
+      branch_name_raw: branch.address_raw || branch.branch_name_clean,
+      requested_qty: branch.requested_qty,
+      confidence: 100,
+      district_hint: branch.district_hint,
+      province_hint: branch.province_hint,
+    }));
+  }
+
+  const parserInput = job.parser_override_text?.trim() || buildErpBranchDemandInput(job);
+  return parseErpBranchDemand(parserInput).items.map((branch, index) => ({
+    ...branch,
+    branch_id: `branch-${index + 1}`,
+    address_raw: branch.branch_name_raw,
+    road: branch.branch_name_clean.match(/(?:ถ\.|ถนน)\s*([^,]+)/)?.[1]?.trim() || null,
+    geocode_status: 'unverified' as const,
+  }));
+}
+
+function buildIrecruitDisplayRows(
+  job: JobRequest,
+  matches: IrecruitCandidateMatch[],
+  includeDistant: boolean,
+): IrecruitDisplayRow[] {
+  const branches = branchDemandItems(job);
+  if (branches.length <= 1) {
+    return matches.map((match) => ({
+      kind: 'candidate',
+      key: `candidate-${match.id}`,
+      match,
+      branchId: branches[0]?.branch_id ?? null,
+      branchName: branches[0]?.branch_name_clean ?? null,
+    }));
+  }
+
+  const groups = distributeIrecruitMatchesToBranches(matches, branches, {
+    perBranchLimit: 20,
+    maxProximityRank: includeDistant ? 4 : 3,
+  });
+  return groups.flatMap((group, index): IrecruitDisplayRow[] => [
+    {
+      kind: 'branch',
+      key: `branch-${index}-${group.branch_name_clean}`,
+      branch: group,
+      candidateCount: group.matches.length,
+    },
+    ...group.matches.map((match) => ({
+      kind: 'candidate' as const,
+      key: `branch-${index}-candidate-${match.id}`,
+      match,
+      branchId: group.branch_id ?? `branch-${index + 1}`,
+      branchName: group.branch_name_clean,
+    })),
+  ]);
+}
 
 const TIER_CRITERIA: Record<MatchTier, { label: string; detail: string; dot: string }> = {
   green: {
@@ -168,6 +250,7 @@ function proposalRefFromItem(item: CandidateProposal): ProposedRef {
   return {
     id: item.id,
     status: item.status,
+    branchName: item.branch_name,
     proposedByName: item.proposed_by_name,
     reason: item.reason,
     updatedAt: item.updated_at,
@@ -362,6 +445,7 @@ function jobTitleText(j: JobRequest): string {
 }
 
 const MatchingPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { jobs, loading: loadingJobs } = useUnitRequestsFeed();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -406,6 +490,11 @@ const MatchingPage: React.FC = () => {
   const [hideProposed, setHideProposed] = useState(false);
   // สีแดงเป็นผลห่างไกล: ซ่อนจากงานประจำและไม่นับเป็น AI แนะนำ แต่เปิดดูเพื่อตรวจ AI ได้
   const [showDistantCandidates, setShowDistantCandidates] = useState(false);
+  const [branchEditorOpen, setBranchEditorOpen] = useState(false);
+  const [branchDrafts, setBranchDrafts] = useState<UnitBranchOverride[]>([]);
+  const [branchSaveBusy, setBranchSaveBusy] = useState(false);
+  const [branchGeocodeBusyId, setBranchGeocodeBusyId] = useState<string | null>(null);
+  const [branchEditorError, setBranchEditorError] = useState<string | null>(null);
   // #1 คำขอโพสหางานใหม่ — สร้าง ID ให้ทีมคอนเทนต์/สรรหารับไปทำต่อ
   const [jobPostingByJobId, setJobPostingByJobId] = useState<Record<string, JobPostingRequest>>({});
   const [creatingPosting, setCreatingPosting] = useState(false);
@@ -712,6 +801,8 @@ const MatchingPage: React.FC = () => {
     status: ProposalStatus,
     operatorName: string,
     decisionReason: string,
+    branchId?: string | null,
+    branchName?: string | null,
   ) => {
     const key = proposalKey('irecruit', m.id);
     setProposingKey(key);
@@ -725,6 +816,8 @@ const MatchingPage: React.FC = () => {
         candidateName: m.full_name,
         candidatePhone: m.phone_number,
         candidatePosition: m.position_name || m.job_name_th || null,
+        branchId,
+        branchName,
         tier: m.tier,
         reason: decisionReason,
         operatorName,
@@ -738,13 +831,146 @@ const MatchingPage: React.FC = () => {
           conflict: e.conflict,
           operatorName,
           decisionReason,
-          retry: () => proposeIrecruit(job, m, status, operatorName, decisionReason),
+          retry: () => proposeIrecruit(job, m, status, operatorName, decisionReason, branchId, branchName),
         });
       } else {
         setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
       }
     } finally {
       setProposingKey((cur) => (cur === key ? null : cur));
+    }
+  };
+
+  // เปิดฟอร์มเพิ่มผู้สมัครโดยเติมข้อมูลจาก iRecruit ให้ก่อน
+  // ยังไม่สร้างข้อมูลจนกว่าผู้ใช้จะตรวจสอบและกดบันทึกในฟอร์ม
+  const openIrecruitCandidatePrefill = (
+    job: JobRequest,
+    match: IrecruitCandidateMatch,
+    branchName?: string | null,
+  ) => {
+    const [first, ...rest] = match.full_name.trim().split(/\s+/);
+    const params = new URLSearchParams();
+    if (first) params.set('first_name', first);
+    if (rest.length) params.set('last_name', rest.join(' '));
+    if (match.phone_number) params.set('phone', match.phone_number);
+    if (match.age != null) params.set('age', String(match.age));
+    if (match.sex) params.set('sex', match.sex);
+    if (match.province_name) params.set('province', match.province_name);
+    if (match.district_name) params.set('district', match.district_name);
+    if (match.location_label) params.set('location_label', match.location_label);
+    if (match.position_name || match.job_name_th) {
+      params.set('job_name', match.position_name || match.job_name_th || '');
+    }
+
+    const reason = [
+      branchName ? `สาขาที่เลือก: ${branchName}` : '',
+      match.reason?.trim(),
+      job.request_no ? `จากใบขอ ${job.request_no}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    if (reason) params.set('reason', reason);
+    params.set('returnTo', `/matching/match?jobId=${encodeURIComponent(job.id)}`);
+    navigate(`/matching/candidates/add?${params.toString()}`);
+  };
+
+  const openBranchEditor = (job: JobRequest) => {
+    const drafts = branchDemandItems(job).map((branch, index): UnitBranchOverride => ({
+      branch_id: branch.branch_id || `branch-${index + 1}`,
+      branch_name_clean: branch.branch_name_clean,
+      address_raw: branch.address_raw || branch.branch_name_raw || null,
+      road: branch.road || null,
+      subdistrict: branch.subdistrict || null,
+      requested_qty: branch.requested_qty,
+      district_hint: branch.district_hint,
+      province_hint: branch.province_hint,
+      postal_code: branch.postal_code || null,
+      lat: branch.lat ?? null,
+      lng: branch.lng ?? null,
+      geocode_status: branch.geocode_status || 'unverified',
+    }));
+    setBranchDrafts(drafts);
+    setBranchEditorError(null);
+    setBranchEditorOpen(true);
+  };
+
+  const updateBranchDraft = (branchId: string, patch: Partial<UnitBranchOverride>) => {
+    setBranchDrafts((current) =>
+      current.map((branch) => (branch.branch_id === branchId ? { ...branch, ...patch } : branch)),
+    );
+  };
+
+  const geocodeBranch = async (branch: UnitBranchOverride) => {
+    const branchId = branch.branch_id || '';
+    const address = [
+      branch.branch_name_clean,
+      branch.address_raw,
+      branch.road,
+      branch.subdistrict,
+      branch.district_hint,
+      branch.province_hint,
+      branch.postal_code,
+      'Thailand',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (!address.trim()) return;
+    setBranchGeocodeBusyId(branchId);
+    setBranchEditorError(null);
+    try {
+      const response = await apiFetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+      const data = (await response.json().catch(() => ({}))) as {
+        lat?: number | string;
+        lng?: number | string;
+        formatted_address?: string;
+        message?: string;
+      };
+      const lat = Number(data.lat);
+      const lng = Number(data.lng);
+      if (!response.ok || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        updateBranchDraft(branchId, { lat: null, lng: null, geocode_status: 'not_found' });
+        throw new Error(data.message || 'ค้นหาพิกัดสาขาไม่สำเร็จ');
+      }
+      updateBranchDraft(branchId, {
+        lat,
+        lng,
+        address_raw: branch.address_raw || data.formatted_address || null,
+        geocode_status: 'estimated',
+      });
+    } catch (error) {
+      setBranchEditorError(error instanceof Error ? error.message : 'ค้นหาพิกัดสาขาไม่สำเร็จ');
+    } finally {
+      setBranchGeocodeBusyId(null);
+    }
+  };
+
+  const saveBranchDrafts = async () => {
+    if (!jobDetail) return;
+    const branches = branchDrafts
+      .map((branch, index): UnitBranchOverride => ({
+        ...branch,
+        branch_id: branch.branch_id || `branch-${index + 1}`,
+        branch_name_clean: branch.branch_name_clean.trim(),
+        requested_qty: Math.max(0, Math.floor(Number(branch.requested_qty) || 0)),
+        district_hint: branch.district_hint?.trim() || null,
+        province_hint: branch.province_hint?.trim() || null,
+      }))
+      .filter((branch) => branch.branch_name_clean);
+    if (!branches.length) {
+      setBranchEditorError('ต้องมีอย่างน้อย 1 สาขา');
+      return;
+    }
+    setBranchSaveBusy(true);
+    setBranchEditorError(null);
+    try {
+      const fieldOverrides = { ...(jobDetail.field_overrides || {}), branches };
+      await saveUnitRequestMeta(unitRequestNoteKey(jobDetail), { field_overrides: fieldOverrides });
+      setJobDetail((current) => (current ? { ...current, field_overrides: fieldOverrides } : current));
+      setBranchEditorOpen(false);
+    } catch (error) {
+      setBranchEditorError(error instanceof Error ? error.message : 'บันทึกสาขาไม่สำเร็จ');
+    } finally {
+      setBranchSaveBusy(false);
     }
   };
 
@@ -778,15 +1004,28 @@ const MatchingPage: React.FC = () => {
     );
   };
 
-  const openIrecruitProposalAction = (job: JobRequest, candidate: IrecruitCandidateMatch, status: ProposalStatus) => {
+  const openIrecruitProposalAction = (
+    job: JobRequest,
+    candidate: IrecruitCandidateMatch,
+    status: ProposalStatus,
+    branchId?: string | null,
+    branchName?: string | null,
+  ) => {
+    const reason = [
+      branchName ? `สาขาที่เลือก: ${branchName}` : '',
+      suggestedProposalReason(status, candidate.reason),
+    ]
+      .filter(Boolean)
+      .join('\n');
     prepareProposalAction(
       {
         candidateName: candidate.full_name,
         status,
-        submit: (operatorName, reason) => proposeIrecruit(job, candidate, status, operatorName, reason),
+        submit: (operatorName, reason) =>
+          proposeIrecruit(job, candidate, status, operatorName, reason, branchId, branchName),
       },
       job,
-      suggestedProposalReason(status, candidate.reason),
+      reason,
     );
   };
 
@@ -1381,24 +1620,33 @@ const MatchingPage: React.FC = () => {
                         ? `ผู้สมัครจากฐาน iRecruit → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
                         : 'ไม่พอ? หาผู้สมัครจากฐาน iRecruit'}
                     </p>
-                    <button
-                      type="button"
-                      disabled={irLoadingId === jobDetail.id}
-                      onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-                    >
-                      {irLoadingId === jobDetail.id ? (
-                        'กำลังค้นหา…'
-                      ) : irMatchById[jobDetail.id] ? (
-                        <>
-                          <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
-                        </>
-                      ) : (
-                        <>
-                          <Search className="h-3 w-3" /> ค้นหา iRecruit
-                        </>
-                      )}
-                    </button>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openBranchEditor(jobDetail)}
+                        className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-3 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                      >
+                        <MapPin className="h-3 w-3" /> แก้ไขสาขา/ที่อยู่
+                      </button>
+                      <button
+                        type="button"
+                        disabled={irLoadingId === jobDetail.id}
+                        onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
+                        className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {irLoadingId === jobDetail.id ? (
+                          'กำลังค้นหา…'
+                        ) : irMatchById[jobDetail.id] ? (
+                          <>
+                            <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+                          </>
+                        ) : (
+                          <>
+                            <Search className="h-3 w-3" /> ค้นหา iRecruit
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {irLoadingId === jobDetail.id ? (
@@ -1411,10 +1659,40 @@ const MatchingPage: React.FC = () => {
                       <p className="text-[11px] text-muted-foreground">ไม่พบผู้สมัครที่ใกล้เคียงในฐาน iRecruit</p>
                     ) : (
                       <div className="space-y-2">
-                        {irMatchById[jobDetail.id].matches
-                          .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
-                          .filter((m) => !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]))
-                          .map((m) => {
+                        {buildIrecruitDisplayRows(
+                          jobDetail,
+                          irMatchById[jobDetail.id].matches
+                            .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
+                            .filter((m) => !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)])),
+                          showDistantCandidates,
+                        ).map((row) => {
+                            if (row.kind === 'branch') {
+                              return (
+                                <div
+                                  key={row.key}
+                                  className="mt-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 first:mt-0"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-blue-950">{row.branch.branch_name_clean}</p>
+                                      <p className="mt-0.5 text-[11px] text-blue-700">
+                                        {[row.branch.district_hint, row.branch.province_hint].filter(Boolean).join(' · ') ||
+                                          row.branch.branch_name_raw}
+                                      </p>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                      <p className="text-xs font-semibold text-blue-800">
+                                        ต้องการ {row.branch.requested_qty} คน
+                                      </p>
+                                      <p className="text-[10px] text-blue-600">พบใกล้สาขา {row.candidateCount} คน</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            const m = row.match;
+                            const branchId = row.branchId;
+                            const branchName = row.branchName;
                             const key = proposalKey('irecruit', m.id);
                             const proposed = proposedByKey[key];
                             const busy = proposingKey === key;
@@ -1422,7 +1700,7 @@ const MatchingPage: React.FC = () => {
                             const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                             return (
                               <div
-                                key={m.id}
+                                key={row.key}
                                 className={cn(
                                   'rounded-xl border border-white/70 bg-white/70 px-3 py-2 space-y-1',
                                   proposed ? 'opacity-70' : '',
@@ -1493,17 +1771,25 @@ const MatchingPage: React.FC = () => {
                                 ) : null}
                                 {proposed ? (
                                   <div className="rounded-lg border border-slate-200 bg-white/80 px-2.5 py-1.5 text-[10px] text-slate-700">
-                                    <p className="font-semibold">
-                                      ผู้ดำเนินการ: {proposed.proposedByName || 'ไม่ระบุ'}
-                                    </p>
-                                    <p className="mt-0.5 text-slate-600">เหตุผล: {proposed.reason || 'ไม่ระบุ'}</p>
+                                     <p className="font-semibold">
+                                       ผู้ดำเนินการ: {proposed.proposedByName || 'ไม่ระบุ'}
+                                     </p>
+                                     {proposed.branchName ? <p className="mt-0.5 text-blue-700">สาขา: {proposed.branchName}</p> : null}
+                                     <p className="mt-0.5 text-slate-600">เหตุผล: {proposed.reason || 'ไม่ระบุ'}</p>
                                   </div>
                                 ) : null}
                                 <div className="flex flex-wrap gap-1.5 pt-0.5">
                                   <button
                                     type="button"
+                                    onClick={() => openIrecruitCandidatePrefill(jobDetail, m, branchName)}
+                                    className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                                  >
+                                    <UserPlus className="h-3 w-3" /> เพิ่มรายละเอียดผู้สมัคร
+                                  </button>
+                                  <button
+                                    type="button"
                                     disabled={busy || !!activeElsewhere}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'contacted')}
+                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'contacted', branchId, branchName)}
                                     className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
                                   >
                                     {busy ? 'บันทึก…' : proposed?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
@@ -1511,7 +1797,7 @@ const MatchingPage: React.FC = () => {
                                   <button
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'reserved')}
+                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'reserved', branchId, branchName)}
                                     className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                                   >
                                     <UserPlus className="h-3 w-3" />
@@ -1520,7 +1806,7 @@ const MatchingPage: React.FC = () => {
                                   <button
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'placed')}
+                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'placed', branchId, branchName)}
                                     className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                                   >
                                     {busy ? 'บันทึก…' : proposed?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
@@ -1528,7 +1814,7 @@ const MatchingPage: React.FC = () => {
                                   <button
                                     type="button"
                                     disabled={busy}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'rejected')}
+                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'rejected', branchId, branchName)}
                                     className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                                   >
                                     {proposed?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
@@ -1595,6 +1881,216 @@ const MatchingPage: React.FC = () => {
           ) : null}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={branchEditorOpen} onOpenChange={(open) => !branchSaveBusy && setBranchEditorOpen(open)}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>แยกและแก้ไขสาขาของใบขอ</DialogTitle>
+            <DialogDescription>
+              ตรวจชื่อสถานที่ ที่อยู่ จำนวนคน และพิกัดทีละสาขา ก่อนใช้จัดผู้สมัครตามพื้นที่
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {branchDrafts.map((branch, index) => {
+              const branchId = branch.branch_id || `branch-${index + 1}`;
+              const hasCoordinate = Number.isFinite(branch.lat) && Number.isFinite(branch.lng);
+              return (
+                <div key={branchId} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-blue-950">สาขา {index + 1}</p>
+                    {branchDrafts.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setBranchDrafts((current) => current.filter((item) => item.branch_id !== branchId))}
+                        className="text-[11px] font-medium text-red-600 hover:underline"
+                      >
+                        ลบสาขา
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+                    <label className="md:col-span-4 text-[11px] font-medium text-slate-600">
+                      ชื่อสาขา/สถานที่
+                      <input
+                        value={branch.branch_name_clean}
+                        onChange={(event) => updateBranchDraft(branchId, { branch_name_clean: event.target.value })}
+                        className="jarvis-soft-field mt-1 w-full"
+                        placeholder="เช่น สิงห์คอมเพล็กซ์"
+                      />
+                    </label>
+                    <label className="md:col-span-2 text-[11px] font-medium text-slate-600">
+                      จำนวนคน
+                      <input
+                        type="number"
+                        min={0}
+                        value={branch.requested_qty}
+                        onChange={(event) => updateBranchDraft(branchId, { requested_qty: Number(event.target.value) })}
+                        className="jarvis-soft-field mt-1 w-full"
+                      />
+                    </label>
+                    <label className="md:col-span-6 text-[11px] font-medium text-slate-600">
+                      ที่อยู่สาขา
+                      <input
+                        value={branch.address_raw || ''}
+                        onChange={(event) =>
+                          updateBranchDraft(branchId, {
+                            address_raw: event.target.value,
+                            geocode_status: 'unverified',
+                          })
+                        }
+                        className="jarvis-soft-field mt-1 w-full"
+                        placeholder="ข้อความที่อยู่ของสาขานี้"
+                      />
+                    </label>
+                    <label className="md:col-span-2 text-[11px] font-medium text-slate-600">
+                      ถนน
+                      <input
+                        value={branch.road || ''}
+                        onChange={(event) => updateBranchDraft(branchId, { road: event.target.value, geocode_status: 'unverified' })}
+                        className="jarvis-soft-field mt-1 w-full"
+                        placeholder="สามเสน"
+                      />
+                    </label>
+                    <label className="md:col-span-2 text-[11px] font-medium text-slate-600">
+                      แขวง/ตำบล
+                      <input
+                        value={branch.subdistrict || ''}
+                        onChange={(event) =>
+                          updateBranchDraft(branchId, { subdistrict: event.target.value, geocode_status: 'unverified' })
+                        }
+                        className="jarvis-soft-field mt-1 w-full"
+                      />
+                    </label>
+                    <label className="md:col-span-2 text-[11px] font-medium text-slate-600">
+                      เขต/อำเภอ
+                      <input
+                        value={branch.district_hint || ''}
+                        onChange={(event) =>
+                          updateBranchDraft(branchId, { district_hint: event.target.value, geocode_status: 'unverified' })
+                        }
+                        className="jarvis-soft-field mt-1 w-full"
+                      />
+                    </label>
+                    <label className="md:col-span-3 text-[11px] font-medium text-slate-600">
+                      จังหวัด
+                      <input
+                        value={branch.province_hint || ''}
+                        onChange={(event) =>
+                          updateBranchDraft(branchId, { province_hint: event.target.value, geocode_status: 'unverified' })
+                        }
+                        className="jarvis-soft-field mt-1 w-full"
+                      />
+                    </label>
+                    <label className="md:col-span-3 text-[11px] font-medium text-slate-600">
+                      รหัสไปรษณีย์
+                      <input
+                        value={branch.postal_code || ''}
+                        onChange={(event) =>
+                          updateBranchDraft(branchId, { postal_code: event.target.value, geocode_status: 'unverified' })
+                        }
+                        className="jarvis-soft-field mt-1 w-full"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      disabled={branchGeocodeBusyId === branchId}
+                      onClick={() => void geocodeBranch(branch)}
+                      className="rounded-full border border-blue-300 bg-white px-3 py-1.5 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                    >
+                      {branchGeocodeBusyId === branchId ? 'กำลังค้นหา…' : 'ค้นหาพิกัดจากที่อยู่'}
+                    </button>
+                    {hasCoordinate ? (
+                      <>
+                        <span className="text-slate-600">
+                          {Number(branch.lat).toFixed(6)}, {Number(branch.lng).toFixed(6)}
+                        </span>
+                        <a
+                          href={`https://www.google.com/maps?q=${branch.lat},${branch.lng}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-700 hover:underline"
+                        >
+                          ดูแผนที่
+                        </a>
+                        {branch.geocode_status !== 'confirmed' ? (
+                          <button
+                            type="button"
+                            onClick={() => updateBranchDraft(branchId, { geocode_status: 'confirmed' })}
+                            className="rounded-full bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700"
+                          >
+                            ยืนยันพิกัดนี้
+                          </button>
+                        ) : (
+                          <span className="font-semibold text-emerald-700">ยืนยันพิกัดแล้ว</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-slate-500">
+                        {branch.geocode_status === 'not_found' ? 'ไม่พบพิกัด กรุณาแก้ที่อยู่' : 'ยังไม่ได้ตรวจพิกัด'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => {
+                const id = globalThis.crypto?.randomUUID?.() || `branch-${Date.now()}`;
+                setBranchDrafts((current) => [
+                  ...current,
+                  {
+                    branch_id: id,
+                    branch_name_clean: '',
+                    address_raw: null,
+                    requested_qty: 1,
+                    district_hint: null,
+                    province_hint: null,
+                    geocode_status: 'unverified',
+                  },
+                ]);
+              }}
+              className="rounded-full border border-dashed border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+            >
+              + เพิ่มสาขา
+            </button>
+
+            {jobDetail &&
+            branchDrafts.reduce((sum, branch) => sum + (Number(branch.requested_qty) || 0), 0) !==
+              requestPositionCount(jobDetail) ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                จำนวนรวมของสาขา {branchDrafts.reduce((sum, branch) => sum + (Number(branch.requested_qty) || 0), 0)} คน
+                ไม่ตรงกับใบขอ {requestPositionCount(jobDetail)} คน — กรุณาตรวจสอบก่อนบันทึก
+              </p>
+            ) : null}
+            {branchEditorError ? <p className="text-xs text-destructive">{branchEditorError}</p> : null}
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <button
+                type="button"
+                disabled={branchSaveBusy}
+                onClick={() => setBranchEditorOpen(false)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={branchSaveBusy}
+                onClick={() => void saveBranchDrafts()}
+                className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {branchSaveBusy ? 'กำลังบันทึก…' : 'บันทึกสาขา'}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* รายละเอียดพนักงานของเรา + เหตุผลที่ AI เลือก */}
       <Dialog open={!!candDetail} onOpenChange={(o) => !o && setCandDetail(null)}>

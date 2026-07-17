@@ -95,6 +95,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         candidateName: body.candidate_name ?? body.candidateName,
         candidatePhone: body.candidate_phone ?? body.candidatePhone,
         candidatePosition: body.candidate_position ?? body.candidatePosition,
+        branchId: body.branch_id ?? body.branchId,
+        branchName: body.branch_name ?? body.branchName,
         tier: body.tier,
         reason: body.reason,
         status: body.status,

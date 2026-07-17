@@ -6,10 +6,18 @@ const MAX_NOTE_LENGTH = 2000;
 
 /** override ฟิลด์ใบขอที่ผู้ใช้แก้เอง (persist) — null/undefined = ใช้ค่าจาก ERP ตามเดิม */
 export type UnitBranchOverride = {
+  branch_id?: string;
   branch_name_clean: string;
+  address_raw?: string | null;
+  road?: string | null;
+  subdistrict?: string | null;
   requested_qty: number;
   district_hint: string | null;
   province_hint: string | null;
+  postal_code?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
 };
 export type UnitFieldOverrides = {
   age_min?: number | null;
@@ -110,7 +118,21 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
           const name = typeof row.branch_name_clean === 'string' ? row.branch_name_clean.trim() : '';
           if (!name) return null;
           return {
+            branch_id:
+              typeof row.branch_id === 'string' && row.branch_id.trim()
+                ? row.branch_id.trim().slice(0, 120)
+                : undefined,
             branch_name_clean: name.slice(0, 200),
+            address_raw:
+              typeof row.address_raw === 'string' && row.address_raw.trim()
+                ? row.address_raw.trim().slice(0, 500)
+                : null,
+            road:
+              typeof row.road === 'string' && row.road.trim() ? row.road.trim().slice(0, 200) : null,
+            subdistrict:
+              typeof row.subdistrict === 'string' && row.subdistrict.trim()
+                ? row.subdistrict.trim().slice(0, 120)
+                : null,
             requested_qty: Math.max(0, Math.floor(numOrNull(row.requested_qty) ?? 0)),
             district_hint:
               typeof row.district_hint === 'string' && row.district_hint.trim()
@@ -120,6 +142,17 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
               typeof row.province_hint === 'string' && row.province_hint.trim()
                 ? row.province_hint.trim().slice(0, 120)
                 : null,
+            postal_code:
+              typeof row.postal_code === 'string' && row.postal_code.trim()
+                ? row.postal_code.trim().slice(0, 10)
+                : null,
+            lat: numOrNull(row.lat),
+            lng: numOrNull(row.lng),
+            geocode_status:
+              typeof row.geocode_status === 'string' &&
+              ['unverified', 'estimated', 'confirmed', 'not_found'].includes(row.geocode_status)
+                ? (row.geocode_status as UnitBranchOverride['geocode_status'])
+                : 'unverified',
           };
         })
         .filter((x): x is UnitBranchOverride => Boolean(x))

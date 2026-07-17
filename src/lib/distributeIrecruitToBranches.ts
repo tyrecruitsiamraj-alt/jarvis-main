@@ -1,12 +1,20 @@
 import type { IrecruitCandidateMatch } from '@/lib/irecruitMatchTypes';
 
 export type BranchDemandItem = {
+  branch_id?: string;
   branch_name_clean: string;
   branch_name_raw: string;
+  address_raw?: string | null;
+  road?: string | null;
+  subdistrict?: string | null;
   requested_qty: number;
   confidence: number;
   district_hint: string | null;
   province_hint: string | null;
+  postal_code?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
 };
 
 /** 0=ตรงเขต 1=ชื่อสาขาใกล้ 2=จังหวัด 3=ปริมณฑล 4=ไกล */

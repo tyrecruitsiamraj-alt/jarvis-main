@@ -20,6 +20,8 @@ export type CandidateProposal = {
   candidate_name: string | null;
   candidate_phone: string | null;
   candidate_position: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   tier: ProposalTier | null;
   reason: string | null;
   status: ProposalStatus;
@@ -37,6 +39,8 @@ export type SaveProposalInput = {
   candidateName?: string | null;
   candidatePhone?: string | null;
   candidatePosition?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
   tier?: string | null;
   reason?: string | null;
   operatorName?: string | null;
@@ -87,6 +91,8 @@ export async function saveProposal(input: SaveProposalInput): Promise<CandidateP
       candidate_name: input.candidateName ?? null,
       candidate_phone: input.candidatePhone ?? null,
       candidate_position: input.candidatePosition ?? null,
+      branch_id: input.branchId ?? null,
+      branch_name: input.branchName ?? null,
       tier: input.tier ?? null,
       reason: input.reason ?? null,
       proposed_by_name: input.operatorName ?? null,

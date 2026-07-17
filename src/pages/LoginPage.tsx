@@ -24,6 +24,7 @@ import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCod
 type AuthConfig = {
   companyEmailLogin: boolean;
   microsoftLogin: boolean;
+  devRoleLogin: boolean;
   emailLoginGate: boolean;
   companyEmailRequired: boolean;
   allowedDomains: string[];
@@ -38,9 +39,6 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   oauth: 'เข้าสู่ระบบ Microsoft ไม่สำเร็จ — ลองใหม่อีกครั้ง',
   azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
-
-// ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์ — ไม่โชว์บนหน้า login
-const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -474,7 +472,7 @@ const LoginPage: React.FC = () => {
               </p>
             ) : null}
 
-            {devRoleEntryEnabled ? (
+            {authConfig?.devRoleLogin ? (
               <div className="space-y-2 rounded-2xl border border-dashed border-orange-300/60 bg-orange-50/40 p-3">
                 <p className="text-xs font-medium text-orange-900 text-center">
                   Dev — เข้าเร็วตามสิทธิ์ (ไม่ต้องกรอกรหัส)

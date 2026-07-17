@@ -41,6 +41,8 @@ export type CandidateProposal = {
   candidate_name: string | null;
   candidate_phone: string | null;
   candidate_position: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   tier: ProposalTier | null;
   reason: string | null;
   status: ProposalStatus;
@@ -59,6 +61,8 @@ type Row = {
   candidate_name: string | null;
   candidate_phone: string | null;
   candidate_position: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   tier: string | null;
   reason: string | null;
   status: string;
@@ -72,7 +76,7 @@ const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 
 const COLS =
   'id, job_id, request_no, source, candidate_ref, candidate_name, candidate_phone, ' +
-  'candidate_position, tier, reason, status, proposed_by_user_id, proposed_by_name, ' +
+  'candidate_position, branch_id, branch_name, tier, reason, status, proposed_by_user_id, proposed_by_name, ' +
   'created_at, updated_at';
 
 function isMissingTable(e: unknown): boolean {
@@ -102,6 +106,8 @@ function mapRow(r: Row): CandidateProposal {
     candidate_name: r.candidate_name,
     candidate_phone: r.candidate_phone,
     candidate_position: r.candidate_position,
+    branch_id: r.branch_id ?? null,
+    branch_name: r.branch_name ?? null,
     tier: r.tier && (TIERS as string[]).includes(r.tier) ? (r.tier as ProposalTier) : null,
     reason: r.reason,
     status: (STATUSES as string[]).includes(r.status) ? (r.status as ProposalStatus) : 'reserved',
@@ -209,6 +215,8 @@ export type UpsertProposalInput = {
   candidateName?: unknown;
   candidatePhone?: unknown;
   candidatePosition?: unknown;
+  branchId?: unknown;
+  branchName?: unknown;
   tier?: unknown;
   reason?: unknown;
   status?: unknown;
@@ -239,6 +247,8 @@ export async function upsertProposal(input: UpsertProposalInput): Promise<Candid
     trimTo(input.candidateName, MAX_TEXT),
     trimTo(input.candidatePhone, MAX_TEXT),
     trimTo(input.candidatePosition, MAX_TEXT),
+    trimTo(input.branchId, MAX_TEXT),
+    trimTo(input.branchName, MAX_TEXT),
     normalizeTier(input.tier),
     trimTo(input.reason, MAX_REASON),
     status,
@@ -250,14 +260,16 @@ export async function upsertProposal(input: UpsertProposalInput): Promise<Candid
     `
     insert into ${table} (
       job_id, request_no, source, candidate_ref, candidate_name, candidate_phone,
-      candidate_position, tier, reason, status, proposed_by_user_id, proposed_by_name
+      candidate_position, branch_id, branch_name, tier, reason, status, proposed_by_user_id, proposed_by_name
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::uuid, $12)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::uuid, $14)
     on conflict (job_id, source, candidate_ref) do update set
       request_no = excluded.request_no,
       candidate_name = coalesce(excluded.candidate_name, ${table}.candidate_name),
       candidate_phone = coalesce(excluded.candidate_phone, ${table}.candidate_phone),
       candidate_position = coalesce(excluded.candidate_position, ${table}.candidate_position),
+      branch_id = coalesce(excluded.branch_id, ${table}.branch_id),
+      branch_name = coalesce(excluded.branch_name, ${table}.branch_name),
       tier = coalesce(excluded.tier, ${table}.tier),
       reason = coalesce(excluded.reason, ${table}.reason),
       status = excluded.status,

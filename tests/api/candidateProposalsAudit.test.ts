@@ -15,6 +15,8 @@ const row = {
   candidate_name: 'ผู้สมัครทดสอบ',
   candidate_phone: '0800000000',
   candidate_position: 'ธุรการ',
+  branch_id: 'branch-1',
+  branch_name: 'ถ.สามเสน เขตดุสิต',
   tier: 'green',
   reason: 'สกิลและพื้นที่ตรงกับใบขอ',
   status: 'reserved',
@@ -36,6 +38,8 @@ describe('candidate proposal operator audit', () => {
       source: 'board',
       candidateRef: '99',
       candidateName: 'ผู้สมัครทดสอบ',
+      branchId: 'branch-1',
+      branchName: 'ถ.สามเสน เขตดุสิต',
       tier: 'green',
       status: 'reserved',
       reason: 'สกิลและพื้นที่ตรงกับใบขอ',
@@ -46,6 +50,7 @@ describe('candidate proposal operator audit', () => {
     expect(params).toEqual(expect.arrayContaining(['สกิลและพื้นที่ตรงกับใบขอ', 'สมหญิง ฝ่ายสรรหา']));
     expect(saved.proposed_by_name).toBe('สมหญิง ฝ่ายสรรหา');
     expect(saved.reason).toBe('สกิลและพื้นที่ตรงกับใบขอ');
+    expect(saved).toMatchObject({ branch_id: 'branch-1', branch_name: 'ถ.สามเสน เขตดุสิต' });
   });
 
   it('updates operator and reason when cancelling', async () => {

@@ -18,7 +18,11 @@ import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranch
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { saveUnitRequestMeta, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
+import {
+  saveUnitRequestMeta,
+  unitRequestNoteKey,
+  type UnitBranchOverride,
+} from '@/lib/siamrajUnitRequestsApi';
 import ScoredCandidateCard from '@/components/matching/ScoredCandidateCard';
 import MatchLoadingBar from '@/components/matching/MatchLoadingBar';
 import { inferProvinceFromAddress, inferDistrictFromAddress } from '@/lib/parseThaiJobAddress';
@@ -37,6 +41,7 @@ import {
 type PreCheckRow = { job: JobRequest; distanceKm: number | null; score: number };
 type Center = { lat: number; lng: number; label: string };
 type ParsedBranchDemandItem = {
+  branch_id?: string;
   org_name: string | null;
   branch_name_raw: string;
   branch_name_clean: string;
@@ -44,6 +49,13 @@ type ParsedBranchDemandItem = {
   confidence: number;
   district_hint: string | null;
   province_hint: string | null;
+  address_raw?: string | null;
+  road?: string | null;
+  subdistrict?: string | null;
+  postal_code?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  geocode_status?: UnitBranchOverride['geocode_status'];
 };
 type ParsedBranchDemandPayload = {
   parser_input: string;
@@ -103,7 +115,7 @@ const PreCheckPage: React.FC = () => {
   const [editAgeMax, setEditAgeMax] = useState('');
   const [editGender, setEditGender] = useState('');
   const [editBranches, setEditBranches] = useState<
-    Array<{ branch_name_clean: string; requested_qty: number; district_hint: string; province_hint: string }>
+    Array<UnitBranchOverride & { district_hint: string; province_hint: string }>
   >([]);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editMsg, setEditMsg] = useState<string | null>(null);
@@ -473,6 +485,7 @@ const PreCheckPage: React.FC = () => {
         parsed: {
           org_name: null,
           items: overrideBranches.map((b) => ({
+            ...b,
             org_name: null,
             branch_name_raw: b.branch_name_clean,
             branch_name_clean: b.branch_name_clean,
@@ -569,6 +582,7 @@ const PreCheckPage: React.FC = () => {
     setEditGender(jobDetail?.gender_requirement || '');
     setEditBranches(
       (branchParseData?.parsed.items || []).map((it) => ({
+        ...it,
         branch_name_clean: it.branch_name_clean,
         requested_qty: it.requested_qty,
         district_hint: it.district_hint || '',
@@ -593,6 +607,7 @@ const PreCheckPage: React.FC = () => {
       const ageMax = editAgeMax.trim() === '' ? null : Number(editAgeMax);
       const branches = editBranches
         .map((b) => ({
+          ...b,
           branch_name_clean: b.branch_name_clean.trim(),
           requested_qty: Math.max(0, Math.floor(Number(b.requested_qty) || 0)),
           district_hint: b.district_hint.trim() || null,
