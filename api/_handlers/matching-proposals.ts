@@ -99,7 +99,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         reason: body.reason,
         status: body.status,
         userId: req.user.sub,
-        userName: req.user.email,
+        userName: getString(body.proposed_by_name) || getString(body.operator_name) || req.user.email,
       });
 
       await auditFromAuthed(req, {
@@ -136,6 +136,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const item = await updateProposal(id, {
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.reason !== undefined ? { reason: body.reason } : {}),
+        ...(body.proposed_by_name !== undefined ? { proposedByName: body.proposed_by_name } : {}),
       });
       if (!item) return sendError(res, 404, 'Not found', 'ไม่พบการเสนอนี้');
 

@@ -274,7 +274,7 @@ export async function upsertProposal(input: UpsertProposalInput): Promise<Candid
 /** อัปเดตสถานะ/เหตุผลของการเสนอที่มีอยู่ (เช่น ยกเลิก, เลื่อนเป็นลงงาน) */
 export async function updateProposal(
   id: string,
-  patch: { status?: unknown; reason?: unknown },
+  patch: { status?: unknown; reason?: unknown; proposedByName?: unknown },
 ): Promise<CandidateProposal | null> {
   const key = id.trim();
   if (!key || !uuidRe.test(key)) throw new Error('valid proposal id is required');
@@ -292,6 +292,10 @@ export async function updateProposal(
   if (patch.reason !== undefined) {
     sets.push(`reason = $${idx++}`);
     params.push(trimTo(patch.reason, MAX_REASON));
+  }
+  if (patch.proposedByName !== undefined) {
+    sets.push(`proposed_by_name = $${idx++}`);
+    params.push(trimTo(patch.proposedByName, MAX_TEXT));
   }
   if (sets.length === 0) throw new Error('nothing to update');
 

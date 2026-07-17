@@ -39,6 +39,7 @@ export type SaveProposalInput = {
   candidatePosition?: string | null;
   tier?: string | null;
   reason?: string | null;
+  operatorName?: string | null;
   status?: ProposalStatus;
 };
 
@@ -88,6 +89,7 @@ export async function saveProposal(input: SaveProposalInput): Promise<CandidateP
       candidate_position: input.candidatePosition ?? null,
       tier: input.tier ?? null,
       reason: input.reason ?? null,
+      proposed_by_name: input.operatorName ?? null,
       status: input.status ?? 'reserved',
     }),
   });
@@ -112,6 +114,21 @@ export async function listProposalsForJob(jobId: string): Promise<CandidatePropo
   return d.items ?? [];
 }
 
+/** ประวัติการเสนอของหลายใบขอ — ใช้ทำสรุปความคืบหน้าบนหน้ารวม */
+export async function listProposalsForJobs(jobIds: string[]): Promise<Record<string, CandidateProposal[]>> {
+  const ids = [...new Set(jobIds.map((id) => id.trim()).filter(Boolean))];
+  const byJob: Record<string, CandidateProposal[]> = {};
+  // จำกัด URL แต่ละรอบและสอดคล้องกับเพดาน endpoint ฝั่ง server
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const r = await apiFetch(`/api/matching/proposals?jobIds=${encodeURIComponent(chunk.join(','))}`);
+    if (!r.ok) continue;
+    const d = (await r.json().catch(() => ({}))) as { byJob?: Record<string, CandidateProposal[]> };
+    Object.assign(byJob, d.byJob ?? {});
+  }
+  return byJob;
+}
+
 /** ทุกคนที่กำลังจอง/ติดต่อ/ลงงานอยู่ (ข้ามทุกใบขอ) — สำหรับหน้า "รายชื่อคนจอง" */
 export async function listActiveProposals(): Promise<CandidateProposal[]> {
   const r = await apiFetch('/api/matching/proposals?active=1');
@@ -120,10 +137,17 @@ export async function listActiveProposals(): Promise<CandidateProposal[]> {
   return d.items ?? [];
 }
 
-export async function cancelProposal(id: string): Promise<CandidateProposal> {
+export async function cancelProposal(
+  id: string,
+  input?: { reason?: string | null; operatorName?: string | null },
+): Promise<CandidateProposal> {
   const r = await apiFetch(`/api/matching/proposals?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status: 'cancelled' }),
+    body: JSON.stringify({
+      status: 'cancelled',
+      reason: input?.reason,
+      proposed_by_name: input?.operatorName,
+    }),
   });
   if (!r.ok) {
     const d = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
