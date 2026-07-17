@@ -37,7 +37,7 @@ import {
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
 import { CheckCircle2, UserPlus, Megaphone, X } from 'lucide-react';
-import { classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
+import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
   type IrecruitMatchResult,
@@ -112,6 +112,7 @@ type IrecruitDisplayRow =
       branchName: string | null;
     };
 const MATCHING_AI_PREWARM_ENABLED = import.meta.env.VITE_MATCHING_AI_PREWARM_ENABLED === 'true';
+const MATCHING_LIST_BATCH_SIZE = 60;
 
 function branchDemandItems(job: JobRequest): BranchDemandItem[] {
   const overrides = job.field_overrides?.branches;
@@ -453,7 +454,9 @@ const MatchingPage: React.FC = () => {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
+  const [visibleJobLimit, setVisibleJobLimit] = useState(MATCHING_LIST_BATCH_SIZE);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
+  const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
@@ -491,6 +494,9 @@ const MatchingPage: React.FC = () => {
   // สีแดงเป็นผลห่างไกล: ซ่อนจากงานประจำและไม่นับเป็น AI แนะนำ แต่เปิดดูเพื่อตรวจ AI ได้
   const [showDistantCandidates, setShowDistantCandidates] = useState(false);
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
+  const [branchEditAgeMin, setBranchEditAgeMin] = useState('');
+  const [branchEditAgeMax, setBranchEditAgeMax] = useState('');
+  const [branchEditGender, setBranchEditGender] = useState('');
   const [branchDrafts, setBranchDrafts] = useState<UnitBranchOverride[]>([]);
   const [branchSaveBusy, setBranchSaveBusy] = useState(false);
   const [branchGeocodeBusyId, setBranchGeocodeBusyId] = useState<string | null>(null);
@@ -640,7 +646,7 @@ const MatchingPage: React.FC = () => {
 
   // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอ/คำขอโพสหางานที่เคยบันทึก
   const openJob = (j: JobRequest) => {
-    setJobDetail(j);
+    setJobDetail({ ...j, ...(localJobEditsById[j.id] || {}) });
     setShowDistantCandidates(false);
     setProposeError(null);
     setPostingError(null);
@@ -889,6 +895,9 @@ const MatchingPage: React.FC = () => {
       lng: branch.lng ?? null,
       geocode_status: branch.geocode_status || 'unverified',
     }));
+    setBranchEditAgeMin(job.age_range_min != null ? String(job.age_range_min) : '');
+    setBranchEditAgeMax(job.age_range_max != null ? String(job.age_range_max) : '');
+    setBranchEditGender(job.gender_requirement || '');
     setBranchDrafts(drafts);
     setBranchEditorError(null);
     setBranchEditorOpen(true);
@@ -963,9 +972,53 @@ const MatchingPage: React.FC = () => {
     setBranchSaveBusy(true);
     setBranchEditorError(null);
     try {
-      const fieldOverrides = { ...(jobDetail.field_overrides || {}), branches };
+      const ageMin = branchEditAgeMin.trim() === '' ? null : Number(branchEditAgeMin);
+      const ageMax = branchEditAgeMax.trim() === '' ? null : Number(branchEditAgeMax);
+      if ((ageMin != null && !Number.isFinite(ageMin)) || (ageMax != null && !Number.isFinite(ageMax))) {
+        setBranchEditorError('กรุณาระบุอายุเป็นตัวเลข');
+        return;
+      }
+      if (ageMin != null && ageMax != null && ageMin > ageMax) {
+        setBranchEditorError('อายุต่ำสุดต้องไม่มากกว่าอายุสูงสุด');
+        return;
+      }
+      const gender = branchEditGender.trim() || null;
+      const fieldOverrides = {
+        ...(jobDetail.field_overrides || {}),
+        age_min: ageMin,
+        age_max: ageMax,
+        gender,
+        branches,
+      };
       await saveUnitRequestMeta(unitRequestNoteKey(jobDetail), { field_overrides: fieldOverrides });
-      setJobDetail((current) => (current ? { ...current, field_overrides: fieldOverrides } : current));
+      const savedEdit: Partial<JobRequest> = {
+        age_range_min: ageMin ?? undefined,
+        age_range_max: ageMax ?? undefined,
+        gender_requirement: gender ?? undefined,
+        field_overrides: fieldOverrides,
+      };
+      setLocalJobEditsById((current) => ({
+        ...current,
+        [jobDetail.id]: { ...(current[jobDetail.id] || {}), ...savedEdit },
+      }));
+      setJobDetail((current) =>
+        current
+          ? {
+              ...current,
+              ...savedEdit,
+            }
+          : current,
+      );
+      setBoardMatchById((current) => {
+        const next = { ...current };
+        delete next[jobDetail.id];
+        return next;
+      });
+      setIrMatchById((current) => {
+        const next = { ...current };
+        delete next[jobDetail.id];
+        return next;
+      });
       setBranchEditorOpen(false);
     } catch (error) {
       setBranchEditorError(error instanceof Error ? error.message : 'บันทึกสาขาไม่สำเร็จ');
@@ -1106,25 +1159,44 @@ const MatchingPage: React.FC = () => {
       });
   }, [jobs, search, urgentOnly, unitFilter, workflowFilter, proposalsByJobId, boardMatchById]);
 
+  useEffect(() => {
+    setVisibleJobLimit(MATCHING_LIST_BATCH_SIZE);
+  }, [search, urgentOnly, unitFilter, workflowFilter]);
+
+  const visibleRows = useMemo(() => rows.slice(0, visibleJobLimit), [rows, visibleJobLimit]);
+
   // นับ "คนของเราน่าจะตรง" ต่อใบขอแบบเบา (ไม่เรียก AI) โชว์ตั้งแต่หน้าแรก
   // #6 แม่นขึ้น: classify ใบขอเข้า job family ก่อน แล้วนับผู้สมัครที่สกิลอยู่ family เดียวกัน
   //   (แทน keyword ดิบที่ over-count จากคำกว้าง ๆ) — fallback เป็น keyword overlap ถ้า classify ไม่ได้
+  const quickCountPoolIndex = useMemo(() => {
+    const texts = pool.map((candidate) => `${candidate.job1_name || ''} ${candidate.job2_name || ''}`.toLowerCase());
+    const familyCounts = Object.fromEntries(
+      JOB_FAMILIES.map((family) => [
+        family.code,
+        texts.reduce((count, text) => count + (candidateMatchesFamily(text, family.code) ? 1 : 0), 0),
+      ]),
+    ) as Record<(typeof JOB_FAMILIES)[number]['code'], number>;
+    return { texts, familyCounts };
+  }, [pool]);
+
   const quickCounts = useMemo(() => {
     const out: Record<string, number> = {};
-    if (pool.length === 0) return out;
-    const poolText = pool.map((c) => `${c.job1_name || ''} ${c.job2_name || ''}`.toLowerCase());
+    if (quickCountPoolIndex.texts.length === 0) return out;
     for (const j of rows) {
       const title = jobTitleText(j);
       const family = classifyJobFamily(title);
       if (family) {
-        out[j.id] = poolText.filter((t) => candidateMatchesFamily(t, family)).length;
+        out[j.id] = quickCountPoolIndex.familyCounts[family] ?? 0;
         continue;
       }
       const kws = fallbackKeywords(title);
-      out[j.id] = kws.length === 0 ? 0 : poolText.filter((t) => kws.some((k) => t.includes(k))).length;
+      out[j.id] =
+        kws.length === 0
+          ? 0
+          : quickCountPoolIndex.texts.filter((text) => kws.some((keyword) => text.includes(keyword))).length;
     }
     return out;
-  }, [rows, pool]);
+  }, [rows, quickCountPoolIndex]);
 
   // #4 dashboard เล็ก — แยกคำแนะนำ AI ออกจากสถานะจอง/ลงงานจริง
   // ถ้าวิเคราะห์แล้วให้นับเฉพาะสีเขียว; ถ้ายังไม่วิเคราะห์ใช้ quick count และติดป้ายว่าเป็นประมาณการ
@@ -1245,6 +1317,7 @@ const MatchingPage: React.FC = () => {
         <div className="flex items-center gap-2 px-1">
           <p className="text-sm text-muted-foreground">
             ใบขอ <span className="text-blue-600 font-bold tabular-nums">{rows.length}</span> รายการ
+            {rows.length > visibleRows.length ? ` · แสดง ${visibleRows.length} รายการแรก` : ''}
             {loadingJobs ? ' · กำลังโหลด…' : ''}
           </p>
           <p className="text-xs text-muted-foreground">· เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง</p>
@@ -1263,7 +1336,7 @@ const MatchingPage: React.FC = () => {
               <p className="text-sm font-medium text-foreground">ไม่พบใบขอตามเงื่อนไข</p>
             </div>
           ) : null}
-          {rows.map((j) => {
+          {visibleRows.map((j) => {
             const matchCount = boardMatchById[j.id]
               ? recommendedCandidateCount(boardMatchById[j.id].matches)
               : undefined;
@@ -1344,6 +1417,15 @@ const MatchingPage: React.FC = () => {
               </div>
             );
           })}
+          {visibleRows.length < rows.length ? (
+            <button
+              type="button"
+              onClick={() => setVisibleJobLimit((current) => current + MATCHING_LIST_BATCH_SIZE)}
+              className="mx-auto flex min-h-[44px] items-center justify-center rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50"
+            >
+              แสดงเพิ่มอีก {Math.min(MATCHING_LIST_BATCH_SIZE, rows.length - visibleRows.length)} รายการ
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1369,13 +1451,23 @@ const MatchingPage: React.FC = () => {
                       ) : null}
                     </div>
                   </div>
-                  <Link
-                    to={unitRequestPath(jobDetail)}
-                    state={{ returnTo: '/matching/match' }}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
-                  >
-                    ดูใบขอ <ExternalLink className="h-3 w-3" />
-                  </Link>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => openBranchEditor(jobDetail)}
+                      className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                    >
+                      <MapPin className="h-3 w-3" /> แก้ไขเงื่อนไข/สาขา
+                    </button>
+                    <Link
+                      to={unitRequestPath(jobDetail)}
+                      state={{ returnTo: '/matching/match' }}
+                      onClick={() => setJobDetail(null)}
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                    >
+                      ดูใบขอ <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
                 </div>
                 {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
                   .filter((v) => v && v !== 'ไม่ระบุ').length ? (
@@ -1415,6 +1507,48 @@ const MatchingPage: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {(() => {
+                const branches = branchDemandItems(jobDetail);
+                if (!branches.length) return null;
+                return (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-violet-900">สาขาที่ระบบแยกได้ ({branches.length})</p>
+                        <p className="text-[10px] text-violet-700">กรุณาตรวจสอบ เพราะข้อความต้นทางอาจแยกคลาดเคลื่อนได้</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openBranchEditor(jobDetail)}
+                        className="shrink-0 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                      >
+                        แก้ไข
+                      </button>
+                    </div>
+                    <div className="mt-2 space-y-1.5">
+                      {branches.map((branch, index) => (
+                        <div
+                          key={branch.branch_id || `${branch.branch_name_clean}-${index}`}
+                          className="flex items-start justify-between gap-3 rounded-lg border border-white/80 bg-white/80 px-2.5 py-2 text-[11px]"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-800">{branch.branch_name_clean || `สาขา ${index + 1}`}</p>
+                            <p className="text-slate-600">
+                              {[branch.road, branch.subdistrict, branch.district_hint, branch.province_hint]
+                                .filter(Boolean)
+                                .join(' · ') || branch.address_raw || 'ยังไม่มีรายละเอียดที่อยู่'}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">
+                            {branch.requested_qty} คน
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {(() => {
                 const progress = proposalCounts(proposalsByJobId[jobDetail.id]);
@@ -1621,13 +1755,6 @@ const MatchingPage: React.FC = () => {
                         : 'ไม่พอ? หาผู้สมัครจากฐาน iRecruit'}
                     </p>
                     <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openBranchEditor(jobDetail)}
-                        className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-3 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
-                      >
-                        <MapPin className="h-3 w-3" /> แก้ไขสาขา/ที่อยู่
-                      </button>
                       <button
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
@@ -1885,13 +2012,61 @@ const MatchingPage: React.FC = () => {
       <Dialog open={branchEditorOpen} onOpenChange={(open) => !branchSaveBusy && setBranchEditorOpen(open)}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>แยกและแก้ไขสาขาของใบขอ</DialogTitle>
+            <DialogTitle>แก้ไขเงื่อนไขและสาขาของใบขอ</DialogTitle>
             <DialogDescription>
-              ตรวจชื่อสถานที่ ที่อยู่ จำนวนคน และพิกัดทีละสาขา ก่อนใช้จัดผู้สมัครตามพื้นที่
+              แก้เพศ ช่วงอายุ ชื่อสถานที่ ที่อยู่ จำนวนคน และพิกัด ก่อนใช้คัดและจัดผู้สมัคร
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
+            <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+              <p className="mb-2 text-xs font-semibold text-violet-900">เงื่อนไขผู้สมัคร</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <label className="text-[11px] font-medium text-slate-600">
+                  เพศ
+                  <select
+                    value={branchEditGender}
+                    onChange={(event) => setBranchEditGender(event.target.value)}
+                    className="jarvis-soft-field mt-1 w-full"
+                  >
+                    <option value="">ไม่ระบุ</option>
+                    <option value="ชาย">ชาย</option>
+                    <option value="หญิง">หญิง</option>
+                  </select>
+                </label>
+                <label className="text-[11px] font-medium text-slate-600">
+                  อายุต่ำสุด
+                  <input
+                    type="number"
+                    min={15}
+                    max={100}
+                    value={branchEditAgeMin}
+                    onChange={(event) => setBranchEditAgeMin(event.target.value)}
+                    className="jarvis-soft-field mt-1 w-full"
+                    placeholder="ไม่ระบุ"
+                  />
+                </label>
+                <label className="text-[11px] font-medium text-slate-600">
+                  อายุสูงสุด
+                  <input
+                    type="number"
+                    min={15}
+                    max={100}
+                    value={branchEditAgeMax}
+                    onChange={(event) => setBranchEditAgeMax(event.target.value)}
+                    className="jarvis-soft-field mt-1 w-full"
+                    placeholder="ไม่ระบุ"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-800">สาขาปฏิบัติงาน</p>
+                <p className="text-[10px] text-muted-foreground">แก้ผลที่ระบบแยกจากข้อความต้นทางได้ทุกช่อง</p>
+              </div>
+            </div>
             {branchDrafts.map((branch, index) => {
               const branchId = branch.branch_id || `branch-${index + 1}`;
               const hasCoordinate = Number.isFinite(branch.lat) && Number.isFinite(branch.lng);
@@ -2085,7 +2260,7 @@ const MatchingPage: React.FC = () => {
                 onClick={() => void saveBranchDrafts()}
                 className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
               >
-                {branchSaveBusy ? 'กำลังบันทึก…' : 'บันทึกสาขา'}
+                {branchSaveBusy ? 'กำลังบันทึก…' : 'บันทึกเงื่อนไขและสาขา'}
               </button>
             </div>
           </div>
