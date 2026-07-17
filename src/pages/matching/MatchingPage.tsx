@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink } from 'lucide-react';
@@ -15,11 +15,14 @@ import { apiFetch } from '@/lib/apiFetch';
 import {
   saveProposal,
   listProposalsForJob,
+  cancelProposal,
   proposalKey,
   proposalStatusLabel,
+  ProposalConflictError,
   type ProposalStatus,
+  type ProposalConflictInfo,
 } from '@/lib/candidateProposalsApi';
-import { CheckCircle2, UserPlus } from 'lucide-react';
+import { CheckCircle2, UserPlus, Megaphone, X } from 'lucide-react';
 import { classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
@@ -27,6 +30,15 @@ import {
   matchTierEmoji,
   matchTierLabel,
 } from '@/lib/irecruitMatchTypes';
+import {
+  getActiveJobPostingForJob,
+  createJobPostingRequest,
+  jobPostingStatusLabel,
+  type JobPostingRequest,
+} from '@/lib/jobPostingRequestsApi';
+
+/** สถานะการเสนอ + id แถวจริงใน DB (ไว้ยกเลิก) — คีย์ = source#ref */
+type ProposedRef = { id: string; status: ProposalStatus };
 
 /** "คนของเรา" — ผ่านสัมภาษณ์แล้ว รอลงงาน (จาก board) แมทกับใบขอด้วย AI */
 type BoardCandidateMatch = {
@@ -72,6 +84,7 @@ function jobTitleText(j: JobRequest): string {
 
 const MatchingPage: React.FC = () => {
   const { jobs, loading: loadingJobs } = useUnitRequestsFeed();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
@@ -89,11 +102,22 @@ const MatchingPage: React.FC = () => {
   // ดูรายละเอียดพนักงานของเรา
   const [candDetail, setCandDetail] = useState<BoardCandidateMatch | null>(null);
   // การเสนอ/จองตัว/ลงงาน — สถานะล่าสุดต่อผู้สมัคร (คีย์ = source#ref) ต่อใบขอที่เปิดอยู่
-  const [proposedByKey, setProposedByKey] = useState<Record<string, ProposalStatus>>({});
+  const [proposedByKey, setProposedByKey] = useState<Record<string, ProposedRef>>({});
   const [proposingKey, setProposingKey] = useState<string | null>(null);
   const [proposeError, setProposeError] = useState<string | null>(null);
+  // ผู้สมัครถูกจองอยู่กับใบขออื่นแล้ว (409 จาก backend) — ให้เลือกยกเลิกอันเดิมแล้วจองใบนี้แทน
+  const [conflictInfo, setConflictInfo] = useState<{
+    message: string;
+    conflict: ProposalConflictInfo;
+    retry: () => Promise<void>;
+  } | null>(null);
+  const [resolvingConflict, setResolvingConflict] = useState(false);
   // #3 กันเสนอซ้ำ — ซ่อนคนที่เสนอ/จอง/ลงแล้ว
   const [hideProposed, setHideProposed] = useState(false);
+  // #1 คำขอโพสหางานใหม่ — สร้าง ID ให้ทีมคอนเทนต์/สรรหารับไปทำต่อ
+  const [jobPostingByJobId, setJobPostingByJobId] = useState<Record<string, JobPostingRequest>>({});
+  const [creatingPosting, setCreatingPosting] = useState(false);
+  const [postingError, setPostingError] = useState<string | null>(null);
   // #5 pre-warm AI งานด่วนเบื้องหลัง
   const [prewarming, setPrewarming] = useState(false);
   const prewarmStartedRef = useRef(false);
@@ -168,19 +192,32 @@ const MatchingPage: React.FC = () => {
     }
   };
 
-  // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอที่เคยบันทึก
+  // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอ/คำขอโพสหางานที่เคยบันทึก
   const openJob = (j: JobRequest) => {
     setJobDetail(j);
     setProposeError(null);
+    setPostingError(null);
     if (!boardMatchById[j.id] && boardLoadingId !== j.id) void fetchBoardMatch(j.id);
     void listProposalsForJob(j.id).then((items) => {
       setProposedByKey((prev) => {
         const next = { ...prev };
-        for (const p of items) next[proposalKey(p.source, p.candidate_ref)] = p.status;
+        for (const p of items) next[proposalKey(p.source, p.candidate_ref)] = { id: p.id, status: p.status };
         return next;
       });
     });
+    void getActiveJobPostingForJob(j.id).then((item) => {
+      if (item) setJobPostingByJobId((prev) => ({ ...prev, [j.id]: item }));
+    });
   };
+
+  // เปิดจาก URL (?jobId=...) — เช่นลิงก์ "เปิดใบขอ" จากหน้ารายชื่อคนจอง/คำขอโพสหางาน
+  useEffect(() => {
+    const jobId = searchParams.get('jobId');
+    if (!jobId || jobs.length === 0) return;
+    const job = jobs.find((j) => j.id === jobId);
+    if (job) openJob(job);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, jobs]);
 
   // บันทึกการเสนอ/จองตัว/ลงงาน "คนของเรา" (board) ลง DB
   const proposeBoard = async (job: JobRequest, m: BoardCandidateMatch, status: ProposalStatus) => {
@@ -200,11 +237,74 @@ const MatchingPage: React.FC = () => {
         reason: m.reason,
         status,
       });
-      setProposedByKey((prev) => ({ ...prev, [key]: saved.status }));
+      setProposedByKey((prev) => ({ ...prev, [key]: { id: saved.id, status: saved.status } }));
     } catch (e) {
-      setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+      if (e instanceof ProposalConflictError) {
+        setConflictInfo({ message: e.message, conflict: e.conflict, retry: () => proposeBoard(job, m, status) });
+      } else {
+        setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+      }
     } finally {
       setProposingKey((cur) => (cur === key ? null : cur));
+    }
+  };
+
+  // ยกเลิกการเสนอ/จองที่มีอยู่ (ปลดล็อกให้เสนอใบขออื่นได้)
+  const cancelExisting = async (key: string) => {
+    const ref = proposedByKey[key];
+    if (!ref) return;
+    setProposingKey(key);
+    setProposeError(null);
+    try {
+      await cancelProposal(ref.id);
+      setProposedByKey((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    } catch (e) {
+      setProposeError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setProposingKey((cur) => (cur === key ? null : cur));
+    }
+  };
+
+  // ยกเลิกการจองเดิมที่ชนกัน แล้วลองเสนอใบขอนี้ใหม่อีกครั้ง
+  const resolveConflict = async () => {
+    if (!conflictInfo) return;
+    setResolvingConflict(true);
+    try {
+      await cancelProposal(conflictInfo.conflict.id);
+      await conflictInfo.retry();
+      setConflictInfo(null);
+    } catch (e) {
+      setProposeError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setResolvingConflict(false);
+    }
+  };
+
+  // #1 สร้างคำขอโพสหางานใหม่ (สร้าง ID ให้ทีมคอนเทนต์/สรรหารับไปทำต่อ)
+  const composePostingReason = (job: JobRequest): string => {
+    const bm = boardMatchById[job.id];
+    if (!bm || bm.matches.length === 0) return 'ไม่มีคนของเราที่สกิลตรงกับใบขอนี้';
+    return `มีคนของเราเสนอ ${bm.matches.length} คน (จาก pool ${bm.pool_size}) แต่ยังไม่โอเค/ไม่เพียงพอ`;
+  };
+
+  const createPosting = async (job: JobRequest) => {
+    setCreatingPosting(true);
+    setPostingError(null);
+    try {
+      const item = await createJobPostingRequest({
+        jobId: job.id,
+        requestNo: job.request_no,
+        reason: composePostingReason(job),
+      });
+      setJobPostingByJobId((prev) => ({ ...prev, [job.id]: item }));
+    } catch (e) {
+      setPostingError(e instanceof Error ? e.message : 'สร้างคำขอไม่สำเร็จ');
+    } finally {
+      setCreatingPosting(false);
     }
   };
 
@@ -255,9 +355,13 @@ const MatchingPage: React.FC = () => {
         reason,
         status,
       });
-      setProposedByKey((prev) => ({ ...prev, [key]: saved.status }));
+      setProposedByKey((prev) => ({ ...prev, [key]: { id: saved.id, status: saved.status } }));
     } catch (e) {
-      setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+      if (e instanceof ProposalConflictError) {
+        setConflictInfo({ message: e.message, conflict: e.conflict, retry: () => proposeIrecruit(job, m, status) });
+      } else {
+        setProposeError(e instanceof Error ? e.message : 'บันทึกการเสนอไม่สำเร็จ');
+      }
     } finally {
       setProposingKey((cur) => (cur === key ? null : cur));
     }
@@ -323,7 +427,14 @@ const MatchingPage: React.FC = () => {
     return { total: urgent.length, ready, none: urgent.length - ready, confirmedCount };
   }, [rows, quickCounts, boardMatchById]);
 
-  const closeJob = () => setJobDetail(null);
+  const closeJob = () => {
+    setJobDetail(null);
+    if (searchParams.get('jobId')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('jobId');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   return (
     <div>
@@ -620,7 +731,7 @@ const MatchingPage: React.FC = () => {
                             <div className="flex shrink-0 items-center gap-1">
                               {proposed ? (
                                 <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                  <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed)}
+                                  <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed.status)}
                                 </span>
                               ) : null}
                               <span className="rounded-full border border-white/80 bg-white/80 px-2 py-0.5 text-[10px] text-slate-600">
@@ -713,7 +824,7 @@ const MatchingPage: React.FC = () => {
                                   <div className="flex shrink-0 items-center gap-1">
                                     {proposed ? (
                                       <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                        <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed)}
+                                        <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposed.status)}
                                       </span>
                                     ) : null}
                                     <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500">
@@ -745,7 +856,7 @@ const MatchingPage: React.FC = () => {
                                     className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                                   >
                                     <UserPlus className="h-3 w-3" />
-                                    {busy ? 'บันทึก…' : proposed === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+                                    {busy ? 'บันทึก…' : proposed?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
                                   </button>
                                   <button
                                     type="button"
@@ -753,8 +864,18 @@ const MatchingPage: React.FC = () => {
                                     onClick={() => void proposeIrecruit(jobDetail, m, 'placed')}
                                     className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                                   >
-                                    {busy ? 'บันทึก…' : proposed === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+                                    {busy ? 'บันทึก…' : proposed?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
                                   </button>
+                                  {proposed ? (
+                                    <button
+                                      type="button"
+                                      disabled={busy}
+                                      onClick={() => void cancelExisting(key)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                    >
+                                      <X className="h-3 w-3" /> ยกเลิก
+                                    </button>
+                                  ) : null}
                                 </div>
                               </div>
                             );
@@ -767,6 +888,40 @@ const MatchingPage: React.FC = () => {
                     </p>
                   )}
                   {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
+                </div>
+              ) : null}
+
+              {/* #1 หาคนไม่ได้ / คนที่มีไม่โอเค → สร้างคำขอโพสหางานใหม่ (ID ให้ทีมคอนเทนต์รับไปทำต่อ) */}
+              {boardMatchById[jobDetail.id] ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/40 px-3 py-3 space-y-2">
+                  <p className="text-xs font-semibold text-rose-900">หาคนไม่ได้เลย หรือคนที่มีไม่โอเค?</p>
+                  {jobPostingByJobId[jobDetail.id] ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        title={jobPostingByJobId[jobDetail.id].id}
+                        className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-mono text-rose-700"
+                      >
+                        ID: {jobPostingByJobId[jobDetail.id].id.slice(0, 8)}
+                      </span>
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-800">
+                        {jobPostingStatusLabel(jobPostingByJobId[jobDetail.id].status)}
+                      </span>
+                      <a href="/matching/job-postings" className="text-[11px] text-blue-700 hover:underline">
+                        ดูคำขอทั้งหมด →
+                      </a>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={creatingPosting}
+                      onClick={() => void createPosting(jobDetail)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                    >
+                      <Megaphone className="h-3.5 w-3.5" />
+                      {creatingPosting ? 'กำลังสร้าง…' : 'ขอโพสหางานใหม่ (สร้าง ID)'}
+                    </button>
+                  )}
+                  {postingError ? <p className="text-[11px] text-destructive">{postingError}</p> : null}
                 </div>
               ) : null}
             </div>
@@ -851,7 +1006,7 @@ const MatchingPage: React.FC = () => {
                         <p className="text-xs font-semibold text-violet-900">เสนอคนนี้ให้ใบขอ</p>
                         {current ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(current)}
+                            <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(current.status)}
                           </span>
                         ) : null}
                       </div>
@@ -862,7 +1017,7 @@ const MatchingPage: React.FC = () => {
                           onClick={() => void proposeBoard(jobDetail, candDetail, 'reserved')}
                           className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                         >
-                          {busy ? 'กำลังบันทึก…' : current === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
+                          {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
                         </button>
                         <button
                           type="button"
@@ -870,14 +1025,62 @@ const MatchingPage: React.FC = () => {
                           onClick={() => void proposeBoard(jobDetail, candDetail, 'placed')}
                           className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                         >
-                          {busy ? 'กำลังบันทึก…' : current === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
+                          {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
                         </button>
+                        {current ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void cancelExisting(key)}
+                            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <X className="h-3 w-3" /> ยกเลิกการจอง
+                          </button>
+                        ) : null}
                       </div>
                       {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                     </div>
                   );
                 })()
               ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* ผู้สมัครนี้ถูกจองอยู่กับใบขออื่นแล้ว — เลือกยกเลิกอันเดิมแล้วจองใบนี้แทน */}
+      <Dialog open={!!conflictInfo} onOpenChange={(o) => !o && setConflictInfo(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">ผู้สมัครนี้ถูกจองอยู่แล้ว</DialogTitle>
+            <DialogDescription className="sr-only">
+              แจ้งเตือนเมื่อพยายามจองผู้สมัครที่มีการจองใบขออื่นอยู่ก่อนแล้ว
+            </DialogDescription>
+          </DialogHeader>
+          {conflictInfo ? (
+            <div className="space-y-3">
+              <p className="text-sm text-foreground">{conflictInfo.message}</p>
+              <p className="text-xs text-muted-foreground">
+                จองอยู่กับใบขอ: {conflictInfo.conflict.request_no || conflictInfo.conflict.job_id} · สถานะ:{' '}
+                {proposalStatusLabel(conflictInfo.conflict.status)}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={resolvingConflict}
+                  onClick={() => void resolveConflict()}
+                  className="rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  {resolvingConflict ? 'กำลังยกเลิก…' : 'ยกเลิกใบเดิม แล้วจองใบนี้แทน'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConflictInfo(null)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  ปิด
+                </button>
+              </div>
             </div>
           ) : null}
         </DialogContent>

@@ -25,6 +25,12 @@ const STATUSES: ProposalStatus[] = [
   'rejected',
   'cancelled',
 ];
+/** สถานะที่ถือว่า "กำลังจอง/ทำงานอยู่" — ผู้สมัครคนเดียวมีได้ใบขอเดียวในสถานะเหล่านี้ */
+export const ACTIVE_PROPOSAL_STATUSES: ProposalStatus[] = ['reserved', 'contacted', 'placed'];
+
+export function isActiveProposalStatus(s: ProposalStatus): boolean {
+  return (ACTIVE_PROPOSAL_STATUSES as string[]).includes(s);
+}
 
 export type CandidateProposal = {
   id: string;
@@ -157,6 +163,40 @@ export async function listProposalsForJobs(
     return map;
   } catch (e) {
     if (isMissingTable(e)) return map;
+    throw e;
+  }
+}
+
+/** ผู้สมัครคนนี้ (source+candidate_ref) กำลังจองอยู่กับใบขออื่นหรือไม่ — กันเสนอซ้อนข้ามใบขอ */
+export async function findActiveConflict(
+  source: ProposalSource,
+  candidateRef: string,
+  excludeJobId: string,
+): Promise<CandidateProposal | null> {
+  try {
+    const { rows } = await dbQuery<Row>(
+      `select ${COLS} from ${table}
+       where source = $1 and candidate_ref = $2 and job_id <> $3 and status = ANY($4::text[])
+       order by updated_at desc limit 1`,
+      [source, candidateRef, excludeJobId, ACTIVE_PROPOSAL_STATUSES],
+    );
+    return rows[0] ? mapRow(rows[0]) : null;
+  } catch (e) {
+    if (isMissingTable(e)) return null;
+    throw e;
+  }
+}
+
+/** รายชื่อคนที่กำลังจอง/ติดต่อ/ลงงานอยู่ ทั่วทุกใบขอ (สำหรับหน้า "รายชื่อคนจอง") */
+export async function listActiveProposals(): Promise<CandidateProposal[]> {
+  try {
+    const { rows } = await dbQuery<Row>(
+      `select ${COLS} from ${table} where status = ANY($1::text[]) order by updated_at desc`,
+      [ACTIVE_PROPOSAL_STATUSES],
+    );
+    return rows.map(mapRow);
+  } catch (e) {
+    if (isMissingTable(e)) return [];
     throw e;
   }
 }

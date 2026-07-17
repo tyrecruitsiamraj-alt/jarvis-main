@@ -13,6 +13,10 @@ import {
   upsertProposal,
   updateProposal,
   normalizeSource,
+  normalizeStatus,
+  findActiveConflict,
+  listActiveProposals,
+  isActiveProposalStatus,
 } from '../_lib/candidateProposals.js';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -28,6 +32,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'GET') {
     try {
+      if (getQuery(req, 'active') === '1') {
+        const items = await listActiveProposals();
+        return res.status(200).json({ items });
+      }
+
       const jobIds = getQuery(req, 'jobIds');
       if (jobIds.trim()) {
         const ids = jobIds
@@ -63,6 +72,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!jobId) return sendError(res, 400, 'Bad request', 'job_id is required');
       if (!candidateRef) return sendError(res, 400, 'Bad request', 'candidate_ref is required');
       if (!source) return sendError(res, 400, 'Bad request', 'source must be board or irecruit');
+
+      const targetStatus = normalizeStatus(body.status) ?? 'reserved';
+      if (isActiveProposalStatus(targetStatus)) {
+        const conflict = await findActiveConflict(source, candidateRef, jobId);
+        if (conflict) {
+          return sendError(
+            res,
+            409,
+            'Conflict',
+            `ผู้สมัครนี้ถูกจองอยู่กับใบขออื่นแล้ว (${conflict.request_no || conflict.job_id}) — ต้องยกเลิกก่อนจึงจะจองใบนี้ได้`,
+            { conflict },
+          );
+        }
+      }
 
       const item = await upsertProposal({
         jobId,

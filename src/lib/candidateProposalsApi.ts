@@ -60,6 +60,21 @@ export function proposalStatusLabel(status: ProposalStatus): string {
   return STATUS_LABEL[status] ?? status;
 }
 
+/** ผู้สมัครถูกจองอยู่กับใบขออื่นแล้ว (409 จาก backend) — ต้องยกเลิกอันเดิมก่อนถึงจะจองใบนี้ได้ */
+export type ProposalConflictInfo = Pick<
+  CandidateProposal,
+  'id' | 'job_id' | 'request_no' | 'status' | 'candidate_name'
+>;
+
+export class ProposalConflictError extends Error {
+  conflict: ProposalConflictInfo;
+  constructor(message: string, conflict: ProposalConflictInfo) {
+    super(message);
+    this.name = 'ProposalConflictError';
+    this.conflict = conflict;
+  }
+}
+
 export async function saveProposal(input: SaveProposalInput): Promise<CandidateProposal> {
   const r = await apiFetch('/api/matching/proposals', {
     method: 'POST',
@@ -77,7 +92,14 @@ export async function saveProposal(input: SaveProposalInput): Promise<CandidateP
     }),
   });
   if (!r.ok) {
-    const d = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
+    const d = (await r.json().catch(() => ({}))) as {
+      message?: string;
+      error?: string;
+      conflict?: ProposalConflictInfo;
+    };
+    if (r.status === 409 && d.conflict) {
+      throw new ProposalConflictError(d.message || 'ผู้สมัครนี้ถูกจองอยู่กับใบขออื่นแล้ว', d.conflict);
+    }
     throw new Error(d.message || d.error || `บันทึกการเสนอไม่สำเร็จ (HTTP ${r.status})`);
   }
   return (await r.json()) as CandidateProposal;
@@ -88,4 +110,24 @@ export async function listProposalsForJob(jobId: string): Promise<CandidatePropo
   if (!r.ok) return [];
   const d = (await r.json().catch(() => ({}))) as { items?: CandidateProposal[] };
   return d.items ?? [];
+}
+
+/** ทุกคนที่กำลังจอง/ติดต่อ/ลงงานอยู่ (ข้ามทุกใบขอ) — สำหรับหน้า "รายชื่อคนจอง" */
+export async function listActiveProposals(): Promise<CandidateProposal[]> {
+  const r = await apiFetch('/api/matching/proposals?active=1');
+  if (!r.ok) return [];
+  const d = (await r.json().catch(() => ({}))) as { items?: CandidateProposal[] };
+  return d.items ?? [];
+}
+
+export async function cancelProposal(id: string): Promise<CandidateProposal> {
+  const r = await apiFetch(`/api/matching/proposals?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'cancelled' }),
+  });
+  if (!r.ok) {
+    const d = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
+    throw new Error(d.message || d.error || `ยกเลิกไม่สำเร็จ (HTTP ${r.status})`);
+  }
+  return (await r.json()) as CandidateProposal;
 }

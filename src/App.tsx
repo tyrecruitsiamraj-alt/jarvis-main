@@ -28,6 +28,8 @@ import CandidateProfile from "@/pages/matching/CandidateProfile";
 import AddCandidatePage from "@/pages/matching/AddCandidatePage";
 import MatchingPage from "@/pages/matching/MatchingPage";
 import PreCheckPage from "@/pages/matching/PreCheckPage";
+import JobPostingsPage from "@/pages/matching/JobPostingsPage";
+import ReservationsPage from "@/pages/matching/ReservationsPage";
 import JobDashboard from "@/pages/jobs/JobDashboard";
 import JobListPage from "@/pages/jobs/JobListPage";
 import StaffJobBoardPage from "@/pages/jobs/StaffJobBoardPage";
@@ -85,6 +87,8 @@ const ProtectedRoutes = () => {
           <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
           <Route path="/matching/match" element={<MatchingPage />} />
           <Route path="/matching/pre-check" element={<PreCheckPage />} />
+          <Route path="/matching/job-postings" element={<JobPostingsPage />} />
+          <Route path="/matching/reservations" element={<ReservationsPage />} />
           <Route path="/driver-care" element={<DriverCareOverview />} />
           <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
           <Route path="/driver-care/actions" element={<DriverActionTracking />} />
