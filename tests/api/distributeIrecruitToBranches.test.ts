@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { distributeIrecruitMatchesToBranches, proximityToBranch } from '../../src/lib/distributeIrecruitToBranches';
+import {
+  distributeIrecruitMatchesToBranches,
+  nearestBranchForArea,
+  proximityToBranch,
+} from '../../src/lib/distributeIrecruitToBranches';
 import type { IrecruitCandidateMatch } from '../../src/lib/irecruitMatchTypes';
 
 function match(partial: Partial<IrecruitCandidateMatch> & Pick<IrecruitCandidateMatch, 'id' | 'full_name'>): IrecruitCandidateMatch {
@@ -102,5 +106,35 @@ describe('distributeIrecruitMatchesToBranches (Option A)', () => {
     expect(out[1].matches[0]?.full_name).toBe('คนห้วยขวาง');
     // คนที่อยู่สาขาอื่นชัดเจนถูกตัด/ดันลง
     expect(out[0].matches.find((m) => m.id === 2)).toBeUndefined();
+  });
+
+  it('assigns a board-style candidate area to the nearest split branch', () => {
+    const nearest = nearestBranchForArea(
+      { district_name: 'บางเขน', province_name: 'กรุงเทพมหานคร' },
+      [
+        {
+          branch_id: 'prachachuen',
+          branch_name_clean: 'ประชาชื่น',
+          branch_name_raw: 'สาขาประชาชื่น',
+          requested_qty: 4,
+          confidence: 80,
+          district_hint: 'จตุจักร',
+          province_hint: 'กรุงเทพมหานคร',
+        },
+        {
+          branch_id: 'bangkhen',
+          branch_name_clean: 'บางเขน',
+          branch_name_raw: 'สาขาบางเขน',
+          requested_qty: 1,
+          confidence: 80,
+          district_hint: 'บางเขน',
+          province_hint: 'กรุงเทพมหานคร',
+        },
+      ],
+    );
+
+    expect(nearest?.branch.branch_id).toBe('bangkhen');
+    expect(nearest?.proximity_rank).toBe(0);
+    expect(nearest?.proximity_reason).toContain('บางเขน');
   });
 });

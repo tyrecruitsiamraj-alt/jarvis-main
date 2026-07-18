@@ -53,7 +53,9 @@ import {
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import {
   distributeIrecruitMatchesToBranches,
+  nearestBranchForArea,
   type BranchDemandItem,
+  type NearestBranchAssignment,
 } from '@/lib/distributeIrecruitToBranches';
 import {
   saveUnitRequestMeta,
@@ -137,6 +139,37 @@ function branchDemandItems(job: JobRequest): BranchDemandItem[] {
     road: branch.branch_name_clean.match(/(?:ถ\.|ถนน)\s*([^,]+)/)?.[1]?.trim() || null,
     geocode_status: 'unverified' as const,
   }));
+}
+
+function nearestBranchForBoardCandidate(
+  job: JobRequest,
+  match: BoardCandidateMatch,
+): NearestBranchAssignment | null {
+  return nearestBranchForArea(
+    {
+      district_name: match.amphur_name,
+      province_name: match.province_name,
+      location_label: [match.amphur_name, match.province_name].filter(Boolean).join(' '),
+    },
+    branchDemandItems(job),
+  );
+}
+
+function boardBranchProximityMeta(assignment: NearestBranchAssignment | null): { label: string; cls: string } {
+  if (!assignment || assignment.proximity_rank === 4) {
+    return { label: 'ยังระบุสาขาใกล้สุดไม่ได้', cls: 'border-slate-200 bg-white text-slate-500' };
+  }
+  const branchName = assignment.branch.branch_name_clean;
+  if (assignment.proximity_rank === 0) {
+    return { label: `ใกล้สาขา ${branchName} · เขตตรง`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+  }
+  if (assignment.proximity_rank === 1) {
+    return { label: `น่าจะใกล้สาขา ${branchName}`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+  }
+  if (assignment.proximity_rank === 2) {
+    return { label: 'จังหวัดเดียวกับจุดงาน · ยังฟันธงสาขาไม่ได้', cls: 'border-sky-200 bg-sky-50 text-sky-700' };
+  }
+  return { label: 'อยู่ กทม./ปริมณฑล · ยังฟันธงสาขาไม่ได้', cls: 'border-amber-200 bg-amber-50 text-amber-700' };
 }
 
 function buildIrecruitDisplayRows(
@@ -1511,6 +1544,21 @@ const MatchingPage: React.FC = () => {
               {(() => {
                 const branches = branchDemandItems(jobDetail);
                 if (!branches.length) return null;
+                const nearbyCounts = new Map<string, number>();
+                for (const match of (boardMatchById[jobDetail.id]?.matches || []).filter((item) => isRecommendedTier(item.tier))) {
+                  const assignment = nearestBranchForArea(
+                    {
+                      district_name: match.amphur_name,
+                      province_name: match.province_name,
+                      location_label: [match.amphur_name, match.province_name].filter(Boolean).join(' '),
+                    },
+                    branches,
+                  );
+                  if (assignment && assignment.proximity_rank <= 1) {
+                    const key = assignment.branch.branch_id || assignment.branch.branch_name_clean;
+                    nearbyCounts.set(key, (nearbyCounts.get(key) || 0) + 1);
+                  }
+                }
                 return (
                   <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-3">
                     <div className="flex items-center justify-between gap-2">
@@ -1540,9 +1588,18 @@ const MatchingPage: React.FC = () => {
                                 .join(' · ') || branch.address_raw || 'ยังไม่มีรายละเอียดที่อยู่'}
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">
-                            {branch.requested_qty} คน
-                          </span>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">
+                              ต้องการ {branch.requested_qty} คน
+                            </span>
+                            {boardMatchById[jobDetail.id] ? (
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                                คนของเราใกล้ {nearbyCounts.get(branch.branch_id || branch.branch_name_clean) || 0} คน
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500">รอประเมินคนใกล้สาขา</span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1653,12 +1710,14 @@ const MatchingPage: React.FC = () => {
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
                       .map((m) => {
-                      const meta = boardTierMeta(m.tier);
-                      const candidateKey = proposalKey('board', m.card_id);
-                      const proposed = proposedByKey[candidateKey];
-                      const otherActive = activeProposalByCandidate[candidateKey];
-                      const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
-                      return (
+                        const meta = boardTierMeta(m.tier);
+                        const branchAssignment = nearestBranchForBoardCandidate(jobDetail, m);
+                        const branchProximity = boardBranchProximityMeta(branchAssignment);
+                        const candidateKey = proposalKey('board', m.card_id);
+                        const proposed = proposedByKey[candidateKey];
+                        const otherActive = activeProposalByCandidate[candidateKey];
+                        const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
+                        return (
                         <button
                           type="button"
                           key={m.card_id}
@@ -1726,6 +1785,17 @@ const MatchingPage: React.FC = () => {
                               </a>
                             ) : null}
                           </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span
+                              title={branchAssignment?.proximity_reason || 'ข้อมูลพื้นที่ไม่พอสำหรับเทียบสาขา'}
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                branchProximity.cls,
+                              )}
+                            >
+                              <MapPin className="h-2.5 w-2.5" /> {branchProximity.label}
+                            </span>
+                          </div>
                           <div className="mt-1">
                             <CandidateChecklist
                               job={jobDetail}
@@ -1738,9 +1808,9 @@ const MatchingPage: React.FC = () => {
                           </div>
                           {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p> : null}
                           <div className="mt-1 text-[10px] font-medium text-sky-600">แตะเพื่อดูรายละเอียด →</div>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })}
                   </div>
                 )
               ) : null}

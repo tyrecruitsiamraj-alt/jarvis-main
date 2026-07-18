@@ -29,6 +29,18 @@ export type BranchDistributionGroup = BranchDemandItem & {
   matches: BranchAssignedMatch[];
 };
 
+export type CandidateArea = {
+  district_name?: string | null;
+  province_name?: string | null;
+  location_label?: string | null;
+};
+
+export type NearestBranchAssignment = {
+  branch: BranchDemandItem;
+  proximity_rank: BranchProximityRank;
+  proximity_reason: string;
+};
+
 function norm(v: string | null | undefined): string {
   return (v || '').trim().toLowerCase();
 }
@@ -48,7 +60,7 @@ function tierRank(tier: IrecruitCandidateMatch['tier']): number {
  * ใช้เขต/อำเภอ → ชื่อสาขา → จังหวัด เป็นหลัก
  */
 export function proximityToBranch(
-  match: IrecruitCandidateMatch,
+  match: CandidateArea,
   branch: Pick<BranchDemandItem, 'branch_name_clean' | 'district_hint' | 'province_hint'>,
 ): { rank: BranchProximityRank; reason: string } {
   const district = norm(match.district_name);
@@ -93,6 +105,26 @@ export function proximityToBranch(
     return { rank: 4, reason: `ห่างพื้นที่งาน (${match.province_name})` };
   }
   return { rank: 4, reason: 'ไม่ระบุพื้นที่ผู้สมัคร' };
+}
+
+/** เลือกสาขาที่ใกล้สุดจากข้อมูลพื้นที่ผู้สมัคร โดยไม่อ้างว่าเป็นระยะทางจริงเมื่อไม่มีพิกัด */
+export function nearestBranchForArea(
+  area: CandidateArea,
+  branches: BranchDemandItem[],
+): NearestBranchAssignment | null {
+  if (!branches.length) return null;
+  const ranked = branches.map((branch, index) => ({
+    branch,
+    index,
+    proximity: proximityToBranch(area, branch),
+  }));
+  ranked.sort((a, b) => a.proximity.rank - b.proximity.rank || a.index - b.index);
+  const nearest = ranked[0];
+  return {
+    branch: nearest.branch,
+    proximity_rank: nearest.proximity.rank,
+    proximity_reason: nearest.proximity.reason,
+  };
 }
 
 function sortAssigned(a: BranchAssignedMatch, b: BranchAssignedMatch): number {
