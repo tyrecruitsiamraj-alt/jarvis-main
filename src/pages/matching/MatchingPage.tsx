@@ -36,7 +36,7 @@ import {
   type ProposalConflictInfo,
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
-import { CheckCircle2, UserPlus, Megaphone, X } from 'lucide-react';
+import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
@@ -279,6 +279,9 @@ function proposalStatusClass(status: ProposalStatus): string {
   if (status === 'rejected') return 'border-red-200 bg-red-50 text-red-700';
   return 'border-slate-200 bg-slate-50 text-slate-600';
 }
+
+const CANDIDATE_ACTION_BUTTON_CLASS =
+  'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
 
 function proposalRefFromItem(item: CandidateProposal): ProposedRef {
   return {
@@ -1993,7 +1996,10 @@ const MatchingPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => openIrecruitCandidatePrefill(jobDetail, m, branchName)}
-                                    className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                                    className={cn(
+                                      CANDIDATE_ACTION_BUTTON_CLASS,
+                                      'border-violet-300 bg-white text-violet-700 hover:border-violet-400 hover:bg-violet-50 focus-visible:ring-violet-400',
+                                    )}
                                   >
                                     <UserPlus className="h-3 w-3" /> เพิ่มรายละเอียดผู้สมัคร
                                   </button>
@@ -2001,33 +2007,48 @@ const MatchingPage: React.FC = () => {
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'contacted', branchId, branchName)}
-                                    className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                                    className={cn(
+                                      CANDIDATE_ACTION_BUTTON_CLASS,
+                                      'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400',
+                                    )}
                                   >
+                                    <PhoneCall className="h-3 w-3" />
                                     {busy ? 'บันทึก…' : proposed?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
                                   </button>
                                   <button
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'reserved', branchId, branchName)}
-                                    className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                                    className={cn(
+                                      CANDIDATE_ACTION_BUTTON_CLASS,
+                                      'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400',
+                                    )}
                                   >
-                                    <UserPlus className="h-3 w-3" />
+                                    <UserCheck className="h-3 w-3" />
                                     {busy ? 'บันทึก…' : proposed?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
                                   </button>
                                   <button
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'placed', branchId, branchName)}
-                                    className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                    className={cn(
+                                      CANDIDATE_ACTION_BUTTON_CLASS,
+                                      'border-emerald-700 bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700 focus-visible:ring-emerald-500',
+                                    )}
                                   >
+                                    <CheckCircle2 className="h-3 w-3" />
                                     {busy ? 'บันทึก…' : proposed?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
                                   </button>
                                   <button
                                     type="button"
                                     disabled={busy}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'rejected', branchId, branchName)}
-                                    className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                    className={cn(
+                                      CANDIDATE_ACTION_BUTTON_CLASS,
+                                      'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400',
+                                    )}
                                   >
+                                    <UserX className="h-3 w-3" />
                                     {proposed?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
                                   </button>
                                   {proposed && isActiveWorkflowStatus(proposed.status) ? (
@@ -2035,7 +2056,10 @@ const MatchingPage: React.FC = () => {
                                       type="button"
                                       disabled={busy}
                                       onClick={() => openCancelProposalAction(jobDetail, key, m.full_name)}
-                                      className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                      className={cn(
+                                        CANDIDATE_ACTION_BUTTON_CLASS,
+                                        'border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus-visible:ring-red-400',
+                                      )}
                                     >
                                       <X className="h-3 w-3" /> ยกเลิก
                                     </button>
@@ -2466,32 +2490,48 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'contacted')}
-                          className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                          className={cn(
+                            CANDIDATE_ACTION_BUTTON_CLASS,
+                            'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400',
+                          )}
                         >
+                          <PhoneCall className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
                         </button>
                         <button
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'reserved')}
-                          className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                          className={cn(
+                            CANDIDATE_ACTION_BUTTON_CLASS,
+                            'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400',
+                          )}
                         >
+                          <UserCheck className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
                         </button>
                         <button
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'placed')}
-                          className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          className={cn(
+                            CANDIDATE_ACTION_BUTTON_CLASS,
+                            'border-emerald-700 bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700 focus-visible:ring-emerald-500',
+                          )}
                         >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
                         </button>
                         <button
                           type="button"
                           disabled={busy}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'rejected')}
-                          className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className={cn(
+                            CANDIDATE_ACTION_BUTTON_CLASS,
+                            'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400',
+                          )}
                         >
+                          <UserX className="h-3.5 w-3.5" />
                           {current?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
                         </button>
                         {current && isActiveWorkflowStatus(current.status) ? (
@@ -2499,7 +2539,10 @@ const MatchingPage: React.FC = () => {
                             type="button"
                             disabled={busy}
                             onClick={() => openCancelProposalAction(jobDetail, key, candDetail.full_name)}
-                            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            className={cn(
+                              CANDIDATE_ACTION_BUTTON_CLASS,
+                              'border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus-visible:ring-red-400',
+                            )}
                           >
                             <X className="h-3 w-3" /> ยกเลิกการจอง
                           </button>
