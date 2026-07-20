@@ -34,6 +34,91 @@ LUMOS_API_KEY=your-secret-key-here
 
 ---
 
+## AI Recruit — Positions
+
+### GET /api/lumos/positions
+
+Lumos เรียกเพื่อดึง positions ที่เปิดรับสมัคร (status = open / in_progress)  
+Logic เหมือน `/api/public/jobs` — ใช้ Siamraj MSSQL เมื่อ `SIAMRAJ_UNIT_REQUESTS_ENABLED=true` ไม่เช่นนั้นใช้ PostgreSQL
+
+**Request**
+```http
+GET /api/lumos/positions
+Authorization: Bearer <LUMOS_API_KEY>
+```
+
+**Query params**
+
+| Param | Type | Default | Notes |
+|-------|------|---------|-------|
+| `limit` | integer | 500 | max 2000 |
+
+**Response 200** — plain JSON array, เรียง `created_at` DESC
+```json
+[
+  {
+    "id": "siamraj:12345",
+    "title": "พนักงานขับรถ",
+    "department": "BKK001",
+    "location": "BKK001",
+    "employment_type": "Outsource",
+    "description": null,
+    "requirements": {
+      "hard_skills": [],
+      "soft_skills": [],
+      "responsibilities": ["สรรหาพนักงาน"],
+      "vehicle_required": "รถกระบะ"
+    },
+    "base_salary": null,
+    "status": "open",
+    "created_by": "วิภาวี รักงาน",
+    "interview_questions": null,
+    "created_at": "2026-07-10T03:00:00.000Z",
+    "updated_at": "2026-07-10T03:00:00.000Z",
+    "active_config_version": null
+  }
+]
+```
+
+**Position Object Schema** (ตาม Lumos AI Recruit Positions API Spec)
+
+| Field | Type | Nullable | SO source field |
+|-------|------|----------|----------------|
+| `id` | string | No | `id` (prefix `siamraj:` สำหรับ Siamraj path) |
+| `title` | string | No | `job_description_code_1` หรือ `request_action_name` |
+| `department` | string | Yes | `department_name` หรือ `unit_name` |
+| `location` | string | Yes | `location_address` |
+| `employment_type` | string | Yes | map จาก `job_type` → `Outsource` / `Full-time` / `Part-time` / `Freelance` |
+| `description` | string | Yes | `null` (ยังไม่มี field นี้ใน SO) |
+| `requirements` | object | Yes | รวมจาก `job_description_code_2`, `request_action_name`, `age_range_*`, `gender_requirement`, `vehicle_required`, `work_schedule` |
+| `base_salary` | number | Yes | `total_income` (null เมื่อ = 0) |
+| `status` | string | No | map: `open`/`in_progress` → `open`, `closed`/`cancelled` → `closed` |
+| `created_by` | string | Yes | `submittedByName` หรือ `submittedByEmail` |
+| `interview_questions` | string[] | Yes | `null` (field นี้ยังไม่มีใน SO) |
+| `created_at` | ISO 8601 | No | `created_at` |
+| `updated_at` | ISO 8601 | No | `updated_at` หรือ fallback `created_at` |
+| `active_config_version` | integer | Yes | `null` (ยังไม่มีใน SO) |
+
+**`requirements` well-known fields**
+
+| Field | SO source |
+|-------|-----------|
+| `hard_skills` | `job_description_code_2` (ถ้ามี) |
+| `soft_skills` | `[]` (ยังไม่มีข้อมูล) |
+| `responsibilities` | `request_action_name` |
+| `age_range` | `{ min: age_range_min, max: age_range_max }` |
+| `gender_requirement` | `gender_requirement` |
+| `vehicle_required` | `vehicle_required` |
+| `work_schedule` | `work_schedule` |
+
+**cURL**
+```bash
+curl -s -H "Authorization: Bearer $LUMOS_KEY" \
+  "http://localhost:9000/api/lumos/positions" | jq .
+```
+
+---
+
 ## AI Interview
 
 ### 1. GET /api/lumos/interview/candidates

@@ -44,6 +44,7 @@ import {
   lumosReminderContactsHandler,
   lumosReminderResultsHandler,
 } from './lumos-reminder.js';
+import lumosPositionsHandler from './lumos-positions.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -71,6 +72,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
   '/api/siamraj/opl-import': siamrajOplImportHandler as ApiHandler,
   '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
+  // Lumos AI Recruit — Positions
+  '/api/lumos/positions': lumosPositionsHandler as ApiHandler,
   // AI Interview (Lumos ↔ SO)
   '/api/lumos/interview/candidates': lumosInterviewCandidatesHandler as ApiHandler,
   '/api/lumos/interview/results': lumosInterviewResultsHandler as ApiHandler,
