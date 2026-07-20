@@ -36,13 +36,16 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <JobNotificationWatcher />
 
       {/* Top header — จอใหญ่ (lg+) */}
-      <header className="hidden lg:flex items-center justify-between gap-4 px-4 xl:px-8 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40">
-        <div className="flex items-center gap-4 xl:gap-8 min-w-0 flex-1">
+      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40">
+        <div className="flex items-center gap-2 2xl:gap-6 min-w-0 flex-1">
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
             <BrandMark size="md" />
-            <BrandTitle className="text-lg font-bold text-foreground truncate max-w-[200px] xl:max-w-none" />
+            <BrandTitle className="hidden 2xl:block text-lg font-bold text-foreground truncate max-w-[200px]" />
           </button>
-          <nav className="flex items-center gap-0.5 xl:gap-1 flex-wrap min-w-0" aria-label="เมนูหลัก">
+          <nav
+            className="flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="เมนูหลัก"
+          >
             {navItems.flatMap((item) => {
               const Icon = item.icon;
               const active = isDockPathActive(item.path, location.pathname);
@@ -52,7 +55,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   type="button"
                   onClick={() => navigate(resolveDockNavTarget(item.path))}
                   className={cn(
-                    'flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all touch-manipulation',
+                    'flex shrink-0 items-center gap-1.5 px-2 2xl:gap-2 2xl:px-3 py-2 rounded-lg text-xs 2xl:text-sm font-medium transition-all touch-manipulation',
                     active ? 'bg-blue-500/12 text-blue-700' : 'text-muted-foreground hover:text-foreground hover:bg-white/50',
                   )}
                 >
@@ -69,7 +72,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
           <NotificationPanel />
-          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[280px]">
+          <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0 capitalize">{user?.role}</span>
@@ -89,7 +92,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
             ) : null}
           </div>
-          <div className="flex xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70">
+          <div className="flex 2xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70">
             <UserCircle className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-medium text-blue-700 uppercase">{user?.role}</span>
             {showSettings ? (
