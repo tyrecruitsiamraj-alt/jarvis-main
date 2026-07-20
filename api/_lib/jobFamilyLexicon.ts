@@ -21,7 +21,8 @@ const FAMILY_TERMS: Record<JobFamilyCode, string[]> = {
   ],
   C: [
     'ขับรถ', 'พขร', 'คนขับ', 'driver', 'chauffeur', 'valet', 'รถผู้บริหาร',
-    'ส่วนกลาง', 'รับส่ง', 'ขนส่ง',
+    'ส่วนกลาง', 'รับส่ง', 'ขนส่ง', 'ส่งเอกสาร', 'เดินเอกสาร',
+    'แมสเซนเจอร์', 'messenger', 'courier',
   ],
   D: [
     'ธุรการ', 'admin', 'clerk', 'เสมียน', 'แคชเชียร์', 'cashier', 'คลังสินค้า', 'คลัง',
@@ -46,10 +47,27 @@ function normalize(text: string): string {
   return (text || '').toLowerCase();
 }
 
+/**
+ * งานรับ-ส่ง/เดินเอกสารมีแก่นเป็น courier/transport ไม่ใช่งานจัดทำเอกสารแบบธุรการ
+ * ต้องตรวจวลีเต็มก่อน keyword "เอกสาร" เพื่อไม่ให้หลุดเข้า Family D.
+ */
+function isDocumentCourier(text: string): boolean {
+  const compact = normalize(text).replace(/[\s/(),.\-\u2013\u2014|\u2022·]+/g, '');
+  return (
+    compact.includes('รับส่งเอกสาร') ||
+    compact.includes('ส่งเอกสาร') ||
+    compact.includes('เดินเอกสาร') ||
+    compact.includes('แมสเซนเจอร์') ||
+    compact.includes('messenger') ||
+    compact.includes('courier')
+  );
+}
+
 /** classify ข้อความตำแหน่งเข้า family — เลือกอันที่มี term ปรากฏมากสุด คืน null ถ้าไม่เข้าข่ายเลย */
 export function classifyJobFamily(text: string): JobFamilyCode | null {
   const t = normalize(text);
   if (!t.trim()) return null;
+  if (isDocumentCourier(t)) return 'C';
   let best: { code: JobFamilyCode; score: number } | null = null;
   for (const code of FAMILY_CODES) {
     let score = 0;
@@ -65,6 +83,7 @@ export function classifyJobFamily(text: string): JobFamilyCode | null {
 export function candidateMatchesFamily(candidateText: string, code: JobFamilyCode): boolean {
   const t = normalize(candidateText);
   if (!t.trim()) return false;
+  if (isDocumentCourier(t)) return code === 'C';
   return FAMILY_TERMS[code].some((term) => t.includes(term));
 }
 
@@ -72,7 +91,8 @@ export type ScoredCandidate<T> = { c: T; s: number };
 
 /**
  * เลือก shortlist จากรายชื่อที่ pre-score แล้ว (เรียงคะแนนมากไปน้อยแล้ว).
- * ถ้าคนสกิลตรง (score>0) มีน้อยกว่าครึ่งของ size ที่ต้องการ เติมจากคนที่เหลือ —
+ * คนที่ score>0 แต่ตรวจได้ว่าอยู่คนละ family จะถูกตัดก่อน; ตำแหน่งที่ lexicon ยังไม่รู้จักยังให้ AI พิจารณาได้.
+ * ถ้าคนสกิลตรงที่ผ่าน gate มีน้อยกว่าครึ่งของ size ที่ต้องการ เติมจากคนที่เหลือ —
  * แต่เติมได้เฉพาะคนที่ "family เดียวกับใบขอ" เท่านั้น (แม้ score=0) ห้ามสุ่มข้าม family เด็ดขาด
  * (กันเคส pool เป็นสายอื่นทั้งหมด แล้ว AI ถูกบังคับให้เลือกคนที่ไม่เกี่ยวข้องเลย เช่น คนขับรถ↔งานอ่านมาตร).
  * ถ้า family เป็น null (classify ไม่ได้) คงพฤติกรรมเดิม — เติมจากคนคะแนน 0 ทั่วไป.
@@ -83,9 +103,18 @@ export function selectShortlist<T>(
   family: JobFamilyCode | null,
   candidateText: (c: T) => string,
 ): ScoredCandidate<T>[] {
-  const withScore = scored.filter((x) => x.s > 0).slice(0, size);
+  const sameFamily = (x: ScoredCandidate<T>) =>
+    !family || candidateMatchesFamily(candidateText(x.c), family);
+  const compatibleScoredFamily = (x: ScoredCandidate<T>) => {
+    if (!family) return true;
+    const text = candidateText(x.c);
+    // ตำแหน่งเฉพาะที่ lexicon ยังไม่รู้จักยังให้ AI พิจารณาได้
+    return candidateMatchesFamily(text, family) || classifyJobFamily(text) === null;
+  };
+  // score จากคำร่วมเช่น "เอกสาร" ห้ามเอาชนะ family gate
+  const withScore = scored.filter((x) => x.s > 0 && compatibleScoredFamily(x)).slice(0, size);
   if (withScore.length >= Math.floor(size / 2)) return withScore;
   const zero = scored.filter((x) => x.s === 0);
-  const fill = family ? zero.filter((x) => candidateMatchesFamily(candidateText(x.c), family)) : zero;
+  const fill = family ? zero.filter(sameFamily) : zero;
   return [...withScore, ...fill.slice(0, size - withScore.length)];
 }

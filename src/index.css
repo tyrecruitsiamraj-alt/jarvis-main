@@ -114,6 +114,24 @@
     padding-top: max(0.75rem, env(safe-area-inset-top));
   }
 
+  /* Matching drawer: keep wheel/touch scrolling on its own compositor layer. */
+  .matching-sheet-scroll {
+    overscroll-behavior-y: contain;
+    scroll-behavior: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* Candidate cards below the viewport are expensive (tooltips, chips, actions).
+     Let Chromium skip their layout/paint until they approach the viewport. */
+  .matching-candidate-card {
+    content-visibility: auto;
+    contain: layout paint style;
+    contain-intrinsic-size: auto 170px;
+  }
+
   .glass-card {
     @apply rounded-[1.25rem] border border-black/[0.06] shadow-[0_6px_24px_rgba(17,17,26,0.06)];
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(248, 248, 250, 0.7));

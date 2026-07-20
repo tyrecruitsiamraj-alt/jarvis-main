@@ -524,8 +524,8 @@ const MatchingPage: React.FC = () => {
   const [resolvingConflict, setResolvingConflict] = useState(false);
   // #3 กันเสนอซ้ำ — ซ่อนคนที่เสนอ/จอง/ลงแล้ว
   const [hideProposed, setHideProposed] = useState(false);
-  // สีแดงเป็นผลห่างไกล: ซ่อนจากงานประจำและไม่นับเป็น AI แนะนำ แต่เปิดดูเพื่อตรวจ AI ได้
-  const [showDistantCandidates, setShowDistantCandidates] = useState(false);
+  // แสดงทางเลือกนอกพื้นที่/ห่างไกลเป็นค่าเริ่มต้น แต่ไม่นับรวมเป็น AI แนะนำ
+  const [showDistantCandidates, setShowDistantCandidates] = useState(true);
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
   const [branchEditAgeMin, setBranchEditAgeMin] = useState('');
   const [branchEditAgeMax, setBranchEditAgeMax] = useState('');
@@ -680,7 +680,7 @@ const MatchingPage: React.FC = () => {
   // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอ/คำขอโพสหางานที่เคยบันทึก
   const openJob = (j: JobRequest) => {
     setJobDetail({ ...j, ...(localJobEditsById[j.id] || {}) });
-    setShowDistantCandidates(false);
+    setShowDistantCandidates(true);
     setProposeError(null);
     setPostingError(null);
     if (!boardMatchById[j.id] && boardLoadingId !== j.id) void fetchBoardMatch(j.id);
@@ -1464,7 +1464,10 @@ const MatchingPage: React.FC = () => {
 
       {/* Drawer: คนของเรา ต่อใบขอ */}
       <Sheet open={!!jobDetail} onOpenChange={(o) => !o && closeJob()}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetContent
+          side="right"
+          className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"
+        >
           <SheetHeader>
             <SheetTitle className="text-foreground">คนของเรา — ผ่านสัมภาษณ์ รอลงงาน</SheetTitle>
             <SheetDescription className="sr-only">ผู้สมัครที่พร้อมลงงานซึ่งสกิลตรงกับใบขอ</SheetDescription>
@@ -1678,7 +1681,9 @@ const MatchingPage: React.FC = () => {
                             : 'border-slate-200 bg-white text-slate-500 hover:border-red-200',
                         )}
                       >
-                        {showDistantCandidates ? 'ซ่อนคนห่างไกล' : `แสดงคนห่างไกล (${distant})`}
+                        {showDistantCandidates
+                          ? 'ซ่อนคนนอกพื้นที่/ห่างไกล'
+                          : `แสดงคนนอกพื้นที่/ห่างไกล (${distant})`}
                       </button>
                     ) : null;
                   })()}
@@ -1693,6 +1698,15 @@ const MatchingPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {showDistantCandidates &&
+              distantCandidateCount(boardMatchById[jobDetail.id]?.matches) +
+                distantCandidateCount(irMatchById[jobDetail.id]?.matches) >
+                0 ? (
+                <p className="rounded-lg border border-red-100 bg-red-50/70 px-2.5 py-1.5 text-[10px] text-red-700">
+                  กำลังแสดงคนนอกพื้นที่/ห่างไกลด้วยเพื่อเป็นทางเลือกสำรอง — กลุ่มนี้ไม่ถูกนับรวมในยอด AI แนะนำ
+                </p>
+              ) : null}
 
               {boardLoadingId === jobDetail.id ? (
                 <AiEvaluationStatus source="board" />
@@ -1723,7 +1737,7 @@ const MatchingPage: React.FC = () => {
                           key={m.card_id}
                           onClick={() => setCandDetail(m)}
                           className={cn(
-                            'w-full text-left rounded-xl border px-3 py-2 transition hover:brightness-[0.98]',
+                            'matching-candidate-card w-full rounded-xl border px-3 py-2 text-left',
                             meta.cls,
                             proposed ? 'opacity-70' : '',
                           )}
@@ -1899,7 +1913,7 @@ const MatchingPage: React.FC = () => {
                               <div
                                 key={row.key}
                                 className={cn(
-                                  'rounded-xl border border-white/70 bg-white/70 px-3 py-2 space-y-1',
+                                  'matching-candidate-card space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2',
                                   proposed ? 'opacity-70' : '',
                                 )}
                               >

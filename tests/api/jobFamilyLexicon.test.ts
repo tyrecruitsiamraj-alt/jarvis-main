@@ -10,6 +10,8 @@ describe('classifyJobFamily', () => {
     expect(classifyJobFamily('ขับรถ ชนิดที่ 2')).toBe('C');
     expect(classifyJobFamily('พนักงานขับรถ ส่วนกลาง')).toBe('C');
     expect(classifyJobFamily('Valet Parking')).toBe('C');
+    expect(classifyJobFamily('รับ - ส่งเอกสาร')).toBe('C');
+    expect(classifyJobFamily('พนักงาน Messenger')).toBe('C');
   });
 
   it('classifies technical/IT jobs into family B', () => {
@@ -58,6 +60,12 @@ describe('candidateMatchesFamily', () => {
 
   it('matches an admin candidate to family D', () => {
     expect(candidateMatchesFamily('ธุรการ / คีย์ข้อมูล', 'D')).toBe(true);
+  });
+
+  it('treats document courier as transport, not office admin', () => {
+    expect(candidateMatchesFamily('รับ-ส่งเอกสาร', 'C')).toBe(true);
+    expect(candidateMatchesFamily('รับ-ส่งเอกสาร', 'D')).toBe(false);
+    expect(candidateMatchesFamily('ธุรการ / จัดทำเอกสาร', 'D')).toBe(true);
   });
 
   it('returns false for empty candidate text', () => {

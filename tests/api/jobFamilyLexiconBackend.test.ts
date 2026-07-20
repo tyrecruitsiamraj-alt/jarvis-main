@@ -23,6 +23,12 @@ describe('classifyJobFamily / candidateMatchesFamily (backend)', () => {
     expect(classifyJobFamily('พนักงาน ขนขยะ')).toBe('F');
   });
 
+  it('classifies document courier as C and excludes it from admin family D', () => {
+    expect(classifyJobFamily('รับ - ส่งเอกสาร')).toBe('C');
+    expect(candidateMatchesFamily('รับ-ส่งเอกสาร', 'C')).toBe(true);
+    expect(candidateMatchesFamily('รับ-ส่งเอกสาร', 'D')).toBe(false);
+  });
+
   it('isJobFamilyCode validates AI-returned family codes', () => {
     expect(isJobFamilyCode('D')).toBe(true);
     expect(isJobFamilyCode('?')).toBe(false);
@@ -64,6 +70,15 @@ describe('selectShortlist — the fix for cross-family forced matches', () => {
     const result = selectShortlist(scored, 4, 'D', candidateText);
     expect(result).toHaveLength(2);
     expect(result.every((r) => r.s > 0)).toBe(true);
+  });
+
+  it('does not let a shared keyword score bypass the family gate', () => {
+    const scored: ScoredCandidate<{ skill: string }>[] = [
+      { c: { skill: 'รับ-ส่งเอกสาร' }, s: 2 },
+      { c: { skill: 'ธุรการ / จัดทำเอกสาร' }, s: 2 },
+    ];
+    const result = selectShortlist(scored, 20, 'D', candidateText);
+    expect(result.map((r) => r.c.skill)).toEqual(['ธุรการ / จัดทำเอกสาร']);
   });
 
   it('falls back to the old (family-agnostic) behavior when family cannot be determined', () => {

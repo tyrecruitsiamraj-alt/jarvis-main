@@ -40,7 +40,8 @@ export const JOB_FAMILIES: JobFamily[] = [
     label: 'ขับรถ/Valet',
     terms: [
       'ขับรถ', 'พขร', 'คนขับ', 'driver', 'chauffeur', 'valet', 'รถผู้บริหาร',
-      'ส่วนกลาง', 'รับส่ง', 'ขนส่ง',
+      'ส่วนกลาง', 'รับส่ง', 'ขนส่ง', 'ส่งเอกสาร', 'เดินเอกสาร',
+      'แมสเซนเจอร์', 'messenger', 'courier',
     ],
   },
   {
@@ -76,6 +77,19 @@ function normalize(text: string): string {
   return (text || '').toLowerCase();
 }
 
+/** แยก courier ออกจากงานจัดทำเอกสาร แม้ข้อความจะมีขีด/ช่องว่างคั่นวลี */
+function isDocumentCourier(text: string): boolean {
+  const compact = normalize(text).replace(/[\s/(),.\-\u2013\u2014|\u2022·]+/g, '');
+  return (
+    compact.includes('รับส่งเอกสาร') ||
+    compact.includes('ส่งเอกสาร') ||
+    compact.includes('เดินเอกสาร') ||
+    compact.includes('แมสเซนเจอร์') ||
+    compact.includes('messenger') ||
+    compact.includes('courier')
+  );
+}
+
 /**
  * จัดใบขอ/ผู้สมัครเข้า job family จากข้อความตำแหน่ง — เลือก family ที่มี term ปรากฏมากสุด
  * (นับตามความยาว term เพื่อให้คำเฉพาะเจาะจงมีน้ำหนักกว่า). คืน null ถ้าไม่เข้าข่ายเลย.
@@ -83,6 +97,7 @@ function normalize(text: string): string {
 export function classifyJobFamily(text: string): JobFamilyCode | null {
   const t = normalize(text);
   if (!t.trim()) return null;
+  if (isDocumentCourier(t)) return 'C';
   let best: { code: JobFamilyCode; score: number } | null = null;
   for (const fam of JOB_FAMILIES) {
     let score = 0;
@@ -106,6 +121,7 @@ const TERMS_BY_CODE: Record<JobFamilyCode, string[]> = JOB_FAMILIES.reduce(
 export function candidateMatchesFamily(candidateText: string, code: JobFamilyCode): boolean {
   const t = normalize(candidateText);
   if (!t.trim()) return false;
+  if (isDocumentCourier(t)) return code === 'C';
   return TERMS_BY_CODE[code].some((term) => t.includes(term));
 }
 
