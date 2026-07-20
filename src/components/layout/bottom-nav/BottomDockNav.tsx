@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { filterByMinimumRole } from '@/lib/rbac';
-import { DOCK_NAV_ITEMS, dockActiveIndex, type DockNavItem } from './dockNavConfig';
+import { DOCK_NAV_ITEMS, dockActiveIndex, resolveDockNavTarget, type DockNavItem } from './dockNavConfig';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import './bottomDockNav.css';
 
@@ -34,7 +34,7 @@ const BottomDockNav: React.FC<Props> = ({ pathname, className, items }) => {
                 key={item.path}
                 type="button"
                 className={cn('bottom-dock__btn', active && 'bottom-dock__btn--active')}
-                onClick={() => navigate(item.path)}
+                onClick={() => navigate(resolveDockNavTarget(item.path))}
                 aria-current={active ? 'page' : undefined}
                 aria-label={item.label}
               >

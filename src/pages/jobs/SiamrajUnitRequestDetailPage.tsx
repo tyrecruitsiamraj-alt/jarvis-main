@@ -3,20 +3,25 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
-import StatusBadge from '@/components/shared/StatusBadge';
+import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
+import { formatYmdDmyBe } from '@/lib/dateTh';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
+import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
 import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { formatYmdDmyBe } from '@/lib/dateTh';
-import { jobPositionUnits } from '@/lib/jobPositionUnits';
-import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
-import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestReplacementDetail } from '@/components/jobs/UnitRequestReplacementToggle';
+import {
+  UnitRequestWorkStatusBadge,
+  UnitRequestWorkStatusEditor,
+} from '@/components/jobs/UnitRequestWorkStatusField';
 import type { JobRequest } from '@/types';
-import { Database, ExternalLink, Users, StickyNote, UserCheck } from 'lucide-react';
+import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+
+import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   const display =
@@ -33,7 +38,10 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const backPath = (location.state as { returnTo?: string } | null)?.returnTo ?? '/jobs/list';
+  const backPath = resolveUnitDetailBackPath({
+    stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+    search: location.search,
+  });
   const { hasPermission } = useAuth();
   const canAssignStaff = hasPermission('supervisor');
 
@@ -146,7 +154,12 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
         {data && (
           <>
             <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 flex flex-wrap items-center gap-2">
-              <StatusBadge status={data.status} type="job" />
+              <UnitRequestWorkStatusBadge
+                status={data.work_status}
+                firstName={data.work_person_first_name}
+                lastName={data.work_person_last_name}
+                persons={data.work_persons}
+              />
               <JobUrgencyBadge job={data} />
               {urgencyHint ? (
                 <span className="text-xs text-muted-foreground" title={urgencyHint}>
@@ -176,7 +189,23 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   value={data.submittedAt ? new Date(data.submittedAt).toLocaleString('th-TH') : undefined}
                 />
                 <Field label="วันที่ต้องการ" value={formatYmdDmyBe(data.required_date)} />
-                <Field label="จำนวนที่ต้องการ" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
+                <Field
+                  label="ขอมา"
+                  value={
+                    data.request_positions != null && data.request_positions > 0
+                      ? `${data.request_positions.toLocaleString('th-TH')} ตำแหน่ง`
+                      : undefined
+                  }
+                />
+                <Field
+                  label="หาได้แล้ว"
+                  value={
+                    data.filled_positions != null
+                      ? `${data.filled_positions.toLocaleString('th-TH')} ตำแหน่ง`
+                      : undefined
+                  }
+                />
+                <Field label="คงเหลือ (ต้องหา)" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
                 <Field label="ทำงานวันสุดท้าย" value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined} />
                 <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
                 <Field label="รหัสไซต์" value={data.site_code || data.unit_name} />
@@ -267,6 +296,21 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <StickyNote className="w-4 h-4 text-blue-600" />
+                หมายเหตุ
+              </h3>
+              <UnitRequestNoteDetail
+                job={data}
+                onSaved={(note) => {
+                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                    old ? { ...old, list_note: note || undefined } : old,
+                  );
+                }}
+              />
+            </section>
+
+            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
                 <UserCheck className="w-4 h-4 text-blue-600" />
                 ส่งคนแทน
               </h3>
@@ -283,17 +327,29 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <StickyNote className="w-4 h-4 text-blue-600" />
-                หมายเหตุ
+                <ClipboardList className="w-4 h-4 text-blue-600" />
+                สถานะทำงาน
               </h3>
-              <UnitRequestNoteDetail
-                job={data}
-                onSaved={(note) => {
-                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
-                    old ? { ...old, list_note: note || undefined } : old,
-                  );
-                }}
-              />
+              <p className="text-xs text-muted-foreground">
+                เก็บในฐานข้อมูล Jarvis สำหรับติดตามงานและ Dashboard — ไม่แก้สถานะบน Siamraj
+              </p>
+              {requestKey ? (
+                <UnitRequestWorkStatusEditor
+                  requestKey={requestKey}
+                  initialStatus={data.work_status}
+                  initialFirstName={data.work_person_first_name}
+                  initialLastName={data.work_person_last_name}
+                  initialStatusDate={data.work_status_date}
+                  initialPersons={data.work_persons}
+                  onSaved={(next) => {
+                    queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                      old ? { ...old, ...next } : old,
+                    );
+                  }}
+                />
+              ) : (
+                <p className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกสถานะไม่ได้</p>
+              )}
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">

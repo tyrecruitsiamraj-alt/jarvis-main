@@ -23,6 +23,8 @@ type Props = {
   onDistrictFilterChange: (v: string) => void;
   positionFilter: string;
   onPositionFilterChange: (v: string) => void;
+  /** ล็อกตำแหน่งจากลิงก์แคมเปญ — ห้ามเปลี่ยน/ล้าง */
+  lockPosition?: boolean;
   subtypeFilter: string;
   onSubtypeFilterChange: (v: string) => void;
   provinceOptions: readonly string[];
@@ -76,6 +78,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
   onDistrictFilterChange,
   positionFilter,
   onPositionFilterChange,
+  lockPosition = false,
   subtypeFilter,
   onSubtypeFilterChange,
   provinceOptions,
@@ -96,7 +99,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
   const clearAllFilters = () => {
     onProvinceFilterChange('');
     onDistrictFilterChange('');
-    onPositionFilterChange('');
+    if (!lockPosition) onPositionFilterChange('');
     onSubtypeFilterChange('');
   };
 
@@ -124,7 +127,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
         value={positionFilter}
         onChange={onPositionFilterChange}
         options={positionOptions}
-        disabled={loading || positionOptions.length === 0}
+        disabled={loading || positionOptions.length === 0 || lockPosition}
       />
       <LocationFilterSelect
         label="ลักษณะงานย่อย"
@@ -146,7 +149,14 @@ const JobBoardTopFilters: React.FC<Props> = ({
         <FilterChip label={`อำเภอ ${districtFilter}`} onRemove={() => onDistrictFilterChange('')} />
       ) : null}
       {positionFilter ? (
-        <FilterChip label={positionFilter} onRemove={() => onPositionFilterChange('')} />
+        lockPosition ? (
+          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 py-1 px-2.5 text-xs font-medium text-amber-950">
+            <span className="truncate">{positionFilter}</span>
+            <span className="text-[10px] text-amber-800/80">ล็อก</span>
+          </span>
+        ) : (
+          <FilterChip label={positionFilter} onRemove={() => onPositionFilterChange('')} />
+        )
       ) : null}
       {subtypeFilter ? (
         <FilterChip label={subtypeFilter} onRemove={() => onSubtypeFilterChange('')} />

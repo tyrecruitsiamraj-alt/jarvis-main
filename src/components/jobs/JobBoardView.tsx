@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
-import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
+import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
@@ -56,8 +57,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   detailReturnTo = '/jobs/board',
 }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selected, setSelected] = useState<JobRequest | null>(null);
-  const filters = useJobBoardFilters(jobs);
+  const positionPreset = useMemo(
+    () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
+    [variant, searchParams],
+  );
+  const filters = useJobBoardFilters(jobs, {
+    initialPosition: positionPreset?.positionFilter,
+    lockPosition: positionPreset?.locked,
+    drivingPositionGroup: positionPreset?.isDrivingGroup,
+  });
   const isStaff = variant === 'staff';
 
   const openApply = () => {
@@ -109,6 +119,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           onDistrictFilterChange={filters.setDistrictFilter}
           positionFilter={filters.positionFilter}
           onPositionFilterChange={filters.setPositionFilter}
+          lockPosition={filters.lockPosition}
           subtypeFilter={filters.subtypeFilter}
           onSubtypeFilterChange={filters.setSubtypeFilter}
           provinceOptions={filters.provinceOptions}
@@ -282,6 +293,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </dd>
                 </div>
                 <div className="border-b border-border/60 py-2.5">
+                  <dt className="text-muted-foreground">ตำบล / แขวง</dt>
+                  <dd className="mt-0.5 font-medium text-foreground break-words">
+                    {inferSubdistrictFromAddress(selected.location_address || '') ?? '—'}
+                  </dd>
+                </div>
+                <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">อำเภอ / เขต</dt>
                   <dd className="mt-0.5 font-medium text-foreground break-words">
                     {displayDistrictLine(selected.location_address || '') ?? '—'}
@@ -302,7 +319,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">รายได้รวม (โดยประมาณ)</dt>
+                  <dt className="text-muted-foreground">ฐานเงินเดือน</dt>
                   <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString()}</dd>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">

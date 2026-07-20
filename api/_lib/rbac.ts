@@ -14,10 +14,8 @@ export function isReadOnlyRole(role: UserRole): boolean {
 
 export function meetsMinimumRole(userRole: UserRole, minimum: UserRole): boolean {
   if (userRole === 'opl') {
+    // OPL = read-only viewer: only pass routes/APIs whose minimum is staff or opl
     return minimum === 'staff' || minimum === 'opl';
-  }
-  if (minimum === 'opl') {
-    return userRole === 'opl';
   }
   return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minimum];
 }
@@ -41,8 +39,18 @@ export type ApiResource =
   | 'siamraj-unit-requests'
   | 'siamraj-unit-assignments'
   | 'siamraj-unit-notes'
+  | 'siamraj-unit-work-status'
   | 'siamraj-opl-import'
-  | 'diagnostics-outbound-ip';
+  | 'recruit-registrations'
+  | 'matching-suggestions'
+  | 'matching-parse-branch-demand'
+  | 'matching-candidate-spec'
+  | 'matching-irecruit-candidates'
+  | 'matching-board-candidates'
+  | 'matching-proposals'
+  | 'matching-job-postings'
+  | 'diagnostics-outbound-ip'
+  | 'app-feedback';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -122,8 +130,26 @@ export function minimumRoleFor(
     case 'siamraj-unit-notes':
       return 'staff';
 
+    case 'siamraj-unit-work-status':
+      return 'staff';
+
     case 'siamraj-opl-import':
       return 'admin';
+
+    case 'recruit-registrations':
+    case 'matching-suggestions':
+    case 'matching-parse-branch-demand':
+    case 'matching-candidate-spec':
+    case 'matching-irecruit-candidates':
+    case 'matching-board-candidates':
+    case 'matching-proposals':
+    case 'matching-job-postings':
+      return 'staff';
+
+    case 'app-feedback':
+      // ทุกคนที่ login แล้วส่งคำขอได้ (รวม OPL); จัดการสถานะ = supervisor+
+      if (isRead || m === 'POST') return 'opl';
+      return 'supervisor';
 
     default:
       return 'admin';
@@ -140,7 +166,10 @@ export function checkApiAccess(
   const isRead = m === 'GET' || m === 'HEAD';
 
   if (isReadOnlyRole(userRole) && !isRead) {
-    return { ok: false, message: 'Read-only role (opl)' };
+    // OPL ส่งคำขอ/แจ้งบัคได้
+    if (!(resource === 'app-feedback' && m === 'POST')) {
+      return { ok: false, message: 'Read-only role (opl)' };
+    }
   }
 
   const minimum = minimumRoleFor(resource, method, hint);

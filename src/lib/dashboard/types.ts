@@ -1,3 +1,5 @@
+import type { LifecycleBoardSummary } from './lifecycle';
+
 export type DashboardTaskStatus =
   | 'pending'
   | 'in_progress'
@@ -5,7 +7,6 @@ export type DashboardTaskStatus =
   | 'overdue'
   | 'cancelled'
   | 'at_risk';
-
 export type DashboardSlaStatus =
   | 'on_track'
   | 'at_risk'
@@ -26,22 +27,25 @@ export type DashboardActivityTrendPoint = {
   /** anchor date YYYY-MM-01 */
   date: string;
   label: string;
+  /** แตกยอดเข้ามาตามประเภท (รวม resignations+…+other ต้องเท่า requestedPositions) */
   resignations: number;
   replacements: number;
   newOpenings: number;
   increaseHeadcount?: number;
   newSite?: number;
-  /** ตำแหน่งที่ขอ (ตามเดือนที่กรอกใบขอ) */
+  /** เข้ามาประเภท "อื่นๆ" (นอกลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์) */
+  other?: number;
+  /** ตำแหน่งที่ขอ (ตามเดือนที่เปิดใบ — ไม่หายเมื่อปิดแล้ว) */
   requestedPositions?: number;
-  /** ตำแหน่งที่ปิดได้/หาได้แล้ว (ตามเดือนที่ปิด) */
+  /** ตำแหน่งที่ปิดได้/หาได้แล้ว (ตามเดือนที่เปิดใบ · สถานะปัจจุบัน) */
   closedPositions?: number;
   /** ตำแหน่งที่ปิดได้/หาได้แล้ว */
   filledPositions?: number;
   /** ใบขอที่ปิดครบ */
   fullyClosedRequests?: number;
-  /** ตำแหน่งที่ยกเลิก */
+  /** ตำแหน่งที่ยกเลิก (ตามเดือนที่เปิดใบ · สถานะปัจจุบัน) */
   cancelledPositions?: number;
-  /** คงเหลือต่อเดือน */
+  /** คงเหลือต่อเดือน (เข้ามา − ปิด − ยกเลิก · สถานะปัจจุบัน) */
   remainingPositions?: number;
   /** อัตราสำเร็จรายเดือน = ปิดได้ / ขอ (%) */
   closeRatePercent?: number | null;
@@ -98,6 +102,11 @@ export type DashboardWorkItem = {
   requestActionName?: string;
   siteCode?: string;
   fullClosureSlaStatus?: string;
+  /** สถานะทำงาน Jarvis (pipeline) */
+  workStatus?: string;
+  workStatusLabel?: string;
+  workPersonName?: string;
+  workStatusDate?: string;
 };
 
 export type DashboardResponsibleRole = 'recruiter' | 'screener';
@@ -139,7 +148,7 @@ export type DashboardResignationMonthly = {
 };
 
 export type DashboardAgeDaysBreakdown = {
-  bucket: '1-7' | '8-14' | '15-30' | '30+' | 'advance';
+  bucket: '1-7' | '8-15' | '16-30' | '30+' | 'advance';
   label: string;
   count: number;
 };
@@ -293,6 +302,8 @@ export type DashboardLifecycleTrendPoint = {
 
 export type DashboardData = {
   kpis: DashboardKpi[];
+  /** นับใบตามสถานะทำงาน (คู่กับ KPI ตำแหน่ง — คงเหลือแยกต่างหาก) */
+  workStatusKpis: DashboardKpi[];
   activityTrend: DashboardActivityTrendPoint[];
   unitOverview: DashboardUnitOverview[];
   ageDaysBreakdown: DashboardAgeDaysBreakdown[];
@@ -307,6 +318,8 @@ export type DashboardData = {
   slaSummary?: DashboardSlaSummary;
   lifecycleTrend?: DashboardLifecycleTrendPoint[];
   lifecycleInsights?: string[];
+  /** สรุป Life Cycle: เข้ามา/ปิดได้/ยกเลิก/คงเหลือ แยกประเภทใบขอ */
+  lifecycleBoard?: LifecycleBoardSummary;
   flowView?: DashboardFlowView;
   executiveInsights?: DashboardExecutiveInsights;
   priorityWorkQueue: DashboardWorkItem[];

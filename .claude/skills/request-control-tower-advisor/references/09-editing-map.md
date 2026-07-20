@@ -120,3 +120,7 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 * `tests/api/requestControlLedger.test.ts`
 * `tests/api/buildDashboardData.test.ts`
 * `tests/api/demandFulfillmentBacklog.test.ts`
+* `src/pages/matching/MatchingPage.tsx`
+* `api/_lib/candidateProposals.ts`
+* `migrations/047_candidate_proposals_branch.sql`
+* `tests/api/unitBranchOverride.test.ts`

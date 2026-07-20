@@ -12,6 +12,9 @@ import { isCompanyEmail, isCompanyEmailLoginEnforced } from '../../_lib/companyE
 import { sendError, handleApiError, sendRedirect, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { issueAuthSessionRedirect, type AuthUserRow } from '../../_lib/authSession.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 function getQuery(req: ApiReq, key: string): string {
   const v = req.query?.[key];
@@ -80,8 +83,8 @@ export default async function azureAdCallbackHandler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<AuthUserRow & { azure_oid: string | null }>(
       `
-      select id, email, role, full_name, is_active, created_at, azure_oid
-      from users
+      select id, email, role, full_name, is_active, created_at, azure_oid, department_code
+      from ${usersTable}
       where azure_oid = $1 or lower(email) = lower($2)
       order by case when azure_oid = $1 then 0 else 1 end
       limit 1
@@ -114,7 +117,7 @@ export default async function azureAdCallbackHandler(req: ApiReq, res: ApiRes) {
 
     if (!row.azure_oid) {
       await dbQuery(
-        `update users set azure_oid = $1, updated_at = now() where id = $2 and azure_oid is null`,
+        `update ${usersTable} set azure_oid = $1, updated_at = now() where id = $2 and azure_oid is null`,
         [profile.oid, row.id],
       );
     }

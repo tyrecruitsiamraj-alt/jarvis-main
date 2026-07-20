@@ -32,10 +32,15 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
 }
 
 export type SiamrajThroughputRecord = {
+  requestNo?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;
   isOpen: boolean;
+  kind?: 'filled' | 'cancelled' | 'remaining';
+  requestActionName?: string;
+  requestActionCode?: string;
+  lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
 };
 
 export async function fetchSiamrajThroughput(from: string, to: string): Promise<SiamrajThroughputRecord[]> {
@@ -79,9 +84,35 @@ export async function saveUnitRequestNote(requestNo: string, note: string): Prom
   await saveUnitRequestMeta(requestNo, { note: note.trim() || null });
 }
 
+export type UnitBranchOverride = {
+  branch_id?: string;
+  branch_name_clean: string;
+  address_raw?: string | null;
+  road?: string | null;
+  subdistrict?: string | null;
+  requested_qty: number;
+  district_hint: string | null;
+  province_hint: string | null;
+  postal_code?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
+};
+export type UnitFieldOverrides = {
+  age_min?: number | null;
+  age_max?: number | null;
+  gender?: string | null;
+  branches?: UnitBranchOverride[] | null;
+};
+
 export async function saveUnitRequestMeta(
   requestNo: string,
-  payload: { note?: string | null; send_replacement?: boolean | null },
+  payload: {
+    note?: string | null;
+    send_replacement?: boolean | null;
+    parser_override_text?: string | null;
+    field_overrides?: UnitFieldOverrides | null;
+  },
 ): Promise<void> {
   const r = await apiFetch('/api/siamraj/unit-notes', {
     method: 'POST',
@@ -89,6 +120,39 @@ export async function saveUnitRequestMeta(
     body: JSON.stringify({ request_no: requestNo, ...payload }),
   });
   if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกข้อมูลใบขอไม่สำเร็จ'));
+}
+
+export type UnitWorkStatusPersonPayload = {
+  first_name: string;
+  last_name: string;
+  status_date?: string | null;
+};
+
+export type UnitWorkStatusPayload = {
+  status: string;
+  persons?: UnitWorkStatusPersonPayload[];
+  person_first_name?: string | null;
+  person_last_name?: string | null;
+  status_date?: string | null;
+};
+
+export type UnitWorkStatusRecord = UnitWorkStatusPayload & {
+  request_no: string;
+  persons?: UnitWorkStatusPersonPayload[];
+  updated_at: string | null;
+};
+
+export async function saveUnitRequestWorkStatus(
+  requestNo: string,
+  payload: UnitWorkStatusPayload,
+): Promise<UnitWorkStatusRecord> {
+  const r = await apiFetch('/api/siamraj/unit-work-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_no: requestNo, ...payload }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกสถานะทำงานไม่สำเร็จ'));
+  return readJsonSafe<UnitWorkStatusRecord>(r);
 }
 
 export function unitRequestNoteKey(job: JobRequest): string {

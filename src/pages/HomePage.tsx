@@ -10,12 +10,14 @@ import {
   HeartPulse,
   ArrowRight,
   LayoutGrid,
+  MessageSquarePlus,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
+import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 import { motion } from 'framer-motion';
 
 const menuItems: {
@@ -78,6 +80,13 @@ const menuItems: {
     desc: 'ภาพรวมและ KPI',
     icon: BarChart3,
     accent: 'text-neutral-800 bg-neutral-500/10',
+  },
+  {
+    path: '/feedback',
+    label: 'ส่งคำขอ',
+    desc: 'อยากเพิ่ม / อยากแก้ / แจ้งบัค',
+    icon: MessageSquarePlus,
+    accent: 'text-teal-700 bg-teal-500/12',
   },
   {
     path: '/settings',
@@ -153,7 +162,9 @@ const HomePage: React.FC = () => {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            onClick={() => navigate(item.path)}
+            onClick={() =>
+              navigate(item.path === '/jobs/list' ? resolveUnitNavPath() : item.path)
+            }
             className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-6 group touch-manipulation"
           >
             <div

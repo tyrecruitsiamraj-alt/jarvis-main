@@ -19,10 +19,12 @@ import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { isValidEnglishName, sanitizeEnglishName } from '@/lib/englishName';
+import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
   microsoftLogin: boolean;
+  devRoleLogin: boolean;
   emailLoginGate: boolean;
   companyEmailRequired: boolean;
   allowedDomains: string[];
@@ -37,9 +39,6 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   oauth: 'เข้าสู่ระบบ Microsoft ไม่สำเร็จ — ลองใหม่อีกครั้ง',
   azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
-
-// ซ่อนปุ่ม Dev เข้าเร็วตามสิทธิ์เสมอ (ไม่โชว์บนหน้า login) — เปิดกลับได้โดยคืนเงื่อนไข env เดิม
-const devRoleEntryEnabled = false;
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -56,6 +55,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [departmentCode, setDepartmentCode] = useState('');
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotBusy, setForgotBusy] = useState(false);
@@ -138,6 +138,10 @@ const LoginPage: React.FC = () => {
       setError('นามสกุลต้องกรอกเป็นภาษาอังกฤษเท่านั้น (A–Z)');
       return;
     }
+    if (!departmentCode) {
+      setError('กรุณาเลือกแผนก');
+      return;
+    }
     setSubmitting(true);
     try {
       const msg = await signUp({
@@ -145,18 +149,10 @@ const LoginPage: React.FC = () => {
         password,
         first_name: firstName,
         last_name: lastName,
+        department_code: departmentCode,
       });
       if (msg) {
         setError(msg);
-        return;
-      }
-      const loginMsg = await signIn(email, password);
-      if (loginMsg) {
-        setAuthMode('login');
-        setFirstName('');
-        setLastName('');
-        setPassword('');
-        setError('สมัครสำเร็จแล้ว — กรุณาเข้าสู่ระบบ');
         return;
       }
       navigate('/', { replace: true });
@@ -403,6 +399,28 @@ const LoginPage: React.FC = () => {
                   ) : null}
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="departmentRegister" className="text-xs font-medium text-muted-foreground ml-1">
+                    แผนก <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="departmentRegister"
+                    value={departmentCode}
+                    onChange={(e) => setDepartmentCode(e.target.value)}
+                    required
+                    className="jarvis-soft-field min-h-[48px] w-full"
+                  >
+                    <option value="">— เลือกแผนก —</option>
+                    {APP_DEPARTMENT_CODES.map((code) => (
+                      <option key={code} value={code}>
+                        {APP_DEPARTMENT_LABELS[code]}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground ml-1">
+                    จะเห็นใบขอเฉพาะแผนกนี้ — Admin แก้ไขให้ได้ภายหลัง
+                  </p>
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="passwordRegister" className="text-xs font-medium text-muted-foreground ml-1">
                     Password (ขั้นต่ำ 8 ตัวอักษร)
                   </Label>
@@ -435,7 +453,7 @@ const LoginPage: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground ml-1">
-                  สมัครใหม่ได้รับสิทธิ์ Staff อัตโนมัติ — ไม่มีตัวเลือกบทบาท
+                  สมัครใหม่ได้รับสิทธิ์ Staff — ต้องเลือกแผนกก่อนใช้งาน
                 </p>
                 <button
                   type="submit"
@@ -454,7 +472,7 @@ const LoginPage: React.FC = () => {
               </p>
             ) : null}
 
-            {devRoleEntryEnabled ? (
+            {authConfig?.devRoleLogin ? (
               <div className="space-y-2 rounded-2xl border border-dashed border-orange-300/60 bg-orange-50/40 p-3">
                 <p className="text-xs font-medium text-orange-900 text-center">
                   Dev — เข้าเร็วตามสิทธิ์ (ไม่ต้องกรอกรหัส)

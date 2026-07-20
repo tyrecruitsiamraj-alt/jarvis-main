@@ -70,6 +70,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
               <th className="px-3 py-2.5 font-medium">
                 <SortBtn label="สถานะ" active={sortKey === 'status'} dir={sortDir} onClick={() => toggle('status')} />
               </th>
+              <th className="px-3 py-2.5 font-medium">สถานะทำงาน</th>
               <th className="px-3 py-2.5 font-medium">SLA</th>
               <th className="px-3 py-2.5 font-medium">ครบ SLA</th>
               <th className="px-3 py-2.5 font-medium">เกิน</th>
@@ -79,7 +80,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={12} className="px-4 py-10 text-center text-slate-500">
                   ไม่พบงานตามเงื่อนไขที่เลือก
                 </td>
               </tr>
@@ -104,6 +105,15 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                   <td className="px-3 py-3 align-top">
                     <DashboardStatusBadge status={item.status} />
                     <p className="text-[10px] text-slate-500 mt-1">{item.controlStatus}</p>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <p className="text-xs font-medium text-slate-800">{item.workStatusLabel || 'ดำเนินการ'}</p>
+                    {item.workPersonName ? (
+                      <p className="text-[10px] text-slate-500 mt-0.5">{item.workPersonName}</p>
+                    ) : null}
+                    {item.workStatusDate ? (
+                      <p className="text-[10px] text-slate-400 mt-0.5">{formatYmdDmyBe(item.workStatusDate)}</p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-3 align-top">
                     <DashboardSlaBadge status={item.slaStatus} />

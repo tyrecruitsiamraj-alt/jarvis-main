@@ -3,7 +3,7 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
-import { Users, Search, ClipboardCheck, Briefcase, ArrowRight, type LucideIcon } from 'lucide-react';
+import { Users, Search, ClipboardCheck, Briefcase, ArrowRight, Megaphone, BookmarkCheck, type LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
 import { useCandidates } from '@/hooks/useCandidates';
@@ -117,6 +117,20 @@ const MatchingDashboard: React.FC = () => {
       desc: 'ค้นหางานใกล้ที่อยู่ผู้สมัครก่อนสมัคร',
       icon: ClipboardCheck,
       accent: 'text-amber-700 bg-amber-500/12',
+    },
+    {
+      path: '/matching/reservations',
+      label: 'รายชื่อคนจอง',
+      desc: 'ดูคนที่กำลังจอง/ลงงานอยู่ ยกเลิกจองได้',
+      icon: BookmarkCheck,
+      accent: 'text-emerald-700 bg-emerald-500/12',
+    },
+    {
+      path: '/matching/job-postings',
+      label: 'คำขอโพสหางานใหม่',
+      desc: 'ใบขอที่หาคนของเราไม่ได้ — ให้ทีมคอนเทนต์รับไปโพสต่อ',
+      icon: Megaphone,
+      accent: 'text-rose-700 bg-rose-500/12',
     },
   ];
 

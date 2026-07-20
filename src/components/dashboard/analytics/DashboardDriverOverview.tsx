@@ -5,6 +5,7 @@ import type { DashboardRecruiterOverview, DashboardResponsibleRole } from '@/lib
 type Props = {
   items: DashboardRecruiterOverview[];
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
+  hideHeader?: boolean;
 };
 
 const ROLE_LABELS: Record<DashboardResponsibleRole, string> = {
@@ -17,10 +18,13 @@ const ROLE_BADGE_CLASS: Record<DashboardResponsibleRole, string> = {
   screener: 'bg-violet-50 text-violet-700',
 };
 
-const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick }) => {
+const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick, hideHeader = false }) => {
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+        {!hideHeader ? (
+          <h3 className="text-sm font-semibold text-slate-900 mb-2">ภาระงานตามผู้รับผิดชอบ</h3>
+        ) : null}
         ยังไม่มีข้อมูลภาระงานตามผู้รับผิดชอบ
       </div>
     );
@@ -28,10 +32,12 @@ const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick }) =
 
   return (
     <div className="space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามผู้รับผิดชอบ</h3>
-        <p className="text-xs text-slate-500">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
-      </div>
+      {!hideHeader ? (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามผู้รับผิดชอบ</h3>
+          <p className="text-xs text-slate-500">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {items.slice(0, 12).map((r) => (
           <button

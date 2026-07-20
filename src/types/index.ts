@@ -1,3 +1,5 @@
+import type { UnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
+
 // ============ AUTH & USERS ============
 export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
@@ -10,6 +12,8 @@ export interface User {
   avatar_url?: string;
   is_active: boolean;
   created_at: string;
+  /** แผนกที่ล็อกสิทธิ์เห็นใบขอ เช่น LBD — ไม่มี = เห็นทุกแผนก (admin มักว่าง) */
+  department_code?: string;
 }
 
 // ============ EMPLOYEES (WL) ============
@@ -123,25 +127,12 @@ export interface JobRequest {
   contract_type_code?: string;
   contract_type_name?: string;
   position_units?: number;
-  /** จำนวนที่ขอทั้งใบ (request_qty) */
+  /** จำนวนตำแหน่งที่ขอมา (Siamraj request_qty) */
   request_positions?: number;
-  /** จำนวนที่หาได้/แจ้งเข้าแล้ว */
+  /** จำนวนที่หาได้แล้ว / แจ้งเข้า */
   filled_positions?: number;
-  /** จำนวนที่ยกเลิก */
+  /** จำนวนที่ยกเลิก / ปิดค้าง */
   cancelled_positions?: number;
-  cancel_date?: string;
-  /** วันที่แจ้งเข้าล่าสุด — จาก st_inform_head.inform_date เมื่อมี */
-  inform_date?: string;
-  /** fulfillment events สำหรับ ledger (ถ้ามีจาก SQL) */
-  fulfillment_events?: Array<{
-    eventDate?: string | null;
-    eventType: 'informed' | 'cancelled';
-    positionQty: number;
-    sourceTable?: string;
-    sourceId?: string;
-    isDateReliable?: boolean;
-    reliabilityNote?: string;
-  }>;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;
@@ -189,6 +180,50 @@ export interface JobRequest {
   list_note?: string;
   /** ส่งคนแทน (true) / ไม่ส่งคนแทน (false) — null = ยังไม่เลือก */
   send_replacement?: boolean | null;
+  /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
+  parser_override_text?: string | null;
+  work_status?: UnitRequestWorkStatus | null;
+  work_person_first_name?: string | null;
+  work_person_last_name?: string | null;
+  /** วันที่ตามสถานะ (YMD) — แจ้งเข้า / นัดสัมภาษณ์ / เริ่มงาน */
+  work_status_date?: string | null;
+  /** รายชื่อคนในสถานะทำงาน (หลายคนต่อใบได้) */
+  work_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
+  /** สาขาที่ผู้ใช้แก้เอง (persist) — ใช้แทนผลแตกสาขาจาก ERP */
+  branch_override?: Array<{
+    branch_id?: string;
+    branch_name_clean: string;
+    address_raw?: string | null;
+    road?: string | null;
+    subdistrict?: string | null;
+    requested_qty: number;
+    district_hint: string | null;
+    province_hint: string | null;
+    postal_code?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
+  }> | null;
+  /** override ฟิลด์ใบขอที่ผู้ใช้แก้เอง (อายุ/เพศ/สาขา) */
+  field_overrides?: {
+    age_min?: number | null;
+    age_max?: number | null;
+    gender?: string | null;
+    branches?: Array<{
+      branch_id?: string;
+      branch_name_clean: string;
+      address_raw?: string | null;
+      road?: string | null;
+      subdistrict?: string | null;
+      requested_qty: number;
+      district_hint: string | null;
+      province_hint: string | null;
+      postal_code?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+      geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
+    }> | null;
+  } | null;
 }
 
 export interface JobAssignment {
@@ -267,7 +302,6 @@ export interface AuditLog {
   id: string;
   user_id: string;
   user_name: string;
-  user_role?: string;
   action: string;
   entity_type: string;
   entity_id: string;

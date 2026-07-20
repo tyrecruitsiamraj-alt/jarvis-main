@@ -1,7 +1,6 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import {
   openStaffingRequestWhereSql,
-  remainingOpenPositionsFromRow,
   effectiveInformQtySql,
   staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
@@ -21,6 +20,10 @@ import {
   normalizeSiamrajRequestNoForDisplay,
   pickBestRequestNoCandidate,
 } from './siamrajRequestNo.js';
+import {
+  sqlServerDepartmentScopeClause,
+  type DepartmentScope,
+} from './departmentScope.js';
 
 type SqlServerRequestRow = {
   external_id: string;
@@ -33,6 +36,8 @@ type SqlServerRequestRow = {
   department_name: string | null;
   customer_name: string | null;
   status: string | null;
+  is_stop: string | null;
+  stop_no: string | null;
   staff_fullname: string | null;
   mobile_phone: string | null;
   job_description_code_1: string | null;
@@ -48,6 +53,7 @@ type SqlServerRequestRow = {
   inform_qty: number | null;
   is_inform_all: string | null;
   effective_inform_qty: number | null;
+  has_inform: number | boolean | null;
   resign_date: Date | string | null;
   reason_main_name: string | null;
   work_addr: string | null;
@@ -72,6 +78,17 @@ function toIso(v: Date | string | null | undefined): string | null {
 
 function toYmd(v: Date | string | null | undefined): string {
   return toBangkokYmd(v);
+}
+
+/** เว้นวรรคหน้าคำนำหน้าที่อยู่ — ให้ filter จังหวัด/อำเภอ/ตำบลจับได้ */
+function normalizeSiamrajWorkAddress(raw: string | null | undefined): string {
+  const s = (raw || '').toString().normalize('NFC').replace(/\u00a0/g, ' ').trim();
+  if (!s) return '';
+  return s
+    .replace(/(ตำบล|แขวง|อำเภอ\/เขต|อำเภอ|เขต|จังหวัด|จ\.|ต\.|อ\.)/gu, ' $1')
+    .replace(/\s*([:：])\s*/gu, '$1 ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 function getSqlFilters() {
@@ -103,7 +120,19 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     siteCode: r.site_code,
     departmentCode: r.department_code,
   });
-  const breakdown = staffingPositionBreakdown(r);
+  const breakdown = staffingPositionBreakdown({
+    status: r.status,
+    // feed นี้ผ่าน open WHERE แล้ว — ถ้า SELECT ขาด is_stop อย่าตีเป็นยกเลิก
+    is_stop: r.is_stop ?? 'N',
+    stop_no: r.stop_no ?? null,
+    is_inform_all: r.is_inform_all,
+    request_qty: r.request_qty,
+    inform_qty: r.inform_qty,
+    effective_inform_qty: r.effective_inform_qty,
+    has_inform:
+      r.has_inform ??
+      ((r.effective_inform_qty ?? r.inform_qty ?? 0) > 0 ? 1 : 0),
+  });
 
   return {
     id: `siamraj-sql:${rawRequestNo}`,
@@ -128,7 +157,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     department_name: r.department_name?.trim() || undefined,
     contract_type_code: r.contract_type_code?.trim() || undefined,
     contract_type_name: r.contract_type_name?.trim() || undefined,
-    location_address: r.work_addr || r.site_name || r.site_code || '',
+    location_address: normalizeSiamrajWorkAddress(r.work_addr) || r.site_name || r.site_code || '',
     request_action_code: r.request_action_code || undefined,
     request_action_name: r.request_action_name || undefined,
     resigned_employee_name: r.staff_fullname?.trim() || undefined,
@@ -177,9 +206,28 @@ const BASE_SQL = `
     RTRIM(SS.contract_type_code) AS contract_type_code,
     (SELECT TOP 1 CT.contract_type_name FROM st_ms_contract_type CT WHERE CT.contract_type_code = SS.contract_type_code) AS contract_type_name,
     A.status,
+    A.is_stop,
+    A.stop_no,
     (SELECT z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name,
     (SELECT z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no) AS customer_name,
-    B.work_place1 + '' + COALESCE(B.work_place2, '') + '' + COALESCE(B.work_place3, '') AS work_addr,
+    LTRIM(RTRIM(
+      ISNULL(NULLIF(LTRIM(RTRIM(B.work_place1)), N''), N'') +
+      CASE
+        WHEN NULLIF(LTRIM(RTRIM(B.work_place1)), N'') IS NOT NULL
+         AND NULLIF(LTRIM(RTRIM(B.work_place2)), N'') IS NOT NULL
+        THEN N' ' ELSE N''
+      END +
+      ISNULL(NULLIF(LTRIM(RTRIM(B.work_place2)), N''), N'') +
+      CASE
+        WHEN (
+          NULLIF(LTRIM(RTRIM(B.work_place1)), N'') IS NOT NULL
+          OR NULLIF(LTRIM(RTRIM(B.work_place2)), N'') IS NOT NULL
+        )
+         AND NULLIF(LTRIM(RTRIM(B.work_place3)), N'') IS NOT NULL
+        THEN N' ' ELSE N''
+      END +
+      ISNULL(NULLIF(LTRIM(RTRIM(B.work_place3)), N''), N'')
+    )) AS work_addr,
     A.staff_title_code,
     A.job_description_code_1,
     A.job_description_code_2,
@@ -226,9 +274,10 @@ const BASE_SQL_BY_ID = `${BASE_SQL}
 const SELECT_COLUMNS = `
   external_id, request_no, act_saleco_datetime, want_date_from, resign_date,
   site_code, site_name, department_code, department_name, contract_type_code, contract_type_name,
-  customer_name, status, staff_fullname, mobile_phone,
+  customer_name, status, is_stop, stop_no, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
-  job_name1, job_name2, requester_name, request_action_name, request_action_code, request_qty, inform_qty, is_inform_all, effective_inform_qty,
+  job_name1, job_name2, requester_name, request_action_name, request_action_code,
+  request_qty, inform_qty, is_inform_all, effective_inform_qty,
   reason_main_name, work_addr, work_date, work_time, age, sex,
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
 `;
@@ -248,12 +297,17 @@ function clampUnitRequestLimit(limit?: number): number {
   return Math.min(Math.max(n, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
 }
 
-export async function listSiamrajSqlServerUnitRequests(options: { limit?: number; mode?: string }) {
+export async function listSiamrajSqlServerUnitRequests(options: {
+  limit?: number;
+  mode?: string;
+  departmentScope?: DepartmentScope;
+}) {
   const limit = clampUnitRequestLimit(options.limit);
   const mode = (options.mode || process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue').toLowerCase();
   const extraWhere = mode === 'all' ? '' : boardRequestTypeExtraWhere();
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
+  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
 
   const rows = await siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
     `
@@ -265,6 +319,7 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
         ${clsExclude}
+        ${deptScope.sql}
         ${extraWhere}
       ORDER BY A.request_date DESC
     ),
@@ -278,7 +333,7 @@ export async function listSiamrajSqlServerUnitRequests(options: { limit?: number
     WHERE rn = 1
     ORDER BY act_saleco_datetime DESC
   `,
-    { limit, ...filters },
+    { limit, ...filters, ...deptScope.params },
   );
 
   return rows.map(mapSqlServerRow);

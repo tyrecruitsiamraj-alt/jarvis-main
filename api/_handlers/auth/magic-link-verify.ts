@@ -11,9 +11,12 @@ import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { consumeMagicLinkToken } from '../../_lib/magicLinkLogin.js';
 import { issueAuthSession, type AuthUserRow } from '../../_lib/authSession.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
+import { tableInAppSchema } from '../../_lib/schema.js';
+
+const usersTable = tableInAppSchema('users');
 
 function isUserRole(v: unknown): v is UserRole {
-  return v === 'admin' || v === 'supervisor' || v === 'staff';
+  return v === 'admin' || v === 'supervisor' || v === 'staff' || v === 'opl';
 }
 
 async function magicLinkVerifyHandler(req: ApiReq, res: ApiRes) {
@@ -51,8 +54,8 @@ async function magicLinkVerifyHandler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<AuthUserRow>(
       `
-      select id, email, role, full_name, is_active, created_at
-      from users
+      select id, email, role, full_name, is_active, created_at, department_code
+      from ${usersTable}
       where id = $1
       limit 1
     `,

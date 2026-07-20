@@ -20,15 +20,15 @@ export const REPLACEMENT_FILTER_OPTIONS: { value: ReplacementFilter; label: stri
   { value: 'unset', label: 'ยังไม่ระบุ' },
 ];
 
-export type AgeDaysFilter = 'all' | 'advance' | 'today' | '1-7' | '8-14' | '15-30' | '30+';
+export type AgeDaysFilter = 'all' | 'advance' | 'today' | '1-7' | '8-15' | '16-30' | '30+';
 
-export type AgeDaysDisplayBucket = '1-7' | '8-14' | '15-30' | '30+' | 'advance';
+export type AgeDaysDisplayBucket = '1-7' | '8-15' | '16-30' | '30+' | 'advance';
 
 export const AGE_DAYS_DISPLAY_BUCKETS: { id: AgeDaysDisplayBucket; label: string }[] = [
   { id: 'advance', label: 'ล่วงหน้า' },
   { id: '1-7', label: '1–7 วัน' },
-  { id: '8-14', label: '8–14 วัน' },
-  { id: '15-30', label: '15–30 วัน' },
+  { id: '8-15', label: '8–15 วัน' },
+  { id: '16-30', label: '16–30 วัน' },
   { id: '30+', label: '30 วันขึ้นไป' },
 ];
 
@@ -39,8 +39,8 @@ export const AGE_DAYS_FILTER_OPTIONS: { value: AgeDaysFilter; label: string }[] 
   { value: 'advance', label: 'ล่วงหน้า' },
   { value: 'today', label: 'วันนี้' },
   { value: '1-7', label: '1–7 วัน' },
-  { value: '8-14', label: '8–14 วัน' },
-  { value: '15-30', label: '15–30 วัน' },
+  { value: '8-15', label: '8–15 วัน' },
+  { value: '16-30', label: '16–30 วัน' },
   { value: '30+', label: '30 วันขึ้นไป' },
 ];
 
@@ -285,12 +285,12 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
       return days <= 0;
     case '1-7':
       return days >= 1 && days <= 7;
-    case '8-14':
-      return days >= 8 && days <= 14;
-    case '15-30':
-      return days >= 15 && days <= 30;
+    case '8-15':
+      return days >= 8 && days <= 15;
+    case '16-30':
+      return days >= 16 && days <= 30;
     case '30+':
-      return days >= 30;
+      return days > 30;
     default:
       return true;
   }
@@ -316,12 +316,12 @@ export function matchesDashboardAgeBucket(
   switch (bucket) {
     case '1-7':
       return days >= 0 && days <= 7;
-    case '8-14':
-      return days >= 8 && days <= 14;
-    case '15-30':
-      return days >= 15 && days <= 30;
+    case '8-15':
+      return days >= 8 && days <= 15;
+    case '16-30':
+      return days >= 16 && days <= 30;
     case '30+':
-      return days >= 30;
+      return days > 30;
     default:
       return false;
   }
@@ -334,8 +334,8 @@ export function countAgeDaysBreakdown(
 ): Record<AgeDaysDisplayBucket, number> {
   const counts: Record<AgeDaysDisplayBucket, number> = {
     '1-7': 0,
-    '8-14': 0,
-    '15-30': 0,
+    '8-15': 0,
+    '16-30': 0,
     '30+': 0,
     advance: 0,
   };

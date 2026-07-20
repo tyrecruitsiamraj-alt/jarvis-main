@@ -17,6 +17,8 @@ import {
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
+import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
+import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -32,7 +34,7 @@ function getQuery(req: AuthedReq, key: string): string {
 async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
-    String(it.externalId || it.request_no || it.id || '').trim();
+    String(it.request_no || it.externalId || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -53,7 +55,7 @@ async function attachAssignments(items: unknown[]): Promise<void> {
 async function attachNotes(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
-    String(it.externalId || it.request_no || it.id || '').trim();
+    String(it.request_no || it.externalId || it.id || '').trim();
   try {
     const keys = list.map(keyOf).filter(Boolean);
     if (keys.length === 0) return;
@@ -64,9 +66,42 @@ async function attachNotes(items: unknown[]): Promise<void> {
       if (!n) continue;
       it.list_note = n.note;
       it.send_replacement = n.send_replacement ?? null;
+      it.parser_override_text = n.parser_override_text ?? null;
+      // apply field overrides ที่ผู้ใช้แก้เอง (persist) ทับค่าจาก ERP
+      const fo = n.field_overrides;
+      if (fo) {
+        if (fo.age_min !== undefined) it.age_range_min = fo.age_min;
+        if (fo.age_max !== undefined) it.age_range_max = fo.age_max;
+        if (fo.gender !== undefined && fo.gender !== null) it.gender_requirement = fo.gender;
+        if (fo.branches !== undefined) it.branch_override = fo.branches;
+        it.field_overrides = fo;
+      }
     }
   } catch {
     /* หมายเหตุเป็นข้อมูลเสริม */
+  }
+}
+
+async function attachWorkStatus(items: unknown[]): Promise<void> {
+  const list = items as Array<Record<string, unknown>>;
+  const keyOf = (it: Record<string, unknown>) =>
+    String(it.request_no || it.externalId || it.id || '').trim();
+  try {
+    const keys = list.map(keyOf).filter(Boolean);
+    if (keys.length === 0) return;
+    const map = await getUnitWorkStatusMap(keys);
+    if (map.size === 0) return;
+    for (const it of list) {
+      const w = map.get(keyOf(it));
+      if (!w) continue;
+      it.work_status = w.status;
+      it.work_person_first_name = w.person_first_name;
+      it.work_person_last_name = w.person_last_name;
+      it.work_status_date = w.status_date;
+      it.work_persons = w.persons;
+    }
+  } catch {
+    /* สถานะทำงานเป็นข้อมูลเสริม */
   }
 }
 
@@ -105,12 +140,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       );
     }
 
+    const departmentScope = await loadUserDepartmentScope(req.user);
+
     const id = getQuery(req, 'id');
     if (id) {
-      const item = await getSiamrajUnitRequestById(id);
+      const item = await getSiamrajUnitRequestById(id, departmentScope);
       if (!item) return sendError(res, 404, 'Not found', 'ไม่พบใบขอ');
       await attachAssignments([item]);
       await attachNotes([item]);
+      await attachWorkStatus([item]);
       return res.status(200).json(item);
     }
 
@@ -120,7 +158,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
-      const items = await listSiamrajThroughput({ from, to });
+      const items = await listSiamrajThroughput({ from, to, departmentScope });
       return res.status(200).json(items);
     }
 
@@ -130,17 +168,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
-      const items = await listSiamrajClosedRequests({ from, to });
-      await attachAssignments(items);
-      await attachNotes(items);
+      const items = await listSiamrajClosedRequests({ from, to, departmentScope });
       return res.status(200).json(items);
     }
 
     const limit = Number(getQuery(req, 'limit') || '200');
     const mode = getQuery(req, 'mode');
-    const items = await listSiamrajUnitRequests({ limit, mode });
+    const items = await listSiamrajUnitRequests({ limit, mode, departmentScope });
     await attachAssignments(items);
     await attachNotes(items);
+    await attachWorkStatus(items);
     return res.status(200).json(items);
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');

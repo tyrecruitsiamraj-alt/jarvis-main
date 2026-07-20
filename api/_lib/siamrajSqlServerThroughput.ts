@@ -1,12 +1,10 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { toBangkokYmd } from './businessDate.js';
+import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 import {
-  effectiveInformedCount,
-  effectiveInformQtySql,
-  isOpenStaffingRowForRemaining,
-  remainingOpenPositionsFromRow,
-  requestPositionTotal,
-} from './siamrajStaffingOpen.js';
+  sqlServerDepartmentScopeClause,
+  type DepartmentScope,
+} from './departmentScope.js';
 
 export {
   effectiveInformedCount,
@@ -18,16 +16,23 @@ export {
   remainingOpenPositions,
   remainingOpenPositionsFromRow,
   requestPositionTotal,
+  staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 
 export type SiamrajThroughputRecord = {
+  requestNo?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;
   isOpen: boolean;
+  kind?: 'filled' | 'cancelled' | 'remaining';
+  requestActionName?: string;
+  requestActionCode?: string;
+  lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
 };
 
 type SqlThroughputRow = {
+  request_no: string | null;
   request_date: Date | string | null;
   want_date_from: Date | string | null;
   request_qty: number | null;
@@ -40,6 +45,8 @@ type SqlThroughputRow = {
   cancel_date: Date | string | null;
   stop_date: Date | string | null;
   has_inform: number | boolean | null;
+  request_action_code: string | null;
+  request_action_name: string | null;
 };
 
 function getSqlFilters() {
@@ -64,77 +71,110 @@ function toYmd(v: Date | string | null | undefined): string | null {
 }
 
 function effectiveRequestDateSql(alias = 'A'): string {
-  return `(
-    CASE
-      WHEN ${alias}.want_date_from IS NOT NULL
-        AND CONVERT(date, ${alias}.want_date_from) < CONVERT(date, ${alias}.request_date)
-        THEN CONVERT(date, ${alias}.request_date)
-      WHEN ${alias}.want_date_from IS NOT NULL
-        THEN CONVERT(date, ${alias}.want_date_from)
-      ELSE CONVERT(date, ${alias}.request_date)
-    END
-  )`;
+  /** วันที่เปิดใบสำหรับ cohort รายเดือน = วันที่กรอกใบ (request_date) */
+  return `CONVERT(date, ${alias}.request_date)`;
 }
 
-function effectiveRequestDateYmdFromRow(row: SqlThroughputRow): string | null {
-  const submit = toYmd(row.request_date);
-  const required = toYmd(row.want_date_from);
-  if (!submit) return required;
-  if (!required) return submit;
-  if (required < submit) return submit;
-  return required;
+function requestOpenDateYmdFromRow(row: SqlThroughputRow): string | null {
+  return toYmd(row.request_date) || toYmd(row.want_date_from);
 }
 
 function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
-  const effectiveRequestDate = effectiveRequestDateYmdFromRow(row);
-  if (!effectiveRequestDate) return [];
+  /** เดือนที่「เข้ามา」= วันที่เปิด/กรอกใบ ไม่ใช่ want_date_from */
+  const requestDate = requestOpenDateYmdFromRow(row);
+  if (!requestDate) return [];
 
-  const total = requestPositionTotal(row.request_qty);
-  const informed = effectiveInformedCount(row);
-  const remaining = remainingOpenPositionsFromRow(row);
-  const isOpen = isOpenStaffingRowForRemaining(row);
-  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || effectiveRequestDate;
+  const requestNo = (row.request_no || '').trim() || undefined;
+  const breakdown = staffingPositionBreakdown(row);
+  const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
+  const requestActionCode = (row.request_action_code || '').trim() || undefined;
+  const requestActionName = (row.request_action_name || '').trim() || undefined;
+  const lifecycleKind = classifyActionToLifecycle(requestActionName, requestActionCode);
+  const meta = { requestActionName, requestActionCode, lifecycleKind };
   const out: SiamrajThroughputRecord[] = [];
 
-  if (informed > 0) {
+  if (breakdown.filledPositions > 0) {
     out.push({
-      requestDate: effectiveRequestDate,
+      requestNo,
+      requestDate,
       closureDate,
-      positionUnits: informed,
+      positionUnits: breakdown.filledPositions,
       isOpen: false,
       kind: 'filled',
+      ...meta,
     });
   }
-
-  if (isOpen && remaining > 0) {
+  if (breakdown.cancelledPositions > 0) {
     out.push({
-      requestDate: effectiveRequestDate,
-      closureDate: null,
-      positionUnits: remaining,
-      isOpen: true,
-      kind: 'remaining',
-    });
-  } else if (!isOpen && informed === 0) {
-    out.push({
-      requestDate: effectiveRequestDate,
+      requestNo,
+      requestDate,
       closureDate,
-      positionUnits: total,
+      positionUnits: breakdown.cancelledPositions,
       isOpen: false,
       kind: 'cancelled',
+      ...meta,
+    });
+  }
+  if (breakdown.remainingPositions > 0) {
+    out.push({
+      requestNo,
+      requestDate,
+      closureDate: null,
+      positionUnits: breakdown.remainingPositions,
+      isOpen: true,
+      kind: 'remaining',
+      ...meta,
     });
   }
 
   return out;
 }
 
+function classifyActionToLifecycle(
+  actionName?: string,
+  actionCode?: string,
+): SiamrajThroughputRecord['lifecycleKind'] {
+  const action = (actionName || '').trim();
+  const codeRaw = (actionCode || '').trim();
+  const code = codeRaw.toUpperCase();
+  switch (codeRaw) {
+    case '001':
+      return 'new_site';
+    case '002':
+    case '003':
+      return 'increase_headcount';
+    case '004':
+      return 'replacement';
+    case '005':
+    case '006':
+    case '013':
+    case '014':
+      return 'resignation';
+    default:
+      break;
+  }
+  if (/ลาออก|พ้นสภาพ|ลาคลอด|ลาบวช|resign/i.test(action) || code === 'RESIGN') return 'resignation';
+  if (/เปลี่ยนคน|เปลี่ยนตัว|ส่งคนแทน|replacement|ทดแทน/i.test(action) || code === 'REPLACE') {
+    return 'replacement';
+  }
+  if (/เพิ่มอัตรา|เพิ่มคน|เพิ่มตำแหน่ง/i.test(action) || code === 'ADD' || code === 'INCREASE') {
+    return 'increase_headcount';
+  }
+  if (/เปิดไซต์|เปิดไซท์|เปิดไซด์/i.test(action) || code === 'SITE' || code === 'NEWSITE') {
+    return 'new_site';
+  }
+  return 'other';
+}
+
 function isDateYmd(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-/** ดึงใบขอในช่วงวันที่ (วันที่กรอก หรือวันที่ปิด) สำหรับกราฟขอ vs ปิด */
+/** ดึงใบขอตามวันที่เปิดใบในงวด — สำหรับ cohort เข้ามา/ปิด/ยกเลิก/คงเหลือ */
 export async function listSiamrajSqlServerThroughput(options: {
   from: string;
   to: string;
+  departmentScope?: DepartmentScope;
 }): Promise<SiamrajThroughputRecord[]> {
   const { from, to } = options;
   if (!isDateYmd(from) || !isDateYmd(to)) {
@@ -143,42 +183,52 @@ export async function listSiamrajSqlServerThroughput(options: {
 
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
+  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
 
-  const effDate = effectiveRequestDateSql('A');
+  const openDate = effectiveRequestDateSql('A');
+  // สรุป inform เฉพาะใบในช่วง — เลี่ยง correlated COUNT ต่อแถว และเลี่ยงสแกน inform ทั้งตาราง
   const rows = await siamrajSqlQuery<SqlThroughputRow>(
     `
     SELECT
+      A.request_no,
       A.request_date,
       A.want_date_from,
       A.request_qty,
       A.inform_qty,
       A.is_inform_all,
-      ${effectiveInformQtySql('A')} AS effective_inform_qty,
+      CASE
+        WHEN ISNULL(A.inform_qty, 0) > 0 THEN A.inform_qty
+        ELSE ISNULL(IH.inform_cnt, 0)
+      END AS effective_inform_qty,
       A.status,
       A.is_stop,
       A.stop_no,
       A.cancel_date,
       A.stop_date,
       CASE
-        WHEN EXISTS (SELECT 1 FROM st_inform_head IH WHERE IH.request_no = A.request_no) THEN 1
+        WHEN ISNULL(A.inform_qty, 0) > 0 OR ISNULL(IH.inform_cnt, 0) > 0 THEN 1
         ELSE 0
-      END AS has_inform
+      END AS has_inform,
+      A.request_code AS request_action_code,
+      (SELECT TOP 1 z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
+    LEFT JOIN (
+      SELECT IH.request_no, COUNT_BIG(*) AS inform_cnt
+      FROM st_inform_head IH
+      INNER JOIN st_request_head A2 ON A2.request_no = IH.request_no
+      WHERE CONVERT(date, A2.request_date) >= @fromDate
+        AND CONVERT(date, A2.request_date) <= @toDate
+      GROUP BY IH.request_no
+    ) IH ON IH.request_no = A.request_no
     WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
       AND A.site_code BETWEEN @siteFrom AND @siteTo
       ${clsExclude}
-      AND (
-        ${effDate} >= @fromDate AND ${effDate} <= @toDate
-        OR (A.stop_date IS NOT NULL AND CONVERT(date, A.stop_date) >= @fromDate AND CONVERT(date, A.stop_date) <= @toDate)
-        OR (A.cancel_date IS NOT NULL AND CONVERT(date, A.cancel_date) >= @fromDate AND CONVERT(date, A.cancel_date) <= @toDate)
-        OR (
-          ISNULL(A.inform_qty, 0) > 0
-          AND ${effDate} >= @fromDate AND ${effDate} <= @toDate
-        )
-      )
+      ${deptScope.sql}
+      AND ${openDate} >= @fromDate
+      AND ${openDate} <= @toDate
   `,
-    { ...filters, fromDate: from, toDate: to },
+    { ...filters, fromDate: from, toDate: to, ...deptScope.params },
   );
 
   return rows.flatMap(mapThroughputRow);

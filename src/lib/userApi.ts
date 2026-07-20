@@ -36,6 +36,9 @@ export function parseAppUser(value: unknown): User | null {
     role: value.role,
     is_active: value.is_active,
     created_at,
+    ...(typeof value.department_code === 'string' && value.department_code.trim()
+      ? { department_code: value.department_code.trim().toUpperCase() }
+      : {}),
   };
 }
 

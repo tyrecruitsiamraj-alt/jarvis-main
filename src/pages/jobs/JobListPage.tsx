@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
@@ -13,6 +14,12 @@ import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
+import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
+import {
+  resolveUnitRequestWorkStatus,
+  UNIT_REQUEST_WORK_STATUS_LABELS,
+  UNIT_REQUEST_WORK_STATUS_OPTIONS,
+} from '@/lib/unitRequestWorkStatus';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
@@ -44,6 +51,7 @@ import {
   matchesUnitOrganizationFilter,
   unitOrganizationKey,
 } from '@/lib/unitGroupName';
+import { cleanedAddressSummary } from '@/lib/districtMatch';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
@@ -96,19 +104,24 @@ const JobListPage: React.FC = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  /** admin เห็นทุกแผนก · คนอื่นที่มี department_code ถูกล็อกแผนก */
+  const lockedDepartmentCode =
+    user?.role !== 'admin' ? user?.department_code?.trim().toUpperCase() || null : null;
 
   const listState = useMemo(() => parseJobListSearchParams(searchParams), [searchParams]);
   const {
     filter,
     search,
     unitFilter,
-    departmentFilter,
+    departmentFilter: departmentFilterRaw,
     jobSubtypeFilter,
     yearFilter,
     recruiterFilter,
     screenerFilter,
     oplFilter,
     urgencyFilter,
+    workStatusFilter,
     noteFilter,
     replacementFilter,
     ageDaysFilter,
@@ -116,6 +129,7 @@ const JobListPage: React.FC = () => {
     page,
     pageSize,
   } = listState;
+  const departmentFilter = lockedDepartmentCode || departmentFilterRaw;
 
   const returnTo = jobListReturnTo(location.pathname, location.search);
   const [openInNewTab, setOpenInNewTab] = useState(loadOpenInNewTabPref);
@@ -142,9 +156,7 @@ const JobListPage: React.FC = () => {
 
   useEffect(() => {
     saveUnitLastPath('/jobs/list');
-    if (location.search) {
-      saveJobListLastUrl(`${location.pathname}${location.search}`);
-    }
+    saveJobListLastUrl(`${location.pathname}${location.search}`);
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -308,6 +320,12 @@ const JobListPage: React.FC = () => {
         if (!matchesScreenerFilter(j, screenerFilter)) return false;
         if (!matchesOplFilter(j, oplFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
+        if (
+          workStatusFilter !== 'all' &&
+          resolveUnitRequestWorkStatus(j.work_status) !== workStatusFilter
+        ) {
+          return false;
+        }
       if (!matchesNoteFilter(j, noteFilter)) return false;
       if (!matchesReplacementFilter(j, replacementFilter)) return false;
       if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
@@ -322,7 +340,7 @@ const JobListPage: React.FC = () => {
           .includes(q);
       })
       .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -452,15 +470,23 @@ const JobListPage: React.FC = () => {
           {siamrajPrimary ? (
             <FilterSelect
               id="job-list-department"
-              label="แผนก"
+              label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก'}
               value={departmentFilter}
-              onChange={(v) => updateListState({ departmentFilter: v })}
+              disabled={Boolean(lockedDepartmentCode)}
+              onChange={(v) => {
+                if (lockedDepartmentCode) return;
+                updateListState({ departmentFilter: v });
+              }}
             >
-              {departmentOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
+              {lockedDepartmentCode ? (
+                <option value={lockedDepartmentCode}>{lockedDepartmentCode}</option>
+              ) : (
+                departmentOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))
+              )}
             </FilterSelect>
           ) : null}
 
@@ -559,6 +585,20 @@ const JobListPage: React.FC = () => {
           </FilterSelect>
 
           <FilterSelect
+            id="job-list-work-status"
+            label="สถานะทำงาน"
+            value={workStatusFilter}
+            onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
+          >
+            <option value="all">ทั้งหมด</option>
+            {UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {UNIT_REQUEST_WORK_STATUS_LABELS[status]}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
             id="job-list-note-filter"
             label="หมายเหตุ"
             value={noteFilter}
@@ -637,7 +677,7 @@ const JobListPage: React.FC = () => {
           ) : (
             // ─── Desktop skeleton table ──────────────────────────────────────
             <div className="glass-card rounded-xl border border-border overflow-x-auto">
-              <table className="w-full text-sm min-w-[1080px]">
+              <table className="w-full text-sm min-w-[1000px]">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
@@ -645,16 +685,15 @@ const JobListPage: React.FC = () => {
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">คงเหลือ</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
                     <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                     <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
-                    <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
+                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
+                    <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -675,10 +714,9 @@ const JobListPage: React.FC = () => {
                         <Skeleton className="h-3 w-20" />
                         <Skeleton className="h-3 w-20" />
                       </td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
-                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
                       <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-16 rounded-full mx-auto" /></td>
-                      <td className="px-3 py-3 text-right"><Skeleton className="h-3 w-16 ml-auto" /></td>
+                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
+                      <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -722,10 +760,40 @@ const JobListPage: React.FC = () => {
                   <div className="text-xs text-muted-foreground mt-1 grid gap-0.5">
                     <span>วันที่กรอก: {formatSubmittedDate(j)}</span>
                     <span>วันที่ต้องการ: {formatYmdDmyBe(j.required_date)}</span>
-                    <span>จำนวนที่ต้องการ: {jobPositionUnits(j)} ตำแหน่ง</span>
+                    <span>
+                      ตำแหน่ง: ขอ {j.request_positions ?? jobPositionUnits(j)}
+                      {j.filled_positions != null ? ` · หาได้ ${j.filled_positions}` : ''}
+                      {' · คงเหลือ '}
+                      {jobPositionUnits(j)}
+                    </span>
                   </div>
 
-                  <div className="text-xs text-muted-foreground mt-1">{j.location_address}</div>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    {(() => {
+                      const loc = cleanedAddressSummary(j.location_address || '');
+                      if (loc.line) {
+                        return (
+                          <>
+                            <div className="text-foreground/80">
+                              {[
+                                loc.province ? `จ.${loc.province}` : null,
+                                loc.district
+                                  ? loc.district.startsWith('เขต') || loc.district.startsWith('อำเภอ')
+                                    ? loc.district
+                                    : `อ.${loc.district}`
+                                  : null,
+                                loc.subdistrict || null,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </div>
+                            <div className="line-clamp-2">{j.location_address}</div>
+                          </>
+                        );
+                      }
+                      return <div className="line-clamp-2">{j.location_address || '—'}</div>;
+                    })()}
+                  </div>
 
                   {(j.recruiter_name || j.screener_name || j.opl_name) && (
                     <div className="text-xs text-muted-foreground mt-1">
@@ -740,10 +808,16 @@ const JobListPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between mt-2 text-xs gap-2">
-                    <span className="text-primary">฿{j.total_income.toLocaleString()}</span>
+                  <div className="flex items-center justify-end mt-2 text-xs gap-2">
                     <div className="flex items-center gap-1.5 shrink-0">
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
+                      <UnitRequestWorkStatusBadge
+                        status={j.work_status}
+                        firstName={j.work_person_first_name}
+                        lastName={j.work_person_last_name}
+                        persons={j.work_persons}
+                        compact
+                      />
                       <JobUrgencyBadge job={j} />
                     </div>
                   </div>
@@ -760,7 +834,7 @@ const JobListPage: React.FC = () => {
           </div>
         ) : (
           <div className={cn('glass-card rounded-xl border border-border overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
-            <table className="w-full text-sm min-w-[1080px]">
+            <table className="w-full text-sm min-w-[1000px]">
               <thead>
                 <tr className="border-b border-border bg-secondary/30">
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
@@ -768,16 +842,15 @@ const JobListPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">จำนวน</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">คงเหลือ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
                   <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                   <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะใบขอ</th>
-                  <th className="px-3 py-3 text-right text-muted-foreground font-medium whitespace-nowrap">รายได้</th>
+                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
+                  <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
                 </tr>
               </thead>
 
@@ -830,16 +903,24 @@ const JobListPage: React.FC = () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 max-w-[200px]">
-                      <UnitRequestNotePreview note={j.list_note} />
-                    </td>
                     <td className="px-3 py-3 text-center">
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <JobUrgencyBadge job={j} compact />
+                      <div className="inline-flex flex-col items-center gap-1">
+                        <UnitRequestWorkStatusBadge
+                          status={j.work_status}
+                          firstName={j.work_person_first_name}
+                          lastName={j.work_person_last_name}
+                          persons={j.work_persons}
+                          compact
+                        />
+                        <JobUrgencyBadge job={j} compact />
+                      </div>
                     </td>
-                    <td className="px-3 py-3 text-right text-foreground whitespace-nowrap">฿{j.total_income.toLocaleString()}</td>
+                    <td className="px-3 py-2 max-w-[200px]">
+                      <UnitRequestNotePreview note={j.list_note} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

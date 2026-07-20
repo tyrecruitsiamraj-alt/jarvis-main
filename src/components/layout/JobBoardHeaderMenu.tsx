@@ -30,7 +30,7 @@ const JobBoardHeaderMenu: React.FC<Props> = ({ variant = 'nav' }) => {
           className={cn(
             isCompact
               ? 'relative flex items-center justify-center rounded-lg p-2.5 text-muted-foreground transition-colors touch-manipulation min-h-[44px] min-w-[44px] hover:text-foreground hover:bg-secondary'
-              : 'flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all touch-manipulation',
+              : 'flex shrink-0 items-center gap-1.5 px-2 2xl:gap-2 2xl:px-3 py-2 rounded-lg text-xs 2xl:text-sm font-medium transition-all touch-manipulation',
             onBoard &&
               (isCompact
                 ? 'bg-blue-500/12 text-blue-700 hover:bg-blue-500/12'
