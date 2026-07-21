@@ -10,6 +10,7 @@ import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/par
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
+import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   Dialog,
@@ -19,12 +20,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, ExternalLink, RefreshCw, FileText } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const SOWORK_APPLY_URL =
-  (import.meta.env.VITE_SOWORK_APPLY_URL as string | undefined)?.trim() ||
-  'https://s.siamrajathanee.dev/u/m82prvg2';
 
 function staffAssigneeLine(j: JobRequest): string | null {
   const parts = [
@@ -70,8 +67,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   });
   const isStaff = variant === 'staff';
 
-  const openApply = () => {
-    window.open(SOWORK_APPLY_URL, '_blank', 'noopener,noreferrer');
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyJob, setApplyJob] = useState<JobRequest | null>(null);
+
+  const openApply = (job: JobRequest | null = null) => {
+    setApplyJob(job);
+    setApplyOpen(true);
   };
 
   return (
@@ -90,8 +91,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             </h1>
             {!isStaff ? (
               <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-                เลือกตำแหน่งที่สนใจ แล้วสมัครผ่านแอป{' '}
-                <span className="font-medium text-foreground">SOWORK</span>
+                เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
+                <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
               </p>
             ) : null}
           </div>
@@ -219,11 +220,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={openApply}
+                    onClick={() => openApply(job)}
                     className="jarvis-pill-btn flex-1 py-2.5 text-xs font-semibold"
                   >
-                    สมัคร SOWORK
-                    <ExternalLink className="h-3.5 w-3.5 opacity-90" />
+                    สมัครงาน
+                    <Send className="h-3.5 w-3.5 opacity-90" />
                   </button>
                 </div>
               </CardFooter>
@@ -234,14 +235,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         <div className="mx-auto max-w-md pb-14 pt-2 text-center">
           <div className="jarvis-frost rounded-2xl border border-white/70 px-6 py-8">
             <p className="text-sm font-medium text-foreground">พร้อมสมัครแล้ว?</p>
-            <p className="mt-1 text-xs text-muted-foreground">เปิดแอป SOWORK เพื่อส่งใบสมัคร</p>
+            <p className="mt-1 text-xs text-muted-foreground">กรอกใบสมัครสั้นๆ แล้วทีมสรรหาจะติดต่อกลับ</p>
             <button
               type="button"
-              onClick={openApply}
+              onClick={() => openApply(null)}
               className="jarvis-pill-btn mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              ไปที่แอปสมัครงาน SOWORK
-              <ExternalLink className="h-4 w-4" />
+              กรอกใบสมัครงาน
+              <Send className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -378,17 +379,27 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 ) : null}
                 <button
                   type="button"
-                  onClick={openApply}
+                  onClick={() => {
+                    const job = selected;
+                    setSelected(null);
+                    openApply(job);
+                  }}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
                 >
-                  สมัครผ่าน SOWORK
-                  <ExternalLink className="h-4 w-4" />
+                  สมัครตำแหน่งนี้
+                  <Send className="h-4 w-4" />
                 </button>
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      <PublicApplyDialog
+        open={applyOpen}
+        job={applyJob}
+        onClose={() => setApplyOpen(false)}
+      />
     </div>
   );
 };

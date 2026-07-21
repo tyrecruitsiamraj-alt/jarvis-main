@@ -28,6 +28,7 @@ import magicLinkVerifyHandler from './auth/magic-link-verify.js';
 import azureAdStartHandler from './auth/azure-ad-start.js';
 import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
+import publicApplyHandler from './public/apply.js';
 import brandingHandler from './branding.js';
 import appFeedbackHandler from './app-feedback.js';
 import driverCareHandler from './driver-care.js';
@@ -104,6 +105,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/branding': brandingHandler as ApiHandler,
   '/api/app-feedback': appFeedbackHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
+  '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
   '/api/auth/dev-role': devRoleHandler as ApiHandler,
   '/api/auth/logout': logoutHandler as ApiHandler,
