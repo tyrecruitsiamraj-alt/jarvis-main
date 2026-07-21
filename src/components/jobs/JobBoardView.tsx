@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
@@ -11,6 +11,8 @@ import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
+import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
+import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   Dialog,
@@ -20,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -75,6 +77,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     setApplyOpen(true);
   };
 
+  // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น + จำนวนผู้สมัครต่อใบ
+  const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
+  const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!isStaff) return;
+    let cancelled = false;
+    fetchJobApplicationCounts()
+      .then((c) => {
+        if (!cancelled) setApplicantCounts(c);
+      })
+      .catch(() => {
+        /* badge is optional — ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStaff, jobs]);
+
   return (
     <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
       <div className="jarvis-page-orb -top-10 right-0 h-48 w-48 opacity-25" aria-hidden />
@@ -87,7 +108,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               {isStaff ? 'บอร์ดงานเปิดรับ · เจ้าหน้าที่' : 'บอร์ดประกาศรับสมัคร'}
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-              ค้นหางานที่เหมาะกับคุณ
+              {isStaff ? 'งานสรรหา' : 'ค้นหางานที่เหมาะกับคุณ'}
             </h1>
             {!isStaff ? (
               <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
@@ -157,7 +178,23 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           {filters.filtered.map((job) => (
             <Card
               key={job.id}
-              className="group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40"
+              onClick={isStaff ? () => setApplicantsJob(job) : undefined}
+              role={isStaff ? 'button' : undefined}
+              tabIndex={isStaff ? 0 : undefined}
+              onKeyDown={
+                isStaff
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setApplicantsJob(job);
+                      }
+                    }
+                  : undefined
+              }
+              className={cn(
+                'group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                isStaff && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+              )}
             >
               <CardHeader className="space-y-3 pb-2">
                 <div className="flex items-start justify-between gap-2">
@@ -210,42 +247,56 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 </div>
               </CardContent>
               <CardFooter className="border-t border-border/60 bg-muted/20 pt-3">
-                <div className="flex w-full gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelected(job)}
-                    className="flex-1 rounded-lg border border-border bg-background py-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
-                  >
-                    รายละเอียด
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openApply(job)}
-                    className="jarvis-pill-btn flex-1 py-2.5 text-xs font-semibold"
-                  >
-                    สมัครงาน
-                    <Send className="h-3.5 w-3.5 opacity-90" />
-                  </button>
-                </div>
+                {isStaff ? (
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                      ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
+                    </span>
+                    <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
+                      ดูรายชื่อ →
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex w-full gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelected(job)}
+                      className="flex-1 rounded-lg border border-border bg-background py-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+                    >
+                      รายละเอียด
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openApply(job)}
+                      className="jarvis-pill-btn flex-1 py-2.5 text-xs font-semibold"
+                    >
+                      สมัครงาน
+                      <Send className="h-3.5 w-3.5 opacity-90" />
+                    </button>
+                  </div>
+                )}
               </CardFooter>
             </Card>
           ))}
         </div>
 
-        <div className="mx-auto max-w-md pb-14 pt-2 text-center">
-          <div className="jarvis-frost rounded-2xl border border-white/70 px-6 py-8">
-            <p className="text-sm font-medium text-foreground">พร้อมสมัครแล้ว?</p>
-            <p className="mt-1 text-xs text-muted-foreground">กรอกใบสมัครสั้นๆ แล้วทีมสรรหาจะติดต่อกลับ</p>
-            <button
-              type="button"
-              onClick={() => openApply(null)}
-              className="jarvis-pill-btn mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
-            >
-              กรอกใบสมัครงาน
-              <Send className="h-4 w-4" />
-            </button>
+        {!isStaff ? (
+          <div className="mx-auto max-w-md pb-14 pt-2 text-center">
+            <div className="jarvis-frost rounded-2xl border border-white/70 px-6 py-8">
+              <p className="text-sm font-medium text-foreground">พร้อมสมัครแล้ว?</p>
+              <p className="mt-1 text-xs text-muted-foreground">กรอกใบสมัครสั้นๆ แล้วทีมสรรหาจะติดต่อกลับ</p>
+              <button
+                type="button"
+                onClick={() => openApply(null)}
+                className="jarvis-pill-btn mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                กรอกใบสมัครงาน
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
@@ -399,6 +450,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         open={applyOpen}
         job={applyJob}
         onClose={() => setApplyOpen(false)}
+      />
+
+      <JobApplicantsDialog
+        open={!!applicantsJob}
+        job={applicantsJob}
+        onClose={() => setApplicantsJob(null)}
       />
     </div>
   );

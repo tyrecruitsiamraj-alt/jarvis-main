@@ -49,6 +49,7 @@ export type ApiResource =
   | 'matching-board-candidates'
   | 'matching-proposals'
   | 'matching-job-postings'
+  | 'job-applications'
   | 'diagnostics-outbound-ip'
   | 'app-feedback';
 
@@ -145,6 +146,11 @@ export function minimumRoleFor(
     case 'matching-proposals':
     case 'matching-job-postings':
       return 'staff';
+
+    case 'job-applications':
+      // staff+: read applicants from the public /apply form; supervisor+: manage
+      if (isRead) return 'staff';
+      return 'supervisor';
 
     case 'app-feedback':
       // ทุกคนที่ login แล้วส่งคำขอได้ (รวม OPL); จัดการสถานะ = supervisor+
