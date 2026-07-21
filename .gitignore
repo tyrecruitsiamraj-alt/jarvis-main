@@ -15,6 +15,7 @@ dist-ssr
 # ความลับ — กรอกบนเครื่องคุณเท่านั้น (DB, JWT, ฯลฯ) ห้าม commit
 .env
 .env.production
+.env.vercel.production
 
 # Editor directories and files
 .vscode/*
