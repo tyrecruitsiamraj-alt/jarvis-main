@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle2, Loader2, Send } from 'lucide-react';
+import { CheckCircle2, Loader2, MapPin, Send, UserRound } from 'lucide-react';
 
 export type PublicApplyDialogProps = {
   open: boolean;
@@ -26,6 +26,31 @@ export type PublicApplyDialogProps = {
 };
 
 type Gender = 'male' | 'female' | 'other';
+
+const Field: React.FC<{
+  label: string;
+  required?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ label, required, className, children }) => (
+  <div className={`space-y-1.5 ${className ?? ''}`}>
+    <label className="block text-xs font-medium text-muted-foreground">
+      {label}
+      {required ? <span className="text-red-500"> *</span> : null}
+    </label>
+    {children}
+  </div>
+);
+
+const SectionLabel: React.FC<{ icon: React.ReactNode; children: React.ReactNode }> = ({
+  icon,
+  children,
+}) => (
+  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+    {icon}
+    <span>{children}</span>
+  </div>
+);
 
 const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClose }) => {
   const [titlePrefix, setTitlePrefix] = useState('นาย');
@@ -48,6 +73,10 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const subdistrictOptions = useMemo(
     () => getSubdistrictOptions(province, district),
     [province, district],
+  );
+  const postalCode = useMemo(
+    () => (province && district && subdistrict ? getZipCodeForSubdistrict(province, district, subdistrict) : null),
+    [province, district, subdistrict],
   );
 
   useEffect(() => {
@@ -91,7 +120,6 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
 
     setSubmitting(true);
     try {
-      const postalCode = getZipCodeForSubdistrict(province, district, subdistrict);
       const res = await apiFetch('/api/public/apply', {
         method: 'POST',
         body: JSON.stringify({
@@ -125,231 +153,240 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     }
   };
 
-  const fieldCls =
-    'w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50';
-  const labelCls = 'flex flex-col gap-1.5 text-xs font-medium text-foreground';
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),34rem)] max-w-none flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
-          <DialogTitle className="text-base font-semibold sm:text-lg">
-            {submitted ? 'ส่งใบสมัครแล้ว' : 'กรอกใบสมัครงาน'}
-          </DialogTitle>
-          <DialogDescription>
-            {submitted
-              ? 'ทีมสรรหาจะติดต่อกลับตามเบอร์ที่ให้ไว้'
-              : job
-                ? `สมัคร: ${jobBoardCardTitle(job)}`
-                : 'กรอกข้อมูลติดต่อ แล้วทีมสรรหาจะติดต่อกลับ'}
-          </DialogDescription>
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-[34rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] border-border/70 p-0">
+        {/* Header */}
+        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <UserRound className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+                {submitted ? 'ส่งใบสมัครแล้ว' : 'กรอกใบสมัครงาน'}
+              </DialogTitle>
+              <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug sm:text-[13px]">
+                {submitted
+                  ? 'ทีมสรรหาจะติดต่อกลับตามเบอร์ที่ให้ไว้'
+                  : job
+                    ? `สมัคร: ${jobBoardCardTitle(job)}`
+                    : 'กรอกข้อมูลติดต่อ แล้วทีมสรรหาจะติดต่อกลับ'}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         {submitted ? (
-          <div className="flex flex-col items-center gap-4 px-5 py-8 text-center">
-            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/12">
+              <CheckCircle2 className="h-9 w-9 text-emerald-500" />
+            </span>
+            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
               ขอบคุณที่สนใจร่วมงานกับเรา เราได้รับข้อมูลของคุณเรียบร้อยแล้ว
             </p>
             <button
               type="button"
               onClick={onClose}
-              className="jarvis-pill-btn w-full justify-center py-2.5 text-sm font-semibold"
+              className="jarvis-pill-btn w-full py-3 text-sm font-semibold"
             >
               ปิดหน้าต่าง
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
-            <div className="flex flex-col gap-3.5 overflow-y-auto px-5 py-4">
-              {/* ชื่อ */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[7rem_1fr_1fr]">
-                <label className={labelCls}>
-                  คำนำหน้า
-                  <select
-                    value={titlePrefix}
-                    onChange={(e) => setTitlePrefix(e.target.value)}
-                    className={fieldCls}
-                  >
-                    {TITLE_PREFIX_OPTIONS.filter((o) => o.value).map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
+              {/* ── ข้อมูลผู้สมัคร ── */}
+              <section className="space-y-3">
+                <SectionLabel icon={<UserRound className="h-3.5 w-3.5" />}>ข้อมูลผู้สมัคร</SectionLabel>
+
+                <div className="grid grid-cols-[5rem_1fr] gap-2.5 sm:grid-cols-[6rem_1fr_1fr]">
+                  <Field label="คำนำหน้า">
+                    <select
+                      value={titlePrefix}
+                      onChange={(e) => setTitlePrefix(e.target.value)}
+                      className="jarvis-soft-field"
+                    >
+                      {TITLE_PREFIX_OPTIONS.filter((o) => o.value).map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="ชื่อ" required>
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="เช่น สมชาย"
+                      autoComplete="given-name"
+                      required
+                      className="jarvis-soft-field"
+                    />
+                  </Field>
+                  <Field label="นามสกุล" required className="col-span-2 sm:col-span-1">
+                    <input
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="เช่น ใจดี"
+                      autoComplete="family-name"
+                      required
+                      className="jarvis-soft-field"
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[1fr_5.5rem_7rem]">
+                  <Field label="เบอร์โทรศัพท์" required className="col-span-2 sm:col-span-1">
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="เช่น 0812345678"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      required
+                      className="jarvis-soft-field"
+                    />
+                  </Field>
+                  <Field label="อายุ" required>
+                    <input
+                      type="number"
+                      value={age}
+                      onChange={(e) => setAge(e.target.value)}
+                      placeholder="ปี"
+                      inputMode="numeric"
+                      min={15}
+                      max={80}
+                      required
+                      className="jarvis-soft-field"
+                    />
+                  </Field>
+                  <Field label="เพศ" required>
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as Gender)}
+                      className="jarvis-soft-field"
+                    >
+                      <option value="male">ชาย</option>
+                      <option value="female">หญิง</option>
+                      <option value="other">อื่นๆ</option>
+                    </select>
+                  </Field>
+                </div>
+              </section>
+
+              {/* ── ที่อยู่ ── */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <SectionLabel icon={<MapPin className="h-3.5 w-3.5" />}>ที่อยู่</SectionLabel>
+                  {postalCode ? (
+                    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">
+                      รหัสไปรษณีย์ {postalCode}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  <Field label="จังหวัด" required>
+                    <select
+                      value={province}
+                      onChange={(e) => {
+                        setProvince(e.target.value);
+                        setDistrict('');
+                        setSubdistrict('');
+                      }}
+                      required
+                      className="jarvis-soft-field"
+                    >
+                      <option value="">— เลือกจังหวัด —</option>
+                      {provinceOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="อำเภอ / เขต" required>
+                    <select
+                      value={district}
+                      onChange={(e) => {
+                        setDistrict(e.target.value);
+                        setSubdistrict('');
+                      }}
+                      disabled={!province}
+                      required
+                      className="jarvis-soft-field disabled:opacity-50"
+                    >
+                      <option value="">{!province ? 'เลือกจังหวัดก่อน' : '— เลือกอำเภอ/เขต —'}</option>
+                      {districtOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="ตำบล / แขวง" required>
+                    <select
+                      value={subdistrict}
+                      onChange={(e) => setSubdistrict(e.target.value)}
+                      disabled={!province || !district}
+                      required
+                      className="jarvis-soft-field disabled:opacity-50"
+                    >
+                      <option value="">
+                        {!province || !district ? 'เลือกอำเภอ/เขตก่อน' : '— เลือกตำบล/แขวง —'}
                       </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={labelCls}>
-                  ชื่อ <span className="text-red-500">*</span>
+                      {subdistrictOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </section>
+
+              {/* ── ตำแหน่ง / หมายเหตุ ── */}
+              <section className="space-y-3">
+                <SectionLabel icon={<Send className="h-3.5 w-3.5" />}>ตำแหน่งที่สนใจ</SectionLabel>
+                <Field label="ตำแหน่งที่สนใจ">
                   <input
                     type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="เช่น สมชาย"
-                    autoComplete="given-name"
-                    required
-                    className={fieldCls}
+                    value={positionInterest}
+                    onChange={(e) => setPositionInterest(e.target.value)}
+                    placeholder="เช่น พนักงานขับรถ"
+                    className="jarvis-soft-field"
                   />
-                </label>
-                <label className={labelCls}>
-                  นามสกุล <span className="text-red-500">*</span>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="เช่น ใจดี"
-                    autoComplete="family-name"
-                    required
-                    className={fieldCls}
+                </Field>
+                <Field label="ข้อมูลเพิ่มเติม (ถ้ามี)">
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="เช่น ประสบการณ์ หรือเวลาที่สะดวกให้ติดต่อ"
+                    rows={2}
+                    className="jarvis-soft-area resize-none"
                   />
-                </label>
-              </div>
-
-              {/* เบอร์ · อายุ · เพศ */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_6rem_7rem]">
-                <label className={labelCls}>
-                  เบอร์โทรศัพท์ <span className="text-red-500">*</span>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="เช่น 0812345678"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    required
-                    className={fieldCls}
-                  />
-                </label>
-                <label className={labelCls}>
-                  อายุ <span className="text-red-500">*</span>
-                  <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="ปี"
-                    inputMode="numeric"
-                    min={15}
-                    max={80}
-                    required
-                    className={fieldCls}
-                  />
-                </label>
-                <label className={labelCls}>
-                  เพศ <span className="text-red-500">*</span>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value as Gender)}
-                    className={fieldCls}
-                  >
-                    <option value="male">ชาย</option>
-                    <option value="female">หญิง</option>
-                    <option value="other">อื่นๆ</option>
-                  </select>
-                </label>
-              </div>
-
-              {/* ที่อยู่ — cascade */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label className={labelCls}>
-                  จังหวัด <span className="text-red-500">*</span>
-                  <select
-                    value={province}
-                    onChange={(e) => {
-                      setProvince(e.target.value);
-                      setDistrict('');
-                      setSubdistrict('');
-                    }}
-                    required
-                    className={fieldCls}
-                  >
-                    <option value="">— เลือกจังหวัด —</option>
-                    {provinceOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={labelCls}>
-                  อำเภอ / เขต <span className="text-red-500">*</span>
-                  <select
-                    value={district}
-                    onChange={(e) => {
-                      setDistrict(e.target.value);
-                      setSubdistrict('');
-                    }}
-                    disabled={!province}
-                    required
-                    className={fieldCls}
-                  >
-                    <option value="">
-                      {!province ? 'เลือกจังหวัดก่อน' : '— เลือกอำเภอ/เขต —'}
-                    </option>
-                    {districtOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={labelCls}>
-                  ตำบล / แขวง <span className="text-red-500">*</span>
-                  <select
-                    value={subdistrict}
-                    onChange={(e) => setSubdistrict(e.target.value)}
-                    disabled={!province || !district}
-                    required
-                    className={fieldCls}
-                  >
-                    <option value="">
-                      {!province || !district ? 'เลือกอำเภอ/เขตก่อน' : '— เลือกตำบล/แขวง —'}
-                    </option>
-                    {subdistrictOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className={labelCls}>
-                ตำแหน่งที่สนใจ
-                <input
-                  type="text"
-                  value={positionInterest}
-                  onChange={(e) => setPositionInterest(e.target.value)}
-                  placeholder="เช่น พนักงานขับรถ"
-                  className={fieldCls}
-                />
-              </label>
-
-              <label className={labelCls}>
-                ข้อมูลเพิ่มเติม (ถ้ามี)
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="เช่น ประสบการณ์ หรือเวลาที่สะดวกให้ติดต่อ"
-                  rows={2}
-                  className={fieldCls}
-                />
-              </label>
+                </Field>
+              </section>
 
               {error ? (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+                <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600">
+                  {error}
+                </p>
               ) : null}
             </div>
 
-            <div className="shrink-0 border-t border-border/50 px-5 py-3">
+            {/* Footer */}
+            <div className="shrink-0 border-t border-border/50 bg-background/80 px-5 py-3 sm:px-6 sm:py-4">
               <button
                 type="submit"
                 disabled={submitting}
-                className="jarvis-pill-btn inline-flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold disabled:opacity-60"
+                className="jarvis-pill-btn w-full py-3 text-sm font-semibold"
               >
-                {submitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 ส่งใบสมัคร
               </button>
             </div>
