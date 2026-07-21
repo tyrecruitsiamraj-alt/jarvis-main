@@ -29,3 +29,6 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Machine-local mirror of .claude/skills (see AGENTS.md) — do not commit
+.agents/
