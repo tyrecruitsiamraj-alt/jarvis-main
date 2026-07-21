@@ -5,8 +5,10 @@ const table = tableInAppSchema('job_posting_requests');
 const MAX_TEXT = 400;
 const MAX_LONG_TEXT = 2000;
 
-export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'filled' | 'cancelled';
-const STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted', 'filled', 'cancelled'];
+export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled';
+export type JobPostingRequestType = 'content' | 'scraping';
+const STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted', 'completed', 'filled', 'cancelled'];
+const REQUEST_TYPES: JobPostingRequestType[] = ['content', 'scraping'];
 /** สถานะที่ถือว่า "ยังเปิดอยู่" — กันสร้างคำขอซ้ำต่อใบขอเดียวกัน (ตรงกับ partial unique index) */
 const ACTIVE_STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted'];
 
@@ -14,6 +16,7 @@ export type JobPostingRequest = {
   id: string;
   job_id: string;
   request_no: string | null;
+  request_type: JobPostingRequestType;
   status: JobPostingStatus;
   reason: string | null;
   notes: string | null;
@@ -27,6 +30,7 @@ type Row = {
   id: string;
   job_id: string;
   request_no: string | null;
+  request_type: string;
   status: string;
   reason: string | null;
   notes: string | null;
@@ -39,7 +43,7 @@ type Row = {
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const COLS =
-  'id, job_id, request_no, status, reason, notes, requested_by_user_id, requested_by_name, created_at, updated_at';
+  'id, job_id, request_no, request_type, status, reason, notes, requested_by_user_id, requested_by_name, created_at, updated_at';
 
 function isMissingTable(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
@@ -63,6 +67,9 @@ function mapRow(r: Row): JobPostingRequest {
     id: r.id,
     job_id: r.job_id,
     request_no: r.request_no,
+    request_type: REQUEST_TYPES.includes(r.request_type as JobPostingRequestType)
+      ? (r.request_type as JobPostingRequestType)
+      : 'content',
     status: (STATUSES as string[]).includes(r.status) ? (r.status as JobPostingStatus) : 'pending',
     reason: r.reason,
     notes: r.notes,
@@ -75,6 +82,12 @@ function mapRow(r: Row): JobPostingRequest {
 
 export function normalizeJobPostingStatus(v: unknown): JobPostingStatus | null {
   return typeof v === 'string' && (STATUSES as string[]).includes(v) ? (v as JobPostingStatus) : null;
+}
+
+export function normalizeJobPostingRequestType(v: unknown): JobPostingRequestType | null {
+  return typeof v === 'string' && REQUEST_TYPES.includes(v as JobPostingRequestType)
+    ? (v as JobPostingRequestType)
+    : null;
 }
 
 /** คำขอที่ยัง active อยู่ของใบขอนี้ (ถ้ามี) */
@@ -116,6 +129,7 @@ export async function listJobPostingRequests(filter?: ListJobPostingsFilter): Pr
 export type CreateJobPostingInput = {
   jobId: string;
   requestNo?: string | null;
+  requestType?: JobPostingRequestType;
   reason?: unknown;
   userId?: string | null;
   userName?: string | null;
@@ -136,6 +150,7 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
   const params = [
     jobId,
     trimTo(input.requestNo, MAX_TEXT),
+    input.requestType ?? 'content',
     trimTo(input.reason, MAX_LONG_TEXT),
     userId,
     trimTo(input.userName, MAX_TEXT),
@@ -144,8 +159,8 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
   try {
     const { rows } = await dbQuery<Row>(
       `
-      insert into ${table} (job_id, request_no, reason, requested_by_user_id, requested_by_name)
-      values ($1, $2, $3, $4::uuid, $5)
+      insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name)
+      values ($1, $2, $3, $4, $5::uuid, $6)
       returning ${COLS}
       `,
       params,

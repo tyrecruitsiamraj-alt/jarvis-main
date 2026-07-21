@@ -14,25 +14,29 @@ const STATUS_CLASS: Record<JobPostingStatus, string> = {
   pending: 'bg-amber-500/15 text-amber-800',
   in_progress: 'bg-blue-500/15 text-blue-700',
   posted: 'bg-violet-500/15 text-violet-700',
+  completed: 'bg-emerald-500/15 text-emerald-700',
   filled: 'bg-emerald-500/15 text-emerald-700',
   cancelled: 'bg-muted text-muted-foreground',
 };
 
-/** ปุ่มขั้นต่อไปที่ทำได้จากสถานะปัจจุบัน */
-const NEXT_STATUS: Partial<Record<JobPostingStatus, { status: JobPostingStatus; label: string }[]>> = {
-  pending: [
+/** ปุ่มขั้นต่อไปตามประเภทงาน — Scraping ไม่มีสถานะ "โพสแล้ว". */
+function nextStatuses(item: JobPostingRequest): { status: JobPostingStatus; label: string }[] | undefined {
+  if (item.status === 'pending') return [
     { status: 'in_progress', label: 'รับไปทำ' },
     { status: 'cancelled', label: 'ยกเลิก' },
-  ],
-  in_progress: [
-    { status: 'posted', label: 'โพสแล้ว' },
+  ];
+  if (item.status === 'in_progress') return [
+    item.request_type === 'scraping'
+      ? { status: 'completed', label: 'ตรวจรับแล้ว' }
+      : { status: 'posted', label: 'โพสแล้ว' },
     { status: 'cancelled', label: 'ยกเลิก' },
-  ],
-  posted: [
+  ];
+  if (item.status === 'posted') return [
     { status: 'filled', label: 'ได้คนแล้ว' },
     { status: 'cancelled', label: 'ยกเลิก' },
-  ],
-};
+  ];
+  return undefined;
+}
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -102,7 +106,7 @@ const JobPostingsPage: React.FC = () => {
   };
 
   const counts = useMemo(() => {
-    const c: Record<JobPostingStatus, number> = { pending: 0, in_progress: 0, posted: 0, filled: 0, cancelled: 0 };
+    const c: Record<JobPostingStatus, number> = { pending: 0, in_progress: 0, posted: 0, completed: 0, filled: 0, cancelled: 0 };
     for (const it of items) c[it.status]++;
     return c;
   }, [items]);
@@ -125,7 +129,7 @@ const JobPostingsPage: React.FC = () => {
             className="jarvis-soft-field min-h-[40px] text-xs w-auto"
           >
             <option value="all">ทุกสถานะ</option>
-            {(['pending', 'in_progress', 'posted', 'filled', 'cancelled'] as JobPostingStatus[]).map((s) => (
+            {(['pending', 'in_progress', 'posted', 'completed', 'filled', 'cancelled'] as JobPostingStatus[]).map((s) => (
               <option key={s} value={s}>
                 {jobPostingStatusLabel(s)} {filterStatus === 'all' ? `(${counts[s]})` : ''}
               </option>
@@ -149,6 +153,12 @@ const JobPostingsPage: React.FC = () => {
                   <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', STATUS_CLASS[it.status])}>
                     {jobPostingStatusLabel(it.status)}
                   </span>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    it.request_type === 'scraping' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-orange-500/15 text-orange-700',
+                  )}>
+                    {it.request_type === 'scraping' ? 'Scraping' : 'Content'}
+                  </span>
                   <CopyIdButton id={it.id} />
                   <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.created_at)}</span>
                 </div>
@@ -167,9 +177,9 @@ const JobPostingsPage: React.FC = () => {
                     เปิดใบขอ <ExternalLink className="h-2.5 w-2.5" />
                   </a>
                 </div>
-                {NEXT_STATUS[it.status] ? (
+                {nextStatuses(it) ? (
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {NEXT_STATUS[it.status]!.map((n) => (
+                    {nextStatuses(it)!.map((n) => (
                       <button
                         key={n.status}
                         type="button"

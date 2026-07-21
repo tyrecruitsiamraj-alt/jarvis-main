@@ -13,6 +13,7 @@ import {
   createJobPostingRequest,
   updateJobPostingRequest,
   normalizeJobPostingStatus,
+  normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -54,6 +55,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const item = await createJobPostingRequest({
         jobId,
         requestNo: getString(body.request_no) ?? getString(body.requestNo),
+        requestType:
+          normalizeJobPostingRequestType(body.request_type ?? body.requestType) ?? 'content',
         reason: body.reason,
         userId: req.user.sub,
         userName: req.user.email,
@@ -63,7 +66,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'job_posting_request.create',
         entityType: 'job_posting_request',
         entityId: item.id,
-        after: { job_id: item.job_id, status: item.status },
+        after: { job_id: item.job_id, request_type: item.request_type, status: item.status },
       });
 
       return res.status(200).json(item);

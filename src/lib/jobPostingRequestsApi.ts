@@ -1,12 +1,14 @@
 import { apiFetch } from '@/lib/apiFetch';
 
 /** คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ */
-export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'filled' | 'cancelled';
+export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled';
+export type JobPostingRequestType = 'content' | 'scraping';
 
 export type JobPostingRequest = {
   id: string;
   job_id: string;
   request_no: string | null;
+  request_type: JobPostingRequestType;
   status: JobPostingStatus;
   reason: string | null;
   notes: string | null;
@@ -20,6 +22,7 @@ const STATUS_LABEL: Record<JobPostingStatus, string> = {
   pending: 'รอดำเนินการ',
   in_progress: 'กำลังทำ',
   posted: 'โพสแล้ว',
+  completed: 'ตรวจรับแล้ว',
   filled: 'ได้คนแล้ว',
   cancelled: 'ยกเลิก',
 };
@@ -52,6 +55,7 @@ export async function createJobPostingRequest(input: {
   jobId: string;
   requestNo?: string | null;
   reason?: string | null;
+  requestType?: JobPostingRequestType;
 }): Promise<JobPostingRequest> {
   const r = await apiFetch('/api/matching/job-postings', {
     method: 'POST',
@@ -59,6 +63,7 @@ export async function createJobPostingRequest(input: {
       job_id: input.jobId,
       request_no: input.requestNo ?? null,
       reason: input.reason ?? null,
+      request_type: input.requestType ?? 'content',
     }),
   });
   if (!r.ok) return readError(r, 'สร้างคำขอไม่สำเร็จ');

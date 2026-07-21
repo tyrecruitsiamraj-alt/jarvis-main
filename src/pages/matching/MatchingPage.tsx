@@ -49,6 +49,7 @@ import {
   createJobPostingRequest,
   jobPostingStatusLabel,
   type JobPostingRequest,
+  type JobPostingRequestType,
 } from '@/lib/jobPostingRequestsApi';
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '@/lib/erpBranchDemandParser';
 import {
@@ -794,7 +795,7 @@ const MatchingPage: React.FC = () => {
     return `มีคนของเราเข้าข่าย ${recommended} คน (จาก pool ${bm.pool_size}) แต่ยังไม่โอเค/ไม่เพียงพอ`;
   };
 
-  const createPosting = async (job: JobRequest) => {
+  const createPosting = async (job: JobRequest, requestType: JobPostingRequestType) => {
     setCreatingPosting(true);
     setPostingError(null);
     try {
@@ -802,6 +803,7 @@ const MatchingPage: React.FC = () => {
         jobId: job.id,
         requestNo: job.request_no,
         reason: composePostingReason(job),
+        requestType,
       });
       setJobPostingByJobId((prev) => ({ ...prev, [job.id]: item }));
     } catch (e) {
@@ -2092,6 +2094,7 @@ const MatchingPage: React.FC = () => {
                         ID: {jobPostingByJobId[jobDetail.id].id.slice(0, 8)}
                       </span>
                       <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-800">
+                        {jobPostingByJobId[jobDetail.id].request_type === 'scraping' ? 'Scraping' : 'Content'} ·{' '}
                         {jobPostingStatusLabel(jobPostingByJobId[jobDetail.id].status)}
                       </span>
                       <a href="/matching/job-postings" className="text-[11px] text-blue-700 hover:underline">
@@ -2099,15 +2102,26 @@ const MatchingPage: React.FC = () => {
                       </a>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={creatingPosting}
-                      onClick={() => void createPosting(jobDetail)}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
-                    >
-                      <Megaphone className="h-3.5 w-3.5" />
-                      {creatingPosting ? 'กำลังสร้าง…' : 'ขอโพสหางานใหม่ (สร้าง ID)'}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={creatingPosting}
+                        onClick={() => void createPosting(jobDetail, 'content')}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-orange-600 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                      >
+                        <Megaphone className="h-3.5 w-3.5" />
+                        {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={creatingPosting}
+                        onClick={() => void createPosting(jobDetail, 'scraping')}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        <Search className="h-3.5 w-3.5" />
+                        {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
+                      </button>
+                    </div>
                   )}
                   {postingError ? <p className="text-[11px] text-destructive">{postingError}</p> : null}
                 </div>
