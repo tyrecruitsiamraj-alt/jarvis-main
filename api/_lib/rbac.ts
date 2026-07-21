@@ -148,9 +148,8 @@ export function minimumRoleFor(
       return 'staff';
 
     case 'job-applications':
-      // staff+: read applicants from the public /apply form; supervisor+: manage
-      if (isRead) return 'staff';
-      return 'supervisor';
+      // recruiter pipeline: staff read applicants and update their status/note
+      return 'staff';
 
     case 'app-feedback':
       // ทุกคนที่ login แล้วส่งคำขอได้ (รวม OPL); จัดการสถานะ = supervisor+

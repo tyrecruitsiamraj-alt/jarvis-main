@@ -3,10 +3,16 @@ import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
+  APPLICATION_STATUS_CLASS,
+  APPLICATION_STATUS_LABEL,
+  APPLICATION_STATUSES,
   fetchJobApplications,
   GENDER_LABEL,
+  updateJobApplication,
+  type ApplicationStatus,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +36,20 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   const [items, setItems] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const changeStatus = async (id: string, status: ApplicationStatus) => {
+    setSavingId(id);
+    setItems((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    try {
+      const updated = await updateJobApplication(id, { status });
+      setItems((prev) => prev.map((a) => (a.id === id ? updated : a)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!open || !job) return;
@@ -110,7 +130,17 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                         {a.position_interest ? <span>· สนใจ {a.position_interest}</span> : null}
                       </p>
                     </div>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{dateLabel(a.created_at)}</span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          APPLICATION_STATUS_CLASS[a.status],
+                        )}
+                      >
+                        {APPLICATION_STATUS_LABEL[a.status]}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{dateLabel(a.created_at)}</span>
+                    </div>
                   </div>
 
                   <div className="mt-2 flex flex-col gap-1 text-xs">
@@ -130,6 +160,26 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                     {a.note ? (
                       <p className="mt-1 rounded-lg bg-muted/50 px-2.5 py-1.5 text-muted-foreground">{a.note}</p>
                     ) : null}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5">
+                    <span className="mr-1 text-[11px] text-muted-foreground">สถานะ:</span>
+                    {APPLICATION_STATUSES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={savingId === a.id}
+                        onClick={() => void changeStatus(a.id, s)}
+                        className={cn(
+                          'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
+                          a.status === s
+                            ? APPLICATION_STATUS_CLASS[s]
+                            : 'bg-muted/60 text-muted-foreground hover:bg-muted',
+                        )}
+                      >
+                        {APPLICATION_STATUS_LABEL[s]}
+                      </button>
+                    ))}
                   </div>
                 </li>
               ))}

@@ -19,8 +19,32 @@ export type PublicApplication = {
   unit_name?: string;
   position_interest?: string;
   note?: string;
-  status: string;
+  status: ApplicationStatus;
+  admin_note?: string;
   created_at: string;
+};
+
+export type ApplicationStatus = 'new' | 'contacted' | 'converted' | 'rejected';
+
+export const APPLICATION_STATUSES: ApplicationStatus[] = [
+  'new',
+  'contacted',
+  'converted',
+  'rejected',
+];
+
+export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
+  new: 'ใหม่',
+  contacted: 'ติดต่อแล้ว',
+  converted: 'รับเข้าทำงาน',
+  rejected: 'ปฏิเสธ',
+};
+
+export const APPLICATION_STATUS_CLASS: Record<ApplicationStatus, string> = {
+  new: 'bg-blue-500/15 text-blue-700',
+  contacted: 'bg-amber-500/15 text-amber-800',
+  converted: 'bg-emerald-500/15 text-emerald-700',
+  rejected: 'bg-muted text-muted-foreground',
 };
 
 export const GENDER_LABEL: Record<string, string> = {
@@ -43,4 +67,21 @@ export async function fetchJobApplicationCounts(): Promise<Record<string, number
   if (!r.ok) return {};
   const body = (await r.json()) as { counts?: Record<string, number> };
   return body.counts ?? {};
+}
+
+/** อัปเดตสถานะ / โน้ตของทีมงานสำหรับใบสมัคร */
+export async function updateJobApplication(
+  id: string,
+  patch: { status?: ApplicationStatus; admin_note?: string | null },
+): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, ...patch }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'อัปเดตสถานะไม่สำเร็จ');
+  }
+  const body = (await r.json()) as { item: PublicApplication };
+  return body.item;
 }
