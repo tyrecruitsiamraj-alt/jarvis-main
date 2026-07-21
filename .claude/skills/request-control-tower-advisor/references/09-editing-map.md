@@ -6,7 +6,7 @@ Use this file to know where to change the inside logic later.
 
 Edit documentation:
 
-* .claude/.claude/skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
+* .claude/skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
 * .cursor/rules/request-control-tower.mdc
 
 Future code:
@@ -124,3 +124,24 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 * `api/_lib/candidateProposals.ts`
 * `migrations/047_candidate_proposals_branch.sql`
 * `tests/api/unitBranchOverride.test.ts`
+
+## Scrap & Content work requests from Matching
+
+* `migrations/045_job_posting_requests.sql` — original request table
+* `migrations/050_job_posting_request_type.sql` — backward-compatible Content/Scraping discriminator
+* `api/_lib/jobPostingRequests.ts` — request adapter and validation
+* `api/_handlers/matching-job-postings.ts` — read/write API
+* `src/lib/jobPostingRequestsApi.ts` — frontend API adapter
+* `src/pages/matching/MatchingPage.tsx` — request-type selection at source
+* `src/pages/matching/JobPostingsPage.tsx` — request tracking UI
+* `tests/api/jobPostingRequests.test.ts` — request type/status contract tests
+
+## Public applications from /apply
+
+* `migrations/048_public_job_applications.sql` — application table
+* `migrations/049_public_job_applications_structured.sql` — structured fields (prefix/name/age/gender/address)
+* `api/_lib/publicApplications.ts` — validation + Thai phone/age normalization
+* `api/_handlers/public/apply.ts` — public POST endpoint (rate-limited)
+* `src/components/jobs/PublicApplyDialog.tsx` — application form dialog
+* `src/components/jobs/JobBoardView.tsx` — apply buttons on /apply board
+* `tests/api/publicApply.test.ts` — validation contract tests
