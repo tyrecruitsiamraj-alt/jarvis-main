@@ -22,11 +22,30 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const { rows } = await dbQuery<{ id: string }>(
       `
       insert into ${tbl}
-        (full_name, phone, job_id, job_title, unit_name, position_interest, note)
-      values ($1, $2, $3, $4, $5, $6, $7)
+        (full_name, title_prefix, first_name, last_name, phone, age, gender,
+         province, district, subdistrict, postal_code,
+         job_id, job_title, unit_name, position_interest, note)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       returning id
       `,
-      [v.fullName, v.phone, v.jobId, v.jobTitle, v.unitName, v.positionInterest, v.note],
+      [
+        v.fullName,
+        v.titlePrefix,
+        v.firstName,
+        v.lastName,
+        v.phone,
+        v.age,
+        v.gender,
+        v.province,
+        v.district,
+        v.subdistrict,
+        v.postalCode,
+        v.jobId,
+        v.jobTitle,
+        v.unitName,
+        v.positionInterest,
+        v.note,
+      ],
     );
     const id = rows[0]?.id;
     if (!id) return sendError(res, 500, 'Failed to submit application');
