@@ -49,18 +49,24 @@ function RosterSection({
   kind,
   title,
   entries,
+  defaultBu,
   onChanged,
 }: {
   kind: RosterKind;
   title: string;
   entries: RosterEntry[];
+  defaultBu: string;
   onChanged: () => void;
 }) {
   const [draft, setDraft] = useState('');
-  const [draftBu, setDraftBu] = useState<string>(NO_BU);
+  const [draftBu, setDraftBu] = useState<string>(defaultBu);
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setDraftBu(defaultBu);
+  }, [defaultBu]);
 
   const run = async (body: Record<string, unknown>) => {
     if (busy) return false;
@@ -201,9 +207,18 @@ function RosterSection({
   );
 }
 
+type BuFilter = 'all' | 'none' | (typeof APP_DEPARTMENT_CODES)[number];
+
+function matchesFilter(entry: RosterEntry, filter: BuFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'none') return entry.bu === null;
+  return entry.bu === filter;
+}
+
 const JobStaffRosterTab: React.FC = () => {
   const [state, setState] = useState<JobStaffManageState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<BuFilter>('all');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -216,33 +231,62 @@ const JobStaffRosterTab: React.FC = () => {
     void reload();
   }, [reload]);
 
+  // adding while filtered to a BU should default the new name to that BU
+  const defaultBu = filter === 'all' || filter === 'none' ? NO_BU : filter;
+
+  const filterTabs: { key: BuFilter; label: string }[] = [
+    { key: 'all', label: 'ทั้งหมด' },
+    ...APP_DEPARTMENT_CODES.map((code) => ({ key: code as BuFilter, label: APP_DEPARTMENT_LABELS[code] })),
+    { key: 'none', label: 'ไม่ระบุ' },
+  ];
+
+  const sections: { kind: RosterKind; title: string; entries: RosterEntry[] }[] = [
+    { kind: 'recruiter', title: 'เจ้าหน้าที่สรรหา', entries: state?.recruiters ?? [] },
+    { kind: 'screener', title: 'เจ้าหน้าที่คัดสรร', entries: state?.screeners ?? [] },
+    { kind: 'opl', title: 'เจ้าหน้าที่ OPL', entries: state?.opls ?? [] },
+  ];
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
-        รายชื่อสรรหา/คัดสรร/OPL — เลือก BU ข้างชื่อได้ (&quot;ไม่ระบุ&quot; = ทุก BU)
-      </p>
+      <div className="jarvis-menu-card rounded-[1.5rem] border border-white/70 border-info/30 bg-info/5 p-3 space-y-2.5">
+        <p className="text-sm text-muted-foreground">
+          รายชื่อสรรหา/คัดสรร/OPL — เลือก BU ข้างชื่อได้ (&quot;ไม่ระบุ&quot; = ทุก BU)
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {filterTabs.map((t) => {
+            const active = filter === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setFilter(t.key)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {loading && !state ? (
         <p className="text-sm text-muted-foreground animate-pulse py-6 text-center">กำลังโหลดรายชื่อ…</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <RosterSection
-            kind="recruiter"
-            title="เจ้าหน้าที่สรรหา"
-            entries={state?.recruiters ?? []}
-            onChanged={reload}
-          />
-          <RosterSection
-            kind="screener"
-            title="เจ้าหน้าที่คัดสรร"
-            entries={state?.screeners ?? []}
-            onChanged={reload}
-          />
-          <RosterSection
-            kind="opl"
-            title="เจ้าหน้าที่ OPL"
-            entries={state?.opls ?? []}
-            onChanged={reload}
-          />
+          {sections.map((s) => (
+            <RosterSection
+              key={s.kind}
+              kind={s.kind}
+              title={s.title}
+              entries={s.entries.filter((e) => matchesFilter(e, filter))}
+              defaultBu={defaultBu}
+              onChanged={reload}
+            />
+          ))}
         </div>
       )}
     </div>
