@@ -57,6 +57,31 @@ export async function loadUserDepartmentScope(user: {
   }
 }
 
+/**
+ * BU scope for the job-staff roster. Unlike loadUserDepartmentScope, this locks
+ * to the user's OWN department even for admins — the roster page mirrors the
+ * department chosen at Login. Admins without a department fall back to 'all'.
+ */
+export async function loadRosterBuScope(user: {
+  sub: string;
+  role: UserRole;
+}): Promise<DepartmentScope> {
+  let code: string | null = null;
+  try {
+    const { rows } = await dbQuery<{ department_code: string | null }>(
+      `select department_code from ${usersTable} where id = $1 limit 1`,
+      [user.sub],
+    );
+    const c = normalizeDepartmentCode(rows[0]?.department_code ?? null);
+    if (c && isAllowedDepartmentCode(c)) code = c;
+  } catch {
+    /* fall through to role-based default */
+  }
+  if (code) return { mode: 'code', code };
+  if (user.role === 'admin') return { mode: 'all' };
+  return { mode: 'none' };
+}
+
 export function jobAllowedByDepartmentScope(
   job: { department_code?: string | null },
   scope: DepartmentScope,

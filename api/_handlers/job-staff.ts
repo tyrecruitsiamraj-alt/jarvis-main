@@ -9,6 +9,7 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { loadRosterBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
 
 const rosterTable = tableInAppSchema('job_staff_roster');
 const excludedTable = tableInAppSchema('job_staff_picker_excluded');
@@ -25,12 +26,54 @@ function normName(s: string): string {
   return s.trim().toLowerCase();
 }
 
-async function fetchState() {
+/** BU value written on new rows; null for the "all"/global scope. */
+function writeBu(scope: DepartmentScope): string | null {
+  return scope.mode === 'code' ? scope.code : null;
+}
+
+/** WHERE clause + params limiting reads to the scope's visible rows. */
+function scopeWhere(scope: DepartmentScope): { sql: string; params: string[] } {
+  // 'code' → own BU rows + legacy NULL rows; 'all' → everything; 'none' handled by caller.
+  if (scope.mode === 'code') {
+    return { sql: `where department_code = $1 or department_code is null`, params: [scope.code] };
+  }
+  return { sql: '', params: [] };
+}
+
+/** Case-insensitive de-dupe, preserving first-seen order. */
+function dedupe(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of names) {
+    const k = normName(n);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(n);
+  }
+  return out;
+}
+
+async function fetchState(scope: DepartmentScope) {
+  const empty = {
+    recruiters: [] as string[],
+    screeners: [] as string[],
+    opls: [] as string[],
+    pickerExcludedRecruiters: [] as string[],
+    pickerExcludedScreeners: [] as string[],
+    pickerExcludedOpls: [] as string[],
+    bu: scope.mode === 'code' ? scope.code : null,
+    buMode: scope.mode,
+  };
+  if (scope.mode === 'none') return empty;
+
+  const w = scopeWhere(scope);
   const { rows: rosterRows } = await dbQuery<{ role: string; display_name: string }>(
-    `select role, display_name from ${rosterTable} order by role asc, display_name asc`,
+    `select role, display_name from ${rosterTable} ${w.sql} order by role asc, display_name asc`,
+    w.params,
   );
   const { rows: exRows } = await dbQuery<{ role: string; name_norm: string }>(
-    `select role, name_norm from ${excludedTable} order by role asc, name_norm asc`,
+    `select role, name_norm from ${excludedTable} ${w.sql} order by role asc, name_norm asc`,
+    w.params,
   );
 
   const recruiters: string[] = [];
@@ -52,22 +95,24 @@ async function fetchState() {
   }
 
   return {
-    recruiters,
-    screeners,
-    opls,
-    pickerExcludedRecruiters,
-    pickerExcludedScreeners,
-    pickerExcludedOpls,
+    recruiters: dedupe(recruiters),
+    screeners: dedupe(screeners),
+    opls: dedupe(opls),
+    pickerExcludedRecruiters: dedupe(pickerExcludedRecruiters),
+    pickerExcludedScreeners: dedupe(pickerExcludedScreeners),
+    pickerExcludedOpls: dedupe(pickerExcludedOpls),
+    bu: scope.mode === 'code' ? scope.code : null,
+    buMode: scope.mode,
   };
 }
 
 async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
+  const scope = await loadRosterBuScope(req.user);
 
   if (method === 'GET') {
     try {
-      const state = await fetchState();
-      return res.status(200).json(state);
+      return res.status(200).json(await fetchState(scope));
     } catch (e) {
       return handleApiError(res, e, 'job-staff GET', { userId: req.user.sub });
     }
@@ -75,6 +120,11 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'POST') {
     try {
+      if (scope.mode === 'none') {
+        return sendError(res, 400, 'Bad request', 'บัญชีนี้ยังไม่ได้ตั้งแผนก — ตั้งแผนกก่อนจัดการรายชื่อ');
+      }
+      const bu = writeBu(scope);
+
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
@@ -94,26 +144,29 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
         if (!nn) return sendError(res, 400, 'Bad request', 'name is empty');
 
         await dbQuery(
-          `delete from ${excludedTable} where role = $1 and name_norm = $2`,
-          [role, nn],
+          `delete from ${excludedTable}
+           where role = $1 and name_norm = $2 and department_code is not distinct from $3`,
+          [role, nn, bu],
         );
         await dbQuery(
           `
-          insert into ${rosterTable} (role, display_name)
-          select $1, $2
+          insert into ${rosterTable} (role, display_name, department_code)
+          select $1, $2, $3
           where not exists (
             select 1 from ${rosterTable} r
-            where r.role = $1 and lower(trim(r.display_name)) = lower(trim($2::text))
+            where r.role = $1
+              and lower(trim(r.display_name)) = lower(trim($2::text))
+              and (r.department_code is not distinct from $3 or r.department_code is null)
           )
         `,
-          [role, name.trim()],
+          [role, name.trim(), bu],
         );
-        const state = await fetchState();
+        const state = await fetchState(scope);
         await auditFromAuthed(req, {
           action: 'job_staff.add',
           entityType: 'job_staff',
           entityId: role,
-          after: { op: 'add', role, name: name.trim() },
+          after: { op: 'add', role, name: name.trim(), bu },
         });
         return res.status(200).json(state);
       }
@@ -125,19 +178,25 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
         if (!nn) return sendError(res, 400, 'Bad request', 'name is empty');
 
         await dbQuery(
-          `delete from ${rosterTable} where role = $1 and lower(trim(display_name)) = $2`,
-          [role, nn],
+          `delete from ${rosterTable}
+           where role = $1 and lower(trim(display_name)) = $2 and department_code is not distinct from $3`,
+          [role, nn, bu],
         );
         await dbQuery(
-          `insert into ${excludedTable} (role, name_norm) values ($1, $2) on conflict do nothing`,
-          [role, nn],
+          `insert into ${excludedTable} (role, name_norm, department_code)
+           select $1, $2, $3
+           where not exists (
+             select 1 from ${excludedTable}
+             where role = $1 and name_norm = $2 and department_code is not distinct from $3
+           )`,
+          [role, nn, bu],
         );
-        const state = await fetchState();
+        const state = await fetchState(scope);
         await auditFromAuthed(req, {
           action: 'job_staff.remove',
           entityType: 'job_staff',
           entityId: role,
-          after: { op: 'remove', role, name: name.trim() },
+          after: { op: 'remove', role, name: name.trim(), bu },
         });
         return res.status(200).json(state);
       }
@@ -151,26 +210,38 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
         const on = normName(oldName);
         const nn = normName(newName);
         if (!on || !nn) return sendError(res, 400, 'Bad request', 'Invalid names');
-        if (on === nn) return res.status(200).json(await fetchState());
+        if (on === nn) return res.status(200).json(await fetchState(scope));
 
         await dbQuery(
-          `delete from ${rosterTable} where role = $1 and lower(trim(display_name)) = $2`,
-          [role, on],
+          `delete from ${rosterTable}
+           where role = $1 and lower(trim(display_name)) = $2 and department_code is not distinct from $3`,
+          [role, on, bu],
         );
         await dbQuery(
-          `insert into ${rosterTable} (role, display_name)
-           select $1, $2
+          `insert into ${rosterTable} (role, display_name, department_code)
+           select $1, $2, $3
            where not exists (
              select 1 from ${rosterTable} r
-             where r.role = $1 and lower(trim(r.display_name)) = lower(trim($2::text))
+             where r.role = $1
+               and lower(trim(r.display_name)) = lower(trim($2::text))
+               and (r.department_code is not distinct from $3 or r.department_code is null)
            )`,
-          [role, newName.trim()],
+          [role, newName.trim(), bu],
         );
         await dbQuery(
-          `insert into ${excludedTable} (role, name_norm) values ($1, $2) on conflict do nothing`,
-          [role, on],
+          `insert into ${excludedTable} (role, name_norm, department_code)
+           select $1, $2, $3
+           where not exists (
+             select 1 from ${excludedTable}
+             where role = $1 and name_norm = $2 and department_code is not distinct from $3
+           )`,
+          [role, on, bu],
         );
-        await dbQuery(`delete from ${excludedTable} where role = $1 and name_norm = $2`, [role, nn]);
+        await dbQuery(
+          `delete from ${excludedTable}
+           where role = $1 and name_norm = $2 and department_code is not distinct from $3`,
+          [role, nn, bu],
+        );
 
         if (role === 'recruiter') {
           await dbQuery(
@@ -195,12 +266,12 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
           );
         }
 
-        const state = await fetchState();
+        const state = await fetchState(scope);
         await auditFromAuthed(req, {
           action: 'job_staff.rename',
           entityType: 'job_staff',
           entityId: role,
-          after: { op: 'rename', role, oldName: oldName.trim(), newName: newName.trim() },
+          after: { op: 'rename', role, oldName: oldName.trim(), newName: newName.trim(), bu },
         });
         return res.status(200).json(state);
       }

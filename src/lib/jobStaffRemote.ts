@@ -2,6 +2,8 @@ import { apiFetch } from '@/lib/apiFetch';
 
 export const JOB_STAFF_ROSTER_CHANGED_EVENT = 'jarvis-job-staff-roster-changed';
 
+export type RosterBuMode = 'code' | 'all' | 'none';
+
 export type JobStaffApiState = {
   recruiters: string[];
   screeners: string[];
@@ -9,6 +11,10 @@ export type JobStaffApiState = {
   pickerExcludedRecruiters: string[];
   pickerExcludedScreeners: string[];
   pickerExcludedOpls: string[];
+  /** BU (department) the roster is locked to, or null when 'all'/'none' */
+  bu: string | null;
+  /** how the roster is scoped for the current user */
+  buMode: RosterBuMode;
 };
 
 let cache: JobStaffApiState | null = null;
@@ -32,6 +38,8 @@ function parseState(data: unknown): JobStaffApiState | null {
   ) {
     return null;
   }
+  const buMode: RosterBuMode =
+    o.buMode === 'code' || o.buMode === 'all' || o.buMode === 'none' ? o.buMode : 'all';
   return {
     recruiters: o.recruiters,
     screeners: o.screeners,
@@ -39,6 +47,8 @@ function parseState(data: unknown): JobStaffApiState | null {
     pickerExcludedRecruiters: o.pickerExcludedRecruiters,
     pickerExcludedScreeners: o.pickerExcludedScreeners,
     pickerExcludedOpls: isStringArray(o.pickerExcludedOpls) ? o.pickerExcludedOpls : [],
+    bu: typeof o.bu === 'string' ? o.bu : null,
+    buMode,
   };
 }
 
