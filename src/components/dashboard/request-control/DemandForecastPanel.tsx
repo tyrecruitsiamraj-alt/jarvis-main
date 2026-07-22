@@ -5,10 +5,12 @@ import {
   FORECAST_GROUP_LABELS,
   THAI_MONTH_SHORT,
   type DemandForecast,
+  type ForecastGroup,
+  type GroupMonthForecast,
   type MonthForecast,
 } from '@/lib/dashboard/request-control/demandForecast';
 import { fetchDemandForecast } from '@/lib/dashboard/request-control/demandForecastApi';
-import { ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function fmt(n: number): string {
@@ -20,57 +22,24 @@ function monthLabel(month: number, year: number): string {
   return `${THAI_MONTH_SHORT[month - 1]} ${String(year + 543).slice(-2)}`;
 }
 
-/** การ์ดตัวเลขใหญ่ของเดือนนี้ */
-function StatCard({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: 'blue' | 'plain';
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-lg border px-3 py-2.5',
-        tone === 'blue' ? 'border-blue-200 bg-blue-50/70' : 'border-slate-200 bg-slate-50/60',
-      )}
-    >
-      <p className="text-[11px] text-slate-500">{label}</p>
-      <p
-        className={cn(
-          'mt-0.5 text-xl font-bold tabular-nums leading-tight',
-          tone === 'blue' ? 'text-blue-700' : 'text-slate-900',
-        )}
-      >
-        {value}
-      </p>
-      {hint ? <p className="mt-0.5 text-[10px] text-slate-500">{hint}</p> : null}
-    </div>
-  );
+type GroupTab = 'total' | ForecastGroup;
+
+const TABS: { key: GroupTab; label: string }[] = [
+  { key: 'total', label: 'รวมทุกประเภท' },
+  ...FORECAST_GROUPS.map((g) => ({ key: g as GroupTab, label: FORECAST_GROUP_LABELS[g] })),
+];
+
+function cellOf(m: MonthForecast, tab: GroupTab): GroupMonthForecast {
+  return tab === 'total' ? m.total : m.groups[tab];
 }
 
-/** เซลล์พยากรณ์เดือนอนาคต: เลขหลักบรรทัดบน ช่วงบรรทัดล่าง */
-function ForecastCell({ med, min, max }: { med: number; min: number; max: number }) {
-  if (med <= 0 && max <= 0) return <span className="text-slate-300">—</span>;
-  return (
-    <div className="leading-tight">
-      <div className="text-sm font-semibold tabular-nums text-slate-900">~{fmt(med)}</div>
-      <div className="text-[10px] tabular-nums text-slate-400">
-        {fmt(min)}–{fmt(max)}
-      </div>
-    </div>
-  );
-}
+const Dash = () => <span className="text-slate-300">—</span>;
 
 const DemandForecastPanel: React.FC = () => {
   const [forecast, setForecast] = useState<DemandForecast | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [showPast, setShowPast] = useState(false);
+  const [tab, setTab] = useState<GroupTab>('total');
 
   useEffect(() => {
     let cancelled = false;
@@ -92,75 +61,23 @@ const DemandForecastPanel: React.FC = () => {
     };
   }, []);
 
-  const current = useMemo(
-    () => forecast?.months.find((m) => m.status === 'current') ?? null,
-    [forecast],
-  );
-  const futureMonths = useMemo(
-    () => forecast?.months.filter((m) => m.status === 'future') ?? [],
-    [forecast],
-  );
-  const pastMonths = useMemo(
-    () => forecast?.months.filter((m) => m.status === 'past') ?? [],
-    [forecast],
-  );
+  const yearsLabel = useMemo(() => {
+    if (!forecast?.historyYears.length) return '';
+    return forecast.historyYears.map((y) => String(y + 543).slice(-2)).join('/');
+  }, [forecast]);
 
-  const yearsLabel = forecast?.historyYears.length
-    ? forecast.historyYears.map((y) => String(y + 543).slice(-2)).join('/')
-    : '';
-
-  const renderGroupHead = () => (
-    <tr className="border-b border-slate-200 text-slate-500">
-      <th className="whitespace-nowrap px-2 py-2 text-left font-medium">เดือน</th>
-      <th className="whitespace-nowrap px-2 py-2 text-right font-medium">รวม</th>
-      {FORECAST_GROUPS.map((g) => (
-        <th key={g} className="whitespace-nowrap px-2 py-2 text-right font-medium">
-          {FORECAST_GROUP_LABELS[g]}
-        </th>
-      ))}
-    </tr>
-  );
-
-  const renderCurrentMonth = (cur: MonthForecast, f: DemandForecast) => (
-    <div className="space-y-2 rounded-lg border border-blue-100 bg-blue-50/40 p-3">
-      <p className="text-xs font-semibold text-slate-800">
-        เดือนนี้ ({monthLabel(cur.month, f.currentYear)})
-      </p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <StatCard label="เข้ามาแล้ว (หักยกเลิก)" value={`${fmt(cur.total.actualNet ?? 0)} อัตรา`} />
-        <StatCard
-          label="คาดว่าจะเข้ามาอีก"
-          value={`~${fmt(cur.total.expectedMoreNet ?? 0)} อัตรา`}
-          tone="blue"
-          hint={
-            (cur.total.actualNet ?? 0) > cur.total.maxNet
-              ? 'เข้ามาเกินทุกปีที่ผ่านมาแล้ว — เดือนนี้หนักกว่าปกติ'
-              : undefined
-          }
-        />
-        <StatCard
-          label={`ปีก่อนๆ เดือนนี้เข้ามา (${yearsLabel})`}
-          value={`~${fmt(cur.total.medNet)} อัตรา`}
-          hint={`ต่ำสุด ${fmt(cur.total.minNet)} · สูงสุด ${fmt(cur.total.maxNet)}`}
-        />
-      </div>
-      <div className="flex flex-wrap gap-1.5 pt-0.5">
-        {FORECAST_GROUPS.map((g) => {
-          const cell = cur.groups[g];
-          if ((cell.actualNet ?? 0) <= 0 && (cell.expectedMoreNet ?? 0) <= 0) return null;
-          return (
-            <span
-              key={g}
-              className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] tabular-nums text-slate-700"
-            >
-              {FORECAST_GROUP_LABELS[g]}: เข้าแล้ว {fmt(cell.actualNet ?? 0)}
-              {(cell.expectedMoreNet ?? 0) > 0 ? ` · คาดอีก ~${fmt(cell.expectedMoreNet ?? 0)}` : ''}
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const summary = useMemo(() => {
+    if (!forecast) return null;
+    const cur = forecast.months.find((m) => m.status === 'current');
+    if (!cur) return null;
+    const c = cellOf(cur, tab);
+    const label = tab === 'total' ? 'รวมทุกประเภท' : FORECAST_GROUP_LABELS[tab];
+    return (
+      `${monthLabel(cur.month, forecast.currentYear)} (${label}): ` +
+      `คาดว่าจะเข้ามา ~${fmt(c.medNet)} (ต่ำสุด ${fmt(c.minNet)} · สูงสุด ${fmt(c.maxNet)}) · ` +
+      `เข้ามาแล้ว ${fmt(c.actualNet ?? 0)} · คาดว่าจะเข้ามาอีก ~${fmt(c.expectedMoreNet ?? 0)}`
+    );
+  }, [forecast, tab]);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -169,12 +86,10 @@ const DemandForecastPanel: React.FC = () => {
           <TrendingUp className="h-4 w-4" />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">
-            พยากรณ์ใบขอเข้าใหม่ตามประเภท
-          </h3>
+          <h3 className="text-sm font-semibold text-slate-900">พยากรณ์ใบขอเข้าใหม่ตามประเภท</h3>
           <p className="mt-0.5 text-xs text-slate-500">
-            ทุกตัวเลข = อัตรา (คน) หักยกเลิกแล้ว · คาดจากเดือนเดียวกันของ 3 ปีก่อน (ใช้ค่าปีกลาง
-            กันปีที่โดดผิดปกติ)
+            หน่วย: อัตรา (คน) หักยกเลิกแล้ว · คาดจากเดือนเดียวกันของปี {yearsLabel || 'ย้อนหลัง'}
+            {' '}(ใช้ค่าปีกลาง กันปีโดดผิดปกติ · ต่ำสุด–สูงสุด = ที่เคยเกิดจริง)
           </p>
         </div>
       </div>
@@ -188,93 +103,116 @@ const DemandForecastPanel: React.FC = () => {
           โหลดข้อมูลพยากรณ์ไม่สำเร็จ — ลองรีเฟรชหน้า
         </p>
       ) : (
-        <div className="space-y-4">
-          {current ? renderCurrentMonth(current, forecast) : null}
-
-          {futureMonths.length > 0 ? (
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-slate-800">
-                เดือนที่เหลือของปี — คาดว่าจะเข้ามาเดือนละ
-              </p>
-              <div className="-mx-1 overflow-x-auto">
-                <table className="w-full min-w-[38rem] border-collapse text-xs">
-                  <thead>{renderGroupHead()}</thead>
-                  <tbody>
-                    {futureMonths.map((m) => (
-                      <tr key={m.month} className="border-b border-slate-100">
-                        <td className="whitespace-nowrap px-2 py-2 font-medium text-slate-800">
-                          {monthLabel(m.month, forecast.currentYear)}
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <ForecastCell
-                            med={m.total.medNet}
-                            min={m.total.minNet}
-                            max={m.total.maxNet}
-                          />
-                        </td>
-                        {FORECAST_GROUPS.map((g) => (
-                          <td key={g} className="px-2 py-2 text-right">
-                            <ForecastCell
-                              med={m.groups[g].medNet}
-                              min={m.groups[g].minNet}
-                              max={m.groups[g].maxNet}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-1.5 px-1 text-[10px] text-slate-400">
-                เลขใหญ่ = คาดการณ์ (ค่าปีกลางจาก 3 ปี) · เลขเล็กใต้ = ช่วงต่ำสุด–สูงสุดที่เคยเกิดจริง
-              </p>
-            </div>
-          ) : null}
-
-          {pastMonths.length > 0 ? (
-            <div>
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            {TABS.map((t) => (
               <button
+                key={t.key}
                 type="button"
-                onClick={() => setShowPast((v) => !v)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  tab === t.key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:text-slate-900',
+                )}
               >
-                {showPast ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                ผลจริงเดือนที่ผ่านมา เทียบที่คาดไว้ ({pastMonths.length} เดือน)
+                {t.label}
               </button>
-              {showPast ? (
-                <div className="-mx-1 mt-2 overflow-x-auto">
-                  <table className="w-full min-w-[38rem] border-collapse text-xs">
-                    <thead>{renderGroupHead()}</thead>
-                    <tbody>
-                      {pastMonths.map((m) => (
-                        <tr key={m.month} className="border-b border-slate-100">
-                          <td className="whitespace-nowrap px-2 py-2 font-medium text-slate-600">
-                            {monthLabel(m.month, forecast.currentYear)}
-                          </td>
-                          {[m.total, ...FORECAST_GROUPS.map((g) => m.groups[g])].map((cell, i) => (
-                            <td key={i} className="px-2 py-2 text-right">
-                              <div className="leading-tight">
-                                <div className="text-sm font-medium tabular-nums text-slate-700">
-                                  {fmt(cell.actualNet ?? 0)}
-                                </div>
-                                <div className="text-[10px] tabular-nums text-slate-400">
-                                  คาดไว้ ~{fmt(cell.medNet)}
-                                </div>
-                              </div>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className="mt-1.5 px-1 text-[10px] text-slate-400">
-                    เลขใหญ่ = เข้ามาจริงปีนี้ · เลขเล็กใต้ = ที่โมเดลคาดไว้ — ใช้เช็คความแม่นของการพยากรณ์
-                  </p>
-                </div>
-              ) : null}
+            ))}
+          </div>
+
+          {summary ? (
+            <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
+              <p className="text-xs font-medium text-slate-800">{summary}</p>
             </div>
           ) : null}
+
+          <div className="-mx-1 overflow-x-auto">
+            <table className="w-full min-w-[38rem] border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="whitespace-nowrap px-2 py-2 text-left font-medium">เดือน</th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-medium">
+                    คาดว่าจะเข้ามา
+                  </th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-medium">ต่ำสุด</th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-medium">สูงสุด</th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-medium">เข้ามาแล้ว</th>
+                  <th className="whitespace-nowrap px-2 py-2 text-right font-medium">
+                    คาดว่าจะเข้ามาอีก
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {forecast.months.map((m) => {
+                  const c = cellOf(m, tab);
+                  const isCurrent = m.status === 'current';
+                  const isPast = m.status === 'past';
+                  const expectedMore = isCurrent
+                    ? (c.expectedMoreNet ?? 0)
+                    : m.status === 'future'
+                      ? c.medNet
+                      : null;
+                  return (
+                    <tr
+                      key={m.month}
+                      className={cn(
+                        'border-b border-slate-100',
+                        isCurrent && 'bg-blue-50/60',
+                        isPast && 'text-slate-400',
+                      )}
+                    >
+                      <td className="whitespace-nowrap px-2 py-2 font-medium">
+                        <span className={isPast ? '' : 'text-slate-800'}>
+                          {monthLabel(m.month, forecast.currentYear)}
+                        </span>
+                        {isCurrent ? (
+                          <span className="ml-1.5 rounded bg-blue-600/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700">
+                            เดือนนี้
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        <span className={cn('font-semibold', !isPast && 'text-slate-900')}>
+                          ~{fmt(c.medNet)}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmt(c.minNet)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmt(c.maxNet)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        {c.actualNet == null ? (
+                          <Dash />
+                        ) : (
+                          <span className={cn('font-semibold', !isPast && 'text-slate-900')}>
+                            {fmt(c.actualNet)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        {expectedMore == null ? (
+                          <Dash />
+                        ) : (
+                          <span
+                            className={cn(
+                              'font-semibold',
+                              isCurrent ? 'text-blue-700' : 'text-slate-700',
+                            )}
+                          >
+                            ~{fmt(expectedMore)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-1 text-[10px] text-slate-400">
+            เดือนที่ผ่านแล้ว (จาง) = ดูย้อนว่าจริงเทียบคาดเป็นยังไง · เดือนหน้าเป็นต้นไป ยังไม่มี
+            &quot;เข้ามาแล้ว&quot; จึงคาดว่าจะเข้ามาอีกเต็มจำนวน
+          </p>
         </div>
       )}
     </div>
