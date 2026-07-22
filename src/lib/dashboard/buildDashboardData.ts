@@ -240,7 +240,8 @@ function nextActionFor(job: JobRequest, status: DashboardTaskStatus): string {
   if (work === 'evaluating') return 'เริ่ม/ตามประเมิน';
   if (work === 'waiting_inform') return 'ติดตามแจ้งเข้า';
   if (work === 'waiting_interview') return 'นัด/ตามสัมภาษณ์';
-  if (work === 'waiting_start') return 'ตามผลสัมภาษณ์/เริ่มงาน';
+  if (work === 'waiting_result') return 'ตามผลสัมภาษณ์';
+  if (work === 'waiting_start') return 'ตามเริ่มงาน';
   if (status === 'overdue') return 'ติดตามด่วน';
   if (status === 'at_risk') return 'ติดตามความคืบหน้า';
   return 'ดูรายละเอียด';
@@ -550,6 +551,7 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     evaluating: 0,
     waiting_inform: 0,
     waiting_interview: 0,
+    waiting_result: 0,
     waiting_start: 0,
   };
   const requestCounts: Record<UnitRequestWorkStatus, number> = {
@@ -557,6 +559,7 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     evaluating: 0,
     waiting_inform: 0,
     waiting_interview: 0,
+    waiting_result: 0,
     waiting_start: 0,
   };
   for (const j of jobs) {
@@ -595,6 +598,7 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
     leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
     leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
+    leaf('work_status_waiting_result', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_result, 'waiting_result'),
     leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
   ];
 }

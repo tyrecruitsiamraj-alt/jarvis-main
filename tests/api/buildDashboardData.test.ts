@@ -162,6 +162,7 @@ describe('buildDashboardData', () => {
       'work_status_evaluating',
       'work_status_waiting_inform',
       'work_status_waiting_interview',
+      'work_status_waiting_result',
       'work_status_waiting_start',
     ]);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(62);

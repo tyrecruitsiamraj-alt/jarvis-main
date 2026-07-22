@@ -4,6 +4,7 @@ export type UnitRequestWorkStatus =
   | 'evaluating'
   | 'waiting_inform'
   | 'waiting_interview'
+  | 'waiting_result'
   | 'waiting_start';
 
 export const UNIT_REQUEST_WORK_STATUS_LABELS: Record<UnitRequestWorkStatus, string> = {
@@ -11,7 +12,8 @@ export const UNIT_REQUEST_WORK_STATUS_LABELS: Record<UnitRequestWorkStatus, stri
   evaluating: 'เริ่มประเมิน',
   waiting_inform: 'รอแจ้งเข้า',
   waiting_interview: 'รอสัมภาษณ์',
-  waiting_start: 'รอเริ่มงาน/รอผลสัมภาษณ์',
+  waiting_result: 'รอผลสัมภาษณ์',
+  waiting_start: 'รอเริ่มงาน',
 };
 
 export const UNIT_REQUEST_WORK_STATUS_DATE_LABELS: Record<UnitRequestWorkStatus, string> = {
@@ -19,6 +21,7 @@ export const UNIT_REQUEST_WORK_STATUS_DATE_LABELS: Record<UnitRequestWorkStatus,
   evaluating: 'วันที่เริ่มประเมิน',
   waiting_inform: 'วันที่แจ้งเข้า',
   waiting_interview: 'วันนัดสัมภาษณ์',
+  waiting_result: 'วันที่สัมภาษณ์',
   waiting_start: 'วันที่เริ่มงาน',
 };
 
@@ -27,6 +30,7 @@ export const UNIT_REQUEST_WORK_STATUS_OPTIONS: UnitRequestWorkStatus[] = [
   'evaluating',
   'waiting_inform',
   'waiting_interview',
+  'waiting_result',
   'waiting_start',
 ];
 

@@ -381,6 +381,7 @@ const SupervisorDashboard: React.FC = () => {
           work_status_evaluating: 'evaluating',
           work_status_waiting_inform: 'waiting_inform',
           work_status_waiting_interview: 'waiting_interview',
+          work_status_waiting_result: 'waiting_result',
           work_status_waiting_start: 'waiting_start',
         };
         const target = statusMap[kpiId];
