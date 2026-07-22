@@ -74,10 +74,52 @@ export function clearJobStaffApiCache(): void {
   cache = null;
 }
 
-type MutateOp =
+export type MutateOp =
   | { op: 'add'; role: 'recruiter' | 'screener' | 'opl'; name: string }
   | { op: 'remove'; role: 'recruiter' | 'screener' | 'opl'; name: string }
   | { op: 'rename'; role: 'recruiter' | 'screener' | 'opl'; oldName: string; newName: string };
+
+/**
+ * Fetch the roster for an explicit BU (roster admin tab). Does NOT touch the
+ * shared picker cache used by job forms — those stay scoped to the logged-in
+ * user's own department.
+ */
+export async function fetchJobStaffState(bu: string | null): Promise<JobStaffApiState | null> {
+  try {
+    const q = bu ? `?bu=${encodeURIComponent(bu)}` : '';
+    const r = await apiFetch(`/api/job-staff${q}`);
+    if (!r.ok) return null;
+    return parseState(await r.json());
+  } catch {
+    return null;
+  }
+}
+
+/** Mutate the roster for an explicit BU (roster admin tab); returns the new state. */
+export async function mutateJobStaffForBu(
+  payload: MutateOp,
+  bu: string | null,
+): Promise<{ ok: boolean; message?: string; state?: JobStaffApiState }> {
+  const r = await apiFetch('/api/job-staff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bu ? { ...payload, bu } : payload),
+  });
+  let data: unknown = {};
+  try {
+    data = await r.json();
+  } catch {
+    /* ignore */
+  }
+  if (!r.ok) {
+    const rec = data as { message?: string };
+    return {
+      ok: false,
+      message: typeof rec.message === 'string' ? rec.message : 'บันทึกไม่สำเร็จ',
+    };
+  }
+  return { ok: true, state: parseState(data) ?? undefined };
+}
 
 export async function mutateJobStaffRemote(
   payload: MutateOp,

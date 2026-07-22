@@ -1,33 +1,30 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Lock } from 'lucide-react';
 import {
-  JOB_STAFF_ROSTER_CHANGED_EVENT,
-  getJobStaffApiCache,
-  mutateJobStaffRemote,
-  refreshJobStaffFromApi,
+  fetchJobStaffState,
+  mutateJobStaffForBu,
+  type JobStaffApiState,
 } from '@/lib/jobStaffRemote';
+import { useAuth } from '@/contexts/AuthContext';
+import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 import { cn } from '@/lib/utils';
 
 type RosterKind = 'recruiter' | 'screener' | 'opl';
 
-function useRosterRev(): number {
-  const [rev, setRev] = useState(0);
-  useEffect(() => {
-    const fn = () => setRev((x) => x + 1);
-    window.addEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
-    return () => window.removeEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, fn);
-  }, []);
-  return rev;
-}
+const BU_STORAGE_KEY = 'jarvis:job-staff-roster-bu';
 
 function RosterSection({
   kind,
   title,
   names,
+  bu,
+  onState,
 }: {
   kind: RosterKind;
   title: string;
   names: string[];
+  bu: string;
+  onState: (s: JobStaffApiState) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -38,19 +35,23 @@ function RosterSection({
     const t = draft.trim();
     if (!t || busy) return;
     setBusy(true);
-    const res = await mutateJobStaffRemote({ op: 'add', role: kind, name: t });
+    const res = await mutateJobStaffForBu({ op: 'add', role: kind, name: t }, bu);
     setBusy(false);
     if (!res.ok) window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-    else setDraft('');
+    else {
+      setDraft('');
+      if (res.state) onState(res.state);
+    }
   };
 
   const remove = async (name: string) => {
-    if (!window.confirm(`ลบ «${name}» ออกจากรายการ?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงในประวัติตามเดิม`)) return;
+    if (!window.confirm(`ลบ «${name}» ออกจากรายการ (BU ${bu})?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงในประวัติตามเดิม`)) return;
     if (busy) return;
     setBusy(true);
-    const res = await mutateJobStaffRemote({ op: 'remove', role: kind, name });
+    const res = await mutateJobStaffForBu({ op: 'remove', role: kind, name }, bu);
     setBusy(false);
     if (!res.ok) window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
+    else if (res.state) onState(res.state);
   };
 
   const startEdit = (name: string) => {
@@ -62,15 +63,16 @@ function RosterSection({
     const t = editValue.trim();
     if (!t || busy) return;
     setBusy(true);
-    const res = await mutateJobStaffRemote({
-      op: 'rename',
-      role: kind,
-      oldName: original,
-      newName: t,
-    });
+    const res = await mutateJobStaffForBu(
+      { op: 'rename', role: kind, oldName: original, newName: t },
+      bu,
+    );
     setBusy(false);
     if (!res.ok) window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-    else setEditing(null);
+    else {
+      setEditing(null);
+      if (res.state) onState(res.state);
+    }
   };
 
   return (
@@ -163,62 +165,104 @@ function RosterSection({
   );
 }
 
+function initialBu(userDept?: string | null): string {
+  try {
+    const stored = sessionStorage.getItem(BU_STORAGE_KEY);
+    if (stored && (APP_DEPARTMENT_CODES as readonly string[]).includes(stored)) return stored;
+  } catch {
+    /* ignore */
+  }
+  const dept = (userDept || '').trim().toUpperCase();
+  if ((APP_DEPARTMENT_CODES as readonly string[]).includes(dept)) return dept;
+  return APP_DEPARTMENT_CODES[0];
+}
+
 const JobStaffRosterTab: React.FC = () => {
-  const rev = useRosterRev();
-  const recruiters = useMemo(() => {
-    void rev;
-    return getJobStaffApiCache()?.recruiters ?? [];
-  }, [rev]);
-  const screeners = useMemo(() => {
-    void rev;
-    return getJobStaffApiCache()?.screeners ?? [];
-  }, [rev]);
-  const opls = useMemo(() => {
-    void rev;
-    return getJobStaffApiCache()?.opls ?? [];
-  }, [rev]);
-  const bu = useMemo(() => {
-    void rev;
-    return getJobStaffApiCache()?.bu ?? null;
-  }, [rev]);
-  const buMode = useMemo(() => {
-    void rev;
-    return getJobStaffApiCache()?.buMode ?? null;
-  }, [rev]);
+  const { user } = useAuth();
+  const [bu, setBu] = useState<string>(() => initialBu(user?.department_code));
+  const [state, setState] = useState<JobStaffApiState | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const s = await fetchJobStaffState(bu);
+    setState(s);
+    setLoading(false);
+  }, [bu]);
 
   useEffect(() => {
-    void refreshJobStaffFromApi();
-  }, []);
+    void reload();
+  }, [reload]);
 
-  const needsDepartment = buMode === 'none';
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(BU_STORAGE_KEY, bu);
+    } catch {
+      /* ignore */
+    }
+  }, [bu]);
 
   return (
     <div className="space-y-4">
-      <div className="jarvis-menu-card flex items-center gap-3 rounded-[1.5rem] border border-white/70 border-info/30 bg-info/5 p-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-          <Lock className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 text-sm text-muted-foreground">
-          {buMode === 'code' ? (
-            <>
-              ล็อกที่ BU{' '}
-              <span className="font-semibold text-foreground">{bu}</span> ตามแผนกของบัญชีที่ล็อกอิน —
-              รายชื่อที่เพิ่ม/แก้จะเห็นเฉพาะ BU นี้ (รายชื่อเดิมที่ยังไม่มี BU จะยังแสดงอยู่)
-            </>
-          ) : buMode === 'all' ? (
-            <>บัญชีนี้ไม่ผูกแผนก — แสดงรายชื่อ<span className="font-semibold text-foreground">ทุก BU</span></>
-          ) : needsDepartment ? (
-            <>บัญชีนี้ยังไม่ได้ตั้งแผนก — กรุณาตั้งแผนกให้บัญชีก่อน จึงจะจัดการรายชื่อตาม BU ได้</>
-          ) : (
-            <>รายชื่อสรรหา/คัดสรร/OPL บันทึกในฐานข้อมูล การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย</>
-          )}
+      <div className="jarvis-menu-card rounded-[1.5rem] border border-white/70 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/12 text-primary">
+            <Lock className="h-4 w-4" />
+          </span>
+          เลือก BU แล้วล็อกจัดการรายชื่อตามนั้น
         </div>
+        <div className="flex flex-wrap gap-2">
+          {APP_DEPARTMENT_CODES.map((code) => {
+            const active = bu === code;
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setBu(code)}
+                className={cn(
+                  'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {APP_DEPARTMENT_LABELS[code]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          กำลังจัดการรายชื่อของ BU{' '}
+          <span className="font-semibold text-foreground">{bu}</span> — ชื่อที่เพิ่ม/แก้จะเห็นเฉพาะ BU นี้
+          (รายชื่อเดิมที่ยังไม่ได้ระบุ BU จะยังแสดงอยู่ทุก BU)
+        </p>
       </div>
-      {needsDepartment ? null : (
+
+      {loading && !state ? (
+        <p className="text-sm text-muted-foreground animate-pulse py-6 text-center">กำลังโหลดรายชื่อ…</p>
+      ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <RosterSection kind="recruiter" title="เจ้าหน้าที่สรรหา" names={recruiters} />
-          <RosterSection kind="screener" title="เจ้าหน้าที่คัดสรร" names={screeners} />
-          <RosterSection kind="opl" title="เจ้าหน้าที่ OPL" names={opls} />
+          <RosterSection
+            kind="recruiter"
+            title="เจ้าหน้าที่สรรหา"
+            names={state?.recruiters ?? []}
+            bu={bu}
+            onState={setState}
+          />
+          <RosterSection
+            kind="screener"
+            title="เจ้าหน้าที่คัดสรร"
+            names={state?.screeners ?? []}
+            bu={bu}
+            onState={setState}
+          />
+          <RosterSection
+            kind="opl"
+            title="เจ้าหน้าที่ OPL"
+            names={state?.opls ?? []}
+            bu={bu}
+            onState={setState}
+          />
         </div>
       )}
     </div>

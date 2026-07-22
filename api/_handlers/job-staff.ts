@@ -9,7 +9,12 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { loadRosterBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
+import {
+  loadRosterBuScope,
+  normalizeDepartmentCode,
+  isAllowedDepartmentCode,
+  type DepartmentScope,
+} from '../_lib/departmentScope.js';
 
 const rosterTable = tableInAppSchema('job_staff_roster');
 const excludedTable = tableInAppSchema('job_staff_picker_excluded');
@@ -106,13 +111,42 @@ async function fetchState(scope: DepartmentScope) {
   };
 }
 
+type ScopeResult =
+  | { ok: true; scope: DepartmentScope }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Resolve the effective roster scope. When the caller passes an explicit `bu`
+ * (the roster tab's BU selector) we honour it — admins may pick any BU, other
+ * roles only their own department. Without `bu`, fall back to the user's own
+ * department (admins → all).
+ */
+async function resolveScope(req: AuthedReq, requestedRaw: string): Promise<ScopeResult> {
+  const requested = normalizeDepartmentCode(requestedRaw);
+  if (requested) {
+    if (!isAllowedDepartmentCode(requested)) {
+      return { ok: false, status: 400, message: 'BU ไม่ถูกต้อง' };
+    }
+    if (req.user.role === 'admin') {
+      return { ok: true, scope: { mode: 'code', code: requested } };
+    }
+    const own = await loadRosterBuScope(req.user);
+    if (own.mode === 'code' && own.code === requested) {
+      return { ok: true, scope: own };
+    }
+    return { ok: false, status: 403, message: 'ไม่มีสิทธิ์เข้าถึง BU นี้' };
+  }
+  return { ok: true, scope: await loadRosterBuScope(req.user) };
+}
+
 async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
-  const scope = await loadRosterBuScope(req.user);
 
   if (method === 'GET') {
     try {
-      return res.status(200).json(await fetchState(scope));
+      const resolved = await resolveScope(req, getString(req.query?.bu));
+      if (!resolved.ok) return sendError(res, resolved.status, 'Forbidden', resolved.message);
+      return res.status(200).json(await fetchState(resolved.scope));
     } catch (e) {
       return handleApiError(res, e, 'job-staff GET', { userId: req.user.sub });
     }
@@ -120,16 +154,20 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'POST') {
     try {
-      if (scope.mode === 'none') {
-        return sendError(res, 400, 'Bad request', 'บัญชีนี้ยังไม่ได้ตั้งแผนก — ตั้งแผนกก่อนจัดการรายชื่อ');
-      }
-      const bu = writeBu(scope);
-
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
       }
-      const body = raw as Record<string, unknown>;
+      const bodyPre = raw as Record<string, unknown>;
+      const resolved = await resolveScope(req, getString(bodyPre.bu));
+      if (!resolved.ok) return sendError(res, resolved.status, 'Forbidden', resolved.message);
+      const scope = resolved.scope;
+      if (scope.mode === 'none') {
+        return sendError(res, 400, 'Bad request', 'เลือก BU ก่อนจัดการรายชื่อ');
+      }
+      const bu = writeBu(scope);
+
+      const body = bodyPre;
       const op = body.op;
       const role = body.role;
 
