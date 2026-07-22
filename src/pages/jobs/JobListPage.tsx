@@ -371,8 +371,11 @@ const JobListPage: React.FC = () => {
   }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter, updateListState]);
 
   useEffect(() => {
+    // don't clamp while the feed is still loading — filtered is momentarily empty
+    // on mount (e.g. returning from a detail page), which would reset page 2 → 1
+    if (loading) return;
     if (page > totalPages) updateListState({ page: totalPages });
-  }, [page, totalPages, updateListState]);
+  }, [loading, page, totalPages, updateListState]);
 
   const pageFrom = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageTo = Math.min(page * pageSize, filtered.length);
