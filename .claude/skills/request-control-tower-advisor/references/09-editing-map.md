@@ -136,6 +136,15 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 * `src/pages/matching/JobPostingsPage.tsx` — request tracking UI
 * `tests/api/jobPostingRequests.test.ts` — request type/status contract tests
 
+## Demand forecast (พยากรณ์ใบขอเข้าใหม่ตามประเภท — แทนที่ตาราง Life Cycle เมื่อ flag เปิด)
+
+* `api/_handlers/request-control-forecast.ts` — read-only API: aggregate 3y+YTD by month × lifecycle (net = intake − cancelled), per-year in-memory cache
+* `src/lib/dashboard/request-control/demandForecast.ts` — pure forecast calc: avg/min/max per month per group, current-month expectedMore
+* `src/lib/dashboard/request-control/demandForecastApi.ts` — frontend fetch adapter
+* `src/components/dashboard/request-control/DemandForecastPanel.tsx` — dashboard panel UI
+* `src/components/dashboard/analytics/DashboardChartSection.tsx` — flag switch (VITE_REQUEST_CONTROL_FORECAST_ENABLED !== 'false'; ปิด flag = ตาราง Life Cycle เดิม)
+* `tests/api/demandForecast.test.ts` — aggregation + forecast contract tests
+
 ## Public applications from /apply
 
 * `migrations/048_public_job_applications.sql` — application table
