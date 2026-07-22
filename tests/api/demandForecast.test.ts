@@ -95,34 +95,34 @@ describe('buildDemandForecast', () => {
     ],
   };
 
-  it('computes avg/min/max per group from complete years (July example)', () => {
+  it('computes median/min/max per group from complete years (July example)', () => {
     const f = buildDemandForecast(base);
     const july = f.months[6];
     expect(july.month).toBe(7);
     expect(july.status).toBe('current');
-    // resignation: (101+89+109)/3 = 99.67 → 100, min 89, max 109
-    expect(july.groups.resignation.avgNet).toBe(100);
+    // resignation: median(101, 89, 109) = 101, min 89, max 109
+    expect(july.groups.resignation.medNet).toBe(101);
     expect(july.groups.resignation.minNet).toBe(89);
     expect(july.groups.resignation.maxNet).toBe(109);
-    // replacement: (40+50+60)/3 = 50
-    expect(july.groups.replacement.avgNet).toBe(50);
-    // increase_headcount มีปีเดียว (9) อีกสองปี 0 → avg 3, min 0, max 9
-    expect(july.groups.increase_headcount.avgNet).toBe(3);
+    // replacement: median(40, 50, 60) = 50
+    expect(july.groups.replacement.medNet).toBe(50);
+    // increase_headcount มีปีเดียว (9) อีกสองปี 0 → median 0 (outlier ไม่ลากตัวเลข) แต่ max ฟ้อง 9
+    expect(july.groups.increase_headcount.medNet).toBe(0);
     expect(july.groups.increase_headcount.minNet).toBe(0);
     expect(july.groups.increase_headcount.maxNet).toBe(9);
-    // new_site รวมใน other
-    expect(july.groups.other.avgNet).toBe(2);
+    // new_site รวมใน other: median(5, 0, 0) = 0, max 5
+    expect(july.groups.other.medNet).toBe(0);
     expect(july.groups.other.maxNet).toBe(5);
   });
 
-  it('current month: actual + expectedMore = max(avg − actual, 0)', () => {
+  it('current month: actual + expectedMore = max(median − actual, 0)', () => {
     const f = buildDemandForecast(base);
     const july = f.months[6];
     expect(july.groups.resignation.actualNet).toBe(94);
-    expect(july.groups.resignation.expectedMoreNet).toBe(6); // 100 − 94
+    expect(july.groups.resignation.expectedMoreNet).toBe(7); // 101 − 94
     expect(july.groups.replacement.actualNet).toBe(20);
     expect(july.groups.replacement.expectedMoreNet).toBe(30); // 50 − 20
-    // actual เกิน avg แล้ว → ไม่ติดลบ
+    // actual เกิน median แล้ว → ไม่ติดลบ
     const over: DemandForecastResponse = {
       ...base,
       years: base.years.map((y) =>
@@ -134,14 +134,30 @@ describe('buildDemandForecast', () => {
     expect(buildDemandForecast(over).months[6].groups.resignation.expectedMoreNet).toBe(0);
   });
 
-  it('total min/max comes from per-year totals, not sum of group extremes', () => {
+  it('median resists a one-year spike where average would not', () => {
+    const spike: DemandForecastResponse = {
+      ...base,
+      years: [
+        { year: 2023, complete: true, months: { 8: { other: cell(13) } } },
+        { year: 2024, complete: true, months: { 8: { other: cell(20) } } },
+        { year: 2025, complete: true, months: { 8: { other: cell(791) } } },
+        { year: 2026, complete: false, months: {} },
+      ],
+    };
+    const aug = buildDemandForecast(spike).months[7];
+    expect(aug.groups.other.medNet).toBe(20); // ค่าเฉลี่ยจะได้ 275 — ค่ากลางไม่โดนลาก
+    expect(aug.groups.other.maxNet).toBe(791); // ช่วงยังฟ้อง outlier
+  });
+
+  it('total median/min/max comes from per-year totals, not sum of group extremes', () => {
     const f = buildDemandForecast(base);
     const july = f.months[6];
-    // yearly totals: 2023=101+40+5=146, 2024=89+50=139, 2025=109+60+9=178
-    expect(july.total.avgNet).toBe(Math.round((146 + 139 + 178) / 3)); // 154
+    // yearly totals: 2023=101+40+5=146, 2024=89+50=139, 2025=109+60+9=178 → median 146
+    expect(july.total.medNet).toBe(146);
     expect(july.total.minNet).toBe(139);
     expect(july.total.maxNet).toBe(178);
     expect(july.total.actualNet).toBe(114); // 94+20
+    expect(july.total.expectedMoreNet).toBe(32); // 146 − 114
   });
 
   it('future months carry forecast only; past months carry actuals', () => {
@@ -159,7 +175,7 @@ describe('buildDemandForecast', () => {
   it('handles no complete years without crashing', () => {
     const f = buildDemandForecast({ ...base, years: base.years.filter((y) => !y.complete) });
     expect(f.historyYears).toEqual([]);
-    expect(f.months[6].groups.resignation.avgNet).toBe(0);
+    expect(f.months[6].groups.resignation.medNet).toBe(0);
     expect(f.months[6].total.minNet).toBe(0);
   });
 });

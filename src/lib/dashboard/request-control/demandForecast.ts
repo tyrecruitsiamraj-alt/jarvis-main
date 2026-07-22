@@ -1,7 +1,8 @@
 /**
  * พยากรณ์ใบขอเข้าใหม่รายเดือน (net = เข้ามา − ยกเลิก) แยกตามประเภทใบขอ
- * โมเดล: ค่าเฉลี่ยรายเดือนของปีย้อนหลังที่ครบปี + ช่วง ต่ำสุด–สูงสุด ของปีเหล่านั้น
- * เดือนปัจจุบัน: คาดว่าจะเข้ามาอีก = max(ค่าเฉลี่ย − เข้ามาจริงแล้ว, 0)
+ * โมเดล: "ค่ากลาง" (median) รายเดือนของปีย้อนหลังที่ครบปี + ช่วง ต่ำสุด–สูงสุด
+ * — ใช้ค่ากลางแทนค่าเฉลี่ยเพื่อกันปีที่มีใบขอก้อนยักษ์ผิดปกติลากตัวเลขเพี้ยน
+ * เดือนปัจจุบัน: คาดว่าจะเข้ามาอีก = max(ค่ากลาง − เข้ามาจริงแล้ว, 0)
  * — pure functions ไม่แตะ network เพื่อให้ unit test ตรง ๆ ได้
  */
 
@@ -56,16 +57,16 @@ export function lifecycleToGroup(lc: ForecastLifecycle): ForecastGroup {
 }
 
 export type GroupMonthForecast = {
-  /** ค่าเฉลี่ย net (อัตรา) จากปีที่ครบ ปัดเป็นจำนวนเต็ม */
-  avgNet: number;
+  /** ค่ากลาง (median) net อัตรา จากปีที่ครบ — ตัวเลขพยากรณ์หลัก ทนต่อปีโดดผิดปกติ */
+  medNet: number;
   minNet: number;
   maxNet: number;
-  /** ค่าเฉลี่ยจำนวนใบ (net) */
-  avgNetRequests: number;
+  /** ค่ากลางจำนวนใบ (net) */
+  medNetRequests: number;
   /** ปีปัจจุบัน: เข้ามาจริง (net) ในเดือนนี้ — undefined เมื่อยังไม่ถึงเดือนนั้น */
   actualNet?: number;
   actualNetRequests?: number;
-  /** เดือนปัจจุบันเท่านั้น: คาดว่าจะเข้ามาอีก = max(avg − actual, 0) */
+  /** เดือนปัจจุบันเท่านั้น: คาดว่าจะเข้ามาอีก = max(med − actual, 0) */
   expectedMoreNet?: number;
 };
 
@@ -117,9 +118,13 @@ function round(n: number): number {
   return Math.round(n);
 }
 
-function avgOf(values: number[]): number {
+/** ค่ากลาง — 3 ปีคือค่าปีกลาง, จำนวนคู่คือเฉลี่ยสองตัวกลาง */
+function medianOf(values: number[]): number {
   if (values.length === 0) return 0;
-  return values.reduce((s, v) => s + v, 0) / values.length;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[mid];
+  return (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 export function buildDemandForecast(response: DemandForecastResponse): DemandForecast {
@@ -142,36 +147,36 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
     for (const g of FORECAST_GROUPS) {
       const nets = perYearGroups.map((cells) => cells[g].net);
       const reqs = perYearGroups.map((cells) => cells[g].netRequests);
-      const avgNet = round(avgOf(nets));
+      const medNet = round(medianOf(nets));
       const entry: GroupMonthForecast = {
-        avgNet,
+        medNet,
         minNet: nets.length ? Math.min(...nets) : 0,
         maxNet: nets.length ? Math.max(...nets) : 0,
-        avgNetRequests: round(avgOf(reqs)),
+        medNetRequests: round(medianOf(reqs)),
       };
       if (hasActual && actualGroups) {
         entry.actualNet = actualGroups[g].net;
         entry.actualNetRequests = actualGroups[g].netRequests;
         if (status === 'current') {
-          entry.expectedMoreNet = Math.max(avgNet - actualGroups[g].net, 0);
+          entry.expectedMoreNet = Math.max(medNet - actualGroups[g].net, 0);
         }
       }
       groups[g] = entry;
     }
 
-    // ยอดรวม: min/max จากยอดรวมของแต่ละปี
+    // ยอดรวม: ค่ากลาง/min/max จากยอดรวมของแต่ละปี (ไม่ใช่ผลบวกของค่ารายกลุ่ม)
     const perYearTotals = perYearGroups.map((cells) =>
       FORECAST_GROUPS.reduce((s, g) => s + cells[g].net, 0),
     );
     const perYearTotalReqs = perYearGroups.map((cells) =>
       FORECAST_GROUPS.reduce((s, g) => s + cells[g].netRequests, 0),
     );
-    const totalAvg = round(avgOf(perYearTotals));
+    const totalMed = round(medianOf(perYearTotals));
     const total: GroupMonthForecast = {
-      avgNet: totalAvg,
+      medNet: totalMed,
       minNet: perYearTotals.length ? Math.min(...perYearTotals) : 0,
       maxNet: perYearTotals.length ? Math.max(...perYearTotals) : 0,
-      avgNetRequests: round(avgOf(perYearTotalReqs)),
+      medNetRequests: round(medianOf(perYearTotalReqs)),
     };
     if (hasActual && actualGroups) {
       total.actualNet = FORECAST_GROUPS.reduce((s, g) => s + actualGroups[g].net, 0);
@@ -180,7 +185,7 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
         0,
       );
       if (status === 'current') {
-        total.expectedMoreNet = Math.max(totalAvg - total.actualNet, 0);
+        total.expectedMoreNet = Math.max(totalMed - total.actualNet, 0);
       }
     }
 
