@@ -21,18 +21,24 @@ function BuSelect({
   disabled?: boolean;
   onChange: (v: string) => void;
 }) {
+  const active = value !== NO_BU;
   return (
     <select
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className="jarvis-soft-field h-8 px-2 py-0 text-xs disabled:opacity-60"
       title="กำหนด BU ของรายชื่อนี้"
+      className={cn(
+        'h-7 shrink-0 cursor-pointer rounded-full border px-2 text-xs font-medium transition-colors disabled:opacity-60',
+        active
+          ? 'border-primary/30 bg-primary/10 text-primary'
+          : 'border-border bg-secondary text-muted-foreground',
+      )}
     >
-      <option value={NO_BU}>ไม่ระบุ</option>
+      <option value={NO_BU}>BU: ไม่ระบุ</option>
       {APP_DEPARTMENT_CODES.map((code) => (
         <option key={code} value={code}>
-          {APP_DEPARTMENT_LABELS[code]}
+          BU: {APP_DEPARTMENT_LABELS[code]}
         </option>
       ))}
     </select>
@@ -105,9 +111,6 @@ function RosterSection({
   return (
     <div className="glass-card rounded-xl border border-border p-4 space-y-3">
       <h3 className="font-semibold text-foreground text-sm">{title}</h3>
-      <p className="text-xs text-muted-foreground">
-        กำหนด BU ให้แต่ละรายชื่อได้จากช่องด้านขวา — &quot;ไม่ระบุ&quot; = แสดงทุก BU
-      </p>
       <ul className="space-y-2">
         {entries.length === 0 && (
           <li className="text-sm text-muted-foreground italic">ยังไม่มีชื่อในรายการ — เพิ่มด้านล่าง</li>
@@ -216,8 +219,7 @@ const JobStaffRosterTab: React.FC = () => {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
-        รายชื่อสรรหา/คัดสรร/OPL บันทึกในฐานข้อมูล กำหนด BU ให้แต่ละคนได้ในช่องขวาของแต่ละรายชื่อ —
-        &quot;ไม่ระบุ&quot; จะแสดงในทุก BU การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
+        รายชื่อสรรหา/คัดสรร/OPL — เลือก BU ข้างชื่อได้ (&quot;ไม่ระบุ&quot; = ทุก BU)
       </p>
       {loading && !state ? (
         <p className="text-sm text-muted-foreground animate-pulse py-6 text-center">กำลังโหลดรายชื่อ…</p>
