@@ -30,6 +30,9 @@ import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
 import publicApplyHandler from './public/apply.js';
 import jobApplicationsHandler from './job-applications.js';
+import jobApplicationDocumentHandler from './job-application-document.js';
+import shortLinksHandler from './short-links.js';
+import shortLinksResolveHandler from './short-links-resolve.js';
 import brandingHandler from './branding.js';
 import appFeedbackHandler from './app-feedback.js';
 import driverCareHandler from './driver-care.js';
@@ -108,6 +111,9 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,
+  '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
+  '/api/short-links': shortLinksHandler as ApiHandler,
+  '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
   '/api/auth/dev-role': devRoleHandler as ApiHandler,
   '/api/auth/logout': logoutHandler as ApiHandler,

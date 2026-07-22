@@ -12,6 +12,7 @@ import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
+import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
@@ -22,7 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -80,6 +81,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น + จำนวนผู้สมัครต่อใบ
   const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
+  // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
+  const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
+  // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
   useEffect(() => {
     if (!isStaff) return;
@@ -95,6 +100,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       cancelled = true;
     };
   }, [isStaff, jobs]);
+
+  useEffect(() => {
+    if (isStaff || deepLinkHandled || loading) return;
+    const jobId = searchParams.get('job');
+    if (!jobId) return;
+    setDeepLinkHandled(true);
+    const match = jobs.find((j) => j.id === jobId);
+    if (match) openApply(match);
+  }, [isStaff, deepLinkHandled, loading, searchParams, jobs]);
 
   return (
     <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
@@ -253,9 +267,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       <Users className="h-3.5 w-3.5 text-blue-600/80" />
                       ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
                     </span>
-                    <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
-                      ดูรายชื่อ →
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGenLinkJob(job);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                      >
+                        <Link2 className="h-3.5 w-3.5" />
+                        Gen Link
+                      </button>
+                      <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
+                        ดูรายชื่อ →
+                      </span>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex w-full gap-2">
@@ -456,6 +483,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         open={!!applicantsJob}
         job={applicantsJob}
         onClose={() => setApplicantsJob(null)}
+      />
+
+      <GenApplyLinkDialog
+        open={!!genLinkJob}
+        job={genLinkJob}
+        onClose={() => setGenLinkJob(null)}
       />
     </div>
   );

@@ -32,6 +32,13 @@ type Row = {
   district: string | null;
   subdistrict: string | null;
   postal_code: string | null;
+  weight_kg: string | number | null;
+  height_cm: string | number | null;
+  education: string | null;
+  referral_source: string | null;
+  document_filename: string | null;
+  document_mime: string | null;
+  has_document: boolean;
   job_id: string | null;
   job_title: string | null;
   unit_name: string | null;
@@ -41,6 +48,12 @@ type Row = {
   admin_note: string | null;
   created_at: string | Date;
 };
+
+function toNum(v: string | number | null): number | undefined {
+  if (v == null) return undefined;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 function toIso(value: string | Date): string {
   if (value instanceof Date) return value.toISOString();
@@ -62,6 +75,13 @@ function toApplication(r: Row) {
     district: r.district || undefined,
     subdistrict: r.subdistrict || undefined,
     postal_code: r.postal_code || undefined,
+    weight_kg: toNum(r.weight_kg),
+    height_cm: toNum(r.height_cm),
+    education: r.education || undefined,
+    referral_source: r.referral_source || undefined,
+    document_filename: r.document_filename || undefined,
+    document_mime: r.document_mime || undefined,
+    has_document: r.has_document === true,
     job_id: r.job_id || undefined,
     job_title: r.job_title || undefined,
     unit_name: r.unit_name || undefined,
@@ -72,6 +92,15 @@ function toApplication(r: Row) {
     created_at: toIso(r.created_at),
   };
 }
+
+// explicit columns (never select document_bytes — it is fetched on demand)
+const LIST_COLUMNS = `
+  id, full_name, title_prefix, first_name, last_name, phone, age, gender,
+  province, district, subdistrict, postal_code,
+  weight_kg, height_cm, education, referral_source,
+  document_filename, document_mime, (document_bytes is not null) as has_document,
+  job_id, job_title, unit_name, position_interest, note, status, admin_note, created_at
+`;
 
 /** GET /api/job-applications
  *   ?job_id=<id>  → applicants submitted for that job (newest first)
@@ -101,7 +130,10 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
         ? b.admin_note.trim().slice(0, 2000)
         : null;
 
-  const { rows: beforeRows } = await dbQuery<Row>(`select * from ${tbl} where id = $1 limit 1`, [id]);
+  const { rows: beforeRows } = await dbQuery<{ status: string; admin_note: string | null }>(
+    `select status, admin_note from ${tbl} where id = $1 limit 1`,
+    [id],
+  );
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
 
@@ -112,7 +144,7 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
         admin_note = case when $3::boolean then $4 else admin_note end,
         updated_at = now()
     where id = $1
-    returning *
+    returning ${LIST_COLUMNS}
     `,
     [id, hasStatus ? (b.status as string) : null, hasNote, adminNote],
   );
@@ -167,7 +199,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const { rows } = await dbQuery<Row>(
-      `select * from ${tbl} ${where} order by created_at desc limit 500`,
+      `select ${LIST_COLUMNS} from ${tbl} ${where} order by created_at desc limit 500`,
       params,
     );
     return res.status(200).json({ items: rows.map(toApplication) });

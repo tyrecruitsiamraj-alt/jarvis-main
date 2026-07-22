@@ -6,8 +6,10 @@ import {
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
   APPLICATION_STATUSES,
+  fetchApplicationDocument,
   fetchJobApplications,
   GENDER_LABEL,
+  REFERRAL_SOURCE_LABEL,
   updateJobApplication,
   type ApplicationStatus,
   type PublicApplication,
@@ -20,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, MapPin, Phone, Users } from 'lucide-react';
+import { Download, Loader2, MapPin, Phone, Users } from 'lucide-react';
 
 export type JobApplicantsDialogProps = {
   open: boolean;
@@ -37,6 +39,24 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const downloadDoc = async (id: string) => {
+    setDownloadingId(id);
+    try {
+      const doc = await fetchApplicationDocument(id);
+      const a = document.createElement('a');
+      a.href = `data:${doc.mime};base64,${doc.dataBase64}`;
+      a.download = doc.filename || 'document';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'โหลดไฟล์แนบไม่สำเร็จ');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const changeStatus = async (id: string, status: ApplicationStatus) => {
     setSavingId(id);
@@ -127,6 +147,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                         {a.age ? <span>อายุ {a.age} ปี</span> : null}
                         {a.gender ? <span>· {GENDER_LABEL[a.gender] ?? a.gender}</span> : null}
+                        {a.weight_kg ? <span>· {a.weight_kg} กก.</span> : null}
+                        {a.height_cm ? <span>· {a.height_cm} ซม.</span> : null}
+                        {a.education ? <span>· {a.education}</span> : null}
                         {a.position_interest ? <span>· สนใจ {a.position_interest}</span> : null}
                       </p>
                     </div>
@@ -160,6 +183,28 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                     {a.note ? (
                       <p className="mt-1 rounded-lg bg-muted/50 px-2.5 py-1.5 text-muted-foreground">{a.note}</p>
                     ) : null}
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      {a.referral_source ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                          เห็นจาก {REFERRAL_SOURCE_LABEL[a.referral_source] ?? a.referral_source}
+                        </span>
+                      ) : null}
+                      {a.has_document ? (
+                        <button
+                          type="button"
+                          disabled={downloadingId === a.id}
+                          onClick={() => void downloadDoc(a.id)}
+                          className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/15 disabled:opacity-50"
+                        >
+                          {downloadingId === a.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3" />
+                          )}
+                          เอกสารแนบ
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5">

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import PublicApplyLayout from "@/components/layout/PublicApplyLayout";
 import PublicJobBoardPage from "@/pages/public/PublicJobBoardPage";
+import ShortLinkRedirectPage from "@/pages/public/ShortLinkRedirectPage";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -136,6 +137,7 @@ const App = () => (
                     </PublicApplyLayout>
                   }
                 />
+                <Route path="/s/:code" element={<ShortLinkRedirectPage />} />
                 <Route path="/apply/driver" element={<Navigate to="/apply?pos=ขับรถ" replace />} />
                 <Route path="/careers" element={<Navigate to="/apply" replace />} />
                 <Route path="/mapwork" element={<Navigate to="/apply" replace />} />

@@ -10,13 +10,36 @@ import {
   getZipCodeForSubdistrict,
 } from '@/lib/thaiAddressCascade';
 import {
+  EDUCATION_LEVELS,
+  REFERRAL_SOURCES,
+  REFERRAL_SOURCE_LABEL,
+} from '@/lib/publicApplicationsApi';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle2, Loader2, MapPin, Send, UserRound } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Loader2, MapPin, Paperclip, Send, UserRound, X } from 'lucide-react';
+
+const MAX_DOC_MB = 3;
+const DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png';
+const DOC_ACCEPT_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
+
+/** อ่านไฟล์เป็น base64 (ไม่รวม data: prefix) */
+function readFileAsBase64(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = String(reader.result || '');
+      const comma = res.indexOf(',');
+      resolve(comma >= 0 ? res.slice(comma + 1) : res);
+    };
+    reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    reader.readAsDataURL(f);
+  });
+}
 
 export type PublicApplyDialogProps = {
   open: boolean;
@@ -62,6 +85,11 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState('');
+  const [education, setEducation] = useState('');
+  const [referralSource, setReferralSource] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [positionInterest, setPositionInterest] = useState('');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -96,7 +124,29 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     setProvince('');
     setDistrict('');
     setSubdistrict('');
+    setWeight('');
+    setHeight('');
+    setEducation('');
+    setReferralSource('');
+    setFile(null);
     setNote('');
+  };
+
+  const onPickFile = (f: File | null) => {
+    if (!f) {
+      setFile(null);
+      return;
+    }
+    if (!DOC_ACCEPT_MIME.includes(f.type)) {
+      setError('รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG');
+      return;
+    }
+    if (f.size > MAX_DOC_MB * 1024 * 1024) {
+      setError(`ไฟล์ใหญ่เกินไป (สูงสุด ${MAX_DOC_MB}MB)`);
+      return;
+    }
+    setError(null);
+    setFile(f);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,6 +170,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
 
     setSubmitting(true);
     try {
+      const document = file
+        ? { filename: file.name, mime: file.type, base64: await readFileAsBase64(file) }
+        : null;
       const res = await apiFetch('/api/public/apply', {
         method: 'POST',
         body: JSON.stringify({
@@ -133,6 +186,11 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           district,
           subdistrict,
           postal_code: postalCode,
+          weight_kg: weight.trim() ? Number(weight) : null,
+          height_cm: height.trim() ? Number(height) : null,
+          education: education || null,
+          referral_source: referralSource || null,
+          document,
           job_id: job?.id ?? null,
           job_title: job ? jobBoardCardTitle(job) : null,
           unit_name: job?.unit_name ?? null,
@@ -347,6 +405,95 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                     </select>
                   </Field>
                 </div>
+              </section>
+
+              {/* ── ข้อมูลเพิ่มเติม ── */}
+              <section className="space-y-3">
+                <SectionLabel icon={<ClipboardList className="h-3.5 w-3.5" />}>ข้อมูลเพิ่มเติม</SectionLabel>
+
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  <Field label="น้ำหนัก (กก.)">
+                    <input
+                      type="number"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                      placeholder="กก."
+                      inputMode="decimal"
+                      min={20}
+                      max={400}
+                      className="jarvis-soft-field"
+                    />
+                  </Field>
+                  <Field label="ส่วนสูง (ซม.)">
+                    <input
+                      type="number"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      placeholder="ซม."
+                      inputMode="decimal"
+                      min={80}
+                      max={260}
+                      className="jarvis-soft-field"
+                    />
+                  </Field>
+                  <Field label="วุฒิการศึกษา" className="col-span-2">
+                    <select
+                      value={education}
+                      onChange={(e) => setEducation(e.target.value)}
+                      className="jarvis-soft-field"
+                    >
+                      <option value="">— เลือกวุฒิ —</option>
+                      {EDUCATION_LEVELS.map((lvl) => (
+                        <option key={lvl} value={lvl}>
+                          {lvl}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <Field label="เห็นประกาศจากช่องทางไหน">
+                  <select
+                    value={referralSource}
+                    onChange={(e) => setReferralSource(e.target.value)}
+                    className="jarvis-soft-field"
+                  >
+                    <option value="">— เลือกช่องทาง —</option>
+                    {REFERRAL_SOURCES.map((s) => (
+                      <option key={s} value={s}>
+                        {REFERRAL_SOURCE_LABEL[s]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label={`แนบเอกสาร (PDF/รูป ≤ ${MAX_DOC_MB}MB)`}>
+                  {file ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-secondary/40 px-3 py-2">
+                      <Paperclip className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFile(null)}
+                        aria-label="ลบไฟล์"
+                        className="rounded-full p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-border bg-background/60 px-3 py-2.5 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground">
+                      <Paperclip className="h-4 w-4" />
+                      เลือกไฟล์เอกสาร (เช่น เรซูเม่ วุฒิ บัตรประชาชน)
+                      <input
+                        type="file"
+                        accept={DOC_ACCEPT}
+                        onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </Field>
               </section>
 
               {/* ── ตำแหน่ง / หมายเหตุ ── */}

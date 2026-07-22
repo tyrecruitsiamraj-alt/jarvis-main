@@ -14,6 +14,13 @@ export type PublicApplication = {
   district?: string;
   subdistrict?: string;
   postal_code?: string;
+  weight_kg?: number;
+  height_cm?: number;
+  education?: string;
+  referral_source?: ApplicationReferralSource;
+  document_filename?: string;
+  document_mime?: string;
+  has_document?: boolean;
   job_id?: string;
   job_title?: string;
   unit_name?: string;
@@ -23,6 +30,34 @@ export type PublicApplication = {
   admin_note?: string;
   created_at: string;
 };
+
+export type ApplicationReferralSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
+
+export const REFERRAL_SOURCES: ApplicationReferralSource[] = [
+  'facebook',
+  'tiktok',
+  'instagram',
+  'flyer',
+  'other',
+];
+
+export const REFERRAL_SOURCE_LABEL: Record<ApplicationReferralSource, string> = {
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
+  flyer: 'ใบปลิว',
+  other: 'อื่นๆ',
+};
+
+export const EDUCATION_LEVELS = [
+  'ประถม',
+  'ม.ต้น',
+  'ม.ปลาย/ปวช.',
+  'ปวส./อนุปริญญา',
+  'ปริญญาตรี',
+  'สูงกว่าปริญญาตรี',
+  'อื่นๆ',
+];
 
 export type ApplicationStatus = 'new' | 'contacted' | 'converted' | 'rejected';
 
@@ -67,6 +102,15 @@ export async function fetchJobApplicationCounts(): Promise<Record<string, number
   if (!r.ok) return {};
   const body = (await r.json()) as { counts?: Record<string, number> };
   return body.counts ?? {};
+}
+
+/** ดึงไฟล์แนบของใบสมัคร (base64) เพื่อดาวน์โหลด (ต้องล็อกอิน) */
+export async function fetchApplicationDocument(
+  id: string,
+): Promise<{ filename: string; mime: string; dataBase64: string }> {
+  const r = await apiFetch(`/api/job-application-document?id=${encodeURIComponent(id)}`);
+  if (!r.ok) throw new Error('โหลดไฟล์แนบไม่สำเร็จ');
+  return (await r.json()) as { filename: string; mime: string; dataBase64: string };
 }
 
 /** อัปเดตสถานะ / โน้ตของทีมงานสำหรับใบสมัคร */
