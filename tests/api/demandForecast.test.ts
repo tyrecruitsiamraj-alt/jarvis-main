@@ -149,6 +149,50 @@ describe('buildDemandForecast', () => {
     expect(aug.groups.other.maxNet).toBe(791); // ช่วงยังฟ้อง outlier
   });
 
+  it('annotates a spike max with the year and dominant request type', () => {
+    const spike: DemandForecastResponse = {
+      ...base,
+      years: [
+        { year: 2023, complete: true, months: { 8: { resignation: cell(62), new_site: cell(13) } } },
+        {
+          year: 2024,
+          complete: true,
+          months: { 8: { resignation: cell(49), new_site: cell(781), increase_headcount: cell(25) } },
+        },
+        { year: 2025, complete: true, months: { 8: { resignation: cell(75), new_site: cell(6) } } },
+        { year: 2026, complete: false, months: {} },
+      ],
+    };
+    const aug = buildDemandForecast(spike).months[7];
+    // total: 75, 855, 81 → median 81, max 855 (≥2×med) → note ชี้ปี 67 เปิดไซต์ 781
+    expect(aug.total.spikeNote).toContain('ปี 67');
+    expect(aug.total.spikeNote).toContain('เปิดไซต์');
+    expect(aug.total.spikeNote).toContain('781');
+    // resignation ปกติ (49/62/75) → ไม่มีหมายเหตุ
+    expect(aug.groups.resignation.spikeNote).toBeUndefined();
+  });
+
+  it('current month exposes the max-based ceiling (อาจถึง)', () => {
+    // resignation กค: med 101, max 109, actual 94 → more ~7, ceiling 15
+    const f = buildDemandForecast(base);
+    const july = f.months[6];
+    expect(july.groups.resignation.expectedMoreNet).toBe(7);
+    expect(july.groups.resignation.expectedMoreMaxNet).toBe(15); // 109 − 94
+    // total: med 146, max 178, actual 114 → more 32, ceiling 64
+    expect(july.total.expectedMoreMaxNet).toBe(64);
+    // เดือนอนาคตไม่มี ceiling
+    expect(f.months[7].total.expectedMoreMaxNet).toBeUndefined();
+  });
+
+  it('passes topResignationUnits through (defaults to empty)', () => {
+    expect(buildDemandForecast(base).topResignationUnits).toEqual([]);
+    const withUnits = buildDemandForecast({
+      ...base,
+      topResignationUnits: [{ unitName: 'ไซต์ A', requests: 12, positions: 15, monthsActive: 8 }],
+    });
+    expect(withUnits.topResignationUnits[0].unitName).toBe('ไซต์ A');
+  });
+
   it('total median/min/max comes from per-year totals, not sum of group extremes', () => {
     const f = buildDemandForecast(base);
     const july = f.months[6];

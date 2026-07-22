@@ -72,11 +72,26 @@ const DemandForecastPanel: React.FC = () => {
     if (!cur) return null;
     const c = cellOf(cur, tab);
     const label = tab === 'total' ? 'รวมทุกประเภท' : FORECAST_GROUP_LABELS[tab];
+    const more = c.expectedMoreNet ?? 0;
+    const moreMax = c.expectedMoreMaxNet ?? 0;
+    const moreText =
+      moreMax > more ? `~${fmt(more)} (อาจถึง ${fmt(moreMax)})` : `~${fmt(more)}`;
     return (
       `${monthLabel(cur.month, forecast.currentYear)} (${label}): ` +
       `คาดว่าจะเข้ามา ~${fmt(c.medNet)} (ต่ำสุด ${fmt(c.minNet)} · สูงสุด ${fmt(c.maxNet)}) · ` +
-      `เข้ามาแล้ว ${fmt(c.actualNet ?? 0)} · คาดว่าจะเข้ามาอีก ~${fmt(c.expectedMoreNet ?? 0)}`
+      `เข้ามาแล้ว ${fmt(c.actualNet ?? 0)} · คาดว่าจะเข้ามาอีก ${moreText}`
     );
+  }, [forecast, tab]);
+
+  /** หมายเหตุปีพีคของแท็บที่เลือก — โชว์ใต้ตาราง */
+  const spikeNotes = useMemo(() => {
+    if (!forecast) return [];
+    return forecast.months
+      .map((m) => {
+        const note = cellOf(m, tab).spikeNote;
+        return note ? `${monthLabel(m.month, forecast.currentYear)}: ${note}` : null;
+      })
+      .filter((n): n is string => n !== null);
   }, [forecast, tab]);
 
   return (
@@ -179,7 +194,14 @@ const DemandForecastPanel: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmt(c.minNet)}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{fmt(c.maxNet)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        {fmt(c.maxNet)}
+                        {c.spikeNote ? (
+                          <span className="ml-0.5 text-amber-600" title={c.spikeNote}>
+                            *
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-2 py-2 text-right tabular-nums">
                         {c.actualNet == null ? (
                           <Dash />
@@ -193,13 +215,20 @@ const DemandForecastPanel: React.FC = () => {
                         {expectedMore == null ? (
                           <Dash />
                         ) : (
-                          <span
-                            className={cn(
-                              'font-semibold',
-                              isCurrent ? 'text-blue-700' : 'text-slate-700',
-                            )}
-                          >
-                            ~{fmt(expectedMore)}
+                          <span className="whitespace-nowrap">
+                            <span
+                              className={cn(
+                                'font-semibold',
+                                isCurrent ? 'text-blue-700' : 'text-slate-700',
+                              )}
+                            >
+                              ~{fmt(expectedMore)}
+                            </span>
+                            {isCurrent && (c.expectedMoreMaxNet ?? 0) > expectedMore ? (
+                              <span className="ml-1 text-[10px] text-slate-500">
+                                อาจถึง {fmt(c.expectedMoreMaxNet ?? 0)}
+                              </span>
+                            ) : null}
                           </span>
                         )}
                       </td>
@@ -209,10 +238,44 @@ const DemandForecastPanel: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {spikeNotes.length > 0 ? (
+            <div className="space-y-0.5 px-1">
+              {spikeNotes.map((n) => (
+                <p key={n} className="text-[10px] text-amber-700">
+                  * {n}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
           <p className="px-1 text-[10px] text-slate-400">
             เดือนที่ผ่านแล้ว (จาง) = ดูย้อนว่าจริงเทียบคาดเป็นยังไง · เดือนหน้าเป็นต้นไป ยังไม่มี
             &quot;เข้ามาแล้ว&quot; จึงคาดว่าจะเข้ามาอีกเต็มจำนวน
           </p>
+
+          {forecast.topResignationUnits.length > 0 ? (
+            <div className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5">
+              <p className="text-xs font-semibold text-slate-800">
+                หน่วยงานที่มีแนวโน้มลาออก (จากใบขอลาออก 12 เดือนล่าสุด)
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {forecast.topResignationUnits.map((u) => (
+                  <span
+                    key={u.unitName}
+                    className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] tabular-nums text-slate-700"
+                    title={`${u.requests.toLocaleString('th-TH')} ใบขอ · เกิดขึ้นใน ${u.monthsActive} เดือน`}
+                  >
+                    {u.unitName}
+                    <span className="ml-1 font-semibold text-amber-800">{fmt(u.positions)} อัตรา</span>
+                    <span className="ml-1 text-slate-400">/{u.monthsActive} เดือน</span>
+                  </span>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] text-slate-500">
+                หน่วยงานที่ติดอันดับซ้ำหลายเดือน = ลาออกเป็นประจำ ควรเตรียมคนสำรอง/หาสาเหตุที่หน้างาน
+              </p>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

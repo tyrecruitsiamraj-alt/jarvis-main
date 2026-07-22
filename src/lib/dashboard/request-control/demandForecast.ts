@@ -27,11 +27,27 @@ export type ForecastYearData = {
   months: Record<number, Partial<Record<ForecastLifecycle, ForecastMonthCell>>>;
 };
 
+export type ResignationUnitRank = {
+  unitName: string;
+  requests: number;
+  positions: number;
+  monthsActive: number;
+};
+
 export type DemandForecastResponse = {
   years: ForecastYearData[];
   currentYear: number;
   currentMonth: number;
   asOf: string;
+  topResignationUnits?: ResignationUnitRank[];
+};
+
+export const LIFECYCLE_LABELS: Record<ForecastLifecycle, string> = {
+  resignation: 'ลาออก',
+  replacement: 'เปลี่ยนตัว',
+  increase_headcount: 'เพิ่มอัตรา',
+  new_site: 'เปิดไซต์',
+  other: 'อื่นๆ',
 };
 
 /** กลุ่มแสดงผล — เปิดไซต์รวมเข้า "อื่นๆ" เพื่อยอดรวม reconcile กับของจริง */
@@ -68,6 +84,10 @@ export type GroupMonthForecast = {
   actualNetRequests?: number;
   /** เดือนปัจจุบันเท่านั้น: คาดว่าจะเข้ามาอีก = max(med − actual, 0) */
   expectedMoreNet?: number;
+  /** เดือนปัจจุบันเท่านั้น: เพดานที่อาจเข้ามาอีก = max(สูงสุดที่เคยเกิด − actual, 0) */
+  expectedMoreMaxNet?: number;
+  /** หมายเหตุเมื่อ "สูงสุด" มาจากปีที่โดดผิดปกติ (เช่น เปิดไซต์ก้อนใหญ่) */
+  spikeNote?: string;
 };
 
 export type MonthForecast = {
@@ -84,6 +104,7 @@ export type DemandForecast = {
   currentYear: number;
   currentMonth: number;
   asOf: string;
+  topResignationUnits: ResignationUnitRank[];
 };
 
 type GroupCells = Record<ForecastGroup, { net: number; netRequests: number }>;
@@ -127,6 +148,36 @@ function medianOf(values: number[]): number {
   return (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+const SPIKE_MIN_ABS = 30;
+
+/**
+ * หมายเหตุเมื่อ "สูงสุด" ของเดือนมาจากปีที่โดดผิดปกติ (สูงสุด ≥ 2× ค่ากลาง และ ≥ 30 อัตรา)
+ * ชี้ปีที่พีคและประเภทใบขอที่เป็นตัวการ เช่น เปิดไซต์ก้อนใหญ่
+ */
+function spikeNoteFor(
+  med: number,
+  max: number,
+  perYear: Array<{ year: number; net: number; byLifecycle: Partial<Record<ForecastLifecycle, number>> }>,
+): string | undefined {
+  if (max < SPIKE_MIN_ABS || max < med * 2) return undefined;
+  const spikeYear = perYear.find((y) => y.net === max);
+  if (!spikeYear) return undefined;
+  const beYear = String(spikeYear.year + 543).slice(-2);
+
+  let topLc: ForecastLifecycle | null = null;
+  let topNet = 0;
+  for (const [lc, net] of Object.entries(spikeYear.byLifecycle) as Array<[ForecastLifecycle, number]>) {
+    if ((net ?? 0) > topNet) {
+      topNet = net ?? 0;
+      topLc = lc;
+    }
+  }
+  if (topLc && topNet >= max * 0.5) {
+    return `สูงสุด ${max.toLocaleString('th-TH')} มาจากปี ${beYear} ที่มีใบขอ${LIFECYCLE_LABELS[topLc]}ก้อนใหญ่ ${topNet.toLocaleString('th-TH')} อัตรา — ปีทั่วไป ~${med.toLocaleString('th-TH')}`;
+  }
+  return `สูงสุด ${max.toLocaleString('th-TH')} มาจากปี ${beYear} ที่สูงผิดปกติ — ปีทั่วไป ~${med.toLocaleString('th-TH')}`;
+}
+
 export function buildDemandForecast(response: DemandForecastResponse): DemandForecast {
   const completeYears = response.years
     .filter((y) => y.complete)
@@ -140,6 +191,19 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
 
     // ค่าประวัติศาสตร์ต่อปี (ปีที่ไม่มีเดือนนั้นนับเป็น 0 — เดือนไม่มีใบขอคือข้อมูล ไม่ใช่ข้อมูลหาย)
     const perYearGroups = completeYears.map((y) => groupCellsForMonth(y.months[month]));
+    // lifecycle รายปีของเดือนนี้ — ใช้ชี้ตัวการของปีพีคใน spikeNote
+    const perYearLifecycles = completeYears.map((y) => {
+      const byLifecycle: Partial<Record<ForecastLifecycle, number>> = {};
+      const monthData = y.months[month];
+      if (monthData) {
+        for (const [lc, cell] of Object.entries(monthData) as Array<
+          [ForecastLifecycle, ForecastMonthCell]
+        >) {
+          if (cell) byLifecycle[lc] = cell.netPositions;
+        }
+      }
+      return { year: y.year, byLifecycle };
+    });
     const actualGroups = currentYearData ? groupCellsForMonth(currentYearData.months[month]) : null;
     const hasActual = status !== 'future' && actualGroups !== null;
 
@@ -148,17 +212,32 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
       const nets = perYearGroups.map((cells) => cells[g].net);
       const reqs = perYearGroups.map((cells) => cells[g].netRequests);
       const medNet = round(medianOf(nets));
+      const maxNet = nets.length ? Math.max(...nets) : 0;
       const entry: GroupMonthForecast = {
         medNet,
         minNet: nets.length ? Math.min(...nets) : 0,
-        maxNet: nets.length ? Math.max(...nets) : 0,
+        maxNet,
         medNetRequests: round(medianOf(reqs)),
+        spikeNote: spikeNoteFor(
+          medNet,
+          maxNet,
+          perYearLifecycles.map((y, i) => ({
+            year: y.year,
+            net: nets[i],
+            byLifecycle: Object.fromEntries(
+              Object.entries(y.byLifecycle).filter(([lc]) =>
+                lifecycleToGroup(lc as ForecastLifecycle) === g,
+              ),
+            ) as Partial<Record<ForecastLifecycle, number>>,
+          })),
+        ),
       };
       if (hasActual && actualGroups) {
         entry.actualNet = actualGroups[g].net;
         entry.actualNetRequests = actualGroups[g].netRequests;
         if (status === 'current') {
           entry.expectedMoreNet = Math.max(medNet - actualGroups[g].net, 0);
+          entry.expectedMoreMaxNet = Math.max(maxNet - actualGroups[g].net, 0);
         }
       }
       groups[g] = entry;
@@ -172,11 +251,21 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
       FORECAST_GROUPS.reduce((s, g) => s + cells[g].netRequests, 0),
     );
     const totalMed = round(medianOf(perYearTotals));
+    const totalMax = perYearTotals.length ? Math.max(...perYearTotals) : 0;
     const total: GroupMonthForecast = {
       medNet: totalMed,
       minNet: perYearTotals.length ? Math.min(...perYearTotals) : 0,
-      maxNet: perYearTotals.length ? Math.max(...perYearTotals) : 0,
+      maxNet: totalMax,
       medNetRequests: round(medianOf(perYearTotalReqs)),
+      spikeNote: spikeNoteFor(
+        totalMed,
+        totalMax,
+        perYearLifecycles.map((y, i) => ({
+          year: y.year,
+          net: perYearTotals[i],
+          byLifecycle: y.byLifecycle,
+        })),
+      ),
     };
     if (hasActual && actualGroups) {
       total.actualNet = FORECAST_GROUPS.reduce((s, g) => s + actualGroups[g].net, 0);
@@ -186,6 +275,7 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
       );
       if (status === 'current') {
         total.expectedMoreNet = Math.max(totalMed - total.actualNet, 0);
+        total.expectedMoreMaxNet = Math.max(totalMax - total.actualNet, 0);
       }
     }
 
@@ -198,6 +288,7 @@ export function buildDemandForecast(response: DemandForecastResponse): DemandFor
     currentYear: response.currentYear,
     currentMonth: response.currentMonth,
     asOf: response.asOf,
+    topResignationUnits: response.topResignationUnits ?? [],
   };
 }
 

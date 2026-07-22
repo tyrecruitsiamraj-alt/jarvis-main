@@ -233,3 +233,71 @@ export async function listSiamrajSqlServerThroughput(options: {
 
   return rows.flatMap(mapThroughputRow);
 }
+
+export type ResignationUnitRank = {
+  unitName: string;
+  requests: number;
+  positions: number;
+  monthsActive: number;
+};
+
+type SqlUnitRankRow = {
+  unit_name: string | null;
+  request_cnt: number | string | null;
+  position_qty: number | string | null;
+  months_active: number | string | null;
+};
+
+/** หน่วยงานที่มีใบขอ "ลาออก" บ่อยสุดในช่วง — สำหรับหมายเหตุเตรียมแผนล่วงหน้า */
+export async function listResignationUnitRanking(options: {
+  from: string;
+  to: string;
+  departmentScope?: DepartmentScope;
+  limit?: number;
+}): Promise<ResignationUnitRank[]> {
+  const { from, to } = options;
+  if (!isDateYmd(from) || !isDateYmd(to)) {
+    throw new Error('from/to must be YYYY-MM-DD');
+  }
+  const limit = Math.min(Math.max(options.limit ?? 8, 1), 30);
+
+  const filters = getSqlFilters();
+  const clsExclude = excludeClsContractTypeWhere('SS');
+  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
+
+  // เงื่อนไขลาออกชุดเดียวกับ classifyActionToLifecycle (รหัส 005/006/013/014 + ชื่อมีคำว่าลาออก)
+  const rows = await siamrajSqlQuery<SqlUnitRankRow>(
+    `
+    SELECT TOP ${limit}
+      RTRIM(ISNULL(SS.site_name, SS.site_code)) AS unit_name,
+      COUNT_BIG(*) AS request_cnt,
+      SUM(CASE WHEN ISNULL(A.request_qty, 0) > 0 THEN A.request_qty ELSE 1 END) AS position_qty,
+      COUNT(DISTINCT CONVERT(varchar(7), A.request_date, 126)) AS months_active
+    FROM st_request_head A
+    INNER JOIN ms_site SS ON A.site_code = SS.site_code
+    LEFT JOIN st_ms_request RQ ON RQ.request_code = A.request_code
+    WHERE SS.department_code BETWEEN @deptFrom AND @deptTo
+      AND A.site_code BETWEEN @siteFrom AND @siteTo
+      ${clsExclude}
+      ${deptScope.sql}
+      AND CONVERT(date, A.request_date) >= @fromDate
+      AND CONVERT(date, A.request_date) <= @toDate
+      AND (
+        RTRIM(A.request_code) IN ('005', '006', '013', '014')
+        OR RQ.request_name LIKE N'%ลาออก%'
+      )
+    GROUP BY RTRIM(ISNULL(SS.site_name, SS.site_code))
+    ORDER BY position_qty DESC, request_cnt DESC
+  `,
+    { ...filters, fromDate: from, toDate: to, ...deptScope.params },
+  );
+
+  return rows
+    .map((r) => ({
+      unitName: (r.unit_name || '').trim() || '—',
+      requests: Number(r.request_cnt) || 0,
+      positions: Number(r.position_qty) || 0,
+      monthsActive: Number(r.months_active) || 0,
+    }))
+    .filter((r) => r.positions > 0);
+}

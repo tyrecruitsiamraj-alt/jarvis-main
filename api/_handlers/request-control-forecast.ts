@@ -4,7 +4,11 @@ import {
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
-import { listSiamrajThroughput } from '../_lib/siamrajUnitRequests.js';
+import {
+  listSiamrajThroughput,
+  listSiamrajResignationUnitRanking,
+  type ResignationUnitRank,
+} from '../_lib/siamrajUnitRequests.js';
 import {
   loadUserDepartmentScope,
   type DepartmentScope,
@@ -48,6 +52,8 @@ export type DemandForecastResponse = {
   currentYear: number;
   currentMonth: number;
   asOf: string;
+  /** หน่วยงานที่มีใบขอลาออกบ่อยสุด 12 เดือนล่าสุด — สำหรับหมายเหตุเตรียมแผน */
+  topResignationUnits: ResignationUnitRank[];
 };
 
 function emptyCell(): ForecastMonthCell {
@@ -144,6 +150,27 @@ async function loadYear(
 
 const HISTORY_YEARS = 3;
 
+const unitRankCache = new Map<string, { data: ResignationUnitRank[]; expiresAt: number }>();
+const UNIT_RANK_TTL_MS = 60 * 60 * 1000;
+
+/** Top หน่วยงานลาออก 12 เดือนล่าสุด (แคช 1 ชม. ต่อ scope) */
+async function loadResignationUnits(
+  todayYmd: string,
+  departmentScope: DepartmentScope,
+): Promise<ResignationUnitRank[]> {
+  const key = scopeKey(departmentScope);
+  const cached = unitRankCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const to = todayYmd;
+  const fromDate = new Date(`${todayYmd}T00:00:00Z`);
+  fromDate.setUTCDate(fromDate.getUTCDate() - 365);
+  const from = fromDate.toISOString().slice(0, 10);
+  const data = await listSiamrajResignationUnitRanking({ from, to, departmentScope, limit: 8 });
+  unitRankCache.set(key, { data, expiresAt: Date.now() + UNIT_RANK_TTL_MS });
+  return data;
+}
+
 /** GET /api/request-control/demand-forecast — ยอด เข้ามา/ยกเลิก/net รายเดือน × ประเภท 3 ปี + YTD */
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
@@ -162,12 +189,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
     for (let y = currentYear - HISTORY_YEARS; y <= currentYear; y += 1) wantedYears.push(y);
 
     // ปีที่จบแล้วมัก cache hit — โหลดขนานกันเมื่อ miss
-    const years = await Promise.all(
-      wantedYears.map((y) => loadYear(y, todayYmd, departmentScope)),
-    );
+    const [years, topResignationUnits] = await Promise.all([
+      Promise.all(wantedYears.map((y) => loadYear(y, todayYmd, departmentScope))),
+      loadResignationUnits(todayYmd, departmentScope).catch(() => [] as ResignationUnitRank[]),
+    ]);
 
     res.setHeader?.('Cache-Control', 'no-store');
-    const body: DemandForecastResponse = { years, currentYear, currentMonth, asOf: todayYmd };
+    const body: DemandForecastResponse = {
+      years,
+      currentYear,
+      currentMonth,
+      asOf: todayYmd,
+      topResignationUnits,
+    };
     return res.status(200).json(body);
   } catch (e) {
     return handleApiError(res, e, 'request-control demand-forecast GET', {

@@ -7,7 +7,9 @@ import {
 } from './siamrajSqlServerRequests.js';
 import {
   listSiamrajSqlServerThroughput,
+  listResignationUnitRanking,
   type SiamrajThroughputRecord,
+  type ResignationUnitRank,
 } from './siamrajSqlServerThroughput.js';
 import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
@@ -271,7 +273,7 @@ export async function getSiamrajUnitRequestById(
   return item;
 }
 
-export type { SiamrajThroughputRecord };
+export type { SiamrajThroughputRecord, ResignationUnitRank };
 
 export async function listSiamrajThroughput(options: {
   from: string;
@@ -281,6 +283,20 @@ export async function listSiamrajThroughput(options: {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {
     return listSiamrajSqlServerThroughput(options);
+  }
+  return [];
+}
+
+/** อันดับหน่วยงานที่มีใบขอลาออกบ่อยในช่วง — [] เมื่อไม่ได้ต่อ SQL Server */
+export async function listSiamrajResignationUnitRanking(options: {
+  from: string;
+  to: string;
+  departmentScope?: DepartmentScope;
+  limit?: number;
+}): Promise<ResignationUnitRank[]> {
+  const source = getSiamrajDbSource();
+  if (source === 'sqlserver') {
+    return listResignationUnitRanking(options);
   }
   return [];
 }
