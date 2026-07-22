@@ -111,6 +111,31 @@ async function fetchState(scope: DepartmentScope) {
   };
 }
 
+type RosterEntry = { name: string; bu: string | null };
+
+/** Roster rows with their BU, for the admin management tab (one row per BU). */
+async function fetchManageEntries(scope: DepartmentScope) {
+  const out = {
+    recruiters: [] as RosterEntry[],
+    screeners: [] as RosterEntry[],
+    opls: [] as RosterEntry[],
+  };
+  if (scope.mode === 'none') return out;
+  const w = scopeWhere(scope);
+  const { rows } = await dbQuery<{ role: string; display_name: string; department_code: string | null }>(
+    `select role, display_name, department_code from ${rosterTable} ${w.sql}
+     order by role asc, lower(trim(display_name)) asc`,
+    w.params,
+  );
+  for (const r of rows) {
+    const entry: RosterEntry = { name: r.display_name, bu: r.department_code ?? null };
+    if (r.role === 'recruiter') out.recruiters.push(entry);
+    else if (r.role === 'screener') out.screeners.push(entry);
+    else if (r.role === 'opl') out.opls.push(entry);
+  }
+  return out;
+}
+
 type ScopeResult =
   | { ok: true; scope: DepartmentScope }
   | { ok: false; status: number; message: string };
@@ -139,11 +164,29 @@ async function resolveScope(req: AuthedReq, requestedRaw: string): Promise<Scope
   return { ok: true, scope: await loadRosterBuScope(req.user) };
 }
 
+/** Resolve a single BU value the caller is allowed to write to (for set-bu). */
+async function authorizeBu(
+  req: AuthedReq,
+  raw: string,
+): Promise<{ ok: true; bu: string | null } | { ok: false; status: number; message: string }> {
+  const r = await resolveScope(req, raw);
+  if (!r.ok) return r;
+  if (r.scope.mode === 'none') return { ok: false, status: 400, message: 'เลือก BU ก่อน' };
+  return { ok: true, bu: writeBu(r.scope) };
+}
+
 async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
   if (method === 'GET') {
     try {
+      if (getString(req.query?.manage)) {
+        // admin manages every BU; other roles see their own department + legacy rows
+        const manageScope: DepartmentScope =
+          req.user.role === 'admin' ? { mode: 'all' } : await loadRosterBuScope(req.user);
+        const entries = await fetchManageEntries(manageScope);
+        return res.status(200).json({ ...entries, canManageAllBu: req.user.role === 'admin' });
+      }
       const resolved = await resolveScope(req, getString(req.query?.bu));
       if (!resolved.ok) return sendError(res, resolved.status, 'Forbidden', resolved.message);
       return res.status(200).json(await fetchState(resolved.scope));
@@ -314,7 +357,50 @@ async function jobStaffHandler(req: AuthedReq, res: ApiRes) {
         return res.status(200).json(state);
       }
 
-      return sendError(res, 400, 'Bad request', 'Unknown op; use add, remove, or rename');
+      if (op === 'set-bu') {
+        const name = getString(body.name);
+        if (!name) return sendError(res, 400, 'Bad request', 'name is required');
+        const nn = normName(name);
+        if (!nn) return sendError(res, 400, 'Bad request', 'name is empty');
+
+        const fromAuth = await authorizeBu(req, getString(body.fromBu));
+        if (!fromAuth.ok) return sendError(res, fromAuth.status, 'Forbidden', fromAuth.message);
+        const toAuth = await authorizeBu(req, getString(body.toBu));
+        if (!toAuth.ok) return sendError(res, toAuth.status, 'Forbidden', toAuth.message);
+        const fromBu = fromAuth.bu;
+        const toBu = toAuth.bu;
+        if (fromBu === toBu) return res.status(200).json(await fetchState(scope));
+
+        const { rows: existing } = await dbQuery(
+          `select 1 from ${rosterTable}
+           where role = $1 and lower(trim(display_name)) = $2 and department_code is not distinct from $3
+           limit 1`,
+          [role, nn, toBu],
+        );
+        if (existing.length > 0) {
+          // target BU already has this name — drop the source row (merge)
+          await dbQuery(
+            `delete from ${rosterTable}
+             where role = $1 and lower(trim(display_name)) = $2 and department_code is not distinct from $3`,
+            [role, nn, fromBu],
+          );
+        } else {
+          await dbQuery(
+            `update ${rosterTable} set department_code = $4
+             where role = $1 and lower(trim(display_name)) = $2 and department_code is not distinct from $3`,
+            [role, nn, fromBu, toBu],
+          );
+        }
+        await auditFromAuthed(req, {
+          action: 'job_staff.set_bu',
+          entityType: 'job_staff',
+          entityId: role,
+          after: { op: 'set-bu', role, name: name.trim(), fromBu, toBu },
+        });
+        return res.status(200).json(await fetchState(scope));
+      }
+
+      return sendError(res, 400, 'Bad request', 'Unknown op; use add, remove, rename, or set-bu');
     } catch (e) {
       return handleApiError(res, e, 'job-staff POST', { userId: req.user.sub });
     }

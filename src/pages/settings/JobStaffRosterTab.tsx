@@ -1,57 +1,92 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Lock } from 'lucide-react';
 import {
-  fetchJobStaffState,
-  mutateJobStaffForBu,
-  type JobStaffApiState,
+  fetchJobStaffManage,
+  rosterMutate,
+  type JobStaffManageState,
+  type RosterEntry,
 } from '@/lib/jobStaffRemote';
-import { useAuth } from '@/contexts/AuthContext';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 import { cn } from '@/lib/utils';
 
 type RosterKind = 'recruiter' | 'screener' | 'opl';
 
-const BU_STORAGE_KEY = 'jarvis:job-staff-roster-bu';
+const NO_BU = ''; // ไม่ระบุ — visible in every BU
+
+function BuSelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className="jarvis-soft-field h-8 px-2 py-0 text-xs disabled:opacity-60"
+      title="กำหนด BU ของรายชื่อนี้"
+    >
+      <option value={NO_BU}>ไม่ระบุ</option>
+      {APP_DEPARTMENT_CODES.map((code) => (
+        <option key={code} value={code}>
+          {APP_DEPARTMENT_LABELS[code]}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function RosterSection({
   kind,
   title,
-  names,
-  bu,
-  onState,
+  entries,
+  onChanged,
 }: {
   kind: RosterKind;
   title: string;
-  names: string[];
-  bu: string;
-  onState: (s: JobStaffApiState) => void;
+  entries: RosterEntry[];
+  onChanged: () => void;
 }) {
   const [draft, setDraft] = useState('');
+  const [draftBu, setDraftBu] = useState<string>(NO_BU);
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const run = async (body: Record<string, unknown>) => {
+    if (busy) return false;
+    setBusy(true);
+    const res = await rosterMutate({ role: kind, ...body });
+    setBusy(false);
+    if (!res.ok) {
+      window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
+      return false;
+    }
+    onChanged();
+    return true;
+  };
+
   const add = async () => {
     const t = draft.trim();
-    if (!t || busy) return;
-    setBusy(true);
-    const res = await mutateJobStaffForBu({ op: 'add', role: kind, name: t }, bu);
-    setBusy(false);
-    if (!res.ok) window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-    else {
+    if (!t) return;
+    if (await run({ op: 'add', name: t, bu: draftBu })) {
       setDraft('');
-      if (res.state) onState(res.state);
+      setDraftBu(NO_BU);
     }
   };
 
-  const remove = async (name: string) => {
-    if (!window.confirm(`ลบ «${name}» ออกจากรายการ (BU ${bu})?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงในประวัติตามเดิม`)) return;
-    if (busy) return;
-    setBusy(true);
-    const res = await mutateJobStaffForBu({ op: 'remove', role: kind, name }, bu);
-    setBusy(false);
-    if (!res.ok) window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-    else if (res.state) onState(res.state);
+  const remove = (entry: RosterEntry) => {
+    const buLabel = entry.bu ?? 'ไม่ระบุ';
+    if (!window.confirm(`ลบ «${entry.name}» (BU ${buLabel}) ออกจากรายการ?\nงานเดิมที่มอบหมายชื่อนี้ยังคงแสดงในประวัติตามเดิม`)) return;
+    void run({ op: 'remove', name: entry.name, bu: entry.bu ?? NO_BU });
+  };
+
+  const changeBu = (entry: RosterEntry, toBu: string) => {
+    if ((entry.bu ?? NO_BU) === toBu) return;
+    void run({ op: 'set-bu', name: entry.name, fromBu: entry.bu ?? NO_BU, toBu });
   };
 
   const startEdit = (name: string) => {
@@ -59,19 +94,11 @@ function RosterSection({
     setEditValue(name);
   };
 
-  const saveEdit = async (original: string) => {
+  const saveEdit = async (entry: RosterEntry) => {
     const t = editValue.trim();
-    if (!t || busy) return;
-    setBusy(true);
-    const res = await mutateJobStaffForBu(
-      { op: 'rename', role: kind, oldName: original, newName: t },
-      bu,
-    );
-    setBusy(false);
-    if (!res.ok) window.alert(res.message ?? 'บันทึกไม่สำเร็จ');
-    else {
+    if (!t) return;
+    if (await run({ op: 'rename', oldName: entry.name, newName: t, bu: entry.bu ?? NO_BU })) {
       setEditing(null);
-      if (res.state) onState(res.state);
     }
   };
 
@@ -79,18 +106,18 @@ function RosterSection({
     <div className="glass-card rounded-xl border border-border p-4 space-y-3">
       <h3 className="font-semibold text-foreground text-sm">{title}</h3>
       <p className="text-xs text-muted-foreground">
-        รายชื่อสำหรับเลือกในฟอร์มงานและตัวกรอง ชื่อจากงานเก่าที่ยังไม่ได้อยู่ในรายการนี้จะยังโผล่ในดรอปดาวน์ตามข้อมูลงาน
+        กำหนด BU ให้แต่ละรายชื่อได้จากช่องด้านขวา — &quot;ไม่ระบุ&quot; = แสดงทุก BU
       </p>
       <ul className="space-y-2">
-        {names.length === 0 && (
+        {entries.length === 0 && (
           <li className="text-sm text-muted-foreground italic">ยังไม่มีชื่อในรายการ — เพิ่มด้านล่าง</li>
         )}
-        {names.map((name) => (
+        {entries.map((entry) => (
           <li
-            key={name}
+            key={`${entry.name}::${entry.bu ?? ''}`}
             className="flex flex-wrap items-center gap-2 py-1.5 border-b border-border/40 last:border-0"
           >
-            {editing === name ? (
+            {editing === entry.name ? (
               <>
                 <input
                   value={editValue}
@@ -98,13 +125,13 @@ function RosterSection({
                   className="flex-1 min-w-[140px] jarvis-soft-field px-2 py-1.5 text-sm"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void saveEdit(name);
+                    if (e.key === 'Enter') void saveEdit(entry);
                     if (e.key === 'Escape') setEditing(null);
                   }}
                 />
                 <button
                   type="button"
-                  onClick={() => void saveEdit(name)}
+                  onClick={() => void saveEdit(entry)}
                   disabled={busy}
                   className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground"
                 >
@@ -120,17 +147,22 @@ function RosterSection({
               </>
             ) : (
               <>
-                <span className="flex-1 text-sm font-medium text-foreground">{name}</span>
+                <span className="flex-1 min-w-[120px] text-sm font-medium text-foreground">{entry.name}</span>
+                <BuSelect
+                  value={entry.bu ?? NO_BU}
+                  disabled={busy}
+                  onChange={(v) => changeBu(entry, v)}
+                />
                 <button
                   type="button"
-                  onClick={() => startEdit(name)}
+                  onClick={() => startEdit(entry.name)}
                   className="text-xs px-2 py-1 rounded bg-secondary text-blue-600 hover:underline"
                 >
                   เปลี่ยนชื่อ
                 </button>
                 <button
                   type="button"
-                  onClick={() => void remove(name)}
+                  onClick={() => remove(entry)}
                   disabled={busy}
                   className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20"
                 >
@@ -141,14 +173,15 @@ function RosterSection({
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="พิมพ์ชื่อใหม่แล้วกดเพิ่ม"
-          className="flex-1 min-w-[180px] jarvis-soft-field"
+          placeholder="พิมพ์ชื่อใหม่"
+          className="flex-1 min-w-[150px] jarvis-soft-field"
           onKeyDown={(e) => e.key === 'Enter' && void add()}
         />
+        <BuSelect value={draftBu} disabled={busy} onChange={setDraftBu} />
         <button
           type="button"
           disabled={busy}
@@ -165,79 +198,27 @@ function RosterSection({
   );
 }
 
-function initialBu(userDept?: string | null): string {
-  try {
-    const stored = sessionStorage.getItem(BU_STORAGE_KEY);
-    if (stored && (APP_DEPARTMENT_CODES as readonly string[]).includes(stored)) return stored;
-  } catch {
-    /* ignore */
-  }
-  const dept = (userDept || '').trim().toUpperCase();
-  if ((APP_DEPARTMENT_CODES as readonly string[]).includes(dept)) return dept;
-  return APP_DEPARTMENT_CODES[0];
-}
-
 const JobStaffRosterTab: React.FC = () => {
-  const { user } = useAuth();
-  const [bu, setBu] = useState<string>(() => initialBu(user?.department_code));
-  const [state, setState] = useState<JobStaffApiState | null>(null);
+  const [state, setState] = useState<JobStaffManageState | null>(null);
   const [loading, setLoading] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const s = await fetchJobStaffState(bu);
+    const s = await fetchJobStaffManage();
     setState(s);
     setLoading(false);
-  }, [bu]);
+  }, []);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(BU_STORAGE_KEY, bu);
-    } catch {
-      /* ignore */
-    }
-  }, [bu]);
-
   return (
     <div className="space-y-4">
-      <div className="jarvis-menu-card rounded-[1.5rem] border border-white/70 p-4 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/12 text-primary">
-            <Lock className="h-4 w-4" />
-          </span>
-          เลือก BU แล้วล็อกจัดการรายชื่อตามนั้น
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {APP_DEPARTMENT_CODES.map((code) => {
-            const active = bu === code;
-            return (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setBu(code)}
-                className={cn(
-                  'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {APP_DEPARTMENT_LABELS[code]}
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          กำลังจัดการรายชื่อของ BU{' '}
-          <span className="font-semibold text-foreground">{bu}</span> — ชื่อที่เพิ่ม/แก้จะเห็นเฉพาะ BU นี้
-          (รายชื่อเดิมที่ยังไม่ได้ระบุ BU จะยังแสดงอยู่ทุก BU)
-        </p>
-      </div>
-
+      <p className="text-sm text-muted-foreground jarvis-menu-card rounded-[1.5rem] p-3 border border-white/70 border-info/30 bg-info/5">
+        รายชื่อสรรหา/คัดสรร/OPL บันทึกในฐานข้อมูล กำหนด BU ให้แต่ละคนได้ในช่องขวาของแต่ละรายชื่อ —
+        &quot;ไม่ระบุ&quot; จะแสดงในทุก BU การเปลี่ยนชื่อจะอัปเดตชื่อบนงานที่ตรงกันด้วย
+      </p>
       {loading && !state ? (
         <p className="text-sm text-muted-foreground animate-pulse py-6 text-center">กำลังโหลดรายชื่อ…</p>
       ) : (
@@ -245,23 +226,20 @@ const JobStaffRosterTab: React.FC = () => {
           <RosterSection
             kind="recruiter"
             title="เจ้าหน้าที่สรรหา"
-            names={state?.recruiters ?? []}
-            bu={bu}
-            onState={setState}
+            entries={state?.recruiters ?? []}
+            onChanged={reload}
           />
           <RosterSection
             kind="screener"
             title="เจ้าหน้าที่คัดสรร"
-            names={state?.screeners ?? []}
-            bu={bu}
-            onState={setState}
+            entries={state?.screeners ?? []}
+            onChanged={reload}
           />
           <RosterSection
             kind="opl"
             title="เจ้าหน้าที่ OPL"
-            names={state?.opls ?? []}
-            bu={bu}
-            onState={setState}
+            entries={state?.opls ?? []}
+            onChanged={reload}
           />
         </div>
       )}

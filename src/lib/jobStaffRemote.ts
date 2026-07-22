@@ -79,46 +79,60 @@ export type MutateOp =
   | { op: 'remove'; role: 'recruiter' | 'screener' | 'opl'; name: string }
   | { op: 'rename'; role: 'recruiter' | 'screener' | 'opl'; oldName: string; newName: string };
 
+/** A roster name with the BU it is assigned to (null = ไม่ระบุ, visible in every BU). */
+export type RosterEntry = { name: string; bu: string | null };
+
+export type JobStaffManageState = {
+  recruiters: RosterEntry[];
+  screeners: RosterEntry[];
+  opls: RosterEntry[];
+  /** admin may assign any BU; other roles only their own department */
+  canManageAllBu: boolean;
+};
+
+function toEntries(v: unknown): RosterEntry[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((e): e is { name: unknown; bu: unknown } => typeof e === 'object' && e !== null)
+    .map((e) => ({
+      name: typeof e.name === 'string' ? e.name : '',
+      bu: typeof e.bu === 'string' && e.bu ? e.bu : null,
+    }))
+    .filter((e) => e.name);
+}
+
 /**
- * Fetch the roster for an explicit BU (roster admin tab). Does NOT touch the
- * shared picker cache used by job forms — those stay scoped to the logged-in
- * user's own department.
+ * Fetch every roster name with its BU, for the admin management tab. Does NOT
+ * touch the shared picker cache used by job forms.
  */
-export async function fetchJobStaffState(bu: string | null): Promise<JobStaffApiState | null> {
+export async function fetchJobStaffManage(): Promise<JobStaffManageState | null> {
   try {
-    const q = bu ? `?bu=${encodeURIComponent(bu)}` : '';
-    const r = await apiFetch(`/api/job-staff${q}`);
+    const r = await apiFetch('/api/job-staff?manage=1');
     if (!r.ok) return null;
-    return parseState(await r.json());
+    const data = (await r.json()) as Record<string, unknown>;
+    return {
+      recruiters: toEntries(data.recruiters),
+      screeners: toEntries(data.screeners),
+      opls: toEntries(data.opls),
+      canManageAllBu: data.canManageAllBu === true,
+    };
   } catch {
     return null;
   }
 }
 
-/** Mutate the roster for an explicit BU (roster admin tab); returns the new state. */
-export async function mutateJobStaffForBu(
-  payload: MutateOp,
-  bu: string | null,
-): Promise<{ ok: boolean; message?: string; state?: JobStaffApiState }> {
+/** Post a roster mutation (add / remove / rename / set-bu); the tab refetches after. */
+export async function rosterMutate(
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; message?: string }> {
   const r = await apiFetch('/api/job-staff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(bu ? { ...payload, bu } : payload),
+    body: JSON.stringify(body),
   });
-  let data: unknown = {};
-  try {
-    data = await r.json();
-  } catch {
-    /* ignore */
-  }
-  if (!r.ok) {
-    const rec = data as { message?: string };
-    return {
-      ok: false,
-      message: typeof rec.message === 'string' ? rec.message : 'บันทึกไม่สำเร็จ',
-    };
-  }
-  return { ok: true, state: parseState(data) ?? undefined };
+  if (r.ok) return { ok: true };
+  const data = (await r.json().catch(() => null)) as { message?: string } | null;
+  return { ok: false, message: data?.message ?? 'บันทึกไม่สำเร็จ' };
 }
 
 export async function mutateJobStaffRemote(
