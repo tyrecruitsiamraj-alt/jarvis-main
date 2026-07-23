@@ -24,12 +24,12 @@ import {
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
-  AGE_DAYS_FILTER_OPTIONS,
+  AGE_DAYS_MULTI_OPTIONS,
   compareJobsForListSort,
   getJobRequestAgeLabel,
   getJobRequestSubmittedDate,
   JOB_LIST_SORT_OPTIONS,
-  matchesAgeDaysFilter,
+  matchesAnyAgeDaysFilter,
   matchesNoteFilter,
   matchesReplacementFilter,
   matchesUrgencyFilter,
@@ -329,7 +329,7 @@ const JobListPage: React.FC = () => {
         }
       if (!matchesNoteFilter(j, noteFilter)) return false;
       if (!matchesReplacementFilter(j, replacementFilter)) return false;
-      if (!matchesAgeDaysFilter(j, ageDaysFilter)) return false;
+      if (!matchesAnyAgeDaysFilter(j, ageDaysFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
@@ -591,6 +591,7 @@ const JobListPage: React.FC = () => {
           <FilterMultiSelect
             id="job-list-work-status"
             label="สถานะทำงาน (เลือกได้หลายค่า)"
+            summaryNoun="สถานะ"
             values={workStatusFilter}
             onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
             options={UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => ({
@@ -623,18 +624,14 @@ const JobListPage: React.FC = () => {
             ))}
           </FilterSelect>
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-age"
-            label="วันผ่านมา"
-            value={ageDaysFilter}
+            label="วันผ่านมา (เลือกได้หลายค่า)"
+            summaryNoun="ช่วง"
+            values={ageDaysFilter}
             onChange={(v) => updateListState({ ageDaysFilter: v as typeof ageDaysFilter })}
-          >
-            {AGE_DAYS_FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </FilterSelect>
+            options={AGE_DAYS_MULTI_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          />
 
           <FilterSelect
             id="job-list-sort"

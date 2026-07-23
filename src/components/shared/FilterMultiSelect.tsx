@@ -12,6 +12,8 @@ type FilterMultiSelectProps = {
   values: string[];
   onChange: (values: string[]) => void;
   allLabel?: string;
+  /** คำนามในสรุป เช่น "เลือก 3 สถานะ" (default: "รายการ") */
+  summaryNoun?: string;
   className?: string;
 };
 
@@ -23,10 +25,29 @@ export function FilterMultiSelect({
   values,
   onChange,
   allLabel = 'ทั้งหมด',
+  summaryNoun = 'รายการ',
   className,
 }: FilterMultiSelectProps) {
   const [open, setOpen] = useState(false);
+  const [placement, setPlacement] = useState<{ up: boolean; maxHeight: number }>({
+    up: false,
+    maxHeight: 256,
+  });
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+
+  // เปิดขึ้นบนเมื่อพื้นที่ด้านล่างไม่พอ + จำกัดความสูง panel ตามพื้นที่จริง (กันทะลุขอบจอ)
+  const openMenu = () => {
+    const btn = btnRef.current;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const below = window.innerHeight - rect.bottom - 12;
+      const above = rect.top - 12;
+      const up = below < 200 && above > below;
+      setPlacement({ up, maxHeight: Math.max(160, Math.floor(up ? above : below)) });
+    }
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -55,7 +76,7 @@ export function FilterMultiSelect({
       ? allLabel
       : values.length === 1
         ? (options.find((o) => o.value === values[0])?.label ?? values[0])
-        : `เลือก ${values.length} สถานะ`;
+        : `เลือก ${values.length} ${summaryNoun}`;
 
   return (
     <div ref={rootRef} className={cn('relative flex w-full min-w-0 flex-col gap-1', className)}>
@@ -64,10 +85,11 @@ export function FilterMultiSelect({
       </label>
       <button
         id={id}
+        ref={btnRef}
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         className={cn(
           'jarvis-filter-select flex w-full min-w-0 items-center justify-between gap-1 text-left',
           values.length > 0 && 'font-medium text-foreground',
@@ -81,7 +103,11 @@ export function FilterMultiSelect({
         <div
           role="listbox"
           aria-multiselectable
-          className="absolute left-0 top-full z-30 mt-1 max-h-64 w-max min-w-full overflow-y-auto rounded-xl border border-border bg-background p-1 shadow-lg"
+          style={{ maxHeight: placement.maxHeight }}
+          className={cn(
+            'absolute left-0 z-30 w-max min-w-full max-w-[min(20rem,85vw)] overflow-y-auto rounded-xl border border-border bg-background p-1 shadow-lg',
+            placement.up ? 'bottom-full mb-1' : 'top-full mt-1',
+          )}
         >
           <button
             type="button"

@@ -8,6 +8,8 @@ import {
 export type JobListFilter = 'all' | 'active' | 'closed';
 /** ตัวกรองสถานะทำงาน — เลือกหลายสถานะพร้อมกันได้, [] = ทั้งหมด */
 export type JobListWorkStatusFilter = UnitRequestWorkStatus[];
+/** ตัวกรองช่วงวันผ่านมา — เลือกหลายช่วงพร้อมกันได้, [] = ทั้งหมด (ไม่รวม 'all') */
+export type JobListAgeDaysFilter = Exclude<AgeDaysFilter, 'all'>[];
 
 export type JobListPageState = {
   filter: JobListFilter;
@@ -23,7 +25,7 @@ export type JobListPageState = {
   workStatusFilter: JobListWorkStatusFilter;
   noteFilter: NoteFilter;
   replacementFilter: ReplacementFilter;
-  ageDaysFilter: AgeDaysFilter;
+  ageDaysFilter: JobListAgeDaysFilter;
   sort: JobListSort;
   page: number;
   pageSize: PageSizeOption;
@@ -43,7 +45,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   workStatusFilter: [],
   noteFilter: 'all',
   replacementFilter: 'all',
-  ageDaysFilter: 'all',
+  ageDaysFilter: [],
   sort: 'assignee_age',
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
@@ -53,7 +55,33 @@ const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
 const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'retroactive', 'urgent', 'advance']);
 const NOTE_VALUES = new Set<NoteFilter>(['all', 'has', 'empty']);
 const REPLACEMENT_VALUES = new Set<ReplacementFilter>(['all', 'send', 'no_send', 'unset']);
-const AGE_DAYS_VALUES = new Set<AgeDaysFilter>(['all', 'advance', 'today', '1-7', '8-15', '16-30', '30+']);
+const AGE_DAYS_MULTI_VALUES = new Set<Exclude<AgeDaysFilter, 'all'>>([
+  'advance',
+  'today',
+  '1-7',
+  '8-15',
+  '16-30',
+  '30+',
+]);
+
+function normalizeAgeToken(raw: string): string {
+  const t = raw.trim();
+  if (t === '8-14') return '8-15';
+  if (t === '15-30') return '16-30';
+  return t;
+}
+
+/** parse 'ag' — รองรับค่าเดี่ยวแบบเดิม (ag=1-7) และหลายค่า (ag=1-7,8-15); 'all'/ค่าเพี้ยนถูกตัดทิ้ง */
+function parseAgeDaysFilter(raw: string | null): JobListAgeDaysFilter {
+  const out: JobListAgeDaysFilter = [];
+  for (const token of (raw || '').split(',')) {
+    const v = normalizeAgeToken(token);
+    if (AGE_DAYS_MULTI_VALUES.has(v as Exclude<AgeDaysFilter, 'all'>) && !out.includes(v as Exclude<AgeDaysFilter, 'all'>)) {
+      out.push(v as Exclude<AgeDaysFilter, 'all'>);
+    }
+  }
+  return out;
+}
 const SORT_VALUES = new Set<JobListSort>(['assignee_age', 'age_desc', 'age_asc', 'newest', 'oldest']);
 
 function parsePageSize(raw: string | null): PageSizeOption {
@@ -77,10 +105,6 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
       : urgencyRaw;
   const noteRaw = (params.get('nf') || JOB_LIST_DEFAULTS.noteFilter) as NoteFilter;
   const replacementRaw = (params.get('sr') || JOB_LIST_DEFAULTS.replacementFilter) as ReplacementFilter;
-  const ageRaw = (params.get('ag') || JOB_LIST_DEFAULTS.ageDaysFilter) as string;
-  const ageNormalized = (
-    ageRaw === '8-14' ? '8-15' : ageRaw === '15-30' ? '16-30' : ageRaw
-  ) as AgeDaysFilter;
   const sortRaw = (params.get('sort') || JOB_LIST_DEFAULTS.sort) as JobListSort;
   // รองรับทั้งค่าเดี่ยวแบบเดิม (ws=waiting_start) และหลายค่า (ws=a,b,c) — 'all'/ค่าเพี้ยนถูกตัดทิ้ง
   const workStatusFilter: JobListWorkStatusFilter = (params.get('ws') || '')
@@ -104,7 +128,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     replacementFilter: REPLACEMENT_VALUES.has(replacementRaw)
       ? replacementRaw
       : JOB_LIST_DEFAULTS.replacementFilter,
-    ageDaysFilter: AGE_DAYS_VALUES.has(ageNormalized) ? ageNormalized : JOB_LIST_DEFAULTS.ageDaysFilter,
+    ageDaysFilter: parseAgeDaysFilter(params.get('ag')),
     sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,
     page,
     pageSize: parsePageSize(params.get('ps')),
@@ -130,7 +154,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   if (state.replacementFilter !== JOB_LIST_DEFAULTS.replacementFilter) {
     params.set('sr', state.replacementFilter);
   }
-  if (state.ageDaysFilter !== JOB_LIST_DEFAULTS.ageDaysFilter) params.set('ag', state.ageDaysFilter);
+  if (state.ageDaysFilter.length > 0) params.set('ag', state.ageDaysFilter.join(','));
   if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
   if (state.page > 1) params.set('p', String(state.page));
   if (state.pageSize !== JOB_LIST_DEFAULTS.pageSize) params.set('ps', String(state.pageSize));

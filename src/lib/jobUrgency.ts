@@ -44,6 +44,9 @@ export const AGE_DAYS_FILTER_OPTIONS: { value: AgeDaysFilter; label: string }[] 
   { value: '30+', label: '30 วันขึ้นไป' },
 ];
 
+/** ค่าที่เลือกได้ในตัวกรองแบบหลายค่า (ไม่รวม 'all' — [] = ทั้งหมด) */
+export const AGE_DAYS_MULTI_OPTIONS = AGE_DAYS_FILTER_OPTIONS.filter((o) => o.value !== 'all');
+
 export const JOB_LIST_SORT_OPTIONS: { value: JobListSort; label: string }[] = [
   { value: 'assignee_age', label: 'ผู้รับผิดชอบ · ผ่านมามากสุด' },
   { value: 'age_desc', label: 'ผ่านมามาก → น้อย' },
@@ -294,6 +297,16 @@ export function matchesAgeDaysFilter(job: JobRequest, filter: AgeDaysFilter, tod
     default:
       return true;
   }
+}
+
+/** ตัวกรองอายุแบบหลายค่า — [] = ทั้งหมด, มิฉะนั้นเข้าเงื่อนไขข้อใดข้อหนึ่ง (OR) */
+export function matchesAnyAgeDaysFilter(
+  job: JobRequest,
+  filters: AgeDaysFilter[],
+  today = new Date(),
+): boolean {
+  if (filters.length === 0) return true;
+  return filters.some((f) => matchesAgeDaysFilter(job, f, today));
 }
 
 function getDashboardElapsedDays(job: JobRequest, today = new Date()): number | null {
