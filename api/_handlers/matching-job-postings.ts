@@ -52,6 +52,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const jobId = getString(body.job_id) || getString(body.jobId);
       if (!jobId) return sendError(res, 400, 'Bad request', 'job_id is required');
 
+      const rawSnapshot = body.job_snapshot ?? body.jobSnapshot;
       const item = await createJobPostingRequest({
         jobId,
         requestNo: getString(body.request_no) ?? getString(body.requestNo),
@@ -60,6 +61,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
         reason: body.reason,
         userId: req.user.sub,
         userName: req.user.email,
+        jobSnapshot:
+          rawSnapshot && typeof rawSnapshot === 'object' && !Array.isArray(rawSnapshot)
+            ? (rawSnapshot as Record<string, unknown>)
+            : null,
       });
 
       await auditFromAuthed(req, {

@@ -56,6 +56,8 @@ export async function createJobPostingRequest(input: {
   requestNo?: string | null;
   reason?: string | null;
   requestType?: JobPostingRequestType;
+  /** ข้อมูลใบขอ (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) แนบให้ทีมคอนเทนต์ปลายทางเห็นครบโดยไม่ต้องต่อ MSSQL */
+  jobSnapshot?: Record<string, unknown> | null;
 }): Promise<JobPostingRequest> {
   const r = await apiFetch('/api/matching/job-postings', {
     method: 'POST',
@@ -64,6 +66,7 @@ export async function createJobPostingRequest(input: {
       request_no: input.requestNo ?? null,
       reason: input.reason ?? null,
       request_type: input.requestType ?? 'content',
+      job_snapshot: input.jobSnapshot ?? null,
     }),
   });
   if (!r.ok) return readError(r, 'สร้างคำขอไม่สำเร็จ');

@@ -795,6 +795,24 @@ const MatchingPage: React.FC = () => {
     return `มีคนของเราเข้าข่าย ${recommended} คน (จาก pool ${bm.pool_size}) แต่ยังไม่โอเค/ไม่เพียงพอ`;
   };
 
+  /** ข้อมูลใบขอที่ทีมคอนเทนต์ต้องใช้ (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) — หน้านี้มีครบอยู่แล้ว
+      แนบไปกับคำขอเลย ปลายทาง (api-scraper) จะได้ไม่เห็นแค่เลขใบขอ */
+  const composeJobSnapshot = (job: JobRequest): Record<string, unknown> => ({
+    position: job.staff_title_name || job.request_action_name || null,
+    unit_name: job.unit_name || null,
+    location: job.location_address || null,
+    income: job.total_income || null,
+    qty: job.request_positions ?? job.position_units ?? null,
+    gender: job.gender_requirement || null,
+    age_min: job.age_range_min ?? null,
+    age_max: job.age_range_max ?? null,
+    work_schedule: job.work_schedule || null,
+    department: job.department_name || null,
+    urgency: job.urgency || null,
+    required_date: job.required_date || null,
+    note: job.list_note || null,
+  });
+
   const createPosting = async (job: JobRequest, requestType: JobPostingRequestType) => {
     setCreatingPosting(true);
     setPostingError(null);
@@ -804,6 +822,7 @@ const MatchingPage: React.FC = () => {
         requestNo: job.request_no,
         reason: composePostingReason(job),
         requestType,
+        jobSnapshot: composeJobSnapshot(job),
       });
       setJobPostingByJobId((prev) => ({ ...prev, [job.id]: item }));
     } catch (e) {

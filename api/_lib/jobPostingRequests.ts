@@ -133,6 +133,8 @@ export type CreateJobPostingInput = {
   reason?: unknown;
   userId?: string | null;
   userName?: string | null;
+  /** ข้อมูลใบขอ (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) แนบให้ทีมคอนเทนต์ปลายทาง — เก็บลง job_snapshot */
+  jobSnapshot?: Record<string, unknown> | null;
 };
 
 /**
@@ -147,6 +149,8 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
   if (existing) return existing;
 
   const userId = input.userId && uuidRe.test(input.userId) ? input.userId : null;
+  const snapshot =
+    input.jobSnapshot && typeof input.jobSnapshot === 'object' ? JSON.stringify(input.jobSnapshot) : null;
   const params = [
     jobId,
     trimTo(input.requestNo, MAX_TEXT),
@@ -154,17 +158,31 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
     trimTo(input.reason, MAX_LONG_TEXT),
     userId,
     trimTo(input.userName, MAX_TEXT),
+    snapshot,
   ];
 
-  try {
-    const { rows } = await dbQuery<Row>(
-      `
-      insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name)
-      values ($1, $2, $3, $4, $5::uuid, $6)
-      returning ${COLS}
-      `,
-      params,
+  const insert = (withSnapshot: boolean) =>
+    dbQuery<Row>(
+      withSnapshot
+        ? `insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name, job_snapshot)
+           values ($1, $2, $3, $4, $5::uuid, $6, $7::jsonb)
+           returning ${COLS}`
+        : `insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name)
+           values ($1, $2, $3, $4, $5::uuid, $6)
+           returning ${COLS}`,
+      withSnapshot ? params : params.slice(0, 6),
     );
+
+  try {
+    let rows: Row[];
+    try {
+      ({ rows } = await insert(true));
+    } catch (e) {
+      // ยังไม่ migrate 055 (ไม่มีคอลัมน์ job_snapshot) — เก็บแบบเดิมไปก่อน ไม่ให้ผู้ใช้พัง
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/job_snapshot/i.test(msg)) throw e;
+      ({ rows } = await insert(false));
+    }
     return mapRow(rows[0]);
   } catch (e) {
     if (isPgUniqueViolation(e)) {
