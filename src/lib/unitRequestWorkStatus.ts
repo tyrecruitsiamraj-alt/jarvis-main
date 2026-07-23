@@ -1,6 +1,7 @@
 /** สถานะทำงานใบขอ (Jarvis PG) — แยกจาก JobStatus / Siamraj ST */
 export type UnitRequestWorkStatus =
   | 'in_progress'
+  | 'on_hold'
   | 'evaluating'
   | 'waiting_inform'
   | 'waiting_interview'
@@ -11,6 +12,7 @@ export type UnitRequestWorkStatus =
 
 export const UNIT_REQUEST_WORK_STATUS_LABELS: Record<UnitRequestWorkStatus, string> = {
   in_progress: 'ดำเนินการ',
+  on_hold: 'ชะลอ',
   evaluating: 'เริ่มประเมิน',
   waiting_inform: 'รอแจ้งเข้า',
   waiting_interview: 'รอสัมภาษณ์',
@@ -22,6 +24,7 @@ export const UNIT_REQUEST_WORK_STATUS_LABELS: Record<UnitRequestWorkStatus, stri
 
 export const UNIT_REQUEST_WORK_STATUS_DATE_LABELS: Record<UnitRequestWorkStatus, string> = {
   in_progress: 'วันที่',
+  on_hold: 'วันที่ชะลอ',
   evaluating: 'วันที่เริ่มประเมิน',
   waiting_inform: 'วันที่แจ้งเข้า',
   waiting_interview: 'วันนัดสัมภาษณ์',
@@ -33,6 +36,7 @@ export const UNIT_REQUEST_WORK_STATUS_DATE_LABELS: Record<UnitRequestWorkStatus,
 
 export const UNIT_REQUEST_WORK_STATUS_OPTIONS: UnitRequestWorkStatus[] = [
   'in_progress',
+  'on_hold',
   'evaluating',
   'waiting_inform',
   'waiting_interview',

@@ -378,6 +378,7 @@ const SupervisorDashboard: React.FC = () => {
         const statusMap: Record<string, string | null> = {
           work_status_total: null,
           work_status_in_progress: 'in_progress',
+          work_status_on_hold: 'on_hold',
           work_status_evaluating: 'evaluating',
           work_status_waiting_inform: 'waiting_inform',
           work_status_waiting_interview: 'waiting_interview',

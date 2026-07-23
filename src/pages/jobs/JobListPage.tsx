@@ -588,17 +588,23 @@ const JobListPage: React.FC = () => {
             ))}
           </FilterSelect>
 
-          <FilterMultiSelect
+          <FilterSelect
             id="job-list-work-status"
-            label="สถานะทำงาน (เลือกได้หลายค่า)"
-            summaryNoun="สถานะ"
-            values={workStatusFilter}
-            onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
-            options={UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => ({
-              value: status,
-              label: UNIT_REQUEST_WORK_STATUS_LABELS[status],
-            }))}
-          />
+            label="สถานะทำงาน"
+            value={workStatusFilter[0] ?? 'all'}
+            onChange={(v) =>
+              updateListState({
+                workStatusFilter: (v === 'all' ? [] : [v]) as typeof workStatusFilter,
+              })
+            }
+          >
+            <option value="all">ทั้งหมด</option>
+            {UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {UNIT_REQUEST_WORK_STATUS_LABELS[status]}
+              </option>
+            ))}
+          </FilterSelect>
 
           <FilterSelect
             id="job-list-note-filter"

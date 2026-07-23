@@ -22,7 +22,7 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, 
   }, [job.id, job.send_replacement]);
 
   const persist = useCallback(
-    async (next: boolean) => {
+    async (next: boolean | null) => {
       const key = unitRequestNoteKey(job);
       if (!key) return;
       setSaving(true);
@@ -51,7 +51,8 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, 
       <button
         type="button"
         disabled={saving}
-        onClick={() => void persist(true)}
+        title={yes ? 'กดซ้ำเพื่อล้างค่ากลับเป็น —' : undefined}
+        onClick={() => void persist(yes ? null : true)}
         className={cn(
           'px-3 py-2 rounded-full border font-medium transition-colors disabled:opacity-50',
           yes
@@ -64,7 +65,8 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, 
       <button
         type="button"
         disabled={saving}
-        onClick={() => void persist(false)}
+        title={no ? 'กดซ้ำเพื่อล้างค่ากลับเป็น —' : undefined}
+        onClick={() => void persist(no ? null : false)}
         className={cn(
           'px-3 py-2 rounded-full border font-medium transition-colors disabled:opacity-50',
           no

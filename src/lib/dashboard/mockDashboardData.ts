@@ -90,6 +90,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   workStatusKpis: [
     { id: 'work_status_total', label: 'ทั้งหมด', value: 25, secondaryCount: 20, secondaryLabel: 'ใบขอ', description: 'ผลรวมสถานะ = 25 อัตรา · 20 ใบ', trendPercent: null },
     { id: 'work_status_in_progress', label: 'กำลังดำเนินการสรรหา', value: 10, secondaryCount: 9, secondaryLabel: 'ใบขอ', description: '10 อัตรา · 9 ใบ', trendPercent: null },
+    { id: 'work_status_on_hold', label: 'ชะลอ', value: 0, secondaryCount: 0, secondaryLabel: 'ใบขอ', description: '0 อัตรา · 0 ใบ', trendPercent: null },
     { id: 'work_status_evaluating', label: 'เริ่มประเมิน', value: 3, secondaryCount: 2, secondaryLabel: 'ใบขอ', description: '3 อัตรา · 2 ใบ', trendPercent: null },
     { id: 'work_status_waiting_inform', label: 'รอแจ้งเข้า', value: 4, secondaryCount: 3, secondaryLabel: 'ใบขอ', description: '4 อัตรา · 3 ใบ', trendPercent: null },
     { id: 'work_status_waiting_interview', label: 'รอสัมภาษณ์', value: 5, secondaryCount: 4, secondaryLabel: 'ใบขอ', description: '5 อัตรา · 4 ใบ', trendPercent: null },
