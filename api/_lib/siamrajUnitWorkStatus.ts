@@ -11,7 +11,10 @@ export const UNIT_REQUEST_WORK_STATUSES = [
   'evaluating',
   'waiting_inform',
   'waiting_interview',
+  'waiting_result',
   'waiting_start',
+  'daily_work',
+  'daily_pay',
 ] as const;
 
 export type UnitRequestWorkStatus = (typeof UNIT_REQUEST_WORK_STATUSES)[number];
@@ -240,7 +243,10 @@ async function ensureWorkStatusTable(): Promise<void> {
         'evaluating',
         'waiting_inform',
         'waiting_interview',
-        'waiting_start'
+        'waiting_result',
+        'waiting_start',
+        'daily_work',
+        'daily_pay'
       ))
   `);
   await dbQuery(`
