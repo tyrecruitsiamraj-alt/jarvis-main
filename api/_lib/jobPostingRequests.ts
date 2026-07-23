@@ -22,6 +22,8 @@ export type JobPostingRequest = {
   notes: string | null;
   requested_by_user_id: string | null;
   requested_by_name: string | null;
+  /** ข้อมูลใบขอ (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) ที่แนบไว้ตอนสร้าง — null สำหรับคำขอเก่าก่อนมีฟีเจอร์ */
+  job_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };
@@ -36,18 +38,40 @@ type Row = {
   notes: string | null;
   requested_by_user_id: string | null;
   requested_by_name: string | null;
+  job_snapshot?: unknown;
   created_at: string | Date;
   updated_at: string | Date;
 };
 
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const COLS =
+const COLS_BASE =
   'id, job_id, request_no, request_type, status, reason, notes, requested_by_user_id, requested_by_name, created_at, updated_at';
+const COLS = `${COLS_BASE}, job_snapshot`;
 
 function isMissingTable(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
   return /job_posting_requests/i.test(msg) && /(does not exist|relation)/i.test(msg);
+}
+
+/** คอลัมน์ job_snapshot ยังไม่ถูก migrate (055) — อ่านแบบไม่มี snapshot แทน */
+function isMissingSnapshotCol(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /job_snapshot/i.test(msg) && /(column|does not exist)/i.test(msg);
+}
+
+/** SELECT ที่ fallback อ่านแบบไม่มี job_snapshot เมื่อ env ยังไม่ migrate 055 */
+async function selectPostings(tail: string, params: unknown[]): Promise<JobPostingRequest[]> {
+  try {
+    const { rows } = await dbQuery<Row>(`select ${COLS} from ${table} ${tail}`, params);
+    return rows.map(mapRow);
+  } catch (e) {
+    if (isMissingSnapshotCol(e)) {
+      const { rows } = await dbQuery<Row>(`select ${COLS_BASE} from ${table} ${tail}`, params);
+      return rows.map(mapRow);
+    }
+    throw e;
+  }
 }
 
 function toIso(v: string | Date | null): string {
@@ -75,6 +99,10 @@ function mapRow(r: Row): JobPostingRequest {
     notes: r.notes,
     requested_by_user_id: r.requested_by_user_id,
     requested_by_name: r.requested_by_name,
+    job_snapshot:
+      r.job_snapshot && typeof r.job_snapshot === 'object'
+        ? (r.job_snapshot as Record<string, unknown>)
+        : null,
     created_at: toIso(r.created_at),
     updated_at: toIso(r.updated_at),
   };
@@ -95,11 +123,11 @@ export async function getActiveJobPostingForJob(jobId: string): Promise<JobPosti
   const key = jobId.trim();
   if (!key) return null;
   try {
-    const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table} where job_id = $1 and status = ANY($2::text[]) order by created_at desc limit 1`,
+    const rows = await selectPostings(
+      `where job_id = $1 and status = ANY($2::text[]) order by created_at desc limit 1`,
       [key, ACTIVE_STATUSES],
     );
-    return rows[0] ? mapRow(rows[0]) : null;
+    return rows[0] ?? null;
   } catch (e) {
     if (isMissingTable(e)) return null;
     throw e;
@@ -112,14 +140,9 @@ export type ListJobPostingsFilter = { status?: JobPostingStatus };
 export async function listJobPostingRequests(filter?: ListJobPostingsFilter): Promise<JobPostingRequest[]> {
   try {
     if (filter?.status) {
-      const { rows } = await dbQuery<Row>(
-        `select ${COLS} from ${table} where status = $1 order by created_at desc`,
-        [filter.status],
-      );
-      return rows.map(mapRow);
+      return await selectPostings(`where status = $1 order by created_at desc`, [filter.status]);
     }
-    const { rows } = await dbQuery<Row>(`select ${COLS} from ${table} order by created_at desc`);
-    return rows.map(mapRow);
+    return await selectPostings(`order by created_at desc`, []);
   } catch (e) {
     if (isMissingTable(e)) return [];
     throw e;
@@ -169,7 +192,7 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
            returning ${COLS}`
         : `insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name)
            values ($1, $2, $3, $4, $5::uuid, $6)
-           returning ${COLS}`,
+           returning ${COLS_BASE}`,
       withSnapshot ? params : params.slice(0, 6),
     );
 
@@ -220,9 +243,19 @@ export async function updateJobPostingRequest(
   sets.push('updated_at = now()');
   params.push(key);
 
-  const { rows } = await dbQuery<Row>(
-    `update ${table} set ${sets.join(', ')} where id = $${idx} returning ${COLS}`,
-    params,
-  );
-  return rows[0] ? mapRow(rows[0]) : null;
+  const setSql = sets.join(', ');
+  try {
+    const { rows } = await dbQuery<Row>(
+      `update ${table} set ${setSql} where id = $${idx} returning ${COLS}`,
+      params,
+    );
+    return rows[0] ? mapRow(rows[0]) : null;
+  } catch (e) {
+    if (!isMissingSnapshotCol(e)) throw e;
+    const { rows } = await dbQuery<Row>(
+      `update ${table} set ${setSql} where id = $${idx} returning ${COLS_BASE}`,
+      params,
+    );
+    return rows[0] ? mapRow(rows[0]) : null;
+  }
 }

@@ -8,6 +8,7 @@ import {
   jobPostingStatusLabel,
   type JobPostingRequest,
   type JobPostingStatus,
+  type JobSnapshot,
 } from '@/lib/jobPostingRequestsApi';
 
 const STATUS_CLASS: Record<JobPostingStatus, string> = {
@@ -36,6 +37,49 @@ function nextStatuses(item: JobPostingRequest): { status: JobPostingStatus; labe
     { status: 'cancelled', label: 'ยกเลิก' },
   ];
   return undefined;
+}
+
+function num(v: number | null | undefined): string | null {
+  return v == null || Number.isNaN(Number(v)) ? null : Number(v).toLocaleString('th-TH');
+}
+
+/** รายละเอียดใบขอที่แนบมากับคำขอ (job_snapshot) — ให้ทีมปลายทางเห็นครบโดยไม่ต้องต่อ MSSQL */
+function SnapshotDetails({ snap }: { snap: JobSnapshot | null }) {
+  if (!snap) {
+    return (
+      <p className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-400">
+        คำขอเก่า — ไม่มีรายละเอียดใบขอแนบ (คำขอที่สร้างหลังจากนี้จะแนบให้อัตโนมัติ)
+      </p>
+    );
+  }
+  const age =
+    snap.age_min != null || snap.age_max != null
+      ? `${snap.age_min ?? '—'}–${snap.age_max ?? '—'} ปี`
+      : null;
+  const rows: { label: string; value: string | null }[] = [
+    { label: 'หน่วยงาน', value: snap.unit_name ?? null },
+    { label: 'พื้นที่', value: snap.location ?? null },
+    { label: 'จำนวน', value: num(snap.qty) ? `${num(snap.qty)} อัตรา` : null },
+    { label: 'รายได้', value: num(snap.income) ? `฿${num(snap.income)}` : null },
+    { label: 'เพศ', value: snap.gender ?? null },
+    { label: 'อายุ', value: age },
+    { label: 'เวลาทำงาน', value: snap.work_schedule ?? null },
+    { label: 'แผนก', value: snap.department ?? null },
+    { label: 'วันที่ต้องการ', value: snap.required_date ?? null },
+    { label: 'หมายเหตุ', value: snap.note ?? null },
+  ].filter((r) => r.value);
+
+  if (rows.length === 0) return null;
+  return (
+    <dl className="grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg bg-slate-50/70 px-3 py-2 text-[11px] sm:grid-cols-2">
+      {rows.map((r) => (
+        <div key={r.label} className="flex gap-1.5">
+          <dt className="shrink-0 text-slate-500">{r.label}:</dt>
+          <dd className="min-w-0 break-words font-medium text-slate-800">{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 function formatWhen(iso: string): string {
@@ -163,8 +207,12 @@ const JobPostingsPage: React.FC = () => {
                   <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.created_at)}</span>
                 </div>
                 <h3 className="text-sm font-semibold text-foreground">
-                  {it.request_no || it.job_id}
+                  {it.job_snapshot?.position || 'ตำแหน่งไม่ระบุ'}
                 </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  เลขที่ใบขอ: <span className="font-mono">{it.request_no || it.job_id}</span>
+                </p>
+                <SnapshotDetails snap={it.job_snapshot} />
                 {it.reason ? (
                   <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{it.reason}</p>
                 ) : null}

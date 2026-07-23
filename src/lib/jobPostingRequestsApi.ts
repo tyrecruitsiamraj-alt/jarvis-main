@@ -14,8 +14,27 @@ export type JobPostingRequest = {
   notes: string | null;
   requested_by_user_id: string | null;
   requested_by_name: string | null;
+  /** ข้อมูลใบขอที่แนบตอนสร้าง (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) — null สำหรับคำขอเก่า */
+  job_snapshot: JobSnapshot | null;
   created_at: string;
   updated_at: string;
+};
+
+/** snapshot ที่ MatchingPage แนบมา (composeJobSnapshot) */
+export type JobSnapshot = {
+  position?: string | null;
+  unit_name?: string | null;
+  location?: string | null;
+  income?: number | null;
+  qty?: number | null;
+  gender?: string | null;
+  age_min?: number | null;
+  age_max?: number | null;
+  work_schedule?: string | null;
+  department?: string | null;
+  urgency?: string | null;
+  required_date?: string | null;
+  note?: string | null;
 };
 
 const STATUS_LABEL: Record<JobPostingStatus, string> = {
