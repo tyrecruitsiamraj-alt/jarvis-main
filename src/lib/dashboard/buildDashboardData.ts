@@ -242,6 +242,8 @@ function nextActionFor(job: JobRequest, status: DashboardTaskStatus): string {
   if (work === 'waiting_interview') return 'นัด/ตามสัมภาษณ์';
   if (work === 'waiting_result') return 'ตามผลสัมภาษณ์';
   if (work === 'waiting_start') return 'ตามเริ่มงาน';
+  if (work === 'daily_work') return 'ตามงานรายวัน';
+  if (work === 'daily_pay') return 'ตามจ่ายรายวัน';
   if (status === 'overdue') return 'ติดตามด่วน';
   if (status === 'at_risk') return 'ติดตามความคืบหน้า';
   return 'ดูรายละเอียด';
@@ -553,6 +555,8 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     waiting_interview: 0,
     waiting_result: 0,
     waiting_start: 0,
+    daily_work: 0,
+    daily_pay: 0,
   };
   const requestCounts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
@@ -561,6 +565,8 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     waiting_interview: 0,
     waiting_result: 0,
     waiting_start: 0,
+    daily_work: 0,
+    daily_pay: 0,
   };
   for (const j of jobs) {
     const status = resolveUnitRequestWorkStatus(j.work_status);
@@ -600,6 +606,8 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
     leaf('work_status_waiting_result', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_result, 'waiting_result'),
     leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
+    leaf('work_status_daily_work', UNIT_REQUEST_WORK_STATUS_LABELS.daily_work, 'daily_work'),
+    leaf('work_status_daily_pay', UNIT_REQUEST_WORK_STATUS_LABELS.daily_pay, 'daily_pay'),
   ];
 }
 

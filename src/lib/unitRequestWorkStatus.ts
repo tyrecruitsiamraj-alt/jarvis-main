@@ -5,7 +5,9 @@ export type UnitRequestWorkStatus =
   | 'waiting_inform'
   | 'waiting_interview'
   | 'waiting_result'
-  | 'waiting_start';
+  | 'waiting_start'
+  | 'daily_work'
+  | 'daily_pay';
 
 export const UNIT_REQUEST_WORK_STATUS_LABELS: Record<UnitRequestWorkStatus, string> = {
   in_progress: 'ดำเนินการ',
@@ -14,6 +16,8 @@ export const UNIT_REQUEST_WORK_STATUS_LABELS: Record<UnitRequestWorkStatus, stri
   waiting_interview: 'รอสัมภาษณ์',
   waiting_result: 'รอผลสัมภาษณ์',
   waiting_start: 'รอเริ่มงาน',
+  daily_work: 'งานรายวัน',
+  daily_pay: 'จ่ายรายวัน',
 };
 
 export const UNIT_REQUEST_WORK_STATUS_DATE_LABELS: Record<UnitRequestWorkStatus, string> = {
@@ -23,6 +27,8 @@ export const UNIT_REQUEST_WORK_STATUS_DATE_LABELS: Record<UnitRequestWorkStatus,
   waiting_interview: 'วันนัดสัมภาษณ์',
   waiting_result: 'วันที่สัมภาษณ์',
   waiting_start: 'วันที่เริ่มงาน',
+  daily_work: 'วันที่เริ่มงานรายวัน',
+  daily_pay: 'วันที่จ่ายรายวัน',
 };
 
 export const UNIT_REQUEST_WORK_STATUS_OPTIONS: UnitRequestWorkStatus[] = [
@@ -32,6 +38,8 @@ export const UNIT_REQUEST_WORK_STATUS_OPTIONS: UnitRequestWorkStatus[] = [
   'waiting_interview',
   'waiting_result',
   'waiting_start',
+  'daily_work',
+  'daily_pay',
 ];
 
 export function isUnitRequestWorkStatus(v: unknown): v is UnitRequestWorkStatus {

@@ -164,6 +164,8 @@ describe('buildDashboardData', () => {
       'work_status_waiting_interview',
       'work_status_waiting_result',
       'work_status_waiting_start',
+      'work_status_daily_work',
+      'work_status_daily_pay',
     ]);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(62);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(62);

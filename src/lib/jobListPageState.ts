@@ -6,7 +6,8 @@ import {
 } from '@/lib/unitRequestWorkStatus';
 
 export type JobListFilter = 'all' | 'active' | 'closed';
-export type JobListWorkStatusFilter = 'all' | UnitRequestWorkStatus;
+/** ตัวกรองสถานะทำงาน — เลือกหลายสถานะพร้อมกันได้, [] = ทั้งหมด */
+export type JobListWorkStatusFilter = UnitRequestWorkStatus[];
 
 export type JobListPageState = {
   filter: JobListFilter;
@@ -39,7 +40,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   screenerFilter: 'all',
   oplFilter: 'all',
   urgencyFilter: 'all',
-  workStatusFilter: 'all',
+  workStatusFilter: [],
   noteFilter: 'all',
   replacementFilter: 'all',
   ageDaysFilter: 'all',
@@ -81,11 +82,11 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     ageRaw === '8-14' ? '8-15' : ageRaw === '15-30' ? '16-30' : ageRaw
   ) as AgeDaysFilter;
   const sortRaw = (params.get('sort') || JOB_LIST_DEFAULTS.sort) as JobListSort;
-  const workStatusRaw = params.get('ws') || JOB_LIST_DEFAULTS.workStatusFilter;
-  const workStatusFilter: JobListWorkStatusFilter =
-    workStatusRaw === 'all' || isUnitRequestWorkStatus(workStatusRaw)
-      ? workStatusRaw
-      : JOB_LIST_DEFAULTS.workStatusFilter;
+  // รองรับทั้งค่าเดี่ยวแบบเดิม (ws=waiting_start) และหลายค่า (ws=a,b,c) — 'all'/ค่าเพี้ยนถูกตัดทิ้ง
+  const workStatusFilter: JobListWorkStatusFilter = (params.get('ws') || '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(isUnitRequestWorkStatus);
 
   return {
     filter,
@@ -122,8 +123,8 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   if (state.screenerFilter !== JOB_LIST_DEFAULTS.screenerFilter) params.set('sc', state.screenerFilter);
   if (state.oplFilter !== JOB_LIST_DEFAULTS.oplFilter) params.set('opl', state.oplFilter);
   if (state.urgencyFilter !== JOB_LIST_DEFAULTS.urgencyFilter) params.set('urg', state.urgencyFilter);
-  if (state.workStatusFilter !== JOB_LIST_DEFAULTS.workStatusFilter) {
-    params.set('ws', state.workStatusFilter);
+  if (state.workStatusFilter.length > 0) {
+    params.set('ws', state.workStatusFilter.join(','));
   }
   if (state.noteFilter !== JOB_LIST_DEFAULTS.noteFilter) params.set('nf', state.noteFilter);
   if (state.replacementFilter !== JOB_LIST_DEFAULTS.replacementFilter) {

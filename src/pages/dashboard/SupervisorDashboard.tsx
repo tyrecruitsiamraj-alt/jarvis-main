@@ -383,6 +383,8 @@ const SupervisorDashboard: React.FC = () => {
           work_status_waiting_interview: 'waiting_interview',
           work_status_waiting_result: 'waiting_result',
           work_status_waiting_start: 'waiting_start',
+          work_status_daily_work: 'daily_work',
+          work_status_daily_pay: 'daily_pay',
         };
         const target = statusMap[kpiId];
         if (kpiId in statusMap) {

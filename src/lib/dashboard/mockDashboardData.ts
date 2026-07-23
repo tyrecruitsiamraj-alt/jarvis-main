@@ -95,6 +95,8 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'work_status_waiting_interview', label: 'รอสัมภาษณ์', value: 5, secondaryCount: 4, secondaryLabel: 'ใบขอ', description: '5 อัตรา · 4 ใบ', trendPercent: null },
     { id: 'work_status_waiting_result', label: 'รอผลสัมภาษณ์', value: 2, secondaryCount: 2, secondaryLabel: 'ใบขอ', description: '2 อัตรา · 2 ใบ', trendPercent: null },
     { id: 'work_status_waiting_start', label: 'รอเริ่มงาน', value: 3, secondaryCount: 2, secondaryLabel: 'ใบขอ', description: '3 อัตรา · 2 ใบ', trendPercent: null },
+    { id: 'work_status_daily_work', label: 'งานรายวัน', value: 2, secondaryCount: 1, secondaryLabel: 'ใบขอ', description: '2 อัตรา · 1 ใบ', trendPercent: null },
+    { id: 'work_status_daily_pay', label: 'จ่ายรายวัน', value: 1, secondaryCount: 1, secondaryLabel: 'ใบขอ', description: '1 อัตรา · 1 ใบ', trendPercent: null },
   ],
   requestControlSummary: summary,
   flowView,

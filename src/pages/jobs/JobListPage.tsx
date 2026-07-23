@@ -6,6 +6,7 @@ import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import SearchField from '@/components/shared/SearchField';
 import { FilterSelect } from '@/components/shared/FilterSelect';
+import { FilterMultiSelect } from '@/components/shared/FilterMultiSelect';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
@@ -321,8 +322,8 @@ const JobListPage: React.FC = () => {
         if (!matchesOplFilter(j, oplFilter)) return false;
         if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
         if (
-          workStatusFilter !== 'all' &&
-          resolveUnitRequestWorkStatus(j.work_status) !== workStatusFilter
+          workStatusFilter.length > 0 &&
+          !workStatusFilter.includes(resolveUnitRequestWorkStatus(j.work_status))
         ) {
           return false;
         }
@@ -587,19 +588,16 @@ const JobListPage: React.FC = () => {
             ))}
           </FilterSelect>
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-work-status"
-            label="สถานะทำงาน"
-            value={workStatusFilter}
+            label="สถานะทำงาน (เลือกได้หลายค่า)"
+            values={workStatusFilter}
             onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
-          >
-            <option value="all">ทั้งหมด</option>
-            {UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>
-                {UNIT_REQUEST_WORK_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </FilterSelect>
+            options={UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => ({
+              value: status,
+              label: UNIT_REQUEST_WORK_STATUS_LABELS[status],
+            }))}
+          />
 
           <FilterSelect
             id="job-list-note-filter"
