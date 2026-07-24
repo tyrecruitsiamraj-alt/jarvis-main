@@ -8,6 +8,8 @@ import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { listProposalsForJobs } from '../_lib/candidateProposals.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
+import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
+import { isBoardCandidateAvailable } from '@/lib/boardMatchAvailability';
 import {
   attachAssignments,
   attachNotes,
@@ -57,11 +59,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
     await attachWorkStatus(raw);
     const jobs = enrichJobsWithUrgency(raw as JobRequest[]);
 
-    // ข้อมูลประกอบตัวกรองจาก PG: การจองตัว + ผล AI ที่เคยคิดเก็บไว้
-    const [proposalMap, tierMap] = await Promise.all([
+    // ข้อมูลประกอบตัวกรองจาก PG: การจองตัว + ผล AI ที่เคยคิดเก็บไว้ + ความพร้อมของคนของเรา
+    const [proposalMap, tierMap, availCtx] = await Promise.all([
       listProposalsForJobs(jobs.map((j) => j.id)),
       loadBoardMatchTierMap(),
+      loadBoardAvailabilityContext(),
     ]);
+
+    // กรองผลที่เก็บไว้ให้เหลือเฉพาะ "คนที่ยังพร้อม" ก่อนนับป้าย/summary/workflow filter
+    // (คนที่ถูกดึงไปใบอื่น/หลุด pool จะไม่ถูกนับ — ตรงกับที่หน้า detail แสดง)
+    for (const [jobId, entry] of tierMap) {
+      entry.tiers = entry.tiers.filter((t) => isBoardCandidateAvailable(t.cardId, jobId, availCtx));
+    }
 
     const query = {
       search: getQuery(req, 'q'),

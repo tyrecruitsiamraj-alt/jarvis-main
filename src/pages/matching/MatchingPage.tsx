@@ -618,6 +618,8 @@ const MatchingPage: React.FC = () => {
   // #5 pre-warm AI งานด่วนเบื้องหลัง
   const [prewarming, setPrewarming] = useState(false);
   const prewarmStartedRef = useRef(false);
+  // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วทับผลเดิม + เสีย ~30-90 วิต่อใบ
+  const [rematchConfirmJobId, setRematchConfirmJobId] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?pool=1')
@@ -1797,7 +1799,7 @@ const MatchingPage: React.FC = () => {
                   <button
                     type="button"
                     disabled={boardLoadingId === jobDetail.id}
-                    onClick={() => void fetchBoardMatch(jobDetail.id, true)}
+                    onClick={() => setRematchConfirmJobId(jobDetail.id)}
                     className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60"
                   >
                     <RefreshCw className={cn('h-3 w-3', boardLoadingId === jobDetail.id && 'animate-spin')} />
@@ -2782,6 +2784,46 @@ const MatchingPage: React.FC = () => {
               </div>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* ยืนยันก่อนค้นหาใหม่ (Rematching) — คิด AI ใหม่ทับผลเดิม ใช้เวลาสักครู่ */}
+      <Dialog open={!!rematchConfirmJobId} onOpenChange={(o) => !o && setRematchConfirmJobId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">ค้นหาใหม่ด้วย AI?</DialogTitle>
+            <DialogDescription className="sr-only">
+              ยืนยันให้ AI ประเมินและจัดอันดับคนของเราสำหรับใบขอนี้ใหม่
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-foreground">
+              ให้ AI ประเมินคนของเราสำหรับใบขอนี้ใหม่ทั้งหมด — จะใช้เวลาประมาณ 30–90 วินาที และผลใหม่จะทับผลเดิมที่เก็บไว้
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ถ้าไม่ต้องการคิดใหม่ ระบบจะคงผลเดิมไว้ (แสดงเฉพาะคนที่ยังพร้อม)
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRematchConfirmJobId(null)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = rematchConfirmJobId;
+                  setRematchConfirmJobId(null);
+                  if (id) void fetchBoardMatch(id, true);
+                }}
+                className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+              >
+                <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

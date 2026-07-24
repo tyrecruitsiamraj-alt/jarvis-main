@@ -8,9 +8,11 @@ import {
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
-import { matchBoardCandidatesForJob } from '../_lib/boardCandidateMatcher.js';
+import { matchBoardCandidatesForJob, type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
 import { listBoardReadyCandidates } from '../_lib/boardCandidatesSql.js';
+import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
+import { filterAvailableBoardMatches } from '@/lib/boardMatchAvailability';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -63,12 +65,26 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const refresh = getQuery(req, 'refresh') === '1';
 
+    // กรองผล (snapshot) ให้เหลือเฉพาะคนที่ "ยังพร้อม" ณ ตอนนี้ — ไม่คิด AI ใหม่, ไม่แตะ snapshot
+    // คนที่ถูกจอง/ลงงานที่ใบอื่น หรือหลุดจาก pool รอลงงานแล้ว จะหายจากผลไปเอง
+    const withAvailability = async (result: BoardMatchResult, computedAt: string, fromStore: boolean) => {
+      const availCtx = await loadBoardAvailabilityContext();
+      const matches = filterAvailableBoardMatches(result.matches, jobId, availCtx);
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({
+        ...result,
+        matches,
+        hidden_unavailable: result.matches.length - matches.length,
+        computed_at: computedAt,
+        from_store: fromStore,
+      });
+    };
+
     // ไม่ได้สั่งคำนวณใหม่ → เสิร์ฟผลที่เคยคิดเก็บไว้ทันที (ข้าม LLM)
     if (!refresh) {
       const stored = await getStoredBoardMatch(jobId);
       if (stored) {
-        res.setHeader?.('Cache-Control', 'no-store');
-        return res.status(200).json({ ...stored.result, computed_at: stored.computedAt, from_store: true });
+        return withAvailability(stored.result, stored.computedAt, true);
       }
     }
 
@@ -76,8 +92,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       refresh,
     });
 
-    res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json({ ...result, computed_at: new Date().toISOString(), from_store: false });
+    return withAvailability(result, new Date().toISOString(), false);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (/เชื่อมต่อ Ollama|ตั้งค่า OLLAMA|ไม่พบโมเดล|ตอบกลับว่าง|ใช้เวลานานเกินไป/i.test(message)) {
