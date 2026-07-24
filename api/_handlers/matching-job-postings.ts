@@ -15,6 +15,9 @@ import {
   normalizeJobPostingStatus,
   normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
+import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
+
+const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -31,6 +34,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     try {
       const jobId = getQuery(req, 'jobId') || getQuery(req, 'job_id');
       if (jobId.trim()) {
+        if (!(await isSiamrajRequestInScope(req.user, jobId))) {
+          return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+        }
         const item = await getActiveJobPostingForJob(jobId);
         return res.status(200).json({ item });
       }
@@ -51,6 +57,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const body = raw as Record<string, unknown>;
       const jobId = getString(body.job_id) || getString(body.jobId);
       if (!jobId) return sendError(res, 400, 'Bad request', 'job_id is required');
+      if (!(await isSiamrajRequestInScope(req.user, jobId))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
 
       const rawSnapshot = body.job_snapshot ?? body.jobSnapshot;
       const item = await createJobPostingRequest({

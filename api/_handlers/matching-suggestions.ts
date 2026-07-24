@@ -6,6 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { buildMatchingSuggestions } from '../_lib/matchingEngine.js';
+import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -29,6 +30,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const jobId = getQuery(req, 'jobId') || getQuery(req, 'job_id');
     if (!jobId) {
       return sendError(res, 400, 'Bad request', 'jobId is required');
+    }
+    if (!(await isSiamrajRequestInScope(req.user, jobId))) {
+      return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น');
     }
 
     const owner = getQuery(req, 'owner') || undefined;
