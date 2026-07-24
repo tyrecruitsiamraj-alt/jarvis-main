@@ -45,6 +45,7 @@ jobs:
                       ./scripts/sync-env.sh .env IRECRUIT_DB_PASSWORD "${{ secrets.IRECRUIT_DB_PASSWORD }}"
                       ./scripts/sync-env.sh .env IRECRUIT_DB_NAME "${{ secrets.IRECRUIT_DB_NAME }}"
                       ./scripts/sync-env.sh .env RECRUIT_REGISTER_OWNER "${{ secrets.RECRUIT_REGISTER_OWNER }}"
+                      ./scripts/sync-env.sh .env MATCH_PRECOMPUTE_ENABLED "true"
                       docker compose up -d --build
                       docker compose exec -T app npm run db:migrate
                       docker compose exec -T app npx tsx scripts/verify-api-registry.mjs
