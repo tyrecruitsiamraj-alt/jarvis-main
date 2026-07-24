@@ -34,6 +34,7 @@ import jobApplicationDocumentHandler from './job-application-document.js';
 import shortLinksHandler from './short-links.js';
 import shortLinksResolveHandler from './short-links-resolve.js';
 import requestControlForecastHandler from './request-control-forecast.js';
+import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
 import appFeedbackHandler from './app-feedback.js';
 import driverCareHandler from './driver-care.js';
@@ -116,6 +117,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/short-links': shortLinksHandler as ApiHandler,
   '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,
   '/api/request-control/demand-forecast': requestControlForecastHandler as ApiHandler,
+  '/api/matching/list': matchingListHandler as ApiHandler,
   '/api/auth/login': loginHandler as ApiHandler,
   '/api/auth/dev-role': devRoleHandler as ApiHandler,
   '/api/auth/logout': logoutHandler as ApiHandler,

@@ -9,6 +9,7 @@ import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchBoardCandidatesForJob } from '../_lib/boardCandidateMatcher.js';
+import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
 import { listBoardReadyCandidates } from '../_lib/boardCandidatesSql.js';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -61,12 +62,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const refresh = getQuery(req, 'refresh') === '1';
+
+    // ไม่ได้สั่งคำนวณใหม่ → เสิร์ฟผลที่เคยคิดเก็บไว้ทันที (ข้าม LLM)
+    if (!refresh) {
+      const stored = await getStoredBoardMatch(jobId);
+      if (stored) {
+        res.setHeader?.('Cache-Control', 'no-store');
+        return res.status(200).json({ ...stored.result, computed_at: stored.computedAt, from_store: true });
+      }
+    }
+
     const result = await matchBoardCandidatesForJob(jobId, job as Record<string, unknown>, {
       refresh,
     });
 
     res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json(result);
+    return res.status(200).json({ ...result, computed_at: new Date().toISOString(), from_store: false });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (/เชื่อมต่อ Ollama|ตั้งค่า OLLAMA|ไม่พบโมเดล|ตอบกลับว่าง|ใช้เวลานานเกินไป/i.test(message)) {

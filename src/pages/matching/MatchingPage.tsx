@@ -22,6 +22,7 @@ import {
   requestPositionCount,
 } from '@/lib/matchingProgress';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
+import { filterAndSortMatchingJobs, type MatchingWorkflowFilter } from '@/lib/matchingListFilter';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   saveProposal,
@@ -73,7 +74,7 @@ type ProposedRef = {
   reason: string | null;
   updatedAt: string;
 };
-type WorkflowFilter = 'all' | 'sla' | 'green' | 'yellow' | 'none' | 'reserved';
+type WorkflowFilter = MatchingWorkflowFilter;
 type ProposalActionDraft = {
   candidateName: string;
   status: ProposalStatus;
@@ -115,6 +116,8 @@ type IrecruitDisplayRow =
       branchName: string | null;
     };
 const MATCHING_AI_PREWARM_ENABLED = import.meta.env.VITE_MATCHING_AI_PREWARM_ENABLED === 'true';
+/** ลิสต์ใบขอแบบ server-side pagination (ปิดกลับเป็น client เดิมได้ด้วย env = rollback) */
+const MATCHING_SERVER_LIST_ENABLED = import.meta.env.VITE_MATCHING_SERVER_LIST !== 'false';
 const MATCHING_LIST_BATCH_SIZE = 60;
 
 function branchDemandItems(job: JobRequest): BranchDemandItem[] {
@@ -494,6 +497,76 @@ const MatchingPage: React.FC = () => {
   const [visibleJobLimit, setVisibleJobLimit] = useState(MATCHING_LIST_BATCH_SIZE);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
   const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
+
+  // ── server-side pagination ของลิสต์ (/api/matching/list) — กรอง/เรียง/แบ่งหน้าที่ server
+  const [serverItems, setServerItems] = useState<JobRequest[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverPageNo, setServerPageNo] = useState(1);
+  const [serverUnitOptions, setServerUnitOptions] = useState<string[]>([]);
+  const [serverSummary, setServerSummary] = useState<{
+    urgentTotal: number;
+    urgentAnalyzed: number;
+    urgentWithGreen: number;
+  } | null>(null);
+  const [serverStoredMatches, setServerStoredMatches] = useState<
+    Record<string, { recommended: number; computedAt: string }>
+  >({});
+  const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
+  const [serverListError, setServerListError] = useState<string | null>(null);
+  const serverFetchSeq = useRef(0);
+
+  const fetchServerPage = async (page: number, append: boolean) => {
+    const seq = ++serverFetchSeq.current;
+    setServerListLoading(true);
+    setServerListError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(MATCHING_LIST_BATCH_SIZE),
+      });
+      const q = search.trim();
+      if (q) params.set('q', q);
+      if (urgentOnly) params.set('urgent', '1');
+      if (unitFilter) params.set('unit', unitFilter);
+      if (workflowFilter !== 'all') params.set('workflow', workflowFilter);
+      const r = await apiFetch(`/api/matching/list?${params.toString()}`);
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { message?: string };
+        throw new Error(body.message || `โหลดรายการไม่สำเร็จ (HTTP ${r.status})`);
+      }
+      const data = (await r.json()) as {
+        items: JobRequest[];
+        total: number;
+        page: number;
+        unitOptions?: string[];
+        summary?: { urgentTotal: number; urgentAnalyzed: number; urgentWithGreen: number };
+        storedMatches?: Record<string, { recommended: number; computedAt: string }>;
+      };
+      if (seq !== serverFetchSeq.current) return;
+      setServerItems((prev) => (append ? [...prev, ...data.items] : data.items));
+      setServerTotal(data.total);
+      setServerPageNo(data.page);
+      if (data.unitOptions?.length) setServerUnitOptions(data.unitOptions);
+      if (data.summary) setServerSummary(data.summary);
+      setServerStoredMatches((prev) =>
+        append ? { ...prev, ...(data.storedMatches ?? {}) } : (data.storedMatches ?? {}),
+      );
+    } catch (e) {
+      if (seq === serverFetchSeq.current) {
+        setServerListError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
+      }
+    } finally {
+      if (seq === serverFetchSeq.current) setServerListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!MATCHING_SERVER_LIST_ENABLED) return;
+    // debounce เฉพาะตอนพิมพ์ค้นหา — เปลี่ยน filter อื่นยิงทันที
+    const t = window.setTimeout(() => void fetchServerPage(1, false), search.trim() ? 350 : 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, urgentOnly, unitFilter, workflowFilter]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
@@ -1167,60 +1240,47 @@ const MatchingPage: React.FC = () => {
     }
   };
 
-  const unitOptions = useMemo(
-    () => [
+  const unitOptions = useMemo(() => {
+    const names =
+      MATCHING_SERVER_LIST_ENABLED && serverUnitOptions.length > 0
+        ? serverUnitOptions
+        : Array.from(new Set(jobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b),
+          );
+    return [
       { value: '', label: '— ทุกหน่วยงาน —' },
-      ...Array.from(new Set(jobs.map((j) => j.unit_name).filter(Boolean)))
-        .sort((a, b) => a.localeCompare(b))
-        .map((name) => ({ value: name, label: name })),
-    ],
-    [jobs],
+      ...names.map((name) => ({ value: name, label: name })),
+    ];
+  }, [jobs, serverUnitOptions]);
+
+  const clientRows = useMemo(
+    () =>
+      MATCHING_SERVER_LIST_ENABLED
+        ? []
+        : filterAndSortMatchingJobs(
+            jobs,
+            { search, urgentOnly, unitFilter, workflowFilter },
+            {
+              hasReserved: (jobId) =>
+                (proposalsByJobId[jobId] ?? []).some((item) => item.status === 'reserved'),
+              matchesFor: (jobId) => boardMatchById[jobId]?.matches,
+            },
+          ),
+    [jobs, search, urgentOnly, unitFilter, workflowFilter, proposalsByJobId, boardMatchById],
   );
 
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return jobs
-      .filter((j) => (urgentOnly ? j.urgency === 'urgent' : true))
-      .filter((j) => (unitFilter ? j.unit_name === unitFilter : true))
-      .filter((j) => (q ? unitRequestSearchBlob(j).includes(q) : true))
-      .filter((j) => {
-        if (workflowFilter === 'all') return true;
-        if (workflowFilter === 'sla') {
-          const status = jobToRequestControlRecord(j).slaStatus;
-          return status === 'at_risk' || status === 'breached';
-        }
-        if (workflowFilter === 'reserved') {
-          return (proposalsByJobId[j.id] ?? []).some((item) => item.status === 'reserved');
-        }
-        const matches = boardMatchById[j.id]?.matches;
-        if (!matches) return false;
-        if (workflowFilter === 'green') return matches.some((match) => match.tier === 'green');
-        if (workflowFilter === 'yellow') {
-          return !matches.some((match) => match.tier === 'green') && matches.some((match) => match.tier === 'yellow');
-        }
-        return recommendedCandidateCount(matches) === 0;
-      })
-      .sort((a, b) => {
-        // SLA เกิน/เสี่ยงขึ้นก่อน ตามด้วยงานด่วนและวันที่ต้องการเร็วสุด
-        const slaRank = (job: JobRequest) => {
-          const status = jobToRequestControlRecord(job).slaStatus;
-          return status === 'breached' ? 0 : status === 'at_risk' ? 1 : 2;
-        };
-        const sa = slaRank(a);
-        const sb = slaRank(b);
-        if (sa !== sb) return sa - sb;
-        const ua = a.urgency === 'urgent' ? 0 : 1;
-        const ub = b.urgency === 'urgent' ? 0 : 1;
-        if (ua !== ub) return ua - ub;
-        return (a.required_date || '').localeCompare(b.required_date || '');
-      });
-  }, [jobs, search, urgentOnly, unitFilter, workflowFilter, proposalsByJobId, boardMatchById]);
+  // server mode: รายการถูกกรอง/เรียง/แบ่งหน้ามาจาก server แล้ว (สะสมทีละหน้า)
+  const rows = MATCHING_SERVER_LIST_ENABLED ? serverItems : clientRows;
+  const listTotal = MATCHING_SERVER_LIST_ENABLED ? serverTotal : clientRows.length;
 
   useEffect(() => {
     setVisibleJobLimit(MATCHING_LIST_BATCH_SIZE);
   }, [search, urgentOnly, unitFilter, workflowFilter]);
 
-  const visibleRows = useMemo(() => rows.slice(0, visibleJobLimit), [rows, visibleJobLimit]);
+  const visibleRows = useMemo(
+    () => (MATCHING_SERVER_LIST_ENABLED ? rows : rows.slice(0, visibleJobLimit)),
+    [rows, visibleJobLimit],
+  );
 
   // นับ "คนของเราน่าจะตรง" ต่อใบขอแบบเบา (ไม่เรียก AI) โชว์ตั้งแต่หน้าแรก
   // #6 แม่นขึ้น: classify ใบขอเข้า job family ก่อน แล้วนับผู้สมัครที่สกิลอยู่ family เดียวกัน
@@ -1258,6 +1318,15 @@ const MatchingPage: React.FC = () => {
   // #4 dashboard เล็ก — แยกคำแนะนำ AI ออกจากสถานะจอง/ลงงานจริง
   // ถ้าวิเคราะห์แล้วให้นับเฉพาะสีเขียว; ถ้ายังไม่วิเคราะห์ใช้ quick count และติดป้ายว่าเป็นประมาณการ
   const urgentSummary = useMemo(() => {
+    if (MATCHING_SERVER_LIST_ENABLED && serverSummary) {
+      // server mode: นับจากผล AI ที่เก็บถาวรทั้งชุด (ครอบคลุมทุกใบ ไม่ใช่แค่หน้าที่โหลด)
+      return {
+        total: serverSummary.urgentTotal,
+        greenSuggested: serverSummary.urgentWithGreen,
+        none: serverSummary.urgentTotal - serverSummary.urgentWithGreen,
+        analyzedCount: serverSummary.urgentAnalyzed,
+      };
+    }
     const urgent = rows.filter((j) => j.urgency === 'urgent');
     let greenSuggested = 0;
     let analyzedCount = 0;
@@ -1270,7 +1339,7 @@ const MatchingPage: React.FC = () => {
       if (hasGreenSuggestion) greenSuggested++;
     }
     return { total: urgent.length, greenSuggested, none: urgent.length - greenSuggested, analyzedCount };
-  }, [rows, quickCounts, boardMatchById]);
+  }, [rows, quickCounts, boardMatchById, serverSummary]);
 
   const closeJob = () => {
     setJobDetail(null);
@@ -1373,9 +1442,9 @@ const MatchingPage: React.FC = () => {
 
         <div className="flex items-center gap-2 px-1">
           <p className="text-sm text-muted-foreground">
-            ใบขอ <span className="text-blue-600 font-bold tabular-nums">{rows.length}</span> รายการ
-            {rows.length > visibleRows.length ? ` · แสดง ${visibleRows.length} รายการแรก` : ''}
-            {loadingJobs ? ' · กำลังโหลด…' : ''}
+            ใบขอ <span className="text-blue-600 font-bold tabular-nums">{listTotal}</span> รายการ
+            {listTotal > visibleRows.length ? ` · แสดง ${visibleRows.length} รายการแรก` : ''}
+            {loadingJobs || serverListLoading ? ' · กำลังโหลด…' : ''}
           </p>
           <p className="text-xs text-muted-foreground">· เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง</p>
           {prewarming ? (
@@ -1387,7 +1456,12 @@ const MatchingPage: React.FC = () => {
 
         {/* การ์ดรวมใบขอ */}
         <div className="space-y-2.5">
-          {rows.length === 0 && !loadingJobs ? (
+          {serverListError ? (
+            <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600">
+              {serverListError} — ลองรีเฟรชหน้า
+            </p>
+          ) : null}
+          {rows.length === 0 && !loadingJobs && !serverListLoading ? (
             <div className="glass-card rounded-2xl p-8 border border-white/70 text-center text-muted-foreground">
               <Search className="w-8 h-8 text-blue-400/60 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground">ไม่พบใบขอตามเงื่อนไข</p>
@@ -1396,7 +1470,9 @@ const MatchingPage: React.FC = () => {
           {visibleRows.map((j) => {
             const matchCount = boardMatchById[j.id]
               ? recommendedCandidateCount(boardMatchById[j.id].matches)
-              : undefined;
+              : serverStoredMatches[j.id]
+                ? serverStoredMatches[j.id].recommended
+                : undefined;
             const progress = proposalCounts(proposalsByJobId[j.id]);
             const requested = requestPositionCount(j);
             const remaining = officialRemainingCount(j);
@@ -1474,13 +1550,20 @@ const MatchingPage: React.FC = () => {
               </div>
             );
           })}
-          {visibleRows.length < rows.length ? (
+          {visibleRows.length < listTotal ? (
             <button
               type="button"
-              onClick={() => setVisibleJobLimit((current) => current + MATCHING_LIST_BATCH_SIZE)}
-              className="mx-auto flex min-h-[44px] items-center justify-center rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50"
+              disabled={serverListLoading}
+              onClick={() =>
+                MATCHING_SERVER_LIST_ENABLED
+                  ? void fetchServerPage(serverPageNo + 1, true)
+                  : setVisibleJobLimit((current) => current + MATCHING_LIST_BATCH_SIZE)
+              }
+              className="mx-auto flex min-h-[44px] items-center justify-center rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-50"
             >
-              แสดงเพิ่มอีก {Math.min(MATCHING_LIST_BATCH_SIZE, rows.length - visibleRows.length)} รายการ
+              {serverListLoading
+                ? 'กำลังโหลด…'
+                : `แสดงเพิ่มอีก ${Math.min(MATCHING_LIST_BATCH_SIZE, listTotal - visibleRows.length).toLocaleString()} รายการ`}
             </button>
           ) : null}
         </div>

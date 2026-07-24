@@ -145,6 +145,15 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 * `src/components/dashboard/analytics/DashboardChartSection.tsx` — flag switch (VITE_REQUEST_CONTROL_FORECAST_ENABLED !== 'false'; ปิด flag = ตาราง Life Cycle เดิม)
 * `tests/api/demandForecast.test.ts` — aggregation + forecast contract tests
 
+## Matching list server-side pagination (zero-drift)
+
+* `src/lib/matchingListFilter.ts` — filter+sort ของลิสต์ Matching เป็น pure fn ชุดเดียว รันทั้ง client และ server (ห้าม logic แตกกัน — แก้ที่นี่ที่เดียว)
+* `api/_handlers/matching-list.ts` — GET /api/matching/list: ท่อเดียวกับ feed หลัก (fetch+attach) + enrich + proposals/stored-matches จาก PG + shared filter/sort + slice; คืน items/total/unitOptions/summary/storedMatches
+* `api/_lib/boardMatchStore.ts` + `migrations/057_board_match_results.sql` — ผล AI แมทเก็บถาวร (write-through ใน boardCandidateMatcher; endpoint เดี่ยวเสิร์ฟจาก store เมื่อไม่ refresh)
+* `src/pages/matching/MatchingPage.tsx` — flag `VITE_MATCHING_SERVER_LIST` (default on; ตั้ง 'false' = กลับ client เดิม)
+* `tests/api/matchingListFilter.test.ts` — contract ของ pipeline กลาง
+* หมายเหตุ: api import src ผ่าน `@/` ได้ (tsx + Vercel build ตรวจแล้วผ่านทั้งคู่)
+
 ## Public applications from /apply
 
 * `migrations/048_public_job_applications.sql` — application table

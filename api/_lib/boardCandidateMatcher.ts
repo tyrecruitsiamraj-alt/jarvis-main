@@ -8,6 +8,7 @@ import {
   type CandidateSpecAnalysis,
 } from './candidateSpecAnalyzer.js';
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
+import { saveBoardMatchResult } from './boardMatchStore.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -201,7 +202,7 @@ export async function matchBoardCandidatesForJob(
   const scoreById = new Map(shortlistItems.map((x) => [x.c.card_id, x.s]));
 
   if (shortlist.length === 0) {
-    return {
+    const empty: BoardMatchResult = {
       jobId,
       request_no: spec.request_no,
       job_family_code: spec.job_family_code,
@@ -210,6 +211,8 @@ export async function matchBoardCandidatesForJob(
       shortlisted: 0,
       matches: [],
     };
+    await saveBoardMatchResult(jobId, empty);
+    return empty;
   }
 
   const { system, user } = buildMatchPrompt(spec, jobTitle, job, shortlist);
@@ -260,7 +263,7 @@ export async function matchBoardCandidatesForJob(
     });
   }
 
-  return {
+  const result: BoardMatchResult = {
     jobId,
     request_no: spec.request_no,
     job_family_code: spec.job_family_code,
@@ -269,4 +272,6 @@ export async function matchBoardCandidatesForJob(
     shortlisted: shortlist.length,
     matches,
   };
+  await saveBoardMatchResult(jobId, result);
+  return result;
 }

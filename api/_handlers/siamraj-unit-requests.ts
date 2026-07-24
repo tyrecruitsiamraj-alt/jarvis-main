@@ -31,7 +31,7 @@ function getQuery(req: AuthedReq, key: string): string {
  * แปะผู้รับผิดชอบ (สรรหา/คัดสรร) จาก PostgreSQL ลงในใบขอที่อ่านมาจาก Siamraj (read-only)
  * เป็นข้อมูลเสริม — ถ้าดึงจาก PG ไม่ได้ ปล่อยผ่านโดยไม่ทำให้ feed ล่ม
  */
-async function attachAssignments(items: unknown[]): Promise<void> {
+export async function attachAssignments(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
     String(it.request_no || it.externalId || it.id || '').trim();
@@ -52,7 +52,7 @@ async function attachAssignments(items: unknown[]): Promise<void> {
   }
 }
 
-async function attachNotes(items: unknown[]): Promise<void> {
+export async function attachNotes(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
     String(it.request_no || it.externalId || it.id || '').trim();
@@ -82,7 +82,7 @@ async function attachNotes(items: unknown[]): Promise<void> {
   }
 }
 
-async function attachWorkStatus(items: unknown[]): Promise<void> {
+export async function attachWorkStatus(items: unknown[]): Promise<void> {
   const list = items as Array<Record<string, unknown>>;
   const keyOf = (it: Record<string, unknown>) =>
     String(it.request_no || it.externalId || it.id || '').trim();
