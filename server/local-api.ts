@@ -13,6 +13,7 @@ import { apiRoutes } from '../api/_handlers/registry.ts';
 import { logError, logInfo, logWarn } from '../api/_lib/logger.ts';
 import { applyCorsHeaders } from '../api/_lib/cors.ts';
 import { isProductionRuntime } from '../api/_lib/runtime.ts';
+import { startMatchPrecomputeWorker } from '../api/_lib/matchPrecomputeWorker.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
 type VercelLikeRes = {
@@ -176,4 +177,6 @@ const server = createServer(async (req, res) => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`[jarvis] Local API (no Vercel)  http://127.0.0.1:${port}`);
   console.log(`[jarvis] เปิด Vite ด้วย npm run dev — proxy /api → พอร์ต ${port}`);
+  // Background precompute (on-prem process เท่านั้น) — ปิดโดยดีฟอลต์ เปิดด้วย MATCH_PRECOMPUTE_ENABLED
+  startMatchPrecomputeWorker();
 });
