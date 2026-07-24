@@ -76,22 +76,43 @@ const LoginPage: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // โหลด config พร้อม retry — เดิม fetch ครั้งเดียวแล้วเงียบ ทำให้หน้า Login
+  // ค้าง "กำลังโหลด" ตลอดถ้าจังหวะนั้น API ยังไม่พร้อม (เช่น server เพิ่ง restart)
+  const [configError, setConfigError] = useState(false);
+  const [configAttempt, setConfigAttempt] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
+    let timer: number | undefined;
     (async () => {
-      try {
-        const r = await apiFetch('/api/auth/config');
-        if (!r.ok || cancelled) return;
-        const data = (await r.json()) as AuthConfig;
-        if (!cancelled) setAuthConfig(data);
-      } catch {
-        /* optional config */
+      for (let attempt = 1; attempt <= 3 && !cancelled; attempt++) {
+        try {
+          const r = await apiFetch('/api/auth/config');
+          if (cancelled) return;
+          if (r.ok) {
+            const data = (await r.json()) as AuthConfig;
+            if (!cancelled) {
+              setAuthConfig(data);
+              setConfigError(false);
+            }
+            return;
+          }
+        } catch {
+          /* ลองใหม่ */
+        }
+        if (attempt < 3) {
+          await new Promise((resolve) => {
+            timer = window.setTimeout(resolve, 1500 * attempt);
+          });
+        }
       }
+      if (!cancelled) setConfigError(true);
     })();
     return () => {
       cancelled = true;
+      if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [configAttempt]);
 
   const emailPlaceholder = useMemo(() => {
     const domain = authConfig?.allowedDomains?.[0];
@@ -224,8 +245,24 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {authConfig === null ? (
-              <p className="text-sm text-muted-foreground text-center py-6">กำลังโหลด…</p>
+            {authConfig === null && configError ? (
+              <div className="space-y-3 py-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบว่า API ทำงานอยู่แล้วลองใหม่
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfigError(false);
+                    setConfigAttempt((n) => n + 1);
+                  }}
+                  className="jarvis-pill-btn mx-auto px-6 py-2.5 text-sm font-semibold"
+                >
+                  ลองอีกครั้ง
+                </button>
+              </div>
+            ) : authConfig === null ? (
+              <p className="text-sm text-muted-foreground text-center py-6 animate-pulse">กำลังโหลด…</p>
             ) : (
               <>
             <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
