@@ -7,7 +7,6 @@ import {
 } from '../_lib/http.js';
 import {
   getSiamrajDbSource,
-  getSiamrajSchema,
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
   listSiamrajThroughput,
@@ -114,13 +113,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     if (method === 'GET' && getQuery(req, 'meta') === '1') {
+      // ⚠ ห้ามคืนรายละเอียด infra (host/IP ของ DB, ชื่อ database, schema) ให้ client —
+      // เป็นข้อมูล reconnaissance ให้ผู้โจมตี และ frontend ไม่ได้ใช้ค่าพวกนี้เลย
+      // คืนแค่ "ต่อ SQL Server ได้ไหม" เป็น boolean พอ
       return res.status(200).json({
         enabled: isSiamrajUnitRequestsEnabled(),
         dbSource: getSiamrajDbSource(),
-        schema: getSiamrajSchema(),
-        sqlServer: getSiamrajSqlServerConfig()
-          ? { host: getSiamrajSqlServerConfig()?.server, database: getSiamrajSqlServerConfig()?.database }
-          : null,
+        sqlServerConfigured: !!getSiamrajSqlServerConfig(),
         postgresFallback: false,
         readOnly: true,
         mode: process.env.SIAMRAJ_UNIT_REQUESTS_MODE || 'staffing_queue',
