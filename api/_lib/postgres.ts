@@ -1,5 +1,6 @@
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import { getDatabaseUrl, getPgSchema, isPgSslEnabled } from './env.js';
+import { logError } from './logger.js';
 
 type PoolState = {
   pool: Pool | null;
@@ -28,6 +29,14 @@ function getOrCreatePool(): Pool {
         }
       : undefined,
     max: process.env.PG_MAX ? Number(process.env.PG_MAX) : 10,
+  });
+
+  // ⚠ ต้องมี listener 'error' เสมอ — idle client ใน pool ที่โดน backend ตัด/ECONNRESET จะ emit
+  // 'error' ที่ระดับ pool; ถ้าไม่มี listener Node จะถือเป็น unhandled แล้ว crash ทั้ง process
+  // (เจอบ่อยขึ้นเมื่อมี worker ที่ idle ยาวระหว่างรอบ) — log แล้วกลืน; pool จะทิ้ง client เสีย
+  // แล้วสร้างใหม่ให้เองในรอบ query ถัดไป
+  pool.on('error', (err) => {
+    logError('pg.pool.idle_error', { message: err instanceof Error ? err.message : String(err) });
   });
 
   // ตั้ง search_path แบบ synchronous ก่อนปล่อย connection ให้ query — กัน race กับ query แรก
