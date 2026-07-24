@@ -276,6 +276,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               : 'Register failed';
         return msg;
       }
+      // สมัครแล้วรอ admin อนุมัติ (is_active=false) — ไม่มี session กลับมา, ไม่ auto-login
+      // คืนข้อความแจ้งผู้ใช้ (แสดงในหน้า Register) แทนการพาเข้าระบบ
+      if (data.pending === true) {
+        return typeof data.message === 'string'
+          ? data.message
+          : 'สมัครสำเร็จ — บัญชีของคุณรอผู้ดูแลระบบอนุมัติก่อนเข้าใช้งาน';
+      }
       const rawUser = data.user as Record<string, unknown> | undefined;
       const u = rawUser ? mapApiUser(rawUser) : null;
       if (u) {

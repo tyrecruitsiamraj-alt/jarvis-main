@@ -18,7 +18,6 @@ import {
 import { isValidEnglishName } from '../../_lib/englishName.js';
 import { APP_DEPARTMENT_CODES, isAllowedDepartmentCode } from '../../_lib/departmentScope.js';
 import { tableInAppSchema } from '../../_lib/schema.js';
-import { issueAuthSession } from '../../_lib/authSession.js';
 
 const usersTable = tableInAppSchema('users');
 
@@ -101,19 +100,15 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
     }
 
     const password_hash = await hashPassword(password);
-    const { rows } = await dbQuery<{
-      id: string;
-      email: string;
-      role: UserRole;
-      full_name: string;
-      is_active: boolean;
-      created_at: string | Date;
-      department_code: string | null;
-    }>(
+    // ⚠ สมัครเอง = สร้างบัญชีแบบ "รออนุมัติ" (is_active=false) — กันคนนอกที่ไม่ได้เป็นเจ้าของ
+    // อีเมล @company จริง ปั๊มบัญชี staff แล้วเข้าถึงข้อมูลได้ทันที ต้องให้ admin อนุมัติก่อน
+    // (admin เปิดใช้งานได้ที่หน้าจัดการผู้ใช้ → PATCH /api/app-users is_active=true)
+    // ไม่ออก session ให้ตอนสมัคร — บัญชียัง login ไม่ได้จนกว่าจะถูกอนุมัติ
+    const { rows } = await dbQuery<{ id: string }>(
       `
-      insert into ${usersTable} (email, password_hash, role, full_name, department_code)
-      values (lower($1::text), $2, $3, $4, $5)
-      returning id, email, role, full_name, is_active, created_at, department_code
+      insert into ${usersTable} (email, password_hash, role, full_name, department_code, is_active)
+      values (lower($1::text), $2, $3, $4, $5, false)
+      returning id
     `,
       [email, password_hash, role, full_name, department_code],
     );
@@ -121,8 +116,10 @@ async function registerHandler(req: ApiReq, res: ApiRes) {
     const row = rows[0];
     if (!row) return sendError(res, 500, 'Failed to create user');
 
-    // สมัครแล้วเข้าสู่ระบบทันที — ไม่ต้อง login รอบสอง (กันโดน rate limit)
-    await issueAuthSession(req, res, row, 'auth.login.success');
+    return res.status(200).json({
+      pending: true,
+      message: 'สมัครสำเร็จ — บัญชีของคุณรอผู้ดูแลระบบอนุมัติก่อนเข้าใช้งาน',
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/unique|duplicate/i.test(msg)) {
