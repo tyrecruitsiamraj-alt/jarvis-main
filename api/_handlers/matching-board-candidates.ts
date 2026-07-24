@@ -6,6 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
+import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchBoardCandidatesForJob, type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
@@ -58,7 +59,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 400, 'Bad request', 'jobId is required');
     }
 
-    const job = await getSiamrajUnitRequestById(jobId);
+    // จำกัดตามแผนก — staff แผนกอื่นอ้าง jobId ข้ามแผนกเพื่อดูผล match + ข้อมูลผู้สมัครไม่ได้
+    const job = await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
     }

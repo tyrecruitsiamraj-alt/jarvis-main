@@ -16,8 +16,25 @@ import {
   normalizeStatus,
   findActiveConflict,
   listActiveProposals,
+  getProposalById,
   isActiveProposalStatus,
+  type CandidateProposal,
 } from '../_lib/candidateProposals.js';
+import {
+  isSiamrajRequestInScope,
+  loadScopedRequestNoSet,
+} from '../_lib/siamrajUnitRequests.js';
+
+const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
+
+/** เก็บเฉพาะ proposal ที่ request_no อยู่ในแผนกที่ผู้ใช้เห็นได้ (null = เห็นทุกแผนก) */
+function scopeProposals(items: CandidateProposal[], scoped: Set<string> | null): CandidateProposal[] {
+  if (scoped === null) return items;
+  return items.filter((p) => {
+    const rn = (p.request_no || '').trim();
+    return rn ? scoped.has(rn) : false;
+  });
+}
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -32,8 +49,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'GET') {
     try {
+      // จำกัดตามแผนก: คืนเฉพาะการเสนอของใบขอที่ผู้ใช้เห็นได้ (admin เห็นทุกแผนก = null)
+      // กัน staff ดูดชื่อ+เบอร์ผู้สมัครทั้งบริษัทผ่าน ?active=1 หรือ ?jobIds ข้ามแผนก
+      const scoped = await loadScopedRequestNoSet(req.user);
+
       if (getQuery(req, 'active') === '1') {
-        const items = await listActiveProposals();
+        const items = scopeProposals(await listActiveProposals(), scoped);
         return res.status(200).json({ items });
       }
 
@@ -46,13 +67,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
           .slice(0, 500);
         const map = await listProposalsForJobs(ids);
         const byJob: Record<string, unknown[]> = {};
-        for (const [k, v] of map) byJob[k] = v;
+        for (const [k, v] of map) byJob[k] = scopeProposals(v, scoped);
         return res.status(200).json({ byJob });
       }
 
       const jobId = getQuery(req, 'jobId') || getQuery(req, 'job_id');
       if (!jobId.trim()) return sendError(res, 400, 'Bad request', 'jobId or jobIds is required');
-      const items = await listProposalsForJob(jobId);
+      const items = scopeProposals(await listProposalsForJob(jobId), scoped);
       return res.status(200).json({ items });
     } catch (e) {
       return handleApiError(res, e, 'matching-proposals GET', { userId: req.user.sub });
@@ -72,6 +93,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!jobId) return sendError(res, 400, 'Bad request', 'job_id is required');
       if (!candidateRef) return sendError(res, 400, 'Bad request', 'candidate_ref is required');
       if (!source) return sendError(res, 400, 'Bad request', 'source must be board or irecruit');
+      // จอง/เสนอได้เฉพาะใบขอในแผนกตัวเอง
+      if (!(await isSiamrajRequestInScope(req.user, jobId))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
 
       const targetStatus = normalizeStatus(body.status) ?? 'reserved';
       if (isActiveProposalStatus(targetStatus)) {
@@ -130,6 +155,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getQuery(req, 'id');
       if (!id.trim()) return sendError(res, 400, 'Bad request', 'id query is required');
+      // เช็คสิทธิ์ก่อนแก้: การเสนอนี้เป็นของใบขอในแผนกผู้ใช้ไหม (กันแก้/ยกเลิกของทีมอื่น)
+      const existing = await getProposalById(id);
+      if (!existing) return sendError(res, 404, 'Not found', 'ไม่พบการเสนอนี้');
+      if (!(await isSiamrajRequestInScope(req.user, existing.request_no || existing.job_id))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
       const raw = await readJsonBody(req);
       if (typeof raw !== 'object' || raw === null) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
