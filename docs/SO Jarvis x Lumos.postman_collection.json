@@ -547,7 +547,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "Dm2W9Pe9eOubFNE5LJg6UF7z6d3SnZG249bOZYIhI0pRfX5dMi",
+                  "value": "bcaa1c4d4adeb7f532a5d154d5c18c3e6360edd40efb2b2b189fd4a3e5df7d63",
                   "type": "string"
                 }
               ]
@@ -555,7 +555,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "https://jarvis.siamrajathanee.dev/api/lumos/interview/candidates",
+              "raw": "https://jarvis.siamrajathanee.dev/api/lumos/positions",
               "protocol": "https",
               "host": [
                 "jarvis",
@@ -565,8 +565,7 @@
               "path": [
                 "api",
                 "lumos",
-                "interview",
-                "candidates"
+                "positions"
               ]
             }
           },

@@ -31,6 +31,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const jobId = getString(req.query?.job_id);
       if (!jobId) return sendError(res, 400, 'Bad request', 'job_id query is required');
 
+      if (jobId.startsWith('siamraj:') || jobId.startsWith('siamraj-sql:')) {
+        return res.status(200).json([]);
+      }
+
       const { rows } = await dbQuery<JobAssignmentRow>(
         `select * from ${table} where job_id = $1::uuid order by created_at desc`,
         [jobId],

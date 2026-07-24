@@ -8,6 +8,10 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import {
+  isSiamrajUnitRequestsEnabled,
+  getSiamrajUnitRequestById,
+} from '../_lib/siamrajUnitRequests.js';
 
 type JobRow = {
   id: string;
@@ -135,6 +139,12 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getString(req.query?.id);
       if (id) {
+        if (id.startsWith('siamraj:') || id.startsWith('siamraj-sql:')) {
+          if (!isSiamrajUnitRequestsEnabled()) return sendError(res, 404, 'Not found', 'Job not found');
+          const row = await getSiamrajUnitRequestById(id);
+          if (!row) return sendError(res, 404, 'Not found', 'Job not found');
+          return res.status(200).json(toJobResponse(row as unknown as JobRow));
+        }
         const { rows } = await dbQuery<JobRow>(
           `select * from jarvis_rm.jobs where id = $1 limit 1`,
           [id],
