@@ -33,6 +33,9 @@ COPY --from=builder /app/api        ./api
 COPY --from=builder /app/shared     ./shared
 COPY --from=builder /app/skills     ./skills
 COPY --from=builder /app/server     ./server
+# บาง API handler แชร์ pure logic จาก src ผ่าน alias @/ (เช่น matching list filter/sort
+# ที่ต้องตรงกับหน้าเว็บเป๊ะ) — tsx resolve @/ → src ตอนรัน จึงต้องมี src ใน production image
+COPY --from=builder /app/src        ./src
 COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/scripts/verify-api-registry.mjs ./scripts/verify-api-registry.mjs
 COPY --from=builder /app/migrations ./migrations
