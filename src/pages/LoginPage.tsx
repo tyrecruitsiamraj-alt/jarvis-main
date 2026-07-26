@@ -31,6 +31,11 @@ type AuthConfig = {
   companyEmailHint: string | null;
 };
 
+// ลิงก์เพิ่มเพื่อน LINE (Official Account) — กดปุ่มโลโก้แล้วเปิด LINE ให้เลย
+// TODO(login): แทนที่ด้วยลิงก์ LINE จริงจาก QR (เช่น https://lin.ee/xxxxxxx)
+const LINE_ADD_URL = '__REPLACE_WITH_LINE_LINK__';
+const LINE_ADD_ENABLED = LINE_ADD_URL.startsWith('http');
+
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   no_account: 'บัญชี Microsoft นี้ยังไม่ได้ลงทะเบียนในระบบ — ติดต่อผู้ดูแล',
   disabled: 'บัญชีนี้ถูกปิดใช้งาน',
@@ -39,6 +44,62 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   oauth: 'เข้าสู่ระบบ Microsoft ไม่สำเร็จ — ลองใหม่อีกครั้ง',
   azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
+
+/** โลโก้ LINE (speech bubble) — ฝังเป็น SVG ในแอป ไม่ดึงจากเน็ต */
+function LineGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M12 3C6.2 3 1.5 6.86 1.5 11.6c0 4.25 3.74 7.81 8.79 8.48.34.07.81.22.93.51.1.26.07.67.03.94l-.15.9c-.04.27-.21 1.04.92.57 1.13-.48 6.08-3.58 8.29-6.13C21.98 15.2 22.5 13.47 22.5 11.6 22.5 6.86 17.8 3 12 3zM7.6 14.02H5.52a.55.55 0 0 1-.55-.55V9.32a.55.55 0 0 1 1.1 0v3.6H7.6a.55.55 0 0 1 0 1.1zm2.16-.55a.55.55 0 0 1-1.1 0V9.32a.55.55 0 0 1 1.1 0v4.15zm4.9 0a.55.55 0 0 1-.38.52.56.56 0 0 1-.62-.19l-2.13-2.9v2.57a.55.55 0 0 1-1.1 0V9.32a.55.55 0 0 1 .99-.33l2.14 2.9V9.32a.55.55 0 0 1 1.1 0v4.15zm3.3-2.62a.55.55 0 0 1 0 1.1h-1.53v.97h1.53a.55.55 0 0 1 0 1.1H15.4a.55.55 0 0 1-.55-.55V9.32a.55.55 0 0 1 .55-.55h2.08a.55.55 0 0 1 0 1.1h-1.53v.98h1.53z" />
+    </svg>
+  );
+}
+
+/** ปุ่มแอดไลน์บนหน้า Login — กดแล้วเปิด LINE (แอด Official Account) ในแท็บใหม่ */
+function LineContactButton() {
+  if (!LINE_ADD_ENABLED) return null;
+  return (
+    <a
+      href={LINE_ADD_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-4 inline-flex w-full min-h-[48px] items-center justify-center gap-2 rounded-full bg-[#06C755] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#05b34c] active:bg-[#04a144] touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#06C755] focus-visible:ring-offset-2"
+      aria-label="แอดไลน์สอบถาม/แจ้งปัญหา (เปิด LINE)"
+    >
+      <LineGlyph className="h-5 w-5 shrink-0" />
+      แอดไลน์สอบถาม/แจ้งปัญหา
+    </a>
+  );
+}
+
+/** ปุ่มเข้าสู่ระบบด้วย Microsoft (Azure AD) — พา browser ไป /api/auth/azure-ad/start
+ *  (redirect เต็มหน้าไป Microsoft แล้วเด้งกลับ) ไม่ต้องกรอก username/password */
+function MicrosoftLoginButton({ returnTo = '/' }: { returnTo?: string }) {
+  const start = () => {
+    window.location.href = `/api/auth/azure-ad/start?returnTo=${encodeURIComponent(returnTo)}`;
+  };
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        onClick={start}
+        className="inline-flex w-full min-h-[52px] items-center justify-center gap-2.5 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+      >
+        <svg viewBox="0 0 21 21" className="h-4 w-4 shrink-0" aria-hidden>
+          <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+        </svg>
+        เข้าสู่ระบบด้วย Microsoft
+      </button>
+      <div className="flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-[11px] text-muted-foreground">หรือเข้าด้วยอีเมล</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    </div>
+  );
+}
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -298,6 +359,8 @@ const LoginPage: React.FC = () => {
               </button>
             </div>
 
+            {authMode === 'login' && authConfig?.microsoftLogin ? <MicrosoftLoginButton /> : null}
+
             {authMode === 'login' ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
@@ -532,6 +595,8 @@ const LoginPage: React.FC = () => {
               </>
             )}
           </div>
+
+          <LineContactButton />
 
           <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
             ต้องการสมัครงานภายนอก?{' '}
