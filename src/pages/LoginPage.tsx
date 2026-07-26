@@ -178,9 +178,8 @@ const LoginPage: React.FC = () => {
               </>
             )}
 
-            {/* ทางเข้าบอร์ดรับสมัครงาน — เห็นได้ทุกขนาดจอ (ไม่ใช่แค่การ์ดขวา desktop) */}
-            <div className="border-t border-white/60 pt-4">
-              <p className="mb-2 text-center text-[11px] text-muted-foreground">ต้องการสมัครงานภายนอก?</p>
+            {/* ทางเข้าบอร์ดรับสมัครงาน — โชว์เฉพาะจอไม่ใหญ่ (มือถือ/แท็บเล็ต); desktop มีการ์ดขวาแล้ว */}
+            <div className="border-t border-white/60 pt-4 lg:hidden">
               <Link
                 to="/apply"
                 className="flex w-full min-h-[46px] items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white/70 px-6 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white touch-manipulation"
