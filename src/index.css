@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -71,8 +71,10 @@
     --jarvis-orange: #007aff;
     --jarvis-orange-soft: #5ac8fa;
 
-    --font-display: 'Kanit', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    /* Apple SF Pro สำหรับ Latin (native บนเครื่อง Apple) + Anuphan สำหรับไทย (คมชัด/luxury)
+       browser fallback ต่อตัวอักษร: Latin→SF Pro, ไทย→Anuphan */
+    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Anuphan', 'Segoe UI', 'Helvetica Neue', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   }
 }
 
@@ -87,10 +89,16 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+    letter-spacing: -0.006em; /* tracking แน่นบางๆ แบบ Apple ให้ตัวอักษรคม */
   }
 
-  h1, h2, h3, h4 {
-    letter-spacing: -0.01em;
+  h1, h2, h3, h4, h5 {
+    letter-spacing: -0.022em; /* หัวข้อแน่นขึ้น = ดูพรีเมียม/คม */
+    font-weight: 600;
+  }
+  h1 {
+    letter-spacing: -0.03em; /* หัวใหญ่สุดแน่นสุดแบบ Apple display */
   }
 
   ::-webkit-scrollbar {
