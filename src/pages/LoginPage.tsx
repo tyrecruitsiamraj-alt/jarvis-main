@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -8,7 +7,6 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import { ArrowRight } from 'lucide-react';
-import type { UserRole } from '@/types';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
@@ -55,15 +53,12 @@ function MicrosoftLoginButton() {
 }
 
 const LoginPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { signInWithDevRole } = useAuth();
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
 
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [configError, setConfigError] = useState(false);
   const [configAttempt, setConfigAttempt] = useState(0);
 
@@ -115,20 +110,6 @@ const LoginPage: React.FC = () => {
       if (timer) window.clearTimeout(timer);
     };
   }, [configAttempt]);
-
-  const handleDevRole = async (role: UserRole) => {
-    setError(null);
-    setSubmitting(true);
-    try {
-      const msg = await signInWithDevRole(role);
-      if (msg) setError(msg);
-      else navigate('/', { replace: true });
-    } catch {
-      setError('เข้าสู่ระบบด้วยสิทธิ์ไม่สำเร็จ — ตรวจสอบว่า API ทำงานและ JARVIS_DEV_ROLE_LOGIN=true');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div
@@ -193,27 +174,6 @@ const LoginPage: React.FC = () => {
                   <p className="text-xs text-destructive text-center" role="alert">
                     {error}
                   </p>
-                ) : null}
-
-                {authConfig.devRoleLogin ? (
-                  <div className="space-y-2 rounded-2xl border border-dashed border-orange-300/60 bg-orange-50/40 p-3">
-                    <p className="text-xs font-medium text-orange-900 text-center">
-                      Dev — เข้าเร็วตามสิทธิ์ (ไม่ต้องกรอกรหัส)
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {(['opl', 'staff', 'supervisor', 'admin'] as UserRole[]).map((role) => (
-                        <button
-                          key={role}
-                          type="button"
-                          disabled={submitting}
-                          onClick={() => void handleDevRole(role)}
-                          className="rounded-full border border-orange-200 bg-white/80 px-2 py-2 text-[11px] font-semibold capitalize text-orange-900 hover:bg-white disabled:opacity-50"
-                        >
-                          {role}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 ) : null}
               </>
             )}
