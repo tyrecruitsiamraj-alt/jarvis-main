@@ -177,14 +177,19 @@ const LoginPage: React.FC = () => {
                 ) : null}
               </>
             )}
-          </div>
 
-          <p className="mt-4 text-center text-xs text-muted-foreground px-1 lg:hidden">
-            ต้องการสมัครงานภายนอก?{' '}
-            <Link to="/apply" className="font-medium text-blue-600 hover:underline underline-offset-4 touch-manipulation">
-              ดูบอร์ดประกาศรับสมัคร
-            </Link>
-          </p>
+            {/* ทางเข้าบอร์ดรับสมัครงาน — เห็นได้ทุกขนาดจอ (ไม่ใช่แค่การ์ดขวา desktop) */}
+            <div className="border-t border-white/60 pt-4">
+              <p className="mb-2 text-center text-[11px] text-muted-foreground">ต้องการสมัครงานภายนอก?</p>
+              <Link
+                to="/apply"
+                className="flex w-full min-h-[46px] items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white/70 px-6 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white touch-manipulation"
+              >
+                ดูประกาศรับสมัครพนักงาน
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </div>
+          </div>
         </motion.div>
 
         {/* Right — visual card (คง "ดูประกาศรับสมัครพนักงาน" ไว้เหมือนเดิม) */}
