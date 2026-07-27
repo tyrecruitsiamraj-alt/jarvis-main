@@ -18,6 +18,8 @@ import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
+import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -175,6 +177,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const mode = getQuery(req, 'mode');
     const items = await listSiamrajUnitRequests({ limit, mode, departmentScope });
     await Promise.all([attachAssignments(items), attachNotes(items), attachWorkStatus(items)]);
+    // Push ให้ precompute worker — urgency ต้องคิดก่อนเพื่อให้ priority sort ถูกต้อง
+    enqueuePrecomputeJobs(enrichJobsWithUrgency(items as Parameters<typeof enrichJobsWithUrgency>[0]));
     return res.status(200).json(items);
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');

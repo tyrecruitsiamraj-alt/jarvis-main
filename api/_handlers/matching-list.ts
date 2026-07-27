@@ -24,6 +24,7 @@ import {
 } from '@/lib/matchingListFilter';
 import { recommendedCandidateCount } from '@/lib/matchingProgress';
 import type { JobRequest } from '@/types';
+import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -56,6 +57,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];
     await Promise.all([attachAssignments(raw), attachNotes(raw), attachWorkStatus(raw)]);
     const jobs = enrichJobsWithUrgency(raw as JobRequest[]);
+
+    // Push ให้ precompute worker ทำ AI match ล่วงหน้า — ลำดับ priority (SLA/urgent ก่อน)
+    enqueuePrecomputeJobs(jobs);
 
     // ข้อมูลประกอบตัวกรองจาก PG: การจองตัว + ผล AI ที่เคยคิดเก็บไว้ + ความพร้อมของคนของเรา
     const [proposalMap, tierMap, availCtx] = await Promise.all([
