@@ -53,10 +53,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const departmentScope = await loadUserDepartmentScope(req.user);
 
     // ท่อเดียวกับ feed หลักของหน้า Matching เดิม: ใบขอเปิด + ผู้รับผิดชอบ/หมายเหตุ/สถานะทำงาน + urgency
-    const raw = (await listSiamrajUnitRequests({ limit: 2000, departmentScope })) as unknown[];
-    await attachAssignments(raw);
-    await attachNotes(raw);
-    await attachWorkStatus(raw);
+    const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];
+    await Promise.all([attachAssignments(raw), attachNotes(raw), attachWorkStatus(raw)]);
     const jobs = enrichJobsWithUrgency(raw as JobRequest[]);
 
     // ข้อมูลประกอบตัวกรองจาก PG: การจองตัว + ผล AI ที่เคยคิดเก็บไว้ + ความพร้อมของคนของเรา

@@ -8,7 +8,7 @@ import { getWorkCalendarSnapshot, subscribeWorkCalendar } from '@/lib/workCalend
 import type { JobRequest } from '@/types';
 
 const SIAMRAJ_POLL_MS = 60_000;
-const UNIT_REQUESTS_FETCH_LIMIT = 2000;
+const UNIT_REQUESTS_FETCH_LIMIT = 500;
 
 async function loadLiveJobs(): Promise<{
   jobs: JobRequest[];

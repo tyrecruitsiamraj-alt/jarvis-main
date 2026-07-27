@@ -175,9 +175,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const limit = Number(getQuery(req, 'limit') || '200');
     const mode = getQuery(req, 'mode');
     const items = await listSiamrajUnitRequests({ limit, mode, departmentScope });
-    await attachAssignments(items);
-    await attachNotes(items);
-    await attachWorkStatus(items);
+    await Promise.all([attachAssignments(items), attachNotes(items), attachWorkStatus(items)]);
     return res.status(200).json(items);
   } catch (e) {
     return handleApiError(res, e, 'siamraj-unit-requests');
