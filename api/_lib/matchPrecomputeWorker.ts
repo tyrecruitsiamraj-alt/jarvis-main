@@ -16,6 +16,7 @@
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import { getOllamaConfig } from './ollamaClient.js';
 import { listSiamrajUnitRequests, isSiamrajUnitRequestsEnabled } from './siamrajUnitRequests.js';
+import { APP_DEPARTMENT_CODES } from './departmentScope.js';
 import { loadBoardMatchTierMap, getStoredBoardMatch, type BoardMatchTierEntry } from './boardMatchStore.js';
 import { matchBoardCandidatesForJob } from './boardCandidateMatcher.js';
 import { logInfo, logWarn, logError } from './logger.js';
@@ -172,6 +173,36 @@ async function sleepInterruptible(ms: number, isStopped: () => boolean): Promise
   }
 }
 
+// ─── Scanner helpers ──────────────────────────────────────────────────────────
+// Fetching with mode:'all' + no departmentScope hits a SQL BETWEEN range filter
+// in env vars that returns only 1 row. Iterating per department code matches
+// exactly what the HTTP handler does and sees all 221+ open requests.
+async function scanAllDepartments(limit: number): Promise<PrecomputeJob[]> {
+  const seen = new Set<string>();
+  const all: PrecomputeJob[] = [];
+  for (const code of APP_DEPARTMENT_CODES) {
+    try {
+      const jobs = (await listSiamrajUnitRequests({
+        limit,
+        departmentScope: { mode: 'code', code },
+      })) as PrecomputeJob[];
+      for (const job of jobs) {
+        const id = typeof job.id === 'string' ? job.id.trim() : '';
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          all.push(job);
+        }
+      }
+    } catch (e) {
+      logError('match-precompute.scan.dept.fail', {
+        code,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  return all;
+}
+
 // ─── Scanner loop ─────────────────────────────────────────────────────────────
 async function runScan(cfg: WorkerConfig): Promise<void> {
   if (!gatesOk()) {
@@ -181,7 +212,7 @@ async function runScan(cfg: WorkerConfig): Promise<void> {
 
   try {
     const [jobs, tierMap] = await Promise.all([
-      listSiamrajUnitRequests({ limit: cfg.scanLimit, mode: 'all' }) as Promise<PrecomputeJob[]>,
+      scanAllDepartments(cfg.scanLimit),
       loadBoardMatchTierMap(),
     ]);
 
