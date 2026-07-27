@@ -5,8 +5,8 @@ import type { JobRequest } from '@/types';
 export type SiamrajFeedMeta = {
   enabled: boolean;
   dbSource?: 'postgres' | 'sqlserver' | null;
-  schema: string | null;
-  sqlServer?: { host: string; database: string } | null;
+  // ไม่รับ host/database/schema ของ DB มาฝั่ง client อีกต่อไป (กันหลุด infra) — ใช้แค่ boolean
+  sqlServerConfigured?: boolean;
   readOnly: boolean;
   mode: string;
 };
@@ -14,7 +14,7 @@ export type SiamrajFeedMeta = {
 export async function fetchSiamrajFeedMeta(): Promise<SiamrajFeedMeta> {
   const r = await apiFetch('/api/siamraj/unit-requests?meta=1', { cache: 'no-store' });
   if (!r.ok) {
-    return { enabled: false, schema: null, readOnly: true, mode: 'staffing_queue' };
+    return { enabled: false, readOnly: true, mode: 'staffing_queue' };
   }
   return readJsonSafe<SiamrajFeedMeta>(r);
 }

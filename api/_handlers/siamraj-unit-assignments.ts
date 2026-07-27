@@ -11,6 +11,9 @@ import {
   getUnitAssignment,
   upsertUnitAssignment,
 } from '../_lib/siamrajUnitAssignments.js';
+import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
+
+const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
@@ -19,6 +22,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     try {
       const requestNo = getString(req.query?.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no query is required');
+      if (!(await isSiamrajRequestInScope(req.user, requestNo))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
       const item = await getUnitAssignment(requestNo);
       return res.status(200).json(
         item ?? {
@@ -43,6 +49,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const body = raw as Record<string, unknown>;
       const requestNo = getString(body.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no is required');
+      if (!(await isSiamrajRequestInScope(req.user, requestNo))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
 
       const before = await getUnitAssignment(requestNo);
 

@@ -14,8 +14,9 @@ import {
 import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
-import { jobAllowedByDepartmentScope } from './departmentScope.js';
+import { jobAllowedByDepartmentScope, loadUserDepartmentScope } from './departmentScope.js';
 import type { DepartmentScope } from './departmentScope.js';
+import type { UserRole } from './auth.js';
 
 export type SiamrajDbSource = 'postgres' | 'sqlserver';
 
@@ -271,6 +272,40 @@ export async function getSiamrajUnitRequestById(
   if (!item) return null;
   if (departmentScope && !jobAllowedByDepartmentScope(item, departmentScope)) return null;
   return item;
+}
+
+export type ScopeUser = { sub: string; role: UserRole };
+
+/**
+ * ผู้ใช้เห็นใบขอนี้ได้ตามแผนกไหม (admin เห็นทุกใบ) — ใช้ก่อน read/write ต่อใบเดียว
+ * กัน IDOR: staff แผนกหนึ่งอ้าง request_no/jobId ของอีกแผนกไม่ได้
+ */
+export async function isSiamrajRequestInScope(user: ScopeUser, requestNoOrId: string): Promise<boolean> {
+  const scope = await loadUserDepartmentScope(user);
+  if (scope.mode === 'all') return true;
+  if (scope.mode === 'none') return false;
+  const item = await getSiamrajUnitRequestById(requestNoOrId, scope);
+  return item !== null;
+}
+
+/**
+ * เซ็ต request_no ที่ผู้ใช้เห็นได้ (null = เห็นทุกแผนก เช่น admin) — ไว้กรองรายการ bulk
+ * (เช่น proposals ต่อหลายใบ) โดยไม่ต้อง query ทีละใบ
+ */
+export async function loadScopedRequestNoSet(user: ScopeUser): Promise<Set<string> | null> {
+  const scope = await loadUserDepartmentScope(user);
+  if (scope.mode === 'all') return null;
+  if (scope.mode === 'none') return new Set<string>();
+  const items = (await listSiamrajUnitRequests({
+    limit: SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT,
+    departmentScope: scope,
+  })) as Array<{ request_no?: string | null }>;
+  const set = new Set<string>();
+  for (const it of items) {
+    const rn = String(it.request_no || '').trim();
+    if (rn) set.add(rn);
+  }
+  return set;
 }
 
 export type { SiamrajThroughputRecord, ResignationUnitRank };

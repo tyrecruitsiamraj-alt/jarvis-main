@@ -193,6 +193,17 @@ export async function findActiveConflict(
   }
 }
 
+/** อ่าน proposal เดียวด้วย id — ใช้เช็คสิทธิ์ (department scope) ก่อน PATCH */
+export async function getProposalById(id: string): Promise<CandidateProposal | null> {
+  try {
+    const { rows } = await dbQuery<Row>(`select ${COLS} from ${table} where id = $1 limit 1`, [id]);
+    return rows[0] ? mapRow(rows[0]) : null;
+  } catch (e) {
+    if (isMissingTable(e)) return null;
+    throw e;
+  }
+}
+
 /** รายชื่อคนที่กำลังจอง/ติดต่อ/ลงงานอยู่ ทั่วทุกใบขอ (สำหรับหน้า "รายชื่อคนจอง") */
 export async function listActiveProposals(): Promise<CandidateProposal[]> {
   try {

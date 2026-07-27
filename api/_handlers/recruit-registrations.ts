@@ -25,9 +25,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     if (method === 'GET' && getQuery(req, 'meta') === '1') {
       const cfg = getIrecruitSqlServerConfig();
+      // ⚠ ไม่คืน host/IP + ชื่อ database ให้ client (กันหลุด infra) — แค่บอกว่าต่อได้ไหมพอ
       return res.status(200).json({
         enabled: Boolean(cfg),
-        sqlServer: cfg ? { host: cfg.server, database: cfg.database } : null,
+        sqlServerConfigured: Boolean(cfg),
         owner: (process.env.RECRUIT_REGISTER_OWNER || 'RM').trim(),
         readOnly: true,
       });
