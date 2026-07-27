@@ -19,6 +19,7 @@ const candidateStatusVariants: Record<CandidateStatus, BadgeVariant> = {
   drop: 'destructive',
   done: 'success',
   waiting_interview: 'warning',
+  interviewed: 'info',
   waiting_to_start: 'primary',
   no_job: 'muted',
 };

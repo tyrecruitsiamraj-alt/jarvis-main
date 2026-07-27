@@ -71,11 +71,12 @@ const isDrivingResult = (v: unknown): v is 'passed' | 'failed' | 'not_tested' =>
 
 const isCandidateStatus = (
   v: unknown,
-): v is 'inprocess' | 'drop' | 'done' | 'waiting_interview' | 'waiting_to_start' | 'no_job' =>
+): v is 'inprocess' | 'drop' | 'done' | 'waiting_interview' | 'interviewed' | 'waiting_to_start' | 'no_job' =>
   v === 'inprocess' ||
   v === 'drop' ||
   v === 'done' ||
   v === 'waiting_interview' ||
+  v === 'interviewed' ||
   v === 'waiting_to_start' ||
   v === 'no_job';
 

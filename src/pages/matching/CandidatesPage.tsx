@@ -22,6 +22,7 @@ const statusFilters: { value: CandidateStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'inprocess', label: 'In Process' },
   { value: 'waiting_interview', label: 'รอสัมภาษณ์' },
+  { value: 'interviewed', label: 'สัมภาษณ์แล้ว' },
   { value: 'waiting_to_start', label: 'รอเริ่มงาน' },
   { value: 'done', label: 'Done' },
   { value: 'drop', label: 'Drop' },
@@ -32,6 +33,7 @@ const statusFilters: { value: CandidateStatus | 'all'; label: string }[] = [
 const STATUS_SUMMARY_ORDER: CandidateStatus[] = [
   'inprocess',
   'waiting_interview',
+  'interviewed',
   'waiting_to_start',
   'done',
   'drop',
@@ -45,7 +47,7 @@ const CandidatesPage: React.FC = () => {
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState<CandidateStatus | 'all'>(() => {
     const s = searchParams.get('status');
-    if (s === 'inprocess' || s === 'drop' || s === 'done' || s === 'waiting_interview' || s === 'waiting_to_start' || s === 'no_job') {
+    if (s === 'inprocess' || s === 'drop' || s === 'done' || s === 'waiting_interview' || s === 'interviewed' || s === 'waiting_to_start' || s === 'no_job') {
       return s;
     }
     return 'all';
@@ -112,6 +114,7 @@ const CandidatesPage: React.FC = () => {
       s === 'drop' ||
       s === 'done' ||
       s === 'waiting_interview' ||
+      s === 'interviewed' ||
       s === 'waiting_to_start' ||
       s === 'no_job'
     ) {
@@ -132,6 +135,7 @@ const CandidatesPage: React.FC = () => {
     const counts: Record<CandidateStatus, number> = {
       inprocess: 0,
       waiting_interview: 0,
+      interviewed: 0,
       waiting_to_start: 0,
       done: 0,
       drop: 0,

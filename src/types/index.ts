@@ -243,7 +243,7 @@ export interface JobAssignment {
 /** 1. พนักงานประจำ 2. WL (แสดงในเมนูพนักงาน WL) 3. EX */
 export type CandidateStaffingTrack = 'regular' | 'wl' | 'ex';
 
-export type CandidateStatus = 'inprocess' | 'drop' | 'done' | 'waiting_interview' | 'waiting_to_start' | 'no_job';
+export type CandidateStatus = 'inprocess' | 'drop' | 'done' | 'waiting_interview' | 'interviewed' | 'waiting_to_start' | 'no_job';
 export type Gender = 'male' | 'female' | 'other';
 export type YesNo = 'yes' | 'no';
 export type DrivingResult = 'passed' | 'failed' | 'not_tested';
@@ -359,6 +359,7 @@ export const CANDIDATE_STATUS_LABELS: Record<CandidateStatus, string> = {
   drop: 'Drop',
   done: 'Done',
   waiting_interview: 'รอสัมภาษณ์',
+  interviewed: 'สัมภาษณ์แล้ว',
   waiting_to_start: 'รอเริ่มงาน',
   no_job: 'ไม่มีงาน',
 };

@@ -66,6 +66,7 @@ const MatchingDashboard: React.FC = () => {
     const counts: Record<CandidateStatus, number> = {
       inprocess: 0,
       waiting_interview: 0,
+      interviewed: 0,
       waiting_to_start: 0,
       done: 0,
       drop: 0,
