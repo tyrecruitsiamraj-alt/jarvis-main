@@ -10,6 +10,7 @@ import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchIrecruitCandidatesForJob } from '../_lib/irecruitCandidateMatcher.js';
+import { enqueueLumosInterviewForIrecruit } from '../_lib/lumosDispatch.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -51,6 +52,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       owner,
       refresh,
     });
+
+    // กดค้นหา iRecruit → ส่งคนที่แนะนำ (green/yellow) เข้าคิว Lumos เส้น interview (error-safe ภายใน)
+    await enqueueLumosInterviewForIrecruit(job as Record<string, unknown>, result);
 
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(result);

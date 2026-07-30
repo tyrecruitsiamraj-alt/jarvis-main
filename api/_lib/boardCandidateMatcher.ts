@@ -9,6 +9,7 @@ import {
 } from './candidateSpecAnalyzer.js';
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
 import { saveBoardMatchResult } from './boardMatchStore.js';
+import { enqueueLumosReminderForBoardMatch } from './lumosDispatch.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -273,5 +274,7 @@ export async function matchBoardCandidatesForJob(
     matches,
   };
   await saveBoardMatchResult(jobId, result);
+  // match เสร็จ → ส่งคนที่แนะนำ (green/yellow) เข้าคิว Lumos เส้น reminder (error-safe ภายใน)
+  await enqueueLumosReminderForBoardMatch(job, result);
   return result;
 }

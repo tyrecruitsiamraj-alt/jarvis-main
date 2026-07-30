@@ -10,6 +10,7 @@ import { withLumosAuth } from '../_lib/lumos-auth.js';
 import { readJsonBody } from '../_lib/body.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { logInfo } from '../_lib/logger.js';
+import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -211,7 +212,11 @@ async function getCandidates(req: ApiReq, res: ApiRes): Promise<void> {
     const rawLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : NaN;
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 200;
 
-    const data = await fetchWaitingInterviewCandidates(limit);
+    // รวม 2 แหล่ง: (1) คิวจากการกดค้นหา iRecruit ในหน้า matching (เสิร์ฟครั้งเดียวต่อรายการ)
+    //             (2) ผู้สมัครภายในสถานะรอสัมภาษณ์ (พฤติกรรมเดิม)
+    const queueItems = (await takePendingLumosItems('interview', limit)) as CandidateForInterview[];
+    const dbItems = await fetchWaitingInterviewCandidates(limit);
+    const data = [...queueItems, ...dbItems];
     return res.status(200).json({ ok: true, data, total: data.length });
   } catch (e) {
     return handleApiError(res, e, 'lumos.interview.candidates');
@@ -360,6 +365,14 @@ async function postInterviewResults(req: ApiReq, res: ApiRes): Promise<void> {
       (results as InterviewResult[]).map((r) => persistInterviewResult(r)),
     );
     const failed = settled.filter((s) => s.status === 'rejected').length;
+
+    // ผลของคนจากคิว iRecruit (id รูปแบบ jobId::ir-N — ไม่ใช่ UUID) → ผูกกลับเข้าคิว dispatch
+    for (const r of results as InterviewResult[]) {
+      if (!r.client_candidate_id.includes('::ir-')) continue;
+      const queueStatus =
+        r.outcome === 'completed' ? 'completed' : r.status === 'ยกเลิก' ? 'cancelled' : 'failed';
+      await applyLumosResult('interview', r.client_candidate_id, queueStatus, r).catch(() => {});
+    }
 
     return res.status(200).json({
       ok: true,

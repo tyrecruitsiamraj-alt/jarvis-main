@@ -8,6 +8,7 @@ import { withLumosAuth } from '../_lib/lumos-auth.js';
 import { readJsonBody } from '../_lib/body.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { logInfo } from '../_lib/logger.js';
+import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,46 +57,6 @@ type ReminderResult = {
   stop_early: boolean;
 };
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_CONTACTS: ContactForReminder[] = [
-  {
-    client_contact_id: 'cli-emp-551',
-    recipient_name: 'คุณสมหญิง',
-    recipient_phone: '+66898765432',
-    title: 'นัดสัมภาษณ์พรุ่งนี้',
-    language: 'th',
-    tone: 'professional',
-    steps: [
-      {
-        type: 'remind',
-        message: 'แจ้งเตือนนัดสัมภาษณ์พรุ่งนี้ 10:00 น.',
-        scheduled_at: '2026-07-10T14:00:00+07:00',
-      },
-      {
-        type: 'follow_up',
-        message: 'ติดตามยืนยันการเข้าสัมภาษณ์',
-        scheduled_at: '2026-07-10T18:00:00+07:00',
-      },
-    ],
-  },
-  {
-    client_contact_id: 'cli-emp-552',
-    recipient_name: 'คุณประสิทธิ์',
-    recipient_phone: '+66876543210',
-    title: 'ยืนยันวันเริ่มงาน',
-    language: 'th',
-    tone: 'professional',
-    steps: [
-      {
-        type: 'confirmation',
-        message: 'ยืนยันวันเริ่มงาน 15 กรกฎาคม 2569',
-        scheduled_at: '2026-07-11T10:00:00+07:00',
-      },
-    ],
-  },
-];
-
 // ─── Validators ───────────────────────────────────────────────────────────────
 
 const VALID_OUTCOMES = [
@@ -121,14 +82,17 @@ function isValidReminderResult(v: unknown): v is ReminderResult {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-async function getContacts(_req: ApiReq, res: ApiRes): Promise<void> {
-  // TODO: replace mock with real DB query
-  // const rows = await dbQuery(`SELECT ... FROM ${tableInAppSchema('employees')} WHERE ...`)
-  return res.status(200).json({
-    ok: true,
-    data: MOCK_CONTACTS,
-    total: MOCK_CONTACTS.length,
-  });
+async function getContacts(req: ApiReq, res: ApiRes): Promise<void> {
+  try {
+    const rawLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : NaN;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 200;
+
+    // คิวจากผล AI match "คนของเรา" — เสิร์ฟครั้งเดียวต่อรายการ (pending → delivered)
+    const data = (await takePendingLumosItems('reminder', limit)) as ContactForReminder[];
+    return res.status(200).json({ ok: true, data, total: data.length });
+  } catch (e) {
+    return handleApiError(res, e, 'lumos.reminder.contacts');
+  }
 }
 
 async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
@@ -155,12 +119,17 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
       step_ids: results.map((r) => (r as ReminderResult).step_id),
     });
 
-    // TODO: persist to DB
-    // await dbQuery(`INSERT INTO ${tableInAppSchema('lumos_reminder_results')} (...) VALUES (...)`)
+    // ผูกผลกลับเข้าคิว dispatch (match ด้วย client_contact_id)
+    let matched = 0;
+    for (const item of results as ReminderResult[]) {
+      const ok = await applyLumosResult('reminder', item.client_contact_id, item.status, item);
+      if (ok) matched += 1;
+    }
 
     return res.status(200).json({
       ok: true,
       received: results.length,
+      matched,
       message: 'Reminder results accepted',
     });
   } catch (e) {
