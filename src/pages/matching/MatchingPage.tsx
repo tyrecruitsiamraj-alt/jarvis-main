@@ -495,7 +495,9 @@ const MatchingPage: React.FC = () => {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
-  const [visibleJobLimit, setVisibleJobLimit] = useState(MATCHING_LIST_BATCH_SIZE);
+  const [clientPageNo, setClientPageNo] = useState(1);
+  const listTopRef = useRef<HTMLDivElement | null>(null);
+  const listScrollPendingRef = useRef(false);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
   const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
 
@@ -1277,13 +1279,49 @@ const MatchingPage: React.FC = () => {
   const listTotal = MATCHING_SERVER_LIST_ENABLED ? serverTotal : clientRows.length;
 
   useEffect(() => {
-    setVisibleJobLimit(MATCHING_LIST_BATCH_SIZE);
+    setClientPageNo(1);
   }, [search, urgentOnly, unitFilter, workflowFilter]);
 
+  // แบ่งหน้าแบบชัดเจน (เปลี่ยนหน้า = แทนที่รายการ ไม่ต่อท้ายสะสม) — server ส่งมาทีละหน้าอยู่แล้ว
+  const currentPage = MATCHING_SERVER_LIST_ENABLED ? serverPageNo : clientPageNo;
+  const totalPages = Math.max(1, Math.ceil(listTotal / MATCHING_LIST_BATCH_SIZE));
   const visibleRows = useMemo(
-    () => (MATCHING_SERVER_LIST_ENABLED ? rows : rows.slice(0, visibleJobLimit)),
-    [rows, visibleJobLimit],
+    () =>
+      MATCHING_SERVER_LIST_ENABLED
+        ? rows
+        : rows.slice((clientPageNo - 1) * MATCHING_LIST_BATCH_SIZE, clientPageNo * MATCHING_LIST_BATCH_SIZE),
+    [rows, clientPageNo],
   );
+  const pageRangeStart = listTotal === 0 ? 0 : (currentPage - 1) * MATCHING_LIST_BATCH_SIZE + 1;
+  const pageRangeEnd = Math.min((currentPage - 1) * MATCHING_LIST_BATCH_SIZE + visibleRows.length, listTotal);
+
+  const goToPage = (page: number) => {
+    const target = Math.min(Math.max(1, page), totalPages);
+    if (target === currentPage) return;
+    listScrollPendingRef.current = true;
+    if (MATCHING_SERVER_LIST_ENABLED) void fetchServerPage(target, false);
+    else setClientPageNo(target);
+  };
+
+  // เลื่อนกลับหัวลิสต์ "หลัง" หน้าเปลี่ยนจริง — เลื่อนตอนสั่ง fetch จะโดน re-render ยกเลิก
+  useEffect(() => {
+    if (!listScrollPendingRef.current) return;
+    listScrollPendingRef.current = false;
+    listTopRef.current?.scrollIntoView({ block: 'start' });
+  }, [currentPage]);
+
+  /** รายการเลขหน้าแบบย่อ: 1 … ก่อนหน้า ปัจจุบัน ถัดไป … สุดท้าย */
+  const pageItems = useMemo<Array<number | '…'>>(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+    const sorted = Array.from(pages).filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+    const items: Array<number | '…'> = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) items.push('…');
+      items.push(sorted[i]);
+    }
+    return items;
+  }, [currentPage, totalPages]);
 
   // นับ "คนของเราน่าจะตรง" ต่อใบขอแบบเบา (ไม่เรียก AI) โชว์ตั้งแต่หน้าแรก
   // #6 แม่นขึ้น: classify ใบขอเข้า job family ก่อน แล้วนับผู้สมัครที่สกิลอยู่ family เดียวกัน
@@ -1453,7 +1491,7 @@ const MatchingPage: React.FC = () => {
             ) : (
               <>
                 ใบขอ <span className="text-blue-600 font-bold tabular-nums">{listTotal}</span> รายการ
-                {listTotal > visibleRows.length ? ` · แสดง ${visibleRows.length} รายการแรก` : ''}
+                {totalPages > 1 ? ` · แสดงลำดับ ${pageRangeStart}–${pageRangeEnd} (หน้า ${currentPage}/${totalPages})` : ''}
               </>
             )}
           </p>
@@ -1466,7 +1504,7 @@ const MatchingPage: React.FC = () => {
         </div>
 
         {/* การ์ดรวมใบขอ */}
-        <div className="space-y-2.5">
+        <div className="space-y-2.5" ref={listTopRef}>
           {serverListError ? (
             <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600">
               {serverListError} — ลองรีเฟรชหน้า
@@ -1587,21 +1625,55 @@ const MatchingPage: React.FC = () => {
             );
           })}
           </div>
-          {visibleRows.length < listTotal ? (
-            <button
-              type="button"
-              disabled={serverListLoading}
-              onClick={() =>
-                MATCHING_SERVER_LIST_ENABLED
-                  ? void fetchServerPage(serverPageNo + 1, true)
-                  : setVisibleJobLimit((current) => current + MATCHING_LIST_BATCH_SIZE)
-              }
-              className="mx-auto flex min-h-[44px] items-center justify-center rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-50"
-            >
-              {serverListLoading
-                ? 'กำลังโหลด…'
-                : `แสดงเพิ่มอีก ${Math.min(MATCHING_LIST_BATCH_SIZE, listTotal - visibleRows.length).toLocaleString()} รายการ`}
-            </button>
+          {totalPages > 1 ? (
+            <nav aria-label="เปลี่ยนหน้ารายการใบขอ" className="space-y-1.5 pt-1">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={serverListLoading || currentPage <= 1}
+                  onClick={() => goToPage(currentPage - 1)}
+                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40"
+                >
+                  ← ก่อนหน้า
+                </button>
+                {pageItems.map((item, idx) =>
+                  item === '…' ? (
+                    <span key={`gap-${idx}`} className="px-1 text-sm text-muted-foreground">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      disabled={serverListLoading}
+                      onClick={() => goToPage(item)}
+                      aria-current={item === currentPage ? 'page' : undefined}
+                      className={cn(
+                        'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full border px-3 py-1.5 text-sm font-medium shadow-sm disabled:opacity-40',
+                        item === currentPage
+                          ? 'border-sky-500 bg-sky-500 text-white'
+                          : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50',
+                      )}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
+                <button
+                  type="button"
+                  disabled={serverListLoading || currentPage >= totalPages}
+                  onClick={() => goToPage(currentPage + 1)}
+                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40"
+                >
+                  ถัดไป →
+                </button>
+              </div>
+              <p className="text-center text-xs text-muted-foreground">
+                {serverListLoading
+                  ? 'กำลังโหลด…'
+                  : `แสดงลำดับ ${pageRangeStart.toLocaleString()}–${pageRangeEnd.toLocaleString()} จาก ${listTotal.toLocaleString()} ใบ`}
+              </p>
+            </nav>
           ) : null}
         </div>
       </div>
