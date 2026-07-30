@@ -25,6 +25,7 @@ type AuthConfig = {
   companyEmailLogin: boolean;
   microsoftLogin: boolean;
   devRoleLogin: boolean;
+  publicRegister?: boolean;
   emailLoginGate: boolean;
   companyEmailRequired: boolean;
   allowedDomains: string[];
@@ -265,6 +266,8 @@ const LoginPage: React.FC = () => {
               <p className="text-sm text-muted-foreground text-center py-6 animate-pulse">กำลังโหลด…</p>
             ) : (
               <>
+            {/* แท็บ Register โชว์เฉพาะเมื่อระบบเปิดรับสมัครเอง (publicRegister) — production ปิด */}
+            {authConfig?.publicRegister ? (
             <div className="flex rounded-full bg-white/50 p-1 border border-white/70">
               <button
                 type="button"
@@ -297,8 +300,9 @@ const LoginPage: React.FC = () => {
                 Register
               </button>
             </div>
+            ) : null}
 
-            {authMode === 'login' ? (
+            {authMode === 'login' || !authConfig?.publicRegister ? (
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="email" className="text-xs font-medium text-muted-foreground ml-1">

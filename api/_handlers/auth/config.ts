@@ -6,7 +6,7 @@ import {
 } from '../../_lib/companyEmail.js';
 import { isPostmarkConfigured } from '../../_lib/postmark.js';
 import { isAzureAdConfigured } from '../../_lib/azureAdAuth.js';
-import { isDevRoleLoginAllowed } from '../../_lib/runtime.js';
+import { isDevRoleLoginAllowed, isPublicRegistrationAllowed } from '../../_lib/runtime.js';
 import { sendError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 
 export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
@@ -24,6 +24,7 @@ export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
     companyEmailLogin: emailLoginEnabled,
     microsoftLogin,
     devRoleLogin: isDevRoleLoginAllowed(),
+    publicRegister: isPublicRegistrationAllowed(),
     /** เมื่อ Postmark หรือ Azure AD พร้อม — หน้า Login เป็นกากบัง Web */
     emailLoginGate,
     companyEmailRequired: isCompanyEmailLoginEnforced(),
