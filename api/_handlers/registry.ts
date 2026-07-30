@@ -36,7 +36,6 @@ import shortLinksResolveHandler from './short-links-resolve.js';
 import requestControlForecastHandler from './request-control-forecast.js';
 import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
-import appFeedbackHandler from './app-feedback.js';
 import followHandler from './follow.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
@@ -107,7 +106,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
-  '/api/app-feedback': appFeedbackHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,

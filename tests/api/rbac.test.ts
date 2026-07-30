@@ -75,14 +75,10 @@ describe('api rbac matrix', () => {
     expect(checkApiAccess('opl', 'matching-job-postings', 'PATCH').ok).toBe(false);
   });
 
-  it('app-feedback: all logged-in roles can read/submit; only supervisor+ manages status', () => {
-    expect(checkApiAccess('staff', 'app-feedback', 'GET').ok).toBe(true);
-    expect(checkApiAccess('staff', 'app-feedback', 'POST').ok).toBe(true);
-    expect(checkApiAccess('staff', 'app-feedback', 'PATCH').ok).toBe(false);
-    expect(checkApiAccess('opl', 'app-feedback', 'GET').ok).toBe(true);
-    expect(checkApiAccess('opl', 'app-feedback', 'POST').ok).toBe(true);
-    expect(checkApiAccess('opl', 'app-feedback', 'PATCH').ok).toBe(false);
-    expect(checkApiAccess('supervisor', 'app-feedback', 'PATCH').ok).toBe(true);
+  it('opl เขียนอะไรไม่ได้เลย (ไม่มีข้อยกเว้นหลังถอด app-feedback)', () => {
+    expect(checkApiAccess('opl', 'candidates', 'POST').ok).toBe(false);
+    expect(checkApiAccess('opl', 'follow', 'POST').ok).toBe(false);
+    expect(checkApiAccess('opl', 'siamraj-unit-notes', 'POST').ok).toBe(false);
   });
 });
 
@@ -130,9 +126,6 @@ describe('frontend route rbac', () => {
     expect(minimumRoleForPath('/settings')).toBe('admin');
     expect(minimumRoleForPath('/dashboard')).toBe('staff');
     expect(minimumRoleForPath('/matching/candidates')).toBe('staff');
-    expect(minimumRoleForPath('/feedback')).toBe('opl');
-    expect(canAccessPath('staff', '/feedback')).toBe(true);
-    expect(canAccessPath('opl', '/feedback')).toBe(true);
   });
 
   it('dashboard and edit/assign helpers', () => {

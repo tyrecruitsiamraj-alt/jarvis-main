@@ -10,7 +10,6 @@ import {
   PhoneForwarded,
   ArrowRight,
   LayoutGrid,
-  MessageSquarePlus,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -81,13 +80,6 @@ const menuItems: {
     desc: 'ภาพรวมและ KPI',
     icon: BarChart3,
     accent: 'text-neutral-800 bg-neutral-500/10',
-  },
-  {
-    path: '/feedback',
-    label: 'ส่งคำขอ',
-    desc: 'อยากเพิ่ม / อยากแก้ / แจ้งบัค',
-    icon: MessageSquarePlus,
-    accent: 'text-teal-700 bg-teal-500/12',
   },
   {
     path: '/settings',

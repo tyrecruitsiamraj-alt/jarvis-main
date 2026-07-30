@@ -44,7 +44,6 @@ const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
 const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
-const FeedbackPage = lazy(() => import("@/pages/feedback/FeedbackPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const RoleHubPage = lazy(() => import("./pages/RoleHubPage"));
 
@@ -111,7 +110,6 @@ const ProtectedRoutes = () => {
             <Route path="/dashboard" element={<SupervisorDashboard />} />
             <Route path="/settings" element={<AdminSettings />} />
             <Route path="/account/change-password" element={<ChangePasswordPage />} />
-            <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

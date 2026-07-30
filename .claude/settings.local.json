@@ -7,7 +7,13 @@
       "Bash(npx vercel env pull /tmp/vercel-prod.env --environment=production --yes 2>&1 | tail -3 *)",
       "Bash(rm -f /tmp/vercel-prod.env && echo cleaned)",
       "Bash(curl -s --max-time 5 http://127.0.0.1:4040/api/tunnels)",
-      "PowerShell(winget install --id Ngrok.Ngrok -e --accept-source-agreements --accept-package-agreements 2>&1)"
+      "PowerShell(winget install --id Ngrok.Ngrok -e --accept-source-agreements --accept-package-agreements 2>&1)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'fix\\(lumos\\): เส้น interview ไม่ขึ้นฝั่ง Lumos — scheduled_at เป็นอดีต ณ ตอนดึง + เสิร์ฟครั้งเดียวแล้วของหายเงียบ *)",
+      "Bash(git push *)",
+      "Bash(python3 -)",
+      "Bash(npm run *)",
+      "Bash(git commit -q -m 'feat\\(ui\\): เอา '\\\\''ส่งคำขอ / แจ้งบัค'\\\\'' ออกทั้งระบบ *)"
     ]
   }
 }

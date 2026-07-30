@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
-import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, PhoneForwarded, ArrowRight, MessageSquarePlus } from 'lucide-react';
+import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, PhoneForwarded, ArrowRight } from 'lucide-react';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -24,7 +24,6 @@ const STAFF_LINKS: HubLink[] = [
   { path: '/follow', label: 'Follow', desc: 'ลงรายชื่อคนที่ต้องติดตาม — Lumos โทรให้', icon: PhoneForwarded, accent: 'text-rose-700 bg-rose-500/12', functionId: 'follow_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', desc: 'ดูรายการใบขอ', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12', functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, accent: 'text-neutral-800 bg-neutral-500/10', functionId: 'dashboard' },
-  { path: '/feedback', label: 'ส่งคำขอ', desc: 'อยากเพิ่ม / อยากแก้ / แจ้งบัค', icon: MessageSquarePlus, accent: 'text-teal-700 bg-teal-500/12' },
 ];
 
 const SUPERVISOR_EXTRA: HubLink[] = [
