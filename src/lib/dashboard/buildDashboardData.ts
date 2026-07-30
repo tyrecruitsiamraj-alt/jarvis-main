@@ -547,8 +547,13 @@ function resolveOpenJobsForStockKpi(
   return jobs;
 }
 
-/** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก */
-function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): DashboardKpi[] {
+/** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก
+ *  totalOverride: โหมดมีงวดส่งยอด cohort มาให้ "ทั้งหมด" เท่าการ์ดคงเหลือ (ใบนอก feed ไม่มี work_status ให้แจก leaf) */
+function buildWorkStatusKpis(
+  jobs: JobRequest[],
+  periodLabel?: string | null,
+  totalOverride?: { positions: number; requests: number },
+): DashboardKpi[] {
   const counts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
     on_hold: 0,
@@ -578,8 +583,8 @@ function buildWorkStatusKpis(jobs: JobRequest[], periodLabel?: string | null): D
     counts[status] += units;
     requestCounts[status] += 1;
   }
-  const total = Object.values(counts).reduce((s, n) => s + n, 0);
-  const totalRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
+  const total = totalOverride?.positions ?? Object.values(counts).reduce((s, n) => s + n, 0);
+  const totalRequests = totalOverride?.requests ?? Object.values(requestCounts).reduce((s, n) => s + n, 0);
   const scopeHint = periodLabel
     ? `เท่าการ์ดคงเหลือในช่วงที่เลือก`
     : `เท่าการ์ดคงเหลือ`;
@@ -1143,12 +1148,15 @@ export function buildDashboardData(
   const kpis =
     cohortStock != null
       ? buildStockKpisFromCohort(
-          {
-            ...cohortStock,
-            /** คงเหลือ = ที่ต้องหาจากใบเปิดจริง (ไม่ใช้ยอด remaining จาก throughput ที่รวมใบนอกคิว) */
-            remainingPositions: openRemainingPositions,
-            remainingRequestCount: openRemainingRequests,
-          },
+          period
+            ? /** โหมดมีงวด: เหลือหา = cohort ตามเดือนที่กรอกใบ (นับครบทุกใบในงวด รวมใบนอก feed) */
+              cohortStock
+            : {
+                ...cohortStock,
+                /** โหมดทั้งหมด: คงเหลือ = ที่ต้องหาจากใบเปิดจริง (ไม่ใช้ยอด remaining จาก throughput ที่รวมใบนอกคิว) */
+                remainingPositions: openRemainingPositions,
+                remainingRequestCount: openRemainingRequests,
+              },
           stockScopeHint,
         ).map((kpi) =>
           !period && kpi.id === 'remaining'
@@ -1159,13 +1167,19 @@ export function buildDashboardData(
             : period && kpi.id === 'remaining'
               ? {
                   ...kpi,
-                  description: `อัตราที่ยังต้องหาจากใบเปิดที่กรอกในช่วง · ${openRemainingPositions.toLocaleString('th-TH')} อัตรา · ${openRemainingRequests.toLocaleString('th-TH')} ใบขอ`,
+                  description: `อัตราที่ยังต้องหาจากใบขอที่กรอกในช่วง · ${cohortStock.remainingPositions.toLocaleString('th-TH')} อัตรา · ${cohortStock.remainingRequestCount.toLocaleString('th-TH')} ใบขอ`,
                 }
               : kpi,
         )
       : buildStockKpis(stockJobs, period?.label ?? null);
 
-  const workStatusKpis = buildWorkStatusKpis(openRemainingJobs, period?.label ?? null);
+  const workStatusKpis = buildWorkStatusKpis(
+    openRemainingJobs,
+    period?.label ?? null,
+    period && cohortStock
+      ? { positions: cohortStock.remainingPositions, requests: cohortStock.remainingRequestCount }
+      : undefined,
+  );
 
   const lifecycleBoard = buildLifecycleBoardFromStockSources({
     throughputRecords,
