@@ -82,30 +82,54 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
   return res.status(200).json({ items: rows.map(toResponse), total: rows.length });
 }
 
-async function createFollow(req: AuthedReq, res: ApiRes) {
-  const raw = await readJsonBody(req);
+export type ParsedFollowInput = {
+  name: string;
+  phone: string;
+  topic: string;
+  note: string | null;
+  when: Date;
+};
+
+/**
+ * อ่าน/ตรวจ body ของ POST /api/follow — pure เพื่อคุมด้วย unit test
+ * ระวัง: getString() trim ให้แล้วและคืน null เมื่อไม่มีค่า — อย่าเรียก .trim() ต่อ
+ */
+export type FollowInputResult = { error: string | null; value: ParsedFollowInput | null };
+
+export function parseFollowInput(raw: unknown, now = new Date()): FollowInputResult {
+  const fail = (message: string): FollowInputResult => ({ error: message, value: null });
   if (typeof raw !== 'object' || raw === null) {
-    return sendError(res, 400, 'Bad request', 'Invalid JSON body');
+    return fail('Invalid JSON body');
   }
   const body = raw as Record<string, unknown>;
-  const name = getString(body.recipient_name).trim();
-  const phoneRaw = getString(body.recipient_phone).trim();
-  const topic = getString(body.topic).trim();
-  const note = getString(body.note).trim() || null;
-  const scheduledAt = getString(body.scheduled_at).trim();
+  const name = getString(body.recipient_name) ?? '';
+  const phoneRaw = getString(body.recipient_phone) ?? '';
+  const topic = getString(body.topic) ?? '';
+  const note = getString(body.note) || null;
+  const scheduledAt = getString(body.scheduled_at) ?? '';
 
-  if (!name) return sendError(res, 400, 'Bad request', 'กรุณากรอกชื่อผู้ที่ต้องติดตาม');
-  if (!topic) return sendError(res, 400, 'Bad request', 'กรุณากรอกเรื่องที่จะให้โทรติดตาม');
+  if (!name) return fail('กรุณากรอกชื่อผู้ที่ต้องติดตาม');
+  if (!topic) return fail('กรุณากรอกเรื่องที่จะให้โทรติดตาม');
 
   const phone = toE164Thai(phoneRaw);
   if (!phone) {
-    return sendError(res, 400, 'Bad request', 'เบอร์โทรไม่ถูกต้อง — ใช้เบอร์มือถือ 10 หลัก เช่น 0812345678');
+    return fail('เบอร์โทรไม่ถูกต้อง — ใช้เบอร์มือถือ 10 หลัก เช่น 0812345678');
   }
 
-  const when = scheduledAt ? new Date(scheduledAt) : new Date();
+  const when = scheduledAt ? new Date(scheduledAt) : now;
   if (Number.isNaN(when.getTime())) {
-    return sendError(res, 400, 'Bad request', 'วันเวลาที่ให้โทรไม่ถูกต้อง');
+    return fail('วันเวลาที่ให้โทรไม่ถูกต้อง');
   }
+
+  return { error: null, value: { name, phone, topic, note, when } };
+}
+
+async function createFollow(req: AuthedReq, res: ApiRes) {
+  const parsed = parseFollowInput(await readJsonBody(req));
+  if (parsed.error || !parsed.value) {
+    return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
+  }
+  const { name, phone, topic, note, when } = parsed.value;
 
   const { rows } = await dbQuery<FollowRow>(
     `insert into ${followTable}
@@ -137,7 +161,7 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
 }
 
 async function cancelFollow(req: AuthedReq, res: ApiRes) {
-  const id = getString(req.query?.id).trim();
+  const id = getString(req.query?.id) ?? '';
   if (!id) return sendError(res, 400, 'Bad request', 'Query id is required');
 
   const { rows } = await dbQuery<FollowRow>(

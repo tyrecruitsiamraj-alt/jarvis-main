@@ -1,9 +1,66 @@
 import { describe, it, expect } from 'vitest';
 import { buildFollowReminderPayload } from '../../api/_lib/lumosDispatch';
+import { parseFollowInput } from '../../api/_handlers/follow';
 import { checkApiAccess } from '../../api/_lib/rbac';
 import { APP_FUNCTIONS, primaryFunctionForPath, OPL_READ_FUNCTIONS } from '../../src/lib/roleFunctions';
 
 const WHEN = new Date('2026-08-15T09:30:00+07:00');
+
+describe('parseFollowInput', () => {
+  const NOW = new Date('2026-07-30T15:00:00+07:00');
+
+  it('ช่องไม่บังคับหายไปทั้งหมดก็ต้องผ่าน (เคยพัง 500 เพราะเว้น note ว่าง)', () => {
+    const r = parseFollowInput(
+      { recipient_name: 'สมชาย ใจดี', recipient_phone: '0812345678', topic: 'ตามเอกสาร' },
+      NOW,
+    );
+    expect(r.error).toBeNull();
+    expect(r.value).not.toBeNull();
+    expect(r.value!.note).toBeNull();
+    expect(r.value!.phone).toBe('+66812345678');
+    expect(r.value!.when.toISOString()).toBe(NOW.toISOString());
+  });
+
+  it('note/scheduled_at เป็นค่าว่างหรือชนิดผิด ก็ไม่ throw', () => {
+    for (const extra of [{ note: '' }, { note: null }, { note: 123 }, { scheduled_at: '' }, { scheduled_at: null }]) {
+      const r = parseFollowInput(
+        { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', ...extra },
+        NOW,
+      );
+      expect(r.error).toBeNull();
+      expect(r.value).not.toBeNull();
+    }
+  });
+
+  it('เก็บ note ที่กรอกมาและ trim ให้', () => {
+    const r = parseFollowInput(
+      { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', note: '  ถามวันสะดวก  ' },
+      NOW,
+    );
+    expect(r.value!.note).toBe('ถามวันสะดวก');
+  });
+
+  it('ปฏิเสธเมื่อขาดชื่อ / เรื่อง / เบอร์ไม่ถูกต้อง / วันเวลาเพี้ยน', () => {
+    expect(parseFollowInput({ recipient_phone: '0812345678', topic: 'ก' }, NOW).error).toContain('ชื่อ');
+    expect(parseFollowInput({ recipient_name: 'ก', recipient_phone: '0812345678' }, NOW).error).toContain('เรื่อง');
+    expect(parseFollowInput({ recipient_name: 'ก', recipient_phone: '02-123-4567', topic: 'ข' }, NOW).error).toContain('เบอร์');
+    expect(
+      parseFollowInput(
+        { recipient_name: 'ก', recipient_phone: '0812345678', topic: 'ข', scheduled_at: 'ไม่ใช่วันที่' },
+        NOW,
+      ).error,
+    ).toContain('วันเวลา');
+    expect(parseFollowInput(null, NOW).error).toBe('Invalid JSON body');
+  });
+
+  it('ใช้ scheduled_at ที่ส่งมาเมื่อเป็นวันเวลาที่ถูกต้อง', () => {
+    const r = parseFollowInput(
+      { recipient_name: 'ก', recipient_phone: '0812345678', topic: 'ข', scheduled_at: '2026-08-15T09:30:00+07:00' },
+      NOW,
+    );
+    expect(r.value!.when.toISOString()).toBe(WHEN.toISOString());
+  });
+});
 
 describe('buildFollowReminderPayload', () => {
   it('ส่งเรื่องที่กรอกเป็นข้อความให้ Lumos ผ่าน step แบบ follow_up', () => {
