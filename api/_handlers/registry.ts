@@ -37,8 +37,7 @@ import requestControlForecastHandler from './request-control-forecast.js';
 import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
 import appFeedbackHandler from './app-feedback.js';
-import driverCareHandler from './driver-care.js';
-import driverCareRecalculateHandler from './driver-care-recalculate.js';
+import followHandler from './follow.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
@@ -83,8 +82,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/audit-logs': auditLogsHandler as ApiHandler,
   '/api/employees': employeesHandler as ApiHandler,
   '/api/geocode': geocodeHandler as ApiHandler,
-  '/api/driver-care': driverCareHandler as ApiHandler,
-  '/api/driver-care/recalculate': driverCareRecalculateHandler as ApiHandler,
+  '/api/follow': followHandler as ApiHandler,
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
   '/api/siamraj/unit-assignments': siamrajUnitAssignmentsHandler as ApiHandler,
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,

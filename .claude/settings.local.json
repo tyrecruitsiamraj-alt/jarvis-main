@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/mssql-ping.mjs)",
+      "Bash(npx tsx *)",
+      "Bash(npx vercel *)",
+      "Bash(npx vercel env pull /tmp/vercel-prod.env --environment=production --yes 2>&1 | tail -3 *)",
+      "Bash(rm -f /tmp/vercel-prod.env && echo cleaned)",
+      "Bash(curl -s --max-time 5 http://127.0.0.1:4040/api/tunnels)",
+      "PowerShell(winget install --id Ngrok.Ngrok -e --accept-source-agreements --accept-package-agreements 2>&1)"
+    ]
+  }
+}

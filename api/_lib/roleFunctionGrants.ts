@@ -22,9 +22,8 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   clients_edit: 'supervisor',
   work_calendar_read: 'staff',
   work_calendar_manage: 'supervisor',
-  driver_care_read: 'staff',
-  driver_care_log: 'staff',
-  driver_care_manage: 'supervisor',
+  follow_read: 'staff',
+  follow_manage: 'staff',
   settings_access: 'admin',
   users_manage: 'admin',
   audit_logs: 'admin',
@@ -42,7 +41,7 @@ export const OPL_READ_FUNCTIONS = new Set([
   'employees_read',
   'clients_read',
   'work_calendar_read',
-  'driver_care_read',
+  'follow_read',
 ]);
 
 export type GrantOverride = { role: UserRole; function_id: string; enabled: boolean };

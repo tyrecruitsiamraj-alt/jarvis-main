@@ -40,10 +40,7 @@ const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
 const StaffJobBoardPage = lazy(() => import("@/pages/jobs/StaffJobBoardPage"));
 const JobDetailPage = lazy(() => import("@/pages/jobs/JobDetailPage"));
 const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
-const DriverCareOverview = lazy(() => import("@/pages/driver-care/DriverCareOverview"));
-const DriverRiskList = lazy(() => import("@/pages/driver-care/DriverRiskList"));
-const DriverActionTracking = lazy(() => import("@/pages/driver-care/DriverActionTracking"));
-const DriverCareResources = lazy(() => import("@/pages/driver-care/DriverCareResources"));
+const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
 const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
@@ -103,10 +100,7 @@ const ProtectedRoutes = () => {
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
             <Route path="/matching/job-postings" element={<JobPostingsPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
-            <Route path="/driver-care" element={<DriverCareOverview />} />
-            <Route path="/driver-care/risk-list" element={<DriverRiskList />} />
-            <Route path="/driver-care/actions" element={<DriverActionTracking />} />
-            <Route path="/driver-care/resources" element={<DriverCareResources />} />
+            <Route path="/follow" element={<FollowPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/overview" element={<JobDashboard />} />
             <Route path="/jobs/list" element={<JobListPage />} />

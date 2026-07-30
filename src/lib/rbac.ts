@@ -38,7 +38,7 @@ type RouteRule = {
 
 /**
  * Route access rules — most specific paths first.
- * Assumption: all authenticated users may access staff-level modules (WL, matching read, jobs read, driver-care read).
+ * Assumption: all authenticated users may access staff-level modules (WL, matching read, jobs read, follow read).
  */
 const ROUTE_RULES: RouteRule[] = [
   { match: (p) => p === '/admin', minimumRole: 'admin', note: 'admin hub' },
@@ -104,7 +104,7 @@ export const PERMISSION_MATRIX = {
   employees: { staff: 'read limited', supervisor: 'create/update', admin: 'all', opl: 'read' },
   clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all', opl: 'read' },
   workCalendar: { staff: 'read + create entries', supervisor: 'manage team', admin: 'all', opl: 'read' },
-  driverCare: { staff: 'read/action if assigned', supervisor: 'manage + recalc', admin: 'all', opl: 'read' },
+  follow: { staff: 'read + add/cancel follow entries', supervisor: 'same', admin: 'all', opl: 'read' },
   settings: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
   auditLogs: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
 } as const;

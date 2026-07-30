@@ -17,9 +17,8 @@ export type AppFunctionId =
   | 'clients_edit'
   | 'work_calendar_read'
   | 'work_calendar_manage'
-  | 'driver_care_read'
-  | 'driver_care_log'
-  | 'driver_care_manage'
+  | 'follow_read'
+  | 'follow_manage'
   | 'settings_access'
   | 'users_manage'
   | 'audit_logs';
@@ -50,9 +49,8 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'clients_edit', label: 'จัดการลูกค้า', group: 'ลูกค้า', minimumRole: 'supervisor' },
   { id: 'work_calendar_read', label: 'ดูปฏิทินงาน', group: 'ปฏิทิน', minimumRole: 'staff' },
   { id: 'work_calendar_manage', label: 'จัดการปฏิทินทีม', group: 'ปฏิทิน', minimumRole: 'supervisor' },
-  { id: 'driver_care_read', label: 'ดู Driver Care', group: 'Driver Care', minimumRole: 'staff' },
-  { id: 'driver_care_log', label: 'บันทึกการดูแล / action', group: 'Driver Care', minimumRole: 'staff' },
-  { id: 'driver_care_manage', label: 'จัดการทรัพยากร Driver Care', group: 'Driver Care', minimumRole: 'supervisor' },
+  { id: 'follow_read', label: 'ดูรายชื่อ Follow', group: 'Follow', minimumRole: 'staff' },
+  { id: 'follow_manage', label: 'เพิ่ม / ยกเลิกรายชื่อ Follow', group: 'Follow', minimumRole: 'staff' },
   { id: 'settings_access', label: 'เข้า Settings', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
   { id: 'users_manage', label: 'จัดการ Users / Role', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
   { id: 'audit_logs', label: 'ดู Audit Log', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
@@ -66,7 +64,7 @@ export const OPL_READ_FUNCTIONS: ReadonlySet<AppFunctionId> = new Set([
   'employees_read',
   'clients_read',
   'work_calendar_read',
-  'driver_care_read',
+  'follow_read',
 ]);
 
 export const ROLE_ORDER: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
@@ -108,7 +106,7 @@ export function primaryFunctionForPath(pathname: string): AppFunctionId | null {
   if (path.startsWith('/matching')) return 'candidates_read';
   if (path.startsWith('/jobs')) return 'unit_requests_read';
   if (path.startsWith('/wl')) return 'work_calendar_read';
-  if (path.startsWith('/driver-care')) return 'driver_care_read';
+  if (path.startsWith('/follow')) return 'follow_read';
   return null;
 }
 

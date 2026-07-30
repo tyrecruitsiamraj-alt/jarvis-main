@@ -15,7 +15,6 @@
     "db:migrate:status": "node scripts/migrate.mjs --status",
     "import:opl": "node scripts/import-opl-assignments.mjs",
     "db:seed": "node scripts/seed.mjs",
-    "db:seed:driver-care": "tsx scripts/seed-driver-care-demo.ts",
     "deploy:vercel": "vercel deploy --prod --yes",
     "build": "vite build",
     "build:dev": "vite build --mode development",

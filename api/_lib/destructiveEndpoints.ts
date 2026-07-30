@@ -5,7 +5,6 @@
  * - DELETE /api/candidates?id=  → status='drop'
  * - DELETE /api/jobs?id=        → status='cancelled'
  * - DELETE /api/employees?id=   → status='inactive'
- * - PATCH  driver-care delete-skill/delete-knowledge → is_active=false
  *
  * STILL HARD DELETE (TODO — add deleted_at / is_active):
  * - DELETE /api/candidate-interviews?id=

@@ -4,17 +4,16 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, HeartPulse, Globe } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
-import DriverCareResourcesPanel from '@/components/driver-care/DriverCareResourcesPanel';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'driverCare' | 'outboundIp';
+type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'outboundIp';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -38,7 +37,6 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
-  { id: 'driverCare', label: 'Driver Care', icon: HeartPulse, adminOnly: true },
   { id: 'outboundIp', label: 'Vercel IP', icon: Globe, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
@@ -50,7 +48,6 @@ const AdminSettings: React.FC = () => {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const initialTab: SettingsTab =
-    tabFromUrl === 'driverCare' ||
     tabFromUrl === 'outboundIp' ||
     tabFromUrl === 'appearance' ||
     tabFromUrl === 'users' ||
@@ -423,7 +420,6 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
 
-        {activeTab === 'driverCare' && <DriverCareResourcesPanel />}
 
         {activeTab === 'outboundIp' && <VercelOutboundIpTab />}
 

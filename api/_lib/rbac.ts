@@ -30,8 +30,7 @@ export type ApiResource =
   | 'candidate-interviews'
   | 'candidate-work-history'
   | 'training-records'
-  | 'driver-care'
-  | 'driver-care-recalculate'
+  | 'follow'
   | 'job-staff'
   | 'app-users'
   | 'audit-logs'
@@ -55,7 +54,7 @@ export type ApiResource =
 
 /**
  * Minimum role per API resource and HTTP method.
- * Fine-grained hints (e.g. driver-care `action`) refine write permissions.
+ * Fine-grained hints refine write permissions per resource.
  */
 export function minimumRoleFor(
   resource: ApiResource,
@@ -64,7 +63,6 @@ export function minimumRoleFor(
 ): UserRole {
   const m = method.toUpperCase();
   const isRead = m === 'GET' || m === 'HEAD';
-  const action = hint?.trim().toLowerCase();
 
   switch (resource) {
     case 'candidates':
@@ -102,14 +100,9 @@ export function minimumRoleFor(
       if (isRead || m === 'POST') return 'staff';
       return 'supervisor';
 
-    case 'driver-care':
-      // staff: read + log/update assigned actions; supervisor+: manage resources & recalc
-      if (isRead) return 'staff';
-      if (action === 'log' || action === 'update-action') return 'staff';
-      return 'supervisor';
-
-    case 'driver-care-recalculate':
-      return 'supervisor';
+    case 'follow':
+      // staff: ดู + เพิ่ม/ยกเลิกรายชื่อที่ต้องติดตามเอง
+      return 'staff';
 
     case 'job-staff':
       if (isRead) return 'staff';

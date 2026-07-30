@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, HeartPulse } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -18,7 +18,7 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/', label: 'หน้าหลัก', icon: Home },
   { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
-  { path: '/driver-care', label: 'Driver Care', icon: HeartPulse, functionId: 'driver_care_read' },
+  { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },
@@ -38,7 +38,7 @@ export function isDockPathActive(path: string, pathname: string): boolean {
     if (p.startsWith('/matching/candidates')) return false;
     return p.startsWith('/matching');
   }
-  if (path === '/driver-care') return p.startsWith('/driver-care');
+  if (path === '/follow') return p.startsWith('/follow');
   if (path === '/jobs/list') {
     if (p === '/jobs/board' || p.startsWith('/jobs/board/')) return false;
     return p.startsWith('/jobs');

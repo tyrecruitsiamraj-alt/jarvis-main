@@ -59,10 +59,6 @@ describe('production audit RBAC', () => {
   });
 
   it('mutation handlers use server-side audit helpers', () => {
-    const driverCareRecalc = readFileSync(
-      join(ROOT, 'api/_handlers/driver-care-recalculate.ts'),
-      'utf8',
-    );
     const jobAssignments = readFileSync(
       join(ROOT, 'api/_lib/jobAssignmentService.ts'),
       'utf8',
@@ -72,7 +68,6 @@ describe('production audit RBAC', () => {
       'utf8',
     );
 
-    expect(driverCareRecalc).toContain('auditFromAuthed');
     expect(jobAssignments).toContain('writeAuditInTx');
     expect(workCalendar).toContain('writeAuditInTx');
   });

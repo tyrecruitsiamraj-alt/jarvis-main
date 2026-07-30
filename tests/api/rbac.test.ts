@@ -22,7 +22,7 @@ describe('api rbac matrix', () => {
     expect(checkApiAccess('opl', 'jobs', 'POST').ok).toBe(false);
     expect(checkApiAccess('opl', 'siamraj-unit-notes', 'POST').ok).toBe(false);
     expect(checkApiAccess('opl', 'work-calendar', 'POST').ok).toBe(false);
-    expect(checkApiAccess('opl', 'driver-care', 'POST', 'log').ok).toBe(false);
+    expect(checkApiAccess('opl', 'follow', 'POST').ok).toBe(false);
   });
 
   it('supervisor cannot access admin settings APIs', () => {
@@ -50,10 +50,11 @@ describe('api rbac matrix', () => {
     expect(checkApiAccess('supervisor', 'clients', 'DELETE').ok).toBe(true);
   });
 
-  it('driver-care: staff can log actions, supervisor recalculates', () => {
-    expect(checkApiAccess('staff', 'driver-care', 'POST', 'log').ok).toBe(true);
-    expect(checkApiAccess('staff', 'driver-care-recalculate', 'POST').ok).toBe(false);
-    expect(checkApiAccess('supervisor', 'driver-care-recalculate', 'POST').ok).toBe(true);
+  it('follow: staff can add/cancel follow entries, opl read-only', () => {
+    expect(checkApiAccess('staff', 'follow', 'GET').ok).toBe(true);
+    expect(checkApiAccess('staff', 'follow', 'POST').ok).toBe(true);
+    expect(checkApiAccess('opl', 'follow', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'follow', 'POST').ok).toBe(false);
   });
 
   it('role hierarchy', () => {
@@ -116,7 +117,7 @@ describe('frontend route rbac', () => {
     expect(canAccessPath('supervisor', '/dashboard')).toBe(true);
     expect(canAccessPath('supervisor', '/wl/employees/add')).toBe(true);
     expect(canAccessPath('supervisor', '/jobs/abc')).toBe(true);
-    expect(canAccessPath('supervisor', '/driver-care/resources')).toBe(true);
+    expect(canAccessPath('supervisor', '/follow')).toBe(true);
   });
 
   it('admin can access all guarded routes', () => {

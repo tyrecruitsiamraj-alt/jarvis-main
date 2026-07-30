@@ -193,6 +193,58 @@ export async function enqueueLumosInterviewForIrecruit(
   }
 }
 
+// ─── Follow (คนกรอกรายชื่อเองในหน้า Follow) ─────────────────────────────────
+
+export type FollowEntryInput = {
+  id: string;
+  recipient_name: string;
+  /** E.164 แล้ว (handler validate ก่อนเรียก) */
+  recipient_phone: string;
+  topic: string;
+  note?: string | null;
+  scheduled_at: Date;
+};
+
+export function buildFollowReminderPayload(entry: FollowEntryInput): LumosReminderPayload {
+  const note = (entry.note || '').trim();
+  return {
+    client_contact_id: `follow::${entry.id}`,
+    recipient_name: entry.recipient_name,
+    recipient_phone: entry.recipient_phone,
+    title: entry.topic,
+    language: 'th',
+    tone: 'professional',
+    steps: [
+      {
+        type: 'follow_up',
+        message: note ? `${entry.topic} — ${note}` : entry.topic,
+        scheduled_at: entry.scheduled_at.toISOString(),
+      },
+    ],
+  };
+}
+
+/** รายชื่อ Follow ที่คนกรอก → คิว reminder (throw ให้ handler จัดการ เพราะผู้ใช้ต้องรู้ว่าเข้าคิวไหม) */
+export async function enqueueFollowReminder(entry: FollowEntryInput): Promise<void> {
+  const added = await insertQueueItems('reminder', 'follow', [
+    { personRef: `follow-${entry.id}`, payload: buildFollowReminderPayload(entry) },
+  ]);
+  logInfo('lumos.dispatch.follow', { followId: entry.id, added });
+}
+
+/** ยกเลิกรายการ Follow ในคิว — ได้ผลเฉพาะที่ Lumos ยังไม่ดึงไป (pending) */
+export async function cancelFollowReminder(followId: string): Promise<boolean> {
+  const { rows } = await dbQuery<{ id: number }>(
+    `update ${queueTable}
+        set status = 'cancelled', updated_at = now()
+      where channel = 'reminder' and job_ref = 'follow'
+        and person_ref = $1 and status = 'pending'
+      returning id`,
+    [`follow-${followId}`],
+  );
+  return rows.length > 0;
+}
+
 // ─── Serve + result (เรียกจาก lumos endpoints) ───────────────────────────────
 
 /** ดึงรายการ pending แล้ว mark delivered ในจังหวะเดียว (Lumos poll ซ้ำจะไม่ได้ของเดิมซ้ำ) */
