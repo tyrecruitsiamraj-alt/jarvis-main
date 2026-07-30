@@ -247,17 +247,56 @@ export async function cancelFollowReminder(followId: string): Promise<boolean> {
 
 // ─── Serve + result (เรียกจาก lumos endpoints) ───────────────────────────────
 
-/** ดึงรายการ pending แล้ว mark delivered ในจังหวะเดียว (Lumos poll ซ้ำจะไม่ได้ของเดิมซ้ำ) */
+/**
+ * Lumos spec บังคับ scheduled_at ต้องเป็น "now or future" — ถ้าเวลาที่เก็บไว้เลยมาแล้ว
+ * (เช่น เข้าคิวก่อน Lumos มาดึงหลายนาที) ให้ขยับไปอนาคตเล็กน้อย ณ ตอนเสิร์ฟ
+ * มิฉะนั้นฝั่ง Lumos จะปัดรายการทิ้งตอน ingest แบบเงียบ ๆ
+ */
+export function bumpScheduledAtForward(payload: unknown, now = new Date()): unknown {
+  if (typeof payload !== 'object' || payload === null) return payload;
+  const p = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  const floor = new Date(now.getTime() + 2 * 60_000).toISOString();
+  const bump = (v: unknown): string | unknown => {
+    if (typeof v !== 'string' || !v) return floor;
+    const t = new Date(v);
+    return Number.isNaN(t.getTime()) || t.getTime() < now.getTime() ? floor : v;
+  };
+  if ('scheduled_at' in p) p.scheduled_at = bump(p.scheduled_at);
+  if (Array.isArray(p.steps)) {
+    p.steps = p.steps.map((s) =>
+      typeof s === 'object' && s !== null
+        ? { ...(s as Record<string, unknown>), scheduled_at: bump((s as Record<string, unknown>).scheduled_at) }
+        : s,
+    );
+  }
+  return p;
+}
+
+const MAX_DELIVERIES = 5;
+const REDELIVER_AFTER_MINUTES = 30;
+
+/**
+ * เสิร์ฟรายการให้ Lumos แบบ at-least-once:
+ * - pending เสิร์ฟทันที · delivered ที่ยังไม่มีผลกลับเกิน 30 นาที เสิร์ฟซ้ำ (กันของหายเงียบ)
+ * - หยุดถาวรเมื่อ Lumos POST ผลกลับ (completed/failed/cancelled) หรือครบ 5 ครั้ง
+ */
 export async function takePendingLumosItems(
   channel: 'reminder' | 'interview',
   limit: number,
 ): Promise<unknown[]> {
   const { rows } = await dbQuery<{ payload: unknown }>(
     `update ${queueTable} q
-        set status = 'delivered', delivered_at = now(), updated_at = now()
+        set status = 'delivered', delivered_at = now(), updated_at = now(),
+            delivery_count = q.delivery_count + 1
       where q.id in (
         select id from ${queueTable}
-         where channel = $1 and status = 'pending'
+         where channel = $1
+           and result is null
+           and delivery_count < ${MAX_DELIVERIES}
+           and (
+             status = 'pending'
+             or (status = 'delivered' and delivered_at < now() - interval '${REDELIVER_AFTER_MINUTES} minutes')
+           )
          order by created_at asc
          limit $2
          for update skip locked
@@ -265,7 +304,7 @@ export async function takePendingLumosItems(
       returning q.payload`,
     [channel, Math.min(Math.max(limit, 1), 500)],
   );
-  return rows.map((r) => r.payload);
+  return rows.map((r) => bumpScheduledAtForward(r.payload));
 }
 
 /** ผูกผลจาก Lumos กลับเข้าคิว — หาแถวจาก client id ใน payload */

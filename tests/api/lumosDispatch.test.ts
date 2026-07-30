@@ -4,6 +4,7 @@ import {
   jobPositionLabel,
   buildReminderPayload,
   buildInterviewPayload,
+  bumpScheduledAtForward,
 } from '../../api/_lib/lumosDispatch';
 
 const NOW = new Date('2026-07-30T10:00:00+07:00');
@@ -60,6 +61,38 @@ describe('buildReminderPayload', () => {
 
   it('คืน null เมื่อไม่มีเบอร์ที่ใช้ได้ (Lumos ต้องมีเบอร์)', () => {
     expect(buildReminderPayload(JOB, RESULT, { card_id: 1, full_name: 'ไม่มีเบอร์', mobile: null }, NOW)).toBeNull();
+  });
+});
+
+describe('bumpScheduledAtForward — Lumos บังคับ scheduled_at เป็น now or future', () => {
+  const SERVE = new Date('2026-07-30T16:17:00+07:00');
+  const FLOOR = new Date(SERVE.getTime() + 2 * 60_000).toISOString();
+
+  it('เวลาที่เลยมาแล้ว (เข้าคิวก่อนถูกดึง) ถูกขยับเป็นอนาคต — ทั้งระดับบนและใน steps', () => {
+    const past = '2026-07-30T16:10:00+07:00';
+    const out = bumpScheduledAtForward(
+      { scheduled_at: past, steps: [{ type: 'remind', message: 'ม', scheduled_at: past }] },
+      SERVE,
+    ) as { scheduled_at: string; steps: Array<{ scheduled_at: string }> };
+    expect(out.scheduled_at).toBe(FLOOR);
+    expect(out.steps[0].scheduled_at).toBe(FLOOR);
+  });
+
+  it('เวลาอนาคต (เช่น Follow ที่นัดล่วงหน้า) ต้องไม่ถูกแตะ', () => {
+    const future = '2026-08-15T09:30:00+07:00';
+    const out = bumpScheduledAtForward({ scheduled_at: future, steps: [{ scheduled_at: future }] }, SERVE) as {
+      scheduled_at: string;
+      steps: Array<{ scheduled_at: string }>;
+    };
+    expect(out.scheduled_at).toBe(future);
+    expect(out.steps[0].scheduled_at).toBe(future);
+  });
+
+  it('ไม่พังกับ payload แปลก ๆ และไม่แก้ object เดิม', () => {
+    expect(bumpScheduledAtForward(null, SERVE)).toBeNull();
+    const original = { scheduled_at: '2026-07-30T16:10:00+07:00' };
+    bumpScheduledAtForward(original, SERVE);
+    expect(original.scheduled_at).toBe('2026-07-30T16:10:00+07:00');
   });
 });
 
