@@ -12,7 +12,7 @@
       "name": "api",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "api:local"],
-      "port": 3000
+      "port": 3100
     }
   ]
 }
