@@ -20,7 +20,8 @@ describe('runtime security', () => {
     delete process.env.JARVIS_ALLOW_PUBLIC_REGISTER;
     expect(isProductionRuntime()).toBe(true);
     expect(isDevRoleLoginAllowed()).toBe(false);
-    expect(isPublicRegistrationAllowed()).toBe(true);
+    // fail-closed: ไม่ตั้งค่า = ปิด public register
+    expect(isPublicRegistrationAllowed()).toBe(false);
   });
 
   it('blocks public register when explicitly disabled', () => {
@@ -28,6 +29,11 @@ describe('runtime security', () => {
     process.env.VERCEL_ENV = 'production';
     process.env.JARVIS_ALLOW_PUBLIC_REGISTER = 'false';
     expect(isPublicRegistrationAllowed()).toBe(false);
+  });
+
+  it('allows public register only when explicitly enabled', () => {
+    process.env.JARVIS_ALLOW_PUBLIC_REGISTER = 'true';
+    expect(isPublicRegistrationAllowed()).toBe(true);
   });
 
   it('allows dev-role only when explicitly enabled outside production', () => {
