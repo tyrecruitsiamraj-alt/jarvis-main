@@ -167,3 +167,31 @@ export function jobSubtypeFilterOptions(
 
   return options;
 }
+
+/** เวอร์ชันเลือกได้หลายค่า — [] = ทั้งหมด (ใช้กับฟิลเตอร์ multi-select) */
+export function filterUnitRequestsByAnyYear(
+  jobs: JobRequest[],
+  filters: SiamrajYearFilter[],
+): JobRequest[] {
+  if (filters.length === 0) return jobs;
+  const set = new Set(filters);
+  return jobs.filter((j) => set.has(extractRequestYear(j) as SiamrajYearFilter));
+}
+
+export function filterUnitRequestsByAnyDepartment(
+  jobs: JobRequest[],
+  filters: SiamrajDepartmentFilter[],
+): JobRequest[] {
+  if (filters.length === 0) return jobs;
+  const set = new Set(filters);
+  return jobs.filter((j) => set.has(extractDepartmentCode(j) as SiamrajDepartmentFilter));
+}
+
+export function filterUnitRequestsByAnyJobSubtype(
+  jobs: JobRequest[],
+  filters: SiamrajJobSubtypeFilter[],
+): JobRequest[] {
+  if (filters.length === 0) return jobs;
+  const set = new Set(filters);
+  return jobs.filter((j) => set.has(extractJobSubtypeKey(j) as SiamrajJobSubtypeFilter));
+}

@@ -176,3 +176,15 @@ export function matchesUnitOrganizationFilter(
   const resolve = buildOrganizationKeyResolver([unitName, filterLabel, ...scopeNames]);
   return resolve(unitName) === resolve(filterLabel);
 }
+
+/** เวอร์ชันเลือกได้หลายหน่วยงาน — [] = ทั้งหมด */
+export function matchesAnyUnitOrganizationFilter(
+  unitName: string | undefined,
+  filterLabels: string[],
+  scopeNames: Array<string | null | undefined> = [],
+): boolean {
+  return (
+    filterLabels.length === 0 ||
+    filterLabels.some((label) => matchesUnitOrganizationFilter(unitName, label, scopeNames))
+  );
+}

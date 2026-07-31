@@ -6,25 +6,27 @@ import {
 } from '@/lib/unitRequestWorkStatus';
 
 export type JobListFilter = 'all' | 'active' | 'closed';
-/** ตัวกรองสถานะทำงาน — เลือกหลายสถานะพร้อมกันได้, [] = ทั้งหมด */
+/** ทุกตัวกรองด้านล่างเลือกหลายค่าพร้อมกันได้ — [] = ทั้งหมด (ไม่เก็บ token 'all') */
 export type JobListWorkStatusFilter = UnitRequestWorkStatus[];
-/** ตัวกรองช่วงวันผ่านมา — เลือกหลายช่วงพร้อมกันได้, [] = ทั้งหมด (ไม่รวม 'all') */
 export type JobListAgeDaysFilter = Exclude<AgeDaysFilter, 'all'>[];
+export type JobListUrgencyFilter = Exclude<UrgencyFilter, 'all'>[];
+export type JobListNoteFilter = Exclude<NoteFilter, 'all'>[];
+export type JobListReplacementFilter = Exclude<ReplacementFilter, 'all'>[];
 
 export type JobListPageState = {
   filter: JobListFilter;
   search: string;
-  unitFilter: string;
-  departmentFilter: string;
-  jobSubtypeFilter: string;
-  yearFilter: string;
-  recruiterFilter: string;
-  screenerFilter: string;
-  oplFilter: string;
-  urgencyFilter: UrgencyFilter;
+  unitFilter: string[];
+  departmentFilter: string[];
+  jobSubtypeFilter: string[];
+  yearFilter: string[];
+  recruiterFilter: string[];
+  screenerFilter: string[];
+  oplFilter: string[];
+  urgencyFilter: JobListUrgencyFilter;
   workStatusFilter: JobListWorkStatusFilter;
-  noteFilter: NoteFilter;
-  replacementFilter: ReplacementFilter;
+  noteFilter: JobListNoteFilter;
+  replacementFilter: JobListReplacementFilter;
   ageDaysFilter: JobListAgeDaysFilter;
   sort: JobListSort;
   page: number;
@@ -34,17 +36,17 @@ export type JobListPageState = {
 export const JOB_LIST_DEFAULTS: JobListPageState = {
   filter: 'all',
   search: '',
-  unitFilter: 'all',
-  departmentFilter: 'all',
-  jobSubtypeFilter: 'all',
-  yearFilter: 'all',
-  recruiterFilter: 'all',
-  screenerFilter: 'all',
-  oplFilter: 'all',
-  urgencyFilter: 'all',
+  unitFilter: [],
+  departmentFilter: [],
+  jobSubtypeFilter: [],
+  yearFilter: [],
+  recruiterFilter: [],
+  screenerFilter: [],
+  oplFilter: [],
+  urgencyFilter: [],
   workStatusFilter: [],
-  noteFilter: 'all',
-  replacementFilter: 'all',
+  noteFilter: [],
+  replacementFilter: [],
   ageDaysFilter: [],
   sort: 'assignee_age',
   page: 1,
@@ -52,17 +54,10 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
 };
 
 const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
-const URGENCY_VALUES = new Set<UrgencyFilter>(['all', 'retroactive', 'urgent', 'advance']);
-const NOTE_VALUES = new Set<NoteFilter>(['all', 'has', 'empty']);
-const REPLACEMENT_VALUES = new Set<ReplacementFilter>(['all', 'send', 'no_send', 'unset']);
-const AGE_DAYS_MULTI_VALUES = new Set<Exclude<AgeDaysFilter, 'all'>>([
-  'advance',
-  'today',
-  '1-7',
-  '8-15',
-  '16-30',
-  '30+',
-]);
+const URGENCY_VALUES = new Set<string>(['retroactive', 'urgent', 'advance']);
+const NOTE_VALUES = new Set<string>(['has', 'empty']);
+const REPLACEMENT_VALUES = new Set<string>(['send', 'no_send', 'unset']);
+const AGE_DAYS_MULTI_VALUES = new Set<string>(['advance', 'today', '1-7', '8-15', '16-30', '30+']);
 
 function normalizeAgeToken(raw: string): string {
   const t = raw.trim();
@@ -71,23 +66,36 @@ function normalizeAgeToken(raw: string): string {
   return t;
 }
 
-/** parse 'ag' — รองรับค่าเดี่ยวแบบเดิม (ag=1-7) และหลายค่า (ag=1-7,8-15); 'all'/ค่าเพี้ยนถูกตัดทิ้ง */
-function parseAgeDaysFilter(raw: string | null): JobListAgeDaysFilter {
-  const out: JobListAgeDaysFilter = [];
+/** urgency เก่าบางลิงก์ใช้ overdue/escalated — map มาเป็น advance */
+function normalizeUrgencyToken(raw: string): string {
+  const t = raw.trim();
+  return t === 'overdue' || t === 'escalated' ? 'advance' : t;
+}
+
+/**
+ * แตกค่าหลายตัวจาก query — รองรับลิงก์เก่าที่เป็นค่าเดี่ยว (d=DS) และค่าใหม่ (d=DS,LM)
+ * 'all' และค่าว่างถูกตัดทิ้ง เพราะ [] แปลว่าทั้งหมดอยู่แล้ว
+ */
+function parseMulti(
+  raw: string | null,
+  opts?: { allowed?: Set<string>; normalize?: (token: string) => string },
+): string[] {
+  const out: string[] = [];
   for (const token of (raw || '').split(',')) {
-    const v = normalizeAgeToken(token);
-    if (AGE_DAYS_MULTI_VALUES.has(v as Exclude<AgeDaysFilter, 'all'>) && !out.includes(v as Exclude<AgeDaysFilter, 'all'>)) {
-      out.push(v as Exclude<AgeDaysFilter, 'all'>);
-    }
+    const v = (opts?.normalize ? opts.normalize(token) : token.trim());
+    if (!v || v === 'all' || out.includes(v)) continue;
+    if (opts?.allowed && !opts.allowed.has(v)) continue;
+    out.push(v);
   }
   return out;
 }
-const SORT_VALUES = new Set<JobListSort>(['assignee_age', 'age_desc', 'age_asc', 'newest', 'oldest']);
 
 function parsePageSize(raw: string | null): PageSizeOption {
   const n = Number(raw);
   return PAGE_SIZE_OPTIONS.includes(n as PageSizeOption) ? (n as PageSizeOption) : DEFAULT_PAGE_SIZE;
 }
+
+const SORT_VALUES = new Set<JobListSort>(['assignee_age', 'age_desc', 'age_asc', 'newest', 'oldest']);
 
 export function parseJobListSearchParams(params: URLSearchParams): JobListPageState {
   const filterRaw = params.get('f') || JOB_LIST_DEFAULTS.filter;
@@ -98,37 +106,34 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
   const pageRaw = Number(params.get('p') || '1');
   const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.trunc(pageRaw) : 1;
 
-  const urgencyRaw = (params.get('urg') || JOB_LIST_DEFAULTS.urgencyFilter) as UrgencyFilter;
-  const urgencyNormalized =
-    (urgencyRaw as string) === 'overdue' || (urgencyRaw as string) === 'escalated'
-      ? ('advance' as UrgencyFilter)
-      : urgencyRaw;
-  const noteRaw = (params.get('nf') || JOB_LIST_DEFAULTS.noteFilter) as NoteFilter;
-  const replacementRaw = (params.get('sr') || JOB_LIST_DEFAULTS.replacementFilter) as ReplacementFilter;
   const sortRaw = (params.get('sort') || JOB_LIST_DEFAULTS.sort) as JobListSort;
-  // รองรับทั้งค่าเดี่ยวแบบเดิม (ws=waiting_start) และหลายค่า (ws=a,b,c) — 'all'/ค่าเพี้ยนถูกตัดทิ้ง
-  const workStatusFilter: JobListWorkStatusFilter = (params.get('ws') || '')
-    .split(',')
-    .map((t) => t.trim())
-    .filter(isUnitRequestWorkStatus);
 
   return {
     filter,
     search: params.get('q') ?? JOB_LIST_DEFAULTS.search,
-    unitFilter: params.get('u') || JOB_LIST_DEFAULTS.unitFilter,
-    departmentFilter: params.get('d') || JOB_LIST_DEFAULTS.departmentFilter,
-    jobSubtypeFilter: params.get('st') || JOB_LIST_DEFAULTS.jobSubtypeFilter,
-    yearFilter: params.get('y') || JOB_LIST_DEFAULTS.yearFilter,
-    recruiterFilter: params.get('r') || JOB_LIST_DEFAULTS.recruiterFilter,
-    screenerFilter: params.get('sc') || JOB_LIST_DEFAULTS.screenerFilter,
-    oplFilter: params.get('opl') || JOB_LIST_DEFAULTS.oplFilter,
-    urgencyFilter: URGENCY_VALUES.has(urgencyNormalized) ? urgencyNormalized : JOB_LIST_DEFAULTS.urgencyFilter,
-    workStatusFilter,
-    noteFilter: NOTE_VALUES.has(noteRaw) ? noteRaw : JOB_LIST_DEFAULTS.noteFilter,
-    replacementFilter: REPLACEMENT_VALUES.has(replacementRaw)
-      ? replacementRaw
-      : JOB_LIST_DEFAULTS.replacementFilter,
-    ageDaysFilter: parseAgeDaysFilter(params.get('ag')),
+    unitFilter: parseMulti(params.get('u')),
+    departmentFilter: parseMulti(params.get('d')),
+    jobSubtypeFilter: parseMulti(params.get('st')),
+    yearFilter: parseMulti(params.get('y')),
+    recruiterFilter: parseMulti(params.get('r')),
+    screenerFilter: parseMulti(params.get('sc')),
+    oplFilter: parseMulti(params.get('opl')),
+    urgencyFilter: parseMulti(params.get('urg'), {
+      allowed: URGENCY_VALUES,
+      normalize: normalizeUrgencyToken,
+    }) as JobListUrgencyFilter,
+    workStatusFilter: (params.get('ws') || '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter(isUnitRequestWorkStatus),
+    noteFilter: parseMulti(params.get('nf'), { allowed: NOTE_VALUES }) as JobListNoteFilter,
+    replacementFilter: parseMulti(params.get('sr'), {
+      allowed: REPLACEMENT_VALUES,
+    }) as JobListReplacementFilter,
+    ageDaysFilter: parseMulti(params.get('ag'), {
+      allowed: AGE_DAYS_MULTI_VALUES,
+      normalize: normalizeAgeToken,
+    }) as JobListAgeDaysFilter,
     sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,
     page,
     pageSize: parsePageSize(params.get('ps')),
@@ -137,24 +142,24 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
 
 export function buildJobListSearchParams(state: JobListPageState): URLSearchParams {
   const params = new URLSearchParams();
+  const setMulti = (key: string, values: readonly string[]) => {
+    if (values.length > 0) params.set(key, values.join(','));
+  };
+
   if (state.filter !== JOB_LIST_DEFAULTS.filter) params.set('f', state.filter);
   if (state.search.trim()) params.set('q', state.search.trim());
-  if (state.unitFilter !== JOB_LIST_DEFAULTS.unitFilter) params.set('u', state.unitFilter);
-  if (state.departmentFilter !== JOB_LIST_DEFAULTS.departmentFilter) params.set('d', state.departmentFilter);
-  if (state.jobSubtypeFilter !== JOB_LIST_DEFAULTS.jobSubtypeFilter) params.set('st', state.jobSubtypeFilter);
-  if (state.yearFilter !== JOB_LIST_DEFAULTS.yearFilter) params.set('y', state.yearFilter);
-  if (state.recruiterFilter !== JOB_LIST_DEFAULTS.recruiterFilter) params.set('r', state.recruiterFilter);
-  if (state.screenerFilter !== JOB_LIST_DEFAULTS.screenerFilter) params.set('sc', state.screenerFilter);
-  if (state.oplFilter !== JOB_LIST_DEFAULTS.oplFilter) params.set('opl', state.oplFilter);
-  if (state.urgencyFilter !== JOB_LIST_DEFAULTS.urgencyFilter) params.set('urg', state.urgencyFilter);
-  if (state.workStatusFilter.length > 0) {
-    params.set('ws', state.workStatusFilter.join(','));
-  }
-  if (state.noteFilter !== JOB_LIST_DEFAULTS.noteFilter) params.set('nf', state.noteFilter);
-  if (state.replacementFilter !== JOB_LIST_DEFAULTS.replacementFilter) {
-    params.set('sr', state.replacementFilter);
-  }
-  if (state.ageDaysFilter.length > 0) params.set('ag', state.ageDaysFilter.join(','));
+  setMulti('u', state.unitFilter);
+  setMulti('d', state.departmentFilter);
+  setMulti('st', state.jobSubtypeFilter);
+  setMulti('y', state.yearFilter);
+  setMulti('r', state.recruiterFilter);
+  setMulti('sc', state.screenerFilter);
+  setMulti('opl', state.oplFilter);
+  setMulti('urg', state.urgencyFilter);
+  setMulti('ws', state.workStatusFilter);
+  setMulti('nf', state.noteFilter);
+  setMulti('sr', state.replacementFilter);
+  setMulti('ag', state.ageDaysFilter);
   if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
   if (state.page > 1) params.set('p', String(state.page));
   if (state.pageSize !== JOB_LIST_DEFAULTS.pageSize) params.set('ps', String(state.pageSize));

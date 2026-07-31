@@ -109,3 +109,16 @@ export function countJobsByStaffName(jobs: JobRequest[], field: StaffNameField):
   }
   return counts;
 }
+
+/** เวอร์ชันเลือกได้หลายค่า — [] = ทั้งหมด (ใช้กับฟิลเตอร์ multi-select) */
+export function matchesAnyRecruiterFilter(job: JobRequest, filters: string[]): boolean {
+  return filters.length === 0 || filters.some((f) => matchesRecruiterFilter(job, f));
+}
+
+export function matchesAnyScreenerFilter(job: JobRequest, filters: string[]): boolean {
+  return filters.length === 0 || filters.some((f) => matchesScreenerFilter(job, f));
+}
+
+export function matchesAnyOplFilter(job: JobRequest, filters: string[]): boolean {
+  return filters.length === 0 || filters.some((f) => matchesOplFilter(job, f));
+}

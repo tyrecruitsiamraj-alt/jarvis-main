@@ -15,6 +15,7 @@ type FilterMultiSelectProps = {
   allLabel?: string;
   /** คำนามในสรุป เช่น "เลือก 3 สถานะ" (default: "รายการ") */
   summaryNoun?: string;
+  disabled?: boolean;
   className?: string;
 };
 
@@ -35,6 +36,7 @@ export function FilterMultiSelect({
   onChange,
   allLabel = 'ทั้งหมด',
   summaryNoun = 'รายการ',
+  disabled = false,
   className,
 }: FilterMultiSelectProps) {
   const [open, setOpen] = useState(false);
@@ -70,6 +72,10 @@ export function FilterMultiSelect({
   }, []);
 
   useLayoutEffect(() => {
+    if (disabled && open) setOpen(false);
+  }, [disabled, open]);
+
+  useLayoutEffect(() => {
     if (!open) return;
     measure();
   }, [open, measure]);
@@ -103,8 +109,23 @@ export function FilterMultiSelect({
     };
   }, [open, measure]);
 
+  /** ค่าที่ "ส่งออกไปล่าสุด" — กันกดรัว ๆ แล้วค่าหาย เพราะ prop values กว่าจะกลับมาต้องผ่าน URL ก่อน */
+  const latestRef = useRef(values);
+  useEffect(() => {
+    latestRef.current = values;
+  }, [values]);
+
   const toggle = (value: string) => {
-    onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+    const base = latestRef.current;
+    const next = base.includes(value) ? base.filter((v) => v !== value) : [...base, value];
+    latestRef.current = next;
+    onChange(next);
+  };
+
+  const clearAll = () => {
+    latestRef.current = [];
+    onChange([]);
+    setOpen(false);
   };
 
   const summary =
@@ -135,10 +156,7 @@ export function FilterMultiSelect({
               type="button"
               role="option"
               aria-selected={values.length === 0}
-              onClick={() => {
-                onChange([]);
-                setOpen(false);
-              }}
+              onClick={clearAll}
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-secondary"
             >
               <span className="flex h-4 w-4 items-center justify-center">
@@ -185,10 +203,12 @@ export function FilterMultiSelect({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => setOpen((v) => !v)}
         className={cn(
           'jarvis-filter-select flex w-full min-w-0 items-center justify-between gap-1 text-left',
           values.length > 0 && 'font-medium text-foreground',
+          disabled && 'cursor-not-allowed opacity-60',
         )}
       >
         <span className="truncate">{summary}</span>

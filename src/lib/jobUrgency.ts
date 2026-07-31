@@ -417,3 +417,16 @@ export function matchesReplacementFilter(job: JobRequest, filter: ReplacementFil
   if (filter === 'no_send') return job.send_replacement === false;
   return job.send_replacement == null;
 }
+
+/** เวอร์ชันเลือกได้หลายค่า — [] = ทั้งหมด (ใช้กับฟิลเตอร์ multi-select) */
+export function matchesAnyUrgencyFilter(job: JobRequest, filters: UrgencyFilter[]): boolean {
+  return filters.length === 0 || filters.some((f) => matchesUrgencyFilter(job, f));
+}
+
+export function matchesAnyNoteFilter(job: JobRequest, filters: NoteFilter[]): boolean {
+  return filters.length === 0 || filters.some((f) => matchesNoteFilter(job, f));
+}
+
+export function matchesAnyReplacementFilter(job: JobRequest, filters: ReplacementFilter[]): boolean {
+  return filters.length === 0 || filters.some((f) => matchesReplacementFilter(job, f));
+}

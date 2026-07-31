@@ -30,26 +30,27 @@ import {
   getJobRequestSubmittedDate,
   JOB_LIST_SORT_OPTIONS,
   matchesAnyAgeDaysFilter,
-  matchesNoteFilter,
-  matchesReplacementFilter,
-  matchesUrgencyFilter,
+  matchesAnyNoteFilter,
+  matchesAnyReplacementFilter,
+  matchesAnyUrgencyFilter,
   REPLACEMENT_FILTER_OPTIONS,
   URGENCY_FILTER_OPTIONS,
 } from '@/lib/jobUrgency';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
-import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, countJobsByStaffName, countUnassignedRecruiters, countUnassignedScreeners, countUnassignedOpls, matchesRecruiterFilter, matchesScreenerFilter, matchesOplFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, countJobsByStaffName, countUnassignedRecruiters, countUnassignedScreeners, countUnassignedOpls, matchesAnyRecruiterFilter, matchesAnyScreenerFilter, matchesAnyOplFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import {
   departmentFilterOptions,
-  filterUnitRequestsByDepartment,
+  filterUnitRequestsByAnyDepartment,
   extractJobSubtypeLabel,
-  filterUnitRequestsByJobSubtype,
+  filterUnitRequestsByAnyJobSubtype,
   jobSubtypeFilterOptions,
-  filterUnitRequestsByYear,
+  filterUnitRequestsByAnyYear,
   yearFilterOptions,
 } from '@/lib/siamrajUnitFilters';
 import {
   groupedUnitFilterOptions,
   matchesUnitOrganizationFilter,
+  matchesAnyUnitOrganizationFilter,
   unitOrganizationKey,
 } from '@/lib/unitGroupName';
 import { cleanedAddressSummary } from '@/lib/districtMatch';
@@ -130,7 +131,11 @@ const JobListPage: React.FC = () => {
     page,
     pageSize,
   } = listState;
-  const departmentFilter = lockedDepartmentCode || departmentFilterRaw;
+  // ต้อง memo — ถ้าสร้าง array ใหม่ทุก render จะทำให้ useMemo/useEffect ที่ผูกอยู่ด้านล่างรันไม่จบ
+  const departmentFilter = useMemo(
+    () => (lockedDepartmentCode ? [lockedDepartmentCode] : departmentFilterRaw),
+    [lockedDepartmentCode, departmentFilterRaw],
+  );
 
   const returnTo = jobListReturnTo(location.pathname, location.search);
   const [openInNewTab, setOpenInNewTab] = useState(loadOpenInNewTabPref);
@@ -145,10 +150,13 @@ const JobListPage: React.FC = () => {
 
   const updateListState = useCallback(
     (patch: Partial<typeof listState>) => {
-      const next = mergeJobListState(listState, patch);
-      setSearchParams(buildJobListSearchParams(next), { replace: true });
+      // ใช้รูปแบบฟังก์ชัน — merge จาก URL ล่าสุดเสมอ กันแก้หลายฟิลเตอร์ติด ๆ กันแล้วทับกันเอง
+      setSearchParams(
+        (prev) => buildJobListSearchParams(mergeJobListState(parseJobListSearchParams(prev), patch)),
+        { replace: true },
+      );
     },
-    [listState, setSearchParams],
+    [setSearchParams],
   );
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
@@ -210,7 +218,7 @@ const JobListPage: React.FC = () => {
   );
 
   const departmentScopedJobs = useMemo(
-    () => (siamrajPrimary ? filterUnitRequestsByDepartment(jobs, departmentFilter) : jobs),
+    () => (siamrajPrimary ? filterUnitRequestsByAnyDepartment(jobs, departmentFilter) : jobs),
     [jobs, siamrajPrimary, departmentFilter],
   );
 
@@ -220,7 +228,7 @@ const JobListPage: React.FC = () => {
   );
 
   const subtypeScopedJobs = useMemo(
-    () => (siamrajPrimary ? filterUnitRequestsByJobSubtype(departmentScopedJobs, jobSubtypeFilter) : departmentScopedJobs),
+    () => (siamrajPrimary ? filterUnitRequestsByAnyJobSubtype(departmentScopedJobs, jobSubtypeFilter) : departmentScopedJobs),
     [departmentScopedJobs, siamrajPrimary, jobSubtypeFilter],
   );
 
@@ -230,7 +238,7 @@ const JobListPage: React.FC = () => {
   );
 
   const scopedJobs = useMemo(
-    () => (siamrajPrimary ? filterUnitRequestsByYear(subtypeScopedJobs, yearFilter) : subtypeScopedJobs),
+    () => (siamrajPrimary ? filterUnitRequestsByAnyYear(subtypeScopedJobs, yearFilter) : subtypeScopedJobs),
     [subtypeScopedJobs, siamrajPrimary, yearFilter],
   );
 
@@ -246,27 +254,27 @@ const JobListPage: React.FC = () => {
 
   const recruiterFilterScope = useMemo(() => {
     return scopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
-      if (!matchesScreenerFilter(j, screenerFilter)) return false;
-      if (!matchesOplFilter(j, oplFilter)) return false;
+      if (!matchesAnyUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
+      if (!matchesAnyScreenerFilter(j, screenerFilter)) return false;
+      if (!matchesAnyOplFilter(j, oplFilter)) return false;
       return true;
     });
   }, [scopedJobs, unitFilter, screenerFilter, oplFilter, unitScopeNames]);
 
   const screenerFilterScope = useMemo(() => {
     return scopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
-      if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
-      if (!matchesOplFilter(j, oplFilter)) return false;
+      if (!matchesAnyUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
+      if (!matchesAnyRecruiterFilter(j, recruiterFilter)) return false;
+      if (!matchesAnyOplFilter(j, oplFilter)) return false;
       return true;
     });
   }, [scopedJobs, unitFilter, recruiterFilter, oplFilter, unitScopeNames]);
 
   const oplFilterScope = useMemo(() => {
     return scopedJobs.filter((j) => {
-      if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
-      if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
-      if (!matchesScreenerFilter(j, screenerFilter)) return false;
+      if (!matchesAnyUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
+      if (!matchesAnyRecruiterFilter(j, recruiterFilter)) return false;
+      if (!matchesAnyScreenerFilter(j, screenerFilter)) return false;
       return true;
     });
   }, [scopedJobs, unitFilter, recruiterFilter, screenerFilter, unitScopeNames]);
@@ -316,19 +324,19 @@ const JobListPage: React.FC = () => {
 
     return pool
       .filter((j) => {
-        if (unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
-        if (!matchesRecruiterFilter(j, recruiterFilter)) return false;
-        if (!matchesScreenerFilter(j, screenerFilter)) return false;
-        if (!matchesOplFilter(j, oplFilter)) return false;
-        if (!matchesUrgencyFilter(j, urgencyFilter)) return false;
+        if (!matchesAnyUnitOrganizationFilter(j.unit_name, unitFilter, unitScopeNames)) return false;
+        if (!matchesAnyRecruiterFilter(j, recruiterFilter)) return false;
+        if (!matchesAnyScreenerFilter(j, screenerFilter)) return false;
+        if (!matchesAnyOplFilter(j, oplFilter)) return false;
+        if (!matchesAnyUrgencyFilter(j, urgencyFilter)) return false;
         if (
           workStatusFilter.length > 0 &&
           !workStatusFilter.includes(resolveUnitRequestWorkStatus(j.work_status))
         ) {
           return false;
         }
-      if (!matchesNoteFilter(j, noteFilter)) return false;
-      if (!matchesReplacementFilter(j, replacementFilter)) return false;
+      if (!matchesAnyNoteFilter(j, noteFilter)) return false;
+      if (!matchesAnyReplacementFilter(j, replacementFilter)) return false;
       if (!matchesAnyAgeDaysFilter(j, ageDaysFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
@@ -350,25 +358,25 @@ const JobListPage: React.FC = () => {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
+  // เมื่อตัวเลือกเปลี่ยน (เช่นเปลี่ยนแผนก) ให้ตัดเฉพาะค่าที่เลือกไว้แล้วไม่มีอยู่แล้ว
   useEffect(() => {
-    if (jobSubtypeFilter === 'all') return;
-    const stillValid = jobSubtypeOptions.some((o) => o.value === jobSubtypeFilter);
-    if (!stillValid) updateListState({ jobSubtypeFilter: 'all' });
+    if (jobSubtypeFilter.length === 0) return;
+    const valid = jobSubtypeFilter.filter((v) => jobSubtypeOptions.some((o) => o.value === v));
+    if (valid.length !== jobSubtypeFilter.length) updateListState({ jobSubtypeFilter: valid });
   }, [departmentFilter, jobSubtypeOptions, jobSubtypeFilter, updateListState]);
 
   useEffect(() => {
-    if (yearFilter === 'all') return;
-    const stillValid = yearOptions.some((o) => o.value === yearFilter);
-    if (!stillValid) updateListState({ yearFilter: 'all' });
+    if (yearFilter.length === 0) return;
+    const valid = yearFilter.filter((v) => yearOptions.some((o) => o.value === v));
+    if (valid.length !== yearFilter.length) updateListState({ yearFilter: valid });
   }, [departmentFilter, jobSubtypeFilter, yearOptions, yearFilter, updateListState]);
 
   useEffect(() => {
-    if (unitFilter === 'all') return;
-    if (unitFilter === 'all') return;
-    const stillValid = unitOptions.some(
-      (o) => unitOrganizationKey(o) === unitOrganizationKey(unitFilter),
+    if (unitFilter.length === 0) return;
+    const valid = unitFilter.filter((v) =>
+      unitOptions.some((o) => unitOrganizationKey(o) === unitOrganizationKey(v)),
     );
-    if (!stillValid) updateListState({ unitFilter: 'all' });
+    if (valid.length !== unitFilter.length) updateListState({ unitFilter: valid });
   }, [departmentFilter, jobSubtypeFilter, unitOptions, unitFilter, updateListState]);
 
   useEffect(() => {
@@ -472,163 +480,133 @@ const JobListPage: React.FC = () => {
             )}
           >
           {siamrajPrimary ? (
-            <FilterSelect
+            <FilterMultiSelect
               id="job-list-department"
-              label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก'}
-              value={departmentFilter}
+              label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก (เลือกได้หลายค่า)'}
+              summaryNoun="แผนก"
+              values={departmentFilter}
               disabled={Boolean(lockedDepartmentCode)}
               onChange={(v) => {
                 if (lockedDepartmentCode) return;
                 updateListState({ departmentFilter: v });
               }}
-            >
-              {lockedDepartmentCode ? (
-                <option value={lockedDepartmentCode}>{lockedDepartmentCode}</option>
-              ) : (
-                departmentOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))
-              )}
-            </FilterSelect>
+              options={
+                lockedDepartmentCode
+                  ? [{ value: lockedDepartmentCode, label: lockedDepartmentCode }]
+                  : departmentOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))
+              }
+            />
           ) : null}
 
           {siamrajPrimary ? (
-            <FilterSelect
+            <FilterMultiSelect
               id="job-list-subtype"
-              label="ลักษณะงานย่อย"
-              value={jobSubtypeFilter}
+              label="ลักษณะงานย่อย (เลือกได้หลายค่า)"
+              summaryNoun="ลักษณะงาน"
+              values={jobSubtypeFilter}
               onChange={(v) => updateListState({ jobSubtypeFilter: v })}
-            >
-              {jobSubtypeOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </FilterSelect>
+              options={jobSubtypeOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+            />
           ) : null}
 
           {siamrajPrimary ? (
-            <FilterSelect
+            <FilterMultiSelect
               id="job-list-year"
-              label="ปี (พ.ศ.)"
-              value={yearFilter}
+              label="ปี พ.ศ. (เลือกได้หลายค่า)"
+              summaryNoun="ปี"
+              allLabel="ทุกปี"
+              values={yearFilter}
               onChange={(v) => updateListState({ yearFilter: v })}
-            >
-              {yearOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </FilterSelect>
+              options={yearOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+            />
           ) : null}
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-recruiter"
-            label="เจ้าหน้าที่สรรหา"
-            value={recruiterFilter}
+            label="เจ้าหน้าที่สรรหา (เลือกได้หลายค่า)"
+            summaryNoun="คน"
+            values={recruiterFilter}
             onChange={(v) => updateListState({ recruiterFilter: v })}
-          >
-            <option value="all">ทั้งหมด</option>
-            <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-              {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
-            </option>
-            {recruiters.map((r) => (
-              <option key={r} value={r}>
-                {r} ({recruiterCounts.get(r) ?? 0})
-              </option>
-            ))}
-          </FilterSelect>
+            options={[
+              {
+                value: STAFF_ASSIGNEE_UNASSIGNED,
+                label: `${STAFF_ASSIGNEE_UNASSIGNED_LABEL} (${unassignedRecruiterCount})`,
+              },
+              ...recruiters.map((n) => ({ value: n, label: `${n} (${recruiterCounts.get(n) ?? 0})` })),
+            ]}
+          />
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-screener"
-            label="เจ้าหน้าที่คัดสรร"
-            value={screenerFilter}
+            label="เจ้าหน้าที่คัดสรร (เลือกได้หลายค่า)"
+            summaryNoun="คน"
+            values={screenerFilter}
             onChange={(v) => updateListState({ screenerFilter: v })}
-          >
-            <option value="all">ทั้งหมด</option>
-            <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-              {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
-            </option>
-            {screeners.map((s) => (
-              <option key={s} value={s}>
-                {s} ({screenerCounts.get(s) ?? 0})
-              </option>
-            ))}
-          </FilterSelect>
+            options={[
+              {
+                value: STAFF_ASSIGNEE_UNASSIGNED,
+                label: `${STAFF_ASSIGNEE_UNASSIGNED_LABEL} (${unassignedScreenerCount})`,
+              },
+              ...screeners.map((n) => ({ value: n, label: `${n} (${screenerCounts.get(n) ?? 0})` })),
+            ]}
+          />
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-opl"
-            label="เจ้าหน้าที่ OPL"
-            value={oplFilter}
+            label="เจ้าหน้าที่ OPL (เลือกได้หลายค่า)"
+            summaryNoun="คน"
+            values={oplFilter}
             onChange={(v) => updateListState({ oplFilter: v })}
-          >
-            <option value="all">ทั้งหมด</option>
-            <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-              {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedOplCount})
-            </option>
-            {opls.map((n) => (
-              <option key={n} value={n}>
-                {n} ({oplCounts.get(n) ?? 0})
-              </option>
-            ))}
-          </FilterSelect>
+            options={[
+              {
+                value: STAFF_ASSIGNEE_UNASSIGNED,
+                label: `${STAFF_ASSIGNEE_UNASSIGNED_LABEL} (${unassignedOplCount})`,
+              },
+              ...opls.map((n) => ({ value: n, label: `${n} (${oplCounts.get(n) ?? 0})` })),
+            ]}
+          />
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-urgency"
-            label="สถานะใบขอ"
-            value={urgencyFilter}
+            label="สถานะใบขอ (เลือกได้หลายค่า)"
+            summaryNoun="สถานะ"
+            values={urgencyFilter}
             onChange={(v) => updateListState({ urgencyFilter: v as typeof urgencyFilter })}
-          >
-            {URGENCY_FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value} title={o.hint}>
-                {o.label}
-              </option>
-            ))}
-          </FilterSelect>
+            options={URGENCY_FILTER_OPTIONS.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+          />
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-work-status"
-            label="สถานะทำงาน"
-            value={workStatusFilter[0] ?? 'all'}
-            onChange={(v) =>
-              updateListState({
-                workStatusFilter: (v === 'all' ? [] : [v]) as typeof workStatusFilter,
-              })
-            }
-          >
-            <option value="all">ทั้งหมด</option>
-            {UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>
-                {UNIT_REQUEST_WORK_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </FilterSelect>
+            label="สถานะทำงาน (เลือกได้หลายค่า)"
+            summaryNoun="สถานะ"
+            values={workStatusFilter}
+            onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
+            options={UNIT_REQUEST_WORK_STATUS_OPTIONS.map((status) => ({
+              value: status,
+              label: UNIT_REQUEST_WORK_STATUS_LABELS[status],
+            }))}
+          />
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-note-filter"
-            label="หมายเหตุ"
-            value={noteFilter}
+            label="หมายเหตุ (เลือกได้หลายค่า)"
+            summaryNoun="แบบ"
+            values={noteFilter}
             onChange={(v) => updateListState({ noteFilter: v as typeof noteFilter })}
-          >
-            <option value="all">ทั้งหมด</option>
-            <option value="has">มีหมายเหตุ</option>
-            <option value="empty">ไม่มีหมายเหตุ</option>
-          </FilterSelect>
+            options={[
+              { value: 'has', label: 'มีหมายเหตุ' },
+              { value: 'empty', label: 'ไม่มีหมายเหตุ' },
+            ]}
+          />
 
-          <FilterSelect
+          <FilterMultiSelect
             id="job-list-replacement-filter"
-            label="ส่งคนแทน"
-            value={replacementFilter}
+            label="ส่งคนแทน (เลือกได้หลายค่า)"
+            summaryNoun="แบบ"
+            values={replacementFilter}
             onChange={(v) => updateListState({ replacementFilter: v as typeof replacementFilter })}
-          >
-            {REPLACEMENT_FILTER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </FilterSelect>
+            options={REPLACEMENT_FILTER_OPTIONS.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+          />
 
           <FilterMultiSelect
             id="job-list-age"
