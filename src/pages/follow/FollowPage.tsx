@@ -128,7 +128,6 @@ const FollowPage: React.FC = () => {
 
   return (
     <div className="relative">
-      <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader
         title="Follow"
         subtitle="ลงรายชื่อคนที่ต้องติดตาม แล้ว AI จะโทรตามให้"

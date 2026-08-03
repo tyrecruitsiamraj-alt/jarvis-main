@@ -35,6 +35,7 @@ const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
 const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
+const OurPeoplePage = lazy(() => import("@/pages/matching/OurPeoplePage"));
 const JobDashboard = lazy(() => import("@/pages/jobs/JobDashboard"));
 const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
 const StaffJobBoardPage = lazy(() => import("@/pages/jobs/StaffJobBoardPage"));
@@ -99,6 +100,7 @@ const ProtectedRoutes = () => {
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
             <Route path="/matching/job-postings" element={<JobPostingsPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
+            <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/overview" element={<JobDashboard />} />

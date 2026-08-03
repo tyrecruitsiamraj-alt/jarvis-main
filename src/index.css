@@ -198,14 +198,6 @@
     background: #fff;
   }
 
-  .jarvis-orange-orb {
-    @apply rounded-full pointer-events-none;
-    background: radial-gradient(circle at 35% 35%, #5ac8fa 0%, #007aff 45%, #0060df 75%, transparent 100%);
-    box-shadow:
-      0 0 60px rgba(0, 122, 255, 0.4),
-      0 0 120px rgba(0, 122, 255, 0.18),
-      inset 0 -8px 24px rgba(0, 96, 223, 0.28);
-  }
 
   .jarvis-dark-card {
     @apply rounded-[1.5rem] text-white;
@@ -262,9 +254,6 @@
     @apply glass-card overflow-hidden rounded-[1.25rem];
   }
 
-  .jarvis-page-orb {
-    @apply pointer-events-none absolute jarvis-orange-orb opacity-25 blur-sm;
-  }
 
   /* ── ภาษากลางของระบบ (3 ส.ค. 2569): chip / ปุ่ม / กล่องตัวเลข / หัวข้อ ──
      กติกา: การ์ดใหญ่ = glass (1.25–1.75rem) · การ์ดย่อย = rounded-xl ·

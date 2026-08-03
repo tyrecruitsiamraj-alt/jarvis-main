@@ -19,6 +19,7 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
+import { jobPositionLabel } from '../_lib/lumosDispatch.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { isBoardCandidateAvailable } from '@/lib/boardMatchAvailability';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
@@ -47,8 +48,13 @@ export type FlowFollowUpItem = {
   person_ref: string;
   channel: string;
   name: string | null;
+  phone: string | null;
   summary: string | null;
+  outcome: string | null;
   updated_at: string;
+  /** ตำแหน่ง+หน่วยงานของใบขอที่คนนี้ถูกแมทไป — โชว์ใน dialog รายละเอียดบนหน้าแรก */
+  job_position: string | null;
+  job_unit: string | null;
 };
 
 type FollowUpSqlRow = {
@@ -56,7 +62,9 @@ type FollowUpSqlRow = {
   person_ref: string;
   channel: string;
   name: string | null;
+  phone: string | null;
   summary: string | null;
+  outcome: string | null;
   updated_at: string | Date;
 };
 
@@ -69,8 +77,12 @@ function toFollowUp(r: FollowUpSqlRow): FlowFollowUpItem {
     person_ref: r.person_ref,
     channel: r.channel,
     name: r.name,
+    phone: r.phone,
     summary: r.summary,
+    outcome: r.outcome,
     updated_at: iso(r.updated_at),
+    job_position: null,
+    job_unit: null,
   };
 }
 
@@ -86,7 +98,9 @@ async function listCallsAwaitingAction(
   const { rows } = await dbQuery<FollowUpSqlRow>(
     `select q.job_ref, q.person_ref, q.channel, q.updated_at,
             coalesce(q.payload->>'recipient_name', q.payload->>'candidate_name') as name,
-            q.result->>'summary' as summary
+            coalesce(q.payload->>'recipient_phone', q.payload->>'phone') as phone,
+            q.result->>'summary' as summary,
+            q.result->>'outcome' as outcome
        from ${queueTable} q
       where q.job_ref = any($3)
         and q.result->>'outcome' = any($1)
@@ -178,10 +192,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     // ── ต้องติดตาม: สนใจแล้วยังไม่มีใครจอง / ไม่รับสาย (เฉพาะใบขอเปิดของ BU ตัวเอง)
-    const [confirmedWaiting, noAnswerWaiting] = await Promise.all([
+    const [confirmedRaw, noAnswerRaw] = await Promise.all([
       listCallsAwaitingAction(['confirmed'], scopedJobIds, 20),
       listCallsAwaitingAction(['no_answer', 'unresponsive'], scopedJobIds, 20),
     ]);
+    // เติมว่าแมทกับงานอะไร (ตำแหน่ง+หน่วยงาน) จากใบขอในลิสต์ที่โหลดมาแล้ว
+    const jobById = new Map(jobs.map((j) => [j.id, j as unknown as Record<string, unknown>]));
+    const enrich = (item: FlowFollowUpItem): FlowFollowUpItem => {
+      const job = jobById.get(item.job_ref);
+      if (!job) return item;
+      return {
+        ...item,
+        job_position: jobPositionLabel(job),
+        job_unit: typeof job.unit_name === 'string' ? job.unit_name : null,
+      };
+    };
+    const confirmedWaiting = confirmedRaw.map(enrich);
+    const noAnswerWaiting = noAnswerRaw.map(enrich);
 
     // ── การเสนอ/จอง/ลงงาน (สถานะทีม Matching — ไม่ใช่ตัวเลขทางการ ERP)
     const { rows: propAgg } = await dbQuery<{

@@ -50,10 +50,10 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
 /** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use) */
 type BoardBucket = { column_id: number; label: string | null; count: number };
 
-const BUCKET_DISPLAY: Record<string, { title: string; desc: string; cls: string }> = {
-  'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: 'text-emerald-700' },
-  'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: 'text-amber-700' },
-  're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: 'text-violet-700' },
+const BUCKET_DISPLAY: Record<string, { title: string; desc: string; cls: string; bucket: string }> = {
+  'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: 'text-emerald-700', bucket: 'todo' },
+  'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: 'text-amber-700', bucket: 'no_job' },
+  're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: 'text-violet-700', bucket: 'reuse' },
 };
 
 const MatchingDashboard: React.FC = () => {
@@ -137,7 +137,6 @@ const MatchingDashboard: React.FC = () => {
 
   return (
     <div className="relative">
-      <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader title="Matching Module" subtitle="จับคู่กับงาน" />
       <div className="px-4 md:px-6 space-y-6">
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูลงาน...</div>}
@@ -196,12 +195,13 @@ const MatchingDashboard: React.FC = () => {
                   title: b.label || `คอลัมน์ ${b.column_id}`,
                   desc: '',
                   cls: 'text-foreground',
+                  bucket: '',
                 };
                 return (
                   <button
                     key={b.column_id}
                     type="button"
-                    onClick={() => navigate('/matching/match')}
+                    onClick={() => navigate(meta.bucket ? `/matching/our-people?bucket=${meta.bucket}` : '/matching/our-people')}
                     className="jarvis-stat-tile"
                   >
                     <div className="jarvis-stat-label">{meta.title}</div>

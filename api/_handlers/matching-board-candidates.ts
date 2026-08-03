@@ -41,6 +41,33 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 503, 'Service unavailable', 'ยังไม่ได้ตั้งค่า Siamraj SQL Server (DB_HOST)');
     }
 
+    // โหมด people: รายชื่อคนของเราทั้ง 3 ถัง (To do / ไม่มีงาน / Re Use) — หน้า "คนของเรา"
+    // ข้อมูลระดับเดียวกับ picker เลือกส่ง AI โทร (ชื่อ+เบอร์+สกิล) — สิทธิ์ staff เท่ากัน
+    if (getQuery(req, 'people') === '1') {
+      const people = await listBoardReadyCandidates({
+        columnIds: [boardPrimaryColumnId(), boardFallbackColumnId(), boardReuseColumnId()],
+        limit: 2000,
+      });
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({
+        people: people.map((c) => ({
+          card_id: c.card_id,
+          full_name:
+            [c.first_name, c.last_name].filter(Boolean).join(' ').trim() ||
+            c.nick_name ||
+            `การ์ด #${c.card_id}`,
+          nick_name: c.nick_name,
+          skills: [c.job1_name, c.job2_name].filter(Boolean).join(' / ') || null,
+          area: [c.amphur_name, c.province_name].filter(Boolean).join(' ') || null,
+          mobile: c.mobile,
+          age: c.age,
+          required_salary: c.required_salary,
+          last_activity_at: c.last_activity_at,
+          column_label: c.column_label,
+        })),
+      });
+    }
+
     // โหมด buckets: ยอดการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — สรุปบน Matching Dashboard
     if (getQuery(req, 'buckets') === '1') {
       const buckets = await countBoardCandidatesByColumn([

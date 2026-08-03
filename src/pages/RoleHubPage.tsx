@@ -56,7 +56,6 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
 
   return (
     <div className="relative">
-      <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader title={title} subtitle={subtitle} backPath="/" />
       <div className="px-4 md:px-6 py-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">

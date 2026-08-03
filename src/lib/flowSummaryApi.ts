@@ -1,14 +1,19 @@
 import { apiFetch } from '@/lib/apiFetch';
 
-/** รายการ "ต้องติดตาม" 1 คนจากผลโทร Lumos ที่ยังไม่มีใครรับช่วงต่อ */
+/** รายการ "ต้องติดตาม" 1 คนจากผลโทร AI ที่ยังไม่มีใครรับช่วงต่อ */
 export type FlowFollowUpItem = {
   job_ref: string;
   request_no: string;
   person_ref: string;
   channel: string;
   name: string | null;
+  phone: string | null;
   summary: string | null;
+  outcome: string | null;
   updated_at: string;
+  /** ตำแหน่ง+หน่วยงานของใบขอที่คนนี้ถูกแมทไป */
+  job_position: string | null;
+  job_unit: string | null;
 };
 
 export type FlowSummary = {

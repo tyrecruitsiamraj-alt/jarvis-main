@@ -4,12 +4,14 @@ import {
   PhoneForwarded,
   ArrowRight,
   ArrowDown,
+  Phone,
   PhoneCall,
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
   LoaderCircle,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrandTitle } from '@/components/shared/BrandMark';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -117,6 +119,8 @@ const HomePage: React.FC = () => {
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [flowLoading, setFlowLoading] = useState(true);
+  // กดชื่อคนในการ์ดติดตาม → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
+  const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
 
   const loadFlow = async () => {
     setFlowLoading(true);
@@ -138,12 +142,6 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 px-4 sm:px-5 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* subtle orb accent */}
-      <div
-        className="pointer-events-none absolute -top-8 right-0 h-40 w-40 jarvis-blue-orb opacity-30 blur-sm"
-        aria-hidden
-      />
-
       {/* ทักทายสั้น ๆ บรรทัดเดียว — login ปุ๊บต้องเห็น "การไหลของงานสรรหา" ทันที */}
       <p className="mb-4 text-sm text-muted-foreground">
         {greeting} <span className="font-semibold text-foreground">{user?.full_name}</span> ·{' '}
@@ -258,7 +256,7 @@ const HomePage: React.FC = () => {
                 <FollowUpList
                   items={flow.follow_ups.confirmed_waiting}
                   tone="good"
-                  onOpen={(it) => navigate(`/matching/match?jobId=${encodeURIComponent(it.job_ref)}`)}
+                  onOpen={(it) => setPersonDetail({ item: it, tone: 'good' })}
                 />
               </div>
             ) : null}
@@ -272,7 +270,7 @@ const HomePage: React.FC = () => {
                 <FollowUpList
                   items={flow.follow_ups.no_answer}
                   tone="warn"
-                  onOpen={(it) => navigate(`/matching/match?jobId=${encodeURIComponent(it.job_ref)}`)}
+                  onOpen={(it) => setPersonDetail({ item: it, tone: 'warn' })}
                 />
               </div>
             ) : null}
@@ -318,6 +316,65 @@ const HomePage: React.FC = () => {
         </motion.section>
       ) : null}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}
+
+      {/* กดชื่อคนในการ์ดติดตาม → รายละเอียดคน + แมทกับงานอะไรไป ก่อนเปิดใบขอ */}
+      <Dialog open={!!personDetail} onOpenChange={(o) => !o && setPersonDetail(null)}>
+        <DialogContent className="max-w-sm">
+          {personDetail ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-foreground">
+                  <span aria-hidden>{FOLLOW_UP_TONE[personDetail.tone].dot}</span>{' '}
+                  {personDetail.item.name || personDetail.item.person_ref}
+                </DialogTitle>
+                <DialogDescription>{FOLLOW_UP_TONE[personDetail.tone].hint}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 space-y-1">
+                  <p className="text-[11px] font-semibold text-muted-foreground">แมทกับใบขอ</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {personDetail.item.job_position || 'ไม่ระบุตำแหน่ง'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {personDetail.item.job_unit || '—'} ·{' '}
+                    <span className="font-mono">{personDetail.item.request_no}</span>
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 space-y-1">
+                  <p className="text-[11px] font-semibold text-muted-foreground">ผลการโทรล่าสุด</p>
+                  <p className="text-xs leading-relaxed text-foreground">
+                    {personDetail.item.summary || 'ยังไม่มีสรุปบทสนทนา'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {new Date(personDetail.item.updated_at).toLocaleString('th-TH', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {personDetail.item.phone ? (
+                    <a href={`tel:${personDetail.item.phone}`} className="jarvis-btn-secondary">
+                      <Phone className="h-3 w-3" /> {personDetail.item.phone}
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const jobRef = personDetail.item.job_ref;
+                      setPersonDetail(null);
+                      navigate(`/matching/match?jobId=${encodeURIComponent(jobRef)}`);
+                    }}
+                    className="jarvis-btn-primary"
+                  >
+                    เปิดใบขอนี้ →
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
