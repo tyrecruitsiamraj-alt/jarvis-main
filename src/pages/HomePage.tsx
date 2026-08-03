@@ -50,17 +50,40 @@ function FlowStage({
   );
 }
 
-/** รายการคนที่ต้องตามต่อจากผลโทร Lumos — กดแล้วเปิดใบขอนั้นในหน้า Matching */
+/** โทนสีบอกสถานะของรายการติดตาม — เขียว=พร้อม/สนใจ · เหลือง=รอโทรซ้ำ · แดง=ติดขัด/ไม่มีคน */
+const FOLLOW_UP_TONE = {
+  good: {
+    row: 'border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100/70',
+    dot: '🟢',
+    hint: 'พร้อม — กดจองได้เลย',
+  },
+  warn: {
+    row: 'border-amber-200 bg-amber-50/80 hover:bg-amber-100/70',
+    dot: '🟡',
+    hint: 'รอโทรซ้ำ',
+  },
+  bad: {
+    row: 'border-red-200 bg-red-50/80 hover:bg-red-100/70',
+    dot: '🔴',
+    hint: 'ติดขัด — ต้องมีคนตัดสินใจ',
+  },
+} as const;
+type FollowUpTone = keyof typeof FOLLOW_UP_TONE;
+
+/** รายการคนที่ต้องตามต่อจากผลโทร — สีของแถวบอกสถานะเอง กดแล้วเปิดใบขอนั้นในหน้า Matching */
 function FollowUpList({
   items,
+  tone,
   emptyHidden,
   onOpen,
 }: {
   items: FlowFollowUpItem[];
+  tone: FollowUpTone;
   emptyHidden?: boolean;
   onOpen: (item: FlowFollowUpItem) => void;
 }) {
   if (items.length === 0 && emptyHidden) return null;
+  const t = FOLLOW_UP_TONE[tone];
   return (
     <div className="mt-1.5 space-y-1">
       {items.slice(0, 3).map((it) => (
@@ -68,10 +91,13 @@ function FollowUpList({
           key={`${it.job_ref}:${it.person_ref}`}
           type="button"
           onClick={() => onOpen(it)}
-          className="w-full rounded-lg border border-white/80 bg-white/70 px-2 py-1.5 text-left hover:bg-white"
+          title={t.hint}
+          className={cn('w-full rounded-lg border px-2 py-1.5 text-left', t.row)}
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] font-medium text-foreground">{it.name || it.person_ref}</span>
+            <span className="truncate text-[11px] font-medium text-foreground">
+              <span aria-hidden>{t.dot}</span> {it.name || it.person_ref}
+            </span>
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{it.request_no}</span>
           </div>
           {it.summary ? <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{it.summary}</p> : null}
@@ -231,6 +257,7 @@ const HomePage: React.FC = () => {
                 </div>
                 <FollowUpList
                   items={flow.follow_ups.confirmed_waiting}
+                  tone="good"
                   onOpen={(it) => navigate(`/matching/match?jobId=${encodeURIComponent(it.job_ref)}`)}
                 />
               </div>
@@ -244,6 +271,7 @@ const HomePage: React.FC = () => {
                 </div>
                 <FollowUpList
                   items={flow.follow_ups.no_answer}
+                  tone="warn"
                   onOpen={(it) => navigate(`/matching/match?jobId=${encodeURIComponent(it.job_ref)}`)}
                 />
               </div>
@@ -259,15 +287,15 @@ const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/matching/match?urgent=1&workflow=none')}
-                    className="w-full rounded-lg border border-white/80 bg-white/70 px-2 py-1.5 text-left text-[11px] text-foreground hover:bg-white"
+                    className="w-full rounded-lg border border-red-200 bg-red-50/80 px-2 py-1.5 text-left text-[11px] text-foreground hover:bg-red-100/70"
                   >
-                    ใบด่วนที่ AI ไม่พบคน และยังไม่ส่งโพสหาคนใหม่ —{' '}
+                    <span aria-hidden>🔴</span> ใบด่วนที่ AI ไม่พบคน และยังไม่ส่งโพสหาคนใหม่ —{' '}
                     <span className="font-bold text-red-700">{flow.jobs.urgent_stuck} ใบ</span>
                   </button>
                 ) : null}
                 {flow.lumos.stale_delivered > 0 ? (
-                  <div className="rounded-lg border border-white/80 bg-white/70 px-2 py-1.5 text-[11px] text-foreground">
-                    ส่ง AI โทรแล้วเกิน 2 วันยังไม่มีผลกลับ —{' '}
+                  <div className="rounded-lg border border-red-200 bg-red-50/80 px-2 py-1.5 text-[11px] text-foreground">
+                    <span aria-hidden>🔴</span> ส่ง AI โทรแล้วเกิน 2 วันยังไม่มีผลกลับ —{' '}
                     <span className="font-bold text-red-700">{flow.lumos.stale_delivered} ราย</span>
                     <span className="text-muted-foreground"> · ควรเช็คกับทีม Lumos</span>
                   </div>

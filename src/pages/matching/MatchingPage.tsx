@@ -571,36 +571,35 @@ function LumosCallBadgeRow({
 }
 
 /**
- * แถวสรุปผลโทร Lumos ของใบขอ 1 ใบ — โชว์ข้างการ์ดในลิสต์ และหัวหน้า detail
- * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ Lumos ยกเลิกเอง)
+ * กล่องสรุปผลโทรของใบขอ 1 ใบ — ตัวเลข 6 ช่องอ่านปราดเดียวรู้:
+ * ส่ง / โทรแล้ว / เหลือ (ยังไม่ได้โทร) / โอเค / ไม่ไป / ไม่รับ
+ * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ระบบยกเลิกเอง)
  */
-function LumosJobSummaryLine({ s, compact }: { s: LumosJobCallSummaryRow; compact?: boolean }) {
+function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; className?: string }) {
   if (s.sent === 0) return null;
-  const chip = (label: string, cls: string, title: string) => (
-    <span title={title} className={cn('rounded-full border px-1.5 py-0.5 font-semibold', cls)}>
-      {label}
-    </span>
-  );
+  const waiting = Math.max(0, s.sent - s.called);
+  const cells = [
+    { label: 'ส่ง', value: s.sent, cls: 'text-slate-700', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-700', title: 'มีผลโทรกลับมาจริง' },
+    { label: 'เหลือ', value: waiting, cls: waiting > 0 ? 'text-amber-700' : 'text-slate-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
+    { label: 'โอเค', value: s.confirmed, cls: s.confirmed > 0 ? 'text-emerald-700' : 'text-slate-300', title: 'สนใจงาน' },
+    { label: 'ไม่ไป', value: s.declined, cls: s.declined > 0 ? 'text-red-700' : 'text-slate-300', title: 'ไม่สนใจ/ปฏิเสธ' },
+    { label: 'ไม่รับ', value: s.no_answer, cls: s.no_answer > 0 ? 'text-amber-800' : 'text-slate-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+  ];
   return (
-    <span
+    <div
       className={cn(
-        'flex flex-wrap items-center gap-1',
-        compact ? 'text-[10px]' : 'text-[11px]',
+        'flex shrink-0 items-stretch divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white/85',
+        className,
       )}
     >
-      <span className="text-muted-foreground">โทร:</span>
-      {chip(`ส่ง ${s.sent}`, 'border-slate-200 bg-slate-50 text-slate-700', 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)')}
-      {chip(`โทรแล้ว ${s.called}`, 'border-blue-200 bg-blue-50 text-blue-700', 'มีผลโทรกลับมาจริง')}
-      {s.confirmed > 0
-        ? chip(`✅ ${s.confirmed}`, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'สนใจงาน')
-        : null}
-      {s.declined > 0
-        ? chip(`❌ ${s.declined}`, 'border-red-200 bg-red-50 text-red-700', 'ไม่สนใจ/ปฏิเสธ')
-        : null}
-      {s.no_answer > 0
-        ? chip(`📵 ${s.no_answer}`, 'border-amber-200 bg-amber-50 text-amber-800', 'ไม่รับสาย — ควรโทรซ้ำ')
-        : null}
-    </span>
+      {cells.map((c) => (
+        <div key={c.label} title={c.title} className="min-w-[36px] px-1.5 py-0.5 text-center">
+          <div className={cn('text-sm font-bold leading-tight tabular-nums', c.cls)}>{c.value}</div>
+          <div className="text-[9px] leading-tight text-muted-foreground">{c.label}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -1911,35 +1910,33 @@ const MatchingPage: React.FC = () => {
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                  <div className="min-w-0 flex-1">
                     <span className="block truncate text-[11px] text-muted-foreground">
                       {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
                     </span>
                     <span className="block truncate text-[10px] text-slate-600">
                       ขอ {requested} · ติดต่อ {progress.contacted} · จอง {progress.reserved} · ลงงานใน Matching {progress.placed} · เหลือหาทางการ {remaining}
                     </span>
-                    {serverLumosSummary[j.id] ? (
-                      <span className="mt-0.5 block">
-                        <LumosJobSummaryLine s={serverLumosSummary[j.id]} compact />
-                      </span>
-                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openJob(j);
-                    }}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
-                  >
-                    <Users className="h-3 w-3" />
-                    {matchCount != null
-                      ? `ดูคนของเรา (${matchCount})`
-                      : boardLoadingId === j.id
-                        ? 'AI กำลังประเมิน…'
-                        : 'หาคนของเรา'}
-                  </button>
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                    {serverLumosSummary[j.id] ? <LumosJobSummaryStats s={serverLumosSummary[j.id]} /> : null}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openJob(j);
+                      }}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+                    >
+                      <Users className="h-3 w-3" />
+                      {matchCount != null
+                        ? `ดูคนของเรา (${matchCount})`
+                        : boardLoadingId === j.id
+                          ? 'AI กำลังประเมิน…'
+                          : 'หาคนของเรา'}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -2284,7 +2281,7 @@ const MatchingPage: React.FC = () => {
 
               {/* ใบขอด่วน + มีคนเพิ่มเข้า pool ทีหลัง → ดันเข้าคิวโทรเองได้ ไม่ต้องรอ AI แมทรอบใหม่ */}
               <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 px-3 py-2">
-                <LumosJobSummaryLine s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
+                <LumosJobSummaryStats s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-slate-600">
                   คนที่ AI แนะนำถูกส่ง AI โทรอัตโนมัติแล้ว — ถ้ามีคนเพิ่มเข้ามาทีหลังและใบขอด่วน เลือกส่งเองได้
