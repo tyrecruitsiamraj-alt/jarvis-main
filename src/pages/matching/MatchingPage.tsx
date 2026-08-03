@@ -77,6 +77,7 @@ import {
   boardPersonRef,
   irecruitPersonRef,
   summarizeLumosCallStatus,
+  boardColumnBadge,
   type LumosCallStatus,
   type LumosPoolCandidate,
   type LumosJobCallSummaryRow,
@@ -111,6 +112,8 @@ type BoardCandidateMatch = {
   job2_name: string | null;
   province_name: string | null;
   amphur_name: string | null;
+  /** ถังบนบอร์ด: 'To do' / 'ไม่มีงาน' (auto ค้นสองถังนี้) */
+  column_label?: string | null;
   tier: 'green' | 'yellow' | 'red';
   reason: string;
 };
@@ -120,6 +123,10 @@ type BoardMatchResult = {
   job_family_label: string;
   pool_size: number;
   matches: BoardCandidateMatch[];
+  /** เป้า = อัตราที่ขอ × 3 — ต่ำกว่านี้ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว */
+  recommended_target?: number;
+  fallback_used?: boolean;
+  fallback_pool_size?: number;
 };
 
 type MatchTier = BoardCandidateMatch['tier'];
@@ -2172,7 +2179,10 @@ const MatchingPage: React.FC = () => {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   {boardMatchById[jobDetail.id]
-                    ? `AI แมทสกิล · จาก pool ${boardMatchById[jobDetail.id].pool_size} คน → แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)}`
+                    ? `AI แมทสกิล · จาก pool ${boardMatchById[jobDetail.id].pool_size} คน → แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)}` +
+                      (boardMatchById[jobDetail.id].recommended_target
+                        ? ` / เป้า ${boardMatchById[jobDetail.id].recommended_target}`
+                        : '')
                     : 'ผู้สมัครที่พร้อมลงงานทันที'}
                 </p>
                 <div className="flex items-center gap-1.5">
@@ -2236,6 +2246,30 @@ const MatchingPage: React.FC = () => {
                   กำลังแสดงคนนอกพื้นที่/ห่างไกลด้วยเพื่อเป็นทางเลือกสำรอง — กลุ่มนี้ไม่ถูกนับรวมในยอด AI แนะนำ
                 </p>
               ) : null}
+
+              {/* กติกาเป้า 3 เท่า: To do หาไม่ถึงเป้า → ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว
+                  ถ้ายังไม่ถึงเป้าอีก บอกทางไปต่อ (iRecruit / Re Use / โพสหาคนใหม่) */}
+              {(() => {
+                const bm = boardMatchById[jobDetail.id];
+                if (!bm?.recommended_target || !bm.fallback_used) return null;
+                const got = recommendedCandidateCount(bm.matches);
+                const short = got < bm.recommended_target;
+                return (
+                  <p
+                    className={cn(
+                      'rounded-lg border px-2.5 py-1.5 text-[10px]',
+                      short
+                        ? 'border-amber-200 bg-amber-50/80 text-amber-900'
+                        : 'border-sky-100 bg-sky-50/70 text-sky-800',
+                    )}
+                  >
+                    To do หาได้ไม่ถึงเป้า {bm.recommended_target} คน (อัตราที่ขอ × 3) — ค้นถัง “ไม่มีงาน” เพิ่มแล้ว
+                    {short
+                      ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร” · หรือส่งโพสหาคนใหม่`
+                      : ` → รวมแนะนำ ${got} คน (ครบเป้า)`}
+                  </p>
+                );
+              })()}
 
               {lumosNotice ? (
                 <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-800">
@@ -2343,6 +2377,19 @@ const MatchingPage: React.FC = () => {
                               {m.nick_name ? ` (${m.nick_name})` : ''}
                             </span>
                             <div className="flex shrink-0 items-center gap-1">
+                              {(() => {
+                                const colBadge = boardColumnBadge(m.column_label);
+                                return colBadge ? (
+                                  <span
+                                    className={cn(
+                                      'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                      colBadge.cls,
+                                    )}
+                                  >
+                                    {colBadge.text}
+                                  </span>
+                                ) : null;
+                              })()}
                               {proposed ? (
                                 <span
                                   className={cn(
@@ -3460,7 +3507,8 @@ const MatchingPage: React.FC = () => {
                 return (
                   <>
                     <p className="text-[10px] text-muted-foreground">
-                      pool รอลงงาน {lumosPool.length} คน · แสดง {rows.length} · คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
+                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use) · แสดง {rows.length} ·
+                      คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
                     </p>
                     <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
                       {rows.map((c) => {
@@ -3485,6 +3533,19 @@ const MatchingPage: React.FC = () => {
                             <span className="min-w-0 flex-1">
                               <span className="flex flex-wrap items-center gap-1.5">
                                 <span className="text-xs font-semibold text-foreground">{c.full_name}</span>
+                                {(() => {
+                                  const colBadge = boardColumnBadge(c.column_label);
+                                  return colBadge ? (
+                                    <span
+                                      className={cn(
+                                        'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold',
+                                        colBadge.cls,
+                                      )}
+                                    >
+                                      {colBadge.text}
+                                    </span>
+                                  ) : null;
+                                })()}
                                 {c.already_sent ? (
                                   <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
                                     ส่งไปแล้ว

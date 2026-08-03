@@ -22,7 +22,13 @@ import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
 import { getCachedCandidateSpec } from '../_lib/candidateSpecAnalyzer.js';
 import { listRecruitCandidatesByIds } from '../_lib/recruitRegisterSql.js';
 import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
-import { listBoardReadyCandidates, type BoardReadyCandidate } from '../_lib/boardCandidatesSql.js';
+import {
+  listBoardReadyCandidates,
+  boardPrimaryColumnId,
+  boardFallbackColumnId,
+  boardReuseColumnId,
+  type BoardReadyCandidate,
+} from '../_lib/boardCandidatesSql.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   enqueueLumosReminderForSelected,
@@ -34,6 +40,25 @@ import {
 
 const MAX_PER_REQUEST = 50;
 const BOARD_POOL_LIMIT = 2000;
+
+/**
+ * ถังที่ให้ "คนเลือกส่งเอง" เห็น: To do (รอลงงาน) + ไม่มีงาน (รองาน) + Re Use (คนเก่า)
+ * — Re Use ตั้งใจให้อยู่เฉพาะเส้นนี้ ห้ามเข้า auto-match เพราะสถานะปัจจุบันไม่แน่ ต้องมีคนตรวจก่อน
+ */
+function pickerColumnIds(): number[] {
+  return [boardPrimaryColumnId(), boardFallbackColumnId(), boardReuseColumnId()];
+}
+
+/** เรียง pool ให้คนพร้อมสุดขึ้นก่อน: To do → ไม่มีงาน → Re Use */
+function pickerColumnRank(c: BoardReadyCandidate): number {
+  const ids = pickerColumnIds();
+  // column_label ใช้แสดงผล — ลำดับใช้จากตำแหน่งใน pickerColumnIds ผ่านการ query แยกไม่ได้
+  // จึงอิง label ที่ DB ให้มา (To do / ไม่มีงาน / Re Use) แบบตายตัว
+  const label = (c.column_label || '').trim().toLowerCase();
+  if (label === 'to do') return 0;
+  if (label === 'ไม่มีงาน') return 1;
+  return ids.length; // Re Use และอื่น ๆ ไปท้าย
+}
 
 /** ชื่อที่แสดง/ส่งให้ Lumos — ตรงกับที่ boardCandidateMatcher ใช้ */
 function boardFullName(c: BoardReadyCandidate): string {
@@ -152,7 +177,8 @@ async function getCallStatus(req: AuthedReq, res: ApiRes) {
   }
 
   const sentRefs = new Set(items.filter((i) => i.status !== 'cancelled').map((i) => i.person_ref));
-  const pool = await listBoardReadyCandidates({ limit: BOARD_POOL_LIMIT });
+  const pool = await listBoardReadyCandidates({ columnIds: pickerColumnIds(), limit: BOARD_POOL_LIMIT });
+  pool.sort((a, b) => pickerColumnRank(a) - pickerColumnRank(b));
   return res.status(200).json({
     items,
     total: items.length,
@@ -165,7 +191,9 @@ async function getCallStatus(req: AuthedReq, res: ApiRes) {
       age: c.age,
       required_salary: c.required_salary,
       last_activity_at: c.last_activity_at,
-      /** ส่งให้ Lumos ในใบขอนี้ไปแล้ว (auto หรือคนกดเอง) — ติ๊กซ้ำไม่ได้ */
+      /** ถังบนบอร์ด: To do / ไม่มีงาน / Re Use — หน้าจอใช้ติดป้ายบอกที่มา */
+      column_label: c.column_label,
+      /** ส่งเข้าคิว AI โทรในใบขอนี้ไปแล้ว (auto หรือคนกดเอง) — ติ๊กซ้ำไม่ได้ */
       already_sent: sentRefs.has(`card-${c.card_id}`),
     })),
   });
@@ -187,9 +215,9 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
   const outcomes: LumosDispatchOutcome[] = [];
 
   if (boardCardIds.length > 0) {
-    // ตรวจกับ pool "คนของเรา" สด ๆ ไม่ใช่ผล snapshot — คนที่เพิ่งเพิ่มเข้า pool ทีหลัง
-    // (ยังไม่เคยผ่าน AI แมท) ต้องส่งได้ทันทีเวลาใบขอด่วน และเบอร์ที่ใช้ต้องเป็นเบอร์ล่าสุด
-    const pool = await listBoardReadyCandidates({ limit: BOARD_POOL_LIMIT });
+    // ตรวจกับ pool สด ๆ ของ 3 ถังที่อนุญาต (To do/ไม่มีงาน/Re Use) ไม่ใช่ผล snapshot —
+    // คนที่เพิ่งเพิ่มเข้า pool ทีหลังต้องส่งได้ทันทีเวลาใบขอด่วน และเบอร์ที่ใช้ต้องเป็นเบอร์ล่าสุด
+    const pool = await listBoardReadyCandidates({ columnIds: pickerColumnIds(), limit: BOARD_POOL_LIMIT });
     const { selected, missing } = resolveBoardSelection(pool, boardCardIds);
     if (missing.length > 0) {
       return sendError(

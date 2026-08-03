@@ -38,8 +38,19 @@ export type LumosPoolCandidate = {
   age: number | null;
   required_salary: number | null;
   last_activity_at: string | null;
+  /** ถังบนบอร์ด: 'To do' / 'ไม่มีงาน' / 'Re Use' */
+  column_label?: string | null;
   already_sent: boolean;
 };
+
+/** ป้ายบอกถังที่มาของผู้สมัคร — To do ไม่ติดป้าย (ค่าปกติ) */
+export function boardColumnBadge(label: string | null | undefined): { text: string; cls: string } | null {
+  const t = (label || '').trim().toLowerCase();
+  if (!t || t === 'to do') return null;
+  if (t === 'ไม่มีงาน') return { text: 'รองาน (ไม่มีงาน)', cls: 'border-amber-300 bg-amber-50 text-amber-800' };
+  if (t === 're use') return { text: 'คนเก่า Re Use — เช็คสถานะก่อนส่ง', cls: 'border-violet-300 bg-violet-50 text-violet-800' };
+  return { text: label!.trim(), cls: 'border-slate-300 bg-slate-50 text-slate-700' };
+}
 
 /** สถานะ+ผลการโทรของทุกคนที่ส่งไปแล้วในใบขอนี้ */
 export async function listLumosCallStatus(jobId: string): Promise<LumosCallStatus[]> {
