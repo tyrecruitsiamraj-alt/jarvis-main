@@ -482,7 +482,7 @@ const JobListPage: React.FC = () => {
           {siamrajPrimary ? (
             <FilterMultiSelect
               id="job-list-department"
-              label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก (เลือกได้หลายค่า)'}
+              label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก'}
               summaryNoun="แผนก"
               values={departmentFilter}
               disabled={Boolean(lockedDepartmentCode)}
@@ -501,7 +501,7 @@ const JobListPage: React.FC = () => {
           {siamrajPrimary ? (
             <FilterMultiSelect
               id="job-list-subtype"
-              label="ลักษณะงานย่อย (เลือกได้หลายค่า)"
+              label="ลักษณะงานย่อย"
               summaryNoun="ลักษณะงาน"
               values={jobSubtypeFilter}
               onChange={(v) => updateListState({ jobSubtypeFilter: v })}
@@ -512,7 +512,7 @@ const JobListPage: React.FC = () => {
           {siamrajPrimary ? (
             <FilterMultiSelect
               id="job-list-year"
-              label="ปี พ.ศ. (เลือกได้หลายค่า)"
+              label="ปี พ.ศ."
               summaryNoun="ปี"
               allLabel="ทุกปี"
               values={yearFilter}
@@ -523,7 +523,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-recruiter"
-            label="เจ้าหน้าที่สรรหา (เลือกได้หลายค่า)"
+            label="เจ้าหน้าที่สรรหา"
             summaryNoun="คน"
             values={recruiterFilter}
             onChange={(v) => updateListState({ recruiterFilter: v })}
@@ -538,7 +538,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-screener"
-            label="เจ้าหน้าที่คัดสรร (เลือกได้หลายค่า)"
+            label="เจ้าหน้าที่คัดสรร"
             summaryNoun="คน"
             values={screenerFilter}
             onChange={(v) => updateListState({ screenerFilter: v })}
@@ -553,7 +553,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-opl"
-            label="เจ้าหน้าที่ OPL (เลือกได้หลายค่า)"
+            label="เจ้าหน้าที่ OPL"
             summaryNoun="คน"
             values={oplFilter}
             onChange={(v) => updateListState({ oplFilter: v })}
@@ -568,7 +568,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-urgency"
-            label="สถานะใบขอ (เลือกได้หลายค่า)"
+            label="สถานะใบขอ"
             summaryNoun="สถานะ"
             values={urgencyFilter}
             onChange={(v) => updateListState({ urgencyFilter: v as typeof urgencyFilter })}
@@ -577,7 +577,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-work-status"
-            label="สถานะทำงาน (เลือกได้หลายค่า)"
+            label="สถานะทำงาน"
             summaryNoun="สถานะ"
             values={workStatusFilter}
             onChange={(v) => updateListState({ workStatusFilter: v as typeof workStatusFilter })}
@@ -589,7 +589,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-note-filter"
-            label="หมายเหตุ (เลือกได้หลายค่า)"
+            label="หมายเหตุ"
             summaryNoun="แบบ"
             values={noteFilter}
             onChange={(v) => updateListState({ noteFilter: v as typeof noteFilter })}
@@ -601,7 +601,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-replacement-filter"
-            label="ส่งคนแทน (เลือกได้หลายค่า)"
+            label="ส่งคนแทน"
             summaryNoun="แบบ"
             values={replacementFilter}
             onChange={(v) => updateListState({ replacementFilter: v as typeof replacementFilter })}
@@ -610,7 +610,7 @@ const JobListPage: React.FC = () => {
 
           <FilterMultiSelect
             id="job-list-age"
-            label="วันผ่านมา (เลือกได้หลายค่า)"
+            label="วันผ่านมา"
             summaryNoun="ช่วง"
             values={ageDaysFilter}
             onChange={(v) => updateListState({ ageDaysFilter: v as typeof ageDaysFilter })}
