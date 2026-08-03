@@ -7,6 +7,7 @@ import {
 import { isPostmarkConfigured } from '../../_lib/postmark.js';
 import { isAzureAdConfigured } from '../../_lib/azureAdAuth.js';
 import { isDevRoleLoginAllowed, isPublicRegistrationAllowed } from '../../_lib/runtime.js';
+import { getJwtSecret } from '../../_lib/auth.js';
 import { sendError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 
 export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
@@ -22,10 +23,11 @@ export default async function authConfigHandler(req: ApiReq, res: ApiRes) {
 
   return res.status(200).json({
     companyEmailLogin: emailLoginEnabled,
+    // email+password login ใช้ได้เมื่อมี JWT secret — ไม่ต้องการ Postmark
+    passwordLogin: !!getJwtSecret(),
     microsoftLogin,
     devRoleLogin: isDevRoleLoginAllowed(),
     publicRegister: isPublicRegistrationAllowed(),
-    /** เมื่อ Postmark หรือ Azure AD พร้อม — หน้า Login เป็นกากบัง Web */
     emailLoginGate,
     companyEmailRequired: isCompanyEmailLoginEnforced(),
     allowedDomains: domains,

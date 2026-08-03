@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
-import { ArrowRight } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 type AuthConfig = {
   companyEmailLogin: boolean;
+  passwordLogin: boolean;
   microsoftLogin: boolean;
   devRoleLogin: boolean;
   publicRegister?: boolean;
@@ -28,16 +30,127 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
 
-/** ปุ่มเข้าสู่ระบบด้วย Microsoft (Azure AD) — พา browser ไป /api/auth/azure-ad/start
- *  (redirect เต็มหน้าไป Microsoft แล้วเด้งกลับ) ไม่ต้องกรอก username/password */
-function MicrosoftLoginButton() {
-  const start = () => {
-    window.location.href = `/api/auth/azure-ad/start?returnTo=${encodeURIComponent('/')}`;
+// ─── Email / Password form ────────────────────────────────────────────────────
+function EmailPasswordForm({
+  hint,
+  onError,
+}: {
+  hint: string | null;
+  onError: (msg: string) => void;
+}) {
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    onError('');
+    if (!email.trim() || !password) {
+      setFormError('กรุณากรอกอีเมลและรหัสผ่าน');
+      return;
+    }
+    setSubmitting(true);
+    const err = await signIn(email.trim(), password);
+    setSubmitting(false);
+    if (err) {
+      setFormError(err);
+      return;
+    }
+    const returnTo = searchParams.get('returnTo');
+    const safe =
+      returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
+        ? returnTo
+        : '/';
+    navigate(safe, { replace: true });
   };
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="space-y-3">
+      <div className="space-y-2">
+        <div>
+          <label htmlFor="login-email" className="block text-xs font-medium text-foreground mb-1">
+            อีเมล
+          </label>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={hint ?? 'you@company.com'}
+            disabled={submitting}
+            className="w-full rounded-xl border border-white/70 bg-white/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 disabled:opacity-60 transition-colors"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="login-password" className="block text-xs font-medium text-foreground mb-1">
+            รหัสผ่าน
+          </label>
+          <div className="relative">
+            <input
+              id="login-password"
+              type={showPw ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={submitting}
+              className="w-full rounded-xl border border-white/70 bg-white/60 px-4 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 disabled:opacity-60 transition-colors"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPw((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showPw ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+            >
+              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {formError ? (
+        <p className="text-xs text-destructive" role="alert">
+          {formError}
+        </p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="inline-flex w-full min-h-[48px] items-center justify-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      >
+        {submitting ? (
+          <>
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            กำลังเข้าสู่ระบบ…
+          </>
+        ) : (
+          'เข้าสู่ระบบ'
+        )}
+      </button>
+    </form>
+  );
+}
+
+// ─── Microsoft button ─────────────────────────────────────────────────────────
+function MicrosoftLoginButton() {
+  const { signInWithMicrosoft } = useAuth();
   return (
     <button
       type="button"
-      onClick={start}
+      onClick={() => signInWithMicrosoft('/')}
       className="inline-flex w-full min-h-[52px] items-center justify-center gap-2.5 rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 active:bg-red-800 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
     >
       <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white">
@@ -53,6 +166,18 @@ function MicrosoftLoginButton() {
   );
 }
 
+// ─── Divider ──────────────────────────────────────────────────────────────────
+function OrDivider() {
+  return (
+    <div className="flex items-center gap-3" role="separator">
+      <div className="h-px flex-1 bg-white/50" />
+      <span className="text-xs text-muted-foreground">หรือ</span>
+      <div className="h-px flex-1 bg-white/50" />
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 const LoginPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { config } = useBranding();
@@ -112,6 +237,10 @@ const LoginPage: React.FC = () => {
     };
   }, [configAttempt]);
 
+  // แสดง form email+password ถ้า JWT ถูกตั้งค่า (passwordLogin) ไม่ต้องรอ Postmark
+  const showEmail = authConfig?.passwordLogin ?? authConfig?.companyEmailLogin ?? false;
+  const showMicrosoft = authConfig?.microsoftLogin ?? false;
+
   return (
     <div
       className={cn('jarvis-warm-bg relative overflow-x-hidden', config.pageBackgroundMode === 'solid' && 'jarvis-warm-bg')}
@@ -122,7 +251,7 @@ const LoginPage: React.FC = () => {
       <div className="pointer-events-none absolute bottom-10 -left-16 h-48 w-48 jarvis-blue-orb opacity-25 blur-md" aria-hidden />
 
       <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center gap-6 overflow-y-auto p-4 py-8 sm:p-6 sm:py-10 lg:flex-row lg:items-stretch lg:gap-8 lg:p-10">
-        {/* Left — sign in with Microsoft */}
+        {/* Left — sign in card */}
         <motion.div
           initial={{ opacity: 0, x: -24 }}
           animate={{ opacity: 1, x: 0 }}
@@ -165,21 +294,40 @@ const LoginPage: React.FC = () => {
                   <p className="text-sm text-muted-foreground">เข้าสู่ระบบด้วยบัญชีองค์กรของคุณ</p>
                 </div>
 
-                <MicrosoftLoginButton />
+                <div className="space-y-4">
+                  {showEmail && (
+                    <EmailPasswordForm
+                      hint={authConfig.companyEmailHint}
+                      onError={(msg) => setError(msg || null)}
+                    />
+                  )}
 
-                <p className="text-center text-[11px] text-muted-foreground">
-                  เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
-                </p>
+                  {showEmail && showMicrosoft && <OrDivider />}
+
+                  {showMicrosoft && <MicrosoftLoginButton />}
+
+                  {!showEmail && !showMicrosoft && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      ยังไม่มีวิธีเข้าสู่ระบบที่เปิดใช้งาน — ติดต่อผู้ดูแลระบบ
+                    </p>
+                  )}
+                </div>
 
                 {error ? (
                   <p className="text-xs text-destructive text-center" role="alert">
                     {error}
                   </p>
                 ) : null}
+
+                {!showEmail && !showMicrosoft ? null : (
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
+                  </p>
+                )}
               </>
             )}
 
-            {/* ทางเข้าบอร์ดรับสมัครงาน — โชว์เฉพาะจอไม่ใหญ่ (มือถือ/แท็บเล็ต); desktop มีการ์ดขวาแล้ว */}
+            {/* ทางเข้าบอร์ดรับสมัครงาน — โชว์เฉพาะจอไม่ใหญ่ (มือถือ/แท็บเล็ต) */}
             <div className="border-t border-white/60 pt-4 lg:hidden">
               <Link
                 to="/apply"
@@ -192,7 +340,7 @@ const LoginPage: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Right — visual card (คง "ดูประกาศรับสมัครพนักงาน" ไว้เหมือนเดิม) */}
+        {/* Right — visual card */}
         <motion.div
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
