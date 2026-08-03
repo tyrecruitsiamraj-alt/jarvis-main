@@ -11,7 +11,13 @@ import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchBoardCandidatesForJob, type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
-import { listBoardReadyCandidates } from '../_lib/boardCandidatesSql.js';
+import {
+  listBoardReadyCandidates,
+  countBoardCandidatesByColumn,
+  boardPrimaryColumnId,
+  boardFallbackColumnId,
+  boardReuseColumnId,
+} from '../_lib/boardCandidatesSql.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { filterAvailableBoardMatches } from '@/lib/boardMatchAvailability';
 
@@ -33,6 +39,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     if (!getSiamrajSqlServerConfig()) {
       return sendError(res, 503, 'Service unavailable', 'ยังไม่ได้ตั้งค่า Siamraj SQL Server (DB_HOST)');
+    }
+
+    // โหมด buckets: ยอดการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — สรุปบน Matching Dashboard
+    if (getQuery(req, 'buckets') === '1') {
+      const buckets = await countBoardCandidatesByColumn([
+        boardPrimaryColumnId(),
+        boardFallbackColumnId(),
+        boardReuseColumnId(),
+      ]);
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ buckets });
     }
 
     // โหมด pool: คืน "คนของเรา" แบบเบา (สกิล+พื้นที่) ให้ client นับเบื้องต้นต่อใบขอ — ไม่เรียก AI, ไม่ส่งข้อมูลติดต่อ

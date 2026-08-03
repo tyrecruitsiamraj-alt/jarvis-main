@@ -127,6 +127,36 @@ export function boardReuseColumnId(): number {
   return Number(process.env.BOARD_REUSE_COLUMN_ID || 6);
 }
 
+export type BoardColumnCount = { column_id: number; label: string | null; count: number };
+
+/** นับการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — ใช้โชว์สรุปบนหน้า Matching Dashboard */
+export async function countBoardCandidatesByColumn(columnIds: number[]): Promise<BoardColumnCount[]> {
+  const boardId = Number(process.env.BOARD_READY_BOARD_ID || 1);
+  const ids = columnIds.filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length === 0) return [];
+  const inputs: Record<string, unknown> = { boardId };
+  const placeholders = ids.map((id, i) => {
+    inputs[`col${i}`] = id;
+    return `@col${i}`;
+  });
+  const rows = await siamrajSqlQuery<{ column_id: number; label: string | null; n: number }>(
+    `SELECT c.column_id, bc.display_label_th AS label, COUNT(*) AS n
+       FROM dbo.ir_board_card c
+      INNER JOIN dbo.ir_board_column bc ON bc.column_id = c.column_id
+      WHERE c.board_id = @boardId AND c.is_archived = 'N'
+        AND c.column_id IN (${placeholders.join(', ')})
+      GROUP BY c.column_id, bc.display_label_th`,
+    inputs,
+  );
+  const byId = new Map(rows.map((r) => [r.column_id, r]));
+  // คืนครบทุกถังที่ขอ (ถังว่าง = 0) เรียงตามลำดับที่ส่งมา
+  return ids.map((id) => ({
+    column_id: id,
+    label: byId.get(id)?.label ?? null,
+    count: Number(byId.get(id)?.n) || 0,
+  }));
+}
+
 export async function listBoardReadyCandidates(options?: {
   boardId?: number;
   columnId?: number;
