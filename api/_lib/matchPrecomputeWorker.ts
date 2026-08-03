@@ -146,7 +146,7 @@ function isEnabled(): boolean {
 function readConfig(): WorkerConfig {
   return {
     scanIntervalMs: parseIntEnv(process.env.MATCH_PRECOMPUTE_INTERVAL_MS, 300_000, 10_000),
-    throttleMs: parseIntEnv(process.env.MATCH_PRECOMPUTE_THROTTLE_MS, 2_000, 0),
+    throttleMs: parseIntEnv(process.env.MATCH_PRECOMPUTE_THROTTLE_MS, 30_000, 0),
     staleMs: parseIntEnv(process.env.MATCH_PRECOMPUTE_STALE_HOURS, 0, 0) * 3_600_000,
     scanLimit: parseIntEnv(process.env.MATCH_PRECOMPUTE_SCAN_LIMIT, 2000, 1),
     startupDelayMs: parseIntEnv(process.env.MATCH_PRECOMPUTE_STARTUP_DELAY_MS, 15_000, 0),

@@ -219,7 +219,7 @@ export async function matchBoardCandidatesForJob(
   const { system, user } = buildMatchPrompt(spec, jobTitle, job, shortlist);
   let ranked: Array<{ id: number; tier: string; reason: string }> = [];
   let lastError: unknown = null;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 1; attempt++) {
     let content = '';
     try {
       content = await ollamaChat({

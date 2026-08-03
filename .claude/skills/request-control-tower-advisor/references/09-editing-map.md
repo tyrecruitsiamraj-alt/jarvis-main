@@ -86,6 +86,18 @@ Edit:
 
 * .claude/skills/request-control-tower-advisor/references/07-cursor-prompt-patterns.md
 
+## Codex project skill adapter
+
+Edit:
+
+* .codex/skills/jarvis-request-control-tower/SKILL.md
+* .codex/skills/jarvis-request-control-tower/references/01-project-overview.md
+* .codex/skills/jarvis-request-control-tower/references/02-code-map.md
+* .codex/skills/jarvis-request-control-tower/references/03-workflow-and-validation.md
+
+Rule:
+Keep `.claude/skills/request-control-tower-advisor/` as the domain source of truth. The `.codex` skill may summarize repo structure and route Codex to the `.claude` references, but it must not introduce conflicting metric rules.
+
 ## Redteam / SWOT / pre-mortem checklist
 
 Edit:

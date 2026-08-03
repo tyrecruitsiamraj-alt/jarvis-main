@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jarvis Request Control Tower"
+  short_description: "Work safely on Jarvis staffing dashboards"
+  default_prompt: "Use $jarvis-request-control-tower to inspect or change Jarvis Request Control Tower metrics safely."
