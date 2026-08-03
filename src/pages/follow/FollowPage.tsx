@@ -92,7 +92,7 @@ const FollowPage: React.FC = () => {
       });
       resetForm();
       setFormOpen(false);
-      setOkMessage('เพิ่มรายชื่อแล้ว — ส่งเข้าคิวให้ Lumos โทรเรียบร้อย');
+      setOkMessage('เพิ่มรายชื่อแล้ว — ส่งเข้าคิว AI โทรเรียบร้อย');
       window.setTimeout(() => setOkMessage(null), 5000);
       await reload();
     } catch (err) {
@@ -131,7 +131,7 @@ const FollowPage: React.FC = () => {
       <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader
         title="Follow"
-        subtitle="ลงรายชื่อคนที่ต้องติดตาม แล้ว Lumos จะโทรตามให้"
+        subtitle="ลงรายชื่อคนที่ต้องติดตาม แล้ว AI จะโทรตามให้"
         backPath="/"
       />
 
@@ -223,7 +223,7 @@ const FollowPage: React.FC = () => {
                   id="followNote"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="ข้อความที่อยากให้ Lumos พูดเพิ่ม"
+                  placeholder="ข้อความที่อยากให้ AI พูดเพิ่ม"
                   className="jarvis-soft-field min-h-[46px]"
                 />
               </div>
@@ -258,7 +258,7 @@ const FollowPage: React.FC = () => {
                 ) : (
                   <PhoneForwarded className="h-4 w-4" aria-hidden />
                 )}
-                {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่งให้ Lumos โทร'}
+                {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่ง AI โทร'}
               </button>
               <button
                 type="button"
@@ -310,7 +310,7 @@ const FollowPage: React.FC = () => {
               {items.length === 0 ? 'ยังไม่มีรายชื่อที่ต้องติดตาม' : 'ไม่มีรายการตามตัวกรองนี้'}
             </p>
             {items.length === 0 ? (
-              <p className="mt-1 text-xs">กด “เพิ่มรายชื่อที่ต้องติดตาม” เพื่อให้ Lumos โทรตามให้</p>
+              <p className="mt-1 text-xs">กด “เพิ่มรายชื่อที่ต้องติดตาม” เพื่อให้ AI โทรตามให้</p>
             ) : null}
           </div>
         ) : (

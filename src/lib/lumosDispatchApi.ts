@@ -103,12 +103,12 @@ const OUTCOME_BADGE: Record<string, LumosCallBadge> = {
   declined: { label: '❌ ปฏิเสธ', cls: 'border-red-300 bg-red-100 text-red-800', tone: 'bad' },
   no_answer: { label: '📵 ไม่รับสาย', cls: 'border-amber-300 bg-amber-100 text-amber-800', tone: 'bad' },
   unresponsive: { label: '📵 ไม่รับสาย', cls: 'border-amber-300 bg-amber-100 text-amber-800', tone: 'bad' },
-  cancelled: { label: '⚠️ Lumos ยกเลิกสาย', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'off' },
+  cancelled: { label: '⚠️ AI ยกเลิกสาย', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'off' },
 };
 
 const STATUS_BADGE: Record<LumosQueueStatus, LumosCallBadge> = {
-  pending: { label: '⏳ รอ Lumos โทร', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'idle' },
-  delivered: { label: '📞 Lumos รับไปโทรแล้ว', cls: 'border-blue-300 bg-blue-100 text-blue-800', tone: 'sent' },
+  pending: { label: '⏳ รอ AI โทร', cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'idle' },
+  delivered: { label: '📞 AI รับไปโทรแล้ว', cls: 'border-blue-300 bg-blue-100 text-blue-800', tone: 'sent' },
   completed: { label: '📗 โทรจบแล้ว', cls: 'border-sky-300 bg-sky-100 text-sky-800', tone: 'sent' },
   failed: { label: '⚠️ โทรไม่สำเร็จ', cls: 'border-red-300 bg-red-50 text-red-700', tone: 'bad' },
   cancelled: { label: '⛔ ยกเลิกแล้ว', cls: 'border-slate-300 bg-slate-50 text-slate-500', tone: 'off' },

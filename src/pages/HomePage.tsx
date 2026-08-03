@@ -267,7 +267,7 @@ const HomePage: React.FC = () => {
                 ) : null}
                 {flow.lumos.stale_delivered > 0 ? (
                   <div className="rounded-lg border border-white/80 bg-white/70 px-2 py-1.5 text-[11px] text-foreground">
-                    Lumos รับสายไปเกิน 2 วันยังไม่มีผลกลับ —{' '}
+                    ส่ง AI โทรแล้วเกิน 2 วันยังไม่มีผลกลับ —{' '}
                     <span className="font-bold text-red-700">{flow.lumos.stale_delivered} ราย</span>
                     <span className="text-muted-foreground"> · ควรเช็คกับทีม Lumos</span>
                   </div>

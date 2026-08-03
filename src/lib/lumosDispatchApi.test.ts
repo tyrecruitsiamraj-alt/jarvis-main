@@ -27,8 +27,8 @@ function row(over: Partial<LumosCallStatus> = {}): LumosCallStatus {
 
 describe('lumosCallBadge', () => {
   it('ยังไม่มีผลกลับ → แสดงสถานะคิว', () => {
-    expect(lumosCallBadge(row({ status: 'pending' })).label).toContain('รอ Lumos โทร');
-    expect(lumosCallBadge(row({ status: 'delivered' })).label).toContain('Lumos รับไปโทรแล้ว');
+    expect(lumosCallBadge(row({ status: 'pending' })).label).toContain('รอ AI โทร');
+    expect(lumosCallBadge(row({ status: 'delivered' })).label).toContain('AI รับไปโทรแล้ว');
   });
 
   it('ผลการโทรมาก่อนสถานะคิว — completed + confirmed ต้องอ่านว่า "สนใจงาน"', () => {

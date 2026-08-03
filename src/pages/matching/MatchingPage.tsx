@@ -544,7 +544,7 @@ function LumosCallBadgeRow({
               <span className="font-semibold">สรุปบทสนทนา:</span> {row.summary}
             </p>
           ) : (
-            <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก Lumos</p>
+            <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก AI</p>
           )}
           <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatCallWhen(row.updated_at)}</p>
           {canCancelLumosCall(row) ? (
@@ -582,7 +582,7 @@ function LumosJobSummaryLine({ s, compact }: { s: LumosJobCallSummaryRow; compac
       )}
     >
       <span className="text-muted-foreground">โทร:</span>
-      {chip(`ส่ง ${s.sent}`, 'border-slate-200 bg-slate-50 text-slate-700', 'ส่งเข้าคิวให้ Lumos โทรแล้ว (ไม่นับที่ยกเลิก)')}
+      {chip(`ส่ง ${s.sent}`, 'border-slate-200 bg-slate-50 text-slate-700', 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)')}
       {chip(`โทรแล้ว ${s.called}`, 'border-blue-200 bg-blue-50 text-blue-700', 'มีผลโทรกลับมาจริง')}
       {s.confirmed > 0
         ? chip(`✅ ${s.confirmed}`, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'สนใจงาน')
@@ -627,7 +627,7 @@ function LumosSendBar({
           onClick={onSend}
           className="inline-flex items-center gap-1 rounded-full border border-sky-700 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
         >
-          <PhoneCall className="h-3 w-3" /> ส่งให้ Lumos โทร ({count} คน)
+          <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
         </button>
       </div>
     </div>
@@ -877,7 +877,7 @@ const MatchingPage: React.FC = () => {
       );
       clearLumosSelection();
       setLumosConfirmOpen(false);
-      const parts = [`เข้าคิวให้ Lumos โทร ${result.queued} คน`];
+      const parts = [`เข้าคิว AI โทร ${result.queued} คน`];
       if (result.duplicated.length > 0) parts.push(`เคยส่งไปแล้ว ${result.duplicated.length} คน (ไม่ส่งซ้ำ)`);
       if (result.skipped.length > 0) {
         parts.push(
@@ -886,7 +886,7 @@ const MatchingPage: React.FC = () => {
       }
       setLumosNotice(parts.join(' · '));
     } catch (e) {
-      setLumosError(e instanceof Error ? e.message : 'ส่งให้ Lumos ไม่สำเร็จ');
+      setLumosError(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
     } finally {
       setLumosSending(false);
     }
@@ -2253,14 +2253,14 @@ const MatchingPage: React.FC = () => {
                 <LumosJobSummaryLine s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-slate-600">
-                  AI ส่งคนที่แนะนำให้ Lumos โทรอัตโนมัติแล้ว — ถ้ามีคนเพิ่มเข้ามาทีหลังและใบขอด่วน เลือกส่งเองได้
+                  คนที่ AI แนะนำถูกส่ง AI โทรอัตโนมัติแล้ว — ถ้ามีคนเพิ่มเข้ามาทีหลังและใบขอด่วน เลือกส่งเองได้
                 </p>
                 <button
                   type="button"
                   onClick={() => void openLumosPicker()}
                   className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100"
                 >
-                  <PhoneCall className="h-3 w-3" /> เลือกคนส่งให้ Lumos โทร
+                  <PhoneCall className="h-3 w-3" /> เลือกคนส่ง AI โทร
                 </button>
                 </div>
               </div>
@@ -2313,13 +2313,13 @@ const MatchingPage: React.FC = () => {
                             checked={lumosSelectedBoard.includes(m.card_id)}
                             disabled={!canPickForLumos}
                             onChange={() => toggleLumosBoard(m.card_id)}
-                            aria-label={`เลือก ${m.full_name} ให้ Lumos โทร`}
+                            aria-label={`เลือก ${m.full_name} ให้ AI โทร`}
                             title={
                               !m.mobile
-                                ? 'ไม่มีเบอร์มือถือ — ให้ Lumos โทรไม่ได้'
+                                ? 'ไม่มีเบอร์มือถือ — ให้ AI โทรไม่ได้'
                                 : lumosRow
-                                  ? 'ส่งให้ Lumos ไปแล้ว'
-                                  : 'เลือกให้ Lumos โทร'
+                                  ? 'ส่ง AI โทรไปแล้ว'
+                                  : 'เลือกให้ AI โทร'
                             }
                             className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
                           />
@@ -2524,13 +2524,13 @@ const MatchingPage: React.FC = () => {
                                       checked={lumosSelectedIrecruit.includes(m.id)}
                                       disabled={!canPickForLumos}
                                       onChange={() => toggleLumosIrecruit(m.id)}
-                                      aria-label={`เลือก ${m.full_name} ให้ Lumos โทรสัมภาษณ์`}
+                                      aria-label={`เลือก ${m.full_name} ให้ AI โทรสัมภาษณ์`}
                                       title={
                                         !m.phone_number
-                                          ? 'ไม่มีเบอร์โทร — ให้ Lumos โทรไม่ได้'
+                                          ? 'ไม่มีเบอร์โทร — ให้ AI โทรไม่ได้'
                                           : lumosRow
-                                            ? 'ส่งให้ Lumos ไปแล้ว'
-                                            : 'เลือกให้ Lumos โทรสัมภาษณ์'
+                                            ? 'ส่ง AI โทรไปแล้ว'
+                                            : 'เลือกให้ AI โทรสัมภาษณ์'
                                       }
                                       className="h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
                                     />
@@ -3354,14 +3354,14 @@ const MatchingPage: React.FC = () => {
       <Dialog open={lumosConfirmOpen} onOpenChange={(o) => !o && setLumosConfirmOpen(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">ส่งให้ Lumos โทร {lumosSelectedCount} คน?</DialogTitle>
+            <DialogTitle className="text-foreground">ส่ง AI โทร {lumosSelectedCount} คน?</DialogTitle>
             <DialogDescription className="sr-only">
-              ยืนยันส่งรายชื่อผู้สมัครที่เลือกเข้าคิวให้ Lumos โทร
+              ยืนยันส่งรายชื่อผู้สมัครที่เลือกเข้าคิว AI โทร
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
-              Lumos จะโทรหาคนเหล่านี้ด้วย AI จริง — ตรวจรายชื่อให้แน่ใจก่อนกดส่ง
+              AI จะโทรหาคนเหล่านี้จริง — ตรวจรายชื่อให้แน่ใจก่อนกดส่ง
             </p>
             {(() => {
               const boardNames = lumosSelectedBoard.map((cardId) => {
@@ -3430,9 +3430,9 @@ const MatchingPage: React.FC = () => {
       <Dialog open={lumosPickerOpen} onOpenChange={(o) => !o && setLumosPickerOpen(false)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-foreground">เลือกคนส่งให้ Lumos โทร</DialogTitle>
+            <DialogTitle className="text-foreground">เลือกคนส่ง AI โทร</DialogTitle>
             <DialogDescription className="sr-only">
-              เลือกผู้สมัครจาก pool คนของเราเพื่อส่งเข้าคิวให้ Lumos โทร
+              เลือกผู้สมัครจาก pool คนของเราเพื่อส่งเข้าคิว AI โทร
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2.5">

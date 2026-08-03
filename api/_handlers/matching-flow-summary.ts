@@ -78,13 +78,17 @@ function toFollowUp(r: FollowUpSqlRow): FlowFollowUpItem {
  * คนที่ Lumos โทรแล้วได้ outcome ตามที่ระบุ และยังไม่มีใครรับช่วงต่อ (ไม่มี proposal
  * ติดต่อ/จอง/ลงงานของคนนั้นในใบนั้น) — คือรายการ "ต้องติดตาม" ตัวจริง
  */
-async function listCallsAwaitingAction(outcomes: string[], limit: number): Promise<FlowFollowUpItem[]> {
+async function listCallsAwaitingAction(
+  outcomes: string[],
+  jobIds: string[],
+  limit: number,
+): Promise<FlowFollowUpItem[]> {
   const { rows } = await dbQuery<FollowUpSqlRow>(
     `select q.job_ref, q.person_ref, q.channel, q.updated_at,
             coalesce(q.payload->>'recipient_name', q.payload->>'candidate_name') as name,
             q.result->>'summary' as summary
        from ${queueTable} q
-      where q.job_ref <> 'follow'
+      where q.job_ref = any($3)
         and q.result->>'outcome' = any($1)
         and not exists (
           select 1 from ${proposalsTable} p
@@ -95,7 +99,7 @@ async function listCallsAwaitingAction(outcomes: string[], limit: number): Promi
         )
       order by q.updated_at desc
       limit $2`,
-    [outcomes, limit],
+    [outcomes, limit, jobIds],
   );
   return rows.map(toFollowUp);
 }
@@ -110,7 +114,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // ── ใบขอเปิดอยู่ (ท่อเดียวกับหน้า Matching — จำกัดตามแผนกเหมือนกัน)
     const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];
     const jobs = enrichJobsWithUrgency(raw as JobRequest[]);
-    const openJobIds = new Set(jobs.map((j) => j.id));
+    // ⚠️ ทุกตัวเลขบนหน้านี้จำกัดที่ "ใบขอเปิดอยู่ของ BU ตัวเอง" เท่านั้น (คิวโทร/จอง/โพส
+    // scope ตามรายการนี้ทั้งหมด) — staff ต่างแผนกเปิดหน้าแรกต้องไม่เห็นเลขของ BU อื่น
+    const scopedJobIds = jobs.map((j) => j.id);
 
     const [tierMap, availCtx] = await Promise.all([
       loadBoardMatchTierMap(),
@@ -127,7 +133,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // ใบด่วนที่ AI ประเมินแล้วไม่มีคนแนะนำ และยังไม่ได้ส่งโพสหาคนใหม่ → ค้างจริง ต้องมีคนตัดสินใจ
     const { rows: activePostingRows } = await dbQuery<{ job_id: string }>(
-      `select job_id from ${postingsTable} where status in ('pending', 'in_progress', 'posted')`,
+      `select job_id from ${postingsTable}
+        where status in ('pending', 'in_progress', 'posted') and job_id = any($1)`,
+      [scopedJobIds],
     );
     const postedJobIds = new Set(activePostingRows.map((r) => r.job_id));
     const urgentStuck = jobs.filter(
@@ -138,7 +146,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         !postedJobIds.has(j.id),
     );
 
-    // ── คิว Lumos (เฉพาะเส้นใบขอ ไม่รวมหน้า Follow) — เดือนนี้ + ของค้างทั้งหมด
+    // ── คิว AI โทร (เฉพาะใบขอของ BU ตัวเอง ไม่รวมหน้า Follow) — เดือนนี้ + ของค้างทั้งหมด
     const { rows: lumosAgg } = await dbQuery<{
       sent_month: string;
       waiting_call: string;
@@ -152,28 +160,28 @@ async function handler(req: AuthedReq, res: ApiRes) {
          count(*) filter (where status = 'delivered' and result is null
                             and delivered_at < now() - interval '2 days')                        as stale_delivered
        from ${queueTable}
-      where job_ref <> 'follow'`,
+      where job_ref = any($1)`,
+      [scopedJobIds],
     );
 
     const { rows: outcomeRows } = await dbQuery<{ outcome: string; n: string }>(
       `select result->>'outcome' as outcome, count(*) as n
          from ${queueTable}
-        where job_ref <> 'follow' and result is not null
+        where job_ref = any($1) and result is not null
           and updated_at >= date_trunc('month', now())
         group by 1`,
+      [scopedJobIds],
     );
     const outcomesMonth: Record<string, number> = {};
     for (const r of outcomeRows) {
       if (r.outcome) outcomesMonth[r.outcome] = Number(r.n) || 0;
     }
 
-    // ── ต้องติดตาม: สนใจแล้วยังไม่มีใครจอง / ไม่รับสาย (เฉพาะใบขอที่ยังเปิดอยู่)
-    const [confirmedRaw, noAnswerRaw] = await Promise.all([
-      listCallsAwaitingAction(['confirmed'], 20),
-      listCallsAwaitingAction(['no_answer', 'unresponsive'], 20),
+    // ── ต้องติดตาม: สนใจแล้วยังไม่มีใครจอง / ไม่รับสาย (เฉพาะใบขอเปิดของ BU ตัวเอง)
+    const [confirmedWaiting, noAnswerWaiting] = await Promise.all([
+      listCallsAwaitingAction(['confirmed'], scopedJobIds, 20),
+      listCallsAwaitingAction(['no_answer', 'unresponsive'], scopedJobIds, 20),
     ]);
-    const confirmedWaiting = confirmedRaw.filter((i) => openJobIds.has(i.job_ref));
-    const noAnswerWaiting = noAnswerRaw.filter((i) => openJobIds.has(i.job_ref));
 
     // ── การเสนอ/จอง/ลงงาน (สถานะทีม Matching — ไม่ใช่ตัวเลขทางการ ERP)
     const { rows: propAgg } = await dbQuery<{
@@ -185,7 +193,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
          count(*) filter (where status = 'contacted' and updated_at >= date_trunc('month', now())) as contacted_month,
          count(*) filter (where status = 'reserved')                                               as reserved_active,
          count(*) filter (where status = 'placed' and updated_at >= date_trunc('month', now()))    as placed_month
-       from ${proposalsTable}`,
+       from ${proposalsTable}
+      where job_id = any($1)`,
+      [scopedJobIds],
     );
 
     res.setHeader?.('Cache-Control', 'no-store');
