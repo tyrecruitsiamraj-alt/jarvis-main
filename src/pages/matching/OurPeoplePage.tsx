@@ -53,11 +53,15 @@ function personBlob(p: BoardPerson): string {
   return [p.full_name, p.nick_name, p.skills, p.area, p.mobile].filter(Boolean).join(' ').toLowerCase();
 }
 
+const PAGE_SIZE = 20;
+
 const OurPeoplePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [people, setPeople] = useState<BoardPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  /** หน้าปัจจุบันของแต่ละกล่อง (คีย์ = bucket key) — ค้นหาเมื่อไหร่รีเซ็ตทุกกล่อง */
+  const [pageByBucket, setPageByBucket] = useState<Record<string, number>>({});
   const boxRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrolledRef = useRef(false);
 
@@ -97,15 +101,20 @@ const OurPeoplePage: React.FC = () => {
     }));
   }, [people, query]);
 
+  const setQueryAndResetPages = (q: string) => {
+    setQuery(q);
+    setPageByBucket({});
+  };
+
   return (
     <div className="relative">
-      <PageHeader title="คนของเรา" subtitle="ตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use" />
+      <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use" />
       <div className="px-4 md:px-6 space-y-4 pb-8">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setQueryAndResetPages(e.target.value)}
             placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
             className="jarvis-soft-field pl-10"
           />
@@ -118,7 +127,15 @@ const OurPeoplePage: React.FC = () => {
           </p>
         ) : null}
 
-        {grouped.map((bucket) => (
+        {grouped.map((bucket) => {
+          const totalPages = Math.max(1, Math.ceil(bucket.items.length / PAGE_SIZE));
+          const page = Math.min(pageByBucket[bucket.key] ?? 1, totalPages);
+          const pageItems = bucket.items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+          const goTo = (next: number) => {
+            setPageByBucket((prev) => ({ ...prev, [bucket.key]: Math.min(Math.max(next, 1), totalPages) }));
+            boxRefs.current[bucket.key]?.scrollIntoView({ behavior: 'auto', block: 'start' });
+          };
+          return (
           <div
             key={bucket.key}
             ref={(el) => {
@@ -129,6 +146,11 @@ const OurPeoplePage: React.FC = () => {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className={cn('text-sm font-semibold', bucket.headCls)}>
                 {bucket.title} · {bucket.items.length} คน
+                {totalPages > 1 ? (
+                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                    แสดง {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, bucket.items.length)}
+                  </span>
+                ) : null}
               </h3>
               <p className="text-[11px] text-muted-foreground">{bucket.desc}</p>
             </div>
@@ -138,7 +160,7 @@ const OurPeoplePage: React.FC = () => {
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {bucket.items.map((p) => (
+                {pageItems.map((p) => (
                   <div key={p.card_id} className="rounded-xl border border-white/80 bg-white/75 px-3 py-2">
                     <p className="truncate text-sm font-semibold text-foreground">
                       {p.full_name}
@@ -164,8 +186,27 @@ const OurPeoplePage: React.FC = () => {
                 ))}
               </div>
             )}
+            {totalPages > 1 ? (
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button type="button" disabled={page <= 1} onClick={() => goTo(page - 1)} className="jarvis-btn-ghost">
+                  ← ก่อนหน้า
+                </button>
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  หน้า {page}/{totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => goTo(page + 1)}
+                  className="jarvis-btn-ghost"
+                >
+                  ถัดไป →
+                </button>
+              </div>
+            ) : null}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -28,7 +28,6 @@ const WLEmployees = lazy(() => import("@/pages/wl/WLEmployees"));
 const EmployeeProfile = lazy(() => import("@/pages/wl/EmployeeProfile"));
 const AddEmployeePage = lazy(() => import("@/pages/wl/AddEmployeePage"));
 const MatchingDashboard = lazy(() => import("@/pages/matching/MatchingDashboard"));
-const CandidatesPage = lazy(() => import("@/pages/matching/CandidatesPage"));
 const CandidateProfile = lazy(() => import("@/pages/matching/CandidateProfile"));
 const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"));
 const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
@@ -93,7 +92,8 @@ const ProtectedRoutes = () => {
             <Route path="/wl/employees/add" element={<AddEmployeePage />} />
             <Route path="/wl/employees/:id" element={<EmployeeProfile />} />
             <Route path="/matching" element={<MatchingDashboard />} />
-            <Route path="/matching/candidates" element={<CandidatesPage />} />
+            {/* ผู้สมัคร = คนของเราแยกถังบนบอร์ด (หน้า CandidatesPage เดิมพักไว้ — ตาราง candidates ภายในแทบไม่ถูกใช้) */}
+            <Route path="/matching/candidates" element={<OurPeoplePage />} />
             <Route path="/matching/candidates/add" element={<AddCandidatePage />} />
             <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
             <Route path="/matching/match" element={<MatchingPage />} />

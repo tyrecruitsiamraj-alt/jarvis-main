@@ -201,7 +201,7 @@ const MatchingDashboard: React.FC = () => {
                   <button
                     key={b.column_id}
                     type="button"
-                    onClick={() => navigate(meta.bucket ? `/matching/our-people?bucket=${meta.bucket}` : '/matching/our-people')}
+                    onClick={() => navigate(meta.bucket ? `/matching/candidates?bucket=${meta.bucket}` : '/matching/candidates')}
                     className="jarvis-stat-tile"
                   >
                     <div className="jarvis-stat-label">{meta.title}</div>
