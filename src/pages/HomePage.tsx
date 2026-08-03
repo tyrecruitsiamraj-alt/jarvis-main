@@ -41,11 +41,11 @@ function FlowStage({
     <button
       type="button"
       onClick={onClick}
-      className="glass-card min-w-0 flex-1 rounded-2xl border border-white/70 bg-white/50 px-3 py-2.5 text-left transition-colors hover:border-blue-300/60 hover:bg-blue-50/40"
+      className="jarvis-stat-tile min-w-0 flex-1"
     >
-      <div className="text-[11px] font-medium leading-snug text-muted-foreground">{label}</div>
-      <div className={cn('mt-0.5 text-2xl font-bold tabular-nums', accent)}>{value}</div>
-      {sub ? <div className="text-[10px] text-muted-foreground">{sub}</div> : null}
+      <div className="jarvis-stat-label">{label}</div>
+      <div className={cn('jarvis-stat-value', accent)}>{value}</div>
+      {sub ? <div className="jarvis-stat-sub">{sub}</div> : null}
     </button>
   );
 }
@@ -173,14 +173,14 @@ const HomePage: React.FC = () => {
           className="mb-8 space-y-3"
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="jarvis-section-title">
               การไหลของงานสรรหา · เดือนนี้
             </h2>
             <button
               type="button"
               onClick={() => void loadFlow()}
               disabled={flowLoading}
-              className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/60 px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-white disabled:opacity-50"
+              className="jarvis-btn-ghost"
             >
               <RefreshCw className={cn('h-3 w-3', flowLoading && 'animate-spin')} /> รีเฟรช
             </button>

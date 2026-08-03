@@ -623,7 +623,7 @@ function LumosSendBar({
         <button
           type="button"
           onClick={onClear}
-          className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+          className="jarvis-btn-ghost"
         >
           ล้างที่เลือก
         </button>
@@ -631,7 +631,7 @@ function LumosSendBar({
           type="button"
           disabled={busy}
           onClick={onSend}
-          className="inline-flex items-center gap-1 rounded-full border border-sky-700 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+          className="jarvis-btn-primary"
         >
           <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
         </button>
@@ -1927,7 +1927,7 @@ const MatchingPage: React.FC = () => {
                         e.stopPropagation();
                         openJob(j);
                       }}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+                      className="jarvis-btn-secondary shrink-0"
                     >
                       <Users className="h-3 w-3" />
                       {matchCount != null
@@ -2227,7 +2227,7 @@ const MatchingPage: React.FC = () => {
                     type="button"
                     disabled={boardLoadingId === jobDetail.id}
                     onClick={() => setRematchConfirmJobId(jobDetail.id)}
-                    className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60"
+                    className="jarvis-btn-secondary disabled:cursor-wait"
                   >
                     <RefreshCw className={cn('h-3 w-3', boardLoadingId === jobDetail.id && 'animate-spin')} />
                     {boardLoadingId === jobDetail.id ? 'AI กำลังประเมิน…' : 'ค้นหาใหม่'}
@@ -2289,7 +2289,7 @@ const MatchingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void openLumosPicker()}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100"
+                  className="jarvis-btn-secondary shrink-0"
                 >
                   <PhoneCall className="h-3 w-3" /> เลือกคนส่ง AI โทร
                 </button>
@@ -2484,7 +2484,7 @@ const MatchingPage: React.FC = () => {
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
-                        className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="jarvis-btn-primary"
                       >
                         {irLoadingId === jobDetail.id ? (
                           'กำลังค้นหา…'
@@ -3344,7 +3344,7 @@ const MatchingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setConflictInfo(null)}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                  className="jarvis-btn-ghost px-4 py-2"
                 >
                   ปิด
                 </button>
@@ -3374,7 +3374,7 @@ const MatchingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setRematchConfirmJobId(null)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                className="jarvis-btn-ghost px-4 py-2"
               >
                 ยกเลิก
               </button>
@@ -3385,7 +3385,7 @@ const MatchingPage: React.FC = () => {
                   setRematchConfirmJobId(null);
                   if (id) void fetchBoardMatch(id, true);
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+                className="jarvis-btn-primary px-4 py-2"
               >
                 <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
               </button>
@@ -3452,7 +3452,7 @@ const MatchingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setLumosConfirmOpen(false)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                className="jarvis-btn-ghost px-4 py-2"
               >
                 ยกเลิก
               </button>
@@ -3460,7 +3460,7 @@ const MatchingPage: React.FC = () => {
                 type="button"
                 disabled={lumosSending}
                 onClick={() => void sendSelectedToLumos()}
-                className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                className="jarvis-btn-primary px-4 py-2"
               >
                 <PhoneCall className="h-3 w-3" />
                 {lumosSending ? 'กำลังส่ง…' : `ยืนยันส่ง ${lumosSelectedCount} คน`}
@@ -3576,7 +3576,7 @@ const MatchingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setLumosPickerOpen(false)}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                  className="jarvis-btn-ghost px-4 py-2"
                 >
                   ปิด
                 </button>
@@ -3587,7 +3587,7 @@ const MatchingPage: React.FC = () => {
                     setLumosPickerOpen(false);
                     setLumosConfirmOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                  className="jarvis-btn-primary px-4 py-2"
                 >
                   <PhoneCall className="h-3 w-3" /> ถัดไป ({lumosSelectedCount} คน)
                 </button>

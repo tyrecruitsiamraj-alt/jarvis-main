@@ -265,6 +265,94 @@
   .jarvis-page-orb {
     @apply pointer-events-none absolute jarvis-orange-orb opacity-25 blur-sm;
   }
+
+  /* ── ภาษากลางของระบบ (3 ส.ค. 2569): chip / ปุ่ม / กล่องตัวเลข / หัวข้อ ──
+     กติกา: การ์ดใหญ่ = glass (1.25–1.75rem) · การ์ดย่อย = rounded-xl ·
+     ปุ่ม+chip = rounded-full · ป้ายหลัก 11px · ป้ายรอง 10px
+     โทนสถานะ: sky=กำลังทำ · emerald=สำเร็จ/พร้อม · amber=รอ/ต้องเช็ค · red=ติดขัด · violet=คนเก่า/จอง */
+
+  .jarvis-chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium;
+  }
+  .jarvis-chip-sm {
+    @apply px-1.5 text-[10px];
+  }
+  .jarvis-chip-neutral {
+    @apply border-slate-200 bg-slate-50 text-slate-700;
+  }
+  .jarvis-chip-info {
+    @apply border-sky-200 bg-sky-50 text-sky-700;
+  }
+  .jarvis-chip-success {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+  .jarvis-chip-warn {
+    @apply border-amber-200 bg-amber-50 text-amber-800;
+  }
+  .jarvis-chip-danger {
+    @apply border-red-200 bg-red-50 text-red-700;
+  }
+  .jarvis-chip-violet {
+    @apply border-violet-200 bg-violet-50 text-violet-700;
+  }
+
+  /* ปุ่มมาตรฐาน 4 ระดับ — ทุกปุ่มในระบบควรเป็นหนึ่งในนี้ */
+  .jarvis-btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors;
+  }
+  .jarvis-btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .jarvis-btn-primary {
+    @apply jarvis-btn border-transparent font-semibold text-primary-foreground;
+    background: hsl(var(--primary));
+    box-shadow: 0 4px 14px hsl(211 100% 50% / 0.25);
+  }
+  .jarvis-btn-primary:hover:not(:disabled) {
+    background: hsl(211 100% 45%);
+  }
+  .jarvis-btn-secondary {
+    @apply jarvis-btn border-sky-200 bg-white text-sky-700;
+  }
+  .jarvis-btn-secondary:hover:not(:disabled) {
+    @apply border-sky-300 bg-sky-50;
+  }
+  .jarvis-btn-ghost {
+    @apply jarvis-btn border-slate-200 bg-white text-slate-600;
+  }
+  .jarvis-btn-ghost:hover:not(:disabled) {
+    @apply bg-slate-50;
+  }
+  .jarvis-btn-danger {
+    @apply jarvis-btn border-red-200 bg-white text-red-700;
+  }
+  .jarvis-btn-danger:hover:not(:disabled) {
+    @apply border-red-300 bg-red-50;
+  }
+
+  /* กล่องตัวเลข (stat tile) — ใช้ทั้ง funnel หน้าแรก / สรุปถัง / สรุปงานด่วน */
+  .jarvis-stat-tile {
+    @apply rounded-2xl border border-white/70 bg-white/55 px-3 py-2.5 text-left transition-colors;
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    box-shadow: 0 4px 16px rgba(17, 17, 26, 0.05);
+  }
+  button.jarvis-stat-tile:hover {
+    @apply border-sky-300/60 bg-sky-50/50;
+  }
+  .jarvis-stat-label {
+    @apply text-[11px] font-medium leading-snug text-muted-foreground;
+  }
+  .jarvis-stat-value {
+    @apply mt-0.5 text-2xl font-bold tabular-nums;
+  }
+  .jarvis-stat-sub {
+    @apply text-[10px] text-muted-foreground;
+  }
+
+  .jarvis-section-title {
+    @apply text-sm font-semibold uppercase tracking-[0.15em] text-muted-foreground;
+  }
 }
 
 @layer components {

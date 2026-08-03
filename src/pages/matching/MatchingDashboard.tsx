@@ -202,12 +202,12 @@ const MatchingDashboard: React.FC = () => {
                     key={b.column_id}
                     type="button"
                     onClick={() => navigate('/matching/match')}
-                    className="glass-card rounded-2xl border border-white/70 bg-white/40 hover:border-blue-300/50 hover:bg-blue-50/30 p-3 text-left transition-colors"
+                    className="jarvis-stat-tile"
                   >
-                    <div className="text-[11px] font-medium text-muted-foreground leading-snug">{meta.title}</div>
-                    <div className={cn('text-2xl font-bold tabular-nums mt-0.5', meta.cls)}>{b.count}</div>
+                    <div className="jarvis-stat-label">{meta.title}</div>
+                    <div className={cn('jarvis-stat-value', meta.cls)}>{b.count}</div>
                     {meta.desc ? (
-                      <div className="text-[10px] leading-snug text-muted-foreground">{meta.desc}</div>
+                      <div className="jarvis-stat-sub leading-snug">{meta.desc}</div>
                     ) : null}
                   </button>
                 );
