@@ -8,6 +8,7 @@ import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { listProposalsForJobs } from '../_lib/candidateProposals.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
+import { loadLumosJobCallSummaryMap, type LumosJobCallSummary } from '../_lib/lumosDispatch.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { isBoardCandidateAvailable } from '@/lib/boardMatchAvailability';
 import {
@@ -62,10 +63,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     enqueuePrecomputeJobs(jobs);
 
     // ข้อมูลประกอบตัวกรองจาก PG: การจองตัว + ผล AI ที่เคยคิดเก็บไว้ + ความพร้อมของคนของเรา
-    const [proposalMap, tierMap, availCtx] = await Promise.all([
+    // + สรุปผลโทร Lumos ต่อใบ (โชว์ข้างการ์ด)
+    const [proposalMap, tierMap, availCtx, lumosMap] = await Promise.all([
       listProposalsForJobs(jobs.map((j) => j.id)),
       loadBoardMatchTierMap(),
       loadBoardAvailabilityContext(),
+      loadLumosJobCallSummaryMap().catch(() => new Map<string, LumosJobCallSummary>()),
     ]);
 
     // กรองผลที่เก็บไว้ให้เหลือเฉพาะ "คนที่ยังพร้อม" ก่อนนับป้าย/summary/workflow filter
@@ -117,6 +120,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
     }
 
+    // สรุปผลโทร Lumos ต่อใบในหน้านี้: ส่งโทร/โทรแล้ว/สนใจ/ไม่สนใจ/ไม่รับสาย
+    const lumosSummary: Record<string, LumosJobCallSummary> = {};
+    for (const j of items) {
+      const entry = lumosMap.get(j.id);
+      if (entry && entry.sent > 0) lumosSummary[j.id] = entry;
+    }
+
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json({
       items,
@@ -126,6 +136,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       unitOptions,
       summary,
       storedMatches,
+      lumosSummary,
     });
   } catch (e) {
     return handleApiError(res, e, 'matching-list GET', { userId: req.user.sub });

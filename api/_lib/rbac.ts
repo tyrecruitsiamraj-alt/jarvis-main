@@ -48,6 +48,8 @@ export type ApiResource =
   | 'matching-board-candidates'
   | 'matching-proposals'
   | 'matching-job-postings'
+  | 'matching-flow-summary'
+  | 'lumos-dispatch'
   | 'job-applications'
   | 'diagnostics-outbound-ip';
 
@@ -137,6 +139,12 @@ export function minimumRoleFor(
     case 'matching-board-candidates':
     case 'matching-proposals':
     case 'matching-job-postings':
+    case 'matching-flow-summary':
+      return 'staff';
+
+    case 'lumos-dispatch':
+      // staff: ดูผลการโทร + ติ๊กเลือกส่งให้ Lumos โทรเอง (โมเดลเดียวกับ follow)
+      // opl ถูกกันที่ checkApiAccess อยู่แล้ว (read-only role ห้าม POST/DELETE)
       return 'staff';
 
     case 'job-applications':
