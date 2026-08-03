@@ -56,10 +56,12 @@ import {
   lumosReminderResultsHandler,
 } from './lumos-reminder.js';
 import lumosPositionsHandler from './lumos-positions.js';
+import lumosDispatchHandler from './lumos-dispatch.js';
 import matchingCandidateSpecHandler from './matching-candidate-spec.js';
 import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js';
 import matchingBoardCandidatesHandler from './matching-board-candidates.js';
 import matchingProposalsHandler from './matching-proposals.js';
+import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
@@ -90,6 +92,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   // Lumos AI Recruit — Positions
   '/api/lumos/positions': lumosPositionsHandler as ApiHandler,
+  // ส่งให้ Lumos โทรแบบคนเลือกเอง + อ่านผลการโทร (เรียกจากหน้า Matching ด้วย session ปกติ)
+  '/api/lumos/dispatch': lumosDispatchHandler as ApiHandler,
   // AI Interview (Lumos ↔ SO)
   '/api/recruit-registrations': recruitRegistrationsHandler as ApiHandler,
   '/api/matching/suggestions': matchingSuggestionsHandler as ApiHandler,
@@ -104,6 +108,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
   '/api/matching/board-candidates': matchingBoardCandidatesHandler as ApiHandler,
   '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
+  '/api/matching/flow-summary': matchingFlowSummaryHandler as ApiHandler,
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,

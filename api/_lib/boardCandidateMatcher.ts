@@ -275,6 +275,7 @@ export async function matchBoardCandidatesForJob(
   };
   await saveBoardMatchResult(jobId, result);
   // match เสร็จ → ส่งคนที่แนะนำ (green/yellow) เข้าคิว Lumos เส้น reminder (error-safe ภายใน)
+  // คนที่ auto ไม่ส่ง (red / ไม่มีเบอร์ / เพิ่มมาทีหลัง) ดันเข้าคิวเองได้ที่ POST /api/lumos/dispatch
   await enqueueLumosReminderForBoardMatch(job, result);
   return result;
 }

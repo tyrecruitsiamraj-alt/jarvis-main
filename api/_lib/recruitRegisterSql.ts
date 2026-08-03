@@ -276,6 +276,31 @@ ORDER BY rr.created_at DESC`;
   return rows.map(mapMatchRow);
 }
 
+/**
+ * ดึงผู้สมัครตาม id ที่ระบุ (อ่านอย่างเดียว) — ใช้ตอนคนติ๊กเลือกแล้วกดส่งให้ Lumos โทร
+ * สร้าง payload จากข้อมูลในฐานเท่านั้น ห้ามเชื่อชื่อ/เบอร์ที่ client ส่งมา
+ */
+export async function listRecruitCandidatesByIds(
+  ids: number[],
+  options?: { owner?: string },
+): Promise<RecruitCandidateForMatch[]> {
+  const owner = (options?.owner || process.env.RECRUIT_REGISTER_OWNER || 'RM').trim();
+  const uniqueIds = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 200);
+  if (uniqueIds.length === 0) return [];
+
+  const placeholders = uniqueIds.map((_, i) => `@id${i}`).join(', ');
+  const sql = `${RECRUIT_MATCH_SELECT_FROM}${RECRUIT_MATCH_BASE_WHERE}  AND rr.id IN (${placeholders})
+ORDER BY rr.created_at DESC`;
+
+  const inputs: Record<string, unknown> = { owner, limit: uniqueIds.length };
+  uniqueIds.forEach((id, i) => {
+    inputs[`id${i}`] = id;
+  });
+
+  const rows = await irecruitSqlQuery<RecruitCandidateForMatchSqlRow>(sql, inputs);
+  return rows.map(mapMatchRow);
+}
+
 export async function listRecruitRegistrations(options?: {
   owner?: string;
   limit?: number;

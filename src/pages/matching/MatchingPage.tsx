@@ -65,6 +65,22 @@ import {
   unitRequestNoteKey,
   type UnitBranchOverride,
 } from '@/lib/siamrajUnitRequestsApi';
+import {
+  listLumosCallStatus,
+  listLumosCallStatusWithPool,
+  filterLumosPool,
+  dispatchLumosCalls,
+  cancelLumosCall,
+  lumosCallBadge,
+  canCancelLumosCall,
+  indexLumosCallStatus,
+  boardPersonRef,
+  irecruitPersonRef,
+  summarizeLumosCallStatus,
+  type LumosCallStatus,
+  type LumosPoolCandidate,
+  type LumosJobCallSummaryRow,
+} from '@/lib/lumosDispatchApi';
 
 /** สถานะการเสนอ + id แถวจริงใน DB (ไว้ยกเลิก) — คีย์ = source#ref */
 type ProposedRef = {
@@ -474,6 +490,150 @@ function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label
   return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60' };
 }
 
+function formatCallWhen(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/**
+ * ป้ายผลการโทร Lumos ต่อคน (ระดับ 1) — รอโทร → Lumos รับไปแล้ว → สนใจ/ปฏิเสธ/ไม่รับสาย
+ * กดขยายเห็นสรุปบทสนทนา + ยกเลิกได้ถ้า Lumos ยังไม่ส่งผลกลับ
+ */
+function LumosCallBadgeRow({
+  row,
+  expanded,
+  onToggle,
+  onCancel,
+  cancelling,
+}: {
+  row: LumosCallStatus;
+  expanded: boolean;
+  onToggle: () => void;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
+  const badge = lumosCallBadge(row);
+  const hasDetail = Boolean(row.summary) || canCancelLumosCall(row);
+  return (
+    <div className="mt-1.5 border-t border-white/70 pt-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={!hasDetail}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+            badge.cls,
+            hasDetail ? 'hover:brightness-95' : 'cursor-default',
+          )}
+        >
+          {badge.label}
+          {hasDetail ? <span aria-hidden>{expanded ? '▴' : '▾'}</span> : null}
+        </button>
+        <span className="text-[10px] text-muted-foreground">ส่งเมื่อ {formatCallWhen(row.sent_at)}</span>
+        {row.delivery_count > 1 ? (
+          <span className="text-[10px] text-muted-foreground">· ส่งซ้ำ {row.delivery_count} ครั้ง</span>
+        ) : null}
+      </div>
+      {expanded ? (
+        <div className="mt-1.5 space-y-1.5 rounded-lg border border-slate-200 bg-white/85 px-2.5 py-1.5">
+          {row.summary ? (
+            <p className="text-[10px] leading-relaxed text-slate-700">
+              <span className="font-semibold">สรุปบทสนทนา:</span> {row.summary}
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก Lumos</p>
+          )}
+          <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatCallWhen(row.updated_at)}</p>
+          {canCancelLumosCall(row) ? (
+            <button
+              type="button"
+              disabled={cancelling}
+              onClick={onCancel}
+              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+            >
+              <X className="h-2.5 w-2.5" /> {cancelling ? 'กำลังยกเลิก…' : 'ยกเลิกการส่ง'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * แถวสรุปผลโทร Lumos ของใบขอ 1 ใบ — โชว์ข้างการ์ดในลิสต์ และหัวหน้า detail
+ * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ Lumos ยกเลิกเอง)
+ */
+function LumosJobSummaryLine({ s, compact }: { s: LumosJobCallSummaryRow; compact?: boolean }) {
+  if (s.sent === 0) return null;
+  const chip = (label: string, cls: string, title: string) => (
+    <span title={title} className={cn('rounded-full border px-1.5 py-0.5 font-semibold', cls)}>
+      {label}
+    </span>
+  );
+  return (
+    <span
+      className={cn(
+        'flex flex-wrap items-center gap-1',
+        compact ? 'text-[10px]' : 'text-[11px]',
+      )}
+    >
+      <span className="text-muted-foreground">โทร:</span>
+      {chip(`ส่ง ${s.sent}`, 'border-slate-200 bg-slate-50 text-slate-700', 'ส่งเข้าคิวให้ Lumos โทรแล้ว (ไม่นับที่ยกเลิก)')}
+      {chip(`โทรแล้ว ${s.called}`, 'border-blue-200 bg-blue-50 text-blue-700', 'มีผลโทรกลับมาจริง')}
+      {s.confirmed > 0
+        ? chip(`✅ ${s.confirmed}`, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'สนใจงาน')
+        : null}
+      {s.declined > 0
+        ? chip(`❌ ${s.declined}`, 'border-red-200 bg-red-50 text-red-700', 'ไม่สนใจ/ปฏิเสธ')
+        : null}
+      {s.no_answer > 0
+        ? chip(`📵 ${s.no_answer}`, 'border-amber-200 bg-amber-50 text-amber-800', 'ไม่รับสาย — ควรโทรซ้ำ')
+        : null}
+    </span>
+  );
+}
+
+/** แถบ "ส่งให้ Lumos โทร" — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 คน (ใช้ทั้งฝั่งคนของเราและ iRecruit) */
+function LumosSendBar({
+  count,
+  onSend,
+  onClear,
+  busy,
+}: {
+  count: number;
+  onSend: () => void;
+  onClear: () => void;
+  busy: boolean;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2">
+      <p className="text-[11px] font-semibold text-sky-900">ติ๊กเลือกไว้ {count} คน</p>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onClear}
+          className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+        >
+          ล้างที่เลือก
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSend}
+          className="inline-flex items-center gap-1 rounded-full border border-sky-700 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+        >
+          <PhoneCall className="h-3 w-3" /> ส่งให้ Lumos โทร ({count} คน)
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** ข้อความตำแหน่งจากใบขอ (รวม job description + staff title) สำหรับ classify family */
 function jobTitleText(j: JobRequest): string {
   const pick = (k: keyof JobRequest) => {
@@ -514,6 +674,8 @@ const MatchingPage: React.FC = () => {
   const [serverStoredMatches, setServerStoredMatches] = useState<
     Record<string, { recommended: number; computedAt: string }>
   >({});
+  /** สรุปผลโทร Lumos ต่อใบ (จาก /api/matching/list) — โชว์ข้างการ์ดในลิสต์ */
+  const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>({});
   const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
   const [serverListError, setServerListError] = useState<string | null>(null);
   const serverFetchSeq = useRef(0);
@@ -544,6 +706,7 @@ const MatchingPage: React.FC = () => {
         unitOptions?: string[];
         summary?: { urgentTotal: number; urgentAnalyzed: number; urgentWithGreen: number };
         storedMatches?: Record<string, { recommended: number; computedAt: string }>;
+        lumosSummary?: Record<string, LumosJobCallSummaryRow>;
       };
       if (seq !== serverFetchSeq.current) return;
       setServerItems((prev) => (append ? [...prev, ...data.items] : data.items));
@@ -553,6 +716,9 @@ const MatchingPage: React.FC = () => {
       if (data.summary) setServerSummary(data.summary);
       setServerStoredMatches((prev) =>
         append ? { ...prev, ...(data.storedMatches ?? {}) } : (data.storedMatches ?? {}),
+      );
+      setServerLumosSummary((prev) =>
+        append ? { ...prev, ...(data.lumosSummary ?? {}) } : (data.lumosSummary ?? {}),
       );
     } catch (e) {
       if (seq === serverFetchSeq.current) {
@@ -623,6 +789,127 @@ const MatchingPage: React.FC = () => {
   const prewarmStartedRef = useRef(false);
   // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วทับผลเดิม + เสีย ~30-90 วิต่อใบ
   const [rematchConfirmJobId, setRematchConfirmJobId] = useState<string | null>(null);
+
+  // ── ส่งให้ Lumos โทร แบบคนติ๊กเลือกเอง (ไม่ส่งอัตโนมัติแล้ว) + ผลการโทรต่อคน
+  /** สถานะการโทรต่อคนของใบขอที่เปิดอยู่ — คีย์ = person_ref ('card-<id>' / 'ir-<id>') */
+  const [lumosStatusByRef, setLumosStatusByRef] = useState<Record<string, LumosCallStatus>>({});
+  const [lumosSelectedBoard, setLumosSelectedBoard] = useState<number[]>([]);
+  const [lumosSelectedIrecruit, setLumosSelectedIrecruit] = useState<number[]>([]);
+  const [lumosConfirmOpen, setLumosConfirmOpen] = useState(false);
+  const [lumosSending, setLumosSending] = useState(false);
+  const [lumosError, setLumosError] = useState<string | null>(null);
+  const [lumosNotice, setLumosNotice] = useState<string | null>(null);
+  const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
+  const [lumosCancellingRef, setLumosCancellingRef] = useState<string | null>(null);
+  // หน้าต่างเลือกคนจาก pool "คนของเรา" — ใช้ตอนมีคนเพิ่มเข้ามาทีหลังแล้วใบขอด่วน
+  // (auto-send ส่งเฉพาะคนที่อยู่ในผล AI แมทตอนนั้น คนเพิ่มใหม่ต้องดันเข้าคิวเอง)
+  const [lumosPickerOpen, setLumosPickerOpen] = useState(false);
+  const [lumosPool, setLumosPool] = useState<LumosPoolCandidate[]>([]);
+  const [lumosPoolLoading, setLumosPoolLoading] = useState(false);
+  const [lumosPoolSearch, setLumosPoolSearch] = useState('');
+
+  const lumosSelectedCount = lumosSelectedBoard.length + lumosSelectedIrecruit.length;
+
+  /** ชื่อ/เบอร์ของ card_id ที่เลือก — หาจากผลแมทก่อน ไม่เจอค่อยดูใน pool (คนเพิ่มใหม่) */
+  const boardPersonLabel = (cardId: number): { name: string; phone: string | null } => {
+    const fromMatch = (boardMatchById[jobDetail?.id ?? '']?.matches ?? []).find((m) => m.card_id === cardId);
+    if (fromMatch) return { name: fromMatch.full_name, phone: fromMatch.mobile };
+    const fromPool = lumosPool.find((c) => c.card_id === cardId);
+    if (fromPool) return { name: fromPool.full_name, phone: fromPool.mobile };
+    return { name: `การ์ด #${cardId}`, phone: null };
+  };
+
+  const openLumosPicker = async () => {
+    if (!jobDetail) return;
+    setLumosPickerOpen(true);
+    setLumosPoolSearch('');
+    setLumosPoolLoading(true);
+    setLumosError(null);
+    try {
+      const { items, pool } = await listLumosCallStatusWithPool(jobDetail.id);
+      setLumosStatusByRef(indexLumosCallStatus(items));
+      setLumosPool(pool);
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'โหลดรายชื่อคนของเราไม่สำเร็จ');
+    } finally {
+      setLumosPoolLoading(false);
+    }
+  };
+
+  const clearLumosSelection = () => {
+    setLumosSelectedBoard([]);
+    setLumosSelectedIrecruit([]);
+  };
+
+  const toggleLumosBoard = (cardId: number) =>
+    setLumosSelectedBoard((prev) =>
+      prev.includes(cardId) ? prev.filter((id) => id !== cardId) : [...prev, cardId],
+    );
+
+  const toggleLumosIrecruit = (id: number) =>
+    setLumosSelectedIrecruit((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const loadLumosStatus = async (jobId: string) => {
+    try {
+      setLumosStatusByRef(indexLumosCallStatus(await listLumosCallStatus(jobId)));
+    } catch {
+      // ไม่ให้ล้มการเปิดใบขอ — แค่ไม่มีป้ายผลการโทร
+      setLumosStatusByRef({});
+    }
+  };
+
+  const sendSelectedToLumos = async () => {
+    if (!jobDetail || lumosSelectedCount === 0) return;
+    setLumosSending(true);
+    setLumosError(null);
+    setLumosNotice(null);
+    try {
+      const result = await dispatchLumosCalls({
+        jobId: jobDetail.id,
+        boardCardIds: lumosSelectedBoard,
+        irecruitIds: lumosSelectedIrecruit,
+      });
+      setLumosStatusByRef(indexLumosCallStatus(result.items));
+      // pool ที่โหลดไว้ต้องรู้ว่าคนเหล่านี้ส่งแล้ว ไม่งั้นเปิด picker ซ้ำจะยังติ๊กได้
+      const justSent = new Set(lumosSelectedBoard);
+      setLumosPool((prev) =>
+        prev.map((c) => (justSent.has(c.card_id) ? { ...c, already_sent: true } : c)),
+      );
+      clearLumosSelection();
+      setLumosConfirmOpen(false);
+      const parts = [`เข้าคิวให้ Lumos โทร ${result.queued} คน`];
+      if (result.duplicated.length > 0) parts.push(`เคยส่งไปแล้ว ${result.duplicated.length} คน (ไม่ส่งซ้ำ)`);
+      if (result.skipped.length > 0) {
+        parts.push(
+          `ส่งไม่ได้ ${result.skipped.length} คน: ${result.skipped.map((s) => s.name).join(', ')} — ${result.skipped[0].reason}`,
+        );
+      }
+      setLumosNotice(parts.join(' · '));
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'ส่งให้ Lumos ไม่สำเร็จ');
+    } finally {
+      setLumosSending(false);
+    }
+  };
+
+  const cancelLumosForRef = async (row: LumosCallStatus) => {
+    if (!jobDetail) return;
+    setLumosCancellingRef(row.person_ref);
+    setLumosError(null);
+    try {
+      const items = await cancelLumosCall({
+        jobId: jobDetail.id,
+        channel: row.channel,
+        ref: row.person_ref,
+      });
+      setLumosStatusByRef(indexLumosCallStatus(items));
+      setLumosNotice('ยกเลิกการส่งแล้ว');
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setLumosCancellingRef((cur) => (cur === row.person_ref ? null : cur));
+    }
+  };
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?pool=1')
@@ -765,6 +1052,16 @@ const MatchingPage: React.FC = () => {
     setShowDistantCandidates(true);
     setProposeError(null);
     setPostingError(null);
+    // Lumos: เริ่มใหม่ทุกครั้งที่เปิดใบขอ (การเลือกผูกกับใบขอที่เปิดอยู่ใบเดียว)
+    clearLumosSelection();
+    setLumosStatusByRef({});
+    setLumosError(null);
+    setLumosNotice(null);
+    setLumosExpandedRef(null);
+    setLumosPickerOpen(false);
+    setLumosPool([]);
+    setLumosPoolSearch('');
+    void loadLumosStatus(j.id);
     if (!boardMatchById[j.id] && boardLoadingId !== j.id) void fetchBoardMatch(j.id);
     void listProposalsForJob(j.id).then((items) => {
       setProposedByKey(() => {
@@ -787,6 +1084,17 @@ const MatchingPage: React.FC = () => {
     if (job) openJob(job);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, jobs]);
+
+  // ตัวกรองจาก URL (?urgent=1&workflow=...) — ลิงก์จากหน้าสรุปการไหลของงานบน HomePage
+  useEffect(() => {
+    if (searchParams.get('urgent') === '1') setUrgentOnly(true);
+    const wf = searchParams.get('workflow');
+    if (wf && (['all', 'sla', 'green', 'yellow', 'none', 'reserved'] as const).includes(wf as WorkflowFilter)) {
+      setWorkflowFilter(wf as WorkflowFilter);
+    }
+    // ครั้งเดียวตอน mount — หลังจากนั้นให้ผู้ใช้คุมเอง
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // บันทึกการเสนอ/จองตัว/ลงงาน "คนของเรา" (board) ลง DB
   const proposeBoard = async (
@@ -1604,6 +1912,11 @@ const MatchingPage: React.FC = () => {
                     <span className="block truncate text-[10px] text-slate-600">
                       ขอ {requested} · ติดต่อ {progress.contacted} · จอง {progress.reserved} · ลงงานใน Matching {progress.placed} · เหลือหาทางการ {remaining}
                     </span>
+                    {serverLumosSummary[j.id] ? (
+                      <span className="mt-0.5 block">
+                        <LumosJobSummaryLine s={serverLumosSummary[j.id]} compact />
+                      </span>
+                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -1924,6 +2237,41 @@ const MatchingPage: React.FC = () => {
                 </p>
               ) : null}
 
+              {lumosNotice ? (
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-800">
+                  {lumosNotice}
+                </p>
+              ) : null}
+              {lumosError ? (
+                <p className="rounded-lg border border-red-200 bg-red-50/80 px-2.5 py-1.5 text-[11px] text-destructive">
+                  {lumosError}
+                </p>
+              ) : null}
+
+              {/* ใบขอด่วน + มีคนเพิ่มเข้า pool ทีหลัง → ดันเข้าคิวโทรเองได้ ไม่ต้องรอ AI แมทรอบใหม่ */}
+              <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 px-3 py-2">
+                <LumosJobSummaryLine s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-600">
+                  AI ส่งคนที่แนะนำให้ Lumos โทรอัตโนมัติแล้ว — ถ้ามีคนเพิ่มเข้ามาทีหลังและใบขอด่วน เลือกส่งเองได้
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void openLumosPicker()}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100"
+                >
+                  <PhoneCall className="h-3 w-3" /> เลือกคนส่งให้ Lumos โทร
+                </button>
+                </div>
+              </div>
+
+              <LumosSendBar
+                count={lumosSelectedCount}
+                busy={lumosSending}
+                onClear={clearLumosSelection}
+                onSend={() => setLumosConfirmOpen(true)}
+              />
+
               {boardLoadingId === jobDetail.id ? (
                 <AiEvaluationStatus source="board" />
               ) : boardErrorById[jobDetail.id] ? (
@@ -1947,16 +2295,38 @@ const MatchingPage: React.FC = () => {
                         const proposed = proposedByKey[candidateKey];
                         const otherActive = activeProposalByCandidate[candidateKey];
                         const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
+                        const lumosRef = boardPersonRef(m.card_id);
+                        const lumosRow = lumosStatusByRef[lumosRef];
+                        const canPickForLumos = Boolean(m.mobile) && !lumosRow;
                         return (
-                        <button
-                          type="button"
+                        <div
                           key={m.card_id}
-                          onClick={() => setCandDetail(m)}
                           className={cn(
-                            'matching-candidate-card w-full rounded-xl border px-3 py-2 text-left',
+                            'matching-candidate-card rounded-xl border px-3 py-2',
                             meta.cls,
                             proposed ? 'opacity-70' : '',
                           )}
+                        >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={lumosSelectedBoard.includes(m.card_id)}
+                            disabled={!canPickForLumos}
+                            onChange={() => toggleLumosBoard(m.card_id)}
+                            aria-label={`เลือก ${m.full_name} ให้ Lumos โทร`}
+                            title={
+                              !m.mobile
+                                ? 'ไม่มีเบอร์มือถือ — ให้ Lumos โทรไม่ได้'
+                                : lumosRow
+                                  ? 'ส่งให้ Lumos ไปแล้ว'
+                                  : 'เลือกให้ Lumos โทร'
+                            }
+                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        <button
+                          type="button"
+                          onClick={() => setCandDetail(m)}
+                          className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold text-foreground">
@@ -2039,6 +2409,17 @@ const MatchingPage: React.FC = () => {
                           {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p> : null}
                           <div className="mt-1 text-[10px] font-medium text-sky-600">แตะเพื่อดูรายละเอียด →</div>
                           </button>
+                        </div>
+                        {lumosRow ? (
+                          <LumosCallBadgeRow
+                            row={lumosRow}
+                            expanded={lumosExpandedRef === lumosRef}
+                            onToggle={() => setLumosExpandedRef((cur) => (cur === lumosRef ? null : lumosRef))}
+                            onCancel={() => void cancelLumosForRef(lumosRow)}
+                            cancelling={lumosCancellingRef === lumosRef}
+                          />
+                        ) : null}
+                        </div>
                         );
                       })}
                   </div>
@@ -2125,6 +2506,9 @@ const MatchingPage: React.FC = () => {
                             const busy = proposingKey === key;
                             const otherActive = activeProposalByCandidate[key];
                             const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
+                            const lumosRef = irecruitPersonRef(m.id);
+                            const lumosRow = lumosStatusByRef[lumosRef];
+                            const canPickForLumos = Boolean(m.phone_number) && !lumosRow;
                             return (
                               <div
                                 key={row.key}
@@ -2134,7 +2518,22 @@ const MatchingPage: React.FC = () => {
                                 )}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="text-sm font-semibold text-blue-700">
+                                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={lumosSelectedIrecruit.includes(m.id)}
+                                      disabled={!canPickForLumos}
+                                      onChange={() => toggleLumosIrecruit(m.id)}
+                                      aria-label={`เลือก ${m.full_name} ให้ Lumos โทรสัมภาษณ์`}
+                                      title={
+                                        !m.phone_number
+                                          ? 'ไม่มีเบอร์โทร — ให้ Lumos โทรไม่ได้'
+                                          : lumosRow
+                                            ? 'ส่งให้ Lumos ไปแล้ว'
+                                            : 'เลือกให้ Lumos โทรสัมภาษณ์'
+                                      }
+                                      className="h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                    />
                                     <TierCriteriaTooltip tier={m.tier}>
                                       <span
                                         tabIndex={0}
@@ -2278,6 +2677,17 @@ const MatchingPage: React.FC = () => {
                                     </button>
                                   ) : null}
                                 </div>
+                                {lumosRow ? (
+                                  <LumosCallBadgeRow
+                                    row={lumosRow}
+                                    expanded={lumosExpandedRef === lumosRef}
+                                    onToggle={() =>
+                                      setLumosExpandedRef((cur) => (cur === lumosRef ? null : lumosRef))
+                                    }
+                                    onCancel={() => void cancelLumosForRef(lumosRow)}
+                                    cancelling={lumosCancellingRef === lumosRef}
+                                  />
+                                ) : null}
                               </div>
                             );
                           })}
@@ -2288,6 +2698,12 @@ const MatchingPage: React.FC = () => {
                       กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วกดจองตัว/ลงงานได้เลยในหน้านี้
                     </p>
                   )}
+                  <LumosSendBar
+                    count={lumosSelectedCount}
+                    busy={lumosSending}
+                    onClear={clearLumosSelection}
+                    onSend={() => setLumosConfirmOpen(true)}
+                  />
                   {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                 </div>
               ) : null}
@@ -2929,6 +3345,195 @@ const MatchingPage: React.FC = () => {
               >
                 <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
               </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ยืนยันก่อนส่งให้ Lumos โทร — AI จะโทรหาคนจริง จึงต้องเห็นรายชื่อครบก่อนกด */}
+      <Dialog open={lumosConfirmOpen} onOpenChange={(o) => !o && setLumosConfirmOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">ส่งให้ Lumos โทร {lumosSelectedCount} คน?</DialogTitle>
+            <DialogDescription className="sr-only">
+              ยืนยันส่งรายชื่อผู้สมัครที่เลือกเข้าคิวให้ Lumos โทร
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
+              Lumos จะโทรหาคนเหล่านี้ด้วย AI จริง — ตรวจรายชื่อให้แน่ใจก่อนกดส่ง
+            </p>
+            {(() => {
+              const boardNames = lumosSelectedBoard.map((cardId) => {
+                const { name, phone } = boardPersonLabel(cardId);
+                return { key: `card-${cardId}`, name, phone };
+              });
+              const irNames = (irMatchById[jobDetail?.id ?? '']?.matches ?? [])
+                .filter((m) => lumosSelectedIrecruit.includes(m.id))
+                .map((m) => ({ key: `ir-${m.id}`, name: m.full_name, phone: m.phone_number }));
+              return (
+                <div className="max-h-56 space-y-2 overflow-y-auto">
+                  {boardNames.length > 0 ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-emerald-800">
+                        คนของเรา — แจ้งงาน/โทรตาม ({boardNames.length})
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {boardNames.map((p) => (
+                          <li key={p.key} className="text-[11px] text-slate-700">
+                            • {p.name} <span className="text-muted-foreground">{p.phone || '(ไม่มีเบอร์)'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {irNames.length > 0 ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-blue-800">
+                        ผู้สมัคร iRecruit — AI โทรสัมภาษณ์ ({irNames.length})
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {irNames.map((p) => (
+                          <li key={p.key} className="text-[11px] text-slate-700">
+                            • {p.name} <span className="text-muted-foreground">{p.phone || '(ไม่มีเบอร์)'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLumosConfirmOpen(false)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={lumosSending}
+                onClick={() => void sendSelectedToLumos()}
+                className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+              >
+                <PhoneCall className="h-3 w-3" />
+                {lumosSending ? 'กำลังส่ง…' : `ยืนยันส่ง ${lumosSelectedCount} คน`}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* เลือกคนจาก pool "คนของเรา" — ครอบคนที่เพิ่งเพิ่มเข้ามาและยังไม่เคยผ่าน AI แมท */}
+      <Dialog open={lumosPickerOpen} onOpenChange={(o) => !o && setLumosPickerOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">เลือกคนส่งให้ Lumos โทร</DialogTitle>
+            <DialogDescription className="sr-only">
+              เลือกผู้สมัครจาก pool คนของเราเพื่อส่งเข้าคิวให้ Lumos โทร
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2.5">
+            <input
+              type="search"
+              value={lumosPoolSearch}
+              onChange={(e) => setLumosPoolSearch(e.target.value)}
+              placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
+              className="w-full rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            />
+            {lumosPoolLoading ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                <LoaderCircle className="mx-auto mb-1.5 h-4 w-4 animate-spin text-sky-500" aria-hidden />
+                กำลังโหลดรายชื่อคนของเรา…
+              </p>
+            ) : (
+              (() => {
+                const rows = filterLumosPool(lumosPool, lumosPoolSearch);
+                if (lumosPool.length === 0) {
+                  return <p className="py-6 text-center text-xs text-muted-foreground">ไม่มีคนของเราใน pool รอลงงาน</p>;
+                }
+                if (rows.length === 0) {
+                  return <p className="py-6 text-center text-xs text-muted-foreground">ไม่พบคนที่ตรงกับคำค้น</p>;
+                }
+                return (
+                  <>
+                    <p className="text-[10px] text-muted-foreground">
+                      pool รอลงงาน {lumosPool.length} คน · แสดง {rows.length} · คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
+                    </p>
+                    <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
+                      {rows.map((c) => {
+                        const selectable = Boolean(c.mobile) && !c.already_sent;
+                        return (
+                          <label
+                            key={c.card_id}
+                            className={cn(
+                              'flex items-start gap-2 rounded-xl border px-2.5 py-2',
+                              selectable
+                                ? 'cursor-pointer border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'
+                                : 'border-slate-200 bg-slate-50 opacity-70',
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={lumosSelectedBoard.includes(c.card_id)}
+                              disabled={!selectable}
+                              onChange={() => toggleLumosBoard(c.card_id)}
+                              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs font-semibold text-foreground">{c.full_name}</span>
+                                {c.already_sent ? (
+                                  <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                                    ส่งไปแล้ว
+                                  </span>
+                                ) : null}
+                                {!c.mobile ? (
+                                  <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                                    ไม่มีเบอร์
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted-foreground">
+                                <span>สกิล: {c.skills || 'ไม่ระบุ'}</span>
+                                {c.area ? <span>{c.area}</span> : null}
+                                {c.age ? <span>อายุ {c.age}</span> : null}
+                                {c.required_salary ? <span>ขอ {c.required_salary.toLocaleString()} บ.</span> : null}
+                                {c.mobile ? <span className="font-medium text-sky-700">{c.mobile}</span> : null}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5">
+              <p className="text-[11px] font-semibold text-sky-900">เลือกไว้ {lumosSelectedBoard.length} คน</p>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLumosPickerOpen(false)}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  ปิด
+                </button>
+                <button
+                  type="button"
+                  disabled={lumosSelectedCount === 0}
+                  onClick={() => {
+                    setLumosPickerOpen(false);
+                    setLumosConfirmOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                >
+                  <PhoneCall className="h-3 w-3" /> ถัดไป ({lumosSelectedCount} คน)
+                </button>
+              </div>
             </div>
           </div>
         </DialogContent>
