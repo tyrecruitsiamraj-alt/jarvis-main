@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { Phone, Search, LoaderCircle } from 'lucide-react';
@@ -60,10 +60,13 @@ const OurPeoplePage: React.FC = () => {
   const [people, setPeople] = useState<BoardPerson[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  /** หน้าปัจจุบันของแต่ละกล่อง (คีย์ = bucket key) — ค้นหาเมื่อไหร่รีเซ็ตทุกกล่อง */
+  /** หน้าปัจจุบันของแต่ละถัง (คีย์ = bucket key) — ค้นหาเมื่อไหร่รีเซ็ตทุกถัง */
   const [pageByBucket, setPageByBucket] = useState<Record<string, number>>({});
-  const boxRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const scrolledRef = useRef(false);
+  /** ถังที่กดดูอยู่ — โชว์ทีละถัง (ค่าเริ่มจาก ?bucket= เช่น tile บน dashboard) */
+  const [activeBucket, setActiveBucket] = useState<string>(() => {
+    const b = searchParams.get('bucket');
+    return BUCKETS.some((x) => x.key === b) ? (b as string) : 'todo';
+  });
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?people=1')
@@ -75,19 +78,6 @@ const OurPeoplePage: React.FC = () => {
       .catch((e) => setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ'));
   }, []);
 
-  // เข้าจาก tile บน dashboard → เลื่อนไปกล่องนั้นครั้งเดียวหลังข้อมูลมา
-  useEffect(() => {
-    if (!people || scrolledRef.current) return;
-    const bucket = searchParams.get('bucket');
-    if (!bucket) return;
-    scrolledRef.current = true;
-    // การ์ดหลายร้อยใบ + ระยะไกลหลักหมื่น px — smooth โดน browser ตัดกลางทาง ใช้เลื่อนทันทีแทน
-    window.setTimeout(() => {
-      requestAnimationFrame(() =>
-        boxRefs.current[bucket]?.scrollIntoView({ behavior: 'auto', block: 'start' }),
-      );
-    }, 250);
-  }, [people, searchParams]);
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -127,21 +117,41 @@ const OurPeoplePage: React.FC = () => {
           </p>
         ) : null}
 
-        {grouped.map((bucket) => {
+        {/* แท็บถัง — กดดูทีละถัง */}
+        {people ? (
+          <div className="flex flex-wrap gap-1.5">
+            {grouped.map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                onClick={() => setActiveBucket(b.key)}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  activeBucket === b.key
+                    ? cn('font-semibold', b.boxCls, b.headCls)
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                )}
+              >
+                {b.title} · {b.items.length}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {grouped
+          .filter((bucket) => bucket.key === activeBucket)
+          .map((bucket) => {
           const totalPages = Math.max(1, Math.ceil(bucket.items.length / PAGE_SIZE));
           const page = Math.min(pageByBucket[bucket.key] ?? 1, totalPages);
           const pageItems = bucket.items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
           const goTo = (next: number) => {
             setPageByBucket((prev) => ({ ...prev, [bucket.key]: Math.min(Math.max(next, 1), totalPages) }));
-            boxRefs.current[bucket.key]?.scrollIntoView({ behavior: 'auto', block: 'start' });
+            window.scrollTo({ top: 0 });
           };
           return (
           <div
             key={bucket.key}
-            ref={(el) => {
-              boxRefs.current[bucket.key] = el;
-            }}
-            className={cn('glass-card scroll-mt-20 rounded-[1.5rem] border p-3 md:p-4 space-y-2.5', bucket.boxCls)}
+            className={cn('glass-card rounded-[1.5rem] border p-3 md:p-4 space-y-2.5', bucket.boxCls)}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className={cn('text-sm font-semibold', bucket.headCls)}>
