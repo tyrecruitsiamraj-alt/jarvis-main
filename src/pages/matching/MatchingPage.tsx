@@ -128,6 +128,15 @@ type BoardMatchResult = {
   fallback_used?: boolean;
   fallback_pool_size?: number;
 };
+/** ผลจาก API — AI คิดที่ worker หลังบ้านเท่านั้น หน้าเว็บได้แค่ผลสำเร็จหรือสถานะรอ */
+type BoardMatchResponse = BoardMatchResult & {
+  computed_at?: string;
+  /** ยังไม่มีผลของใบนี้ — ส่งเข้าคิวหลังบ้านให้แล้ว */
+  pending?: boolean;
+  /** สั่งค้นหาใหม่แล้ว — ผลที่เห็นคือของเดิม รอผลใหม่มาแทน */
+  refresh_queued?: boolean;
+  worker_active?: boolean;
+};
 
 type MatchTier = BoardCandidateMatch['tier'];
 type IrecruitDisplayRow =
@@ -139,7 +148,6 @@ type IrecruitDisplayRow =
       branchId: string | null;
       branchName: string | null;
     };
-const MATCHING_AI_PREWARM_ENABLED = import.meta.env.VITE_MATCHING_AI_PREWARM_ENABLED === 'true';
 /** ลิสต์ใบขอแบบ server-side pagination (ปิดกลับเป็น client เดิมได้ด้วย env = rollback) */
 const MATCHING_SERVER_LIST_ENABLED = import.meta.env.VITE_MATCHING_SERVER_LIST !== 'false';
 const MATCHING_LIST_BATCH_SIZE = 60;
@@ -790,11 +798,10 @@ const MatchingPage: React.FC = () => {
   const [jobPostingByJobId, setJobPostingByJobId] = useState<Record<string, JobPostingRequest>>({});
   const [creatingPosting, setCreatingPosting] = useState(false);
   const [postingError, setPostingError] = useState<string | null>(null);
-  // #5 pre-warm AI งานด่วนเบื้องหลัง
-  const [prewarming, setPrewarming] = useState(false);
-  const prewarmStartedRef = useRef(false);
-  // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วทับผลเดิม + เสีย ~30-90 วิต่อใบ
+  // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วสั่งคิดใหม่ทับผลเดิมโดยไม่ตั้งใจ
   const [rematchConfirmJobId, setRematchConfirmJobId] = useState<string | null>(null);
+  /** ใบที่รอผลจาก worker หลังบ้าน — baseline = computed_at เดิม (null = ยังไม่เคยมีผล) */
+  const [boardWaitingById, setBoardWaitingById] = useState<Record<string, { baseline: string | null }>>({});
 
   // ── ส่งให้ Lumos โทร แบบคนติ๊กเลือกเอง (ไม่ส่งอัตโนมัติแล้ว) + ผลการโทรต่อคน
   /** สถานะการโทรต่อคนของใบขอที่เปิดอยู่ — คีย์ = person_ref ('card-<id>' / 'ir-<id>') */
@@ -990,44 +997,15 @@ const MatchingPage: React.FC = () => {
     void refreshActiveProposals();
   };
 
-  // #5 pre-warm AI แมทงานด่วนล่วงหน้าเบื้องหลัง (~30วิ/ใบ) — เปิดใบด่วนแล้วผลพร้อมทันที
-  // ทำแบบระวัง: เฉพาะงานด่วนที่ใกล้ครบกำหนดสุด, ทีละใบ, จำกัดจำนวน, ข้ามใบที่มีผล/เคยอุ่นแล้ว
-  const PREWARM_LIMIT = 3;
-  useEffect(() => {
-    if (!MATCHING_AI_PREWARM_ENABLED) return;
-    // รันครั้งเดียวเมื่อ jobs โหลดเสร็จ (กัน re-run จาก jobs อ้างอิงใหม่ทุก render)
-    if (prewarmStartedRef.current || jobs.length === 0) return;
-    prewarmStartedRef.current = true;
-    let cancelled = false;
-    const targets = jobs
-      .filter((j) => j.urgency === 'urgent')
-      .slice()
-      .sort((a, b) => (a.required_date || '').localeCompare(b.required_date || ''))
-      .slice(0, PREWARM_LIMIT);
-    if (targets.length === 0) return;
+  const clearBoardWaiting = (jobId: string) =>
+    setBoardWaitingById((prev) => {
+      if (!(jobId in prev)) return prev;
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
 
-    const run = async () => {
-      setPrewarming(true);
-      for (const j of targets) {
-        if (cancelled) break;
-        try {
-          const r = await apiFetch(`/api/matching/board-candidates?jobId=${encodeURIComponent(j.id)}`);
-          if (!r.ok) continue;
-          const data = (await r.json()) as BoardMatchResult;
-          if (!cancelled) setBoardMatchById((prev) => (prev[j.id] ? prev : { ...prev, [j.id]: data }));
-        } catch {
-          /* เงียบ — เป็นการอุ่นเครื่องเบื้องหลัง */
-        }
-      }
-      if (!cancelled) setPrewarming(false);
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobs.length]);
-
+  // AI คิดที่ worker หลังบ้านเท่านั้น — GET นี้แค่ดึงผลที่ค้นเสร็จแล้ว (หรือส่งใบเข้าคิวถ้ายังไม่มี)
   const fetchBoardMatch = async (jobId: string, refresh = false) => {
     setBoardLoadingId(jobId);
     setBoardErrorById((prev) => {
@@ -1043,14 +1021,59 @@ const MatchingPage: React.FC = () => {
         const data = (await r.json().catch(() => ({}))) as { message?: string; detail?: string; error?: string };
         throw new Error(data.message || data.detail || data.error || `ค้นหาไม่สำเร็จ (HTTP ${r.status})`);
       }
-      const data = (await r.json()) as BoardMatchResult;
+      const data = (await r.json()) as BoardMatchResponse;
+      if (data.pending) {
+        if (data.worker_active === false) {
+          setBoardErrorById((prev) => ({
+            ...prev,
+            [jobId]: 'ระบบค้นหาหลังบ้านปิดอยู่ — ต้องเปิด MATCH_PRECOMPUTE_ENABLED บนเซิร์ฟเวอร์ก่อนจึงจะมีผลใหม่',
+          }));
+          return;
+        }
+        setBoardWaitingById((prev) => ({ ...prev, [jobId]: { baseline: null } }));
+        return;
+      }
       setBoardMatchById((prev) => ({ ...prev, [jobId]: data }));
+      if (data.refresh_queued) {
+        // สั่งคิดใหม่แล้ว — คงผลเดิมไว้ก่อน แล้วรอผลใหม่ (computed_at เปลี่ยน) มาแทน
+        setBoardWaitingById((prev) => ({ ...prev, [jobId]: { baseline: data.computed_at ?? null } }));
+      } else if (refresh && data.worker_active === false) {
+        setBoardErrorById((prev) => ({
+          ...prev,
+          [jobId]: 'ระบบค้นหาหลังบ้านปิดอยู่ — แสดงผลเดิมไว้ก่อน (ต้องเปิด MATCH_PRECOMPUTE_ENABLED จึงจะคิดใหม่ได้)',
+        }));
+      } else {
+        clearBoardWaiting(jobId);
+      }
     } catch (e) {
       setBoardErrorById((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ' }));
     } finally {
       setBoardLoadingId((current) => (current === jobId ? null : current));
     }
   };
+
+  // ระหว่างรอ worker หลังบ้าน — เช็คผลซ้ำทุก 15 วิ เฉพาะใบที่เปิดดูอยู่ (ผลใหม่มาแล้วแสดงเองอัตโนมัติ)
+  useEffect(() => {
+    const jobId = jobDetail?.id;
+    if (!jobId) return;
+    const waiting = boardWaitingById[jobId];
+    if (!waiting) return;
+    const timer = setInterval(async () => {
+      try {
+        const r = await apiFetch(`/api/matching/board-candidates?jobId=${encodeURIComponent(jobId)}`);
+        if (!r.ok) return;
+        const data = (await r.json()) as BoardMatchResponse;
+        if (data.pending) return;
+        if (waiting.baseline && data.computed_at === waiting.baseline) return; // ยังเป็นผลเดิม
+        setBoardMatchById((prev) => ({ ...prev, [jobId]: data }));
+        clearBoardWaiting(jobId);
+      } catch {
+        /* เงียบ — รอบถัดไป */
+      }
+    }, 15_000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobDetail?.id, boardWaitingById]);
 
   // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอ/คำขอโพสหางานที่เคยบันทึก
   const openJob = (j: JobRequest) => {
@@ -1810,11 +1833,6 @@ const MatchingPage: React.FC = () => {
             )}
           </p>
           <p className="text-xs text-muted-foreground">· เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง</p>
-          {prewarming ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
-              <RefreshCw className="h-2.5 w-2.5 animate-spin" /> อุ่นเครื่อง AI งานด่วนล่วงหน้า…
-            </span>
-          ) : null}
         </div>
 
         {/* การ์ดรวมใบขอ */}
@@ -1933,8 +1951,10 @@ const MatchingPage: React.FC = () => {
                       {matchCount != null
                         ? `ดูคนของเรา (${matchCount})`
                         : boardLoadingId === j.id
-                          ? 'AI กำลังประเมิน…'
-                          : 'หาคนของเรา'}
+                          ? 'กำลังโหลดผล…'
+                          : boardWaitingById[j.id]
+                            ? 'AI กำลังคิดที่หลังบ้าน…'
+                            : 'หาคนของเรา'}
                     </button>
                   </div>
                 </div>
@@ -2225,12 +2245,21 @@ const MatchingPage: React.FC = () => {
                   })()}
                   <button
                     type="button"
-                    disabled={boardLoadingId === jobDetail.id}
+                    disabled={boardLoadingId === jobDetail.id || !!boardWaitingById[jobDetail.id]}
                     onClick={() => setRematchConfirmJobId(jobDetail.id)}
                     className="jarvis-btn-secondary disabled:cursor-wait"
                   >
-                    <RefreshCw className={cn('h-3 w-3', boardLoadingId === jobDetail.id && 'animate-spin')} />
-                    {boardLoadingId === jobDetail.id ? 'AI กำลังประเมิน…' : 'ค้นหาใหม่'}
+                    <RefreshCw
+                      className={cn(
+                        'h-3 w-3',
+                        (boardLoadingId === jobDetail.id || boardWaitingById[jobDetail.id]) && 'animate-spin',
+                      )}
+                    />
+                    {boardWaitingById[jobDetail.id]
+                      ? 'AI กำลังคิดที่หลังบ้าน…'
+                      : boardLoadingId === jobDetail.id
+                        ? 'กำลังโหลดผล…'
+                        : 'ค้นหาใหม่'}
                   </button>
                 </div>
               </div>
@@ -2308,7 +2337,14 @@ const MatchingPage: React.FC = () => {
               ) : boardErrorById[jobDetail.id] ? (
                 <p className="text-xs text-destructive">{boardErrorById[jobDetail.id]}</p>
               ) : boardMatchById[jobDetail.id] ? (
-                recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
+                <>
+                {boardWaitingById[jobDetail.id] ? (
+                  <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] text-sky-800">
+                    <RefreshCw className="h-3 w-3 shrink-0 animate-spin" />
+                    สั่งค้นหาใหม่แล้ว — AI กำลังคิดอยู่หลังบ้าน ผลใหม่จะมาแทนที่อัตโนมัติ (ที่เห็นตอนนี้คือผลเดิม)
+                  </p>
+                ) : null}
+                {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
                   <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3 text-xs text-foreground">
                     ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองหาจากฐาน iRecruit ด้านล่าง แล้วเสนอได้เลย
@@ -2467,7 +2503,13 @@ const MatchingPage: React.FC = () => {
                         );
                       })}
                   </div>
-                )
+                )}
+                </>
+              ) : boardWaitingById[jobDetail.id] ? (
+                <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-3 text-xs text-sky-800">
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  AI กำลังค้นหาใบนี้อยู่ที่หลังบ้าน — ผลจะแสดงอัตโนมัติเมื่อค้นหาเสร็จ
+                </p>
               ) : null}
 
               {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
@@ -3354,7 +3396,7 @@ const MatchingPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ยืนยันก่อนค้นหาใหม่ (Rematching) — คิด AI ใหม่ทับผลเดิม ใช้เวลาสักครู่ */}
+      {/* ยืนยันก่อนค้นหาใหม่ (Rematching) — สั่งให้ worker หลังบ้านคิดใหม่ ผลใหม่ทับผลเดิม */}
       <Dialog open={!!rematchConfirmJobId} onOpenChange={(o) => !o && setRematchConfirmJobId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -3365,7 +3407,8 @@ const MatchingPage: React.FC = () => {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-foreground">
-              ให้ AI ประเมินคนของเราสำหรับใบขอนี้ใหม่ทั้งหมด — จะใช้เวลาประมาณ 30–90 วินาที และผลใหม่จะทับผลเดิมที่เก็บไว้
+              ระบบจะส่งใบนี้ให้ AI ที่หลังบ้านประเมินใหม่ทั้งหมด — ระหว่างรอยังเห็นผลเดิม
+              และผลใหม่จะมาแทนที่อัตโนมัติเมื่อคิดเสร็จ (ปกติไม่กี่นาที)
             </p>
             <p className="text-xs text-muted-foreground">
               ถ้าไม่ต้องการคิดใหม่ ระบบจะคงผลเดิมไว้ (แสดงเฉพาะคนที่ยังพร้อม)

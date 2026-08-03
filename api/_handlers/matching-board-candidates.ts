@@ -8,9 +8,12 @@ import {
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
-import { getOllamaConfig } from '../_lib/ollamaClient.js';
-import { matchBoardCandidatesForJob, type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
+import { type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
+import {
+  enqueuePrecomputeJobs,
+  isMatchPrecomputeWorkerActive,
+} from '../_lib/matchPrecomputeWorker.js';
 import {
   listBoardReadyCandidates,
   countBoardCandidatesByColumn,
@@ -94,10 +97,6 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
-    if (!getOllamaConfig()) {
-      return sendError(res, 503, 'Service unavailable', 'ตั้งค่า OLLAMA_BASE_URL / OLLAMA_MODEL ก่อน');
-    }
-
     const jobId = getQuery(req, 'jobId') || getQuery(req, 'job_id');
     if (!jobId.trim()) {
       return sendError(res, 400, 'Bad request', 'jobId is required');
@@ -113,7 +112,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // กรองผล (snapshot) ให้เหลือเฉพาะคนที่ "ยังพร้อม" ณ ตอนนี้ — ไม่คิด AI ใหม่, ไม่แตะ snapshot
     // คนที่ถูกจอง/ลงงานที่ใบอื่น หรือหลุดจาก pool รอลงงานแล้ว จะหายจากผลไปเอง
-    const withAvailability = async (result: BoardMatchResult, computedAt: string, fromStore: boolean) => {
+    const withAvailability = async (
+      result: BoardMatchResult,
+      computedAt: string,
+      extra: Record<string, unknown> = {},
+    ) => {
       const availCtx = await loadBoardAvailabilityContext();
       const matches = filterAvailableBoardMatches(result.matches, jobId, availCtx);
       res.setHeader?.('Cache-Control', 'no-store');
@@ -122,28 +125,43 @@ async function handler(req: AuthedReq, res: ApiRes) {
         matches,
         hidden_unavailable: result.matches.length - matches.length,
         computed_at: computedAt,
-        from_store: fromStore,
+        from_store: true,
+        ...extra,
       });
     };
 
-    // ไม่ได้สั่งคำนวณใหม่ → เสิร์ฟผลที่เคยคิดเก็บไว้ทันที (ข้าม LLM)
-    if (!refresh) {
-      const stored = await getStoredBoardMatch(jobId);
-      if (stored) {
-        return withAvailability(stored.result, stored.computedAt, true);
-      }
+    // นโยบาย: request จากหน้าเว็บไม่รัน AI เอง — เสิร์ฟเฉพาะผลที่ worker หลังบ้านค้นเสร็จแล้ว
+    // ใบที่ยังไม่มีผล (หรือสั่งค้นหาใหม่) ส่งเข้าหัวคิว worker แล้วตอบ pending ให้หน้าเว็บรอ
+    const stored = await getStoredBoardMatch(jobId);
+
+    if (stored && !refresh) {
+      return withAvailability(stored.result, stored.computedAt);
     }
 
-    const result = await matchBoardCandidatesForJob(jobId, job as Record<string, unknown>, {
-      refresh,
+    const workerActive = isMatchPrecomputeWorkerActive();
+    if (workerActive) {
+      enqueuePrecomputeJobs([{ ...(job as Record<string, unknown>), id: jobId }], {
+        refresh,
+        front: true,
+      });
+    }
+
+    if (stored) {
+      // สั่งค้นหาใหม่: โชว์ผลเดิมไปก่อน ผลใหม่จากหลังบ้านจะมาแทนที่เมื่อคิดเสร็จ
+      return withAvailability(stored.result, stored.computedAt, {
+        refresh_queued: workerActive,
+        worker_active: workerActive,
+      });
+    }
+
+    res.setHeader?.('Cache-Control', 'no-store');
+    return res.status(200).json({
+      jobId,
+      pending: true,
+      queued: workerActive,
+      worker_active: workerActive,
     });
-
-    return withAvailability(result, new Date().toISOString(), false);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (/เชื่อมต่อ Ollama|ตั้งค่า OLLAMA|ไม่พบโมเดล|ตอบกลับว่าง|ใช้เวลานานเกินไป/i.test(message)) {
-      return sendError(res, 503, 'Service unavailable', message);
-    }
     return handleApiError(res, e, 'matching-board-candidates');
   }
 }
