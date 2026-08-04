@@ -53,6 +53,8 @@ type Props = {
   onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
   onSiteClick?: (siteCode: string | undefined, label: string) => void;
+  /** false = ยังไม่ได้ดึงชุดใบปิด (โหมด "ทั้งหมด") → ช่อง "ปิด" ต่อคนต้องโชว์ "—" ไม่ใช่ 0 */
+  closedTotalsAvailable?: boolean;
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
 };
 
@@ -83,6 +85,7 @@ const DashboardShell: React.FC<Props> = ({
   onFullyClosedBreakdownClick,
   onAgeBucketClick,
   onSiteClick,
+  closedTotalsAvailable = true,
   onRecruiterClick,
 }) => {
   const [showUnitOverview, setShowUnitOverview] = useState(false);
@@ -229,6 +232,7 @@ const DashboardShell: React.FC<Props> = ({
                   items={data.recruiterOverview}
                   onRecruiterClick={onRecruiterClick}
                   hideHeader
+                  closedTotalsAvailable={closedTotalsAvailable}
                 />
               </DashboardExpandablePanel>
               <DashboardExpandablePanel

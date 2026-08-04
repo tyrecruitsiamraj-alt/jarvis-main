@@ -6,6 +6,11 @@ type Props = {
   items: DashboardRecruiterOverview[];
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
   hideHeader?: boolean;
+  /**
+   * โหมด "ทั้งหมด" ไม่ดึงชุดใบปิด (ใช้ throughput แทน) — ยอด "ปิด" จึงยังไม่รู้ ไม่ใช่ศูนย์
+   * false = โชว์ "—" แทนเลข 0 เพื่อไม่ให้อ่านว่าคนนั้นปิดงานไม่ได้เลย
+   */
+  closedTotalsAvailable?: boolean;
 };
 
 const ROLE_LABELS: Record<DashboardResponsibleRole, string> = {
@@ -18,7 +23,12 @@ const ROLE_BADGE_CLASS: Record<DashboardResponsibleRole, string> = {
   screener: 'bg-violet-50 text-violet-700',
 };
 
-const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick, hideHeader = false }) => {
+const DashboardDriverOverview: React.FC<Props> = ({
+  items,
+  onRecruiterClick,
+  hideHeader = false,
+  closedTotalsAvailable = true,
+}) => {
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
@@ -37,6 +47,11 @@ const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick, hid
           <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามผู้รับผิดชอบ</h3>
           <p className="text-xs text-slate-500">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
         </div>
+      ) : null}
+      {!closedTotalsAvailable ? (
+        <p className="rounded-lg bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-200">
+          ยอด <span className="font-medium">ปิด</span> ยังไม่ได้ดึงในโหมด "ทั้งหมด" — เลือกช่วงเวลาก่อนจึงจะเห็นยอดปิดต่อคน
+        </p>
       ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {items.slice(0, 12).map((r) => (
@@ -71,7 +86,16 @@ const DashboardDriverOverview: React.FC<Props> = ({ items, onRecruiterClick, hid
                 <p className="text-[10px] text-slate-500">มี</p>
               </div>
               <div>
-                <p className="text-lg font-semibold text-emerald-600 tabular-nums">{r.completed}</p>
+                {closedTotalsAvailable ? (
+                  <p className="text-lg font-semibold text-emerald-600 tabular-nums">{r.completed}</p>
+                ) : (
+                  <p
+                    className="text-lg font-semibold text-slate-300 dark:text-slate-600 tabular-nums"
+                    title="ยังไม่รู้ — เลือกช่วงเวลาเพื่อดูยอดปิด"
+                  >
+                    —
+                  </p>
+                )}
                 <p className="text-[10px] text-slate-500">ปิด</p>
               </div>
               <div>

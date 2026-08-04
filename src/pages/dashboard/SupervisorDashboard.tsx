@@ -94,6 +94,13 @@ const SupervisorDashboard: React.FC = () => {
     [dateRange],
   );
 
+  /**
+   * ชุดใบปิดถูกดึงจริงเมื่อไหร่ — ต้องตรงกับเงื่อนไขของ effect ที่ setClosedJobs ด้านล่าง
+   * ถ้าไม่ดึง ยอด "ปิด" ต่อคนคือ "ยังไม่รู้" ไม่ใช่ 0 → ส่งธงไปให้ UI โชว์ "—"
+   */
+  const closedTotalsAvailable =
+    !DEMO_MODE && siamrajPrimary && dbSource === 'sqlserver' && period != null;
+
   const throughputRange = useMemo(() => {
     // ดึงตามช่วงที่เลือก (ไม่ใช้ previous) เพื่อให้ cohort เดือนนั้นครบรวมใบที่ปิดแล้ว
     if (period) return { from: period.from, to: period.to };
@@ -514,6 +521,7 @@ const SupervisorDashboard: React.FC = () => {
       onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
       onSiteClick={DEMO_MODE ? undefined : handleSiteClick}
+      closedTotalsAvailable={closedTotalsAvailable}
       onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}
     />
     <DetailListDialog
