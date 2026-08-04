@@ -25,6 +25,11 @@ import {
 import { jobToRequestControlRecord } from '@/lib/requestControl';
 import { filterAndSortMatchingJobs, type MatchingWorkflowFilter } from '@/lib/matchingListFilter';
 import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import {
+  getJobRequestAgeDays,
+  ageUrgencyLevelFromDays,
+  JOB_AGE_URGENCY_META,
+} from '@/lib/jobUrgency';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   saveProposal,
@@ -1942,6 +1947,22 @@ const MatchingPage: React.FC = () => {
           <p className="w-full text-xs text-muted-foreground">
             · เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง
           </p>
+          {/* คู่มือสีสั้น ๆ — แถบสีซ้ายการ์ดบอกว่าใบขอค้างมานานแค่ไหน */}
+          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+            <span className="font-medium">สีบอกอายุใบขอ:</span>
+            {(['fresh', 'warming', 'urgent', 'critical'] as const).map((lv) => (
+              <span key={lv} className="inline-flex items-center gap-1">
+                <span
+                  className={cn('h-2 w-2.5 rounded-sm', JOB_AGE_URGENCY_META[lv].barCls)}
+                  aria-hidden
+                />
+                {JOB_AGE_URGENCY_META[lv].label}
+                <span className="text-muted-foreground/70">
+                  {lv === 'fresh' ? '≤7 วัน' : lv === 'warming' ? '8–30' : lv === 'urgent' ? '31–60' : '60+'}
+                </span>
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* การ์ดรวมใบขอ */}
@@ -1991,6 +2012,10 @@ const MatchingPage: React.FC = () => {
             const progress = proposalCounts(proposalsByJobId[j.id]);
             const requested = requestPositionCount(j);
             const remaining = officialRemainingCount(j);
+            // สีบอกความด่วนจากอายุใบขอ: ≤7 วันยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก
+            const ageDays = getJobRequestAgeDays(j);
+            const ageLevel = ageUrgencyLevelFromDays(ageDays);
+            const ageMeta = JOB_AGE_URGENCY_META[ageLevel];
             return (
               <div
                 key={j.id}
@@ -1998,8 +2023,13 @@ const MatchingPage: React.FC = () => {
                 tabIndex={0}
                 onClick={() => openJob(j)}
                 onKeyDown={(e) => e.key === 'Enter' && openJob(j)}
-                className="glass-card rounded-2xl px-3 py-2.5 border border-white/70 cursor-pointer hover:border-sky-300/50 transition-colors"
+                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-sky-300/50 transition-colors"
               >
+                {/* แถบสีซ้ายการ์ด — กวาดตาแล้วรู้ทันทีว่าใบไหนค้างนาน */}
+                <span
+                  aria-hidden
+                  className={cn('absolute inset-y-0 left-0 w-1.5', ageMeta.barCls)}
+                />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-semibold text-blue-600 text-sm truncate">{unitRequestCardTitle(j)}</div>
@@ -2012,6 +2042,22 @@ const MatchingPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
+                    {/* ระดับความด่วนตามอายุใบขอ (คนละเรื่องกับ "ด่วน/ล่วงหน้า" ที่มาจากใบขอ ERP) */}
+                    <span
+                      title={
+                        ageDays == null
+                          ? 'ไม่ทราบอายุใบขอ'
+                          : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
+                      }
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums',
+                        ageMeta.chipCls,
+                      )}
+                    >
+                      <span className={cn('h-1.5 w-1.5 rounded-full', ageMeta.dotCls)} aria-hidden />
+                      {ageMeta.label}
+                      {ageDays != null ? ` · ${ageDays} วัน` : ''}
+                    </span>
                     <span
                       className={cn(
                         'text-[10px] px-2 py-0.5 rounded-full',

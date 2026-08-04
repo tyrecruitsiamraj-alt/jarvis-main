@@ -39,7 +39,8 @@ export type FlowSummary = {
     reserved_active: number;
     placed_month: number;
   };
-  postings: { active: number };
+  /** คำขอโพสหาคนที่ยังเปิดอยู่ — แยกตามประเภท (content = ให้ทีมคิดคอนเทนต์ · scraping = ให้ไปดูดประกาศ) */
+  postings: { active: number; content?: number; scraping?: number };
   follow_ups: {
     confirmed_waiting: FlowFollowUpItem[];
     no_answer: FlowFollowUpItem[];

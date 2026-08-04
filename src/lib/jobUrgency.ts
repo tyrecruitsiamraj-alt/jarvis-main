@@ -430,3 +430,59 @@ export function matchesAnyNoteFilter(job: JobRequest, filters: NoteFilter[]): bo
 export function matchesAnyReplacementFilter(job: JobRequest, filters: ReplacementFilter[]): boolean {
   return filters.length === 0 || filters.some((f) => matchesReplacementFilter(job, f));
 }
+
+/**
+ * ระดับความด่วนจาก "อายุใบขอ" (วันที่ค้างอยู่) — ใช้ทำสีให้มองรู้ทันทีบนหน้า Matching
+ * แยกจาก urgency ของ ERP (urgent/normal) และจาก SLA status คนละเรื่องกัน:
+ * อันนี้บอกว่า "ใบนี้ค้างมานานแค่ไหนแล้ว" ตามเกณฑ์ที่เจ้าของกำหนด
+ *   ≤ 7 วัน = ยังไม่ด่วน · 8–30 = เริ่มด่วน · 31–60 = ด่วน · 60+ = ด่วนมาก
+ */
+export type JobAgeUrgencyLevel = 'fresh' | 'warming' | 'urgent' | 'critical' | 'unknown';
+
+export const JOB_AGE_URGENCY_META: Record<
+  JobAgeUrgencyLevel,
+  { label: string; chipCls: string; barCls: string; dotCls: string }
+> = {
+  fresh: {
+    label: 'ยังไม่ด่วน',
+    chipCls: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    barCls: 'bg-emerald-400',
+    dotCls: 'bg-emerald-500',
+  },
+  warming: {
+    label: 'เริ่มด่วน',
+    chipCls: 'border-amber-200 bg-amber-50 text-amber-800',
+    barCls: 'bg-amber-400',
+    dotCls: 'bg-amber-500',
+  },
+  urgent: {
+    label: 'ด่วน',
+    chipCls: 'border-orange-300 bg-orange-50 text-orange-800',
+    barCls: 'bg-orange-500',
+    dotCls: 'bg-orange-500',
+  },
+  critical: {
+    label: 'ด่วนมาก',
+    chipCls: 'border-red-300 bg-red-50 text-red-800',
+    barCls: 'bg-red-500',
+    dotCls: 'bg-red-500',
+  },
+  unknown: {
+    label: 'ไม่ทราบอายุ',
+    chipCls: 'border-slate-200 bg-slate-50 text-slate-600',
+    barCls: 'bg-slate-300',
+    dotCls: 'bg-slate-400',
+  },
+};
+
+export function ageUrgencyLevelFromDays(ageDays: number | null): JobAgeUrgencyLevel {
+  if (ageDays == null || !Number.isFinite(ageDays)) return 'unknown';
+  if (ageDays <= 7) return 'fresh';
+  if (ageDays <= 30) return 'warming';
+  if (ageDays <= 60) return 'urgent';
+  return 'critical';
+}
+
+export function getJobAgeUrgencyLevel(job: JobRequest, today = new Date()): JobAgeUrgencyLevel {
+  return ageUrgencyLevelFromDays(getJobRequestAgeDays(job, today));
+}

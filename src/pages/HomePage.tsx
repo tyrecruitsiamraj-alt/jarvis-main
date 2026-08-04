@@ -239,6 +239,24 @@ const HomePage: React.FC = () => {
                 onClick={() => navigate('/matching/reservations')}
               />
             </div>
+
+            {/* หาคนของเราไม่ได้ → ส่งต่อทีมอื่น: คิดคอนเทนต์ / ไปดูดประกาศ (เส้นขนานกับ funnel หลัก) */}
+            <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+              <FlowStage
+                label="ส่งคิด Content"
+                value={flow.postings.content ?? 0}
+                sub="ใบขอที่รอทีมคอนเทนต์ทำโพส"
+                accent="text-orange-700"
+                onClick={() => navigate('/matching/job-postings')}
+              />
+              <FlowStage
+                label="ส่ง Scraping"
+                value={flow.postings.scraping ?? 0}
+                sub="ใบขอที่รอไปดูดประกาศหาคน"
+                accent="text-teal-700"
+                onClick={() => navigate('/matching/job-postings')}
+              />
+            </div>
             <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
               ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด · เป็นสถานะการทำงานของทีม Matching ไม่ใช่ยอด
               "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ

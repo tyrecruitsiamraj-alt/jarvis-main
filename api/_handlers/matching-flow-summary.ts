@@ -146,12 +146,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
     );
 
     // ใบด่วนที่ AI ประเมินแล้วไม่มีคนแนะนำ และยังไม่ได้ส่งโพสหาคนใหม่ → ค้างจริง ต้องมีคนตัดสินใจ
-    const { rows: activePostingRows } = await dbQuery<{ job_id: string }>(
-      `select job_id from ${postingsTable}
+    const { rows: activePostingRows } = await dbQuery<{ job_id: string; request_type: string }>(
+      `select job_id, request_type from ${postingsTable}
         where status in ('pending', 'in_progress', 'posted') and job_id = any($1)`,
       [scopedJobIds],
     );
     const postedJobIds = new Set(activePostingRows.map((r) => r.job_id));
+    // แยกตามประเภทคำขอ — หน้าแรกโชว์ "ส่งคิด Content" กับ "ส่ง Scraping" เป็นสองก้อน
+    const contentJobIds = new Set(
+      activePostingRows.filter((r) => r.request_type !== 'scraping').map((r) => r.job_id),
+    );
+    const scrapingJobIds = new Set(
+      activePostingRows.filter((r) => r.request_type === 'scraping').map((r) => r.job_id),
+    );
     const urgentStuck = jobs.filter(
       (j) =>
         j.urgency === 'urgent' &&
@@ -247,7 +254,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
         reserved_active: Number(propAgg[0]?.reserved_active) || 0,
         placed_month: Number(propAgg[0]?.placed_month) || 0,
       },
-      postings: { active: postedJobIds.size },
+      postings: {
+        active: postedJobIds.size,
+        content: contentJobIds.size,
+        scraping: scrapingJobIds.size,
+      },
       follow_ups: {
         confirmed_waiting: confirmedWaiting,
         no_answer: noAnswerWaiting,
