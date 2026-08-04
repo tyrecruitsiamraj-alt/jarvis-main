@@ -176,6 +176,33 @@ function loadSavedPageSize(): number {
   }
 }
 
+/** สรุปยอดจาก /api/matching/list (นับตามชุดเต็มของ BU ที่เลือก) */
+type ServerListSummary = {
+  urgentTotal: number;
+  urgentAnalyzed: number;
+  urgentWithGreen: number;
+  scopedTotal?: number;
+  withGreen?: number;
+  withYellow?: number;
+  noRecommend?: number;
+};
+
+/**
+ * เก็บผลลิสต์ครั้งล่าสุดไว้ระดับ module — กด back/สลับเมนูกลับมาแล้วเห็นข้อมูลเดิมทันที
+ * (เดิมทุกครั้งที่กลับเข้าหน้า ต้องโหลดใหม่จากศูนย์ ~หลายวินาที จนดูเหมือนหน้าค้าง)
+ * ข้อมูลอาจเก่ากว่าจริงชั่วครู่ — effect โหลดชุดใหม่มาแทนที่เองทันทีที่เข้าหน้า
+ */
+let lastServerList: {
+  items: JobRequest[];
+  total: number;
+  page: number;
+  unitOptions: string[];
+  buCounts: Record<string, number>;
+  summary: ServerListSummary | null;
+  storedMatches: Record<string, { recommended: number; computedAt: string }>;
+  lumosSummary: Record<string, LumosJobCallSummaryRow>;
+} | null = null;
+
 function branchDemandItems(job: JobRequest): BranchDemandItem[] {
   const overrides = job.field_overrides?.branches;
   if (overrides?.length) {
@@ -611,28 +638,67 @@ function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; cla
   if (s.sent === 0) return null;
   const waiting = Math.max(0, s.sent - s.called);
   const cells = [
-    { label: 'ส่ง', value: s.sent, cls: 'text-slate-700', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
-    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-700', title: 'มีผลโทรกลับมาจริง' },
-    { label: 'เหลือ', value: waiting, cls: waiting > 0 ? 'text-amber-700' : 'text-slate-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
-    { label: 'โอเค', value: s.confirmed, cls: s.confirmed > 0 ? 'text-emerald-700' : 'text-slate-300', title: 'สนใจงาน' },
-    { label: 'ไม่ไป', value: s.declined, cls: s.declined > 0 ? 'text-red-700' : 'text-slate-300', title: 'ไม่สนใจ/ปฏิเสธ' },
-    { label: 'ไม่รับ', value: s.no_answer, cls: s.no_answer > 0 ? 'text-amber-800' : 'text-slate-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+    { label: 'ส่ง', value: s.sent, cls: 'text-slate-800', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-600', title: 'มีผลโทรกลับมาจริง' },
+    { label: 'เหลือ', value: waiting, cls: 'text-amber-600', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
+    { label: 'โอเค', value: s.confirmed, cls: 'text-emerald-600', title: 'สนใจงาน' },
+    { label: 'ไม่ไป', value: s.declined, cls: 'text-rose-600', title: 'ไม่สนใจ/ปฏิเสธ' },
+    { label: 'ไม่รับ', value: s.no_answer, cls: 'text-amber-700', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
   ];
+  // สไตล์เรียบแบบ Apple: พื้นจางชิ้นเดียว ไม่มีเส้นแบ่ง เลขน้ำหนักกลางตัวใหญ่ขึ้นเล็กน้อย
+  // ป้ายตัวจิ๋วโทนเทา ค่า 0 จางลงทั้งช่องให้ตาไหลผ่านไปหาช่องที่มีค่า
   return (
     <div
       className={cn(
-        'flex shrink-0 items-stretch divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white/85',
+        'flex shrink-0 items-center gap-0.5 rounded-2xl bg-slate-900/[0.04] px-2 py-1.5',
         className,
       )}
     >
       {cells.map((c) => (
-        <div key={c.label} title={c.title} className="min-w-[36px] px-1.5 py-0.5 text-center">
-          <div className={cn('text-sm font-bold leading-tight tabular-nums', c.cls)}>{c.value}</div>
-          <div className="text-[9px] leading-tight text-muted-foreground">{c.label}</div>
+        <div
+          key={c.label}
+          title={c.title}
+          className={cn('min-w-[42px] px-1 text-center', c.value === 0 && 'opacity-35')}
+        >
+          <div
+            className={cn(
+              'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
+              c.value === 0 ? 'text-slate-500' : c.cls,
+            )}
+          >
+            {c.value}
+          </div>
+          <div className="text-[9px] font-medium leading-tight tracking-wide text-slate-500">
+            {c.label}
+          </div>
         </div>
       ))}
     </div>
   );
+}
+
+/**
+ * ชิป "ทำต่อเลย" บนการ์ดใบขอ — มองปุ๊บรู้ว่าก้าวถัดไปคืออะไร โดยไม่ต้องเปิดใบ
+ * เรียงตามความสำคัญ: มีคนสนใจ (ปิดงานได้) > ไม่รับสาย (โทรซ้ำ) > มีคนพร้อมส่งโทร >
+ * รอผลโทร > ไม่มีคนแนะนำ (ส่งต่อทีมอื่น) · ใบที่ AI ยังไม่ประเมิน = ไม่เดา ไม่ขึ้นชิป
+ */
+function cardNextAction(
+  matchCount: number | undefined,
+  s: LumosJobCallSummaryRow | undefined,
+): { text: string; cls: string } | null {
+  const confirmed = s?.confirmed ?? 0;
+  const noAnswer = s?.no_answer ?? 0;
+  const sent = s?.sent ?? 0;
+  const waiting = s ? Math.max(0, s.sent - s.called) : 0;
+  if (confirmed > 0)
+    return { text: `มีคนสนใจ ${confirmed} — กดจองตัวเลย`, cls: 'jarvis-chip-success' };
+  if (noAnswer > 0) return { text: `ไม่รับสาย ${noAnswer} — ควรโทรซ้ำ`, cls: 'jarvis-chip-warn' };
+  if ((matchCount ?? 0) > 0 && sent === 0)
+    return { text: `AI แนะนำ ${matchCount} — เลือกคนส่ง AI โทร`, cls: 'jarvis-chip-info' };
+  if (waiting > 0) return { text: `รอผลโทร ${waiting} สาย`, cls: 'jarvis-chip-neutral' };
+  if (matchCount === 0)
+    return { text: 'ไม่มีคนแนะนำ — ส่งคิด Content / Scraping', cls: 'jarvis-chip-danger' };
+  return null;
 }
 
 /** แถบ "ส่งให้ Lumos โทร" — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 คน (ใช้ทั้งฝั่งคนของเราและ iRecruit) */
@@ -710,27 +776,30 @@ const MatchingPage: React.FC = () => {
   const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
 
   // ── server-side pagination ของลิสต์ (/api/matching/list) — กรอง/เรียง/แบ่งหน้าที่ server
-  const [serverItems, setServerItems] = useState<JobRequest[]>([]);
-  const [serverTotal, setServerTotal] = useState(0);
-  const [serverPageNo, setServerPageNo] = useState(1);
-  const [serverUnitOptions, setServerUnitOptions] = useState<string[]>([]);
+  // เริ่มจาก cache ของครั้งก่อน (ถ้ามี) → กลับเข้าหน้าแล้วเห็นทันที ระหว่างที่ effect โหลดชุดสดมาแทน
+  const [serverItems, setServerItems] = useState<JobRequest[]>(() => lastServerList?.items ?? []);
+  const [serverTotal, setServerTotal] = useState(() => lastServerList?.total ?? 0);
+  const [serverPageNo, setServerPageNo] = useState(() => lastServerList?.page ?? 1);
+  const [serverUnitOptions, setServerUnitOptions] = useState<string[]>(
+    () => lastServerList?.unitOptions ?? [],
+  );
   /** ยอดใบขอเปิดต่อ BU จาก /api/matching/list — ใช้วาดชิป "แยกดูตาม BU" */
-  const [serverBuCounts, setServerBuCounts] = useState<Record<string, number>>({});
-  const [serverSummary, setServerSummary] = useState<{
-    urgentTotal: number;
-    urgentAnalyzed: number;
-    urgentWithGreen: number;
-    scopedTotal?: number;
-    withGreen?: number;
-    withYellow?: number;
-    noRecommend?: number;
-  } | null>(null);
+  const [serverBuCounts, setServerBuCounts] = useState<Record<string, number>>(
+    () => lastServerList?.buCounts ?? {},
+  );
+  const [serverSummary, setServerSummary] = useState<ServerListSummary | null>(
+    () => lastServerList?.summary ?? null,
+  );
   const [serverStoredMatches, setServerStoredMatches] = useState<
     Record<string, { recommended: number; computedAt: string }>
-  >({});
+  >(() => lastServerList?.storedMatches ?? {});
   /** สรุปผลโทร Lumos ต่อใบ (จาก /api/matching/list) — โชว์ข้างการ์ดในลิสต์ */
-  const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>({});
-  const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
+  const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>(
+    () => lastServerList?.lumosSummary ?? {},
+  );
+  const [serverListLoading, setServerListLoading] = useState(
+    MATCHING_SERVER_LIST_ENABLED && !lastServerList,
+  );
   const [serverListError, setServerListError] = useState<string | null>(null);
   const serverFetchSeq = useRef(0);
 
@@ -791,15 +860,7 @@ const MatchingPage: React.FC = () => {
         page: number;
         unitOptions?: string[];
         buCounts?: Record<string, number>;
-        summary?: {
-          urgentTotal: number;
-          urgentAnalyzed: number;
-          urgentWithGreen: number;
-          scopedTotal?: number;
-          withGreen?: number;
-          withYellow?: number;
-          noRecommend?: number;
-        };
+        summary?: ServerListSummary;
         storedMatches?: Record<string, { recommended: number; computedAt: string }>;
         lumosSummary?: Record<string, LumosJobCallSummaryRow>;
       };
@@ -816,6 +877,19 @@ const MatchingPage: React.FC = () => {
       setServerLumosSummary((prev) =>
         append ? { ...prev, ...(data.lumosSummary ?? {}) } : (data.lumosSummary ?? {}),
       );
+      if (!append) {
+        // เก็บไว้ระดับ module — กลับเข้าหน้านี้รอบหน้าเห็นชุดนี้ทันทีระหว่างรอโหลดสด
+        lastServerList = {
+          items: data.items,
+          total: data.total,
+          page: data.page,
+          unitOptions: data.unitOptions ?? [],
+          buCounts: data.buCounts ?? {},
+          summary: data.summary ?? null,
+          storedMatches: data.storedMatches ?? {},
+          lumosSummary: data.lumosSummary ?? {},
+        };
+      }
     } catch (e) {
       if (seq === serverFetchSeq.current) {
         setServerListError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
@@ -2273,6 +2347,13 @@ const MatchingPage: React.FC = () => {
                     <span className="block truncate text-[10px] text-slate-600">
                       ขอ {requested} · ติดต่อ {progress.contacted} · จอง {progress.reserved} · ลงงานใน Matching {progress.placed} · เหลือหาทางการ {remaining}
                     </span>
+                    {(() => {
+                      // ก้าวถัดไปของใบนี้ — เห็นจากลิสต์เลยไม่ต้องเปิดใบ
+                      const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
+                      return action ? (
+                        <span className={cn(action.cls, 'mt-1')}>→ {action.text}</span>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                     {serverLumosSummary[j.id] ? <LumosJobSummaryStats s={serverLumosSummary[j.id]} /> : null}
