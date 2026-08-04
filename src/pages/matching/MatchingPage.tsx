@@ -151,7 +151,20 @@ type IrecruitDisplayRow =
     };
 /** ลิสต์ใบขอแบบ server-side pagination (ปิดกลับเป็น client เดิมได้ด้วย env = rollback) */
 const MATCHING_SERVER_LIST_ENABLED = import.meta.env.VITE_MATCHING_SERVER_LIST !== 'false';
+/** ค่าเริ่มต้นจำนวนใบขอต่อหน้า — ผู้ใช้เลือกเองได้ (จำไว้ในเครื่อง) */
 const MATCHING_LIST_BATCH_SIZE = 60;
+/** ตัวเลือกจำนวนต่อหน้า — เพดาน 100 ตรงกับที่ API ยอมรับ (pageSize > 100 ถูกตัดเป็น 100) */
+const MATCHING_PAGE_SIZE_OPTIONS = [20, 40, 60, 100] as const;
+const MATCHING_PAGE_SIZE_KEY = 'jarvis:matching-page-size';
+
+function loadSavedPageSize(): number {
+  try {
+    const raw = Number(localStorage.getItem(MATCHING_PAGE_SIZE_KEY));
+    return (MATCHING_PAGE_SIZE_OPTIONS as readonly number[]).includes(raw) ? raw : MATCHING_LIST_BATCH_SIZE;
+  } catch {
+    return MATCHING_LIST_BATCH_SIZE;
+  }
+}
 
 function branchDemandItems(job: JobRequest): BranchDemandItem[] {
   const overrides = job.field_overrides?.branches;
@@ -672,6 +685,8 @@ const MatchingPage: React.FC = () => {
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
   /** แยกดูตาม BU (department_code เช่น LBD) — '' = ทุก BU */
   const [buFilter, setBuFilter] = useState('');
+  /** จำนวนใบขอต่อหน้า — ผู้ใช้เลือกเอง จำค่าไว้ในเครื่อง */
+  const [pageSize, setPageSize] = useState<number>(loadSavedPageSize);
   const [clientPageNo, setClientPageNo] = useState(1);
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const listScrollPendingRef = useRef(false);
@@ -706,7 +721,7 @@ const MatchingPage: React.FC = () => {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        pageSize: String(MATCHING_LIST_BATCH_SIZE),
+        pageSize: String(pageSize),
       });
       const q = search.trim();
       if (q) params.set('q', q);
@@ -757,7 +772,7 @@ const MatchingPage: React.FC = () => {
     const t = window.setTimeout(() => void fetchServerPage(1, false), search.trim() ? 350 : 0);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
@@ -1634,8 +1649,9 @@ const MatchingPage: React.FC = () => {
     setUnitFilter('');
   };
 
-  // ชิป "แยกดูตาม BU" — server mode ใช้ facet จาก API, client mode นับจาก jobs ที่โหลดมา
-  const buChips = useMemo(() => {
+  // ตัวเลือก BU ในตัวกรอง — server mode ใช้ facet จาก API, client mode นับจาก jobs ที่โหลดมา
+  // ผู้ใช้ที่ถูกล็อก BU จะได้กลับมาแค่ BU เดียว → หน้าเว็บซ่อนช่อง BU ไปเลย
+  const buOptions = useMemo(() => {
     const counts: Record<string, number> = MATCHING_SERVER_LIST_ENABLED
       ? serverBuCounts
       : jobs.reduce<Record<string, number>>((acc, j) => {
@@ -1647,7 +1663,13 @@ const MatchingPage: React.FC = () => {
     const extra = Object.keys(counts)
       .filter((c) => !(APP_DEPARTMENT_CODES as readonly string[]).includes(c))
       .sort();
-    return [...known, ...extra].map((code) => ({ code, count: counts[code] ?? 0 }));
+    const codes = [...known, ...extra];
+    if (codes.length <= 1) return codes.map((code) => ({ value: code, label: `BU ${code}` }));
+    const total = codes.reduce((sum, code) => sum + (counts[code] ?? 0), 0);
+    return [
+      { value: '', label: `ทุก BU · ${total}` },
+      ...codes.map((code) => ({ value: code, label: `${code} · ${counts[code] ?? 0}` })),
+    ];
   }, [serverBuCounts, jobs]);
 
   // server mode: รายการถูกกรอง/เรียง/แบ่งหน้ามาจาก server แล้ว (สะสมทีละหน้า)
@@ -1660,16 +1682,28 @@ const MatchingPage: React.FC = () => {
 
   // แบ่งหน้าแบบชัดเจน (เปลี่ยนหน้า = แทนที่รายการ ไม่ต่อท้ายสะสม) — server ส่งมาทีละหน้าอยู่แล้ว
   const currentPage = MATCHING_SERVER_LIST_ENABLED ? serverPageNo : clientPageNo;
-  const totalPages = Math.max(1, Math.ceil(listTotal / MATCHING_LIST_BATCH_SIZE));
+  const totalPages = Math.max(1, Math.ceil(listTotal / pageSize));
   const visibleRows = useMemo(
     () =>
       MATCHING_SERVER_LIST_ENABLED
         ? rows
-        : rows.slice((clientPageNo - 1) * MATCHING_LIST_BATCH_SIZE, clientPageNo * MATCHING_LIST_BATCH_SIZE),
-    [rows, clientPageNo],
+        : rows.slice((clientPageNo - 1) * pageSize, clientPageNo * pageSize),
+    [rows, clientPageNo, pageSize],
   );
-  const pageRangeStart = listTotal === 0 ? 0 : (currentPage - 1) * MATCHING_LIST_BATCH_SIZE + 1;
-  const pageRangeEnd = Math.min((currentPage - 1) * MATCHING_LIST_BATCH_SIZE + visibleRows.length, listTotal);
+  const pageRangeStart = listTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const pageRangeEnd = Math.min((currentPage - 1) * pageSize + visibleRows.length, listTotal);
+
+  // เปลี่ยนจำนวนต่อหน้า → กลับหน้า 1 เสมอ (หน้าเดิมอาจเลยจำนวนหน้าใหม่) + จำค่าไว้ใช้ครั้งต่อไป
+  const changePageSize = (size: number) => {
+    if (size === pageSize) return;
+    setPageSize(size);
+    setClientPageNo(1);
+    try {
+      localStorage.setItem(MATCHING_PAGE_SIZE_KEY, String(size));
+    } catch {
+      /* ไม่ให้ storage ที่ปิดอยู่ทำให้เปลี่ยนจำนวนต่อหน้าไม่ได้ */
+    }
+  };
 
   const goToPage = (page: number) => {
     const target = Math.min(Math.max(1, page), totalPages);
@@ -1796,47 +1830,28 @@ const MatchingPage: React.FC = () => {
               🔴 ด่วนเท่านั้น
             </button>
           </div>
-          <SearchableSelect
-            value={unitFilter}
-            onChange={setUnitFilter}
-            options={unitOptions}
-            placeholder="ทุกหน่วยงาน"
-            searchPlaceholder="ค้นหาหน่วยงาน..."
-            emptyText="ไม่พบหน่วยงาน"
-          />
-          {/* แยกดูตาม BU — โชว์เมื่อผู้ใช้เห็นมากกว่า 1 BU (staff ที่ถูกล็อกแผนกไม่ต้องเห็นชิปเดียว) */}
-          {buChips.length > 1 ? (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-              <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">BU:</span>
-              <button
-                type="button"
-                onClick={() => selectBu('')}
-                className={cn(
-                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                  buFilter === ''
-                    ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
-                )}
-              >
-                ทุก BU
-              </button>
-              {buChips.map(({ code, count }) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => selectBu(buFilter === code ? '' : code)}
-                  className={cn(
-                    'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium tabular-nums transition-colors',
-                    buFilter === code
-                      ? 'border-blue-300 bg-blue-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
-                  )}
-                >
-                  {code} · {count}
-                </button>
-              ))}
-            </div>
-          ) : null}
+          {/* BU + หน่วยงาน = ตัวกรองคู่กัน · BU ซ้าย (แคบ) เพราะเลือก BU ก่อนแล้วหน่วยงานหดตาม
+              ผู้ใช้ที่ถูกล็อก BU เดียวไม่เห็นช่อง BU — เห็นแค่งาน BU ตัวเองอยู่แล้ว */}
+          <div className={cn('grid gap-2', buOptions.length > 1 ? 'sm:grid-cols-[minmax(0,12rem)_1fr]' : '')}>
+            {buOptions.length > 1 ? (
+              <SearchableSelect
+                value={buFilter}
+                onChange={selectBu}
+                options={buOptions}
+                placeholder="ทุก BU"
+                searchPlaceholder="ค้นหา BU..."
+                emptyText="ไม่พบ BU"
+              />
+            ) : null}
+            <SearchableSelect
+              value={unitFilter}
+              onChange={setUnitFilter}
+              options={unitOptions}
+              placeholder="ทุกหน่วยงาน"
+              searchPlaceholder="ค้นหาหน่วยงาน..."
+              emptyText="ไม่พบหน่วยงาน"
+            />
+          </div>
           <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             {(
               [
@@ -1890,7 +1905,7 @@ const MatchingPage: React.FC = () => {
           </p>
         ) : null}
 
-        <div className="flex items-center gap-2 px-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <p className="text-sm text-muted-foreground">
             {loadingJobs || serverListLoading ? (
               <span className="inline-flex items-center gap-1.5">
@@ -1904,7 +1919,29 @@ const MatchingPage: React.FC = () => {
               </>
             )}
           </p>
-          <p className="text-xs text-muted-foreground">· เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง</p>
+          {/* เลือกจำนวนต่อหน้า — จำค่าไว้ในเครื่อง กลับมาเปิดหน้านี้อีกครั้งได้ค่าเดิม */}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">หน้าละ</span>
+            {MATCHING_PAGE_SIZE_OPTIONS.map((size) => (
+              <button
+                key={size}
+                type="button"
+                onClick={() => changePageSize(size)}
+                disabled={serverListLoading}
+                className={cn(
+                  'rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-wait',
+                  pageSize === size
+                    ? 'border-blue-300 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                )}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+          <p className="w-full text-xs text-muted-foreground">
+            · เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง
+          </p>
         </div>
 
         {/* การ์ดรวมใบขอ */}
