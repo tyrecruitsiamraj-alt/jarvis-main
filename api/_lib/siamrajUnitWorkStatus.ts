@@ -88,6 +88,21 @@ export function isUnitRequestWorkStatus(v: unknown): v is UnitRequestWorkStatus 
   return typeof v === 'string' && (UNIT_REQUEST_WORK_STATUSES as readonly string[]).includes(v);
 }
 
+/**
+ * รับสถานะที่ Admin เพิ่มเองใน master ด้วย (ไม่จำกัดแค่ 9 ค่า built-in ในโค้ด)
+ * ค่าที่ปิดใช้งานแล้วบันทึกใหม่ไม่ได้ — แต่ใบขอเก่าที่ใช้ค่านั้นยังอ่าน/แสดงได้ปกติ
+ */
+export async function isAllowedWorkStatusCode(v: unknown): Promise<boolean> {
+  if (typeof v !== 'string' || !v.trim()) return false;
+  if (isUnitRequestWorkStatus(v)) return true;
+  try {
+    const { activeWorkStatusCodes } = await import('./workStatusMaster.js');
+    return (await activeWorkStatusCodes()).includes(v);
+  } catch {
+    return false;
+  }
+}
+
 function cleanName(v: unknown, field: string): string | null {
   if (v == null) return null;
   if (typeof v !== 'string') throw new Error(`${field} must be a string`);
@@ -410,7 +425,8 @@ export async function upsertUnitWorkStatus(input: {
 }): Promise<UnitWorkStatusRow> {
   const requestNo = input.requestNo.trim();
   if (!requestNo) throw new Error('request_no is required');
-  if (!isUnitRequestWorkStatus(input.status)) throw new Error('invalid status');
+  // รับค่าที่ Admin เพิ่มเองใน master ด้วย ไม่ใช่แค่ 9 ค่า built-in
+  if (!(await isAllowedWorkStatusCode(input.status))) throw new Error('invalid status');
 
   const persons = resolvePersonsForUpsert(input);
   const primary = persons[0] ?? null;

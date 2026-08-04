@@ -4,17 +4,18 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
+import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit';
+type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'reference' | 'audit';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -38,6 +39,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
+  { id: 'workStatus', label: 'สถานะทำงาน', icon: ListChecks, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
 ];
@@ -52,6 +54,7 @@ const AdminSettings: React.FC = () => {
     tabFromUrl === 'users' ||
     tabFromUrl === 'roles' ||
     tabFromUrl === 'jobStaff' ||
+    tabFromUrl === 'workStatus' ||
     tabFromUrl === 'reference' ||
     tabFromUrl === 'audit'
       ? tabFromUrl
@@ -370,6 +373,8 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
 
         {activeTab === 'roles' && <RolePermissionsTab />}
+
+        {activeTab === 'workStatus' && <WorkStatusMasterTab />}
 
         {activeTab === 'reference' && (
           <div className="space-y-3">

@@ -50,7 +50,8 @@ export type ApiResource =
   | 'matching-job-postings'
   | 'matching-flow-summary'
   | 'lumos-dispatch'
-  | 'job-applications';
+  | 'job-applications'
+  | 'work-status-master';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -111,6 +112,11 @@ export function minimumRoleFor(
     case 'app-users':
     case 'audit-logs':
     case 'branding':
+      return 'admin';
+
+    case 'work-status-master':
+      // อ่านได้ทุกคน (dropdown สถานะทำงานทั้งระบบใช้) — เพิ่ม/แก้/ลบเฉพาะ admin
+      if (isRead) return 'staff';
       return 'admin';
 
     case 'siamraj-unit-requests':
