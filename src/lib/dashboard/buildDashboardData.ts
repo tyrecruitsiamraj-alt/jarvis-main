@@ -20,6 +20,7 @@ import {
 } from '@/lib/jobUrgency';
 import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
 import { pickUnitOrganizationDisplayName, NO_SITE_CODE_LABEL } from '@/lib/unitGroupName';
+import { buildPriorityWorkQueue } from '@/lib/dashboard/priorityWorkQueue';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
@@ -1110,18 +1111,25 @@ export function buildDashboardData(
         : requestControlSummary
           ? buildFlowView(requestControlSummary)
           : undefined;
-  const flowView =
-    flowViewBase && requestControlSummary
-      ? {
-          ...flowViewBase,
-          endingBacklogPositions: remainingKpi.remainingPositions,
-        }
-      : flowViewBase;
+  /**
+   * ห้าม override ช่องปลายงวดด้วย KPI "คงเหลือ"
+   *
+   * เดิมทับด้วย `remainingKpi.remainingPositions` ซึ่งเป็น "เหลือหาของใบที่กรอกในงวดนี้"
+   * คนละนิยามกับ "ยอดค้างปลายงวดทั้งกอง" ของ ledger → การ์ดโชว์สมการที่บวกลบไม่ลงตัว
+   * (ต้นงวด 388 + ขอใหม่ 87 − หาได้ 7 − ยกเลิก 5 = 463 แต่โชว์ 18) และขัดกับ
+   * netBacklogChange ของ summary เอง · ปล่อยให้ ledger เป็นเจ้าของเลขนี้ตัวเดียว
+   */
+  const flowView = flowViewBase;
   const executiveInsights =
     period && requestControlSummary
       ? buildExecutiveInsights(requestControlSummary, controlRecords, lifecycleInsights)
       : undefined;
-  const priorityWorkQueue: DashboardWorkItem[] = [];
+  /**
+   * "ต้องแก้วันนี้" — เดิม hard-code เป็น [] ทำให้การ์ดไม่เคยขึ้น
+   * คิดทั้ง 2 โหมด (ไม่ผูกกับการเลือกช่วงเวลา) เพราะเป็นข้อมูลที่ต้องลงมือทันที
+   * periodFrom = null ในโหมด "ทั้งหมด" → ตัวจัดอันดับข้ามเกณฑ์ "ใบข้ามงวด" ไปเอง
+   */
+  const priorityWorkQueue = buildPriorityWorkQueue(sortedQueue, controlRecords, period?.from ?? null);
 
   const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
   const stockScopeHint = period

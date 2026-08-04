@@ -188,7 +188,6 @@ export type DashboardRequestControlSummary = {
   cancelledRequestsThisPeriod: number;
   remainingPositions: number;
   remainingRequests: number;
-  endingBacklogPositions?: number;
   endingBacklogRequests?: number;
   startingBacklogPositions: number;
   endingBacklogPositions: number;

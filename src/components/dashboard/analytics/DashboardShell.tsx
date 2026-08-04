@@ -12,6 +12,12 @@ import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
 import DashboardWorkQueueTable from './DashboardWorkQueueTable';
+import DashboardPriorityQueue from './DashboardPriorityQueue';
+import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
+import DashboardFlowViewCard from './DashboardFlowView';
+import DashboardSlaSummaryCard from './DashboardSlaSummary';
+import DashboardCohortSummaryCard from './DashboardCohortSummary';
+import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 
 type FilterOptions = {
@@ -88,6 +94,7 @@ const DashboardShell: React.FC<Props> = ({
   closedTotalsAvailable = true,
   onRecruiterClick,
 }) => {
+  const [showControlDetail, setShowControlDetail] = useState(false);
   const [showUnitOverview, setShowUnitOverview] = useState(false);
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
   const [showWorkQueue, setShowWorkQueue] = useState(false);
@@ -210,6 +217,12 @@ const DashboardShell: React.FC<Props> = ({
                 </div>
               </div>
 
+              <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
+
+              {data.executiveInsights ? (
+                <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
+              ) : null}
+
               <DashboardAgeOverview
                 items={data.ageDaysBreakdown}
                 requestTotal={data.ageDaysRequestTotal}
@@ -217,7 +230,46 @@ const DashboardShell: React.FC<Props> = ({
                 onBucketClick={onAgeBucketClick}
               />
 
+              {data.flowView ? (
+                <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
+              ) : null}
+
               <DashboardChartSection data={data} />
+              {data.slaSummary || data.requestCohortSummary || data.fulfillmentBreakdown ? (
+                <DashboardExpandablePanel
+                  title="รายละเอียด Control Tower"
+                  subtitle="SLA · ยอดค้างจากงวดก่อน vs ขอใหม่ · แยกที่มาของยอดหาได้/ปิดครบ — กดเพื่อดู"
+                  open={showControlDetail}
+                  onOpenChange={setShowControlDetail}
+                >
+                  <div className="space-y-3">
+                    {data.slaSummary ? (
+                      <DashboardSlaSummaryCard summary={data.slaSummary} onBucketClick={onSlaClick} />
+                    ) : null}
+                    {data.requestCohortSummary ? (
+                      <DashboardCohortSummaryCard
+                        summary={data.requestCohortSummary}
+                        onRowClick={onCohortClick}
+                      />
+                    ) : null}
+                    {data.fulfillmentBreakdown ? (
+                      <DashboardClosedBreakdownCard
+                        breakdown={data.fulfillmentBreakdown}
+                        filledTotal={
+                          data.fulfillmentBreakdown.filledSamePeriod + data.fulfillmentBreakdown.filledBacklog
+                        }
+                        fullyClosedTotal={
+                          data.fulfillmentBreakdown.fullyClosedSamePeriod +
+                          data.fulfillmentBreakdown.fullyClosedBacklog
+                        }
+                        onFilledClick={onFilledBreakdownClick}
+                        onFullyClosedClick={onFullyClosedBreakdownClick}
+                      />
+                    ) : null}
+                  </div>
+                </DashboardExpandablePanel>
+              ) : null}
+
               <DashboardExpandablePanel
                 title="ภาระงานตามผู้รับผิดชอบ"
                 subtitle={

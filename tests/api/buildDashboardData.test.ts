@@ -178,7 +178,10 @@ describe('buildDashboardData', () => {
       .reduce((s, k) => s + k.value, 0);
     expect(statusSum).toBe(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value);
     expect(data.flowView).toBeUndefined();
-    expect(data.priorityWorkQueue).toEqual([]);
+    // "ต้องแก้วันนี้" คิดในโหมด "ทั้งหมด" ด้วย — ไม่ผูกกับการเลือกช่วงเวลา (เดิม hard-code เป็น [])
+    expect(data.priorityWorkQueue.length).toBeGreaterThan(0);
+    expect(data.priorityWorkQueue.every((i) => i.remainingPositions > 0)).toBe(true);
+    expect(data.priorityWorkQueue.length).toBeLessThanOrEqual(12);
     expect(data.periodLabel).toBe('ทั้งหมดที่โหลด');
   });
 
@@ -342,7 +345,58 @@ describe('buildDashboardData', () => {
     expect(data.kpis.find((k) => k.id === 'closed')?.value).toBe(3);
     expect(data.kpis.find((k) => k.id === 'closed')?.label).toBe('ปิดแล้ว');
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(2);
-    expect(data.priorityWorkQueue).toEqual([]);
+    // ใบ 'a' ยังเหลือ 2 อัตรา → ต้องขึ้นใน "ต้องแก้วันนี้" · ใบที่ปิดแล้วต้องไม่ขึ้น
+    expect(data.priorityWorkQueue).toHaveLength(1);
+    expect(data.priorityWorkQueue[0]?.remainingPositions).toBe(2);
+  });
+
+  it('flow view keeps the core equation balanced — ปลายงวดต้องไม่ถูกทับด้วย KPI คงเหลือ', () => {
+    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
+    const jobs = [
+      // ใบข้ามงวด (กรอกก่อนงวด ยังเหลือ) = ยอดค้างต้นงวด
+      job({
+        id: 'old',
+        unit_name: 'A',
+        position_units: 9,
+        request_positions: 9,
+        filled_positions: 0,
+        request_date: '2026-05-02',
+        required_date: '2026-05-10',
+      }),
+      // ใบของงวดนี้ หาได้บางส่วน
+      job({
+        id: 'new',
+        unit_name: 'B',
+        position_units: 3,
+        request_positions: 5,
+        filled_positions: 2,
+        request_date: '2026-07-03',
+        required_date: '2026-07-20',
+      }),
+    ];
+    const data = buildDashboardData(
+      jobs,
+      [],
+      period,
+      DEFAULT_DASHBOARD_FILTERS,
+      new Date('2026-07-15'),
+      undefined,
+      [],
+      jobs,
+    );
+    const flow = data.flowView;
+    const summary = data.requestControlSummary;
+    expect(flow).toBeDefined();
+    expect(summary).toBeDefined();
+    if (!flow || !summary) return;
+
+    expect(flow.startingBacklogPositions + flow.newRequestPositions).toBe(flow.totalWorkloadPositions);
+
+    // ยอดค้างปลายงวด = เหลือหาจริงทั้งกอง (ใบข้ามงวด 9 + ใบงวดนี้ 3 = 12)
+    // KPI "คงเหลือ" นับแค่ใบที่กรอกในงวดนี้ (3) — คนละนิยาม
+    // ถ้าช่องปลายงวดกลายเป็น 3 คือ override ด้วย KPI กลับมาแล้ว
+    expect(flow.endingBacklogPositions).toBe(12);
+    expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(3);
   });
 
   it('filters work queue by search', () => {
