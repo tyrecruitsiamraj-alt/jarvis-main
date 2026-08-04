@@ -6,7 +6,6 @@ import {
   mapJobToTaskStatus,
   type RequestActivityKind,
 } from '@/lib/dashboard/buildDashboardData';
-import { buildOrganizationKeyResolver } from '@/lib/unitGroupName';
 import type { DashboardAgeDaysBreakdown, DashboardTaskStatus } from '@/lib/dashboard/types';
 import type { RequestControlRecord } from '@/lib/requestControl';
 import {
@@ -186,10 +185,14 @@ export function filterJobsForTaskStatus(
   return jobs.filter((j) => mapJobToTaskStatus(j, today) === status);
 }
 
-export function filterJobsForUnitName(jobs: JobRequest[], unitName: string): JobRequest[] {
-  const resolve = buildOrganizationKeyResolver([...jobs.map((j) => j.unit_name), unitName]);
-  const target = resolve(unitName);
-  return jobs.filter((j) => resolve(j.unit_name) === target);
+/**
+ * drill-down ของแผง "ภาระงานตามรหัสไซต์" — เทียบ `site_code` ตรงตัว ไม่ผ่านการรวมชื่อ
+ * ส่ง siteCode ว่าง/undefined = ขอถังใบขอที่ยังไม่มีรหัสไซต์
+ */
+export function filterJobsForSiteCode(jobs: JobRequest[], siteCode: string | undefined): JobRequest[] {
+  const target = siteCode?.trim() || '';
+  if (!target) return jobs.filter((j) => !j.site_code?.trim());
+  return jobs.filter((j) => (j.site_code?.trim() || '') === target);
 }
 
 export function filterJobsForRecruiter(

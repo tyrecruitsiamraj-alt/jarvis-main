@@ -123,7 +123,12 @@ export type DashboardRecruiterOverview = {
 
 /** ภาระงานรวมตามชื่อหน่วยงาน/ลูกค้า (unit_name) */
 export type DashboardUnitOverview = {
+  /** ป้ายหลักที่โชว์บนกราฟ = รหัสไซต์ (site_code) */
   name: string;
+  /** รหัสไซต์จริง — undefined = ใบขอนั้นไม่มี site_code */
+  siteCode?: string;
+  /** ชื่อหน่วยงาน/ลูกค้าของไซต์นั้น (ใช้ประกอบใน tooltip) */
+  unitName?: string;
   total: number;
   open: number;
   overdue: number;

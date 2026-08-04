@@ -19,7 +19,7 @@ import {
   countAgeDaysBreakdown,
 } from '@/lib/jobUrgency';
 import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
-import { pickUnitOrganizationDisplayName, buildOrganizationKeyResolver } from '@/lib/unitGroupName';
+import { pickUnitOrganizationDisplayName, NO_SITE_CODE_LABEL } from '@/lib/unitGroupName';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
@@ -824,34 +824,36 @@ function buildStatusBreakdown(jobs: JobRequest[], today: Date): DashboardStatusB
     .sort((a, b) => b.count - a.count);
 }
 
-function buildUnitOverview(
-  jobs: JobRequest[],
-  today: Date,
-  organizationScopeNames: Array<string | null | undefined> = [],
-): DashboardUnitOverview[] {
-  const resolve = buildOrganizationKeyResolver([
-    ...jobs.map((j) => j.unit_name),
-    ...organizationScopeNames,
-  ]);
+/**
+ * ภาระงานตามรหัสไซต์ — group ด้วย `site_code` ไม่ใช่ชื่อหน่วยงาน
+ *
+ * ลูกค้ารายเดียวมีได้หลายไซต์ (ข้อมูลจริง: 147 รหัสไซต์ จาก 127 ชื่อลูกค้า) การ group
+ * ด้วยชื่อจึงยุบหลายไซต์เป็นแท่งเดียวและมองไม่เห็นว่าไซต์ไหนหนักจริง
+ * ใบที่ไม่มี `site_code` ไม่ถูกทิ้ง — รวมไว้ในถัง NO_SITE_CODE_LABEL ให้เห็นชัด
+ */
+function buildUnitOverview(jobs: JobRequest[], today: Date): DashboardUnitOverview[] {
   const map = new Map<string, { names: string[]; total: number; open: number; overdue: number }>();
   for (const j of jobs) {
     const rem = positionBreakdownFromJob(j).remainingPositions;
     if (rem <= 0) continue;
     if (j.status === 'closed' || j.status === 'cancelled') continue;
-    const rawName = j.unit_name?.trim() || '—';
-    const key = resolve(rawName);
-    const row = map.get(key) ?? { names: [], total: 0, open: 0, overdue: 0 };
-    row.names.push(rawName);
+    const siteCode = j.site_code?.trim() || '';
+    const row = map.get(siteCode) ?? { names: [], total: 0, open: 0, overdue: 0 };
+    const rawName = j.unit_name?.trim();
+    if (rawName) row.names.push(rawName);
     row.total += rem;
     row.open += rem;
     const st = mapJobToTaskStatus(j, today);
     if (st === 'overdue') row.overdue += rem;
-    map.set(key, row);
+    map.set(siteCode, row);
   }
   const totalAll = [...map.values()].reduce((s, r) => s + r.open, 0) || 1;
   return [...map.entries()]
-    .map(([, row]) => ({
-      name: pickUnitOrganizationDisplayName(row.names),
+    .map(([siteCode, row]) => ({
+      name: siteCode || NO_SITE_CODE_LABEL,
+      siteCode: siteCode || undefined,
+      // ปกติ 1 ไซต์ = 1 ชื่อลูกค้า — ถ้าเจอหลายชื่อ (สะกดต่างกัน) เลือกชื่อกลางด้วย helper เดิม
+      unitName: row.names.length > 0 ? pickUnitOrganizationDisplayName(row.names) : undefined,
       total: row.total,
       open: row.open,
       overdue: row.overdue,
@@ -999,10 +1001,8 @@ export function buildDashboardData(
   trend?: BuildDashboardTrendInput,
   closedJobs: JobRequest[] = [],
   openJobs?: JobRequest[],
-  organizationScopeNames?: Array<string | null | undefined>,
 ): DashboardData {
   const openJobSet = openJobs ?? scopedJobs;
-  const unitScopeNames = organizationScopeNames ?? openJobSet.map((j) => j.unit_name);
   const workItems = scopedJobs.map((j) => jobToWorkItem(j, today));
   const filteredQueue = applyDashboardFilters(workItems, uiFilters);
   const sortedQueue = sortWorkQueue(filteredQueue, 'priority', 'asc');
@@ -1192,7 +1192,7 @@ export function buildDashboardData(
     kpis,
     workStatusKpis,
     activityTrend,
-    unitOverview: buildUnitOverview(openRemainingJobs, today, unitScopeNames),
+    unitOverview: buildUnitOverview(openRemainingJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),
     ageDaysRequestTotal: (period ? stockJobs : openRemainingJobs).length,
     ageDaysPositionTotal: period

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { unitOrganizationKey, unitOrganizationLabel, pickUnitOrganizationDisplayName, buildOrganizationKeyResolver } from '../../src/lib/unitGroupName';
+import { unitOrganizationKey, unitOrganizationLabel, pickUnitOrganizationDisplayName, buildOrganizationKeyResolver, NO_SITE_CODE_LABEL } from '../../src/lib/unitGroupName';
+import { filterJobsForSiteCode } from '../../src/lib/dashboard/drillDownFilters';
 import { buildDashboardData } from '../../src/lib/dashboard/buildDashboardData';
 import { DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
 import { resolvePeriodRange } from '../../src/lib/dashboard/buildDashboardData';
@@ -55,11 +56,11 @@ describe('unitGroupName', () => {
   });
 });
 
-describe('buildDashboardData unit overview grouping', () => {
-  function job(unit_name: string, partial: Partial<JobRequest> = {}): JobRequest {
+describe('buildDashboardData site overview grouping', () => {
+  function job(id: string, partial: Partial<JobRequest> = {}): JobRequest {
     return {
-      id: unit_name,
-      unit_name,
+      id,
+      unit_name: id,
       job_type: 'central',
       job_category: 'private',
       status: 'open',
@@ -76,39 +77,65 @@ describe('buildDashboardData unit overview grouping', () => {
     };
   }
 
-  it('merges Krung Sri branches into one row', () => {
-    const jobs = [
-      job('ธนาคารกรุงศรี สาขาเซ็นทรัล', { position_units: 3 }),
-      job('ธนาคารกรุงศรี สำนักงานใหญ่', { position_units: 2 }),
-    ];
+  function build(jobs: JobRequest[]) {
     const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
-    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
-    const krungsri = data.unitOverview.filter((u) => u.name.includes('กรุงศรี'));
-    expect(krungsri).toHaveLength(1);
-    expect(krungsri[0]?.total).toBe(5);
+    return buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
+  }
+
+  it('keeps one row per site_code even when the customer name is the same', () => {
+    const jobs = [
+      job('a', { site_code: '67LBDL0208', unit_name: 'ธนาคารกรุงศรี สาขาเซ็นทรัล', position_units: 3 }),
+      job('b', { site_code: '67LBDL0324', unit_name: 'ธนาคารกรุงศรี สำนักงานใหญ่', position_units: 2 }),
+    ];
+    const rows = build(jobs).unitOverview;
+    expect(rows.map((r) => r.siteCode).sort()).toEqual(['67LBDL0208', '67LBDL0324']);
+    expect(rows.find((r) => r.siteCode === '67LBDL0208')?.total).toBe(3);
+    expect(rows.find((r) => r.siteCode === '67LBDL0324')?.total).toBe(2);
   });
 
-  it('merges จำกัด and plain company name', () => {
+  it('merges rows that share the same site_code', () => {
     const jobs = [
-      job('บริษัท บำรุงราษฎร์ จำกัด', { position_units: 2 }),
-      job('บำรุงราษฎร์', { position_units: 3 }),
+      job('a', { site_code: '68LML0019', unit_name: 'บริษัท บำรุงราษฎร์ จำกัด', position_units: 2 }),
+      job('b', { site_code: '68LML0019', unit_name: 'บำรุงราษฎร์', position_units: 3 }),
     ];
-    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
-    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
-    const rows = data.unitOverview.filter((u) => u.name.includes('บำรุงราษ'));
+    const rows = build(jobs).unitOverview;
     expect(rows).toHaveLength(1);
+    expect(rows[0]?.siteCode).toBe('68LML0019');
+    expect(rows[0]?.name).toBe('68LML0019');
     expect(rows[0]?.total).toBe(5);
+    // ชื่อลูกค้าที่สะกดต่างกันในไซต์เดียวกัน → เลือกชื่อกลางด้วย helper เดิม
+    expect(rows[0]?.unitName).toContain('บำรุงราษ');
   });
 
-  it('merges truncated บำรุงราษ with full บำรุงราษฎร์ name', () => {
+  it('keeps requests without site_code in a labelled bucket instead of dropping them', () => {
     const jobs = [
-      job('บำรุงราษ', { position_units: 4 }),
-      job('บริษัท บำรุงราษฎร์ จำกัด', { position_units: 6 }),
+      job('a', { site_code: '69DSL0037', unit_name: 'บริษัท วัน แบงค็อก จำกัด', position_units: 4 }),
+      job('b', { unit_name: 'ลูกค้าที่ยังไม่ผูกไซต์', position_units: 6 }),
     ];
-    const period = resolvePeriodRange('this_month', undefined, new Date('2026-07-15'));
-    const data = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'));
-    const rows = data.unitOverview.filter((u) => u.name.includes('บำรุงราษ'));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.total).toBe(10);
+    const rows = build(jobs).unitOverview;
+    expect(rows).toHaveLength(2);
+    const noSite = rows.find((r) => r.siteCode === undefined);
+    expect(noSite?.name).toBe(NO_SITE_CODE_LABEL);
+    expect(noSite?.total).toBe(6);
+    // ยอดรวมต้องไม่หายไปกับถังที่ไม่มีรหัส
+    expect(rows.reduce((s, r) => s + r.open, 0)).toBe(10);
+  });
+});
+
+describe('filterJobsForSiteCode', () => {
+  const jobs = [
+    { id: 'a', site_code: '67LBDL0208' },
+    { id: 'b', site_code: ' 67LBDL0208 ' },
+    { id: 'c', site_code: '67LBDL0324' },
+    { id: 'd' },
+  ] as unknown as JobRequest[];
+
+  it('matches site_code exactly (trimmed) — ไม่ผ่านการรวมชื่อ', () => {
+    expect(filterJobsForSiteCode(jobs, '67LBDL0208').map((j) => j.id)).toEqual(['a', 'b']);
+    expect(filterJobsForSiteCode(jobs, '67LBDL0324').map((j) => j.id)).toEqual(['c']);
+  });
+
+  it('returns the no-site bucket when siteCode is undefined', () => {
+    expect(filterJobsForSiteCode(jobs, undefined).map((j) => j.id)).toEqual(['d']);
   });
 });

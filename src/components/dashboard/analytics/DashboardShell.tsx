@@ -52,7 +52,7 @@ type Props = {
   onFilledBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
-  onUnitClick?: (unitName: string) => void;
+  onSiteClick?: (siteCode: string | undefined, label: string) => void;
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
 };
 
@@ -82,15 +82,15 @@ const DashboardShell: React.FC<Props> = ({
   onFilledBreakdownClick,
   onFullyClosedBreakdownClick,
   onAgeBucketClick,
-  onUnitClick,
+  onSiteClick,
   onRecruiterClick,
 }) => {
   const [showUnitOverview, setShowUnitOverview] = useState(false);
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
   const [showWorkQueue, setShowWorkQueue] = useState(false);
 
-  const activeUnitCount = data.unitOverview.filter((u) => u.open > 0).length;
-  const unitOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
+  const activeSiteCount = data.unitOverview.filter((u) => u.open > 0).length;
+  const siteOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
   const recruiterRemainingTotal = data.recruiterOverview.reduce((sum, r) => sum + r.remaining, 0);
 
   return (
@@ -232,10 +232,10 @@ const DashboardShell: React.FC<Props> = ({
                 />
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
-                title="ภาระงานตามหน่วยงาน"
+                title="ภาระงานตามรหัสไซต์"
                 subtitle={
-                  activeUnitCount > 0
-                    ? `คงเหลือ ${unitOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeUnitCount.toLocaleString('th-TH')} หน่วยงาน · กดเพื่อดู`
+                  activeSiteCount > 0
+                    ? `คงเหลือ ${siteOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeSiteCount.toLocaleString('th-TH')} ไซต์ · กดเพื่อดู`
                     : 'กดเพื่อดูรายละเอียด'
                 }
                 open={showUnitOverview}
@@ -244,7 +244,7 @@ const DashboardShell: React.FC<Props> = ({
                 <DashboardUnitOverviewChart
                   items={data.unitOverview}
                   periodLabel={data.periodLabel}
-                  onUnitClick={onUnitClick}
+                  onSiteClick={onSiteClick}
                   hideHeader
                 />
               </DashboardExpandablePanel>

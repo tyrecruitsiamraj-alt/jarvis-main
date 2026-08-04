@@ -1,5 +1,8 @@
 import type { JobRequest } from '@/types';
 
+/** ป้ายของถังใบขอที่ไม่มีรหัสไซต์ — ไม่ทิ้งข้อมูล ให้เห็นชัดว่ายังไม่ระบุ */
+export const NO_SITE_CODE_LABEL = 'ไม่ระบุรหัสไซต์';
+
 /** ทำความสะอาดชื่อหน่วยงานก่อนรวมกลุ่ม */
 function cleanUnitName(name: string): string {
   return name

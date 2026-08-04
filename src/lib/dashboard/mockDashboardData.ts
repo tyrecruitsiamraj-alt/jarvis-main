@@ -179,9 +179,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { date: '2026-07-01', label: 'ก.ค.', resignations: 4, replacements: 3, newOpenings: 6, increaseHeadcount: 3, newSite: 3, requestedPositions: 14, closedPositions: 11, filledPositions: 11 },
   ],
   unitOverview: [
-    { name: 'ธนาคารกรุงศรี', total: 18, open: 9, overdue: 2, sharePercent: 34.6 },
-    { name: 'ศูนย์การค้าเซ็นทรัล', total: 14, open: 6, overdue: 1, sharePercent: 26.9 },
-    { name: 'ไทยพาณิชย์ สำนักงานใหญ่', total: 11, open: 4, overdue: 0, sharePercent: 21.2 },
+    { name: '67LBDL0208', siteCode: '67LBDL0208', unitName: 'ธนาคารกรุงศรี', total: 18, open: 9, overdue: 2, sharePercent: 34.6 },
+    { name: '67LBDL0324', siteCode: '67LBDL0324', unitName: 'ศูนย์การค้าเซ็นทรัล', total: 14, open: 6, overdue: 1, sharePercent: 26.9 },
+    { name: '68LBAL0012', siteCode: '68LBAL0012', unitName: 'ไทยพาณิชย์ สำนักงานใหญ่', total: 11, open: 4, overdue: 0, sharePercent: 21.2 },
   ],
     ageDaysBreakdown: [
     { bucket: 'advance', label: 'ล่วงหน้า', count: 22 },

@@ -26,7 +26,7 @@ import {
   filterJobsForDashboardKpi,
   filterJobsForRemainingKpi,
   filterJobsForRecruiter,
-  filterJobsForUnitName,
+  filterJobsForSiteCode,
   filterRecordsForCohort,
   filterRecordsForControlKpi,
   filterRecordsForFilledBreakdown,
@@ -304,7 +304,6 @@ const SupervisorDashboard: React.FC = () => {
       },
       scopedClosedJobs,
       jobsWithoutAgeFilter,
-      jobs.map((j) => j.unit_name),
     );
     return {
       ...built,
@@ -457,9 +456,9 @@ const SupervisorDashboard: React.FC = () => {
     [openJobList, jobsWithoutAgeFilter, period, dateRange],
   );
 
-  const handleUnitClick = useCallback(
-    (unitName: string) => {
-      openJobList(`หน่วยงาน: ${unitName}`, filterJobsForUnitName(scopedJobs, unitName));
+  const handleSiteClick = useCallback(
+    (siteCode: string | undefined, label: string) => {
+      openJobList(`รหัสไซต์: ${label}`, filterJobsForSiteCode(scopedJobs, siteCode));
     },
     [openJobList, scopedJobs],
   );
@@ -514,7 +513,7 @@ const SupervisorDashboard: React.FC = () => {
       onFilledBreakdownClick={DEMO_MODE ? undefined : handleFilledBreakdownClick}
       onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
-      onUnitClick={DEMO_MODE ? undefined : handleUnitClick}
+      onSiteClick={DEMO_MODE ? undefined : handleSiteClick}
       onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}
     />
     <DetailListDialog
