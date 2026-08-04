@@ -262,14 +262,11 @@ async function scannerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promise
 async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promise<void> {
   logInfo('match-precompute.consumer.ready');
   let loggedIdle = false;
-  let totalProcessed = 0;
-  let totalStored = 0;
-  let totalFailed = 0;
 
   while (!isStopped()) {
     if (queue.size === 0) {
       if (!loggedIdle) {
-        logInfo('match-precompute.idle', { totalProcessed, totalStored, totalFailed });
+        logInfo('match-precompute.idle', workerStats);
         loggedIdle = true;
       }
       await sleep(2_000);
@@ -290,12 +287,13 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
 
     try {
       await matchBoardCandidatesForJob(id, entry.job, { refresh: entry.refresh });
-      totalProcessed++;
+      workerStats.totalProcessed++;
+      workerStats.lastJobAt = Date.now();
 
       // saveBoardMatchResult catches its own errors — verify the row was actually written
       const saved = await getStoredBoardMatch(id);
       if (saved) {
-        totalStored++;
+        workerStats.totalStored++;
         logInfo('match-precompute.job.done', {
           jobId: id,
           matches: saved.result.matches?.length ?? 0,
@@ -306,8 +304,8 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
         logWarn('match-precompute.job.not-stored', { jobId: id, queueRemaining: queue.size });
       }
     } catch (e) {
-      totalProcessed++;
-      totalFailed++;
+      workerStats.totalProcessed++;
+      workerStats.totalFailed++;
       logError('match-precompute.job.fail', {
         jobId: id,
         message: e instanceof Error ? e.message : String(e),
@@ -319,7 +317,39 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
     }
   }
 
-  logInfo('match-precompute.consumer.stop', { totalProcessed, totalStored, totalFailed });
+  logInfo('match-precompute.consumer.stop', workerStats);
+}
+
+// ─── Module-level stats (readable via getWorkerStatus) ───────────────────────
+const workerStats = {
+  totalProcessed: 0,
+  totalStored: 0,
+  totalFailed: 0,
+  lastJobAt: null as number | null,
+};
+
+export type WorkerStatus = {
+  enabled: boolean;
+  started: boolean;
+  queueSize: number;
+  totalProcessed: number;
+  totalStored: number;
+  totalFailed: number;
+  lastJobAt: number | null;
+  isIdle: boolean;
+};
+
+export function getWorkerStatus(): WorkerStatus {
+  return {
+    enabled: isEnabled(),
+    started: workerStarted,
+    queueSize: queue.size,
+    totalProcessed: workerStats.totalProcessed,
+    totalStored: workerStats.totalStored,
+    totalFailed: workerStats.totalFailed,
+    lastJobAt: workerStats.lastJobAt,
+    isIdle: workerStarted && queue.size === 0,
+  };
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────

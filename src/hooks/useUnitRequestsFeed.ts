@@ -45,7 +45,7 @@ async function loadLiveJobs(): Promise<{
   };
 }
 
-export function useUnitRequestsFeed(): {
+export function useUnitRequestsFeed(options?: { skip?: boolean }): {
   jobs: JobRequest[];
   loading: boolean;
   refreshing: boolean;
@@ -55,8 +55,10 @@ export function useUnitRequestsFeed(): {
   loadError: string | null;
   refetch: () => Promise<void>;
 } {
+  const skip = options?.skip ?? false;
+
   const [jobs, setJobs] = useState<JobRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!skip);
   const [refreshing, setRefreshing] = useState(false);
   const [siamrajPrimary, setSiamrajPrimary] = useState(false);
   const [readOnly, setReadOnly] = useState(false);
@@ -75,6 +77,7 @@ export function useUnitRequestsFeed(): {
   }, []);
 
   const refetch = useCallback(async () => {
+    if (skip) return;
     setRefreshing(true);
     try {
       const result = await loadLiveJobs();
@@ -95,28 +98,30 @@ export function useUnitRequestsFeed(): {
       setRefreshing(false);
       setLoading(false);
     }
-  }, []);
+  }, [skip]);
 
   useEffect(() => {
     void refetch();
   }, [refetch]);
 
   useEffect(() => {
+    if (skip) return;
     const onVisible = () => {
       if (document.visibilityState === 'visible') void refetch();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [refetch]);
+  }, [refetch, skip]);
 
   useEffect(() => {
+    if (skip) return;
     const id = window.setInterval(() => {
       if (!siamrajPrimaryRef.current) return;
       void refetch();
     }, SIAMRAJ_POLL_MS);
 
     return () => window.clearInterval(id);
-  }, [refetch]);
+  }, [refetch, skip]);
 
   useEffect(() => {
     siamrajPrimaryRef.current = siamrajPrimary;

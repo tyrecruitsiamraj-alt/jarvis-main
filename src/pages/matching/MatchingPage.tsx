@@ -61,6 +61,7 @@ import {
   type NearestBranchAssignment,
 } from '@/lib/distributeIrecruitToBranches';
 import {
+  fetchSiamrajUnitRequest,
   saveUnitRequestMeta,
   unitRequestNoteKey,
   type UnitBranchOverride,
@@ -489,7 +490,13 @@ function jobTitleText(j: JobRequest): string {
 const MatchingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { jobs, loading: loadingJobs } = useUnitRequestsFeed();
+  // ในโหมด server-side list ไม่ต้องดึง feed 500 ใบมาที่ client — ใช้ serverItems แทน
+  // skip=true → hook ไม่ยิง /api/siamraj/unit-requests?limit=500 เลย
+  const { jobs: feedJobs, loading: feedLoading } = useUnitRequestsFeed({
+    skip: MATCHING_SERVER_LIST_ENABLED,
+  });
+  const jobs = MATCHING_SERVER_LIST_ENABLED ? serverItems : feedJobs;
+  const loadingJobs = MATCHING_SERVER_LIST_ENABLED ? serverListLoading : feedLoading;
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [urgentOnly, setUrgentOnly] = useState(false);
@@ -517,6 +524,32 @@ const MatchingPage: React.FC = () => {
   const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
   const [serverListError, setServerListError] = useState<string | null>(null);
   const serverFetchSeq = useRef(0);
+
+  // ── worker status badge ───────────────────────────────────────────────────
+  const [workerStatus, setWorkerStatus] = useState<{
+    enabled: boolean;
+    started: boolean;
+    queueSize: number;
+    isIdle: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const r = await apiFetch('/api/matching/worker-status');
+        if (!cancelled && r.ok) {
+          const data = (await r.json()) as { enabled: boolean; started: boolean; queueSize: number; isIdle: boolean };
+          setWorkerStatus(data);
+        }
+      } catch {
+        // silent — status badge is non-critical
+      }
+    };
+    void poll();
+    const id = window.setInterval(() => void poll(), 15_000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, []);
 
   const fetchServerPage = async (page: number, append: boolean) => {
     const seq = ++serverFetchSeq.current;
@@ -676,7 +709,15 @@ const MatchingPage: React.FC = () => {
     if (jobs.length === 0) return;
     let cancelled = false;
     void listProposalsForJobs(jobs.map((job) => job.id)).then((byJob) => {
-      if (!cancelled) setProposalsByJobId(byJob);
+      if (!cancelled) {
+        // ในโหมด server ใช้ serverItems (เปลี่ยนตามหน้า) → สะสมแทน replace
+        // เพื่อไม่ให้ proposal ของหน้าก่อนหายเมื่อเปลี่ยนหน้า
+        if (MATCHING_SERVER_LIST_ENABLED) {
+          setProposalsByJobId((prev) => ({ ...prev, ...byJob }));
+        } else {
+          setProposalsByJobId(byJob);
+        }
+      }
     });
     void refreshActiveProposals();
     return () => {
@@ -782,11 +823,21 @@ const MatchingPage: React.FC = () => {
   // เปิดจาก URL (?jobId=...) — เช่นลิงก์ "เปิดใบขอ" จากหน้ารายชื่อคนจอง/คำขอโพสหางาน
   useEffect(() => {
     const jobId = searchParams.get('jobId');
-    if (!jobId || jobs.length === 0) return;
+    if (!jobId) return;
+    // หาจาก items ที่มีอยู่ก่อน (เร็ว)
     const job = jobs.find((j) => j.id === jobId);
-    if (job) openJob(job);
+    if (job) {
+      openJob(job);
+      return;
+    }
+    // ในโหมด server: serverItems มีแค่หน้าปัจจุบัน → fetch เดี่ยวถ้ายังไม่โหลด
+    if (MATCHING_SERVER_LIST_ENABLED && !serverListLoading) {
+      void fetchSiamrajUnitRequest(jobId)
+        .then((j) => openJob(j))
+        .catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, jobs]);
+  }, [searchParams, jobs, serverListLoading]);
 
   // บันทึกการเสนอ/จองตัว/ลงงาน "คนของเรา" (board) ลง DB
   const proposeBoard = async (
@@ -1499,6 +1550,19 @@ const MatchingPage: React.FC = () => {
           {prewarming ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
               <RefreshCw className="h-2.5 w-2.5 animate-spin" /> อุ่นเครื่อง AI งานด่วนล่วงหน้า…
+            </span>
+          ) : null}
+          {workerStatus?.started && workerStatus.queueSize > 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+              <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
+            </span>
+          ) : workerStatus?.started && workerStatus.isIdle ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AI พร้อมแล้ว
+            </span>
+          ) : workerStatus && !workerStatus.enabled ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-400">
+              AI ปิดอยู่
             </span>
           ) : null}
         </div>
