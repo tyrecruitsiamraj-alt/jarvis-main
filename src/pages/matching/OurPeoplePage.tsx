@@ -68,6 +68,14 @@ const BUCKETS = [
     headCls: 'text-violet-800',
     boxCls: 'border-violet-200/80 bg-violet-50/40',
   },
+  {
+    key: 'in_process',
+    match: 'in process',
+    title: 'กำลังเสนอใบอื่น (In process)',
+    desc: 'ถูกเสนอกับใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คก่อนว่าใบเดิมจบแล้วหรือยัง)',
+    headCls: 'text-sky-800',
+    boxCls: 'border-sky-200/80 bg-sky-50/40',
+  },
 ] as const;
 
 function personBlob(p: BoardPerson): string {
@@ -143,7 +151,7 @@ const OurPeoplePage: React.FC = () => {
 
   return (
     <div className="relative">
-      <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use" />
+      <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use · In process" />
       <div className="px-4 md:px-6 space-y-4 pb-8">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

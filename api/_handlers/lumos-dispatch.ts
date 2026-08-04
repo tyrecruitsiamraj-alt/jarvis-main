@@ -27,6 +27,7 @@ import {
   boardPrimaryColumnId,
   boardFallbackColumnId,
   boardReuseColumnId,
+  boardInProcessColumnId,
   type BoardReadyCandidate,
 } from '../_lib/boardCandidatesSql.js';
 import { auditFromAuthed } from '../_lib/audit.js';
@@ -43,10 +44,17 @@ const BOARD_POOL_LIMIT = 2000;
 
 /**
  * ถังที่ให้ "คนเลือกส่งเอง" เห็น: To do (รอลงงาน) + ไม่มีงาน (รองาน) + Re Use (คนเก่า)
- * — Re Use ตั้งใจให้อยู่เฉพาะเส้นนี้ ห้ามเข้า auto-match เพราะสถานะปัจจุบันไม่แน่ ต้องมีคนตรวจก่อน
+ *   + In process (กำลังเสนอใบอื่น)
+ * — Re Use กับ In process ตั้งใจให้อยู่เฉพาะเส้นนี้ ห้ามเข้า auto-match:
+ *   Re Use สถานะปัจจุบันไม่แน่ · In process กำลังถูกเสนอใบอื่น เสี่ยงเสนอซ้อน ต้องมีคนตรวจก่อน
  */
 function pickerColumnIds(): number[] {
-  return [boardPrimaryColumnId(), boardFallbackColumnId(), boardReuseColumnId()];
+  return [
+    boardPrimaryColumnId(),
+    boardFallbackColumnId(),
+    boardReuseColumnId(),
+    boardInProcessColumnId(),
+  ];
 }
 
 /** เรียง pool ให้คนพร้อมสุดขึ้นก่อน: To do → ไม่มีงาน → Re Use */
@@ -57,7 +65,9 @@ function pickerColumnRank(c: BoardReadyCandidate): number {
   const label = (c.column_label || '').trim().toLowerCase();
   if (label === 'to do') return 0;
   if (label === 'ไม่มีงาน') return 1;
-  return ids.length; // Re Use และอื่น ๆ ไปท้าย
+  if (label === 're use') return 2;
+  // In process ไปท้ายสุด — ต้องตรวจก่อนว่าใบขอเดิมจบแล้วหรือยัง
+  return ids.length;
 }
 
 /** ชื่อที่แสดง/ส่งให้ Lumos — ตรงกับที่ boardCandidateMatcher ใช้ */

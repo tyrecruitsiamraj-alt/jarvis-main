@@ -3922,7 +3922,7 @@ const MatchingPage: React.FC = () => {
                 return (
                   <>
                     <p className="text-[10px] text-muted-foreground">
-                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use) · แสดง {rows.length} ·
+                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use + กำลังเสนอใบอื่น) · แสดง {rows.length} ·
                       คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
                     </p>
                     <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">

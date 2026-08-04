@@ -47,13 +47,19 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
   );
 }
 
-/** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use) */
+/** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use / In process) */
 type BoardBucket = { column_id: number; label: string | null; count: number };
 
 const BUCKET_DISPLAY: Record<string, { title: string; desc: string; cls: string; bucket: string }> = {
   'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: 'text-emerald-700', bucket: 'todo' },
   'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: 'text-amber-700', bucket: 'no_job' },
   're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: 'text-violet-700', bucket: 'reuse' },
+  'in process': {
+    title: 'กำลังเสนอใบอื่น (In process)',
+    desc: 'ถูกเสนอใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คว่าใบเดิมจบแล้วหรือยัง)',
+    cls: 'text-sky-700',
+    bucket: 'in_process',
+  },
 };
 
 const MatchingDashboard: React.FC = () => {
@@ -189,7 +195,7 @@ const MatchingDashboard: React.FC = () => {
             )}
           </div>
           {buckets ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {buckets.map((b) => {
                 const meta = BUCKET_DISPLAY[(b.label || '').trim().toLowerCase()] ?? {
                   title: b.label || `คอลัมน์ ${b.column_id}`,
