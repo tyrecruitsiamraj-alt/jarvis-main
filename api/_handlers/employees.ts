@@ -267,6 +267,20 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       const cur = curRows[0];
       if (!cur) return sendError(res, 404, 'Not found', 'Employee not found');
 
+      // จำกัดตาม BU — กันแก้ข้อมูลพนักงานของแผนกอื่นด้วยการเดา id
+      // (แถวที่ยังไม่มีรหัสแผนกแก้ได้ทุกแผนก — ต้องมีคนตั้งรหัสให้ก่อน)
+      const patchScope = await loadUserDepartmentScope(req.user);
+      if (patchScope.mode === 'none') {
+        return sendError(res, 403, 'Forbidden', 'ยังไม่ได้กำหนดแผนกให้ผู้ใช้นี้');
+      }
+      if (
+        patchScope.mode === 'code' &&
+        cur.department_code &&
+        cur.department_code.trim().toUpperCase() !== patchScope.code
+      ) {
+        return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์แก้ข้อมูลพนักงานของแผนกอื่น');
+      }
+
       const employee_code =
         raw.employee_code !== undefined ? getString(raw.employee_code) : cur.employee_code;
       const first_name = raw.first_name !== undefined ? getString(raw.first_name) : cur.first_name;

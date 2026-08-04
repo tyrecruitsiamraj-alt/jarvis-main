@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
-import { loadWlBu, saveWlBu, wlBuLabel, type WlBuCode } from '@/lib/wlBuState';
+import { loadWlBu, saveWlBu, wlBuViewLabel, type WlBuView } from '@/lib/wlBuState';
 
-export function useWlBu(defaultBu: WlBuCode = 'LBD') {
-  const [selectedBu, setSelectedBuState] = useState<WlBuCode>(() => loadWlBu() ?? defaultBu);
+export function useWlBu(defaultBu: WlBuView = 'LBD') {
+  const [selectedBu, setSelectedBuState] = useState<WlBuView>(() => loadWlBu() ?? defaultBu);
 
-  const setSelectedBu = useCallback((bu: WlBuCode) => {
+  const setSelectedBu = useCallback((bu: WlBuView) => {
     setSelectedBuState(bu);
     saveWlBu(bu);
   }, []);
@@ -12,6 +12,6 @@ export function useWlBu(defaultBu: WlBuCode = 'LBD') {
   return {
     selectedBu,
     setSelectedBu,
-    buLabel: wlBuLabel(selectedBu),
+    buLabel: wlBuViewLabel(selectedBu),
   };
 }

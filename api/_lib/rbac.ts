@@ -50,8 +50,7 @@ export type ApiResource =
   | 'matching-job-postings'
   | 'matching-flow-summary'
   | 'lumos-dispatch'
-  | 'job-applications'
-  | 'diagnostics-outbound-ip';
+  | 'job-applications';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -112,7 +111,6 @@ export function minimumRoleFor(
     case 'app-users':
     case 'audit-logs':
     case 'branding':
-    case 'diagnostics-outbound-ip':
       return 'admin';
 
     case 'siamraj-unit-requests':

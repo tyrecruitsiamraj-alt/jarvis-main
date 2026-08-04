@@ -6,6 +6,7 @@ import type { Candidate, Employee, EmployeeStatus } from '@/types';
 import SearchField from '@/components/shared/SearchField';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { WL_BU_CODES, WL_BU_UNASSIGNED, type WlBuCode } from '@/lib/wlBuState';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { mergeCandidateSources } from '@/lib/mergeCandidates';
 import { combineWlEmployeeList } from '@/lib/wlEmployeeList';
@@ -33,6 +34,36 @@ const WLEmployees: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** id ที่กำลังบันทึก BU อยู่ — กันกดรัวและบอกผู้ใช้ว่ากำลังบันทึก */
+  const [buSavingId, setBuSavingId] = useState<string | null>(null);
+  const [buSaveError, setBuSaveError] = useState<string | null>(null);
+  const canEditBu = hasPermission('supervisor');
+
+  /** ตั้งรหัส BU ให้พนักงาน — พนักงานที่ไม่มีรหัสจะไม่ถูกกรองตาม BU ที่ไหนเลย ต้องเติมให้ครบ */
+  const assignBu = async (emp: Employee, bu: WlBuCode) => {
+    if (!canEditBu || buSavingId) return;
+    setBuSavingId(emp.id);
+    setBuSaveError(null);
+    try {
+      // PATCH /api/employees อ่าน id จาก body (ไม่ใช่ query string)
+      const r = await apiFetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: emp.id, department_code: bu }),
+      });
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { message?: string; detail?: string };
+        throw new Error(body.message || body.detail || `บันทึกไม่สำเร็จ (HTTP ${r.status})`);
+      }
+      setEmployees((prev) =>
+        prev.map((e) => (e.id === emp.id ? { ...e, department_code: bu } : e)),
+      );
+    } catch (e) {
+      setBuSaveError(e instanceof Error ? e.message : 'บันทึก BU ไม่สำเร็จ');
+    } finally {
+      setBuSavingId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +133,17 @@ const WLEmployees: React.FC = () => {
           onChange={setSelectedBu}
           counts={buCounts}
           variant="pills"
+          showUnassigned
         />
+
+        {selectedBu === WL_BU_UNASSIGNED ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+            {canEditBu
+              ? 'คนกลุ่มนี้ยังไม่มีรหัส BU — กด LBD หรือ LBA ในคอลัมน์ BU เพื่อตั้งค่า จนกว่าจะตั้งครบ ระบบจะยังให้ทุกแผนกเห็นคนกลุ่มนี้'
+              : 'คนกลุ่มนี้ยังไม่มีรหัส BU — ให้หัวหน้างานตั้งค่าให้ จนกว่าจะตั้งครบ ระบบจะยังให้ทุกแผนกเห็นคนกลุ่มนี้'}
+          </p>
+        ) : null}
+        {buSaveError ? <p className="text-xs text-destructive">{buSaveError}</p> : null}
 
         <div className="flex flex-col md:flex-row gap-3">
           <SearchField
@@ -162,7 +203,30 @@ const WLEmployees: React.FC = () => {
 
                 <div className="text-xs text-muted-foreground">
                   {emp.employee_code} • {emp.position}
+                  {emp.department_code ? ` • ${emp.department_code}` : ''}
                 </div>
+                {!emp.department_code && canEditBu ? (
+                  <div
+                    className="mt-2 flex items-center gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                  >
+                    <span className="text-[11px] text-amber-800">ตั้ง BU:</span>
+                    {WL_BU_CODES.map((bu) => (
+                      <button
+                        key={bu}
+                        type="button"
+                        disabled={buSavingId === emp.id}
+                        onClick={() => void assignBu(emp, bu)}
+                        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {buSavingId === emp.id ? '…' : bu}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
                 <div className="flex gap-4 mt-2 text-xs">
                   <span className="text-primary">Reliability: {emp.reliability_score}%</span>
@@ -194,7 +258,28 @@ const WLEmployees: React.FC = () => {
                     className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
                   >
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{emp.employee_code}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{emp.department_code || '—'}</td>
+                    {/* BU: ตั้งค่าได้ตรงนี้เลย (หัวหน้างานขึ้นไป) — คลิกไม่ทะลุไปหน้าโปรไฟล์ */}
+                    <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
+                      {emp.department_code ? (
+                        <span className="jarvis-chip-violet">{emp.department_code}</span>
+                      ) : canEditBu ? (
+                        <span className="inline-flex items-center gap-1">
+                          {WL_BU_CODES.map((bu) => (
+                            <button
+                              key={bu}
+                              type="button"
+                              disabled={buSavingId === emp.id}
+                              onClick={() => void assignBu(emp, bu)}
+                              className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
+                            >
+                              {buSavingId === emp.id ? '…' : bu}
+                            </button>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-medium text-foreground">
                       {emp.first_name} {emp.last_name}
                     </td>

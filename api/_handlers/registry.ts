@@ -42,7 +42,6 @@ import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
 import siamrajUnitWorkStatusHandler from './siamraj-unit-work-status.js';
 import siamrajOplImportHandler from './siamraj-opl-import.js';
-import outboundIpHandler from './diagnostics/outbound-ip.js';
 import recruitRegistrationsHandler from './recruit-registrations.js';
 import matchingSuggestionsHandler from './matching-suggestions.js';
 import matchingParseBranchDemandHandler from './matching-parse-branch-demand.js';
@@ -89,7 +88,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
   '/api/siamraj/unit-work-status': siamrajUnitWorkStatusHandler as ApiHandler,
   '/api/siamraj/opl-import': siamrajOplImportHandler as ApiHandler,
-  '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   // Lumos AI Recruit — Positions
   '/api/lumos/positions': lumosPositionsHandler as ApiHandler,
   // ส่งให้ Lumos โทรแบบคนเลือกเอง + อ่านผลการโทร (เรียกจากหน้า Matching ด้วย session ปกติ)

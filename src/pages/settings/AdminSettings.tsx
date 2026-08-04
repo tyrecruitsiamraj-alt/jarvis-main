@@ -4,16 +4,17 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, Globe } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
-import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'outboundIp';
+type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -37,7 +38,6 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
-  { id: 'outboundIp', label: 'Vercel IP', icon: Globe, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
 ];
@@ -48,7 +48,6 @@ const AdminSettings: React.FC = () => {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const initialTab: SettingsTab =
-    tabFromUrl === 'outboundIp' ||
     tabFromUrl === 'appearance' ||
     tabFromUrl === 'users' ||
     tabFromUrl === 'roles' ||
@@ -61,6 +60,9 @@ const AdminSettings: React.FC = () => {
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiAuditLogs, setApiAuditLogs] = useState<AuditLog[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  // แบ่งหน้าผู้ใช้ — เริ่มที่ 10 คน/หน้า เลือกได้เอง (ใช้แถบเลขหน้ากลางของระบบ)
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState<PageSizeOption>(10);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [userActionError, setUserActionError] = useState('');
   const [userActionOk, setUserActionOk] = useState('');
@@ -97,6 +99,31 @@ const AdminSettings: React.FC = () => {
     setUserActionError('');
     setUserActionOk('');
   }, [activeTab]);
+
+  // แบ่งหน้าผู้ใช้ + กันค้างอยู่หน้าที่หายไปเมื่อจำนวนคนหรือจำนวนต่อหน้าเปลี่ยน
+  const userTotalPages = getTotalPages(apiUsers.length, userPageSize);
+  const currentUserPage = Math.min(userPage, userTotalPages);
+  const userPageStart = (currentUserPage - 1) * userPageSize;
+  const visibleUsers = apiUsers.slice(userPageStart, userPageStart + userPageSize);
+  useEffect(() => {
+    if (userPage > userTotalPages) setUserPage(userTotalPages);
+  }, [userPage, userTotalPages]);
+
+  const userPaginationBar = (
+    <ListPaginationBar
+      page={currentUserPage}
+      pageSize={userPageSize}
+      totalItems={apiUsers.length}
+      totalPages={userTotalPages}
+      pageFrom={apiUsers.length === 0 ? 0 : userPageStart + 1}
+      pageTo={userPageStart + visibleUsers.length}
+      onPageChange={setUserPage}
+      onPageSizeChange={(size) => {
+        setUserPageSize(size);
+        setUserPage(1);
+      }}
+    />
+  );
 
   const updateUser = async (
     id: string,
@@ -252,7 +279,7 @@ const AdminSettings: React.FC = () => {
                       </td>
                     </tr>
                   )}
-                  {apiUsers.map((u) => (
+                  {visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
                       <td className="px-4 py-3 font-medium text-foreground">{u.full_name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
@@ -325,6 +352,7 @@ const AdminSettings: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              <div className="px-4 pb-4">{userPaginationBar}</div>
             </div>
           ))}
 
@@ -343,7 +371,7 @@ const AdminSettings: React.FC = () => {
             ) : null}
 
             <div className="space-y-2">
-              {apiUsers.map((u) => (
+              {visibleUsers.map((u) => (
                 <div key={`manage-${u.id}`} className="rounded-lg border border-border p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-foreground truncate">{u.full_name}</div>
@@ -415,13 +443,11 @@ const AdminSettings: React.FC = () => {
                 </div>
               ))}
             </div>
+            {userPaginationBar}
           </div>
         )}
 
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
-
-
-        {activeTab === 'outboundIp' && <VercelOutboundIpTab />}
 
         {activeTab === 'roles' && <RolePermissionsTab />}
 

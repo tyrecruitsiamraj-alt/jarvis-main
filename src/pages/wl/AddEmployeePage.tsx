@@ -6,7 +6,7 @@ import { reverseGeocodeLatLng, parseGoogleMapsUrl } from '@/lib/googleMaps';
 import { apiFetch } from '@/lib/apiFetch';
 import { toYmdLocal } from '@/lib/dateTh';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
-import { WL_BU_CODES, loadWlBu, type WlBuCode } from '@/lib/wlBuState';
+import { WL_BU_CODES, loadWlBu, normalizeWlBuCode, type WlBuCode } from '@/lib/wlBuState';
 
 const AddEmployeePage: React.FC = () => {
   const navigate = useNavigate();
@@ -21,7 +21,10 @@ const AddEmployeePage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<EmployeeStatus>('active');
   const [position, setPosition] = useState('');
-  const [departmentCode, setDepartmentCode] = useState<WlBuCode>(() => loadWlBu() ?? 'LBD');
+  // พนักงานใหม่ต้องมี BU จริงเสมอ — ถ้าค้างอยู่ที่ถัง "ยังไม่ระบุ BU" ให้ default เป็น LBD
+  const [departmentCode, setDepartmentCode] = useState<WlBuCode>(
+    () => normalizeWlBuCode(loadWlBu()) ?? 'LBD',
+  );
   const [joinDate, setJoinDate] = useState(() => toYmdLocal(new Date()));
 
   const [locationMode, setLocationMode] = useState<'manual' | 'google' | 'latlong'>('manual');
