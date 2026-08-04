@@ -17,7 +17,7 @@ const DashboardExpandablePanel: React.FC<Props> = ({ title, subtitle, open, onOp
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm hover:bg-slate-50 transition-colors"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-5 py-3.5 text-left shadow-sm hover:bg-slate-50 transition-colors"
         >
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-900">{title}</h3>

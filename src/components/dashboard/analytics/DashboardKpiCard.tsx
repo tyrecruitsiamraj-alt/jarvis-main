@@ -8,6 +8,19 @@ type Props = {
   onClick?: () => void;
 };
 
+/**
+ * โทนพาสเทลต่อ KPI — ตามความหมายของตัวเลข (ล็อกความหมายสีเดียวกับทั้งระบบ):
+ * เข้ามา = ฟ้า · ปิดแล้ว = เขียว · ยกเลิก = เทา · คงเหลือ = เหลือง (งานที่ยังค้าง)
+ * KPI สถานะทำงานอื่น ๆ = ขาวเรียบ ไม่แย่งสายตา
+ */
+const KPI_TONE: Record<string, { tile: string; num: string }> = {
+  total_requests: { tile: 'bg-sky-50 hover:bg-sky-100/70', num: 'text-sky-900' },
+  closed: { tile: 'bg-emerald-50 hover:bg-emerald-100/70', num: 'text-emerald-900' },
+  cancelled: { tile: 'bg-slate-100/80 hover:bg-slate-200/60', num: 'text-slate-700' },
+  remaining: { tile: 'bg-amber-50 hover:bg-amber-100/70', num: 'text-amber-900' },
+  overdue: { tile: 'bg-red-50 hover:bg-red-100/70', num: 'text-red-900' },
+};
+
 const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
   const trend = kpi.trendPercent;
   const TrendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? ArrowUp : ArrowDown;
@@ -21,6 +34,7 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
         : trend > 0
           ? 'text-emerald-600'
           : 'text-red-600';
+  const tone = KPI_TONE[kpi.id] ?? { tile: 'bg-white hover:bg-slate-50', num: 'text-slate-900' };
 
   return (
     <button
@@ -28,13 +42,13 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        'rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-left w-full transition-colors',
-        onClick && 'hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer',
-        !onClick && 'cursor-default',
+        'w-full rounded-2xl p-4 text-left shadow-sm transition-colors',
+        tone.tile,
+        onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
       <p className="text-xs font-medium text-slate-500">{kpi.label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">
+      <p className={cn('mt-1.5 text-2xl font-semibold tracking-tight tabular-nums', tone.num)}>
         {kpi.format === 'percent' ? `${kpi.value}%` : kpi.value.toLocaleString('th-TH')}
         {kpi.secondaryCount != null ? (
           <span className="ml-1.5 text-sm font-normal text-slate-500">
