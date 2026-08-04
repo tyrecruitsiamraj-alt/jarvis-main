@@ -28,6 +28,12 @@ export type PrecomputeJob = Record<string, unknown> & { id: string };
 export type QueueEntry = { job: PrecomputeJob; refresh: boolean };
 const queue = new Map<string, QueueEntry>();
 
+// ─── Known-stored guard ────────────────────────────────────────────────────────
+// job IDs ที่มีผล AI เก็บใน DB แล้ว — populated by scanner (tierMap) + consumer (on store)
+// enqueuePrecomputeJobs ใช้ set นี้กรองออกก่อน เพื่อไม่ re-queue งานที่ทำแล้ว
+// (ยกเว้น refresh:true = user สั่ง re-match ใหม่)
+const knownStoredIds = new Set<string>();
+
 /**
  * Insert items into a FIFO queue map. Exported (pure on `target`) for tests.
  * - dedupe by job id — ใบที่อยู่ในคิวแล้วคงตำแหน่งเดิม แต่อัปเกรดเป็น refresh ได้
@@ -112,15 +118,33 @@ export function enqueuePrecomputeJobs(
   opts: { refresh?: boolean; front?: boolean } = {},
 ): void {
   if (!workerStarted) return;
+  const isRefresh = opts.refresh === true;
+
+  // กรองงานที่มีผลแล้วออก เพื่อไม่วนซ้ำเมื่อ user refresh หน้า
+  // refresh:true = user สั่ง re-match ใหม่ → ไม่กรอง
+  const eligible = isRefresh
+    ? jobs
+    : jobs.filter((job) => {
+        const id = typeof job.id === 'string' ? job.id.trim() : '';
+        return id && !knownStoredIds.has(id);
+      });
+
+  const skipped = jobs.length - eligible.length;
+  if (eligible.length === 0) {
+    if (skipped > 0) logInfo('match-precompute.push.skip', { skipped, reason: 'already-stored' });
+    return;
+  }
+
   const sorted = sortByPriority(
-    jobs.map((job) => ({ job: job as PrecomputeJob, refresh: opts.refresh === true })),
+    eligible.map((job) => ({ job: job as PrecomputeJob, refresh: isRefresh })),
   );
   const added = enqueue(sorted, { front: opts.front === true });
   if (added > 0)
     logInfo('match-precompute.push', {
       added,
+      skipped,
       queueSize: queue.size,
-      refresh: opts.refresh === true,
+      refresh: isRefresh,
       front: opts.front === true,
     });
 }
@@ -261,6 +285,9 @@ async function runScan(cfg: WorkerConfig): Promise<void> {
     const nowMs = Date.now();
     const items: Array<{ job: PrecomputeJob; refresh: boolean }> = [];
 
+    // อัปเดต knownStoredIds จาก DB ทุกรอบ scan → HTTP-push จะกรองงานที่ทำแล้วออก
+    for (const id of tierMap.keys()) knownStoredIds.add(id);
+
     for (const job of jobs) {
       const id = typeof job.id === 'string' ? job.id.trim() : '';
       if (!id) continue;
@@ -336,6 +363,7 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
       const saved = await getStoredBoardMatch(id);
       if (saved) {
         workerStats.totalStored++;
+        knownStoredIds.add(id); // mark ไม่ให้ HTTP-push วนซ้ำ
         logInfo('match-precompute.job.done', {
           jobId: id,
           matches: saved.result.matches?.length ?? 0,
@@ -416,6 +444,12 @@ export function startMatchPrecomputeWorker(): () => void {
 
   let stopped = false;
   const isStopped = () => stopped;
+
+  // โหลด tierMap ทันทีที่ worker start เพื่อ populate knownStoredIds ก่อนที่ HTTP handlers
+  // จะเริ่ม push งาน — กันกรณี deploy ใหม่แต่ผลเก่ายังอยู่ใน DB
+  void loadBoardMatchTierMap()
+    .then((m) => { for (const id of m.keys()) knownStoredIds.add(id); })
+    .catch(() => { /* non-critical — scanner will populate on first run */ });
 
   // Both loops run concurrently — scanner fills the queue, consumer drains it
   void scannerLoop(cfg, isStopped);
