@@ -638,7 +638,7 @@ function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; cla
   if (s.sent === 0) return null;
   const waiting = Math.max(0, s.sent - s.called);
   const cells = [
-    { label: 'ส่ง', value: s.sent, cls: 'text-slate-800', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'ส่ง', value: s.sent, cls: 'text-slate-800 dark:text-slate-200', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
     { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-600', title: 'มีผลโทรกลับมาจริง' },
     { label: 'เหลือ', value: waiting, cls: 'text-amber-600', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
     { label: 'โอเค', value: s.confirmed, cls: 'text-emerald-600', title: 'สนใจงาน' },
@@ -650,7 +650,7 @@ function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; cla
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center gap-0.5 rounded-2xl bg-slate-900/[0.04] px-2 py-1.5',
+        'flex shrink-0 items-center gap-0.5 rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.07] px-2 py-1.5',
         className,
       )}
     >
@@ -663,12 +663,12 @@ function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; cla
           <div
             className={cn(
               'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
-              c.value === 0 ? 'text-slate-500' : c.cls,
+              c.value === 0 ? 'text-slate-500 dark:text-slate-400' : c.cls,
             )}
           >
             {c.value}
           </div>
-          <div className="text-[9px] font-medium leading-tight tracking-wide text-slate-500">
+          <div className="text-[9px] font-medium leading-tight tracking-wide text-slate-500 dark:text-slate-400">
             {c.label}
           </div>
         </div>
@@ -1975,7 +1975,7 @@ const MatchingPage: React.FC = () => {
                 'shrink-0 rounded-full border px-3 py-2 text-xs font-medium transition-colors',
                 urgentOnly
                   ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                  : 'border-white/70 bg-white/50 text-muted-foreground hover:border-destructive/30',
+                  : 'border-white/70 bg-white/50 text-muted-foreground hover:border-destructive/30 dark:border-white/15 dark:bg-white/10',
               )}
             >
               🔴 ด่วนเท่านั้น
@@ -2022,7 +2022,7 @@ const MatchingPage: React.FC = () => {
                   'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   workflowFilter === value
                     ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50',
                 )}
               >
                 {label}
@@ -2040,8 +2040,8 @@ const MatchingPage: React.FC = () => {
                   key: 'total',
                   label: 'ใบขอทั้งหมด',
                   value: serverSummary?.scopedTotal ?? listTotal,
-                  cls: 'border-slate-200/70 bg-white/60',
-                  num: 'text-slate-800',
+                  cls: 'border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5',
+                  num: 'text-slate-800 dark:text-slate-100',
                   active: !urgentOnly && workflowFilter === 'all',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2151,7 +2151,7 @@ const MatchingPage: React.FC = () => {
                   'rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-wait',
                   pageSize === size
                     ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50',
                 )}
               >
                 {size}
@@ -2182,7 +2182,7 @@ const MatchingPage: React.FC = () => {
                   'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-wait',
                   sortBy === value
                     ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50',
                 )}
               >
                 {label}

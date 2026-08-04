@@ -445,31 +445,31 @@ export const JOB_AGE_URGENCY_META: Record<
 > = {
   fresh: {
     label: 'ยังไม่ด่วน',
-    chipCls: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    chipCls: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300',
     barCls: 'bg-emerald-400',
     dotCls: 'bg-emerald-500',
   },
   warming: {
     label: 'เริ่มด่วน',
-    chipCls: 'border-amber-200 bg-amber-50 text-amber-800',
+    chipCls: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-300',
     barCls: 'bg-amber-400',
     dotCls: 'bg-amber-500',
   },
   urgent: {
     label: 'ด่วน',
-    chipCls: 'border-orange-300 bg-orange-50 text-orange-800',
+    chipCls: 'border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/70 dark:text-orange-300',
     barCls: 'bg-orange-500',
     dotCls: 'bg-orange-500',
   },
   critical: {
     label: 'ด่วนมาก',
-    chipCls: 'border-red-300 bg-red-50 text-red-800',
+    chipCls: 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/70 dark:text-red-300',
     barCls: 'bg-red-500',
     dotCls: 'bg-red-500',
   },
   unknown: {
     label: 'ไม่ทราบอายุ',
-    chipCls: 'border-slate-200 bg-slate-50 text-slate-600',
+    chipCls: 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300',
     barCls: 'bg-slate-300',
     dotCls: 'bg-slate-400',
   },

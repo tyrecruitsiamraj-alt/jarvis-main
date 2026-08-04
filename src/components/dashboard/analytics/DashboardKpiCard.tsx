@@ -14,11 +14,11 @@ type Props = {
  * KPI สถานะทำงานอื่น ๆ = ขาวเรียบ ไม่แย่งสายตา
  */
 const KPI_TONE: Record<string, { tile: string; num: string }> = {
-  total_requests: { tile: 'bg-sky-50 hover:bg-sky-100/70', num: 'text-sky-900' },
-  closed: { tile: 'bg-emerald-50 hover:bg-emerald-100/70', num: 'text-emerald-900' },
-  cancelled: { tile: 'bg-slate-100/80 hover:bg-slate-200/60', num: 'text-slate-700' },
-  remaining: { tile: 'bg-amber-50 hover:bg-amber-100/70', num: 'text-amber-900' },
-  overdue: { tile: 'bg-red-50 hover:bg-red-100/70', num: 'text-red-900' },
+  total_requests: { tile: 'bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/60 dark:hover:bg-sky-950', num: 'text-sky-900 dark:text-sky-200' },
+  closed: { tile: 'bg-emerald-50 hover:bg-emerald-100/70 dark:bg-emerald-950/60 dark:hover:bg-emerald-950', num: 'text-emerald-900 dark:text-emerald-200' },
+  cancelled: { tile: 'bg-slate-100/80 hover:bg-slate-200/60 dark:bg-slate-800/70 dark:hover:bg-slate-800', num: 'text-slate-700 dark:text-slate-300' },
+  remaining: { tile: 'bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/60 dark:hover:bg-amber-950', num: 'text-amber-900 dark:text-amber-200' },
+  overdue: { tile: 'bg-red-50 hover:bg-red-100/70 dark:bg-red-950/60 dark:hover:bg-red-950', num: 'text-red-900 dark:text-red-200' },
 };
 
 const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
@@ -34,7 +34,7 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
         : trend > 0
           ? 'text-emerald-600'
           : 'text-red-600';
-  const tone = KPI_TONE[kpi.id] ?? { tile: 'bg-white hover:bg-slate-50', num: 'text-slate-900' };
+  const tone = KPI_TONE[kpi.id] ?? { tile: 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800', num: 'text-slate-900 dark:text-slate-100' };
 
   return (
     <button
