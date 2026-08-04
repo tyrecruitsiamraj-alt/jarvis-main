@@ -117,11 +117,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
       new Set(scopedJobs.map((j) => j.unit_name?.trim()).filter((u): u is string => Boolean(u))),
     ).sort((a, b) => a.localeCompare(b, 'th'));
     const urgentJobs = scopedJobs.filter((j) => j.urgency === 'urgent');
+    // นับตามชุดเต็มของ BU ที่เลือก (ก่อนตัวกรองย่อย) — กล่องสรุปกดแล้วต้องพาไปเจอตามจำนวนที่โชว์
+    const tiersOf = (id: string) => tierMap.get(id)?.tiers ?? [];
+    const hasGreen = (id: string) => tiersOf(id).some((t) => t.tier === 'green');
+    // "เหลือง" = มีเหลืองแต่ไม่มีเขียว (นิยามเดียวกับตัวกรอง workflow=yellow ไม่ให้นับซ้อนกับเขียว)
+    const hasYellowOnly = (id: string) =>
+      !hasGreen(id) && tiersOf(id).some((t) => t.tier === 'yellow');
     const summary = {
       urgentTotal: urgentJobs.length,
       urgentAnalyzed: urgentJobs.filter((j) => tierMap.has(j.id)).length,
-      urgentWithGreen: urgentJobs.filter((j) =>
-        (tierMap.get(j.id)?.tiers ?? []).some((t) => t.tier === 'green'),
+      urgentWithGreen: urgentJobs.filter((j) => hasGreen(j.id)).length,
+      // ยอดทั้งชุด (ตาม BU) สำหรับกล่องสรุปที่กดเพื่อกรองได้
+      scopedTotal: scopedJobs.length,
+      withGreen: scopedJobs.filter((j) => hasGreen(j.id)).length,
+      withYellow: scopedJobs.filter((j) => hasYellowOnly(j.id)).length,
+      // ประเมินแล้วแต่ไม่มีใครแนะนำ — ตรงกับตัวกรอง "AI ไม่พบคน"
+      noRecommend: scopedJobs.filter(
+        (j) => tierMap.has(j.id) && recommendedCandidateCount(tiersOf(j.id)) === 0,
       ).length,
     };
 

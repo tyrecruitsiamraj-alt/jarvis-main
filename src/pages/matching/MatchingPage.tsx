@@ -715,6 +715,10 @@ const MatchingPage: React.FC = () => {
     urgentTotal: number;
     urgentAnalyzed: number;
     urgentWithGreen: number;
+    scopedTotal?: number;
+    withGreen?: number;
+    withYellow?: number;
+    noRecommend?: number;
   } | null>(null);
   const [serverStoredMatches, setServerStoredMatches] = useState<
     Record<string, { recommended: number; computedAt: string }>
@@ -752,7 +756,15 @@ const MatchingPage: React.FC = () => {
         page: number;
         unitOptions?: string[];
         buCounts?: Record<string, number>;
-        summary?: { urgentTotal: number; urgentAnalyzed: number; urgentWithGreen: number };
+        summary?: {
+          urgentTotal: number;
+          urgentAnalyzed: number;
+          urgentWithGreen: number;
+          scopedTotal?: number;
+          withGreen?: number;
+          withYellow?: number;
+          noRecommend?: number;
+        };
         storedMatches?: Record<string, { recommended: number; computedAt: string }>;
         lumosSummary?: Record<string, LumosJobCallSummaryRow>;
       };
@@ -1892,21 +1904,89 @@ const MatchingPage: React.FC = () => {
           </div>
         </div>
 
-        {/* #4 สรุปงานด่วน: พร้อมลง vs ยังไม่มีคนของเรา */}
-        {urgentSummary.total > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            <div className="glass-card rounded-2xl border border-red-200/70 bg-red-50/50 px-3 py-2.5 text-center">
-              <div className="text-lg font-bold tabular-nums text-red-600">{urgentSummary.total}</div>
-              <div className="text-[11px] text-muted-foreground">ใบขอด่วน</div>
-            </div>
-            <div className="glass-card rounded-2xl border border-emerald-200/70 bg-emerald-50/50 px-3 py-2.5 text-center">
-              <div className="text-lg font-bold tabular-nums text-emerald-600">{urgentSummary.greenSuggested}</div>
-              <div className="text-[11px] text-muted-foreground">มีคนเขียวแนะนำ</div>
-            </div>
-            <div className="glass-card rounded-2xl border border-amber-200/70 bg-amber-50/50 px-3 py-2.5 text-center">
-              <div className="text-lg font-bold tabular-nums text-amber-600">{urgentSummary.none}</div>
-              <div className="text-[11px] text-muted-foreground">ยังไม่มีคน</div>
-            </div>
+        {/* กล่องสรุป — กดแล้วตั้งตัวกรองให้ตรงกับจำนวนที่โชว์ (ใช้ตัวกรองชุดเดียวกับปุ่มด้านบน) */}
+        {(serverSummary?.scopedTotal ?? listTotal) > 0 ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(
+              [
+                {
+                  key: 'total',
+                  label: 'ใบขอทั้งหมด',
+                  value: serverSummary?.scopedTotal ?? listTotal,
+                  cls: 'border-slate-200/70 bg-white/60',
+                  num: 'text-slate-800',
+                  active: !urgentOnly && workflowFilter === 'all',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('all');
+                  },
+                },
+                {
+                  key: 'urgent',
+                  label: 'ใบขอด่วน',
+                  value: urgentSummary.total,
+                  cls: 'border-red-200/70 bg-red-50/50',
+                  num: 'text-red-600',
+                  active: urgentOnly,
+                  apply: () => {
+                    setUrgentOnly(true);
+                    setWorkflowFilter('all');
+                  },
+                },
+                {
+                  key: 'green',
+                  label: 'มีคนเขียวแนะนำ',
+                  value: serverSummary?.withGreen ?? urgentSummary.greenSuggested,
+                  cls: 'border-emerald-200/70 bg-emerald-50/50',
+                  num: 'text-emerald-600',
+                  active: workflowFilter === 'green',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('green');
+                  },
+                },
+                {
+                  key: 'yellow',
+                  label: 'มีคนเหลืองแนะนำ',
+                  value: serverSummary?.withYellow ?? 0,
+                  cls: 'border-amber-200/70 bg-amber-50/50',
+                  num: 'text-amber-600',
+                  active: workflowFilter === 'yellow',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('yellow');
+                  },
+                },
+                {
+                  key: 'none',
+                  label: 'ยังไม่มีคน',
+                  value: serverSummary?.noRecommend ?? urgentSummary.none,
+                  cls: 'border-orange-200/70 bg-orange-50/50',
+                  num: 'text-orange-600',
+                  active: workflowFilter === 'none',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('none');
+                  },
+                },
+              ] as const
+            ).map((tile) => (
+              <button
+                key={tile.key}
+                type="button"
+                onClick={tile.apply}
+                disabled={serverListLoading}
+                title={`กดเพื่อดูเฉพาะ "${tile.label}"`}
+                className={cn(
+                  'glass-card rounded-2xl border px-3 py-2.5 text-center transition-colors disabled:cursor-wait',
+                  tile.cls,
+                  tile.active ? 'ring-2 ring-blue-400/50' : 'hover:border-blue-300/60',
+                )}
+              >
+                <div className={cn('text-lg font-bold tabular-nums', tile.num)}>{tile.value}</div>
+                <div className="text-[11px] text-muted-foreground">{tile.label}</div>
+              </button>
+            ))}
           </div>
         ) : null}
         {urgentSummary.total > 0 ? (
