@@ -217,6 +217,19 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
 }
 
 /** อัปเดตสถานะ/หมายเหตุของคำขอ (เช่น รับไปทำ → in_progress, โพสแล้ว → posted, ได้คนแล้ว → filled) */
+/** คำขอตาม id — ใช้เช็คสิทธิ์ BU ก่อนแก้ (request_no ของคำขอต้องอยู่ในแผนกที่ผู้ใช้เห็นได้) */
+export async function getJobPostingRequestById(id: string): Promise<JobPostingRequest | null> {
+  const key = id.trim();
+  if (!key || !uuidRe.test(key)) return null;
+  try {
+    const rows = await selectPostings(`where id = $1 limit 1`, [key]);
+    return rows[0] ?? null;
+  } catch (e) {
+    if (isMissingTable(e)) return null;
+    throw e;
+  }
+}
+
 export async function updateJobPostingRequest(
   id: string,
   patch: { status?: unknown; notes?: unknown },
