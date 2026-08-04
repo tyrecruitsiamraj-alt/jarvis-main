@@ -2548,23 +2548,61 @@ const MatchingPage: React.FC = () => {
                   ถ้ายังไม่ถึงเป้าอีก บอกทางไปต่อ (iRecruit / Re Use / โพสหาคนใหม่) */}
               {(() => {
                 const bm = boardMatchById[jobDetail.id];
-                if (!bm?.recommended_target || !bm.fallback_used) return null;
+                // ขึ้นเมื่อรู้เป้าแล้ว และ (เคยค้นถังสำรอง หรือหาได้ไม่ถึงเป้า) — ไม่ครบต้องเห็นคำแนะนำเสมอ
+                if (!bm?.recommended_target) return null;
+                if (!bm.fallback_used && recommendedCandidateCount(bm.matches) >= bm.recommended_target) {
+                  return null;
+                }
                 const got = recommendedCandidateCount(bm.matches);
                 const short = got < bm.recommended_target;
+                const posting = jobPostingByJobId[jobDetail.id];
                 return (
-                  <p
+                  <div
                     className={cn(
-                      'rounded-lg border px-2.5 py-1.5 text-[10px]',
+                      'rounded-lg border px-2.5 py-2 text-[10px] space-y-1.5',
                       short
                         ? 'border-amber-200 bg-amber-50/80 text-amber-900'
                         : 'border-sky-100 bg-sky-50/70 text-sky-800',
                     )}
                   >
-                    To do หาได้ไม่ถึงเป้า {bm.recommended_target} คน (อัตราที่ขอ × 3) — ค้นถัง “ไม่มีงาน” เพิ่มแล้ว
-                    {short
-                      ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร” · หรือส่งโพสหาคนใหม่`
-                      : ` → รวมแนะนำ ${got} คน (ครบเป้า)`}
-                  </p>
+                    <p>
+                      To do หาได้ไม่ถึงเป้า {bm.recommended_target} คน (อัตราที่ขอ × 3) — ค้นถัง “ไม่มีงาน” เพิ่มแล้ว
+                      {short
+                        ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
+                        : ` → รวมแนะนำ ${got} คน (ครบเป้า)`}
+                    </p>
+                    {/* หาไม่ครบเป้า = แนะนำให้ส่งต่อทีมอื่นตรงนี้เลย ไม่ต้องเลื่อนไปหาปุ่มด้านล่าง */}
+                    {short ? (
+                      posting ? (
+                        <p className="font-semibold">
+                          ส่งคำขอโพสหาคนไปแล้ว ({posting.request_type === 'scraping' ? 'Scraping' : 'Content'}) —
+                          รอทีมรับไปทำ
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold">แนะนำ: หาคนของเราไม่ครบ ส่งต่อทีมอื่นเลย →</span>
+                          <button
+                            type="button"
+                            disabled={creatingPosting}
+                            onClick={() => void createPosting(jobDetail, 'content')}
+                            className="inline-flex items-center gap-1 rounded-full bg-orange-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                          >
+                            <Megaphone className="h-3 w-3" />
+                            {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={creatingPosting}
+                            onClick={() => void createPosting(jobDetail, 'scraping')}
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            <Search className="h-3 w-3" />
+                            {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
+                          </button>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
                 );
               })()}
 
