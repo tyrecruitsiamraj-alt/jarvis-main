@@ -19,6 +19,8 @@ export type MatchingListQuery = {
   /** ชื่อหน่วยงานแบบตรงตัว — '' = ทั้งหมด */
   unitFilter: string;
   workflowFilter: MatchingWorkflowFilter;
+  /** รหัส BU/แผนกของใบขอ (department_code เช่น 'LBD') — ''/undefined = ทุก BU */
+  buFilter?: string;
 };
 
 export type MatchingListContext = {
@@ -36,9 +38,11 @@ export function filterAndSortMatchingJobs(
   ctx: MatchingListContext,
 ): JobRequest[] {
   const q = query.search.trim().toLowerCase();
+  const bu = (query.buFilter || '').trim().toUpperCase();
   const today = ctx.today ?? new Date();
   return jobs
     .filter((j) => (query.urgentOnly ? j.urgency === 'urgent' : true))
+    .filter((j) => (bu ? (j.department_code || '').trim().toUpperCase() === bu : true))
     .filter((j) => (query.unitFilter ? j.unit_name === query.unitFilter : true))
     .filter((j) => (q ? unitRequestSearchBlob(j).includes(q) : true))
     .filter((j) => {

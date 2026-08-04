@@ -53,6 +53,42 @@ describe('filterAndSortMatchingJobs', () => {
     ).toEqual(['a']);
   });
 
+  it('buFilter keeps only the selected BU และเทียบแบบไม่สนตัวพิมพ์/ช่องว่าง', () => {
+    const jobs = [
+      job({ id: 'lbd', department_code: 'LBD' }),
+      job({ id: 'lba', department_code: 'LBA' }),
+      job({ id: 'lbd-messy', department_code: ' lbd ' }),
+      job({ id: 'no-bu', department_code: undefined }),
+    ];
+    expect(
+      filterAndSortMatchingJobs(jobs, { ...baseQuery, buFilter: 'LBD' }, { ...noCtx, today }).map((j) => j.id),
+    ).toEqual(['lbd', 'lbd-messy']);
+    // ผู้ใช้พิมพ์/ลิงก์มาเป็นตัวเล็กก็ต้องได้ชุดเดียวกัน
+    expect(
+      filterAndSortMatchingJobs(jobs, { ...baseQuery, buFilter: 'lbd' }, { ...noCtx, today }).map((j) => j.id),
+    ).toEqual(['lbd', 'lbd-messy']);
+    // '' / ไม่ส่งมา = ทุก BU (ใบที่ไม่มีรหัสก็ยังเห็น)
+    expect(
+      filterAndSortMatchingJobs(jobs, { ...baseQuery, buFilter: '' }, { ...noCtx, today }).map((j) => j.id),
+    ).toEqual(['lbd', 'lba', 'lbd-messy', 'no-bu']);
+    expect(filterAndSortMatchingJobs(jobs, baseQuery, { ...noCtx, today })).toHaveLength(4);
+  });
+
+  it('buFilter composes with the other filters', () => {
+    const jobs = [
+      job({ id: 'lbd-urgent', department_code: 'LBD', urgency: 'urgent' }),
+      job({ id: 'lbd-normal', department_code: 'LBD', urgency: 'normal' }),
+      job({ id: 'lba-urgent', department_code: 'LBA', urgency: 'urgent' }),
+    ];
+    expect(
+      filterAndSortMatchingJobs(
+        jobs,
+        { ...baseQuery, buFilter: 'LBD', urgentOnly: true },
+        { ...noCtx, today },
+      ).map((j) => j.id),
+    ).toEqual(['lbd-urgent']);
+  });
+
   it('workflow=reserved uses the reserved lookup', () => {
     const jobs = [job({ id: 'a' }), job({ id: 'b' })];
     const out = filterAndSortMatchingJobs(

@@ -24,6 +24,7 @@ import {
 } from '@/lib/matchingProgress';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
 import { filterAndSortMatchingJobs, type MatchingWorkflowFilter } from '@/lib/matchingListFilter';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   saveProposal,
@@ -669,6 +670,8 @@ const MatchingPage: React.FC = () => {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
+  /** แยกดูตาม BU (department_code เช่น LBD) — '' = ทุก BU */
+  const [buFilter, setBuFilter] = useState('');
   const [clientPageNo, setClientPageNo] = useState(1);
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const listScrollPendingRef = useRef(false);
@@ -680,6 +683,8 @@ const MatchingPage: React.FC = () => {
   const [serverTotal, setServerTotal] = useState(0);
   const [serverPageNo, setServerPageNo] = useState(1);
   const [serverUnitOptions, setServerUnitOptions] = useState<string[]>([]);
+  /** ยอดใบขอเปิดต่อ BU จาก /api/matching/list — ใช้วาดชิป "แยกดูตาม BU" */
+  const [serverBuCounts, setServerBuCounts] = useState<Record<string, number>>({});
   const [serverSummary, setServerSummary] = useState<{
     urgentTotal: number;
     urgentAnalyzed: number;
@@ -708,6 +713,7 @@ const MatchingPage: React.FC = () => {
       if (urgentOnly) params.set('urgent', '1');
       if (unitFilter) params.set('unit', unitFilter);
       if (workflowFilter !== 'all') params.set('workflow', workflowFilter);
+      if (buFilter) params.set('bu', buFilter);
       const r = await apiFetch(`/api/matching/list?${params.toString()}`);
       if (!r.ok) {
         const body = (await r.json().catch(() => ({}))) as { message?: string };
@@ -718,6 +724,7 @@ const MatchingPage: React.FC = () => {
         total: number;
         page: number;
         unitOptions?: string[];
+        buCounts?: Record<string, number>;
         summary?: { urgentTotal: number; urgentAnalyzed: number; urgentWithGreen: number };
         storedMatches?: Record<string, { recommended: number; computedAt: string }>;
         lumosSummary?: Record<string, LumosJobCallSummaryRow>;
@@ -726,7 +733,8 @@ const MatchingPage: React.FC = () => {
       setServerItems((prev) => (append ? [...prev, ...data.items] : data.items));
       setServerTotal(data.total);
       setServerPageNo(data.page);
-      if (data.unitOptions?.length) setServerUnitOptions(data.unitOptions);
+      if (data.unitOptions) setServerUnitOptions(data.unitOptions);
+      if (data.buCounts) setServerBuCounts(data.buCounts);
       if (data.summary) setServerSummary(data.summary);
       setServerStoredMatches((prev) =>
         append ? { ...prev, ...(data.storedMatches ?? {}) } : (data.storedMatches ?? {}),
@@ -749,7 +757,7 @@ const MatchingPage: React.FC = () => {
     const t = window.setTimeout(() => void fetchServerPage(1, false), search.trim() ? 350 : 0);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, urgentOnly, unitFilter, workflowFilter]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
@@ -1114,13 +1122,15 @@ const MatchingPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, jobs]);
 
-  // ตัวกรองจาก URL (?urgent=1&workflow=...) — ลิงก์จากหน้าสรุปการไหลของงานบน HomePage
+  // ตัวกรองจาก URL (?urgent=1&workflow=...&bu=LBD) — ลิงก์จากหน้าสรุปการไหลของงานบน HomePage
   useEffect(() => {
     if (searchParams.get('urgent') === '1') setUrgentOnly(true);
     const wf = searchParams.get('workflow');
     if (wf && (['all', 'sla', 'green', 'yellow', 'none', 'reserved'] as const).includes(wf as WorkflowFilter)) {
       setWorkflowFilter(wf as WorkflowFilter);
     }
+    const bu = (searchParams.get('bu') || '').trim().toUpperCase();
+    if (bu) setBuFilter(bu);
     // ครั้งเดียวตอน mount — หลังจากนั้นให้ผู้ใช้คุมเอง
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1586,14 +1596,21 @@ const MatchingPage: React.FC = () => {
     const names =
       MATCHING_SERVER_LIST_ENABLED && serverUnitOptions.length > 0
         ? serverUnitOptions
-        : Array.from(new Set(jobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) =>
-            a.localeCompare(b),
-          );
+        : Array.from(
+            new Set(
+              jobs
+                .filter((j) =>
+                  buFilter ? (j.department_code || '').trim().toUpperCase() === buFilter : true,
+                )
+                .map((j) => j.unit_name)
+                .filter(Boolean),
+            ),
+          ).sort((a, b) => a.localeCompare(b));
     return [
       { value: '', label: '— ทุกหน่วยงาน —' },
       ...names.map((name) => ({ value: name, label: name })),
     ];
-  }, [jobs, serverUnitOptions]);
+  }, [jobs, serverUnitOptions, buFilter]);
 
   const clientRows = useMemo(
     () =>
@@ -1601,15 +1618,37 @@ const MatchingPage: React.FC = () => {
         ? []
         : filterAndSortMatchingJobs(
             jobs,
-            { search, urgentOnly, unitFilter, workflowFilter },
+            { search, urgentOnly, unitFilter, workflowFilter, buFilter },
             {
               hasReserved: (jobId) =>
                 (proposalsByJobId[jobId] ?? []).some((item) => item.status === 'reserved'),
               matchesFor: (jobId) => boardMatchById[jobId]?.matches,
             },
           ),
-    [jobs, search, urgentOnly, unitFilter, workflowFilter, proposalsByJobId, boardMatchById],
+    [jobs, search, urgentOnly, unitFilter, workflowFilter, buFilter, proposalsByJobId, boardMatchById],
   );
+
+  // เปลี่ยน BU = เปลี่ยนขอบเขต → ล้างหน่วยงานที่เลือกไว้ (คนละ BU มีหน่วยงานคนละชุด ไม่ล้างจะได้ลิสต์ว่าง)
+  const selectBu = (code: string) => {
+    setBuFilter(code);
+    setUnitFilter('');
+  };
+
+  // ชิป "แยกดูตาม BU" — server mode ใช้ facet จาก API, client mode นับจาก jobs ที่โหลดมา
+  const buChips = useMemo(() => {
+    const counts: Record<string, number> = MATCHING_SERVER_LIST_ENABLED
+      ? serverBuCounts
+      : jobs.reduce<Record<string, number>>((acc, j) => {
+          const code = (j.department_code || '').trim().toUpperCase();
+          if (code) acc[code] = (acc[code] ?? 0) + 1;
+          return acc;
+        }, {});
+    const known = APP_DEPARTMENT_CODES.filter((c) => counts[c]);
+    const extra = Object.keys(counts)
+      .filter((c) => !(APP_DEPARTMENT_CODES as readonly string[]).includes(c))
+      .sort();
+    return [...known, ...extra].map((code) => ({ code, count: counts[code] ?? 0 }));
+  }, [serverBuCounts, jobs]);
 
   // server mode: รายการถูกกรอง/เรียง/แบ่งหน้ามาจาก server แล้ว (สะสมทีละหน้า)
   const rows = MATCHING_SERVER_LIST_ENABLED ? serverItems : clientRows;
@@ -1617,7 +1656,7 @@ const MatchingPage: React.FC = () => {
 
   useEffect(() => {
     setClientPageNo(1);
-  }, [search, urgentOnly, unitFilter, workflowFilter]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter]);
 
   // แบ่งหน้าแบบชัดเจน (เปลี่ยนหน้า = แทนที่รายการ ไม่ต่อท้ายสะสม) — server ส่งมาทีละหน้าอยู่แล้ว
   const currentPage = MATCHING_SERVER_LIST_ENABLED ? serverPageNo : clientPageNo;
@@ -1765,6 +1804,39 @@ const MatchingPage: React.FC = () => {
             searchPlaceholder="ค้นหาหน่วยงาน..."
             emptyText="ไม่พบหน่วยงาน"
           />
+          {/* แยกดูตาม BU — โชว์เมื่อผู้ใช้เห็นมากกว่า 1 BU (staff ที่ถูกล็อกแผนกไม่ต้องเห็นชิปเดียว) */}
+          {buChips.length > 1 ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+              <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">BU:</span>
+              <button
+                type="button"
+                onClick={() => selectBu('')}
+                className={cn(
+                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                  buFilter === ''
+                    ? 'border-blue-300 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                )}
+              >
+                ทุก BU
+              </button>
+              {buChips.map(({ code, count }) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => selectBu(buFilter === code ? '' : code)}
+                  className={cn(
+                    'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium tabular-nums transition-colors',
+                    buFilter === code
+                      ? 'border-blue-300 bg-blue-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                  )}
+                >
+                  {code} · {count}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             {(
               [

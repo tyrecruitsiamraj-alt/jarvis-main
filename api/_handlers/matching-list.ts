@@ -82,6 +82,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       urgentOnly: getQuery(req, 'urgent') === '1',
       unitFilter: getQuery(req, 'unit'),
       workflowFilter: normalizeWorkflow(getQuery(req, 'workflow')),
+      buFilter: getQuery(req, 'bu'),
     };
 
     const rows = filterAndSortMatchingJobs(jobs, query, {
@@ -95,11 +96,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const start = (page - 1) * pageSize;
     const items = rows.slice(start, start + pageSize);
 
-    // facet/summary จากชุดเต็ม (ก่อนแบ่งหน้า) — ให้ dropdown หน่วยงานและสรุปงานด่วนไม่ผูกกับหน้า
+    // ยอดใบขอเปิดต่อ BU — นับจากชุดเต็มตามสิทธิ์ผู้ใช้ ไม่ผูกกับตัวกรองใด (ป้ายบนชิป "แยกดูตาม BU"
+    // ต้องคงที่ ไม่หายไปเมื่อเลือก BU อื่น)
+    const buCounts: Record<string, number> = {};
+    for (const j of jobs) {
+      const code = (j.department_code || '').trim().toUpperCase();
+      if (code) buCounts[code] = (buCounts[code] ?? 0) + 1;
+    }
+
+    // BU = ขอบเขตการดู ไม่ใช่ตัวกรองย่อย → dropdown หน่วยงาน + สรุปงานด่วนต้องอยู่ใน BU ที่เลือก
+    const buScope = query.buFilter.trim().toUpperCase();
+    const scopedJobs = buScope
+      ? jobs.filter((j) => (j.department_code || '').trim().toUpperCase() === buScope)
+      : jobs;
+
+    // facet/summary จากชุดเต็มของ BU นั้น (ก่อนแบ่งหน้า) — ไม่ผูกกับหน้าที่กำลังดู
     const unitOptions = Array.from(
-      new Set(jobs.map((j) => j.unit_name?.trim()).filter((u): u is string => Boolean(u))),
+      new Set(scopedJobs.map((j) => j.unit_name?.trim()).filter((u): u is string => Boolean(u))),
     ).sort((a, b) => a.localeCompare(b, 'th'));
-    const urgentJobs = jobs.filter((j) => j.urgency === 'urgent');
+    const urgentJobs = scopedJobs.filter((j) => j.urgency === 'urgent');
     const summary = {
       urgentTotal: urgentJobs.length,
       urgentAnalyzed: urgentJobs.filter((j) => tierMap.has(j.id)).length,
@@ -134,6 +149,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       page,
       pageSize,
       unitOptions,
+      buCounts,
       summary,
       storedMatches,
       lumosSummary,
