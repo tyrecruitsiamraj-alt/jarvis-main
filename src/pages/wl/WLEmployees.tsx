@@ -174,10 +174,19 @@ const WLEmployees: React.FC = () => {
         {isMobile ? (
           <div className="space-y-2">
             {filtered.map((emp) => (
-              <button
+              // การ์ดเป็น div (ไม่ใช่ button) เพราะมีปุ่มตั้ง BU ซ้อนอยู่ข้างใน — ปุ่มซ้อนปุ่มกดไม่ติดบนมือถือ
+              <div
                 key={emp.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => navigate(`/wl/employees/${emp.id}`)}
-                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/wl/employees/${emp.id}`);
+                  }
+                }}
+                className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left cursor-pointer hover:border-blue-300/50 transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-foreground text-sm">
@@ -232,7 +241,7 @@ const WLEmployees: React.FC = () => {
                   <span className="text-primary">Reliability: {emp.reliability_score}%</span>
                   <span className="text-muted-foreground">Util: {emp.utilization_rate}%</span>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         ) : (

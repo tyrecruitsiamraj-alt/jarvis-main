@@ -67,6 +67,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
           required_salary: c.required_salary,
           last_activity_at: c.last_activity_at,
           column_label: c.column_label,
+          // ฟิลด์สำหรับหน้ารายละเอียด — SQL ดึงมาให้อยู่แล้ว (ไม่ได้ query เพิ่ม)
+          job1_name: c.job1_name,
+          job2_name: c.job2_name,
+          application_no: c.application_no,
+          application_date: c.application_date,
+          sex_code: c.sex_code,
+          province_name: c.province_name,
+          amphur_name: c.amphur_name,
+          full_address: c.full_address,
+          site_name: c.site_name,
+          work_place: c.work_place,
+          remarks: c.remarks,
         })),
       });
     }
