@@ -9,8 +9,10 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 
 const tbl = tableInAppSchema('public_job_applications');
+const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบสมัครของแผนกอื่น';
 
 type ApplicationStatus = 'new' | 'contacted' | 'converted' | 'rejected';
 const STATUSES: ApplicationStatus[] = ['new', 'contacted', 'converted', 'rejected'];
@@ -130,12 +132,19 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
         ? b.admin_note.trim().slice(0, 2000)
         : null;
 
-  const { rows: beforeRows } = await dbQuery<{ status: string; admin_note: string | null }>(
-    `select status, admin_note from ${tbl} where id = $1 limit 1`,
-    [id],
-  );
+  const { rows: beforeRows } = await dbQuery<{
+    status: string;
+    admin_note: string | null;
+    job_id: string | null;
+  }>(`select status, admin_note, job_id from ${tbl} where id = $1 limit 1`, [id]);
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
+
+  // จำกัดตาม BU — กันเปลี่ยนสถานะ/โน้ตใบสมัครของงานแผนกอื่นด้วยการเดา id
+  const scopedJobIds = await loadScopedJobIdSet(req.user);
+  if (scopedJobIds && !(before.job_id && scopedJobIds.has(before.job_id))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
 
   const { rows } = await dbQuery<Row>(
     `
@@ -181,21 +190,34 @@ async function handler(req: AuthedReq, res: ApiRes) {
   res.setHeader?.('Cache-Control', 'no-store');
 
   try {
+    // จำกัดตาม BU — ใบสมัครผูกกับ job_id ('siamraj-sql:<เลขใบขอ>') จึงกรองจากใบขอที่ผู้ใช้เห็นได้
+    // (null = admin เห็นทุกแผนก) · ใบสมัครที่ไม่ระบุงาน (job_id null) ผูก BU ไม่ได้ → staff ไม่เห็น
+    const scopedJobIds = await loadScopedJobIdSet(req.user);
+
     if (getString(req.query?.counts) === '1') {
       const { rows } = await dbQuery<{ job_id: string; n: string }>(
         `select job_id, count(*)::text as n from ${tbl} where job_id is not null group by job_id`,
       );
       const counts: Record<string, number> = {};
-      for (const r of rows) counts[r.job_id] = Number(r.n);
+      for (const r of rows) {
+        if (scopedJobIds && !scopedJobIds.has(r.job_id)) continue;
+        counts[r.job_id] = Number(r.n);
+      }
       return res.status(200).json({ counts });
     }
 
     const jobId = getString(req.query?.job_id);
+    if (jobId && scopedJobIds && !scopedJobIds.has(jobId)) {
+      return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+    }
     const params: unknown[] = [];
     let where = '';
     if (jobId) {
       params.push(jobId);
       where = `where job_id = $1`;
+    } else if (scopedJobIds) {
+      params.push([...scopedJobIds]);
+      where = `where job_id = any($1::text[])`;
     }
 
     const { rows } = await dbQuery<Row>(

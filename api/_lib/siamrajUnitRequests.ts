@@ -308,6 +308,29 @@ export async function loadScopedRequestNoSet(user: ScopeUser): Promise<Set<strin
   return set;
 }
 
+/**
+ * เซ็ต job id ที่ผู้ใช้เห็นได้ (null = เห็นทุกแผนก) — สำหรับตารางที่เก็บ job_id เป็น
+ * 'siamraj-sql:<request_no>' (เช่น public_job_applications) แทนที่จะเก็บ request_no เปล่า
+ */
+export async function loadScopedJobIdSet(user: ScopeUser): Promise<Set<string> | null> {
+  const scope = await loadUserDepartmentScope(user);
+  if (scope.mode === 'all') return null;
+  if (scope.mode === 'none') return new Set<string>();
+  const items = (await listSiamrajUnitRequests({
+    limit: SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT,
+    departmentScope: scope,
+  })) as Array<{ id?: string | null; request_no?: string | null }>;
+  const set = new Set<string>();
+  for (const it of items) {
+    const id = String(it.id || '').trim();
+    if (id) set.add(id);
+    // เผื่อบางแถวเก็บเลขใบขอเปล่า ๆ ไม่มี prefix
+    const rn = String(it.request_no || '').trim();
+    if (rn) set.add(rn);
+  }
+  return set;
+}
+
 export type { SiamrajThroughputRecord, ResignationUnitRank };
 
 export async function listSiamrajThroughput(options: {

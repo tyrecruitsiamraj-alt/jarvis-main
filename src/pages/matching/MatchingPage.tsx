@@ -23,7 +23,17 @@ import {
   requestPositionCount,
 } from '@/lib/matchingProgress';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
-import { filterAndSortMatchingJobs, type MatchingWorkflowFilter } from '@/lib/matchingListFilter';
+import {
+  filterAndSortMatchingJobs,
+  type MatchingWorkflowFilter,
+  type MatchingListSort,
+} from '@/lib/matchingListFilter';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import {
+  getJobRequestAgeDays,
+  ageUrgencyLevelFromDays,
+  JOB_AGE_URGENCY_META,
+} from '@/lib/jobUrgency';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   saveProposal,
@@ -66,6 +76,23 @@ import {
   unitRequestNoteKey,
   type UnitBranchOverride,
 } from '@/lib/siamrajUnitRequestsApi';
+import {
+  listLumosCallStatus,
+  listLumosCallStatusWithPool,
+  filterLumosPool,
+  dispatchLumosCalls,
+  cancelLumosCall,
+  lumosCallBadge,
+  canCancelLumosCall,
+  indexLumosCallStatus,
+  boardPersonRef,
+  irecruitPersonRef,
+  summarizeLumosCallStatus,
+  boardColumnBadge,
+  type LumosCallStatus,
+  type LumosPoolCandidate,
+  type LumosJobCallSummaryRow,
+} from '@/lib/lumosDispatchApi';
 
 /** สถานะการเสนอ + id แถวจริงใน DB (ไว้ยกเลิก) — คีย์ = source#ref */
 type ProposedRef = {
@@ -96,6 +123,8 @@ type BoardCandidateMatch = {
   job2_name: string | null;
   province_name: string | null;
   amphur_name: string | null;
+  /** ถังบนบอร์ด: 'To do' / 'ไม่มีงาน' (auto ค้นสองถังนี้) */
+  column_label?: string | null;
   tier: 'green' | 'yellow' | 'red';
   reason: string;
 };
@@ -105,6 +134,19 @@ type BoardMatchResult = {
   job_family_label: string;
   pool_size: number;
   matches: BoardCandidateMatch[];
+  /** เป้า = อัตราที่ขอ × 3 — ต่ำกว่านี้ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว */
+  recommended_target?: number;
+  fallback_used?: boolean;
+  fallback_pool_size?: number;
+};
+/** ผลจาก API — AI คิดที่ worker หลังบ้านเท่านั้น หน้าเว็บได้แค่ผลสำเร็จหรือสถานะรอ */
+type BoardMatchResponse = BoardMatchResult & {
+  computed_at?: string;
+  /** ยังไม่มีผลของใบนี้ — ส่งเข้าคิวหลังบ้านให้แล้ว */
+  pending?: boolean;
+  /** สั่งค้นหาใหม่แล้ว — ผลที่เห็นคือของเดิม รอผลใหม่มาแทน */
+  refresh_queued?: boolean;
+  worker_active?: boolean;
 };
 
 type MatchTier = BoardCandidateMatch['tier'];
@@ -117,10 +159,22 @@ type IrecruitDisplayRow =
       branchId: string | null;
       branchName: string | null;
     };
-const MATCHING_AI_PREWARM_ENABLED = import.meta.env.VITE_MATCHING_AI_PREWARM_ENABLED === 'true';
 /** ลิสต์ใบขอแบบ server-side pagination (ปิดกลับเป็น client เดิมได้ด้วย env = rollback) */
 const MATCHING_SERVER_LIST_ENABLED = import.meta.env.VITE_MATCHING_SERVER_LIST !== 'false';
+/** ค่าเริ่มต้นจำนวนใบขอต่อหน้า — ผู้ใช้เลือกเองได้ (จำไว้ในเครื่อง) */
 const MATCHING_LIST_BATCH_SIZE = 60;
+/** ตัวเลือกจำนวนต่อหน้า — เพดาน 100 ตรงกับที่ API ยอมรับ (pageSize > 100 ถูกตัดเป็น 100) */
+const MATCHING_PAGE_SIZE_OPTIONS = [20, 40, 60, 100] as const;
+const MATCHING_PAGE_SIZE_KEY = 'jarvis:matching-page-size';
+
+function loadSavedPageSize(): number {
+  try {
+    const raw = Number(localStorage.getItem(MATCHING_PAGE_SIZE_KEY));
+    return (MATCHING_PAGE_SIZE_OPTIONS as readonly number[]).includes(raw) ? raw : MATCHING_LIST_BATCH_SIZE;
+  } catch {
+    return MATCHING_LIST_BATCH_SIZE;
+  }
+}
 
 function branchDemandItems(job: JobRequest): BranchDemandItem[] {
   const overrides = job.field_overrides?.branches;
@@ -475,6 +529,149 @@ function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label
   return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60' };
 }
 
+function formatCallWhen(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/**
+ * ป้ายผลการโทร Lumos ต่อคน (ระดับ 1) — รอโทร → Lumos รับไปแล้ว → สนใจ/ปฏิเสธ/ไม่รับสาย
+ * กดขยายเห็นสรุปบทสนทนา + ยกเลิกได้ถ้า Lumos ยังไม่ส่งผลกลับ
+ */
+function LumosCallBadgeRow({
+  row,
+  expanded,
+  onToggle,
+  onCancel,
+  cancelling,
+}: {
+  row: LumosCallStatus;
+  expanded: boolean;
+  onToggle: () => void;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
+  const badge = lumosCallBadge(row);
+  const hasDetail = Boolean(row.summary) || canCancelLumosCall(row);
+  return (
+    <div className="mt-1.5 border-t border-white/70 pt-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={!hasDetail}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+            badge.cls,
+            hasDetail ? 'hover:brightness-95' : 'cursor-default',
+          )}
+        >
+          {badge.label}
+          {hasDetail ? <span aria-hidden>{expanded ? '▴' : '▾'}</span> : null}
+        </button>
+        <span className="text-[10px] text-muted-foreground">ส่งเมื่อ {formatCallWhen(row.sent_at)}</span>
+        {row.delivery_count > 1 ? (
+          <span className="text-[10px] text-muted-foreground">· ส่งซ้ำ {row.delivery_count} ครั้ง</span>
+        ) : null}
+      </div>
+      {expanded ? (
+        <div className="mt-1.5 space-y-1.5 rounded-lg border border-slate-200 bg-white/85 px-2.5 py-1.5">
+          {row.summary ? (
+            <p className="text-[10px] leading-relaxed text-slate-700">
+              <span className="font-semibold">สรุปบทสนทนา:</span> {row.summary}
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก AI</p>
+          )}
+          <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatCallWhen(row.updated_at)}</p>
+          {canCancelLumosCall(row) ? (
+            <button
+              type="button"
+              disabled={cancelling}
+              onClick={onCancel}
+              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+            >
+              <X className="h-2.5 w-2.5" /> {cancelling ? 'กำลังยกเลิก…' : 'ยกเลิกการส่ง'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * กล่องสรุปผลโทรของใบขอ 1 ใบ — ตัวเลข 6 ช่องอ่านปราดเดียวรู้:
+ * ส่ง / โทรแล้ว / เหลือ (ยังไม่ได้โทร) / โอเค / ไม่ไป / ไม่รับ
+ * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ระบบยกเลิกเอง)
+ */
+function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; className?: string }) {
+  if (s.sent === 0) return null;
+  const waiting = Math.max(0, s.sent - s.called);
+  const cells = [
+    { label: 'ส่ง', value: s.sent, cls: 'text-slate-700', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-700', title: 'มีผลโทรกลับมาจริง' },
+    { label: 'เหลือ', value: waiting, cls: waiting > 0 ? 'text-amber-700' : 'text-slate-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
+    { label: 'โอเค', value: s.confirmed, cls: s.confirmed > 0 ? 'text-emerald-700' : 'text-slate-300', title: 'สนใจงาน' },
+    { label: 'ไม่ไป', value: s.declined, cls: s.declined > 0 ? 'text-red-700' : 'text-slate-300', title: 'ไม่สนใจ/ปฏิเสธ' },
+    { label: 'ไม่รับ', value: s.no_answer, cls: s.no_answer > 0 ? 'text-amber-800' : 'text-slate-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+  ];
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 items-stretch divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white/85',
+        className,
+      )}
+    >
+      {cells.map((c) => (
+        <div key={c.label} title={c.title} className="min-w-[36px] px-1.5 py-0.5 text-center">
+          <div className={cn('text-sm font-bold leading-tight tabular-nums', c.cls)}>{c.value}</div>
+          <div className="text-[9px] leading-tight text-muted-foreground">{c.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** แถบ "ส่งให้ Lumos โทร" — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 คน (ใช้ทั้งฝั่งคนของเราและ iRecruit) */
+function LumosSendBar({
+  count,
+  onSend,
+  onClear,
+  busy,
+}: {
+  count: number;
+  onSend: () => void;
+  onClear: () => void;
+  busy: boolean;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2">
+      <p className="text-[11px] font-semibold text-sky-900">ติ๊กเลือกไว้ {count} คน</p>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onClear}
+          className="jarvis-btn-ghost"
+        >
+          ล้างที่เลือก
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSend}
+          className="jarvis-btn-primary"
+        >
+          <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** ข้อความตำแหน่งจากใบขอ (รวม job description + staff title) สำหรับ classify family */
 function jobTitleText(j: JobRequest): string {
   const pick = (k: keyof JobRequest) => {
@@ -502,6 +699,12 @@ const MatchingPage: React.FC = () => {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
+  /** แยกดูตาม BU (department_code เช่น LBD) — '' = ทุก BU */
+  const [buFilter, setBuFilter] = useState('');
+  /** จำนวนใบขอต่อหน้า — ผู้ใช้เลือกเอง จำค่าไว้ในเครื่อง */
+  const [pageSize, setPageSize] = useState<number>(loadSavedPageSize);
+  /** การเรียงลิสต์ — 'default' = SLA/ด่วนก่อนเหมือนเดิม */
+  const [sortBy, setSortBy] = useState<MatchingListSort>('default');
   const [clientPageNo, setClientPageNo] = useState(1);
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const listScrollPendingRef = useRef(false);
@@ -513,14 +716,22 @@ const MatchingPage: React.FC = () => {
   const [serverTotal, setServerTotal] = useState(0);
   const [serverPageNo, setServerPageNo] = useState(1);
   const [serverUnitOptions, setServerUnitOptions] = useState<string[]>([]);
+  /** ยอดใบขอเปิดต่อ BU จาก /api/matching/list — ใช้วาดชิป "แยกดูตาม BU" */
+  const [serverBuCounts, setServerBuCounts] = useState<Record<string, number>>({});
   const [serverSummary, setServerSummary] = useState<{
     urgentTotal: number;
     urgentAnalyzed: number;
     urgentWithGreen: number;
+    scopedTotal?: number;
+    withGreen?: number;
+    withYellow?: number;
+    noRecommend?: number;
   } | null>(null);
   const [serverStoredMatches, setServerStoredMatches] = useState<
     Record<string, { recommended: number; computedAt: string }>
   >({});
+  /** สรุปผลโทร Lumos ต่อใบ (จาก /api/matching/list) — โชว์ข้างการ์ดในลิสต์ */
+  const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>({});
   const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
   const [serverListError, setServerListError] = useState<string | null>(null);
   const serverFetchSeq = useRef(0);
@@ -558,13 +769,15 @@ const MatchingPage: React.FC = () => {
     try {
       const params = new URLSearchParams({
         page: String(page),
-        pageSize: String(MATCHING_LIST_BATCH_SIZE),
+        pageSize: String(pageSize),
       });
       const q = search.trim();
       if (q) params.set('q', q);
       if (urgentOnly) params.set('urgent', '1');
       if (unitFilter) params.set('unit', unitFilter);
       if (workflowFilter !== 'all') params.set('workflow', workflowFilter);
+      if (buFilter) params.set('bu', buFilter);
+      if (sortBy !== 'default') params.set('sort', sortBy);
       const r = await apiFetch(`/api/matching/list?${params.toString()}`);
       if (!r.ok) {
         const body = (await r.json().catch(() => ({}))) as { message?: string };
@@ -575,17 +788,31 @@ const MatchingPage: React.FC = () => {
         total: number;
         page: number;
         unitOptions?: string[];
-        summary?: { urgentTotal: number; urgentAnalyzed: number; urgentWithGreen: number };
+        buCounts?: Record<string, number>;
+        summary?: {
+          urgentTotal: number;
+          urgentAnalyzed: number;
+          urgentWithGreen: number;
+          scopedTotal?: number;
+          withGreen?: number;
+          withYellow?: number;
+          noRecommend?: number;
+        };
         storedMatches?: Record<string, { recommended: number; computedAt: string }>;
+        lumosSummary?: Record<string, LumosJobCallSummaryRow>;
       };
       if (seq !== serverFetchSeq.current) return;
       setServerItems((prev) => (append ? [...prev, ...data.items] : data.items));
       setServerTotal(data.total);
       setServerPageNo(data.page);
-      if (data.unitOptions?.length) setServerUnitOptions(data.unitOptions);
+      if (data.unitOptions) setServerUnitOptions(data.unitOptions);
+      if (data.buCounts) setServerBuCounts(data.buCounts);
       if (data.summary) setServerSummary(data.summary);
       setServerStoredMatches((prev) =>
         append ? { ...prev, ...(data.storedMatches ?? {}) } : (data.storedMatches ?? {}),
+      );
+      setServerLumosSummary((prev) =>
+        append ? { ...prev, ...(data.lumosSummary ?? {}) } : (data.lumosSummary ?? {}),
       );
     } catch (e) {
       if (seq === serverFetchSeq.current) {
@@ -602,7 +829,7 @@ const MatchingPage: React.FC = () => {
     const t = window.setTimeout(() => void fetchServerPage(1, false), search.trim() ? 350 : 0);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, urgentOnly, unitFilter, workflowFilter]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize, sortBy]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
@@ -651,11 +878,131 @@ const MatchingPage: React.FC = () => {
   const [jobPostingByJobId, setJobPostingByJobId] = useState<Record<string, JobPostingRequest>>({});
   const [creatingPosting, setCreatingPosting] = useState(false);
   const [postingError, setPostingError] = useState<string | null>(null);
-  // #5 pre-warm AI งานด่วนเบื้องหลัง
-  const [prewarming, setPrewarming] = useState(false);
-  const prewarmStartedRef = useRef(false);
-  // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วทับผลเดิม + เสีย ~30-90 วิต่อใบ
+  // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วสั่งคิดใหม่ทับผลเดิมโดยไม่ตั้งใจ
   const [rematchConfirmJobId, setRematchConfirmJobId] = useState<string | null>(null);
+  /** ใบที่รอผลจาก worker หลังบ้าน — baseline = computed_at เดิม (null = ยังไม่เคยมีผล) */
+  const [boardWaitingById, setBoardWaitingById] = useState<Record<string, { baseline: string | null }>>({});
+
+  // ── ส่งให้ Lumos โทร แบบคนติ๊กเลือกเอง (ไม่ส่งอัตโนมัติแล้ว) + ผลการโทรต่อคน
+  /** สถานะการโทรต่อคนของใบขอที่เปิดอยู่ — คีย์ = person_ref ('card-<id>' / 'ir-<id>') */
+  const [lumosStatusByRef, setLumosStatusByRef] = useState<Record<string, LumosCallStatus>>({});
+  const [lumosSelectedBoard, setLumosSelectedBoard] = useState<number[]>([]);
+  const [lumosSelectedIrecruit, setLumosSelectedIrecruit] = useState<number[]>([]);
+  const [lumosConfirmOpen, setLumosConfirmOpen] = useState(false);
+  const [lumosSending, setLumosSending] = useState(false);
+  const [lumosError, setLumosError] = useState<string | null>(null);
+  const [lumosNotice, setLumosNotice] = useState<string | null>(null);
+  const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
+  const [lumosCancellingRef, setLumosCancellingRef] = useState<string | null>(null);
+  // หน้าต่างเลือกคนจาก pool "คนของเรา" — ใช้ตอนมีคนเพิ่มเข้ามาทีหลังแล้วใบขอด่วน
+  // (auto-send ส่งเฉพาะคนที่อยู่ในผล AI แมทตอนนั้น คนเพิ่มใหม่ต้องดันเข้าคิวเอง)
+  const [lumosPickerOpen, setLumosPickerOpen] = useState(false);
+  const [lumosPool, setLumosPool] = useState<LumosPoolCandidate[]>([]);
+  const [lumosPoolLoading, setLumosPoolLoading] = useState(false);
+  const [lumosPoolSearch, setLumosPoolSearch] = useState('');
+
+  const lumosSelectedCount = lumosSelectedBoard.length + lumosSelectedIrecruit.length;
+
+  /** ชื่อ/เบอร์ของ card_id ที่เลือก — หาจากผลแมทก่อน ไม่เจอค่อยดูใน pool (คนเพิ่มใหม่) */
+  const boardPersonLabel = (cardId: number): { name: string; phone: string | null } => {
+    const fromMatch = (boardMatchById[jobDetail?.id ?? '']?.matches ?? []).find((m) => m.card_id === cardId);
+    if (fromMatch) return { name: fromMatch.full_name, phone: fromMatch.mobile };
+    const fromPool = lumosPool.find((c) => c.card_id === cardId);
+    if (fromPool) return { name: fromPool.full_name, phone: fromPool.mobile };
+    return { name: `การ์ด #${cardId}`, phone: null };
+  };
+
+  const openLumosPicker = async () => {
+    if (!jobDetail) return;
+    setLumosPickerOpen(true);
+    setLumosPoolSearch('');
+    setLumosPoolLoading(true);
+    setLumosError(null);
+    try {
+      const { items, pool } = await listLumosCallStatusWithPool(jobDetail.id);
+      setLumosStatusByRef(indexLumosCallStatus(items));
+      setLumosPool(pool);
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'โหลดรายชื่อคนของเราไม่สำเร็จ');
+    } finally {
+      setLumosPoolLoading(false);
+    }
+  };
+
+  const clearLumosSelection = () => {
+    setLumosSelectedBoard([]);
+    setLumosSelectedIrecruit([]);
+  };
+
+  const toggleLumosBoard = (cardId: number) =>
+    setLumosSelectedBoard((prev) =>
+      prev.includes(cardId) ? prev.filter((id) => id !== cardId) : [...prev, cardId],
+    );
+
+  const toggleLumosIrecruit = (id: number) =>
+    setLumosSelectedIrecruit((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const loadLumosStatus = async (jobId: string) => {
+    try {
+      setLumosStatusByRef(indexLumosCallStatus(await listLumosCallStatus(jobId)));
+    } catch {
+      // ไม่ให้ล้มการเปิดใบขอ — แค่ไม่มีป้ายผลการโทร
+      setLumosStatusByRef({});
+    }
+  };
+
+  const sendSelectedToLumos = async () => {
+    if (!jobDetail || lumosSelectedCount === 0) return;
+    setLumosSending(true);
+    setLumosError(null);
+    setLumosNotice(null);
+    try {
+      const result = await dispatchLumosCalls({
+        jobId: jobDetail.id,
+        boardCardIds: lumosSelectedBoard,
+        irecruitIds: lumosSelectedIrecruit,
+      });
+      setLumosStatusByRef(indexLumosCallStatus(result.items));
+      // pool ที่โหลดไว้ต้องรู้ว่าคนเหล่านี้ส่งแล้ว ไม่งั้นเปิด picker ซ้ำจะยังติ๊กได้
+      const justSent = new Set(lumosSelectedBoard);
+      setLumosPool((prev) =>
+        prev.map((c) => (justSent.has(c.card_id) ? { ...c, already_sent: true } : c)),
+      );
+      clearLumosSelection();
+      setLumosConfirmOpen(false);
+      const parts = [`เข้าคิว AI โทร ${result.queued} คน`];
+      if (result.duplicated.length > 0) parts.push(`เคยส่งไปแล้ว ${result.duplicated.length} คน (ไม่ส่งซ้ำ)`);
+      if (result.skipped.length > 0) {
+        parts.push(
+          `ส่งไม่ได้ ${result.skipped.length} คน: ${result.skipped.map((s) => s.name).join(', ')} — ${result.skipped[0].reason}`,
+        );
+      }
+      setLumosNotice(parts.join(' · '));
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
+    } finally {
+      setLumosSending(false);
+    }
+  };
+
+  const cancelLumosForRef = async (row: LumosCallStatus) => {
+    if (!jobDetail) return;
+    setLumosCancellingRef(row.person_ref);
+    setLumosError(null);
+    try {
+      const items = await cancelLumosCall({
+        jobId: jobDetail.id,
+        channel: row.channel,
+        ref: row.person_ref,
+      });
+      setLumosStatusByRef(indexLumosCallStatus(items));
+      setLumosNotice('ยกเลิกการส่งแล้ว');
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setLumosCancellingRef((cur) => (cur === row.person_ref ? null : cur));
+    }
+  };
 
   useEffect(() => {
     apiFetch('/api/matching/board-candidates?pool=1')
@@ -738,44 +1085,15 @@ const MatchingPage: React.FC = () => {
     void refreshActiveProposals();
   };
 
-  // #5 pre-warm AI แมทงานด่วนล่วงหน้าเบื้องหลัง (~30วิ/ใบ) — เปิดใบด่วนแล้วผลพร้อมทันที
-  // ทำแบบระวัง: เฉพาะงานด่วนที่ใกล้ครบกำหนดสุด, ทีละใบ, จำกัดจำนวน, ข้ามใบที่มีผล/เคยอุ่นแล้ว
-  const PREWARM_LIMIT = 3;
-  useEffect(() => {
-    if (!MATCHING_AI_PREWARM_ENABLED) return;
-    // รันครั้งเดียวเมื่อ jobs โหลดเสร็จ (กัน re-run จาก jobs อ้างอิงใหม่ทุก render)
-    if (prewarmStartedRef.current || jobs.length === 0) return;
-    prewarmStartedRef.current = true;
-    let cancelled = false;
-    const targets = jobs
-      .filter((j) => j.urgency === 'urgent')
-      .slice()
-      .sort((a, b) => (a.required_date || '').localeCompare(b.required_date || ''))
-      .slice(0, PREWARM_LIMIT);
-    if (targets.length === 0) return;
+  const clearBoardWaiting = (jobId: string) =>
+    setBoardWaitingById((prev) => {
+      if (!(jobId in prev)) return prev;
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
 
-    const run = async () => {
-      setPrewarming(true);
-      for (const j of targets) {
-        if (cancelled) break;
-        try {
-          const r = await apiFetch(`/api/matching/board-candidates?jobId=${encodeURIComponent(j.id)}`);
-          if (!r.ok) continue;
-          const data = (await r.json()) as BoardMatchResult;
-          if (!cancelled) setBoardMatchById((prev) => (prev[j.id] ? prev : { ...prev, [j.id]: data }));
-        } catch {
-          /* เงียบ — เป็นการอุ่นเครื่องเบื้องหลัง */
-        }
-      }
-      if (!cancelled) setPrewarming(false);
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobs.length]);
-
+  // AI คิดที่ worker หลังบ้านเท่านั้น — GET นี้แค่ดึงผลที่ค้นเสร็จแล้ว (หรือส่งใบเข้าคิวถ้ายังไม่มี)
   const fetchBoardMatch = async (jobId: string, refresh = false) => {
     setBoardLoadingId(jobId);
     setBoardErrorById((prev) => {
@@ -791,8 +1109,30 @@ const MatchingPage: React.FC = () => {
         const data = (await r.json().catch(() => ({}))) as { message?: string; detail?: string; error?: string };
         throw new Error(data.message || data.detail || data.error || `ค้นหาไม่สำเร็จ (HTTP ${r.status})`);
       }
-      const data = (await r.json()) as BoardMatchResult;
+      const data = (await r.json()) as BoardMatchResponse;
+      if (data.pending) {
+        if (data.worker_active === false) {
+          setBoardErrorById((prev) => ({
+            ...prev,
+            [jobId]: 'ระบบค้นหาหลังบ้านปิดอยู่ — ต้องเปิด MATCH_PRECOMPUTE_ENABLED บนเซิร์ฟเวอร์ก่อนจึงจะมีผลใหม่',
+          }));
+          return;
+        }
+        setBoardWaitingById((prev) => ({ ...prev, [jobId]: { baseline: null } }));
+        return;
+      }
       setBoardMatchById((prev) => ({ ...prev, [jobId]: data }));
+      if (data.refresh_queued) {
+        // สั่งคิดใหม่แล้ว — คงผลเดิมไว้ก่อน แล้วรอผลใหม่ (computed_at เปลี่ยน) มาแทน
+        setBoardWaitingById((prev) => ({ ...prev, [jobId]: { baseline: data.computed_at ?? null } }));
+      } else if (refresh && data.worker_active === false) {
+        setBoardErrorById((prev) => ({
+          ...prev,
+          [jobId]: 'ระบบค้นหาหลังบ้านปิดอยู่ — แสดงผลเดิมไว้ก่อน (ต้องเปิด MATCH_PRECOMPUTE_ENABLED จึงจะคิดใหม่ได้)',
+        }));
+      } else {
+        clearBoardWaiting(jobId);
+      }
     } catch (e) {
       setBoardErrorById((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ' }));
     } finally {
@@ -800,12 +1140,45 @@ const MatchingPage: React.FC = () => {
     }
   };
 
+  // ระหว่างรอ worker หลังบ้าน — เช็คผลซ้ำทุก 15 วิ เฉพาะใบที่เปิดดูอยู่ (ผลใหม่มาแล้วแสดงเองอัตโนมัติ)
+  useEffect(() => {
+    const jobId = jobDetail?.id;
+    if (!jobId) return;
+    const waiting = boardWaitingById[jobId];
+    if (!waiting) return;
+    const timer = setInterval(async () => {
+      try {
+        const r = await apiFetch(`/api/matching/board-candidates?jobId=${encodeURIComponent(jobId)}`);
+        if (!r.ok) return;
+        const data = (await r.json()) as BoardMatchResponse;
+        if (data.pending) return;
+        if (waiting.baseline && data.computed_at === waiting.baseline) return; // ยังเป็นผลเดิม
+        setBoardMatchById((prev) => ({ ...prev, [jobId]: data }));
+        clearBoardWaiting(jobId);
+      } catch {
+        /* เงียบ — รอบถัดไป */
+      }
+    }, 15_000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobDetail?.id, boardWaitingById]);
+
   // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอ/คำขอโพสหางานที่เคยบันทึก
   const openJob = (j: JobRequest) => {
     setJobDetail({ ...j, ...(localJobEditsById[j.id] || {}) });
     setShowDistantCandidates(true);
     setProposeError(null);
     setPostingError(null);
+    // Lumos: เริ่มใหม่ทุกครั้งที่เปิดใบขอ (การเลือกผูกกับใบขอที่เปิดอยู่ใบเดียว)
+    clearLumosSelection();
+    setLumosStatusByRef({});
+    setLumosError(null);
+    setLumosNotice(null);
+    setLumosExpandedRef(null);
+    setLumosPickerOpen(false);
+    setLumosPool([]);
+    setLumosPoolSearch('');
+    void loadLumosStatus(j.id);
     if (!boardMatchById[j.id] && boardLoadingId !== j.id) void fetchBoardMatch(j.id);
     void listProposalsForJob(j.id).then((items) => {
       setProposedByKey(() => {
@@ -838,6 +1211,19 @@ const MatchingPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, jobs, serverListLoading]);
+
+  // ตัวกรองจาก URL (?urgent=1&workflow=...&bu=LBD) — ลิงก์จากหน้าสรุปการไหลของงานบน HomePage
+  useEffect(() => {
+    if (searchParams.get('urgent') === '1') setUrgentOnly(true);
+    const wf = searchParams.get('workflow');
+    if (wf && (['all', 'sla', 'green', 'yellow', 'none', 'reserved'] as const).includes(wf as WorkflowFilter)) {
+      setWorkflowFilter(wf as WorkflowFilter);
+    }
+    const bu = (searchParams.get('bu') || '').trim().toUpperCase();
+    if (bu) setBuFilter(bu);
+    // ครั้งเดียวตอน mount — หลังจากนั้นให้ผู้ใช้คุมเอง
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // บันทึกการเสนอ/จองตัว/ลงงาน "คนของเรา" (board) ลง DB
   const proposeBoard = async (
@@ -1300,14 +1686,21 @@ const MatchingPage: React.FC = () => {
     const names =
       MATCHING_SERVER_LIST_ENABLED && serverUnitOptions.length > 0
         ? serverUnitOptions
-        : Array.from(new Set(jobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) =>
-            a.localeCompare(b),
-          );
+        : Array.from(
+            new Set(
+              jobs
+                .filter((j) =>
+                  buFilter ? (j.department_code || '').trim().toUpperCase() === buFilter : true,
+                )
+                .map((j) => j.unit_name)
+                .filter(Boolean),
+            ),
+          ).sort((a, b) => a.localeCompare(b));
     return [
       { value: '', label: '— ทุกหน่วยงาน —' },
       ...names.map((name) => ({ value: name, label: name })),
     ];
-  }, [jobs, serverUnitOptions]);
+  }, [jobs, serverUnitOptions, buFilter]);
 
   const clientRows = useMemo(
     () =>
@@ -1315,15 +1708,44 @@ const MatchingPage: React.FC = () => {
         ? []
         : filterAndSortMatchingJobs(
             jobs,
-            { search, urgentOnly, unitFilter, workflowFilter },
+            { search, urgentOnly, unitFilter, workflowFilter, buFilter, sort: sortBy },
             {
               hasReserved: (jobId) =>
                 (proposalsByJobId[jobId] ?? []).some((item) => item.status === 'reserved'),
               matchesFor: (jobId) => boardMatchById[jobId]?.matches,
             },
           ),
-    [jobs, search, urgentOnly, unitFilter, workflowFilter, proposalsByJobId, boardMatchById],
+    [jobs, search, urgentOnly, unitFilter, workflowFilter, buFilter, sortBy, proposalsByJobId, boardMatchById],
   );
+
+  // เปลี่ยน BU = เปลี่ยนขอบเขต → ล้างหน่วยงานที่เลือกไว้ (คนละ BU มีหน่วยงานคนละชุด ไม่ล้างจะได้ลิสต์ว่าง)
+  const selectBu = (code: string) => {
+    setBuFilter(code);
+    setUnitFilter('');
+  };
+
+  // ตัวเลือก BU ในตัวกรอง — server mode ใช้ facet จาก API, client mode นับจาก jobs ที่โหลดมา
+  // ผู้ใช้ที่ถูกล็อก BU จะได้กลับมาแค่ BU เดียว → หน้าเว็บซ่อนช่อง BU ไปเลย
+  const buOptions = useMemo(() => {
+    const counts: Record<string, number> = MATCHING_SERVER_LIST_ENABLED
+      ? serverBuCounts
+      : jobs.reduce<Record<string, number>>((acc, j) => {
+          const code = (j.department_code || '').trim().toUpperCase();
+          if (code) acc[code] = (acc[code] ?? 0) + 1;
+          return acc;
+        }, {});
+    const known = APP_DEPARTMENT_CODES.filter((c) => counts[c]);
+    const extra = Object.keys(counts)
+      .filter((c) => !(APP_DEPARTMENT_CODES as readonly string[]).includes(c))
+      .sort();
+    const codes = [...known, ...extra];
+    if (codes.length <= 1) return codes.map((code) => ({ value: code, label: `BU ${code}` }));
+    const total = codes.reduce((sum, code) => sum + (counts[code] ?? 0), 0);
+    return [
+      { value: '', label: `ทุก BU · ${total}` },
+      ...codes.map((code) => ({ value: code, label: `${code} · ${counts[code] ?? 0}` })),
+    ];
+  }, [serverBuCounts, jobs]);
 
   // server mode: รายการถูกกรอง/เรียง/แบ่งหน้ามาจาก server แล้ว (สะสมทีละหน้า)
   const rows = MATCHING_SERVER_LIST_ENABLED ? serverItems : clientRows;
@@ -1331,20 +1753,32 @@ const MatchingPage: React.FC = () => {
 
   useEffect(() => {
     setClientPageNo(1);
-  }, [search, urgentOnly, unitFilter, workflowFilter]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, sortBy]);
 
   // แบ่งหน้าแบบชัดเจน (เปลี่ยนหน้า = แทนที่รายการ ไม่ต่อท้ายสะสม) — server ส่งมาทีละหน้าอยู่แล้ว
   const currentPage = MATCHING_SERVER_LIST_ENABLED ? serverPageNo : clientPageNo;
-  const totalPages = Math.max(1, Math.ceil(listTotal / MATCHING_LIST_BATCH_SIZE));
+  const totalPages = Math.max(1, Math.ceil(listTotal / pageSize));
   const visibleRows = useMemo(
     () =>
       MATCHING_SERVER_LIST_ENABLED
         ? rows
-        : rows.slice((clientPageNo - 1) * MATCHING_LIST_BATCH_SIZE, clientPageNo * MATCHING_LIST_BATCH_SIZE),
-    [rows, clientPageNo],
+        : rows.slice((clientPageNo - 1) * pageSize, clientPageNo * pageSize),
+    [rows, clientPageNo, pageSize],
   );
-  const pageRangeStart = listTotal === 0 ? 0 : (currentPage - 1) * MATCHING_LIST_BATCH_SIZE + 1;
-  const pageRangeEnd = Math.min((currentPage - 1) * MATCHING_LIST_BATCH_SIZE + visibleRows.length, listTotal);
+  const pageRangeStart = listTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const pageRangeEnd = Math.min((currentPage - 1) * pageSize + visibleRows.length, listTotal);
+
+  // เปลี่ยนจำนวนต่อหน้า → กลับหน้า 1 เสมอ (หน้าเดิมอาจเลยจำนวนหน้าใหม่) + จำค่าไว้ใช้ครั้งต่อไป
+  const changePageSize = (size: number) => {
+    if (size === pageSize) return;
+    setPageSize(size);
+    setClientPageNo(1);
+    try {
+      localStorage.setItem(MATCHING_PAGE_SIZE_KEY, String(size));
+    } catch {
+      /* ไม่ให้ storage ที่ปิดอยู่ทำให้เปลี่ยนจำนวนต่อหน้าไม่ได้ */
+    }
+  };
 
   const goToPage = (page: number) => {
     const target = Math.min(Math.max(1, page), totalPages);
@@ -1471,14 +1905,28 @@ const MatchingPage: React.FC = () => {
               🔴 ด่วนเท่านั้น
             </button>
           </div>
-          <SearchableSelect
-            value={unitFilter}
-            onChange={setUnitFilter}
-            options={unitOptions}
-            placeholder="ทุกหน่วยงาน"
-            searchPlaceholder="ค้นหาหน่วยงาน..."
-            emptyText="ไม่พบหน่วยงาน"
-          />
+          {/* BU + หน่วยงาน = ตัวกรองคู่กัน · BU ซ้าย (แคบ) เพราะเลือก BU ก่อนแล้วหน่วยงานหดตาม
+              ผู้ใช้ที่ถูกล็อก BU เดียวไม่เห็นช่อง BU — เห็นแค่งาน BU ตัวเองอยู่แล้ว */}
+          <div className={cn('grid gap-2', buOptions.length > 1 ? 'sm:grid-cols-[minmax(0,12rem)_1fr]' : '')}>
+            {buOptions.length > 1 ? (
+              <SearchableSelect
+                value={buFilter}
+                onChange={selectBu}
+                options={buOptions}
+                placeholder="ทุก BU"
+                searchPlaceholder="ค้นหา BU..."
+                emptyText="ไม่พบ BU"
+              />
+            ) : null}
+            <SearchableSelect
+              value={unitFilter}
+              onChange={setUnitFilter}
+              options={unitOptions}
+              placeholder="ทุกหน่วยงาน"
+              searchPlaceholder="ค้นหาหน่วยงาน..."
+              emptyText="ไม่พบหน่วยงาน"
+            />
+          </div>
           <div className="flex gap-1.5 overflow-x-auto pb-0.5">
             {(
               [
@@ -1507,21 +1955,89 @@ const MatchingPage: React.FC = () => {
           </div>
         </div>
 
-        {/* #4 สรุปงานด่วน: พร้อมลง vs ยังไม่มีคนของเรา */}
-        {urgentSummary.total > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            <div className="glass-card rounded-2xl border border-red-200/70 bg-red-50/50 px-3 py-2.5 text-center">
-              <div className="text-lg font-bold tabular-nums text-red-600">{urgentSummary.total}</div>
-              <div className="text-[11px] text-muted-foreground">ใบขอด่วน</div>
-            </div>
-            <div className="glass-card rounded-2xl border border-emerald-200/70 bg-emerald-50/50 px-3 py-2.5 text-center">
-              <div className="text-lg font-bold tabular-nums text-emerald-600">{urgentSummary.greenSuggested}</div>
-              <div className="text-[11px] text-muted-foreground">มีคนเขียวแนะนำ</div>
-            </div>
-            <div className="glass-card rounded-2xl border border-amber-200/70 bg-amber-50/50 px-3 py-2.5 text-center">
-              <div className="text-lg font-bold tabular-nums text-amber-600">{urgentSummary.none}</div>
-              <div className="text-[11px] text-muted-foreground">ยังไม่มีคน</div>
-            </div>
+        {/* กล่องสรุป — กดแล้วตั้งตัวกรองให้ตรงกับจำนวนที่โชว์ (ใช้ตัวกรองชุดเดียวกับปุ่มด้านบน) */}
+        {(serverSummary?.scopedTotal ?? listTotal) > 0 ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(
+              [
+                {
+                  key: 'total',
+                  label: 'ใบขอทั้งหมด',
+                  value: serverSummary?.scopedTotal ?? listTotal,
+                  cls: 'border-slate-200/70 bg-white/60',
+                  num: 'text-slate-800',
+                  active: !urgentOnly && workflowFilter === 'all',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('all');
+                  },
+                },
+                {
+                  key: 'urgent',
+                  label: 'ใบขอด่วน',
+                  value: urgentSummary.total,
+                  cls: 'border-red-200/70 bg-red-50/50',
+                  num: 'text-red-600',
+                  active: urgentOnly,
+                  apply: () => {
+                    setUrgentOnly(true);
+                    setWorkflowFilter('all');
+                  },
+                },
+                {
+                  key: 'green',
+                  label: 'มีคนเขียวแนะนำ',
+                  value: serverSummary?.withGreen ?? urgentSummary.greenSuggested,
+                  cls: 'border-emerald-200/70 bg-emerald-50/50',
+                  num: 'text-emerald-600',
+                  active: workflowFilter === 'green',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('green');
+                  },
+                },
+                {
+                  key: 'yellow',
+                  label: 'มีคนเหลืองแนะนำ',
+                  value: serverSummary?.withYellow ?? 0,
+                  cls: 'border-amber-200/70 bg-amber-50/50',
+                  num: 'text-amber-600',
+                  active: workflowFilter === 'yellow',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('yellow');
+                  },
+                },
+                {
+                  key: 'none',
+                  label: 'ยังไม่มีคน',
+                  value: serverSummary?.noRecommend ?? urgentSummary.none,
+                  cls: 'border-orange-200/70 bg-orange-50/50',
+                  num: 'text-orange-600',
+                  active: workflowFilter === 'none',
+                  apply: () => {
+                    setUrgentOnly(false);
+                    setWorkflowFilter('none');
+                  },
+                },
+              ] as const
+            ).map((tile) => (
+              <button
+                key={tile.key}
+                type="button"
+                onClick={tile.apply}
+                disabled={serverListLoading}
+                title={`กดเพื่อดูเฉพาะ "${tile.label}"`}
+                className={cn(
+                  'glass-card rounded-2xl border px-3 py-2.5 text-center transition-colors disabled:cursor-wait',
+                  tile.cls,
+                  tile.active ? 'ring-2 ring-blue-400/50' : 'hover:border-blue-300/60',
+                )}
+              >
+                <div className={cn('text-lg font-bold tabular-nums', tile.num)}>{tile.value}</div>
+                <div className="text-[11px] text-muted-foreground">{tile.label}</div>
+              </button>
+            ))}
           </div>
         ) : null}
         {urgentSummary.total > 0 ? (
@@ -1532,7 +2048,7 @@ const MatchingPage: React.FC = () => {
           </p>
         ) : null}
 
-        <div className="flex items-center gap-2 px-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <p className="text-sm text-muted-foreground">
             {loadingJobs || serverListLoading ? (
               <span className="inline-flex items-center gap-1.5">
@@ -1546,25 +2062,74 @@ const MatchingPage: React.FC = () => {
               </>
             )}
           </p>
-          <p className="text-xs text-muted-foreground">· เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง</p>
-          {prewarming ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700">
-              <RefreshCw className="h-2.5 w-2.5 animate-spin" /> อุ่นเครื่อง AI งานด่วนล่วงหน้า…
-            </span>
-          ) : null}
-          {workerStatus?.started && workerStatus.queueSize > 0 ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-              <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
-            </span>
-          ) : workerStatus?.started && workerStatus.isIdle ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AI พร้อมแล้ว
-            </span>
-          ) : workerStatus && !workerStatus.enabled ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-400">
-              AI ปิดอยู่
-            </span>
-          ) : null}
+          {/* เลือกจำนวนต่อหน้า — จำค่าไว้ในเครื่อง กลับมาเปิดหน้านี้อีกครั้งได้ค่าเดิม */}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">หน้าละ</span>
+            {MATCHING_PAGE_SIZE_OPTIONS.map((size) => (
+              <button
+                key={size}
+                type="button"
+                onClick={() => changePageSize(size)}
+                disabled={serverListLoading}
+                className={cn(
+                  'rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-wait',
+                  pageSize === size
+                    ? 'border-blue-300 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                )}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+          <p className="w-full text-xs text-muted-foreground">
+            · เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง
+          </p>
+          {/* เรียงลิสต์ — ค่าเริ่มต้นคงพฤติกรรมเดิม (SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน) */}
+          <div className="flex w-full flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-muted-foreground">เรียงตาม:</span>
+            {(
+              [
+                ['default', 'SLA / ด่วนก่อน'],
+                ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
+                ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
+                ['recommend', 'มีคนแนะนำก่อน'],
+                ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
+              ] as Array<[MatchingListSort, string]>
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSortBy(value)}
+                disabled={serverListLoading}
+                className={cn(
+                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-wait',
+                  sortBy === value
+                    ? 'border-blue-300 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* คู่มือสีสั้น ๆ — แถบสีซ้ายการ์ดบอกว่าใบขอค้างมานานแค่ไหน */}
+          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+            <span className="font-medium">สีบอกอายุใบขอ:</span>
+            {(['fresh', 'warming', 'urgent', 'critical'] as const).map((lv) => (
+              <span key={lv} className="inline-flex items-center gap-1">
+                <span
+                  className={cn('h-2 w-2.5 rounded-sm', JOB_AGE_URGENCY_META[lv].barCls)}
+                  aria-hidden
+                />
+                {JOB_AGE_URGENCY_META[lv].label}
+                <span className="text-muted-foreground/70">
+                  {lv === 'fresh' ? '≤7 วัน' : lv === 'warming' ? '8–30' : lv === 'urgent' ? '31–60' : '60+'}
+                </span>
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* การ์ดรวมใบขอ */}
@@ -1614,6 +2179,10 @@ const MatchingPage: React.FC = () => {
             const progress = proposalCounts(proposalsByJobId[j.id]);
             const requested = requestPositionCount(j);
             const remaining = officialRemainingCount(j);
+            // สีบอกความด่วนจากอายุใบขอ: ≤7 วันยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก
+            const ageDays = getJobRequestAgeDays(j);
+            const ageLevel = ageUrgencyLevelFromDays(ageDays);
+            const ageMeta = JOB_AGE_URGENCY_META[ageLevel];
             return (
               <div
                 key={j.id}
@@ -1621,8 +2190,13 @@ const MatchingPage: React.FC = () => {
                 tabIndex={0}
                 onClick={() => openJob(j)}
                 onKeyDown={(e) => e.key === 'Enter' && openJob(j)}
-                className="glass-card rounded-2xl px-3 py-2.5 border border-white/70 cursor-pointer hover:border-sky-300/50 transition-colors"
+                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-sky-300/50 transition-colors"
               >
+                {/* แถบสีซ้ายการ์ด — กวาดตาแล้วรู้ทันทีว่าใบไหนค้างนาน */}
+                <span
+                  aria-hidden
+                  className={cn('absolute inset-y-0 left-0 w-1.5', ageMeta.barCls)}
+                />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-semibold text-blue-600 text-sm truncate">{unitRequestCardTitle(j)}</div>
@@ -1635,6 +2209,22 @@ const MatchingPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
+                    {/* ระดับความด่วนตามอายุใบขอ (คนละเรื่องกับ "ด่วน/ล่วงหน้า" ที่มาจากใบขอ ERP) */}
+                    <span
+                      title={
+                        ageDays == null
+                          ? 'ไม่ทราบอายุใบขอ'
+                          : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
+                      }
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums',
+                        ageMeta.chipCls,
+                      )}
+                    >
+                      <span className={cn('h-1.5 w-1.5 rounded-full', ageMeta.dotCls)} aria-hidden />
+                      {ageMeta.label}
+                      {ageDays != null ? ` · ${ageDays} วัน` : ''}
+                    </span>
                     <span
                       className={cn(
                         'text-[10px] px-2 py-0.5 rounded-full',
@@ -1660,8 +2250,8 @@ const MatchingPage: React.FC = () => {
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                  <div className="min-w-0 flex-1">
                     <span className="block truncate text-[11px] text-muted-foreground">
                       {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
                     </span>
@@ -1669,21 +2259,26 @@ const MatchingPage: React.FC = () => {
                       ขอ {requested} · ติดต่อ {progress.contacted} · จอง {progress.reserved} · ลงงานใน Matching {progress.placed} · เหลือหาทางการ {remaining}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openJob(j);
-                    }}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
-                  >
-                    <Users className="h-3 w-3" />
-                    {matchCount != null
-                      ? `ดูคนของเรา (${matchCount})`
-                      : boardLoadingId === j.id
-                        ? 'AI กำลังประเมิน…'
-                        : 'หาคนของเรา'}
-                  </button>
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                    {serverLumosSummary[j.id] ? <LumosJobSummaryStats s={serverLumosSummary[j.id]} /> : null}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openJob(j);
+                      }}
+                      className="jarvis-btn-secondary shrink-0"
+                    >
+                      <Users className="h-3 w-3" />
+                      {matchCount != null
+                        ? `ดูคนของเรา (${matchCount})`
+                        : boardLoadingId === j.id
+                          ? 'กำลังโหลดผล…'
+                          : boardWaitingById[j.id]
+                            ? 'AI กำลังคิดที่หลังบ้าน…'
+                            : 'หาคนของเรา'}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1923,7 +2518,10 @@ const MatchingPage: React.FC = () => {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   {boardMatchById[jobDetail.id]
-                    ? `AI แมทสกิล · จาก pool ${boardMatchById[jobDetail.id].pool_size} คน → แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)}`
+                    ? `AI แมทสกิล · จาก pool ${boardMatchById[jobDetail.id].pool_size} คน → แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)}` +
+                      (boardMatchById[jobDetail.id].recommended_target
+                        ? ` / เป้า ${boardMatchById[jobDetail.id].recommended_target}`
+                        : '')
                     : 'ผู้สมัครที่พร้อมลงงานทันที'}
                 </p>
                 <div className="flex items-center gap-1.5">
@@ -1969,12 +2567,21 @@ const MatchingPage: React.FC = () => {
                   })()}
                   <button
                     type="button"
-                    disabled={boardLoadingId === jobDetail.id}
+                    disabled={boardLoadingId === jobDetail.id || !!boardWaitingById[jobDetail.id]}
                     onClick={() => setRematchConfirmJobId(jobDetail.id)}
-                    className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60"
+                    className="jarvis-btn-secondary disabled:cursor-wait"
                   >
-                    <RefreshCw className={cn('h-3 w-3', boardLoadingId === jobDetail.id && 'animate-spin')} />
-                    {boardLoadingId === jobDetail.id ? 'AI กำลังประเมิน…' : 'ค้นหาใหม่'}
+                    <RefreshCw
+                      className={cn(
+                        'h-3 w-3',
+                        (boardLoadingId === jobDetail.id || boardWaitingById[jobDetail.id]) && 'animate-spin',
+                      )}
+                    />
+                    {boardWaitingById[jobDetail.id]
+                      ? 'AI กำลังคิดที่หลังบ้าน…'
+                      : boardLoadingId === jobDetail.id
+                        ? 'กำลังโหลดผล…'
+                        : 'ค้นหาใหม่'}
                   </button>
                 </div>
               </div>
@@ -1988,12 +2595,116 @@ const MatchingPage: React.FC = () => {
                 </p>
               ) : null}
 
+              {/* กติกาเป้า 3 เท่า: To do หาไม่ถึงเป้า → ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว
+                  ถ้ายังไม่ถึงเป้าอีก บอกทางไปต่อ (iRecruit / Re Use / โพสหาคนใหม่) */}
+              {(() => {
+                const bm = boardMatchById[jobDetail.id];
+                // ขึ้นเมื่อรู้เป้าแล้ว และ (เคยค้นถังสำรอง หรือหาได้ไม่ถึงเป้า) — ไม่ครบต้องเห็นคำแนะนำเสมอ
+                if (!bm?.recommended_target) return null;
+                if (!bm.fallback_used && recommendedCandidateCount(bm.matches) >= bm.recommended_target) {
+                  return null;
+                }
+                const got = recommendedCandidateCount(bm.matches);
+                const short = got < bm.recommended_target;
+                const posting = jobPostingByJobId[jobDetail.id];
+                return (
+                  <div
+                    className={cn(
+                      'rounded-lg border px-2.5 py-2 text-[10px] space-y-1.5',
+                      short
+                        ? 'border-amber-200 bg-amber-50/80 text-amber-900'
+                        : 'border-sky-100 bg-sky-50/70 text-sky-800',
+                    )}
+                  >
+                    <p>
+                      To do หาได้ไม่ถึงเป้า {bm.recommended_target} คน (อัตราที่ขอ × 3) — ค้นถัง “ไม่มีงาน” เพิ่มแล้ว
+                      {short
+                        ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
+                        : ` → รวมแนะนำ ${got} คน (ครบเป้า)`}
+                    </p>
+                    {/* หาไม่ครบเป้า = แนะนำให้ส่งต่อทีมอื่นตรงนี้เลย ไม่ต้องเลื่อนไปหาปุ่มด้านล่าง */}
+                    {short ? (
+                      posting ? (
+                        <p className="font-semibold">
+                          ส่งคำขอโพสหาคนไปแล้ว ({posting.request_type === 'scraping' ? 'Scraping' : 'Content'}) —
+                          รอทีมรับไปทำ
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold">แนะนำ: หาคนของเราไม่ครบ ส่งต่อทีมอื่นเลย →</span>
+                          <button
+                            type="button"
+                            disabled={creatingPosting}
+                            onClick={() => void createPosting(jobDetail, 'content')}
+                            className="inline-flex items-center gap-1 rounded-full bg-orange-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                          >
+                            <Megaphone className="h-3 w-3" />
+                            {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={creatingPosting}
+                            onClick={() => void createPosting(jobDetail, 'scraping')}
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            <Search className="h-3 w-3" />
+                            {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
+                          </button>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                );
+              })()}
+
+              {lumosNotice ? (
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-800">
+                  {lumosNotice}
+                </p>
+              ) : null}
+              {lumosError ? (
+                <p className="rounded-lg border border-red-200 bg-red-50/80 px-2.5 py-1.5 text-[11px] text-destructive">
+                  {lumosError}
+                </p>
+              ) : null}
+
+              {/* ใบขอด่วน + มีคนเพิ่มเข้า pool ทีหลัง → ดันเข้าคิวโทรเองได้ ไม่ต้องรอ AI แมทรอบใหม่ */}
+              <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 px-3 py-2">
+                <LumosJobSummaryStats s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-600">
+                  คนที่ AI แนะนำถูกส่ง AI โทรอัตโนมัติแล้ว — ถ้ามีคนเพิ่มเข้ามาทีหลังและใบขอด่วน เลือกส่งเองได้
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void openLumosPicker()}
+                  className="jarvis-btn-secondary shrink-0"
+                >
+                  <PhoneCall className="h-3 w-3" /> เลือกคนส่ง AI โทร
+                </button>
+                </div>
+              </div>
+
+              <LumosSendBar
+                count={lumosSelectedCount}
+                busy={lumosSending}
+                onClear={clearLumosSelection}
+                onSend={() => setLumosConfirmOpen(true)}
+              />
+
               {boardLoadingId === jobDetail.id ? (
                 <AiEvaluationStatus source="board" />
               ) : boardErrorById[jobDetail.id] ? (
                 <p className="text-xs text-destructive">{boardErrorById[jobDetail.id]}</p>
               ) : boardMatchById[jobDetail.id] ? (
-                recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
+                <>
+                {boardWaitingById[jobDetail.id] ? (
+                  <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] text-sky-800">
+                    <RefreshCw className="h-3 w-3 shrink-0 animate-spin" />
+                    สั่งค้นหาใหม่แล้ว — AI กำลังคิดอยู่หลังบ้าน ผลใหม่จะมาแทนที่อัตโนมัติ (ที่เห็นตอนนี้คือผลเดิม)
+                  </p>
+                ) : null}
+                {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
                   <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3 text-xs text-foreground">
                     ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองหาจากฐาน iRecruit ด้านล่าง แล้วเสนอได้เลย
@@ -2011,16 +2722,38 @@ const MatchingPage: React.FC = () => {
                         const proposed = proposedByKey[candidateKey];
                         const otherActive = activeProposalByCandidate[candidateKey];
                         const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
+                        const lumosRef = boardPersonRef(m.card_id);
+                        const lumosRow = lumosStatusByRef[lumosRef];
+                        const canPickForLumos = Boolean(m.mobile) && !lumosRow;
                         return (
-                        <button
-                          type="button"
+                        <div
                           key={m.card_id}
-                          onClick={() => setCandDetail(m)}
                           className={cn(
-                            'matching-candidate-card w-full rounded-xl border px-3 py-2 text-left',
+                            'matching-candidate-card rounded-xl border px-3 py-2',
                             meta.cls,
                             proposed ? 'opacity-70' : '',
                           )}
+                        >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={lumosSelectedBoard.includes(m.card_id)}
+                            disabled={!canPickForLumos}
+                            onChange={() => toggleLumosBoard(m.card_id)}
+                            aria-label={`เลือก ${m.full_name} ให้ AI โทร`}
+                            title={
+                              !m.mobile
+                                ? 'ไม่มีเบอร์มือถือ — ให้ AI โทรไม่ได้'
+                                : lumosRow
+                                  ? 'ส่ง AI โทรไปแล้ว'
+                                  : 'เลือกให้ AI โทร'
+                            }
+                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        <button
+                          type="button"
+                          onClick={() => setCandDetail(m)}
+                          className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold text-foreground">
@@ -2037,6 +2770,19 @@ const MatchingPage: React.FC = () => {
                               {m.nick_name ? ` (${m.nick_name})` : ''}
                             </span>
                             <div className="flex shrink-0 items-center gap-1">
+                              {(() => {
+                                const colBadge = boardColumnBadge(m.column_label);
+                                return colBadge ? (
+                                  <span
+                                    className={cn(
+                                      'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                      colBadge.cls,
+                                    )}
+                                  >
+                                    {colBadge.text}
+                                  </span>
+                                ) : null;
+                              })()}
                               {proposed ? (
                                 <span
                                   className={cn(
@@ -2103,10 +2849,27 @@ const MatchingPage: React.FC = () => {
                           {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p> : null}
                           <div className="mt-1 text-[10px] font-medium text-sky-600">แตะเพื่อดูรายละเอียด →</div>
                           </button>
+                        </div>
+                        {lumosRow ? (
+                          <LumosCallBadgeRow
+                            row={lumosRow}
+                            expanded={lumosExpandedRef === lumosRef}
+                            onToggle={() => setLumosExpandedRef((cur) => (cur === lumosRef ? null : lumosRef))}
+                            onCancel={() => void cancelLumosForRef(lumosRow)}
+                            cancelling={lumosCancellingRef === lumosRef}
+                          />
+                        ) : null}
+                        </div>
                         );
                       })}
                   </div>
-                )
+                )}
+                </>
+              ) : boardWaitingById[jobDetail.id] ? (
+                <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-3 text-xs text-sky-800">
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                  AI กำลังค้นหาใบนี้อยู่ที่หลังบ้าน — ผลจะแสดงอัตโนมัติเมื่อค้นหาเสร็จ
+                </p>
               ) : null}
 
               {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
@@ -2123,7 +2886,7 @@ const MatchingPage: React.FC = () => {
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
-                        className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                        className="jarvis-btn-primary"
                       >
                         {irLoadingId === jobDetail.id ? (
                           'กำลังค้นหา…'
@@ -2189,6 +2952,9 @@ const MatchingPage: React.FC = () => {
                             const busy = proposingKey === key;
                             const otherActive = activeProposalByCandidate[key];
                             const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
+                            const lumosRef = irecruitPersonRef(m.id);
+                            const lumosRow = lumosStatusByRef[lumosRef];
+                            const canPickForLumos = Boolean(m.phone_number) && !lumosRow;
                             return (
                               <div
                                 key={row.key}
@@ -2198,7 +2964,22 @@ const MatchingPage: React.FC = () => {
                                 )}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="text-sm font-semibold text-blue-700">
+                                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={lumosSelectedIrecruit.includes(m.id)}
+                                      disabled={!canPickForLumos}
+                                      onChange={() => toggleLumosIrecruit(m.id)}
+                                      aria-label={`เลือก ${m.full_name} ให้ AI โทรสัมภาษณ์`}
+                                      title={
+                                        !m.phone_number
+                                          ? 'ไม่มีเบอร์โทร — ให้ AI โทรไม่ได้'
+                                          : lumosRow
+                                            ? 'ส่ง AI โทรไปแล้ว'
+                                            : 'เลือกให้ AI โทรสัมภาษณ์'
+                                      }
+                                      className="h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                    />
                                     <TierCriteriaTooltip tier={m.tier}>
                                       <span
                                         tabIndex={0}
@@ -2342,6 +3123,17 @@ const MatchingPage: React.FC = () => {
                                     </button>
                                   ) : null}
                                 </div>
+                                {lumosRow ? (
+                                  <LumosCallBadgeRow
+                                    row={lumosRow}
+                                    expanded={lumosExpandedRef === lumosRef}
+                                    onToggle={() =>
+                                      setLumosExpandedRef((cur) => (cur === lumosRef ? null : lumosRef))
+                                    }
+                                    onCancel={() => void cancelLumosForRef(lumosRow)}
+                                    cancelling={lumosCancellingRef === lumosRef}
+                                  />
+                                ) : null}
                               </div>
                             );
                           })}
@@ -2352,6 +3144,12 @@ const MatchingPage: React.FC = () => {
                       กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วกดจองตัว/ลงงานได้เลยในหน้านี้
                     </p>
                   )}
+                  <LumosSendBar
+                    count={lumosSelectedCount}
+                    busy={lumosSending}
+                    onClear={clearLumosSelection}
+                    onSend={() => setLumosConfirmOpen(true)}
+                  />
                   {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                 </div>
               ) : null}
@@ -2948,7 +3746,7 @@ const MatchingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setConflictInfo(null)}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                  className="jarvis-btn-ghost px-4 py-2"
                 >
                   ปิด
                 </button>
@@ -2958,7 +3756,7 @@ const MatchingPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ยืนยันก่อนค้นหาใหม่ (Rematching) — คิด AI ใหม่ทับผลเดิม ใช้เวลาสักครู่ */}
+      {/* ยืนยันก่อนค้นหาใหม่ (Rematching) — สั่งให้ worker หลังบ้านคิดใหม่ ผลใหม่ทับผลเดิม */}
       <Dialog open={!!rematchConfirmJobId} onOpenChange={(o) => !o && setRematchConfirmJobId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -2969,7 +3767,8 @@ const MatchingPage: React.FC = () => {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-foreground">
-              ให้ AI ประเมินคนของเราสำหรับใบขอนี้ใหม่ทั้งหมด — จะใช้เวลาประมาณ 30–90 วินาที และผลใหม่จะทับผลเดิมที่เก็บไว้
+              ระบบจะส่งใบนี้ให้ AI ที่หลังบ้านประเมินใหม่ทั้งหมด — ระหว่างรอยังเห็นผลเดิม
+              และผลใหม่จะมาแทนที่อัตโนมัติเมื่อคิดเสร็จ (ปกติไม่กี่นาที)
             </p>
             <p className="text-xs text-muted-foreground">
               ถ้าไม่ต้องการคิดใหม่ ระบบจะคงผลเดิมไว้ (แสดงเฉพาะคนที่ยังพร้อม)
@@ -2978,7 +3777,7 @@ const MatchingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setRematchConfirmJobId(null)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                className="jarvis-btn-ghost px-4 py-2"
               >
                 ยกเลิก
               </button>
@@ -2989,10 +3788,213 @@ const MatchingPage: React.FC = () => {
                   setRematchConfirmJobId(null);
                   if (id) void fetchBoardMatch(id, true);
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+                className="jarvis-btn-primary px-4 py-2"
               >
                 <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
               </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ยืนยันก่อนส่งให้ Lumos โทร — AI จะโทรหาคนจริง จึงต้องเห็นรายชื่อครบก่อนกด */}
+      <Dialog open={lumosConfirmOpen} onOpenChange={(o) => !o && setLumosConfirmOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">ส่ง AI โทร {lumosSelectedCount} คน?</DialogTitle>
+            <DialogDescription className="sr-only">
+              ยืนยันส่งรายชื่อผู้สมัครที่เลือกเข้าคิว AI โทร
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
+              AI จะโทรหาคนเหล่านี้จริง — ตรวจรายชื่อให้แน่ใจก่อนกดส่ง
+            </p>
+            {(() => {
+              const boardNames = lumosSelectedBoard.map((cardId) => {
+                const { name, phone } = boardPersonLabel(cardId);
+                return { key: `card-${cardId}`, name, phone };
+              });
+              const irNames = (irMatchById[jobDetail?.id ?? '']?.matches ?? [])
+                .filter((m) => lumosSelectedIrecruit.includes(m.id))
+                .map((m) => ({ key: `ir-${m.id}`, name: m.full_name, phone: m.phone_number }));
+              return (
+                <div className="max-h-56 space-y-2 overflow-y-auto">
+                  {boardNames.length > 0 ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-emerald-800">
+                        คนของเรา — แจ้งงาน/โทรตาม ({boardNames.length})
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {boardNames.map((p) => (
+                          <li key={p.key} className="text-[11px] text-slate-700">
+                            • {p.name} <span className="text-muted-foreground">{p.phone || '(ไม่มีเบอร์)'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {irNames.length > 0 ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-blue-800">
+                        ผู้สมัคร iRecruit — AI โทรสัมภาษณ์ ({irNames.length})
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {irNames.map((p) => (
+                          <li key={p.key} className="text-[11px] text-slate-700">
+                            • {p.name} <span className="text-muted-foreground">{p.phone || '(ไม่มีเบอร์)'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLumosConfirmOpen(false)}
+                className="jarvis-btn-ghost px-4 py-2"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={lumosSending}
+                onClick={() => void sendSelectedToLumos()}
+                className="jarvis-btn-primary px-4 py-2"
+              >
+                <PhoneCall className="h-3 w-3" />
+                {lumosSending ? 'กำลังส่ง…' : `ยืนยันส่ง ${lumosSelectedCount} คน`}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* เลือกคนจาก pool "คนของเรา" — ครอบคนที่เพิ่งเพิ่มเข้ามาและยังไม่เคยผ่าน AI แมท */}
+      <Dialog open={lumosPickerOpen} onOpenChange={(o) => !o && setLumosPickerOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">เลือกคนส่ง AI โทร</DialogTitle>
+            <DialogDescription className="sr-only">
+              เลือกผู้สมัครจาก pool คนของเราเพื่อส่งเข้าคิว AI โทร
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2.5">
+            <input
+              type="search"
+              value={lumosPoolSearch}
+              onChange={(e) => setLumosPoolSearch(e.target.value)}
+              placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
+              className="w-full rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            />
+            {lumosPoolLoading ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                <LoaderCircle className="mx-auto mb-1.5 h-4 w-4 animate-spin text-sky-500" aria-hidden />
+                กำลังโหลดรายชื่อคนของเรา…
+              </p>
+            ) : (
+              (() => {
+                const rows = filterLumosPool(lumosPool, lumosPoolSearch);
+                if (lumosPool.length === 0) {
+                  return <p className="py-6 text-center text-xs text-muted-foreground">ไม่มีคนของเราใน pool รอลงงาน</p>;
+                }
+                if (rows.length === 0) {
+                  return <p className="py-6 text-center text-xs text-muted-foreground">ไม่พบคนที่ตรงกับคำค้น</p>;
+                }
+                return (
+                  <>
+                    <p className="text-[10px] text-muted-foreground">
+                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use) · แสดง {rows.length} ·
+                      คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
+                    </p>
+                    <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
+                      {rows.map((c) => {
+                        const selectable = Boolean(c.mobile) && !c.already_sent;
+                        return (
+                          <label
+                            key={c.card_id}
+                            className={cn(
+                              'flex items-start gap-2 rounded-xl border px-2.5 py-2',
+                              selectable
+                                ? 'cursor-pointer border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'
+                                : 'border-slate-200 bg-slate-50 opacity-70',
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={lumosSelectedBoard.includes(c.card_id)}
+                              disabled={!selectable}
+                              onChange={() => toggleLumosBoard(c.card_id)}
+                              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs font-semibold text-foreground">{c.full_name}</span>
+                                {(() => {
+                                  const colBadge = boardColumnBadge(c.column_label);
+                                  return colBadge ? (
+                                    <span
+                                      className={cn(
+                                        'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold',
+                                        colBadge.cls,
+                                      )}
+                                    >
+                                      {colBadge.text}
+                                    </span>
+                                  ) : null;
+                                })()}
+                                {c.already_sent ? (
+                                  <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                                    ส่งไปแล้ว
+                                  </span>
+                                ) : null}
+                                {!c.mobile ? (
+                                  <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                                    ไม่มีเบอร์
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted-foreground">
+                                <span>สกิล: {c.skills || 'ไม่ระบุ'}</span>
+                                {c.area ? <span>{c.area}</span> : null}
+                                {c.age ? <span>อายุ {c.age}</span> : null}
+                                {c.required_salary ? <span>ขอ {c.required_salary.toLocaleString()} บ.</span> : null}
+                                {c.mobile ? <span className="font-medium text-sky-700">{c.mobile}</span> : null}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5">
+              <p className="text-[11px] font-semibold text-sky-900">เลือกไว้ {lumosSelectedBoard.length} คน</p>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLumosPickerOpen(false)}
+                  className="jarvis-btn-ghost px-4 py-2"
+                >
+                  ปิด
+                </button>
+                <button
+                  type="button"
+                  disabled={lumosSelectedCount === 0}
+                  onClick={() => {
+                    setLumosPickerOpen(false);
+                    setLumosConfirmOpen(true);
+                  }}
+                  className="jarvis-btn-primary px-4 py-2"
+                >
+                  <PhoneCall className="h-3 w-3" /> ถัดไป ({lumosSelectedCount} คน)
+                </button>
+              </div>
             </div>
           </div>
         </DialogContent>

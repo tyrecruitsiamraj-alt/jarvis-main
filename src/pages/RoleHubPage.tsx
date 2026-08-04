@@ -21,7 +21,7 @@ type HubLink = {
 
 const STAFF_LINKS: HubLink[] = [
   { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, accent: 'text-blue-600 bg-blue-500/12', functionId: 'work_calendar_read' },
-  { path: '/follow', label: 'Follow', desc: 'ลงรายชื่อคนที่ต้องติดตาม — Lumos โทรให้', icon: PhoneForwarded, accent: 'text-rose-700 bg-rose-500/12', functionId: 'follow_read' },
+  { path: '/follow', label: 'Follow', desc: 'ลงรายชื่อคนที่ต้องติดตาม — AI โทรให้', icon: PhoneForwarded, accent: 'text-rose-700 bg-rose-500/12', functionId: 'follow_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', desc: 'ดูรายการใบขอ', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12', functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, accent: 'text-neutral-800 bg-neutral-500/10', functionId: 'dashboard' },
 ];
@@ -56,7 +56,6 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
 
   return (
     <div className="relative">
-      <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader title={title} subtitle={subtitle} backPath="/" />
       <div className="px-4 md:px-6 py-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">

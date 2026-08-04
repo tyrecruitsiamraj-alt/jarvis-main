@@ -36,13 +36,13 @@ import shortLinksResolveHandler from './short-links-resolve.js';
 import requestControlForecastHandler from './request-control-forecast.js';
 import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
+import workStatusMasterHandler from './work-status-master.js';
 import followHandler from './follow.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
 import siamrajUnitWorkStatusHandler from './siamraj-unit-work-status.js';
 import siamrajOplImportHandler from './siamraj-opl-import.js';
-import outboundIpHandler from './diagnostics/outbound-ip.js';
 import recruitRegistrationsHandler from './recruit-registrations.js';
 import matchingSuggestionsHandler from './matching-suggestions.js';
 import matchingParseBranchDemandHandler from './matching-parse-branch-demand.js';
@@ -56,10 +56,12 @@ import {
   lumosReminderResultsHandler,
 } from './lumos-reminder.js';
 import lumosPositionsHandler from './lumos-positions.js';
+import lumosDispatchHandler from './lumos-dispatch.js';
 import matchingCandidateSpecHandler from './matching-candidate-spec.js';
 import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js';
 import matchingBoardCandidatesHandler from './matching-board-candidates.js';
 import matchingProposalsHandler from './matching-proposals.js';
+import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
 import matchingWorkerStatusHandler from './matching-worker-status.js';
 
@@ -88,9 +90,10 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
   '/api/siamraj/unit-work-status': siamrajUnitWorkStatusHandler as ApiHandler,
   '/api/siamraj/opl-import': siamrajOplImportHandler as ApiHandler,
-  '/api/diagnostics/outbound-ip': outboundIpHandler as ApiHandler,
   // Lumos AI Recruit — Positions
   '/api/lumos/positions': lumosPositionsHandler as ApiHandler,
+  // ส่งให้ Lumos โทรแบบคนเลือกเอง + อ่านผลการโทร (เรียกจากหน้า Matching ด้วย session ปกติ)
+  '/api/lumos/dispatch': lumosDispatchHandler as ApiHandler,
   // AI Interview (Lumos ↔ SO)
   '/api/recruit-registrations': recruitRegistrationsHandler as ApiHandler,
   '/api/matching/suggestions': matchingSuggestionsHandler as ApiHandler,
@@ -105,9 +108,11 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
   '/api/matching/board-candidates': matchingBoardCandidatesHandler as ApiHandler,
   '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
+  '/api/matching/flow-summary': matchingFlowSummaryHandler as ApiHandler,
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
+  '/api/work-status-master': workStatusMasterHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,

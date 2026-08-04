@@ -48,8 +48,10 @@ export type ApiResource =
   | 'matching-board-candidates'
   | 'matching-proposals'
   | 'matching-job-postings'
+  | 'matching-flow-summary'
+  | 'lumos-dispatch'
   | 'job-applications'
-  | 'diagnostics-outbound-ip';
+  | 'work-status-master';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -110,7 +112,11 @@ export function minimumRoleFor(
     case 'app-users':
     case 'audit-logs':
     case 'branding':
-    case 'diagnostics-outbound-ip':
+      return 'admin';
+
+    case 'work-status-master':
+      // อ่านได้ทุกคน (dropdown สถานะทำงานทั้งระบบใช้) — เพิ่ม/แก้/ลบเฉพาะ admin
+      if (isRead) return 'staff';
       return 'admin';
 
     case 'siamraj-unit-requests':
@@ -137,6 +143,12 @@ export function minimumRoleFor(
     case 'matching-board-candidates':
     case 'matching-proposals':
     case 'matching-job-postings':
+    case 'matching-flow-summary':
+      return 'staff';
+
+    case 'lumos-dispatch':
+      // staff: ดูผลการโทร + ติ๊กเลือกส่งให้ Lumos โทรเอง (โมเดลเดียวกับ follow)
+      // opl ถูกกันที่ checkApiAccess อยู่แล้ว (read-only role ห้าม POST/DELETE)
       return 'staff';
 
     case 'job-applications':

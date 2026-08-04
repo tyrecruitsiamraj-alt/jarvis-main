@@ -8,6 +8,7 @@ import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { listProposalsForJobs } from '../_lib/candidateProposals.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
+import { loadLumosJobCallSummaryMap, type LumosJobCallSummary } from '../_lib/lumosDispatch.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { isBoardCandidateAvailable } from '@/lib/boardMatchAvailability';
 import {
@@ -20,6 +21,7 @@ import {
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import {
   filterAndSortMatchingJobs,
+  normalizeMatchingListSort,
   type MatchingWorkflowFilter,
 } from '@/lib/matchingListFilter';
 import { recommendedCandidateCount } from '@/lib/matchingProgress';
@@ -62,10 +64,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     enqueuePrecomputeJobs(jobs);
 
     // ข้อมูลประกอบตัวกรองจาก PG: การจองตัว + ผล AI ที่เคยคิดเก็บไว้ + ความพร้อมของคนของเรา
-    const [proposalMap, tierMap, availCtx] = await Promise.all([
+    // + สรุปผลโทร Lumos ต่อใบ (โชว์ข้างการ์ด)
+    const [proposalMap, tierMap, availCtx, lumosMap] = await Promise.all([
       listProposalsForJobs(jobs.map((j) => j.id)),
       loadBoardMatchTierMap(),
       loadBoardAvailabilityContext(),
+      loadLumosJobCallSummaryMap().catch(() => new Map<string, LumosJobCallSummary>()),
     ]);
 
     // กรองผลที่เก็บไว้ให้เหลือเฉพาะ "คนที่ยังพร้อม" ก่อนนับป้าย/summary/workflow filter
@@ -79,6 +83,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       urgentOnly: getQuery(req, 'urgent') === '1',
       unitFilter: getQuery(req, 'unit'),
       workflowFilter: normalizeWorkflow(getQuery(req, 'workflow')),
+      buFilter: getQuery(req, 'bu'),
+      sort: normalizeMatchingListSort(getQuery(req, 'sort')),
     };
 
     const rows = filterAndSortMatchingJobs(jobs, query, {
@@ -92,16 +98,42 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const start = (page - 1) * pageSize;
     const items = rows.slice(start, start + pageSize);
 
-    // facet/summary จากชุดเต็ม (ก่อนแบ่งหน้า) — ให้ dropdown หน่วยงานและสรุปงานด่วนไม่ผูกกับหน้า
+    // ยอดใบขอเปิดต่อ BU — นับจากชุดเต็มตามสิทธิ์ผู้ใช้ ไม่ผูกกับตัวกรองใด (ป้ายบนชิป "แยกดูตาม BU"
+    // ต้องคงที่ ไม่หายไปเมื่อเลือก BU อื่น)
+    const buCounts: Record<string, number> = {};
+    for (const j of jobs) {
+      const code = (j.department_code || '').trim().toUpperCase();
+      if (code) buCounts[code] = (buCounts[code] ?? 0) + 1;
+    }
+
+    // BU = ขอบเขตการดู ไม่ใช่ตัวกรองย่อย → dropdown หน่วยงาน + สรุปงานด่วนต้องอยู่ใน BU ที่เลือก
+    const buScope = query.buFilter.trim().toUpperCase();
+    const scopedJobs = buScope
+      ? jobs.filter((j) => (j.department_code || '').trim().toUpperCase() === buScope)
+      : jobs;
+
+    // facet/summary จากชุดเต็มของ BU นั้น (ก่อนแบ่งหน้า) — ไม่ผูกกับหน้าที่กำลังดู
     const unitOptions = Array.from(
-      new Set(jobs.map((j) => j.unit_name?.trim()).filter((u): u is string => Boolean(u))),
+      new Set(scopedJobs.map((j) => j.unit_name?.trim()).filter((u): u is string => Boolean(u))),
     ).sort((a, b) => a.localeCompare(b, 'th'));
-    const urgentJobs = jobs.filter((j) => j.urgency === 'urgent');
+    const urgentJobs = scopedJobs.filter((j) => j.urgency === 'urgent');
+    // นับตามชุดเต็มของ BU ที่เลือก (ก่อนตัวกรองย่อย) — กล่องสรุปกดแล้วต้องพาไปเจอตามจำนวนที่โชว์
+    const tiersOf = (id: string) => tierMap.get(id)?.tiers ?? [];
+    const hasGreen = (id: string) => tiersOf(id).some((t) => t.tier === 'green');
+    // "เหลือง" = มีเหลืองแต่ไม่มีเขียว (นิยามเดียวกับตัวกรอง workflow=yellow ไม่ให้นับซ้อนกับเขียว)
+    const hasYellowOnly = (id: string) =>
+      !hasGreen(id) && tiersOf(id).some((t) => t.tier === 'yellow');
     const summary = {
       urgentTotal: urgentJobs.length,
       urgentAnalyzed: urgentJobs.filter((j) => tierMap.has(j.id)).length,
-      urgentWithGreen: urgentJobs.filter((j) =>
-        (tierMap.get(j.id)?.tiers ?? []).some((t) => t.tier === 'green'),
+      urgentWithGreen: urgentJobs.filter((j) => hasGreen(j.id)).length,
+      // ยอดทั้งชุด (ตาม BU) สำหรับกล่องสรุปที่กดเพื่อกรองได้
+      scopedTotal: scopedJobs.length,
+      withGreen: scopedJobs.filter((j) => hasGreen(j.id)).length,
+      withYellow: scopedJobs.filter((j) => hasYellowOnly(j.id)).length,
+      // ประเมินแล้วแต่ไม่มีใครแนะนำ — ตรงกับตัวกรอง "AI ไม่พบคน"
+      noRecommend: scopedJobs.filter(
+        (j) => tierMap.has(j.id) && recommendedCandidateCount(tiersOf(j.id)) === 0,
       ).length,
     };
 
@@ -117,6 +149,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
     }
 
+    // สรุปผลโทร Lumos ต่อใบในหน้านี้: ส่งโทร/โทรแล้ว/สนใจ/ไม่สนใจ/ไม่รับสาย
+    const lumosSummary: Record<string, LumosJobCallSummary> = {};
+    for (const j of items) {
+      const entry = lumosMap.get(j.id);
+      if (entry && entry.sent > 0) lumosSummary[j.id] = entry;
+    }
+
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json({
       items,
@@ -124,8 +163,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       page,
       pageSize,
       unitOptions,
+      buCounts,
       summary,
       storedMatches,
+      lumosSummary,
     });
   } catch (e) {
     return handleApiError(res, e, 'matching-list GET', { userId: req.user.sub });

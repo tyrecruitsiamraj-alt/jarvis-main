@@ -112,7 +112,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
   return (
     <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
-      <div className="jarvis-page-orb -top-10 right-0 h-48 w-48 opacity-25" aria-hidden />
 
       <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">

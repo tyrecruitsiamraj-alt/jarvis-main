@@ -25,18 +25,48 @@ export type PrecomputeJob = Record<string, unknown> & { id: string };
 
 // ─── Shared queue ─────────────────────────────────────────────────────────────
 // Map preserves insertion order → FIFO. Dedupes by job ID.
-type QueueEntry = { job: PrecomputeJob; refresh: boolean };
+export type QueueEntry = { job: PrecomputeJob; refresh: boolean };
 const queue = new Map<string, QueueEntry>();
 
-function enqueue(items: Array<{ job: PrecomputeJob; refresh: boolean }>): number {
-  let added = 0;
+/**
+ * Insert items into a FIFO queue map. Exported (pure on `target`) for tests.
+ * - dedupe by job id — ใบที่อยู่ในคิวแล้วคงตำแหน่งเดิม แต่อัปเกรดเป็น refresh ได้
+ * - front: แทรกรายการใหม่ไว้หัวคิว (ใบที่ผู้ใช้เปิดอยู่ ต้องได้คิดก่อน scan ปกติ)
+ */
+export function applyEnqueue(
+  target: Map<string, QueueEntry>,
+  items: Array<{ job: PrecomputeJob; refresh: boolean }>,
+  opts: { front?: boolean } = {},
+): number {
+  const fresh: Array<[string, QueueEntry]> = [];
   for (const { job, refresh } of items) {
     const id = typeof job.id === 'string' ? job.id.trim() : '';
-    if (!id || queue.has(id)) continue;
-    queue.set(id, { job, refresh });
-    added++;
+    if (!id) continue;
+    const existing = target.get(id);
+    if (existing) {
+      if (refresh && !existing.refresh) existing.refresh = true;
+      continue;
+    }
+    if (fresh.some(([k]) => k === id)) continue;
+    fresh.push([id, { job, refresh }]);
   }
-  return added;
+  if (fresh.length === 0) return 0;
+  if (opts.front && target.size > 0) {
+    const rest = [...target];
+    target.clear();
+    for (const [k, v] of fresh) target.set(k, v);
+    for (const [k, v] of rest) target.set(k, v);
+  } else {
+    for (const [k, v] of fresh) target.set(k, v);
+  }
+  return fresh.length;
+}
+
+function enqueue(
+  items: Array<{ job: PrecomputeJob; refresh: boolean }>,
+  opts: { front?: boolean } = {},
+): number {
+  return applyEnqueue(queue, items, opts);
 }
 
 // ─── Priority ─────────────────────────────────────────────────────────────────
@@ -79,13 +109,25 @@ function sortByPriority(
  */
 export function enqueuePrecomputeJobs(
   jobs: Array<Record<string, unknown> & { id: string }>,
+  opts: { refresh?: boolean; front?: boolean } = {},
 ): void {
   if (!workerStarted) return;
   const sorted = sortByPriority(
-    jobs.map((job) => ({ job: job as PrecomputeJob, refresh: false })),
+    jobs.map((job) => ({ job: job as PrecomputeJob, refresh: opts.refresh === true })),
   );
-  const added = enqueue(sorted);
-  if (added > 0) logInfo('match-precompute.push', { added, queueSize: queue.size });
+  const added = enqueue(sorted, { front: opts.front === true });
+  if (added > 0)
+    logInfo('match-precompute.push', {
+      added,
+      queueSize: queue.size,
+      refresh: opts.refresh === true,
+      front: opts.front === true,
+    });
+}
+
+/** หน้าเว็บไม่รัน AI เองแล้ว — handler ใช้เช็คว่ามี worker หลังบ้านรับงานต่อจริงไหม */
+export function isMatchPrecomputeWorkerActive(): boolean {
+  return workerStarted;
 }
 
 // ─── selectPrecomputeQueue (kept for existing tests) ─────────────────────────

@@ -4,16 +4,18 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, Globe } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
-import VercelOutboundIpTab from '@/pages/settings/VercelOutboundIpTab';
+import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'reference' | 'audit' | 'outboundIp';
+type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'reference' | 'audit';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -37,7 +39,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
-  { id: 'outboundIp', label: 'Vercel IP', icon: Globe, adminOnly: true },
+  { id: 'workStatus', label: 'สถานะทำงาน', icon: ListChecks, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
 ];
@@ -48,11 +50,11 @@ const AdminSettings: React.FC = () => {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const initialTab: SettingsTab =
-    tabFromUrl === 'outboundIp' ||
     tabFromUrl === 'appearance' ||
     tabFromUrl === 'users' ||
     tabFromUrl === 'roles' ||
     tabFromUrl === 'jobStaff' ||
+    tabFromUrl === 'workStatus' ||
     tabFromUrl === 'reference' ||
     tabFromUrl === 'audit'
       ? tabFromUrl
@@ -61,6 +63,11 @@ const AdminSettings: React.FC = () => {
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiAuditLogs, setApiAuditLogs] = useState<AuditLog[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  // แบ่งหน้าผู้ใช้ — เริ่มที่ 10 คน/หน้า เลือกได้เอง (ใช้แถบเลขหน้ากลางของระบบ)
+  const [userPage, setUserPage] = useState(1);
+  const [userPageSize, setUserPageSize] = useState<PageSizeOption>(10);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState<PageSizeOption>(20);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [userActionError, setUserActionError] = useState('');
   const [userActionOk, setUserActionOk] = useState('');
@@ -97,6 +104,40 @@ const AdminSettings: React.FC = () => {
     setUserActionError('');
     setUserActionOk('');
   }, [activeTab]);
+
+  // แบ่งหน้าผู้ใช้ + กันค้างอยู่หน้าที่หายไปเมื่อจำนวนคนหรือจำนวนต่อหน้าเปลี่ยน
+  const userTotalPages = getTotalPages(apiUsers.length, userPageSize);
+  const currentUserPage = Math.min(userPage, userTotalPages);
+  const userPageStart = (currentUserPage - 1) * userPageSize;
+  const visibleUsers = apiUsers.slice(userPageStart, userPageStart + userPageSize);
+  useEffect(() => {
+    if (userPage > userTotalPages) setUserPage(userTotalPages);
+  }, [userPage, userTotalPages]);
+
+  const userPaginationBar = (
+    <ListPaginationBar
+      page={currentUserPage}
+      pageSize={userPageSize}
+      totalItems={apiUsers.length}
+      totalPages={userTotalPages}
+      pageFrom={apiUsers.length === 0 ? 0 : userPageStart + 1}
+      pageTo={userPageStart + visibleUsers.length}
+      onPageChange={setUserPage}
+      onPageSizeChange={(size) => {
+        setUserPageSize(size);
+        setUserPage(1);
+      }}
+    />
+  );
+
+  // แบ่งหน้า audit log — บันทึกเยอะ ต้องดูทีละหน้าเหมือนตารางอื่น
+  const auditTotalPages = getTotalPages(apiAuditLogs.length, auditPageSize);
+  const currentAuditPage = Math.min(auditPage, auditTotalPages);
+  const auditPageStart = (currentAuditPage - 1) * auditPageSize;
+  const visibleAuditLogs = apiAuditLogs.slice(auditPageStart, auditPageStart + auditPageSize);
+  useEffect(() => {
+    if (auditPage > auditTotalPages) setAuditPage(auditTotalPages);
+  }, [auditPage, auditTotalPages]);
 
   const updateUser = async (
     id: string,
@@ -252,7 +293,7 @@ const AdminSettings: React.FC = () => {
                       </td>
                     </tr>
                   )}
-                  {apiUsers.map((u) => (
+                  {visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
                       <td className="px-4 py-3 font-medium text-foreground">{u.full_name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
@@ -325,105 +366,15 @@ const AdminSettings: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              <div className="px-4 pb-4">{userPaginationBar}</div>
             </div>
           ))}
 
-        {activeTab === 'users' && !usersLoading && (
-          <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
-            <div className="text-sm font-semibold text-foreground">จัดการสิทธิ์ผู้ใช้</div>
-            {userActionError ? (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {userActionError}
-              </div>
-            ) : null}
-            {userActionOk ? (
-              <div className="rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
-                {userActionOk}
-              </div>
-            ) : null}
-
-            <div className="space-y-2">
-              {apiUsers.map((u) => (
-                <div key={`manage-${u.id}`} className="rounded-lg border border-border p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">{u.full_name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{u.email}</div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <select
-                      value={u.role}
-                      disabled={savingUserId === u.id}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        if (!isUserRole(next)) return;
-                        if (next === u.role) return;
-                        void updateUser(u.id, { role: next });
-                      }}
-                      className={cn(
-                        'rounded-md border border-border bg-secondary px-2 py-1 text-xs',
-                        savingUserId === u.id && 'opacity-60',
-                      )}
-                    >
-                      <option value="admin">admin</option>
-                      <option value="supervisor">supervisor</option>
-                      <option value="staff">staff</option>
-                      <option value="opl">opl (อ่านอย่างเดียว)</option>
-                    </select>
-
-                    <select
-                      value={u.department_code || ''}
-                      disabled={savingUserId === u.id}
-                      onChange={(e) => {
-                        const next = e.target.value.trim().toUpperCase() || null;
-                        const cur = u.department_code || null;
-                        if (next === cur) return;
-                        void updateUser(u.id, { department_code: next });
-                      }}
-                      className={cn(
-                        'rounded-md border border-border bg-secondary px-2 py-1 text-xs min-w-[5.5rem]',
-                        savingUserId === u.id && 'opacity-60',
-                      )}
-                      title="ล็อกให้เห็นใบขอเฉพาะแผนกนี้ (ว่าง = บังคับให้ผู้ใช้เลือกตอนเข้าครั้งแรก)"
-                    >
-                      <option value="">ยังไม่ตั้ง</option>
-                      {APP_DEPARTMENT_CODES.map((code) => (
-                        <option key={code} value={code}>
-                          {code}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      disabled={savingUserId === u.id}
-                      onClick={() => void updateUser(u.id, { is_active: !u.is_active })}
-                      className={cn(
-                        'text-xs px-2 py-1 rounded-full transition-colors',
-                        u.is_active
-                          ? 'bg-success/15 text-success hover:bg-success/25'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                        savingUserId === u.id && 'opacity-60',
-                      )}
-                    >
-                      {u.is_active ? 'Active' : 'Inactive'}
-                    </button>
-                    <span className="text-[11px] text-muted-foreground">
-                      {user?.id === u.id ? 'บัญชีของคุณ' : savingUserId === u.id ? 'saving…' : ''}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {activeTab === 'jobStaff' && <JobStaffRosterTab />}
 
-
-        {activeTab === 'outboundIp' && <VercelOutboundIpTab />}
-
         {activeTab === 'roles' && <RolePermissionsTab />}
+
+        {activeTab === 'workStatus' && <WorkStatusMasterTab />}
 
         {activeTab === 'reference' && (
           <div className="space-y-3">
@@ -508,7 +459,7 @@ const AdminSettings: React.FC = () => {
             </p>
           ) : (
             <div className="space-y-2">
-              {apiAuditLogs.map((log) => (
+              {visibleAuditLogs.map((log) => (
                 <div key={log.id} className="glass-card rounded-lg p-3 border border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-foreground">{log.user_name}</span>
@@ -532,6 +483,19 @@ const AdminSettings: React.FC = () => {
                   </div>
                 </div>
               ))}
+              <ListPaginationBar
+                page={currentAuditPage}
+                pageSize={auditPageSize}
+                totalItems={apiAuditLogs.length}
+                totalPages={auditTotalPages}
+                pageFrom={auditPageStart + 1}
+                pageTo={auditPageStart + visibleAuditLogs.length}
+                onPageChange={setAuditPage}
+                onPageSizeChange={(size) => {
+                  setAuditPageSize(size);
+                  setAuditPage(1);
+                }}
+              />
             </div>
           ))}
       </div>

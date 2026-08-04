@@ -12,6 +12,7 @@ import {
   isSiamrajUnitRequestsEnabled,
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
+import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 
 type JobRow = {
   id: string;
@@ -141,7 +142,8 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
       if (id) {
         if (id.startsWith('siamraj:') || id.startsWith('siamraj-sql:')) {
           if (!isSiamrajUnitRequestsEnabled()) return sendError(res, 404, 'Not found', 'Job not found');
-          const row = await getSiamrajUnitRequestById(id);
+          // จำกัดตาม BU — เส้นนี้เป็นประตูหลังอ่านใบขอ ERP ต้อง scope เหมือน /api/siamraj/unit-requests
+          const row = await getSiamrajUnitRequestById(id, await loadUserDepartmentScope(req.user));
           if (!row) return sendError(res, 404, 'Not found', 'Job not found');
           return res.status(200).json(toJobResponse(row as unknown as JobRow));
         }

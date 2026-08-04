@@ -10,14 +10,27 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import {
   listJobPostingRequests,
   getActiveJobPostingForJob,
+  getJobPostingRequestById,
   createJobPostingRequest,
   updateJobPostingRequest,
   normalizeJobPostingStatus,
   normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
-import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
+import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
+
+/** เก็บเฉพาะคำขอโพสของใบขอที่ผู้ใช้เห็นได้ (null = เห็นทุกแผนก) — job_snapshot มีข้อมูลใบขอในตัว */
+function scopePostings<T extends { job_id: string; request_no: string | null }>(
+  items: T[],
+  scoped: Set<string> | null,
+): T[] {
+  if (scoped === null) return items;
+  return items.filter((p) => {
+    const rn = (p.request_no || '').trim();
+    return rn ? scoped.has(rn) : false;
+  });
+}
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -41,7 +54,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return res.status(200).json({ item });
       }
       const status = normalizeJobPostingStatus(getQuery(req, 'status'));
-      const items = await listJobPostingRequests(status ? { status } : undefined);
+      const scoped = await loadScopedRequestNoSet(req.user);
+      const items = scopePostings(
+        await listJobPostingRequests(status ? { status } : undefined),
+        scoped,
+      );
       return res.status(200).json({ items });
     } catch (e) {
       return handleApiError(res, e, 'matching-job-postings GET', { userId: req.user.sub });
@@ -102,6 +119,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 400, 'Bad request', 'Invalid JSON body');
       }
       const body = raw as Record<string, unknown>;
+
+      // จำกัดตาม BU — กันแก้/ปิดคำขอโพสของใบขอแผนกอื่นด้วยการเดา id
+      const existing = await getJobPostingRequestById(id);
+      if (!existing) return sendError(res, 404, 'Not found', 'ไม่พบคำขอนี้');
+      if (!(await isSiamrajRequestInScope(req.user, existing.request_no || existing.job_id))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
+
       const item = await updateJobPostingRequest(id, {
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.notes !== undefined ? { notes: body.notes } : {}),

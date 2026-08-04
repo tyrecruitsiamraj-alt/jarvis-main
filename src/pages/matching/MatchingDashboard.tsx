@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
@@ -6,8 +6,6 @@ import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type JobRequest } from '@/types';
 import { Users, Search, ClipboardCheck, Briefcase, ArrowRight, Megaphone, BookmarkCheck, type LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDemoAwareJobs } from '@/hooks/useDemoAwareJobs';
-import { useCandidates } from '@/hooks/useCandidates';
-import { CANDIDATE_STATUS_LABELS, type CandidateStatus } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -17,18 +15,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/apiFetch';
 import { unitRequestCardSubtitle, unitRequestCardTitle } from '@/lib/unitRequestDisplay';
 
 const TOP_N = 10;
 
-const CANDIDATE_STATUS_SUMMARY_ORDER: CandidateStatus[] = [
-  'inprocess',
-  'waiting_interview',
-  'waiting_to_start',
-  'done',
-  'drop',
-  'no_job',
-];
 
 function sortByRequiredDate(a: JobRequest, b: JobRequest) {
   return new Date(a.required_date).getTime() - new Date(b.required_date).getTime();
@@ -56,27 +47,32 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
   );
 }
 
+/** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use) */
+type BoardBucket = { column_id: number; label: string | null; count: number };
+
+const BUCKET_DISPLAY: Record<string, { title: string; desc: string; cls: string; bucket: string }> = {
+  'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: 'text-emerald-700', bucket: 'todo' },
+  'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: 'text-amber-700', bucket: 'no_job' },
+  're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: 'text-violet-700', bucket: 'reuse' },
+};
+
 const MatchingDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { jobs, loading: loadingJobs } = useDemoAwareJobs();
-  const { candidates: matchCandidates, loading: loadingMatchCandidates } = useCandidates();
   const [allJobsOpen, setAllJobsOpen] = useState(false);
 
-  const candidateStatusCounts = useMemo(() => {
-    const counts: Record<CandidateStatus, number> = {
-      inprocess: 0,
-      waiting_interview: 0,
-      interviewed: 0,
-      waiting_to_start: 0,
-      done: 0,
-      drop: 0,
-      no_job: 0,
-    };
-    matchCandidates.forEach((c) => {
-      counts[c.status] += 1;
-    });
-    return counts;
-  }, [matchCandidates]);
+  const [buckets, setBuckets] = useState<BoardBucket[] | null>(null);
+  const [bucketsLoading, setBucketsLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch('/api/matching/board-candidates?buckets=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.buckets)) setBuckets(d.buckets);
+      })
+      .catch(() => {})
+      .finally(() => setBucketsLoading(false));
+  }, []);
 
   const urgentTop = useMemo(
     () =>
@@ -141,7 +137,6 @@ const MatchingDashboard: React.FC = () => {
 
   return (
     <div className="relative">
-      <div className="jarvis-page-orb top-0 right-4 h-32 w-32" aria-hidden />
       <PageHeader title="Matching Module" subtitle="จับคู่กับงาน" />
       <div className="px-4 md:px-6 space-y-6">
         {loadingJobs && <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูลงาน...</div>}
@@ -176,35 +171,49 @@ const MatchingDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* สรุปสถานะ Candidates — กดเปิดรายการพร้อมกรอง */}
+        {/* คนของเรา · ตามถังบนบอร์ด iRecruit — ยอดจริง ณ ตอนนี้ */}
         <div className="glass-card rounded-[1.5rem] border border-white/70 p-3 md:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-600" />
-              สรุปตามสถานะ · Candidates
+              คนของเรา · ตามถังบนบอร์ด
             </h3>
-            {loadingMatchCandidates ? (
+            {bucketsLoading ? (
               <span className="text-xs text-muted-foreground">กำลังโหลด…</span>
+            ) : buckets ? (
+              <span className="text-xs text-muted-foreground">
+                รวม {buckets.reduce((s, b) => s + b.count, 0)} คน
+              </span>
             ) : (
-              <span className="text-xs text-muted-foreground">รวม {matchCandidates.length} คน</span>
+              <span className="text-xs text-muted-foreground">โหลดไม่สำเร็จ</span>
             )}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            {CANDIDATE_STATUS_SUMMARY_ORDER.map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => navigate(`/matching/candidates?status=${st}`)}
-                className="glass-card rounded-2xl border border-white/70 bg-white/40 hover:border-blue-300/50 hover:bg-blue-50/30 p-3 text-left transition-colors"
-              >
-                <div className="text-[11px] font-medium text-muted-foreground leading-snug">
-                  {CANDIDATE_STATUS_LABELS[st]}
-                </div>
-                <div className="text-2xl font-bold text-foreground tabular-nums mt-0.5">{candidateStatusCounts[st]}</div>
-                <div className="text-[10px] text-muted-foreground">คน</div>
-              </button>
-            ))}
-          </div>
+          {buckets ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {buckets.map((b) => {
+                const meta = BUCKET_DISPLAY[(b.label || '').trim().toLowerCase()] ?? {
+                  title: b.label || `คอลัมน์ ${b.column_id}`,
+                  desc: '',
+                  cls: 'text-foreground',
+                  bucket: '',
+                };
+                return (
+                  <button
+                    key={b.column_id}
+                    type="button"
+                    onClick={() => navigate(meta.bucket ? `/matching/candidates?bucket=${meta.bucket}` : '/matching/candidates')}
+                    className="jarvis-stat-tile"
+                  >
+                    <div className="jarvis-stat-label">{meta.title}</div>
+                    <div className={cn('jarvis-stat-value', meta.cls)}>{b.count}</div>
+                    {meta.desc ? (
+                      <div className="jarvis-stat-sub leading-snug">{meta.desc}</div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
 
         {/* Job Request Summary — 10 ด่วน + 10 ใกล้กำหนด */}

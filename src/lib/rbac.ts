@@ -104,6 +104,7 @@ export const PERMISSION_MATRIX = {
   clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all', opl: 'read' },
   workCalendar: { staff: 'read + create entries', supervisor: 'manage team', admin: 'all', opl: 'read' },
   follow: { staff: 'read + add/cancel follow entries', supervisor: 'same', admin: 'all', opl: 'read' },
+  lumosDispatch: { staff: 'read call results + select & send', supervisor: 'same', admin: 'all', opl: 'read' },
   settings: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
   auditLogs: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
 } as const;

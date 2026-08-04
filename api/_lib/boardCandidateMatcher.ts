@@ -1,7 +1,12 @@
 import { ollamaChat } from './ollamaClient.js';
-import { logError } from './logger.js';
+import { logInfo, logError } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
-import { listBoardReadyCandidates, type BoardReadyCandidate } from './boardCandidatesSql.js';
+import {
+  listBoardReadyCandidates,
+  boardPrimaryColumnId,
+  boardFallbackColumnId,
+  type BoardReadyCandidate,
+} from './boardCandidatesSql.js';
 import {
   analyzeCandidateSpecForJob,
   getCachedCandidateSpec,
@@ -30,9 +35,32 @@ export type BoardMatchResult = {
   pool_size: number;
   shortlisted: number;
   matches: BoardCandidateMatch[];
+  /** เป้าที่ต้องหาให้ได้ = อัตราที่ขอ × 3 (กติกา 3 ส.ค. 2569) */
+  recommended_target?: number;
+  /** true = To do หาได้ต่ำกว่าเป้า จึงค้นถัง "ไม่มีงาน" เพิ่มแล้ว */
+  fallback_used?: boolean;
+  fallback_pool_size?: number;
 };
 
 const SHORTLIST_SIZE = 20;
+
+/** ต้องหาได้อย่างน้อยกี่เท่าของอัตราที่ขอ ก่อนจะถือว่า "พอ" ไม่ต้องค้นถังต่อ */
+const RECOMMEND_MULTIPLIER = 3;
+
+/** คนที่ AI แนะนำจริง = เขียว+เหลือง (แดงคือทางเลือกสำรอง ไม่นับเข้าเป้า) */
+export function recommendedCount(matches: Array<{ tier: 'green' | 'yellow' | 'red' }>): number {
+  return matches.filter((m) => m.tier === 'green' || m.tier === 'yellow').length;
+}
+
+/**
+ * เป้าจำนวนคนแนะนำต่อใบขอ = อัตราที่ขอ × 3 (ขอ 3 ต้องมีอย่างน้อย 9)
+ * ต่ำกว่านี้ให้ค้นถังถัดไป (To do → ไม่มีงาน) — อัตราอ่านแบบเดียวกับหน้าจอ (ขั้นต่ำ 1)
+ */
+export function recommendedTarget(job: Record<string, unknown>): number {
+  const raw = Number(job.request_positions ?? job.position_units ?? 1);
+  const qty = Math.max(1, Number.isFinite(raw) ? Math.round(raw) : 1);
+  return qty * RECOMMEND_MULTIPLIER;
+}
 
 const STOPWORDS = new Set([
   'พนักงาน',
@@ -176,20 +204,14 @@ function parseMatches(text: string): Array<{ id: number; tier: string; reason: s
     .filter((x): x is { id: number; tier: string; reason: string } => Boolean(x));
 }
 
-export async function matchBoardCandidatesForJob(
+/** ประเมิน 1 ถัง: pre-rank สกิล → family gate → shortlist → AI จัด tier */
+async function rankPool(
   jobId: string,
   job: Record<string, unknown>,
-  options?: { refresh?: boolean },
-): Promise<BoardMatchResult> {
-  const spec =
-    (!options?.refresh && getCachedCandidateSpec(jobId)) ||
-    (await analyzeCandidateSpecForJob(jobId, job, { refresh: options?.refresh }));
-
-  const jobTitle = buildJobTitle(job) || spec.job_family_label || '';
-
-  // pool เล็ก (~ร้อยคน) — ดึงทั้งหมดแล้ว pre-rank ในโค้ด
-  const pool = await listBoardReadyCandidates({ limit: 1000 });
-
+  spec: CandidateSpecAnalysis,
+  jobTitle: string,
+  pool: BoardReadyCandidate[],
+): Promise<{ matches: BoardCandidateMatch[]; shortlisted: number }> {
   const terms = seedTerms(spec, jobTitle);
   const scored = pool
     .map((c) => ({ c, s: prescore(c, terms, jobTitle) }))
@@ -202,19 +224,7 @@ export async function matchBoardCandidatesForJob(
   const shortlist = shortlistItems.map((x) => x.c);
   const scoreById = new Map(shortlistItems.map((x) => [x.c.card_id, x.s]));
 
-  if (shortlist.length === 0) {
-    const empty: BoardMatchResult = {
-      jobId,
-      request_no: spec.request_no,
-      job_family_code: spec.job_family_code,
-      job_family_label: spec.job_family_label,
-      pool_size: pool.length,
-      shortlisted: 0,
-      matches: [],
-    };
-    await saveBoardMatchResult(jobId, empty);
-    return empty;
-  }
+  if (shortlist.length === 0) return { matches: [], shortlisted: 0 };
 
   const { system, user } = buildMatchPrompt(spec, jobTitle, job, shortlist);
   let ranked: Array<{ id: number; tier: string; reason: string }> = [];
@@ -263,18 +273,82 @@ export async function matchBoardCandidatesForJob(
       prescore: scoreById.get(c.card_id) ?? 0,
     });
   }
+  return { matches, shortlisted: shortlist.length };
+}
+
+/**
+ * Waterfall (กติกา 3 ส.ค. 2569): ค้น "To do" (ข้อมูลใหม่สุด) ก่อนเสมอ —
+ * ถ้าแนะนำ (เขียว+เหลือง) ได้น้อยกว่า อัตราที่ขอ × 3 ค่อยค้นถัง "ไม่มีงาน" เพิ่ม
+ * ผลรอบแรกอยู่หน้าเสมอ (การ์ดพก column_label บอกที่มา) · Re Use ไม่เข้า auto — เลือกส่งเองเท่านั้น
+ */
+export async function matchBoardCandidatesForJob(
+  jobId: string,
+  job: Record<string, unknown>,
+  options?: { refresh?: boolean },
+): Promise<BoardMatchResult> {
+  const spec =
+    (!options?.refresh && getCachedCandidateSpec(jobId)) ||
+    (await analyzeCandidateSpecForJob(jobId, job, { refresh: options?.refresh }));
+
+  const jobTitle = buildJobTitle(job) || spec.job_family_label || '';
+  const target = recommendedTarget(job);
+
+  // ถังหลัก: To do — pool เล็ก (~ร้อยคน) ดึงทั้งหมดแล้ว pre-rank ในโค้ด
+  const primaryPool = await listBoardReadyCandidates({ columnId: boardPrimaryColumnId(), limit: 1000 });
+  const primary = await rankPool(jobId, job, spec, jobTitle, primaryPool);
+
+  let matches = primary.matches;
+  let shortlisted = primary.shortlisted;
+  let poolSize = primaryPool.length;
+  let fallbackUsed = false;
+  let fallbackPoolSize = 0;
+
+  if (recommendedCount(primary.matches) < target) {
+    // To do หาได้ต่ำกว่าเป้า → ค้นถัง "ไม่มีงาน" ต่อ (รอบนี้พังไม่ทำให้ผลรอบแรกหาย)
+    try {
+      const fallbackPool = await listBoardReadyCandidates({
+        columnId: boardFallbackColumnId(),
+        limit: 1000,
+      });
+      fallbackPoolSize = fallbackPool.length;
+      if (fallbackPool.length > 0) {
+        const fallback = await rankPool(jobId, job, spec, jobTitle, fallbackPool);
+        const already = new Set(matches.map((m) => m.card_id));
+        matches = [...matches, ...fallback.matches.filter((m) => !already.has(m.card_id))];
+        shortlisted += fallback.shortlisted;
+        poolSize += fallbackPool.length;
+      }
+      fallbackUsed = true;
+      logInfo('board-match.fallback', {
+        jobId,
+        target,
+        primaryRecommended: recommendedCount(primary.matches),
+        fallbackPool: fallbackPoolSize,
+        totalRecommended: recommendedCount(matches),
+      });
+    } catch (e) {
+      logError('board-match.fallback.fail', {
+        jobId,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 
   const result: BoardMatchResult = {
     jobId,
     request_no: spec.request_no,
     job_family_code: spec.job_family_code,
     job_family_label: spec.job_family_label,
-    pool_size: pool.length,
-    shortlisted: shortlist.length,
+    pool_size: poolSize,
+    shortlisted,
     matches,
+    recommended_target: target,
+    fallback_used: fallbackUsed,
+    fallback_pool_size: fallbackPoolSize,
   };
   await saveBoardMatchResult(jobId, result);
-  // match เสร็จ → ส่งคนที่แนะนำ (green/yellow) เข้าคิว Lumos เส้น reminder (error-safe ภายใน)
+  // match เสร็จ → ส่งคนที่แนะนำ (green/yellow ทั้งสองถัง) เข้าคิวโทรอัตโนมัติ (error-safe ภายใน)
+  // คนที่ auto ไม่ส่ง (red / ไม่มีเบอร์ / เพิ่มมาทีหลัง / Re Use) ดันเข้าคิวเองได้ที่ POST /api/lumos/dispatch
   await enqueueLumosReminderForBoardMatch(job, result);
   return result;
 }

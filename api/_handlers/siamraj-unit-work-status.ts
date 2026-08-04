@@ -9,8 +9,9 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   getUnitWorkStatus,
-  isUnitRequestWorkStatus,
+  isAllowedWorkStatusCode,
   upsertUnitWorkStatus,
+  type UnitRequestWorkStatus,
 } from '../_lib/siamrajUnitWorkStatus.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 
@@ -62,14 +63,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!(await isSiamrajRequestInScope(req.user, requestNo))) {
         return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
       }
-      if (!isUnitRequestWorkStatus(body.status)) {
+      // ยอมรับสถานะที่ Admin เพิ่มเองในหน้าตั้งค่าด้วย (master ใน DB) ไม่ใช่แค่ค่า built-in
+      // (async guard จึง narrow type เองไม่ได้ — ตรวจแล้วค่อย cast)
+      if (!(await isAllowedWorkStatusCode(body.status))) {
         return sendError(res, 400, 'Bad request', 'status is invalid');
       }
+      const nextStatus = body.status as UnitRequestWorkStatus;
 
       const before = await getUnitWorkStatus(requestNo);
       const item = await upsertUnitWorkStatus({
         requestNo,
-        status: body.status,
+        status: nextStatus,
         persons: body.persons,
         person_first_name: body.person_first_name,
         person_last_name: body.person_last_name,

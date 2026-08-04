@@ -9,8 +9,31 @@ import type { JobRequest } from '@/types';
 import { unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
 import { recommendedCandidateCount, type CandidateMatchTier } from '@/lib/matchingProgress';
+import { getJobRequestAgeDays } from '@/lib/jobUrgency';
 
 export type MatchingWorkflowFilter = 'all' | 'sla' | 'green' | 'yellow' | 'none' | 'reserved';
+
+/**
+ * การเรียงลิสต์ใบขอ
+ * default   = SLA เกิน/เสี่ยง แล้วงานด่วน แล้ววันที่ต้องการเร็วสุด (ของเดิม ห้ามเปลี่ยนพฤติกรรม)
+ * age_desc  = ค้างนานสุดก่อน · age_asc = ใบใหม่สุดก่อน
+ * recommend = ใบที่ AI แนะนำคนได้แล้วขึ้นก่อน · no_recommend = ใบที่ยังไม่มีคนแนะนำขึ้นก่อน
+ */
+export type MatchingListSort = 'default' | 'age_desc' | 'age_asc' | 'recommend' | 'no_recommend';
+
+export const MATCHING_LIST_SORTS: MatchingListSort[] = [
+  'default',
+  'age_desc',
+  'age_asc',
+  'recommend',
+  'no_recommend',
+];
+
+export function normalizeMatchingListSort(v: unknown): MatchingListSort {
+  return typeof v === 'string' && (MATCHING_LIST_SORTS as string[]).includes(v)
+    ? (v as MatchingListSort)
+    : 'default';
+}
 
 export type MatchingListQuery = {
   /** คำค้น (จะถูก trim/lowercase ในนี้) */
@@ -19,6 +42,10 @@ export type MatchingListQuery = {
   /** ชื่อหน่วยงานแบบตรงตัว — '' = ทั้งหมด */
   unitFilter: string;
   workflowFilter: MatchingWorkflowFilter;
+  /** รหัส BU/แผนกของใบขอ (department_code เช่น 'LBD') — ''/undefined = ทุก BU */
+  buFilter?: string;
+  /** การเรียง — ไม่ส่ง = 'default' (ของเดิม) */
+  sort?: MatchingListSort;
 };
 
 export type MatchingListContext = {
@@ -36,9 +63,12 @@ export function filterAndSortMatchingJobs(
   ctx: MatchingListContext,
 ): JobRequest[] {
   const q = query.search.trim().toLowerCase();
+  const bu = (query.buFilter || '').trim().toUpperCase();
+  const sort = query.sort ?? 'default';
   const today = ctx.today ?? new Date();
   return jobs
     .filter((j) => (query.urgentOnly ? j.urgency === 'urgent' : true))
+    .filter((j) => (bu ? (j.department_code || '').trim().toUpperCase() === bu : true))
     .filter((j) => (query.unitFilter ? j.unit_name === query.unitFilter : true))
     .filter((j) => (q ? unitRequestSearchBlob(j).includes(q) : true))
     .filter((j) => {
@@ -59,6 +89,28 @@ export function filterAndSortMatchingJobs(
       return recommendedCandidateCount(matches) === 0;
     })
     .sort((a, b) => {
+      // เรียงตามอายุใบขอ (จำนวนวันที่ค้าง) — ใบที่ไม่รู้อายุไปท้ายสุดทั้งสองทิศ ไม่ให้ปนกับของจริง
+      if (sort === 'age_desc' || sort === 'age_asc') {
+        const da = getJobRequestAgeDays(a, today);
+        const db = getJobRequestAgeDays(b, today);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        if (da !== db) return sort === 'age_desc' ? db - da : da - db;
+        return (a.required_date || '').localeCompare(b.required_date || '');
+      }
+
+      // เรียงตาม "มี/ไม่มีคนแนะนำ" — ในกลุ่มเดียวกันยังเรียงด้วยตรรกะเดิม (SLA/ด่วน) ต่อ
+      if (sort === 'recommend' || sort === 'no_recommend') {
+        const hasRec = (job: JobRequest) => {
+          const matches = ctx.matchesFor(job.id);
+          return matches ? recommendedCandidateCount(matches) > 0 : false;
+        };
+        const ra = hasRec(a) ? 0 : 1;
+        const rb = hasRec(b) ? 0 : 1;
+        if (ra !== rb) return sort === 'recommend' ? ra - rb : rb - ra;
+      }
+
       // SLA เกิน/เสี่ยงขึ้นก่อน ตามด้วยงานด่วนและวันที่ต้องการเร็วสุด
       const slaRank = (job: JobRequest) => {
         const status = jobToRequestControlRecord(job, today).slaStatus;

@@ -13,7 +13,7 @@ import {
   listDistinctUnitNoteSuggestions,
 } from '../_lib/siamrajUnitNotes.js';
 import { checkFunctionAccess } from '../_lib/roleFunctionGrants.js';
-import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
+import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
@@ -31,7 +31,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
     try {
       if (getQuery(req, 'history') === '1') {
         const limit = Number(getQuery(req, 'limit') || '50');
-        const items = await listDistinctUnitNoteSuggestions(limit);
+        // จำกัดตาม BU — autocomplete ต้องไม่โชว์หมายเหตุของใบขอแผนกอื่น
+        const items = await listDistinctUnitNoteSuggestions(
+          limit,
+          await loadScopedRequestNoSet(req.user),
+        );
         return res.status(200).json({ items });
       }
 

@@ -100,7 +100,7 @@ LEFT JOIN dbo.ms_province_amphur      AS am ON am.province_code = ra.province_co
 LEFT JOIN dbo.ms_province_tambon      AS tb ON tb.province_code = ra.province_code AND tb.amphur_code = ra.amphur_code AND tb.tambon_code = ra.tambon_code
 WHERE c.board_id    = @boardId
   AND c.is_archived = 'N'
-  AND c.column_id   = @columnId
+  AND c.column_id   IN (/*COLUMN_IDS*/)
 ORDER BY c.last_activity_at DESC, c.card_id DESC
 `;
 
@@ -112,16 +112,72 @@ function toIso(v: Date | string | null): string | null {
 
 const clean = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
 
+/** คอลัมน์หลัก "To do" — ผ่านสัมภาษณ์ รอลงงาน (pool ตั้งต้นของ AI matcher) */
+export function boardPrimaryColumnId(): number {
+  return Number(process.env.BOARD_READY_COLUMN_ID || 2);
+}
+
+/** คอลัมน์ "ไม่มีงาน" — ผ่านคัดเลือกแต่ยังไม่มีตำแหน่งให้ลง (ถังสำรองเมื่อ To do หาได้ไม่พอ) */
+export function boardFallbackColumnId(): number {
+  return Number(process.env.BOARD_FALLBACK_COLUMN_ID || 7);
+}
+
+/** คอลัมน์ "Re Use" — คนเก่าเคยผ่านงาน (ให้เลือกส่งเองเท่านั้น ห้ามเข้า auto) */
+export function boardReuseColumnId(): number {
+  return Number(process.env.BOARD_REUSE_COLUMN_ID || 6);
+}
+
+export type BoardColumnCount = { column_id: number; label: string | null; count: number };
+
+/** นับการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — ใช้โชว์สรุปบนหน้า Matching Dashboard */
+export async function countBoardCandidatesByColumn(columnIds: number[]): Promise<BoardColumnCount[]> {
+  const boardId = Number(process.env.BOARD_READY_BOARD_ID || 1);
+  const ids = columnIds.filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length === 0) return [];
+  const inputs: Record<string, unknown> = { boardId };
+  const placeholders = ids.map((id, i) => {
+    inputs[`col${i}`] = id;
+    return `@col${i}`;
+  });
+  const rows = await siamrajSqlQuery<{ column_id: number; label: string | null; n: number }>(
+    `SELECT c.column_id, bc.display_label_th AS label, COUNT(*) AS n
+       FROM dbo.ir_board_card c
+      INNER JOIN dbo.ir_board_column bc ON bc.column_id = c.column_id
+      WHERE c.board_id = @boardId AND c.is_archived = 'N'
+        AND c.column_id IN (${placeholders.join(', ')})
+      GROUP BY c.column_id, bc.display_label_th`,
+    inputs,
+  );
+  const byId = new Map(rows.map((r) => [r.column_id, r]));
+  // คืนครบทุกถังที่ขอ (ถังว่าง = 0) เรียงตามลำดับที่ส่งมา
+  return ids.map((id) => ({
+    column_id: id,
+    label: byId.get(id)?.label ?? null,
+    count: Number(byId.get(id)?.n) || 0,
+  }));
+}
+
 export async function listBoardReadyCandidates(options?: {
   boardId?: number;
   columnId?: number;
+  /** หลายคอลัมน์พร้อมกัน (ชนะ columnId) — ใช้กับ picker เลือกส่งเอง */
+  columnIds?: number[];
   limit?: number;
 }): Promise<BoardReadyCandidate[]> {
   const boardId = options?.boardId ?? Number(process.env.BOARD_READY_BOARD_ID || 1);
-  const columnId = options?.columnId ?? Number(process.env.BOARD_READY_COLUMN_ID || 2);
+  const columnIds = (
+    options?.columnIds?.length ? options.columnIds : [options?.columnId ?? boardPrimaryColumnId()]
+  ).filter((n) => Number.isInteger(n) && n > 0);
   const limit = Math.min(Math.max(options?.limit ?? 500, 1), 2000);
 
-  const rows = await siamrajSqlQuery<Row>(LIST_SQL, { boardId, columnId, limit });
+  const inputs: Record<string, unknown> = { boardId, limit };
+  const placeholders = columnIds.map((id, i) => {
+    inputs[`col${i}`] = id;
+    return `@col${i}`;
+  });
+  const sql = LIST_SQL.replace('/*COLUMN_IDS*/', placeholders.join(', '));
+
+  const rows = await siamrajSqlQuery<Row>(sql, inputs);
   return rows.map((r) => ({
     card_id: r.card_id,
     board_name: clean(r.board_name),

@@ -7,11 +7,11 @@ import { saveUnitRequestWorkStatus } from '@/lib/siamrajUnitRequestsApi';
 import {
   UNIT_REQUEST_WORK_STATUS_DATE_LABELS,
   UNIT_REQUEST_WORK_STATUS_LABELS,
-  UNIT_REQUEST_WORK_STATUS_OPTIONS,
   formatWorkPersonsSummary,
   resolveUnitRequestWorkStatus,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
+import { useWorkStatusOptions } from '@/hooks/useWorkStatusOptions';
 
 type PersonDraft = {
   key: string;
@@ -87,7 +87,9 @@ export function UnitRequestWorkStatusBadge({
   compact?: boolean;
 }) {
   const resolved = resolveUnitRequestWorkStatus(status);
-  const label = UNIT_REQUEST_WORK_STATUS_LABELS[resolved];
+  // ชื่อสถานะมาจาก master (Admin แก้ได้) — ค่า built-in ในโค้ดเป็น fallback
+  const { labelOf } = useWorkStatusOptions();
+  const label = labelOf(resolved) || UNIT_REQUEST_WORK_STATUS_LABELS[resolved];
   const person = formatWorkPersonsSummary(persons, firstName, lastName);
   const tone =
     resolved === 'in_progress'
@@ -143,7 +145,26 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
   }, [requestKey, initialStatus, initialFirstName, initialLastName, initialStatusDate, initialPersons]);
 
   const needsPerson = status !== 'in_progress';
-  const dateLabel = UNIT_REQUEST_WORK_STATUS_DATE_LABELS[status];
+  // ป้ายช่องวันที่ + ตัวเลือกสถานะมาจาก master (Admin แก้ได้) — โค้ดเป็น fallback
+  const { activeItems, allItems, dateLabelOf } = useWorkStatusOptions();
+  const dateLabel = dateLabelOf(status) || UNIT_REQUEST_WORK_STATUS_DATE_LABELS[status];
+  const statusOptions = useMemo(() => {
+    const list = [...activeItems];
+    if (status && !list.some((i) => i.code === status)) {
+      const current = allItems.find((i) => i.code === status);
+      list.unshift(
+        current ?? {
+          code: status,
+          label: UNIT_REQUEST_WORK_STATUS_LABELS[status] ?? status,
+          date_label: 'วันที่',
+          sort_order: 0,
+          is_builtin: true,
+          is_active: false,
+        },
+      );
+    }
+    return list;
+  }, [activeItems, allItems, status]);
 
   const baseline = useMemo(() => {
     const list = personsFromInitial(initialPersons, initialFirstName, initialLastName, initialStatusDate).map(
@@ -240,9 +261,12 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
           }}
           className="w-full jarvis-soft-field"
         >
-          {UNIT_REQUEST_WORK_STATUS_OPTIONS.map((id) => (
-            <option key={id} value={id}>
-              {UNIT_REQUEST_WORK_STATUS_LABELS[id]}
+          {/* ตัวเลือกมาจาก master ใน DB — Admin เพิ่ม/ปิดใช้งานได้ในหน้าตั้งค่า
+              ถ้าสถานะปัจจุบันถูกปิดใช้งานไปแล้ว ยังต้องมีในลิสต์ ไม่ให้ค่าเดิมหายตอนบันทึกซ้ำ */}
+          {statusOptions.map((opt) => (
+            <option key={opt.code} value={opt.code}>
+              {opt.label}
+              {!opt.is_active ? ' (ปิดใช้งาน)' : ''}
             </option>
           ))}
         </select>

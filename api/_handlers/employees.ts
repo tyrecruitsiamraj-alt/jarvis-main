@@ -8,6 +8,7 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
+import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 
 type EmployeeRow = {
   id: string;
@@ -105,11 +106,21 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'GET') {
     try {
+      // จำกัดตาม BU — employees มี department_code อยู่แล้ว กรองได้ตรง ๆ
+      // (แถวที่ไม่มีรหัสแผนก = ข้อมูลกลางรุ่นเก่า ให้เห็นได้ทุกแผนกตามเดิม ไม่ให้ข้อมูลหายไปเงียบ ๆ)
+      const scope = await loadUserDepartmentScope(req.user);
+      if (scope.mode === 'none') return res.status(200).json([]);
+      const scopedCode = scope.mode === 'code' ? scope.code : null;
+
       const id = getString(req.query?.id);
       if (id) {
         const { rows } = await dbQuery<EmployeeRow>(
-          `select * from jarvis_rm.employees where id = $1 limit 1`,
-          [id],
+          scopedCode
+            ? `select * from jarvis_rm.employees
+               where id = $1 and (department_code is null or upper(trim(department_code)) = $2)
+               limit 1`
+            : `select * from jarvis_rm.employees where id = $1 limit 1`,
+          scopedCode ? [id, scopedCode] : [id],
         );
         if (rows.length === 0) return sendError(res, 404, 'Not found', 'Employee not found');
         return res.status(200).json(toEmployeeResponse(rows[0]));
@@ -119,20 +130,23 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       const statusOk = statusFilter && isEmployeeStatus(statusFilter) ? statusFilter : null;
       const { limit, offset } = parseLimitOffset(req.query);
 
+      const conds: string[] = [];
+      const params: unknown[] = [];
+      if (statusOk) {
+        params.push(statusOk);
+        conds.push(`status = $${params.length}`);
+      }
+      if (scopedCode) {
+        params.push(scopedCode);
+        conds.push(`(department_code is null or upper(trim(department_code)) = $${params.length})`);
+      }
+      params.push(limit, offset);
       const { rows } = await dbQuery<EmployeeRow>(
-        statusOk
-          ? `
-          select * from jarvis_rm.employees
-          where status = $1
-          order by created_at desc
-          limit $2 offset $3
-        `
-          : `
-          select * from jarvis_rm.employees
-          order by created_at desc
-          limit $1 offset $2
-        `,
-        statusOk ? [statusOk, limit, offset] : [limit, offset],
+        `select * from jarvis_rm.employees
+         ${conds.length ? `where ${conds.join(' and ')}` : ''}
+         order by created_at desc
+         limit $${params.length - 1} offset $${params.length}`,
+        params,
       );
       return res.status(200).json(rows.map(toEmployeeResponse));
     } catch (e) {
@@ -252,6 +266,20 @@ async function employeesHandler(req: AuthedReq, res: ApiRes) {
       );
       const cur = curRows[0];
       if (!cur) return sendError(res, 404, 'Not found', 'Employee not found');
+
+      // จำกัดตาม BU — กันแก้ข้อมูลพนักงานของแผนกอื่นด้วยการเดา id
+      // (แถวที่ยังไม่มีรหัสแผนกแก้ได้ทุกแผนก — ต้องมีคนตั้งรหัสให้ก่อน)
+      const patchScope = await loadUserDepartmentScope(req.user);
+      if (patchScope.mode === 'none') {
+        return sendError(res, 403, 'Forbidden', 'ยังไม่ได้กำหนดแผนกให้ผู้ใช้นี้');
+      }
+      if (
+        patchScope.mode === 'code' &&
+        cur.department_code &&
+        cur.department_code.trim().toUpperCase() !== patchScope.code
+      ) {
+        return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์แก้ข้อมูลพนักงานของแผนกอื่น');
+      }
 
       const employee_code =
         raw.employee_code !== undefined ? getString(raw.employee_code) : cur.employee_code;

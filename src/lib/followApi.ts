@@ -50,8 +50,8 @@ export async function cancelFollowEntry(id: string): Promise<void> {
 }
 
 export const FOLLOW_STATUS_LABEL: Record<FollowCallStatus, string> = {
-  pending: 'รอ Lumos โทร',
-  delivered: 'Lumos รับไปโทรแล้ว',
+  pending: 'รอ AI โทร',
+  delivered: 'AI รับไปโทรแล้ว',
   completed: 'โทรสำเร็จ',
   failed: 'โทรไม่สำเร็จ',
   cancelled: 'ยกเลิกแล้ว',
