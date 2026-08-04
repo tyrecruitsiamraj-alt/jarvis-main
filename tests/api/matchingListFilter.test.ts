@@ -131,3 +131,39 @@ describe('filterAndSortMatchingJobs', () => {
     expect(out[2]).toBe('normal-late');
   });
 });
+
+describe('การเรียงลิสต์ (sort)', () => {
+  const today = new Date('2026-07-22T09:00:00+07:00');
+  // request_date ต่างกัน → อายุใบขอต่างกัน (retroactive = นับจากวันที่กรอก)
+  const oldJob = job({ id: 'old', request_date: '2026-05-01', required_date: '2026-04-25' });
+  const midJob = job({ id: 'mid', request_date: '2026-07-01', required_date: '2026-06-28' });
+  const newJob = job({ id: 'new', request_date: '2026-07-20', required_date: '2026-07-18' });
+  const jobs = [midJob, newJob, oldJob];
+
+  it('age_desc = ค้างนานสุดก่อน · age_asc = ใหม่สุดก่อน', () => {
+    const desc = filterAndSortMatchingJobs(jobs, { ...baseQuery, sort: 'age_desc' }, { ...noCtx, today });
+    const asc = filterAndSortMatchingJobs(jobs, { ...baseQuery, sort: 'age_asc' }, { ...noCtx, today });
+    expect(desc.map((j) => j.id)).toEqual(['old', 'mid', 'new']);
+    expect(asc.map((j) => j.id)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('recommend = ใบที่ AI แนะนำได้ขึ้นก่อน · no_recommend = สลับด้าน', () => {
+    const withRec = [job({ id: 'has' }), job({ id: 'none' })];
+    const ctx = {
+      ...noCtx,
+      today,
+      matchesFor: (id: string) => (id === 'has' ? [{ tier: 'green' as const }] : [{ tier: 'red' as const }]),
+    };
+    expect(
+      filterAndSortMatchingJobs(withRec, { ...baseQuery, sort: 'recommend' }, ctx).map((j) => j.id),
+    ).toEqual(['has', 'none']);
+    expect(
+      filterAndSortMatchingJobs(withRec, { ...baseQuery, sort: 'no_recommend' }, ctx).map((j) => j.id),
+    ).toEqual(['none', 'has']);
+  });
+
+  it('ไม่ส่ง sort = พฤติกรรมเดิม (SLA เกินขึ้นก่อน) ต้องไม่เปลี่ยน', () => {
+    const out = filterAndSortMatchingJobs(jobs, baseQuery, { ...noCtx, today });
+    expect(out[0].id).toBe('old'); // retroactive เก่ามาก → breached
+  });
+});

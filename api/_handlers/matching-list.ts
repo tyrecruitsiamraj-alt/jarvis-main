@@ -21,6 +21,7 @@ import {
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import {
   filterAndSortMatchingJobs,
+  normalizeMatchingListSort,
   type MatchingWorkflowFilter,
 } from '@/lib/matchingListFilter';
 import { recommendedCandidateCount } from '@/lib/matchingProgress';
@@ -83,6 +84,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       unitFilter: getQuery(req, 'unit'),
       workflowFilter: normalizeWorkflow(getQuery(req, 'workflow')),
       buFilter: getQuery(req, 'bu'),
+      sort: normalizeMatchingListSort(getQuery(req, 'sort')),
     };
 
     const rows = filterAndSortMatchingJobs(jobs, query, {

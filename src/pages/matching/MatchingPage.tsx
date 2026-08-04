@@ -23,7 +23,11 @@ import {
   requestPositionCount,
 } from '@/lib/matchingProgress';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
-import { filterAndSortMatchingJobs, type MatchingWorkflowFilter } from '@/lib/matchingListFilter';
+import {
+  filterAndSortMatchingJobs,
+  type MatchingWorkflowFilter,
+  type MatchingListSort,
+} from '@/lib/matchingListFilter';
 import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import {
   getJobRequestAgeDays,
@@ -692,6 +696,8 @@ const MatchingPage: React.FC = () => {
   const [buFilter, setBuFilter] = useState('');
   /** จำนวนใบขอต่อหน้า — ผู้ใช้เลือกเอง จำค่าไว้ในเครื่อง */
   const [pageSize, setPageSize] = useState<number>(loadSavedPageSize);
+  /** การเรียงลิสต์ — 'default' = SLA/ด่วนก่อนเหมือนเดิม */
+  const [sortBy, setSortBy] = useState<MatchingListSort>('default');
   const [clientPageNo, setClientPageNo] = useState(1);
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const listScrollPendingRef = useRef(false);
@@ -734,6 +740,7 @@ const MatchingPage: React.FC = () => {
       if (unitFilter) params.set('unit', unitFilter);
       if (workflowFilter !== 'all') params.set('workflow', workflowFilter);
       if (buFilter) params.set('bu', buFilter);
+      if (sortBy !== 'default') params.set('sort', sortBy);
       const r = await apiFetch(`/api/matching/list?${params.toString()}`);
       if (!r.ok) {
         const body = (await r.json().catch(() => ({}))) as { message?: string };
@@ -777,7 +784,7 @@ const MatchingPage: React.FC = () => {
     const t = window.setTimeout(() => void fetchServerPage(1, false), search.trim() ? 350 : 0);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize, sortBy]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
@@ -1638,14 +1645,14 @@ const MatchingPage: React.FC = () => {
         ? []
         : filterAndSortMatchingJobs(
             jobs,
-            { search, urgentOnly, unitFilter, workflowFilter, buFilter },
+            { search, urgentOnly, unitFilter, workflowFilter, buFilter, sort: sortBy },
             {
               hasReserved: (jobId) =>
                 (proposalsByJobId[jobId] ?? []).some((item) => item.status === 'reserved'),
               matchesFor: (jobId) => boardMatchById[jobId]?.matches,
             },
           ),
-    [jobs, search, urgentOnly, unitFilter, workflowFilter, buFilter, proposalsByJobId, boardMatchById],
+    [jobs, search, urgentOnly, unitFilter, workflowFilter, buFilter, sortBy, proposalsByJobId, boardMatchById],
   );
 
   // เปลี่ยน BU = เปลี่ยนขอบเขต → ล้างหน่วยงานที่เลือกไว้ (คนละ BU มีหน่วยงานคนละชุด ไม่ล้างจะได้ลิสต์ว่าง)
@@ -1683,7 +1690,7 @@ const MatchingPage: React.FC = () => {
 
   useEffect(() => {
     setClientPageNo(1);
-  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter]);
+  }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, sortBy]);
 
   // แบ่งหน้าแบบชัดเจน (เปลี่ยนหน้า = แทนที่รายการ ไม่ต่อท้ายสะสม) — server ส่งมาทีละหน้าอยู่แล้ว
   const currentPage = MATCHING_SERVER_LIST_ENABLED ? serverPageNo : clientPageNo;
@@ -1947,6 +1954,35 @@ const MatchingPage: React.FC = () => {
           <p className="w-full text-xs text-muted-foreground">
             · เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง
           </p>
+          {/* เรียงลิสต์ — ค่าเริ่มต้นคงพฤติกรรมเดิม (SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน) */}
+          <div className="flex w-full flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-muted-foreground">เรียงตาม:</span>
+            {(
+              [
+                ['default', 'SLA / ด่วนก่อน'],
+                ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
+                ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
+                ['recommend', 'มีคนแนะนำก่อน'],
+                ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
+              ] as Array<[MatchingListSort, string]>
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSortBy(value)}
+                disabled={serverListLoading}
+                className={cn(
+                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-wait',
+                  sortBy === value
+                    ? 'border-blue-300 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {/* คู่มือสีสั้น ๆ — แถบสีซ้ายการ์ดบอกว่าใบขอค้างมานานแค่ไหน */}
           <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
             <span className="font-medium">สีบอกอายุใบขอ:</span>
