@@ -692,8 +692,6 @@ const MatchingPage: React.FC = () => {
   const { jobs: feedJobs, loading: feedLoading } = useUnitRequestsFeed({
     skip: MATCHING_SERVER_LIST_ENABLED,
   });
-  const jobs = MATCHING_SERVER_LIST_ENABLED ? serverItems : feedJobs;
-  const loadingJobs = MATCHING_SERVER_LIST_ENABLED ? serverListLoading : feedLoading;
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [urgentOnly, setUrgentOnly] = useState(false);
@@ -735,6 +733,10 @@ const MatchingPage: React.FC = () => {
   const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
   const [serverListError, setServerListError] = useState<string | null>(null);
   const serverFetchSeq = useRef(0);
+
+  // ย้ายมาอยู่หลัง state declarations ทั้งหมด เพื่อหลีก TDZ error
+  const jobs = MATCHING_SERVER_LIST_ENABLED ? serverItems : feedJobs;
+  const loadingJobs = MATCHING_SERVER_LIST_ENABLED ? serverListLoading : feedLoading;
 
   // ── worker status badge ───────────────────────────────────────────────────
   const [workerStatus, setWorkerStatus] = useState<{
@@ -2129,6 +2131,19 @@ const MatchingPage: React.FC = () => {
                 </span>
               </span>
             ))}
+            {workerStatus?.started && workerStatus.queueSize > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
+              </span>
+            ) : workerStatus?.started && workerStatus.isIdle ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AI พร้อมแล้ว
+              </span>
+            ) : workerStatus && !workerStatus.enabled ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-400">
+                AI ปิดอยู่
+              </span>
+            ) : null}
           </div>
         </div>
 
