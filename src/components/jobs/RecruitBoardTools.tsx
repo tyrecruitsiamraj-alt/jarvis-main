@@ -14,6 +14,7 @@ import {
   deleteRecruitChannel,
 } from '@/lib/recruitPostingsApi';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 
 const BU_OPTIONS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 
@@ -241,11 +242,15 @@ const StandalonePickerDialog: React.FC<{
 
 /** ปุ่มระดับ "ตั้งค่า" ของบอร์ดรับสมัคร (เฉพาะฝั่งเจ้าหน้าที่) */
 const RecruitBoardTools: React.FC = () => {
+  const { isFunctionEnabled } = useRolePermissions();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [standalone, setStandalone] = useState<
     { kind: string; kindLabel: string; departmentCode: string } | null
   >(null);
+
+  // ฟีเจอร์ปิดอยู่ (admin ยังไม่เปิดให้ role นี้) — ไม่ต้องแสดงอะไรเลย
+  if (!isFunctionEnabled('recruit_postings')) return null;
 
   return (
     <>

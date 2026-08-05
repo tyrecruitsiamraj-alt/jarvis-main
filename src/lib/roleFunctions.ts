@@ -11,6 +11,7 @@ export type AppFunctionId =
   | 'jobs_assign_staff'
   | 'unit_requests_read'
   | 'unit_notes_edit'
+  | 'recruit_postings'
   | 'employees_read'
   | 'employees_edit'
   | 'clients_read'
@@ -43,6 +44,8 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'jobs_assign_staff', label: 'กำหนดสรรหา / คัดสรร', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
   { id: 'unit_requests_read', label: 'ดูใบขอหน่วยงาน Siamraj', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
   { id: 'unit_notes_edit', label: 'แก้ไขหมายเหตุใบขอ', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
+  // ฟีเจอร์ใหม่ ตั้งต้นเป็น supervisor เพื่อให้ admin ปิดเหลือเฉพาะตัวเองได้ตอนยังไม่พร้อมเปิดใช้
+  { id: 'recruit_postings', label: 'ประกาศรับสมัคร / สร้างลิงก์', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
   { id: 'employees_read', label: 'ดูพนักงาน WL', group: 'WL', minimumRole: 'staff' },
   { id: 'employees_edit', label: 'เพิ่ม / แก้ไขพนักงาน WL', group: 'WL', minimumRole: 'supervisor' },
   { id: 'clients_read', label: 'ดูลูกค้า / สถานที่', group: 'ลูกค้า', minimumRole: 'staff' },
