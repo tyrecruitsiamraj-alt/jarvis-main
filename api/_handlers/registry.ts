@@ -40,6 +40,7 @@ import requestControlForecastHandler from './request-control-forecast.js';
 import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
 import workStatusMasterHandler from './work-status-master.js';
+import featureFlagsHandler from './feature-flags.js';
 import followHandler from './follow.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
@@ -116,6 +117,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/work-status-master': workStatusMasterHandler as ApiHandler,
+  '/api/feature-flags': featureFlagsHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
