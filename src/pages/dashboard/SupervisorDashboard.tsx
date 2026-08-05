@@ -50,6 +50,7 @@ import {
 import { fetchSiamrajThroughput, fetchSiamrajClosedRequests } from '@/lib/siamrajUnitRequestsApi';
 import {
   filterJobsForThroughput,
+  filterThroughputByDepartment,
   jobsToThroughputRecords,
   type ThroughputRecord,
 } from '@/lib/dashboard/throughput';
@@ -307,7 +308,12 @@ const SupervisorDashboard: React.FC = () => {
         from: trendRange.from,
         to: trendRange.to,
         label: trendRange.label,
-        throughputRecords,
+        // throughput มาจาก SQL เป็นยอดรวม ไม่ผ่าน filterUnitRequests เหมือน jobs
+        // ต้องกรอง BU ที่นี่ ไม่งั้น KPI เข้ามา/ปิด/ยกเลิก ค้างที่ยอดทั้งบริษัท
+        throughputRecords: filterThroughputByDepartment(
+          throughputRecords,
+          unitFilters.departmentFilter,
+        ),
       },
       scopedClosedJobs,
       jobsWithoutAgeFilter,

@@ -5,6 +5,9 @@ import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/
 
 export type ThroughputRecord = {
   requestNo?: string;
+  /** รหัส BU ของไซต์ — throughput เป็นยอดรวมจาก SQL ที่ไม่ผ่านตัวกรองฝั่ง client
+   *  ถ้าไม่มีมิตินี้ KPI เข้ามา/ปิด/ยกเลิก จะไม่ขยับตาม BU ที่เลือก */
+  departmentCode?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;
@@ -66,6 +69,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
       effectiveRequestDateYmd(j, today);
     if (!requestDate) continue;
     const requestNo = (j.request_no || j.externalId || j.id || '').trim() || undefined;
+    const departmentCode = j.department_code?.trim().toUpperCase() || undefined;
     const b = positionBreakdownFromJob(j);
     const closureDate =
       b.remainingPositions === 0
@@ -77,6 +81,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (b.filledPositions > 0) {
       out.push({
         requestNo,
+        departmentCode,
         requestDate,
         closureDate: closedYmd,
         positionUnits: b.filledPositions,
@@ -97,6 +102,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (b.cancelledPositions > 0) {
       out.push({
         requestNo,
+        departmentCode,
         requestDate,
         closureDate: closedYmd,
         positionUnits: b.cancelledPositions,
@@ -117,6 +123,7 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (b.remainingPositions > 0) {
       out.push({
         requestNo,
+        departmentCode,
         requestDate,
         closureDate: null,
         positionUnits: b.remainingPositions,
@@ -136,6 +143,26 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     }
   }
   return out;
+}
+
+/**
+ * กรอง throughput ตาม BU ที่เลือกบน dashboard
+ *
+ * throughput มาจาก SQL เป็นยอดรวม ไม่ได้ผ่าน filterUnitRequests เหมือน jobs
+ * ถ้าไม่กรองที่นี่ KPI เข้ามา/ปิดแล้ว/ยกเลิก จะค้างที่ยอดทั้งบริษัทขณะที่ คงเหลือ ขยับตาม BU
+ * แถวที่ไม่มี departmentCode ถูกเก็บไว้ (ไม่ตัดข้อมูลที่ระบุ BU ไม่ได้ออกเงียบ ๆ)
+ */
+export function filterThroughputByDepartment(
+  records: ThroughputRecord[],
+  departmentFilter: string,
+): ThroughputRecord[] {
+  const want = departmentFilter.trim().toUpperCase();
+  if (!want || want === 'ALL') return records;
+  return records.filter((r) => {
+    const code = r.departmentCode?.trim().toUpperCase();
+    if (!code) return true;
+    return code === want;
+  });
 }
 
 export function filterJobsForThroughput(

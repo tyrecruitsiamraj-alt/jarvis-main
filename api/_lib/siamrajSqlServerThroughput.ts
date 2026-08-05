@@ -21,6 +21,8 @@ export {
 
 export type SiamrajThroughputRecord = {
   requestNo?: string;
+  /** รหัส BU ของไซต์ (ms_site.department_code) — ให้ dashboard กรองตาม BU ที่เลือกได้ */
+  departmentCode?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;
@@ -33,6 +35,7 @@ export type SiamrajThroughputRecord = {
 
 type SqlThroughputRow = {
   request_no: string | null;
+  department_code: string | null;
   request_date: Date | string | null;
   want_date_from: Date | string | null;
   request_qty: number | null;
@@ -85,12 +88,13 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   if (!requestDate) return [];
 
   const requestNo = (row.request_no || '').trim() || undefined;
+  const departmentCode = (row.department_code || '').trim().toUpperCase() || undefined;
   const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
   const requestActionCode = (row.request_action_code || '').trim() || undefined;
   const requestActionName = (row.request_action_name || '').trim() || undefined;
   const lifecycleKind = classifyActionToLifecycle(requestActionName, requestActionCode);
-  const meta = { requestActionName, requestActionCode, lifecycleKind };
+  const meta = { departmentCode, requestActionName, requestActionCode, lifecycleKind };
   const out: SiamrajThroughputRecord[] = [];
 
   if (breakdown.filledPositions > 0) {
@@ -191,6 +195,7 @@ export async function listSiamrajSqlServerThroughput(options: {
     `
     SELECT
       A.request_no,
+      RTRIM(SS.department_code) AS department_code,
       A.request_date,
       A.want_date_from,
       A.request_qty,
