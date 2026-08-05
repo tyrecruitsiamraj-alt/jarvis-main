@@ -53,8 +53,7 @@ export type ApiResource =
   | 'job-applications'
   | 'work-status-master'
   | 'recruit-channels'
-  | 'recruit-postings'
-  | 'feature-flags';
+  | 'recruit-postings';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -115,11 +114,6 @@ export function minimumRoleFor(
     case 'app-users':
     case 'audit-logs':
     case 'branding':
-      return 'admin';
-
-    case 'feature-flags':
-      // อ่านได้ทุกคน (หน้าเว็บต้องรู้ว่าอะไรเปิดอยู่ถึงซ่อนเมนูถูก) — เปิด/ปิด admin เท่านั้น
-      if (isRead) return 'staff';
       return 'admin';
 
     case 'recruit-channels':

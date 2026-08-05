@@ -15,7 +15,6 @@ import {
 } from '@/lib/recruitPostingsApi';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 const BU_OPTIONS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 
@@ -244,15 +243,13 @@ const StandalonePickerDialog: React.FC<{
 /** ปุ่มระดับ "ตั้งค่า" ของบอร์ดรับสมัคร (เฉพาะฝั่งเจ้าหน้าที่) */
 const RecruitBoardTools: React.FC = () => {
   const { isFunctionEnabled } = useRolePermissions();
-  const { isVisible } = useFeatureFlags();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [standalone, setStandalone] = useState<
     { kind: string; kindLabel: string; departmentCode: string } | null
   >(null);
 
-  // 2 ชั้นแยกกัน: สวิตช์แม่ (ฟีเจอร์เปิดใช้งานหรือยัง) → สิทธิ์ (role นี้ใช้ได้ไหม)
-  if (!isVisible('recruit_postings')) return null;
+  // ฟีเจอร์ปิดอยู่ (admin ยังไม่เปิดให้ role นี้) — ไม่ต้องแสดงอะไรเลย
   if (!isFunctionEnabled('recruit_postings')) return null;
 
   return (
