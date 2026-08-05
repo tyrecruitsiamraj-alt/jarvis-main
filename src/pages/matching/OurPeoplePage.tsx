@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { Phone, Search, LoaderCircle, ChevronRight } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { Phone, LoaderCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import {
@@ -153,15 +154,11 @@ const OurPeoplePage: React.FC = () => {
     <div className="relative">
       <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use · In process" />
       <div className="px-4 md:px-6 space-y-4 pb-8">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQueryAndResetPages(e.target.value)}
-            placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
-            className="jarvis-soft-field pl-10"
-          />
-        </div>
+        <SearchField
+          value={query}
+          onChange={(e) => setQueryAndResetPages(e.target.value)}
+          placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
+        />
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!people && !error ? (
