@@ -18,6 +18,7 @@ import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -45,15 +46,22 @@ function FlowStage({
   tone: ToneKey;
 }) {
   const t = TONE[tone];
+  // ขั้น funnel อยู่บน hero เข้ม (mockup rev.3 ข้อ 01): กล่องโปร่งขอบบนสีตามขั้น
+  // ตัวเลขใช้ TONE.onDark (โทนอ่อน) เพราะพื้นเข้มตลอดทั้งสองธีม
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn('jarvis-stat-tile min-w-0 flex-1 !border-t-[3px]', t.bar)}
+      className={cn(
+        'min-w-0 flex-1 rounded-xl border border-white/[0.14] bg-white/[0.07] px-3 py-2 text-left transition-colors hover:bg-white/[0.12] !border-t-[3px]',
+        t.bar,
+      )}
     >
-      <div className="jarvis-stat-label">{label}</div>
-      <div className={cn('jarvis-stat-value', t.value)}>{value}</div>
-      {sub ? <div className="jarvis-stat-sub">{sub}</div> : null}
+      <div className="text-[10px] font-medium leading-tight text-slate-400">{label}</div>
+      <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
+        {value}
+      </div>
+      {sub ? <div className="mt-1 text-[10px] leading-tight text-slate-400">{sub}</div> : null}
     </button>
   );
 }
@@ -180,23 +188,22 @@ const HomePage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 space-y-3"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="jarvis-section-title">
-              การไหลของงานสรรหา · เดือนนี้
-            </h2>
-            <button
-              type="button"
-              onClick={() => void loadFlow()}
-              disabled={flowLoading}
-              className="jarvis-btn-ghost"
-            >
-              <RefreshCw className={cn('h-3 w-3', flowLoading && 'animate-spin')} /> รีเฟรช
-            </button>
-          </div>
-
-          {/* Funnel หลัก — 5 ขั้นหลัก + เส้นแยก "ไม่มีคนแนะนำ" อยู่ในแถวเดียวกัน */}
-          <div className="glass-card rounded-[1.5rem] border border-white/70 p-3">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
+          {/* Funnel อยู่ใน hero เข้มตาม mockup rev.3 ข้อ 01 — เข้าระบบมาเจอการไหลของงานก่อนทุกอย่าง
+              5 ขั้นหลัก + เส้นแยก "ไม่มีคนแนะนำ" อยู่ในแถวเดียวกัน (กดตัวเลขไปหน้านั้นได้เหมือนเดิม) */}
+          <PageHeroStrip
+            eyebrow="การไหลของงานสรรหา · เดือนนี้"
+            actions={
+              <button
+                type="button"
+                onClick={() => void loadFlow()}
+                disabled={flowLoading}
+                className={cn(heroButton, 'disabled:opacity-50')}
+              >
+                <RefreshCw className={cn('h-3 w-3', flowLoading && 'animate-spin')} /> รีเฟรช
+              </button>
+            }
+          >
+            <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
               <FlowStage
                 label="ใบขอเปิดอยู่"
                 value={flow.jobs.open_total}
@@ -204,7 +211,7 @@ const HomePage: React.FC = () => {
                 tone="neutral"
                 onClick={() => navigate(resolveUnitNavPath())}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -215,7 +222,7 @@ const HomePage: React.FC = () => {
                 tone="info"
                 onClick={() => navigate('/matching/match?workflow=green')}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -226,7 +233,7 @@ const HomePage: React.FC = () => {
                 tone="primary"
                 onClick={() => navigate('/matching/match')}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -237,7 +244,7 @@ const HomePage: React.FC = () => {
                 tone="success"
                 onClick={() => navigate('/matching/match')}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -251,9 +258,9 @@ const HomePage: React.FC = () => {
 
               {/* แยกเส้น ไม่ใช่ขั้นที่ 6 — ใบที่ AI หาคนของเราไม่ได้ ถูกส่งต่อทีมอื่นแทน
                   ป้ายกำกับไว้กันอ่านผิดว่าต่อจาก "จองตัว/ลงงาน" */}
-              <div className="flex items-center justify-center gap-1.5 px-1 text-muted-foreground/60">
-                <span className="hidden h-8 w-px bg-border sm:block" aria-hidden />
-                <span className="text-[10px] font-medium leading-tight text-muted-foreground">
+              <div className="flex items-center justify-center gap-1.5 px-1">
+                <span className="hidden h-8 w-px bg-white/20 sm:block" aria-hidden />
+                <span className="text-[10px] font-medium leading-tight text-[#c9b184]">
                   ไม่มีคน
                   <br className="hidden sm:block" /> แนะนำ →
                 </span>
@@ -273,11 +280,11 @@ const HomePage: React.FC = () => {
                 onClick={() => navigate('/matching/job-postings')}
               />
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+            <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
               ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด · เป็นสถานะการทำงานของทีม Matching ไม่ใช่ยอด
               "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ
             </p>
-          </div>
+          </PageHeroStrip>
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

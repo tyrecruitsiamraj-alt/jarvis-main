@@ -5,7 +5,8 @@ import { DASH } from '@/lib/designTokens';
 type Props = {
   /** ป้ายทองบรรทัดบน — บอกว่าหน้านี้คือมุมมองของใคร */
   eyebrow: string;
-  title: string;
+  /** ไม่ส่ง = hero มีแต่ป้ายทอง + ของใน children (เช่น funnel หน้าแรก ที่ป้ายทองทำหน้าที่หัวข้อ) */
+  title?: string;
   /** ต่อท้ายชื่อหน้าด้วยตัวเลขสรุป เช่น "· 334 ตำแหน่ง" */
   meta?: string;
   /** ปุ่มมุมขวา — ต้องเป็นทรงสำหรับพื้นเข้ม (ดู heroButton/heroButtonSolid) */
@@ -30,10 +31,12 @@ const PageHeroStrip: React.FC<Props> = ({ eyebrow, title, meta, actions, childre
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <p className={DASH.heroLabel}>{eyebrow}</p>
-        <h1 className="mt-1 text-lg font-bold tracking-tight text-white md:text-xl">
-          {title}
-          {meta ? <span className="ml-2 text-xs font-medium text-slate-400">{meta}</span> : null}
-        </h1>
+        {title ? (
+          <h1 className="mt-1 text-lg font-bold tracking-tight text-white md:text-xl">
+            {title}
+            {meta ? <span className="ml-2 text-xs font-medium text-slate-400">{meta}</span> : null}
+          </h1>
+        ) : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>

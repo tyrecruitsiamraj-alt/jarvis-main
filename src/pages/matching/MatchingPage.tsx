@@ -633,7 +633,16 @@ function LumosCallBadgeRow({
  * ส่ง / โทรแล้ว / เหลือ (ยังไม่ได้โทร) / โอเค / ไม่ไป / ไม่รับ
  * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ระบบยกเลิกเอง)
  */
-function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; className?: string }) {
+function LumosJobSummaryStats({
+  s,
+  className,
+  variant = 'pill',
+}: {
+  s: LumosJobCallSummaryRow;
+  className?: string;
+  /** pill = ก้อนลอยพื้นจาง (ในใบขอ/หน้ารายละเอียด) · column = เต็มความกว้างคอลัมน์ขวาของการ์ด */
+  variant?: 'pill' | 'column';
+}) {
   if (s.sent === 0) return null;
   const waiting = Math.max(0, s.sent - s.called);
   const cells = [
@@ -649,7 +658,10 @@ function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; cla
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center gap-0.5 rounded-2xl bg-slate-900/[0.04] dark:bg-white/[0.07] px-2 py-1.5',
+        'flex items-center gap-0.5',
+        variant === 'pill'
+          ? 'shrink-0 rounded-2xl bg-slate-900/[0.04] px-2 py-1.5 dark:bg-white/[0.07]'
+          : 'mt-0.5 w-full justify-between',
         className,
       )}
     >
@@ -657,7 +669,11 @@ function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; cla
         <div
           key={c.label}
           title={c.title}
-          className={cn('min-w-[42px] px-1 text-center', c.value === 0 && 'opacity-35')}
+          className={cn(
+            'px-1 text-center',
+            variant === 'pill' ? 'min-w-[42px]' : 'min-w-0 flex-1',
+            c.value === 0 && 'opacity-35',
+          )}
         >
           <div
             className={cn(
@@ -2294,6 +2310,13 @@ const MatchingPage: React.FC = () => {
                           น่าจะตรง ~{quickCounts[j.id]}
                         </span>
                       ) : null}
+                      {/* ชิปก้าวถัดไปอยู่ติดชื่อหน่วยงานตามที่เจ้าของสั่ง — อ่านชื่อแล้วรู้เลยว่าต้องทำอะไรต่อ */}
+                      {(() => {
+                        const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
+                        return action ? (
+                          <span className={cn(action.cls, 'shrink-0')}>→ {action.text}</span>
+                        ) : null;
+                      })()}
                     </div>
                     {unitRequestCardSubtitle(j) ? (
                       <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
@@ -2332,32 +2355,34 @@ const MatchingPage: React.FC = () => {
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                   {/* ในกล่องแบ่งสองคอลัมน์: ซ้าย = รายละเอียดงาน · ขวา = สรุปว่ามีใครกี่คนแล้ว */}
-                  <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[1.2fr_1fr]">
+                  {/* แบ่งครึ่งตามที่เจ้าของสั่ง: ซ้าย = รายละเอียดงาน + ยอดอัตราทางการ
+                      ขวา = แถบผลโทร 6 ช่อง (ใบที่ยังไม่ได้ส่งโทร ใช้ยอดคนบนบอร์ดแทน ไม่ปล่อยว่าง) */}
+                  <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
                     <div className="min-w-0">
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
                       </span>
-                      {(() => {
-                        // ก้าวถัดไปของใบนี้ — เห็นจากลิสต์เลยไม่ต้องเปิดใบ
-                        const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
-                        return action ? (
-                          <span className={cn(action.cls, 'mt-1')}>→ {action.text}</span>
-                        ) : null;
-                      })()}
+                      <span className="mt-0.5 block text-[10px] text-slate-600 dark:text-slate-300">
+                        ขอมา <b className="tabular-nums">{requested}</b> · เหลือหาทางการ{' '}
+                        <b className="tabular-nums">{remaining}</b>
+                      </span>
                     </div>
                     <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">สรุปคนในใบนี้</p>
-                      <div className="mt-0.5 grid grid-cols-2 gap-x-2.5 text-[10px] text-slate-600 dark:text-slate-300">
-                        <span>ขอมา <b className="tabular-nums">{requested}</b></span>
-                        <span>ติดต่อ <b className="tabular-nums">{progress.contacted}</b></span>
-                        <span>จอง <b className="tabular-nums">{progress.reserved}</b></span>
-                        <span>ลงงาน <b className="tabular-nums">{progress.placed}</b></span>
-                        <span className="col-span-2">เหลือหาทางการ <b className="tabular-nums">{remaining}</b></span>
-                      </div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                        {serverLumosSummary[j.id] ? 'ผลโทรในใบนี้' : 'คนในใบนี้'}
+                      </p>
+                      {serverLumosSummary[j.id] ? (
+                        <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
+                      ) : (
+                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-600 dark:text-slate-300">
+                          <span>ติดต่อ <b className="tabular-nums">{progress.contacted}</b></span>
+                          <span>จอง <b className="tabular-nums">{progress.reserved}</b></span>
+                          <span>ลงงาน <b className="tabular-nums">{progress.placed}</b></span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                    {serverLumosSummary[j.id] ? <LumosJobSummaryStats s={serverLumosSummary[j.id]} /> : null}
                     <button
                       type="button"
                       onClick={(e) => {

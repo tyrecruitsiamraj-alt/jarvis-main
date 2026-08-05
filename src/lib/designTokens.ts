@@ -58,6 +58,11 @@ export type ToneClasses = {
   solid: string;
   /** จุดสีเล็กหน้าป้าย */
   dot: string;
+  /**
+   * ตัวเลข/ตัวหนังสือบน "พื้นเข้ม" (hero, การ์ดดำ) — สีเดียวทั้งสองธีมเพราะพื้นเข้มตลอด
+   * โทนอ่อนกว่า `value` เพื่อให้อ่านออกบนพื้นน้ำเงินหมึก
+   */
+  onDark: string;
   /** ชิป — class กลางใน src/index.css (แหล่งเดียวกับที่หน้าอื่นเรียกใช้) */
   chip: string;
   /** ค่าสีจริงสำหรับ recharts (รับ class ไม่ได้ ต้องเป็น hex) */
@@ -74,6 +79,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-slate-100/70 dark:hover:bg-slate-800',
     solid: 'bg-slate-600 text-white hover:bg-slate-500',
     dot: 'bg-slate-400',
+    onDark: 'text-slate-200',
     chip: 'jarvis-chip jarvis-chip-neutral',
     hex: '#94a3b8',
   },
@@ -86,6 +92,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-sky-100/70 dark:hover:bg-sky-950',
     solid: 'bg-sky-600 text-white hover:bg-sky-500',
     dot: 'bg-sky-400',
+    onDark: 'text-sky-300',
     chip: 'jarvis-chip jarvis-chip-info',
     hex: '#0ea5e9',
   },
@@ -98,6 +105,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-blue-100/70 dark:hover:bg-blue-950',
     solid: 'bg-blue-600 text-white hover:bg-blue-500',
     dot: 'bg-blue-500',
+    onDark: 'text-blue-400',
     chip: 'jarvis-chip jarvis-chip-primary',
     hex: '#3b82f6',
   },
@@ -110,6 +118,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-emerald-100/70 dark:hover:bg-emerald-950',
     solid: 'bg-emerald-600 text-white hover:bg-emerald-500',
     dot: 'bg-emerald-400',
+    onDark: 'text-emerald-300',
     chip: 'jarvis-chip jarvis-chip-success',
     hex: '#22c55e',
   },
@@ -122,6 +131,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-amber-100/70 dark:hover:bg-amber-950',
     solid: 'bg-amber-500 text-white hover:bg-amber-400',
     dot: 'bg-amber-400',
+    onDark: 'text-amber-300',
     chip: 'jarvis-chip jarvis-chip-warn',
     hex: '#f59e0b',
   },
@@ -134,6 +144,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-red-100/70 dark:hover:bg-red-950',
     solid: 'bg-red-600 text-white hover:bg-red-500',
     dot: 'bg-red-500',
+    onDark: 'text-red-400',
     chip: 'jarvis-chip jarvis-chip-danger',
     hex: '#ef4444',
   },
@@ -146,6 +157,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-violet-100/70 dark:hover:bg-violet-950',
     solid: 'bg-violet-600 text-white hover:bg-violet-500',
     dot: 'bg-violet-400',
+    onDark: 'text-violet-300',
     chip: 'jarvis-chip jarvis-chip-violet',
     hex: '#8b5cf6',
   },
@@ -158,6 +170,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-orange-100/70 dark:hover:bg-orange-950',
     solid: 'bg-orange-500 text-white hover:bg-orange-400',
     dot: 'bg-orange-400',
+    onDark: 'text-orange-300',
     chip: 'jarvis-chip jarvis-chip-orange',
     hex: '#f97316',
   },
@@ -170,6 +183,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     softHover: 'hover:bg-teal-100/70 dark:hover:bg-teal-950',
     solid: 'bg-teal-600 text-white hover:bg-teal-500',
     dot: 'bg-teal-400',
+    onDark: 'text-teal-300',
     chip: 'jarvis-chip jarvis-chip-teal',
     hex: '#14b8a6',
   },

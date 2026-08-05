@@ -46,6 +46,7 @@ describe('designTokens — TONE', () => {
       'softHover',
       'solid',
       'dot',
+      'onDark',
       'chip',
       'hex',
     ] as const;
