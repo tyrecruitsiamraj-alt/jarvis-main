@@ -10,6 +10,7 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
+import { Switch } from '@/components/ui/switch';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { loadThemeMode, resolveTheme, setThemeMode } from '@/lib/theme';
@@ -32,16 +33,28 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setThemeMode(next);
     setTheme(next);
   };
-  const themeButton = (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      className="p-2.5 rounded-full text-muted-foreground hover:text-blue-500 hover:bg-white/60 dark:hover:bg-white/10 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-      aria-label={theme === 'dark' ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
-      title={theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}
+  /** สลับธีมด้วย Switch — เห็นสถานะปัจจุบันจากตำแหน่งปุ่ม ไม่ต้องเดาจากไอคอน
+   *  ไอคอนสองข้างบอกทิศ · ข้างที่ใช้อยู่เข้มขึ้น */
+  const themeSwitch = (
+    <div
+      className="flex min-h-[44px] items-center gap-1.5 px-1"
+      title={theme === 'dark' ? 'ตอนนี้โหมดมืด' : 'ตอนนี้โหมดสว่าง'}
     >
-      {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-    </button>
+      <Sun
+        aria-hidden
+        className={cn('h-4 w-4 transition-colors', theme === 'dark' ? 'text-muted-foreground/40' : 'text-amber-500')}
+      />
+      <Switch
+        checked={theme === 'dark'}
+        onCheckedChange={toggleTheme}
+        aria-label={theme === 'dark' ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
+        className="data-[state=checked]:bg-slate-700 data-[state=unchecked]:bg-slate-300"
+      />
+      <Moon
+        aria-hidden
+        className={cn('h-4 w-4 transition-colors', theme === 'dark' ? 'text-sky-300' : 'text-muted-foreground/40')}
+      />
+    </div>
   );
 
   const hamburger = (
@@ -110,7 +123,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
             ) : null}
           </div>
-          {themeButton}
+          {themeSwitch}
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
@@ -145,7 +158,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}
           </span>
-          {themeButton}
+          {themeSwitch}
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
