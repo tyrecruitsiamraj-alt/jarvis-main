@@ -184,9 +184,9 @@ const HomePage: React.FC = () => {
             </button>
           </div>
 
-          {/* Funnel หลัก */}
+          {/* Funnel หลัก — 5 ขั้นหลัก + เส้นแยก "ไม่มีคนแนะนำ" อยู่ในแถวเดียวกัน */}
           <div className="glass-card rounded-[1.5rem] border border-white/70 p-3">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
               <FlowStage
                 label="ใบขอเปิดอยู่"
                 value={flow.jobs.open_total}
@@ -238,10 +238,16 @@ const HomePage: React.FC = () => {
                 accent="text-violet-700"
                 onClick={() => navigate('/matching/reservations')}
               />
-            </div>
 
-            {/* หาคนของเราไม่ได้ → ส่งต่อทีมอื่น: คิดคอนเทนต์ / ไปดูดประกาศ (เส้นขนานกับ funnel หลัก) */}
-            <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+              {/* แยกเส้น ไม่ใช่ขั้นที่ 6 — ใบที่ AI หาคนของเราไม่ได้ ถูกส่งต่อทีมอื่นแทน
+                  ป้ายกำกับไว้กันอ่านผิดว่าต่อจาก "จองตัว/ลงงาน" */}
+              <div className="flex items-center justify-center gap-1.5 px-1 text-muted-foreground/60">
+                <span className="hidden h-8 w-px bg-border sm:block" aria-hidden />
+                <span className="text-[10px] font-medium leading-tight text-muted-foreground">
+                  ไม่มีคน
+                  <br className="hidden sm:block" /> แนะนำ →
+                </span>
+              </div>
               <FlowStage
                 label="ส่งคิด Content"
                 value={flow.postings.content ?? 0}

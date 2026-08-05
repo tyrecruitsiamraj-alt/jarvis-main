@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, Clock3, LoaderCircle } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -2228,29 +2227,18 @@ const MatchingPage: React.FC = () => {
               {serverListError} — ลองรีเฟรชหน้า
             </p>
           ) : null}
+          {/* โหลดครั้งแรก (ยังไม่มีข้อมูลใน cache) — spinner ตัวเดียวพร้อมข้อความ
+              ชัดกว่าการ์ดหลอก 8 ใบ ที่คนเข้าใจผิดว่าหน้าค้างแล้วกด refresh ซ้ำ */}
           {rows.length === 0 && (loadingJobs || serverListLoading) ? (
-            <>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="glass-card rounded-2xl px-3 py-2.5 border border-white/70">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <Skeleton className="h-4 w-3/5 rounded" />
-                      <Skeleton className="h-3 w-2/5 rounded" />
-                      <Skeleton className="h-3 w-1/2 rounded" />
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <Skeleton className="h-4 w-10 rounded-full" />
-                      <Skeleton className="h-4 w-16 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex gap-1.5">
-                    <Skeleton className="h-3 w-12 rounded-full" />
-                    <Skeleton className="h-3 w-16 rounded-full" />
-                    <Skeleton className="h-3 w-10 rounded-full" />
-                  </div>
-                </div>
-              ))}
-            </>
+            <div className="glass-card flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 px-6 py-16 text-center">
+              <LoaderCircle className="h-8 w-8 animate-spin text-sky-500" aria-hidden />
+              <div>
+                <p className="text-sm font-semibold text-foreground">กำลังโหลดใบขอ…</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  ดึงใบขอจากระบบ ERP พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
+                </p>
+              </div>
+            </div>
           ) : null}
           {rows.length === 0 && !loadingJobs && !serverListLoading ? (
             <div className="glass-card rounded-2xl p-8 border border-white/70 text-center text-muted-foreground">
@@ -2298,6 +2286,23 @@ const MatchingPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
+                    {/* ป้าย "AI แนะนำ" อยู่บนสุด — เป็นตัวชี้ว่าใบนี้ทำงานต่อได้เลยหรือยัง
+                        กวาดตาเจอก่อนป้ายอื่น (เดิมอยู่ล่างสุดของกลุ่มจนมองข้าม) */}
+                    {matchCount != null ? (
+                      <span
+                        title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
+                        className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
+                      >
+                        AI แนะนำ {matchCount}
+                      </span>
+                    ) : quickCounts[j.id] ? (
+                      <span
+                        title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
+                        className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-300"
+                      >
+                        น่าจะตรง ~{quickCounts[j.id]}
+                      </span>
+                    ) : null}
                     {/* ระดับความด่วนตามอายุใบขอ (คนละเรื่องกับ "ด่วน/ล่วงหน้า" ที่มาจากใบขอ ERP) */}
                     <span
                       title={
@@ -2322,21 +2327,6 @@ const MatchingPage: React.FC = () => {
                     >
                       {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
                     </span>
-                    {matchCount != null ? (
-                      <span
-                        title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                        className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
-                      >
-                        AI แนะนำ {matchCount}
-                      </span>
-                    ) : quickCounts[j.id] ? (
-                      <span
-                        title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                        className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
-                      >
-                        น่าจะตรง ~{quickCounts[j.id]}
-                      </span>
-                    ) : null}
                   </div>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
