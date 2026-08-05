@@ -46,6 +46,8 @@ export type PublicApplyDialogProps = {
   /** งานที่กดสมัคร — null เมื่อสมัครแบบไม่ระบุงาน (ปุ่มท้ายหน้า) */
   job: JobRequest | null;
   onClose: () => void;
+  /** เปิดจากลิงก์ประกาศ — ไม่มี job object แต่มีบริบทประกาศ/ช่องทาง */
+  posting?: { postingId: string; linkId: string; jobId: string | null; title: string } | null;
 };
 
 type Gender = 'male' | 'female' | 'other';
@@ -75,7 +77,7 @@ const SectionLabel: React.FC<{ icon: React.ReactNode; children: React.ReactNode 
   </div>
 );
 
-const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClose }) => {
+const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClose, posting = null }) => {
   const [titlePrefix, setTitlePrefix] = useState('นาย');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -191,9 +193,11 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           education: education || null,
           referral_source: referralSource || null,
           document,
-          job_id: job?.id ?? null,
-          job_title: job ? jobBoardCardTitle(job) : null,
+          job_id: job?.id ?? posting?.jobId ?? null,
+          job_title: job ? jobBoardCardTitle(job) : posting?.title ?? null,
           unit_name: job?.unit_name ?? null,
+          posting_id: posting?.postingId ?? null,
+          link_id: posting?.linkId ?? null,
           position_interest: positionInterest.trim() || null,
           note: note.trim() || null,
         }),

@@ -16,6 +16,7 @@ import RequireRole from "@/components/auth/RequireRole";
 
 /** โหลดทีละหน้าเมื่อถูกเรียกใช้ (code-split) — ลดขนาด JS ก้อนแรกให้เปิดแอปเร็วขึ้น */
 const PublicJobBoardPage = lazy(() => import("@/pages/public/PublicJobBoardPage"));
+const PublicPostingApplyPage = lazy(() => import("@/pages/public/PublicPostingApplyPage"));
 const ShortLinkRedirectPage = lazy(() => import("@/pages/public/ShortLinkRedirectPage"));
 const MagicLinkVerifyPage = lazy(() => import("@/pages/MagicLinkVerifyPage"));
 const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
@@ -143,6 +144,14 @@ const App = () => (
                     element={
                       <PublicApplyLayout>
                         <PublicJobBoardPage />
+                      </PublicApplyLayout>
+                    }
+                  />
+                  <Route
+                    path="/apply/p/:code"
+                    element={
+                      <PublicApplyLayout>
+                        <PublicPostingApplyPage />
                       </PublicApplyLayout>
                     }
                   />
