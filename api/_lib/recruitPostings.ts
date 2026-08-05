@@ -1,0 +1,399 @@
+import { randomBytes } from 'node:crypto';
+
+import { dbQuery, isPgUniqueViolation } from './postgres.js';
+import { tableInAppSchema } from './schema.js';
+import {
+  isStandalonePostingKind,
+  validatePostingInput,
+  type RecruitChannel,
+  type RecruitPosting,
+  type RecruitPostingLink,
+} from '@/lib/recruitPostings';
+
+const channelsTable = tableInAppSchema('recruit_channels');
+const postingsTable = tableInAppSchema('recruit_postings');
+const linksTable = tableInAppSchema('recruit_posting_links');
+const applicationsTable = tableInAppSchema('public_job_applications');
+
+const MAX_TEXT = 200;
+const MAX_LONG_TEXT = 4000;
+
+function trimTo(value: unknown, max: number): string | null {
+  const s = typeof value === 'string' ? value.trim() : '';
+  if (!s) return null;
+  return s.slice(0, max);
+}
+
+/** โค้ดลิงก์ — ตัวอักษรที่อ่าน/พิมพ์ตามไม่สับสน (ตัด 0/O/1/I/l ออก) */
+const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+function makeLinkCode(length = 7): string {
+  const bytes = randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i += 1) out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  return out;
+}
+
+// ── ช่องทาง ───────────────────────────────────────────────────────────
+
+type ChannelRow = {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
+function mapChannel(r: ChannelRow): RecruitChannel {
+  return {
+    id: r.id,
+    parentId: r.parent_id,
+    name: r.name,
+    sortOrder: Number(r.sort_order) || 0,
+    isActive: !!r.is_active,
+  };
+}
+
+/** คืนช่องทางเป็นทรี 2 ระดับ (หลัก → รอง) */
+export async function listRecruitChannels(includeInactive = false): Promise<RecruitChannel[]> {
+  const { rows } = await dbQuery<ChannelRow>(
+    `SELECT id, parent_id, name, sort_order, is_active
+       FROM ${channelsTable}
+      ${includeInactive ? '' : 'WHERE is_active = true'}
+      ORDER BY sort_order, lower(name)`,
+  );
+  const all = rows.map(mapChannel);
+  const parents = all.filter((c) => !c.parentId);
+  const byParent = new Map<string, RecruitChannel[]>();
+  for (const c of all) {
+    if (!c.parentId) continue;
+    const list = byParent.get(c.parentId) ?? [];
+    list.push(c);
+    byParent.set(c.parentId, list);
+  }
+  return parents.map((p) => ({ ...p, children: byParent.get(p.id) ?? [] }));
+}
+
+export async function createRecruitChannel(input: {
+  parentId?: string | null;
+  name: string;
+  sortOrder?: number;
+}): Promise<RecruitChannel> {
+  const name = trimTo(input.name, MAX_TEXT);
+  if (!name) throw new Error('ต้องระบุชื่อช่องทาง');
+  const parentId = trimTo(input.parentId, 64);
+  if (parentId) {
+    // กันทำช่องทางรองซ้อนรอง — รองรับแค่ 2 ระดับตามที่ตกลงไว้
+    const { rows } = await dbQuery<{ parent_id: string | null }>(
+      `SELECT parent_id FROM ${channelsTable} WHERE id = $1`,
+      [parentId],
+    );
+    if (rows.length === 0) throw new Error('ไม่พบช่องทางหลักที่อ้างถึง');
+    if (rows[0].parent_id) throw new Error('ช่องทางรองซ้อนช่องทางรองไม่ได้');
+  }
+  try {
+    const { rows } = await dbQuery<ChannelRow>(
+      `INSERT INTO ${channelsTable} (parent_id, name, sort_order)
+       VALUES ($1, $2, $3)
+       RETURNING id, parent_id, name, sort_order, is_active`,
+      [parentId, name, Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 100],
+    );
+    return mapChannel(rows[0]);
+  } catch (e) {
+    if (isPgUniqueViolation(e)) throw new Error('มีช่องทางชื่อนี้อยู่แล้ว');
+    throw e;
+  }
+}
+
+export async function updateRecruitChannel(
+  id: string,
+  patch: { name?: string; sortOrder?: number; isActive?: boolean },
+): Promise<RecruitChannel | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  const name = patch.name === undefined ? null : trimTo(patch.name, MAX_TEXT);
+  if (patch.name !== undefined) {
+    if (!name) throw new Error('ชื่อช่องทางว่างไม่ได้');
+    params.push(name);
+    sets.push(`name = $${params.length}`);
+  }
+  if (patch.sortOrder !== undefined) {
+    params.push(Number(patch.sortOrder) || 0);
+    sets.push(`sort_order = $${params.length}`);
+  }
+  if (patch.isActive !== undefined) {
+    params.push(!!patch.isActive);
+    sets.push(`is_active = $${params.length}`);
+  }
+  if (sets.length === 0) return null;
+  params.push(id);
+  try {
+    const { rows } = await dbQuery<ChannelRow>(
+      `UPDATE ${channelsTable} SET ${sets.join(', ')}, updated_at = now()
+        WHERE id = $${params.length}
+        RETURNING id, parent_id, name, sort_order, is_active`,
+      params,
+    );
+    return rows[0] ? mapChannel(rows[0]) : null;
+  } catch (e) {
+    if (isPgUniqueViolation(e)) throw new Error('มีช่องทางชื่อนี้อยู่แล้ว');
+    throw e;
+  }
+}
+
+/** ลบช่องทาง — ลิงก์ที่เคยสร้างไว้ยังใช้ได้ (channel_id เป็น null แต่ channel_label ยังอยู่) */
+export async function deleteRecruitChannel(id: string): Promise<boolean> {
+  const { rowCount } = await dbQuery(`DELETE FROM ${channelsTable} WHERE id = $1`, [id]);
+  return (rowCount ?? 0) > 0;
+}
+
+// ── ประกาศ ────────────────────────────────────────────────────────────
+
+type PostingRow = {
+  id: string;
+  job_id: string | null;
+  standalone_kind: string | null;
+  department_code: string | null;
+  title: string;
+  detail: string | null;
+  location_text: string | null;
+  salary_text: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  status: string;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+  application_count?: string | number | null;
+};
+
+type LinkRow = {
+  id: string;
+  posting_id: string;
+  channel_id: string | null;
+  channel_label: string | null;
+  code: string;
+  note: string | null;
+  hit_count: number;
+  created_at: string;
+  application_count?: string | number | null;
+};
+
+function mapLink(r: LinkRow): RecruitPostingLink {
+  return {
+    id: r.id,
+    channelId: r.channel_id,
+    channelLabel: r.channel_label,
+    code: r.code,
+    note: r.note,
+    hitCount: Number(r.hit_count) || 0,
+    createdAt: r.created_at,
+    applicationCount: r.application_count == null ? undefined : Number(r.application_count) || 0,
+  };
+}
+
+function mapPosting(r: PostingRow, links: RecruitPostingLink[]): RecruitPosting {
+  return {
+    id: r.id,
+    jobId: r.job_id,
+    standaloneKind: isStandalonePostingKind(r.standalone_kind) ? r.standalone_kind : null,
+    departmentCode: r.department_code,
+    title: r.title,
+    detail: r.detail,
+    locationText: r.location_text,
+    salaryText: r.salary_text,
+    contactName: r.contact_name,
+    contactPhone: r.contact_phone,
+    status: r.status === 'closed' ? 'closed' : 'open',
+    createdByName: r.created_by_name,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    links,
+    applicationCount: r.application_count == null ? undefined : Number(r.application_count) || 0,
+  };
+}
+
+const POSTING_COLUMNS = `p.id, p.job_id, p.standalone_kind, p.department_code, p.title, p.detail,
+  p.location_text, p.salary_text, p.contact_name, p.contact_phone, p.status,
+  p.created_by_name, p.created_at, p.updated_at,
+  (SELECT count(*) FROM ${applicationsTable} a WHERE a.posting_id = p.id) AS application_count`;
+
+async function attachLinks(postings: PostingRow[]): Promise<RecruitPosting[]> {
+  if (postings.length === 0) return [];
+  const ids = postings.map((p) => p.id);
+  const { rows } = await dbQuery<LinkRow>(
+    `SELECT l.id, l.posting_id, l.channel_id, l.channel_label, l.code, l.note, l.hit_count, l.created_at,
+            (SELECT count(*) FROM ${applicationsTable} a WHERE a.link_id = l.id) AS application_count
+       FROM ${linksTable} l
+      WHERE l.posting_id = ANY($1::uuid[])
+      ORDER BY l.created_at`,
+    [ids],
+  );
+  const byPosting = new Map<string, RecruitPostingLink[]>();
+  for (const r of rows) {
+    const list = byPosting.get(r.posting_id) ?? [];
+    list.push(mapLink(r));
+    byPosting.set(r.posting_id, list);
+  }
+  return postings.map((p) => mapPosting(p, byPosting.get(p.id) ?? []));
+}
+
+export async function listRecruitPostings(options: {
+  jobId?: string | null;
+  standaloneOnly?: boolean;
+  departmentCodes?: string[] | null;
+}): Promise<RecruitPosting[]> {
+  const where: string[] = [];
+  const params: unknown[] = [];
+
+  if (options.jobId) {
+    params.push(options.jobId);
+    where.push(`p.job_id = $${params.length}`);
+  }
+  if (options.standaloneOnly) where.push('p.job_id IS NULL');
+
+  // scope ตาม BU: ประกาศลอยกรองด้วย department_code ตรง ๆ
+  // ส่วนประกาศที่ผูกใบขอ ตัวกรอง BU ทำที่ชั้นใบขอ (handler ส่ง jobId ที่ scope แล้วมา)
+  const depts = (options.departmentCodes ?? []).filter(Boolean);
+  if (depts.length > 0) {
+    params.push(depts);
+    where.push(`(p.job_id IS NOT NULL OR p.department_code = ANY($${params.length}::text[]))`);
+  }
+
+  const { rows } = await dbQuery<PostingRow>(
+    `SELECT ${POSTING_COLUMNS}
+       FROM ${postingsTable} p
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY p.created_at DESC
+      LIMIT 500`,
+    params,
+  );
+  return attachLinks(rows);
+}
+
+export async function getRecruitPosting(id: string): Promise<RecruitPosting | null> {
+  const { rows } = await dbQuery<PostingRow>(
+    `SELECT ${POSTING_COLUMNS} FROM ${postingsTable} p WHERE p.id = $1`,
+    [id],
+  );
+  if (rows.length === 0) return null;
+  return (await attachLinks(rows))[0] ?? null;
+}
+
+/** resolve ลิงก์สาธารณะ — คืนประกาศ + ลิงก์ที่ใช้เข้ามา */
+export async function getPostingByLinkCode(
+  code: string,
+): Promise<{ posting: RecruitPosting; link: RecruitPostingLink } | null> {
+  const clean = (code || '').trim().toLowerCase();
+  if (!clean) return null;
+  const { rows } = await dbQuery<LinkRow>(
+    `SELECT id, posting_id, channel_id, channel_label, code, note, hit_count, created_at
+       FROM ${linksTable} WHERE lower(code) = $1`,
+    [clean],
+  );
+  if (rows.length === 0) return null;
+  const link = rows[0];
+  const posting = await getRecruitPosting(link.posting_id);
+  if (!posting) return null;
+  // นับคลิก — พลาดไม่เป็นไร ไม่ให้ล้มการเปิดหน้า
+  void dbQuery(`UPDATE ${linksTable} SET hit_count = hit_count + 1 WHERE id = $1`, [link.id]).catch(
+    () => undefined,
+  );
+  return { posting, link: mapLink(link) };
+}
+
+export type CreatePostingInput = {
+  jobId?: string | null;
+  standaloneKind?: string | null;
+  departmentCode?: string | null;
+  title: string;
+  detail?: string | null;
+  locationText?: string | null;
+  salaryText?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  /** ช่องทางที่จะสร้างลิงก์ให้ — 1 ช่องทาง = 1 ลิงก์ */
+  channels?: Array<{ channelId?: string | null; label?: string | null; note?: string | null }>;
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+};
+
+export async function createRecruitPosting(input: CreatePostingInput): Promise<RecruitPosting> {
+  const invalid = validatePostingInput(input);
+  if (invalid) throw new Error(invalid);
+
+  const jobId = trimTo(input.jobId, 128);
+  const { rows } = await dbQuery<PostingRow>(
+    `INSERT INTO ${postingsTable}
+       (job_id, standalone_kind, department_code, title, detail, location_text, salary_text,
+        contact_name, contact_phone, created_by_user_id, created_by_name)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING id, job_id, standalone_kind, department_code, title, detail, location_text,
+               salary_text, contact_name, contact_phone, status, created_by_name, created_at, updated_at`,
+    [
+      jobId,
+      jobId ? null : trimTo(input.standaloneKind, 64),
+      trimTo(input.departmentCode, 32),
+      trimTo(input.title, MAX_TEXT),
+      trimTo(input.detail, MAX_LONG_TEXT),
+      trimTo(input.locationText, MAX_TEXT),
+      trimTo(input.salaryText, MAX_TEXT),
+      trimTo(input.contactName, MAX_TEXT),
+      trimTo(input.contactPhone, 64),
+      trimTo(input.createdByUserId, 64),
+      trimTo(input.createdByName, MAX_TEXT),
+    ],
+  );
+  const posting = rows[0];
+
+  const channels = (input.channels ?? []).slice(0, 20);
+  // ไม่เลือกช่องทางเลย = ยังได้ 1 ลิงก์กลาง (ไม่ระบุช่องทาง) จะได้ส่งออกได้ทันที
+  const wanted = channels.length > 0 ? channels : [{ channelId: null, label: null, note: null }];
+  const links: RecruitPostingLink[] = [];
+  for (const ch of wanted) {
+    links.push(
+      await createPostingLink(posting.id, {
+        channelId: ch.channelId ?? null,
+        label: ch.label ?? null,
+        note: ch.note ?? null,
+      }),
+    );
+  }
+  return mapPosting(posting, links);
+}
+
+export async function createPostingLink(
+  postingId: string,
+  input: { channelId?: string | null; label?: string | null; note?: string | null },
+): Promise<RecruitPostingLink> {
+  // โค้ดสุ่มอาจชนกันได้ — ลองใหม่ไม่กี่ครั้งแทนที่จะปล่อยพัง
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const { rows } = await dbQuery<LinkRow>(
+        `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at`,
+        [
+          postingId,
+          trimTo(input.channelId, 64),
+          trimTo(input.label, MAX_TEXT),
+          makeLinkCode(),
+          trimTo(input.note, MAX_TEXT),
+        ],
+      );
+      return mapLink(rows[0]);
+    } catch (e) {
+      if (isPgUniqueViolation(e) && attempt < 4) continue;
+      throw e;
+    }
+  }
+  throw new Error('สร้างลิงก์ไม่สำเร็จ');
+}
+
+export async function setPostingStatus(id: string, status: 'open' | 'closed'): Promise<boolean> {
+  const { rowCount } = await dbQuery(
+    `UPDATE ${postingsTable} SET status = $2, updated_at = now() WHERE id = $1`,
+    [id, status],
+  );
+  return (rowCount ?? 0) > 0;
+}
