@@ -106,7 +106,7 @@ const DashboardShell: React.FC<Props> = ({
   return (
     <div className="min-h-full bg-slate-100/60 dark:bg-transparent pb-24">
       <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-sm">
-        <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-4 space-y-3">
+        <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-4 space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100">Request Control Tower</h1>
@@ -149,7 +149,7 @@ const DashboardShell: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-5">
+      <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-5">
         {loading ? (
           <p className="text-sm text-slate-500 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
