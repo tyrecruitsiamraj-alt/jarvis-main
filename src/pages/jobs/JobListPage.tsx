@@ -22,11 +22,14 @@ import {
   UNIT_REQUEST_WORK_STATUS_OPTIONS,
 } from '@/lib/unitRequestWorkStatus';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { DASH } from '@/lib/designTokens';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
   AGE_DAYS_MULTI_OPTIONS,
   compareJobsForListSort,
+  getJobAgeUrgencyLevel,
   getJobRequestAgeLabel,
+  JOB_AGE_URGENCY_META,
   getJobRequestSubmittedDate,
   JOB_LIST_SORT_OPTIONS,
   matchesAnyAgeDaysFilter,
@@ -423,55 +426,61 @@ const JobListPage: React.FC = () => {
           </div>
         )}
 
-        <div className="rounded-2xl border border-black/[0.06] bg-white/35 backdrop-blur-sm p-3 md:p-4 space-y-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="job-list-search" className="text-xs text-muted-foreground leading-snug">
-              ค้นหา
+        {/* ตัวกรองเป็นแถบบนเต็มความกว้าง (mockup rev.3 ข้อ 05) — ช่องกรองครบเท่าเดิมทุกช่อง
+            แถวแรกรวม ค้นหา + ปุ่มสถานะ + เปิดแท็บใหม่ ไว้บรรทัดเดียว ตารางข้างล่างจึงขึ้นมาเห็นเร็วขึ้น */}
+        <div className={cn(DASH.cardLg, 'p-3 md:p-4 space-y-3')}>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[220px] flex-1">
+              <label htmlFor="job-list-search" className="sr-only">
+                ค้นหา
+              </label>
+              <SearchField
+                id="job-list-search"
+                compact
+                type="text"
+                placeholder="เลขที่ใบขอ, หน่วยงาน, ผู้รับผิดชอบ..."
+                value={search}
+                onChange={(e) => updateListState({ search: e.target.value })}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { value: 'all' as const, label: 'ทั้งหมด' },
+                { value: 'active' as const, label: 'ดำเนินการ' },
+                { value: 'closed' as const, label: 'ปิดแล้ว' },
+              ].map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => updateListState({ filter: f.value })}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
+                    filter === f.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary/80 text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <label className="inline-flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                className="rounded border-border"
+                checked={openInNewTab}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setOpenInNewTab(next);
+                  saveOpenInNewTabPref(next);
+                }}
+              />
+              เปิดใบขอในแท็บใหม่
+              <span className="text-[10px] text-muted-foreground/80">(หรือ Ctrl/⌘+คลิก)</span>
             </label>
-            <SearchField
-              id="job-list-search"
-              compact
-              type="text"
-              placeholder="เลขที่ใบขอ, หน่วยงาน, ผู้รับผิดชอบ..."
-              value={search}
-              onChange={(e) => updateListState({ search: e.target.value })}
-            />
           </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { value: 'all' as const, label: 'ทั้งหมด' },
-              { value: 'active' as const, label: 'ดำเนินการ' },
-              { value: 'closed' as const, label: 'ปิดแล้ว' },
-            ].map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => updateListState({ filter: f.value })}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap',
-                  filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-secondary/80 text-muted-foreground',
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="rounded border-border"
-              checked={openInNewTab}
-              onChange={(e) => {
-                const next = e.target.checked;
-                setOpenInNewTab(next);
-                saveOpenInNewTabPref(next);
-              }}
-            />
-            เปิดใบขอในแท็บใหม่
-            <span className="text-[10px] text-muted-foreground/80">(หรือ Ctrl/⌘+คลิก)</span>
-          </label>
 
           <div
             className={cn(
@@ -658,24 +667,24 @@ const JobListPage: React.FC = () => {
             </div>
           ) : (
             // ─── Desktop skeleton table ──────────────────────────────────────
-            <div className="glass-card rounded-xl border border-border overflow-x-auto">
+            <div className={cn(DASH.card, 'overflow-x-auto')}>
               <table className="w-full text-sm min-w-[1000px]">
                 <thead>
-                  <tr className="border-b border-border bg-secondary/30">
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผ่านมา</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">คงเหลือ</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
-                    <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
-                    <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
+                  <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
+                    <th className="px-3 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้ลาออก</th>
+                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
+                    <th className="px-3 py-3 text-center font-medium whitespace-nowrap">ส่งคนแทน</th>
+                    <th className="px-3 py-3 text-center font-medium whitespace-nowrap">สถานะทำงาน</th>
+                    <th className="px-3 py-3 text-left font-medium min-w-[180px]">หมายเหตุ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -724,7 +733,13 @@ const JobListPage: React.FC = () => {
                       {j.request_no || j.unit_name}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
+                      <span
+                        className={cn(
+                          'jarvis-chip whitespace-nowrap',
+                          JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].chipCls,
+                        )}
+                        title={JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].label}
+                      >
                         ผ่านมา {ageDaysLabel(j)}
                       </span>
                     </div>
@@ -815,24 +830,24 @@ const JobListPage: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className={cn('glass-card rounded-xl border border-border overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
+          <div className={cn(DASH.card, 'overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
             <table className="w-full text-sm min-w-[1000px]">
               <thead>
-                <tr className="border-b border-border bg-secondary/30">
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">เลขที่ใบขอ</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผ่านมา</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">หน่วยงาน</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่กรอก</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">คงเหลือ</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ประเภทใบขอ</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ตำแหน่ง</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้ลาออก</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">ส่งคนแทน</th>
-                  <th className="px-3 py-3 text-center text-muted-foreground font-medium whitespace-nowrap">สถานะทำงาน</th>
-                  <th className="px-3 py-3 text-left text-muted-foreground font-medium min-w-[180px]">หมายเหตุ</th>
+                <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
+                  <th className="px-3 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้ลาออก</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
+                  <th className="px-3 py-3 text-center font-medium whitespace-nowrap">ส่งคนแทน</th>
+                  <th className="px-3 py-3 text-center font-medium whitespace-nowrap">สถานะทำงาน</th>
+                  <th className="px-3 py-3 text-left font-medium min-w-[180px]">หมายเหตุ</th>
                 </tr>
               </thead>
 
@@ -847,42 +862,53 @@ const JobListPage: React.FC = () => {
                         openJob(j, e);
                       }
                     }}
-                    className="border-b border-border/50 hover:bg-secondary/20 cursor-pointer"
+                    className={cn('cursor-pointer border-b', DASH.tableRow)}
                   >
-                    <td className="px-3 py-3 font-medium text-foreground whitespace-nowrap">{j.request_no || '—'}</td>
+                    <td className={cn('px-3 py-3 whitespace-nowrap', DASH.cellStrong)}>{j.request_no || '—'}</td>
+                    {/* ชิปอายุใบขอ 4 ระดับ (mockup rev.3 ข้อ 05) — ภาษาสีเดียวกับหน้า Matching
+                        เดิมเป็นชิปเทาเท่ากันหมด มองไม่ออกว่าใบไหนค้างนาน · เกณฑ์ถังไม่เปลี่ยน */}
                     <td className="px-3 py-3 text-xs whitespace-nowrap">
-                      <span className="inline-flex px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                      <span
+                        className={cn(
+                          'jarvis-chip',
+                          JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].chipCls,
+                        )}
+                        title={JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].label}
+                      >
                         {ageDaysLabel(j)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-foreground text-xs">{j.unit_name || '—'}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatSubmittedDate(j)}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs whitespace-nowrap">{formatYmdDmyBe(j.required_date)}</td>
-                    <td className="px-3 py-3 text-center text-foreground text-xs tabular-nums whitespace-nowrap">
+                    {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) ไม่ใช้ text-foreground
+                        เพราะ branding เขียน --foreground ทับ inline บน <html> ทำให้ค่านั้นไม่สลับตามธีม
+                        แล้วจะได้ตัวหนังสือเข้มบนการ์ดเข้มในโหมดมืด */}
+                    <td className={cn('px-3 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
+                    <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
+                    <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
+                    <td className={cn('px-3 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
                       {jobPositionUnits(j)}
                     </td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{j.job_description_code_1 || '—'}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{extractJobSubtypeLabel(j)}</td>
-                    <td className="px-3 py-3 text-muted-foreground text-xs">{j.resigned_employee_name || '—'}</td>
+                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>
+                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{extractJobSubtypeLabel(j)}</td>
+                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.resigned_employee_name || '—'}</td>
                     <td className="px-3 py-3">
                       {j.recruiter_name || j.screener_name || j.opl_name ? (
-                        <div className="text-xs leading-tight whitespace-nowrap">
+                        <div className={cn('text-xs leading-tight whitespace-nowrap', DASH.cell)}>
                           <div>
-                            <span className="text-muted-foreground">OPL </span>
+                            <span className={DASH.muted}>OPL </span>
                             {j.opl_name || '—'}
                           </div>
                           <div>
-                            <span className="text-muted-foreground">สรรหา </span>
+                            <span className={DASH.muted}>สรรหา </span>
                             {j.recruiter_name || '—'}
                           </div>
                           <div>
-                            <span className="text-muted-foreground">คัดสรร </span>
+                            <span className={DASH.muted}>คัดสรร </span>
                             {j.screener_name || '—'}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className={cn('text-xs', DASH.cellMuted)}>—</span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">

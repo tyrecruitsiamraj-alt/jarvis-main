@@ -88,6 +88,12 @@ Code:
   (deterministic จากชื่อ ไม่ผูกลำดับแถว) · เทสต์ที่ `tests/api/nameAvatar.test.ts`
 * `src/lib/followApi.ts` — `FOLLOW_STATUS_CLASS`/`FOLLOW_STATUS_BAR` ชี้เข้า TONE แล้ว
   (เดิมเป็นชุดสี `/15` ของตัวเอง ไม่มีคู่ dark)
+* `src/pages/jobs/JobListPage.tsx` (หน้าหน่วยงาน) — ตัวกรองเป็นแถบบนเต็มความกว้าง แถวแรกรวม
+  ค้นหา+ปุ่มสถานะ+เปิดแท็บใหม่ · ชิปอายุใบขอ 4 ระดับจาก `JOB_AGE_URGENCY_META` (เกณฑ์ถังไม่เปลี่ยน)
+  · **ตัวหนังสือในตารางต้องใช้ `DASH.cell*` ไม่ใช้ `text-foreground`** เพราะ
+  `brandingStorage.applyBrandingToDocument()` เขียน `--foreground` ทับ inline บน `<html>`
+  ค่านั้นจึงไม่สลับตามธีม (bug ระดับแอป แยกไป task ต่างหาก) — ถ้าเผลอใช้ `text-foreground`
+  บนพื้นเข้ม จะได้ตัวหนังสือเข้มบนการ์ดเข้มในโหมดมืด
 * src/components/dashboard/request-control/ (แผงใหม่ของ parallel layer)
 
 ## Safe implementation / feature flag
