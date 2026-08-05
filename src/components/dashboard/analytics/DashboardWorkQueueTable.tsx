@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DASH } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
 import { DashboardSlaBadge, DashboardStatusBadge } from './DashboardStatusBadge';
@@ -28,9 +29,9 @@ function SortBtn({
 }) {
   const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
-    <button type="button" onClick={onClick} className="inline-flex items-center gap-1 hover:text-slate-900">
+    <button type="button" onClick={onClick} className="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-100">
       {label}
-      <Icon className={cn('h-3.5 w-3.5', active ? 'text-slate-700' : 'text-slate-400')} />
+      <Icon className={cn('h-3.5 w-3.5', active ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500')} />
     </button>
   );
 }
@@ -47,18 +48,18 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
   const toggle = (key: DashboardSortKey) => onSort(key);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className={cn(DASH.card, 'overflow-hidden')}>
       {!hideHeader ? (
-        <div className="px-4 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-semibold text-slate-900">งานที่ต้องติดตาม</h3>
-          <p className="text-xs text-slate-500">{items.length} รายการ — เรียงตามความสำคัญ</p>
+        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">งานที่ต้องติดตาม</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{items.length} รายการ — เรียงตามความสำคัญ</p>
         </div>
       ) : null}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1200px] text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs text-slate-500">
+            <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/60 text-left text-xs text-slate-500 dark:text-slate-400">
               <th className="px-3 py-2.5 font-medium">
                 <SortBtn label="ใบงาน" active={sortKey === 'createdAt'} dir={sortDir} onClick={() => toggle('createdAt')} />
               </th>
@@ -80,7 +81,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={12} className="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
                   ไม่พบงานตามเงื่อนไขที่เลือก
                 </td>
               </tr>
@@ -88,40 +89,40 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
               items.map((item) => (
                 <tr
                   key={item.id}
-                  className="border-b border-slate-100 hover:bg-slate-50/60 cursor-pointer"
+                  className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 cursor-pointer"
                   onClick={() => onView(item)}
                 >
                   <td className="px-3 py-3 align-top">
-                    <p className="font-medium text-slate-900">{item.requestNo}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.unitName}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{item.lifecycleKind}</p>
-                    <p className="text-[10px] text-slate-400">{item.requestAction || item.requestKind}</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">{item.requestNo}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.unitName}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{item.lifecycleKind}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500">{item.requestAction || item.requestKind}</p>
                   </td>
                   <td className="px-3 py-3 align-top tabular-nums text-xs">{item.requestPositions}</td>
-                  <td className="px-3 py-3 align-top tabular-nums text-xs text-emerald-700">{item.filledPositions}</td>
-                  <td className="px-3 py-3 align-top tabular-nums text-xs text-slate-600">{item.cancelledPositions}</td>
+                  <td className="px-3 py-3 align-top tabular-nums text-xs text-emerald-700 dark:text-emerald-300">{item.filledPositions}</td>
+                  <td className="px-3 py-3 align-top tabular-nums text-xs text-slate-600 dark:text-slate-400">{item.cancelledPositions}</td>
                   <td className="px-3 py-3 align-top tabular-nums text-xs font-medium">{item.remainingPositions}</td>
-                  <td className="px-3 py-3 align-top text-xs text-slate-600">{item.requestKind}</td>
+                  <td className="px-3 py-3 align-top text-xs text-slate-600 dark:text-slate-400">{item.requestKind}</td>
                   <td className="px-3 py-3 align-top">
                     <DashboardStatusBadge status={item.status} />
-                    <p className="text-[10px] text-slate-500 mt-1">{item.controlStatus}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">{item.controlStatus}</p>
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <p className="text-xs font-medium text-slate-800">{item.workStatusLabel || 'ดำเนินการ'}</p>
+                    <p className="text-xs font-medium text-slate-800 dark:text-slate-200">{item.workStatusLabel || 'ดำเนินการ'}</p>
                     {item.workPersonName ? (
-                      <p className="text-[10px] text-slate-500 mt-0.5">{item.workPersonName}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{item.workPersonName}</p>
                     ) : null}
                     {item.workStatusDate ? (
-                      <p className="text-[10px] text-slate-400 mt-0.5">{formatYmdDmyBe(item.workStatusDate)}</p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{formatYmdDmyBe(item.workStatusDate)}</p>
                     ) : null}
                   </td>
                   <td className="px-3 py-3 align-top">
                     <DashboardSlaBadge status={item.slaStatus} />
                   </td>
-                  <td className="px-3 py-3 align-top text-xs text-slate-600 whitespace-nowrap">
+                  <td className="px-3 py-3 align-top text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
                     {item.slaDueDate ? formatYmdDmyBe(item.slaDueDate) : '—'}
                   </td>
-                  <td className="px-3 py-3 align-top text-xs tabular-nums text-red-600">
+                  <td className="px-3 py-3 align-top text-xs tabular-nums text-red-600 dark:text-red-400">
                     {item.daysOverdue > 0 ? item.daysOverdue : '—'}
                   </td>
                   <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
@@ -129,7 +130,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => onView(item)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                         ดู
@@ -138,7 +139,7 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => onAssign(item)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                         >
                           <UserPlus className="h-3.5 w-3.5" />
                           ติดตาม

@@ -10,6 +10,8 @@ import {
   YAxis,
 } from 'recharts';
 import type { DashboardActivityTrendPoint } from '@/lib/dashboard/types';
+import { cn } from '@/lib/utils';
+import { CHART, DASH, TONE } from '@/lib/designTokens';
 
 type Props = {
   data: DashboardActivityTrendPoint[];
@@ -127,25 +129,25 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
 
   if (months.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
-        <h3 className="text-sm font-semibold text-slate-900">
+      <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
-        <p className="text-xs text-slate-500 mt-1">ยังไม่มีข้อมูลในช่วง {scopeLabel}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">ยังไม่มีข้อมูลในช่วง {scopeLabel}</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2 space-y-4">
+    <div className={cn(DASH.card, 'p-4 xl:col-span-2 space-y-4')}>
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
           คอลัมน์ลาออก–อื่นๆ = แตกยอด「เข้ามา」ของเดือนนั้น · คงเหลือแยกต่างหาก · สรุปตาม {scopeLabel}
         </p>
-        <ul className="text-xs text-slate-700 mt-2 space-y-0.5 list-disc list-inside">
+        <ul className="text-xs text-slate-700 dark:text-slate-300 mt-2 space-y-0.5 list-disc list-inside">
           {summaries.map((line) => (
             <li key={line}>{line}</li>
           ))}
@@ -155,7 +157,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
       <div className="overflow-x-auto -mx-1">
         <table className="w-full min-w-[48rem] text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
               <th className="text-left font-medium px-2 py-2 whitespace-nowrap">เดือน</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เข้ามา</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ปิดแล้ว</th>
@@ -176,14 +178,14 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
               const typeSum = intakeTypeTotal(p);
               const mismatch = typeSum !== requested;
               return (
-                <tr key={p.date} className="border-b border-slate-100">
-                  <td className="px-2 py-2 font-medium text-slate-800 whitespace-nowrap">{p.label}</td>
+                <tr key={p.date} className="border-b border-slate-100 dark:border-slate-800">
+                  <td className="px-2 py-2 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">{p.label}</td>
                   <td className="px-2 py-2 text-right tabular-nums font-semibold">{fmt(requested)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">
                     {fmt(p.filledPositions ?? p.closedPositions ?? 0)}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums">{fmt(p.cancelledPositions ?? 0)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-amber-800">
+                  <td className="px-2 py-2 text-right tabular-nums text-amber-800 dark:text-amber-200">
                     {fmt(p.remainingPositions ?? 0)}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums">{fmt(intake.resignation)}</td>
@@ -201,8 +203,8 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
                 </tr>
               );
             })}
-            <tr className="bg-slate-50 border-t border-slate-200">
-              <td className="px-2 py-2.5 font-semibold text-slate-900 whitespace-nowrap">รวม {scopeLabel}</td>
+            <tr className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+              <td className="px-2 py-2.5 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">รวม {scopeLabel}</td>
               <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.requested)}</td>
               <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.filled)}</td>
               <td className="px-2 py-2.5 text-right tabular-nums font-semibold">{fmt(totals.cancelled)}</td>
@@ -226,31 +228,33 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
             </tr>
           </tbody>
         </table>
-        <p className="text-[11px] text-slate-500 mt-1.5 px-1">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 px-1">
           คอลัมน์「รวมประเภท」ต้องเท่า「เข้ามา」ทุกเดือน · คงเหลือไม่ใช่ผลรวมของคอลัมน์ประเภท
         </p>
       </div>
 
       <div>
-        <p className="text-xs font-medium text-slate-600 mb-2">แนวโน้มเข้ามาแยกประเภท (รายเดือน)</p>
-        <div className="h-56">
+        <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">แนวโน้มเข้ามาแยกประเภท (รายเดือน)</p>
+        {/* div ครอบพากสีตัวหนังสือไปให้แกนกราฟผ่าน currentColor — สลับตามธีมเอง */}
+        <div className={cn('h-56', DASH.sub)}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
               <Tooltip
+                {...CHART.tooltip}
                 formatter={(value: number, name: string) => [
                   `${fmt(Number(value))} อัตรา`,
                   name,
                 ]}
               />
               <Legend />
-              <Line type="monotone" dataKey="resignations" name="ลาออก" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="replacements" name="เปลี่ยนตัว" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="increaseHeadcount" name="เพิ่มอัตรา" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="newSite" name="เปิดไซต์" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="other" name="อื่นๆ" stroke="#64748b" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="resignations" name="ลาออก" stroke={TONE.warn.hex} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="replacements" name="เปลี่ยนตัว" stroke={TONE.primary.hex} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="increaseHeadcount" name="เพิ่มอัตรา" stroke={TONE.violet.hex} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="newSite" name="เปิดไซต์" stroke={TONE.success.hex} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="other" name="อื่นๆ" stroke={TONE.neutral.hex} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

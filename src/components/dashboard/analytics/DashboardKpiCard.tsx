@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { DashboardKpi } from '@/lib/dashboard/types';
 
 type Props = {
@@ -9,32 +10,50 @@ type Props = {
 };
 
 /**
- * โทนพาสเทลต่อ KPI — ตามความหมายของตัวเลข (ล็อกความหมายสีเดียวกับทั้งระบบ):
- * เข้ามา = ฟ้า · ปิดแล้ว = เขียว · ยกเลิก = เทา · คงเหลือ = เหลือง (งานที่ยังค้าง)
- * KPI สถานะทำงานอื่น ๆ = ขาวเรียบ ไม่แย่งสายตา
+ * ความหมายสีของ KPI — ตัวคลาสจริงมาจาก token กลาง (@/lib/designTokens) ที่นี่บอกแค่ว่า
+ * ตัวเลขไหนหมายถึงอะไร: เข้ามา = ฟ้า · ปิดแล้ว/หาได้ = เขียว · ยกเลิก = เทา ·
+ * คงเหลือ = เหลือง (ยังต้องหา) · เกินกำหนด = แดง
+ * KPI สถานะทำงานที่ไม่อยู่ในนี้ = ขาวเรียบ ไม่แย่งสายตา
  */
-const KPI_TONE: Record<string, { tile: string; num: string }> = {
-  total_requests: { tile: 'bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/60 dark:hover:bg-sky-950', num: 'text-sky-900 dark:text-sky-200' },
-  closed: { tile: 'bg-emerald-50 hover:bg-emerald-100/70 dark:bg-emerald-950/60 dark:hover:bg-emerald-950', num: 'text-emerald-900 dark:text-emerald-200' },
-  cancelled: { tile: 'bg-slate-100/80 hover:bg-slate-200/60 dark:bg-slate-800/70 dark:hover:bg-slate-800', num: 'text-slate-700 dark:text-slate-300' },
-  remaining: { tile: 'bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/60 dark:hover:bg-amber-950', num: 'text-amber-900 dark:text-amber-200' },
-  overdue: { tile: 'bg-red-50 hover:bg-red-100/70 dark:bg-red-950/60 dark:hover:bg-red-950', num: 'text-red-900 dark:text-red-200' },
+const KPI_TONE: Record<string, ToneKey> = {
+  total_requests: 'info',
+  total: 'info',
+  closed: 'success',
+  completed: 'success',
+  cancelled: 'neutral',
+  remaining: 'warn',
+  overdue: 'danger',
 };
+
+/**
+ * KPI ที่ต้องลงมือวันนี้ = บล็อกสีอิ่ม (ตามรูป reference ที่เจ้าของส่งมา)
+ * เติมชื่อเข้ามาที่นี่ได้ แต่อย่าให้เกิน 1-2 ตัวต่อหน้า ไม่งั้นจะไม่เหลือของที่เด่นจริง
+ */
+const KPI_SOLID_IDS = new Set(['overdue']);
+
+const NEUTRAL_TILE = 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800';
+const NEUTRAL_NUM = 'text-slate-900 dark:text-slate-100';
 
 const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
   const trend = kpi.trendPercent;
   const TrendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? ArrowUp : ArrowDown;
+  const solid = KPI_SOLID_IDS.has(kpi.id);
+  const toneKey = KPI_TONE[kpi.id];
+  const tone = toneKey ? TONE[toneKey] : null;
   const trendColor =
     trend == null || trend === 0
-      ? 'text-slate-400'
-      : kpi.id === 'overdue'
-        ? trend > 0
-          ? 'text-red-600'
-          : 'text-emerald-600'
-        : trend > 0
-          ? 'text-emerald-600'
-          : 'text-red-600';
-  const tone = KPI_TONE[kpi.id] ?? { tile: 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800', num: 'text-slate-900 dark:text-slate-100' };
+      ? solid
+        ? 'text-white/70'
+        : 'text-slate-400'
+      : solid
+        ? 'text-white/90'
+        : kpi.id === 'overdue'
+          ? trend > 0
+            ? 'text-red-600'
+            : 'text-emerald-600'
+          : trend > 0
+            ? 'text-emerald-600 dark:text-emerald-400'
+            : 'text-red-600 dark:text-red-400';
 
   return (
     <button
@@ -43,20 +62,31 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
       disabled={!onClick}
       className={cn(
         'w-full rounded-2xl p-4 text-left shadow-sm transition-colors',
-        tone.tile,
+        solid && tone ? tone.solid : (tone?.tile ?? NEUTRAL_TILE),
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
-      <p className="text-xs font-medium text-slate-500">{kpi.label}</p>
-      <p className={cn('mt-1.5 text-2xl font-semibold tracking-tight tabular-nums', tone.num)}>
+      <p className={cn('text-xs font-medium', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+        {kpi.label}
+      </p>
+      <p
+        className={cn(
+          'mt-1.5 text-2xl font-semibold tracking-tight tabular-nums',
+          solid ? 'text-white' : (tone?.num ?? NEUTRAL_NUM),
+        )}
+      >
         {kpi.format === 'percent' ? `${kpi.value}%` : kpi.value.toLocaleString('th-TH')}
         {kpi.secondaryCount != null ? (
-          <span className="ml-1.5 text-sm font-normal text-slate-500">
+          <span
+            className={cn('ml-1.5 text-sm font-normal', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}
+          >
             · {kpi.secondaryCount.toLocaleString('th-TH')} {kpi.secondaryLabel ?? 'ใบขอ'}
           </span>
         ) : null}
       </p>
-      <p className="mt-1 text-xs text-slate-500">{kpi.description}</p>
+      <p className={cn('mt-1 text-xs', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+        {kpi.description}
+      </p>
       {trend != null ? (
         <div className={cn('mt-2 flex items-center gap-1 text-xs font-medium', trendColor)}>
           <TrendIcon className="h-3.5 w-3.5" aria-hidden />

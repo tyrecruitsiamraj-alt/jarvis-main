@@ -9,6 +9,7 @@ import { resolvePeriodRange } from '@/lib/dashboard/buildDashboardData';
 import type { DashboardTaskStatus } from '@/lib/dashboard/types';
 import { THAI_MONTHS, ceToBeYear, toYmdLocal } from '@/lib/dateTh';
 import { cn } from '@/lib/utils';
+import { DASH } from '@/lib/designTokens';
 
 const PERIOD_PRESETS = [
   { id: 'all' as const, label: 'ทั้งหมด' },
@@ -157,16 +158,17 @@ const DashboardFilterBar: React.FC<Props> = ({
   return (
     <aside
       className={cn(
-        'rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto',
+        DASH.card,
+        'p-4 space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto',
         className,
       )}
     >
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">ตัวกรอง</h2>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ตัวกรอง</h2>
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-slate-600">ช่วงเวลา</label>
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">ช่วงเวลา</label>
         <div className="flex flex-wrap gap-2">
           {PERIOD_PRESETS.map((preset) => (
             <button
@@ -176,8 +178,8 @@ const DashboardFilterBar: React.FC<Props> = ({
               className={cn(
                 'flex-1 min-w-[4.5rem] rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
                 activePreset === preset.id
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                  ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40',
               )}
             >
               {preset.label}
@@ -186,7 +188,7 @@ const DashboardFilterBar: React.FC<Props> = ({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
-            <label htmlFor="dashboard-month-select" className="text-[11px] text-slate-500">
+            <label htmlFor="dashboard-month-select" className="text-[11px] text-slate-500 dark:text-slate-400">
               เดือน
             </label>
             <select
@@ -210,7 +212,7 @@ const DashboardFilterBar: React.FC<Props> = ({
             </select>
           </div>
           <div className="space-y-1">
-            <label htmlFor="dashboard-year-select" className="text-[11px] text-slate-500">
+            <label htmlFor="dashboard-year-select" className="text-[11px] text-slate-500 dark:text-slate-400">
               ปี (พ.ศ.)
             </label>
             <select
@@ -234,7 +236,7 @@ const DashboardFilterBar: React.FC<Props> = ({
               })}
             </select>
           </div>
-          <p className="text-[11px] text-slate-500 col-span-2">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 col-span-2">
             เลือกเฉพาะปี = ดูทั้งปี · เลือกเดือน+ปี = เฉพาะเดือนนั้น
           </p>
         </div>
@@ -261,8 +263,8 @@ const DashboardFilterBar: React.FC<Props> = ({
         className="!space-y-3"
       />
 
-      <div className="space-y-1.5 pt-1 border-t border-slate-100">
-        <label className="text-xs font-medium text-slate-600">กรองตารางงานติดตาม</label>
+      <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">กรองตารางงานติดตาม</label>
         <select
           value={queueStatus}
           onChange={(e) => onQueueStatusChange(e.target.value as DashboardStatusFilter)}

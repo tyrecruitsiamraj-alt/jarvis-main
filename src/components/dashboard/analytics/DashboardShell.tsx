@@ -113,7 +113,7 @@ const DashboardShell: React.FC<Props> = ({
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                 <input
                   value={filters.search}
                   onChange={(e) => onFiltersChange({ search: e.target.value })}
@@ -127,7 +127,7 @@ const DashboardShell: React.FC<Props> = ({
                     type="button"
                     onClick={onRefresh}
                     disabled={refreshing}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800 disabled:opacity-50"
                   >
                     <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
                     รีเฟรช
@@ -137,7 +137,7 @@ const DashboardShell: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={onExport}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800"
                   >
                     <Download className="h-4 w-4" />
                     Export CSV
@@ -151,7 +151,7 @@ const DashboardShell: React.FC<Props> = ({
 
       <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-5">
         {loading ? (
-          <p className="text-sm text-slate-500 py-8 text-center">กำลังโหลดข้อมูล…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
@@ -169,11 +169,11 @@ const DashboardShell: React.FC<Props> = ({
             <div className="space-y-5 min-w-0">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">สรุปอัตราในช่วงที่เลือก</p>
-                  <p className="text-[11px] text-slate-500 mb-2">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">สรุปอัตราในช่วงที่เลือก</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                     {dateRange == null ? (
                       <>
-                        <span className="font-medium text-slate-600">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>
+                        <span className="font-medium text-slate-600 dark:text-slate-400">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>
                         {' · '}
                         เข้ามา/ปิดแล้ว/ยกเลิก = ของใบที่กรอกในช่วงแนวโน้ม
                       </>
@@ -204,7 +204,7 @@ const DashboardShell: React.FC<Props> = ({
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-2">สถานะทำงาน (นับอัตรา)</p>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">สถานะทำงาน (นับอัตรา)</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                     {(data.workStatusKpis ?? []).map((kpi) => (
                       <DashboardKpiCard

@@ -1,5 +1,7 @@
 import React from 'react';
 import { ArrowRight, Minus, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import type { DashboardFlowView, DashboardRequestControlSummary } from '@/lib/dashboard/types';
 
 type Props = {
@@ -12,21 +14,26 @@ function FlowStep({
   label,
   value,
   operator,
-  accent,
+  tone,
   onClick,
 }: {
   label: string;
   value: number;
   operator?: '+' | '=' | '−';
-  accent?: string;
+  tone: ToneKey;
   onClick?: () => void;
 }) {
+  const t = TONE[tone];
   const inner = (
     <div
-      className={`rounded-lg border px-3 py-2 min-w-[88px] text-center ${accent ?? 'border-slate-200 bg-slate-50'} ${onClick ? 'cursor-pointer hover:border-blue-300 hover:bg-blue-50/50' : ''}`}
+      className={cn(
+        'rounded-lg border px-3 py-2 min-w-[88px] text-center transition-colors',
+        t.soft,
+        onClick && cn('cursor-pointer', t.softHover),
+      )}
     >
-      <p className="text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="text-lg font-semibold tabular-nums text-slate-900">{value.toLocaleString('th-TH')}</p>
+      <p className={cn('text-[10px] uppercase tracking-wide', DASH.muted)}>{label}</p>
+      <p className={cn('text-lg font-semibold tabular-nums', t.num)}>{value.toLocaleString('th-TH')}</p>
     </div>
   );
 
@@ -62,26 +69,27 @@ const DashboardFlowViewCard: React.FC<Props> = ({ flow, summary, onSegmentClick 
   const netBacklogChange = flow.endingBacklogPositions - flow.startingBacklogPositions;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-900">การไหลของงาน: ขอ → หาได้ → งานค้าง</h3>
-        <p className="text-xs text-slate-500 mt-0.5">ยอดค้างต้นงวด + ขอใหม่ − หาได้แล้ว − ยกเลิก = ยอดค้างปลายงวด</p>
+    <div className={cn(DASH.card, 'overflow-hidden')}>
+      <div className={cn('px-4 py-3 border-b', DASH.divider)}>
+        <h3 className={DASH.title}>การไหลของงาน: ขอ → หาได้ → งานค้าง</h3>
+        <p className={cn('mt-0.5', DASH.sub)}>ยอดค้างต้นงวด + ขอใหม่ − หาได้แล้ว − ยกเลิก = ยอดค้างปลายงวด</p>
       </div>
 
       <div className="p-4 overflow-x-auto">
+        {/* โทนสีของแต่ละก้อนตรงกับความหมายเดียวกันในการ์ด KPI ด้านบน — ยกเลิกเป็นเทา ไม่ใช่ชมพู */}
         <div className="flex flex-wrap items-center gap-2 min-w-max">
           <FlowStep
             label="ยอดค้างต้นงวด"
             value={flow.startingBacklogPositions}
-            accent="border-amber-200 bg-amber-50"
+            tone="warn"
             onClick={click?.('carried_over', 'ยอดค้างต้นงวด')}
           />
-          <FlowStep label="ขอใหม่" value={flow.newRequestPositions} operator="+" accent="border-sky-200 bg-sky-50" onClick={click?.('new_requests', 'ขอใหม่เดือนนี้')} />
-          <FlowStep label="ภาระงานรวม" value={flow.totalWorkloadPositions} operator="=" accent="border-violet-200 bg-violet-50" onClick={click?.('total_workload', 'ภาระงานรวมเดือนนี้')} />
+          <FlowStep label="ขอใหม่" value={flow.newRequestPositions} operator="+" tone="info" onClick={click?.('new_requests', 'ขอใหม่เดือนนี้')} />
+          <FlowStep label="ภาระงานรวม" value={flow.totalWorkloadPositions} operator="=" tone="violet" onClick={click?.('total_workload', 'ภาระงานรวมเดือนนี้')} />
           <ArrowRight className="h-4 w-4 text-slate-300 shrink-0 hidden sm:block" />
-          <FlowStep label="หาได้แล้ว" value={flow.filledPositions} operator="−" accent="border-emerald-200 bg-emerald-50" onClick={click?.('fulfilled', 'หาได้แล้ว')} />
-          <FlowStep label="ยกเลิก" value={flow.cancelledPositions} operator="−" accent="border-rose-200 bg-rose-50" onClick={click?.('cancelled', 'ยกเลิกเดือนนี้')} />
-          <FlowStep label="ยอดค้างปลายงวด" value={flow.endingBacklogPositions} operator="=" accent="border-slate-300 bg-slate-100" onClick={click?.('remaining', 'เหลือหา')} />
+          <FlowStep label="หาได้แล้ว" value={flow.filledPositions} operator="−" tone="success" onClick={click?.('fulfilled', 'หาได้แล้ว')} />
+          <FlowStep label="ยกเลิก" value={flow.cancelledPositions} operator="−" tone="neutral" onClick={click?.('cancelled', 'ยกเลิกเดือนนี้')} />
+          <FlowStep label="ยอดค้างปลายงวด" value={flow.endingBacklogPositions} operator="=" tone="warn" onClick={click?.('remaining', 'เหลือหา')} />
         </div>
 
         {unexplainedGap !== 0 ? (
@@ -112,9 +120,9 @@ const DashboardFlowViewCard: React.FC<Props> = ({ flow, summary, onSegmentClick 
               { label: '% ลาออก', value: `${summary.resignationPressureRatio}%` },
               { label: 'อัตรายกเลิก', value: `${summary.cancellationRatePercent}%` },
             ].map((m) => (
-              <div key={m.label} className="rounded-lg bg-slate-50 px-2.5 py-2 text-center">
-                <p className="text-[10px] text-slate-500">{m.label}</p>
-                <p className="text-sm font-semibold text-slate-800 tabular-nums">{m.value}</p>
+              <div key={m.label} className="rounded-lg bg-slate-50 dark:bg-slate-800/50 px-2.5 py-2 text-center">
+                <p className={cn('text-[10px]', DASH.muted)}>{m.label}</p>
+                <p className={cn('text-sm font-semibold tabular-nums', DASH.cellStrong)}>{m.value}</p>
               </div>
             ))}
           </div>

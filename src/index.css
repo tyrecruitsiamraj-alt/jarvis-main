@@ -335,6 +335,17 @@
   .jarvis-chip-violet {
     @apply border-violet-200 bg-violet-50 text-violet-700;
   }
+  /* 3 โทนล่างเพิ่มตอนทำ token กลาง (src/lib/designTokens.ts) — ให้ครบ 9 โทนเท่าที่ TONE ประกาศ
+     น้ำเงิน=กำลังดำเนินการ · ส้ม=ส่งทีมคอนเทนต์/ปิดช้า · เขียวน้ำทะเล=ส่ง Scraping */
+  .jarvis-chip-primary {
+    @apply border-blue-200 bg-blue-50 text-blue-700;
+  }
+  .jarvis-chip-orange {
+    @apply border-orange-200 bg-orange-50 text-orange-700;
+  }
+  .jarvis-chip-teal {
+    @apply border-teal-200 bg-teal-50 text-teal-700;
+  }
 
   /* ปุ่มมาตรฐาน 4 ระดับ — ทุกปุ่มในระบบควรเป็นหนึ่งในนี้ */
   .jarvis-btn {
@@ -431,6 +442,11 @@
     background: #1e1e24;
   }
 
+  /* การ์ดดำอยู่บนพื้นมืดแล้วขอบจะกลืนไปเลย — เติมเส้นจาง ๆ ให้ยังเห็นเป็นการ์ด */
+  .dark .jarvis-dark-card {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
   .dark .jarvis-menu-card:hover {
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
     border-color: rgba(255, 255, 255, 0.16);
@@ -467,6 +483,15 @@
   }
   .dark .jarvis-chip-violet {
     @apply border-violet-800 bg-violet-950/70 text-violet-300;
+  }
+  .dark .jarvis-chip-primary {
+    @apply border-blue-800 bg-blue-950/70 text-blue-300;
+  }
+  .dark .jarvis-chip-orange {
+    @apply border-orange-800 bg-orange-950/70 text-orange-300;
+  }
+  .dark .jarvis-chip-teal {
+    @apply border-teal-800 bg-teal-950/70 text-teal-300;
   }
 
   /* ปุ่มมาตรฐาน — primary ใช้ตัวแปรอยู่แล้ว ไม่ต้องแตะ */

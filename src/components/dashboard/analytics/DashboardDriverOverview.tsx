@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { DASH } from '@/lib/designTokens';
 import type { DashboardRecruiterOverview, DashboardResponsibleRole } from '@/lib/dashboard/types';
 
 type Props = {
@@ -19,8 +20,8 @@ const ROLE_LABELS: Record<DashboardResponsibleRole, string> = {
 };
 
 const ROLE_BADGE_CLASS: Record<DashboardResponsibleRole, string> = {
-  recruiter: 'bg-blue-50 text-blue-700',
-  screener: 'bg-violet-50 text-violet-700',
+  recruiter: 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300',
+  screener: 'bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300',
 };
 
 const DashboardDriverOverview: React.FC<Props> = ({
@@ -31,9 +32,9 @@ const DashboardDriverOverview: React.FC<Props> = ({
 }) => {
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+      <div className={cn(DASH.card, 'p-6 text-sm', DASH.sub)}>
         {!hideHeader ? (
-          <h3 className="text-sm font-semibold text-slate-900 mb-2">ภาระงานตามผู้รับผิดชอบ</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">ภาระงานตามผู้รับผิดชอบ</h3>
         ) : null}
         ยังไม่มีข้อมูลภาระงานตามผู้รับผิดชอบ
       </div>
@@ -44,8 +45,8 @@ const DashboardDriverOverview: React.FC<Props> = ({
     <div className="space-y-3">
       {!hideHeader ? (
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">ภาระงานตามผู้รับผิดชอบ</h3>
-          <p className="text-xs text-slate-500">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ภาระงานตามผู้รับผิดชอบ</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
         </div>
       ) : null}
       {!closedTotalsAvailable ? (
@@ -61,14 +62,15 @@ const DashboardDriverOverview: React.FC<Props> = ({
             onClick={() => onRecruiterClick?.(r.name, r.role)}
             disabled={!onRecruiterClick}
             className={cn(
-              'rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-left w-full transition-colors',
+              DASH.card,
+              'p-4 text-left w-full transition-colors',
               onRecruiterClick && 'hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer',
               !onRecruiterClick && 'cursor-default',
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 truncate">{r.name}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{r.name}</p>
                 <span
                   className={cn(
                     'mt-1 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium',
@@ -78,16 +80,16 @@ const DashboardDriverOverview: React.FC<Props> = ({
                   {ROLE_LABELS[r.role]}
                 </span>
               </div>
-              <span className="text-xs font-medium text-slate-500 shrink-0">{r.sharePercent}%</span>
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 shrink-0">{r.sharePercent}%</span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="text-lg font-semibold text-slate-900 tabular-nums">{r.total}</p>
-                <p className="text-[10px] text-slate-500">มี</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{r.total}</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">มี</p>
               </div>
               <div>
                 {closedTotalsAvailable ? (
-                  <p className="text-lg font-semibold text-emerald-600 tabular-nums">{r.completed}</p>
+                  <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{r.completed}</p>
                 ) : (
                   <p
                     className="text-lg font-semibold text-slate-300 dark:text-slate-600 tabular-nums"
@@ -96,19 +98,19 @@ const DashboardDriverOverview: React.FC<Props> = ({
                     —
                   </p>
                 )}
-                <p className="text-[10px] text-slate-500">ปิด</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">ปิด</p>
               </div>
               <div>
                 <p
                   className={
                     r.remaining > 0
-                      ? 'text-lg font-semibold text-amber-600 tabular-nums'
-                      : 'text-lg font-semibold text-slate-900 tabular-nums'
+                      ? 'text-lg font-semibold text-amber-600 dark:text-amber-400 tabular-nums'
+                      : 'text-lg font-semibold text-slate-900 dark:text-slate-100 tabular-nums'
                   }
                 >
                   {r.remaining}
                 </p>
-                <p className="text-[10px] text-slate-500">คงเหลือ</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">คงเหลือ</p>
               </div>
             </div>
           </button>

@@ -17,6 +17,7 @@ import { BrandTitle } from '@/components/shared/BrandMark';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -25,54 +26,56 @@ import {
 } from '@/lib/flowSummaryApi';
 
 
-/** ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง */
+/**
+ * ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง
+ * สีทั้งแถบหัวการ์ดและตัวเลขมาจาก token กลางตัวเดียว (@/lib/designTokens) ไม่ประกาศ class สีที่นี่
+ */
 function FlowStage({
   label,
   value,
   sub,
   onClick,
-  accent,
   tone,
 }: {
   label: string;
   value: number;
   sub?: string;
   onClick: () => void;
-  accent: string;
-  /** สีแถบบนหัวการ์ด — บอกว่าขั้นนี้เป็นช่วงไหนของสาย กวาดตาแยกได้ก่อนอ่านตัวเลข */
-  tone?: string;
+  /** โทนของขั้นนี้ — บอกว่าอยู่ช่วงไหนของสาย กวาดตาแยกได้ก่อนอ่านตัวเลข */
+  tone: ToneKey;
 }) {
+  const t = TONE[tone];
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn('jarvis-stat-tile min-w-0 flex-1 !border-t-[3px]', tone ?? 'border-t-transparent')}
+      className={cn('jarvis-stat-tile min-w-0 flex-1 !border-t-[3px]', t.bar)}
     >
       <div className="jarvis-stat-label">{label}</div>
-      <div className={cn('jarvis-stat-value', accent)}>{value}</div>
+      <div className={cn('jarvis-stat-value', t.value)}>{value}</div>
       {sub ? <div className="jarvis-stat-sub">{sub}</div> : null}
     </button>
   );
 }
 
-/** โทนสีบอกสถานะของรายการติดตาม — เขียว=พร้อม/สนใจ · เหลือง=รอโทรซ้ำ · แดง=ติดขัด/ไม่มีคน */
+/** สถานะของรายการติดตาม — ผูกกับโทนกลาง: สำเร็จ=พร้อม/สนใจ · รอ=โทรซ้ำ · ติดขัด=ต้องมีคนตัดสินใจ */
 const FOLLOW_UP_TONE = {
   good: {
-    row: 'border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100/70',
+    tone: 'success',
     dot: '🟢',
     hint: 'พร้อม — กดจองได้เลย',
   },
   warn: {
-    row: 'border-amber-200 bg-amber-50/80 hover:bg-amber-100/70',
+    tone: 'warn',
     dot: '🟡',
     hint: 'รอโทรซ้ำ',
   },
   bad: {
-    row: 'border-red-200 bg-red-50/80 hover:bg-red-100/70',
+    tone: 'danger',
     dot: '🔴',
     hint: 'ติดขัด — ต้องมีคนตัดสินใจ',
   },
-} as const;
+} as const satisfies Record<string, { tone: ToneKey; dot: string; hint: string }>;
 type FollowUpTone = keyof typeof FOLLOW_UP_TONE;
 
 /** รายการคนที่ต้องตามต่อจากผลโทร — สีของแถวบอกสถานะเอง กดแล้วเปิดใบขอนั้นในหน้า Matching */
@@ -97,7 +100,11 @@ function FollowUpList({
           type="button"
           onClick={() => onOpen(it)}
           title={t.hint}
-          className={cn('w-full rounded-lg border px-2 py-1.5 text-left', t.row)}
+          className={cn(
+            'w-full rounded-lg border px-2 py-1.5 text-left',
+            TONE[t.tone].soft,
+            TONE[t.tone].softHover,
+          )}
         >
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-[11px] font-medium text-foreground">
@@ -194,8 +201,7 @@ const HomePage: React.FC = () => {
                 label="ใบขอเปิดอยู่"
                 value={flow.jobs.open_total}
                 sub={`ด่วน ${flow.jobs.urgent} ใบ`}
-                accent="text-slate-800"
-                tone="border-t-slate-400 dark:border-t-slate-500"
+                tone="neutral"
                 onClick={() => navigate(resolveUnitNavPath())}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -206,8 +212,7 @@ const HomePage: React.FC = () => {
                 label="AI แนะนำคนแล้ว"
                 value={flow.jobs.with_recommend}
                 sub={`จากที่ประเมิน ${flow.jobs.analyzed} ใบ`}
-                accent="text-sky-700"
-                tone="border-t-sky-400 dark:border-t-sky-500"
+                tone="info"
                 onClick={() => navigate('/matching/match?workflow=green')}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -218,8 +223,7 @@ const HomePage: React.FC = () => {
                 label="ส่ง AI โทร"
                 value={flow.lumos.sent_month}
                 sub={`รอโทรอีก ${flow.lumos.waiting_call + flow.lumos.delivered_waiting}`}
-                accent="text-blue-700"
-                tone="border-t-blue-500 dark:border-t-blue-400"
+                tone="primary"
                 onClick={() => navigate('/matching/match')}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -230,8 +234,7 @@ const HomePage: React.FC = () => {
                 label="สนใจงาน (จากผลโทร)"
                 value={confirmedThisMonth(flow)}
                 sub={`ปฏิเสธ ${flow.lumos.outcomes_month['declined'] ?? 0} · ไม่รับสาย ${(flow.lumos.outcomes_month['no_answer'] ?? 0) + (flow.lumos.outcomes_month['unresponsive'] ?? 0)}`}
-                accent="text-emerald-700"
-                tone="border-t-emerald-500 dark:border-t-emerald-400"
+                tone="success"
                 onClick={() => navigate('/matching/match')}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -242,8 +245,7 @@ const HomePage: React.FC = () => {
                 label="จองตัวอยู่ / ลงงาน"
                 value={flow.proposals.reserved_active + flow.proposals.placed_month}
                 sub={`จอง ${flow.proposals.reserved_active} · ลงงานเดือนนี้ ${flow.proposals.placed_month}`}
-                accent="text-violet-700"
-                tone="border-t-violet-500 dark:border-t-violet-400"
+                tone="violet"
                 onClick={() => navigate('/matching/reservations')}
               />
 
@@ -260,16 +262,14 @@ const HomePage: React.FC = () => {
                 label="ส่งคิด Content"
                 value={flow.postings.content ?? 0}
                 sub="ใบขอที่รอทีมคอนเทนต์ทำโพส"
-                accent="text-orange-700"
-                tone="border-t-orange-400 dark:border-t-orange-400"
+                tone="orange"
                 onClick={() => navigate('/matching/job-postings')}
               />
               <FlowStage
                 label="ส่ง Scraping"
                 value={flow.postings.scraping ?? 0}
                 sub="ใบขอที่รอไปดูดประกาศหาคน"
-                accent="text-teal-700"
-                tone="border-t-teal-400 dark:border-t-teal-400"
+                tone="teal"
                 onClick={() => navigate('/matching/job-postings')}
               />
             </div>
@@ -282,8 +282,8 @@ const HomePage: React.FC = () => {
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             {flow.follow_ups.confirmed_waiting.length > 0 ? (
-              <div className="glass-card rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-900">
+              <div className={cn('glass-card rounded-2xl border p-3', TONE.success.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.success.num)}>
                   <PhoneCall className="h-3.5 w-3.5" />
                   สนใจงานแล้ว — รอคนกดจอง ({flow.follow_ups.confirmed_waiting.length})
                 </div>
@@ -296,8 +296,8 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {flow.follow_ups.no_answer.length > 0 ? (
-              <div className="glass-card rounded-2xl border border-amber-200/80 bg-amber-50/40 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900">
+              <div className={cn('glass-card rounded-2xl border p-3', TONE.warn.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.warn.num)}>
                   <PhoneForwarded className="h-3.5 w-3.5" />
                   ไม่รับสาย — ควรโทรซ้ำ ({flow.follow_ups.no_answer.length})
                 </div>
@@ -310,8 +310,8 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {flow.jobs.urgent_stuck > 0 || flow.lumos.stale_delivered > 0 ? (
-              <div className="glass-card rounded-2xl border border-red-200/80 bg-red-50/40 p-3 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-red-900">
+              <div className={cn('glass-card rounded-2xl border p-3 space-y-1.5', TONE.danger.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.danger.num)}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   ติดขัด — ต้องมีคนตัดสินใจ
                 </div>
@@ -319,16 +319,20 @@ const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/matching/match?urgent=1&workflow=none')}
-                    className="w-full rounded-lg border border-red-200 bg-red-50/80 px-2 py-1.5 text-left text-[11px] text-foreground hover:bg-red-100/70"
+                    className={cn(
+                      'w-full rounded-lg border px-2 py-1.5 text-left text-[11px] text-foreground',
+                      TONE.danger.soft,
+                      TONE.danger.softHover,
+                    )}
                   >
                     <span aria-hidden>🔴</span> ใบด่วนที่ AI ไม่พบคน และยังไม่ส่งโพสหาคนใหม่ —{' '}
-                    <span className="font-bold text-red-700">{flow.jobs.urgent_stuck} ใบ</span>
+                    <span className={cn('font-bold', TONE.danger.value)}>{flow.jobs.urgent_stuck} ใบ</span>
                   </button>
                 ) : null}
                 {flow.lumos.stale_delivered > 0 ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50/80 px-2 py-1.5 text-[11px] text-foreground">
+                  <div className={cn('rounded-lg border px-2 py-1.5 text-[11px] text-foreground', TONE.danger.soft)}>
                     <span aria-hidden>🔴</span> ส่ง AI โทรแล้วเกิน 2 วันยังไม่มีผลกลับ —{' '}
-                    <span className="font-bold text-red-700">{flow.lumos.stale_delivered} ราย</span>
+                    <span className={cn('font-bold', TONE.danger.value)}>{flow.lumos.stale_delivered} ราย</span>
                     <span className="text-muted-foreground"> · ควรเช็คกับทีม Lumos</span>
                   </div>
                 ) : null}
@@ -339,8 +343,8 @@ const HomePage: React.FC = () => {
             flow.follow_ups.no_answer.length === 0 &&
             flow.jobs.urgent_stuck === 0 &&
             flow.lumos.stale_delivered === 0 ? (
-              <div className="glass-card rounded-2xl border border-emerald-200/80 bg-emerald-50/30 p-3 lg:col-span-3">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-800">
+              <div className={cn('glass-card rounded-2xl border p-3 lg:col-span-3', TONE.success.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-medium', TONE.success.value)}>
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   ไม่มีเรื่องค้างที่ต้องตามตอนนี้ — ผลโทรที่สนใจถูกจองครบ และใบด่วนมีคนดูแลแล้ว
                 </div>
