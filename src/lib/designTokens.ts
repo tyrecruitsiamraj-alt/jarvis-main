@@ -191,6 +191,12 @@ export const DASH = {
   cardLg: 'rounded-2xl bg-white shadow-sm dark:bg-slate-900',
   /** การ์ดดำสำหรับสรุปผู้บริหาร (ตามรูป reference ที่เจ้าของส่งมา) */
   darkCard: 'jarvis-dark-card',
+  /** hero เข้มหัวหน้า Dashboard (mockup rev.3 ข้อ 02) — น้ำเงินหมึก เข้มทั้งสองธีม */
+  hero: 'jarvis-hero-card',
+  /** ป้ายทอง (brass) บน hero เข้ม — สีเดียวทั้งสองธีมเพราะพื้นเข้มตลอด */
+  heroLabel: 'text-[10px] font-bold uppercase tracking-[0.14em] text-[#c9b184]',
+  /** ป้ายหัวข้อกลุ่ม (brass) บนพื้นสว่างของหน้า — ภาษาเดียวกับ eyebrow ใน mockup */
+  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]',
   title: 'text-sm font-semibold text-slate-900 dark:text-slate-100',
   label: 'text-xs font-medium text-slate-600 dark:text-slate-300',
   sub: 'text-xs text-slate-500 dark:text-slate-400',
@@ -204,8 +210,8 @@ export const DASH = {
   cellMuted: 'text-slate-600 dark:text-slate-400',
 } as const;
 
-/** key ของ DASH ที่ยกเว้นกฎ "ต้องมีคู่ dark" — การ์ดดำเป็นสีเดียวทั้งสองธีมโดยตั้งใจ */
-export const DASH_DARK_EXEMPT_KEYS = ['darkCard'] as const;
+/** key ของ DASH ที่ยกเว้นกฎ "ต้องมีคู่ dark" — การ์ดดำ/hero/ป้ายบน hero เป็นสีเดียวทั้งสองธีมโดยตั้งใจ */
+export const DASH_DARK_EXEMPT_KEYS = ['darkCard', 'hero', 'heroLabel'] as const;
 
 /**
  * กราฟ (recharts) — รับ class ไม่ได้ ต้องส่งค่าสีเข้าไปตรง ๆ

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -11,11 +11,17 @@ type Props = {
   onView: (item: DashboardWorkItem) => void;
 };
 
+/**
+ * "ต้องแก้วันนี้" แบบย่อ (mockup rev.3 ข้อ 02) — อยู่คู่กับการ์ดสมการงานค้างในแถวเดียว
+ * เดิมเป็นตารางเต็ม 8 คอลัมน์กว้างทั้งจอ — ยุบเหลือคอลัมน์ที่ใช้ตัดสินใจ (ใบ/เหลือ/SLA/คน)
+ * รายการไม่ถูกตัดทิ้ง: เกิน 6 แถวเลื่อนดูin-card ได้ · กดแถวเพื่อเปิดใบ (แทนปุ่ม "ดู" เดิม)
+ * รายละเอียดเต็มของทุกใบยังอยู่ในตาราง "งานที่ต้องติดตาม" ข้างล่างตามเดิม
+ */
 const DashboardPriorityQueue: React.FC<Props> = ({ items, onView }) => {
   if (items.length === 0) return null;
 
   return (
-    <div className={cn(DASH.card, 'overflow-hidden border-red-200 dark:border-red-900/70')}>
+    <div className={cn(DASH.card, 'flex flex-col overflow-hidden border-red-200 dark:border-red-900/70')}>
       {/* หัวการ์ดเป็นโทนแดง — การ์ดนี้คือ "ต้องแก้วันนี้" ต้องเห็นก่อนการ์ดอื่นในหน้า */}
       <div
         className={cn(
@@ -24,51 +30,37 @@ const DashboardPriorityQueue: React.FC<Props> = ({ items, onView }) => {
       >
         <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
         <div>
-          <h3 className={DASH.title}>ต้องแก้วันนี้</h3>
-          <p className={DASH.sub}>
-            {items.length} ใบขอ — เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → คงเหลือมาก → งานค้างเก่า
-          </p>
+          <h3 className={DASH.title}>ต้องแก้วันนี้ · {items.length.toLocaleString('th-TH')} ใบขอ</h3>
+          <p className={DASH.sub}>เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → คงเหลือมาก → งานค้างเก่า</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead>
-            <tr className={cn('border-b text-left text-xs', DASH.divider, DASH.tableHead)}>
-              <th className="px-3 py-2.5 font-medium">ใบงาน</th>
-              <th className="px-3 py-2.5 font-medium">หน่วยงาน</th>
-              <th className="px-3 py-2.5 font-medium">เหลือ</th>
-              <th className="px-3 py-2.5 font-medium">ประเภท</th>
-              <th className="px-3 py-2.5 font-medium">SLA</th>
-              <th className="px-3 py-2.5 font-medium">ครบ SLA</th>
-              <th className="px-3 py-2.5 font-medium">ผู้รับผิดชอบ</th>
-              <th className="px-3 py-2.5 font-medium text-right">Action</th>
-            </tr>
-          </thead>
+      <div className="max-h-[280px] overflow-y-auto">
+        <table className="w-full text-sm">
           <tbody>
             {items.map((item) => (
-              <tr key={item.id} className={cn('border-b', DASH.tableRow)}>
-                <td className={cn('px-3 py-2.5', DASH.cellStrong)}>{item.requestNo}</td>
-                <td className={cn('px-3 py-2.5 max-w-[160px] truncate', DASH.cell)}>{item.unitName}</td>
-                <td className={cn('px-3 py-2.5 tabular-nums font-semibold', TONE.danger.value)}>
+              <tr
+                key={item.id}
+                onClick={() => onView(item)}
+                title={`${item.lifecycleKind} · ครบ SLA ${item.slaDueDate ? formatYmdDmyBe(item.slaDueDate) : '—'} — กดเพื่อเปิดใบ`}
+                className={cn('cursor-pointer border-b last:border-b-0', DASH.tableRow)}
+              >
+                <td className="px-4 py-2.5">
+                  <p className={DASH.cellStrong}>{item.requestNo}</p>
+                  <p className={cn('max-w-[220px] truncate text-xs', DASH.cellMuted)}>{item.unitName}</p>
+                </td>
+                <td className={cn('px-2 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap', TONE.danger.value)}>
                   {item.remainingPositions}
+                  <span className={cn('ml-1 font-normal text-[10px]', DASH.muted)}>เหลือ</span>
                 </td>
-                <td className={cn('px-3 py-2.5 text-xs', DASH.cellMuted)}>{item.lifecycleKind}</td>
-                <td className="px-3 py-2.5">
+                <td className="px-2 py-2.5 whitespace-nowrap text-right">
                   <DashboardSlaBadge status={item.slaStatus} />
-                </td>
-                <td className={cn('px-3 py-2.5 text-xs whitespace-nowrap', DASH.cellMuted)}>
-                  {item.slaDueDate ? formatYmdDmyBe(item.slaDueDate) : '—'}
                   {item.daysOverdue > 0 ? (
-                    <span className={cn('ml-1', TONE.danger.value)}>+{item.daysOverdue}d</span>
+                    <span className={cn('ml-1 text-xs', TONE.danger.value)}>+{item.daysOverdue}d</span>
                   ) : null}
                 </td>
-                <td className={cn('px-3 py-2.5 text-xs', DASH.cellMuted)}>{item.ownerName}</td>
-                <td className="px-3 py-2.5 text-right">
-                  <button type="button" onClick={() => onView(item)} className="jarvis-btn-ghost">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    ดู
-                  </button>
+                <td className={cn('px-4 py-2.5 text-right text-xs whitespace-nowrap', DASH.cellMuted)}>
+                  {item.ownerName}
                 </td>
               </tr>
             ))}

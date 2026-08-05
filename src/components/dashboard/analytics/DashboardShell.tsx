@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import type { DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
-import DashboardAgeOverview from './DashboardAgeOverview';
+import DashboardHeroStrip from './DashboardHeroStrip';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
@@ -98,10 +99,31 @@ const DashboardShell: React.FC<Props> = ({
   const [showUnitOverview, setShowUnitOverview] = useState(false);
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
   const [showWorkQueue, setShowWorkQueue] = useState(false);
+  const [showExecInsights, setShowExecInsights] = useState(false);
+  const [showLifecycle, setShowLifecycle] = useState(false);
 
   const activeSiteCount = data.unitOverview.filter((u) => u.open > 0).length;
   const siteOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
   const recruiterRemainingTotal = data.recruiterOverview.reduce((sum, r) => sum + r.remaining, 0);
+  const remainingKpiValue = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
+
+  /**
+   * แถบสัดส่วนใต้ตัวเลข KPI (mockup rev.3) — เทียบกับ "เข้ามา" ของช่วงเดียวกัน
+   * รองรับทั้งชุด stock (total_requests/closed/…) และชุด throughput (total/completed/…)
+   * แสดงเฉพาะเมื่อฐานเป็นบวก · การ์ด % ไม่ใส่ (ตัวเลขเป็น % อยู่แล้ว)
+   */
+  const kpiDenominator =
+    data.kpis.find((k) => k.id === 'total_requests' || k.id === 'total')?.value ?? 0;
+  const kpiProgress = (kpi: DashboardKpi): number | null => {
+    if (kpiDenominator <= 0 || kpi.format === 'percent') return null;
+    if (kpi.id === 'total_requests' || kpi.id === 'total') return 100;
+    if (['closed', 'completed', 'cancelled', 'remaining'].includes(kpi.id)) {
+      return Math.min(100, Math.round((kpi.value / kpiDenominator) * 100));
+    }
+    return null;
+  };
+
+  const hasPriority = data.priorityWorkQueue.length > 0;
 
   return (
     <div className="min-h-full bg-slate-100/60 dark:bg-transparent pb-24">
@@ -167,9 +189,21 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
+              {/* hero เข้ม "ต้องลงมือตอนนี้" — ถังอายุเดิมยกขึ้นมาไว้บนสุด + แท่งเข้ามารายเดือน */}
+              <DashboardHeroStrip
+                items={data.ageDaysBreakdown}
+                requestTotal={data.ageDaysRequestTotal}
+                positionTotal={data.ageDaysPositionTotal}
+                remainingPositions={remainingKpiValue}
+                siteCount={activeSiteCount}
+                trend={data.activityTrend}
+                trendLabel={data.activityTrendLabel || data.periodLabel}
+                onBucketClick={onAgeBucketClick}
+              />
+
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">สรุปอัตราในช่วงที่เลือก</p>
+                  <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                     {dateRange == null ? (
                       <>
@@ -198,43 +232,69 @@ const DashboardShell: React.FC<Props> = ({
                       <DashboardKpiCard
                         key={kpi.id}
                         kpi={kpi}
+                        progressPercent={kpiProgress(kpi)}
                         onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
                       />
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">สถานะทำงาน (นับอัตรา)</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                    {(data.workStatusKpis ?? []).map((kpi) => (
-                      <DashboardKpiCard
-                        key={kpi.id}
-                        kpi={kpi}
-                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
-                      />
-                    ))}
+                  <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา) — กดชิปเพื่อกรอง</p>
+                  {/* mockup rev.3: ชิปแทนการ์ด 11 ใบ — ครบทุกสถานะเท่าเดิม ตัวเป็นศูนย์แค่จางลง
+                      กดได้เหมือนการ์ดเดิม (เปิดลิสต์ใบขอสถานะนั้น) · รายละเอียดอยู่ใน title */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {(data.workStatusKpis ?? []).map((kpi) => {
+                      const tone: ToneKey = kpi.id === 'work_status_total' ? 'info' : 'neutral';
+                      return (
+                        <button
+                          key={kpi.id}
+                          type="button"
+                          disabled={!onKpiClick}
+                          title={kpi.description}
+                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                          className={cn(
+                            TONE[tone].chip,
+                            onKpiClick && 'transition-opacity hover:opacity-75',
+                            kpi.value === 0 && 'opacity-50',
+                          )}
+                        >
+                          {kpi.label}{' '}
+                          <b className="tabular-nums">{kpi.value.toLocaleString('th-TH')}</b>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
 
-              <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
-
-              {data.executiveInsights ? (
-                <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
+              {/* mockup rev.3: "ต้องแก้วันนี้" คู่กับสมการงานค้างในแถวเดียว — สองการ์ดที่ต้องเห็นก่อนเพื่อน */}
+              {hasPriority || data.flowView ? (
+                <div
+                  className={cn(
+                    'grid gap-3',
+                    hasPriority && data.flowView && 'xl:grid-cols-[1.6fr_1fr]',
+                  )}
+                >
+                  {hasPriority ? (
+                    <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
+                  ) : null}
+                  {data.flowView ? (
+                    <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
+                  ) : null}
+                </div>
               ) : null}
 
-              <DashboardAgeOverview
-                items={data.ageDaysBreakdown}
-                requestTotal={data.ageDaysRequestTotal}
-                positionTotal={data.ageDaysPositionTotal}
-                onBucketClick={onAgeBucketClick}
-              />
-
-              {data.flowView ? (
-                <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
+              {/* แผงรองทั้งหมดยุบเป็นแถวกดขยาย — ข้อมูลครบทุกแผง ไม่มีตัวไหนหาย (กติกา mockup ข้อ 02) */}
+              {data.executiveInsights && data.executiveInsights.sentences.length > 0 ? (
+                <DashboardExpandablePanel
+                  title="สรุปผู้บริหาร"
+                  subtitle={`${data.executiveInsights.sentences.length.toLocaleString('th-TH')} ข้อสรุปอัตโนมัติ — กดเพื่อดู`}
+                  open={showExecInsights}
+                  onOpenChange={setShowExecInsights}
+                >
+                  <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
+                </DashboardExpandablePanel>
               ) : null}
-
-              <DashboardChartSection data={data} />
               {data.slaSummary || data.requestCohortSummary || data.fulfillmentBreakdown ? (
                 <DashboardExpandablePanel
                   title="รายละเอียด Control Tower"
@@ -271,6 +331,23 @@ const DashboardShell: React.FC<Props> = ({
               ) : null}
 
               <DashboardExpandablePanel
+                title="ภาระงานตามรหัสไซต์"
+                subtitle={
+                  activeSiteCount > 0
+                    ? `คงเหลือ ${siteOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeSiteCount.toLocaleString('th-TH')} ไซต์ · กดเพื่อดู`
+                    : 'กดเพื่อดูรายละเอียด'
+                }
+                open={showUnitOverview}
+                onOpenChange={setShowUnitOverview}
+              >
+                <DashboardUnitOverviewChart
+                  items={data.unitOverview}
+                  periodLabel={data.periodLabel}
+                  onSiteClick={onSiteClick}
+                  hideHeader
+                />
+              </DashboardExpandablePanel>
+              <DashboardExpandablePanel
                 title="ภาระงานตามผู้รับผิดชอบ"
                 subtitle={
                   data.recruiterOverview.length > 0
@@ -288,21 +365,12 @@ const DashboardShell: React.FC<Props> = ({
                 />
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
-                title="ภาระงานตามรหัสไซต์"
-                subtitle={
-                  activeSiteCount > 0
-                    ? `คงเหลือ ${siteOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeSiteCount.toLocaleString('th-TH')} ไซต์ · กดเพื่อดู`
-                    : 'กดเพื่อดูรายละเอียด'
-                }
-                open={showUnitOverview}
-                onOpenChange={setShowUnitOverview}
+                title="แนวโน้มรายเดือน & Life Cycle"
+                subtitle="เข้ามา/ปิดแล้ว/ยกเลิก/คงเหลือ · ลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์ — กดเพื่อดู"
+                open={showLifecycle}
+                onOpenChange={setShowLifecycle}
               >
-                <DashboardUnitOverviewChart
-                  items={data.unitOverview}
-                  periodLabel={data.periodLabel}
-                  onSiteClick={onSiteClick}
-                  hideHeader
-                />
+                <DashboardChartSection data={data} />
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
                 title="งานที่ต้องติดตาม"

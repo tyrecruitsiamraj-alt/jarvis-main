@@ -256,6 +256,14 @@
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   }
 
+  /* hero เข้มของหน้า Dashboard (mockup rev.3 ข้อ 02) — น้ำเงินหมึกไล่จากมุมบนซ้าย
+     เข้มเท่ากันทั้งสองธีมโดยตั้งใจ (คู่มืดมีแค่เงา/เส้นใน — ดู @layer ล่าง) */
+  .jarvis-hero-card {
+    @apply rounded-[1.25rem] text-white;
+    background: radial-gradient(1200px 320px at 12% -40%, #22345c 0%, #10182b 55%);
+    box-shadow: 0 12px 40px rgba(16, 24, 43, 0.22);
+  }
+
   .jarvis-pill-btn {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-medium transition-all;
     box-shadow: 0 4px 14px hsl(211 100% 50% / 0.28);
@@ -442,8 +450,11 @@
     background: #1e1e24;
   }
 
-  /* การ์ดดำอยู่บนพื้นมืดแล้วขอบจะกลืนไปเลย — เติมเส้นจาง ๆ ให้ยังเห็นเป็นการ์ด */
+  /* การ์ดดำ/hero อยู่บนพื้นมืดแล้วขอบจะกลืนไปเลย — เติมเส้นจาง ๆ ให้ยังเห็นเป็นการ์ด */
   .dark .jarvis-dark-card {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .dark .jarvis-hero-card {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 

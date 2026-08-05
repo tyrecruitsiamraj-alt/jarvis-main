@@ -7,6 +7,8 @@ import type { DashboardKpi } from '@/lib/dashboard/types';
 type Props = {
   kpi: DashboardKpi;
   onClick?: () => void;
+  /** 0–100 = โชว์แถบสัดส่วนเทียบ "เข้ามา" ใต้ตัวเลข (mockup rev.3) · null/ไม่ส่ง = ไม่มีแถบ */
+  progressPercent?: number | null;
 };
 
 /**
@@ -34,7 +36,7 @@ const KPI_SOLID_IDS = new Set(['overdue']);
 const NEUTRAL_TILE = 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800';
 const NEUTRAL_NUM = 'text-slate-900 dark:text-slate-100';
 
-const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
+const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick, progressPercent = null }) => {
   const trend = kpi.trendPercent;
   const TrendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? ArrowUp : ArrowDown;
   const solid = KPI_SOLID_IDS.has(kpi.id);
@@ -87,6 +89,18 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick }) => {
       <p className={cn('mt-1 text-xs', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
         {kpi.description}
       </p>
+      {progressPercent != null ? (
+        <div
+          className={cn('mt-2 h-[5px] overflow-hidden rounded-full', solid ? 'bg-white/25' : 'bg-slate-900/10 dark:bg-white/10')}
+          title={`${progressPercent}% ของเข้ามา`}
+          aria-hidden
+        >
+          <span
+            className={cn('block h-full rounded-full', solid ? 'bg-white/90' : (tone?.dot ?? 'bg-slate-400'))}
+            style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+          />
+        </div>
+      ) : null}
       {trend != null ? (
         <div className={cn('mt-2 flex items-center gap-1 text-xs font-medium', trendColor)}>
           <TrendIcon className="h-3.5 w-3.5" aria-hidden />

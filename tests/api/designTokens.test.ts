@@ -111,9 +111,12 @@ describe('designTokens — DASH (พื้นผิวหน้า /dashboard)',
     }
   });
 
-  it('การ์ดดำอ้าง class กลางใน index.css ไม่ประกาศ gradient ซ้ำ', () => {
+  it('การ์ดดำ/hero อ้าง class กลางใน index.css ไม่ประกาศ gradient ซ้ำ', () => {
     expect(DASH.darkCard).toBe('jarvis-dark-card');
     expect(indexCss).toContain('.jarvis-dark-card {');
     expect(indexCss).toContain('.dark .jarvis-dark-card {');
+    expect(DASH.hero).toBe('jarvis-hero-card');
+    expect(indexCss).toContain('.jarvis-hero-card {');
+    expect(indexCss).toContain('.dark .jarvis-hero-card {');
   });
 });
