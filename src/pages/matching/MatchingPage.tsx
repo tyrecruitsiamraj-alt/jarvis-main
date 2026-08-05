@@ -2276,7 +2276,25 @@ const MatchingPage: React.FC = () => {
                 />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-semibold text-blue-600 text-sm truncate">{unitRequestCardTitle(j)}</div>
+                    {/* ชื่อหน่วยงาน + ป้าย AI แนะนำ อยู่บรรทัดเดียวกัน — อ่านทีเดียวรู้ว่าใบนี้ไปต่อได้ไหม */}
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-semibold text-blue-600">{unitRequestCardTitle(j)}</span>
+                      {matchCount != null ? (
+                        <span
+                          title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
+                          className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        >
+                          AI แนะนำ {matchCount}
+                        </span>
+                      ) : quickCounts[j.id] ? (
+                        <span
+                          title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
+                          className="shrink-0 rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-300"
+                        >
+                          น่าจะตรง ~{quickCounts[j.id]}
+                        </span>
+                      ) : null}
+                    </div>
                     {unitRequestCardSubtitle(j) ? (
                       <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
                     ) : null}
@@ -2286,23 +2304,6 @@ const MatchingPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    {/* ป้าย "AI แนะนำ" อยู่บนสุด — เป็นตัวชี้ว่าใบนี้ทำงานต่อได้เลยหรือยัง
-                        กวาดตาเจอก่อนป้ายอื่น (เดิมอยู่ล่างสุดของกลุ่มจนมองข้าม) */}
-                    {matchCount != null ? (
-                      <span
-                        title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                        className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
-                      >
-                        AI แนะนำ {matchCount}
-                      </span>
-                    ) : quickCounts[j.id] ? (
-                      <span
-                        title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                        className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-300"
-                      >
-                        น่าจะตรง ~{quickCounts[j.id]}
-                      </span>
-                    ) : null}
                     {/* ระดับความด่วนตามอายุใบขอ (คนละเรื่องกับ "ด่วน/ล่วงหน้า" ที่มาจากใบขอ ERP) */}
                     <span
                       title={
@@ -2330,20 +2331,30 @@ const MatchingPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                      {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
-                    </span>
-                    <span className="block truncate text-[10px] text-slate-600">
-                      ขอ {requested} · ติดต่อ {progress.contacted} · จอง {progress.reserved} · ลงงานใน Matching {progress.placed} · เหลือหาทางการ {remaining}
-                    </span>
-                    {(() => {
-                      // ก้าวถัดไปของใบนี้ — เห็นจากลิสต์เลยไม่ต้องเปิดใบ
-                      const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
-                      return action ? (
-                        <span className={cn(action.cls, 'mt-1')}>→ {action.text}</span>
-                      ) : null;
-                    })()}
+                  {/* ในกล่องแบ่งสองคอลัมน์: ซ้าย = รายละเอียดงาน · ขวา = สรุปว่ามีใครกี่คนแล้ว */}
+                  <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[1.2fr_1fr]">
+                    <div className="min-w-0">
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
+                      </span>
+                      {(() => {
+                        // ก้าวถัดไปของใบนี้ — เห็นจากลิสต์เลยไม่ต้องเปิดใบ
+                        const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
+                        return action ? (
+                          <span className={cn(action.cls, 'mt-1')}>→ {action.text}</span>
+                        ) : null;
+                      })()}
+                    </div>
+                    <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">สรุปคนในใบนี้</p>
+                      <div className="mt-0.5 grid grid-cols-2 gap-x-2.5 text-[10px] text-slate-600 dark:text-slate-300">
+                        <span>ขอมา <b className="tabular-nums">{requested}</b></span>
+                        <span>ติดต่อ <b className="tabular-nums">{progress.contacted}</b></span>
+                        <span>จอง <b className="tabular-nums">{progress.reserved}</b></span>
+                        <span>ลงงาน <b className="tabular-nums">{progress.placed}</b></span>
+                        <span className="col-span-2">เหลือหาทางการ <b className="tabular-nums">{remaining}</b></span>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                     {serverLumosSummary[j.id] ? <LumosJobSummaryStats s={serverLumosSummary[j.id]} /> : null}

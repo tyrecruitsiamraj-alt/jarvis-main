@@ -32,18 +32,21 @@ function FlowStage({
   sub,
   onClick,
   accent,
+  tone,
 }: {
   label: string;
   value: number;
   sub?: string;
   onClick: () => void;
   accent: string;
+  /** สีแถบบนหัวการ์ด — บอกว่าขั้นนี้เป็นช่วงไหนของสาย กวาดตาแยกได้ก่อนอ่านตัวเลข */
+  tone?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="jarvis-stat-tile min-w-0 flex-1"
+      className={cn('jarvis-stat-tile min-w-0 flex-1 !border-t-[3px]', tone ?? 'border-t-transparent')}
     >
       <div className="jarvis-stat-label">{label}</div>
       <div className={cn('jarvis-stat-value', accent)}>{value}</div>
@@ -192,6 +195,7 @@ const HomePage: React.FC = () => {
                 value={flow.jobs.open_total}
                 sub={`ด่วน ${flow.jobs.urgent} ใบ`}
                 accent="text-slate-800"
+                tone="border-t-slate-400 dark:border-t-slate-500"
                 onClick={() => navigate(resolveUnitNavPath())}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -203,6 +207,7 @@ const HomePage: React.FC = () => {
                 value={flow.jobs.with_recommend}
                 sub={`จากที่ประเมิน ${flow.jobs.analyzed} ใบ`}
                 accent="text-sky-700"
+                tone="border-t-sky-400 dark:border-t-sky-500"
                 onClick={() => navigate('/matching/match?workflow=green')}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -214,6 +219,7 @@ const HomePage: React.FC = () => {
                 value={flow.lumos.sent_month}
                 sub={`รอโทรอีก ${flow.lumos.waiting_call + flow.lumos.delivered_waiting}`}
                 accent="text-blue-700"
+                tone="border-t-blue-500 dark:border-t-blue-400"
                 onClick={() => navigate('/matching/match')}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -225,6 +231,7 @@ const HomePage: React.FC = () => {
                 value={confirmedThisMonth(flow)}
                 sub={`ปฏิเสธ ${flow.lumos.outcomes_month['declined'] ?? 0} · ไม่รับสาย ${(flow.lumos.outcomes_month['no_answer'] ?? 0) + (flow.lumos.outcomes_month['unresponsive'] ?? 0)}`}
                 accent="text-emerald-700"
+                tone="border-t-emerald-500 dark:border-t-emerald-400"
                 onClick={() => navigate('/matching/match')}
               />
               <div className="flex items-center justify-center text-muted-foreground/60">
@@ -236,6 +243,7 @@ const HomePage: React.FC = () => {
                 value={flow.proposals.reserved_active + flow.proposals.placed_month}
                 sub={`จอง ${flow.proposals.reserved_active} · ลงงานเดือนนี้ ${flow.proposals.placed_month}`}
                 accent="text-violet-700"
+                tone="border-t-violet-500 dark:border-t-violet-400"
                 onClick={() => navigate('/matching/reservations')}
               />
 
@@ -253,6 +261,7 @@ const HomePage: React.FC = () => {
                 value={flow.postings.content ?? 0}
                 sub="ใบขอที่รอทีมคอนเทนต์ทำโพส"
                 accent="text-orange-700"
+                tone="border-t-orange-400 dark:border-t-orange-400"
                 onClick={() => navigate('/matching/job-postings')}
               />
               <FlowStage
@@ -260,6 +269,7 @@ const HomePage: React.FC = () => {
                 value={flow.postings.scraping ?? 0}
                 sub="ใบขอที่รอไปดูดประกาศหาคน"
                 accent="text-teal-700"
+                tone="border-t-teal-400 dark:border-t-teal-400"
                 onClick={() => navigate('/matching/job-postings')}
               />
             </div>
