@@ -13,6 +13,8 @@ import { combineWlEmployeeList } from '@/lib/wlEmployeeList';
 import { readJsonSafe } from '@/lib/api';
 import { apiFetch } from '@/lib/apiFetch';
 import WlBuSelector from '@/components/wl/WlBuSelector';
+import NameAvatar from '@/components/shared/NameAvatar';
+import { TONE } from '@/lib/designTokens';
 import { useWlBu } from '@/hooks/useWlBu';
 import { countEmployeesByBu, filterEmployeesByBu } from '@/lib/wlBuFilters';
 
@@ -188,19 +190,21 @@ const WLEmployees: React.FC = () => {
                 }}
                 className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left cursor-pointer hover:border-blue-300/50 transition-all"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-foreground text-sm">
-                    {emp.first_name} {emp.last_name}
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-foreground text-sm">
+                    <NameAvatar name={`${emp.first_name} ${emp.last_name}`} />
+                    <span className="truncate">
+                      {emp.first_name} {emp.last_name}
+                    </span>
                   </span>
                   <span
-                    className={cn(
-                      'text-xs px-2 py-0.5 rounded-full',
+                    className={
                       emp.status === 'active'
-                        ? 'bg-success/15 text-success'
+                        ? TONE.success.chip
                         : emp.status === 'suspended'
-                          ? 'bg-destructive/15 text-destructive'
-                          : 'bg-muted text-muted-foreground',
-                    )}
+                          ? TONE.danger.chip
+                          : TONE.neutral.chip
+                    }
                   >
                     {emp.status === 'active'
                       ? 'ใช้งาน'
@@ -270,7 +274,7 @@ const WLEmployees: React.FC = () => {
                     {/* BU: ตั้งค่าได้ตรงนี้เลย (หัวหน้างานขึ้นไป) — คลิกไม่ทะลุไปหน้าโปรไฟล์ */}
                     <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
                       {emp.department_code ? (
-                        <span className="jarvis-chip-violet">{emp.department_code}</span>
+                        <span className={TONE.violet.chip}>{emp.department_code}</span>
                       ) : canEditBu ? (
                         <span className="inline-flex items-center gap-1">
                           {WL_BU_CODES.map((bu) => (
@@ -290,7 +294,10 @@ const WLEmployees: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 font-medium text-foreground">
-                      {emp.first_name} {emp.last_name}
+                      <span className="inline-flex items-center gap-2">
+                        <NameAvatar name={`${emp.first_name} ${emp.last_name}`} />
+                        {emp.first_name} {emp.last_name}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{emp.position}</td>
                     <td className="px-4 py-3 text-center">
@@ -310,14 +317,13 @@ const WLEmployees: React.FC = () => {
                     <td className="px-4 py-3 text-center text-foreground">{emp.utilization_rate}%</td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={cn(
-                          'text-xs px-2 py-0.5 rounded-full',
+                        className={
                           emp.status === 'active'
-                            ? 'bg-success/15 text-success'
+                            ? TONE.success.chip
                             : emp.status === 'suspended'
-                              ? 'bg-destructive/15 text-destructive'
-                              : 'bg-muted text-muted-foreground',
-                        )}
+                              ? TONE.danger.chip
+                              : TONE.neutral.chip
+                        }
                       >
                         {emp.status === 'active'
                           ? 'ใช้งาน'

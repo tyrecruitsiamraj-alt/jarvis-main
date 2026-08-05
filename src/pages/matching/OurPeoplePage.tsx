@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import NameAvatar from '@/components/shared/NameAvatar';
+import { TONE } from '@/lib/designTokens';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 
 /**
@@ -234,8 +236,9 @@ const OurPeoplePage: React.FC = () => {
                               setDetail(p);
                             }
                           }}
-                          className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-white/80 bg-white/75 px-3 py-2.5 text-left transition-colors hover:border-blue-300/70 hover:bg-white"
+                          className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-white/80 bg-white/75 px-3 py-2.5 text-left transition-colors hover:border-blue-300/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/60 dark:hover:border-blue-500/50 dark:hover:bg-slate-900"
                         >
+                          <NameAvatar name={p.full_name} size="md" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-foreground">
                               {p.full_name}
@@ -258,7 +261,7 @@ const OurPeoplePage: React.FC = () => {
                             <a
                               href={`tel:${p.mobile}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="jarvis-chip-info shrink-0 hover:underline"
+                              className={cn(TONE.info.chip, 'shrink-0 hover:underline')}
                             >
                               <Phone className="h-2.5 w-2.5" /> {p.mobile}
                             </a>

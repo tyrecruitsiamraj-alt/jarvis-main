@@ -62,9 +62,14 @@ const PublicPostingApplyPage: React.FC = () => {
   const closed = info.status === 'closed';
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:py-12">
-      <div className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:p-7">
-        <h1 className="text-xl font-bold leading-tight text-foreground sm:text-2xl">{info.title}</h1>
+    // หน้าที่คนนอกเห็น = หน้าตาแบรนด์ที่หรูสุดในระบบ (mockup rev.3 ข้อ 10)
+    // การ์ดเดี่ยวกลางจอ · ป้ายทองบรรทัดบน · ปุ่มหมึกเต็มความกว้าง · ปิดท้ายด้วยคำสัญญาว่าจะติดต่อกลับ
+    <div className="mx-auto w-full max-w-md px-4 py-10 sm:py-14">
+      <div className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-28px_rgba(16,24,43,0.35),0_2px_8px_rgba(16,24,43,0.08)] sm:p-7">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b08d4f] dark:text-[#cfae72]">
+          So Recruit · รับสมัครงาน
+        </p>
+        <h1 className="mt-2 text-xl font-bold leading-snug text-foreground sm:text-2xl">{info.title}</h1>
 
         {info.detail ? (
           <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
@@ -100,13 +105,18 @@ const PublicPostingApplyPage: React.FC = () => {
             ตำแหน่งนี้ปิดรับสมัครแล้ว ขอบคุณที่สนใจครับ
           </p>
         ) : (
-          <button
-            type="button"
-            onClick={() => setApplyOpen(true)}
-            className="mt-6 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-          >
-            กรอกใบสมัคร
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setApplyOpen(true)}
+              className="mt-6 w-full rounded-full bg-[#10182b] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1c2949] dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            >
+              กรอกใบสมัคร
+            </button>
+            <p className="mt-2.5 text-center text-xs text-muted-foreground">
+              ทีมสรรหาติดต่อกลับภายใน 2 วันทำการ
+            </p>
+          </>
         )}
       </div>
 

@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { STANDALONE_POSTING_KINDS, type RecruitChannel } from '@/lib/recruitPostings';
+import { heroButton, heroButtonSolid } from '@/components/shared/PageHeroStrip';
 import {
   fetchRecruitChannels,
   createRecruitChannel,
@@ -241,7 +242,7 @@ const StandalonePickerDialog: React.FC<{
 };
 
 /** ปุ่มระดับ "ตั้งค่า" ของบอร์ดรับสมัคร (เฉพาะฝั่งเจ้าหน้าที่) */
-const RecruitBoardTools: React.FC = () => {
+const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant = 'light' }) => {
   const { isFunctionEnabled } = useRolePermissions();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -258,14 +259,22 @@ const RecruitBoardTools: React.FC = () => {
         <button
           type="button"
           onClick={() => setChannelsOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+          className={
+            variant === 'onDark'
+              ? heroButton
+              : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary'
+          }
         >
           <Settings2 className="h-3.5 w-3.5" /> จัดการช่องทาง
         </button>
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
+          className={
+            variant === 'onDark'
+              ? heroButtonSolid
+              : 'inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15'
+          }
         >
           <Plus className="h-3.5 w-3.5" /> ประกาศลอย
         </button>
