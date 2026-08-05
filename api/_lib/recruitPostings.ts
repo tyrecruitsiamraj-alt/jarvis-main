@@ -8,7 +8,7 @@ import {
   type RecruitChannel,
   type RecruitPosting,
   type RecruitPostingLink,
-} from '@/lib/recruitPostings';
+} from '../../src/lib/recruitPostings.js';
 
 const channelsTable = tableInAppSchema('recruit_channels');
 const postingsTable = tableInAppSchema('recruit_postings');
@@ -143,8 +143,11 @@ export async function updateRecruitChannel(
 
 /** ลบช่องทาง — ลิงก์ที่เคยสร้างไว้ยังใช้ได้ (channel_id เป็น null แต่ channel_label ยังอยู่) */
 export async function deleteRecruitChannel(id: string): Promise<boolean> {
-  const { rowCount } = await dbQuery(`DELETE FROM ${channelsTable} WHERE id = $1`, [id]);
-  return (rowCount ?? 0) > 0;
+  const { rows } = await dbQuery<{ id: string }>(
+    `DELETE FROM ${channelsTable} WHERE id = $1 RETURNING id`,
+    [id],
+  );
+  return rows.length > 0;
 }
 
 // ── ประกาศ ────────────────────────────────────────────────────────────
@@ -391,9 +394,9 @@ export async function createPostingLink(
 }
 
 export async function setPostingStatus(id: string, status: 'open' | 'closed'): Promise<boolean> {
-  const { rowCount } = await dbQuery(
-    `UPDATE ${postingsTable} SET status = $2, updated_at = now() WHERE id = $1`,
+  const { rows } = await dbQuery<{ id: string }>(
+    `UPDATE ${postingsTable} SET status = $2, updated_at = now() WHERE id = $1 RETURNING id`,
     [id, status],
   );
-  return (rowCount ?? 0) > 0;
+  return rows.length > 0;
 }
