@@ -13,6 +13,7 @@ import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
@@ -123,6 +124,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
               {isStaff ? 'งานสรรหา' : 'ค้นหางานที่เหมาะกับคุณ'}
             </h1>
+            {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย (เจ้าหน้าที่เท่านั้น) */}
+            {isStaff ? (
+              <div className="mt-3">
+                <RecruitBoardTools />
+              </div>
+            ) : null}
             {!isStaff ? (
               <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
                 เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
