@@ -16,7 +16,8 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { cancelFollowReminder } from '../_lib/lumosDispatch.js';
+import { enqueueFollowReminder, cancelFollowReminder } from '../_lib/lumosDispatch.js';
+import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { toE164Thai } from '../_lib/lumosDispatch.js';
 
 const followTable = tableInAppSchema('follow_entries');
@@ -140,6 +141,19 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   );
   const created = rows[0];
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
+
+  // ส่งให้ Lumos โทรตาม **เฉพาะเมื่อตั้งโหมดเป็น auto**
+  // ปิดอยู่ = รายการถูกบันทึกไว้แต่ยังไม่มีใครโทร (ตั้งใจ — เจ้าของสั่งปิด auto ก่อน)
+  if (await isAutoDispatchEnabled('follow_entry')) {
+    await enqueueFollowReminder({
+      id: created.id,
+      recipient_name: name,
+      recipient_phone: phone,
+      topic,
+      note,
+      scheduled_at: when,
+    });
+  }
 
   await auditFromAuthed(req, {
     action: 'follow.create',

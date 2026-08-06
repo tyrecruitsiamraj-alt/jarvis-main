@@ -66,6 +66,7 @@ import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js
 import matchingBoardCandidatesHandler from './matching-board-candidates.js';
 import matchingProposalsHandler from './matching-proposals.js';
 import matchingCandidateScreeningHandler from './matching-candidate-screening.js';
+import lumosDispatchModeHandler from './lumos-dispatch-mode.js';
 import matchingCallHoldsHandler from './matching-call-holds.js';
 import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
@@ -115,6 +116,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/board-candidates': matchingBoardCandidatesHandler as ApiHandler,
   '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
   '/api/matching/candidate-screening': matchingCandidateScreeningHandler as ApiHandler,
+  '/api/lumos/dispatch-mode': lumosDispatchModeHandler as ApiHandler,
   '/api/matching/call-holds': matchingCallHoldsHandler as ApiHandler,
   '/api/matching/flow-summary': matchingFlowSummaryHandler as ApiHandler,
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,

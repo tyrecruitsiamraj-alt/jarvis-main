@@ -236,6 +236,40 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 (กันข้อมูลรั่ว) — จับคู่ไม่ได้จะเทกองไม่ได้ ปุ่มจะ disable และบอกให้โอนรายคนแทน
 ถ้าจะแก้ให้แน่นกว่านี้ ต้องเพิ่ม field ที่ปลอดภัย (เช่น hash) ไม่ใช่ส่ง userId ดิบ
 
+## โหมดส่งงานให้ Lumos (manual / auto ต่อจุด)
+
+เดิม auto-send ถูก hardcode 3 จุด · เจ้าของสั่งปิดก่อน (commit `eb8c386` ถอด call ออกตรง ๆ)
+แต่บอกว่า "อนาคตจะเอากลับมานะ" — ถอดโค้ดทิ้งแล้วต้องเขียนใหม่ทั้งชุดตอนอยากเปิด
+จึงเอา call กลับมา **แต่ครอบด้วยสวิตช์** ที่เก็บใน DB
+
+* `migrations/069_lumos_dispatch_mode.sql` — ตาราง `app_lumos_dispatch_mode` (jsonb แถวเดียว)
+* `src/lib/lumosDispatchMode.ts` — **ความหมายของค่าอยู่ที่นี่ที่เดียว** (ใช้ร่วมสองฝั่ง)
+  trigger: `board_match` · `irecruit_search` · `follow_entry` · mode: `manual` | `auto`
+* `api/_lib/lumosDispatchMode.ts` — อ่าน/เขียน + cache 60 วินาที + `isAutoDispatchEnabled()`
+* `api/_handlers/lumos-dispatch-mode.ts` — `GET/PUT /api/lumos/dispatch-mode`
+  (GET ทุก role · **PUT เฉพาะ admin** เพราะเปิด auto = ระบบเริ่มโทรหาคนจริง) + audit before/after
+* `src/lib/lumosDispatchModeApi.ts` · `src/pages/settings/LumosDispatchModeTab.tsx` (แท็บ admin)
+* `tests/api/lumosDispatchMode.test.ts` + guard เพิ่มใน `tests/api/lumosDispatchSelection.test.ts`
+
+จุดที่ถูกครอบ (เดิมเรียกตรง ๆ):
+
+| ไฟล์ | trigger | ช่องคิว |
+|---|---|---|
+| `api/_lib/boardCandidateMatcher.ts` | `board_match` | reminder |
+| `api/_handlers/matching-irecruit-candidates.ts` | `irecruit_search` | interview |
+| `api/_handlers/follow.ts` | `follow_entry` | reminder |
+
+⚠️ **ทุก call site ของ auto-send ต้องผ่าน `isAutoDispatchEnabled()`** ห้ามเรียก enqueue ตรง ๆ
+มีเทสต์กันที่ `lumosDispatchSelection.test.ts` (เช็คว่ามีทั้ง call และ `isAutoDispatchEnabled('<trigger>')`)
+
+⚠️ **ค่าเริ่มต้น = manual ทุกจุด และ fail-safe ทุกทาง** — ตารางยังไม่ migrate / ค่าเพี้ยน /
+คีย์ไม่รู้จัก → `manual` · เพราะเดาผิดทาง auto = โทรหาผู้สมัครจริงโดยไม่มีใครสั่ง ซึ่งกู้คืนไม่ได้
+มีเทสต์กันไม่ให้ default เป็น `auto`
+⚠️ DB ล้มด้วยเหตุอื่น (ไม่ใช่ 42P01) **โยนต่อ ไม่กลืน** — ไม่งั้นจะเข้าใจผิดว่าปิด auto อยู่
+
+หมายเหตุ: ยังไม่มีโหมด `assist` (ระบบจัดชุดให้ คนกดยืนยันทีเดียว) เพราะยังไม่มีชั้น
+"ชุดส่ง + อนุมัติ" รองรับ — ใส่ตอนนี้จะเป็นตัวเลือกที่กดได้แต่ไม่มีผล
+
 ## Safe implementation / feature flag
 
 Edit documentation:

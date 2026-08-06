@@ -91,8 +91,12 @@ describe('resolveBoardSelection — ตรวจกับ pool สด ไม่�
 });
 
 /**
- * ต้องมี 2 ทางอยู่คู่กัน: auto-send จาก flow matching (ของเดิม) + ส่งเองแบบเลือก (ตอนด่วน)
+ * ต้องมี 2 ทางอยู่คู่กัน: auto-send จาก flow matching + ส่งเองแบบเลือก (ตอนด่วน)
  * เทสต์นี้กันการเผลอถอดทางใดทางหนึ่งออก
+ *
+ * ⚠️ auto-send **ต้องอยู่ในโค้ดแต่ถูกครอบด้วยสวิตช์โหมด** (isAutoDispatchEnabled)
+ * ค่าเริ่มต้นคือ manual จึงไม่โทรเองจนกว่าจะเปิดที่หน้าตั้งค่า
+ * เคยถอด call ออกตรง ๆ ครั้งหนึ่ง (commit eb8c386) ซึ่งทำให้ต้องเขียนใหม่ทั้งชุดตอนอยากเปิด
  */
 describe('เส้นทางส่งเข้าคิว Lumos', () => {
   const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
@@ -123,5 +127,37 @@ describe('เส้นทางส่งเข้าคิว Lumos', () => {
     const lib = read('api/_lib/lumosDispatch.ts');
     const autoBlock = lib.slice(lib.indexOf('export async function enqueueLumosReminderForBoardMatch'));
     expect(autoBlock).toMatch(/enqueueLumosReminderForSelected/);
+  });
+
+  /**
+   * ทุกจุดที่ส่งอัตโนมัติต้องถามสวิตช์ก่อน — ถ้าใครถอด if ออก ระบบจะกลับไปโทรเองทันที
+   * ที่ deploy โดยไม่มีใครสั่ง (กู้คืนไม่ได้เพราะสายโทรออกไปแล้ว)
+   */
+  it('auto-send ทุกจุดต้องถูกครอบด้วยสวิตช์โหมด (isAutoDispatchEnabled)', () => {
+    const cases: Array<[string, string]> = [
+      ['api/_lib/boardCandidateMatcher.ts', 'board_match'],
+      ['api/_handlers/matching-irecruit-candidates.ts', 'irecruit_search'],
+      ['api/_handlers/follow.ts', 'follow_entry'],
+    ];
+    for (const [file, trigger] of cases) {
+      const src = read(file);
+      expect(src).toMatch(/isAutoDispatchEnabled/);
+      expect(src).toContain(`isAutoDispatchEnabled('${trigger}')`);
+    }
+  });
+
+  it('follow: สร้างรายการติดตามแล้วส่งให้ Lumos ได้ (อยู่ใต้สวิตช์)', () => {
+    const src = read('api/_handlers/follow.ts');
+    expect(src).toMatch(/enqueueFollowReminder\(/);
+  });
+
+  it('ค่าเริ่มต้นของทุกจุดต้องเป็น manual — ห้าม default เป็น auto', () => {
+    const src = read('src/lib/lumosDispatchMode.ts');
+    const block = src.slice(src.indexOf('DEFAULT_LUMOS_DISPATCH_MODE'));
+    const head = block.slice(0, block.indexOf('};'));
+    expect(head).not.toMatch(/'auto'/);
+    for (const t of ['board_match', 'irecruit_search', 'follow_entry']) {
+      expect(head).toContain(`${t}: 'manual'`);
+    }
   });
 });

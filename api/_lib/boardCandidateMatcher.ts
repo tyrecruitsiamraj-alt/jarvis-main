@@ -14,6 +14,8 @@ import {
 } from './candidateSpecAnalyzer.js';
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
 import { saveBoardMatchResult } from './boardMatchStore.js';
+import { enqueueLumosReminderForBoardMatch } from './lumosDispatch.js';
+import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -346,5 +348,11 @@ export async function matchBoardCandidatesForJob(
     fallback_pool_size: fallbackPoolSize,
   };
   await saveBoardMatchResult(jobId, result);
+  // match เสร็จ → ส่งคนที่แนะนำ (green/yellow) เข้าคิวโทร **เฉพาะเมื่อตั้งโหมดเป็น auto**
+  // ค่าเริ่มต้นคือ manual: ต้องติ๊กเลือกแล้วกดส่งเองที่หน้า Matching (POST /api/lumos/dispatch)
+  // เปลี่ยนที่หน้าตั้งค่า > โหมดส่งงานให้ Lumos — ไม่ต้องแก้โค้ด
+  if (await isAutoDispatchEnabled('board_match')) {
+    await enqueueLumosReminderForBoardMatch(job, result);
+  }
   return result;
 }
