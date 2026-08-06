@@ -14,6 +14,7 @@ import {
   resolveOpenStockTrendRange,
   resolveYearToDateTrendRange,
   sortWorkQueue,
+  buildRecruiterOverview,
 } from '@/lib/dashboard/buildDashboardData';
 import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dashboardPageState';
 import { exportWorkQueueCsv } from '@/lib/dashboard/exportWorkQueue';
@@ -76,6 +77,12 @@ const SupervisorDashboard: React.FC = () => {
 
   const [throughputRecords, setThroughputRecords] = useState<ThroughputRecord[]>([]);
   const [closedJobs, setClosedJobs] = useState<JobRequest[]>([]);
+  /**
+   * โหมด "ทั้งหมด" ไม่ดึงชุดใบปิดตอนเปิดหน้า — ช่วงเต็มมี 2,700+ ใบ ใช้เวลา ~20 วิ
+   * จะดึงก็ต่อเมื่อคนกดกางแผง "ภาระงานตามผู้รับผิดชอบ" ซึ่งเป็นที่เดียวที่ใช้ยอดปิดรายคน
+   */
+  const [closedAllJobs, setClosedAllJobs] = useState<JobRequest[] | null>(null);
+  const [closedAllLoading, setClosedAllLoading] = useState(false);
 
   const RETURN_TO = '/dashboard';
 
@@ -100,7 +107,7 @@ const SupervisorDashboard: React.FC = () => {
    * ถ้าไม่ดึง ยอด "ปิด" ต่อคนคือ "ยังไม่รู้" ไม่ใช่ 0 → ส่งธงไปให้ UI โชว์ "—"
    */
   const closedTotalsAvailable =
-    !DEMO_MODE && siamrajPrimary && dbSource === 'sqlserver' && period != null;
+    !DEMO_MODE && siamrajPrimary && dbSource === 'sqlserver' && (period != null || closedAllJobs != null);
 
   const throughputRange = useMemo(() => {
     // ดึงตามช่วงที่เลือก (ไม่ใช้ previous) เพื่อให้ cohort เดือนนั้นครบรวมใบที่ปิดแล้ว
@@ -158,7 +165,7 @@ const SupervisorDashboard: React.FC = () => {
       setClosedJobs([]);
       return;
     }
-    // โหมดทั้งหมดใช้ throughput เป็นหลัก — ไม่ดึง closed ชุดใหญ่ซ้ำ
+    // โหมดทั้งหมดใช้ throughput เป็นหลัก + โหลดใบปิดแบบ on-demand (ดู requestClosedTotals)
     if (!period) {
       setClosedJobs([]);
       return;
@@ -175,6 +182,23 @@ const SupervisorDashboard: React.FC = () => {
       cancelled = true;
     };
   }, [siamrajPrimary, dbSource, period]);
+
+  /** กางแผง "ภาระงานตามผู้รับผิดชอบ" ในโหมดทั้งหมด → ค่อยดึงใบปิดของช่วงเดียวกับ throughput */
+  const requestClosedTotals = useCallback(() => {
+    if (DEMO_MODE || period || closedAllJobs || closedAllLoading) return;
+    if (!(siamrajPrimary && dbSource === 'sqlserver')) return;
+    setClosedAllLoading(true);
+    void fetchSiamrajClosedRequests(throughputFrom, throughputTo)
+      .then((rows) => setClosedAllJobs(rows))
+      .catch(() => setClosedAllJobs([]))
+      .finally(() => setClosedAllLoading(false));
+  }, [period, closedAllJobs, closedAllLoading, siamrajPrimary, dbSource, throughputFrom, throughputTo]);
+
+  /** ใบปิดที่เอาไปคิดยอดรายคน — ช่วงที่เลือกใช้ชุดของช่วง · ทั้งหมดใช้ชุดที่โหลด on-demand */
+  const closedJobsForOverview = useMemo(
+    () => (period ? closedJobs : (closedAllJobs ?? [])),
+    [period, closedJobs, closedAllJobs],
+  );
 
   /** ชุดข้อมูลเดียวกับหน้ารายการหน่วยงาน — ไม่กรองวันที่จนกว่าจะเลือกช่วงวันที่กรอก */
   const filterApi = useSiamrajUnitRequestFilters(jobs, siamrajPrimary, unitFilters, staffRosterRev);
@@ -198,6 +222,20 @@ const SupervisorDashboard: React.FC = () => {
       }),
     [closedJobs, siamrajPrimary, unitFilters],
   );
+
+  /**
+   * ยอด "ปิด" รายคนของโหมดทั้งหมด — คิดแยกเฉพาะแผงผู้รับผิดชอบ ไม่ยัดเข้า buildDashboardData
+   * เพราะชุดใบปิดชุดใหญ่จะไปขยับ KPI/cohort/กระทบยอด ที่โหมดนี้คิดจาก throughput อยู่แล้ว
+   */
+  const recruiterOverviewAllMode = useMemo(() => {
+    if (period || !closedAllJobs) return null;
+    const scopedAll = filterUnitRequests(closedAllJobs, siamrajPrimary, unitFilters, {
+      statusFilter: true,
+      ageDaysFilter: true,
+      urgencyFilter: true,
+    });
+    return buildRecruiterOverview(scopedJobs, new Date(), scopedAll);
+  }, [period, closedAllJobs, siamrajPrimary, unitFilters, scopedJobs]);
 
   const controlRecords = useMemo(() => {
     const merged = mergeRequestControlJobs(jobsWithoutAgeFilter, scopedClosedJobs);
@@ -321,8 +359,10 @@ const SupervisorDashboard: React.FC = () => {
     return {
       ...built,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
+      // โหมดทั้งหมด: ทับด้วยชุดที่รวมใบปิดที่โหลด on-demand แล้ว (ถ้ายังไม่โหลดก็ใช้ของเดิม)
+      recruiterOverview: recruiterOverviewAllMode ?? built.recruiterOverview,
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
@@ -515,19 +555,16 @@ const SupervisorDashboard: React.FC = () => {
       refreshing={refreshing}
       onRefresh={() => void refetch()}
       onExport={handleExport}
-      sortKey={sortKey}
-      sortDir={sortDir}
-      onSort={handleSort}
       onViewItem={handleView}
-      onAssignItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
       onCohortClick={DEMO_MODE ? undefined : handleCohortClick}
-      onSlaClick={DEMO_MODE ? undefined : handleSlaClick}
       onFilledBreakdownClick={DEMO_MODE ? undefined : handleFilledBreakdownClick}
       onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
       onSiteClick={DEMO_MODE ? undefined : handleSiteClick}
       closedTotalsAvailable={closedTotalsAvailable}
+      onRecruiterPanelOpen={requestClosedTotals}
+      closedTotalsLoading={closedAllLoading}
       onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}
     />
     <DetailListDialog
