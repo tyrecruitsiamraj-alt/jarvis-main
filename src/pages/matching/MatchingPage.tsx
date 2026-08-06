@@ -53,9 +53,12 @@ import {
   compareCandidatePriority,
   describePriorityScore,
   scoreCandidatePriority,
+  DEFAULT_PRIORITY_CONFIG,
   type CandidatePriorityScore,
+  type PriorityConfig,
   type PriorityVerdict,
 } from '@/lib/candidatePriority';
+import { fetchMatchPriorityConfig } from '@/lib/matchPriorityWeightsApi';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
@@ -506,13 +509,20 @@ function salaryVerdict(job: JobRequest, salary: number | null | undefined): Chec
  * ประสบการณ์ = สายงานที่เคยทำตรงกับใบขอไหม ใช้ tier จาก AI แมทสกิล (เขียว=ตรง เหลือง=ใกล้ แดง=คนละสาย)
  * เหล้า/บุหรี่ กับ คดี ยังไม่มีข้อมูลจากบอร์ด → unknown (ไม่ถูกนับ) จนกว่าจะมี field จริง
  */
-function boardCandidatePriority(job: JobRequest, m: BoardCandidateMatch): CandidatePriorityScore {
-  return scoreCandidatePriority({
-    age: ageVerdict(job, m.age) as PriorityVerdict,
-    area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
-    experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
-    salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
-  });
+function boardCandidatePriority(
+  job: JobRequest,
+  m: BoardCandidateMatch,
+  config: PriorityConfig,
+): CandidatePriorityScore {
+  return scoreCandidatePriority(
+    {
+      age: ageVerdict(job, m.age) as PriorityVerdict,
+      area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
+      experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
+      salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
+    },
+    config,
+  );
 }
 
 /** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
@@ -946,6 +956,18 @@ const MatchingPage: React.FC = () => {
   }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize, sortBy]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
+  /** น้ำหนักเรียงผู้สมัครที่ตั้งไว้ที่ Settings — โหลดพลาดใช้ค่าเริ่มต้นในโค้ด */
+  const [priorityConfig, setPriorityConfig] = useState<PriorityConfig>(DEFAULT_PRIORITY_CONFIG);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchMatchPriorityConfig().then((c) => {
+      if (!cancelled) setPriorityConfig(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
   const [boardErrorById, setBoardErrorById] = useState<Record<string, string>>({});
   // #2 (ยุบ) — หาผู้สมัคร iRecruit + เสนอในหน้า match เลย (ไม่ต้องไป pre-check)
@@ -2861,7 +2883,7 @@ const MatchingPage: React.FC = () => {
                     {boardMatchById[jobDetail.id].matches
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
-                      .map((m) => ({ m, priority: boardCandidatePriority(jobDetail, m) }))
+                      .map((m) => ({ m, priority: boardCandidatePriority(jobDetail, m, priorityConfig) }))
                       .sort((a, b) => compareCandidatePriority(a.priority, b.priority))
                       .map(({ m, priority }) => {
                         const meta = boardTierMeta(m.tier);
@@ -2988,7 +3010,7 @@ const MatchingPage: React.FC = () => {
                           <div className="mt-1 flex flex-wrap items-center gap-1">
                             {/* คะแนนที่ใช้เรียงลิสต์นี้ — ชี้เมาส์ดูที่มาของคะแนนรายเกณฑ์ */}
                             <span
-                              title={describePriorityScore(priority).join('\n')}
+                              title={describePriorityScore(priority, priorityConfig).join('\n')}
                               className={cn(
                                 'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums',
                                 priority.hardFails > 0

@@ -16,6 +16,8 @@ import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
 import { TONE, type ToneKey } from '@/lib/designTokens';
@@ -83,6 +85,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     drivingPositionGroup: positionPreset?.isDrivingGroup,
   });
   const isStaff = variant === 'staff';
+
+  // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(20);
+  const totalPages = getTotalPages(filters.filtered.length, pageSize);
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const visibleJobs = filters.filtered.slice(pageStart, pageStart + pageSize);
+
+  // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyJob, setApplyJob] = useState<JobRequest | null>(null);
@@ -294,8 +309,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 pb-10">
-          {filters.filtered.map((job) => (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visibleJobs.map((job) => (
             <Card
               key={job.id}
               onClick={isStaff ? () => setApplicantsJob(job) : undefined}
@@ -429,6 +444,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             </Card>
           ))}
         </div>
+
+        {/* แถบเลขหน้า — ตัวเดียวกับหน้าหน่วยงาน/ผู้สมัคร เลือกจำนวนต่อหน้าได้ (20/40/60/100) */}
+        {filters.filtered.length > 0 ? (
+          <div className="pb-10 pt-4">
+            <ListPaginationBar
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filters.filtered.length}
+              totalPages={totalPages}
+              pageFrom={pageStart + 1}
+              pageTo={pageStart + visibleJobs.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </div>
+        ) : null}
 
         {!isStaff ? (
           <div className="mx-auto max-w-md pb-14 pt-2 text-center">
