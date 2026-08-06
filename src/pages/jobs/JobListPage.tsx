@@ -47,8 +47,6 @@ import {
   extractJobSubtypeLabel,
   filterUnitRequestsByAnyJobSubtype,
   jobSubtypeFilterOptions,
-  filterUnitRequestsByAnyYear,
-  yearFilterOptions,
 } from '@/lib/siamrajUnitFilters';
 import {
   groupedUnitFilterOptions,
@@ -103,7 +101,6 @@ const JobListPage: React.FC = () => {
     unitFilter,
     departmentFilter: departmentFilterRaw,
     jobSubtypeFilter,
-    yearFilter,
     recruiterFilter,
     screenerFilter,
     oplFilter,
@@ -218,15 +215,8 @@ const JobListPage: React.FC = () => {
     [departmentScopedJobs, siamrajPrimary, jobSubtypeFilter],
   );
 
-  const yearOptions = useMemo(
-    () => (siamrajPrimary ? yearFilterOptions(subtypeScopedJobs) : []),
-    [subtypeScopedJobs, siamrajPrimary],
-  );
 
-  const scopedJobs = useMemo(
-    () => (siamrajPrimary ? filterUnitRequestsByAnyYear(subtypeScopedJobs, yearFilter) : subtypeScopedJobs),
-    [subtypeScopedJobs, siamrajPrimary, yearFilter],
-  );
+  const scopedJobs = subtypeScopedJobs;
 
   const unitOptions = useMemo(
     () => groupedUnitFilterOptions(scopedJobs),
@@ -351,11 +341,6 @@ const JobListPage: React.FC = () => {
     if (valid.length !== jobSubtypeFilter.length) updateListState({ jobSubtypeFilter: valid });
   }, [departmentFilter, jobSubtypeOptions, jobSubtypeFilter, updateListState]);
 
-  useEffect(() => {
-    if (yearFilter.length === 0) return;
-    const valid = yearFilter.filter((v) => yearOptions.some((o) => o.value === v));
-    if (valid.length !== yearFilter.length) updateListState({ yearFilter: valid });
-  }, [departmentFilter, jobSubtypeFilter, yearOptions, yearFilter, updateListState]);
 
   useEffect(() => {
     if (unitFilter.length === 0) return;
@@ -476,17 +461,6 @@ const JobListPage: React.FC = () => {
             />
           ) : null}
 
-          {siamrajPrimary ? (
-            <FilterMultiSelect
-              id="job-list-year"
-              label="ปี พ.ศ."
-              summaryNoun="ปี"
-              allLabel="ทุกปี"
-              values={yearFilter}
-              onChange={(v) => updateListState({ yearFilter: v })}
-              options={yearOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
-            />
-          ) : null}
 
           <FilterMultiSelect
             id="job-list-recruiter"
