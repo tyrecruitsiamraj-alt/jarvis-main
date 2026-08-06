@@ -14,7 +14,6 @@ import {
 } from './candidateSpecAnalyzer.js';
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
 import { saveBoardMatchResult } from './boardMatchStore.js';
-import { enqueueLumosReminderForBoardMatch } from './lumosDispatch.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -347,8 +346,5 @@ export async function matchBoardCandidatesForJob(
     fallback_pool_size: fallbackPoolSize,
   };
   await saveBoardMatchResult(jobId, result);
-  // match เสร็จ → ส่งคนที่แนะนำ (green/yellow ทั้งสองถัง) เข้าคิวโทรอัตโนมัติ (error-safe ภายใน)
-  // คนที่ auto ไม่ส่ง (red / ไม่มีเบอร์ / เพิ่มมาทีหลัง / Re Use) ดันเข้าคิวเองได้ที่ POST /api/lumos/dispatch
-  await enqueueLumosReminderForBoardMatch(job, result);
   return result;
 }

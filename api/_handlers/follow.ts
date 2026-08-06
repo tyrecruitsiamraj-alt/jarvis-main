@@ -16,7 +16,7 @@ import {
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { enqueueFollowReminder, cancelFollowReminder } from '../_lib/lumosDispatch.js';
+import { cancelFollowReminder } from '../_lib/lumosDispatch.js';
 import { toE164Thai } from '../_lib/lumosDispatch.js';
 
 const followTable = tableInAppSchema('follow_entries');
@@ -140,15 +140,6 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   );
   const created = rows[0];
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
-
-  await enqueueFollowReminder({
-    id: created.id,
-    recipient_name: name,
-    recipient_phone: phone,
-    topic,
-    note,
-    scheduled_at: when,
-  });
 
   await auditFromAuthed(req, {
     action: 'follow.create',
