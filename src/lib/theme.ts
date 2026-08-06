@@ -3,6 +3,8 @@
  * เก็บเป็นค่าเฉพาะเครื่องใน localStorage (ไม่ผูกบัญชี) และทำงานด้วยการสลับ class `dark`
  * บน <html> ตาม config ของ tailwind (darkMode: ["class"])
  */
+import { resyncBrandingForTheme } from '@/lib/brandingStorage';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 const THEME_KEY = 'jarvis:theme';
@@ -28,6 +30,9 @@ export function applyThemeMode(mode: ThemeMode): void {
   document.documentElement.classList.toggle('dark', dark);
   // บอกเบราว์เซอร์ให้ form control / scrollbar พื้นเมืองเข้าโหมดเดียวกัน
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  // สีพื้นผิวของแบรนด์เขียนเป็น inline บน <html> ซึ่งชนะกฎ .dark — ต้องคำนวณใหม่ทุกครั้งที่สลับธีม
+  // ไม่งั้นโหมดมืดจะยังใช้พื้น/หมึกของธีมสว่างค้างอยู่ (ดู brandingStorage.applyBrandSurfaceVars)
+  resyncBrandingForTheme();
 }
 
 export function setThemeMode(mode: ThemeMode): void {

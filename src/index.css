@@ -104,6 +104,16 @@
     --destructive: 3 85% 58%;
     --destructive-foreground: 0 0% 100%;
 
+    /* success/warning/info ของธีมมืด — เดิมไม่ได้ประกาศไว้เลย ค่าธีมสว่างจึงถูกใช้ต่อ
+       (เขียว/ส้มเข้มพออ่านได้บนพื้นขาว แต่บนพื้นมืดจะทึบเกิน) สว่างขึ้นและลดความอิ่มลงเล็กน้อย
+       ให้เข้าชุดกับ --primary/--destructive ของธีมมืด */
+    --success: 145 55% 52%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 92% 58%;
+    --warning-foreground: 240 6% 11%;
+    --info: 211 100% 62%;
+    --info-foreground: 0 0% 100%;
+
     --border: 240 5% 22%;
     --input: 240 5% 22%;
     --ring: 211 100% 55%;

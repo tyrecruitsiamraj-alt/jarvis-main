@@ -185,6 +185,47 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
     `linear-gradient(135deg, hsl(${c.primaryHsl}), hsl(${ph} ${ps} ${darkerL}%))`,
   );
 
+  applyBrandSurfaceVars(c);
+}
+
+/** ตัวแปรพื้นผิวที่ธีมมืดต้องเป็นคนกำหนดเอง — เขียนทับได้เฉพาะตอนธีมสว่าง */
+const SURFACE_VARS = [
+  '--background',
+  '--foreground',
+  '--card',
+  '--card-foreground',
+  '--popover',
+  '--popover-foreground',
+  '--gradient-card',
+  '--gradient-hero',
+] as const;
+
+/** ค่าแบรนด์ล่าสุดที่ใช้อยู่ — เก็บไว้เพื่อ sync ใหม่ตอนสลับธีมโดยไม่ต้องให้คนเรียกส่งมาอีก */
+let lastBrandingConfig: BrandingConfig | null = null;
+
+function isDarkTheme(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+}
+
+/**
+ * สีพื้นผิวของแบรนด์ — เขียนเป็น inline style บน <html> ซึ่ง "ชนะ" กฎ .dark ใน index.css เสมอ
+ *
+ * ก่อนหน้านี้เขียนทับทุกครั้งไม่ดูธีม ผลคือโหมดมืดยังได้หมึกเข้มของธีมสว่าง (--foreground)
+ * ตัวหนังสือจึงจมหายบนพื้นเข้ม (ช่องกรองทุกหน้าอ่านไม่ออก) — ตอนนี้ถ้าอยู่โหมดมืด
+ * จะถอด inline ออกให้ .dark ทำงานตามปกติ · สีแบรนด์ที่เป็นตัวตน (primary/accent/ring)
+ * ยังคุมทั้งสองธีมเหมือนเดิม
+ */
+export function applyBrandSurfaceVars(c: BrandingConfig): void {
+  if (typeof document === 'undefined') return;
+  lastBrandingConfig = c;
+  const root = document.documentElement;
+
+  if (isDarkTheme()) {
+    for (const v of SURFACE_VARS) root.style.removeProperty(v);
+    root.removeAttribute('data-page-bg');
+    return;
+  }
+
   root.style.setProperty('--background', c.backgroundHsl);
   root.style.setProperty('--foreground', c.foregroundHsl);
   root.style.setProperty('--card', c.cardHsl);
@@ -209,9 +250,17 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
   }
 }
 
-/** พื้นหลังแบบ gradient สำหรับ wrapper หลัก (AppLayout / Login) */
+/** เรียกหลังสลับธีม (src/lib/theme.ts) — ธีมเปลี่ยนแล้วต้องคำนวณพื้นผิวใหม่ */
+export function resyncBrandingForTheme(): void {
+  if (lastBrandingConfig) applyBrandSurfaceVars(lastBrandingConfig);
+}
+
+/**
+ * พื้นหลังแบบ gradient สำหรับ wrapper หลัก (AppLayout / Login)
+ * โหมดมืดไม่ใช้ gradient ของแบรนด์ (เป็นสีอ่อน) — ปล่อยให้พื้นของธีมมืดทำงาน
+ */
 export function getAppShellBackgroundStyle(c: BrandingConfig): CSSProperties | undefined {
-  if (c.pageBackgroundMode !== 'gradient') return undefined;
+  if (c.pageBackgroundMode !== 'gradient' || isDarkTheme()) return undefined;
   return {
     background: `linear-gradient(135deg, hsl(${c.gradientFromHsl}), hsl(${c.gradientToHsl}))`,
     minHeight: '100vh',
