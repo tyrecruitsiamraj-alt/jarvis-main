@@ -127,3 +127,16 @@ export function isPgForeignKeyViolation(e: unknown): boolean {
   );
 }
 
+/**
+ * ตารางยังไม่มี (42P01 undefined_table) — เกิดตอนโค้ดใหม่ขึ้นก่อน migration รัน
+ * ใช้ตอบข้อความที่คนอ่านรู้เรื่องแทนจะปล่อย error ดิบของ Postgres ออกไปหน้าเว็บ
+ */
+export function isPgUndefinedTable(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    (e as { code: string }).code === '42P01'
+  );
+}
+

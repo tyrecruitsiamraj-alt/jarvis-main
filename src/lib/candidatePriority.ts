@@ -40,10 +40,13 @@ export const DEFAULT_PRIORITY_CONFIG: PriorityConfig = {
   hard: ['age', 'area'],
 };
 
-/** เกณฑ์ที่ยังไม่มีข้อมูลในระบบ — โชว์ในหน้าตั้งค่า กันตั้งน้ำหนักแล้วงงว่าทำไมไม่ขยับ */
+/**
+ * หมายเหตุแหล่งข้อมูลต่อเกณฑ์ — โชว์ในหน้าตั้งค่า กันตั้งน้ำหนักแล้วงงว่าทำไมไม่ขยับ
+ * สองเกณฑ์นี้ไม่มีในบอร์ด iRecruit ต้องให้เจ้าหน้าที่คัดกรองบันทึกเองที่หน้า Matching
+ */
 export const PRIORITY_DATA_NOTE: Partial<Record<PriorityCriterion, string>> = {
-  lifestyle: 'ยังไม่มีข้อมูลจากบอร์ด iRecruit — ตั้งรอไว้ได้ จะมีผลเมื่อมีข้อมูล',
-  criminalRecord: 'ยังไม่มีการเก็บข้อมูลนี้ในระบบ — ตั้งรอไว้ได้ จะมีผลเมื่อมีข้อมูล',
+  lifestyle: 'บอร์ด iRecruit ไม่มีข้อมูลนี้ — มีผลเมื่อเจ้าหน้าที่บันทึกผลคัดกรองรายคน',
+  criminalRecord: 'บอร์ด iRecruit ไม่มีข้อมูลนี้ — มีผลเมื่อเจ้าหน้าที่บันทึกผลคัดกรองรายคน',
 };
 
 /** กันค่าจาก API/ผู้ใช้เพี้ยน — น้ำหนัก 0–100 · ถ้าเป็นศูนย์หมดถือว่าไม่ตั้ง ใช้ค่าเริ่มต้น */
@@ -76,6 +79,73 @@ export const PRIORITY_LABELS: Record<PriorityCriterion, string> = {
   criminalRecord: 'ประวัติคดี',
   salary: 'รายได้',
 };
+
+// ── ผลคัดกรองที่ Jarvis เก็บเอง → verdict ─────────────────────────────────────
+
+/** ยังไม่ได้ถาม = unknown (ต่างจาก 'no' ที่ยืนยันแล้วว่าไม่) */
+export type ScreeningAnswer = 'yes' | 'no' | 'unknown';
+
+export type CandidateScreening = {
+  drinking: ScreeningAnswer;
+  smoking: ScreeningAnswer;
+  criminalRecord: ScreeningAnswer;
+};
+
+export function isScreeningAnswer(v: unknown): v is ScreeningAnswer {
+  return v === 'yes' || v === 'no' || v === 'unknown';
+}
+
+export const EMPTY_SCREENING: CandidateScreening = {
+  drinking: 'unknown',
+  smoking: 'unknown',
+  criminalRecord: 'unknown',
+};
+
+/**
+ * เหล้า/บุหรี่ → verdict — **นิยามอยู่ที่นี่ที่เดียว ถ้าเจ้าของอยากปรับให้แก้ฟังก์ชันนี้**
+ *
+ *   ไม่ดื่ม + ไม่สูบ        → pass
+ *   ดื่มหรือสูบ อย่างใดอย่างหนึ่ง → warn
+ *   ทั้งดื่มและสูบ            → fail
+ *   ไม่รู้ทั้งคู่              → unknown (ไม่ถูกนับ)
+ *
+ * เกณฑ์นี้เป็น flexible ตามที่เจ้าของกำหนด — fail แค่ลดอันดับ **ไม่ตัดใครออกจากลิสต์**
+ * (จะตัดออกได้ต้องใส่ 'lifestyle' ใน config.hard ซึ่งค่าเริ่มต้นไม่ได้ใส่)
+ * ถ้ารู้ข้างเดียวก็ตัดสินจากข้างที่รู้ — ไม่ต้องรอให้ครบทั้งสองข้อ
+ */
+export function lifestyleVerdict(screening: Partial<CandidateScreening>): PriorityVerdict {
+  const known = [screening.drinking, screening.smoking].filter(
+    (v): v is 'yes' | 'no' => v === 'yes' || v === 'no',
+  );
+  if (known.length === 0) return 'unknown';
+  const yes = known.filter((v) => v === 'yes').length;
+  if (yes === 0) return 'pass';
+  return yes >= 2 ? 'fail' : 'warn';
+}
+
+/**
+ * ประวัติคดี → verdict — ไม่มีคดี = pass · มีคดี = fail · ยังไม่ได้ถาม = unknown
+ *
+ * เป็น flexible เหมือนกัน (fail = ลดอันดับ ไม่ตัดออก) เพราะเจ้าของบอกว่า "คุยกันได้"
+ * รายละเอียดคดีที่เจ้าหน้าที่บันทึกไว้ (criminal_note) **ไม่ถูกเอามาคิดคะแนนอัตโนมัติ**
+ * — ให้คนอ่านแล้วตัดสินเอง ไม่ให้โค้ดเดาความหนักเบาของคดี
+ */
+export function criminalRecordVerdict(screening: Partial<CandidateScreening>): PriorityVerdict {
+  if (screening.criminalRecord === 'no') return 'pass';
+  if (screening.criminalRecord === 'yes') return 'fail';
+  return 'unknown';
+}
+
+/** รวมผลคัดกรองเป็นสองเกณฑ์ที่เอาไปต่อกับ scoreCandidatePriority ได้ตรง ๆ */
+export function screeningVerdicts(
+  screening: Partial<CandidateScreening> | null | undefined,
+): Pick<PriorityInput, 'lifestyle' | 'criminalRecord'> {
+  if (!screening) return {};
+  return {
+    lifestyle: lifestyleVerdict(screening),
+    criminalRecord: criminalRecordVerdict(screening),
+  };
+}
 
 export type PriorityInput = Partial<Record<PriorityCriterion, PriorityVerdict>>;
 

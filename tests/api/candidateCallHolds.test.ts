@@ -1,0 +1,324 @@
+// @vitest-environment node
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../api/_lib/postgres.js', () => ({
+  dbQuery: vi.fn(),
+  isPgUniqueViolation: (e: unknown) =>
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '23505',
+  isPgUndefinedTable: (e: unknown) =>
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42P01',
+}));
+vi.mock('../../api/_lib/schema.js', () => ({ tableInAppSchema: (n: string) => n }));
+
+import { dbQuery } from '../../api/_lib/postgres.js';
+import {
+  acquireCallHold,
+  callHoldKey,
+  getActiveCallHoldsByPhones,
+  isCallResultOutcome,
+  recordCallResult,
+  releaseAllCallHoldsForUser,
+  releaseCallHold,
+  tallyCallResultsSince,
+  transferCallHold,
+  CALL_RESULT_OUTCOMES,
+} from '../../api/_lib/candidateCallHolds.js';
+import { toE164Thai } from '../../api/_lib/thaiPhone.js';
+
+const HOLD_ID = '33333333-3333-4333-8333-333333333333';
+
+function row(over: Record<string, unknown> = {}) {
+  return {
+    id: HOLD_ID,
+    phone_e164: '+66812345678',
+    source: 'board',
+    candidate_ref: '1834',
+    candidate_name: 'ฉัตรชัย สุคันธวณิช',
+    job_id: 'siamraj-sql:DS5812003',
+    request_no: 'DS5812003',
+    held_by_user_id: 'user-1',
+    held_by_name: 'ตั้ม',
+    held_at: '2026-08-06T07:02:00.000Z',
+    expires_at: '2026-08-07T07:02:00.000Z',
+    released_at: null,
+    release_reason: null,
+    result_outcome: null,
+    result_scope: null,
+    result_note: null,
+    ...over,
+  };
+}
+
+const uniqueViolation = Object.assign(new Error('duplicate key'), { code: '23505' });
+const undefinedTable = Object.assign(new Error('relation does not exist'), { code: '42P01' });
+
+function sqlOf(i: number) {
+  return String(vi.mocked(dbQuery).mock.calls[i]?.[0] ?? '');
+}
+function paramsOf(i: number) {
+  return (vi.mocked(dbQuery).mock.calls[i]?.[1] ?? []) as unknown[];
+}
+
+describe('กุญแจล็อกคือเบอร์ ไม่ใช่ ref', () => {
+  it('callHoldKey ใช้สูตรเดียวกับที่ใส่ลง payload ของ Lumos', () => {
+    // ล็อกกับ payload ต้องแปลงเบอร์เหมือนกันเป๊ะ ไม่งั้นเทียบไม่ตรง = โทรทับกันเงียบ ๆ
+    for (const raw of ['0812345678', '081-234-5678', '66812345678', '+66812345678']) {
+      expect(callHoldKey(raw)).toBe(toE164Thai(raw));
+    }
+    expect(callHoldKey('0812345678')).toBe('+66812345678');
+  });
+
+  it('เบอร์ที่แปลงไม่ได้ = ล็อกไม่ได้', () => {
+    expect(callHoldKey('123')).toBeNull();
+    expect(callHoldKey('')).toBeNull();
+    expect(callHoldKey(null)).toBeNull();
+  });
+});
+
+describe('จับล็อก — คนแรกชนะ', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+
+  it('ว่างอยู่ = จับได้', async () => {
+    // call 0 = กวาดหมดอายุ · call 1 = insert
+    vi.mocked(dbQuery).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row()] });
+
+    const out = await acquireCallHold({
+      phone: '081-234-5678',
+      source: 'board',
+      candidateRef: '1834',
+      jobId: 'siamraj-sql:DS5812003',
+      userId: 'user-1',
+      userName: 'ตั้ม',
+    });
+
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.hold.phone).toBe('+66812345678');
+    // ต้อง insert ด้วยเบอร์ที่ normalize แล้ว ไม่ใช่เบอร์ดิบ
+    expect(paramsOf(1)[0]).toBe('+66812345678');
+  });
+
+  it('มีคนถืออยู่ = unique violation → คืนว่าใครถือ ไม่ใช่โยน error', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [] })                       // กวาด
+      .mockImplementationOnce(() => { throw uniqueViolation; })   // insert ชน
+      .mockResolvedValueOnce({ rows: [row({ held_by_name: 'หนิง' })] }); // อ่านว่าใครถือ
+
+    const out = await acquireCallHold({
+      phone: '0812345678', source: 'board', candidateRef: '1834',
+      jobId: 'siamraj-sql:DS5812003', userId: 'user-2',
+    });
+
+    expect(out.ok).toBe(false);
+    if (!out.ok && out.reason === 'taken') expect(out.hold.heldByName).toBe('หนิง');
+  });
+
+  it('ไม่มีเบอร์ = ตอบ no_phone ไม่แตะ DB', async () => {
+    const out = await acquireCallHold({
+      phone: '123', source: 'board', candidateRef: '1834', jobId: 'j1',
+    });
+    expect(out).toEqual({ ok: false, reason: 'no_phone' });
+    expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();
+  });
+
+  it('กวาดล็อกหมดอายุก่อนจับทุกครั้ง — หมดอายุแล้วถือว่าว่าง', async () => {
+    vi.mocked(dbQuery).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [row()] });
+    await acquireCallHold({ phone: '0812345678', source: 'board', candidateRef: '1', jobId: 'j1' });
+    expect(sqlOf(0)).toContain("release_reason = 'expired'");
+    expect(sqlOf(0)).toContain('expires_at <= now()');
+  });
+
+  it('ไม่ระบุใบขอ = โยน error (ต้องรู้ว่าโทรเรื่องใบไหน)', async () => {
+    await expect(
+      acquireCallHold({ phone: '0812345678', source: 'board', candidateRef: '1', jobId: '  ' }),
+    ).rejects.toThrow('ต้องระบุใบขอ');
+  });
+});
+
+describe('บันทึกผลโทร', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+
+  it('ผลโทรใช้ศัพท์ชุดเดียวกับ Lumos outcome — funnel นับรวมกันได้', () => {
+    // ถ้าเพิ่มค่าใหม่ต้องเป็นค่าที่ Lumos ส่งกลับได้จริงด้วย
+    expect([...CALL_RESULT_OUTCOMES]).toEqual([
+      'confirmed', 'declined', 'reschedule_requested', 'no_answer', 'wrong_person',
+    ]);
+    expect(isCallResultOutcome('confirmed')).toBe(true);
+    expect(isCallResultOutcome('สนใจ')).toBe(false);
+  });
+
+  it('บันทึกผลแล้วปล่อยล็อกในคำสั่งเดียว (ผลจบ = ไม่ต้องถือต่อ)', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row({ released_at: 'x', release_reason: 'result', result_outcome: 'confirmed' })] });
+
+    await recordCallResult({ holdId: HOLD_ID, outcome: 'confirmed' });
+
+    const sql = sqlOf(0);
+    expect(sql).toContain('released_at    = now()');
+    expect(sql).toContain("release_reason = 'result'");
+    // อัปเดตได้เฉพาะล็อกที่ยังไม่ปล่อย — กันบันทึกผลทับซ้อน
+    expect(sql).toContain('released_at is null');
+  });
+
+  it('"ไม่สนใจ" ต้องแยก 2 แบบ: ไม่เอางานนี้ vs ไม่หางานแล้ว', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+
+    await recordCallResult({ holdId: HOLD_ID, outcome: 'declined', scope: 'job' });
+    expect(paramsOf(0)[2]).toBe('job');
+
+    vi.mocked(dbQuery).mockReset();
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+    await recordCallResult({ holdId: HOLD_ID, outcome: 'declined', scope: 'all' });
+    expect(paramsOf(0)[2]).toBe('all');
+  });
+
+  it('ปฏิเสธแบบไม่ระบุ scope = ถือเป็น "job" (ปลอดภัยกว่า ไม่ตัดคนออกจากระบบเอง)', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+    await recordCallResult({ holdId: HOLD_ID, outcome: 'declined' });
+    expect(paramsOf(0)[2]).toBe('job');
+  });
+
+  it('ผลที่ไม่ใช่ปฏิเสธไม่มี scope', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+    await recordCallResult({ holdId: HOLD_ID, outcome: 'no_answer' });
+    expect(paramsOf(0)[2]).toBeNull();
+  });
+});
+
+describe('คืนงาน', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+
+  it('คืนได้ 3 เหตุผล และเฉพาะล็อกที่ยังถืออยู่', async () => {
+    for (const reason of ['manual', 'transferred', 'to_ai'] as const) {
+      vi.mocked(dbQuery).mockReset();
+      vi.mocked(dbQuery).mockResolvedValue({ rows: [row({ released_at: 'x', release_reason: reason })] });
+      const out = await releaseCallHold(HOLD_ID, reason);
+      expect(out?.releaseReason).toBe(reason);
+      expect(paramsOf(0)).toEqual([HOLD_ID, reason]);
+      expect(sqlOf(0)).toContain('released_at is null');
+    }
+  });
+});
+
+describe('ทนตารางยังไม่ถูก migrate', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+
+  it('อ่านล็อกไม่ได้ = คืน map ว่าง ไม่ทำให้หน้า Matching ล่ม', async () => {
+    // ยิง DB 2 ครั้ง (กวาดหมดอายุ + อ่านล็อก) — ต้องทนทั้งสองครั้ง
+    vi.mocked(dbQuery)
+      .mockImplementationOnce(() => { throw undefinedTable; })
+      .mockImplementationOnce(() => { throw undefinedTable; });
+    let threw = false;
+    let map = new Map<string, unknown>();
+    try {
+      map = await getActiveCallHoldsByPhones(['0812345678']);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(map.size).toBe(0);
+  });
+
+  it('ไม่มีเบอร์ให้ถาม = ไม่ยิง DB', async () => {
+    await expect(getActiveCallHoldsByPhones([null, '', '123'])).resolves.toEqual(new Map());
+    expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();
+  });
+});
+
+describe('บอร์ดหัวหน้า — สรุปยอด / โอนงาน / เทกอง', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+
+  it('สรุปยอดวันนี้: แยก "ไม่เอางานนี้" กับ "ไม่หางานแล้ว" ออกจากกัน', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({
+      rows: [
+        { result_outcome: 'confirmed', result_scope: null, n: '2' },
+        { result_outcome: 'declined', result_scope: 'job', n: '3' },
+        { result_outcome: 'declined', result_scope: 'all', n: '1' },
+        { result_outcome: 'no_answer', result_scope: null, n: '4' },
+      ],
+    });
+
+    const t = await tallyCallResultsSince('2026-08-06');
+
+    expect(t.byOutcome.confirmed).toBe(2);
+    expect(t.byOutcome.declined).toBe(4);
+    expect(t.declinedByScope).toEqual({ job: 3, all: 1 });
+    expect(t.byOutcome.no_answer).toBe(4);
+    expect(t.total).toBe(10);
+    // ค่าที่ไม่มีต้องเป็น 0 ไม่ใช่ undefined (หน้าเว็บเอาไปบวกตรง ๆ)
+    expect(t.byOutcome.wrong_person).toBe(0);
+  });
+
+  it('สรุปยอด: ส่ง userId มา = กรองเฉพาะของคนนั้น', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] });
+    await tallyCallResultsSince('2026-08-06', 'user-1');
+    expect(sqlOf(0)).toContain('held_by_user_id');
+    expect(paramsOf(0)).toEqual(['2026-08-06T00:00:00+07:00', 'user-1']);
+  });
+
+  it('สรุปยอด: ค่าผลแปลก ๆ ใน DB ถูกข้าม ไม่ทำให้ยอดเพี้ยน', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({
+      rows: [
+        { result_outcome: 'confirmed', result_scope: null, n: '1' },
+        { result_outcome: 'ไม่รู้จัก', result_scope: null, n: '9' },
+      ],
+    });
+    const t = await tallyCallResultsSince('2026-08-06');
+    expect(t.total).toBe(1);
+  });
+
+  it('โอนงาน: ปล่อยแถวเดิมเป็น transferred แล้วสร้างแถวใหม่ให้คนรับ นับเวลาใหม่ 1 วัน', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [row()] })                       // getCallHoldById
+      .mockResolvedValueOnce({ rows: [] })                            // update ปล่อยแถวเดิม
+      .mockResolvedValueOnce({ rows: [row({ held_by_name: 'หนิง' })] }); // insert แถวใหม่
+
+    const moved = await transferCallHold({ holdId: HOLD_ID, toUserId: 'user-2', toName: 'หนิง' });
+
+    expect(sqlOf(1)).toContain("release_reason = 'transferred'");
+    expect(sqlOf(2)).toContain('insert into');
+    expect(sqlOf(2)).toContain("now() + interval '1 day'");
+    // เบอร์/ผู้สมัคร/ใบขอ ต้องยกมาจากแถวเดิมทั้งชุด
+    expect(paramsOf(2).slice(0, 6)).toEqual([
+      '+66812345678',
+      'board',
+      '1834',
+      'ฉัตรชัย สุคันธวณิช',
+      'siamraj-sql:DS5812003',
+      'DS5812003',
+    ]);
+    expect(paramsOf(2)[6]).toBe('user-2');
+    expect(moved?.heldByName).toBe('หนิง');
+  });
+
+  it('โอนงาน: ล็อกที่ปล่อยไปแล้ว โอนไม่ได้ (ไม่แตะ DB ต่อ)', async () => {
+    vi.mocked(dbQuery).mockResolvedValueOnce({
+      rows: [row({ released_at: '2026-08-06T09:00:00.000Z', release_reason: 'result' })],
+    });
+    await expect(
+      transferCallHold({ holdId: HOLD_ID, toUserId: 'user-2', toName: 'หนิง' }),
+    ).resolves.toBeNull();
+    expect(vi.mocked(dbQuery)).toHaveBeenCalledTimes(1);
+  });
+
+  it('เทกอง: ปล่อยทุกล็อกของคนนั้น พร้อมเหตุผลที่เลือก', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] });
+
+    const n = await releaseAllCallHoldsForUser('user-1', 'to_ai');
+
+    expect(n).toBe(3);
+    expect(sqlOf(0)).toContain('held_by_user_id = $1');
+    expect(sqlOf(0)).toContain('released_at is null');
+    expect(paramsOf(0)).toEqual(['user-1', 'to_ai']);
+  });
+
+  it('ตารางยังไม่ migrate: สรุปยอดเป็นศูนย์ · เทกองเป็น 0 ไม่โยน error', async () => {
+    vi.mocked(dbQuery).mockImplementationOnce(() => {
+      throw undefinedTable;
+    });
+    await expect(tallyCallResultsSince('2026-08-06')).resolves.toMatchObject({ total: 0 });
+
+    vi.mocked(dbQuery).mockImplementationOnce(() => {
+      throw undefinedTable;
+    });
+    await expect(releaseAllCallHoldsForUser('user-1', 'manual')).resolves.toBe(0);
+  });
+});

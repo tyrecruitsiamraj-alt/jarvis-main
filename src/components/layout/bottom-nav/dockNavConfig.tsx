@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, PhoneCall, Headphones } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -13,12 +13,14 @@ export type DockNavItem = {
   functionId?: AppFunctionId;
 };
 
-/** 8 เมนูหลัก — ลำดับต้องตรงกับ UI bottom dock */
+/** เมนูหลัก — ลำดับต้องตรงกับ UI bottom dock */
 export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/', label: 'หน้าหลัก', icon: Home },
   { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
   { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
+  { path: '/matching/my-calls', label: 'โทรของฉัน', icon: PhoneCall, functionId: 'candidates_read' },
+  { path: '/matching/call-team', label: 'ภาระโทรทีม', icon: Headphones, minimumRole: 'supervisor', functionId: 'candidates_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },

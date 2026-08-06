@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -44,21 +44,43 @@ import {
   proposalStatusLabel,
   proposalStatusChip,
   ProposalConflictError,
+  PROPOSAL_STATUS_TONE,
   type ProposalStatus,
   type ProposalConflictInfo,
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
-import { TONE, type ToneKey } from '@/lib/designTokens';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import {
   compareCandidatePriority,
   describePriorityScore,
   scoreCandidatePriority,
+  screeningVerdicts,
   DEFAULT_PRIORITY_CONFIG,
   type CandidatePriorityScore,
+  type CandidateScreening,
   type PriorityConfig,
   type PriorityVerdict,
+  type ScreeningAnswer,
 } from '@/lib/candidatePriority';
 import { fetchMatchPriorityConfig } from '@/lib/matchPriorityWeightsApi';
+import {
+  fetchCandidateScreening,
+  saveCandidateScreening,
+  type CandidateScreeningRecord,
+} from '@/lib/candidateScreeningApi';
+import {
+  acquireCallHold,
+  fetchCallHoldsByPhones,
+  fetchMyCallHolds,
+  recordCallResult,
+  releaseCallHold,
+  CALL_RESULT_DESTINATION,
+  CALL_RESULT_LABEL,
+  type CallHold,
+  type CallHoldSource,
+  type CallResultOutcome,
+  type CallResultScope,
+} from '@/lib/callHoldsApi';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
@@ -70,6 +92,7 @@ import {
 import {
   getActiveJobPostingForJob,
   createJobPostingRequest,
+  jobPostingStatusChip,
   jobPostingStatusLabel,
   type JobPostingRequest,
   type JobPostingRequestType,
@@ -253,21 +276,25 @@ function nearestBranchForBoardCandidate(
   );
 }
 
+/**
+ * ความมั่นใจว่าผู้สมัครอยู่ใกล้สาขาไหน — สีมาจาก token กลาง (designTokens) ไม่เขียนสีซ้ำที่หน้านี้
+ * ฟันธงได้ = success · ยังต้องเช็คเอง = warn · รู้แค่จังหวัด = info (ยังรอได้) · ไม่รู้เลย = neutral
+ */
 function boardBranchProximityMeta(assignment: NearestBranchAssignment | null): { label: string; cls: string } {
   if (!assignment || assignment.proximity_rank === 4) {
-    return { label: 'ยังระบุสาขาใกล้สุดไม่ได้', cls: 'border-slate-200 bg-white text-slate-500' };
+    return { label: 'ยังระบุสาขาใกล้สุดไม่ได้', cls: cn(TONE.neutral.soft, DASH.muted) };
   }
   const branchName = assignment.branch.branch_name_clean;
   if (assignment.proximity_rank === 0) {
-    return { label: `ใกล้สาขา ${branchName} · เขตตรง`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' };
+    return { label: `ใกล้สาขา ${branchName} · เขตตรง`, cls: cn(TONE.success.soft, TONE.success.value) };
   }
   if (assignment.proximity_rank === 1) {
-    return { label: `น่าจะใกล้สาขา ${branchName}`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' };
+    return { label: `น่าจะใกล้สาขา ${branchName}`, cls: cn(TONE.success.soft, TONE.success.value) };
   }
   if (assignment.proximity_rank === 2) {
-    return { label: 'จังหวัดเดียวกับจุดงาน · ยังฟันธงสาขาไม่ได้', cls: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300' };
+    return { label: 'จังหวัดเดียวกับจุดงาน · ยังฟันธงสาขาไม่ได้', cls: cn(TONE.info.soft, TONE.info.value) };
   }
-  return { label: 'อยู่ กทม./ปริมณฑล · ยังฟันธงสาขาไม่ได้', cls: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300' };
+  return { label: 'อยู่ กทม./ปริมณฑล · ยังฟันธงสาขาไม่ได้', cls: cn(TONE.warn.soft, TONE.warn.value) };
 }
 
 function buildIrecruitDisplayRows(
@@ -376,7 +403,29 @@ function proposalStatusClass(status: ProposalStatus): string {
 }
 
 const CANDIDATE_ACTION_BUTTON_CLASS =
-  'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
+  'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
+
+/**
+ * ปุ่มเปลี่ยนสถานะผู้สมัคร — สีมาจากโทนของสถานะที่แหล่งกลาง (PROPOSAL_STATUS_TONE)
+ * ไม่ประกาศสีสถานะซ้ำในหน้านี้: ติดต่อ=น้ำเงิน · จอง=ม่วง · ลงงาน=เขียว · ไม่ผ่าน=แดง
+ * "ลงงานแล้ว" เป็นการปิดงานจริงจึงใช้ solid (บล็อกสีอิ่ม) ตัวเดียวในกลุ่ม ที่เหลือเป็นปุ่มพื้นจาง
+ */
+function proposalActionButtonClass(status: ProposalStatus): string {
+  const tone = TONE[PROPOSAL_STATUS_TONE[status]];
+  if (status === 'placed') return cn(CANDIDATE_ACTION_BUTTON_CLASS, 'border-transparent', tone.solid);
+  return cn(CANDIDATE_ACTION_BUTTON_CLASS, tone.soft, tone.softHover, tone.value);
+}
+
+/**
+ * ปุ่มกลม ๆ ของตัวกรอง/การเรียง/จำนวนต่อหน้า — ที่เลือกอยู่ = โทน primary (กำลังดำเนินการ)
+ * ที่ไม่ได้เลือก = พื้นกลาง แล้ว hover เป็น primary เพื่อบอกว่ากดได้
+ */
+const FILTER_PILL_ACTIVE_CLASS = cn('border-blue-300 dark:border-blue-700', TONE.primary.solid);
+const FILTER_PILL_IDLE_CLASS = cn(
+  'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+  'hover:border-blue-200 dark:hover:border-blue-800',
+  TONE.primary.softHover,
+);
 
 function proposalRefFromItem(item: CandidateProposal): ProposedRef {
   return {
@@ -444,23 +493,23 @@ function AiEvaluationStatus({ source }: { source: 'board' | 'irecruit' }) {
       aria-live="polite"
       className={cn(
         'rounded-xl border px-3 py-3 shadow-sm',
-        isBoard ? 'border-sky-200 bg-sky-50/80 dark:border-sky-800 dark:bg-sky-950/50' : 'border-blue-200 bg-blue-50/80 dark:border-blue-800 dark:bg-blue-950/50',
+        isBoard ? TONE.info.soft : TONE.primary.soft,
       )}
     >
       <div className="flex items-start gap-2.5">
         <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-300" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-blue-700 dark:text-blue-300">
+            <p className={cn('text-xs font-semibold', TONE.primary.num)}>กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
+            <span className={cn('inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 dark:bg-slate-800 text-[10px] font-semibold tabular-nums', TONE.primary.value)}>
               <Clock3 className="h-3 w-3" /> {formatElapsed(elapsedSeconds)}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-blue-800 dark:text-blue-200">{stage}</p>
+          <p className={cn('mt-1 text-[11px]', TONE.primary.num)}>{stage}</p>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
             <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-400 via-sky-500 to-blue-400" />
           </div>
-          <p className="mt-1.5 text-[10px] text-blue-700 dark:text-blue-300">{estimate} · ไม่ต้องกดซ้ำ สามารถรอหน้านี้ได้</p>
+          <p className={cn('mt-1.5 text-[10px]', TONE.primary.value)}>{estimate} · ไม่ต้องกดซ้ำ สามารถรอหน้านี้ได้</p>
         </div>
       </div>
     </div>
@@ -505,14 +554,18 @@ function salaryVerdict(job: JobRequest, salary: number | null | undefined): Chec
 }
 
 /**
- * คะแนนตามลำดับความสำคัญของเจ้าของ (อายุ → ที่อยู่ → ประสบการณ์ → รายได้ · ดู lib/candidatePriority)
+ * คะแนนตามลำดับความสำคัญของเจ้าของ (อายุ → ที่อยู่ → ประสบการณ์ → เหล้า/บุหรี่ → คดี → รายได้)
+ * ดู lib/candidatePriority — น้ำหนักตั้งได้ที่ Settings
+ *
  * ประสบการณ์ = สายงานที่เคยทำตรงกับใบขอไหม ใช้ tier จาก AI แมทสกิล (เขียว=ตรง เหลือง=ใกล้ แดง=คนละสาย)
- * เหล้า/บุหรี่ กับ คดี ยังไม่มีข้อมูลจากบอร์ด → unknown (ไม่ถูกนับ) จนกว่าจะมี field จริง
+ * เหล้า/บุหรี่ กับ คดี ไม่มีในบอร์ด iRecruit — มาจากผลคัดกรองที่เจ้าหน้าที่บันทึกไว้ฝั่ง Jarvis
+ * (ยังไม่บันทึก = unknown ซึ่งไม่ถูกนับทั้งตัวตั้งและตัวหาร คนที่ยังไม่ถูกคัดกรองจึงไม่เสียเปรียบ)
  */
 function boardCandidatePriority(
   job: JobRequest,
   m: BoardCandidateMatch,
   config: PriorityConfig,
+  screening?: CandidateScreening | null,
 ): CandidatePriorityScore {
   return scoreCandidatePriority(
     {
@@ -520,6 +573,7 @@ function boardCandidatePriority(
       area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
       experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
       salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
+      ...screeningVerdicts(screening),
     },
     config,
   );
@@ -550,6 +604,7 @@ function CandidateChecklist({
   areaParts,
   salary,
   licenses,
+  screening,
 }: {
   job: JobRequest;
   tier: MatchTier;
@@ -558,6 +613,8 @@ function CandidateChecklist({
   areaParts: Array<string | null | undefined>;
   salary?: number | null;
   licenses?: string[];
+  /** ผลคัดกรองที่เจ้าหน้าที่บันทึกไว้ — ไม่มี = ยังไม่ถูกถาม ชิปจะไม่โชว์ */
+  screening?: CandidateScreening | null;
 }) {
   const position: CheckVerdict = tier === 'green' ? 'pass' : tier === 'yellow' ? 'warn' : 'fail';
   const requiresLicense = Boolean(job.vehicle_required && normText(job.vehicle_required) !== 'ไม่ระบุ');
@@ -568,13 +625,22 @@ function CandidateChecklist({
         ? 'pass'
         : 'warn'
     : 'unknown';
-  // ลำดับชิปไล่ตามลำดับความสำคัญที่เจ้าของกำหนด: อายุ → ที่อยู่ → ประสบการณ์ (ตำแหน่ง) → รายได้
+  // ลำดับชิปไล่ตามลำดับความสำคัญที่เจ้าของกำหนด:
+  //   อายุ → ที่อยู่ → ประสบการณ์ (ตำแหน่ง) → เหล้า/บุหรี่ → คดี → รายได้
   // เพศ/ใบขับขี่เป็นเกณฑ์ของใบขอ อยู่ท้ายรายการ
+  // สองชิปคัดกรองโชว์เฉพาะเมื่อมีคนบันทึกไว้แล้ว — ยังไม่ถาม = ไม่โชว์ ไม่ใช่โชว์เทา
+  const screened = screening ? screeningVerdicts(screening) : {};
   return (
     <div className="flex flex-wrap gap-1" aria-label="ผลตรวจคุณสมบัติเบื้องต้น">
       <CheckChip label="อายุ" verdict={ageVerdict(job, age)} />
       <CheckChip label="ที่อยู่" verdict={areaVerdict(job, areaParts)} />
       <CheckChip label="ประสบการณ์" verdict={position} />
+      {screened.lifestyle && screened.lifestyle !== 'unknown' ? (
+        <CheckChip label="เหล้า/บุหรี่" verdict={screened.lifestyle} />
+      ) : null}
+      {screened.criminalRecord && screened.criminalRecord !== 'unknown' ? (
+        <CheckChip label="ประวัติคดี" verdict={screened.criminalRecord} />
+      ) : null}
       {salary !== undefined ? <CheckChip label="รายได้" verdict={salaryVerdict(job, salary)} /> : null}
       <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
       {requiresLicense ? <CheckChip label="ใบขับขี่" verdict={license} /> : null}
@@ -582,10 +648,442 @@ function CandidateChecklist({
   );
 }
 
-function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; cls: string } {
-  if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', cls: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/50' };
-  if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', cls: 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/50' };
-  return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/50' };
+// ─── "รับไปโทรเอง" — ล็อกสิทธิ์โทร กันเจ้าหน้าที่โทรชนกัน + กัน AI โทรทับ ──────
+
+/**
+ * นาฬิกาเดียวของหน้า — เดินเฉพาะเมื่อมีงานโทรที่ถืออยู่
+ * (ห้ามสร้าง interval ต่อการ์ด ลิสต์นี้มีได้ 100 การ์ด)
+ */
+function useNowTick(enabled: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!enabled) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+  return now;
+}
+
+function formatCountdown(msLeft: number): string {
+  if (msLeft <= 0) return 'หมดเวลาแล้ว';
+  const total = Math.floor(msLeft / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function shortTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** ผลโทร → โทนสีตามความหมาย (ห้ามเขียนสีสดในหน้า — ดู designTokens) */
+const CALL_RESULT_TONE: Record<CallResultOutcome, ToneKey> = {
+  confirmed: 'success',
+  declined: 'danger',
+  reschedule_requested: 'warn',
+  no_answer: 'neutral',
+  wrong_person: 'neutral',
+};
+
+const CALL_RESULT_ORDER: CallResultOutcome[] = [
+  'confirmed',
+  'declined',
+  'reschedule_requested',
+  'no_answer',
+  'wrong_person',
+];
+
+/**
+ * แผงโทร — กางในการ์ดเดิม ไม่เปลี่ยนหน้า (mockup ที่เจ้าของเคาะ 6 ส.ค. 2569)
+ *
+ * ผลโทรใช้ศัพท์ชุดเดียวกับที่ Lumos ส่งกลับ → funnel นับ "ผลจากคน" รวมกับ "ผลจาก AI" ได้
+ * "ไม่สนใจ" **บังคับเลือก 2 แบบ** เพราะผลต่างกันมาก:
+ *   ไม่สนใจงานนี้ → AI ยังเสนองานอื่นให้เขาได้ · ไม่หางานแล้ว → ต้องพักเบอร์ ห้ามโทรอีก
+ */
+function CallHoldPanel({
+  hold,
+  phone,
+  now,
+  onFinished,
+}: {
+  hold: CallHold;
+  phone: string | null;
+  now: number;
+  /** ปล่อย/บันทึกผลเสร็จ — ให้หน้าเอา hold ออกจาก state การ์ดจะกลับเป็น "ว่าง" */
+  onFinished: (candidateRef: string) => void;
+}) {
+  const [outcome, setOutcome] = useState<CallResultOutcome | null>(null);
+  const [scope, setScope] = useState<CallResultScope | null>(null);
+  const [note, setNote] = useState('');
+  const [agreedSalary, setAgreedSalary] = useState('');
+  const [callbackAt, setCallbackAt] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const msLeft = new Date(hold.expiresAt).getTime() - now;
+
+  const pick = (next: CallResultOutcome) => {
+    setOutcome(next);
+    setError(null);
+    if (next !== 'declined') setScope(null);
+  };
+
+  const save = async () => {
+    if (!outcome || busy) return;
+    if (outcome === 'declined' && !scope) {
+      setError('เลือกก่อนว่า “ไม่สนใจงานนี้” หรือ “ไม่หางานแล้ว”');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const detail: Record<string, unknown> = {};
+      if (outcome === 'confirmed' && agreedSalary.trim()) detail.agreedSalary = agreedSalary.trim();
+      if (outcome === 'reschedule_requested' && callbackAt) detail.callbackAt = callbackAt;
+      if (outcome === 'wrong_person' && newPhone.trim()) detail.newPhone = newPhone.trim();
+      await recordCallResult({
+        holdId: hold.id,
+        outcome,
+        scope: outcome === 'declined' ? (scope ?? 'job') : undefined,
+        note: note.trim() || null,
+        detail: Object.keys(detail).length > 0 ? detail : undefined,
+      });
+      onFinished(hold.candidateRef);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกผลโทรไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const release = async (reason: 'manual' | 'to_ai') => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await releaseCallHold(hold.id, reason);
+      onFinished(hold.candidateRef);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'คืนงานไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={cn('mt-2 space-y-2 rounded-xl border px-3 py-2.5', TONE.primary.soft)}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px]">
+        <span className={cn('font-semibold', TONE.primary.value)}>
+          คุณถืออยู่ · รับเมื่อ {shortTime(hold.heldAt)}
+        </span>
+        <span className={DASH.muted}>
+          ล็อก 1 วัน · คายอีก{' '}
+          <span className="font-mono font-bold tabular-nums">{formatCountdown(msLeft)}</span>
+        </span>
+      </div>
+
+      {phone ? (
+        <div className={cn('flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-2', TONE.neutral.soft)}>
+          <a
+            href={`tel:${phone}`}
+            className={cn('flex-1 font-mono text-base font-bold tabular-nums', TONE.primary.value)}
+          >
+            {phone}
+          </a>
+          <a
+            href={`tel:${phone}`}
+            className={cn('rounded-full px-3 py-1 text-[11px] font-bold', TONE.primary.solid)}
+          >
+            โทร
+          </a>
+        </div>
+      ) : null}
+
+      <div className="space-y-1.5">
+        <p className={cn('text-[10px] font-bold uppercase tracking-wider', DASH.muted)}>
+          โทรเสร็จแล้ว กดผล
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {CALL_RESULT_ORDER.map((key) => {
+            const tone = TONE[CALL_RESULT_TONE[key]];
+            const active = outcome === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => pick(key)}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  active ? cn(tone.soft, tone.value, 'ring-2 ring-ring') : cn(tone.soft, tone.value, tone.softHover),
+                )}
+              >
+                {CALL_RESULT_LABEL[key]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {outcome ? (
+        <div className={cn('space-y-2 rounded-lg border px-2.5 py-2 text-[11px]', TONE.neutral.soft)}>
+          <p className={DASH.muted}>ผลนี้จะไปต่อที่: {CALL_RESULT_DESTINATION[outcome]}</p>
+
+          {outcome === 'declined' ? (
+            <div className="space-y-1">
+              {(
+                [
+                  ['job', 'ไม่สนใจงานนี้', 'AI ยังเสนองานอื่นให้เขาได้'],
+                  ['all', 'ไม่หางานแล้ว', 'พักเบอร์นี้ ไม่โทรอีก — ดับทุกใบที่เขาแมท'],
+                ] as Array<[CallResultScope, string, string]>
+              ).map(([value, label, hint]) => (
+                <label key={value} className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name={`declined-scope-${hold.id}`}
+                    checked={scope === value}
+                    onChange={() => setScope(value)}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
+                  />
+                  <span>
+                    <span className={cn('font-semibold', DASH.cellStrong)}>{label}</span>
+                    <span className={cn('ml-1', DASH.muted)}>— {hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          {outcome === 'confirmed' ? (
+            <input
+              type="text"
+              value={agreedSalary}
+              onChange={(e) => setAgreedSalary(e.target.value)}
+              placeholder="ค่าจ้างที่ตกลงได้ (ถ้ามี)"
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          ) : null}
+
+          {outcome === 'reschedule_requested' ? (
+            <div className="space-y-1">
+              <input
+                type="datetime-local"
+                value={callbackAt}
+                onChange={(e) => setCallbackAt(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <p className={DASH.muted}>เว้นว่างได้ — ถ้าไม่ระบุจะถือว่าให้นัดใหม่ตามค่าเริ่มต้น</p>
+            </div>
+          ) : null}
+
+          {outcome === 'wrong_person' ? (
+            <input
+              type="text"
+              value={newPhone}
+              onChange={(e) => setNewPhone(e.target.value)}
+              placeholder="เบอร์ใหม่ (ถ้าได้มา)"
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          ) : null}
+
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="โน้ตเพิ่มเติม (ถ้ามี)"
+            className="min-h-[44px] w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+      ) : null}
+
+      {error ? <p className={cn('text-[11px]', TONE.danger.value)}>{error}</p> : null}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy || !outcome}
+          className={cn(
+            'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+            TONE.primary.solid,
+          )}
+        >
+          {busy ? 'กำลังบันทึก…' : 'บันทึกผล'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void release('manual')}
+          disabled={busy}
+          className={cn(
+            'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+            TONE.neutral.soft,
+            TONE.neutral.value,
+            TONE.neutral.softHover,
+          )}
+        >
+          คืนงาน
+        </button>
+        <button
+          type="button"
+          onClick={() => void release('to_ai')}
+          disabled={busy}
+          className={cn(
+            'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+            TONE.info.soft,
+            TONE.info.value,
+            TONE.info.softHover,
+          )}
+        >
+          คืนให้ AI โทรต่อ
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * บันทึกผลคัดกรอง เหล้า/บุหรี่ + ประวัติคดี (ข้อ 4-5 ของลำดับความสำคัญที่เจ้าของกำหนด)
+ *
+ * บอร์ด iRecruit ไม่มีสองฟิลด์นี้ — เจ้าหน้าที่ถามแล้วกดบันทึกที่นี่ เก็บฝั่ง Jarvis
+ * "ยังไม่ถาม" ต่างจาก "ไม่" — ยังไม่ถามจะไม่ถูกนับในคะแนน คนที่ยังไม่ถูกคัดกรองไม่เสียเปรียบ
+ * รายละเอียดคดีเป็นบันทึกให้คนอ่าน ไม่ถูกเอาไปคิดคะแนนอัตโนมัติ
+ */
+const SCREENING_CHOICES: Array<{ value: ScreeningAnswer; label: string; tone: ToneKey }> = [
+  { value: 'no', label: 'ไม่', tone: 'success' },
+  { value: 'yes', label: 'ใช่', tone: 'danger' },
+  { value: 'unknown', label: 'ยังไม่ถาม', tone: 'neutral' },
+];
+
+function ScreeningEditor({
+  candidateRef,
+  candidateName,
+  record,
+  onSaved,
+}: {
+  candidateRef: string;
+  candidateName: string | null;
+  record?: CandidateScreeningRecord;
+  onSaved: (rec: CandidateScreeningRecord) => void;
+}) {
+  const [drinking, setDrinking] = useState<ScreeningAnswer>('unknown');
+  const [smoking, setSmoking] = useState<ScreeningAnswer>('unknown');
+  const [criminalRecord, setCriminalRecord] = useState<ScreeningAnswer>('unknown');
+  const [criminalNote, setCriminalNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // เปลี่ยนคน/โหลดผลมาใหม่ = เติมค่าที่บันทึกไว้ลงฟอร์ม
+  useEffect(() => {
+    setDrinking(record?.drinking ?? 'unknown');
+    setSmoking(record?.smoking ?? 'unknown');
+    setCriminalRecord(record?.criminalRecord ?? 'unknown');
+    setCriminalNote(record?.criminalNote ?? '');
+    setError(null);
+    setSavedAt(null);
+  }, [candidateRef, record]);
+
+  const submit = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const rec = await saveCandidateScreening({
+        source: 'board',
+        candidateRef,
+        candidateName,
+        drinking,
+        smoking,
+        criminalRecord,
+        criminalNote: criminalNote.trim() || null,
+      });
+      onSaved(rec);
+      setSavedAt(Date.now());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกผลคัดกรองไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const row = (
+    label: string,
+    value: ScreeningAnswer,
+    set: (v: ScreeningAnswer) => void,
+  ) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={cn('w-20 shrink-0 text-[11px]', DASH.muted)}>{label}</span>
+      <div className="flex gap-1">
+        {SCREENING_CHOICES.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => set(c.value)}
+            className={cn(
+              'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+              value === c.value
+                ? cn(TONE[c.tone].soft, TONE[c.tone].value)
+                : cn(TONE.neutral.soft, DASH.muted, TONE.neutral.softHover),
+            )}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={cn('space-y-2 rounded-xl border px-3 py-3', TONE.neutral.soft)}>
+      <div className="flex items-center justify-between gap-2">
+        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>ผลคัดกรอง</p>
+        {record?.screenedByName ? (
+          <span className={cn('text-[10px]', DASH.muted)}>บันทึกโดย {record.screenedByName}</span>
+        ) : null}
+      </div>
+      {row('ดื่มเหล้า', drinking, setDrinking)}
+      {row('สูบบุหรี่', smoking, setSmoking)}
+      {row('มีคดี', criminalRecord, setCriminalRecord)}
+      {criminalRecord === 'yes' ? (
+        <textarea
+          value={criminalNote}
+          onChange={(e) => setCriminalNote(e.target.value)}
+          placeholder="รายละเอียดคดี (ให้คนอ่านตัดสิน ไม่ถูกเอาไปคิดคะแนนอัตโนมัติ)"
+          className="min-h-[52px] w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        />
+      ) : null}
+      {error ? <p className={cn('text-[11px]', TONE.danger.value)}>{error}</p> : null}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={saving}
+          className={cn(
+            'rounded-full px-3 py-1 text-[11px] font-semibold disabled:opacity-60',
+            TONE.primary.solid,
+          )}
+        >
+          {saving ? 'กำลังบันทึก…' : 'บันทึกผลคัดกรอง'}
+        </button>
+        {savedAt ? (
+          <span className={cn('text-[11px]', TONE.success.value)}>บันทึกแล้ว — ลำดับอัปเดตทันที</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ป้าย tier ของคนบนบอร์ด — ตั้งชื่อโทนไว้ที่เดียวแบบเดียวกับ CHECK_META
+ * ความหมายเดียวกับ TIER_CRITERIA (เขียว=success · เหลือง=warn · แดง=danger) จุดเรียกใช้เลือก variant เอง
+ */
+function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; tone: ToneKey } {
+  if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', tone: 'success' };
+  if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', tone: 'danger' };
+  return { icon: '🟡', label: 'พอได้ ต้องเช็ค', tone: 'warn' };
 }
 
 function formatCallWhen(iso: string | null): string {
@@ -679,12 +1177,14 @@ function LumosJobSummaryStats({
   if (s.sent === 0) return null;
   const waiting = Math.max(0, s.sent - s.called);
   const cells = [
-    { label: 'ส่ง', value: s.sent, cls: 'text-slate-800 dark:text-slate-200', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
-    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-600 dark:text-blue-300', title: 'มีผลโทรกลับมาจริง' },
-    { label: 'เหลือ', value: waiting, cls: 'text-amber-600 dark:text-amber-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
-    { label: 'โอเค', value: s.confirmed, cls: 'text-emerald-600 dark:text-emerald-300', title: 'สนใจงาน' },
-    { label: 'ไม่ไป', value: s.declined, cls: 'text-rose-600 dark:text-rose-300', title: 'ไม่สนใจ/ปฏิเสธ' },
-    { label: 'ไม่รับ', value: s.no_answer, cls: 'text-amber-700 dark:text-amber-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+    // สีของแต่ละช่องมาจาก token กลาง: ส่ง=กลาง · โทรแล้ว=กำลังดำเนินการ · เหลือ/ไม่รับ=รอคนทำต่อ ·
+    // โอเค=สนใจงาน (หาได้แล้ว) · ไม่ไป=ติดขัด
+    { label: 'ส่ง', value: s.sent, cls: TONE.neutral.value, title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'โทรแล้ว', value: s.called, cls: TONE.primary.value, title: 'มีผลโทรกลับมาจริง' },
+    { label: 'เหลือ', value: waiting, cls: TONE.warn.value, title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
+    { label: 'โอเค', value: s.confirmed, cls: TONE.success.value, title: 'สนใจงาน' },
+    { label: 'ไม่ไป', value: s.declined, cls: TONE.danger.value, title: 'ไม่สนใจ/ปฏิเสธ' },
+    { label: 'ไม่รับ', value: s.no_answer, cls: TONE.warn.value, title: 'ไม่รับสาย — ควรโทรซ้ำ' },
   ];
   // สไตล์เรียบแบบ Apple: พื้นจางชิ้นเดียว ไม่มีเส้นแบ่ง เลขน้ำหนักกลางตัวใหญ่ขึ้นเล็กน้อย
   // ป้ายตัวจิ๋วโทนเทา ค่า 0 จางลงทั้งช่องให้ตาไหลผ่านไปหาช่องที่มีค่า
@@ -711,12 +1211,12 @@ function LumosJobSummaryStats({
           <div
             className={cn(
               'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
-              c.value === 0 ? 'text-slate-500 dark:text-slate-400' : c.cls,
+              c.value === 0 ? DASH.muted : c.cls,
             )}
           >
             {c.value}
           </div>
-          <div className="text-[9px] font-medium leading-tight tracking-wide text-slate-500 dark:text-slate-400">
+          <div className={cn('text-[9px] font-medium leading-tight tracking-wide', DASH.muted)}>
             {c.label}
           </div>
         </div>
@@ -733,19 +1233,19 @@ function LumosJobSummaryStats({
 function cardNextAction(
   matchCount: number | undefined,
   s: LumosJobCallSummaryRow | undefined,
-): { text: string; cls: string } | null {
+): { text: string; tone: ToneKey } | null {
   const confirmed = s?.confirmed ?? 0;
   const noAnswer = s?.no_answer ?? 0;
   const sent = s?.sent ?? 0;
   const waiting = s ? Math.max(0, s.sent - s.called) : 0;
   if (confirmed > 0)
-    return { text: `มีคนสนใจ ${confirmed} — กดจองตัวเลย`, cls: 'jarvis-chip-success' };
-  if (noAnswer > 0) return { text: `ไม่รับสาย ${noAnswer} — ควรโทรซ้ำ`, cls: 'jarvis-chip-warn' };
+    return { text: `มีคนสนใจ ${confirmed} — กดจองตัวเลย`, tone: 'success' };
+  if (noAnswer > 0) return { text: `ไม่รับสาย ${noAnswer} — ควรโทรซ้ำ`, tone: 'warn' };
   if ((matchCount ?? 0) > 0 && sent === 0)
-    return { text: `AI แนะนำ ${matchCount} — เลือกคนส่ง AI โทร`, cls: 'jarvis-chip-info' };
-  if (waiting > 0) return { text: `รอผลโทร ${waiting} สาย`, cls: 'jarvis-chip-neutral' };
+    return { text: `AI แนะนำ ${matchCount} — เลือกคนส่ง AI โทร`, tone: 'info' };
+  if (waiting > 0) return { text: `รอผลโทร ${waiting} สาย`, tone: 'neutral' };
   if (matchCount === 0)
-    return { text: 'ไม่มีคนแนะนำ — ส่งคิด Content / Scraping', cls: 'jarvis-chip-danger' };
+    return { text: 'ไม่มีคนแนะนำ — ส่งคิด Content / Scraping', tone: 'danger' };
   return null;
 }
 
@@ -968,6 +1468,155 @@ const MatchingPage: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  /**
+   * ผลคัดกรอง (เหล้า/บุหรี่ + คดี) ของผู้สมัครในใบขอที่เปิดอยู่ — คีย์เป็น card_id (string)
+   * บอร์ด iRecruit ไม่มีสองฟิลด์นี้ เราเก็บฝั่ง Jarvis เอง (ดู lib/candidateScreeningApi)
+   * โหลดพลาด/ตารางยังไม่ถูก migrate = ว่าง → เกณฑ์เป็น unknown ไม่ถูกนับ ไม่ทำให้ลิสต์เพี้ยน
+   */
+  const [screeningByRef, setScreeningByRef] = useState<Record<string, CandidateScreeningRecord>>({});
+
+  /** โหลดผลคัดกรองของผู้สมัครทุกคนในใบขอที่เปิด — รอผลแมทมาก่อนจึงรู้ว่ามีใคร */
+  const openJobMatches = jobDetail ? boardMatchById[jobDetail.id]?.matches : undefined;
+  useEffect(() => {
+    if (!openJobMatches?.length) return;
+    const refs = openJobMatches.map((m) => String(m.card_id));
+    let cancelled = false;
+    void fetchCandidateScreening('board', refs).then((map) => {
+      if (cancelled || map.size === 0) return;
+      setScreeningByRef((prev) => {
+        const next = { ...prev };
+        for (const [ref, rec] of map) next[ref] = rec;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openJobMatches]);
+
+  /**
+   * งานโทรที่ถูก "รับไปโทรเอง" — คีย์เป็น candidateRef (card_id / iRecruit id)
+   * ล็อกจริงผูกกับเบอร์ที่ฝั่ง server · อ่านล็อกไม่ได้/ยังไม่ migrate = ทุกการ์ดเป็น "ว่าง"
+   * ซึ่งยังปลอดภัยเพราะ server เป็นคนตัดสินตอนกดรับอยู่ดี
+   */
+  const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
+  const [holdBusyRef, setHoldBusyRef] = useState<string | null>(null);
+  const [holdErrorByRef, setHoldErrorByRef] = useState<Record<string, string>>({});
+  const [myHoldCount, setMyHoldCount] = useState(0);
+  const [myHoldNames, setMyHoldNames] = useState<string[]>([]);
+
+  const holdActive = Object.keys(holdByRef).length > 0;
+  const now = useNowTick(holdActive);
+
+  const refreshMyHolds = useCallback(() => {
+    void fetchMyCallHolds().then((rows) => {
+      setMyHoldCount(rows.length);
+      setMyHoldNames(rows.map((r) => r.candidateName || r.candidateRef));
+    });
+  }, []);
+
+  useEffect(() => {
+    refreshMyHolds();
+  }, [refreshMyHolds]);
+
+  /** โหลดสถานะล็อกของผู้สมัครในใบขอที่เปิด (คีย์ด้วยเบอร์ฝั่ง server) */
+  useEffect(() => {
+    if (!openJobMatches?.length) return;
+    const phones = openJobMatches.map((m) => m.mobile);
+    let cancelled = false;
+    void fetchCallHoldsByPhones(phones).then((map) => {
+      if (cancelled || map.size === 0) return;
+      setHoldByRef((prev) => {
+        const next = { ...prev };
+        for (const [ref, hold] of map) next[ref] = hold;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openJobMatches]);
+
+  /** เอาล็อกออกจาก state — การ์ดกลับเป็น "ว่าง" ทันทีโดยไม่ต้องรีเฟรชหน้า */
+  const dropHold = useCallback(
+    (candidateRef: string) => {
+      setHoldByRef((prev) => {
+        if (!prev[candidateRef]) return prev;
+        const next = { ...prev };
+        delete next[candidateRef];
+        return next;
+      });
+      setHoldErrorByRef((prev) => {
+        if (!prev[candidateRef]) return prev;
+        const next = { ...prev };
+        delete next[candidateRef];
+        return next;
+      });
+      refreshMyHolds();
+    },
+    [refreshMyHolds],
+  );
+
+  /**
+   * กดรับไปโทรเอง — คนแรกชนะ (server ตัดสิน)
+   * ชนแล้วอัปเดตการ์ดเป็น "คนอื่นถือ" ทันทีจากข้อมูลที่ 409 ส่งกลับมา ไม่ต้องรีเฟรช
+   * คืน true เมื่อจับล็อกได้ (ตัวเรียกใช้ตัดสินว่าจะต่อสายต่อไหม)
+   */
+  const takeCallHold = useCallback(
+    async (input: {
+      candidateRef: string;
+      source: CallHoldSource;
+      phone: string | null | undefined;
+      candidateName: string | null;
+      jobId: string;
+      requestNo: string | null;
+    }): Promise<boolean> => {
+      const ref = input.candidateRef;
+      if (!input.phone) {
+        setHoldErrorByRef((p) => ({ ...p, [ref]: 'ไม่มีเบอร์ที่โทรได้ — รับไปโทรไม่ได้' }));
+        return false;
+      }
+      setHoldBusyRef(ref);
+      setHoldErrorByRef((p) => {
+        const next = { ...p };
+        delete next[ref];
+        return next;
+      });
+      try {
+        const res = await acquireCallHold({
+          phone: input.phone,
+          source: input.source,
+          candidateRef: ref,
+          candidateName: input.candidateName,
+          jobId: input.jobId,
+          requestNo: input.requestNo,
+        });
+        if (!res.ok || !res.hold) {
+          // ชนกับคนอื่น — อัปเดตการ์ดเป็น "คนอื่นถือ" จากข้อมูลที่ 409 ส่งกลับ ไม่ต้องรีเฟรช
+          const message = res.message ?? 'รับงานโทรไม่สำเร็จ';
+          const heldBy = res.heldBy;
+          setHoldErrorByRef((p) => ({ ...p, [ref]: message }));
+          if (heldBy) setHoldByRef((p) => ({ ...p, [ref]: heldBy }));
+          return false;
+        }
+        const acquired = res.hold;
+        setHoldByRef((p) => ({ ...p, [ref]: acquired }));
+        refreshMyHolds();
+        return true;
+      } catch (e) {
+        setHoldErrorByRef((p) => ({
+          ...p,
+          [ref]: e instanceof Error ? e.message : 'รับงานโทรไม่สำเร็จ',
+        }));
+        return false;
+      } finally {
+        setHoldBusyRef(null);
+      }
+    },
+    [refreshMyHolds],
+  );
+
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
   const [boardErrorById, setBoardErrorById] = useState<Record<string, string>>({});
   // #2 (ยุบ) — หาผู้สมัคร iRecruit + เสนอในหน้า match เลย (ไม่ต้องไป pre-check)
@@ -2081,8 +2730,8 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   workflowFilter === value
-                    ? 'border-blue-300 bg-blue-600 text-white dark:border-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/50',
+                    ? FILTER_PILL_ACTIVE_CLASS
+                    : FILTER_PILL_IDLE_CLASS,
                 )}
               >
                 {label}
@@ -2101,7 +2750,7 @@ const MatchingPage: React.FC = () => {
                   label: 'ใบขอทั้งหมด',
                   value: serverSummary?.scopedTotal ?? listTotal,
                   cls: 'border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5',
-                  num: 'text-slate-800 dark:text-slate-100',
+                  num: TONE.neutral.value,
                   active: !urgentOnly && workflowFilter === 'all',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2112,8 +2761,8 @@ const MatchingPage: React.FC = () => {
                   key: 'urgent',
                   label: 'ใบขอด่วน',
                   value: urgentSummary.total,
-                  cls: 'border-red-200/70 bg-red-50/50 dark:border-red-800/70 dark:bg-red-950/50',
-                  num: 'text-red-600 dark:text-red-300',
+                  cls: TONE.danger.soft,
+                  num: TONE.danger.value,
                   active: urgentOnly,
                   apply: () => {
                     setUrgentOnly(true);
@@ -2124,8 +2773,8 @@ const MatchingPage: React.FC = () => {
                   key: 'green',
                   label: 'มีคนเขียวแนะนำ',
                   value: serverSummary?.withGreen ?? urgentSummary.greenSuggested,
-                  cls: 'border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-800/70 dark:bg-emerald-950/50',
-                  num: 'text-emerald-600 dark:text-emerald-300',
+                  cls: TONE.success.soft,
+                  num: TONE.success.value,
                   active: workflowFilter === 'green',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2136,8 +2785,8 @@ const MatchingPage: React.FC = () => {
                   key: 'yellow',
                   label: 'มีคนเหลืองแนะนำ',
                   value: serverSummary?.withYellow ?? 0,
-                  cls: 'border-amber-200/70 bg-amber-50/50 dark:border-amber-800/70 dark:bg-amber-950/50',
-                  num: 'text-amber-600 dark:text-amber-300',
+                  cls: TONE.warn.soft,
+                  num: TONE.warn.value,
                   active: workflowFilter === 'yellow',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2148,8 +2797,8 @@ const MatchingPage: React.FC = () => {
                   key: 'none',
                   label: 'ยังไม่มีคน',
                   value: serverSummary?.noRecommend ?? urgentSummary.none,
-                  cls: 'border-orange-200/70 bg-orange-50/50 dark:border-orange-800/70 dark:bg-orange-950/50',
-                  num: 'text-orange-600 dark:text-orange-300',
+                  cls: TONE.orange.soft,
+                  num: TONE.orange.value,
                   active: workflowFilter === 'none',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2184,6 +2833,19 @@ const MatchingPage: React.FC = () => {
           </p>
         ) : null}
 
+        {/* งานโทรที่เราถืออยู่ — ล็อกมีอายุ 1 วัน ชิปนี้กันลืมข้ามใบขอ */}
+        {myHoldCount > 0 ? (
+          <div className="px-1">
+            <Link
+              to="/matching/my-calls"
+              className={cn(TONE.primary.chip, 'hover:underline')}
+              title={`งานโทรที่คุณถืออยู่:\n${myHoldNames.join('\n')}`}
+            >
+              📞 ของฉันถืออยู่ {myHoldCount.toLocaleString('th-TH')} คน · ไปหน้าโทรของฉัน →
+            </Link>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <p className="text-sm text-muted-foreground">
             {loadingJobs || serverListLoading ? (
@@ -2210,8 +2872,8 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-wait',
                   pageSize === size
-                    ? 'border-blue-300 bg-blue-600 text-white dark:border-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/50',
+                    ? FILTER_PILL_ACTIVE_CLASS
+                    : FILTER_PILL_IDLE_CLASS,
                 )}
               >
                 {size}
@@ -2241,8 +2903,8 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-wait',
                   sortBy === value
-                    ? 'border-blue-300 bg-blue-600 text-white dark:border-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/50',
+                    ? FILTER_PILL_ACTIVE_CLASS
+                    : FILTER_PILL_IDLE_CLASS,
                 )}
               >
                 {label}
@@ -2266,15 +2928,15 @@ const MatchingPage: React.FC = () => {
               </span>
             ))}
             {workerStatus?.started && workerStatus.queueSize > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.warn.soft, TONE.warn.value)}>
                 <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
               </span>
             ) : workerStatus?.started && workerStatus.isIdle ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AI พร้อมแล้ว
+              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.success.soft, TONE.success.value)}>
+                <span className={cn('h-1.5 w-1.5 rounded-full', TONE.success.dot)} /> AI พร้อมแล้ว
               </span>
             ) : workerStatus && !workerStatus.enabled ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-400">
+              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.neutral.soft, DASH.muted)}>
                 AI ปิดอยู่
               </span>
             ) : null}
@@ -2284,7 +2946,7 @@ const MatchingPage: React.FC = () => {
         {/* การ์ดรวมใบขอ */}
         <div className="space-y-2.5" ref={listTopRef}>
           {serverListError ? (
-            <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600 dark:bg-red-950/50 dark:text-red-300">
+            <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
               {serverListError} — ลองรีเฟรชหน้า
             </p>
           ) : null}
@@ -2343,14 +3005,14 @@ const MatchingPage: React.FC = () => {
                       {matchCount != null ? (
                         <span
                           title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                          className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.success.soft, TONE.success.value)}
                         >
                           AI แนะนำ {matchCount}
                         </span>
                       ) : quickCounts[j.id] ? (
                         <span
                           title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                          className="shrink-0 rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-300"
+                          className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.info.soft, TONE.info.value)}
                         >
                           น่าจะตรง ~{quickCounts[j.id]}
                         </span>
@@ -2359,7 +3021,7 @@ const MatchingPage: React.FC = () => {
                       {(() => {
                         const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
                         return action ? (
-                          <span className={cn(action.cls, 'shrink-0')}>→ {action.text}</span>
+                          <span className={cn(TONE[action.tone].chip, 'shrink-0')}>→ {action.text}</span>
                         ) : null;
                       })()}
                     </div>
@@ -2558,10 +3220,10 @@ const MatchingPage: React.FC = () => {
                 ) : null}
                 <div className="text-[11px] text-muted-foreground">📍 {jobDetail.location_address}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     เพศ: {jobDetail.gender_requirement || 'ไม่ระบุ'}
                   </span>
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     อายุ:{' '}
                     {jobDetail.age_range_min != null || jobDetail.age_range_max != null
                       ? `${jobDetail.age_range_min ?? '—'}–${jobDetail.age_range_max ?? '—'}`
@@ -2570,15 +3232,15 @@ const MatchingPage: React.FC = () => {
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                     {jobDetail.total_income.toLocaleString()} บาท
                   </span>
-                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     ต้องการ: {formatYmdDmyBe(jobDetail.required_date)}
                   </span>
                   <span
                     className={cn(
                       'rounded-full border px-2 py-0.5 text-[11px] font-medium',
                       jobDetail.urgency === 'urgent'
-                        ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
-                        : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
+                        ? cn(TONE.danger.soft, TONE.danger.value)
+                        : cn(TONE.info.soft, TONE.info.value),
                     )}
                   >
                     {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
@@ -2638,7 +3300,7 @@ const MatchingPage: React.FC = () => {
                               ต้องการ {branch.requested_qty} คน
                             </span>
                             {boardMatchById[jobDetail.id] ? (
-                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                              <span className={cn('rounded-full border px-2 py-0.5 font-semibold', TONE.success.soft, TONE.success.value)}>
                                 คนของเราใกล้ {nearbyCounts.get(branch.branch_id || branch.branch_name_clean) || 0} คน
                               </span>
                             ) : (
@@ -2658,18 +3320,20 @@ const MatchingPage: React.FC = () => {
                   recommendedCandidateCount(boardMatchById[jobDetail.id]?.matches) +
                   recommendedCandidateCount(irMatchById[jobDetail.id]?.matches);
                 const cells = [
-                  { label: 'ขอ', value: requestPositionCount(jobDetail), cls: 'text-slate-700' },
-                  { label: 'AI แนะนำ', value: recommended, cls: 'text-sky-700 dark:text-sky-300' },
-                  { label: 'ติดต่อ', value: progress.contacted, cls: 'text-blue-700 dark:text-blue-300' },
-                  { label: 'จอง', value: progress.reserved, cls: 'text-violet-700 dark:text-violet-300' },
-                  { label: 'ลงงาน Matching', value: progress.placed, cls: 'text-emerald-700 dark:text-emerald-300' },
-                  { label: 'เหลือหาทางการ', value: officialRemainingCount(jobDetail), cls: 'text-amber-700 dark:text-amber-300' },
+                  // ขอมา=กลาง · AI แนะนำ=ฟ้า · สถานะการเสนอ 3 ช่องกลางดึงโทนจากแหล่งเดียวกับชิปสถานะ ·
+                  // เหลือหา=เหลือง (ตาม token กลาง)
+                  { label: 'ขอ', value: requestPositionCount(jobDetail), cls: TONE.neutral.value },
+                  { label: 'AI แนะนำ', value: recommended, cls: TONE.info.value },
+                  { label: 'ติดต่อ', value: progress.contacted, cls: TONE[PROPOSAL_STATUS_TONE.contacted].value },
+                  { label: 'จอง', value: progress.reserved, cls: TONE[PROPOSAL_STATUS_TONE.reserved].value },
+                  { label: 'ลงงาน Matching', value: progress.placed, cls: TONE[PROPOSAL_STATUS_TONE.placed].value },
+                  { label: 'เหลือหาทางการ', value: officialRemainingCount(jobDetail), cls: TONE.warn.value },
                 ];
                 return (
                   <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
                     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                       {cells.map((cell) => (
-                        <div key={cell.label} className="rounded-lg bg-white px-1.5 py-1.5 text-center">
+                        <div key={cell.label} className="rounded-lg bg-white px-1.5 py-1.5 text-center dark:bg-slate-900">
                           <div className={cn('text-sm font-bold tabular-nums', cell.cls)}>{cell.value}</div>
                           <div className="text-[9px] leading-tight text-muted-foreground">{cell.label}</div>
                         </div>
@@ -2703,7 +3367,7 @@ const MatchingPage: React.FC = () => {
                         className={cn(
                           'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                           hideProposed
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            ? cn(TONE.success.soft, TONE.success.value)
                             : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:hover:border-emerald-700',
                         )}
                       >
@@ -2722,7 +3386,7 @@ const MatchingPage: React.FC = () => {
                         className={cn(
                           'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                           showDistantCandidates
-                            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
+                            ? cn(TONE.danger.soft, TONE.danger.value)
                             : 'border-slate-200 bg-white text-slate-500 hover:border-red-200 dark:hover:border-red-800',
                         )}
                       >
@@ -2757,7 +3421,7 @@ const MatchingPage: React.FC = () => {
               distantCandidateCount(boardMatchById[jobDetail.id]?.matches) +
                 distantCandidateCount(irMatchById[jobDetail.id]?.matches) >
                 0 ? (
-                <p className="rounded-lg border border-red-100 bg-red-50/70 px-2.5 py-1.5 text-[10px] text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+                <p className={cn('rounded-lg border px-2.5 py-1.5 text-[10px]', TONE.danger.soft, TONE.danger.value)}>
                   กำลังแสดงคนนอกพื้นที่/ห่างไกลด้วยเพื่อเป็นทางเลือกสำรอง — กลุ่มนี้ไม่ถูกนับรวมในยอด AI แนะนำ
                 </p>
               ) : null}
@@ -2779,8 +3443,8 @@ const MatchingPage: React.FC = () => {
                     className={cn(
                       'rounded-lg border px-2.5 py-2 text-[10px] space-y-1.5',
                       short
-                        ? 'border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
-                        : 'border-sky-100 bg-sky-50/70 text-sky-800 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-200',
+                        ? cn(TONE.warn.soft, TONE.warn.num)
+                        : cn(TONE.info.soft, TONE.info.num),
                     )}
                   >
                     <p>
@@ -2803,7 +3467,7 @@ const MatchingPage: React.FC = () => {
                             type="button"
                             disabled={creatingPosting}
                             onClick={() => void createPosting(jobDetail, 'content')}
-                            className="inline-flex items-center gap-1 rounded-full bg-orange-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                            className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold disabled:opacity-60', TONE.orange.solid)}
                           >
                             <Megaphone className="h-3 w-3" />
                             {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
@@ -2812,7 +3476,7 @@ const MatchingPage: React.FC = () => {
                             type="button"
                             disabled={creatingPosting}
                             onClick={() => void createPosting(jobDetail, 'scraping')}
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                            className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold disabled:opacity-60', TONE.teal.solid)}
                           >
                             <Search className="h-3 w-3" />
                             {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
@@ -2825,12 +3489,12 @@ const MatchingPage: React.FC = () => {
               })()}
 
               {lumosNotice ? (
-                <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+                <p className={cn('rounded-lg border px-2.5 py-1.5 text-[11px]', TONE.success.soft, TONE.success.num)}>
                   {lumosNotice}
                 </p>
               ) : null}
               {lumosError ? (
-                <p className="rounded-lg border border-red-200 bg-red-50/80 px-2.5 py-1.5 text-[11px] text-destructive dark:border-red-800 dark:bg-red-950/50">
+                <p className={cn('rounded-lg border px-2.5 py-1.5 text-[11px] text-destructive', TONE.danger.soft)}>
                   {lumosError}
                 </p>
               ) : null}
@@ -2873,7 +3537,7 @@ const MatchingPage: React.FC = () => {
                 ) : null}
                 {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3 text-xs text-foreground dark:border-amber-800 dark:bg-amber-950/50">
+                  <p className={cn('rounded-xl border px-3 py-3 text-xs', TONE.warn.soft, TONE.warn.num)}>
                     ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองหาจากฐาน iRecruit ด้านล่าง แล้วเสนอได้เลย
                   </p>
                 ) : (
@@ -2883,7 +3547,15 @@ const MatchingPage: React.FC = () => {
                     {boardMatchById[jobDetail.id].matches
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
-                      .map((m) => ({ m, priority: boardCandidatePriority(jobDetail, m, priorityConfig) }))
+                      .map((m) => ({
+                        m,
+                        priority: boardCandidatePriority(
+                          jobDetail,
+                          m,
+                          priorityConfig,
+                          screeningByRef[String(m.card_id)],
+                        ),
+                      }))
                       .sort((a, b) => compareCandidatePriority(a.priority, b.priority))
                       .map(({ m, priority }) => {
                         const meta = boardTierMeta(m.tier);
@@ -2895,13 +3567,29 @@ const MatchingPage: React.FC = () => {
                         const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                         const lumosRef = boardPersonRef(m.card_id);
                         const lumosRow = lumosStatusByRef[lumosRef];
-                        const canPickForLumos = Boolean(m.mobile) && !lumosRow;
+                        const holdRef = String(m.card_id);
+                        const hold = holdByRef[holdRef];
+                        const heldByOther = hold && !hold.mine ? hold : null;
+                        const heldByMe = hold && hold.mine ? hold : null;
+                        const holdBusy = holdBusyRef === holdRef;
+                        const holdError = holdErrorByRef[holdRef];
+                        // คนถือไปโทรเองอยู่ = ห้ามส่ง AI ทับ (server กันอีกชั้นที่ insertQueueItems)
+                        const canPickForLumos = Boolean(m.mobile) && !lumosRow && !hold;
+                        const takeThis = () =>
+                          takeCallHold({
+                            candidateRef: holdRef,
+                            source: 'board',
+                            phone: m.mobile,
+                            candidateName: m.full_name,
+                            jobId: jobDetail.id,
+                            requestNo: jobDetail.request_no ?? null,
+                          });
                         return (
                         <div
                           key={m.card_id}
                           className={cn(
                             'matching-candidate-card rounded-xl border px-3 py-2',
-                            meta.cls,
+                            TONE[meta.tone].soft,
                             proposed ? 'opacity-70' : '',
                           )}
                         >
@@ -2965,7 +3653,7 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               ) : null}
                               {activeElsewhere ? (
-                                <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-300">
+                                <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.orange.soft, TONE.orange.value)}>
                                   ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                 </span>
                               ) : null}
@@ -2987,10 +3675,33 @@ const MatchingPage: React.FC = () => {
                             {m.age ? <span>อายุ {m.age}</span> : null}
                             {m.required_salary ? <span>ขอ {m.required_salary.toLocaleString()} บ.</span> : null}
                             {m.mobile ? (
+                              /**
+                               * แตะเบอร์ = รับไปโทรเองอัตโนมัติ (ล็อกก่อน แล้วต่อสาย)
+                               * เดิมเป็นลิงก์ tel: เปล่า ๆ กดโทรได้เลยโดยไม่ผ่านอะไร — ตัวทำให้โทรชนกัน
+                               * ถ้าคนอื่นถืออยู่จะไม่ต่อสายให้ · ถ้าเราถืออยู่แล้วต่อสายได้ทันที
+                               */
                               <a
                                 href={`tel:${m.mobile}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline dark:text-sky-300"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (heldByMe) return;
+                                  e.preventDefault();
+                                  if (heldByOther || holdBusy) return;
+                                  void takeThis().then((ok) => {
+                                    if (ok) window.location.href = `tel:${m.mobile}`;
+                                  });
+                                }}
+                                title={
+                                  heldByOther
+                                    ? `${heldByOther.heldByName || 'เจ้าหน้าที่อีกคน'} รับไปโทรแล้ว`
+                                    : heldByMe
+                                      ? 'คุณถืออยู่ — แตะเพื่อโทร'
+                                      : 'แตะเพื่อรับไปโทรเอง แล้วต่อสาย'
+                                }
+                                className={cn(
+                                  'inline-flex items-center gap-1 font-medium hover:underline',
+                                  heldByOther ? cn(DASH.muted, 'cursor-not-allowed') : TONE.info.value,
+                                )}
                               >
                                 <Phone className="h-3 w-3" /> {m.mobile}
                               </a>
@@ -3014,8 +3725,8 @@ const MatchingPage: React.FC = () => {
                               className={cn(
                                 'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums',
                                 priority.hardFails > 0
-                                  ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
-                                  : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200',
+                                  ? cn(TONE.danger.soft, TONE.danger.value)
+                                  : cn(TONE.neutral.soft, TONE.neutral.value),
                               )}
                             >
                               {priority.percent}%
@@ -3027,6 +3738,7 @@ const MatchingPage: React.FC = () => {
                               age={m.age}
                               areaParts={[m.amphur_name, m.province_name]}
                               salary={m.required_salary}
+                              screening={screeningByRef[String(m.card_id)]}
                             />
                           </div>
                           {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p> : null}
@@ -3041,6 +3753,61 @@ const MatchingPage: React.FC = () => {
                             onCancel={() => void cancelLumosForRef(lumosRow)}
                             cancelling={lumosCancellingRef === lumosRef}
                           />
+                        ) : null}
+
+                        {/* รับไปโทรเอง — 4 สถานะตาม mockup ที่เจ้าของเคาะ */}
+                        {heldByOther ? (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className={TONE.neutral.chip}>
+                              🔒 {heldByOther.heldByName || 'เจ้าหน้าที่อีกคน'} รับไปโทรแล้ว ·{' '}
+                              {shortTime(heldByOther.heldAt)}
+                            </span>
+                            <span className={TONE.warn.chip}>
+                              คายอัตโนมัติ {new Date(heldByOther.expiresAt).toLocaleString('th-TH', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        ) : heldByMe ? (
+                          <CallHoldPanel
+                            hold={heldByMe}
+                            phone={m.mobile}
+                            now={now}
+                            onFinished={dropHold}
+                          />
+                        ) : (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void takeThis()}
+                              disabled={holdBusy || !m.mobile}
+                              title={!m.mobile ? 'ไม่มีเบอร์ — รับไปโทรไม่ได้' : undefined}
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold disabled:opacity-50',
+                                lumosRow
+                                  ? cn(TONE.info.soft, TONE.info.value, TONE.info.softHover, 'border')
+                                  : TONE.primary.solid,
+                              )}
+                            >
+                              <Phone className="h-3 w-3" />
+                              {holdBusy
+                                ? 'กำลังรับงาน…'
+                                : lumosRow
+                                  ? 'ดึงมาโทรเอง'
+                                  : 'รับไปโทรเอง'}
+                            </button>
+                            {lumosRow ? (
+                              <span className={cn('text-[10px]', DASH.muted)}>
+                                AI จะไม่โทรทับหลังรับ
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
+                        {holdError ? (
+                          <p className={cn('mt-1 text-[11px]', TONE.danger.value)}>{holdError}</p>
                         ) : null}
                         </div>
                         );
@@ -3142,7 +3909,7 @@ const MatchingPage: React.FC = () => {
                               <div
                                 key={row.key}
                                 className={cn(
-                                  'matching-candidate-card space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2',
+                                  'matching-candidate-card space-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900',
                                   proposed ? 'opacity-70' : '',
                                 )}
                               >
@@ -3186,14 +3953,14 @@ const MatchingPage: React.FC = () => {
                                       </span>
                                     ) : null}
                                     {activeElsewhere ? (
-                                      <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-300">
+                                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.orange.soft, TONE.orange.value)}>
                                         ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                       </span>
                                     ) : null}
                                     <TierCriteriaTooltip tier={m.tier}>
                                       <span
                                         tabIndex={0}
-                                        className="cursor-help rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="cursor-help rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
                                         {matchTierLabel(m.tier)}
                                       </span>
@@ -3248,10 +4015,7 @@ const MatchingPage: React.FC = () => {
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'contacted', branchId, branchName)}
-                                    className={cn(
-                                      CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/40',
-                                    )}
+                                    className={proposalActionButtonClass('contacted')}
                                   >
                                     <PhoneCall className="h-3 w-3" />
                                     {busy ? 'บันทึก…' : proposed?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
@@ -3260,10 +4024,7 @@ const MatchingPage: React.FC = () => {
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'reserved', branchId, branchName)}
-                                    className={cn(
-                                      CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400 dark:bg-violet-900/40 dark:text-violet-200',
-                                    )}
+                                    className={proposalActionButtonClass('reserved')}
                                   >
                                     <UserCheck className="h-3 w-3" />
                                     {busy ? 'บันทึก…' : proposed?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
@@ -3272,10 +4033,7 @@ const MatchingPage: React.FC = () => {
                                     type="button"
                                     disabled={busy || !!activeElsewhere}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'placed', branchId, branchName)}
-                                    className={cn(
-                                      CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-emerald-700 bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700 focus-visible:ring-emerald-500',
-                                    )}
+                                    className={proposalActionButtonClass('placed')}
                                   >
                                     <CheckCircle2 className="h-3 w-3" />
                                     {busy ? 'บันทึก…' : proposed?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
@@ -3284,10 +4042,7 @@ const MatchingPage: React.FC = () => {
                                     type="button"
                                     disabled={busy}
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'rejected', branchId, branchName)}
-                                    className={cn(
-                                      CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/40',
-                                    )}
+                                    className={proposalActionButtonClass('rejected')}
                                   >
                                     <UserX className="h-3 w-3" />
                                     {proposed?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
@@ -3339,17 +4094,22 @@ const MatchingPage: React.FC = () => {
 
               {/* #1 หาคนไม่ได้ / คนที่มีไม่โอเค → สร้างคำขอโพสหางานใหม่ (ID ให้ทีมคอนเทนต์รับไปทำต่อ) */}
               {boardMatchById[jobDetail.id] ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/40 px-3 py-3 space-y-2 dark:border-rose-800 dark:bg-rose-950/50">
-                  <p className="text-xs font-semibold text-rose-900 dark:text-rose-200">หาคนไม่ได้เลย หรือคนที่มีไม่โอเค?</p>
+                <div className={cn('rounded-xl border px-3 py-3 space-y-2', TONE.danger.soft)}>
+                  <p className={cn('text-xs font-semibold', TONE.danger.num)}>หาคนไม่ได้เลย หรือคนที่มีไม่โอเค?</p>
                   {jobPostingByJobId[jobDetail.id] ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <span
                         title={jobPostingByJobId[jobDetail.id].id}
-                        className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-mono text-rose-700 dark:border-rose-800 dark:text-rose-300"
+                        className={cn('rounded-full border px-2 py-0.5 text-[10px] font-mono', TONE.danger.soft, TONE.danger.value, 'bg-white dark:bg-transparent')}
                       >
                         ID: {jobPostingByJobId[jobDetail.id].id.slice(0, 8)}
                       </span>
-                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
+                      <span
+                        className={cn(
+                          jobPostingStatusChip(jobPostingByJobId[jobDetail.id].status),
+                          'jarvis-chip-sm',
+                        )}
+                      >
                         {jobPostingByJobId[jobDetail.id].request_type === 'scraping' ? 'Scraping' : 'Content'} ·{' '}
                         {jobPostingStatusLabel(jobPostingByJobId[jobDetail.id].status)}
                       </span>
@@ -3363,7 +4123,7 @@ const MatchingPage: React.FC = () => {
                         type="button"
                         disabled={creatingPosting}
                         onClick={() => void createPosting(jobDetail, 'content')}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-orange-600 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+                        className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.orange.solid)}
                       >
                         <Megaphone className="h-3.5 w-3.5" />
                         {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
@@ -3372,7 +4132,7 @@ const MatchingPage: React.FC = () => {
                         type="button"
                         disabled={creatingPosting}
                         onClick={() => void createPosting(jobDetail, 'scraping')}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                        className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.teal.solid)}
                       >
                         <Search className="h-3.5 w-3.5" />
                         {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
@@ -3456,7 +4216,7 @@ const MatchingPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setBranchDrafts((current) => current.filter((item) => item.branch_id !== branchId))}
-                        className="text-[11px] font-medium text-red-600 hover:underline dark:text-red-300"
+                        className={cn('text-[11px] font-medium hover:underline', TONE.danger.value)}
                       >
                         ลบสาขา
                       </button>
@@ -3574,12 +4334,12 @@ const MatchingPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => updateBranchDraft(branchId, { geocode_status: 'confirmed' })}
-                            className="rounded-full bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700"
+                            className={cn('rounded-full px-3 py-1.5 font-semibold', TONE.success.solid)}
                           >
                             ยืนยันพิกัดนี้
                           </button>
                         ) : (
-                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">ยืนยันพิกัดแล้ว</span>
+                          <span className={cn('font-semibold', TONE.success.value)}>ยืนยันพิกัดแล้ว</span>
                         )}
                       </>
                     ) : (
@@ -3617,7 +4377,7 @@ const MatchingPage: React.FC = () => {
             {jobDetail &&
             branchDrafts.reduce((sum, branch) => sum + (Number(branch.requested_qty) || 0), 0) !==
               requestPositionCount(jobDetail) ? (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+              <p className={cn('rounded-lg border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.num)}>
                 จำนวนรวมของสาขา {branchDrafts.reduce((sum, branch) => sum + (Number(branch.requested_qty) || 0), 0)} คน
                 ไม่ตรงกับใบขอ {requestPositionCount(jobDetail)} คน — กรุณาตรวจสอบก่อนบันทึก
               </p>
@@ -3628,7 +4388,7 @@ const MatchingPage: React.FC = () => {
                 type="button"
                 disabled={branchSaveBusy}
                 onClick={() => setBranchEditorOpen(false)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               >
                 ยกเลิก
               </button>
@@ -3636,7 +4396,7 @@ const MatchingPage: React.FC = () => {
                 type="button"
                 disabled={branchSaveBusy}
                 onClick={() => void saveBranchDrafts()}
-                className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                className={cn('rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.primary.solid)}
               >
                 {branchSaveBusy ? 'กำลังบันทึก…' : 'บันทึกเงื่อนไขและสาขา'}
               </button>
@@ -3657,7 +4417,7 @@ const MatchingPage: React.FC = () => {
           </DialogHeader>
           {candDetail ? (
             <div className="space-y-3">
-              <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600">
+              <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 {boardTierMeta(candDetail.tier).label}
               </span>
 
@@ -3676,8 +4436,16 @@ const MatchingPage: React.FC = () => {
                   age={candDetail.age}
                   areaParts={[candDetail.amphur_name, candDetail.province_name]}
                   salary={candDetail.required_salary}
+                  screening={screeningByRef[String(candDetail.card_id)]}
                 />
               ) : null}
+
+              <ScreeningEditor
+                candidateRef={String(candDetail.card_id)}
+                candidateName={candDetail.full_name}
+                record={screeningByRef[String(candDetail.card_id)]}
+                onSaved={(rec) => setScreeningByRef((prev) => ({ ...prev, [rec.candidateRef]: rec }))}
+              />
 
               <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-1.5 text-sm">
                 <div className="flex justify-between gap-3">
@@ -3713,7 +4481,7 @@ const MatchingPage: React.FC = () => {
               {candDetail.mobile ? (
                 <a
                   href={`tel:${candDetail.mobile}`}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                  className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold', TONE.info.solid)}
                 >
                   <Phone className="h-4 w-4" /> โทร {candDetail.mobile}
                 </a>
@@ -3745,7 +4513,7 @@ const MatchingPage: React.FC = () => {
                         ) : null}
                       </div>
                       {activeElsewhere ? (
-                        <p className="rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2 text-[11px] text-orange-800 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-200">
+                        <p className={cn('rounded-lg border px-2.5 py-2 text-[11px]', TONE.orange.soft, TONE.orange.num)}>
                           ผู้สมัครติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id} · {proposalStatusLabel(activeElsewhere.status)}
                         </p>
                       ) : null}
@@ -3760,10 +4528,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'contacted')}
-                          className={cn(
-                            CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/40',
-                          )}
+                          className={proposalActionButtonClass('contacted')}
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
@@ -3772,10 +4537,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'reserved')}
-                          className={cn(
-                            CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400 dark:bg-violet-900/40 dark:text-violet-200',
-                          )}
+                          className={proposalActionButtonClass('reserved')}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
@@ -3784,10 +4546,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'placed')}
-                          className={cn(
-                            CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-emerald-700 bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700 focus-visible:ring-emerald-500',
-                          )}
+                          className={proposalActionButtonClass('placed')}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
@@ -3796,10 +4555,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'rejected')}
-                          className={cn(
-                            CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/40',
-                          )}
+                          className={proposalActionButtonClass('rejected')}
                         >
                           <UserX className="h-3.5 w-3.5" />
                           {current?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
@@ -3855,7 +4611,7 @@ const MatchingPage: React.FC = () => {
               <select
                 value={proposalOperatorName}
                 onChange={(event) => setProposalOperatorName(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-blue-400"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="">— เลือกชื่อ —</option>
                 {proposalOperatorName && !proposalOperatorOptions.includes(proposalOperatorName) ? (
@@ -3873,7 +4629,7 @@ const MatchingPage: React.FC = () => {
                 onChange={(event) => setProposalDecisionReason(event.target.value)}
                 rows={4}
                 placeholder="ระบุเหตุผลจากการตรวจสอบจริง เช่น สกิลตรง พื้นที่ใกล้ และยืนยันพร้อมเริ่มงาน"
-                className="mt-1 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-foreground outline-none focus:border-blue-400"
+                className="mt-1 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
             </label>
             <p className="text-[10px] leading-relaxed text-muted-foreground">
@@ -3885,7 +4641,7 @@ const MatchingPage: React.FC = () => {
               type="button"
               disabled={proposalFormBusy}
               onClick={() => setProposalActionDraft(null)}
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 disabled:opacity-50"
             >
               กลับ
             </button>
@@ -3893,7 +4649,7 @@ const MatchingPage: React.FC = () => {
               type="button"
               disabled={proposalFormBusy || !proposalOperatorName.trim() || !proposalDecisionReason.trim()}
               onClick={() => void submitProposalAction()}
-              className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className={cn('rounded-full px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50', TONE.primary.solid)}
             >
               {proposalFormBusy ? 'กำลังบันทึก…' : 'ยืนยันและบันทึก'}
             </button>
@@ -3922,7 +4678,7 @@ const MatchingPage: React.FC = () => {
                   type="button"
                   disabled={resolvingConflict}
                   onClick={() => void resolveConflict()}
-                  className="rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                  className={cn('rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.danger.solid)}
                 >
                   {resolvingConflict ? 'กำลังยกเลิก…' : 'ยกเลิกใบเดิม แล้วจองใบนี้แทน'}
                 </button>
@@ -3990,7 +4746,7 @@ const MatchingPage: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+            <p className={cn('rounded-lg border px-2.5 py-2 text-[11px]', TONE.warn.soft, TONE.warn.num)}>
               AI จะโทรหาคนเหล่านี้จริง — ตรวจรายชื่อให้แน่ใจก่อนกดส่ง
             </p>
             {(() => {
@@ -4005,7 +4761,7 @@ const MatchingPage: React.FC = () => {
                 <div className="max-h-56 space-y-2 overflow-y-auto">
                   {boardNames.length > 0 ? (
                     <div>
-                      <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200">
+                      <p className={cn('text-[11px] font-semibold', TONE.success.num)}>
                         คนของเรา — แจ้งงาน/โทรตาม ({boardNames.length})
                       </p>
                       <ul className="mt-1 space-y-0.5">
@@ -4019,7 +4775,7 @@ const MatchingPage: React.FC = () => {
                   ) : null}
                   {irNames.length > 0 ? (
                     <div>
-                      <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200">
+                      <p className={cn('text-[11px] font-semibold', TONE.primary.num)}>
                         ผู้สมัคร iRecruit — AI โทรสัมภาษณ์ ({irNames.length})
                       </p>
                       <ul className="mt-1 space-y-0.5">
@@ -4071,7 +4827,7 @@ const MatchingPage: React.FC = () => {
               value={lumosPoolSearch}
               onChange={(e) => setLumosPoolSearch(e.target.value)}
               placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
-              className="w-full rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+              className="w-full rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 focus-visible:ring-2 focus-visible:ring-sky-400"
             />
             {lumosPoolLoading ? (
               <p className="py-6 text-center text-xs text-muted-foreground">
@@ -4130,12 +4886,12 @@ const MatchingPage: React.FC = () => {
                                   ) : null;
                                 })()}
                                 {c.already_sent ? (
-                                  <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                                  <span className="rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                                     ส่งไปแล้ว
                                   </span>
                                 ) : null}
                                 {!c.mobile ? (
-                                  <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+                                  <span className={cn('rounded-full border px-1.5 py-0.5 text-[9px] font-semibold', TONE.warn.soft, TONE.warn.num)}>
                                     ไม่มีเบอร์
                                   </span>
                                 ) : null}

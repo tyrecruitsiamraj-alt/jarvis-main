@@ -21,19 +21,15 @@ import { tableInAppSchema } from './schema.js';
 import { logInfo, logError } from './logger.js';
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
+import { listHeldPhones } from './candidateCallHolds.js';
+import { toE164Thai } from './thaiPhone.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
-/** เบอร์ไทย → E.164 (+66…) — คืน null ถ้าแปลงไม่ได้ (Lumos ต้องการ E.164 เท่านั้น) */
-export function toE164Thai(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const digits = String(raw).replace(/\D/g, '');
-  if (digits.startsWith('66') && digits.length === 11) return `+${digits}`;
-  if (digits.startsWith('0') && digits.length === 10) return `+66${digits.slice(1)}`;
-  return null;
-}
+/** re-export ให้ผู้ใช้เดิมไม่พัง — ตัวจริงอยู่ที่ ./thaiPhone.ts (ตัดวง import กับ callHolds) */
+export { toE164Thai };
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -138,14 +134,43 @@ export function buildInterviewPayload(
 
 // ─── Enqueue (คนกดส่งเอง — ต้องรายงานผลกลับให้ผู้ใช้) ───────────────────────
 
-/** insert คิว กันซ้ำด้วย unique key — คืน person_ref ที่ "เข้าคิวใหม่จริง" (ที่ซ้ำจะไม่อยู่ในผล) */
+/** อ่านเบอร์ผู้รับออกจาก payload — ใช้เทียบกับล็อก "รับไปโทรเอง" */
+function payloadPhone(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = (payload as Record<string, unknown>).recipient_phone;
+  return typeof p === 'string' && p.trim() ? p.trim() : null;
+}
+
+/**
+ * insert คิว — คืน ref ที่เข้าคิวใหม่จริง (`added`) กับ ref ที่ไม่ส่งเพราะคนถือไปโทรเอง (`held`)
+ *
+ * **คอขวดเดียวของการเข้าคิวทุกเส้น** (auto / คนติ๊กเลือก / หน้า Follow) — กรองล็อกที่นี่
+ * ที่เดียวจึงครอบทุกทางเข้า: เบอร์ที่เจ้าหน้าที่กด "รับไปโทรเอง" ไว้ AI จะไม่แตะ
+ * ตารางล็อกยังไม่ถูก migrate ก็ไม่พัง — listHeldPhones() คืนเซ็ตว่าง
+ */
 async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
   items: Array<{ personRef: string; payload: unknown }>,
-): Promise<string[]> {
+): Promise<{ added: string[]; held: string[] }> {
   const added: string[] = [];
+  const held: string[] = [];
+  if (items.length === 0) return { added, held };
+
+  let heldPhones: Set<string>;
+  try {
+    heldPhones = await listHeldPhones();
+  } catch {
+    // อ่านล็อกไม่ได้ = ไม่กรอง ดีกว่าหยุดส่งงานทั้งระบบ (เสี่ยงโทรซ้ำ < เสี่ยงงานไม่วิ่ง)
+    heldPhones = new Set();
+  }
+
   for (const item of items) {
+    const phone = payloadPhone(item.payload);
+    if (phone && heldPhones.has(phone)) {
+      held.push(item.personRef);
+      continue;
+    }
     const { rows } = await dbQuery<{ id: number }>(
       `insert into ${queueTable} (channel, job_ref, person_ref, payload)
        values ($1, $2, $3, $4::jsonb)
@@ -155,7 +180,7 @@ async function insertQueueItems(
     );
     if (rows.length > 0) added.push(item.personRef);
   }
-  return added;
+  return { added, held };
 }
 
 export type LumosDispatchOutcome = {
@@ -168,6 +193,7 @@ export type LumosDispatchOutcome = {
 };
 
 const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที่ใช้โทรได้ (ต้องเป็นมือถือ 10 หลัก)';
+const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
 
 /** ผู้สมัคร "คนของเรา" ที่คนติ๊กเลือก → คิว reminder */
 export async function enqueueLumosReminderForSelected(
@@ -185,14 +211,20 @@ export async function enqueueLumosReminderForSelected(
     }
     items.push({ personRef: `card-${m.card_id}`, payload });
   }
-  const added = await insertQueueItems('reminder', result.jobId, items);
+  const { added, held } = await insertQueueItems('reminder', result.jobId, items);
   const addedSet = new Set(added);
-  const duplicated = items.map((i) => i.personRef).filter((ref) => !addedSet.has(ref));
+  const heldSet = new Set(held);
+  const nameByRef = new Map(selected.map((m) => [`card-${m.card_id}`, m.full_name]));
+  for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+  const duplicated = items
+    .map((i) => i.personRef)
+    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
   logInfo('lumos.dispatch.reminder.manual', {
     jobId: result.jobId,
     requested: selected.length,
     queued: added.length,
     duplicated: duplicated.length,
+    held: held.length,
     skipped: skipped.length,
   });
   return { queued: added.length, duplicated, skipped };
@@ -220,14 +252,20 @@ export async function enqueueLumosInterviewForSelected(
     }
     items.push({ personRef: `ir-${m.id}`, payload });
   }
-  const added = await insertQueueItems('interview', result.jobId, items);
+  const { added, held } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
-  const duplicated = items.map((i) => i.personRef).filter((ref) => !addedSet.has(ref));
+  const heldSet = new Set(held);
+  const nameByRef = new Map(selected.map((m) => [`ir-${m.id}`, m.full_name]));
+  for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+  const duplicated = items
+    .map((i) => i.personRef)
+    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
   logInfo('lumos.dispatch.interview.manual', {
     jobId: result.jobId,
     requested: selected.length,
     queued: added.length,
     duplicated: duplicated.length,
+    held: held.length,
     skipped: skipped.length,
   });
   return { queued: added.length, duplicated, skipped };
@@ -436,10 +474,10 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
 
 /** รายชื่อ Follow ที่คนกรอก → คิว reminder (throw ให้ handler จัดการ เพราะผู้ใช้ต้องรู้ว่าเข้าคิวไหม) */
 export async function enqueueFollowReminder(entry: FollowEntryInput): Promise<void> {
-  const added = await insertQueueItems('reminder', 'follow', [
+  const { added, held } = await insertQueueItems('reminder', 'follow', [
     { personRef: `follow-${entry.id}`, payload: buildFollowReminderPayload(entry) },
   ]);
-  logInfo('lumos.dispatch.follow', { followId: entry.id, added });
+  logInfo('lumos.dispatch.follow', { followId: entry.id, added, held });
 }
 
 /** ยกเลิกรายการ Follow ในคิว — ได้ผลเฉพาะที่ Lumos ยังไม่ดึงไป (pending) */
