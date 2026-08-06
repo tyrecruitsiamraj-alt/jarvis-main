@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiFetch';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 
 /** การเสนอ/จองตัว/ลงงานผู้สมัคร (board/iRecruit) ต่อใบขอ — client helper */
 export type ProposalSource = 'board' | 'irecruit';
@@ -63,6 +64,30 @@ const STATUS_LABEL: Record<ProposalStatus, string> = {
 
 export function proposalStatusLabel(status: ProposalStatus): string {
   return STATUS_LABEL[status] ?? status;
+}
+
+/**
+ * สีของสถานะการเสนอ — แหล่งเดียวของทั้งระบบ
+ *
+ * ก่อนหน้านี้สถานะชุดเดียวกันถูกทำสีไว้ 3 ที่และไม่ตรงกัน:
+ * MatchingPage (จอง=ม่วง พื้น -50), ReservationsPage (จอง=เหลือง พื้น /15),
+ * และหน้าประกาศหางานอีกเฉด — เป็นอาการเดียวกับที่ designTokens ถูกสร้างมาแก้
+ *
+ * ความหมายตาม token กลาง: เสนอ/ยกเลิก = เทา · ติดต่อแล้ว = น้ำเงิน (กำลังดำเนินการ) ·
+ * จองตัว = ม่วง · ลงงาน = เขียว (หาได้แล้ว) · ปฏิเสธ = แดง
+ */
+export const PROPOSAL_STATUS_TONE: Record<ProposalStatus, ToneKey> = {
+  proposed: 'neutral',
+  reserved: 'violet',
+  contacted: 'primary',
+  placed: 'success',
+  rejected: 'danger',
+  cancelled: 'neutral',
+};
+
+/** ชิปสถานะพร้อมใช้ (class กลางใน index.css — มีคู่ dark ครบ) */
+export function proposalStatusChip(status: ProposalStatus): string {
+  return TONE[PROPOSAL_STATUS_TONE[status]].chip;
 }
 
 /** ผู้สมัครถูกจองอยู่กับใบขออื่นแล้ว (409 จาก backend) — ต้องยกเลิกอันเดิมก่อนถึงจะจองใบนี้ได้ */

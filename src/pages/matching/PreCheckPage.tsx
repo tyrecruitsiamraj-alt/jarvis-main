@@ -5,6 +5,7 @@ import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, ClipboardCheck, Navigation, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
@@ -558,7 +559,7 @@ const PreCheckPage: React.FC = () => {
   const branchParserStatusMeta = useMemo(() => {
     const status = branchParseData?.parsed.parser_status;
     if (status === 'high_confidence') {
-      return { label: 'มั่นใจสูง', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+      return { label: 'มั่นใจสูง', className: TONE.success.chip };
     }
     // ไม่โชว์ป้าย fallback/เดา — เงียบไว้ให้ดูผลสาขาอย่างเดียว
     return null;
@@ -1160,8 +1161,8 @@ const PreCheckPage: React.FC = () => {
                             className={cn(
                               'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                               hideProposedIrecruit
-                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                                ? cn(TONE.success.soft, TONE.success.value)
+                                : cn(TONE.neutral.soft, TONE.neutral.value, TONE.neutral.softHover),
                             )}
                           >
                             {hideProposedIrecruit ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
@@ -1334,8 +1335,8 @@ const PreCheckPage: React.FC = () => {
                                     className={cn(
                                       'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                                       hideProposedIrecruit
-                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                                        ? cn(TONE.success.soft, TONE.success.value)
+                                        : cn(TONE.neutral.soft, TONE.neutral.value, TONE.neutral.softHover),
                                     )}
                                   >
                                     {hideProposedIrecruit ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}

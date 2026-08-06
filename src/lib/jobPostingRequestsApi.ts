@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiFetch';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 
 /** คำขอ "โพสหางานใหม่" — สร้าง ID ให้ทีมอื่นรับไปทำคอนเทนต์/โพสหาคนต่อ */
 export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled';
@@ -45,6 +46,25 @@ const STATUS_LABEL: Record<JobPostingStatus, string> = {
   filled: 'ได้คนแล้ว',
   cancelled: 'ยกเลิก',
 };
+
+/**
+ * สีของสถานะคำขอโพสหางาน — ผูกกับ token กลาง (เดิมเป็นชุด `/15` ของหน้าเดียว ไม่มีคู่ dark)
+ * รอดำเนินการ = เหลือง (รอคนทำต่อ) · กำลังทำ = น้ำเงิน · โพสแล้ว = ฟ้า (ปล่อยแล้ว รอผล) ·
+ * ตรวจรับแล้ว/ได้คนแล้ว = เขียว · ยกเลิก = เทา
+ */
+export const JOB_POSTING_STATUS_TONE: Record<JobPostingStatus, ToneKey> = {
+  pending: 'warn',
+  in_progress: 'primary',
+  posted: 'info',
+  completed: 'success',
+  filled: 'success',
+  cancelled: 'neutral',
+};
+
+/** ชิปสถานะพร้อมใช้ (class กลางใน index.css — มีคู่ dark ครบ) */
+export function jobPostingStatusChip(status: JobPostingStatus): string {
+  return TONE[JOB_POSTING_STATUS_TONE[status]].chip;
+}
 
 export function jobPostingStatusLabel(status: JobPostingStatus): string {
   return STATUS_LABEL[status] ?? status;

@@ -6,6 +6,7 @@ import {
   listActiveProposals,
   cancelProposal,
   proposalStatusLabel,
+  proposalStatusChip,
   type CandidateProposal,
   type ProposalSource,
 } from '@/lib/candidateProposalsApi';
@@ -13,15 +14,6 @@ import {
 const SOURCE_META: Record<ProposalSource, { label: string; cls: string }> = {
   board: { label: 'คนของเรา', cls: 'bg-sky-500/15 text-sky-700' },
   irecruit: { label: 'iRecruit', cls: 'bg-blue-500/15 text-blue-700' },
-};
-
-const STATUS_CLASS: Record<CandidateProposal['status'], string> = {
-  proposed: 'bg-slate-500/15 text-slate-700',
-  reserved: 'bg-amber-500/15 text-amber-800',
-  contacted: 'bg-blue-500/15 text-blue-700',
-  placed: 'bg-emerald-500/15 text-emerald-700',
-  rejected: 'bg-red-500/10 text-red-700',
-  cancelled: 'bg-muted text-muted-foreground',
 };
 
 function formatWhen(iso: string): string {
@@ -115,7 +107,7 @@ const ReservationsPage: React.FC = () => {
                       {src.label}
                     </span>
                     <span
-                      className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', STATUS_CLASS[it.status])}
+                      className={proposalStatusChip(it.status)}
                     >
                       {proposalStatusLabel(it.status)}
                     </span>

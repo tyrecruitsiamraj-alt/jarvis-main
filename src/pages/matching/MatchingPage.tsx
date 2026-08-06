@@ -42,11 +42,13 @@ import {
   cancelProposal,
   proposalKey,
   proposalStatusLabel,
+  proposalStatusChip,
   ProposalConflictError,
   type ProposalStatus,
   type ProposalConflictInfo,
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
@@ -299,17 +301,17 @@ const TIER_CRITERIA: Record<MatchTier, { label: string; detail: string; dot: str
   green: {
     label: 'เขียว — เข้าข่ายมาก',
     detail: 'ตำแหน่งตรงหรือใกล้มาก อยู่สายงานเดียวกัน หรืองานใกล้เคียงระดับเขียว',
-    dot: 'bg-emerald-500',
+    dot: TONE.success.dot,
   },
   yellow: {
     label: 'เหลือง — พอได้ ต้องเช็ค',
     detail: 'งานใกล้เคียงและมีโอกาสทำได้ แต่ต้องเช็คประสบการณ์จริง คุณสมบัติสำคัญ หรือการเทรนเพิ่ม',
-    dot: 'bg-amber-400',
+    dot: TONE.warn.dot,
   },
   red: {
     label: 'แดง — ห่างไกล',
     detail: 'คนละสายงาน ห่างจากตำแหน่งที่ขอมาก หรือคุณสมบัติสำคัญไม่สอดคล้อง',
-    dot: 'bg-red-500',
+    dot: TONE.danger.dot,
   },
 };
 
@@ -358,12 +360,9 @@ function isActiveWorkflowStatus(status: ProposalStatus): boolean {
   return ACTIVE_WORKFLOW_STATUSES.includes(status);
 }
 
+/** สีสถานะการเสนอ — ใช้แหล่งกลางเดียวกับหน้าจองตัว (lib/candidateProposalsApi) */
 function proposalStatusClass(status: ProposalStatus): string {
-  if (status === 'placed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'reserved') return 'border-violet-200 bg-violet-50 text-violet-700';
-  if (status === 'contacted') return 'border-blue-200 bg-blue-50 text-blue-700';
-  if (status === 'rejected') return 'border-red-200 bg-red-50 text-red-700';
-  return 'border-slate-200 bg-slate-50 text-slate-600';
+  return proposalStatusChip(status);
 }
 
 const CANDIDATE_ACTION_BUTTON_CLASS =
@@ -495,17 +494,18 @@ function salaryVerdict(job: JobRequest, salary: number | null | undefined): Chec
   return salary <= job.total_income ? 'pass' : 'warn';
 }
 
-const CHECK_META: Record<CheckVerdict, { icon: string; cls: string }> = {
-  pass: { icon: '✓', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  warn: { icon: '!', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-  fail: { icon: '×', cls: 'border-red-200 bg-red-50 text-red-700' },
-  unknown: { icon: '?', cls: 'border-slate-200 bg-slate-50 text-slate-500' },
+/** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
+const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
+  pass: { icon: '✓', tone: 'success' },
+  warn: { icon: '!', tone: 'warn' },
+  fail: { icon: '×', tone: 'danger' },
+  unknown: { icon: '?', tone: 'neutral' },
 };
 
 function CheckChip({ label, verdict }: { label: string; verdict: CheckVerdict }) {
   const meta = CHECK_META[verdict];
   return (
-    <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', meta.cls)}>
+    <span className={TONE[meta.tone].chip}>
       {label} {meta.icon}
     </span>
   );

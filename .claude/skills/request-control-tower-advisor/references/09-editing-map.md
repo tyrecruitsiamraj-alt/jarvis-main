@@ -88,6 +88,13 @@ Code:
   (deterministic จากชื่อ ไม่ผูกลำดับแถว) · เทสต์ที่ `tests/api/nameAvatar.test.ts`
 * `src/lib/followApi.ts` — `FOLLOW_STATUS_CLASS`/`FOLLOW_STATUS_BAR` ชี้เข้า TONE แล้ว
   (เดิมเป็นชุดสี `/15` ของตัวเอง ไม่มีคู่ dark)
+* **สีของสถานะ = ประกาศที่ lib เดียวเท่านั้น ห้ามทำตารางสีในไฟล์หน้า** — มีเทสต์บังคับที่
+  `tests/api/statusTones.test.ts` (เช็คทั้งว่าชิปมีจริงใน index.css มีคู่ dark และหน้าเว็บ
+  ไม่ประกาศ `STATUS_CLASS` ซ้ำ):
+  - `candidateProposalsApi.ts` → `PROPOSAL_STATUS_TONE` / `proposalStatusChip()`
+  - `jobPostingRequestsApi.ts` → `JOB_POSTING_STATUS_TONE` / `jobPostingStatusChip()`
+  - `followApi.ts` → `FOLLOW_STATUS_TONE` / `FOLLOW_STATUS_CLASS` / `FOLLOW_STATUS_BAR`
+  - อายุใบขอ → `jobUrgency.ts` → `JOB_AGE_URGENCY_META`
 * `src/pages/jobs/JobListPage.tsx` (หน้าหน่วยงาน) — ตัวกรองเป็นแถบบนเต็มความกว้าง แถวแรกรวม
   ค้นหา+ปุ่มสถานะ+เปิดแท็บใหม่ · ชิปอายุใบขอ 4 ระดับจาก `JOB_AGE_URGENCY_META` (เกณฑ์ถังไม่เปลี่ยน)
   · **ตัวหนังสือในตารางต้องใช้ `DASH.cell*` ไม่ใช้ `text-foreground`** เพราะ

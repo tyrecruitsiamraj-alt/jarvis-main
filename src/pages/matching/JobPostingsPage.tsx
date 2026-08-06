@@ -6,19 +6,11 @@ import {
   listJobPostingRequests,
   updateJobPostingStatus,
   jobPostingStatusLabel,
+  jobPostingStatusChip,
   type JobPostingRequest,
   type JobPostingStatus,
   type JobSnapshot,
 } from '@/lib/jobPostingRequestsApi';
-
-const STATUS_CLASS: Record<JobPostingStatus, string> = {
-  pending: 'bg-amber-500/15 text-amber-800',
-  in_progress: 'bg-blue-500/15 text-blue-700',
-  posted: 'bg-violet-500/15 text-violet-700',
-  completed: 'bg-emerald-500/15 text-emerald-700',
-  filled: 'bg-emerald-500/15 text-emerald-700',
-  cancelled: 'bg-muted text-muted-foreground',
-};
 
 /** ปุ่มขั้นต่อไปตามประเภทงาน — Scraping ไม่มีสถานะ "โพสแล้ว". */
 function nextStatuses(item: JobPostingRequest): { status: JobPostingStatus; label: string }[] | undefined {
@@ -194,7 +186,7 @@ const JobPostingsPage: React.FC = () => {
             {items.map((it) => (
               <li key={it.id} className="glass-card rounded-2xl border border-white/70 p-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', STATUS_CLASS[it.status])}>
+                  <span className={jobPostingStatusChip(it.status)}>
                     {jobPostingStatusLabel(it.status)}
                   </span>
                   <span className={cn(
