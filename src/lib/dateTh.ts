@@ -22,14 +22,17 @@ export function toYmdLocal(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** สร้างครั้งเดียว — `new Intl.DateTimeFormat()` แพงมาก อย่าสร้างในลูป (ดู api/_lib/businessDate.ts) */
+const bangkokYmdFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 /** YYYY-MM-DD ตามปฏิทินกรุงเทพ (ใช้กับคำนวณวันธุรกิจ) */
 export function toYmdBangkok(d: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d);
+  return bangkokYmdFormat.format(d);
 }
 
 export function parseYmd(ymd: string | undefined | null): { y: number; m: number; d: number } | null {

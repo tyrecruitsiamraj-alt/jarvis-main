@@ -133,6 +133,24 @@ export interface JobRequest {
   filled_positions?: number;
   /** จำนวนที่ยกเลิก / ปิดค้าง */
   cancelled_positions?: number;
+  /** วันที่แจ้งเข้า (YMD) — ยังไม่มี adapter ไหนส่งมา ledger จึง fallback เป็น closed_date */
+  inform_date?: string;
+  /** วันที่ยกเลิก (YMD) — ใบขอที่ปิดแล้วจาก SQL Server ส่งค่านี้มา */
+  cancel_date?: string;
+  /**
+   * เหตุการณ์หาได้/ยกเลิกรายครั้งพร้อมวันที่ — ถ้ามีค่านี้ ledger จะใช้แทน snapshot
+   * (`filled_positions`/`cancelled_positions`) ทำให้ยอดรายงวดแม่นขึ้นและเลิกเป็น snapshot_fallback
+   * ยังไม่มี adapter ไหนส่งมา — โครงรอไว้ให้ตรงกับ `FulfillmentLedgerEvent`
+   */
+  fulfillment_events?: Array<{
+    eventDate: string | null;
+    eventType: 'informed' | 'cancelled';
+    positionQty: number;
+    sourceTable?: string;
+    sourceId?: string;
+    isDateReliable?: boolean;
+    reliabilityNote?: string;
+  }>;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;
