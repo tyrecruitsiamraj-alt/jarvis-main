@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
+import { DASH, TONE } from '@/lib/designTokens';
 import { Phone, ExternalLink, X } from 'lucide-react';
 import {
   listActiveProposals,
@@ -11,9 +12,13 @@ import {
   type ProposalSource,
 } from '@/lib/candidateProposalsApi';
 
+/**
+ * แหล่งที่มาของผู้สมัคร (ไม่ใช่ "สถานะ" — สีสถานะยังมาจาก candidateProposalsApi เท่านั้น)
+ * คนของเรา = info (ฟ้า) · iRecruit = primary (น้ำเงิน) ตามความหมายที่ล็อกไว้ใน designTokens.ts
+ */
 const SOURCE_META: Record<ProposalSource, { label: string; cls: string }> = {
-  board: { label: 'คนของเรา', cls: 'bg-sky-500/15 text-sky-700' },
-  irecruit: { label: 'iRecruit', cls: 'bg-blue-500/15 text-blue-700' },
+  board: { label: 'คนของเรา', cls: TONE.info.chip },
+  irecruit: { label: 'iRecruit', cls: TONE.primary.chip },
 };
 
 function formatWhen(iso: string): string {
@@ -103,9 +108,7 @@ const ReservationsPage: React.FC = () => {
               return (
                 <li key={it.id} className="glass-card rounded-2xl border border-white/70 p-4 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', src.cls)}>
-                      {src.label}
-                    </span>
+                    <span className={src.cls}>{src.label}</span>
                     <span
                       className={proposalStatusChip(it.status)}
                     >
@@ -113,14 +116,19 @@ const ReservationsPage: React.FC = () => {
                     </span>
                     <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.updated_at)}</span>
                   </div>
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
                     {it.candidate_name || `#${it.candidate_ref}`}
                   </h3>
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     {it.candidate_position ? <span>{it.candidate_position}</span> : null}
-                    {it.branch_name ? <span className="font-medium text-blue-700">สาขา: {it.branch_name}</span> : null}
+                    {it.branch_name ? (
+                      <span className={cn('font-medium', TONE.primary.value)}>สาขา: {it.branch_name}</span>
+                    ) : null}
                     {it.candidate_phone ? (
-                      <a href={`tel:${it.candidate_phone}`} className="inline-flex items-center gap-1 text-sky-700 hover:underline">
+                      <a
+                        href={`tel:${it.candidate_phone}`}
+                        className={cn('inline-flex items-center gap-1 hover:underline', TONE.info.value)}
+                      >
                         <Phone className="h-3 w-3" /> {it.candidate_phone}
                       </a>
                     ) : null}
@@ -132,7 +140,7 @@ const ReservationsPage: React.FC = () => {
                     <span>จองไว้กับใบขอ: {it.request_no || it.job_id}</span>
                     <a
                       href={`/matching/match?jobId=${encodeURIComponent(it.job_id)}`}
-                      className="inline-flex items-center gap-0.5 text-blue-700 hover:underline"
+                      className={cn('inline-flex items-center gap-0.5 hover:underline', TONE.primary.value)}
                     >
                       เปิดใบขอ <ExternalLink className="h-2.5 w-2.5" />
                     </a>
@@ -145,14 +153,22 @@ const ReservationsPage: React.FC = () => {
                           type="button"
                           disabled={busy}
                           onClick={() => void cancel(it.id)}
-                          className="rounded-full border border-red-300 bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                          className={cn(
+                            'rounded-full border border-transparent px-3 py-1 text-[11px] font-semibold disabled:opacity-60',
+                            TONE.danger.solid,
+                          )}
                         >
                           {busy ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setConfirmingId(null)}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-600 hover:bg-slate-50"
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-[11px]',
+                            TONE.neutral.soft,
+                            TONE.neutral.value,
+                            TONE.neutral.softHover,
+                          )}
                         >
                           ไม่ยกเลิก
                         </button>
@@ -161,7 +177,12 @@ const ReservationsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setConfirmingId(it.id)}
-                        className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
+                          TONE.danger.soft,
+                          TONE.danger.value,
+                          TONE.danger.softHover,
+                        )}
                       >
                         <X className="h-3 w-3" /> ยกเลิกจอง
                       </button>

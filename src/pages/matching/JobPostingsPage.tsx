@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
+import { DASH, TONE } from '@/lib/designTokens';
 import { Copy, Check, ExternalLink } from 'lucide-react';
 import {
   listJobPostingRequests,
@@ -39,7 +40,7 @@ function num(v: number | null | undefined): string | null {
 function SnapshotDetails({ snap }: { snap: JobSnapshot | null }) {
   if (!snap) {
     return (
-      <p className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-400">
+      <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.neutral.soft, DASH.muted)}>
         คำขอเก่า — ไม่มีรายละเอียดใบขอแนบ (คำขอที่สร้างหลังจากนี้จะแนบให้อัตโนมัติ)
       </p>
     );
@@ -63,11 +64,16 @@ function SnapshotDetails({ snap }: { snap: JobSnapshot | null }) {
 
   if (rows.length === 0) return null;
   return (
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg bg-slate-50/70 px-3 py-2 text-[11px] sm:grid-cols-2">
+    <dl
+      className={cn(
+        'grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg px-3 py-2 text-[11px] sm:grid-cols-2',
+        TONE.neutral.soft,
+      )}
+    >
       {rows.map((r) => (
         <div key={r.label} className="flex gap-1.5">
-          <dt className="shrink-0 text-slate-500">{r.label}:</dt>
-          <dd className="min-w-0 break-words font-medium text-slate-800">{r.value}</dd>
+          <dt className={cn('shrink-0', DASH.muted)}>{r.label}:</dt>
+          <dd className={cn('min-w-0 break-words', DASH.cellStrong)}>{r.value}</dd>
         </div>
       ))}
     </dl>
@@ -101,9 +107,14 @@ function CopyIdButton({ id }: { id: string }) {
       type="button"
       onClick={() => void copy()}
       title={id}
-      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-mono text-slate-600 hover:bg-slate-50"
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-mono',
+        TONE.neutral.soft,
+        TONE.neutral.value,
+        TONE.neutral.softHover,
+      )}
     >
-      {copied ? <Check className="h-2.5 w-2.5 text-emerald-600" /> : <Copy className="h-2.5 w-2.5" />}
+      {copied ? <Check className={cn('h-2.5 w-2.5', TONE.success.value)} /> : <Copy className="h-2.5 w-2.5" />}
       {id.slice(0, 8)}
     </button>
   );
@@ -189,16 +200,14 @@ const JobPostingsPage: React.FC = () => {
                   <span className={jobPostingStatusChip(it.status)}>
                     {jobPostingStatusLabel(it.status)}
                   </span>
-                  <span className={cn(
-                    'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                    it.request_type === 'scraping' ? 'bg-emerald-500/15 text-emerald-700' : 'bg-orange-500/15 text-orange-700',
-                  )}>
+                  {/* ประเภทงานที่ส่งต่อ — ความหมายล็อกไว้ที่ token: Scraping = teal · ทีมคอนเทนต์ = orange */}
+                  <span className={it.request_type === 'scraping' ? TONE.teal.chip : TONE.orange.chip}>
                     {it.request_type === 'scraping' ? 'Scraping' : 'Content'}
                   </span>
                   <CopyIdButton id={it.id} />
                   <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.created_at)}</span>
                 </div>
-                <h3 className="text-sm font-semibold text-foreground">
+                <h3 className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
                   {it.job_snapshot?.position || 'ตำแหน่งไม่ระบุ'}
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
@@ -212,7 +221,7 @@ const JobPostingsPage: React.FC = () => {
                   {it.requested_by_name ? <span>ขอโดย {it.requested_by_name}</span> : null}
                   <a
                     href={`/matching/match?jobId=${encodeURIComponent(it.job_id)}`}
-                    className="inline-flex items-center gap-0.5 text-blue-700 hover:underline"
+                    className={cn('inline-flex items-center gap-0.5 hover:underline', TONE.primary.value)}
                   >
                     เปิดใบขอ <ExternalLink className="h-2.5 w-2.5" />
                   </a>
@@ -227,8 +236,8 @@ const JobPostingsPage: React.FC = () => {
                         className={cn(
                           'rounded-full border px-3 py-1 text-[11px] font-medium',
                           n.status === 'cancelled'
-                            ? 'border-red-200 bg-white text-red-600 hover:bg-red-50'
-                            : 'border-blue-300 bg-blue-600 text-white hover:bg-blue-700',
+                            ? cn(TONE.danger.soft, TONE.danger.value, TONE.danger.softHover)
+                            : cn('border-transparent', TONE.primary.solid),
                         )}
                       >
                         {n.label}

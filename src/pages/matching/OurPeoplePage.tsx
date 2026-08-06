@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import NameAvatar from '@/components/shared/NameAvatar';
-import { TONE } from '@/lib/designTokens';
+import { DASH, TONE } from '@/lib/designTokens';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 
 /**
@@ -46,38 +46,44 @@ type BoardPerson = {
   remarks: string | null;
 };
 
+/**
+ * ถังบนบอร์ด — สีมาจาก token กลางตามความหมายที่ล็อกไว้ใน designTokens.ts
+ * (เดิมเป็นจานสีของหน้านี้เอง ไม่มีคู่ `dark:` เลย ถังทั้ง 4 จึงเป็นพาสเทลสว่างในโหมดมืด)
+ *   todo (พร้อมลงงาน) → success · no_job (รอตำแหน่ง) → warn
+ *   reuse (คนเก่า) → violet   · in_process (เสนอใบอื่นอยู่) → info
+ */
 const BUCKETS = [
   {
     key: 'todo',
     match: 'to do',
     title: 'รอลงงาน (To do)',
     desc: 'ผ่านสัมภาษณ์ พร้อมลงงานทันที — AI แมทถังนี้ก่อนเสมอ',
-    headCls: 'text-emerald-800',
-    boxCls: 'border-emerald-200/80 bg-emerald-50/40',
+    headCls: TONE.success.value,
+    boxCls: TONE.success.soft,
   },
   {
     key: 'no_job',
     match: 'ไม่มีงาน',
     title: 'รองาน (ไม่มีงาน)',
     desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่งให้ลง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า',
-    headCls: 'text-amber-800',
-    boxCls: 'border-amber-200/80 bg-amber-50/40',
+    headCls: TONE.warn.value,
+    boxCls: TONE.warn.soft,
   },
   {
     key: 'reuse',
     match: 're use',
     title: 'คนเก่า (Re Use)',
     desc: 'เคยผ่านงานมาแล้ว — เลือกส่ง AI โทรเองได้ ไม่เข้า auto (เช็คสถานะก่อนส่ง)',
-    headCls: 'text-violet-800',
-    boxCls: 'border-violet-200/80 bg-violet-50/40',
+    headCls: TONE.violet.value,
+    boxCls: TONE.violet.soft,
   },
   {
     key: 'in_process',
     match: 'in process',
     title: 'กำลังเสนอใบอื่น (In process)',
     desc: 'ถูกเสนอกับใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คก่อนว่าใบเดิมจบแล้วหรือยัง)',
-    headCls: 'text-sky-800',
-    boxCls: 'border-sky-200/80 bg-sky-50/40',
+    headCls: TONE.info.value,
+    boxCls: TONE.info.soft,
   },
 ] as const;
 
@@ -103,9 +109,9 @@ function thaiDate(iso: string | null): string | null {
 /** แถวข้อมูลใน dialog — ซ่อนแถวที่ไม่มีค่า ไม่ให้เห็นช่องว่างเปล่า */
 const DetailRow: React.FC<{ label: string; value: React.ReactNode | null }> = ({ label, value }) =>
   value ? (
-    <div className="flex gap-2 border-b border-slate-100 py-1.5 last:border-0">
+    <div className={cn('flex gap-2 border-b py-1.5 last:border-0', DASH.divider)}>
       <span className="w-28 shrink-0 text-[11px] text-muted-foreground">{label}</span>
-      <span className="min-w-0 flex-1 text-xs text-foreground">{value}</span>
+      <span className={cn('min-w-0 flex-1 text-xs', DASH.cell)}>{value}</span>
     </div>
   ) : null;
 
@@ -181,7 +187,7 @@ const OurPeoplePage: React.FC = () => {
                   'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                   activeBucket === b.key
                     ? cn('font-semibold', b.boxCls, b.headCls)
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                    : cn(TONE.neutral.soft, TONE.neutral.value, TONE.neutral.softHover),
                 )}
               >
                 {b.title} · {b.items.length}
@@ -240,7 +246,7 @@ const OurPeoplePage: React.FC = () => {
                         >
                           <NameAvatar name={p.full_name} size="md" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-foreground">
+                            <p className={cn('truncate text-sm', DASH.cellStrong, 'font-semibold')}>
                               {p.full_name}
                               {p.nick_name ? (
                                 <span className="font-normal text-muted-foreground"> ({p.nick_name})</span>
@@ -306,7 +312,7 @@ const OurPeoplePage: React.FC = () => {
           </DialogHeader>
           {detail ? (
             <div className="space-y-3">
-              <div className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
+              <div className={cn(DASH.card, 'px-3 py-2')}>
                 <DetailRow label="ตำแหน่งที่คัดไว้" value={detail.job1_name} />
                 <DetailRow label="ตำแหน่งสำรอง" value={detail.job2_name} />
                 <DetailRow label="เงินเดือนที่ขอ" value={detail.required_salary ? `${detail.required_salary.toLocaleString()} บาท` : null} />
@@ -316,7 +322,7 @@ const OurPeoplePage: React.FC = () => {
                   label="เบอร์โทร"
                   value={
                     detail.mobile ? (
-                      <a href={`tel:${detail.mobile}`} className="font-medium text-sky-700 hover:underline">
+                      <a href={`tel:${detail.mobile}`} className={cn('font-medium hover:underline', TONE.info.value)}>
                         {detail.mobile}
                       </a>
                     ) : null
