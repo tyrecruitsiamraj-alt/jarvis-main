@@ -89,6 +89,30 @@ export async function addPostingLink(
   return (await readJsonSafe<RecruitPostingLink>(r)) as RecruitPostingLink;
 }
 
+/** เนื้อหาประกาศที่แก้ได้ — BU/ใบขอแก้ไม่ได้ (ดู api/_lib/recruitPostings.ts) */
+export type UpdatePostingBody = {
+  title?: string;
+  detail?: string | null;
+  locationText?: string | null;
+  salaryText?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+};
+
+/** แก้เนื้อหาประกาศที่มีอยู่ — คืนประกาศหลังแก้ (พร้อมลิงก์/ยอดผู้สมัคร) */
+export async function updateRecruitPosting(
+  id: string,
+  patch: UpdatePostingBody,
+): Promise<RecruitPosting> {
+  const r = await apiFetch('/api/recruit/postings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...patch }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'แก้ประกาศไม่สำเร็จ'));
+  return (await readJsonSafe<RecruitPosting>(r)) as RecruitPosting;
+}
+
 export async function setPostingStatus(id: string, status: 'open' | 'closed'): Promise<void> {
   const r = await apiFetch('/api/recruit/postings', {
     method: 'PATCH',

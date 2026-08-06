@@ -13,13 +13,14 @@ import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
-import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
+import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
@@ -30,7 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2 } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -112,6 +113,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
+  // เจ้าหน้าที่: แก้เนื้อหาประกาศที่สร้างไว้แล้ว (mockup rev.3 ข้อ 04)
+  const [editPosting, setEditPosting] = useState<RecruitPosting | null>(null);
   // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
@@ -121,6 +124,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ล้มเหลวก็ปล่อยเงียบเหมือน applicantCounts — เป็นข้อมูลเสริม ไม่ใช่ตัวหลักของหน้า
    */
   const [postings, setPostings] = useState<Awaited<ReturnType<typeof fetchRecruitPostings>>>([]);
+  /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
+  const [postingsRev, setPostingsRev] = useState(0);
 
   useEffect(() => {
     if (!isStaff) return;
@@ -135,7 +140,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isStaff]);
+  }, [isStaff, postingsRev]);
 
   /** ประเภทกล่องลอย → จำนวนประกาศ/ผู้สมัคร (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น) */
   const standaloneSummary = useMemo(() => {
@@ -147,6 +152,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       acc[p.standaloneKind].applicants += p.applicationCount ?? 0;
     }
     return acc;
+  }, [postings]);
+
+  /**
+   * ใบขอ → ประกาศล่าสุดของใบนั้น — ใช้กับปุ่ม "แก้ไข" บนการ์ด (mockup rev.3 ข้อ 04)
+   * ใบเดียวมีได้หลายประกาศ เลือกใบล่าสุดเพราะเป็นตัวที่กำลังใช้รับสมัครอยู่
+   * (API เรียงมาแบบ created_at DESC แล้ว จึงเอาตัวแรกที่เจอ)
+   */
+  const latestPostingByJob = useMemo(() => {
+    const map = new Map<string, RecruitPosting>();
+    for (const p of postings) {
+      if (!p.jobId || map.has(p.jobId)) continue;
+      map.set(p.jobId, p);
+    }
+    return map;
   }, [postings]);
 
   /** ใบขอ → ช่องทางที่ปล่อยลิงก์ไว้ (รวมยอดคลิกของช่องทางเดียวกันเข้าด้วยกัน) */
@@ -415,6 +434,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           <Link2 className="h-3.5 w-3.5" />
                           สร้างลิงก์
                         </button>
+                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "สร้างลิงก์" ก่อน */}
+                        {latestPostingByJob.has(job.id) ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditPosting(latestPostingByJob.get(job.id) ?? null);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            แก้ไข
+                          </button>
+                        ) : null}
                         <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
                           ดูรายชื่อ →
                         </span>
@@ -645,6 +678,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         open={!!genLinkJob}
         job={genLinkJob}
         onClose={() => setGenLinkJob(null)}
+        onCreated={() => setPostingsRev((n) => n + 1)}
+      />
+
+      <EditPostingDialog
+        posting={editPosting}
+        onClose={() => setEditPosting(null)}
+        onSaved={() => setPostingsRev((n) => n + 1)}
       />
     </div>
   );

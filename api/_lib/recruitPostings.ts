@@ -393,6 +393,79 @@ export async function createPostingLink(
   throw new Error('สร้างลิงก์ไม่สำเร็จ');
 }
 
+/** ฟิลด์เนื้อหาที่แก้ไขได้ — ดู updateRecruitPosting ว่าทำไมไม่มี jobId/standaloneKind/departmentCode */
+export type UpdatePostingPatch = {
+  title?: string;
+  detail?: string | null;
+  locationText?: string | null;
+  salaryText?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+};
+
+/** ฟิลด์เนื้อหาที่แก้ไขได้ → คอลัมน์ · ที่เดียวที่ตัดสินว่าอะไรแก้ได้ */
+const EDITABLE_POSTING_COLUMNS = {
+  title: 'title',
+  detail: 'detail',
+  locationText: 'location_text',
+  salaryText: 'salary_text',
+  contactName: 'contact_name',
+  contactPhone: 'contact_phone',
+} as const satisfies Record<keyof UpdatePostingPatch, string>;
+
+/** ความยาวสูงสุดของแต่ละฟิลด์ — ต้องตรงกับตอน createRecruitPosting */
+const POSTING_FIELD_MAX: Record<keyof UpdatePostingPatch, number> = {
+  title: MAX_TEXT,
+  detail: MAX_LONG_TEXT,
+  locationText: MAX_TEXT,
+  salaryText: MAX_TEXT,
+  contactName: MAX_TEXT,
+  contactPhone: 64,
+};
+
+/**
+ * แก้เนื้อหาประกาศ (mockup rev.3 ข้อ 04 — ปุ่ม "แก้ไข" บนการ์ด)
+ *
+ * แก้ได้เฉพาะ "เนื้อหาที่ผู้สมัครเห็น" — **jobId / standaloneKind / departmentCode แก้ไม่ได้**
+ * เพราะสามตัวนั้นเป็นตัวกำหนดสิทธิ์การมองเห็น (BU scope) ถ้าเปิดให้แก้ จะย้ายประกาศ
+ * ข้าม BU ได้ผ่านการ PATCH ทั้งที่ตอนสร้างมีการกันไว้แล้วที่ handler
+ * อยากย้าย BU ให้ปิดประกาศเดิมแล้วสร้างใหม่
+ *
+ * ส่งฟิลด์ไหนมาแก้เฉพาะฟิลด์นั้น (undefined = ไม่แตะ) · title ว่างไม่ได้
+ * คืน null เมื่อไม่มีฟิลด์ให้แก้ หรือหา id ไม่เจอ
+ */
+export async function updateRecruitPosting(
+  id: string,
+  patch: UpdatePostingPatch,
+): Promise<RecruitPosting | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  for (const [key, column] of Object.entries(EDITABLE_POSTING_COLUMNS) as Array<
+    [keyof UpdatePostingPatch, string]
+  >) {
+    const value = patch[key];
+    if (value === undefined) continue;
+    const cleaned = trimTo(value, POSTING_FIELD_MAX[key]);
+    // หัวข้อเป็นชื่อประกาศที่ผู้สมัครเห็น ปล่อยว่างแล้วการ์ดจะไม่มีชื่อ
+    if (key === 'title' && !cleaned) throw new Error('ต้องระบุหัวข้อประกาศ');
+    params.push(cleaned);
+    sets.push(`${column} = $${params.length}`);
+  }
+
+  if (sets.length === 0) return null;
+  params.push(id);
+  const { rows } = await dbQuery<{ id: string }>(
+    `UPDATE ${postingsTable} SET ${sets.join(', ')}, updated_at = now()
+      WHERE id = $${params.length}
+      RETURNING id`,
+    params,
+  );
+  if (rows.length === 0) return null;
+  // อ่านกลับผ่าน getRecruitPosting เพื่อให้ได้ links + applicationCount ครบเหมือนเส้นอื่น
+  return getRecruitPosting(id);
+}
+
 export async function setPostingStatus(id: string, status: 'open' | 'closed'): Promise<boolean> {
   const { rows } = await dbQuery<{ id: string }>(
     `UPDATE ${postingsTable} SET status = $2, updated_at = now() WHERE id = $1 RETURNING id`,
