@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { TONE } from '@/lib/designTokens';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import AssignDialog from '@/components/shared/AssignDialog';
@@ -78,7 +79,7 @@ const MonthlyPlanner: React.FC = () => {
             </div>
           ))}
           <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+            <div className={cn('w-2.5 h-2.5 rounded-full', TONE.danger.dot)} />
             <span className="text-muted-foreground">วันอาทิตย์ (วันหยุด WL)</span>
           </div>
         </div>
@@ -96,7 +97,7 @@ const MonthlyPlanner: React.FC = () => {
                       key={d}
                       className={cn(
                         'px-1 py-1.5 text-center font-medium min-w-[32px]',
-                        sunday ? 'text-red-600 bg-red-500/10' : 'text-muted-foreground',
+                        sunday ? cn(TONE.danger.value, TONE.danger.tile) : 'text-muted-foreground',
                       )}
                     >
                       <div className="text-[9px] leading-none opacity-80">{weekday}</div>
@@ -120,7 +121,7 @@ const MonthlyPlanner: React.FC = () => {
                     return (
                       <td
                         key={d}
-                        className={cn('px-1 py-2 text-center', sunday && 'bg-red-500/8')}
+                        className={cn('px-1 py-2 text-center', sunday && TONE.danger.tile)}
                       >
                         {entry ? (
                           <div
@@ -147,7 +148,7 @@ const MonthlyPlanner: React.FC = () => {
                             className={cn(
                               'w-6 h-6 rounded-md mx-auto cursor-pointer transition-colors',
                               sunday
-                                ? 'bg-red-500/15 border border-red-400/25 hover:bg-red-500/25'
+                                ? cn('border', TONE.danger.soft, TONE.danger.softHover)
                                 : 'bg-secondary/30 hover:bg-blue-500/15',
                             )}
                             title={sunday ? 'วันหยุด (อาทิตย์) — กดเพื่อมอบหมายงาน' : 'กดเพื่อมอบหมายงาน'}
