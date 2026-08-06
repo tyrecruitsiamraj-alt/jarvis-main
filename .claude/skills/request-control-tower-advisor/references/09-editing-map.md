@@ -95,6 +95,10 @@ Code:
   - `jobPostingRequestsApi.ts` → `JOB_POSTING_STATUS_TONE` / `jobPostingStatusChip()`
   - `followApi.ts` → `FOLLOW_STATUS_TONE` / `FOLLOW_STATUS_CLASS` / `FOLLOW_STATUS_BAR`
   - อายุใบขอ → `jobUrgency.ts` → `JOB_AGE_URGENCY_META`
+* `src/lib/candidatePriority.ts` — ลำดับความสำคัญการเรียงผู้สมัครหน้า Matching ที่เจ้าของกำหนด
+  (อายุ → ที่อยู่ → ประสบการณ์ → เหล้า-บุหรี่ → คดี → รายได้ · สองตัวแรกเกณฑ์แข็ง ที่เหลือ flexible)
+  เหล้า-บุหรี่/คดี ยังไม่มีข้อมูลจากบอร์ด iRecruit — โครงรับไว้แล้ว ส่ง verdict เข้ามาได้ทันทีเมื่อมี field
+  เทสต์ที่ `tests/api/candidatePriority.test.ts` · จะแก้น้ำหนัก/ลำดับ แก้ที่ไฟล์นี้ที่เดียว
 * `src/pages/jobs/JobListPage.tsx` (หน้าหน่วยงาน) — ตัวกรองเป็นแถบบนเต็มความกว้าง แถวแรกรวม
   ค้นหา+ปุ่มสถานะ+เปิดแท็บใหม่ · ชิปอายุใบขอ 4 ระดับจาก `JOB_AGE_URGENCY_META` (เกณฑ์ถังไม่เปลี่ยน)
   · **ตัวหนังสือในตารางต้องใช้ `DASH.cell*` ไม่ใช้ `text-foreground`** เพราะ

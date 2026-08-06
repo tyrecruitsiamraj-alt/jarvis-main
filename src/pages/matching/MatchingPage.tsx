@@ -49,6 +49,13 @@ import {
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import {
+  compareCandidatePriority,
+  describePriorityScore,
+  scoreCandidatePriority,
+  type CandidatePriorityScore,
+  type PriorityVerdict,
+} from '@/lib/candidatePriority';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
@@ -494,6 +501,20 @@ function salaryVerdict(job: JobRequest, salary: number | null | undefined): Chec
   return salary <= job.total_income ? 'pass' : 'warn';
 }
 
+/**
+ * คะแนนตามลำดับความสำคัญของเจ้าของ (อายุ → ที่อยู่ → ประสบการณ์ → รายได้ · ดู lib/candidatePriority)
+ * ประสบการณ์ = สายงานที่เคยทำตรงกับใบขอไหม ใช้ tier จาก AI แมทสกิล (เขียว=ตรง เหลือง=ใกล้ แดง=คนละสาย)
+ * เหล้า/บุหรี่ กับ คดี ยังไม่มีข้อมูลจากบอร์ด → unknown (ไม่ถูกนับ) จนกว่าจะมี field จริง
+ */
+function boardCandidatePriority(job: JobRequest, m: BoardCandidateMatch): CandidatePriorityScore {
+  return scoreCandidatePriority({
+    age: ageVerdict(job, m.age) as PriorityVerdict,
+    area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
+    experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
+    salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
+  });
+}
+
 /** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
 const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
   pass: { icon: '✓', tone: 'success' },
@@ -537,13 +558,15 @@ function CandidateChecklist({
         ? 'pass'
         : 'warn'
     : 'unknown';
+  // ลำดับชิปไล่ตามลำดับความสำคัญที่เจ้าของกำหนด: อายุ → ที่อยู่ → ประสบการณ์ (ตำแหน่ง) → รายได้
+  // เพศ/ใบขับขี่เป็นเกณฑ์ของใบขอ อยู่ท้ายรายการ
   return (
     <div className="flex flex-wrap gap-1" aria-label="ผลตรวจคุณสมบัติเบื้องต้น">
-      <CheckChip label="ตำแหน่ง" verdict={position} />
-      <CheckChip label="พื้นที่" verdict={areaVerdict(job, areaParts)} />
-      <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
       <CheckChip label="อายุ" verdict={ageVerdict(job, age)} />
-      {salary !== undefined ? <CheckChip label="เงินเดือน" verdict={salaryVerdict(job, salary)} /> : null}
+      <CheckChip label="ที่อยู่" verdict={areaVerdict(job, areaParts)} />
+      <CheckChip label="ประสบการณ์" verdict={position} />
+      {salary !== undefined ? <CheckChip label="รายได้" verdict={salaryVerdict(job, salary)} /> : null}
+      <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
       {requiresLicense ? <CheckChip label="ใบขับขี่" verdict={license} /> : null}
     </div>
   );
@@ -2833,10 +2856,14 @@ const MatchingPage: React.FC = () => {
                   </p>
                 ) : (
                   <div className="space-y-2">
+                    {/* เรียงตามลำดับความสำคัญของเจ้าของ: อายุ → ที่อยู่ → ประสบการณ์ → รายได้
+                        (เกณฑ์แข็งพังตกท้าย · คะแนนเท่ากันคงลำดับจาก AI — sort ของ JS เป็น stable) */}
                     {boardMatchById[jobDetail.id].matches
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
-                      .map((m) => {
+                      .map((m) => ({ m, priority: boardCandidatePriority(jobDetail, m) }))
+                      .sort((a, b) => compareCandidatePriority(a.priority, b.priority))
+                      .map(({ m, priority }) => {
                         const meta = boardTierMeta(m.tier);
                         const branchAssignment = nearestBranchForBoardCandidate(jobDetail, m);
                         const branchProximity = boardBranchProximityMeta(branchAssignment);
@@ -2958,7 +2985,19 @@ const MatchingPage: React.FC = () => {
                               <MapPin className="h-2.5 w-2.5" /> {branchProximity.label}
                             </span>
                           </div>
-                          <div className="mt-1">
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {/* คะแนนที่ใช้เรียงลิสต์นี้ — ชี้เมาส์ดูที่มาของคะแนนรายเกณฑ์ */}
+                            <span
+                              title={describePriorityScore(priority).join('\n')}
+                              className={cn(
+                                'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums',
+                                priority.hardFails > 0
+                                  ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
+                                  : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200',
+                              )}
+                            >
+                              {priority.percent}%
+                            </span>
                             <CandidateChecklist
                               job={jobDetail}
                               tier={m.tier}
