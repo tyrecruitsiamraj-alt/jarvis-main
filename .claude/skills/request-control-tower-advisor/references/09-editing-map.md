@@ -107,6 +107,135 @@ Code:
   บนพื้นเข้ม จะได้ตัวหนังสือเข้มบนการ์ดเข้มในโหมดมืด
 * src/components/dashboard/request-control/ (แผงใหม่ของ parallel layer)
 
+## ความเร็วของเส้นใบขอ (ห้ามสร้าง Intl.DateTimeFormat ในลูป)
+
+`api/_lib/businessDate.ts` — `bangkokBusinessDateYmd()` ใช้ตัวจัดรูปที่สร้าง **ครั้งเดียว**
+ระดับโมดูล เดิมสร้างใหม่ทุกครั้งที่เรียก ซึ่งแพงมาก (~0.16ms/ครั้ง):
+เส้นใบขอที่ปิดแล้วเรียก `toBangkokYmd` 6 ครั้ง/แถว × 5,000 แถว = 30,000 ครั้ง → 4.7 วินาที
+เป็นต้นเหตุจริงของอาการ "API ใบขอที่ปิดแล้วช้า" (ไม่ใช่ SQL — SQL ใช้แค่ 0.6 วินาที)
+
+* `src/lib/dateTh.ts` — `toYmdBangkok()` ฝั่ง client ก็ hoist แบบเดียวกัน
+* `tests/api/businessDate.test.ts` — contract: ความถูกต้องข้ามเขตเวลา/ข้ามปี ·
+  ฝั่ง client กับ API ต้องให้ผลตรงกัน · **เทสต์ความเร็ว 30,000 ครั้งต้องไม่เกิน 1.5 วินาที**
+  (พังแปลว่ามีคนเอา `new Intl.*` กลับเข้าไปในฟังก์ชัน)
+
+⚠️ กติกา: `new Intl.DateTimeFormat` / `new Intl.NumberFormat` ให้ประกาศระดับโมดูลเสมอ
+ห้ามสร้างในฟังก์ชันที่ถูกเรียกต่อแถว
+
+### cache ใบขอที่ปิดแล้ว
+
+`api/_lib/siamrajSqlServerClosed.ts` — cache ในหน่วยความจำ TTL 10 นาที
+key = `departmentScope | from | to | limit` (**scope ต้องอยู่ใน key** ไม่งั้นข้ามสิทธิ์กัน)
+
+* เก็บเฉพาะข้อมูลจาก SQL Server ซึ่งเป็นประวัติที่ไม่ขยับแล้ว
+* **ชื่อผู้รับผิดชอบไม่ถูก cache** — `attachAssignments` (PostgreSQL) วิ่งใหม่ทุกครั้ง
+  เพราะ admin แก้ได้ตลอด
+* คืนค่าเป็น **สำเนา** เสมอ (`{...r}`) — `attachAssignments` เขียนทับ object ที่ได้รับ
+  ถ้าคืนตัวจริงจาก cache ชื่อของรอบก่อนจะค้างในแถวที่รอบใหม่ไม่มีข้อมูล (ถอนคนแล้วชื่อไม่หาย)
+* `clearSiamrajClosedCache()` สำหรับเทสต์
+* ผลที่วัดได้: 4–5 วินาที → **1.3 วินาที (cold) · 0.08 วินาที (warm)**
+
+หมายเหตุ: แผน "API สรุปยอดปิดต่อคน" ในเอกสารส่งต่อ **ไม่ต้องทำแล้ว** — เป้าหมายคือกันไม่ให้
+Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุได้ผลกว่าและช่วยทุก endpoint ที่แปลงวันที่ ไม่ใช่แค่แผงเดียว
+
+## ผลคัดกรองผู้สมัคร (เหล้า/บุหรี่ + ประวัติคดี)
+
+บอร์ด iRecruit (SQL Server ของ ERP) ไม่มีสองฟิลด์นี้ และเราเพิ่มคอลัมน์ในฐานเขาไม่ได้
+จึงเก็บเป็น "ชั้นทับ" ฝั่ง Jarvis ผูกด้วยคู่ `(source, candidate_ref)` แบบเดียวกับ `candidate_proposals`
+
+* `migrations/067_candidate_screening.sql` — ตาราง `candidate_screening`
+  (drinking / smoking / criminal_record เป็น `yes|no|unknown` + `criminal_note`)
+* `api/_lib/candidateScreening.ts` — อ่านหลายคนในคิวรีเดียว + upsert (ส่งฟิลด์ไหนแก้ฟิลด์นั้น)
+* `api/_handlers/matching-candidate-screening.ts` — `GET/POST /api/matching/candidate-screening`
+  rbac ใช้ `matching-proposals` · เขียนทุกครั้งลง audit log (**ไม่เก็บข้อความคดีลง log** เก็บแค่ธงว่ามี)
+* `src/lib/candidateScreeningApi.ts` — client adapter (แบ่งก้อนละ 300 ref อัตโนมัติ)
+* `src/lib/candidatePriority.ts` — **ความหมายของค่า → verdict อยู่ที่นี่ที่เดียว**
+  `lifestyleVerdict()` · `criminalRecordVerdict()` · `screeningVerdicts()`
+* `tests/api/candidateScreening.test.ts` — contract ของทั้งการแปลงความหมายและตัวเก็บข้อมูล
+
+กติกาที่ตั้งใจไว้ (แก้ที่ `candidatePriority.ts` ถ้าเจ้าของอยากปรับ):
+
+| ข้อมูล | verdict |
+|---|---|
+| ไม่ดื่ม + ไม่สูบ | pass |
+| ดื่มหรือสูบ อย่างใดอย่างหนึ่ง | warn |
+| ทั้งดื่มและสูบ | fail |
+| ไม่มีคดี | pass · มีคดี = fail |
+| ยังไม่ได้ถาม | unknown (ไม่ถูกนับทั้งตัวตั้งและตัวหาร) |
+
+⚠️ ทั้งสองเกณฑ์เป็น **flexible** — `fail` แค่ลดอันดับ **ไม่ตัดใครออกจากลิสต์**
+(จะให้ตัดต้องใส่ใน `config.hard` ซึ่งค่าเริ่มต้นมีแค่ `age` กับ `area`)
+⚠️ `criminal_note` เป็นบันทึกให้คนอ่าน **ไม่ถูกเอาไปคิดคะแนนอัตโนมัติ** — ไม่ให้โค้ดเดาความหนักเบาของคดี
+⚠️ ตารางยังไม่ถูก migrate ก็ไม่พัง — `getCandidateScreeningMap()` คืน map ว่าง (มีเทสต์คุม)
+
+## "รับไปโทรเอง" — ล็อกสิทธิ์โทรผู้สมัคร (กันคนโทรชนกัน + กัน AI โทรทับ)
+
+โจทย์: เจ้าหน้าที่ 6 คนโทรเอง + AI (Lumos) โทรด้วย · คนเดียวแมทได้หลายใบ
+(ข้อมูลจริง: card 1805 อยู่ในผลแมท **113 ใบขอ**) ถ้าไม่ล็อกจะโทรถล่มคนเดียวกัน
+
+* `migrations/068_candidate_call_holds.sql` — ตาราง `candidate_call_holds`
+* `api/_lib/thaiPhone.ts` — `toE164Thai()` **สูตรเดียวของทั้งระบบ** (แยกออกมาเพื่อตัดวง
+  import ระหว่าง `lumosDispatch` ↔ `candidateCallHolds`) — ห้ามก๊อปสูตรไปไว้ที่อื่น
+* `api/_lib/candidateCallHolds.ts` — จับ/ปล่อย/บันทึกผล + `listHeldPhones()`
+* `api/_handlers/matching-call-holds.ts` — GET/POST/PATCH/DELETE · rbac `matching-proposals`
+* `src/lib/callHoldsApi.ts` — client adapter + `CALL_RESULT_LABEL` / `CALL_RESULT_DESTINATION`
+* `src/pages/matching/MatchingPage.tsx` — การ์ด 4 สถานะ + `CallHoldPanel` (แผงโทรกางในการ์ดเดิม)
+* `tests/api/candidateCallHolds.test.ts` — contract ของการกันชน
+
+### กติกาที่ห้ามพลาด
+
+⚠️ **กุญแจล็อกคือเบอร์ (E.164) ไม่ใช่ `candidate_ref`** — คนเดียวมีหลายรหัส
+(บอร์ด `card_id` · iRecruit `id` · Follow `follow-<id>`) แต่เบอร์ที่ดังมีเบอร์เดียว
+ล็อกที่ ref จะกันไม่อยู่จริง
+
+⚠️ **DB เป็นคนตัดสินว่าใครชนะ ไม่ใช่ลำดับโค้ด** — `partial unique index`
+`(phone_e164) where released_at is null` + จับด้วยการ insert แล้วอ่าน unique violation
+เป็นคำตอบ "มีคนถือแล้ว" · ห้ามเปลี่ยนไปเช็คก่อนแล้วค่อย insert (race กันได้)
+
+⚠️ **`insertQueueItems()` ใน `lumosDispatch.ts` เป็นคอขวดเดียวของการเข้าคิวทุกเส้น**
+(auto / คนติ๊กเลือก / Follow) — กรองเบอร์ที่คนถือไว้ที่นั้นที่เดียวจึงครอบทุกทางเข้า
+คืน `{ added, held }` · `held` ต้องไม่ถูกนับเป็น `duplicated`
+
+⚠️ **ผลโทรใช้ศัพท์ชุดเดียวกับ Lumos outcome** (`confirmed` / `declined` /
+`reschedule_requested` / `no_answer` / `wrong_person`) เพื่อให้ funnel นับ "ผลจากคน"
+รวมกับ "ผลจาก AI" เป็นชุดเดียว — เพิ่มค่าใหม่ต้องเป็นค่าที่ Lumos ส่งกลับได้จริงด้วย
+
+⚠️ **"ไม่สนใจ" แยก 2 แบบด้วย `result_scope`** (เจ้าของกำหนด):
+`job` = ไม่เอางานนี้ → AI ยังเสนองานอื่นต่อได้ · `all` = ไม่หางานแล้ว → ต้องพักเบอร์
+ไม่ส่ง scope มาถือเป็น `job` (ปลอดภัยกว่า ไม่ตัดคนออกจากระบบเอง)
+
+⚠️ อายุล็อก **1 วัน** · กวาดแบบ lazy (`releaseExpiredCallHolds()` เรียกก่อนจับ/อ่านทุกครั้ง)
+ไม่มี cron · `criminal`-style ข้อมูลอ่อนไหวไม่มีในตารางนี้
+
+⚠️ **API ไม่ส่งเบอร์กลับไปหน้าเว็บ** (`toWire()`) — ล็อกของแผนกอื่นจึงไม่รั่วเบอร์
+หน้าเว็บมีเบอร์อยู่แล้วและใช้ `candidateRef` เป็นคีย์
+
+⚠️ **แตะเบอร์บนการ์ด = รับไปโทรเองอัตโนมัติ** (ล็อกก่อน แล้วต่อสาย) เดิมเป็นลิงก์ `tel:`
+เปล่า ๆ กดโทรได้เลยโดยไม่ผ่านอะไร — ตัวต้นเหตุที่ทำให้โทรชนกัน
+
+หมายเหตุ: `AcquireCallHoldResult` เป็น object **แบน** ไม่ใช่ discriminated union โดยตั้งใจ
+เพราะจุดเรียกใช้อยู่ใน callback ของ setState ซึ่ง narrowing ไม่ข้ามเข้าไปให้
+
+### หน้า "โทรของฉัน" + บอร์ดหัวหน้า
+
+* `src/pages/matching/MyCallsPage.tsx` (`/matching/my-calls`) — ถังงานโทรของตัวเอง
+  จัดกลุ่มตามใบขอ (โทรจบเป็นเรื่อง ๆ) · ไฮไลต์แถวที่ใกล้คายภายใน 2 ชม. ·
+  แผนผังบอกปลายทางของผลแต่ละแบบ + ยอดวันนี้
+* `src/pages/matching/CallTeamBoardPage.tsx` (`/matching/call-team`) — เฉพาะ supervisor/admin
+  แถบภาระเทียบเพดาน 10 คน/คน · แดงเมื่อมีงานค้างเกิน 20 ชม. · โอนรายคน · คืน AI ทั้งกอง · เทกอง
+* API เพิ่ม: `GET ?mine=1` (คืน `{holds, tally}`) · `GET ?team=1` (403 ถ้าไม่ใช่หัวหน้า) ·
+  `PATCH {holdId, transferToUserId}` โอนงาน · `DELETE ?dumpUserId=&reason=` เทกอง
+* `tallyCallResultsSince()` — สรุปผลโทร**ที่คนบันทึก**ของวันนี้
+  ⚠️ **แยก "ไม่เอางานนี้" (`job`) กับ "ไม่หางานแล้ว" (`all`) เป็นสองตัวเลข** เพราะปลายทางต่างกัน
+  ยอดของ AI อยู่ที่ `lumos_dispatch_queue` — หน้าเว็บเอามาต่อกันเป็น funnel เดียว
+
+⚠️ **โอนงาน = ปล่อยแถวเดิม (`transferred`) + สร้างแถวใหม่** ไม่ใช่ update ผู้ถือ
+เพื่อให้ timeline เห็นว่างานเคยอยู่มือใคร · **คนรับได้เวลาใหม่เต็ม 1 วัน** ไม่ใช่เศษเวลาของคนเดิม
+
+⚠️ บอร์ดหัวหน้าจับคู่ผู้ถือด้วย **ชื่อ** (`heldByName`) เพราะ API ไม่ส่ง `heldByUserId` กลับ
+(กันข้อมูลรั่ว) — จับคู่ไม่ได้จะเทกองไม่ได้ ปุ่มจะ disable และบอกให้โอนรายคนแทน
+ถ้าจะแก้ให้แน่นกว่านี้ ต้องเพิ่ม field ที่ปลอดภัย (เช่น hash) ไม่ใช่ส่ง userId ดิบ
+
 ## Safe implementation / feature flag
 
 Edit documentation:
