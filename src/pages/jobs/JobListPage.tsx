@@ -70,24 +70,6 @@ import {
 } from '@/lib/jobListPageState';
 import { saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
 
-const OPEN_IN_NEW_TAB_KEY = 'jarvis.unitRequest.openInNewTab';
-
-function loadOpenInNewTabPref(): boolean {
-  try {
-    return localStorage.getItem(OPEN_IN_NEW_TAB_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function saveOpenInNewTabPref(value: boolean) {
-  try {
-    localStorage.setItem(OPEN_IN_NEW_TAB_KEY, value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
-}
-
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
   if (!d) return '—';
@@ -141,14 +123,15 @@ const JobListPage: React.FC = () => {
   );
 
   const returnTo = jobListReturnTo(location.pathname, location.search);
-  const [openInNewTab, setOpenInNewTab] = useState(loadOpenInNewTabPref);
-
   const openJob = useCallback(
     (job: JobRequest, e?: { metaKey: boolean; ctrlKey: boolean; button: number; altKey?: boolean }) => {
-      const newTab = openInNewTab || (e ? shouldOpenInNewTabFromEvent(e) : false);
-      navigateToUnitRequest(job, navigate, { returnTo, openInNewTab: newTab });
+      // เปิดแท็บใหม่เฉพาะตอนกด Ctrl/⌘ หรือคลิกกลางเท่านั้น (ไม่มีค่า preference แล้ว)
+      navigateToUnitRequest(job, navigate, {
+        returnTo,
+        openInNewTab: e ? shouldOpenInNewTabFromEvent(e) : false,
+      });
     },
-    [navigate, returnTo, openInNewTab],
+    [navigate, returnTo],
   );
 
   const updateListState = useCallback(
@@ -407,30 +390,9 @@ const JobListPage: React.FC = () => {
         }
         backPath="/"
         actions={
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            disabled={refreshing}
-            className="flex items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50"
-          >
-            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-            รีเฟรช
-          </button>
-        }
-      />
-
-      <div className="px-4 md:px-6 space-y-4">
-        {loadError && (
-          <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
-            {loadError}
-          </div>
-        )}
-
-        {/* ตัวกรองเป็นแถบบนเต็มความกว้าง (mockup rev.3 ข้อ 05) — ช่องกรองครบเท่าเดิมทุกช่อง
-            แถวแรกรวม ค้นหา + ปุ่มสถานะ + เปิดแท็บใหม่ ไว้บรรทัดเดียว ตารางข้างล่างจึงขึ้นมาเห็นเร็วขึ้น */}
-        <div className={cn(DASH.cardLg, 'p-3 md:p-4 space-y-3')}>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-[220px] flex-1">
+          // ช่องค้นหาอยู่คู่ปุ่มรีเฟรชบนหัวหน้า — ของที่ใช้บ่อยสุดอยู่ใกล้มือ ไม่ต้องเลื่อนหาในกล่องตัวกรอง
+          <div className="flex items-center gap-2">
+            <div className="w-[200px] sm:w-[280px]">
               <label htmlFor="job-list-search" className="sr-only">
                 ค้นหา
               </label>
@@ -443,51 +405,47 @@ const JobListPage: React.FC = () => {
                 onChange={(e) => updateListState({ search: e.target.value })}
               />
             </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { value: 'all' as const, label: 'ทั้งหมด' },
-                { value: 'active' as const, label: 'ดำเนินการ' },
-                { value: 'closed' as const, label: 'ปิดแล้ว' },
-              ].map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  onClick={() => updateListState({ filter: f.value })}
-                  className={cn(
-                    'rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors',
-                    filter === f.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary/80 text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            <label className="inline-flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                className="rounded border-border"
-                checked={openInNewTab}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  setOpenInNewTab(next);
-                  saveOpenInNewTabPref(next);
-                }}
-              />
-              เปิดใบขอในแท็บใหม่
-              <span className="text-[10px] text-muted-foreground/80">(หรือ Ctrl/⌘+คลิก)</span>
-            </label>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              disabled={refreshing}
+              className="flex shrink-0 items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/60"
+            >
+              <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+              รีเฟรช
+            </button>
           </div>
+        }
+      />
 
+      <div className="px-4 md:px-6 space-y-4">
+        {loadError && (
+          <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+            {loadError}
+          </div>
+        )}
+
+        {/* ตัวกรองเป็นแถบบนเต็มความกว้าง — ช่องกรองครบทุกช่อง อยู่ในกริดเดียวกันหมด
+            (ค้นหาย้ายขึ้นไปอยู่คู่ปุ่มรีเฟรชบนหัวหน้า · สถานะใบขอกลายเป็นช่องกรองตัวหนึ่ง) */}
+        <div className={cn(DASH.cardLg, 'p-3 md:p-4')}>
           <div
             className={cn(
               'grid gap-3',
               siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
             )}
           >
+          {/* สถานะใบขอ (ทั้งหมด/ดำเนินการ/ปิดแล้ว) — เดิมเป็นปุ่มลอย ย้ายมาเป็นช่องกรองตัวแรกของกริด */}
+          <FilterSelect
+            id="job-list-status"
+            label="ใบขอเปิด / ปิด"
+            value={filter}
+            onChange={(v) => updateListState({ filter: v as typeof filter })}
+          >
+            <option value="all">ทั้งหมด</option>
+            <option value="active">ดำเนินการ</option>
+            <option value="closed">ปิดแล้ว</option>
+          </FilterSelect>
+
           {siamrajPrimary ? (
             <FilterMultiSelect
               id="job-list-department"
