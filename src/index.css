@@ -76,6 +76,67 @@
     --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Anuphan', 'Segoe UI', 'Helvetica Neue', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   }
+
+  /* ── Dark mode — สลับด้วย class `dark` บน <html> (src/lib/theme.ts) ──
+     คุมโทนเดียวกับ light: พื้นเทาเย็นแบบ Apple + system blue accent */
+  .dark {
+    --background: 240 6% 8%;
+    --foreground: 240 10% 92%;
+
+    --card: 240 5% 12%;
+    --card-foreground: 240 10% 92%;
+
+    --popover: 240 5% 12%;
+    --popover-foreground: 240 10% 92%;
+
+    --primary: 211 100% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 16%;
+    --secondary-foreground: 240 8% 80%;
+
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 5% 64%;
+
+    --accent: 211 100% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 3 85% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* success/warning/info ของธีมมืด — เดิมไม่ได้ประกาศไว้เลย ค่าธีมสว่างจึงถูกใช้ต่อ
+       (เขียว/ส้มเข้มพออ่านได้บนพื้นขาว แต่บนพื้นมืดจะทึบเกิน) สว่างขึ้นและลดความอิ่มลงเล็กน้อย
+       ให้เข้าชุดกับ --primary/--destructive ของธีมมืด */
+    --success: 145 55% 52%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 92% 58%;
+    --warning-foreground: 240 6% 11%;
+    --info: 211 100% 62%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 240 5% 22%;
+    --input: 240 5% 22%;
+    --ring: 211 100% 55%;
+
+    --sidebar-background: 240 5% 10%;
+    --sidebar-foreground: 240 8% 80%;
+    --sidebar-primary: 211 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 16%;
+    --sidebar-accent-foreground: 240 10% 92%;
+    --sidebar-border: 240 5% 22%;
+    --sidebar-ring: 211 100% 55%;
+
+    --gradient-card: linear-gradient(145deg, hsl(240 5% 13% / 0.92), hsl(240 5% 10% / 0.75));
+    --gradient-hero: linear-gradient(135deg, hsl(240 5% 11%), hsl(240 5% 8%));
+
+    --shadow-glow: 0 0 40px hsl(211 100% 55% / 0.25);
+    --shadow-card: 0 8px 24px hsl(0 0% 0% / 0.45);
+
+    --jarvis-warm-1: #0e0e11;
+    --jarvis-warm-2: #121218;
+    --jarvis-warm-3: #16161d;
+  }
 }
 
 @layer base {
@@ -205,6 +266,14 @@
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   }
 
+  /* hero เข้มของหน้า Dashboard (mockup rev.3 ข้อ 02) — น้ำเงินหมึกไล่จากมุมบนซ้าย
+     เข้มเท่ากันทั้งสองธีมโดยตั้งใจ (คู่มืดมีแค่เงา/เส้นใน — ดู @layer ล่าง) */
+  .jarvis-hero-card {
+    @apply rounded-[1.25rem] text-white;
+    background: radial-gradient(1200px 320px at 12% -40%, #22345c 0%, #10182b 55%);
+    box-shadow: 0 12px 40px rgba(16, 24, 43, 0.22);
+  }
+
   .jarvis-pill-btn {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-medium transition-all;
     box-shadow: 0 4px 14px hsl(211 100% 50% / 0.28);
@@ -284,6 +353,17 @@
   .jarvis-chip-violet {
     @apply border-violet-200 bg-violet-50 text-violet-700;
   }
+  /* 3 โทนล่างเพิ่มตอนทำ token กลาง (src/lib/designTokens.ts) — ให้ครบ 9 โทนเท่าที่ TONE ประกาศ
+     น้ำเงิน=กำลังดำเนินการ · ส้ม=ส่งทีมคอนเทนต์/ปิดช้า · เขียวน้ำทะเล=ส่ง Scraping */
+  .jarvis-chip-primary {
+    @apply border-blue-200 bg-blue-50 text-blue-700;
+  }
+  .jarvis-chip-orange {
+    @apply border-orange-200 bg-orange-50 text-orange-700;
+  }
+  .jarvis-chip-teal {
+    @apply border-teal-200 bg-teal-50 text-teal-700;
+  }
 
   /* ปุ่มมาตรฐาน 4 ระดับ — ทุกปุ่มในระบบควรเป็นหนึ่งในนี้ */
   .jarvis-btn {
@@ -353,5 +433,119 @@
     @apply -translate-y-0.5;
     box-shadow: 0 14px 44px rgba(24, 20, 16, 0.09);
     border-color: rgba(255, 255, 255, 0.92);
+  }
+}
+
+/* ── Dark variants ของ class กลาง — คู่กับตัวแปรใน .dark ข้างบน ──
+   ทุก class ที่ประกาศสีสว่างตายตัว (ขาว/glass) ต้องมีคู่มืดตรงนี้ ไม่งั้นสลับธีมแล้วจะสว่างค้าง */
+@layer utilities {
+  .dark .glass-card {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(145deg, rgba(30, 30, 36, 0.88), rgba(22, 22, 27, 0.72));
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .dark .jarvis-frost {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(145deg, rgba(30, 30, 36, 0.85), rgba(22, 22, 27, 0.65));
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .dark .jarvis-soft-field {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(32, 32, 38, 0.85);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+  .dark .jarvis-soft-field:focus {
+    background: #1e1e24;
+  }
+
+  /* การ์ดดำ/hero อยู่บนพื้นมืดแล้วขอบจะกลืนไปเลย — เติมเส้นจาง ๆ ให้ยังเห็นเป็นการ์ด */
+  .dark .jarvis-dark-card {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .dark .jarvis-hero-card {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .jarvis-menu-card:hover {
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .dark .jarvis-interactive-card:hover {
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .dark .jarvis-stat-tile {
+    @apply border-white/10 bg-white/[0.05];
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  }
+  .dark button.jarvis-stat-tile:hover {
+    @apply border-sky-700/60 bg-sky-950/40;
+  }
+
+  /* chips — โทนเดียวกับ light แต่บนพื้นมืด: พื้นทึบจาง ตัวหนังสือโทนอ่อน */
+  .dark .jarvis-chip-neutral {
+    @apply border-slate-700 bg-slate-800/70 text-slate-300;
+  }
+  .dark .jarvis-chip-info {
+    @apply border-sky-800 bg-sky-950/70 text-sky-300;
+  }
+  .dark .jarvis-chip-success {
+    @apply border-emerald-800 bg-emerald-950/70 text-emerald-300;
+  }
+  .dark .jarvis-chip-warn {
+    @apply border-amber-800 bg-amber-950/70 text-amber-300;
+  }
+  .dark .jarvis-chip-danger {
+    @apply border-red-800 bg-red-950/70 text-red-300;
+  }
+  .dark .jarvis-chip-violet {
+    @apply border-violet-800 bg-violet-950/70 text-violet-300;
+  }
+  .dark .jarvis-chip-primary {
+    @apply border-blue-800 bg-blue-950/70 text-blue-300;
+  }
+  .dark .jarvis-chip-orange {
+    @apply border-orange-800 bg-orange-950/70 text-orange-300;
+  }
+  .dark .jarvis-chip-teal {
+    @apply border-teal-800 bg-teal-950/70 text-teal-300;
+  }
+
+  /* ปุ่มมาตรฐาน — primary ใช้ตัวแปรอยู่แล้ว ไม่ต้องแตะ */
+  .dark .jarvis-btn-secondary {
+    @apply border-sky-800 bg-slate-900 text-sky-300;
+  }
+  .dark .jarvis-btn-secondary:hover:not(:disabled) {
+    @apply border-sky-700 bg-sky-950/60;
+  }
+  .dark .jarvis-btn-ghost {
+    @apply border-slate-700 bg-slate-900 text-slate-300;
+  }
+  .dark .jarvis-btn-ghost:hover:not(:disabled) {
+    @apply bg-slate-800;
+  }
+  .dark .jarvis-btn-danger {
+    @apply border-red-900 bg-slate-900 text-red-400;
+  }
+  .dark .jarvis-btn-danger:hover:not(:disabled) {
+    @apply border-red-800 bg-red-950/50;
+  }
+
+  .dark .jarvis-warm-bg {
+    background:
+      radial-gradient(ellipse 80% 60% at 85% 12%, hsl(211 100% 55% / 0.07), transparent 55%),
+      radial-gradient(ellipse 60% 50% at 8% 85%, hsl(211 90% 60% / 0.05), transparent 50%),
+      linear-gradient(160deg, var(--jarvis-warm-1) 0%, var(--jarvis-warm-2) 50%, var(--jarvis-warm-3) 100%);
+  }
+
+  .dark .btn-primary {
+    @apply border-slate-600 bg-slate-900 text-slate-300;
+  }
+  .dark .btn-primary:hover:not(:disabled) {
+    @apply bg-slate-800;
   }
 }

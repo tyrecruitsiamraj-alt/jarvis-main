@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import { apiFetch } from '@/lib/apiFetch';
 import { unitRequestCardSubtitle, unitRequestCardTitle } from '@/lib/unitRequestDisplay';
 
@@ -47,13 +48,19 @@ function JobRow({ job, onOpen }: { job: JobRequest; onOpen: () => void }) {
   );
 }
 
-/** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use) */
+/** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use / In process) */
 type BoardBucket = { column_id: number; label: string | null; count: number };
 
 const BUCKET_DISPLAY: Record<string, { title: string; desc: string; cls: string; bucket: string }> = {
-  'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: 'text-emerald-700', bucket: 'todo' },
-  'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: 'text-amber-700', bucket: 'no_job' },
-  're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: 'text-violet-700', bucket: 'reuse' },
+  'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: TONE.success.value, bucket: 'todo' },
+  'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: TONE.warn.value, bucket: 'no_job' },
+  're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: TONE.violet.value, bucket: 'reuse' },
+  'in process': {
+    title: 'กำลังเสนอใบอื่น (In process)',
+    desc: 'ถูกเสนอใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คว่าใบเดิมจบแล้วหรือยัง)',
+    cls: TONE.info.value,
+    bucket: 'in_process',
+  },
 };
 
 const MatchingDashboard: React.FC = () => {
@@ -99,35 +106,36 @@ const MatchingDashboard: React.FC = () => {
     label: string;
     desc: string;
     icon: LucideIcon;
-    accent: string;
+    /** โทนของเมนู — พื้น/ไอคอนมาจาก token กลาง (มีคู่ dark ครบ) */
+    tone: ToneKey;
   }[] = [
     {
       path: '/matching/match',
       label: 'Matching',
       desc: 'จับคู่ผู้สมัครกับงานตามรัศมีและคะแนน Match',
       icon: Search,
-      accent: 'text-blue-700 bg-blue-500/12',
+      tone: 'primary' as const,
     },
     {
       path: '/matching/pre-check',
       label: 'Pre-Check',
       desc: 'ค้นหางานใกล้ที่อยู่ผู้สมัครก่อนสมัคร',
       icon: ClipboardCheck,
-      accent: 'text-amber-700 bg-amber-500/12',
+      tone: 'warn' as const,
     },
     {
       path: '/matching/reservations',
       label: 'รายชื่อคนจอง',
       desc: 'ดูคนที่กำลังจอง/ลงงานอยู่ ยกเลิกจองได้',
       icon: BookmarkCheck,
-      accent: 'text-emerald-700 bg-emerald-500/12',
+      tone: 'success' as const,
     },
     {
       path: '/matching/job-postings',
       label: 'คำขอโพสหางานใหม่',
       desc: 'ใบขอที่หาคนของเราไม่ได้ — ให้ทีมคอนเทนต์รับไปโพสต่อ',
       icon: Megaphone,
-      accent: 'text-rose-700 bg-rose-500/12',
+      tone: 'danger' as const,
     },
   ];
 
@@ -156,7 +164,8 @@ const MatchingDashboard: React.FC = () => {
               <div
                 className={cn(
                   'w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105',
-                  item.accent,
+                  TONE[item.tone].tile,
+                  TONE[item.tone].value,
                 )}
               >
                 <item.icon className="w-5 h-5" />
@@ -189,7 +198,7 @@ const MatchingDashboard: React.FC = () => {
             )}
           </div>
           {buckets ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {buckets.map((b) => {
                 const meta = BUCKET_DISPLAY[(b.label || '').trim().toLowerCase()] ?? {
                   title: b.label || `คอลัมน์ ${b.column_id}`,

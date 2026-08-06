@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiFetch';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 
 export type FollowCallStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 
@@ -57,10 +58,35 @@ export const FOLLOW_STATUS_LABEL: Record<FollowCallStatus, string> = {
   cancelled: 'ยกเลิกแล้ว',
 };
 
+/**
+ * สีสถานะการโทร — ผูกกับ token กลาง (mockup rev.3 ข้อ 08 "ภาษาเดียวกับ Matching ทั้งระบบ")
+ * เดิมเป็นชุดสี /15 ของตัวเอง ไม่มีคู่ dark เลย
+ *
+ * ความหมายตรงกับ TONE: รอ = เทา · AI รับไปโทร = น้ำเงิน (กำลังดำเนินการ) ·
+ * สำเร็จ = เขียว · ไม่สำเร็จ = แดง · ยกเลิก = เทา
+ */
+export const FOLLOW_STATUS_TONE: Record<FollowCallStatus, ToneKey> = {
+  pending: 'neutral',
+  delivered: 'primary',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+};
+
+/** ชิปสถานะพร้อมใช้ — ชี้ไปที่ class กลางเดียวกับหน้าอื่น */
 export const FOLLOW_STATUS_CLASS: Record<FollowCallStatus, string> = {
-  pending: 'bg-slate-500/15 text-slate-700',
-  delivered: 'bg-blue-500/15 text-blue-700',
-  completed: 'bg-emerald-500/15 text-emerald-700',
-  failed: 'bg-red-500/10 text-red-700',
-  cancelled: 'bg-muted text-muted-foreground',
+  pending: TONE.neutral.chip,
+  delivered: TONE.primary.chip,
+  completed: TONE.success.chip,
+  failed: TONE.danger.chip,
+  cancelled: TONE.neutral.chip,
+};
+
+/** แถบสีซ้ายของการ์ด (mockup rev.3 ข้อ 08) — โทนเดียวกับชิป */
+export const FOLLOW_STATUS_BAR: Record<FollowCallStatus, string> = {
+  pending: TONE.neutral.dot,
+  delivered: TONE.primary.dot,
+  completed: TONE.success.dot,
+  failed: TONE.danger.dot,
+  cancelled: TONE.neutral.dot,
 };

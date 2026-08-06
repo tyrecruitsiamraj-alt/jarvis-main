@@ -17,6 +17,8 @@ import { BrandTitle } from '@/components/shared/BrandMark';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -25,51 +27,63 @@ import {
 } from '@/lib/flowSummaryApi';
 
 
-/** ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง */
+/**
+ * ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง
+ * สีทั้งแถบหัวการ์ดและตัวเลขมาจาก token กลางตัวเดียว (@/lib/designTokens) ไม่ประกาศ class สีที่นี่
+ */
 function FlowStage({
   label,
   value,
   sub,
   onClick,
-  accent,
+  tone,
 }: {
   label: string;
   value: number;
   sub?: string;
   onClick: () => void;
-  accent: string;
+  /** โทนของขั้นนี้ — บอกว่าอยู่ช่วงไหนของสาย กวาดตาแยกได้ก่อนอ่านตัวเลข */
+  tone: ToneKey;
 }) {
+  const t = TONE[tone];
+  // ขั้น funnel อยู่บน hero เข้ม (mockup rev.3 ข้อ 01): กล่องโปร่งขอบบนสีตามขั้น
+  // ตัวเลขใช้ TONE.onDark (โทนอ่อน) เพราะพื้นเข้มตลอดทั้งสองธีม
   return (
     <button
       type="button"
       onClick={onClick}
-      className="jarvis-stat-tile min-w-0 flex-1"
+      className={cn(
+        'min-w-0 flex-1 rounded-xl border border-white/[0.14] bg-white/[0.07] px-3 py-2 text-left transition-colors hover:bg-white/[0.12] !border-t-[3px]',
+        t.bar,
+      )}
     >
-      <div className="jarvis-stat-label">{label}</div>
-      <div className={cn('jarvis-stat-value', accent)}>{value}</div>
-      {sub ? <div className="jarvis-stat-sub">{sub}</div> : null}
+      <div className="text-[10px] font-medium leading-tight text-slate-400">{label}</div>
+      <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
+        {value}
+      </div>
+      {sub ? <div className="mt-1 text-[10px] leading-tight text-slate-400">{sub}</div> : null}
     </button>
   );
 }
 
-/** โทนสีบอกสถานะของรายการติดตาม — เขียว=พร้อม/สนใจ · เหลือง=รอโทรซ้ำ · แดง=ติดขัด/ไม่มีคน */
+/** สถานะของรายการติดตาม — ผูกกับโทนกลาง: สำเร็จ=พร้อม/สนใจ · รอ=โทรซ้ำ · ติดขัด=ต้องมีคนตัดสินใจ */
 const FOLLOW_UP_TONE = {
   good: {
-    row: 'border-emerald-200 bg-emerald-50/80 hover:bg-emerald-100/70',
+    tone: 'success',
     dot: '🟢',
     hint: 'พร้อม — กดจองได้เลย',
   },
   warn: {
-    row: 'border-amber-200 bg-amber-50/80 hover:bg-amber-100/70',
+    tone: 'warn',
     dot: '🟡',
     hint: 'รอโทรซ้ำ',
   },
   bad: {
-    row: 'border-red-200 bg-red-50/80 hover:bg-red-100/70',
+    tone: 'danger',
     dot: '🔴',
     hint: 'ติดขัด — ต้องมีคนตัดสินใจ',
   },
-} as const;
+} as const satisfies Record<string, { tone: ToneKey; dot: string; hint: string }>;
 type FollowUpTone = keyof typeof FOLLOW_UP_TONE;
 
 /** รายการคนที่ต้องตามต่อจากผลโทร — สีของแถวบอกสถานะเอง กดแล้วเปิดใบขอนั้นในหน้า Matching */
@@ -94,7 +108,11 @@ function FollowUpList({
           type="button"
           onClick={() => onOpen(it)}
           title={t.hint}
-          className={cn('w-full rounded-lg border px-2 py-1.5 text-left', t.row)}
+          className={cn(
+            'w-full rounded-lg border px-2 py-1.5 text-left',
+            TONE[t.tone].soft,
+            TONE[t.tone].softHover,
+          )}
         >
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-[11px] font-medium text-foreground">
@@ -170,31 +188,30 @@ const HomePage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 space-y-3"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="jarvis-section-title">
-              การไหลของงานสรรหา · เดือนนี้
-            </h2>
-            <button
-              type="button"
-              onClick={() => void loadFlow()}
-              disabled={flowLoading}
-              className="jarvis-btn-ghost"
-            >
-              <RefreshCw className={cn('h-3 w-3', flowLoading && 'animate-spin')} /> รีเฟรช
-            </button>
-          </div>
-
-          {/* Funnel หลัก */}
-          <div className="glass-card rounded-[1.5rem] border border-white/70 p-3">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+          {/* Funnel อยู่ใน hero เข้มตาม mockup rev.3 ข้อ 01 — เข้าระบบมาเจอการไหลของงานก่อนทุกอย่าง
+              5 ขั้นหลัก + เส้นแยก "ไม่มีคนแนะนำ" อยู่ในแถวเดียวกัน (กดตัวเลขไปหน้านั้นได้เหมือนเดิม) */}
+          <PageHeroStrip
+            eyebrow="การไหลของงานสรรหา · เดือนนี้"
+            actions={
+              <button
+                type="button"
+                onClick={() => void loadFlow()}
+                disabled={flowLoading}
+                className={cn(heroButton, 'disabled:opacity-50')}
+              >
+                <RefreshCw className={cn('h-3 w-3', flowLoading && 'animate-spin')} /> รีเฟรช
+              </button>
+            }
+          >
+            <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
               <FlowStage
                 label="ใบขอเปิดอยู่"
                 value={flow.jobs.open_total}
                 sub={`ด่วน ${flow.jobs.urgent} ใบ`}
-                accent="text-slate-800"
+                tone="neutral"
                 onClick={() => navigate(resolveUnitNavPath())}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -202,10 +219,10 @@ const HomePage: React.FC = () => {
                 label="AI แนะนำคนแล้ว"
                 value={flow.jobs.with_recommend}
                 sub={`จากที่ประเมิน ${flow.jobs.analyzed} ใบ`}
-                accent="text-sky-700"
+                tone="info"
                 onClick={() => navigate('/matching/match?workflow=green')}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -213,10 +230,10 @@ const HomePage: React.FC = () => {
                 label="ส่ง AI โทร"
                 value={flow.lumos.sent_month}
                 sub={`รอโทรอีก ${flow.lumos.waiting_call + flow.lumos.delivered_waiting}`}
-                accent="text-blue-700"
+                tone="primary"
                 onClick={() => navigate('/matching/match')}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -224,10 +241,10 @@ const HomePage: React.FC = () => {
                 label="สนใจงาน (จากผลโทร)"
                 value={confirmedThisMonth(flow)}
                 sub={`ปฏิเสธ ${flow.lumos.outcomes_month['declined'] ?? 0} · ไม่รับสาย ${(flow.lumos.outcomes_month['no_answer'] ?? 0) + (flow.lumos.outcomes_month['unresponsive'] ?? 0)}`}
-                accent="text-emerald-700"
+                tone="success"
                 onClick={() => navigate('/matching/match')}
               />
-              <div className="flex items-center justify-center text-muted-foreground/60">
+              <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
@@ -235,39 +252,45 @@ const HomePage: React.FC = () => {
                 label="จองตัวอยู่ / ลงงาน"
                 value={flow.proposals.reserved_active + flow.proposals.placed_month}
                 sub={`จอง ${flow.proposals.reserved_active} · ลงงานเดือนนี้ ${flow.proposals.placed_month}`}
-                accent="text-violet-700"
+                tone="violet"
                 onClick={() => navigate('/matching/reservations')}
               />
-            </div>
 
-            {/* หาคนของเราไม่ได้ → ส่งต่อทีมอื่น: คิดคอนเทนต์ / ไปดูดประกาศ (เส้นขนานกับ funnel หลัก) */}
-            <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
+              {/* แยกเส้น ไม่ใช่ขั้นที่ 6 — ใบที่ AI หาคนของเราไม่ได้ ถูกส่งต่อทีมอื่นแทน
+                  ป้ายกำกับไว้กันอ่านผิดว่าต่อจาก "จองตัว/ลงงาน" */}
+              <div className="flex items-center justify-center gap-1.5 px-1">
+                <span className="hidden h-8 w-px bg-white/20 sm:block" aria-hidden />
+                <span className="text-[10px] font-medium leading-tight text-[#c9b184]">
+                  ไม่มีคน
+                  <br className="hidden sm:block" /> แนะนำ →
+                </span>
+              </div>
               <FlowStage
                 label="ส่งคิด Content"
                 value={flow.postings.content ?? 0}
                 sub="ใบขอที่รอทีมคอนเทนต์ทำโพส"
-                accent="text-orange-700"
+                tone="orange"
                 onClick={() => navigate('/matching/job-postings')}
               />
               <FlowStage
                 label="ส่ง Scraping"
                 value={flow.postings.scraping ?? 0}
                 sub="ใบขอที่รอไปดูดประกาศหาคน"
-                accent="text-teal-700"
+                tone="teal"
                 onClick={() => navigate('/matching/job-postings')}
               />
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+            <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
               ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด · เป็นสถานะการทำงานของทีม Matching ไม่ใช่ยอด
               "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ
             </p>
-          </div>
+          </PageHeroStrip>
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             {flow.follow_ups.confirmed_waiting.length > 0 ? (
-              <div className="glass-card rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-900">
+              <div className={cn('glass-card rounded-2xl border p-3', TONE.success.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.success.num)}>
                   <PhoneCall className="h-3.5 w-3.5" />
                   สนใจงานแล้ว — รอคนกดจอง ({flow.follow_ups.confirmed_waiting.length})
                 </div>
@@ -280,8 +303,8 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {flow.follow_ups.no_answer.length > 0 ? (
-              <div className="glass-card rounded-2xl border border-amber-200/80 bg-amber-50/40 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900">
+              <div className={cn('glass-card rounded-2xl border p-3', TONE.warn.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.warn.num)}>
                   <PhoneForwarded className="h-3.5 w-3.5" />
                   ไม่รับสาย — ควรโทรซ้ำ ({flow.follow_ups.no_answer.length})
                 </div>
@@ -294,8 +317,8 @@ const HomePage: React.FC = () => {
             ) : null}
 
             {flow.jobs.urgent_stuck > 0 || flow.lumos.stale_delivered > 0 ? (
-              <div className="glass-card rounded-2xl border border-red-200/80 bg-red-50/40 p-3 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-red-900">
+              <div className={cn('glass-card rounded-2xl border p-3 space-y-1.5', TONE.danger.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.danger.num)}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   ติดขัด — ต้องมีคนตัดสินใจ
                 </div>
@@ -303,16 +326,20 @@ const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/matching/match?urgent=1&workflow=none')}
-                    className="w-full rounded-lg border border-red-200 bg-red-50/80 px-2 py-1.5 text-left text-[11px] text-foreground hover:bg-red-100/70"
+                    className={cn(
+                      'w-full rounded-lg border px-2 py-1.5 text-left text-[11px] text-foreground',
+                      TONE.danger.soft,
+                      TONE.danger.softHover,
+                    )}
                   >
                     <span aria-hidden>🔴</span> ใบด่วนที่ AI ไม่พบคน และยังไม่ส่งโพสหาคนใหม่ —{' '}
-                    <span className="font-bold text-red-700">{flow.jobs.urgent_stuck} ใบ</span>
+                    <span className={cn('font-bold', TONE.danger.value)}>{flow.jobs.urgent_stuck} ใบ</span>
                   </button>
                 ) : null}
                 {flow.lumos.stale_delivered > 0 ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50/80 px-2 py-1.5 text-[11px] text-foreground">
+                  <div className={cn('rounded-lg border px-2 py-1.5 text-[11px] text-foreground', TONE.danger.soft)}>
                     <span aria-hidden>🔴</span> ส่ง AI โทรแล้วเกิน 2 วันยังไม่มีผลกลับ —{' '}
-                    <span className="font-bold text-red-700">{flow.lumos.stale_delivered} ราย</span>
+                    <span className={cn('font-bold', TONE.danger.value)}>{flow.lumos.stale_delivered} ราย</span>
                     <span className="text-muted-foreground"> · ควรเช็คกับทีม Lumos</span>
                   </div>
                 ) : null}
@@ -323,8 +350,8 @@ const HomePage: React.FC = () => {
             flow.follow_ups.no_answer.length === 0 &&
             flow.jobs.urgent_stuck === 0 &&
             flow.lumos.stale_delivered === 0 ? (
-              <div className="glass-card rounded-2xl border border-emerald-200/80 bg-emerald-50/30 p-3 lg:col-span-3">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-800">
+              <div className={cn('glass-card rounded-2xl border p-3 lg:col-span-3', TONE.success.soft)}>
+                <div className={cn('flex items-center gap-1.5 text-xs font-medium', TONE.success.value)}>
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   ไม่มีเรื่องค้างที่ต้องตามตอนนี้ — ผลโทรที่สนใจถูกจองครบ และใบด่วนมีคนดูแลแล้ว
                 </div>

@@ -8,9 +8,11 @@ import {
   cancelFollowEntry,
   FOLLOW_STATUS_LABEL,
   FOLLOW_STATUS_CLASS,
+  FOLLOW_STATUS_BAR,
   type FollowEntry,
   type FollowCallStatus,
 } from '@/lib/followApi';
+import NameAvatar from '@/components/shared/NameAvatar';
 
 const FILTERS: Array<{ id: 'all' | FollowCallStatus; label: string }> = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -315,17 +317,21 @@ const FollowPage: React.FC = () => {
         ) : (
           <div className="space-y-2.5">
             {filtered.map((it) => (
-              <div key={it.id} className="glass-card rounded-2xl border border-white/70 px-3.5 py-3">
+              // แถบสีซ้าย 4px บอกสถานะทันทีแบบการ์ด Matching (mockup rev.3 ข้อ 08)
+              <div
+                key={it.id}
+                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 pl-4 pr-3.5 py-3 dark:border-slate-700/70"
+              >
+                <span
+                  aria-hidden
+                  className={cn('absolute left-0 top-0 bottom-0 w-1', FOLLOW_STATUS_BAR[it.call_status])}
+                />
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      <NameAvatar name={it.recipient_name} />
                       <span className="font-bold text-foreground">{it.recipient_name}</span>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                          FOLLOW_STATUS_CLASS[it.call_status],
-                        )}
-                      >
+                      <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
                         {FOLLOW_STATUS_LABEL[it.call_status]}
                       </span>
                     </div>

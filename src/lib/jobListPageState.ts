@@ -19,7 +19,6 @@ export type JobListPageState = {
   unitFilter: string[];
   departmentFilter: string[];
   jobSubtypeFilter: string[];
-  yearFilter: string[];
   recruiterFilter: string[];
   screenerFilter: string[];
   oplFilter: string[];
@@ -39,7 +38,6 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   unitFilter: [],
   departmentFilter: [],
   jobSubtypeFilter: [],
-  yearFilter: [],
   recruiterFilter: [],
   screenerFilter: [],
   oplFilter: [],
@@ -114,7 +112,6 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     unitFilter: parseMulti(params.get('u')),
     departmentFilter: parseMulti(params.get('d')),
     jobSubtypeFilter: parseMulti(params.get('st')),
-    yearFilter: parseMulti(params.get('y')),
     recruiterFilter: parseMulti(params.get('r')),
     screenerFilter: parseMulti(params.get('sc')),
     oplFilter: parseMulti(params.get('opl')),
@@ -151,7 +148,6 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   setMulti('u', state.unitFilter);
   setMulti('d', state.departmentFilter);
   setMulti('st', state.jobSubtypeFilter);
-  setMulti('y', state.yearFilter);
   setMulti('r', state.recruiterFilter);
   setMulti('sc', state.screenerFilter);
   setMulti('opl', state.oplFilter);
@@ -176,7 +172,6 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'unitFilter',
   'departmentFilter',
   'jobSubtypeFilter',
-  'yearFilter',
   'recruiterFilter',
   'screenerFilter',
   'oplFilter',

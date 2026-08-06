@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import type { LifecycleBoardSummary, LifecycleBoardRow } from '@/lib/dashboard/lifecycle';
 import { LIFECYCLE_KIND_LABELS } from '@/lib/dashboard/lifecycle';
+import { cn } from '@/lib/utils';
+import { DASH } from '@/lib/designTokens';
 
 type Props = {
   board: LifecycleBoardSummary;
@@ -13,12 +15,12 @@ function fmt(n: number): string {
 
 function cell(bucket: { positions: number; requests: number }) {
   if (bucket.positions <= 0 && bucket.requests <= 0) {
-    return <span className="text-slate-300">—</span>;
+    return <span className="text-slate-300 dark:text-slate-600">—</span>;
   }
   return (
     <span className="tabular-nums">
-      <span className="font-semibold text-slate-900">{fmt(bucket.positions)}</span>
-      <span className="text-[10px] text-slate-500 ml-1">{fmt(bucket.requests)} ใบ</span>
+      <span className="font-semibold text-slate-900 dark:text-slate-100">{fmt(bucket.positions)}</span>
+      <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">{fmt(bucket.requests)} ใบ</span>
     </span>
   );
 }
@@ -96,18 +98,18 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
   }, [board, showOther]);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className={cn(DASH.card, 'p-4')}>
       <div className="mb-3 space-y-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Life Cycle ตามประเภทใบขอ</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Life Cycle ตามประเภทใบขอ</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             มุมวิเคราะห์: เข้ามาเท่าไหร่ → ปิด/ยกเลิกไปแล้วเท่าไหร่ → คงเหลือยังหาอยู่เท่าไหร่ · แยกตามประเภท · {periodLabel}
           </p>
         </div>
 
         {summary ? (
-          <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 space-y-1.5">
-            <p className="text-xs text-slate-800 font-medium">
+          <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 px-3 py-2 space-y-1.5">
+            <p className="text-xs text-slate-800 dark:text-slate-200 font-medium">
               ข้อสรุป {periodLabel}: เข้ามา{' '}
               <span className="tabular-nums">{fmt(summary.inPos)}</span> · ปิดแล้ว{' '}
               <span className="tabular-nums">{fmt(summary.closedPos)}</span>
@@ -116,14 +118,14 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
               <span className="tabular-nums text-amber-900">{fmt(summary.remPos)}</span>
               {summary.stillOpenPct != null ? ` (~${summary.stillOpenPct}% ของที่เข้ามา)` : ''}
             </p>
-            <p className="text-[11px] text-slate-600">
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">
               เข้ามาแยกประเภท — {summary.intakeByType}
             </p>
-            <p className="text-[11px] text-slate-600">
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">
               คงเหลือแยกประเภท (= การ์ดคงเหลือ) — {summary.remainingByType}
             </p>
             {summary.weak ? (
-              <p className="text-[11px] text-slate-600">
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
                 อ่าน % ปิดได้: ประเภทไหนต่ำ = ปิดช้า/ค้างนาน · ตอนนี้{summary.weak}
               </p>
             ) : null}
@@ -134,7 +136,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
       <div className="overflow-x-auto -mx-1">
         <table className="w-full min-w-[40rem] text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
               <th className="text-left font-medium px-2 py-2 whitespace-nowrap">รายการ</th>
               {cols.map((c) => (
                 <th key={c.key} className="text-right font-medium px-2 py-2 whitespace-nowrap">
@@ -149,11 +151,11 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
                 key={row.id}
                 className={
                   row.id === 'remaining'
-                    ? 'border-b border-slate-100 bg-amber-50/40'
-                    : 'border-b border-slate-100'
+                    ? 'border-b border-slate-100 dark:border-slate-800 bg-amber-50/40'
+                    : 'border-b border-slate-100 dark:border-slate-800'
                 }
               >
-                <td className="px-2 py-2.5 font-medium text-slate-800 whitespace-nowrap">{row.label}</td>
+                <td className="px-2 py-2.5 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">{row.label}</td>
                 {cols.map((c) => (
                   <td key={c.key} className="px-2 py-2.5 text-right">
                     {cell(row[c.key])}
@@ -161,7 +163,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
                 ))}
               </tr>
             ))}
-            <tr className="text-slate-500">
+            <tr className="text-slate-500 dark:text-slate-400">
               <td className="px-2 py-2.5 whitespace-nowrap">% ปิดได้ / ที่ขอ</td>
               {cols.map((c) => {
                 const kind =

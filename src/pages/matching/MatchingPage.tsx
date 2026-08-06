@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, Clock3, LoaderCircle } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -43,11 +42,23 @@ import {
   cancelProposal,
   proposalKey,
   proposalStatusLabel,
+  proposalStatusChip,
   ProposalConflictError,
   type ProposalStatus,
   type ProposalConflictInfo,
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import {
+  compareCandidatePriority,
+  describePriorityScore,
+  scoreCandidatePriority,
+  DEFAULT_PRIORITY_CONFIG,
+  type CandidatePriorityScore,
+  type PriorityConfig,
+  type PriorityVerdict,
+} from '@/lib/candidatePriority';
+import { fetchMatchPriorityConfig } from '@/lib/matchPriorityWeightsApi';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
@@ -176,6 +187,33 @@ function loadSavedPageSize(): number {
   }
 }
 
+/** สรุปยอดจาก /api/matching/list (นับตามชุดเต็มของ BU ที่เลือก) */
+type ServerListSummary = {
+  urgentTotal: number;
+  urgentAnalyzed: number;
+  urgentWithGreen: number;
+  scopedTotal?: number;
+  withGreen?: number;
+  withYellow?: number;
+  noRecommend?: number;
+};
+
+/**
+ * เก็บผลลิสต์ครั้งล่าสุดไว้ระดับ module — กด back/สลับเมนูกลับมาแล้วเห็นข้อมูลเดิมทันที
+ * (เดิมทุกครั้งที่กลับเข้าหน้า ต้องโหลดใหม่จากศูนย์ ~หลายวินาที จนดูเหมือนหน้าค้าง)
+ * ข้อมูลอาจเก่ากว่าจริงชั่วครู่ — effect โหลดชุดใหม่มาแทนที่เองทันทีที่เข้าหน้า
+ */
+let lastServerList: {
+  items: JobRequest[];
+  total: number;
+  page: number;
+  unitOptions: string[];
+  buCounts: Record<string, number>;
+  summary: ServerListSummary | null;
+  storedMatches: Record<string, { recommended: number; computedAt: string }>;
+  lumosSummary: Record<string, LumosJobCallSummaryRow>;
+} | null = null;
+
 function branchDemandItems(job: JobRequest): BranchDemandItem[] {
   const overrides = job.field_overrides?.branches;
   if (overrides?.length) {
@@ -221,15 +259,15 @@ function boardBranchProximityMeta(assignment: NearestBranchAssignment | null): {
   }
   const branchName = assignment.branch.branch_name_clean;
   if (assignment.proximity_rank === 0) {
-    return { label: `ใกล้สาขา ${branchName} · เขตตรง`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    return { label: `ใกล้สาขา ${branchName} · เขตตรง`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' };
   }
   if (assignment.proximity_rank === 1) {
-    return { label: `น่าจะใกล้สาขา ${branchName}`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    return { label: `น่าจะใกล้สาขา ${branchName}`, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' };
   }
   if (assignment.proximity_rank === 2) {
-    return { label: 'จังหวัดเดียวกับจุดงาน · ยังฟันธงสาขาไม่ได้', cls: 'border-sky-200 bg-sky-50 text-sky-700' };
+    return { label: 'จังหวัดเดียวกับจุดงาน · ยังฟันธงสาขาไม่ได้', cls: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300' };
   }
-  return { label: 'อยู่ กทม./ปริมณฑล · ยังฟันธงสาขาไม่ได้', cls: 'border-amber-200 bg-amber-50 text-amber-700' };
+  return { label: 'อยู่ กทม./ปริมณฑล · ยังฟันธงสาขาไม่ได้', cls: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300' };
 }
 
 function buildIrecruitDisplayRows(
@@ -273,17 +311,17 @@ const TIER_CRITERIA: Record<MatchTier, { label: string; detail: string; dot: str
   green: {
     label: 'เขียว — เข้าข่ายมาก',
     detail: 'ตำแหน่งตรงหรือใกล้มาก อยู่สายงานเดียวกัน หรืองานใกล้เคียงระดับเขียว',
-    dot: 'bg-emerald-500',
+    dot: TONE.success.dot,
   },
   yellow: {
     label: 'เหลือง — พอได้ ต้องเช็ค',
     detail: 'งานใกล้เคียงและมีโอกาสทำได้ แต่ต้องเช็คประสบการณ์จริง คุณสมบัติสำคัญ หรือการเทรนเพิ่ม',
-    dot: 'bg-amber-400',
+    dot: TONE.warn.dot,
   },
   red: {
     label: 'แดง — ห่างไกล',
     detail: 'คนละสายงาน ห่างจากตำแหน่งที่ขอมาก หรือคุณสมบัติสำคัญไม่สอดคล้อง',
-    dot: 'bg-red-500',
+    dot: TONE.danger.dot,
   },
 };
 
@@ -332,12 +370,9 @@ function isActiveWorkflowStatus(status: ProposalStatus): boolean {
   return ACTIVE_WORKFLOW_STATUSES.includes(status);
 }
 
+/** สีสถานะการเสนอ — ใช้แหล่งกลางเดียวกับหน้าจองตัว (lib/candidateProposalsApi) */
 function proposalStatusClass(status: ProposalStatus): string {
-  if (status === 'placed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'reserved') return 'border-violet-200 bg-violet-50 text-violet-700';
-  if (status === 'contacted') return 'border-blue-200 bg-blue-50 text-blue-700';
-  if (status === 'rejected') return 'border-red-200 bg-red-50 text-red-700';
-  return 'border-slate-200 bg-slate-50 text-slate-600';
+  return proposalStatusChip(status);
 }
 
 const CANDIDATE_ACTION_BUTTON_CLASS =
@@ -409,23 +444,23 @@ function AiEvaluationStatus({ source }: { source: 'board' | 'irecruit' }) {
       aria-live="polite"
       className={cn(
         'rounded-xl border px-3 py-3 shadow-sm',
-        isBoard ? 'border-sky-200 bg-sky-50/80' : 'border-blue-200 bg-blue-50/80',
+        isBoard ? 'border-sky-200 bg-sky-50/80 dark:border-sky-800 dark:bg-sky-950/50' : 'border-blue-200 bg-blue-50/80 dark:border-blue-800 dark:bg-blue-950/50',
       )}
     >
       <div className="flex items-start gap-2.5">
-        <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600" />
+        <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-300" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <p className="text-xs font-semibold text-blue-900">กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-blue-700">
+            <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold tabular-nums text-blue-700 dark:text-blue-300">
               <Clock3 className="h-3 w-3" /> {formatElapsed(elapsedSeconds)}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-blue-800">{stage}</p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100">
+          <p className="mt-1 text-[11px] text-blue-800 dark:text-blue-200">{stage}</p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
             <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-400 via-sky-500 to-blue-400" />
           </div>
-          <p className="mt-1.5 text-[10px] text-blue-700">{estimate} · ไม่ต้องกดซ้ำ สามารถรอหน้านี้ได้</p>
+          <p className="mt-1.5 text-[10px] text-blue-700 dark:text-blue-300">{estimate} · ไม่ต้องกดซ้ำ สามารถรอหน้านี้ได้</p>
         </div>
       </div>
     </div>
@@ -469,17 +504,39 @@ function salaryVerdict(job: JobRequest, salary: number | null | undefined): Chec
   return salary <= job.total_income ? 'pass' : 'warn';
 }
 
-const CHECK_META: Record<CheckVerdict, { icon: string; cls: string }> = {
-  pass: { icon: '✓', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  warn: { icon: '!', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-  fail: { icon: '×', cls: 'border-red-200 bg-red-50 text-red-700' },
-  unknown: { icon: '?', cls: 'border-slate-200 bg-slate-50 text-slate-500' },
+/**
+ * คะแนนตามลำดับความสำคัญของเจ้าของ (อายุ → ที่อยู่ → ประสบการณ์ → รายได้ · ดู lib/candidatePriority)
+ * ประสบการณ์ = สายงานที่เคยทำตรงกับใบขอไหม ใช้ tier จาก AI แมทสกิล (เขียว=ตรง เหลือง=ใกล้ แดง=คนละสาย)
+ * เหล้า/บุหรี่ กับ คดี ยังไม่มีข้อมูลจากบอร์ด → unknown (ไม่ถูกนับ) จนกว่าจะมี field จริง
+ */
+function boardCandidatePriority(
+  job: JobRequest,
+  m: BoardCandidateMatch,
+  config: PriorityConfig,
+): CandidatePriorityScore {
+  return scoreCandidatePriority(
+    {
+      age: ageVerdict(job, m.age) as PriorityVerdict,
+      area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
+      experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
+      salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
+    },
+    config,
+  );
+}
+
+/** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
+const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
+  pass: { icon: '✓', tone: 'success' },
+  warn: { icon: '!', tone: 'warn' },
+  fail: { icon: '×', tone: 'danger' },
+  unknown: { icon: '?', tone: 'neutral' },
 };
 
 function CheckChip({ label, verdict }: { label: string; verdict: CheckVerdict }) {
   const meta = CHECK_META[verdict];
   return (
-    <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', meta.cls)}>
+    <span className={TONE[meta.tone].chip}>
       {label} {meta.icon}
     </span>
   );
@@ -511,22 +568,24 @@ function CandidateChecklist({
         ? 'pass'
         : 'warn'
     : 'unknown';
+  // ลำดับชิปไล่ตามลำดับความสำคัญที่เจ้าของกำหนด: อายุ → ที่อยู่ → ประสบการณ์ (ตำแหน่ง) → รายได้
+  // เพศ/ใบขับขี่เป็นเกณฑ์ของใบขอ อยู่ท้ายรายการ
   return (
     <div className="flex flex-wrap gap-1" aria-label="ผลตรวจคุณสมบัติเบื้องต้น">
-      <CheckChip label="ตำแหน่ง" verdict={position} />
-      <CheckChip label="พื้นที่" verdict={areaVerdict(job, areaParts)} />
-      <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
       <CheckChip label="อายุ" verdict={ageVerdict(job, age)} />
-      {salary !== undefined ? <CheckChip label="เงินเดือน" verdict={salaryVerdict(job, salary)} /> : null}
+      <CheckChip label="ที่อยู่" verdict={areaVerdict(job, areaParts)} />
+      <CheckChip label="ประสบการณ์" verdict={position} />
+      {salary !== undefined ? <CheckChip label="รายได้" verdict={salaryVerdict(job, salary)} /> : null}
+      <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
       {requiresLicense ? <CheckChip label="ใบขับขี่" verdict={license} /> : null}
     </div>
   );
 }
 
 function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; cls: string } {
-  if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', cls: 'border-emerald-200 bg-emerald-50/60' };
-  if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', cls: 'border-red-200 bg-red-50/50' };
-  return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60' };
+  if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', cls: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/50' };
+  if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', cls: 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/50' };
+  return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/50' };
 }
 
 function formatCallWhen(iso: string | null): string {
@@ -591,7 +650,7 @@ function LumosCallBadgeRow({
               type="button"
               disabled={cancelling}
               onClick={onCancel}
-              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/50"
             >
               <X className="h-2.5 w-2.5" /> {cancelling ? 'กำลังยกเลิก…' : 'ยกเลิกการส่ง'}
             </button>
@@ -607,32 +666,87 @@ function LumosCallBadgeRow({
  * ส่ง / โทรแล้ว / เหลือ (ยังไม่ได้โทร) / โอเค / ไม่ไป / ไม่รับ
  * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ระบบยกเลิกเอง)
  */
-function LumosJobSummaryStats({ s, className }: { s: LumosJobCallSummaryRow; className?: string }) {
+function LumosJobSummaryStats({
+  s,
+  className,
+  variant = 'pill',
+}: {
+  s: LumosJobCallSummaryRow;
+  className?: string;
+  /** pill = ก้อนลอยพื้นจาง (ในใบขอ/หน้ารายละเอียด) · column = เต็มความกว้างคอลัมน์ขวาของการ์ด */
+  variant?: 'pill' | 'column';
+}) {
   if (s.sent === 0) return null;
   const waiting = Math.max(0, s.sent - s.called);
   const cells = [
-    { label: 'ส่ง', value: s.sent, cls: 'text-slate-700', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
-    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-700', title: 'มีผลโทรกลับมาจริง' },
-    { label: 'เหลือ', value: waiting, cls: waiting > 0 ? 'text-amber-700' : 'text-slate-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
-    { label: 'โอเค', value: s.confirmed, cls: s.confirmed > 0 ? 'text-emerald-700' : 'text-slate-300', title: 'สนใจงาน' },
-    { label: 'ไม่ไป', value: s.declined, cls: s.declined > 0 ? 'text-red-700' : 'text-slate-300', title: 'ไม่สนใจ/ปฏิเสธ' },
-    { label: 'ไม่รับ', value: s.no_answer, cls: s.no_answer > 0 ? 'text-amber-800' : 'text-slate-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+    { label: 'ส่ง', value: s.sent, cls: 'text-slate-800 dark:text-slate-200', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-600 dark:text-blue-300', title: 'มีผลโทรกลับมาจริง' },
+    { label: 'เหลือ', value: waiting, cls: 'text-amber-600 dark:text-amber-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
+    { label: 'โอเค', value: s.confirmed, cls: 'text-emerald-600 dark:text-emerald-300', title: 'สนใจงาน' },
+    { label: 'ไม่ไป', value: s.declined, cls: 'text-rose-600 dark:text-rose-300', title: 'ไม่สนใจ/ปฏิเสธ' },
+    { label: 'ไม่รับ', value: s.no_answer, cls: 'text-amber-700 dark:text-amber-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
   ];
+  // สไตล์เรียบแบบ Apple: พื้นจางชิ้นเดียว ไม่มีเส้นแบ่ง เลขน้ำหนักกลางตัวใหญ่ขึ้นเล็กน้อย
+  // ป้ายตัวจิ๋วโทนเทา ค่า 0 จางลงทั้งช่องให้ตาไหลผ่านไปหาช่องที่มีค่า
   return (
     <div
       className={cn(
-        'flex shrink-0 items-stretch divide-x divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white/85',
+        'flex items-center gap-0.5',
+        variant === 'pill'
+          ? 'shrink-0 rounded-2xl bg-slate-900/[0.04] px-2 py-1.5 dark:bg-white/[0.07]'
+          : 'mt-0.5 w-full justify-between',
         className,
       )}
     >
       {cells.map((c) => (
-        <div key={c.label} title={c.title} className="min-w-[36px] px-1.5 py-0.5 text-center">
-          <div className={cn('text-sm font-bold leading-tight tabular-nums', c.cls)}>{c.value}</div>
-          <div className="text-[9px] leading-tight text-muted-foreground">{c.label}</div>
+        <div
+          key={c.label}
+          title={c.title}
+          className={cn(
+            'px-1 text-center',
+            variant === 'pill' ? 'min-w-[42px]' : 'min-w-0 flex-1',
+            c.value === 0 && 'opacity-35',
+          )}
+        >
+          <div
+            className={cn(
+              'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
+              c.value === 0 ? 'text-slate-500 dark:text-slate-400' : c.cls,
+            )}
+          >
+            {c.value}
+          </div>
+          <div className="text-[9px] font-medium leading-tight tracking-wide text-slate-500 dark:text-slate-400">
+            {c.label}
+          </div>
         </div>
       ))}
     </div>
   );
+}
+
+/**
+ * ชิป "ทำต่อเลย" บนการ์ดใบขอ — มองปุ๊บรู้ว่าก้าวถัดไปคืออะไร โดยไม่ต้องเปิดใบ
+ * เรียงตามความสำคัญ: มีคนสนใจ (ปิดงานได้) > ไม่รับสาย (โทรซ้ำ) > มีคนพร้อมส่งโทร >
+ * รอผลโทร > ไม่มีคนแนะนำ (ส่งต่อทีมอื่น) · ใบที่ AI ยังไม่ประเมิน = ไม่เดา ไม่ขึ้นชิป
+ */
+function cardNextAction(
+  matchCount: number | undefined,
+  s: LumosJobCallSummaryRow | undefined,
+): { text: string; cls: string } | null {
+  const confirmed = s?.confirmed ?? 0;
+  const noAnswer = s?.no_answer ?? 0;
+  const sent = s?.sent ?? 0;
+  const waiting = s ? Math.max(0, s.sent - s.called) : 0;
+  if (confirmed > 0)
+    return { text: `มีคนสนใจ ${confirmed} — กดจองตัวเลย`, cls: 'jarvis-chip-success' };
+  if (noAnswer > 0) return { text: `ไม่รับสาย ${noAnswer} — ควรโทรซ้ำ`, cls: 'jarvis-chip-warn' };
+  if ((matchCount ?? 0) > 0 && sent === 0)
+    return { text: `AI แนะนำ ${matchCount} — เลือกคนส่ง AI โทร`, cls: 'jarvis-chip-info' };
+  if (waiting > 0) return { text: `รอผลโทร ${waiting} สาย`, cls: 'jarvis-chip-neutral' };
+  if (matchCount === 0)
+    return { text: 'ไม่มีคนแนะนำ — ส่งคิด Content / Scraping', cls: 'jarvis-chip-danger' };
+  return null;
 }
 
 /** แถบ "ส่งให้ Lumos โทร" — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 คน (ใช้ทั้งฝั่งคนของเราและ iRecruit) */
@@ -649,8 +763,8 @@ function LumosSendBar({
 }) {
   if (count === 0) return null;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2">
-      <p className="text-[11px] font-semibold text-sky-900">ติ๊กเลือกไว้ {count} คน</p>
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2 dark:border-sky-700 dark:bg-sky-950/50">
+      <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">ติ๊กเลือกไว้ {count} คน</p>
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -710,27 +824,30 @@ const MatchingPage: React.FC = () => {
   const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
 
   // ── server-side pagination ของลิสต์ (/api/matching/list) — กรอง/เรียง/แบ่งหน้าที่ server
-  const [serverItems, setServerItems] = useState<JobRequest[]>([]);
-  const [serverTotal, setServerTotal] = useState(0);
-  const [serverPageNo, setServerPageNo] = useState(1);
-  const [serverUnitOptions, setServerUnitOptions] = useState<string[]>([]);
+  // เริ่มจาก cache ของครั้งก่อน (ถ้ามี) → กลับเข้าหน้าแล้วเห็นทันที ระหว่างที่ effect โหลดชุดสดมาแทน
+  const [serverItems, setServerItems] = useState<JobRequest[]>(() => lastServerList?.items ?? []);
+  const [serverTotal, setServerTotal] = useState(() => lastServerList?.total ?? 0);
+  const [serverPageNo, setServerPageNo] = useState(() => lastServerList?.page ?? 1);
+  const [serverUnitOptions, setServerUnitOptions] = useState<string[]>(
+    () => lastServerList?.unitOptions ?? [],
+  );
   /** ยอดใบขอเปิดต่อ BU จาก /api/matching/list — ใช้วาดชิป "แยกดูตาม BU" */
-  const [serverBuCounts, setServerBuCounts] = useState<Record<string, number>>({});
-  const [serverSummary, setServerSummary] = useState<{
-    urgentTotal: number;
-    urgentAnalyzed: number;
-    urgentWithGreen: number;
-    scopedTotal?: number;
-    withGreen?: number;
-    withYellow?: number;
-    noRecommend?: number;
-  } | null>(null);
+  const [serverBuCounts, setServerBuCounts] = useState<Record<string, number>>(
+    () => lastServerList?.buCounts ?? {},
+  );
+  const [serverSummary, setServerSummary] = useState<ServerListSummary | null>(
+    () => lastServerList?.summary ?? null,
+  );
   const [serverStoredMatches, setServerStoredMatches] = useState<
     Record<string, { recommended: number; computedAt: string }>
-  >({});
+  >(() => lastServerList?.storedMatches ?? {});
   /** สรุปผลโทร Lumos ต่อใบ (จาก /api/matching/list) — โชว์ข้างการ์ดในลิสต์ */
-  const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>({});
-  const [serverListLoading, setServerListLoading] = useState(MATCHING_SERVER_LIST_ENABLED);
+  const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>(
+    () => lastServerList?.lumosSummary ?? {},
+  );
+  const [serverListLoading, setServerListLoading] = useState(
+    MATCHING_SERVER_LIST_ENABLED && !lastServerList,
+  );
   const [serverListError, setServerListError] = useState<string | null>(null);
   const serverFetchSeq = useRef(0);
 
@@ -791,15 +908,7 @@ const MatchingPage: React.FC = () => {
         page: number;
         unitOptions?: string[];
         buCounts?: Record<string, number>;
-        summary?: {
-          urgentTotal: number;
-          urgentAnalyzed: number;
-          urgentWithGreen: number;
-          scopedTotal?: number;
-          withGreen?: number;
-          withYellow?: number;
-          noRecommend?: number;
-        };
+        summary?: ServerListSummary;
         storedMatches?: Record<string, { recommended: number; computedAt: string }>;
         lumosSummary?: Record<string, LumosJobCallSummaryRow>;
       };
@@ -816,6 +925,19 @@ const MatchingPage: React.FC = () => {
       setServerLumosSummary((prev) =>
         append ? { ...prev, ...(data.lumosSummary ?? {}) } : (data.lumosSummary ?? {}),
       );
+      if (!append) {
+        // เก็บไว้ระดับ module — กลับเข้าหน้านี้รอบหน้าเห็นชุดนี้ทันทีระหว่างรอโหลดสด
+        lastServerList = {
+          items: data.items,
+          total: data.total,
+          page: data.page,
+          unitOptions: data.unitOptions ?? [],
+          buCounts: data.buCounts ?? {},
+          summary: data.summary ?? null,
+          storedMatches: data.storedMatches ?? {},
+          lumosSummary: data.lumosSummary ?? {},
+        };
+      }
     } catch (e) {
       if (seq === serverFetchSeq.current) {
         setServerListError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
@@ -834,6 +956,18 @@ const MatchingPage: React.FC = () => {
   }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize, sortBy]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
+  /** น้ำหนักเรียงผู้สมัครที่ตั้งไว้ที่ Settings — โหลดพลาดใช้ค่าเริ่มต้นในโค้ด */
+  const [priorityConfig, setPriorityConfig] = useState<PriorityConfig>(DEFAULT_PRIORITY_CONFIG);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchMatchPriorityConfig().then((c) => {
+      if (!cancelled) setPriorityConfig(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
   const [boardErrorById, setBoardErrorById] = useState<Record<string, string>>({});
   // #2 (ยุบ) — หาผู้สมัคร iRecruit + เสนอในหน้า match เลย (ไม่ต้องไป pre-check)
@@ -1886,7 +2020,7 @@ const MatchingPage: React.FC = () => {
         <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
           <div className="flex items-center gap-2">
             <div className="glass-card rounded-xl px-3 py-2 border border-white/70 flex items-center gap-2 flex-1">
-              <Search className="w-4 h-4 text-blue-600 shrink-0" />
+              <Search className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1901,7 +2035,7 @@ const MatchingPage: React.FC = () => {
                 'shrink-0 rounded-full border px-3 py-2 text-xs font-medium transition-colors',
                 urgentOnly
                   ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                  : 'border-white/70 bg-white/50 text-muted-foreground hover:border-destructive/30',
+                  : 'border-white/70 bg-white/50 text-muted-foreground hover:border-destructive/30 dark:border-white/15 dark:bg-white/10',
               )}
             >
               🔴 ด่วนเท่านั้น
@@ -1947,8 +2081,8 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   workflowFilter === value
-                    ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                    ? 'border-blue-300 bg-blue-600 text-white dark:border-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/50',
                 )}
               >
                 {label}
@@ -1966,8 +2100,8 @@ const MatchingPage: React.FC = () => {
                   key: 'total',
                   label: 'ใบขอทั้งหมด',
                   value: serverSummary?.scopedTotal ?? listTotal,
-                  cls: 'border-slate-200/70 bg-white/60',
-                  num: 'text-slate-800',
+                  cls: 'border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5',
+                  num: 'text-slate-800 dark:text-slate-100',
                   active: !urgentOnly && workflowFilter === 'all',
                   apply: () => {
                     setUrgentOnly(false);
@@ -1978,8 +2112,8 @@ const MatchingPage: React.FC = () => {
                   key: 'urgent',
                   label: 'ใบขอด่วน',
                   value: urgentSummary.total,
-                  cls: 'border-red-200/70 bg-red-50/50',
-                  num: 'text-red-600',
+                  cls: 'border-red-200/70 bg-red-50/50 dark:border-red-800/70 dark:bg-red-950/50',
+                  num: 'text-red-600 dark:text-red-300',
                   active: urgentOnly,
                   apply: () => {
                     setUrgentOnly(true);
@@ -1990,8 +2124,8 @@ const MatchingPage: React.FC = () => {
                   key: 'green',
                   label: 'มีคนเขียวแนะนำ',
                   value: serverSummary?.withGreen ?? urgentSummary.greenSuggested,
-                  cls: 'border-emerald-200/70 bg-emerald-50/50',
-                  num: 'text-emerald-600',
+                  cls: 'border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-800/70 dark:bg-emerald-950/50',
+                  num: 'text-emerald-600 dark:text-emerald-300',
                   active: workflowFilter === 'green',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2002,8 +2136,8 @@ const MatchingPage: React.FC = () => {
                   key: 'yellow',
                   label: 'มีคนเหลืองแนะนำ',
                   value: serverSummary?.withYellow ?? 0,
-                  cls: 'border-amber-200/70 bg-amber-50/50',
-                  num: 'text-amber-600',
+                  cls: 'border-amber-200/70 bg-amber-50/50 dark:border-amber-800/70 dark:bg-amber-950/50',
+                  num: 'text-amber-600 dark:text-amber-300',
                   active: workflowFilter === 'yellow',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2014,8 +2148,8 @@ const MatchingPage: React.FC = () => {
                   key: 'none',
                   label: 'ยังไม่มีคน',
                   value: serverSummary?.noRecommend ?? urgentSummary.none,
-                  cls: 'border-orange-200/70 bg-orange-50/50',
-                  num: 'text-orange-600',
+                  cls: 'border-orange-200/70 bg-orange-50/50 dark:border-orange-800/70 dark:bg-orange-950/50',
+                  num: 'text-orange-600 dark:text-orange-300',
                   active: workflowFilter === 'none',
                   apply: () => {
                     setUrgentOnly(false);
@@ -2033,7 +2167,7 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'glass-card rounded-2xl border px-3 py-2.5 text-center transition-colors disabled:cursor-wait',
                   tile.cls,
-                  tile.active ? 'ring-2 ring-blue-400/50' : 'hover:border-blue-300/60',
+                  tile.active ? 'ring-2 ring-blue-400/50' : 'hover:border-blue-300/60 dark:hover:border-blue-700/60',
                 )}
               >
                 <div className={cn('text-lg font-bold tabular-nums', tile.num)}>{tile.value}</div>
@@ -2059,7 +2193,7 @@ const MatchingPage: React.FC = () => {
               </span>
             ) : (
               <>
-                ใบขอ <span className="text-blue-600 font-bold tabular-nums">{listTotal}</span> รายการ
+                ใบขอ <span className="text-blue-600 font-bold tabular-nums dark:text-blue-300">{listTotal}</span> รายการ
                 {totalPages > 1 ? ` · แสดงลำดับ ${pageRangeStart}–${pageRangeEnd} (หน้า ${currentPage}/${totalPages})` : ''}
               </>
             )}
@@ -2076,8 +2210,8 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-wait',
                   pageSize === size
-                    ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                    ? 'border-blue-300 bg-blue-600 text-white dark:border-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/50',
                 )}
               >
                 {size}
@@ -2107,8 +2241,8 @@ const MatchingPage: React.FC = () => {
                 className={cn(
                   'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-wait',
                   sortBy === value
-                    ? 'border-blue-300 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50',
+                    ? 'border-blue-300 bg-blue-600 text-white dark:border-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-950/50',
                 )}
               >
                 {label}
@@ -2132,11 +2266,11 @@ const MatchingPage: React.FC = () => {
               </span>
             ))}
             {workerStatus?.started && workerStatus.queueSize > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
                 <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
               </span>
             ) : workerStatus?.started && workerStatus.isIdle ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AI พร้อมแล้ว
               </span>
             ) : workerStatus && !workerStatus.enabled ? (
@@ -2150,33 +2284,22 @@ const MatchingPage: React.FC = () => {
         {/* การ์ดรวมใบขอ */}
         <div className="space-y-2.5" ref={listTopRef}>
           {serverListError ? (
-            <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600">
+            <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600 dark:bg-red-950/50 dark:text-red-300">
               {serverListError} — ลองรีเฟรชหน้า
             </p>
           ) : null}
+          {/* โหลดครั้งแรก (ยังไม่มีข้อมูลใน cache) — spinner ตัวเดียวพร้อมข้อความ
+              ชัดกว่าการ์ดหลอก 8 ใบ ที่คนเข้าใจผิดว่าหน้าค้างแล้วกด refresh ซ้ำ */}
           {rows.length === 0 && (loadingJobs || serverListLoading) ? (
-            <>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="glass-card rounded-2xl px-3 py-2.5 border border-white/70">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <Skeleton className="h-4 w-3/5 rounded" />
-                      <Skeleton className="h-3 w-2/5 rounded" />
-                      <Skeleton className="h-3 w-1/2 rounded" />
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <Skeleton className="h-4 w-10 rounded-full" />
-                      <Skeleton className="h-4 w-16 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex gap-1.5">
-                    <Skeleton className="h-3 w-12 rounded-full" />
-                    <Skeleton className="h-3 w-16 rounded-full" />
-                    <Skeleton className="h-3 w-10 rounded-full" />
-                  </div>
-                </div>
-              ))}
-            </>
+            <div className="glass-card flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 px-6 py-16 text-center">
+              <LoaderCircle className="h-8 w-8 animate-spin text-sky-500" aria-hidden />
+              <div>
+                <p className="text-sm font-semibold text-foreground">กำลังโหลดใบขอ…</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  ดึงใบขอจากระบบ ERP พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
+                </p>
+              </div>
+            </div>
           ) : null}
           {rows.length === 0 && !loadingJobs && !serverListLoading ? (
             <div className="glass-card rounded-2xl p-8 border border-white/70 text-center text-muted-foreground">
@@ -2205,7 +2328,7 @@ const MatchingPage: React.FC = () => {
                 tabIndex={0}
                 onClick={() => openJob(j)}
                 onKeyDown={(e) => e.key === 'Enter' && openJob(j)}
-                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-sky-300/50 transition-colors"
+                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-sky-300/50 transition-colors dark:hover:border-sky-700/50"
               >
                 {/* แถบสีซ้ายการ์ด — กวาดตาแล้วรู้ทันทีว่าใบไหนค้างนาน */}
                 <span
@@ -2214,7 +2337,32 @@ const MatchingPage: React.FC = () => {
                 />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-semibold text-blue-600 text-sm truncate">{unitRequestCardTitle(j)}</div>
+                    {/* ชื่อหน่วยงาน + ป้าย AI แนะนำ อยู่บรรทัดเดียวกัน — อ่านทีเดียวรู้ว่าใบนี้ไปต่อได้ไหม */}
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-semibold text-blue-600 dark:text-blue-300">{unitRequestCardTitle(j)}</span>
+                      {matchCount != null ? (
+                        <span
+                          title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
+                          className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        >
+                          AI แนะนำ {matchCount}
+                        </span>
+                      ) : quickCounts[j.id] ? (
+                        <span
+                          title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
+                          className="shrink-0 rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-300"
+                        >
+                          น่าจะตรง ~{quickCounts[j.id]}
+                        </span>
+                      ) : null}
+                      {/* ชิปก้าวถัดไปอยู่ติดชื่อหน่วยงานตามที่เจ้าของสั่ง — อ่านชื่อแล้วรู้เลยว่าต้องทำอะไรต่อ */}
+                      {(() => {
+                        const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
+                        return action ? (
+                          <span className={cn(action.cls, 'shrink-0')}>→ {action.text}</span>
+                        ) : null;
+                      })()}
+                    </div>
                     {unitRequestCardSubtitle(j) ? (
                       <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
                     ) : null}
@@ -2248,34 +2396,38 @@ const MatchingPage: React.FC = () => {
                     >
                       {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
                     </span>
-                    {matchCount != null ? (
-                      <span
-                        title="จำนวนที่ AI แนะนำจากคนของเรา — ยังไม่ใช่การยืนยันว่าพร้อมลงงาน"
-                        className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
-                      >
-                        AI แนะนำ {matchCount}
-                      </span>
-                    ) : quickCounts[j.id] ? (
-                      <span
-                        title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                        className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
-                      >
-                        น่าจะตรง ~{quickCounts[j.id]}
-                      </span>
-                    ) : null}
                   </div>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                  <div className="min-w-0 flex-1">
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                      {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
-                    </span>
-                    <span className="block truncate text-[10px] text-slate-600">
-                      ขอ {requested} · ติดต่อ {progress.contacted} · จอง {progress.reserved} · ลงงานใน Matching {progress.placed} · เหลือหาทางการ {remaining}
-                    </span>
+                  {/* ในกล่องแบ่งสองคอลัมน์: ซ้าย = รายละเอียดงาน · ขวา = สรุปว่ามีใครกี่คนแล้ว */}
+                  {/* แบ่งครึ่งตามที่เจ้าของสั่ง: ซ้าย = รายละเอียดงาน + ยอดอัตราทางการ
+                      ขวา = แถบผลโทร 6 ช่อง (ใบที่ยังไม่ได้ส่งโทร ใช้ยอดคนบนบอร์ดแทน ไม่ปล่อยว่าง) */}
+                  <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                    <div className="min-w-0">
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-slate-600 dark:text-slate-300">
+                        ขอมา <b className="tabular-nums">{requested}</b> · เหลือหาทางการ{' '}
+                        <b className="tabular-nums">{remaining}</b>
+                      </span>
+                    </div>
+                    <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                        {serverLumosSummary[j.id] ? 'ผลโทรในใบนี้' : 'คนในใบนี้'}
+                      </p>
+                      {serverLumosSummary[j.id] ? (
+                        <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
+                      ) : (
+                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-600 dark:text-slate-300">
+                          <span>ติดต่อ <b className="tabular-nums">{progress.contacted}</b></span>
+                          <span>จอง <b className="tabular-nums">{progress.reserved}</b></span>
+                          <span>ลงงาน <b className="tabular-nums">{progress.placed}</b></span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                    {serverLumosSummary[j.id] ? <LumosJobSummaryStats s={serverLumosSummary[j.id]} /> : null}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -2306,7 +2458,7 @@ const MatchingPage: React.FC = () => {
                   type="button"
                   disabled={serverListLoading || currentPage <= 1}
                   onClick={() => goToPage(currentPage - 1)}
-                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40"
+                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/50"
                 >
                   ← ก่อนหน้า
                 </button>
@@ -2326,7 +2478,7 @@ const MatchingPage: React.FC = () => {
                         'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full border px-3 py-1.5 text-sm font-medium shadow-sm disabled:opacity-40',
                         item === currentPage
                           ? 'border-sky-500 bg-sky-500 text-white'
-                          : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50',
+                          : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/50',
                       )}
                     >
                       {item}
@@ -2337,7 +2489,7 @@ const MatchingPage: React.FC = () => {
                   type="button"
                   disabled={serverListLoading || currentPage >= totalPages}
                   onClick={() => goToPage(currentPage + 1)}
-                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40"
+                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/50"
                 >
                   ถัดไป →
                 </button>
@@ -2368,7 +2520,7 @@ const MatchingPage: React.FC = () => {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                      <Building2 className="w-4 h-4 text-blue-600" />
+                      <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-300" />
                     </div>
                     <div className="min-w-0">
                       <div className="font-bold text-foreground truncate">{unitRequestCardTitle(jobDetail)}</div>
@@ -2381,7 +2533,7 @@ const MatchingPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => openBranchEditor(jobDetail)}
-                      className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                      className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300 dark:hover:bg-violet-900/40"
                     >
                       <MapPin className="h-3 w-3" /> แก้ไขเงื่อนไข/สาขา
                     </button>
@@ -2389,7 +2541,7 @@ const MatchingPage: React.FC = () => {
                       to={unitRequestPath(jobDetail)}
                       state={{ returnTo: '/matching/match' }}
                       onClick={() => setJobDetail(null)}
-                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50"
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50"
                     >
                       ดูใบขอ <ExternalLink className="h-3 w-3" />
                     </Link>
@@ -2415,7 +2567,7 @@ const MatchingPage: React.FC = () => {
                       ? `${jobDetail.age_range_min ?? '—'}–${jobDetail.age_range_max ?? '—'}`
                       : 'ไม่ระบุ'}
                   </span>
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                     {jobDetail.total_income.toLocaleString()} บาท
                   </span>
                   <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
@@ -2425,8 +2577,8 @@ const MatchingPage: React.FC = () => {
                     className={cn(
                       'rounded-full border px-2 py-0.5 text-[11px] font-medium',
                       jobDetail.urgency === 'urgent'
-                        ? 'border-red-200 bg-red-50 text-red-700'
-                        : 'border-sky-200 bg-sky-50 text-sky-700',
+                        ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
+                        : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
                     )}
                   >
                     {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
@@ -2453,16 +2605,16 @@ const MatchingPage: React.FC = () => {
                   }
                 }
                 return (
-                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-3">
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-3 dark:border-violet-800 dark:bg-violet-950/50">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs font-semibold text-violet-900">สาขาที่ระบบแยกได้ ({branches.length})</p>
-                        <p className="text-[10px] text-violet-700">กรุณาตรวจสอบ เพราะข้อความต้นทางอาจแยกคลาดเคลื่อนได้</p>
+                        <p className="text-xs font-semibold text-violet-900 dark:text-violet-200">สาขาที่ระบบแยกได้ ({branches.length})</p>
+                        <p className="text-[10px] text-violet-700 dark:text-violet-300">กรุณาตรวจสอบ เพราะข้อความต้นทางอาจแยกคลาดเคลื่อนได้</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => openBranchEditor(jobDetail)}
-                        className="shrink-0 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                        className="shrink-0 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-900/40"
                       >
                         แก้ไข
                       </button>
@@ -2482,11 +2634,11 @@ const MatchingPage: React.FC = () => {
                             </p>
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
-                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800 dark:bg-violet-900/40 dark:text-violet-200">
                               ต้องการ {branch.requested_qty} คน
                             </span>
                             {boardMatchById[jobDetail.id] ? (
-                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                                 คนของเราใกล้ {nearbyCounts.get(branch.branch_id || branch.branch_name_clean) || 0} คน
                               </span>
                             ) : (
@@ -2507,11 +2659,11 @@ const MatchingPage: React.FC = () => {
                   recommendedCandidateCount(irMatchById[jobDetail.id]?.matches);
                 const cells = [
                   { label: 'ขอ', value: requestPositionCount(jobDetail), cls: 'text-slate-700' },
-                  { label: 'AI แนะนำ', value: recommended, cls: 'text-sky-700' },
-                  { label: 'ติดต่อ', value: progress.contacted, cls: 'text-blue-700' },
-                  { label: 'จอง', value: progress.reserved, cls: 'text-violet-700' },
-                  { label: 'ลงงาน Matching', value: progress.placed, cls: 'text-emerald-700' },
-                  { label: 'เหลือหาทางการ', value: officialRemainingCount(jobDetail), cls: 'text-amber-700' },
+                  { label: 'AI แนะนำ', value: recommended, cls: 'text-sky-700 dark:text-sky-300' },
+                  { label: 'ติดต่อ', value: progress.contacted, cls: 'text-blue-700 dark:text-blue-300' },
+                  { label: 'จอง', value: progress.reserved, cls: 'text-violet-700 dark:text-violet-300' },
+                  { label: 'ลงงาน Matching', value: progress.placed, cls: 'text-emerald-700 dark:text-emerald-300' },
+                  { label: 'เหลือหาทางการ', value: officialRemainingCount(jobDetail), cls: 'text-amber-700 dark:text-amber-300' },
                 ];
                 return (
                   <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
@@ -2551,8 +2703,8 @@ const MatchingPage: React.FC = () => {
                         className={cn(
                           'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                           hideProposed
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:hover:border-emerald-700',
                         )}
                       >
                         {hideProposed ? `แสดงทั้งหมด` : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
@@ -2570,8 +2722,8 @@ const MatchingPage: React.FC = () => {
                         className={cn(
                           'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                           showDistantCandidates
-                            ? 'border-red-200 bg-red-50 text-red-700'
-                            : 'border-slate-200 bg-white text-slate-500 hover:border-red-200',
+                            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-red-200 dark:hover:border-red-800',
                         )}
                       >
                         {showDistantCandidates
@@ -2605,7 +2757,7 @@ const MatchingPage: React.FC = () => {
               distantCandidateCount(boardMatchById[jobDetail.id]?.matches) +
                 distantCandidateCount(irMatchById[jobDetail.id]?.matches) >
                 0 ? (
-                <p className="rounded-lg border border-red-100 bg-red-50/70 px-2.5 py-1.5 text-[10px] text-red-700">
+                <p className="rounded-lg border border-red-100 bg-red-50/70 px-2.5 py-1.5 text-[10px] text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
                   กำลังแสดงคนนอกพื้นที่/ห่างไกลด้วยเพื่อเป็นทางเลือกสำรอง — กลุ่มนี้ไม่ถูกนับรวมในยอด AI แนะนำ
                 </p>
               ) : null}
@@ -2627,8 +2779,8 @@ const MatchingPage: React.FC = () => {
                     className={cn(
                       'rounded-lg border px-2.5 py-2 text-[10px] space-y-1.5',
                       short
-                        ? 'border-amber-200 bg-amber-50/80 text-amber-900'
-                        : 'border-sky-100 bg-sky-50/70 text-sky-800',
+                        ? 'border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
+                        : 'border-sky-100 bg-sky-50/70 text-sky-800 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-200',
                     )}
                   >
                     <p>
@@ -2673,18 +2825,18 @@ const MatchingPage: React.FC = () => {
               })()}
 
               {lumosNotice ? (
-                <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-800">
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
                   {lumosNotice}
                 </p>
               ) : null}
               {lumosError ? (
-                <p className="rounded-lg border border-red-200 bg-red-50/80 px-2.5 py-1.5 text-[11px] text-destructive">
+                <p className="rounded-lg border border-red-200 bg-red-50/80 px-2.5 py-1.5 text-[11px] text-destructive dark:border-red-800 dark:bg-red-950/50">
                   {lumosError}
                 </p>
               ) : null}
 
               {/* ใบขอด่วน + มีคนเพิ่มเข้า pool ทีหลัง → ดันเข้าคิวโทรเองได้ ไม่ต้องรอ AI แมทรอบใหม่ */}
-              <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 px-3 py-2">
+              <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 px-3 py-2 dark:border-sky-800">
                 <LumosJobSummaryStats s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-slate-600">
@@ -2714,22 +2866,26 @@ const MatchingPage: React.FC = () => {
               ) : boardMatchById[jobDetail.id] ? (
                 <>
                 {boardWaitingById[jobDetail.id] ? (
-                  <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] text-sky-800">
+                  <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[11px] text-sky-800 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
                     <RefreshCw className="h-3 w-3 shrink-0 animate-spin" />
                     สั่งค้นหาใหม่แล้ว — AI กำลังคิดอยู่หลังบ้าน ผลใหม่จะมาแทนที่อัตโนมัติ (ที่เห็นตอนนี้คือผลเดิม)
                   </p>
                 ) : null}
                 {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3 text-xs text-foreground">
+                  <p className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-3 text-xs text-foreground dark:border-amber-800 dark:bg-amber-950/50">
                     ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองหาจากฐาน iRecruit ด้านล่าง แล้วเสนอได้เลย
                   </p>
                 ) : (
                   <div className="space-y-2">
+                    {/* เรียงตามลำดับความสำคัญของเจ้าของ: อายุ → ที่อยู่ → ประสบการณ์ → รายได้
+                        (เกณฑ์แข็งพังตกท้าย · คะแนนเท่ากันคงลำดับจาก AI — sort ของ JS เป็น stable) */}
                     {boardMatchById[jobDetail.id].matches
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
-                      .map((m) => {
+                      .map((m) => ({ m, priority: boardCandidatePriority(jobDetail, m, priorityConfig) }))
+                      .sort((a, b) => compareCandidatePriority(a.priority, b.priority))
+                      .map(({ m, priority }) => {
                         const meta = boardTierMeta(m.tier);
                         const branchAssignment = nearestBranchForBoardCandidate(jobDetail, m);
                         const branchProximity = boardBranchProximityMeta(branchAssignment);
@@ -2809,7 +2965,7 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               ) : null}
                               {activeElsewhere ? (
-                                <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                                <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-300">
                                   ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                 </span>
                               ) : null}
@@ -2834,7 +2990,7 @@ const MatchingPage: React.FC = () => {
                               <a
                                 href={`tel:${m.mobile}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline"
+                                className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline dark:text-sky-300"
                               >
                                 <Phone className="h-3 w-3" /> {m.mobile}
                               </a>
@@ -2851,7 +3007,19 @@ const MatchingPage: React.FC = () => {
                               <MapPin className="h-2.5 w-2.5" /> {branchProximity.label}
                             </span>
                           </div>
-                          <div className="mt-1">
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {/* คะแนนที่ใช้เรียงลิสต์นี้ — ชี้เมาส์ดูที่มาของคะแนนรายเกณฑ์ */}
+                            <span
+                              title={describePriorityScore(priority, priorityConfig).join('\n')}
+                              className={cn(
+                                'cursor-help rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums',
+                                priority.hardFails > 0
+                                  ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
+                                  : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200',
+                              )}
+                            >
+                              {priority.percent}%
+                            </span>
                             <CandidateChecklist
                               job={jobDetail}
                               tier={m.tier}
@@ -2862,7 +3030,7 @@ const MatchingPage: React.FC = () => {
                             />
                           </div>
                           {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p> : null}
-                          <div className="mt-1 text-[10px] font-medium text-sky-600">แตะเพื่อดูรายละเอียด →</div>
+                          <div className="mt-1 text-[10px] font-medium text-sky-600 dark:text-sky-300">แตะเพื่อดูรายละเอียด →</div>
                           </button>
                         </div>
                         {lumosRow ? (
@@ -2881,7 +3049,7 @@ const MatchingPage: React.FC = () => {
                 )}
                 </>
               ) : boardWaitingById[jobDetail.id] ? (
-                <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-3 text-xs text-sky-800">
+                <p className="flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-3 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200">
                   <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
                   AI กำลังค้นหาใบนี้อยู่ที่หลังบ้าน — ผลจะแสดงอัตโนมัติเมื่อค้นหาเสร็จ
                 </p>
@@ -2889,9 +3057,9 @@ const MatchingPage: React.FC = () => {
 
               {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
               {boardMatchById[jobDetail.id] && !boardErrorById[jobDetail.id] ? (
-                <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/50">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-blue-900">
+                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">
                       {irMatchById[jobDetail.id]
                         ? `ผู้สมัครจากฐาน iRecruit → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
                         : 'ไม่พอ? หาผู้สมัครจากฐาน iRecruit'}
@@ -2939,21 +3107,21 @@ const MatchingPage: React.FC = () => {
                               return (
                                 <div
                                   key={row.key}
-                                  className="mt-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 first:mt-0"
+                                  className="mt-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 first:mt-0 dark:border-blue-800 dark:bg-blue-950/50"
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
                                       <p className="text-sm font-semibold text-blue-950">{row.branch.branch_name_clean}</p>
-                                      <p className="mt-0.5 text-[11px] text-blue-700">
+                                      <p className="mt-0.5 text-[11px] text-blue-700 dark:text-blue-300">
                                         {[row.branch.district_hint, row.branch.province_hint].filter(Boolean).join(' · ') ||
                                           row.branch.branch_name_raw}
                                       </p>
                                     </div>
                                     <div className="shrink-0 text-right">
-                                      <p className="text-xs font-semibold text-blue-800">
+                                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">
                                         ต้องการ {row.branch.requested_qty} คน
                                       </p>
-                                      <p className="text-[10px] text-blue-600">พบใกล้สาขา {row.candidateCount} คน</p>
+                                      <p className="text-[10px] text-blue-600 dark:text-blue-300">พบใกล้สาขา {row.candidateCount} คน</p>
                                     </div>
                                   </div>
                                 </div>
@@ -2979,7 +3147,7 @@ const MatchingPage: React.FC = () => {
                                 )}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-700">
+                                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-300">
                                     <input
                                       type="checkbox"
                                       checked={lumosSelectedIrecruit.includes(m.id)}
@@ -3018,7 +3186,7 @@ const MatchingPage: React.FC = () => {
                                       </span>
                                     ) : null}
                                     {activeElsewhere ? (
-                                      <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                                      <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-300">
                                         ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                       </span>
                                     ) : null}
@@ -3039,7 +3207,7 @@ const MatchingPage: React.FC = () => {
                                   {m.phone_number ? (
                                     <a
                                       href={`tel:${m.phone_number}`}
-                                      className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline"
+                                      className="inline-flex items-center gap-1 font-medium text-sky-700 hover:underline dark:text-sky-300"
                                     >
                                       <Phone className="h-3 w-3" /> {m.phone_number}
                                     </a>
@@ -3061,7 +3229,7 @@ const MatchingPage: React.FC = () => {
                                      <p className="font-semibold">
                                        ผู้ดำเนินการ: {proposed.proposedByName || 'ไม่ระบุ'}
                                      </p>
-                                     {proposed.branchName ? <p className="mt-0.5 text-blue-700">สาขา: {proposed.branchName}</p> : null}
+                                     {proposed.branchName ? <p className="mt-0.5 text-blue-700 dark:text-blue-300">สาขา: {proposed.branchName}</p> : null}
                                      <p className="mt-0.5 text-slate-600">เหตุผล: {proposed.reason || 'ไม่ระบุ'}</p>
                                   </div>
                                 ) : null}
@@ -3071,7 +3239,7 @@ const MatchingPage: React.FC = () => {
                                     onClick={() => openIrecruitCandidatePrefill(jobDetail, m, branchName)}
                                     className={cn(
                                       CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-violet-300 bg-white text-violet-700 hover:border-violet-400 hover:bg-violet-50 focus-visible:ring-violet-400',
+                                      'border-violet-300 bg-white text-violet-700 hover:border-violet-400 hover:bg-violet-50 focus-visible:ring-violet-400 dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-950/50',
                                     )}
                                   >
                                     <UserPlus className="h-3 w-3" /> เพิ่มรายละเอียดผู้สมัคร
@@ -3082,7 +3250,7 @@ const MatchingPage: React.FC = () => {
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'contacted', branchId, branchName)}
                                     className={cn(
                                       CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400',
+                                      'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/40',
                                     )}
                                   >
                                     <PhoneCall className="h-3 w-3" />
@@ -3094,7 +3262,7 @@ const MatchingPage: React.FC = () => {
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'reserved', branchId, branchName)}
                                     className={cn(
                                       CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400',
+                                      'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400 dark:bg-violet-900/40 dark:text-violet-200',
                                     )}
                                   >
                                     <UserCheck className="h-3 w-3" />
@@ -3118,7 +3286,7 @@ const MatchingPage: React.FC = () => {
                                     onClick={() => openIrecruitProposalAction(jobDetail, m, 'rejected', branchId, branchName)}
                                     className={cn(
                                       CANDIDATE_ACTION_BUTTON_CLASS,
-                                      'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400',
+                                      'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/40',
                                     )}
                                   >
                                     <UserX className="h-3 w-3" />
@@ -3131,7 +3299,7 @@ const MatchingPage: React.FC = () => {
                                       onClick={() => openCancelProposalAction(jobDetail, key, m.full_name)}
                                       className={cn(
                                         CANDIDATE_ACTION_BUTTON_CLASS,
-                                        'border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus-visible:ring-red-400',
+                                        'border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus-visible:ring-red-400 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/50',
                                       )}
                                     >
                                       <X className="h-3 w-3" /> ยกเลิก
@@ -3171,21 +3339,21 @@ const MatchingPage: React.FC = () => {
 
               {/* #1 หาคนไม่ได้ / คนที่มีไม่โอเค → สร้างคำขอโพสหางานใหม่ (ID ให้ทีมคอนเทนต์รับไปทำต่อ) */}
               {boardMatchById[jobDetail.id] ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/40 px-3 py-3 space-y-2">
-                  <p className="text-xs font-semibold text-rose-900">หาคนไม่ได้เลย หรือคนที่มีไม่โอเค?</p>
+                <div className="rounded-xl border border-rose-200 bg-rose-50/40 px-3 py-3 space-y-2 dark:border-rose-800 dark:bg-rose-950/50">
+                  <p className="text-xs font-semibold text-rose-900 dark:text-rose-200">หาคนไม่ได้เลย หรือคนที่มีไม่โอเค?</p>
                   {jobPostingByJobId[jobDetail.id] ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <span
                         title={jobPostingByJobId[jobDetail.id].id}
-                        className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-mono text-rose-700"
+                        className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-mono text-rose-700 dark:border-rose-800 dark:text-rose-300"
                       >
                         ID: {jobPostingByJobId[jobDetail.id].id.slice(0, 8)}
                       </span>
-                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-800">
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
                         {jobPostingByJobId[jobDetail.id].request_type === 'scraping' ? 'Scraping' : 'Content'} ·{' '}
                         {jobPostingStatusLabel(jobPostingByJobId[jobDetail.id].status)}
                       </span>
-                      <a href="/matching/job-postings" className="text-[11px] text-blue-700 hover:underline">
+                      <a href="/matching/job-postings" className="text-[11px] text-blue-700 hover:underline dark:text-blue-300">
                         ดูคำขอทั้งหมด →
                       </a>
                     </div>
@@ -3229,8 +3397,8 @@ const MatchingPage: React.FC = () => {
           </DialogHeader>
 
           <div className="space-y-3">
-            <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
-              <p className="mb-2 text-xs font-semibold text-violet-900">เงื่อนไขผู้สมัคร</p>
+            <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800 dark:bg-violet-950/50">
+              <p className="mb-2 text-xs font-semibold text-violet-900 dark:text-violet-200">เงื่อนไขผู้สมัคร</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="text-[11px] font-medium text-slate-600">
                   เพศ
@@ -3281,14 +3449,14 @@ const MatchingPage: React.FC = () => {
               const branchId = branch.branch_id || `branch-${index + 1}`;
               const hasCoordinate = Number.isFinite(branch.lat) && Number.isFinite(branch.lng);
               return (
-                <div key={branchId} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-3">
+                <div key={branchId} className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-3 dark:border-blue-900 dark:bg-blue-950/50">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-blue-950">สาขา {index + 1}</p>
                     {branchDrafts.length > 1 ? (
                       <button
                         type="button"
                         onClick={() => setBranchDrafts((current) => current.filter((item) => item.branch_id !== branchId))}
-                        className="text-[11px] font-medium text-red-600 hover:underline"
+                        className="text-[11px] font-medium text-red-600 hover:underline dark:text-red-300"
                       >
                         ลบสาขา
                       </button>
@@ -3385,7 +3553,7 @@ const MatchingPage: React.FC = () => {
                       type="button"
                       disabled={branchGeocodeBusyId === branchId}
                       onClick={() => void geocodeBranch(branch)}
-                      className="rounded-full border border-blue-300 bg-white px-3 py-1.5 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                      className="rounded-full border border-blue-300 bg-white px-3 py-1.5 font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/50"
                     >
                       {branchGeocodeBusyId === branchId ? 'กำลังค้นหา…' : 'ค้นหาพิกัดจากที่อยู่'}
                     </button>
@@ -3398,7 +3566,7 @@ const MatchingPage: React.FC = () => {
                           href={`https://www.google.com/maps?q=${branch.lat},${branch.lng}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="font-medium text-blue-700 hover:underline"
+                          className="font-medium text-blue-700 hover:underline dark:text-blue-300"
                         >
                           ดูแผนที่
                         </a>
@@ -3411,7 +3579,7 @@ const MatchingPage: React.FC = () => {
                             ยืนยันพิกัดนี้
                           </button>
                         ) : (
-                          <span className="font-semibold text-emerald-700">ยืนยันพิกัดแล้ว</span>
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">ยืนยันพิกัดแล้ว</span>
                         )}
                       </>
                     ) : (
@@ -3441,7 +3609,7 @@ const MatchingPage: React.FC = () => {
                   },
                 ]);
               }}
-              className="rounded-full border border-dashed border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              className="rounded-full border border-dashed border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/50"
             >
               + เพิ่มสาขา
             </button>
@@ -3449,7 +3617,7 @@ const MatchingPage: React.FC = () => {
             {jobDetail &&
             branchDrafts.reduce((sum, branch) => sum + (Number(branch.requested_qty) || 0), 0) !==
               requestPositionCount(jobDetail) ? (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
                 จำนวนรวมของสาขา {branchDrafts.reduce((sum, branch) => sum + (Number(branch.requested_qty) || 0), 0)} คน
                 ไม่ตรงกับใบขอ {requestPositionCount(jobDetail)} คน — กรุณาตรวจสอบก่อนบันทึก
               </p>
@@ -3493,9 +3661,9 @@ const MatchingPage: React.FC = () => {
                 {boardTierMeta(candDetail.tier).label}
               </span>
 
-              <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2">
-                <p className="text-xs font-semibold text-sky-900">ทำไม AI เลือกคนนี้</p>
-                <p className="mt-1 text-xs text-sky-800 leading-relaxed">
+              <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-3 py-2 dark:border-sky-800 dark:bg-sky-950/50">
+                <p className="text-xs font-semibold text-sky-900 dark:text-sky-200">ทำไม AI เลือกคนนี้</p>
+                <p className="mt-1 text-xs text-sky-800 leading-relaxed dark:text-sky-200">
                   {candDetail.reason || 'สกิลตรงกับใบขอ'}
                 </p>
               </div>
@@ -3562,9 +3730,9 @@ const MatchingPage: React.FC = () => {
                   const otherActive = activeProposalByCandidate[key];
                   const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                   return (
-                    <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 space-y-2">
+                    <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 space-y-2 dark:border-violet-800 dark:bg-violet-950/50">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-violet-900">เสนอคนนี้ให้ใบขอ</p>
+                        <p className="text-xs font-semibold text-violet-900 dark:text-violet-200">เสนอคนนี้ให้ใบขอ</p>
                         {current ? (
                           <span
                             className={cn(
@@ -3577,12 +3745,12 @@ const MatchingPage: React.FC = () => {
                         ) : null}
                       </div>
                       {activeElsewhere ? (
-                        <p className="rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2 text-[11px] text-orange-800">
+                        <p className="rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2 text-[11px] text-orange-800 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-200">
                           ผู้สมัครติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id} · {proposalStatusLabel(activeElsewhere.status)}
                         </p>
                       ) : null}
                       {current ? (
-                        <div className="rounded-lg border border-violet-200 bg-white/80 px-2.5 py-2 text-[11px] text-slate-700">
+                        <div className="rounded-lg border border-violet-200 bg-white/80 px-2.5 py-2 text-[11px] text-slate-700 dark:border-violet-800">
                           <p className="font-semibold">ผู้ดำเนินการ: {current.proposedByName || 'ไม่ระบุ'}</p>
                           <p className="mt-0.5 text-slate-600">เหตุผล: {current.reason || 'ไม่ระบุ'}</p>
                         </div>
@@ -3594,7 +3762,7 @@ const MatchingPage: React.FC = () => {
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'contacted')}
                           className={cn(
                             CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400',
+                            'border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100 focus-visible:ring-blue-400 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/40',
                           )}
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
@@ -3606,7 +3774,7 @@ const MatchingPage: React.FC = () => {
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'reserved')}
                           className={cn(
                             CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400',
+                            'border-violet-400 bg-violet-100 text-violet-800 hover:border-violet-500 hover:bg-violet-200 focus-visible:ring-violet-400 dark:bg-violet-900/40 dark:text-violet-200',
                           )}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
@@ -3630,7 +3798,7 @@ const MatchingPage: React.FC = () => {
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'rejected')}
                           className={cn(
                             CANDIDATE_ACTION_BUTTON_CLASS,
-                            'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400',
+                            'border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 focus-visible:ring-red-400 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/40',
                           )}
                         >
                           <UserX className="h-3.5 w-3.5" />
@@ -3643,7 +3811,7 @@ const MatchingPage: React.FC = () => {
                             onClick={() => openCancelProposalAction(jobDetail, key, candDetail.full_name)}
                             className={cn(
                               CANDIDATE_ACTION_BUTTON_CLASS,
-                              'border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus-visible:ring-red-400',
+                              'border-red-300 bg-white text-red-700 hover:border-red-400 hover:bg-red-50 focus-visible:ring-red-400 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/50',
                             )}
                           >
                             <X className="h-3 w-3" /> ยกเลิกการจอง
@@ -3822,7 +3990,7 @@ const MatchingPage: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
+            <p className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
               AI จะโทรหาคนเหล่านี้จริง — ตรวจรายชื่อให้แน่ใจก่อนกดส่ง
             </p>
             {(() => {
@@ -3837,7 +4005,7 @@ const MatchingPage: React.FC = () => {
                 <div className="max-h-56 space-y-2 overflow-y-auto">
                   {boardNames.length > 0 ? (
                     <div>
-                      <p className="text-[11px] font-semibold text-emerald-800">
+                      <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200">
                         คนของเรา — แจ้งงาน/โทรตาม ({boardNames.length})
                       </p>
                       <ul className="mt-1 space-y-0.5">
@@ -3851,7 +4019,7 @@ const MatchingPage: React.FC = () => {
                   ) : null}
                   {irNames.length > 0 ? (
                     <div>
-                      <p className="text-[11px] font-semibold text-blue-800">
+                      <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200">
                         ผู้สมัคร iRecruit — AI โทรสัมภาษณ์ ({irNames.length})
                       </p>
                       <ul className="mt-1 space-y-0.5">
@@ -3922,7 +4090,7 @@ const MatchingPage: React.FC = () => {
                 return (
                   <>
                     <p className="text-[10px] text-muted-foreground">
-                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use) · แสดง {rows.length} ·
+                      pool {lumosPool.length} คน (รอลงงาน + รองาน + คนเก่า Re Use + กำลังเสนอใบอื่น) · แสดง {rows.length} ·
                       คนที่ส่งไปแล้วหรือไม่มีเบอร์เลือกไม่ได้
                     </p>
                     <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
@@ -3934,7 +4102,7 @@ const MatchingPage: React.FC = () => {
                             className={cn(
                               'flex items-start gap-2 rounded-xl border px-2.5 py-2',
                               selectable
-                                ? 'cursor-pointer border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'
+                                ? 'cursor-pointer border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/50'
                                 : 'border-slate-200 bg-slate-50 opacity-70',
                             )}
                           >
@@ -3967,7 +4135,7 @@ const MatchingPage: React.FC = () => {
                                   </span>
                                 ) : null}
                                 {!c.mobile ? (
-                                  <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                                  <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
                                     ไม่มีเบอร์
                                   </span>
                                 ) : null}
@@ -3977,7 +4145,7 @@ const MatchingPage: React.FC = () => {
                                 {c.area ? <span>{c.area}</span> : null}
                                 {c.age ? <span>อายุ {c.age}</span> : null}
                                 {c.required_salary ? <span>ขอ {c.required_salary.toLocaleString()} บ.</span> : null}
-                                {c.mobile ? <span className="font-medium text-sky-700">{c.mobile}</span> : null}
+                                {c.mobile ? <span className="font-medium text-sky-700 dark:text-sky-300">{c.mobile}</span> : null}
                               </span>
                             </span>
                           </label>
@@ -3989,7 +4157,7 @@ const MatchingPage: React.FC = () => {
               })()
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5">
-              <p className="text-[11px] font-semibold text-sky-900">เลือกไว้ {lumosSelectedBoard.length} คน</p>
+              <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">เลือกไว้ {lumosSelectedBoard.length} คน</p>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button
                   type="button"

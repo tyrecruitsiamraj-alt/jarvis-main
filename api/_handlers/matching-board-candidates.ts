@@ -20,6 +20,7 @@ import {
   boardPrimaryColumnId,
   boardFallbackColumnId,
   boardReuseColumnId,
+  boardInProcessColumnId,
 } from '../_lib/boardCandidatesSql.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { filterAvailableBoardMatches } from '@/lib/boardMatchAvailability';
@@ -44,11 +45,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 503, 'Service unavailable', 'ยังไม่ได้ตั้งค่า Siamraj SQL Server (DB_HOST)');
     }
 
-    // โหมด people: รายชื่อคนของเราทั้ง 3 ถัง (To do / ไม่มีงาน / Re Use) — หน้า "คนของเรา"
+    // โหมด people: รายชื่อคนของเราทั้ง 4 ถัง (To do / ไม่มีงาน / Re Use / In process) — หน้า "ผู้สมัคร"
     // ข้อมูลระดับเดียวกับ picker เลือกส่ง AI โทร (ชื่อ+เบอร์+สกิล) — สิทธิ์ staff เท่ากัน
     if (getQuery(req, 'people') === '1') {
       const people = await listBoardReadyCandidates({
-        columnIds: [boardPrimaryColumnId(), boardFallbackColumnId(), boardReuseColumnId()],
+        columnIds: [
+          boardPrimaryColumnId(),
+          boardFallbackColumnId(),
+          boardReuseColumnId(),
+          boardInProcessColumnId(),
+        ],
         limit: 2000,
       });
       res.setHeader?.('Cache-Control', 'no-store');
@@ -83,12 +89,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
-    // โหมด buckets: ยอดการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — สรุปบน Matching Dashboard
+    // โหมด buckets: ยอดการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use / In process) — สรุปบน Matching Dashboard
     if (getQuery(req, 'buckets') === '1') {
       const buckets = await countBoardCandidatesByColumn([
         boardPrimaryColumnId(),
         boardFallbackColumnId(),
         boardReuseColumnId(),
+        boardInProcessColumnId(),
       ]);
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json({ buckets });

@@ -10,6 +10,8 @@ import {
   YAxis,
 } from 'recharts';
 import type { DashboardActivityTrendPoint } from '@/lib/dashboard/types';
+import { cn } from '@/lib/utils';
+import { CHART, DASH, TONE } from '@/lib/designTokens';
 
 type Props = {
   data: DashboardActivityTrendPoint[];
@@ -51,29 +53,31 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
   );
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-2">
+    <div className={cn(DASH.card, 'p-4 xl:col-span-2')}>
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           แนวโน้มรายเดือน — เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ
         </h3>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           นับเป็นอัตรา · ตามเดือนที่กรอก/เปิดใบ · เข้ามา/ปิด/ยกเลิกจาก cohort · คงเหลือ = ใบเปิดที่ต้องหา (เท่าการ์ดคงเหลือ) ·{' '}
           {periodLabel}
         </p>
-        <p className="text-xs text-slate-600 mt-1">
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
           รวมช่วง เข้ามา {totals.requested.toLocaleString('th-TH')} · ปิดแล้ว{' '}
           {totals.filled.toLocaleString('th-TH')} · ยกเลิก {totals.cancelled.toLocaleString('th-TH')} ·
           คงเหลือ {totals.remaining.toLocaleString('th-TH')}
           {totals.remaining > 0 ? ' (= การ์ดคงเหลือ)' : ''}
         </p>
       </div>
-      <div className="h-64">
+      {/* div ครอบพากสีตัวหนังสือ (DASH.sub) ไปให้แกนกราฟผ่าน currentColor — สลับตามธีมเอง */}
+      <div className={cn('h-64', DASH.sub)}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
-            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
             <Tooltip
+              {...CHART.tooltip}
               formatter={(value: number, name: string) => [
                 `${Number(value).toLocaleString('th-TH')} อัตรา`,
                 SERIES_LABELS[name] ?? name,
@@ -84,7 +88,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               type="monotone"
               dataKey="requested"
               name="requested"
-              stroke="#6366f1"
+              stroke={TONE.info.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
@@ -93,7 +97,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               type="monotone"
               dataKey="filled"
               name="filled"
-              stroke="#22c55e"
+              stroke={TONE.success.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
@@ -102,7 +106,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               type="monotone"
               dataKey="cancelled"
               name="cancelled"
-              stroke="#94a3b8"
+              stroke={TONE.neutral.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
@@ -111,7 +115,7 @@ const DashboardThroughputChart: React.FC<Props> = ({ data, periodLabel }) => {
               type="monotone"
               dataKey="remaining"
               name="remaining"
-              stroke="#f59e0b"
+              stroke={TONE.warn.hex}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}

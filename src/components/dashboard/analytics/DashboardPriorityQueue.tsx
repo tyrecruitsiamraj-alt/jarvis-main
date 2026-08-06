@@ -1,5 +1,7 @@
 import React from 'react';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { DASH, TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 import { DashboardSlaBadge } from './DashboardStatusBadge';
@@ -9,61 +11,56 @@ type Props = {
   onView: (item: DashboardWorkItem) => void;
 };
 
+/**
+ * "ต้องแก้วันนี้" แบบย่อ (mockup rev.3 ข้อ 02) — อยู่คู่กับการ์ดสมการงานค้างในแถวเดียว
+ * เดิมเป็นตารางเต็ม 8 คอลัมน์กว้างทั้งจอ — ยุบเหลือคอลัมน์ที่ใช้ตัดสินใจ (ใบ/เหลือ/SLA/คน)
+ * รายการไม่ถูกตัดทิ้ง: เกิน 6 แถวเลื่อนดูin-card ได้ · กดแถวเพื่อเปิดใบ (แทนปุ่ม "ดู" เดิม)
+ * รายละเอียดเต็มของทุกใบยังอยู่ในตาราง "งานที่ต้องติดตาม" ข้างล่างตามเดิม
+ */
 const DashboardPriorityQueue: React.FC<Props> = ({ items, onView }) => {
   if (items.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-red-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-red-100 bg-red-50/60 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-red-600" />
+    <div className={cn(DASH.card, 'flex flex-col overflow-hidden border-red-200 dark:border-red-900/70')}>
+      {/* หัวการ์ดเป็นโทนแดง — การ์ดนี้คือ "ต้องแก้วันนี้" ต้องเห็นก่อนการ์ดอื่นในหน้า */}
+      <div
+        className={cn(
+          'px-4 py-3 border-b flex items-center gap-2 border-red-100 bg-red-50/60 dark:border-red-900/60 dark:bg-red-950/40',
+        )}
+      >
+        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">ต้องแก้วันนี้</h3>
-          <p className="text-xs text-slate-600">
-            {items.length} ใบขอ — เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → คงเหลือมาก → งานค้างเก่า
-          </p>
+          <h3 className={DASH.title}>ต้องแก้วันนี้ · {items.length.toLocaleString('th-TH')} ใบขอ</h3>
+          <p className={DASH.sub}>เรียงตามเกิน SLA → เสี่ยง SLA → ฉุกเฉินย้อนหลัง → คงเหลือมาก → งานค้างเก่า</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/80 text-left text-xs text-slate-500">
-              <th className="px-3 py-2.5 font-medium">ใบงาน</th>
-              <th className="px-3 py-2.5 font-medium">หน่วยงาน</th>
-              <th className="px-3 py-2.5 font-medium">เหลือ</th>
-              <th className="px-3 py-2.5 font-medium">ประเภท</th>
-              <th className="px-3 py-2.5 font-medium">SLA</th>
-              <th className="px-3 py-2.5 font-medium">ครบ SLA</th>
-              <th className="px-3 py-2.5 font-medium">ผู้รับผิดชอบ</th>
-              <th className="px-3 py-2.5 font-medium text-right">Action</th>
-            </tr>
-          </thead>
+      <div className="max-h-[280px] overflow-y-auto">
+        <table className="w-full text-sm">
           <tbody>
             {items.map((item) => (
-              <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                <td className="px-3 py-2.5 font-medium text-slate-900">{item.requestNo}</td>
-                <td className="px-3 py-2.5 text-slate-700 max-w-[160px] truncate">{item.unitName}</td>
-                <td className="px-3 py-2.5 tabular-nums font-semibold text-red-700">{item.remainingPositions}</td>
-                <td className="px-3 py-2.5 text-slate-600 text-xs">{item.lifecycleKind}</td>
-                <td className="px-3 py-2.5">
-                  <DashboardSlaBadge status={item.slaStatus} />
+              <tr
+                key={item.id}
+                onClick={() => onView(item)}
+                title={`${item.lifecycleKind} · ครบ SLA ${item.slaDueDate ? formatYmdDmyBe(item.slaDueDate) : '—'} — กดเพื่อเปิดใบ`}
+                className={cn('cursor-pointer border-b last:border-b-0', DASH.tableRow)}
+              >
+                <td className="px-4 py-2.5">
+                  <p className={DASH.cellStrong}>{item.requestNo}</p>
+                  <p className={cn('max-w-[220px] truncate text-xs', DASH.cellMuted)}>{item.unitName}</p>
                 </td>
-                <td className="px-3 py-2.5 text-slate-600 text-xs whitespace-nowrap">
-                  {item.slaDueDate ? formatYmdDmyBe(item.slaDueDate) : '—'}
+                <td className={cn('px-2 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap', TONE.danger.value)}>
+                  {item.remainingPositions}
+                  <span className={cn('ml-1 font-normal text-[10px]', DASH.muted)}>เหลือ</span>
+                </td>
+                <td className="px-2 py-2.5 whitespace-nowrap text-right">
+                  <DashboardSlaBadge status={item.slaStatus} />
                   {item.daysOverdue > 0 ? (
-                    <span className="ml-1 text-red-600">+{item.daysOverdue}d</span>
+                    <span className={cn('ml-1 text-xs', TONE.danger.value)}>+{item.daysOverdue}d</span>
                   ) : null}
                 </td>
-                <td className="px-3 py-2.5 text-slate-600 text-xs">{item.ownerName}</td>
-                <td className="px-3 py-2.5 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onView(item)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-white"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    ดู
-                  </button>
+                <td className={cn('px-4 py-2.5 text-right text-xs whitespace-nowrap', DASH.cellMuted)}>
+                  {item.ownerName}
                 </td>
               </tr>
             ))}

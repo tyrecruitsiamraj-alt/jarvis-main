@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, Menu, Settings, UserCircle } from 'lucide-react';
+import { KeyRound, LogOut, Menu, Moon, Settings, Sun, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
@@ -10,8 +10,10 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
+import { Switch } from '@/components/ui/switch';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import { loadThemeMode, resolveTheme, setThemeMode } from '@/lib/theme';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
@@ -24,13 +26,43 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const showJobBoardMenu = isFunctionEnabled('unit_requests_read');
   const showSettings = isFunctionEnabled('settings_access');
   const [navOpen, setNavOpen] = useState(false);
+  /** ธีมที่ใช้จริงตอนนี้ — ปุ่มสลับ light/dark (จำค่าต่อเครื่อง) */
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => resolveTheme(loadThemeMode()));
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setThemeMode(next);
+    setTheme(next);
+  };
+  /** สลับธีมด้วย Switch — เห็นสถานะปัจจุบันจากตำแหน่งปุ่ม ไม่ต้องเดาจากไอคอน
+   *  ไอคอนสองข้างบอกทิศ · ข้างที่ใช้อยู่เข้มขึ้น */
+  const themeSwitch = (
+    <div
+      className="flex min-h-[44px] items-center gap-1.5 px-1"
+      title={theme === 'dark' ? 'ตอนนี้โหมดมืด' : 'ตอนนี้โหมดสว่าง'}
+    >
+      <Sun
+        aria-hidden
+        className={cn('h-4 w-4 transition-colors', theme === 'dark' ? 'text-muted-foreground/40' : 'text-amber-500')}
+      />
+      <Switch
+        checked={theme === 'dark'}
+        onCheckedChange={toggleTheme}
+        aria-label={theme === 'dark' ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
+        className="data-[state=checked]:bg-slate-700 data-[state=unchecked]:bg-slate-300"
+      />
+      <Moon
+        aria-hidden
+        className={cn('h-4 w-4 transition-colors', theme === 'dark' ? 'text-sky-300' : 'text-muted-foreground/40')}
+      />
+    </div>
+  );
 
   const hamburger = (
     <button
       type="button"
       onClick={() => setNavOpen(true)}
       aria-label="เปิดเมนู"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/60 hover:text-foreground touch-manipulation"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/60 dark:hover:bg-white/10 hover:text-foreground touch-manipulation"
     >
       <Menu className="h-5 w-5" />
     </button>
@@ -47,7 +79,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <JobNotificationWatcher />
 
       {/* Top header — จอใหญ่ (lg+) */}
-      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40">
+      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-white/60 bg-white/45 dark:border-white/10 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-40">
         <div className="flex items-center gap-2 min-w-0">
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
@@ -57,7 +89,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
         <div className="flex items-center gap-2 xl:gap-3 shrink-0">
           <NotificationPanel />
-          <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 max-w-[280px]">
+          <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0 capitalize">{user?.role}</span>
@@ -77,7 +109,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
             ) : null}
           </div>
-          <div className="flex 2xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70">
+          <div className="flex 2xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15">
             <UserCircle className="w-4 h-4 text-blue-600" />
             <span className="text-xs font-medium text-blue-700 uppercase">{user?.role}</span>
             {showSettings ? (
@@ -91,10 +123,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
             ) : null}
           </div>
+          {themeSwitch}
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-white/60 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2.5 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-white/60 dark:hover:bg-white/10 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="เปลี่ยนรหัสผ่าน"
             title="เปลี่ยนรหัสผ่าน"
           >
@@ -112,7 +145,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg) */}
-      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-white/60 bg-white/45 backdrop-blur-xl sticky top-0 z-40 safe-area-pt">
+      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-white/60 bg-white/45 dark:border-white/10 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-40 safe-area-pt">
         <div className="flex items-center gap-1 min-w-0">
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left min-w-0 touch-manipulation py-1">
@@ -125,6 +158,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}
           </span>
+          {themeSwitch}
           <button
             type="button"
             onClick={() => navigate('/account/change-password')}

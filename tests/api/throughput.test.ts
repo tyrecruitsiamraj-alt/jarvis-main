@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { enrichActivityTrendWithThroughput, applyOpenQueueRemainingToActivityTrend, sumCohortStockByRequestDate, sumThroughputInRange } from '../../src/lib/dashboard/throughput';
+import { enrichActivityTrendWithThroughput, applyOpenQueueRemainingToActivityTrend, sumCohortStockByRequestDate, sumThroughputInRange, filterThroughputByDepartment } from '../../src/lib/dashboard/throughput';
+import type { ThroughputRecord } from '../../src/lib/dashboard/throughput';
 import type { DashboardActivityTrendPoint } from '../../src/lib/dashboard/types';
 
 describe('throughput', () => {
@@ -189,5 +190,30 @@ describe('throughput', () => {
         (enriched[0]?.newSite ?? 0) +
         (enriched[0]?.other ?? 0),
     ).toBe(226);
+  });
+});
+
+describe('filterThroughputByDepartment', () => {
+  const records: ThroughputRecord[] = [
+    { requestNo: 'a', departmentCode: 'LBD', requestDate: '2026-07-01', closureDate: null, positionUnits: 5, isOpen: true, kind: 'remaining' },
+    { requestNo: 'b', departmentCode: 'SN', requestDate: '2026-07-02', closureDate: null, positionUnits: 3, isOpen: true, kind: 'remaining' },
+    { requestNo: 'c', departmentCode: 'lbd', requestDate: '2026-07-03', closureDate: null, positionUnits: 2, isOpen: true, kind: 'remaining' },
+    { requestNo: 'd', requestDate: '2026-07-04', closureDate: null, positionUnits: 1, isOpen: true, kind: 'remaining' },
+  ];
+
+  it('keeps every record when no BU is selected', () => {
+    expect(filterThroughputByDepartment(records, 'all')).toHaveLength(4);
+    expect(filterThroughputByDepartment(records, '')).toHaveLength(4);
+  });
+
+  it('matches BU case-insensitively', () => {
+    const lbd = filterThroughputByDepartment(records, 'LBD');
+    expect(lbd.map((r) => r.requestNo)).toEqual(['a', 'c', 'd']);
+    expect(filterThroughputByDepartment(records, 'sn').map((r) => r.requestNo)).toEqual(['b', 'd']);
+  });
+
+  it('keeps rows without a BU code — ห้ามตัดข้อมูลที่ระบุ BU ไม่ได้ออกเงียบ ๆ', () => {
+    const sn = filterThroughputByDepartment(records, 'SN');
+    expect(sn.some((r) => r.requestNo === 'd')).toBe(true);
   });
 });

@@ -170,6 +170,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
       const items = await listSiamrajClosedRequests({ from, to, departmentScope });
+      // แนบชื่อผู้รับผิดชอบเหมือนเส้นใบเปิด — ไม่งั้น "ปิดแล้ว" ต่อคนใน
+      // ภาระงานตามผู้รับผิดชอบ (buildRecruiterOverview) จะเป็น 0 เพราะยอดไปกองที่ "ยังไม่มอบหมาย"
+      await attachAssignments(items);
       return res.status(200).json(items);
     }
 

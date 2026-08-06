@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import {
   APP_FUNCTIONS,
+  type AppFunctionDef,
   ROLE_LABELS,
   ROLE_ORDER,
   functionGroups,
@@ -16,6 +17,19 @@ const RolePermissionsTab: React.FC = () => {
   const { matrix, loading, updateGrant, savingKey } = useRolePermissions();
   const [error, setError] = useState<string | null>(null);
   const groups = functionGroups();
+
+  /**
+   * "เปิดเฉพาะ admin" — ปิด opl/staff/supervisor ในคลิกเดียว
+   * ใช้ตอนฟีเจอร์ยังไม่พร้อมเปิดใช้ แต่ deploy ขึ้นไปแล้ว (admin ทดสอบบนของจริงคนเดียว)
+   * เดิมต้องปิดทีละ role ถ้าเผลอปิดไม่ครบ = คนอื่นยังเห็น
+   */
+  const adminOnly = async (fn: AppFunctionDef) => {
+    for (const role of ROLE_ORDER) {
+      if (role === 'admin') continue;
+      if (!roleHasFunction(role, fn, matrix)) continue;
+      await updateGrant(role, fn.id, false);
+    }
+  };
 
   const handleToggle = async (role: UserRole, functionId: AppFunctionId, next: boolean) => {
     setError(null);
@@ -66,7 +80,24 @@ const RolePermissionsTab: React.FC = () => {
                 {APP_FUNCTIONS.filter((f) => f.group === group).map((fn) => (
                   <tr key={fn.id} className="border-b border-border/30 last:border-0">
                     <td className="px-4 py-2.5">
-                      <div className="text-foreground">{fn.label}</div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-foreground">{fn.label}</span>
+                        {ROLE_ORDER.every((r) => r === 'admin' || !roleHasFunction(r, fn, matrix)) ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                            ยังไม่เปิดใช้ — เห็นเฉพาะ admin
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void adminOnly(fn)}
+                            disabled={loading || !!savingKey}
+                            className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground hover:bg-secondary disabled:opacity-50"
+                            title="ปิดฟีเจอร์นี้สำหรับทุก role ยกเว้น admin"
+                          >
+                            เปิดเฉพาะ admin
+                          </button>
+                        )}
+                      </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">ขั้นต่ำ: {ROLE_LABELS[fn.minimumRole]}</div>
                     </td>
                     {ROLE_ORDER.map((role) => {

@@ -3,6 +3,11 @@
 Preferred UI style:
 Executive Control Tower.
 
+Implementation: colour meaning lives in one place — `src/lib/designTokens.ts` (`TONE` / `DASH` / `CHART`).
+Never write fresh Tailwind colour classes or hex values in dashboard components; map the metric to a
+`ToneKey` instead. Every light-theme value must ship with its dark pair (enforced by
+`tests/api/designTokens.test.ts`).
+
 Design direction:
 
 * Light enterprise dashboard

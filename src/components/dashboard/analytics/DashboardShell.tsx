@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { Download, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardSortDir, DashboardSortKey, DashboardStatusFilter } from '@/lib/dashboard/types';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import type { DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
-import DashboardAgeOverview from './DashboardAgeOverview';
+import DashboardHeroStrip from './DashboardHeroStrip';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
-import DashboardWorkQueueTable from './DashboardWorkQueueTable';
+import DashboardPriorityQueue from './DashboardPriorityQueue';
+import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
+import DashboardFlowViewCard from './DashboardFlowView';
+import DashboardCohortSummaryCard from './DashboardCohortSummary';
+import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 
 type FilterOptions = {
@@ -41,18 +46,18 @@ type Props = {
   refreshing?: boolean;
   onRefresh?: () => void;
   onExport?: () => void;
-  sortKey: DashboardSortKey;
-  sortDir: DashboardSortDir;
-  onSort: (key: DashboardSortKey) => void;
   onViewItem: (item: DashboardWorkItem) => void;
-  onAssignItem?: (item: DashboardWorkItem) => void;
   onKpiClick?: (kpiId: string, label: string) => void;
   onCohortClick?: (rowId: string, label: string) => void;
-  onSlaClick?: (bucket: string, label: string) => void;
   onFilledBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
-  onUnitClick?: (unitName: string) => void;
+  onSiteClick?: (siteCode: string | undefined, label: string) => void;
+  /** false = ยังไม่ได้ดึงชุดใบปิด (โหมด "ทั้งหมด") → ช่อง "ปิด" ต่อคนต้องโชว์ "—" ไม่ใช่ 0 */
+  closedTotalsAvailable?: boolean;
+  /** โหมด "ทั้งหมด" ใบปิดถูกดึงตอนกางแผงผู้รับผิดชอบเท่านั้น (ช่วงเต็มใช้เวลานาน) */
+  onRecruiterPanelOpen?: () => void;
+  closedTotalsLoading?: boolean;
   onRecruiterClick?: (name: string, role: DashboardResponsibleRole) => void;
 };
 
@@ -71,44 +76,63 @@ const DashboardShell: React.FC<Props> = ({
   refreshing,
   onRefresh,
   onExport,
-  sortKey,
-  sortDir,
-  onSort,
   onViewItem,
-  onAssignItem,
   onKpiClick,
   onCohortClick,
-  onSlaClick,
   onFilledBreakdownClick,
   onFullyClosedBreakdownClick,
   onAgeBucketClick,
-  onUnitClick,
+  onSiteClick,
+  closedTotalsAvailable = true,
+  onRecruiterPanelOpen,
+  closedTotalsLoading = false,
   onRecruiterClick,
 }) => {
+  const [showControlDetail, setShowControlDetail] = useState(false);
   const [showUnitOverview, setShowUnitOverview] = useState(false);
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
-  const [showWorkQueue, setShowWorkQueue] = useState(false);
+  const [showExecInsights, setShowExecInsights] = useState(false);
+  const [showLifecycle, setShowLifecycle] = useState(false);
 
-  const activeUnitCount = data.unitOverview.filter((u) => u.open > 0).length;
-  const unitOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
+  const activeSiteCount = data.unitOverview.filter((u) => u.open > 0).length;
+  const siteOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
   const recruiterRemainingTotal = data.recruiterOverview.reduce((sum, r) => sum + r.remaining, 0);
+  const remainingKpiValue = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
+
+  /**
+   * แถบสัดส่วนใต้ตัวเลข KPI (mockup rev.3) — เทียบกับ "เข้ามา" ของช่วงเดียวกัน
+   * รองรับทั้งชุด stock (total_requests/closed/…) และชุด throughput (total/completed/…)
+   * แสดงเฉพาะเมื่อฐานเป็นบวก · การ์ด % ไม่ใส่ (ตัวเลขเป็น % อยู่แล้ว)
+   */
+  const kpiDenominator =
+    data.kpis.find((k) => k.id === 'total_requests' || k.id === 'total')?.value ?? 0;
+  const kpiProgress = (kpi: DashboardKpi): number | null => {
+    if (kpiDenominator <= 0 || kpi.format === 'percent') return null;
+    if (kpi.id === 'total_requests' || kpi.id === 'total') return 100;
+    if (['closed', 'completed', 'cancelled', 'remaining'].includes(kpi.id)) {
+      return Math.min(100, Math.round((kpi.value / kpiDenominator) * 100));
+    }
+    return null;
+  };
+
+  const hasPriority = data.priorityWorkQueue.length > 0;
 
   return (
-    <div className="min-h-full bg-slate-50 pb-24">
-      <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-4 space-y-3">
+    <div className="min-h-full bg-slate-100/60 dark:bg-transparent pb-24">
+      <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-4 space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Request Control Tower</h1>
+              <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100">Request Control Tower</h1>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                 <input
                   value={filters.search}
                   onChange={(e) => onFiltersChange({ search: e.target.value })}
                   placeholder="ค้นหาใบงาน, คน, ปลายทาง..."
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400"
+                  className="w-full rounded-full border-0 bg-slate-100 dark:bg-slate-800 py-2.5 pl-9 pr-3 text-sm text-slate-900 dark:text-slate-100 shadow-inner placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
                 />
               </div>
               <div className="flex gap-2">
@@ -117,7 +141,7 @@ const DashboardShell: React.FC<Props> = ({
                     type="button"
                     onClick={onRefresh}
                     disabled={refreshing}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800 disabled:opacity-50"
                   >
                     <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
                     รีเฟรช
@@ -127,7 +151,7 @@ const DashboardShell: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={onExport}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800"
                   >
                     <Download className="h-4 w-4" />
                     Export CSV
@@ -139,9 +163,9 @@ const DashboardShell: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1400px] px-4 md:px-6 py-5">
+      <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-5">
         {loading ? (
-          <p className="text-sm text-slate-500 py-8 text-center">กำลังโหลดข้อมูล…</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
@@ -157,13 +181,25 @@ const DashboardShell: React.FC<Props> = ({
             />
 
             <div className="space-y-5 min-w-0">
+              {/* hero เข้ม "ต้องลงมือตอนนี้" — ถังอายุเดิมยกขึ้นมาไว้บนสุด + แท่งเข้ามารายเดือน */}
+              <DashboardHeroStrip
+                items={data.ageDaysBreakdown}
+                requestTotal={data.ageDaysRequestTotal}
+                positionTotal={data.ageDaysPositionTotal}
+                remainingPositions={remainingKpiValue}
+                siteCount={activeSiteCount}
+                trend={data.activityTrend}
+                trendLabel={data.activityTrendLabel || data.periodLabel}
+                onBucketClick={onAgeBucketClick}
+              />
+
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">สรุปอัตราในช่วงที่เลือก</p>
-                  <p className="text-[11px] text-slate-500 mb-2">
+                  <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
                     {dateRange == null ? (
                       <>
-                        <span className="font-medium text-slate-600">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>
+                        <span className="font-medium text-slate-600 dark:text-slate-400">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>
                         {' · '}
                         เข้ามา/ปิดแล้ว/ยกเลิก = ของใบที่กรอกในช่วงแนวโน้ม
                       </>
@@ -188,13 +224,16 @@ const DashboardShell: React.FC<Props> = ({
                       <DashboardKpiCard
                         key={kpi.id}
                         kpi={kpi}
+                        progressPercent={kpiProgress(kpi)}
                         onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
                       />
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-2">สถานะทำงาน (นับอัตรา)</p>
+                  <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา) — กดเพื่อกรอง</p>
+                  {/* ใช้การ์ดทรงเดียวกับ "สรุปอัตราในช่วงที่เลือก" ตามที่เจ้าของสั่ง — กวาดตาอ่านง่ายกว่าชิป
+                      ครบทุกสถานะเท่าเดิม (ตัวเลข 0 ก็ยังอยู่ ไม่ซ่อน) · กดแล้วเปิดลิสต์ใบขอสถานะนั้นเหมือนเดิม */}
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                     {(data.workStatusKpis ?? []).map((kpi) => (
                       <DashboardKpiCard
@@ -207,35 +246,71 @@ const DashboardShell: React.FC<Props> = ({
                 </div>
               </div>
 
-              <DashboardAgeOverview
-                items={data.ageDaysBreakdown}
-                requestTotal={data.ageDaysRequestTotal}
-                positionTotal={data.ageDaysPositionTotal}
-                onBucketClick={onAgeBucketClick}
-              />
+              {/* mockup rev.3: "ต้องแก้วันนี้" คู่กับสมการงานค้างในแถวเดียว — สองการ์ดที่ต้องเห็นก่อนเพื่อน */}
+              {hasPriority || data.flowView ? (
+                <div
+                  className={cn(
+                    'grid gap-3',
+                    hasPriority && data.flowView && 'xl:grid-cols-[1.6fr_1fr]',
+                  )}
+                >
+                  {hasPriority ? (
+                    <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
+                  ) : null}
+                  {data.flowView ? (
+                    <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
+                  ) : null}
+                </div>
+              ) : null}
 
-              <DashboardChartSection data={data} />
+              {/* แผงรองทั้งหมดยุบเป็นแถวกดขยาย — ข้อมูลครบทุกแผง ไม่มีตัวไหนหาย (กติกา mockup ข้อ 02) */}
+              {data.executiveInsights && data.executiveInsights.sentences.length > 0 ? (
+                <DashboardExpandablePanel
+                  title="สรุปผู้บริหาร"
+                  subtitle={`${data.executiveInsights.sentences.length.toLocaleString('th-TH')} ข้อสรุปอัตโนมัติ — กดเพื่อดู`}
+                  open={showExecInsights}
+                  onOpenChange={setShowExecInsights}
+                >
+                  <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
+                </DashboardExpandablePanel>
+              ) : null}
+              {data.requestCohortSummary || data.fulfillmentBreakdown ? (
+                <DashboardExpandablePanel
+                  title="รายละเอียด Control Tower"
+                  subtitle="ยอดค้างจากงวดก่อน vs ขอใหม่ · แยกที่มาของยอดหาได้/ปิดครบ — กดเพื่อดู"
+                  open={showControlDetail}
+                  onOpenChange={setShowControlDetail}
+                >
+                  <div className="space-y-3">
+                    {data.requestCohortSummary ? (
+                      <DashboardCohortSummaryCard
+                        summary={data.requestCohortSummary}
+                        onRowClick={onCohortClick}
+                      />
+                    ) : null}
+                    {data.fulfillmentBreakdown ? (
+                      <DashboardClosedBreakdownCard
+                        breakdown={data.fulfillmentBreakdown}
+                        filledTotal={
+                          data.fulfillmentBreakdown.filledSamePeriod + data.fulfillmentBreakdown.filledBacklog
+                        }
+                        fullyClosedTotal={
+                          data.fulfillmentBreakdown.fullyClosedSamePeriod +
+                          data.fulfillmentBreakdown.fullyClosedBacklog
+                        }
+                        onFilledClick={onFilledBreakdownClick}
+                        onFullyClosedClick={onFullyClosedBreakdownClick}
+                      />
+                    ) : null}
+                  </div>
+                </DashboardExpandablePanel>
+              ) : null}
+
               <DashboardExpandablePanel
-                title="ภาระงานตามผู้รับผิดชอบ"
+                title="ภาระงานตามรหัสไซต์"
                 subtitle={
-                  data.recruiterOverview.length > 0
-                    ? `${data.recruiterOverview.length.toLocaleString('th-TH')} คน · คงเหลือ ${recruiterRemainingTotal.toLocaleString('th-TH')} · กดเพื่อดู`
-                    : 'กดเพื่อดูรายละเอียด'
-                }
-                open={showRecruiterOverview}
-                onOpenChange={setShowRecruiterOverview}
-              >
-                <DashboardDriverOverview
-                  items={data.recruiterOverview}
-                  onRecruiterClick={onRecruiterClick}
-                  hideHeader
-                />
-              </DashboardExpandablePanel>
-              <DashboardExpandablePanel
-                title="ภาระงานตามหน่วยงาน"
-                subtitle={
-                  activeUnitCount > 0
-                    ? `คงเหลือ ${unitOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeUnitCount.toLocaleString('th-TH')} หน่วยงาน · กดเพื่อดู`
+                  activeSiteCount > 0
+                    ? `คงเหลือ ${siteOpenTotal.toLocaleString('th-TH')} อัตรา · ${activeSiteCount.toLocaleString('th-TH')} ไซต์ · กดเพื่อดู`
                     : 'กดเพื่อดูรายละเอียด'
                 }
                 open={showUnitOverview}
@@ -244,25 +319,38 @@ const DashboardShell: React.FC<Props> = ({
                 <DashboardUnitOverviewChart
                   items={data.unitOverview}
                   periodLabel={data.periodLabel}
-                  onUnitClick={onUnitClick}
+                  onSiteClick={onSiteClick}
                   hideHeader
                 />
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
-                title="งานที่ต้องติดตาม"
-                subtitle={`${data.workQueue.length.toLocaleString('th-TH')} รายการ — กดเพื่อดู`}
-                open={showWorkQueue}
-                onOpenChange={setShowWorkQueue}
+                title="ภาระงานตามผู้รับผิดชอบ"
+                subtitle={
+                  data.recruiterOverview.length > 0
+                    ? `${data.recruiterOverview.length.toLocaleString('th-TH')} คน · คงเหลือ ${recruiterRemainingTotal.toLocaleString('th-TH')} · กดเพื่อดู`
+                    : 'กดเพื่อดูรายละเอียด'
+                }
+                open={showRecruiterOverview}
+                onOpenChange={(open) => {
+                  setShowRecruiterOverview(open);
+                  if (open) onRecruiterPanelOpen?.();
+                }}
               >
-                <DashboardWorkQueueTable
-                  items={data.workQueue}
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={onSort}
-                  onView={onViewItem}
-                  onAssign={onAssignItem}
+                <DashboardDriverOverview
+                  items={data.recruiterOverview}
+                  closedTotalsLoading={closedTotalsLoading}
+                  onRecruiterClick={onRecruiterClick}
                   hideHeader
+                  closedTotalsAvailable={closedTotalsAvailable}
                 />
+              </DashboardExpandablePanel>
+              <DashboardExpandablePanel
+                title="แนวโน้มรายเดือน & Life Cycle"
+                subtitle="เข้ามา/ปิดแล้ว/ยกเลิก/คงเหลือ · ลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์ — กดเพื่อดู"
+                open={showLifecycle}
+                onOpenChange={setShowLifecycle}
+              >
+                <DashboardChartSection data={data} />
               </DashboardExpandablePanel>
             </div>
           </div>

@@ -60,6 +60,9 @@ export type PublicApplicationInput = {
   referralSource: PublicApplicationSource | null;
   document: PublicApplicationDocument | null;
   jobId: string | null;
+  /** ประกาศ/ลิงก์ที่ผู้สมัครเข้ามา — บอกได้ว่ามาจากช่องทางไหน */
+  postingId: string | null;
+  linkId: string | null;
   jobTitle: string | null;
   unitName: string | null;
   positionInterest: string | null;
@@ -225,6 +228,8 @@ export function validatePublicApplication(raw: unknown): PublicApplicationValida
       referralSource: normalizeSource(b.referral_source ?? b.source),
       document: doc.value,
       jobId: optionalText(b.job_id, 100),
+      postingId: optionalText(b.posting_id, 64),
+      linkId: optionalText(b.link_id, 64),
       jobTitle: optionalText(b.job_title, 300),
       unitName: optionalText(b.unit_name, 300),
       positionInterest: optionalText(b.position_interest, 200),

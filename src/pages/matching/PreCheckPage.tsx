@@ -5,6 +5,7 @@ import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, ClipboardCheck, Navigation, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
@@ -558,7 +559,7 @@ const PreCheckPage: React.FC = () => {
   const branchParserStatusMeta = useMemo(() => {
     const status = branchParseData?.parsed.parser_status;
     if (status === 'high_confidence') {
-      return { label: 'มั่นใจสูง', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+      return { label: 'มั่นใจสูง', className: TONE.success.chip };
     }
     // ไม่โชว์ป้าย fallback/เดา — เงียบไว้ให้ดูผลสาขาอย่างเดียว
     return null;
@@ -673,7 +674,7 @@ const PreCheckPage: React.FC = () => {
           <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-amber-500/12 flex items-center justify-center shrink-0">
-                <ClipboardCheck className="w-4 h-4 text-amber-700" />
+                <ClipboardCheck className="w-4 h-4 text-amber-700 dark:text-amber-300" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground">ค้นหาตำแหน่งผู้สมัคร</h3>
@@ -752,7 +753,7 @@ const PreCheckPage: React.FC = () => {
                         'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                         radius === r
                           ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-blue-300/50',
+                          : 'bg-white/50 text-muted-foreground border border-white/70 hover:border-blue-300/50 dark:hover:border-blue-700/50',
                       )}
                     >
                       {r} กม.
@@ -770,7 +771,7 @@ const PreCheckPage: React.FC = () => {
           <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-blue-500/12 flex items-center justify-center shrink-0">
-                <Navigation className="w-4 h-4 text-blue-600" />
+                <Navigation className="w-4 h-4 text-blue-600 dark:text-blue-300" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground">แผนที่</h3>
@@ -780,7 +781,7 @@ const PreCheckPage: React.FC = () => {
             {appliedCenter ? (
               <div className="space-y-2">
                 <div className="text-xs text-muted-foreground rounded-xl bg-white/40 border border-white/70 px-3 py-2">
-                  <MapPin className="w-3 h-3 inline mr-1 text-blue-600" />
+                  <MapPin className="w-3 h-3 inline mr-1 text-blue-600 dark:text-blue-300" />
                   {appliedCenter.label}
                 </div>
                 <iframe
@@ -814,10 +815,10 @@ const PreCheckPage: React.FC = () => {
           </div>
         ) : null}
         <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
+          <MapPin className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
           <p className="text-sm text-muted-foreground">
             {appliedCenter || appliedTextQuery ? 'งานที่ใกล้/เกี่ยวข้อง' : 'งานเปิดจาก ERP'}{' '}
-            <span className="text-blue-600 font-bold tabular-nums">{filteredRows.length}</span> รายการ
+            <span className="text-blue-600 font-bold tabular-nums dark:text-blue-300">{filteredRows.length}</span> รายการ
             {appliedCenter ? (
               <span className="text-muted-foreground"> · รัศมี {radius} กม.</span>
             ) : null}
@@ -849,11 +850,11 @@ const PreCheckPage: React.FC = () => {
               tabIndex={0}
               onClick={() => openJobAndFindCandidates(j)}
               onKeyDown={(e) => e.key === 'Enter' && openJobAndFindCandidates(j)}
-              className="glass-card rounded-2xl px-3 py-2.5 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors"
+              className="glass-card rounded-2xl px-3 py-2.5 border border-white/70 cursor-pointer hover:border-blue-300/50 transition-colors dark:hover:border-blue-700/50"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold text-blue-600 text-sm truncate">{unitRequestCardTitle(j)}</div>
+                  <div className="font-semibold text-blue-600 text-sm truncate dark:text-blue-300">{unitRequestCardTitle(j)}</div>
                   {unitRequestCardSubtitle(j) ? (
                     <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
                   ) : null}
@@ -881,8 +882,8 @@ const PreCheckPage: React.FC = () => {
                         className={cn(
                           'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
                           jobMatchById[j.id].matches.length > 0
-                            ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                            : 'border-amber-100 bg-amber-50 text-amber-700',
+                            ? 'border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            : 'border-amber-100 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300',
                         )}
                       >
                         AI {jobMatchById[j.id].matches.length}
@@ -898,7 +899,7 @@ const PreCheckPage: React.FC = () => {
                               ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความเกี่ยวข้องกับคำค้น + ความด่วน`
                               : `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความด่วนของงาน (${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'})`
                       }
-                      className="cursor-help rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
+                      className="cursor-help rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
                     >
                       {score} คะแนน
                     </span>
@@ -915,7 +916,7 @@ const PreCheckPage: React.FC = () => {
                     e.stopPropagation();
                     openJobAndFindCandidates(j);
                   }}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-900/40"
                 >
                   <Users className="h-3 w-3" />
                   {jobMatchById[j.id]
@@ -946,14 +947,14 @@ const PreCheckPage: React.FC = () => {
                       to={unitRequestPath(jobDetail)}
                       state={{ returnTo: preCheckReturnPath(jobDetail.id) }}
                       onClick={() => setJobDetail(null)}
-                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/40"
                     >
                       ดูใบขอ →
                     </Link>
                   </div>
                   <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-blue-600" />
+                      <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-300" />
                       <p className="text-sm font-semibold text-foreground">สถานที่ทำงาน</p>
                     </div>
                     <div className="space-y-1 text-sm">
@@ -973,11 +974,11 @@ const PreCheckPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3 space-y-2">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-3 space-y-2 dark:border-blue-900 dark:bg-blue-950/50">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-foreground">{unitRequestCardTitle(jobDetail)}</p>
                           {jobDetail.request_no ? (
-                            <span className="shrink-0 text-[11px] rounded-full border border-blue-200 bg-white px-2 py-0.5 text-blue-700">
+                            <span className="shrink-0 text-[11px] rounded-full border border-blue-200 bg-white px-2 py-0.5 text-blue-700 dark:border-blue-800 dark:text-blue-300">
                               {jobDetail.request_no}
                             </span>
                           ) : null}
@@ -1012,8 +1013,8 @@ const PreCheckPage: React.FC = () => {
                             className={cn(
                               'rounded-full border px-2 py-0.5 text-[11px] font-medium',
                               jobDetail.urgency === 'urgent'
-                                ? 'border-red-200 bg-red-50 text-red-700'
-                                : 'border-sky-200 bg-sky-50 text-sky-700',
+                                ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
+                                : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
                             )}
                           >
                             {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
@@ -1021,13 +1022,13 @@ const PreCheckPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="mt-3 rounded-xl border border-violet-200/70 bg-violet-50/30 px-3 py-3 space-y-2">
+                      <div className="mt-3 rounded-xl border border-violet-200/70 bg-violet-50/30 px-3 py-3 space-y-2 dark:border-violet-800/70 dark:bg-violet-950/50">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-violet-900">แก้ไขใบขอ (บันทึกถาวร)</p>
+                          <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">แก้ไขใบขอ (บันทึกถาวร)</p>
                           <button
                             type="button"
                             onClick={toggleEditJob}
-                            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50"
+                            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/50"
                           >
                             {editOpen ? 'ยกเลิก' : 'แก้ไข อายุ/เพศ/สาขา'}
                           </button>
@@ -1073,7 +1074,7 @@ const PreCheckPage: React.FC = () => {
                                       { branch_name_clean: '', requested_qty: 1, district_hint: '', province_hint: '' },
                                     ])
                                   }
-                                  className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50"
+                                  className="rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/50"
                                 >
                                   + เพิ่มสาขา
                                 </button>
@@ -1117,7 +1118,7 @@ const PreCheckPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => setEditBranches((prev) => prev.filter((_, xi) => xi !== i))}
-                                    className="rounded-full border border-red-200 bg-white px-2 py-1 text-[11px] text-red-600 hover:bg-red-50"
+                                    className="rounded-full border border-red-200 bg-white px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50"
                                   >
                                     ✕
                                   </button>
@@ -1137,7 +1138,7 @@ const PreCheckPage: React.FC = () => {
                             </div>
                           </div>
                         ) : editMsg ? (
-                          <p className="text-[11px] text-emerald-700">{editMsg}</p>
+                          <p className="text-[11px] text-emerald-700 dark:text-emerald-300">{editMsg}</p>
                         ) : (
                           <p className="text-[11px] text-muted-foreground">
                             แก้ช่วงอายุ เพศ หรือสาขาที่แตก แล้วบันทึกถาวร (มีผลต่อการให้คะแนน/กระจายผู้สมัคร)
@@ -1160,8 +1161,8 @@ const PreCheckPage: React.FC = () => {
                             className={cn(
                               'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                               hideProposedIrecruit
-                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                                ? cn(TONE.success.soft, TONE.success.value)
+                                : cn(TONE.neutral.soft, TONE.neutral.value, TONE.neutral.softHover),
                             )}
                           >
                             {hideProposedIrecruit ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
@@ -1202,7 +1203,7 @@ const PreCheckPage: React.FC = () => {
                               type="button"
                               onClick={() => void saveBranchParserOverride()}
                               disabled={savingBranchOverride}
-                              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/40"
                             >
                               {savingBranchOverride ? 'กำลังบันทึก…' : 'บันทึกเป็นค่าเริ่มต้น'}
                             </button>
@@ -1220,7 +1221,7 @@ const PreCheckPage: React.FC = () => {
                           กระจายจากผล AI ระดับใบขอ ตามเขต/จังหวัดผู้สมัคร (ไม่เรียก AI เพิ่ม)
                         </p>
                         {jobMatchById[jobDetail.id] ? (
-                          <p className="text-[11px] font-medium text-blue-700">
+                          <p className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
                             iRecruit AI แมทได้ {jobMatchById[jobDetail.id].matches.length} คน · ลงโซน{' '}
                             {jobMatchById[jobDetail.id].matches.length - unassignedMatches.length} · ไม่เข้าโซน{' '}
                             {unassignedMatches.length}
@@ -1237,19 +1238,19 @@ const PreCheckPage: React.FC = () => {
                                 b.requested_qty === item.requested_qty,
                             );
                             return (
-                              <div key={`${item.branch_name_clean}-${idx}`} className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 space-y-2">
+                              <div key={`${item.branch_name_clean}-${idx}`} className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 space-y-2 dark:border-blue-900 dark:bg-blue-950/50">
                                 <div className="flex items-center justify-between gap-3">
                                   <div>
                                     <p className="text-sm font-medium text-foreground">{item.branch_name_clean}</p>
                                     <p className="text-xs text-muted-foreground">ต้นฉบับ: {item.branch_name_raw}</p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-sm font-semibold text-blue-700">ต้องการ {item.requested_qty} คน</p>
+                                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">ต้องการ {item.requested_qty} คน</p>
                                     <p className="text-[11px] text-muted-foreground">มั่นใจ {item.confidence}%</p>
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300">
                                     ใกล้สาขานี้ {branchMatch?.matches.length ?? 0} คน
                                   </span>
                                   {item.district_hint ? (
@@ -1334,8 +1335,8 @@ const PreCheckPage: React.FC = () => {
                                     className={cn(
                                       'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                                       hideProposedIrecruit
-                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300',
+                                        ? cn(TONE.success.soft, TONE.success.value)
+                                        : cn(TONE.neutral.soft, TONE.neutral.value, TONE.neutral.softHover),
                                     )}
                                   >
                                     {hideProposedIrecruit ? 'แสดงทั้งหมด' : `ซ่อนที่เสนอแล้ว (${proposedCount})`}
@@ -1353,7 +1354,7 @@ const PreCheckPage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => void fetchIrecruitMatch(jobDetail.id, true)}
-                                  className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                                  className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50"
                                 >
                                   ลองใหม่
                                 </button>

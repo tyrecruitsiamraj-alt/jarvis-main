@@ -28,10 +28,11 @@ export default async function handler(req: ApiReq, res: ApiRes) {
          province, district, subdistrict, postal_code,
          weight_kg, height_cm, education, referral_source,
          document_filename, document_mime, document_size, document_bytes,
-         job_id, job_title, unit_name, position_interest, note)
+         job_id, job_title, unit_name, position_interest, note,
+         posting_id, link_id)
       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
               $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24)
+              $20, $21, $22, $23, $24, $25, $26)
       returning id
       `,
       [
@@ -59,6 +60,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
         v.unitName,
         v.positionInterest,
         v.note,
+        v.postingId,
+        v.linkId,
       ],
     );
     const id = rows[0]?.id;

@@ -6,6 +6,8 @@ import type { LucideIcon } from 'lucide-react';
 import { CalendarDays, Search, Briefcase, Users, BarChart3, Settings, PhoneForwarded, ArrowRight } from 'lucide-react';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import type { AppFunctionId } from '@/lib/roleFunctions';
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 
 export type HubRole = 'opl' | 'staff' | 'supervisor' | 'admin';
@@ -15,24 +17,25 @@ type HubLink = {
   label: string;
   desc: string;
   icon: LucideIcon;
-  accent: string;
+  /** โทนของเมนู — สีพื้น/ไอคอนมาจาก token กลาง (มีคู่ dark ครบ) */
+  tone: ToneKey;
   functionId?: AppFunctionId;
 };
 
 const STAFF_LINKS: HubLink[] = [
-  { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, accent: 'text-blue-600 bg-blue-500/12', functionId: 'work_calendar_read' },
-  { path: '/follow', label: 'Follow', desc: 'ลงรายชื่อคนที่ต้องติดตาม — AI โทรให้', icon: PhoneForwarded, accent: 'text-rose-700 bg-rose-500/12', functionId: 'follow_read' },
-  { path: '/jobs/list', label: 'หน่วยงาน', desc: 'ดูรายการใบขอ', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12', functionId: 'unit_requests_read' },
-  { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, accent: 'text-neutral-800 bg-neutral-500/10', functionId: 'dashboard' },
+  { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, tone: 'primary' as const, functionId: 'work_calendar_read' },
+  { path: '/follow', label: 'Follow', desc: 'ลงรายชื่อคนที่ต้องติดตาม — AI โทรให้', icon: PhoneForwarded, tone: 'danger' as const, functionId: 'follow_read' },
+  { path: '/jobs/list', label: 'หน่วยงาน', desc: 'ดูรายการใบขอ', icon: Briefcase, tone: 'warn' as const, functionId: 'unit_requests_read' },
+  { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, tone: 'neutral' as const, functionId: 'dashboard' },
 ];
 
 const SUPERVISOR_EXTRA: HubLink[] = [
-  { path: '/matching', label: 'Matching', desc: 'จับคู่ผู้สมัครกับงาน', icon: Search, accent: 'text-blue-700 bg-blue-400/12', functionId: 'candidates_read' },
-  { path: '/jobs/overview', label: 'แดชบอร์ดหน่วยงาน', desc: 'สรุปใบขอและหน่วยงาน', icon: Briefcase, accent: 'text-amber-700 bg-amber-500/12', functionId: 'unit_requests_read' },
+  { path: '/matching', label: 'Matching', desc: 'จับคู่ผู้สมัครกับงาน', icon: Search, tone: 'info' as const, functionId: 'candidates_read' },
+  { path: '/jobs/overview', label: 'แดชบอร์ดหน่วยงาน', desc: 'สรุปใบขอและหน่วยงาน', icon: Briefcase, tone: 'warn' as const, functionId: 'unit_requests_read' },
 ];
 
 const ADMIN_EXTRA: HubLink[] = [
-  { path: '/settings', label: 'Settings', desc: 'ตั้งค่าระบบ / สิทธิ์ฟังก์ชัน', icon: Settings, accent: 'text-muted-foreground bg-white/60', functionId: 'settings_access' },
+  { path: '/settings', label: 'Settings', desc: 'ตั้งค่าระบบ / สิทธิ์ฟังก์ชัน', icon: Settings, tone: 'neutral' as const, functionId: 'settings_access' },
 ];
 
 function linksForRole(role: HubRole): HubLink[] {
@@ -71,7 +74,13 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
               }
               className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-6 group touch-manipulation"
             >
-              <div className={`w-11 h-11 rounded-2xl ${item.accent} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}>
+              <div
+                className={cn(
+                  'w-11 h-11 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-105',
+                  TONE[item.tone].tile,
+                  TONE[item.tone].value,
+                )}
+              >
                 <item.icon className="w-5 h-5" />
               </div>
               <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>

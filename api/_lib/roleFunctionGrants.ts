@@ -16,6 +16,8 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   jobs_assign_staff: 'supervisor',
   unit_requests_read: 'staff',
   unit_notes_edit: 'staff',
+  // ฟีเจอร์ใหม่ — ต้องเพิ่มทั้งที่นี่และ src/lib/roleFunctions.ts ไม่งั้น PATCH ถูกปฏิเสธเงียบ ๆ
+  recruit_postings: 'supervisor',
   employees_read: 'staff',
   employees_edit: 'supervisor',
   clients_read: 'staff',

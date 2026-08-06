@@ -13,7 +13,14 @@ import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
+import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
+import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
   Dialog,
@@ -34,6 +41,15 @@ function staffAssigneeLine(j: JobRequest): string | null {
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
+
+/** สีกล่องลอยต่อประเภท (mockup rev.3 ข้อ 04) — ม่วง/ม่วง/ฟ้า/ส้ม/เขียว ตามลำดับใน STANDALONE_POSTING_KINDS */
+const STANDALONE_KIND_TONE: Record<string, ToneKey> = {
+  thai_executive: 'violet',
+  foreign_executive: 'violet',
+  central: 'info',
+  valet: 'orange',
+  government: 'success',
+};
 
 export type JobBoardViewProps = {
   jobs: JobRequest[];
@@ -70,6 +86,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   });
   const isStaff = variant === 'staff';
 
+  // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(20);
+  const totalPages = getTotalPages(filters.filtered.length, pageSize);
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const visibleJobs = filters.filtered.slice(pageStart, pageStart + pageSize);
+
+  // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyJob, setApplyJob] = useState<JobRequest | null>(null);
 
@@ -85,6 +114,56 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
   // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+
+  /**
+   * ประกาศของบอร์ด (mockup rev.3 ข้อ 04) — ใช้ 2 ที่:
+   * แถวกล่องลอย = รวมผู้สมัครต่อประเภทที่ไม่ผูกใบขอ · ชิปบนการ์ด = ช่องทางที่ปล่อยลิงก์ + ยอดคลิก
+   * ล้มเหลวก็ปล่อยเงียบเหมือน applicantCounts — เป็นข้อมูลเสริม ไม่ใช่ตัวหลักของหน้า
+   */
+  const [postings, setPostings] = useState<Awaited<ReturnType<typeof fetchRecruitPostings>>>([]);
+
+  useEffect(() => {
+    if (!isStaff) return;
+    let cancelled = false;
+    fetchRecruitPostings()
+      .then((p) => {
+        if (!cancelled) setPostings(p);
+      })
+      .catch(() => {
+        /* ข้อมูลเสริม — ไม่ต้องรบกวนคนใช้งาน */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStaff]);
+
+  /** ประเภทกล่องลอย → จำนวนประกาศ/ผู้สมัคร (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น) */
+  const standaloneSummary = useMemo(() => {
+    const acc: Record<string, { postings: number; applicants: number }> = {};
+    for (const k of STANDALONE_POSTING_KINDS) acc[k.code] = { postings: 0, applicants: 0 };
+    for (const p of postings) {
+      if (!p.standaloneKind || !acc[p.standaloneKind]) continue;
+      acc[p.standaloneKind].postings += 1;
+      acc[p.standaloneKind].applicants += p.applicationCount ?? 0;
+    }
+    return acc;
+  }, [postings]);
+
+  /** ใบขอ → ช่องทางที่ปล่อยลิงก์ไว้ (รวมยอดคลิกของช่องทางเดียวกันเข้าด้วยกัน) */
+  const channelsByJob = useMemo(() => {
+    const map = new Map<string, { label: string; hits: number }[]>();
+    for (const p of postings) {
+      if (!p.jobId) continue;
+      const acc = new Map<string, number>();
+      for (const l of p.links) {
+        const label = (l.channelLabel || 'ลิงก์กลาง').trim();
+        acc.set(label, (acc.get(label) ?? 0) + (l.hitCount ?? 0));
+      }
+      const prev = map.get(p.jobId) ?? [];
+      map.set(p.jobId, [...prev, ...[...acc].map(([label, hits]) => ({ label, hits }))]);
+    }
+    return map;
+  }, [postings]);
 
   useEffect(() => {
     if (!isStaff) return;
@@ -114,34 +193,77 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
 
       <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-2xl min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 mb-3">
-              <Sparkles className="h-3.5 w-3.5" />
-              {isStaff ? 'บอร์ดงานเปิดรับ · เจ้าหน้าที่' : 'บอร์ดประกาศรับสมัคร'}
-            </div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-              {isStaff ? 'งานสรรหา' : 'ค้นหางานที่เหมาะกับคุณ'}
-            </h1>
-            {!isStaff ? (
+        {/* ฝั่งเจ้าหน้าที่ = hero เข้มตาม mockup rev.3 ข้อ 04 · ฝั่งคนนอกคงหัวสว่างเดิมไว้ (หน้าแบรนด์) */}
+        {isStaff ? (
+          <PageHeroStrip
+            eyebrow="บอร์ดงานเปิดรับ · เจ้าหน้าที่"
+            title="งานสรรหา"
+            meta={loading ? undefined : `· ${filters.visibleCount.toLocaleString('th-TH')} ตำแหน่ง`}
+            actions={
+              <>
+                {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย */}
+                <RecruitBoardTools variant="onDark" />
+                {onRefresh ? (
+                  <button
+                    type="button"
+                    onClick={() => void onRefresh()}
+                    disabled={loading || refreshing}
+                    className={cn(heroButton, 'disabled:opacity-50')}
+                  >
+                    <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+                    รีเฟรชข้อมูล
+                  </button>
+                ) : null}
+              </>
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-2xl min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 mb-3">
+                <Sparkles className="h-3.5 w-3.5" />
+                บอร์ดประกาศรับสมัคร
+              </div>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
+                ค้นหางานที่เหมาะกับคุณ
+              </h1>
               <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
                 เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
                 <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
               </p>
-            ) : null}
+            </div>
           </div>
-          {isStaff && onRefresh ? (
-            <button
-              type="button"
-              onClick={() => void onRefresh()}
-              disabled={loading || refreshing}
-              className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-white/80 bg-white/70 px-4 py-2.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-white disabled:opacity-50"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
-              รีเฟรชข้อมูล
-            </button>
-          ) : null}
-        </div>
+        )}
+
+        {/* กล่องลอย (ไม่ผูกใบขอ) — โชว์เฉพาะเมื่อมีประกาศลอยจริง ไม่งั้นเป็นแถวศูนย์เปล่า ๆ */}
+        {isStaff && postings.some((p) => p.standaloneKind) ? (
+          <div className="mt-4">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+              กล่องลอย (ไม่ผูกใบขอ)
+            </p>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+              {STANDALONE_POSTING_KINDS.map((k) => {
+                const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
+                const s = standaloneSummary[k.code] ?? { postings: 0, applicants: 0 };
+                return (
+                  <div
+                    key={k.code}
+                    className={cn('rounded-2xl px-3 py-2.5', tone.tile, s.postings === 0 && 'opacity-60')}
+                    title={`${k.label} · ประกาศ ${s.postings} ใบ · ผู้สมัคร ${s.applicants} คน`}
+                  >
+                    <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{k.label}</p>
+                    <p className={cn('mt-0.5 text-lg font-bold tabular-nums', tone.num)}>
+                      {s.applicants.toLocaleString('th-TH')}
+                      <span className="ml-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        ผู้สมัคร · {s.postings.toLocaleString('th-TH')} ประกาศ
+                      </span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         <JobBoardTopFilters
           search={filters.search}
@@ -187,8 +309,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 pb-10">
-          {filters.filtered.map((job) => (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visibleJobs.map((job) => (
             <Card
               key={job.id}
               onClick={isStaff ? () => setApplicantsJob(job) : undefined}
@@ -259,30 +381,46 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </span>
                 </div>
               </CardContent>
-              <CardFooter className="border-t border-border/60 bg-muted/20 pt-3">
+              <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (
-                  <div className="flex w-full items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <Users className="h-3.5 w-3.5 text-blue-600/80" />
-                      ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setGenLinkJob(job);
-                        }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
-                      >
-                        <Link2 className="h-3.5 w-3.5" />
-                        Gen Link
-                      </button>
-                      <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
-                        ดูรายชื่อ →
+                  <>
+                    {/* ชิปช่องทางที่ปล่อยลิงก์ไว้ + ยอดคลิก (mockup rev.3 ข้อ 04) */}
+                    {(channelsByJob.get(job.id) ?? []).length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(channelsByJob.get(job.id) ?? []).slice(0, 3).map((c, i) => (
+                          <span
+                            key={`${c.label}-${i}`}
+                            className={i === 0 ? TONE.primary.chip : TONE.neutral.chip}
+                            title={`${c.label} · คลิก ${c.hits.toLocaleString('th-TH')} ครั้ง`}
+                          >
+                            {c.label} · คลิก {c.hits.toLocaleString('th-TH')}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                        ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
                       </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGenLinkJob(job);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          สร้างลิงก์
+                        </button>
+                        <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
+                          ดูรายชื่อ →
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </>
                 ) : (
                   <div className="flex w-full gap-2">
                     <button
@@ -306,6 +444,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             </Card>
           ))}
         </div>
+
+        {/* แถบเลขหน้า — ตัวเดียวกับหน้าหน่วยงาน/ผู้สมัคร เลือกจำนวนต่อหน้าได้ (20/40/60/100) */}
+        {filters.filtered.length > 0 ? (
+          <div className="pb-10 pt-4">
+            <ListPaginationBar
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filters.filtered.length}
+              totalPages={totalPages}
+              pageFrom={pageStart + 1}
+              pageTo={pageStart + visibleJobs.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </div>
+        ) : null}
 
         {!isStaff ? (
           <div className="mx-auto max-w-md pb-14 pt-2 text-center">

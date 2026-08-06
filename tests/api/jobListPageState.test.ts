@@ -56,7 +56,6 @@ describe('jobListPageState', () => {
     );
     expect(state.departmentFilter).toEqual(['DS']);
     expect(state.jobSubtypeFilter).toEqual(['driver']);
-    expect(state.yearFilter).toEqual(['2569']);
     expect(state.recruiterFilter).toEqual(['ตั้ม']);
     expect(state.screenerFilter).toEqual(['เนส']);
     expect(state.oplFilter).toEqual(['อั๋น']);
@@ -66,13 +65,19 @@ describe('jobListPageState', () => {
     expect(state.ageDaysFilter).toEqual(['1-7']);
   });
 
+  it('ลิงก์เก่าที่มีตัวกรองปี (y=) ถูกมองข้าม — เอาฟิลเตอร์ปีออกจากหน้าแล้ว', () => {
+    const state = parseJobListSearchParams(new URLSearchParams('y=2569&d=DS'));
+    expect('yearFilter' in state).toBe(false);
+    expect(state.departmentFilter).toEqual(['DS']);
+    expect(buildJobListSearchParams(state).has('y')).toBe(false);
+  });
+
   it('ลิงก์เก่าที่ระบุ all แปลว่าทั้งหมด → []', () => {
     const state = parseJobListSearchParams(new URLSearchParams('d=all&urg=all&nf=all&sr=all&y=all'));
     expect(state.departmentFilter).toEqual([]);
     expect(state.urgencyFilter).toEqual([]);
     expect(state.noteFilter).toEqual([]);
     expect(state.replacementFilter).toEqual([]);
-    expect(state.yearFilter).toEqual([]);
   });
 
   it('อ่าน/เขียนหลายค่าได้ครบทุกฟิลเตอร์ และตัดค่าเพี้ยน/ค่าซ้ำทิ้ง', () => {

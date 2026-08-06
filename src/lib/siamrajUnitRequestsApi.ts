@@ -33,6 +33,8 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
 
 export type SiamrajThroughputRecord = {
   requestNo?: string;
+  /** รหัส BU ของไซต์ — ใช้กรอง KPI เข้ามา/ปิด/ยกเลิก ตาม BU ที่เลือก */
+  departmentCode?: string;
   requestDate: string;
   closureDate: string | null;
   positionUnits: number;

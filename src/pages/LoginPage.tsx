@@ -87,7 +87,7 @@ function EmailPasswordForm({
             onChange={(e) => setEmail(e.target.value)}
             placeholder={hint ?? 'you@company.com'}
             disabled={submitting}
-            className="w-full rounded-xl border border-white/70 bg-white/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 disabled:opacity-60 transition-colors"
+            className="w-full rounded-xl border border-white/70 bg-white/60 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800/70 dark:focus:border-blue-500"
           />
         </div>
 
@@ -105,7 +105,7 @@ function EmailPasswordForm({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={submitting}
-              className="w-full rounded-xl border border-white/70 bg-white/60 px-4 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 disabled:opacity-60 transition-colors"
+              className="w-full rounded-xl border border-white/70 bg-white/60 px-4 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800/70 dark:focus:border-blue-500"
             />
             <button
               type="button"
@@ -328,7 +328,7 @@ const LoginPage: React.FC = () => {
             <div className="border-t border-white/60 pt-4 lg:hidden">
               <Link
                 to="/apply"
-                className="flex w-full min-h-[46px] items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white/70 px-6 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white touch-manipulation"
+                className="flex w-full min-h-[46px] touch-manipulation items-center justify-center gap-1.5 rounded-full border border-slate-300 bg-white/70 px-6 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-100 dark:hover:bg-slate-800"
               >
                 ดูประกาศรับสมัครพนักงาน
                 <ArrowRight className="h-4 w-4" aria-hidden />

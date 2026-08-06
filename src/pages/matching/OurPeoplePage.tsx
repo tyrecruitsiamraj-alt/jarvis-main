@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { Phone, Search, LoaderCircle, ChevronRight } from 'lucide-react';
+import SearchField from '@/components/shared/SearchField';
+import { Phone, LoaderCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import {
@@ -12,6 +13,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import NameAvatar from '@/components/shared/NameAvatar';
+import { TONE } from '@/lib/designTokens';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 
 /**
@@ -67,6 +70,14 @@ const BUCKETS = [
     desc: 'เคยผ่านงานมาแล้ว — เลือกส่ง AI โทรเองได้ ไม่เข้า auto (เช็คสถานะก่อนส่ง)',
     headCls: 'text-violet-800',
     boxCls: 'border-violet-200/80 bg-violet-50/40',
+  },
+  {
+    key: 'in_process',
+    match: 'in process',
+    title: 'กำลังเสนอใบอื่น (In process)',
+    desc: 'ถูกเสนอกับใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คก่อนว่าใบเดิมจบแล้วหรือยัง)',
+    headCls: 'text-sky-800',
+    boxCls: 'border-sky-200/80 bg-sky-50/40',
   },
 ] as const;
 
@@ -143,17 +154,13 @@ const OurPeoplePage: React.FC = () => {
 
   return (
     <div className="relative">
-      <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use" />
+      <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use · In process" />
       <div className="px-4 md:px-6 space-y-4 pb-8">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQueryAndResetPages(e.target.value)}
-            placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
-            className="jarvis-soft-field pl-10"
-          />
-        </div>
+        <SearchField
+          value={query}
+          onChange={(e) => setQueryAndResetPages(e.target.value)}
+          placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
+        />
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!people && !error ? (
@@ -229,8 +236,9 @@ const OurPeoplePage: React.FC = () => {
                               setDetail(p);
                             }
                           }}
-                          className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-white/80 bg-white/75 px-3 py-2.5 text-left transition-colors hover:border-blue-300/70 hover:bg-white"
+                          className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-white/80 bg-white/75 px-3 py-2.5 text-left transition-colors hover:border-blue-300/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/60 dark:hover:border-blue-500/50 dark:hover:bg-slate-900"
                         >
+                          <NameAvatar name={p.full_name} size="md" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-foreground">
                               {p.full_name}
@@ -253,7 +261,7 @@ const OurPeoplePage: React.FC = () => {
                             <a
                               href={`tel:${p.mobile}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="jarvis-chip-info shrink-0 hover:underline"
+                              className={cn(TONE.info.chip, 'shrink-0 hover:underline')}
                             >
                               <Phone className="h-2.5 w-2.5" /> {p.mobile}
                             </a>

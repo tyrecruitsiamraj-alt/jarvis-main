@@ -17,10 +17,10 @@ const DashboardExpandablePanel: React.FC<Props> = ({ title, subtitle, open, onOp
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm hover:bg-slate-50 transition-colors"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white dark:bg-slate-900 px-5 py-3.5 text-left shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
         >
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
             {subtitle ? <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p> : null}
           </div>
           <ChevronDown

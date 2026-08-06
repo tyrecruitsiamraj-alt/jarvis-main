@@ -127,6 +127,15 @@ export function boardReuseColumnId(): number {
   return Number(process.env.BOARD_REUSE_COLUMN_ID || 6);
 }
 
+/**
+ * คอลัมน์ "In process" — กำลังถูกเสนอกับใบขออื่นอยู่
+ * ให้เห็นและเลือกส่งเองได้ แต่ห้ามเข้า auto เพราะเสี่ยงเสนอคนเดียวกันซ้อนสองใบ
+ * ต้องมีคนตรวจก่อนว่าใบเดิมจบแล้วหรือยัง
+ */
+export function boardInProcessColumnId(): number {
+  return Number(process.env.BOARD_IN_PROCESS_COLUMN_ID || 3);
+}
+
 export type BoardColumnCount = { column_id: number; label: string | null; count: number };
 
 /** นับการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — ใช้โชว์สรุปบนหน้า Matching Dashboard */

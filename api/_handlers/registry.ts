@@ -29,6 +29,9 @@ import azureAdStartHandler from './auth/azure-ad-start.js';
 import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
 import publicApplyHandler from './public/apply.js';
+import publicApplyLinkHandler from './public/apply-link.js';
+import recruitChannelsHandler from './recruit-channels.js';
+import recruitPostingsHandler from './recruit-postings.js';
 import jobApplicationsHandler from './job-applications.js';
 import jobApplicationDocumentHandler from './job-application-document.js';
 import shortLinksHandler from './short-links.js';
@@ -36,6 +39,7 @@ import shortLinksResolveHandler from './short-links-resolve.js';
 import requestControlForecastHandler from './request-control-forecast.js';
 import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
+import matchPriorityWeightsHandler from './match-priority-weights.js';
 import workStatusMasterHandler from './work-status-master.js';
 import followHandler from './follow.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
@@ -112,9 +116,13 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
+  '/api/match-priority-weights': matchPriorityWeightsHandler as ApiHandler,
   '/api/work-status-master': workStatusMasterHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
+  '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
+  '/api/recruit/channels': recruitChannelsHandler as ApiHandler,
+  '/api/recruit/postings': recruitPostingsHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,

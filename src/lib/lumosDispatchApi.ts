@@ -49,6 +49,12 @@ export function boardColumnBadge(label: string | null | undefined): { text: stri
   if (!t || t === 'to do') return null;
   if (t === 'ไม่มีงาน') return { text: 'รองาน (ไม่มีงาน)', cls: 'border-amber-300 bg-amber-50 text-amber-800' };
   if (t === 're use') return { text: 'คนเก่า Re Use — เช็คสถานะก่อนส่ง', cls: 'border-violet-300 bg-violet-50 text-violet-800' };
+  // In process = กำลังถูกเสนอใบขออื่น — ต้องเตือนชัด เสี่ยงเสนอคนเดียวกันซ้อนสองใบ
+  if (t === 'in process')
+    return {
+      text: 'กำลังเสนอใบอื่น — เช็คก่อนว่าใบเดิมจบแล้วหรือยัง',
+      cls: 'border-sky-300 bg-sky-50 text-sky-800',
+    };
   return { text: label!.trim(), cls: 'border-slate-300 bg-slate-50 text-slate-700' };
 }
 
