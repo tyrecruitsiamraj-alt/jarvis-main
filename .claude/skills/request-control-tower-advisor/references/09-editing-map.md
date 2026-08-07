@@ -228,13 +228,27 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 หมายเหตุ: `AcquireCallHoldResult` เป็น object **แบน** ไม่ใช่ discriminated union โดยตั้งใจ
 เพราะจุดเรียกใช้อยู่ใน callback ของ setState ซึ่ง narrowing ไม่ข้ามเข้าไปให้
 
-### หน้า "โทรของฉัน" + บอร์ดหัวหน้า
+### หน้า "งานโทร" (โทรของฉัน + ภาระทีม รวมหน้าเดียว)
 
-* `src/pages/matching/MyCallsPage.tsx` (`/matching/my-calls`) — ถังงานโทรของตัวเอง
-  จัดกลุ่มตามใบขอ (โทรจบเป็นเรื่อง ๆ) · ไฮไลต์แถวที่ใกล้คายภายใน 2 ชม. ·
-  แผนผังบอกปลายทางของผลแต่ละแบบ + ยอดวันนี้
-* `src/pages/matching/CallTeamBoardPage.tsx` (`/matching/call-team`) — เฉพาะ supervisor/admin
-  แถบภาระเทียบเพดาน 10 คน/คน · แดงเมื่อมีงานค้างเกิน 20 ชม. · โอนรายคน · คืน AI ทั้งกอง · เทกอง
+เจ้าของสั่ง 7 ส.ค. 2569: ยุบสองหน้าเป็นหน้าเดียว และ **ซ่อนไว้ให้เห็นเฉพาะ admin ก่อน**
+
+* `src/pages/matching/MyCallsPage.tsx` (`/matching/my-calls`) — หน้าเดียวที่เหลือ
+  ถังงานโทรของตัวเอง จัดกลุ่มตามใบขอ · ไฮไลต์แถวที่ใกล้คายภายใน 2 ชม. ·
+  แผนผังปลายทางของผลแต่ละแบบ + ยอดวันนี้ · แล้วต่อด้วย `<CallTeamBoardSection />`
+* `src/pages/matching/CallTeamBoardPage.tsx` — **เป็น section ไม่ใช่หน้าแล้ว**
+  export `CallTeamBoardSection` (ไม่มี PageHeader ของตัวเอง) · แถบภาระเทียบเพดาน
+  10 คน/คน · แดงเมื่อค้างเกิน 20 ชม. · โอนรายคน · คืน AI ทั้งกอง · เทกอง
+* `/matching/call-team` เหลือเป็น **redirect** ไป `/matching/my-calls` (กัน bookmark เก่าพัง)
+
+⚠️ **จุดที่คุมการซ่อน มี 4 ที่ ต้องแก้พร้อมกันตอนจะเปิดให้ทุกคน**
+1. `canSeeCallDesk` ใน `MyCallsPage` (หน้าจะขึ้น "ยังไม่เปิดให้ใช้งาน")
+2. `minimumRole: 'admin'` ของ `/matching/my-calls` ใน `dockNavConfig.tsx` (เมนู)
+3. `canSeeCallDesk` ใน `MatchingPage` (ชิป "ของฉันถืออยู่ n คน")
+4. `canSeeCallDesk` ใน `CallFunnelPanel` (ลิงก์ "รับแล้ว → ไปหน้างานโทร")
+ลืมข้อ 3-4 = คนที่เข้าหน้าไม่ได้จะเห็นลิงก์แล้วกดไปเจอหน้าปิด
+
+⚠️ นี่คือการซ่อน **หน้าจอ** เท่านั้น — สิทธิ์จริงยังอยู่ที่ API เหมือนเดิม
+(`?team=1` ต้อง supervisor+ · จับล็อกใช้ rbac `matching-proposals`) ไม่ได้ผ่อนหรือรัดเพิ่ม
 * API เพิ่ม: `GET ?mine=1` (คืน `{holds, tally}`) · `GET ?team=1` (403 ถ้าไม่ใช่หัวหน้า) ·
   `PATCH {holdId, transferToUserId}` โอนงาน · `DELETE ?dumpUserId=&reason=` เทกอง
 * `tallyCallResultsSince()` — สรุปผลโทร**ที่คนบันทึก**ของวันนี้

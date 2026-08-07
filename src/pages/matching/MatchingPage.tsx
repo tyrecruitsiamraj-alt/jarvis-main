@@ -1155,7 +1155,10 @@ function LumosCallBadgeRow({
               type="button"
               disabled={cancelling}
               onClick={onCancel}
-              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/50"
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-60',
+                TONE.danger.outline,
+              )}
             >
               <X className="h-2.5 w-2.5" /> {cancelling ? 'กำลังยกเลิก…' : 'ยกเลิกการส่ง'}
             </button>
@@ -1307,7 +1310,9 @@ function jobTitleText(j: JobRequest): string {
 
 const MatchingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
+  const canSeeCallDesk = hasPermission('admin');
   // ในโหมด server-side list ไม่ต้องดึง feed 500 ใบมาที่ client — ใช้ serverItems แทน
   // skip=true → hook ไม่ยิง /api/siamraj/unit-requests?limit=500 เลย
   const { jobs: feedJobs, loading: feedLoading } = useUnitRequestsFeed({
@@ -2874,8 +2879,9 @@ const MatchingPage: React.FC = () => {
           </p>
         ) : null}
 
-        {/* งานโทรที่เราถืออยู่ — ล็อกมีอายุ 1 วัน ชิปนี้กันลืมข้ามใบขอ */}
-        {myHoldCount > 0 ? (
+        {/* งานโทรที่เราถืออยู่ — ล็อกมีอายุ 1 วัน ชิปนี้กันลืมข้ามใบขอ
+            ซ่อนจากคนที่เข้าหน้า "งานโทร" ไม่ได้ ไม่งั้นกดแล้วเจอหน้าปิด */}
+        {myHoldCount > 0 && canSeeCallDesk ? (
           <div className="px-1">
             <Link
               to="/matching/my-calls"
@@ -3161,7 +3167,10 @@ const MatchingPage: React.FC = () => {
                   type="button"
                   disabled={serverListLoading || currentPage <= 1}
                   onClick={() => goToPage(currentPage - 1)}
-                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/50"
+                  className={cn(
+                    'flex min-h-[40px] items-center rounded-full border px-4 py-1.5 text-sm font-medium shadow-sm disabled:opacity-40',
+                    TONE.info.outline,
+                  )}
                 >
                   ← ก่อนหน้า
                 </button>
@@ -3180,8 +3189,8 @@ const MatchingPage: React.FC = () => {
                       className={cn(
                         'flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full border px-3 py-1.5 text-sm font-medium shadow-sm disabled:opacity-40',
                         item === currentPage
-                          ? 'border-sky-500 bg-sky-500 text-white'
-                          : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/50',
+                          ? cn('border-sky-500', TONE.info.solid)
+                          : TONE.info.outline,
                       )}
                     >
                       {item}
@@ -3192,7 +3201,10 @@ const MatchingPage: React.FC = () => {
                   type="button"
                   disabled={serverListLoading || currentPage >= totalPages}
                   onClick={() => goToPage(currentPage + 1)}
-                  className="flex min-h-[40px] items-center rounded-full border border-sky-200 bg-white px-4 py-1.5 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/50"
+                  className={cn(
+                    'flex min-h-[40px] items-center rounded-full border px-4 py-1.5 text-sm font-medium shadow-sm disabled:opacity-40',
+                    TONE.info.outline,
+                  )}
                 >
                   ถัดไป →
                 </button>
@@ -3244,7 +3256,10 @@ const MatchingPage: React.FC = () => {
                       to={unitRequestPath(jobDetail)}
                       state={{ returnTo: '/matching/match' }}
                       onClick={() => setJobDetail(null)}
-                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50"
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                        TONE.primary.outline,
+                      )}
                     >
                       ดูใบขอ <ExternalLink className="h-3 w-3" />
                     </Link>
@@ -3317,7 +3332,10 @@ const MatchingPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => openBranchEditor(jobDetail)}
-                        className="shrink-0 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-900/40"
+                        className={cn(
+                          'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                          TONE.violet.outline,
+                        )}
                       >
                         แก้ไข
                       </button>

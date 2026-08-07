@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { useAuth } from '@/contexts/AuthContext';
+import { CallTeamBoardSection } from '@/pages/matching/CallTeamBoardPage';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
@@ -61,6 +63,15 @@ function countdown(ms: number): string {
 const DUE_SOON_MS = 2 * 60 * 60 * 1000;
 
 const MyCallsPage: React.FC = () => {
+  /**
+   * เจ้าของสั่ง 7 ส.ค. 2569: ยังไม่เปิดให้ทุกคนเห็น ซ่อนไว้ให้แอดมินก่อน
+   * เป็นการซ่อน "หน้าจอ" เท่านั้น — API ล็อกสิทธิ์ของมันเองอยู่แล้ว
+   * (จับล็อกโทรผ่าน rbac `matching-proposals` · `?team=1` ต้อง supervisor+)
+   * ตอนจะเปิดให้ทุกคน แก้บรรทัดนี้กับ `minimumRole` ใน dockNavConfig ที่เดียว
+   */
+  const { hasPermission } = useAuth();
+  const canSeeCallDesk = hasPermission('admin');
+
   const [holds, setHolds] = useState<CallHold[]>([]);
   const [tally, setTally] = useState<CallResultTally>(EMPTY_TALLY);
   const [loading, setLoading] = useState(true);
@@ -168,12 +179,33 @@ const MyCallsPage: React.FC = () => {
     }
   };
 
+  if (!canSeeCallDesk) {
+    return (
+      <div className="space-y-4 pb-10">
+        <PageHeader title="งานโทร" subtitle="ยังไม่เปิดใช้งาน" />
+        <div className={cn('rounded-2xl border p-6 text-center', DASH.card)}>
+          <p className={cn('text-sm font-semibold', DASH.cellStrong)}>ยังไม่เปิดให้ใช้งาน</p>
+          <p className={cn('mt-1 text-xs', DASH.muted)}>
+            หน้านี้อยู่ระหว่างทดลองใช้ เปิดให้เฉพาะผู้ดูแลระบบก่อน
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 pb-10">
       <PageHeader
-        title="โทรของฉัน"
-        subtitle="งานโทรที่รับมาจากหน้า Matching — เรียงให้แล้วว่าโทรใครก่อน"
+        title="งานโทร"
+        subtitle="โทรของฉัน + ภาระงานโทรของทีม อยู่หน้าเดียวกัน"
       />
+
+      <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
+        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>โทรของฉัน</h2>
+        <p className={cn('text-xs', DASH.muted)}>
+          งานโทรที่รับมาจากหน้า Matching — เรียงให้แล้วว่าโทรใครก่อน
+        </p>
+      </div>
 
       {/* แผนผังปลายทาง — กดผลแล้วงานวิ่งไปไหนต่อ */}
       <div className={cn('rounded-2xl border p-4', DASH.card)}>
@@ -442,6 +474,9 @@ const MyCallsPage: React.FC = () => {
           </div>
         </div>
       ) : null}
+
+      {/* ยุบ "ภาระโทรทีม" เข้ามาหน้าเดียวกันตามที่เจ้าของสั่ง — เดิมอยู่ที่ /matching/call-team */}
+      <CallTeamBoardSection />
     </div>
   );
 };

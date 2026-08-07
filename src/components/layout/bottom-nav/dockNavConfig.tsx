@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, PhoneCall, Headphones } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, PhoneCall } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -19,8 +19,9 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
   { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
-  { path: '/matching/my-calls', label: 'โทรของฉัน', icon: PhoneCall, functionId: 'candidates_read' },
-  { path: '/matching/call-team', label: 'ภาระโทรทีม', icon: Headphones, minimumRole: 'supervisor', functionId: 'candidates_read' },
+  // "โทรของฉัน" + "ภาระโทรทีม" ยุบเป็นหน้าเดียวแล้ว · เจ้าของสั่งซ่อนไว้ให้แอดมินก่อน
+  // จะเปิดให้ทุกคน = ถอด minimumRole ตรงนี้ + แก้ canSeeCallDesk ใน MyCallsPage
+  { path: '/matching/my-calls', label: 'งานโทร', icon: PhoneCall, minimumRole: 'admin', functionId: 'candidates_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },

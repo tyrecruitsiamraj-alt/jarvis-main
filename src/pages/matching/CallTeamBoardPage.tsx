@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
@@ -19,12 +18,17 @@ import {
 import { RefreshCw } from 'lucide-react';
 
 /**
- * บอร์ดหัวหน้า — เห็นภาระงานโทรของทีมทั้งหมด แล้วเกลี่ยงานได้จากที่เดียว
+ * บอร์ดภาระงานโทรของทีม — เห็นว่าใครถืออะไรค้าง แล้วเกลี่ยงานได้จากที่เดียว
  *
  * ทำ 3 อย่าง: โอนงานรายคน · คืนให้ AI โทรต่อ · เทกองของคนที่ลาป่วย/ลาออกทั้งหมด
  * ทุก action ลง audit log (ดู api/_handlers/matching-call-holds.ts)
  *
- * เฉพาะ supervisor/admin — staff ยิง ?team=1 จะได้ 403 และหน้านี้จะบอกว่าไม่มีสิทธิ์
+ * ⚠️ **เป็น section ไม่ใช่หน้า** — เจ้าของสั่ง 7 ส.ค. 2569 ให้ยุบมารวมกับ "โทรของฉัน"
+ * ที่ `/matching/my-calls` หน้าเดียว จึงไม่มี PageHeader ของตัวเอง
+ * เส้นทางเดิม `/matching/call-team` ถูกเปลี่ยนเป็น redirect ไว้กัน bookmark เก่าพัง
+ *
+ * สิทธิ์: API `?team=1` ตอบ 403 ให้คนที่ไม่ใช่ supervisor+ อยู่แล้ว (ยังคงไว้)
+ * ส่วนหน้าที่ห่ออยู่จำกัดเป็น admin เท่านั้นตามที่เจ้าของสั่งให้ซ่อนก่อน
  */
 
 const OUTCOME_TONE: Record<CallResultOutcome, ToneKey> = {
@@ -48,7 +52,15 @@ type HolderRow = {
   oldestMs: number;
 };
 
-const CallTeamBoardPage: React.FC = () => {
+/** หัวข้อของ section — แทน PageHeader เดิมตอนที่ยังเป็นหน้าแยก */
+const SectionHeading: React.FC = () => (
+  <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+    <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>ภาระงานโทรของทีม</h2>
+    <p className={cn('text-xs', DASH.muted)}>เห็นว่าใครถืออะไรค้าง แล้วเกลี่ยงานได้จากที่เดียว</p>
+  </div>
+);
+
+export const CallTeamBoardSection: React.FC = () => {
   const [holds, setHolds] = useState<CallHold[]>([]);
   const [tally, setTally] = useState<CallResultTally>(EMPTY_TALLY);
   const [forbidden, setForbidden] = useState(false);
@@ -161,24 +173,21 @@ const CallTeamBoardPage: React.FC = () => {
 
   if (forbidden) {
     return (
-      <div className="space-y-4 pb-10">
-        <PageHeader title="ภาระงานโทรของทีม" subtitle="เฉพาะหัวหน้าและผู้ดูแลระบบ" />
+      <section className="space-y-3">
+        <SectionHeading />
         <div className={cn('rounded-2xl border p-6 text-center', DASH.card)}>
-          <p className={cn('text-sm font-semibold', DASH.cellStrong)}>ไม่มีสิทธิ์ดูหน้านี้</p>
+          <p className={cn('text-sm font-semibold', DASH.cellStrong)}>ไม่มีสิทธิ์ดูส่วนนี้</p>
           <p className={cn('mt-1 text-xs', DASH.muted)}>
-            หน้านี้เปิดให้เฉพาะหัวหน้า/แอดมิน — งานโทรของตัวเองดูได้ที่เมนู “โทรของฉัน”
+            ภาระงานโทรของทีมเปิดให้เฉพาะหัวหน้า/แอดมิน — งานโทรของตัวเองดูได้ที่ด้านบน
           </p>
         </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="space-y-4 pb-10">
-      <PageHeader
-        title="ภาระงานโทรของทีม"
-        subtitle="เห็นว่าใครถืออะไรค้าง แล้วเกลี่ยงานได้จากที่เดียว"
-      />
+    <section className="space-y-4">
+      <SectionHeading />
 
       <div className={cn('rounded-2xl border p-4', DASH.card)}>
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
@@ -376,8 +385,8 @@ const CallTeamBoardPage: React.FC = () => {
           ) : null}
         </div>
       )}
-    </div>
+    </section>
   );
 };
 
-export default CallTeamBoardPage;
+export default CallTeamBoardSection;

@@ -8,6 +8,7 @@ import {
   type NeedsHumanItem,
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
 import { RefreshCw, ChevronDown } from 'lucide-react';
@@ -75,6 +76,10 @@ function Stat({
 }
 
 const CallFunnelPanel: React.FC = () => {
+  /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
+  const { hasPermission } = useAuth();
+  const canSeeCallDesk = hasPermission('admin');
+
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -227,12 +232,17 @@ const CallFunnelPanel: React.FC = () => {
                   </span>
                   <span className="ml-auto flex items-center gap-2">
                     {taken.has(item.id) ? (
-                      <Link
-                        to="/matching/my-calls"
-                        className={cn('text-[11px] font-bold underline', TONE.success.value)}
-                      >
-                        รับแล้ว → ไปโทรของฉัน
-                      </Link>
+                      canSeeCallDesk ? (
+                        <Link
+                          to="/matching/my-calls"
+                          className={cn('text-[11px] font-bold underline', TONE.success.value)}
+                        >
+                          รับแล้ว → ไปหน้างานโทร
+                        </Link>
+                      ) : (
+                        /* หน้างานโทรยังซ่อนไว้ให้แอดมิน — คนอื่นบอกแค่ว่ารับแล้ว ไม่ให้ลิงก์ที่กดไปแล้วตัน */
+                        <span className={cn('text-[11px] font-bold', TONE.success.value)}>รับแล้ว</span>
+                      )
                     ) : item.candidateRef && item.phone ? (
                       <button
                         type="button"
