@@ -54,6 +54,14 @@ export type ToneClasses = {
   soft: string;
   /** hover ของกล่อง soft ที่กดได้ — ใส่คู่กับ soft เท่านั้น */
   softHover: string;
+  /**
+   * ปุ่ม/ลิงก์แบบเส้นขอบบนพื้นขาว (ธีมสว่าง) — เส้นขอบ + ตัวหนังสือสีโทน + hover จาง
+   *
+   * มีไว้เพราะเวลาเขียนมือมักลืมคู่มืดของ `bg-white` → ปุ่มเป็นสี่เหลี่ยมขาวโพลน
+   * บนพื้นเข้มในโหมดมืด (เจอมาแล้วที่ปุ่มแบ่งหน้าของ MatchingPage)
+   * ต่างจาก `soft` ตรงที่ soft เป็นกล่องพื้นพาสเทล ส่วน outline พื้นขาว/เข้มตามธีม
+   */
+  outline: string;
   /** บล็อกสีอิ่ม ตัวหนังสือขาว — เฉพาะตัวเลขที่ต้องลงมือวันนี้ */
   solid: string;
   /** จุดสีเล็กหน้าป้าย */
@@ -77,6 +85,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-slate-800 dark:text-slate-200',
     soft: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100/70 dark:hover:bg-slate-800',
+    outline: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-950/50',
     solid: 'bg-slate-600 text-white hover:bg-slate-500',
     dot: 'bg-slate-400',
     onDark: 'text-slate-200',
@@ -90,6 +99,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-sky-700 dark:text-sky-300',
     soft: 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/50',
     softHover: 'hover:bg-sky-100/70 dark:hover:bg-sky-950',
+    outline: 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950/50',
     solid: 'bg-sky-600 text-white hover:bg-sky-500',
     dot: 'bg-sky-400',
     onDark: 'text-sky-300',
@@ -103,6 +113,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-blue-700 dark:text-blue-300',
     soft: 'border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50',
     softHover: 'hover:bg-blue-100/70 dark:hover:bg-blue-950',
+    outline: 'border-blue-200 bg-white text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/50',
     solid: 'bg-blue-600 text-white hover:bg-blue-500',
     dot: 'bg-blue-500',
     onDark: 'text-blue-400',
@@ -116,6 +127,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-emerald-700 dark:text-emerald-300',
     soft: 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/50',
     softHover: 'hover:bg-emerald-100/70 dark:hover:bg-emerald-950',
+    outline: 'border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/50',
     solid: 'bg-emerald-600 text-white hover:bg-emerald-500',
     dot: 'bg-emerald-400',
     onDark: 'text-emerald-300',
@@ -129,6 +141,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-amber-700 dark:text-amber-300',
     soft: 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50',
     softHover: 'hover:bg-amber-100/70 dark:hover:bg-amber-950',
+    outline: 'border-amber-200 bg-white text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-950/50',
     solid: 'bg-amber-500 text-white hover:bg-amber-400',
     dot: 'bg-amber-400',
     onDark: 'text-amber-300',
@@ -142,6 +155,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-red-700 dark:text-red-300',
     soft: 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/50',
     softHover: 'hover:bg-red-100/70 dark:hover:bg-red-950',
+    outline: 'border-red-200 bg-white text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50',
     solid: 'bg-red-600 text-white hover:bg-red-500',
     dot: 'bg-red-500',
     onDark: 'text-red-400',
@@ -155,6 +169,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-violet-700 dark:text-violet-300',
     soft: 'border-violet-200 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/50',
     softHover: 'hover:bg-violet-100/70 dark:hover:bg-violet-950',
+    outline: 'border-violet-200 bg-white text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-violet-950/50',
     solid: 'bg-violet-600 text-white hover:bg-violet-500',
     dot: 'bg-violet-400',
     onDark: 'text-violet-300',
@@ -168,6 +183,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-orange-700 dark:text-orange-300',
     soft: 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/50',
     softHover: 'hover:bg-orange-100/70 dark:hover:bg-orange-950',
+    outline: 'border-orange-200 bg-white text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:bg-slate-900 dark:text-orange-300 dark:hover:bg-orange-950/50',
     solid: 'bg-orange-500 text-white hover:bg-orange-400',
     dot: 'bg-orange-400',
     onDark: 'text-orange-300',
@@ -181,6 +197,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-teal-700 dark:text-teal-300',
     soft: 'border-teal-200 bg-teal-50 dark:border-teal-900 dark:bg-teal-950/50',
     softHover: 'hover:bg-teal-100/70 dark:hover:bg-teal-950',
+    outline: 'border-teal-200 bg-white text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-300 dark:hover:bg-teal-950/50',
     solid: 'bg-teal-600 text-white hover:bg-teal-500',
     dot: 'bg-teal-400',
     onDark: 'text-teal-300',
@@ -190,7 +207,15 @@ export const TONE: Record<ToneKey, ToneClasses> = {
 };
 
 /** variant ที่ต้องมีคู่ `dark:` เสมอ — dot/solid ใช้สีอิ่มตัวเดียวกันทั้งสองธีมโดยตั้งใจ */
-export const TONE_DARK_REQUIRED_VARIANTS = ['bar', 'tile', 'num', 'value', 'soft', 'softHover'] as const;
+export const TONE_DARK_REQUIRED_VARIANTS = [
+  'bar',
+  'tile',
+  'num',
+  'value',
+  'soft',
+  'softHover',
+  'outline',
+] as const;
 
 /**
  * พื้นผิวของหน้า /dashboard (Request Control Tower)
