@@ -12,6 +12,7 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
+import { notifyRoles } from './appNotifications.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
@@ -110,6 +111,8 @@ type QueueRow = {
   id: number;
   attempt_count: number;
   payload: unknown;
+  person_ref: string;
+  job_ref: string;
 };
 
 function phoneFromPayload(payload: unknown): string | null {
@@ -145,7 +148,7 @@ export async function applyCallFollowupToQueueRow(input: {
   let row: QueueRow | undefined;
   try {
     const { rows } = await dbQuery<QueueRow>(
-      `select id, attempt_count, payload from ${queueTable} where id = $1 limit 1`,
+      `select id, attempt_count, payload, person_ref, job_ref from ${queueTable} where id = $1 limit 1`,
       [input.queueId],
     );
     row = rows[0];
@@ -206,6 +209,30 @@ export async function applyCallFollowupToQueueRow(input: {
       until: until.toISOString(),
       reason: 'wrong_number',
       note: decision.reason,
+    });
+  }
+
+  // แจ้งเตือนคน — เดิมผลกลับมาแล้วจบเงียบ ระบบดีแค่ไหนก็ช้าเท่าคนเปิดหน้าจอ
+  // ยิงเฉพาะเหตุการณ์ที่ "คนต้องขยับ": สนใจ (รีบจอง) กับ ต้องคนตาม (AI สุดมือแล้ว)
+  // ผู้รับ = admin — หน้างานโทรยังซ่อนให้ admin เท่านั้น (7 ส.ค. 2569) เปิดกว้างเมื่อไหร่ค่อยขยาย
+  // dedupe ด้วย queue id + เหตุการณ์ — Lumos ยิงผลเดิมซ้ำจะไม่เด้งซ้ำ
+  // ⚠️ ห้าม throw ข้ามจุดนี้ — notifyRoles กลืน error เองอยู่แล้ว
+  const who = nameFromPayload(row.payload) || row.person_ref;
+  if (input.outcome === 'confirmed') {
+    await notifyRoles(['admin'], {
+      type: 'call_confirmed',
+      title: `📞 ${who} สนใจงาน — รีบติดต่อกลับ`,
+      body: `ใบขอ ${row.job_ref} · AI โทรแล้วเขาตอบรับ อย่าปล่อยให้เย็นตัว`,
+      link: '/follow',
+      dedupeKey: `call_confirmed:${row.id}`,
+    });
+  } else if (decision.action === 'needs_human') {
+    await notifyRoles(['admin'], {
+      type: 'needs_human',
+      title: `🚩 ${who} ต้องคนตาม — AI โทรจนสุดมือแล้ว`,
+      body: `ใบขอ ${row.job_ref} · ${decision.reason}`,
+      link: '/follow',
+      dedupeKey: `needs_human:${row.id}`,
     });
   }
 

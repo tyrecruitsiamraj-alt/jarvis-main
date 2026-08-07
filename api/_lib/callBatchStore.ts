@@ -7,6 +7,7 @@
  * ก่อนอ่านรายการชุด และก่อนเสิร์ฟคิวให้ Lumos (ซึ่ง Lumos ยิงเข้ามาเรื่อย ๆ อยู่แล้ว)
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
+import { notifyRoles } from './appNotifications.js';
 import { tableInAppSchema } from './schema.js';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch, type CallBatchStatus } from '../../src/lib/callBatch.js';
 
@@ -132,6 +133,20 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
       [batch.id, item.source, item.candidateRef, item.candidateName ?? null],
     );
   }
+
+  // เด้งบอกคนอนุมัติ — เดิมชุดรออนุมัตินอนเงียบจนกว่าจะมีคนเปิดหน้า Follow เอง
+  // ครอบคลุมทุกทางเข้า (ปุ่มในหน้า Matching + โหมด assist จัดชุดเอง) เพราะทุกทางผ่านที่นี่
+  // notifyRoles กลืน error เอง — ชุดต้องสร้างสำเร็จแม้ตารางแจ้งเตือนยังไม่ migrate
+  if (status === 'pending_approval') {
+    await notifyRoles(['admin', 'supervisor'], {
+      type: 'batch_pending',
+      title: `📋 ชุดส่งงานโทรรออนุมัติ — ${input.items.length.toLocaleString('th-TH')} คน`,
+      body: `ใบขอ ${input.requestNo || input.jobId} · สร้างโดย ${input.createdByName || 'ระบบ'}`,
+      link: '/follow',
+      dedupeKey: `batch_pending:${batch.id}`,
+    });
+  }
+
   return (await attachItems([batch]))[0] ?? null;
 }
 

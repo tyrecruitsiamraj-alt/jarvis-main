@@ -449,6 +449,28 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 แต่ **ไม่ตัด "ไม่ระบุ"** เพราะนั่นคือคำตอบจริง ไม่ใช่ช่องว่าง
 (ข้อมูลจริง 2 ปี: `boss_nationality` กรอกมา 1,949/4,924 ใบ ในนั้นเป็น `-` อีก 408 ใบ)
 
+## แจ้งเตือนในแอป (server-backed · migration 072)
+
+เดิมเหตุการณ์ฝั่ง server จบเงียบ — ระบบดีแค่ไหนก็ช้าเท่าคนเปิดหน้าจอ
+
+* `migrations/072_app_notifications.sql` — กล่องขาเข้ารายคน (แจ้งทั้ง role = fan-out ตอนสร้าง)
+* `api/_lib/appNotifications.ts` — `notifyUsers`/`notifyRoles` (**กลืน error เงียบ** —
+  แจ้งเตือนเป็นของแถม ห้ามทำให้ ingest/สร้างชุดล้ม) · `listMyNotifications`/`markNotificationsRead`
+* `api/_handlers/notifications.ts` — GET/PATCH `/api/notifications` (withAuth ทุก role เห็นของตัวเอง)
+* จุดยิง: `callFollowup.applyCallFollowupToQueueRow` (สนใจ + ต้องคนตาม → admin) ·
+  `callBatchStore.createCallBatch` (ชุดรออนุมัติ → supervisor/admin ครอบทุกทางเข้า)
+* client: `NotificationContext` poll ทุก 60 วิ · id ฝั่ง server ขึ้นต้น `srv-` ·
+  กดอ่าน PATCH กลับ · `NotificationPanel` ชนิดที่ไม่รู้จักตกไปไอคอนกระดิ่งกลาง
+
+⚠️ dedupe ต่อคนต่อเหตุการณ์ (`recipient_user_id, dedupe_key`) — Lumos ยิงผลเดิมซ้ำไม่เด้งซ้ำ
+⚠️ ผู้รับตอนนี้ = admin (หน้างานโทรยังซ่อนให้ admin) — เปิดกว้างเมื่อไหร่ขยาย role ที่จุดยิง
+
+## ประวัติการติดต่อรายคน
+
+* `api/_handlers/matching-contact-history.ts` — GET `?phone=` รวม holds + คิว Lumos
+  เส้นเวลาเดียว · คีย์เบอร์ E.164 · **ไม่ส่งเบอร์กลับ** · อ่าน outcome แบบ coalesce กับ result
+* `src/components/matching/ContactHistoryStrip.tsx` — เสียบใน dialog รายละเอียดผู้สมัคร
+
 ## Safe implementation / feature flag
 
 Edit documentation:
