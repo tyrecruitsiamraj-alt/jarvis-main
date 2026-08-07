@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
+import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import { cn } from '@/lib/utils';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded } from 'lucide-react';
 import {
@@ -137,6 +138,9 @@ const FollowPage: React.FC = () => {
       />
 
       <div className="px-4 md:px-6 py-4 space-y-4">
+        {/* funnel การโทรทั้งระบบ + ถัง "ต้องคนตาม" (ดู components/follow/CallFunnelPanel) */}
+        <CallFunnelPanel />
+
         {/* สรุป + ปุ่มเพิ่ม */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button

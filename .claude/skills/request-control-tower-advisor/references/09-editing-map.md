@@ -313,6 +313,21 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ทั้งสองใช้ `resolveCallFollowup()` ตัวเดียวกัน — คนกับ AI จึงส่งไม้ต่อกันได้
 (คนโทรไม่ติด → AI รับช่วงโทรซ้ำ) · error ในลูปนี้ **ห้ามทำให้ ingest/บันทึกผลล้ม**
 
+### หน้า Follow — funnel การโทร + ถัง "ต้องคนตาม"
+
+* `api/_handlers/lumos-call-funnel.ts` — `GET /api/lumos/call-funnel` (rbac `follow`)
+  นับด้วย **group by ในฐาน** ไม่ดึงแถวมานับที่ node (คิวมี 5,300+ แถว)
+* `src/lib/callFunnelApi.ts` · `src/components/follow/CallFunnelPanel.tsx`
+  เสียบบนสุดของ `src/pages/follow/FollowPage.tsx`
+
+⚠️ **อ่าน outcome ด้วย `coalesce(last_outcome, result->>'outcome')`** —
+`last_outcome` เป็นคอลัมน์ใหม่ (migration 070) แถวที่มีผลอยู่ก่อนหน้าจะว่าง
+ถ้าไม่ถอยไปอ่าน `result` หน้าเว็บจะโชว์ "มีผลกลับ 458 แต่โทรติด 0" ซึ่งดูเหมือนพัง
+(เจอตอนทดสอบกับข้อมูลจริง)
+
+⚠️ `byOutcome` อาจมีค่าที่ไม่ใช่ outcome จริงหลุดมาจากข้อมูลเก่า (เจอ `completed` 1 แถว)
+หน้าเว็บกรองด้วย `CALL_OUTCOMES` จึงไม่โชว์ — อย่าถอดตัวกรองนั้นออก
+
 ## Safe implementation / feature flag
 
 Edit documentation:
