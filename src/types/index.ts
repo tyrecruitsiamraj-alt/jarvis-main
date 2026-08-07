@@ -174,6 +174,14 @@ export interface JobRequest {
   urgency: JobUrgency;
   total_income: number;
   location_address: string;
+  /**
+   * สถานที่ปฏิบัติงาน — ชื่อสถานที่/บริษัทที่ไปประจำ (ERP `st_request_p2.work_place1`)
+   * ต่างจาก `location_address` ที่รวม work_place1-3 (มีที่อยู่/ผู้ใช้บริการปนมา) และเป็นตัวที่
+   * ตัวกรองจังหวัด-อำเภอใช้ — ช่องนี้ไว้อ่านอย่างเดียว ไม่เอาไปกรอง
+   */
+  work_place?: string;
+  /** สัญชาติเจ้านาย (ERP `st_request_p2.boss_nationality`) — เป็นข้อความอิสระ ~40% ของใบขอเท่านั้นที่กรอก */
+  boss_nationality?: string;
   lat?: number;
   lng?: number;
   job_type: JobType;

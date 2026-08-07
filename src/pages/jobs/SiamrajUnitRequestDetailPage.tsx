@@ -209,7 +209,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <Field label="ทำงานวันสุดท้าย" value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined} />
                 <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
                 <Field label="รหัสไซต์" value={data.site_code || data.unit_name} />
-                <Field label="สถานที่ทำงาน" value={data.location_address} />
+                <Field label="สถานที่ปฏิบัติงาน" value={data.work_place} />
+                <Field label="สถานที่ทำงาน (ที่อยู่เต็ม)" value={data.location_address} />
                 <Field label="ลักษณะงาน" value={data.job_description_code_1} />
                 <Field label="ตำแหน่ง (รายละเอียด)" value={data.staff_title_name || data.job_description_code_2} />
                 <Field
@@ -221,6 +222,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   }
                 />
                 <Field label="เพศ" value={data.gender_requirement} />
+                <Field label="สัญชาติเจ้านาย" value={data.boss_nationality} />
                 <Field label="ประเภทใบขอ" value={data.request_action_name} />
                 <Field label="ชื่อคนลาออก" value={data.resigned_employee_name} />
                 <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />

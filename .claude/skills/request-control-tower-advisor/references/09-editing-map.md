@@ -376,6 +376,28 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ⚠️ **`assist` ที่จุดที่ไม่รองรับ → normalize เป็น `manual` ไม่ใช่ `auto`** (ปลอดภัยกว่า)
 มีเทสต์คุม
 
+## ฟิลด์ใบขอที่ดึงจาก ERP (หน้า "ข้อมูลใบขอ")
+
+* `api/_lib/siamrajSqlServerRequests.ts` — **ที่เดียวที่ประกาศว่าดึงคอลัมน์ไหนจาก ERP**
+  เพิ่มฟิลด์ใหม่ต้องแก้ **3 จุดในไฟล์นี้พร้อมกัน** ไม่งั้นค่าหายเงียบ:
+  1. `SqlServerRequestRow` (type ของแถวดิบ)
+  2. `BASE_SQL` (SELECT ชั้นใน)
+  3. **`SELECT_COLUMNS`** ← จุดที่ลืมบ่อยสุด · query ซ้อน CTE อยู่
+     ถ้าชั้นนอกไม่ได้ SELECT ชื่อคอลัมน์นั้น จะได้ `undefined` โดยไม่มี error
+* `src/types/index.ts` (`JobRequest`) → `src/pages/jobs/SiamrajUnitRequestDetailPage.tsx`
+* `docs/erp-request-fields.md` — เอกสารแมปช่องบนหน้าจอ ↔ คอลัมน์ ERP + เงื่อนไขกรอง
+  (เขียนไว้ส่งให้ทีม ERP อ่าน — แก้ฟิลด์แล้วอัปเดตด้วย)
+
+⚠️ **`work_place` กับ `location_address` ไม่ใช่ตัวเดียวกัน ห้ามยุบรวม**
+`location_address` = `work_place1+2+3` ต่อกันแล้วผ่าน `normalizeSiamrajWorkAddress()`
+เป็นตัวที่ **ตัวกรองจังหวัด/อำเภอและการจับคู่พื้นที่ฝั่ง Matching ใช้** (`useJobBoardFilters`,
+`inferProvinceFromAddress`, `MatchingPage` `jobArea`) — เปลี่ยนรูปเมื่อไหร่ตัวกรองเพี้ยนทันที
+`work_place` = `work_place1` เดี่ยว ๆ = ชื่อสถานที่ที่ไปประจำ **ไว้อ่านอย่างเดียว ไม่เอาไปกรอง**
+
+⚠️ `cleanErpText()` ตัดค่าที่คนกรอกใส่ขีดทิ้งไว้ (`-` `--` `.`) ออกเป็น `undefined`
+แต่ **ไม่ตัด "ไม่ระบุ"** เพราะนั่นคือคำตอบจริง ไม่ใช่ช่องว่าง
+(ข้อมูลจริง 2 ปี: `boss_nationality` กรอกมา 1,949/4,924 ใบ ในนั้นเป็น `-` อีก 408 ใบ)
+
 ## Safe implementation / feature flag
 
 Edit documentation:
