@@ -82,7 +82,8 @@ import {
   type CallResultOutcome,
   type CallResultScope,
 } from '@/lib/callHoldsApi';
-import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
+import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX, ClipboardCheck } from 'lucide-react';
+import { createCallBatch } from '@/lib/callBatchApi';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
@@ -1263,13 +1264,18 @@ function cardNextAction(
 function LumosSendBar({
   count,
   onSend,
+  onCreateBatch,
   onClear,
   busy,
+  creatingBatch,
 }: {
   count: number;
   onSend: () => void;
+  /** สร้างชุดรออนุมัติแทนการส่งเข้าคิวทันที — คนอนุมัติที่หน้า Follow */
+  onCreateBatch: () => void;
   onClear: () => void;
   busy: boolean;
+  creatingBatch: boolean;
 }) {
   if (count === 0) return null;
   return (
@@ -1283,9 +1289,24 @@ function LumosSendBar({
         >
           ล้างที่เลือก
         </button>
+        {/* ทางเลือกที่ 2: ไม่ส่งเข้าคิวทันที แต่ตั้งเป็นชุดให้หัวหน้าอนุมัติก่อน
+            เดิมชุดเกิดได้จากโหมด assist อย่างเดียว ทั้งที่ API รองรับสร้างเองมาตั้งแต่แรก */}
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || creatingBatch}
+          onClick={onCreateBatch}
+          title="ตั้งเป็นชุดรออนุมัติ — ยังไม่โทร จนกว่าหัวหน้าจะกดอนุมัติที่หน้า Follow"
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+            TONE.warn.outline,
+          )}
+        >
+          <ClipboardCheck className="h-3 w-3" />
+          {creatingBatch ? 'กำลังสร้างชุด…' : `ตั้งชุดรออนุมัติ (${count})`}
+        </button>
+        <button
+          type="button"
+          disabled={busy || creatingBatch}
           onClick={onSend}
           className="jarvis-btn-primary"
         >
@@ -1721,6 +1742,8 @@ const MatchingPage: React.FC = () => {
   const [lumosSelectedIrecruit, setLumosSelectedIrecruit] = useState<number[]>([]);
   const [lumosConfirmOpen, setLumosConfirmOpen] = useState(false);
   const [lumosSending, setLumosSending] = useState(false);
+  /** กำลังสร้างชุดรออนุมัติ — แยกจาก lumosSending เพราะเป็นคนละปุ่มคนละปลายทาง */
+  const [batchCreating, setBatchCreating] = useState(false);
   const [lumosError, setLumosError] = useState<string | null>(null);
   const [lumosNotice, setLumosNotice] = useState<string | null>(null);
   const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
@@ -1779,6 +1802,41 @@ const MatchingPage: React.FC = () => {
     } catch {
       // ไม่ให้ล้มการเปิดใบขอ — แค่ไม่มีป้ายผลการโทร
       setLumosStatusByRef({});
+    }
+  };
+
+  /**
+   * ตั้งคนที่ติ๊กไว้เป็น "ชุดรออนุมัติ" แทนการยิงเข้าคิวทันที
+   *
+   * ⚠️ หนึ่งชุด = หนึ่งช่อง (บอร์ด→reminder · iRecruit→interview) API ตอบ 400 ถ้าส่งปนกัน
+   * เลือกปนสองฝั่งจึงต้องยิงสองครั้ง = ได้ 2 ชุด ไม่ใช่ชุดเดียว
+   * ถ้าครั้งที่สองล้ม ชุดแรกที่สร้างไปแล้วยังอยู่ — บอกผู้ใช้ตรง ๆ ว่าอะไรสำเร็จไปแล้ว
+   * จะได้ไม่กดซ้ำจนเกิดชุดซ้อน
+   */
+  const createBatchFromSelection = async () => {
+    if (!jobDetail || lumosSelectedCount === 0) return;
+    setBatchCreating(true);
+    setLumosError(null);
+    setLumosNotice(null);
+    const done: string[] = [];
+    try {
+      if (lumosSelectedBoard.length > 0) {
+        await createCallBatch({ jobId: jobDetail.id, boardCardIds: lumosSelectedBoard });
+        done.push(`คนของเรา ${lumosSelectedBoard.length} คน`);
+      }
+      if (lumosSelectedIrecruit.length > 0) {
+        await createCallBatch({ jobId: jobDetail.id, irecruitIds: lumosSelectedIrecruit });
+        done.push(`iRecruit ${lumosSelectedIrecruit.length} คน`);
+      }
+      clearLumosSelection();
+      setLumosNotice(
+        `ตั้งชุดรออนุมัติแล้ว — ${done.join(' · ')} · ยังไม่โทรจนกว่าจะอนุมัติที่หน้า Follow`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'สร้างชุดส่งไม่สำเร็จ';
+      setLumosError(done.length > 0 ? `${msg} (ที่สร้างสำเร็จแล้ว: ${done.join(' · ')})` : msg);
+    } finally {
+      setBatchCreating(false);
     }
   };
 
@@ -3579,6 +3637,8 @@ const MatchingPage: React.FC = () => {
                 count={lumosSelectedCount}
                 busy={lumosSending}
                 onClear={clearLumosSelection}
+                creatingBatch={batchCreating}
+                onCreateBatch={() => void createBatchFromSelection()}
                 onSend={() => setLumosConfirmOpen(true)}
               />
 
@@ -4168,6 +4228,8 @@ const MatchingPage: React.FC = () => {
                     count={lumosSelectedCount}
                     busy={lumosSending}
                     onClear={clearLumosSelection}
+                    creatingBatch={batchCreating}
+                    onCreateBatch={() => void createBatchFromSelection()}
                     onSend={() => setLumosConfirmOpen(true)}
                   />
                   {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}

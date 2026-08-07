@@ -14,6 +14,30 @@ export async function fetchCallBatches(): Promise<CallBatch[]> {
   }
 }
 
+/**
+ * สร้างชุดส่งรออนุมัติจากคนที่ติ๊กเลือกไว้ในหน้า Matching
+ *
+ * ⚠️ หนึ่งชุด = หนึ่งช่อง — บอร์ดเข้าช่อง reminder · iRecruit เข้าช่อง interview
+ * ส่งมาปนกันในคำขอเดียว server ตอบ 400 (สถานะ/การยกเลิกจะกำกวม)
+ * ตัวเรียกจึงต้องแยกยิงทีละฝั่ง ไม่ใช่รวมก้อนเดียว
+ */
+export async function createCallBatch(input: {
+  jobId: string;
+  boardCardIds?: number[];
+  irecruitIds?: number[];
+  note?: string;
+}): Promise<CallBatch> {
+  const r = await apiFetch('/api/lumos/call-batches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'สร้างชุดส่งไม่สำเร็จ'));
+  const data = await readJsonSafe<{ batch?: CallBatch }>(r);
+  if (!data?.batch) throw new Error('สร้างชุดส่งไม่สำเร็จ');
+  return data.batch;
+}
+
 export async function approveCallBatch(batchId: string): Promise<CallBatch> {
   const r = await apiFetch('/api/lumos/call-batches', {
     method: 'PATCH',
