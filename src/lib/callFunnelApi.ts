@@ -20,10 +20,14 @@ export type NeedsHumanItem = {
   channel: string;
   jobRef: string;
   personRef: string;
+  /** ref ผู้สมัครที่ตัด prefix แล้ว — null = รายการติดตามที่คนกรอกเอง (รับไปตามแบบนี้ไม่ได้) */
+  candidateRef: string | null;
+  source: 'board' | 'irecruit' | null;
+  candidateName: string | null;
+  phone: string | null;
   lastOutcome: string | null;
   attemptCount: number;
   updatedAt: string;
-  payload: unknown;
 };
 
 export const EMPTY_FUNNEL: CallFunnel = {
@@ -38,17 +42,6 @@ export const EMPTY_FUNNEL: CallFunnel = {
   needsHuman: 0,
   closed: 0,
 };
-
-/** ชื่อ/เบอร์ที่โชว์ได้จาก payload ของคิว (รูปแบบต่างกันเล็กน้อยระหว่าง 2 ช่อง) */
-export function personLabelFromPayload(payload: unknown): string | null {
-  if (typeof payload !== 'object' || payload === null) return null;
-  const p = payload as Record<string, unknown>;
-  for (const key of ['recipient_name', 'candidate_name', 'full_name']) {
-    const v = p[key];
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  }
-  return null;
-}
 
 /** โหลดพลาด/ยังไม่ migrate = ศูนย์ทั้งชุด ไม่ให้หน้า Follow พัง */
 export async function fetchCallFunnel(

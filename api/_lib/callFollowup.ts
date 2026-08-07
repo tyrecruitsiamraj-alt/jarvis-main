@@ -319,18 +319,40 @@ function isUndefinedColumn(e: unknown): boolean {
 }
 
 /** งานที่ AI เอาไม่อยู่ ต้องให้คนตาม — หน้า Follow อ่านจากนี่ */
-export async function listNeedsHumanQueueItems(limit = 200): Promise<
-  Array<{
-    id: number;
-    channel: string;
-    jobRef: string;
-    personRef: string;
-    lastOutcome: string | null;
-    attemptCount: number;
-    updatedAt: string;
-    payload: unknown;
-  }>
-> {
+export type NeedsHumanItem = {
+  id: number;
+  channel: string;
+  jobRef: string;
+  personRef: string;
+  /** ref ของผู้สมัครโดยตัด prefix (card-/ir-/follow-) — ใช้กดรับไปตามต่อ */
+  candidateRef: string | null;
+  source: 'board' | 'irecruit' | null;
+  candidateName: string | null;
+  /** เบอร์สำหรับกด "รับไปตาม" — จำเป็นเพราะล็อกผูกกับเบอร์ */
+  phone: string | null;
+  lastOutcome: string | null;
+  attemptCount: number;
+  updatedAt: string;
+};
+
+/** person_ref → (source, ref) · follow-xxx ไม่ใช่ผู้สมัครในบอร์ด จึงรับไปตามแบบนี้ไม่ได้ */
+function splitPersonRef(personRef: string): { source: 'board' | 'irecruit' | null; ref: string | null } {
+  if (personRef.startsWith('card-')) return { source: 'board', ref: personRef.slice(5) };
+  if (personRef.startsWith('ir-')) return { source: 'irecruit', ref: personRef.slice(3) };
+  return { source: null, ref: null };
+}
+
+function nameFromPayload(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as Record<string, unknown>;
+  for (const key of ['recipient_name', 'candidate_name', 'full_name']) {
+    const v = p[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+export async function listNeedsHumanQueueItems(limit = 200): Promise<NeedsHumanItem[]> {
   try {
     const { rows } = await dbQuery<{
       id: number;
@@ -349,16 +371,23 @@ export async function listNeedsHumanQueueItems(limit = 200): Promise<
         limit $1`,
       [Math.min(Math.max(limit, 1), 500)],
     );
-    return rows.map((r) => ({
-      id: r.id,
-      channel: r.channel,
-      jobRef: r.job_ref,
-      personRef: r.person_ref,
-      lastOutcome: r.last_outcome,
-      attemptCount: Number(r.attempt_count) || 1,
-      updatedAt: r.updated_at,
-      payload: r.payload,
-    }));
+    // ส่งเฉพาะฟิลด์ที่หน้าเว็บใช้จริง ไม่ dump payload ทั้งก้อน
+    return rows.map((r) => {
+      const { source, ref } = splitPersonRef(r.person_ref);
+      return {
+        id: r.id,
+        channel: r.channel,
+        jobRef: r.job_ref,
+        personRef: r.person_ref,
+        candidateRef: ref,
+        source,
+        candidateName: nameFromPayload(r.payload),
+        phone: phoneFromPayload(r.payload),
+        lastOutcome: r.last_outcome,
+        attemptCount: Number(r.attempt_count) || 1,
+        updatedAt: r.updated_at,
+      };
+    });
   } catch (e) {
     if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return [];
     throw e;

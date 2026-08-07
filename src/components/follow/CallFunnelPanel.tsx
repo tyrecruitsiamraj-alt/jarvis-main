@@ -4,10 +4,11 @@ import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import {
   EMPTY_FUNNEL,
   fetchCallFunnel,
-  personLabelFromPayload,
   type CallFunnel,
   type NeedsHumanItem,
 } from '@/lib/callFunnelApi';
+import { acquireCallHold } from '@/lib/callHoldsApi';
+import { Link } from 'react-router-dom';
 import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 
@@ -78,6 +79,10 @@ const CallFunnelPanel: React.FC = () => {
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [openBucket, setOpenBucket] = useState(false);
+  const [takingId, setTakingId] = useState<number | null>(null);
+  const [takeError, setTakeError] = useState<string | null>(null);
+  /** id ที่เพิ่งรับไปตามในรอบนี้ — โชว์ผลค้างไว้ ไม่ให้ดูเหมือนกดแล้วไม่มีอะไรเกิด */
+  const [taken, setTaken] = useState<Set<number>>(new Set());
 
   const load = () => {
     setLoading(true);
@@ -91,6 +96,35 @@ const CallFunnelPanel: React.FC = () => {
   useEffect(load, []);
 
   const outcomesWithCount = CALL_OUTCOMES.filter((o) => (funnel.byOutcome[o] ?? 0) > 0);
+
+  /**
+   * รับงานตามจากถังนี้ตรง ๆ — ใช้ล็อกตัวเดียวกับหน้า Matching (ผูกกับเบอร์)
+   * รับแล้วไปโทรต่อที่หน้า "โทรของฉัน" · คนอื่นถือแล้วจะได้ 409 พร้อมชื่อคนถือ
+   */
+  const take = async (item: NeedsHumanItem) => {
+    if (takingId || !item.candidateRef || !item.source || !item.phone) return;
+    setTakingId(item.id);
+    setTakeError(null);
+    try {
+      const res = await acquireCallHold({
+        phone: item.phone,
+        source: item.source,
+        candidateRef: item.candidateRef,
+        candidateName: item.candidateName,
+        jobId: item.jobRef,
+        requestNo: null,
+      });
+      if (res.ok) {
+        setTaken((prev) => new Set(prev).add(item.id));
+      } else {
+        setTakeError(res.message ?? 'รับงานไม่สำเร็จ');
+      }
+    } catch (e) {
+      setTakeError(e instanceof Error ? e.message : 'รับงานไม่สำเร็จ');
+    } finally {
+      setTakingId(null);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -168,6 +202,11 @@ const CallFunnelPanel: React.FC = () => {
           </button>
           {openBucket ? (
             <div className={cn('border-t', DASH.divider)}>
+              {takeError ? (
+                <p className={cn('border-b px-3 py-2 text-[11px]', DASH.divider, TONE.danger.value)}>
+                  {takeError}
+                </p>
+              ) : null}
               {needsHuman.map((item) => (
                 <div
                   key={item.id}
@@ -177,7 +216,7 @@ const CallFunnelPanel: React.FC = () => {
                   )}
                 >
                   <span className={cn('font-semibold', DASH.cellStrong)}>
-                    {personLabelFromPayload(item.payload) || item.personRef}
+                    {item.candidateName || item.personRef}
                   </span>
                   <span className={cn('font-mono text-[11px]', DASH.muted)}>{item.jobRef}</span>
                   <span className={cn('text-[11px]', DASH.muted)}>
@@ -186,13 +225,39 @@ const CallFunnelPanel: React.FC = () => {
                       ? ` · ล่าสุด ${OUTCOME_LABEL[item.lastOutcome as CallOutcome] ?? item.lastOutcome}`
                       : ''}
                   </span>
-                  <span className={cn('ml-auto text-[10px]', DASH.muted)}>
-                    {new Date(item.updatedAt).toLocaleString('th-TH', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                  <span className="ml-auto flex items-center gap-2">
+                    {taken.has(item.id) ? (
+                      <Link
+                        to="/matching/my-calls"
+                        className={cn('text-[11px] font-bold underline', TONE.success.value)}
+                      >
+                        รับแล้ว → ไปโทรของฉัน
+                      </Link>
+                    ) : item.candidateRef && item.phone ? (
+                      <button
+                        type="button"
+                        onClick={() => void take(item)}
+                        disabled={takingId === item.id}
+                        className={cn(
+                          'rounded-full px-2.5 py-1 text-[11px] font-bold disabled:opacity-50',
+                          TONE.primary.solid,
+                        )}
+                      >
+                        {takingId === item.id ? 'กำลังรับ…' : 'รับไปตาม'}
+                      </button>
+                    ) : (
+                      <span className={cn('text-[10px]', DASH.muted)} title="ไม่มีเบอร์ที่โทรได้">
+                        รับไปตามไม่ได้
+                      </span>
+                    )}
+                    <span className={cn('text-[10px]', DASH.muted)}>
+                      {new Date(item.updatedAt).toLocaleString('th-TH', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
                   </span>
                 </div>
               ))}
