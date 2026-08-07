@@ -85,6 +85,14 @@ import {
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX, ClipboardCheck } from 'lucide-react';
 import { createCallBatch } from '@/lib/callBatchApi';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
+import type { BoardCandidateMatch, MatchTier } from '@/lib/boardCandidateTypes';
+import CandidateChecklist from '@/components/matching/CandidateChecklist';
+import {
+  areaVerdict,
+  boardCandidatePriority,
+  normText,
+  type CheckVerdict,
+} from '@/lib/candidateVerdicts';
 import { fetchLumosDispatchMode } from '@/lib/lumosDispatchModeApi';
 import type { LumosDispatchModeConfig } from '@/lib/lumosDispatchMode';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
@@ -149,24 +157,6 @@ type ProposalActionDraft = {
   submit: (operatorName: string, reason: string) => Promise<void>;
 };
 
-/** "คนของเรา" — ผ่านสัมภาษณ์แล้ว รอลงงาน (จาก board) แมทกับใบขอด้วย AI */
-type BoardCandidateMatch = {
-  card_id: number;
-  full_name: string;
-  nick_name: string | null;
-  mobile: string | null;
-  sex_code: string | null;
-  age: number | null;
-  required_salary: number | null;
-  job1_name: string | null;
-  job2_name: string | null;
-  province_name: string | null;
-  amphur_name: string | null;
-  /** ถังบนบอร์ด: 'To do' / 'ไม่มีงาน' (auto ค้นสองถังนี้) */
-  column_label?: string | null;
-  tier: 'green' | 'yellow' | 'red';
-  reason: string;
-};
 type BoardMatchResult = {
   jobId: string;
   job_family_code: string;
@@ -188,7 +178,6 @@ type BoardMatchResponse = BoardMatchResult & {
   worker_active?: boolean;
 };
 
-type MatchTier = BoardCandidateMatch['tier'];
 type IrecruitDisplayRow =
   | { kind: 'branch'; key: string; branch: BranchDemandItem; candidateCount: number }
   | {
@@ -517,138 +506,6 @@ function AiEvaluationStatus({ source }: { source: 'board' | 'irecruit' }) {
           <p className={cn('mt-1.5 text-[10px]', TONE.primary.value)}>{estimate} · ไม่ต้องกดซ้ำ สามารถรอหน้านี้ได้</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-type CheckVerdict = 'pass' | 'warn' | 'fail' | 'unknown';
-
-function normText(value: string | null | undefined): string {
-  return (value || '').trim().toLowerCase().replace(/\s+/g, '');
-}
-
-function genderVerdict(required: string | null | undefined, actual: string | null | undefined): CheckVerdict {
-  const req = normText(required);
-  const value = normText(actual);
-  if (!req || req === 'ไม่ระบุ' || !value) return 'unknown';
-  const male = ['m', 'male', 'ชาย'].includes(value);
-  const female = ['f', 'female', 'หญิง'].includes(value);
-  if (req.includes('ชาย')) return male ? 'pass' : 'fail';
-  if (req.includes('หญิง')) return female ? 'pass' : 'fail';
-  return 'unknown';
-}
-
-function ageVerdict(job: JobRequest, age: number | null | undefined): CheckVerdict {
-  if (job.age_range_min == null && job.age_range_max == null) return 'unknown';
-  if (age == null) return 'unknown';
-  if (job.age_range_min != null && age < job.age_range_min) return 'fail';
-  if (job.age_range_max != null && age > job.age_range_max) return 'fail';
-  return 'pass';
-}
-
-function areaVerdict(job: JobRequest, parts: Array<string | null | undefined>): CheckVerdict {
-  const candidateParts = parts.map(normText).filter(Boolean);
-  if (candidateParts.length === 0) return 'unknown';
-  const jobArea = normText(`${job.location_address} ${job.unit_name}`);
-  return candidateParts.some((part) => jobArea.includes(part)) ? 'pass' : 'warn';
-}
-
-function salaryVerdict(job: JobRequest, salary: number | null | undefined): CheckVerdict {
-  if (!salary || !job.total_income) return 'unknown';
-  return salary <= job.total_income ? 'pass' : 'warn';
-}
-
-/**
- * คะแนนตามลำดับความสำคัญของเจ้าของ (อายุ → ที่อยู่ → ประสบการณ์ → เหล้า/บุหรี่ → คดี → รายได้)
- * ดู lib/candidatePriority — น้ำหนักตั้งได้ที่ Settings
- *
- * ประสบการณ์ = สายงานที่เคยทำตรงกับใบขอไหม ใช้ tier จาก AI แมทสกิล (เขียว=ตรง เหลือง=ใกล้ แดง=คนละสาย)
- * เหล้า/บุหรี่ กับ คดี ไม่มีในบอร์ด iRecruit — มาจากผลคัดกรองที่เจ้าหน้าที่บันทึกไว้ฝั่ง Jarvis
- * (ยังไม่บันทึก = unknown ซึ่งไม่ถูกนับทั้งตัวตั้งและตัวหาร คนที่ยังไม่ถูกคัดกรองจึงไม่เสียเปรียบ)
- */
-function boardCandidatePriority(
-  job: JobRequest,
-  m: BoardCandidateMatch,
-  config: PriorityConfig,
-  screening?: CandidateScreening | null,
-): CandidatePriorityScore {
-  return scoreCandidatePriority(
-    {
-      age: ageVerdict(job, m.age) as PriorityVerdict,
-      area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
-      experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
-      salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
-      ...screeningVerdicts(screening),
-    },
-    config,
-  );
-}
-
-/** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
-const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
-  pass: { icon: '✓', tone: 'success' },
-  warn: { icon: '!', tone: 'warn' },
-  fail: { icon: '×', tone: 'danger' },
-  unknown: { icon: '?', tone: 'neutral' },
-};
-
-function CheckChip({ label, verdict }: { label: string; verdict: CheckVerdict }) {
-  const meta = CHECK_META[verdict];
-  return (
-    <span className={TONE[meta.tone].chip}>
-      {label} {meta.icon}
-    </span>
-  );
-}
-
-function CandidateChecklist({
-  job,
-  tier,
-  sex,
-  age,
-  areaParts,
-  salary,
-  licenses,
-  screening,
-}: {
-  job: JobRequest;
-  tier: MatchTier;
-  sex?: string | null;
-  age?: number | null;
-  areaParts: Array<string | null | undefined>;
-  salary?: number | null;
-  licenses?: string[];
-  /** ผลคัดกรองที่เจ้าหน้าที่บันทึกไว้ — ไม่มี = ยังไม่ถูกถาม ชิปจะไม่โชว์ */
-  screening?: CandidateScreening | null;
-}) {
-  const position: CheckVerdict = tier === 'green' ? 'pass' : tier === 'yellow' ? 'warn' : 'fail';
-  const requiresLicense = Boolean(job.vehicle_required && normText(job.vehicle_required) !== 'ไม่ระบุ');
-  const license: CheckVerdict = requiresLicense
-    ? licenses == null
-      ? 'unknown'
-      : licenses.length > 0
-        ? 'pass'
-        : 'warn'
-    : 'unknown';
-  // ลำดับชิปไล่ตามลำดับความสำคัญที่เจ้าของกำหนด:
-  //   อายุ → ที่อยู่ → ประสบการณ์ (ตำแหน่ง) → เหล้า/บุหรี่ → คดี → รายได้
-  // เพศ/ใบขับขี่เป็นเกณฑ์ของใบขอ อยู่ท้ายรายการ
-  // สองชิปคัดกรองโชว์เฉพาะเมื่อมีคนบันทึกไว้แล้ว — ยังไม่ถาม = ไม่โชว์ ไม่ใช่โชว์เทา
-  const screened = screening ? screeningVerdicts(screening) : {};
-  return (
-    <div className="flex flex-wrap gap-1" aria-label="ผลตรวจคุณสมบัติเบื้องต้น">
-      <CheckChip label="อายุ" verdict={ageVerdict(job, age)} />
-      <CheckChip label="ที่อยู่" verdict={areaVerdict(job, areaParts)} />
-      <CheckChip label="ประสบการณ์" verdict={position} />
-      {screened.lifestyle && screened.lifestyle !== 'unknown' ? (
-        <CheckChip label="เหล้า/บุหรี่" verdict={screened.lifestyle} />
-      ) : null}
-      {screened.criminalRecord && screened.criminalRecord !== 'unknown' ? (
-        <CheckChip label="ประวัติคดี" verdict={screened.criminalRecord} />
-      ) : null}
-      {salary !== undefined ? <CheckChip label="รายได้" verdict={salaryVerdict(job, salary)} /> : null}
-      <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
-      {requiresLicense ? <CheckChip label="ใบขับขี่" verdict={license} /> : null}
     </div>
   );
 }
