@@ -177,6 +177,29 @@ const CallFunnelPanel: React.FC = () => {
         />
       </div>
 
+      {/* อัตราแปลงผล — ตัวเลขไว้ประกอบการตัดสินใจเปิด auto ไม่ใช่แค่ความรู้สึก
+          ฐาน = มีผลกลับแล้ว "หักที่คนกดยกเลิกออก" — ข้อมูลจริงมีสายยกเลิก 409/458
+          ถ้าไม่หัก เปอร์เซ็นต์จะหลอกตา (โทรติดเหลือ 7% ทั้งที่สายที่โทรจริงติดเกินครึ่ง) */}
+      {(() => {
+        const resolved = funnel.withResult - (funnel.byOutcome.cancelled ?? 0);
+        if (resolved <= 0) return null;
+        const pct = (n: number) => `${Math.round((n / resolved) * 100)}%`;
+        return (
+          <p className={cn('px-1 text-xs', DASH.muted)}>
+            จากสายที่มีผลจริง {resolved.toLocaleString('th-TH')} สาย (ไม่นับที่กดยกเลิก) — โทรติด{' '}
+            <span className={cn('font-semibold', TONE.success.value)}>{pct(funnel.connected)}</span>
+            {' · '}สนใจ{' '}
+            <span className={cn('font-semibold', TONE.success.value)}>
+              {pct(funnel.byOutcome.confirmed ?? 0)}
+            </span>
+            {' · '}ต้องคนตาม{' '}
+            <span className={cn('font-semibold', funnel.needsHuman > 0 ? TONE.danger.value : DASH.muted)}>
+              {pct(funnel.needsHuman)}
+            </span>
+          </p>
+        );
+      })()}
+
       {outcomesWithCount.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {outcomesWithCount.map((o) => (
@@ -224,6 +247,22 @@ const CallFunnelPanel: React.FC = () => {
                     {item.candidateName || item.personRef}
                   </span>
                   <span className={cn('font-mono text-[11px]', DASH.muted)}>{item.jobRef}</span>
+                  {/* นาฬิกาของถัง — เดิมงานตกถังแล้วนอนได้ไม่จำกัดโดยไม่มีอะไรบอก
+                      ค้างเกิน 2 วัน = แดง ขัดกับหลัก "ไม่มีงานหายเงียบ" ถ้าปล่อยเงียบ */}
+                  {(() => {
+                    const days = Math.floor((Date.now() - new Date(item.updatedAt).getTime()) / 86400000);
+                    if (days <= 0) return <span className={cn('text-[11px]', DASH.muted)}>เข้าวันนี้</span>;
+                    return (
+                      <span
+                        className={cn(
+                          'rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                          days >= 2 ? cn(TONE.danger.soft, TONE.danger.value) : cn(TONE.warn.soft, TONE.warn.value),
+                        )}
+                      >
+                        ค้าง {days.toLocaleString('th-TH')} วัน
+                      </span>
+                    );
+                  })()}
                   <span className={cn('text-[11px]', DASH.muted)}>
                     โทรไป {item.attemptCount.toLocaleString('th-TH')} ครั้ง
                     {item.lastOutcome
