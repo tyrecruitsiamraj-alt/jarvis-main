@@ -8,6 +8,7 @@ import {
   type NeedsHumanItem,
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
+import { conversionRates } from '@/lib/callFunnelMath';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
@@ -178,23 +179,19 @@ const CallFunnelPanel: React.FC = () => {
       </div>
 
       {/* อัตราแปลงผล — ตัวเลขไว้ประกอบการตัดสินใจเปิด auto ไม่ใช่แค่ความรู้สึก
-          ฐาน = มีผลกลับแล้ว "หักที่คนกดยกเลิกออก" — ข้อมูลจริงมีสายยกเลิก 409/458
-          ถ้าไม่หัก เปอร์เซ็นต์จะหลอกตา (โทรติดเหลือ 7% ทั้งที่สายที่โทรจริงติดเกินครึ่ง) */}
+          นิยามฐาน (หักสายยกเลิก) อยู่ที่ callFunnelMath.ts ที่เดียว มีเทสต์คุม */}
       {(() => {
-        const resolved = funnel.withResult - (funnel.byOutcome.cancelled ?? 0);
-        if (resolved <= 0) return null;
-        const pct = (n: number) => `${Math.round((n / resolved) * 100)}%`;
+        const rates = conversionRates(funnel);
+        if (!rates) return null;
         return (
           <p className={cn('px-1 text-xs', DASH.muted)}>
-            จากสายที่มีผลจริง {resolved.toLocaleString('th-TH')} สาย (ไม่นับที่กดยกเลิก) — โทรติด{' '}
-            <span className={cn('font-semibold', TONE.success.value)}>{pct(funnel.connected)}</span>
+            จากสายที่มีผลจริง {rates.base.toLocaleString('th-TH')} สาย (ไม่นับที่กดยกเลิก) — โทรติด{' '}
+            <span className={cn('font-semibold', TONE.success.value)}>{rates.connectedPct}%</span>
             {' · '}สนใจ{' '}
-            <span className={cn('font-semibold', TONE.success.value)}>
-              {pct(funnel.byOutcome.confirmed ?? 0)}
-            </span>
+            <span className={cn('font-semibold', TONE.success.value)}>{rates.confirmedPct}%</span>
             {' · '}ต้องคนตาม{' '}
             <span className={cn('font-semibold', funnel.needsHuman > 0 ? TONE.danger.value : DASH.muted)}>
-              {pct(funnel.needsHuman)}
+              {rates.needsHumanPct}%
             </span>
           </p>
         );
