@@ -67,6 +67,7 @@ import {
   fetchCandidateScreening,
   saveCandidateScreening,
   type CandidateScreeningRecord,
+  type ScreeningSource,
 } from '@/lib/candidateScreeningApi';
 import {
   acquireCallHold,
@@ -958,11 +959,17 @@ const SCREENING_CHOICES: Array<{ value: ScreeningAnswer; label: string; tone: To
 ];
 
 function ScreeningEditor({
+  source,
   candidateRef,
   candidateName,
   record,
   onSaved,
 }: {
+  /**
+   * คนละคลังกับ ref เดียวกันได้ — บอร์ดใช้ `card_id` · iRecruit ใช้ `id` ของเขา
+   * ซึ่งเป็นเลขคนละชุดแต่ชนกันได้ (เช่น 1805 มีทั้งสองฝั่ง) จึงต้องส่ง source มาเสมอ
+   */
+  source: ScreeningSource;
   candidateRef: string;
   candidateName: string | null;
   record?: CandidateScreeningRecord;
@@ -984,7 +991,7 @@ function ScreeningEditor({
     setCriminalNote(record?.criminalNote ?? '');
     setError(null);
     setSavedAt(null);
-  }, [candidateRef, record]);
+  }, [source, candidateRef, record]);
 
   const submit = async () => {
     if (saving) return;
@@ -992,7 +999,7 @@ function ScreeningEditor({
     setError(null);
     try {
       const rec = await saveCandidateScreening({
-        source: 'board',
+        source,
         candidateRef,
         candidateName,
         drinking,
@@ -1476,6 +1483,17 @@ const MatchingPage: React.FC = () => {
    */
   const [screeningByRef, setScreeningByRef] = useState<Record<string, CandidateScreeningRecord>>({});
 
+  /**
+   * ผลคัดกรองของผู้สมัครฝั่ง iRecruit — คีย์เป็น `id` ของ iRecruit (string)
+   * ⚠ ต้องแยก map กับ `screeningByRef` ของบอร์ด ห้ามยุบรวมเป็นก้อนเดียว
+   * เพราะ `card_id` ของบอร์ดกับ `id` ของ iRecruit เป็นเลขคนละชุดที่ชนกันได้
+   * (เช่น 1805 มีทั้งสองฝั่ง แต่เป็นคนละคน) — ฝั่ง DB แยกด้วยคอลัมน์ `source` อยู่แล้ว
+   */
+  const [irScreeningByRef, setIrScreeningByRef] = useState<Record<string, CandidateScreeningRecord>>({});
+
+  /** แถว iRecruit ที่กางฟอร์มบันทึกผลคัดกรองอยู่ (ทีละคน — กันลิสต์ยาวเกินจนอ่านไม่ไหว) */
+  const [screeningOpenIrId, setScreeningOpenIrId] = useState<number | null>(null);
+
   /** โหลดผลคัดกรองของผู้สมัครทุกคนในใบขอที่เปิด — รอผลแมทมาก่อนจึงรู้ว่ามีใคร */
   const openJobMatches = jobDetail ? boardMatchById[jobDetail.id]?.matches : undefined;
   useEffect(() => {
@@ -1623,6 +1641,29 @@ const MatchingPage: React.FC = () => {
   const [irMatchById, setIrMatchById] = useState<Record<string, IrecruitMatchResult>>({});
   const [irLoadingId, setIrLoadingId] = useState<string | null>(null);
   const [irErrorById, setIrErrorById] = useState<Record<string, string>>({});
+
+  /**
+   * โหลดผลคัดกรองฝั่ง iRecruit ของใบขอที่เปิด — คู่กับ effect ของบอร์ดข้างบน
+   * ยิงแยกกันเพราะ `source` ต่างกัน ผลจึงเป็นคนละชุด ห้ามรวมเป็นคำขอเดียว
+   * (อยู่ตรงนี้ ไม่ใช่ข้างบนกับของบอร์ด เพราะต้องประกาศหลัง `irMatchById`)
+   */
+  const openJobIrMatches = jobDetail ? irMatchById[jobDetail.id]?.matches : undefined;
+  useEffect(() => {
+    if (!openJobIrMatches?.length) return;
+    const refs = openJobIrMatches.map((m) => String(m.id));
+    let cancelled = false;
+    void fetchCandidateScreening('irecruit', refs).then((map) => {
+      if (cancelled || map.size === 0) return;
+      setIrScreeningByRef((prev) => {
+        const next = { ...prev };
+        for (const [ref, rec] of map) next[ref] = rec;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openJobIrMatches]);
   // pool เบา ๆ สำหรับนับ "คนของเราน่าจะตรง" บนการ์ดตั้งแต่หน้าแรก (ไม่เรียก AI)
   const [pool, setPool] = useState<Array<{ card_id: number; job1_name: string | null; job2_name: string | null }>>([]);
   // ดูรายละเอียดพนักงานของเรา
@@ -3987,7 +4028,30 @@ const MatchingPage: React.FC = () => {
                                   age={m.age}
                                   areaParts={[m.district_name, m.province_name, m.location_label]}
                                   licenses={m.driving_licenses}
+                                  screening={irScreeningByRef[String(m.id)]}
                                 />
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setScreeningOpenIrId((prev) => (prev === m.id ? null : m.id))}
+                                    className="text-[10px] font-medium text-slate-500 underline-offset-2 hover:underline dark:text-slate-400"
+                                  >
+                                    {screeningOpenIrId === m.id ? 'ปิดผลคัดกรอง' : 'ผลคัดกรอง เหล้า-บุหรี่ / คดี'}
+                                  </button>
+                                  {screeningOpenIrId === m.id ? (
+                                    <div className="mt-1.5">
+                                      <ScreeningEditor
+                                        source="irecruit"
+                                        candidateRef={String(m.id)}
+                                        candidateName={m.full_name}
+                                        record={irScreeningByRef[String(m.id)]}
+                                        onSaved={(rec) =>
+                                          setIrScreeningByRef((prev) => ({ ...prev, [rec.candidateRef]: rec }))
+                                        }
+                                      />
+                                    </div>
+                                  ) : null}
+                                </div>
                                 {m.reason ? (
                                   <p className="text-[11px] italic text-slate-600 line-clamp-2">— {m.reason}</p>
                                 ) : null}
@@ -4441,6 +4505,7 @@ const MatchingPage: React.FC = () => {
               ) : null}
 
               <ScreeningEditor
+                source="board"
                 candidateRef={String(candDetail.card_id)}
                 candidateName={candDetail.full_name}
                 record={screeningByRef[String(candDetail.card_id)]}
