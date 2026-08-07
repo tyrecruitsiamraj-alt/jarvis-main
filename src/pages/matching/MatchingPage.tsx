@@ -84,6 +84,7 @@ import {
 } from '@/lib/callHoldsApi';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX, ClipboardCheck } from 'lucide-react';
 import { createCallBatch } from '@/lib/callBatchApi';
+import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
@@ -4587,6 +4588,11 @@ const MatchingPage: React.FC = () => {
                   screening={screeningByRef[String(candDetail.card_id)]}
                 />
               ) : null}
+
+              {/* ก่อนยกหู: คนนี้ถูกติดต่ออะไรไปแล้วบ้าง (คน+AI รวมเส้นเวลาเดียว คีย์ด้วยเบอร์) */}
+              <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                <ContactHistoryStrip phone={candDetail.mobile} />
+              </div>
 
               <ScreeningEditor
                 source="board"
