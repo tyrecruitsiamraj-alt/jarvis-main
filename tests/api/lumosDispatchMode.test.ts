@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LUMOS_DISPATCH_MODE,
   LUMOS_DISPATCH_TRIGGERS,
+  TRIGGERS_WITH_ASSIST,
   isLumosDispatchMode,
   isLumosDispatchTrigger,
+  modesForTrigger,
   normalizeLumosDispatchMode,
 } from '../../src/lib/lumosDispatchMode';
 
@@ -22,7 +24,6 @@ describe('ความหมายของโหมดส่งงานให�
       irecruit_search: 'manual',
       follow_entry: 'manual',
     });
-    expect(normalizeLumosDispatchMode({ board_match: 'assist' }).board_match).toBe('manual');
     expect(normalizeLumosDispatchMode({ board_match: 'AUTO' }).board_match).toBe('manual');
     expect(normalizeLumosDispatchMode({ ไม่รู้จัก: 'auto' })).toEqual(DEFAULT_LUMOS_DISPATCH_MODE);
   });
@@ -40,8 +41,8 @@ describe('ความหมายของโหมดส่งงานให�
     expect(isLumosDispatchTrigger('อื่น')).toBe(false);
     expect(isLumosDispatchMode('manual')).toBe(true);
     expect(isLumosDispatchMode('auto')).toBe(true);
-    // assist ยังไม่มีโค้ดรองรับ — ต้องไม่ผ่าน
-    expect(isLumosDispatchMode('assist')).toBe(false);
+    expect(isLumosDispatchMode('assist')).toBe(true);
+    expect(isLumosDispatchMode('draft')).toBe(false);
   });
 });
 
@@ -59,6 +60,28 @@ const { getLumosDispatchMode, isAutoDispatchEnabled, setLumosDispatchMode, clear
   await import('../../api/_lib/lumosDispatchMode.js');
 
 const undefinedTable = Object.assign(new Error('relation does not exist'), { code: '42P01' });
+
+describe('assist — มีเฉพาะจุดที่ระบบเป็นคนเริ่ม', () => {
+  it('จุดที่ระบบเริ่มเองเลือก assist ได้', () => {
+    for (const t of TRIGGERS_WITH_ASSIST) {
+      expect(modesForTrigger(t)).toContain('assist');
+      expect(normalizeLumosDispatchMode({ [t]: 'assist' })[t]).toBe('assist');
+    }
+  });
+
+  it('รายการติดตามที่คนกรอกเอง = อนุมัติแล้วในตัว จึงไม่มี assist', () => {
+    expect(modesForTrigger('follow_entry')).toEqual(['manual', 'auto']);
+    // ยัด assist เข้ามาต้องตกเป็น manual ไม่ใช่ auto (ปลอดภัยกว่า)
+    expect(normalizeLumosDispatchMode({ follow_entry: 'assist' }).follow_entry).toBe('manual');
+  });
+
+  it('ทุกจุดต้องมี manual กับ auto เสมอ', () => {
+    for (const t of LUMOS_DISPATCH_TRIGGERS) {
+      expect(modesForTrigger(t)).toContain('manual');
+      expect(modesForTrigger(t)).toContain('auto');
+    }
+  });
+});
 
 describe('lumosDispatchMode store', () => {
   beforeEach(() => {

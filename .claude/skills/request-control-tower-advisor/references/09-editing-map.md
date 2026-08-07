@@ -357,6 +357,18 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ⚠️ **อนุมัติได้เฉพาะ supervisor/admin** (สมมติฐาน — เจ้าของยังไม่ยืนยัน)
 แก้ที่ `canApprove()` ใน handler ที่เดียว
 
+### โหมด assist — ระบบจัดชุด คนอนุมัติ
+
+* `src/lib/lumosDispatchMode.ts` — เพิ่มค่า `assist` + `TRIGGERS_WITH_ASSIST` + `modesForTrigger()`
+* `api/_lib/lumosDispatchMode.ts` — `isAssistDispatchEnabled()`
+* จุดที่รองรับ: `board_match` · `irecruit_search` (ระบบเป็นคนเริ่ม)
+  **`follow_entry` ไม่มี assist** เพราะคนกรอกเอง = อนุมัติแล้วในตัว
+* `src/components/follow/CallBatchPanel.tsx` — อนุมัติ/ยกเลิก/ถอนคนออก + นับถอยหลังช่วงถอนคำ
+  (ซ่อนตัวเองเมื่อไม่มีชุด)
+
+⚠️ **`assist` ที่จุดที่ไม่รองรับ → normalize เป็น `manual` ไม่ใช่ `auto`** (ปลอดภัยกว่า)
+มีเทสต์คุม
+
 ## Safe implementation / feature flag
 
 Edit documentation:

@@ -10,12 +10,11 @@ export const LUMOS_DISPATCH_TRIGGERS = ['board_match', 'irecruit_search', 'follo
 export type LumosDispatchTrigger = (typeof LUMOS_DISPATCH_TRIGGERS)[number];
 
 /**
- * manual = คนติ๊กเลือกแล้วกดส่งเอง · auto = ส่งเองทันทีเมื่อถึงจุดนั้น
- *
- * ยังไม่มี 'assist' (ระบบจัดชุดให้ คนกดยืนยันทีเดียว) เพราะยังไม่มีชั้น
- * "ชุดส่ง + อนุมัติ" รองรับ — ใส่ไว้ตอนนี้จะเป็นค่าที่เลือกได้แต่ไม่มีผล
+ * manual = คนติ๊กเลือกแล้วกดส่งเอง
+ * assist = ระบบจัดชุดให้ คนกดอนุมัติทีเดียว (มีช่วงถอนคำก่อนเข้าคิวจริง)
+ * auto   = ส่งเองทันทีเมื่อถึงจุดนั้น
  */
-export const LUMOS_DISPATCH_MODES = ['manual', 'auto'] as const;
+export const LUMOS_DISPATCH_MODES = ['manual', 'assist', 'auto'] as const;
 export type LumosDispatchMode = (typeof LUMOS_DISPATCH_MODES)[number];
 
 export type LumosDispatchModeConfig = Record<LumosDispatchTrigger, LumosDispatchMode>;
@@ -46,7 +45,10 @@ export function normalizeLumosDispatchMode(raw: unknown): LumosDispatchModeConfi
   const src = raw as Record<string, unknown>;
   for (const trigger of LUMOS_DISPATCH_TRIGGERS) {
     const v = src[trigger];
-    if (isLumosDispatchMode(v)) out[trigger] = v;
+    if (!isLumosDispatchMode(v)) continue;
+    // assist ที่จุดที่ไม่รองรับ → manual (ปลอดภัยกว่า ไม่ใช่ auto)
+    if (v === 'assist' && !TRIGGERS_WITH_ASSIST.includes(trigger)) continue;
+    out[trigger] = v;
   }
   return out;
 }
@@ -69,5 +71,18 @@ export const LUMOS_TRIGGER_DETAIL: Record<LumosDispatchTrigger, string> = {
 
 export const LUMOS_MODE_LABEL: Record<LumosDispatchMode, string> = {
   manual: 'คนกดส่งเอง',
+  assist: 'ระบบจัดชุด คนอนุมัติ',
   auto: 'ส่งอัตโนมัติ',
 };
+
+/**
+ * assist ใช้ได้เฉพาะจุดที่ "ระบบเป็นคนเริ่ม" — ถึงมีความหมายว่าจัดชุดรออนุมัติ
+ * follow_entry เกิดจากคนกรอกเอง (เท่ากับอนุมัติไปแล้ว) จึงมีแค่ manual/auto
+ */
+export const TRIGGERS_WITH_ASSIST: LumosDispatchTrigger[] = ['board_match', 'irecruit_search'];
+
+export function modesForTrigger(trigger: LumosDispatchTrigger): LumosDispatchMode[] {
+  return TRIGGERS_WITH_ASSIST.includes(trigger)
+    ? ['manual', 'assist', 'auto']
+    : ['manual', 'auto'];
+}

@@ -7,8 +7,8 @@ import {
 } from '@/lib/lumosDispatchModeApi';
 import {
   DEFAULT_LUMOS_DISPATCH_MODE,
-  LUMOS_DISPATCH_MODES,
   LUMOS_DISPATCH_TRIGGERS,
+  modesForTrigger,
   LUMOS_MODE_LABEL,
   LUMOS_TRIGGER_DETAIL,
   LUMOS_TRIGGER_LABEL,
@@ -59,6 +59,7 @@ const LumosDispatchModeTab: React.FC = () => {
   };
 
   const autoCount = LUMOS_DISPATCH_TRIGGERS.filter((t) => config[t] === 'auto').length;
+  const assistCount = LUMOS_DISPATCH_TRIGGERS.filter((t) => config[t] === 'assist').length;
 
   return (
     <div className="space-y-4">
@@ -77,7 +78,9 @@ const LumosDispatchModeTab: React.FC = () => {
         )}
       >
         {autoCount === 0
-          ? 'ตอนนี้ปิด auto ทุกจุด — ระบบจะไม่โทรหาใครเองจนกว่าจะมีคนกดส่ง'
+          ? assistCount === 0
+            ? 'ตอนนี้ปิด auto ทุกจุด — ระบบจะไม่โทรหาใครเองจนกว่าจะมีคนกดส่ง'
+            : `ระบบจัดชุดให้ ${assistCount} จุด — ยังไม่โทรจนกว่าจะมีคนอนุมัติที่หน้า Follow`
           : `เปิด auto อยู่ ${autoCount} จุด — ระบบจะโทรหาผู้สมัครเองเมื่อถึงจุดนั้น`}
       </div>
 
@@ -94,9 +97,10 @@ const LumosDispatchModeTab: React.FC = () => {
                 {LUMOS_TRIGGER_DETAIL[trigger]}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {LUMOS_DISPATCH_MODES.map((mode) => {
+                {modesForTrigger(trigger).map((mode) => {
                   const active = config[trigger] === mode;
-                  const tone = mode === 'auto' ? TONE.warn : TONE.neutral;
+                  const tone =
+                    mode === 'auto' ? TONE.warn : mode === 'assist' ? TONE.info : TONE.neutral;
                   return (
                     <button
                       key={mode}
@@ -140,8 +144,9 @@ const LumosDispatchModeTab: React.FC = () => {
       </button>
 
       <p className={cn('text-[11px] leading-relaxed', DASH.muted)}>
-        หมายเหตุ: โหมด "ระบบจัดชุดให้ คนกดยืนยันทีเดียว" (assist) จะเพิ่มมาพร้อมชั้นชุดส่ง+อนุมัติ
-        ยังไม่ใส่ไว้ตอนนี้เพราะจะเป็นตัวเลือกที่กดได้แต่ไม่มีผล
+        <b>ระบบจัดชุด คนอนุมัติ</b> = ระบบรวมคนที่ AI แนะนำเป็น "ชุดรออนุมัติ" ไปโผล่ที่หน้า Follow
+        กดอนุมัติทีเดียวแล้วยังถอนคำได้อีก 10 นาทีก่อนโทรจริง ·
+        มีเฉพาะจุดที่ระบบเป็นคนเริ่ม — รายการติดตามที่คนกรอกเองถือว่าอนุมัติแล้วในตัว
       </p>
     </div>
   );

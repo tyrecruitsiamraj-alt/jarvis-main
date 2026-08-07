@@ -55,6 +55,12 @@ export async function isAutoDispatchEnabled(trigger: LumosDispatchTrigger): Prom
   return config[trigger] === 'auto';
 }
 
+/** จุดนี้ตั้งเป็น assist ไหม (ระบบจัดชุดรออนุมัติแทนการเข้าคิวตรง) */
+export async function isAssistDispatchEnabled(trigger: LumosDispatchTrigger): Promise<boolean> {
+  const config = await getLumosDispatchMode();
+  return config[trigger] === 'assist';
+}
+
 export async function setLumosDispatchMode(
   next: LumosDispatchModeConfig,
   updatedByName: string | null,
