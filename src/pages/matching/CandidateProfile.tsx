@@ -8,6 +8,7 @@ import { hydrateCandidateStaffing, candidateStaffingLabel } from '@/lib/candidat
 import { formatCandidateDisplayName } from '@/lib/formatCandidateName';
 import { User, Phone, MapPin, AlertTriangle, Briefcase, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { apiFetch } from '@/lib/apiFetch';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { wlEmployeeIdFromCandidateId } from '@/lib/wlFromCandidate';
@@ -115,7 +116,7 @@ const CandidateProfile: React.FC = () => {
         <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
-              <User className="w-6 h-6 text-blue-600" />
+              <User className={cn('w-6 h-6', TONE.primary.value)} />
             </div>
             <div className="flex-1">
               <div className="font-bold text-foreground">{formatCandidateDisplayName(candidate)}</div>
@@ -224,12 +225,7 @@ const CandidateProfile: React.FC = () => {
                       {formatYmdDmyBe(i.interview_date)} • {i.location}
                     </div>
                   </div>
-                  <span
-                    className={cn(
-                      'text-xs px-2 py-0.5 rounded-full',
-                      i.attended ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive',
-                    )}
-                  >
+                  <span className={i.attended ? TONE.success.chip : TONE.danger.chip}>
                     {i.attended ? 'ไป' : 'ไม่ไป'}
                   </span>
                 </div>
@@ -255,12 +251,7 @@ const CandidateProfile: React.FC = () => {
                       {formatYmdDmyBe(w.start_date)} - {w.end_date ? formatYmdDmyBe(w.end_date) : 'ปัจจุบัน'}
                     </div>
                   </div>
-                  <span
-                    className={cn(
-                      'text-xs px-2 py-0.5 rounded-full',
-                      w.work_type === 'start' ? 'bg-primary/15 text-blue-600' : 'bg-warning/15 text-warning',
-                    )}
-                  >
+                  <span className={w.work_type === 'start' ? TONE.primary.chip : TONE.warn.chip}>
                     {w.work_type === 'start' ? 'เริ่มงาน' : 'แทนงาน'}
                   </span>
                 </div>

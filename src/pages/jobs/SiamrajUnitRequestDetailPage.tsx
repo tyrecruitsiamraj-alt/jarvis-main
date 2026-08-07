@@ -19,6 +19,8 @@ import {
   UnitRequestWorkStatusEditor,
 } from '@/components/jobs/UnitRequestWorkStatusField';
 import type { JobRequest } from '@/types';
+import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
@@ -136,7 +138,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
         subtitle={data?.request_no || 'อ่านจาก Siamraj'}
         backPath={backPath}
         actions={
-          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-blue-500/15 text-blue-700">
+          <span className={cn('inline-flex items-center gap-1', TONE.primary.chip)}>
             <Database className="w-3.5 h-3.5" />
             Siamraj · อ่านอย่างเดียว
           </span>
@@ -178,7 +180,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <ExternalLink className="w-4 h-4 text-blue-600" />
+                <ExternalLink className={cn("w-4 h-4", TONE.primary.value)} />
                 ข้อมูลใบขอ
               </h3>
               <div className="grid sm:grid-cols-2 gap-2">
@@ -235,7 +237,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-blue-600" />
+                <Users className={cn("w-4 h-4", TONE.primary.value)} />
                 ผู้รับผิดชอบ
               </h3>
               {canAssignStaff ? (
@@ -298,7 +300,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <StickyNote className="w-4 h-4 text-blue-600" />
+                <StickyNote className={cn("w-4 h-4", TONE.primary.value)} />
                 หมายเหตุ
               </h3>
               <UnitRequestNoteDetail
@@ -313,7 +315,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4 text-blue-600" />
+                <UserCheck className={cn("w-4 h-4", TONE.primary.value)} />
                 ส่งคนแทน
               </h3>
               <p className="text-xs text-muted-foreground">เลือกว่าใบขอนี้ส่งคนแทนหรือไม่ส่งคนแทน</p>
@@ -329,7 +331,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <ClipboardList className="w-4 h-4 text-blue-600" />
+                <ClipboardList className={cn("w-4 h-4", TONE.primary.value)} />
                 สถานะทำงาน
               </h3>
               <p className="text-xs text-muted-foreground">
