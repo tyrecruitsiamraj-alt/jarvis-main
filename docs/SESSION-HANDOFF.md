@@ -35,10 +35,11 @@
 
 ## 1. อ่านต่อที่ไหน
 
-| **แผนงานให้เซสชันถัดไปทำต่อ (Opus)** | `docs/PLAN-NEXT.md` — ทำทีละข้อ commit ทีละข้อ |
-
 | เรื่อง | ไฟล์ |
 |---|---|
+| **แผนงานที่ยังทำไม่ครบ** (อ่านก่อนลงมือ) | `docs/PLAN-NEXT.md` — ทำทีละข้อ commit ทีละข้อ |
+| **สารบัญ skill ทั้งหมด (ภาษาไทย)** | `docs/SKILLS-INDEX.md` |
+| **ระบบทำอะไรได้แล้ว (ภาษาคน)** | `docs/SYSTEM-OVERVIEW.md` |
 | **แผนที่ไฟล์ + กับดักทุกข้อ** (สำคัญที่สุด) | `.claude/skills/request-control-tower-advisor/references/09-editing-map.md` |
 | แผน Lumos Hybrid + สิ่งที่ทำแล้ว | `docs/lumos-hybrid-flow.md` |
 | งาน UI redesign (mockup rev.3) | `docs/ui-redesign-handoff.md` |
