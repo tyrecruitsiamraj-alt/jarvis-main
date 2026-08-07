@@ -35,6 +35,8 @@
 
 ## 1. อ่านต่อที่ไหน
 
+| **แผนงานให้เซสชันถัดไปทำต่อ (Opus)** | `docs/PLAN-NEXT.md` — ทำทีละข้อ commit ทีละข้อ |
+
 | เรื่อง | ไฟล์ |
 |---|---|
 | **แผนที่ไฟล์ + กับดักทุกข้อ** (สำคัญที่สุด) | `.claude/skills/request-control-tower-advisor/references/09-editing-map.md` |
