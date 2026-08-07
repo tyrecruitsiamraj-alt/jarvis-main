@@ -19,6 +19,7 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { logInfo, logError } from './logger.js';
+import { applyCallFollowupToQueueRow, listSuppressedPhones } from './callFollowup.js';
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
@@ -152,10 +153,11 @@ async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
   items: Array<{ personRef: string; payload: unknown }>,
-): Promise<{ added: string[]; held: string[] }> {
+): Promise<{ added: string[]; held: string[]; suppressed: string[] }> {
   const added: string[] = [];
   const held: string[] = [];
-  if (items.length === 0) return { added, held };
+  const suppressed: string[] = [];
+  if (items.length === 0) return { added, held, suppressed };
 
   let heldPhones: Set<string>;
   try {
@@ -165,10 +167,28 @@ async function insertQueueItems(
     heldPhones = new Set();
   }
 
+  // เบอร์ที่ถูกพัก ("ไม่หางานแล้ว" / เบอร์เสีย) — ห้ามโทรอีกไม่ว่าจากใบขอไหน
+  // อันนี้ต่างจากล็อก: ถ้าอ่านไม่ได้ต้อง **ไม่ส่ง** ดีกว่าเผลอโทรคนที่บอกว่าเลิกหางานแล้ว
+  let suppressedPhones: Set<string> | null;
+  try {
+    suppressedPhones = await listSuppressedPhones();
+  } catch {
+    suppressedPhones = null;
+  }
+
   for (const item of items) {
     const phone = payloadPhone(item.payload);
     if (phone && heldPhones.has(phone)) {
       held.push(item.personRef);
+      continue;
+    }
+    if (phone && suppressedPhones === null) {
+      // อ่านรายการพักเบอร์ไม่ได้ → กันไว้ก่อน (นับเป็น held เพื่อให้รายงานบอกว่ายังไม่ส่ง)
+      held.push(item.personRef);
+      continue;
+    }
+    if (phone && suppressedPhones.has(phone)) {
+      suppressed.push(item.personRef);
       continue;
     }
     const { rows } = await dbQuery<{ id: number }>(
@@ -180,7 +200,7 @@ async function insertQueueItems(
     );
     if (rows.length > 0) added.push(item.personRef);
   }
-  return { added, held };
+  return { added, held, suppressed };
 }
 
 export type LumosDispatchOutcome = {
@@ -194,6 +214,7 @@ export type LumosDispatchOutcome = {
 
 const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที่ใช้โทรได้ (ต้องเป็นมือถือ 10 หลัก)';
 const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
+const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
 
 /** ผู้สมัคร "คนของเรา" ที่คนติ๊กเลือก → คิว reminder */
 export async function enqueueLumosReminderForSelected(
@@ -211,11 +232,14 @@ export async function enqueueLumosReminderForSelected(
     }
     items.push({ personRef: `card-${m.card_id}`, payload });
   }
-  const { added, held } = await insertQueueItems('reminder', result.jobId, items);
+  const { added, held, suppressed } = await insertQueueItems('reminder', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   const nameByRef = new Map(selected.map((m) => [`card-${m.card_id}`, m.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+  for (const ref of suppressed) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
+  }
   const duplicated = items
     .map((i) => i.personRef)
     .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
@@ -225,6 +249,7 @@ export async function enqueueLumosReminderForSelected(
     queued: added.length,
     duplicated: duplicated.length,
     held: held.length,
+    suppressed: suppressed.length,
     skipped: skipped.length,
   });
   return { queued: added.length, duplicated, skipped };
@@ -252,11 +277,14 @@ export async function enqueueLumosInterviewForSelected(
     }
     items.push({ personRef: `ir-${m.id}`, payload });
   }
-  const { added, held } = await insertQueueItems('interview', result.jobId, items);
+  const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   const nameByRef = new Map(selected.map((m) => [`ir-${m.id}`, m.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+  for (const ref of suppressed) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
+  }
   const duplicated = items
     .map((i) => i.personRef)
     .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
@@ -266,6 +294,7 @@ export async function enqueueLumosInterviewForSelected(
     queued: added.length,
     duplicated: duplicated.length,
     held: held.length,
+    suppressed: suppressed.length,
     skipped: skipped.length,
   });
   return { queued: added.length, duplicated, skipped };
@@ -474,10 +503,10 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
 
 /** รายชื่อ Follow ที่คนกรอก → คิว reminder (throw ให้ handler จัดการ เพราะผู้ใช้ต้องรู้ว่าเข้าคิวไหม) */
 export async function enqueueFollowReminder(entry: FollowEntryInput): Promise<void> {
-  const { added, held } = await insertQueueItems('reminder', 'follow', [
+  const { added, held, suppressed } = await insertQueueItems('reminder', 'follow', [
     { personRef: `follow-${entry.id}`, payload: buildFollowReminderPayload(entry) },
   ]);
-  logInfo('lumos.dispatch.follow', { followId: entry.id, added, held });
+  logInfo('lumos.dispatch.follow', { followId: entry.id, added, held, suppressed });
 }
 
 /** ยกเลิกรายการ Follow ในคิว — ได้ผลเฉพาะที่ Lumos ยังไม่ดึงไป (pending) */
@@ -541,6 +570,8 @@ export async function takePendingLumosItems(
          where channel = $1
            and result is null
            and delivery_count < ${MAX_DELIVERIES}
+           -- นัดโทรซ้ำไว้แล้ว: ห้ามเสิร์ฟก่อนถึงเวลา (ดู api/_lib/callFollowup.ts)
+           and (next_attempt_at is null or next_attempt_at <= now())
            and (
              status = 'pending'
              or (status = 'delivered' and delivered_at < now() - interval '${REDELIVER_AFTER_MINUTES} minutes')
@@ -570,5 +601,24 @@ export async function applyLumosResult(
       returning id`,
     [channel, clientId, status, JSON.stringify(result ?? null)],
   );
-  return rows.length > 0;
+  if (rows.length === 0) return false;
+
+  // ได้ผลแล้วต้องมีคนทำอะไรต่อ — ไม่รับสายก็โทรซ้ำ ขอเลื่อนก็นัดใหม่ ครบเพดานก็ส่งให้คนตาม
+  // เดิมจบแค่บันทึกผล งานเลยตายคาที่ · error ที่นี่ห้ามทำให้ ingest ล้ม (Lumos จะยิงซ้ำ)
+  const outcome = readOutcome(result);
+  if (outcome) {
+    try {
+      await applyCallFollowupToQueueRow({ queueId: rows[0].id, outcome, result });
+    } catch (e) {
+      logError('lumos.followup.failed', e, { queueId: rows[0].id, outcome });
+    }
+  }
+  return true;
+}
+
+/** ดึง outcome ออกจากผลที่ Lumos ส่งมา (รูปแบบต่างกันเล็กน้อยระหว่าง 2 ช่อง) */
+function readOutcome(result: unknown): string | null {
+  if (typeof result !== 'object' || result === null) return null;
+  const r = result as Record<string, unknown>;
+  return typeof r.outcome === 'string' && r.outcome.trim() ? r.outcome.trim() : null;
 }

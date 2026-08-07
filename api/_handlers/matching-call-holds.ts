@@ -20,6 +20,7 @@ import {
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { isPgUndefinedTable } from '../_lib/postgres.js';
+import { applyHumanCallFollowup } from '../_lib/callFollowup.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 import { bangkokBusinessDateYmd } from '../_lib/businessDate.js';
 import {
@@ -226,14 +227,37 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
       if (!saved) return sendError(res, 409, 'Conflict', 'งานโทรนี้ถูกปล่อยไปก่อนแล้ว');
 
+      // ผลที่คนกดเดินนโยบายเดียวกับผลของ AI — ไม่รับสายก็เข้าคิวโทรซ้ำ ขอเลื่อนก็นัดใหม่
+      // "ไม่หางานแล้ว" พักเบอร์ · ครบเพดานตกถังต้องคนตาม (ดู src/lib/callFollowupPolicy.ts)
+      // พลาดที่นี่ต้องไม่ทำให้การบันทึกผลล้ม — ผลถูกบันทึกไปแล้ว
+      let followup: Awaited<ReturnType<typeof applyHumanCallFollowup>> = null;
+      try {
+        followup = await applyHumanCallFollowup({
+          phone: existing.phone,
+          jobId: saved.jobId,
+          candidateRef: saved.candidateRef,
+          outcome: body.outcome,
+          declinedScope: scope,
+          detail: isPlainObject(body.detail) ? body.detail : undefined,
+          byName: req.user?.email ?? null,
+        });
+      } catch (e) {
+        void e;
+      }
+
       void auditFromAuthed(req, {
         action: 'call-hold.result',
         entityType: 'candidate_call_hold',
         entityId: holdId,
-        after: { outcome: saved.resultOutcome, scope: saved.resultScope, jobId: saved.jobId },
+        after: {
+          outcome: saved.resultOutcome,
+          scope: saved.resultScope,
+          jobId: saved.jobId,
+          followup: followup?.action ?? null,
+        },
       });
 
-      return res.status(200).json({ hold: toWire(saved, viewerId) });
+      return res.status(200).json({ hold: toWire(saved, viewerId), followup });
     }
 
     if (method === 'DELETE') {
