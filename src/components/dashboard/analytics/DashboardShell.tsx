@@ -165,7 +165,7 @@ const DashboardShell: React.FC<Props> = ({
 
       <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-5">
         {loading ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
@@ -196,7 +196,7 @@ const DashboardShell: React.FC<Props> = ({
               <div className="space-y-3">
                 <div>
                   <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
                     {dateRange == null ? (
                       <>
                         <span className="font-medium text-slate-600 dark:text-slate-400">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>

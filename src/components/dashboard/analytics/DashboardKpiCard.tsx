@@ -68,7 +68,7 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick, progressPercent = nul
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
-      <p className={cn('text-xs font-medium', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+      <p className={cn('text-xs font-medium', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}>
         {kpi.label}
       </p>
       <p
@@ -80,13 +80,13 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick, progressPercent = nul
         {kpi.format === 'percent' ? `${kpi.value}%` : kpi.value.toLocaleString('th-TH')}
         {kpi.secondaryCount != null ? (
           <span
-            className={cn('ml-1.5 text-sm font-normal', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}
+            className={cn('ml-1.5 text-sm font-normal', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}
           >
             · {kpi.secondaryCount.toLocaleString('th-TH')} {kpi.secondaryLabel ?? 'ใบขอ'}
           </span>
         ) : null}
       </p>
-      <p className={cn('mt-1 text-xs', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+      <p className={cn('mt-1 text-xs', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}>
         {kpi.description}
       </p>
       {progressPercent != null ? (

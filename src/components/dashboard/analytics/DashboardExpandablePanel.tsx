@@ -21,7 +21,7 @@ const DashboardExpandablePanel: React.FC<Props> = ({ title, subtitle, open, onOp
         >
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-            {subtitle ? <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p> : null}
+            {subtitle ? <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{subtitle}</p> : null}
           </div>
           <ChevronDown
             className={cn('h-4 w-4 shrink-0 text-slate-500 transition-transform', open && 'rotate-180')}

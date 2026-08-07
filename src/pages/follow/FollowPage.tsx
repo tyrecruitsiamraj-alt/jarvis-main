@@ -169,8 +169,8 @@ const FollowPage: React.FC = () => {
           </button>
           <p className="text-xs text-muted-foreground">
             ทั้งหมด <span className="font-bold tabular-nums text-foreground">{counts.total}</span> · รอโทร{' '}
-            <span className="font-bold tabular-nums text-slate-700">{counts.pending}</span> · สำเร็จ{' '}
-            <span className="font-bold tabular-nums text-emerald-700">{counts.done}</span>
+            <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">{counts.pending}</span> · สำเร็จ{' '}
+            <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{counts.done}</span>
           </p>
         </div>
 
@@ -294,7 +294,7 @@ const FollowPage: React.FC = () => {
                 'min-h-[36px] rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
                 filter === f.id
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'border border-white/70 bg-white/60 text-muted-foreground hover:text-foreground',
+                  : 'border border-white/70 bg-white/60 text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300',
               )}
             >
               {f.label}
@@ -360,7 +360,7 @@ const FollowPage: React.FC = () => {
                   <div className="flex shrink-0 items-center gap-1.5">
                     <a
                       href={`tel:${it.recipient_phone}`}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-950"
                     >
                       <Phone className="h-3 w-3" aria-hidden />
                       {it.recipient_phone}
@@ -388,7 +388,7 @@ const FollowPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setCancellingId(it.id)}
-                          className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+                          className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
                         >
                           <X className="h-3 w-3" aria-hidden />
                           ยกเลิก

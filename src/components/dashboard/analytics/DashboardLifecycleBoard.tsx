@@ -20,7 +20,7 @@ function cell(bucket: { positions: number; requests: number }) {
   return (
     <span className="tabular-nums">
       <span className="font-semibold text-slate-900 dark:text-slate-100">{fmt(bucket.positions)}</span>
-      <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">{fmt(bucket.requests)} ใบ</span>
+      <span className="text-[10px] text-slate-600 dark:text-slate-400 ml-1">{fmt(bucket.requests)} ใบ</span>
     </span>
   );
 }
@@ -102,7 +102,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
       <div className="mb-3 space-y-2">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Life Cycle ตามประเภทใบขอ</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
             มุมวิเคราะห์: เข้ามาเท่าไหร่ → ปิด/ยกเลิกไปแล้วเท่าไหร่ → คงเหลือยังหาอยู่เท่าไหร่ · แยกตามประเภท · {periodLabel}
           </p>
         </div>
@@ -136,7 +136,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
       <div className="overflow-x-auto -mx-1">
         <table className="w-full min-w-[40rem] text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
               <th className="text-left font-medium px-2 py-2 whitespace-nowrap">รายการ</th>
               {cols.map((c) => (
                 <th key={c.key} className="text-right font-medium px-2 py-2 whitespace-nowrap">
@@ -163,7 +163,7 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
                 ))}
               </tr>
             ))}
-            <tr className="text-slate-500 dark:text-slate-400">
+            <tr className="text-slate-600 dark:text-slate-400">
               <td className="px-2 py-2.5 whitespace-nowrap">% ปิดได้ / ที่ขอ</td>
               {cols.map((c) => {
                 const kind =

@@ -52,7 +52,7 @@ const DashboardDriverOverview: React.FC<Props> = ({
       {!hideHeader ? (
         <div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ภาระงานตามผู้รับผิดชอบ</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">มี · ปิด · คงเหลือ รายบุคคล (สรรหา / คัดสรร)</p>
         </div>
       ) : null}
       {closedTotalsLoading ? (

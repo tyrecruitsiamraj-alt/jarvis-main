@@ -235,12 +235,12 @@ export const DASH = {
   /** ป้ายทอง (brass) บน hero เข้ม — สีเดียวทั้งสองธีมเพราะพื้นเข้มตลอด */
   heroLabel: 'text-[10px] font-bold uppercase tracking-[0.14em] text-[#c9b184]',
   /** ป้ายหัวข้อกลุ่ม (brass) บนพื้นสว่างของหน้า — ภาษาเดียวกับ eyebrow ใน mockup */
-  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]',
+  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a6c33] dark:text-[#cfae72]',
   title: 'text-sm font-semibold text-slate-900 dark:text-slate-100',
   label: 'text-xs font-medium text-slate-600 dark:text-slate-300',
   sub: 'text-xs text-slate-500 dark:text-slate-400',
   /** เหมือน sub แต่ไม่กำหนดขนาด — ใช้เมื่อจุดเรียกใช้กำหนดขนาดเอง (twMerge จะทับขนาดถ้าใช้ sub) */
-  muted: 'text-slate-500 dark:text-slate-400',
+  muted: 'text-slate-600 dark:text-slate-400',
   divider: 'border-slate-100 dark:border-slate-800',
   tableHead: 'bg-slate-50/80 text-slate-500 dark:bg-slate-800/60 dark:text-slate-400',
   tableRow: 'border-slate-50 hover:bg-slate-50/50 dark:border-slate-800 dark:hover:bg-slate-800/40',
