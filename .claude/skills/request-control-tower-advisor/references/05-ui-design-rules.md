@@ -1,38 +1,41 @@
-# UI Design Rules
+# กติกาการออกแบบหน้าจอ
 
-Preferred UI style:
-Executive Control Tower.
+**สไตล์ที่ใช้:** ศูนย์ควบคุมระดับผู้บริหาร (Executive Control Tower)
 
-Implementation: colour meaning lives in one place — `src/lib/designTokens.ts` (`TONE` / `DASH` / `CHART`).
-Never write fresh Tailwind colour classes or hex values in dashboard components; map the metric to a
-`ToneKey` instead. Every light-theme value must ship with its dark pair (enforced by
-`tests/api/designTokens.test.ts`).
+## กติกาสีที่ห้ามผิด
 
-Design direction:
+**ความหมายของสีอยู่ที่เดียว: `src/lib/designTokens.ts`** (`TONE` / `DASH` / `CHART`)
 
-* Light enterprise dashboard
-* Dark executive header
-* White KPI cards
-* Blue primary accent
-* Green for fulfilled/success
-* Amber for risk
-* Red for SLA breach
-* Slate gray for cancellation/neutral
-* Avoid overcrowding
-* Show only important metrics above the fold
+* **ห้ามเขียน class สี Tailwind หรือค่า hex สดใหม่ในไฟล์หน้า dashboard**
+  ให้จับคู่ metric กับ `ToneKey` แทน
+* ทุกค่าของธีมสว่างต้องมีคู่ธีมมืดเสมอ — มีเทสต์บังคับที่
+  `tests/api/designTokens.test.ts`
 
-Main sections:
+## ทิศทางการออกแบบ
 
-1. Executive Header
-2. KPI Cards
-3. Backlog Flow Card
-4. ต้องแก้วันนี้ / Priority Work Queue
-5. Lifecycle Trend
-6. Root Cause Ranking
-7. Cohort / Resolution Breakdown
-8. Work Queue Table
+* แดชบอร์ดพื้นสว่างแบบองค์กร
+* แถบหัวผู้บริหารพื้นเข้ม
+* การ์ด KPI พื้นขาว
+* น้ำเงินเป็นสีหลัก
+* เขียว = หาได้แล้ว/สำเร็จ
+* เหลืองอำพัน = เสี่ยง
+* แดง = เกิน SLA
+* เทา = ยกเลิก/กลาง
+* อย่าอัดของแน่นเกินไป
+* โชว์เฉพาะตัวชี้วัดสำคัญในหน้าจอแรกที่เห็นโดยไม่ต้องเลื่อน
 
-KPI cards:
+## แผงหลักบนหน้า
+
+1. แถบหัวผู้บริหาร
+2. การ์ด KPI
+3. การ์ดสมการงานค้าง
+4. ต้องแก้วันนี้ / คิวงานเร่งด่วน
+5. แนวโน้มวงจรชีวิตใบขอ
+6. อันดับต้นเหตุ
+7. สรุปการจบงานแยกกลุ่ม
+8. ตารางคิวงาน
+
+## การ์ด KPI 8 ใบ
 
 1. ภาระงานรวม
 2. ขอใหม่งวดนี้
@@ -41,13 +44,13 @@ KPI cards:
 5. ยกเลิก
 6. เหลือหา
 7. SLA เสี่ยง/เกิน
-8. Backlog เพิ่ม/ลด
+8. งานค้างเพิ่ม/ลด
 
-The first screen must answer:
+## หน้าจอแรกต้องตอบให้ได้
 
 * งานรวมเท่าไหร่
 * หาได้แล้วเท่าไหร่
 * เหลือหาเท่าไหร่
 * SLA เสี่ยงกี่รายการ
-* Backlog เพิ่มหรือลด
+* งานค้างเพิ่มหรือลด
 * ต้องแก้อะไรก่อนวันนี้
