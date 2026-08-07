@@ -85,6 +85,8 @@ import {
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX, ClipboardCheck } from 'lucide-react';
 import { createCallBatch } from '@/lib/callBatchApi';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
+import { fetchLumosDispatchMode } from '@/lib/lumosDispatchModeApi';
+import type { LumosDispatchModeConfig } from '@/lib/lumosDispatchMode';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
@@ -1269,6 +1271,7 @@ function LumosSendBar({
   onClear,
   busy,
   creatingBatch,
+  assistOnly,
 }: {
   count: number;
   onSend: () => void;
@@ -1277,6 +1280,8 @@ function LumosSendBar({
   onClear: () => void;
   busy: boolean;
   creatingBatch: boolean;
+  /** จุดนี้อยู่ใต้โหมด assist — ของใหม่ต้องผ่านอนุมัติเสมอ จึงไม่มีปุ่มส่งเข้าคิวตรง */
+  assistOnly: boolean;
 }) {
   if (count === 0) return null;
   return (
@@ -1305,14 +1310,18 @@ function LumosSendBar({
           <ClipboardCheck className="h-3 w-3" />
           {creatingBatch ? 'กำลังสร้างชุด…' : `ตั้งชุดรออนุมัติ (${count})`}
         </button>
-        <button
-          type="button"
-          disabled={busy || creatingBatch}
-          onClick={onSend}
-          className="jarvis-btn-primary"
-        >
-          <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
-        </button>
+        {/* จุดที่เปิด assist: ของใหม่ต้องผ่านอนุมัติเสมอ — ซ่อนปุ่มส่งตรง
+            ไม่งั้นมีสองปุ่มที่ขัดนโยบายกันเองให้คนงงว่ากดอันไหน */}
+        {assistOnly ? null : (
+          <button
+            type="button"
+            disabled={busy || creatingBatch}
+            onClick={onSend}
+            className="jarvis-btn-primary"
+          >
+            <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1745,6 +1754,25 @@ const MatchingPage: React.FC = () => {
   const [lumosSending, setLumosSending] = useState(false);
   /** กำลังสร้างชุดรออนุมัติ — แยกจาก lumosSending เพราะเป็นคนละปุ่มคนละปลายทาง */
   const [batchCreating, setBatchCreating] = useState(false);
+
+  /**
+   * โหมดส่งงานของจุด board_match/irecruit_search — ไว้ยุบปุ่มในแถบติ๊กเลือก
+   * จุดไหนเปิด assist = ของใหม่ต้อง "ผ่านการอนุมัติ" เสมอ จึงซ่อนปุ่มส่งเข้าคิวตรง
+   * เหลือแต่ "ตั้งชุดรออนุมัติ" — ไม่งั้นมีสองปุ่มที่ขัดนโยบายกันเองให้คนงง
+   * อ่านค่าไม่ได้ = ถือเป็น manual (โชว์ทั้งสองปุ่มแบบเดิม) ตามหลัก fail-safe
+   */
+  const [dispatchModeCfg, setDispatchModeCfg] = useState<LumosDispatchModeConfig | null>(null);
+  useEffect(() => {
+    void fetchLumosDispatchMode()
+      .then(setDispatchModeCfg)
+      .catch(() => setDispatchModeCfg(null));
+  }, []);
+  // ซ่อนปุ่มส่งตรงเมื่อ "ทุกฝั่งที่ติ๊กไว้" อยู่ใต้ assist — ติ๊กปนฝั่งที่ยัง manual อยู่ก็ยังส่งตรงได้
+  const assistOnly =
+    (lumosSelectedBoard.length === 0 || dispatchModeCfg?.board_match === 'assist') &&
+    (lumosSelectedIrecruit.length === 0 || dispatchModeCfg?.irecruit_search === 'assist') &&
+    (lumosSelectedBoard.length > 0 || lumosSelectedIrecruit.length > 0) &&
+    dispatchModeCfg !== null;
   const [lumosError, setLumosError] = useState<string | null>(null);
   const [lumosNotice, setLumosNotice] = useState<string | null>(null);
   const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
@@ -3643,6 +3671,7 @@ const MatchingPage: React.FC = () => {
                 busy={lumosSending}
                 onClear={clearLumosSelection}
                 creatingBatch={batchCreating}
+                assistOnly={assistOnly}
                 onCreateBatch={() => void createBatchFromSelection()}
                 onSend={() => setLumosConfirmOpen(true)}
               />
@@ -4234,6 +4263,7 @@ const MatchingPage: React.FC = () => {
                     busy={lumosSending}
                     onClear={clearLumosSelection}
                     creatingBatch={batchCreating}
+                    assistOnly={assistOnly}
                     onCreateBatch={() => void createBatchFromSelection()}
                     onSend={() => setLumosConfirmOpen(true)}
                   />
