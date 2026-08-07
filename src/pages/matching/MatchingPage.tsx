@@ -2,11 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, Clock3, LoaderCircle } from 'lucide-react';
+import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { JobRequest } from '@/types';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { unitRequestCardSubtitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
@@ -82,7 +81,7 @@ import {
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { createCallBatch } from '@/lib/callBatchApi';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
-import type { BoardCandidateMatch, MatchTier } from '@/lib/boardCandidateTypes';
+import type { BoardCandidateMatch } from '@/lib/boardCandidateTypes';
 import CandidateChecklist from '@/components/matching/CandidateChecklist';
 import CallHoldPanel from '@/components/matching/CallHoldPanel';
 import ScreeningEditor from '@/components/matching/ScreeningEditor';
@@ -92,6 +91,9 @@ import {
   LumosSendBar,
 } from '@/components/matching/LumosPanels';
 import { cardNextAction } from '@/lib/matchingCardAction';
+import TierCriteriaTooltip from '@/components/matching/TierCriteriaTooltip';
+import AiEvaluationStatus from '@/components/matching/AiEvaluationStatus';
+import { TIER_CRITERIA } from '@/lib/matchTierCriteria';
 import { useNowTick } from '@/hooks/useNowTick';
 import { shortTime } from '@/lib/dateTh';
 import {
@@ -333,63 +335,6 @@ function buildIrecruitDisplayRows(
   ]);
 }
 
-const TIER_CRITERIA: Record<MatchTier, { label: string; detail: string; dot: string }> = {
-  green: {
-    label: 'เขียว — เข้าข่ายมาก',
-    detail: 'ตำแหน่งตรงหรือใกล้มาก อยู่สายงานเดียวกัน หรืองานใกล้เคียงระดับเขียว',
-    dot: TONE.success.dot,
-  },
-  yellow: {
-    label: 'เหลือง — พอได้ ต้องเช็ค',
-    detail: 'งานใกล้เคียงและมีโอกาสทำได้ แต่ต้องเช็คประสบการณ์จริง คุณสมบัติสำคัญ หรือการเทรนเพิ่ม',
-    dot: TONE.warn.dot,
-  },
-  red: {
-    label: 'แดง — ห่างไกล',
-    detail: 'คนละสายงาน ห่างจากตำแหน่งที่ขอมาก หรือคุณสมบัติสำคัญไม่สอดคล้อง',
-    dot: TONE.danger.dot,
-  },
-};
-
-function TierCriteriaTooltip({ tier, children }: { tier: MatchTier; children: React.ReactNode }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="left" className="w-[min(340px,calc(100vw-24px))] space-y-2 p-3 text-left">
-        <p className="text-xs font-semibold">AI ใช้เกณฑ์อะไรในการจัดสี?</p>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          เทียบตำแหน่งที่สมัครกับตำแหน่งในใบขอ สายงาน (Job Family) งานใกล้เคียงที่ยอมรับได้ และคุณสมบัติที่มีข้อมูล
-          เช่น สกิล/ประสบการณ์ เพศ อายุ ใบขับขี่ และพื้นที่
-        </p>
-        <ul className="space-y-1.5">
-          {(['green', 'yellow', 'red'] as const).map((candidateTier) => {
-            const item = TIER_CRITERIA[candidateTier];
-            return (
-              <li
-                key={candidateTier}
-                className={cn(
-                  'flex gap-2 rounded-md px-2 py-1.5 text-[11px] leading-snug',
-                  tier === candidateTier ? 'bg-muted font-medium' : '',
-                )}
-              >
-                <span className={cn('mt-1 h-2.5 w-2.5 shrink-0 rounded-full', item.dot)} aria-hidden="true" />
-                <span>
-                  <span className="font-semibold">{item.label}</span>
-                  <br />
-                  {item.detail}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="border-t pt-2 text-[10px] leading-relaxed text-muted-foreground">
-          สีเป็นคำแนะนำจาก AI ควรเช็คข้อมูลจริงกับผู้สมัครก่อนจองตัวหรือลงงาน
-        </p>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 const ACTIVE_WORKFLOW_STATUSES: ProposalStatus[] = ['reserved', 'contacted', 'placed'];
 
 function isActiveWorkflowStatus(status: ProposalStatus): boolean {
@@ -453,66 +398,6 @@ function suggestedProposalReason(status: ProposalStatus, aiReason?: string | nul
   if (status === 'rejected') return 'คุณสมบัติหรือความพร้อมยังไม่สอดคล้องกับใบขอ';
   if (status === 'cancelled') return 'ยกเลิกการจองเพื่อเปลี่ยนผู้สมัครหรือแก้ไขข้อมูล';
   return aiReason?.trim() || '';
-}
-
-function formatElapsed(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remain = seconds % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(remain).padStart(2, '0')}`;
-}
-
-function AiEvaluationStatus({ source }: { source: 'board' | 'irecruit' }) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const isBoard = source === 'board';
-  const estimate = isBoard ? 'ปกติประมาณ 30–90 วินาที' : 'ปกติประมาณ 1–3 นาที';
-  const stage = isBoard
-    ? elapsedSeconds < 15
-      ? 'กำลังอ่านสเปกใบขอ'
-      : elapsedSeconds < 60
-        ? 'กำลังเทียบสกิล พื้นที่ และเงื่อนไข'
-        : 'AI ยังประเมินและจัดอันดับอยู่'
-    : elapsedSeconds < 20
-      ? 'กำลังค้นหาผู้สมัครในฐาน iRecruit'
-      : elapsedSeconds < 60
-        ? 'กำลังคัดคนที่อยู่ในสายงานใกล้เคียง'
-        : 'AI กำลังประเมินและจัดอันดับผู้สมัคร';
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={cn(
-        'rounded-xl border px-3 py-3 shadow-sm',
-        isBoard ? TONE.info.soft : TONE.primary.soft,
-      )}
-    >
-      <div className="flex items-start gap-2.5">
-        <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-300" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <p className={cn('text-xs font-semibold', TONE.primary.num)}>กำลังรอ AI ประเมิน — ระบบไม่ได้ค้าง</p>
-            <span className={cn('inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 dark:bg-slate-800 text-[10px] font-semibold tabular-nums', TONE.primary.value)}>
-              <Clock3 className="h-3 w-3" /> {formatElapsed(elapsedSeconds)}
-            </span>
-          </div>
-          <p className={cn('mt-1 text-[11px]', TONE.primary.num)}>{stage}</p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
-            <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-400 via-sky-500 to-blue-400" />
-          </div>
-          <p className={cn('mt-1.5 text-[10px]', TONE.primary.value)}>{estimate} · ไม่ต้องกดซ้ำ สามารถรอหน้านี้ได้</p>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /**
