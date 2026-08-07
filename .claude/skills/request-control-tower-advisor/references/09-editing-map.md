@@ -569,6 +569,49 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 * `tests/api/matchingListFilter.test.ts` — contract ของ pipeline กลาง
 * หมายเหตุ: api import src ผ่าน `@/` ได้ (tsx + Vercel build ตรวจแล้วผ่านทั้งคู่)
 
+## แตกไฟล์ MatchingPage (5,138 → 4,221 บรรทัด)
+
+หน้าเดียวใหญ่เกินอ่านรอบเดียว จึงค่อย ๆ ย้ายชิ้นที่ **จบในตัว รับ props อย่างเดียว**
+ออกไปทีละชิ้น — ตรวจและ commit ทุกชิ้น ถอยได้ทีละชิ้นถ้าพัง
+
+| ชิ้น | ไฟล์ที่ได้ |
+|---|---|
+| ตรรกะตรวจคุณสมบัติผู้สมัคร | `src/lib/candidateVerdicts.ts` · `src/components/matching/CandidateChecklist.tsx` |
+| แผงโทร "รับไปโทรเอง" | `src/components/matching/CallHoldPanel.tsx` · `src/hooks/useNowTick.ts` · `src/lib/dateTh.ts` (`formatCountdown`) |
+| ฟอร์มผลคัดกรอง | `src/components/matching/ScreeningEditor.tsx` |
+| แผงฝั่ง Lumos | `src/components/matching/LumosPanels.tsx` (`LumosCallBadgeRow` · `LumosJobSummaryStats` · `LumosSendBar`) · `src/lib/matchingCardAction.ts` (`cardNextAction`) |
+| เกณฑ์สี + รอ AI ประเมิน | `src/lib/matchTierCriteria.ts` (`TIER_CRITERIA`) · `src/components/matching/TierCriteriaTooltip.tsx` · `src/components/matching/AiEvaluationStatus.tsx` |
+
+⚠️ **สูตรที่ใช้ได้ผลมาแล้ว 5 ครั้ง — ทำผิดลำดับแล้วพังมาก่อน**
+
+1. **ชนิดข้อมูล/ค่าคงที่ที่ใช้ร่วมย้ายไป `src/lib/` ก่อน** ไม่งั้น import วนกลับเข้าหน้า
+2. **ฟังก์ชันล้วน/ข้อมูลล้วน → `src/lib/xxx.ts` · component → `src/components/matching/Xxx.tsx`
+   คนละไฟล์เสมอ** — ไฟล์ที่ export ทั้ง component และ non-component จะได้ warning
+   `react-refresh/only-export-components` เพิ่ม (baseline คือ 16 warning ห้ามเกิน)
+   ตัวช่วยที่ใช้แต่ในไฟล์ component เดียว **ไม่ต้อง export** ก็ไม่โดนกฎนี้
+   (เช่น `formatCallWhen` ใน LumosPanels · `formatElapsed` ใน AiEvaluationStatus)
+3. **ตัดบล็อกด้วย python โดยหา index ของข้อความหัว/ท้าย** ห้ามใช้ regex แทนที่
+   (กติกาข้อ 3 ของโปรเจกต์ — regex หลายจุดพังมาแล้ว 2 ครั้ง)
+4. **ถอด import ที่ไม่ได้ใช้แล้วออกจากหน้าด้วย** — `tsc` ไม่ฟ้อง type import
+   ที่ไม่ได้ใช้ ต้องไล่เองว่าสัญลักษณ์ไหนย้ายไปหมดแล้ว
+5. **พิสูจน์ว่าเป็นการย้ายล้วน** — ประกอบไฟล์ใหม่กลับเป็นบล็อกเดิมแล้วเทียบกับ
+   `git show HEAD:<ไฟล์>` ให้ได้ "เท่ากันตัวต่อตัว" ก่อน commit
+   (ถูกกว่าการเดาว่าไม่ได้แก้อะไร และทำให้รีวิวเชื่อได้)
+6. ตรวจตามลำดับ: tsc **2 config** → eslint (ต้องได้ 16 warning เท่าเดิม) → test →
+   **เปิดแท็บใหม่ในเบราว์เซอร์** เช็ค console 0 error + ฟีเจอร์ยังทำงาน
+
+⚠️ **แก้ไฟล์ทั้งที่หน้ายัง mount อยู่ = HMR ทำให้ MatchingPage โยน error ในแท็บเก่า**
+(เห็นเป็นจอดำ + `The above error occurred in the <MatchingPage> component`)
+**ไม่ใช่บั๊กของโค้ด** — เปิดแท็บใหม่แล้ว flow เดิมผ่านหมด console 0 error
+อย่าไล่แก้ตามรอย error ในแท็บเก่า
+
+### ชิ้นที่แยกได้สะอาดชิ้นถัดไป (ยังไม่ทำ)
+
+`CallHoldPanel` กับ `IrecruitMatchPanel` แยกไปแล้ว · ที่เหลือในหน้าเป็น JSX ก้อนใหญ่
+ที่ผูกกับ state ของหน้าหลายตัว (การ์ดใบขอ · dialog รายละเอียดผู้สมัคร · แผง iRecruit)
+แยกต่อได้แต่ต้องส่ง props เป็นสิบตัว หรือยกไปเป็น context — **ต้องถามเจ้าของก่อน**
+ว่าคุ้มกับความเสี่ยงไหม อย่าตัดสินใจเอง
+
 ## Public applications from /apply
 
 * `migrations/048_public_job_applications.sql` — application table
