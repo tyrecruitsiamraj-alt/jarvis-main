@@ -385,8 +385,6 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
   3. **`SELECT_COLUMNS`** ← จุดที่ลืมบ่อยสุด · query ซ้อน CTE อยู่
      ถ้าชั้นนอกไม่ได้ SELECT ชื่อคอลัมน์นั้น จะได้ `undefined` โดยไม่มี error
 * `src/types/index.ts` (`JobRequest`) → `src/pages/jobs/SiamrajUnitRequestDetailPage.tsx`
-* `docs/erp-request-fields.md` — เอกสารแมปช่องบนหน้าจอ ↔ คอลัมน์ ERP + เงื่อนไขกรอง
-  (เขียนไว้ส่งให้ทีม ERP อ่าน — แก้ฟิลด์แล้วอัปเดตด้วย)
 
 ⚠️ **`work_place` กับ `location_address` ไม่ใช่ตัวเดียวกัน ห้ามยุบรวม**
 `location_address` = `work_place1+2+3` ต่อกันแล้วผ่าน `normalizeSiamrajWorkAddress()`
