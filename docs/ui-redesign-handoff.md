@@ -107,8 +107,9 @@ mockup ทั้ง 10 หน้าอยู่ที่ artifact นี้ (อ
   `npx tsc --noEmit -p tsconfig.app.json` = **สะอาด 0 error** (error เดิม 6-7 ตัวของ
   requestControl แก้แล้ว ดูข้อ 8) · eslint = 0 error · warning เดิม 4 ตัว
   (MatchingPage · PreCheckPage · NotificationContext · RolePermissionsContext)
-- **`scripts/verify-api-registry.mjs` พังอยู่ก่อนแล้ว** — มันไป import `api/_handlers/*.js`
-  ซึ่งโปรเจกต์นี้เป็น TS ไม่มีไฟล์ `.js` · ไม่ใช่ของใหม่ที่เพิ่งพัง (ยืนยันด้วยการ stash แล้วรันซ้ำ)
+- **`scripts/verify-api-registry.mjs` ไม่ได้พัง** — ต้องรันด้วย `npx tsx` (ซึ่ง `deploy.yml`
+  ทำอยู่แล้ว) ไม่ใช่ `node` · docstring เดิมเขียนว่า `node` จึงเข้าใจผิดกันได้ — แก้แล้ว
+  พร้อมเพิ่ม route สำคัญเข้าลิสต์ตรวจจาก 3 เป็น 13 เส้น
 
 ---
 
