@@ -96,3 +96,23 @@ export function buildDateRangeYmd(from: string, to: string | null): string[] {
   }
   return out;
 }
+
+/**
+ * นับถอยหลังเป็น ช:นน:ss — ใช้กับล็อกโทรที่มีอายุจำกัด
+ * (ย้ายมาจาก MatchingPage.tsx ตอนแตกไฟล์)
+ */
+export function formatCountdown(msLeft: number): string {
+  if (msLeft <= 0) return 'หมดเวลาแล้ว';
+  const total = Math.floor(msLeft / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** เวลาสั้น ชั่วโมง:นาที แบบไทย — ค่าที่อ่านไม่ออกคืน "—" ไม่ throw */
+export function shortTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+}
