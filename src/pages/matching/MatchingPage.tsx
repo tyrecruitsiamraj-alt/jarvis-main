@@ -3133,9 +3133,42 @@ const MatchingPage: React.FC = () => {
                   aria-hidden
                   className={cn('absolute inset-y-0 left-0 w-1.5', ageMeta.barCls)}
                 />
-                <div className="flex items-start justify-between gap-2">
+                {/*
+                  บรรทัดแรก = "สิ่งที่ต้องตัดสินใจ" ตามหลักคนอ่านบนลงล่างที่เจ้าของยึด
+                  ด่วนแค่ไหน → ต้องทำอะไรต่อ → เหลือหากี่คน
+                  ชื่อหน่วยงาน/ตำแหน่ง/ที่อยู่เป็นของประกอบ ลงไปอยู่บรรทัดถัดไป
+                */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span
+                    title={
+                      ageDays == null
+                        ? 'ไม่ทราบอายุใบขอ'
+                        : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
+                    }
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tabular-nums',
+                      ageMeta.chipCls,
+                    )}
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full', ageMeta.dotCls)} aria-hidden />
+                    {ageMeta.label}
+                    {ageDays != null ? ` · ค้าง ${ageDays} วัน` : ''}
+                  </span>
+                  {(() => {
+                    const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
+                    return action ? (
+                      <span className={cn(TONE[action.tone].chip, 'shrink-0')}>→ {action.text}</span>
+                    ) : null;
+                  })()}
+                  <span className="ml-auto shrink-0 text-[11px] text-slate-600 dark:text-slate-300">
+                    เหลือหา <b className={cn('text-[15px] tabular-nums', TONE.warn.value)}>{remaining}</b>
+                    <span className="text-muted-foreground"> / {requested} อัตรา</span>
+                  </span>
+                </div>
+
+                <div className="mt-1 flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    {/* ชื่อหน่วยงาน + ป้าย AI แนะนำ อยู่บรรทัดเดียวกัน — อ่านทีเดียวรู้ว่าใบนี้ไปต่อได้ไหม */}
+                    {/* ชื่อหน่วยงาน + ป้ายผลคัดคน — ของประกอบการตัดสินใจ ไม่ใช่ตัวตัดสินใจเอง */}
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <span className="truncate text-sm font-semibold text-blue-600 dark:text-blue-300">{unitRequestCardTitle(j)}</span>
                       {matchCount != null ? (
@@ -3146,20 +3179,15 @@ const MatchingPage: React.FC = () => {
                           AI แนะนำ {matchCount}
                         </span>
                       ) : quickCounts[j.id] ? (
+                        /* เลข "ประมาณ" ต้องต่างจากเลข "ยืนยันแล้ว" ด้วยตา ไม่ใช่แค่ตัวหนอน —
+                           เส้นประ + ไม่มีพื้น = ยังไม่ผ่าน AI · ทึบ + มีเครื่องหมายถูก = ยืนยันแล้ว */
                         <span
                           title="ประมาณการเบื้องต้นจากสกิล (ยังไม่ผ่าน AI) — กดเพื่อให้ AI คัดจริง"
-                          className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.info.soft, TONE.info.value)}
+                          className="shrink-0 rounded-full border border-dashed border-slate-400 px-2 py-0.5 text-[10px] text-slate-600 dark:border-slate-500 dark:text-slate-300"
                         >
-                          น่าจะตรง ~{quickCounts[j.id]}
+                          ~{quickCounts[j.id]} (ยังไม่ผ่าน AI)
                         </span>
                       ) : null}
-                      {/* ชิปก้าวถัดไปอยู่ติดชื่อหน่วยงานตามที่เจ้าของสั่ง — อ่านชื่อแล้วรู้เลยว่าต้องทำอะไรต่อ */}
-                      {(() => {
-                        const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
-                        return action ? (
-                          <span className={cn(TONE[action.tone].chip, 'shrink-0')}>→ {action.text}</span>
-                        ) : null;
-                      })()}
                     </div>
                     {unitRequestCardSubtitle(j) ? (
                       <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
@@ -3168,29 +3196,6 @@ const MatchingPage: React.FC = () => {
                       <MapPin className="w-3 h-3 shrink-0" />
                       <span className="truncate">{j.location_address}</span>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    {/* ระดับความด่วนตามอายุใบขอ (คนละเรื่องกับ "ด่วน/ล่วงหน้า" ที่มาจากใบขอ ERP) */}
-                    <span
-                      title={
-                        ageDays == null
-                          ? 'ไม่ทราบอายุใบขอ'
-                          : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
-                      }
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums',
-                        ageMeta.chipCls,
-                      )}
-                    >
-                      <span className={cn('h-1.5 w-1.5 rounded-full', ageMeta.dotCls)} aria-hidden />
-                      {ageMeta.label}
-                      {ageDays != null ? ` · ${ageDays} วัน` : ''}
-                    </span>
-                    {/* ชิปนี้ซ้ำ 100 ใบต่อหน้า — เดิมใช้ CSS var (destructive/info) ตรง ๆ
-                        วัดได้ contrast 4.2 ตกเกณฑ์ AA · ย้ายมาใช้ TONE ให้เท่ากับชิปอื่นทั้งแอป */}
-                    <span className={j.urgency === 'urgent' ? TONE.danger.chip : TONE.info.chip}>
-                      {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
-                    </span>
                   </div>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
@@ -3202,10 +3207,13 @@ const MatchingPage: React.FC = () => {
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
                       </span>
-                      <span className="mt-0.5 block text-[10px] text-slate-600 dark:text-slate-300">
-                        ขอมา <b className="tabular-nums">{requested}</b> · เหลือหาทางการ{' '}
-                        <b className="tabular-nums">{remaining}</b>
-                      </span>
+                      {/* ยอด ขอมา/เหลือหา ย้ายขึ้นบรรทัดแรกแล้ว ตรงนี้เหลือเลขที่ใบขอ
+                          ซึ่งเป็นของอ้างอิง — ตามหลักบนลงล่าง ของอ้างอิงอยู่ล่างสุด */}
+                      {j.request_no ? (
+                        <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                          {j.request_no}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
                       <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
@@ -3806,7 +3814,7 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               ) : null}
                               {activeElsewhere ? (
-                                <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.orange.soft, TONE.orange.value)}>
+                                <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.violet.soft, TONE.violet.value)}>
                                   ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                 </span>
                               ) : null}
@@ -4106,7 +4114,7 @@ const MatchingPage: React.FC = () => {
                                       </span>
                                     ) : null}
                                     {activeElsewhere ? (
-                                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.orange.soft, TONE.orange.value)}>
+                                      <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', TONE.violet.soft, TONE.violet.value)}>
                                         ติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id.slice(0, 8)}
                                       </span>
                                     ) : null}
@@ -4698,7 +4706,7 @@ const MatchingPage: React.FC = () => {
                         ) : null}
                       </div>
                       {activeElsewhere ? (
-                        <p className={cn('rounded-lg border px-2.5 py-2 text-[11px]', TONE.orange.soft, TONE.orange.num)}>
+                        <p className={cn('rounded-lg border px-2.5 py-2 text-[11px]', TONE.violet.soft, TONE.violet.num)}>
                           ผู้สมัครติดใบขอ {activeElsewhere.request_no || activeElsewhere.job_id} · {proposalStatusLabel(activeElsewhere.status)}
                         </p>
                       ) : null}
