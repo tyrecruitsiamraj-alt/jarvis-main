@@ -328,6 +328,35 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ⚠️ `byOutcome` อาจมีค่าที่ไม่ใช่ outcome จริงหลุดมาจากข้อมูลเก่า (เจอ `completed` 1 แถว)
 หน้าเว็บกรองด้วย `CALL_OUTCOMES` จึงไม่โชว์ — อย่าถอดตัวกรองนั้นออก
 
+## ชุดส่งงานโทร + อนุมัติ + ช่วงถอนคำ
+
+โจทย์: "อนุมัติไปแล้วแล้วอยากยกเลิกมีปรับแก้อะไรจะได้ทำได้"
+ทางแก้: อนุมัติแล้ว **ยังไม่เข้าคิวจริงทันที** — ตั้ง `release_at` ไว้ข้างหน้า
+ระหว่างนั้นยกเลิก/ถอนคนออกได้ · พ้นเวลาแล้วค่อยเข้าคิว
+
+* `migrations/071_lumos_call_batches.sql` — `lumos_call_batches` + `lumos_call_batch_items`
+* `src/lib/callBatch.ts` — สถานะ + `CALL_BATCH_UNDO_MINUTES` (**10 นาที** — ตัวเลขที่เสนอไว้
+  เจ้าของยังไม่ยืนยัน แก้ที่ค่านี้ที่เดียว)
+* `api/_lib/callBatchStore.ts` — สร้าง/อนุมัติ/ยกเลิก/ถอนคน/ปล่อย
+* `api/_lib/callBatchDispatcher.ts` — ตัวปล่อยเข้าคิวจริง (แยกไฟล์กัน import วงกลม)
+* `api/_handlers/lumos-call-batches.ts` — `GET/POST/PATCH/DELETE /api/lumos/call-batches`
+* `tests/api/callBatch.test.ts`
+
+⚠️ **ชื่อ/เบอร์อ่านใหม่ตอนปล่อย ไม่ใช่ snapshot ตอนกดเลือก** — คนอาจย้ายถัง/เปลี่ยนเบอร์
+ระหว่างรออนุมัติ ใช้ค่าเก่าจะโทรผิดเบอร์ · ใช้ `resolveBoardSelection` ชุดเดียวกับการส่งเอง
+
+⚠️ **ไม่มี cron** — `releaseDueCallBatches()` ถูกเรียกตอน `takePendingLumosItems()`
+(Lumos ดึงคิวเป็นระยะอยู่แล้ว) และตอนอ่านรายการชุด · ล้มก็ไม่กระทบการเสิร์ฟคิวเดิม
+
+⚠️ ปล่อยชุดใช้ **claim-then-work**: `update ... where status='approved' returning`
++ `for update skip locked` — 2 request พร้อมกันจะไม่ปล่อยชุดเดียวกันซ้ำ (DB ตัดสิน)
+
+⚠️ **หนึ่งชุด = หนึ่งช่อง** (board→reminder · iRecruit→interview) ผสมกันไม่ได้
+เพราะสถานะ/การยกเลิกจะกำกวม — handler ตอบ 400
+
+⚠️ **อนุมัติได้เฉพาะ supervisor/admin** (สมมติฐาน — เจ้าของยังไม่ยืนยัน)
+แก้ที่ `canApprove()` ใน handler ที่เดียว
+
 ## Safe implementation / feature flag
 
 Edit documentation:

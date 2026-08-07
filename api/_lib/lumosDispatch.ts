@@ -20,6 +20,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { logInfo, logError } from './logger.js';
 import { applyCallFollowupToQueueRow, listSuppressedPhones } from './callFollowup.js';
+import { releaseDueCallBatches } from './callBatchStore.js';
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
@@ -561,6 +562,14 @@ export async function takePendingLumosItems(
   channel: 'reminder' | 'interview',
   limit: number,
 ): Promise<unknown[]> {
+  // ชุดที่อนุมัติแล้วและพ้นช่วงถอนคำ → ปล่อยเข้าคิวก่อนเสิร์ฟ (แทน cron —
+  // Lumos ดึงคิวเป็นระยะอยู่แล้ว) · ล้มก็ไม่กระทบการเสิร์ฟคิวเดิม
+  try {
+    await releaseDueCallBatches();
+  } catch (e) {
+    logError('call-batch.release.failed', e);
+  }
+
   const { rows } = await dbQuery<{ payload: unknown }>(
     `update ${queueTable} q
         set status = 'delivered', delivered_at = now(), updated_at = now(),
