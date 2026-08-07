@@ -10,6 +10,7 @@ import {
   type JobCriteria,
 } from '@/lib/scoreIrecruitMatch';
 import { cn } from '@/lib/utils';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type Props = {
@@ -26,19 +27,34 @@ type Props = {
   proposalBusy?: boolean;
 };
 
-function scoreColor(percent: number): string {
-  if (percent >= 70) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (percent >= 40) return 'bg-amber-50 text-amber-700 border-amber-200';
-  return 'bg-slate-50 text-slate-600 border-slate-200';
+/**
+ * ความหมายสีของไฟล์นี้มาจาก TONE ที่เดียว — เดิมเขียนสีมือและ **ไม่มีคู่ `dark:` เลย**
+ * พอสลับโหมดมืด พื้นยังเป็นสีอ่อน (emerald-50) แต่ตัวหนังสือกลายเป็นสีอ่อนตามธีม
+ * ชิปจึงจมหายไปกับพื้นของตัวเอง — วัดได้ contrast ต่ำถึง 1.8 (เกณฑ์ต้อง 4.5)
+ */
+function scoreTone(percent: number): ToneKey {
+  if (percent >= 70) return 'success';
+  if (percent >= 40) return 'warn';
+  return 'neutral';
 }
 
+function scoreColor(percent: number): string {
+  const t = TONE[scoreTone(percent)];
+  return cn(t.soft, t.value);
+}
+
+const VERDICT_TONE: Record<CriterionVerdict, ToneKey> = {
+  pass: 'success',
+  fail: 'danger',
+  na: 'neutral',
+};
+
 function VerdictChip({ label, verdict }: { label: string; verdict: CriterionVerdict }) {
-  const meta =
-    verdict === 'pass'
-      ? { icon: '✓', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
-      : verdict === 'fail'
-        ? { icon: '✗', className: 'border-red-200 bg-red-50 text-red-700' }
-        : { icon: '–', className: 'border-slate-200 bg-slate-50 text-slate-500' };
+  const tone = TONE[VERDICT_TONE[verdict] ?? 'neutral'];
+  const meta = {
+    icon: verdict === 'pass' ? '✓' : verdict === 'fail' ? '✗' : '–',
+    className: cn(tone.soft, tone.value),
+  };
   return (
     <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', meta.className)}>
       {label} {meta.icon}
@@ -53,9 +69,7 @@ function verdictText(v: CriterionVerdict): string {
 }
 
 function verdictRowClass(v: CriterionVerdict): string {
-  if (v === 'pass') return 'text-emerald-700';
-  if (v === 'fail') return 'text-red-600';
-  return 'text-slate-500';
+  return TONE[VERDICT_TONE[v] ?? 'neutral'].value;
 }
 
 function ScorePercentBadge({
@@ -119,7 +133,7 @@ export default function ScoredCandidateCard({
   const proposeButtons = onPropose ? (
     <div className="flex flex-wrap items-center gap-1.5">
       {proposalStatus ? (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
           <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(proposalStatus)}
         </span>
       ) : null}
@@ -127,7 +141,7 @@ export default function ScoredCandidateCard({
         type="button"
         disabled={proposalBusy}
         onClick={() => onPropose(match, 'reserved', buildWhy())}
-        className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:bg-violet-950/50 dark:border-violet-800 dark:text-violet-300"
       >
         {proposalBusy ? 'บันทึก…' : proposalStatus === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
       </button>
@@ -135,7 +149,7 @@ export default function ScoredCandidateCard({
         type="button"
         disabled={proposalBusy}
         onClick={() => onPropose(match, 'placed', buildWhy())}
-        className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 dark:border-emerald-800"
       >
         {proposalBusy ? 'บันทึก…' : proposalStatus === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
       </button>
@@ -145,12 +159,12 @@ export default function ScoredCandidateCard({
   // ---------- หน้า "ทำไมเป็นคนนี้ + จะโทร" ----------
   if (showWhy) {
     return (
-      <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-2.5 py-2 space-y-2">
+      <div className="rounded-lg border border-sky-200 bg-sky-50/60 px-2.5 py-2 space-y-2 dark:bg-sky-950/50 dark:border-sky-800">
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => setShowWhy(false)}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:underline"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:underline dark:text-sky-300"
           >
             <ArrowLeft className="h-3 w-3" /> ย้อนกลับ
           </button>
@@ -161,18 +175,18 @@ export default function ScoredCandidateCard({
           {matchTierEmoji(match.tier)} {match.full_name}
         </p>
 
-        <div className="rounded-md border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5">
-          <p className="text-[11px] font-semibold text-slate-700">ทำไมแนะนำคนนี้</p>
+        <div className="rounded-md border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5 dark:bg-white/5 dark:border-white/10">
+          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">ทำไมแนะนำคนนี้</p>
           <ul className="space-y-1 text-[11px]">
             <li className={verdictRowClass(score.gender)}>• เพศ: {verdictText(score.gender)}</li>
             <li className={verdictRowClass(score.age)}>• อายุ: {verdictText(score.age)}</li>
-            <li className="text-sky-700">• พื้นที่: {score.areaLabel}</li>
-            <li className="text-slate-600">
+            <li className="text-sky-700 dark:text-sky-300">• พื้นที่: {score.areaLabel}</li>
+            <li className="text-slate-600 dark:text-slate-300">
               • ตำแหน่งที่สมัคร: {match.position_name || match.job_name_th || 'ไม่ระบุ'}
             </li>
           </ul>
           {match.reason ? (
-            <p className="pt-1 text-[11px] text-slate-600 italic border-t border-slate-100">
+            <p className="pt-1 text-[11px] text-slate-600 italic border-t border-slate-100 dark:text-slate-300">
               เหตุผล AI: {match.reason}
             </p>
           ) : null}
@@ -190,7 +204,7 @@ export default function ScoredCandidateCard({
             <span className="text-[11px] text-muted-foreground">ไม่มีเบอร์โทร</span>
           )}
           {match.line_id ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-700 dark:bg-white/5 dark:border-emerald-800 dark:text-emerald-300">
               <MessageCircle className="h-3.5 w-3.5" /> LINE: {match.line_id}
             </span>
           ) : null}
@@ -198,7 +212,7 @@ export default function ScoredCandidateCard({
             <button
               type="button"
               onClick={() => onPrefill(match, buildWhy())}
-              className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
+              className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 dark:bg-violet-950/50 dark:border-violet-800 dark:text-violet-300"
             >
               <UserPlus className="h-3.5 w-3.5" /> เพิ่มรายละเอียดผู้สมัคร
             </button>
@@ -211,12 +225,12 @@ export default function ScoredCandidateCard({
 
   // ---------- หน้าข้อมูลผู้สมัคร (ค่าเริ่มต้น) ----------
   return (
-    <div className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5">
+    <div className="rounded-lg border border-white/70 bg-white/70 px-2.5 py-2 space-y-1.5 dark:bg-white/5 dark:border-white/10">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-blue-700">
+        <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
           {matchTierEmoji(match.tier)} {match.full_name}
           {proposalStatus ? (
-            <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-emerald-700">
+            <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
               <CheckCircle2 className="h-2.5 w-2.5" /> {proposalStatusLabel(proposalStatus)}
             </span>
           ) : null}
@@ -227,10 +241,10 @@ export default function ScoredCandidateCard({
       <div className="flex flex-wrap items-center gap-1.5">
         <VerdictChip label="เพศ" verdict={score.gender} />
         <VerdictChip label="อายุ" verdict={score.age} />
-        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-300">
           พื้นที่: {score.areaLabel}
         </span>
-        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500">
+        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-500 dark:bg-white/5 dark:border-slate-800 dark:text-slate-400">
           {matchTierLabel(match.tier)}
         </span>
       </div>
@@ -246,7 +260,7 @@ export default function ScoredCandidateCard({
         <button
           type="button"
           onClick={() => setShowWhy(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100"
+          className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100 dark:bg-sky-950/50 dark:border-sky-800 dark:text-sky-300"
         >
           <Phone className="h-3 w-3" /> สนใจ / จะโทร
         </button>
@@ -254,7 +268,7 @@ export default function ScoredCandidateCard({
           <button
             type="button"
             onClick={() => onPrefill(match, buildWhy())}
-            className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+            className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:bg-violet-950/50 dark:border-violet-800 dark:text-violet-300"
           >
             <UserPlus className="h-3 w-3" /> เพิ่มรายละเอียดผู้สมัคร
           </button>
