@@ -690,6 +690,41 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 แยกต่อได้แต่ต้องส่ง props เป็นสิบตัว หรือยกไปเป็น context — **ต้องถามเจ้าของก่อน**
 ว่าคุ้มกับความเสี่ยงไหม อย่าตัดสินใจเอง
 
+## เข้าสู่ระบบด้วย Microsoft (Azure AD SSO — ใช้จริงทั้งบริษัทแล้ว)
+
+* `api/_lib/azureAdAuth.ts` — สร้าง state · cookie · ประกอบ URL · แลก code · อ่านโปรไฟล์
+* `api/_lib/authSession.ts` — ออก session หลังยืนยันตัวตนผ่าน
+* `api/_handlers/auth/azure-ad-start.ts` · `api/_handlers/auth/azure-ad-callback.ts`
+* `tests/api/azureAdAuth.test.ts` — contract 20 เคส (ชุดแรกของไฟล์นี้)
+
+### ⚠️ `sanitizeReturnPath()` คือด่านกัน open redirect — แตะแล้วต้องรันเทสต์เสมอ
+
+ค่า `returnTo` จบที่ header `Location` ตอนล็อกอินเสร็จ หลุดออกนอกเว็บได้เมื่อไหร่
+= พาคนที่เพิ่งล็อกอินไปหน้าปลอมได้ทันที
+
+**เบราว์เซอร์ normalize URL ก่อนใช้** — สองแบบนี้ผ่านด่าน "ขึ้นต้น `/` และไม่ใช่ `//`"
+ได้ทั้งคู่ แต่กลายเป็น protocol-relative ตอนเบราว์เซอร์อ่าน จึงต้องตัดทิ้งด้วย:
+
+| ค่าที่ส่งมา | เบราว์เซอร์เห็นเป็น |
+|---|---|
+| `/\evil.com` | `//evil.com` (แปลง `\` เป็น `/`) |
+| `/<tab>/evil.com` | `//evil.com` (ตัดอักขระควบคุมทิ้ง) |
+
+⚠️ **อย่าพึ่ง origin ที่เติมข้างหน้าอย่างเดียว** — `azureAuthSuccessRedirect()` เติม
+`getAppPublicUrl()` ไว้ข้างหน้าก็จริง แต่ค่านั้นเป็น **สตริงว่างได้** เมื่อไม่ได้ตั้ง
+`APP_PUBLIC_URL` และ `isAzureAdConfigured()` **ไม่ได้บังคับให้ตั้ง** (เช็คแค่
+client id / secret / tenant) — เจอสภาพนั้นเมื่อไหร่ Location เหลือ path ล้วน ๆ
+แล้วช่องโหว่ทำงานจริง เทสต์จึงมีเคส "ไม่ได้ตั้ง APP_PUBLIC_URL ก็ต้องไม่หลุด"
+
+ยิงของจริงยืนยันแล้ว (`/api/auth/azure-ad/start?returnTo=...`):
+`https://evil.com` · `//evil.com` · `/\evil.com` · `/\/evil.com` · `/<tab>/evil.com` ·
+`/api/jobs` → ถูกตัดเป็น `/` ทั้งหมด ส่วน `/dashboard` ผ่านตามปกติ
+
+### ของที่ยังไม่มีเทสต์ในสายนี้ (ไล่ต่อได้เลย)
+
+`authSession.ts` · `magicLinkLogin.ts` · `roleFunctionGrants.ts` — ยังไม่มีเทสต์แตะเลย
+เกณฑ์เลือกอันถัดไป: **"พังแล้วเงียบ"** กับ **"ผิดแล้วข้อมูลรั่ว"** ก่อนเสมอ
+
 ## Public applications from /apply
 
 * `migrations/048_public_job_applications.sql` — application table
