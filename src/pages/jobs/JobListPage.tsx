@@ -810,9 +810,10 @@ const JobListPage: React.FC = () => {
                         {ageDaysLabel(j)}
                       </span>
                     </td>
-                    {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) ไม่ใช้ text-foreground
-                        เพราะ branding เขียน --foreground ทับ inline บน <html> ทำให้ค่านั้นไม่สลับตามธีม
-                        แล้วจะได้ตัวหนังสือเข้มบนการ์ดเข้มในโหมดมืด */}
+                    {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) เพื่อคุมคอนทราสต์
+                        ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline
+                        บน <html> จนไม่สลับตามธีมนั้น แก้แล้วที่ brandingStorage.applyBrandSurfaceVars()
+                        และมีเทสต์คุมที่ tests/api/brandingSurfaceTheme.test.ts */}
                     <td className={cn('px-3 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
                     <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
                     <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
