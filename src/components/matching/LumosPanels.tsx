@@ -7,17 +7,11 @@ import {
   type LumosJobCallSummaryRow,
 } from '@/lib/lumosDispatchApi';
 import { ClipboardCheck, PhoneCall, X } from 'lucide-react';
+import { formatDateTimeTh } from '@/lib/dateTh';
 
 // ─── แผงฝั่ง Lumos ในหน้า Matching — แยกออกจาก MatchingPage.tsx ตอนแตกไฟล์ ──────
 // ไฟล์นี้ export แต่ component เท่านั้น (ฟังก์ชันล้วน `cardNextAction` อยู่ที่
 // src/lib/matchingCardAction.ts) ไม่งั้น eslint เพิ่ม warning react-refresh
-
-function formatCallWhen(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
-}
 
 /**
  * ป้ายผลการโทร Lumos ต่อคน (ระดับ 1) — รอโทร → Lumos รับไปแล้ว → สนใจ/ปฏิเสธ/ไม่รับสาย
@@ -54,7 +48,7 @@ export function LumosCallBadgeRow({
           {badge.label}
           {hasDetail ? <span aria-hidden>{expanded ? '▴' : '▾'}</span> : null}
         </button>
-        <span className="text-[10px] text-muted-foreground">ส่งเมื่อ {formatCallWhen(row.sent_at)}</span>
+        <span className="text-[10px] text-muted-foreground">ส่งเมื่อ {formatDateTimeTh(row.sent_at)}</span>
         {row.delivery_count > 1 ? (
           <span className="text-[10px] text-muted-foreground">· ส่งซ้ำ {row.delivery_count} ครั้ง</span>
         ) : null}
@@ -68,7 +62,7 @@ export function LumosCallBadgeRow({
           ) : (
             <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก AI</p>
           )}
-          <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatCallWhen(row.updated_at)}</p>
+          <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatDateTimeTh(row.updated_at)}</p>
           {canCancelLumosCall(row) ? (
             <button
               type="button"

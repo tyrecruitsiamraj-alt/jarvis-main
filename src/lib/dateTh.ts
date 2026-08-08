@@ -110,9 +110,31 @@ export function formatCountdown(msLeft: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * ตัวจัดรูปสองตัวนี้ **สร้างครั้งเดียวระดับโมดูล** ตามกติกาเดียวกับ `bangkokYmdFormat`
+ * ข้างบนและ `api/_lib/businessDate.ts` — `toLocaleString()` / `toLocaleTimeString()`
+ * สร้าง Intl formatter ใหม่ทุกครั้งที่เรียก ซึ่งแพง (~0.16ms) และสองฟังก์ชันนี้ถูกเรียก
+ * **ต่อแถว** (ป้ายผลโทรทุกใบในหน้า Matching · ทุกแถวในแผงล็อกโทร)
+ */
+const thDateTimeFormat = new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+const thShortTimeFormat = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit' });
+
 /** เวลาสั้น ชั่วโมง:นาที แบบไทย — ค่าที่อ่านไม่ออกคืน "—" ไม่ throw */
 export function shortTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  return thShortTimeFormat.format(d);
+}
+
+/**
+ * วันที่+เวลาแบบไทยอ่านง่าย (เช่น "3 ส.ค. 2569 18:08") — ใช้กับป้ายผลโทรของ Lumos
+ *
+ * ไม่มีค่า = "—" · ค่าที่อ่านไม่ออก **คืนสตริงเดิม** ไม่ใช่ "—"
+ * (ตั้งใจ: ถ้า ERP/คิวส่งอะไรแปลก ๆ มา อยากให้เห็นของจริงเพื่อไล่ต้นเหตุได้)
+ */
+export function formatDateTimeTh(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return thDateTimeFormat.format(d);
 }

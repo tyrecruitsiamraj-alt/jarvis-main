@@ -185,12 +185,21 @@ Code:
 เป็นต้นเหตุจริงของอาการ "API ใบขอที่ปิดแล้วช้า" (ไม่ใช่ SQL — SQL ใช้แค่ 0.6 วินาที)
 
 * `src/lib/dateTh.ts` — `toYmdBangkok()` ฝั่ง client ก็ hoist แบบเดียวกัน
+  · `formatDateTimeTh()` (วันที่+เวลา) และ `shortTime()` (เวลาสั้น) ใช้ตัวจัดรูป
+  `thDateTimeFormat` / `thShortTimeFormat` ที่ hoist ระดับโมดูลเช่นกัน
 * `tests/api/businessDate.test.ts` — contract: ความถูกต้องข้ามเขตเวลา/ข้ามปี ·
   ฝั่ง client กับ API ต้องให้ผลตรงกัน · **เทสต์ความเร็ว 30,000 ครั้งต้องไม่เกิน 1.5 วินาที**
   (พังแปลว่ามีคนเอา `new Intl.*` กลับเข้าไปในฟังก์ชัน)
+* `tests/api/dateThFormatters.test.ts` — contract ของสองตัวข้างบน:
+  ผลต้องตรงกับ `toLocaleString`/`toLocaleTimeString` เดิมเป๊ะ · ค่าที่อ่านไม่ออกคืนต่างกัน
+  โดยตั้งใจ (`formatDateTimeTh` คืนสตริงเดิม · `shortTime` คืน `—`) · **เทสต์ความเร็ว**
 
 ⚠️ กติกา: `new Intl.DateTimeFormat` / `new Intl.NumberFormat` ให้ประกาศระดับโมดูลเสมอ
 ห้ามสร้างในฟังก์ชันที่ถูกเรียกต่อแถว
+
+⚠️ **`toLocaleString()` / `toLocaleTimeString()` / `toLocaleDateString()` ก็นับด้วย** —
+มันสร้าง Intl formatter ใหม่ข้างในทุกครั้งที่เรียก ไม่ได้ปลอดภัยกว่า `new Intl.*`
+วัดจริงแล้ว: 30,000 ครั้ง **4,964 ms → 266 ms (เร็วขึ้น 18.7 เท่า)** ผลลัพธ์ตรงกันทุกค่า
 
 ### cache ใบขอที่ปิดแล้ว
 
