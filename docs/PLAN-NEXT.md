@@ -6,9 +6,9 @@
 อ่านก่อนเริ่ม: `docs/SESSION-HANDOFF.md` (กติกา 13 ข้อ + กับดักตอนตรวจงาน) และ
 `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline ณ commit `846e53f`:** test 567 ผ่าน/4 skip · tsc 0 error **ทั้ง 2 config
+**Baseline ณ commit `be33cad`:** test 618 ผ่าน/4 skip · tsc 0 error **ทั้ง 2 config
 (ต้องเช็คทั้งคู่!)** · eslint 0 error/16 warning · migration ถึง 072
-(ตัวเลขเท่าเดิมทุกตัวตั้งแต่ `7436c80` — งานรอบนี้เป็นการแตกไฟล์ล้วน)
+(เทสต์เพิ่มจาก 567 เป็น 618 — ปิดช่องว่าง 4 จุด · tsc/eslint เท่าเดิม)
 
 ---
 
