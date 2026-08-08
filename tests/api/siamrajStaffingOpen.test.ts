@@ -3,6 +3,7 @@ import {
   effectiveInformedCount,
   isOpenStaffingRow,
   remainingOpenPositionsFromRow,
+  requestPositionTotal,
   staffingPositionBreakdown,
 } from '../../api/_lib/siamrajStaffingOpen.js';
 
@@ -142,5 +143,42 @@ describe('siamrajStaffingOpen feed', () => {
     expect(breakdown.filledPositions).toBe(2);
     expect(breakdown.cancelledPositions).toBe(3);
     expect(breakdown.remainingPositions).toBe(0);
+  });
+});
+
+/**
+ * invariant ที่ทำให้ "ทางเดา" ใน `src/lib/requestControl.ts` ไปไม่ถึงสำหรับใบขอจาก ERP
+ *
+ * `positionBreakdownFromJob()` จะเข้าทางเดา (ซึ่งแปลง "ปิดใบขอ" เป็น "หาได้ครบ")
+ * ก็ต่อเมื่อ `request_positions` เป็น null หรือ <= 0 เท่านั้น
+ * ตราบใดที่ `requestPositionTotal()` คืนค่าอย่างน้อย 1 เสมอ ใบขอจาก ERP จะไม่มีทางตกไปทางนั้น
+ *
+ * เทสต์ชุดนี้พังเมื่อไหร่ = มีคนเปิดประตูให้ตัวเลขเดาไหลเข้าแดชบอร์ดโดยไม่รู้ตัว
+ */
+describe('invariant: request_qty เท่าไหร่ก็ต้องได้อย่างน้อย 1 อัตรา', () => {
+  const emptyish = [null, undefined, 0, '0', '', '   ', -5, 'ไม่ใช่ตัวเลข', NaN];
+
+  it('requestPositionTotal ไม่มีทางคืน 0 หรือติดลบ', () => {
+    for (const qty of emptyish) {
+      expect(requestPositionTotal(qty as never)).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('staffingPositionBreakdown คืน requestPositions >= 1 และ filled/cancelled เป็นตัวเลขเสมอ', () => {
+    for (const qty of emptyish) {
+      const b = staffingPositionBreakdown({
+        status: 'A',
+        is_stop: 'N',
+        stop_no: null,
+        request_qty: qty as never,
+        inform_qty: null,
+        effective_inform_qty: null,
+      });
+      expect(b.requestPositions).toBeGreaterThanOrEqual(1);
+      expect(Number.isFinite(b.filledPositions)).toBe(true);
+      expect(Number.isFinite(b.cancelledPositions)).toBe(true);
+      // ครบสมการ: ขอมา = หาได้ + ยกเลิก + เหลือหา
+      expect(b.filledPositions + b.cancelledPositions + b.remainingPositions).toBe(b.requestPositions);
+    }
   });
 });

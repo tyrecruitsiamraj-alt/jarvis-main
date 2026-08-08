@@ -58,6 +58,38 @@ Future code:
 * src/lib/dashboard/request-control/calculations.ts
 * src/lib/dashboard/request-control/reconciliation.ts
 
+### ⚠️ มี 2 เส้นคิด "หาได้แล้ว" ขนานกัน — อย่าสับสน
+
+| เส้น | ไฟล์ | ธงคุณภาพ |
+|---|---|---|
+| เส้นหลัก (event-based) | `src/lib/dashboard/requestControlLedger.ts` | `DataQualityMode` = `event_based` / `snapshot_fallback` / `mixed` / `insufficient` · ถ้าเป็น `snapshot_fallback` จะ **zero ยอดรายงวด** ทิ้ง |
+| เส้นย่อ (ต่อใบ) | `src/lib/requestControl.ts` → `positionBreakdownFromJob()` | `isDerived?: true` |
+
+`positionBreakdownFromJob()` ถูกเรียก **12 จุด** ใน `buildDashboardData.ts` + `throughput.ts`
+มันมี **ทางเดาจาก status** ที่แปลง `status === 'closed'` → `filledPositions = ทุกอัตรา`
+ซึ่งขัดกติกาข้อ 1 ตรง ๆ (ห้ามเอา "ปิดครบใบขอ" มาเป็น "หาได้แล้ว") จึงต้องติดธง `isDerived`
+
+**วัดกับข้อมูลจริงแล้ว (7 ส.ค. 2569) — ทางเดาไปไม่ถึงสำหรับข้อมูล ERP:**
+
+| feed | จำนวน | ใช้เลขจาก ERP | ตกไปทางเดา |
+|---|---|---|---|
+| ใบขอเปิดอยู่ (`/api/siamraj/unit-requests`) | 325 | **325 (100%)** | 0 |
+| ใบขอที่ปิดแล้ว (`?closed=1`) | 2,734 | **2,734 (100%)** | 0 |
+| ใบขอฝั่ง PostgreSQL (`/api/jobs`) | 18 | **0 (0%)** | 18 (ในนั้น 7 ใบ `closed`) |
+
+เหตุผลที่ไปไม่ถึง: `requestPositionTotal()` ใน `api/_lib/siamrajStaffingOpen.ts`
+คืนค่า **อย่างน้อย 1 เสมอ** และ mapper ทั้งสองเส้น (`siamrajSqlServerRequests.ts` ·
+`siamrajSqlServerClosed.ts`) เซ็ตครบทั้ง 3 ฟิลด์เสมอ → เข้าเงื่อนไข "เลขจาก ERP" ทุกแถว
+
+⚠️ **แต่ลบทางเดาทิ้งไม่ได้** — `useUnitRequestsFeed` เป็นแบบ either/or:
+feed Siamraj ปิด/ERP ล่มเมื่อไหร่ จะถอยไปใช้ `/api/jobs` ซึ่งไม่มีฟิลด์ staffing เลย
+ทางเดาจะทำงานทันทีในจังหวะที่ตัวเลขสำคัญที่สุดและไม่มีใครสงสัยมัน
+
+เทสต์ที่คุมไว้ (พังเมื่อไหร่ = มีคนเปิดประตูให้เลขเดาไหลเข้าแดชบอร์ด):
+* `tests/api/requestControl.test.ts` — เลขจาก ERP ต้อง**ไม่**ติดธง · ทางเดาทั้ง 3 ทางต้องติดธง
+* `tests/api/siamrajStaffingOpen.test.ts` — `requestPositionTotal()` ไม่มีทางคืน 0/ติดลบ
+  และ `staffingPositionBreakdown()` ต้องครบสมการ ขอมา = หาได้ + ยกเลิก + เหลือหา
+
 ## UI style / layout
 
 Edit documentation:
