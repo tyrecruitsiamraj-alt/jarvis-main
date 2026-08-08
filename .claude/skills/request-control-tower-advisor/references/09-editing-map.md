@@ -497,11 +497,28 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ⚠️ dedupe ต่อคนต่อเหตุการณ์ (`recipient_user_id, dedupe_key`) — Lumos ยิงผลเดิมซ้ำไม่เด้งซ้ำ
 ⚠️ ผู้รับตอนนี้ = admin (หน้างานโทรยังซ่อนให้ admin) — เปิดกว้างเมื่อไหร่ขยาย role ที่จุดยิง
 
+* `tests/api/appNotifications.test.ts` — contract 18 เคส
+
+⚠️ **ฝั่งสร้างกลืน error ทุกแบบโดยตั้งใจ = พังแล้วไม่มีสัญญาณอะไรเลย**
+ไม่มี error ไม่มี log เจ้าหน้าที่แค่ "ไม่ได้รับแจ้งเตือน" แล้วงานค้างโดยไม่มีใครรู้สาเหตุ
+**เทสต์คือด่านเดียวที่จับได้** — เส้นแบ่งที่ต้องรักษา:
+ฝั่ง**สร้าง** (`notifyUsers`/`notifyRoles`) กลืนหมด · ฝั่ง**อ่าน** (`listMyNotifications`/
+`markNotificationsRead`) กลืนเฉพาะ 42P01 ที่เหลือโยนต่อ ไม่งั้นเข้าใจผิดว่าไม่มีแจ้งเตือน
+
 ## ประวัติการติดต่อรายคน
 
 * `api/_handlers/matching-contact-history.ts` — GET `?phone=` รวม holds + คิว Lumos
   เส้นเวลาเดียว · คีย์เบอร์ E.164 · **ไม่ส่งเบอร์กลับ** · อ่าน outcome แบบ coalesce กับ result
 * `src/components/matching/ContactHistoryStrip.tsx` — เสียบใน dialog รายละเอียดผู้สมัคร
+* `tests/api/contactHistory.test.ts` — contract 13 เคส
+
+⚠️ **สองข้อห้ามที่ผิดแล้วเป็นข้อมูลรั่ว ไม่ใช่แค่หน้าเพี้ยน** (แผงนี้รวมประวัติข้ามแผนก):
+1. ห้ามส่งเบอร์กลับไปในผลลัพธ์ — หน้าเว็บมีเบอร์อยู่แล้ว มันเป็นคนส่งมาถาม
+2. ห้าม select `payload` ของคิว Lumos ออกมา (มีบทที่ AI จะพูด + ข้อมูลภายใน)
+   ใช้เป็นเงื่อนไข `where` ได้เท่านั้น
+เทสต์คุมทั้งสองข้อ + กับดัก coalesce `last_outcome` กับ `result->>'outcome'`
+(แถวก่อน migration 070 ไม่มี `last_outcome` ถ้าไม่ถอยไปอ่าน `result` จะเห็น
+"มีผลกลับ แต่โทรติด 0" ซึ่งดูเหมือนพัง)
 
 ## Safe implementation / feature flag
 
