@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
+import { ExternalLink, KeyRound, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import {
@@ -159,6 +159,15 @@ const AppNavDrawer: React.FC<Props> = ({
               <span className="truncate">ตั้งค่า</span>
             </button>
           ) : null}
+          {/* ย้ายมาจากหัวเว็บ — จอมือถือใส่ปุ่มพวกนี้ไว้บนหัวไม่พอ ปุ่มจะเบียดทับกัน */}
+          <button
+            type="button"
+            onClick={() => go('/account/change-password')}
+            className={rowClass(location.pathname.startsWith('/account/change-password'))}
+          >
+            <KeyRound className="h-4 w-4 shrink-0" />
+            <span className="truncate">เปลี่ยนรหัสผ่าน</span>
+          </button>
           <button
             type="button"
             onClick={() => {

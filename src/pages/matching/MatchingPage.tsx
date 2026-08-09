@@ -1883,14 +1883,17 @@ const MatchingPage: React.FC = () => {
       <div className="px-4 md:px-6 space-y-4">
         {/* ตัวกรอง */}
         <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="glass-card rounded-xl px-3 py-2 border border-white/70 flex items-center gap-2 flex-1">
+          {/* จอมือถือ: ช่องค้นหาต้องหดได้จริง (`min-w-0`) ไม่งั้น input ดันความกว้างขั้นต่ำ
+              จนปุ่ม "ด่วนเท่านั้น" ที่เป็น shrink-0 ทะลุออกนอกจอ · เผื่อ flex-wrap ไว้ให้
+              ปุ่มตกบรรทัดใหม่ในจอที่แคบมาก */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="glass-card rounded-xl px-3 py-2 border border-white/70 flex items-center gap-2 flex-1 min-w-0">
               <Search className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
-                className="bg-transparent text-sm outline-none flex-1"
+                className="bg-transparent text-sm outline-none flex-1 min-w-0"
               />
             </div>
             <button

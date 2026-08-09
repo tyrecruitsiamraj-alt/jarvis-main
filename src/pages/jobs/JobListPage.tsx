@@ -376,8 +376,9 @@ const JobListPage: React.FC = () => {
         backPath="/"
         actions={
           // ช่องค้นหาอยู่คู่ปุ่มรีเฟรชบนหัวหน้า — ของที่ใช้บ่อยสุดอยู่ใกล้มือ ไม่ต้องเลื่อนหาในกล่องตัวกรอง
-          <div className="flex items-center gap-2">
-            <div className="w-[200px] sm:w-[280px]">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* จอเล็กหดได้ ไม่ล็อกความกว้างตายตัว (จอ 320px เคยล้นออกไป) · จอใหญ่เท่าเดิม */}
+            <div className="w-full min-w-0 max-w-[200px] sm:max-w-[280px]">
               <label htmlFor="job-list-search" className="sr-only">
                 ค้นหา
               </label>
