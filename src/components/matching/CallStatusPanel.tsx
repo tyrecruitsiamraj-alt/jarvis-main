@@ -71,16 +71,45 @@ const CallStatusPanel: React.FC = () => {
   return (
     <div className={cn('rounded-2xl border p-4', DASH.card)}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div>
-          <p className={DASH.eyebrow}>งานโทรของฉัน · รอโทร</p>
-          <p className={cn('font-mono text-3xl font-extrabold tabular-nums', DASH.cellStrong)}>
+        <div className="min-w-0 flex-1">
+          <p className={DASH.eyebrow}>งานโทรของฉัน</p>
+          {/* เจ้าของสั่ง 10 ส.ค. 2569: "ดูแล้วรู้ว่าต้องทำอะไร" — เลขเปล่าบอกไม่ได้
+              จึงเป็นประโยคสั่งงานตรง ๆ + แถบสัดส่วน "ใกล้คาย vs ยังมีเวลา"
+              ล็อกหมดอายุ = คนหลุดกลับไปให้ AI/คนอื่นรับ งานที่ทำค้างไว้จะเสียเปล่า */}
+          <p
+            className={cn(
+              'font-mono text-3xl font-extrabold leading-none tabular-nums',
+              holds.length === 0 ? DASH.muted : dueSoonCount > 0 ? TONE.danger.value : DASH.cellStrong,
+            )}
+          >
             {holds.length.toLocaleString('th-TH')}
           </p>
-          <p className={cn('text-xs', DASH.muted)}>
-            {dueSoonCount > 0
-              ? `ใกล้คาย ${dueSoonCount.toLocaleString('th-TH')} คน — รีบโทรก่อน`
-              : 'ล็อกอยู่ได้ 1 วันต่อคน'}
+          <p
+            className={cn(
+              'mt-1 text-xs font-semibold',
+              holds.length === 0 ? DASH.muted : dueSoonCount > 0 ? TONE.danger.value : TONE.success.value,
+            )}
+          >
+            {holds.length === 0
+              ? 'ไม่มีงานโทรค้าง — ไปรับคนจากหน้า Matching ได้'
+              : dueSoonCount > 0
+                ? `รีบโทร ${dueSoonCount.toLocaleString('th-TH')} คนก่อน — ใกล้หลุดล็อกใน 2 ชม.`
+                : `โทรให้ครบ ${holds.length.toLocaleString('th-TH')} คนวันนี้ — ยังมีเวลา`}
           </p>
+          {holds.length > 0 ? (
+            <div className="mt-2 flex h-2 w-full max-w-sm overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+              <div
+                className={cn('h-full', TONE.danger.dot)}
+                style={{ width: `${(dueSoonCount / holds.length) * 100}%` }}
+                title={`ใกล้คาย ${dueSoonCount} คน`}
+              />
+              <div
+                className={cn('h-full', TONE.success.dot)}
+                style={{ width: `${((holds.length - dueSoonCount) / holds.length) * 100}%` }}
+                title={`ยังมีเวลา ${holds.length - dueSoonCount} คน`}
+              />
+            </div>
+          ) : null}
         </div>
         <button
           type="button"

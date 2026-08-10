@@ -20,7 +20,6 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
-import CallBatchPanel from '@/components/follow/CallBatchPanel';
 import CallStatusPanel from '@/components/matching/CallStatusPanel';
 import {
   fetchFlowSummary,
@@ -368,16 +367,11 @@ const HomePage: React.FC = () => {
           {/* ⚠️ เคยมี <CallFunnelPanel defaultSource="all" /> ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
               funnel การโทรอยู่หน้า Follow (ล็อกของหน้านั้น) และหน้า Matching (กดสลับต้นทางได้) */}
 
-          {/* ย้ายมาจากหน้า "งานโทร" ที่ถูกปิดไป (เจ้าของสั่ง 10 ส.ค. 2569)
-              — แผงอนุมัติชุดต้องมีที่ไป ไม่งั้นชุดที่รออนุมัติจะไม่มีใครกดได้เลย
-              ซ่อนให้เห็นเฉพาะ admin เท่าเดิม (หน้างานโทรเดิมก็ admin-only) ไม่ได้ผ่อนสิทธิ์
-              สิทธิ์จริงยังอยู่ที่ API เหมือนเดิม (supervisor/admin) */}
-          {hasPermission('admin') ? (
-            <>
-              <CallBatchPanel />
-              <CallStatusPanel />
-            </>
-          ) : null}
+          {/* ⚠️ แผงอนุมัติชุด (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+              **ย้ายไปหน้า Matching ไม่ได้ลบ** เพราะชุดที่รออนุมัติต้องมีที่ให้กด
+              ไม่งั้นจะค้างถาวร (ตอนนี้มีค้างจริงบนฐาน) · หน้า Matching คือที่ที่ชุดถูกสร้าง
+              จึงเป็นที่ที่ตรงกับงานที่สุด */}
+          {hasPermission('admin') ? <CallStatusPanel /> : null}
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

@@ -129,6 +129,28 @@ function sexLabel(code: string | null): string | null {
   return c;
 }
 
+/**
+ * สมัครมากี่วันแล้ว (เจ้าของสั่ง 10 ส.ค. 2569) — นับจาก `application_date` ของ iRecruit
+ * ⚠️ ตัดเวลาออกทั้งสองฝั่งก่อนลบ ไม่งั้น "สมัครเมื่อเช้า" กับ "เมื่อวานดึก" จะได้ 0 วันเท่ากัน
+ * คืน null เมื่อไม่มีวันที่/อ่านไม่ออก — หน้าเว็บจะไม่โชว์ป้าย ดีกว่าโชว์ "NaN วัน"
+ */
+function daysSinceApplied(iso: string | null): number | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.floor((startOf(new Date()) - startOf(d)) / 86_400_000);
+  return diff >= 0 ? diff : null;
+}
+
+/** ป้ายอายุใบสมัคร — ยิ่งนานยิ่งร้อน (เกณฑ์เดียวกับความรู้สึกของทีม: 7/30/90 วัน) */
+function appliedAgeTone(days: number): 'success' | 'info' | 'warn' | 'danger' {
+  if (days <= 7) return 'success';
+  if (days <= 30) return 'info';
+  if (days <= 90) return 'warn';
+  return 'danger';
+}
+
 function thaiDate(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -153,6 +175,8 @@ const OurPeoplePage: React.FC = () => {
   /** หน้าปัจจุบันของแต่ละถัง (คีย์ = bucket key) — ค้นหาเมื่อไหร่รีเซ็ตทุกถัง */
   const [pageByBucket, setPageByBucket] = useState<Record<string, number>>({});
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
+  /** เดือนที่กรองอยู่จากปฏิทินวันที่สมัคร (YYYY-MM) — null = ไม่กรอง */
+  const [activeMonth, setActiveMonth] = useState<string | null>(null);
   /** คนที่กดดูรายละเอียดอยู่ */
   const [detail, setDetail] = useState<BoardPerson | null>(null);
   /** ถังที่กดดูอยู่ — โชว์ทีละถัง (ค่าเริ่มจาก ?bucket= เช่น tile บน dashboard) */
@@ -171,17 +195,42 @@ const OurPeoplePage: React.FC = () => {
       .catch((e) => setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ'));
   }, []);
 
+  /**
+   * ปฏิทินจากวันที่สมัคร (เจ้าของสั่ง 10 ส.ค. 2569) — 12 เดือนล่าสุดที่มีคนสมัครจริง
+   * กดเดือน = กรองรายชื่อทุกถังเหลือเฉพาะคนที่สมัครเดือนนั้น · กดซ้ำ = ปลด
+   * แพตเทิร์นเดียวกับแท่งเดือนบน Dashboard (เดือนที่เลือกเข้ม เดือนอื่นหรี่)
+   */
+  const monthOptions = useMemo(() => {
+    const count = new Map<string, number>();
+    for (const p of people ?? []) {
+      const d = p.application_date ? new Date(p.application_date) : null;
+      if (!d || Number.isNaN(d.getTime())) continue;
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      count.set(ym, (count.get(ym) ?? 0) + 1);
+    }
+    return [...count.entries()]
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .slice(0, 12)
+      .reverse()
+      .map(([ym, n]) => ({ ym, n }));
+  }, [people]);
+  const maxMonth = Math.max(...monthOptions.map((m) => m.n), 0);
+
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const terms = q.split(/\s+/).filter(Boolean);
-    const filtered = (people ?? []).filter((p) =>
-      terms.length === 0 ? true : terms.every((t) => personBlob(p).includes(t)),
-    );
+    const filtered = (people ?? []).filter((p) => {
+      if (terms.length > 0 && !terms.every((t) => personBlob(p).includes(t))) return false;
+      if (!activeMonth) return true;
+      const d = p.application_date ? new Date(p.application_date) : null;
+      if (!d || Number.isNaN(d.getTime())) return false;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === activeMonth;
+    });
     return BUCKETS.map((b) => ({
       ...b,
       items: filtered.filter((p) => (p.column_label || '').trim().toLowerCase() === b.match),
     }));
-  }, [people, query]);
+  }, [people, query, activeMonth]);
 
   const setQueryAndResetPages = (q: string) => {
     setQuery(q);
@@ -210,6 +259,62 @@ const OurPeoplePage: React.FC = () => {
           <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
             <LoaderCircle className="h-4 w-4 animate-spin text-blue-500" aria-hidden /> กำลังโหลดรายชื่อ…
           </p>
+        ) : null}
+
+        {/* ปฏิทินวันที่สมัคร — กดเดือนเพื่อกรองรายชื่อทุกถัง (เจ้าของสั่ง 10 ส.ค. 2569)
+            แพตเทิร์นเดียวกับแท่งเดือนบน Dashboard: เดือนที่เลือกเข้ม เดือนอื่นหรี่ กดซ้ำเพื่อปลด */}
+        {people && monthOptions.length > 0 ? (
+          <div className={cn('rounded-2xl border p-3', DASH.card)}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className={DASH.eyebrow}>ปฏิทินวันที่สมัคร · 12 เดือนล่าสุด</p>
+              {activeMonth ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveMonth(null)}
+                  className={cn('text-[11px] font-semibold underline', TONE.info.value)}
+                >
+                  ล้างตัวกรองเดือน
+                </button>
+              ) : (
+                <p className={cn('text-[11px]', DASH.muted)}>กดเดือนเพื่อดูเฉพาะคนที่สมัครเดือนนั้น</p>
+              )}
+            </div>
+            <div className="mt-2 flex items-end gap-1.5">
+              {monthOptions.map((m) => {
+                const active = activeMonth === m.ym;
+                const [yy, mm] = m.ym.split('-');
+                return (
+                  <button
+                    key={m.ym}
+                    type="button"
+                    onClick={() => setActiveMonth(active ? null : m.ym)}
+                    aria-pressed={active}
+                    title={`${m.ym} · สมัคร ${m.n.toLocaleString('th-TH')} คน`}
+                    className="flex min-w-0 flex-1 flex-col items-center gap-1"
+                  >
+                    <span className="flex h-14 w-full items-end">
+                      <span
+                        className={cn(
+                          'w-full rounded-t-[5px] rounded-b-sm transition-all',
+                          active ? TONE.primary.dot : 'bg-slate-300 dark:bg-slate-600',
+                          activeMonth && !active && 'opacity-30',
+                        )}
+                        style={{ height: `${Math.max(8, Math.round((m.n / Math.max(maxMonth, 1)) * 100))}%` }}
+                      />
+                    </span>
+                    <span
+                      className={cn(
+                        'w-full truncate text-center text-[10px] tabular-nums',
+                        active ? cn('font-bold', TONE.primary.value) : DASH.muted,
+                      )}
+                    >
+                      {mm}/{yy.slice(2)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ) : null}
 
         {/* แท็บถัง — กดดูทีละถัง */}
@@ -315,6 +420,19 @@ const OurPeoplePage: React.FC = () => {
                               {p.skills || 'ไม่ระบุสกิล'}
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted-foreground">
+                              {/* สมัครมากี่วันแล้ว — ยิ่งนานยิ่งร้อน (เจ้าของสั่ง 10 ส.ค. 2569) */}
+                              {(() => {
+                                const d = daysSinceApplied(p.application_date);
+                                if (d == null) return null;
+                                return (
+                                  <span
+                                    className={cn('font-semibold', TONE[appliedAgeTone(d)].value)}
+                                    title={`วันที่สมัคร ${thaiDate(p.application_date) ?? '—'}`}
+                                  >
+                                    สมัครมา {d.toLocaleString('th-TH')} วัน
+                                  </span>
+                                );
+                              })()}
                               {p.area ? <span>{p.area}</span> : null}
                               {p.age ? <span>อายุ {p.age}</span> : null}
                               {p.required_salary ? (

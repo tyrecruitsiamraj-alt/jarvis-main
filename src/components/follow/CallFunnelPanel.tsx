@@ -128,11 +128,18 @@ export type CallFunnelPanelProps = {
    * ส่วนตัวที่กดสลับดูต้นทางอื่นได้ ให้ไปอยู่หน้าการไหลของงานแทน
    */
   lockSource?: boolean;
+  /**
+   * โชว์แผง "สถานะการโทรรายรอบ" ไหม — **เปิดเฉพาะหน้า Follow**
+   * (เจ้าของสั่ง 10 ส.ค. 2569 ให้เอาออกจากหน้า Matching · หน้านั้นดูภาพรวม funnel พอ
+   * รายรอบเป็นมุมของคนที่ตามงานทีละคนซึ่งเป็นงานของหน้า Follow)
+   */
+  showAttempts?: boolean;
 };
 
 const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   defaultSource = 'follow',
   lockSource = false,
+  showAttempts = false,
 }) => {
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
@@ -309,7 +316,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           คนที่โทรไปแล้ว 3 รอบจะอยู่ในแถวรอบ 3 อย่างเดียว ไม่ถูกนับซ้ำในรอบ 1-2
           (ฐานเก็บ `attempt_count` เป็นรอบล่าสุดต่อแถว ไม่ได้เก็บประวัติรายครั้ง)
           บรรทัดกำกับใต้แผงบอกเรื่องนี้ไว้ กันอ่านผิดว่าเป็นยอดสายต่อรอบ */}
-      {funnel.byAttempt && funnel.byAttempt.some((a) => a.total > 0) ? (
+      {showAttempts && funnel.byAttempt && funnel.byAttempt.some((a) => a.total > 0) ? (
         <div className={cn('rounded-2xl border p-3', DASH.card)}>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <p className={DASH.eyebrow}>สถานะการโทรรายรอบ</p>

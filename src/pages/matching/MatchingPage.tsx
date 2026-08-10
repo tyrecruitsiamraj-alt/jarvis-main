@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import SearchField from '@/components/shared/SearchField';
+import CallBatchPanel from '@/components/follow/CallBatchPanel';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -1912,6 +1913,11 @@ const MatchingPage: React.FC = () => {
             (ข้อมูลจริง: คนของเรา 5,280 + iRecruit 26 + Follow 1) แล้วกดสลับดูรายต้นทางได้
             หัวแผงบอกเสมอว่ากำลังดูต้นทางไหน จึงไม่ซ้ำรอย "เลขถูกแต่ตอบผิดคำถาม" */}
         <CallFunnelPanel defaultSource="all" />
+
+        {/* ชุดส่งงานโทรที่รออนุมัติ — ย้ายมาจากหน้าหลัก (เจ้าของสั่ง 10 ส.ค. 2569)
+            ที่นี่คือที่ที่ชุดถูกสร้าง (ปุ่ม "ตั้งชุดรออนุมัติ") จึงเป็นที่ที่ตรงกับงานที่สุด
+            แผงซ่อนตัวเองเมื่อไม่มีชุด · ยังจำกัดให้เห็นเฉพาะ admin เท่าเดิม ไม่ได้ผ่อนสิทธิ์ */}
+        {hasPermission('admin') ? <CallBatchPanel /> : null}
 
         {/* ตัวกรอง */}
         <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">

@@ -7,8 +7,14 @@ import type { DashboardKpi } from '@/lib/dashboard/types';
 type Props = {
   kpi: DashboardKpi;
   onClick?: () => void;
-  /** 0–100 = โชว์แถบสัดส่วนเทียบ "เข้ามา" ใต้ตัวเลข (mockup rev.3) · null/ไม่ส่ง = ไม่มีแถบ */
+  /** 0–100 = โชว์แถบสัดส่วนใต้ตัวเลข (mockup rev.3) · null/ไม่ส่ง = ไม่มีแถบ */
   progressPercent?: number | null;
+  /**
+   * ฐานที่แถบเทียบ — ใช้ทำป้ายกำกับให้ตรงความจริง
+   * KPI ด้านบนเทียบกับ "เข้ามา" ส่วนการ์ดสถานะทำงานเทียบกับ "ทุกสถานะรวมกัน"
+   * ถ้าไม่ส่ง จะขึ้นว่า "ของเข้ามา" ตามพฤติกรรมเดิม
+   */
+  progressBaseLabel?: string;
 };
 
 /**
@@ -36,7 +42,12 @@ const KPI_SOLID_IDS = new Set(['overdue']);
 const NEUTRAL_TILE = 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800';
 const NEUTRAL_NUM = 'text-slate-900 dark:text-slate-100';
 
-const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick, progressPercent = null }) => {
+const DashboardKpiCard: React.FC<Props> = ({
+  kpi,
+  onClick,
+  progressPercent = null,
+  progressBaseLabel = 'ของเข้ามา',
+}) => {
   const trend = kpi.trendPercent;
   const TrendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? ArrowUp : ArrowDown;
   const solid = KPI_SOLID_IDS.has(kpi.id);
@@ -90,16 +101,23 @@ const DashboardKpiCard: React.FC<Props> = ({ kpi, onClick, progressPercent = nul
         {kpi.description}
       </p>
       {progressPercent != null ? (
-        <div
-          className={cn('mt-2 h-[5px] overflow-hidden rounded-full', solid ? 'bg-white/25' : 'bg-slate-900/10 dark:bg-white/10')}
-          title={`${progressPercent}% ของเข้ามา`}
-          aria-hidden
-        >
-          <span
-            className={cn('block h-full rounded-full', solid ? 'bg-white/90' : (tone?.dot ?? 'bg-slate-400'))}
-            style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
-          />
-        </div>
+        <>
+          <div
+            className={cn('mt-2 h-[5px] overflow-hidden rounded-full', solid ? 'bg-white/25' : 'bg-slate-900/10 dark:bg-white/10')}
+            title={`${progressPercent}% ${progressBaseLabel}`}
+            aria-hidden
+          >
+            <span
+              className={cn('block h-full rounded-full', solid ? 'bg-white/90' : (tone?.dot ?? 'bg-slate-400'))}
+              style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+            />
+          </div>
+          {/* เขียน % ออกมาเป็นตัวหนังสือด้วย — แถบอย่างเดียวบอกได้แค่ "มาก/น้อย"
+              พอมีเลขกำกับถึงจะเทียบข้ามการ์ดได้จริง (เจ้าของติงว่า "ไม่เป็น visual control เลย") */}
+          <p className={cn('mt-1 text-[10px] tabular-nums', solid ? 'text-white/70' : 'text-slate-500 dark:text-slate-400')}>
+            {progressPercent}% {progressBaseLabel}
+          </p>
+        </>
       ) : null}
       {trend != null ? (
         <div className={cn('mt-2 flex items-center gap-1 text-xs font-medium', trendColor)}>

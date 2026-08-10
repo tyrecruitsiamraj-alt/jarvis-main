@@ -239,15 +239,25 @@ const DashboardShell: React.FC<Props> = ({
                   <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา) — กดเพื่อกรอง</p>
                   {/* ใช้การ์ดทรงเดียวกับ "สรุปอัตราในช่วงที่เลือก" ตามที่เจ้าของสั่ง — กวาดตาอ่านง่ายกว่าชิป
                       ครบทุกสถานะเท่าเดิม (ตัวเลข 0 ก็ยังอยู่ ไม่ซ่อน) · กดแล้วเปิดลิสต์ใบขอสถานะนั้นเหมือนเดิม */}
-                  {/* เจ้าของสั่ง 10 ส.ค. 2569: "แถวละ 5 จะได้พอดีกัน" */}
+                  {/* เจ้าของสั่ง 10 ส.ค. 2569: "แถวละ 5 จะได้พอดีกัน" และ "ไม่เป็น visual control เลย"
+                      → ใส่แถบสัดส่วนเทียบยอดรวมของทุกสถานะ ทำให้กวาดตาแล้วเห็นทันทีว่าอัตรา
+                      ไปกองอยู่สถานะไหน ไม่ต้องอ่านเลขทีละใบแล้วเทียบในหัวเอง
+                      (การ์ดตัวเดียวกับ KPI ด้านบนอยู่แล้ว — มันรองรับ `progressPercent` มาแต่แรก
+                      แค่ไม่เคยถูกส่งค่าให้) */}
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                    {(data.workStatusKpis ?? []).map((kpi) => (
-                      <DashboardKpiCard
-                        key={kpi.id}
-                        kpi={kpi}
-                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
-                      />
-                    ))}
+                    {(() => {
+                      const list = data.workStatusKpis ?? [];
+                      const total = list.reduce((sum, k) => sum + (k.value || 0), 0);
+                      return list.map((kpi) => (
+                        <DashboardKpiCard
+                          key={kpi.id}
+                          kpi={kpi}
+                          progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
+                          progressBaseLabel="ของทุกสถานะ"
+                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                        />
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>
