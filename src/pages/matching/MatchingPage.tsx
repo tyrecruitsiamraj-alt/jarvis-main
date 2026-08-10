@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -1891,6 +1892,13 @@ const MatchingPage: React.FC = () => {
     <div>
       <PageHeader title="Matching — คนของเรา" subtitle="เปิดใบขอ แล้วหาคนที่ผ่านสัมภาษณ์รอลงงานที่สกิลตรง" backPath="/matching" />
       <div className="px-4 md:px-6 space-y-4">
+        {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)
+            ใช้คอมโพเนนต์ตัวเดียวกับหน้า Follow ตัวเลข/นิยาม/โทนสีจึงมาจากที่เดียวกัน
+            เริ่มที่ "ทั้งระบบ" เพราะงานโทรเกือบทั้งหมดออกจากหน้านี้อยู่แล้ว
+            (ข้อมูลจริง: คนของเรา 5,280 + iRecruit 26 + Follow 1) แล้วกดสลับดูรายต้นทางได้
+            หัวแผงบอกเสมอว่ากำลังดูต้นทางไหน จึงไม่ซ้ำรอย "เลขถูกแต่ตอบผิดคำถาม" */}
+        <CallFunnelPanel defaultSource="all" />
+
         {/* ตัวกรอง */}
         <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
           {/* จอมือถือ: ช่องค้นหาต้องหดได้จริง (`min-w-0`) ไม่งั้น input ดันความกว้างขั้นต่ำ

@@ -87,6 +87,21 @@ const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> 
   { id: 'all', label: 'ทั้งระบบ', hint: 'รวมทุกต้นทาง' },
 ];
 
+/**
+ * โครงคอลัมน์ของแถบ funnel — **หลักการเดียวกับ FLOW_ROW_GRID ในหน้าหลัก**
+ * (เจ้าของสั่ง 10 ส.ค. 2569: "ทำ Tone ให้เหมือนกับหน้าหลัก")
+ *
+ * 7 ช่องการ์ด `minmax(0,1fr)` กว้างเท่ากันเป๊ะ สลับกับช่องลูกศร `auto` 4 ช่อง
+ * เดิมเป็น flex ล้วน ซึ่งแบ่งความกว้างตามเนื้อหาแต่ละใบ การ์ดจึงกว้างไม่เท่ากัน
+ * และดูคนละจังหวะกับ funnel หน้าหลักทั้งที่เป็นของชุดเดียวกัน
+ *
+ * สังเกต: สนใจ / ไม่สนใจ / ไม่รับ อยู่ติดกันโดยไม่มีลูกศรคั่น เพราะเป็น
+ * **ผลลัพธ์คู่ขนานของขั้น "มีผลจริง"** ไม่ใช่ขั้นที่ต่อจากกัน
+ */
+const FUNNEL_ROW_GRID =
+  'mt-3 flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
+  'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)]';
+
 const Arrow = () => (
   <div className="flex items-center justify-center text-slate-500">
     <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
@@ -197,7 +212,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
       >
         {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → จบยังไง → ตกถังคน
             "มีผลจริง" หักสายที่คนกดยกเลิกออกแล้ว (นิยามเดียวกับอัตราด้านล่าง) */}
-        <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
+        <div className={FUNNEL_ROW_GRID}>
           <FlowStage label="ส่งให้ Lumos" value={funnel.queued} sub="ทั้งหมดที่เข้าคิว" tone="neutral" />
           <Arrow />
           <FlowStage
