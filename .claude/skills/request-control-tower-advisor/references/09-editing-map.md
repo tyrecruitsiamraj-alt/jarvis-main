@@ -467,6 +467,32 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ⚠️ เทสต์ `callFollowup.test.ts` นับลำดับคิวรีด้วย `sqlOf(i)` จึง mock store ให้คืน
 ค่าเริ่มต้นคงที่ — พฤติกรรม store จริงมีเทสต์แยกของตัวเอง
 
+### แถบตัวเลขการโทร "ต่อใบขอ" (ข้างการ์ดในหน้า Matching)
+
+* `api/_lib/lumosDispatch.ts` → `loadLumosJobCallSummaryMap()` — คิวรีเดียว group by `job_ref`
+  · `api/_lib/callBatchStore.ts` → `countPendingApprovalByJob()` — ชุดที่ยังไม่ปล่อย (คนละตาราง)
+* `src/components/matching/LumosPanels.tsx` → `LumosJobSummaryStats` (9 ช่อง)
+  · `src/lib/matchingCardAction.ts` → ชิป "ทำต่อเลย" · `tests/api/lumosJobCallSummary.test.ts` (10 เคส)
+
+ลำดับช่องตามที่งานเดินจริง: **รออนุมัติ → ส่ง → โทรแล้ว → เหลือ → โอเค / ไม่ไป / ไม่รับ /
+ขอเลื่อน / ต้องคนตาม** · สามช่อง (รออนุมัติ · ขอเลื่อน · ต้องคนตาม) **โผล่เฉพาะตอนมีค่า**
+ไม่งั้นแทบทุกใบจะได้แถบที่เป็น 0 อยู่ 3 ช่อง กวาดตาแล้วหาของจริงไม่เจอ
+
+⚠️ **อ่าน outcome ด้วย `coalesce(last_outcome, result->>'outcome')`** — กับดักเดียวกับ funnel
+หน้า Follow แต่ตรงนี้เคยตกหล่น: ผลที่ **คน** บันทึกเขียนแค่ `last_outcome` ไม่ได้เขียน `result`
+และตอนตั้งโทรซ้ำก็ **ล้าง `result` ทิ้ง** → อ่าน `result` อย่างเดียวจะนับหายแบบเงียบ ๆ
+
+⚠️ **จุดกรองใน `api/_handlers/matching-list.ts` ต้องเช็ค `pendingApproval` ด้วย**
+เดิมเป็น `entry.sent > 0` อย่างเดียว ใบที่เพิ่งตั้งชุดรออนุมัติ (`sent` = 0) จะไม่ขึ้นแถบเลย
+ทั้งที่มีคนรอให้กดอนุมัติ — และ `loadLumosJobCallSummaryMap()` ก็ต้อง**เติมแถวให้ใบที่มีแต่ชุด
+ยังไม่เคยเข้าคิว** ด้วย (สองจุดนี้ต้องแก้คู่กันเสมอ ไม่งั้นเลขหายเหมือนเดิม)
+
+⚠️ `job_id` ของชุด กับ `job_ref` ของคิว เป็นรหัสชุดเดียวกัน (`siamraj-sql:XXX`) — ตรวจกับฐานจริงแล้ว
+ถ้าวันไหนสองฝั่งใช้รูปแบบต่างกัน เลข "รออนุมัติ" จะเงียบ ๆ เป็น 0 ทุกใบ
+
+⚠️ อ่านตารางชุดล้มด้วยเหตุที่ไม่ใช่ 42P01 **ต้องโยนต่อ ห้ามกลืนเป็น 0** — 0 ที่แปลว่า
+"เช็คไม่ได้" อันตรายกว่าไม่มีตัวเลข (มีเทสต์คุม + mutation test แล้ว 10/10)
+
 ### หน้า Follow — funnel การโทร + ถัง "ต้องคนตาม"
 
 * `api/_handlers/lumos-call-funnel.ts` — `GET /api/lumos/call-funnel` (rbac `follow`)

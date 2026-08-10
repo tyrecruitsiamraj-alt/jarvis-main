@@ -154,16 +154,34 @@ export function irecruitPersonRef(id: number): string {
 
 /** สรุปผลโทรต่อใบขอ — รูปเดียวกับ lumosSummary จาก /api/matching/list */
 export type LumosJobCallSummaryRow = {
+  /** ยังไม่ได้โทรเพราะติดขั้นอนุมัติ (รอกด + อนุมัติแล้วแต่ยังอยู่ในช่วงถอนคำ) */
+  pendingApproval: number;
   sent: number;
   called: number;
   confirmed: number;
   declined: number;
   no_answer: number;
+  /** ผู้สมัครขอให้โทรกลับ — นัดใหม่ไว้แล้ว */
+  reschedule: number;
+  /** AI เอาไม่อยู่แล้ว ต้องให้คนตาม */
+  needsHuman: number;
 };
 
 /** รวมสถานะรายคน (ที่โหลดในหน้า detail) เป็นเลขสรุปแบบเดียวกับข้างการ์ด */
 export function summarizeLumosCallStatus(items: LumosCallStatus[]): LumosJobCallSummaryRow {
-  const s: LumosJobCallSummaryRow = { sent: 0, called: 0, confirmed: 0, declined: 0, no_answer: 0 };
+  // ⚠️ `pendingApproval` / `needsHuman` คิดจากตัวนี้ไม่ได้ — อยู่คนละตาราง (ชุดส่ง)
+  // และคนละคอลัมน์ (followup_state) ที่ endpoint รายคนไม่ได้ส่งมา จึงคง 0 ไว้
+  // ตัวเลขจริงของสองช่องนี้มาจาก /api/matching/list เท่านั้น
+  const s: LumosJobCallSummaryRow = {
+    pendingApproval: 0,
+    sent: 0,
+    called: 0,
+    confirmed: 0,
+    declined: 0,
+    no_answer: 0,
+    reschedule: 0,
+    needsHuman: 0,
+  };
   for (const it of items) {
     if (it.status !== 'cancelled') s.sent += 1;
     const outcome = (it.outcome || '').trim().toLowerCase();
@@ -171,6 +189,7 @@ export function summarizeLumosCallStatus(items: LumosCallStatus[]): LumosJobCall
     if (outcome === 'confirmed') s.confirmed += 1;
     if (outcome === 'declined') s.declined += 1;
     if (outcome === 'no_answer' || outcome === 'unresponsive') s.no_answer += 1;
+    if (outcome === 'reschedule_requested') s.reschedule += 1;
   }
   return s;
 }

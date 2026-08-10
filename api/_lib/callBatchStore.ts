@@ -177,6 +177,34 @@ export async function listCallBatches(limit = 50): Promise<CallBatch[]> {
   }
 }
 
+/**
+ * นับ "คนที่ยังไม่ถูกโทรเพราะติดขั้นอนุมัติ" ต่อใบขอ — ใช้โชว์ข้างการ์ดในลิสต์ Matching
+ *
+ * นับทั้ง `pending_approval` (รอคนกด) และ `approved` (อนุมัติแล้วแต่ยังไม่พ้นช่วงถอนคำ)
+ * เพราะจากมุมคนดูการ์ด ทั้งสองสถานะแปลว่า "ยังไม่ได้โทร" เหมือนกัน
+ * · ไม่นับคนที่ถูกถอนออกจากชุดแล้ว (`removed_at`)
+ *
+ * ⚠️ `job_id` ของชุด กับ `job_ref` ของคิว เป็นรหัสชุดเดียวกัน (`siamraj-sql:XXX`)
+ * ตรวจกับฐานจริงแล้ว 10 ส.ค. 2569 — ถ้าวันไหนสองฝั่งใช้รูปแบบต่างกัน ตัวเลขนี้จะเงียบ ๆ เป็น 0
+ */
+export async function countPendingApprovalByJob(): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const { rows } = await dbQuery<{ job_id: string; n: string }>(
+      `select b.job_id, count(*) as n
+         from ${batchTable} b
+         join ${itemTable} i on i.batch_id = b.id
+        where b.status in ('pending_approval', 'approved') and i.removed_at is null
+        group by b.job_id`,
+    );
+    for (const r of rows) map.set(r.job_id, Number(r.n) || 0);
+    return map;
+  } catch (e) {
+    if (isPgUndefinedTable(e)) return map;
+    throw e;
+  }
+}
+
 /** อนุมัติ — ตั้งเวลาปล่อยไว้ข้างหน้าเพื่อให้ยังถอนคำได้ */
 export async function approveCallBatch(
   id: string,

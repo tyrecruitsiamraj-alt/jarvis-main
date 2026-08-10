@@ -176,11 +176,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
     }
 
-    // สรุปผลโทร Lumos ต่อใบในหน้านี้: ส่งโทร/โทรแล้ว/สนใจ/ไม่สนใจ/ไม่รับสาย
+    // สรุปผลโทร Lumos ต่อใบในหน้านี้: รออนุมัติ/ส่งโทร/โทรแล้ว/สนใจ/ไม่สนใจ/ไม่รับสาย/ขอเลื่อน/ต้องคนตาม
+    // ⚠️ เงื่อนไขต้องรวม `pendingApproval` ด้วย ไม่ใช่ `sent > 0` อย่างเดียว —
+    // ใบที่เพิ่งตั้งชุดรออนุมัติยังไม่เคยเข้าคิว `sent` เป็น 0 ถ้ากรองด้วย sent อย่างเดียว
+    // แถบตัวเลขจะไม่ขึ้นเลยทั้งที่มีคนรอให้กดอนุมัติอยู่ (เจอตอนตรวจกับฐานจริง 10 ส.ค. 2569)
     const lumosSummary: Record<string, LumosJobCallSummary> = {};
     for (const j of items) {
       const entry = lumosMap.get(j.id);
-      if (entry && entry.sent > 0) lumosSummary[j.id] = entry;
+      if (entry && (entry.sent > 0 || entry.pendingApproval > 0)) lumosSummary[j.id] = entry;
     }
 
     res.setHeader?.('Cache-Control', 'no-store');

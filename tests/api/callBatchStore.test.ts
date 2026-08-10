@@ -25,6 +25,7 @@ const {
   approveCallBatch,
   cancelCallBatch,
   claimDueCallBatches,
+  countPendingApprovalByJob,
   createCallBatch,
   getCallBatch,
   listCallBatches,
@@ -224,6 +225,29 @@ describe('removeCallBatchItem — ถอนคนออกจากชุด', (
   it('ไม่มีแถวไหนเข้าเงื่อนไข → false (หน้าเว็บต้องได้รู้ว่าถอนไม่สำเร็จ)', async () => {
     mockDb({ removeRows: [] });
     expect(await removeCallBatchItem('b-1', 'i-9', 'ตั้ม')).toBe(false);
+  });
+});
+
+describe('countPendingApprovalByJob — เลข "รออนุมัติ" ข้างการ์ดใบขอ', () => {
+  it('นับทั้งรอกดและอนุมัติแล้วแต่ยังไม่ปล่อย + ไม่นับคนที่ถูกถอนออก', async () => {
+    mockDb({ batchRows: [{ job_id: 'siamraj-sql:DS1', n: '4' }] });
+    const map = await countPendingApprovalByJob();
+    const sql = callMatching(/from\s+lumos_call_batches/i)![0] as string;
+    // อนุมัติแล้วแต่ยังอยู่ในช่วงถอนคำ = ยังไม่ได้โทร ต้องนับด้วย
+    expect(sql).toMatch(/status in \('pending_approval', 'approved'\)/i);
+    // ถอนคนออกแล้วยังนับอยู่ = เลขบนการ์ดบอกว่ามีคนรอโทรทั้งที่ไม่มี
+    expect(sql).toMatch(/i\.removed_at is null/i);
+    expect(map.get('siamraj-sql:DS1')).toBe(4);
+  });
+
+  it('ตารางยังไม่ migrate → คืน map ว่าง ไม่ล้ม', async () => {
+    vi.mocked(dbQuery).mockRejectedValue(undefinedTable);
+    expect((await countPendingApprovalByJob()).size).toBe(0);
+  });
+
+  it('DB ล้มด้วยเหตุอื่น → โยนต่อ', async () => {
+    vi.mocked(dbQuery).mockRejectedValue(otherDbError);
+    await expect(countPendingApprovalByJob()).rejects.toThrow('connection lost');
   });
 });
 

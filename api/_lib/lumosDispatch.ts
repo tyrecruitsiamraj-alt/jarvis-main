@@ -20,7 +20,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { logInfo, logError } from './logger.js';
 import { applyCallFollowupToQueueRow, listSuppressedPhones } from './callFollowup.js';
-import { releaseDueCallBatches } from './callBatchStore.js';
+import { countPendingApprovalByJob, releaseDueCallBatches } from './callBatchStore.js';
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
@@ -430,6 +430,8 @@ export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCal
 // ─── สรุปผลโทรต่อใบขอ (โชว์ข้างการ์ดในลิสต์ Matching) ────────────────────────
 
 export type LumosJobCallSummary = {
+  /** ยังไม่ได้โทรเพราะติดขั้นอนุมัติ (รอกด + อนุมัติแล้วแต่ยังอยู่ในช่วงถอนคำ) */
+  pendingApproval: number;
   /** ส่งเข้าคิวแล้ว (ไม่นับที่ถูกยกเลิก) */
   sent: number;
   /** มีผลโทรกลับมาจริง (ไม่นับที่ Lumos ยกเลิกสายเอง) */
@@ -437,6 +439,10 @@ export type LumosJobCallSummary = {
   confirmed: number;
   declined: number;
   no_answer: number;
+  /** ผู้สมัครขอให้โทรกลับ — นัดใหม่ไว้แล้ว */
+  reschedule: number;
+  /** AI เอาไม่อยู่แล้ว ต้องให้คนตาม */
+  needsHuman: number;
 };
 
 type JobSummarySqlRow = {
@@ -446,32 +452,110 @@ type JobSummarySqlRow = {
   confirmed: string;
   declined: string;
   no_answer: string;
+  reschedule: string;
+  needs_human: string;
 };
+
+/**
+ * ⚠️ **อ่าน outcome ด้วย `coalesce(last_outcome, result->>'outcome')`**
+ *
+ * ผลที่ **คน** บันทึก (`applyHumanCallFollowup`) เขียนแค่ `last_outcome`/`followup_state`
+ * ไม่ได้เขียน `result` · และตอนตั้งโทรซ้ำก็ **ล้าง `result` ทิ้ง** (`result = null`)
+ * เดิมคิวรีนี้อ่าน `result->>'outcome'` อย่างเดียว ผลจากคนกับผลของรอบก่อนโทรซ้ำ
+ * จึงหายไปจากตัวเลขข้างการ์ดแบบเงียบ ๆ (funnel หน้า Follow แก้ไปแล้ว ที่นี่ตกหล่น)
+ *
+ * ตรวจกับฐานจริง 10 ส.ค. 2569: ตอนนี้สองสูตรให้เลขเท่ากันเป๊ะ (ยังไม่มีผลที่คนบันทึก)
+ * = เปลี่ยนแล้วตัวเลขวันนี้ไม่ขยับ แต่กันไม่ให้หายตอนเริ่มมีคนบันทึกผลเอง
+ */
+const JOB_SUMMARY_SQL = `
+  select job_ref,
+         count(*) filter (where status <> 'cancelled')                          as sent,
+         count(*) filter (where oc is not null and oc <> 'cancelled')           as called,
+         count(*) filter (where oc = 'confirmed')                               as confirmed,
+         count(*) filter (where oc = 'declined')                                as declined,
+         count(*) filter (where oc in ('no_answer', 'unresponsive'))            as no_answer,
+         count(*) filter (where oc = 'reschedule_requested')                    as reschedule,
+         count(*) filter (where followup_state = 'needs_human')                 as needs_human
+    from (
+      select job_ref, status, followup_state,
+             coalesce(last_outcome, result->>'outcome') as oc
+        from {{queue}}
+       where job_ref <> 'follow'
+    ) t
+   group by job_ref`;
+
+/** สูตรเดิมสำหรับกรณีที่ยังไม่ได้รัน migration 070 (ไม่มีคอลัมน์ last_outcome/followup_state) */
+const JOB_SUMMARY_SQL_LEGACY = `
+  select job_ref,
+         count(*) filter (where status <> 'cancelled')                                as sent,
+         count(*) filter (where result is not null
+                            and coalesce(result->>'outcome', '') <> 'cancelled')      as called,
+         count(*) filter (where result->>'outcome' = 'confirmed')                     as confirmed,
+         count(*) filter (where result->>'outcome' = 'declined')                      as declined,
+         count(*) filter (where result->>'outcome' in ('no_answer', 'unresponsive'))  as no_answer,
+         0 as reschedule,
+         0 as needs_human
+    from {{queue}}
+   where job_ref <> 'follow'
+   group by job_ref`;
+
+/** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 070 */
+function isUndefinedColumn(e: unknown): boolean {
+  return (
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703'
+  );
+}
 
 /** รวมผลคิว Lumos ต่อใบขอในคำสั่งเดียว — เฉพาะเส้นใบขอ (ไม่รวมหน้า Follow) */
 export async function loadLumosJobCallSummaryMap(): Promise<Map<string, LumosJobCallSummary>> {
   const map = new Map<string, LumosJobCallSummary>();
-  const { rows } = await dbQuery<JobSummarySqlRow>(
-    `select job_ref,
-            count(*) filter (where status <> 'cancelled')                                        as sent,
-            count(*) filter (where result is not null
-                               and coalesce(result->>'outcome', '') <> 'cancelled')             as called,
-            count(*) filter (where result->>'outcome' = 'confirmed')                            as confirmed,
-            count(*) filter (where result->>'outcome' = 'declined')                             as declined,
-            count(*) filter (where result->>'outcome' in ('no_answer', 'unresponsive'))         as no_answer
-       from ${queueTable}
-      where job_ref <> 'follow'
-      group by job_ref`,
-  );
+
+  let rows: JobSummarySqlRow[];
+  try {
+    ({ rows } = await dbQuery<JobSummarySqlRow>(JOB_SUMMARY_SQL.replace('{{queue}}', queueTable)));
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    ({ rows } = await dbQuery<JobSummarySqlRow>(
+      JOB_SUMMARY_SQL_LEGACY.replace('{{queue}}', queueTable),
+    ));
+  }
+
+  // ชุดที่ยังไม่ถูกปล่อย — คนละตารางกัน จึงต้องอ่านแยกแล้วมาต่อกัน
+  // ⚠️ **ห้ามครอบ .catch() ตรงนี้** — ตารางยังไม่ migrate ถูกกลืนไปแล้วข้างใน (คืน map ว่าง)
+  // ที่เหลือคือ DB ล้มจริง ซึ่งถ้ากลืนจะได้การ์ดที่เขียนว่า "รออนุมัติ 0" ทั้งที่แปลว่า
+  // "เช็คไม่ได้" — โกหกในทางที่อันตราย (คนอ่านจะคิดว่าไม่มีใครรอให้กดอนุมัติ)
+  // ตรงกับกติกาเดียวกับ callFollowupPolicyStore: กลืนเฉพาะ 42P01 ที่เหลือโยนต่อ
+  const pending = await countPendingApprovalByJob();
+
   for (const r of rows) {
     map.set(r.job_ref, {
+      pendingApproval: pending.get(r.job_ref) ?? 0,
       sent: Number(r.sent) || 0,
       called: Number(r.called) || 0,
       confirmed: Number(r.confirmed) || 0,
       declined: Number(r.declined) || 0,
       no_answer: Number(r.no_answer) || 0,
+      reschedule: Number(r.reschedule) || 0,
+      needsHuman: Number(r.needs_human) || 0,
     });
   }
+
+  // ใบที่ "มีแต่ชุดรออนุมัติ ยังไม่เคยเข้าคิวเลย" ไม่มีแถวใน queue — ต้องเติมเอง
+  // ไม่งั้นการ์ดใบนั้นจะว่างเปล่าทั้งที่มีคนรอให้กดอนุมัติอยู่
+  for (const [jobRef, n] of pending) {
+    if (map.has(jobRef) || n <= 0) continue;
+    map.set(jobRef, {
+      pendingApproval: n,
+      sent: 0,
+      called: 0,
+      confirmed: 0,
+      declined: 0,
+      no_answer: 0,
+      reschedule: 0,
+      needsHuman: 0,
+    });
+  }
+
   return map;
 }
 
