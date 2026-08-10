@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import type { LifecycleBoardSummary, LifecycleBoardRow } from '@/lib/dashboard/lifecycle';
 import { LIFECYCLE_KIND_LABELS } from '@/lib/dashboard/lifecycle';
 import { cn } from '@/lib/utils';
-import { DASH } from '@/lib/designTokens';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CHART, DASH, TONE } from '@/lib/designTokens';
 
 type Props = {
   board: LifecycleBoardSummary;
@@ -97,6 +98,37 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
     };
   }, [board, showOther]);
 
+  /**
+   * กราฟเทียบประเภทใบขอ (เจ้าของสั่ง 10 ส.ค. 2569: "ทำเป็นกราฟเพื่อเปรียบเทียบที")
+   *
+   * แท่งกลุ่มละประเภท × 4 ขั้นของวงจร — เทียบด้วยตาได้ทันทีว่าประเภทไหนเข้ามาเยอะ
+   * ปิดได้เยอะ หรือค้างเยอะ ซึ่งอ่านจากตารางตัวเลขล้วนต้องไล่ทีละช่อง
+   *
+   * ⚠️ **ตารางเดิมยังอยู่ครบใต้กราฟ** ตามกติกา mockup ข้อ 02 (ข้อมูลครบทุกแผง ไม่มีตัวไหนหาย)
+   * กราฟใช้หน่วย "อัตรา" ตัวเดียว ไม่ผสมจำนวนใบ — ตารางมีทั้งสองอยู่แล้ว
+   * สีของแต่ละขั้นมาจาก token กลาง (`TONE.*.hex`) ไม่ประกาศสีสดใหม่ในไฟล์หน้า
+   */
+  const chartData = useMemo(
+    () =>
+      cols
+        .filter((c) => c.key !== 'total')
+        .map((c) => {
+          const pick = (id: LifecycleBoardRow['id']) =>
+            board.rows.find((r) => r.id === id)?.[c.key]?.positions ?? 0;
+          return {
+            ประเภท: c.label,
+            เข้ามา: pick('requested'),
+            ปิดแล้ว: pick('filled'),
+            ยกเลิก: pick('cancelled'),
+            คงเหลือ: pick('remaining'),
+          };
+        }),
+    [board.rows, cols],
+  );
+  const chartHasData = chartData.some(
+    (d) => d.เข้ามา > 0 || d.ปิดแล้ว > 0 || d.ยกเลิก > 0 || d.คงเหลือ > 0,
+  );
+
   return (
     <div className={cn(DASH.card, 'p-4')}>
       <div className="mb-3 space-y-2">
@@ -132,6 +164,34 @@ const DashboardLifecycleBoard: React.FC<Props> = ({ board, periodLabel }) => {
           </div>
         ) : null}
       </div>
+
+      {chartHasData ? (
+        <div className="mb-4 h-64 w-full text-slate-500 dark:text-slate-400">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke={CHART.gridStroke}
+                strokeOpacity={CHART.gridOpacity}
+                vertical={false}
+              />
+              <XAxis dataKey="ประเภท" tick={{ fontSize: 11, fill: CHART.axisFill }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: CHART.axisFill }} tickLine={false} axisLine={false} width={48} />
+              <Tooltip
+                contentStyle={CHART.tooltip.contentStyle}
+                labelStyle={CHART.tooltip.labelStyle}
+                itemStyle={{ fontSize: 12 }}
+                formatter={(v: number) => [`${fmt(v)} อัตรา`, '']}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
+              <Bar dataKey="เข้ามา" fill={TONE.info.hex} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ปิดแล้ว" fill={TONE.success.hex} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ยกเลิก" fill={TONE.danger.hex} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="คงเหลือ" fill={TONE.warn.hex} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto -mx-1">
         <table className="w-full min-w-[40rem] text-xs border-collapse">
