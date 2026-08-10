@@ -26,8 +26,6 @@ import {
   type FlowSummary,
   type FlowFollowUpItem,
 } from '@/lib/flowSummaryApi';
-import { fetchCallFunnel, type CallFunnel } from '@/lib/callFunnelApi';
-import { conversionRates, resolvedCallBase } from '@/lib/callFunnelMath';
 
 
 /**
@@ -144,10 +142,6 @@ const HomePage: React.FC = () => {
   // กดชื่อคนในการ์ดติดตาม → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
   const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
 
-  // การไหลของการโทร — แถบที่สองใต้การไหลของงาน (ตัวเลขชุดเดียวกับหน้า Follow เป๊ะ
-  // เพราะใช้ API + นิยามฐานจาก callFunnelMath ตัวเดียวกัน) · โหลดไม่ได้ = ซ่อนแถบ ไม่พังหน้า
-  const [callFunnel, setCallFunnel] = useState<CallFunnel | null>(null);
-
   const loadFlow = async () => {
     setFlowLoading(true);
     try {
@@ -156,11 +150,6 @@ const HomePage: React.FC = () => {
       setFlow(null);
     } finally {
       setFlowLoading(false);
-    }
-    try {
-      setCallFunnel((await fetchCallFunnel()).funnel);
-    } catch {
-      setCallFunnel(null);
     }
   };
 
@@ -202,7 +191,9 @@ const HomePage: React.FC = () => {
           className="mb-8 space-y-3"
         >
           {/* Funnel อยู่ใน hero เข้มตาม mockup rev.3 ข้อ 01 — เข้าระบบมาเจอการไหลของงานก่อนทุกอย่าง
-              5 ขั้นหลัก + เส้นแยก "ไม่มีคนแนะนำ" อยู่ในแถวเดียวกัน (กดตัวเลขไปหน้านั้นได้เหมือนเดิม) */}
+              เจ้าของสั่ง 10 ส.ค. 2569: แยก 2 บรรทัด — แถวบนคือเส้นที่ "มีคนแนะนำ" เดินต่อได้
+              แถวล่างคือใบที่ AI ไม่พบคน ซึ่งไม่ได้เดินต่อในเส้นนี้ แต่โยงไป Content/Scraping
+              (เดิมทั้งหมดอยู่แถวเดียว เส้นแยกเลยจมหาย อ่านผิดว่า Content ต่อจาก "จองตัว/ลงงาน") */}
           {/* ไม่ติดป้าย "เดือนนี้" ทั้งแถบ — ตัวเลขปนกันสองแบบ (ของค้างนับทั้งหมด ·
               การเคลื่อนไหวนับเดือนนี้) ป้ายรวมจะโกหกครึ่งนึงเสมอ ให้บรรทัดท้ายอธิบายแทน */}
           <PageHeroStrip
@@ -281,14 +272,26 @@ const HomePage: React.FC = () => {
                 onClick={() => navigate('/matching/reservations')}
               />
 
-              {/* แยกเส้น ไม่ใช่ขั้นที่ 6 — ใบที่ AI หาคนของเราไม่ได้ ถูกส่งต่อทีมอื่นแทน
-                  ป้ายกำกับไว้กันอ่านผิดว่าต่อจาก "จองตัว/ลงงาน" */}
-              <div className="flex items-center justify-center gap-1.5 px-1">
-                <span className="hidden h-8 w-px bg-white/20 sm:block" aria-hidden />
+            </div>
+
+            {/* บรรทัดที่ 2 — ใบที่ AI ไม่พบคนของเรา ไม่ได้ไปต่อในเส้นบน แต่ถูกส่งต่อทีมอื่น
+                เยื้องเข้ามาให้เห็นว่าแตกออกจาก "AI แนะนำคนแล้ว" ไม่ใช่ต่อจากขั้นสุดท้าย */}
+            <div className="mt-2 flex flex-col gap-1.5 border-t border-white/10 pt-2 sm:flex-row sm:flex-wrap sm:items-stretch">
+              <div className="flex items-center gap-2 px-1 sm:min-w-[150px]">
                 <span className="text-[10px] font-medium leading-tight text-[#c9b184]">
-                  ไม่มีคน
-                  <br className="hidden sm:block" /> แนะนำ →
+                  ไม่มีคนแนะนำ <span aria-hidden>→</span>
                 </span>
+              </div>
+              <FlowStage
+                label="ยังไม่มีคน"
+                value={Math.max(flow.jobs.analyzed - flow.jobs.with_recommend, 0)}
+                sub="AI ประเมินแล้วไม่พบคนของเรา"
+                tone="danger"
+                onClick={() => navigate('/matching/match?workflow=none')}
+              />
+              <div className="flex items-center justify-center text-slate-500">
+                <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+                <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
               <FlowStage
                 label="ส่งคิด Content"
@@ -305,89 +308,12 @@ const HomePage: React.FC = () => {
                 onClick={() => navigate('/matching/job-postings')}
               />
             </div>
+
             <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
               ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด · เป็นสถานะการทำงานของทีม Matching ไม่ใช่ยอด
               "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ
             </p>
           </PageHeroStrip>
-
-          {/* การไหลของการโทร — เจ้าของขอให้โผล่หน้าหลักด้วย ในกล่องแบบเดียวกับการไหลของงาน
-              เลขทุกช่องตรงกับหน้า Follow (API + นิยามฐานเดียวกัน) · กดช่องไหนก็ไป /follow */}
-          {callFunnel ? (
-            <PageHeroStrip eyebrow="การไหลของการโทร · ทั้งหมด">
-              <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
-                <FlowStage
-                  label="ส่งให้ Lumos"
-                  value={callFunnel.queued}
-                  sub="ทั้งหมดที่เข้าคิว"
-                  tone="neutral"
-                  onClick={() => navigate('/follow')}
-                />
-                <div className="flex items-center justify-center text-slate-500">
-                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
-                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
-                </div>
-                <FlowStage
-                  label="รอโทร"
-                  value={callFunnel.waiting}
-                  sub={callFunnel.retryScheduled > 0 ? `นัดโทรซ้ำไว้ ${callFunnel.retryScheduled}` : 'ยังไม่มีผลกลับ'}
-                  tone="info"
-                  onClick={() => navigate('/follow')}
-                />
-                <div className="flex items-center justify-center text-slate-500">
-                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
-                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
-                </div>
-                <FlowStage
-                  label="มีผลจริง"
-                  value={resolvedCallBase(callFunnel)}
-                  sub="ไม่นับสายที่กดยกเลิก"
-                  tone="primary"
-                  onClick={() => navigate('/follow')}
-                />
-                <div className="flex items-center justify-center text-slate-500">
-                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
-                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
-                </div>
-                {/* สามช่องผลลัพธ์ใช้โทนชุดเดียวกับทั้งระบบ — เขียว=สนใจ แดง=ไม่สนใจ เหลือง=ไม่รับ/ไม่ติด */}
-                <FlowStage
-                  label="สนใจ"
-                  value={callFunnel.byOutcome['confirmed'] ?? 0}
-                  sub={(() => { const r = conversionRates(callFunnel); return r ? `${r.confirmedPct}% ของสายที่มีผลจริง` : undefined; })()}
-                  tone="success"
-                  onClick={() => navigate('/follow')}
-                />
-                <FlowStage
-                  label="ไม่สนใจ"
-                  value={callFunnel.byOutcome['declined'] ?? 0}
-                  sub="ปฏิเสธงาน"
-                  tone="danger"
-                  onClick={() => navigate('/follow')}
-                />
-                <FlowStage
-                  label="ไม่รับ / ไม่ติด"
-                  value={callFunnel.unreached}
-                  sub="ควรโทรซ้ำ"
-                  tone="warn"
-                  onClick={() => navigate('/follow')}
-                />
-                <div className="flex items-center justify-center text-slate-500">
-                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
-                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
-                </div>
-                <FlowStage
-                  label="ต้องคนตาม"
-                  value={callFunnel.needsHuman}
-                  sub="AI เอาไม่อยู่แล้ว"
-                  tone="orange"
-                  onClick={() => navigate('/follow')}
-                />
-              </div>
-              <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
-                สถานะการทำงานของการโทร (นับทั้งหมด) — ตัวเลขชุดเดียวกับหน้า Follow · กดช่องไหนก็ได้เพื่อไปดูรายละเอียด
-              </p>
-            </PageHeroStrip>
-          ) : null}
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

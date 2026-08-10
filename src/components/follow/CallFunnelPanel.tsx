@@ -12,7 +12,10 @@ import { conversionRates } from '@/lib/callFunnelMath';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
-import { RefreshCw, ChevronDown } from 'lucide-react';
+import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
+import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
+import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
+import { resolvedCallBase } from '@/lib/callFunnelMath';
 
 /**
  * funnel การโทร + ถัง "ต้องคนตาม" — ตอบคำถามที่เจ้าของถามหน้า Follow:
@@ -35,46 +38,52 @@ const OUTCOME_LABEL: Record<CallOutcome, string> = {
   cancelled: 'ยกเลิก',
 };
 
-const OUTCOME_TONE: Record<CallOutcome, ToneKey> = {
-  confirmed: 'success',
-  acknowledged: 'success',
-  declined: 'danger',
-  reschedule_requested: 'warn',
-  wrong_person: 'neutral',
-  no_answer: 'neutral',
-  busy: 'neutral',
-  unresponsive: 'neutral',
-  failed: 'neutral',
-  cancelled: 'neutral',
-};
 
-function Stat({
+/**
+ * ก้อนตัวเลข 1 ขั้นของ funnel — รูปแบบเดียวกับ "การไหลของงานสรรหา" บนหน้าหลัก
+ * (เจ้าของสั่ง 10 ส.ค. 2569: "หน้า Follow ทำให้สวยแบบนี้")
+ * อยู่บน hero เข้มทั้งสองธีม จึงใช้ TONE.onDark ไม่ใช่ .value
+ */
+function FlowStage({
   label,
   value,
-  hint,
+  sub,
   tone,
+  onClick,
 }: {
   label: string;
   value: number;
-  hint?: string;
-  tone?: ToneKey;
+  sub?: React.ReactNode;
+  tone: ToneKey;
+  onClick?: () => void;
 }) {
-  const t = tone ? TONE[tone] : null;
+  const t = TONE[tone];
   return (
-    <div className={cn('rounded-xl border px-3 py-2.5', t ? t.soft : DASH.card)}>
-      <p className={cn('text-[10px] font-bold uppercase tracking-wider', DASH.muted)}>{label}</p>
-      <p
-        className={cn(
-          'font-mono text-2xl font-extrabold tabular-nums leading-tight',
-          t ? t.value : DASH.cellStrong,
-        )}
-      >
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        'min-w-0 flex-1 rounded-xl border border-white/[0.14] bg-white/[0.07] px-3 py-2 text-left transition-colors !border-t-[3px]',
+        onClick ? 'hover:bg-white/[0.12]' : 'cursor-default',
+        t.bar,
+      )}
+    >
+      <div className="text-[10px] font-medium leading-tight text-slate-400">{label}</div>
+      <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
         {value.toLocaleString('th-TH')}
-      </p>
-      {hint ? <p className={cn('text-[10px]', DASH.muted)}>{hint}</p> : null}
-    </div>
+      </div>
+      {sub ? <div className="mt-1 text-[10px] leading-tight text-slate-400">{sub}</div> : null}
+    </button>
   );
 }
+
+const Arrow = () => (
+  <div className="flex items-center justify-center text-slate-500">
+    <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+    <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
+  </div>
+);
 
 const CallFunnelPanel: React.FC = () => {
   /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
@@ -134,49 +143,58 @@ const CallFunnelPanel: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className={DASH.eyebrow}>การไหลของการโทร</p>
-          <p className={cn('text-[11px]', DASH.muted)}>
-            สถานะการทำงานของการโทร — ไม่ใช่ยอด "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
-          </p>
+      <PageHeroStrip
+        eyebrow="การไหลของการโทร"
+        actions={
+          <button type="button" onClick={load} className={cn(heroButton, 'disabled:opacity-50')}>
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
+          </button>
+        }
+      >
+        {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → จบยังไง → ตกถังคน
+            "มีผลจริง" หักสายที่คนกดยกเลิกออกแล้ว (นิยามเดียวกับอัตราด้านล่าง) */}
+        <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
+          <FlowStage label="ส่งให้ Lumos" value={funnel.queued} sub="ทั้งหมดที่เข้าคิว" tone="neutral" />
+          <Arrow />
+          <FlowStage
+            label="รอโทร"
+            value={funnel.waiting}
+            sub={funnel.retryScheduled > 0 ? `นัดโทรซ้ำไว้ ${funnel.retryScheduled.toLocaleString('th-TH')}` : 'ยังไม่มีผลกลับ'}
+            tone="info"
+          />
+          <Arrow />
+          <FlowStage
+            label="มีผลจริง"
+            value={resolvedCallBase(funnel)}
+            sub="ไม่นับสายที่กดยกเลิก"
+            tone="primary"
+          />
+          <Arrow />
+          <FlowStage
+            label="สนใจ"
+            value={funnel.byOutcome['confirmed'] ?? 0}
+            sub="พร้อมให้กดจอง"
+            tone="success"
+          />
+          <FlowStage
+            label="ไม่สนใจ"
+            value={funnel.byOutcome['declined'] ?? 0}
+            sub="ปฏิเสธงาน"
+            tone="danger"
+          />
+          <FlowStage label="ไม่รับ / ไม่ติด" value={funnel.unreached} sub="ควรโทรซ้ำ" tone="warn" />
+          <Arrow />
+          <FlowStage
+            label="ต้องคนตาม"
+            value={funnel.needsHuman}
+            sub="AI เอาไม่อยู่แล้ว"
+            tone="orange"
+          />
         </div>
-        <button
-          type="button"
-          onClick={load}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold',
-            TONE.neutral.soft,
-            TONE.neutral.value,
-            TONE.neutral.softHover,
-          )}
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> รีเฟรช
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="ส่งให้ Lumos" value={funnel.queued} hint="ทั้งหมดที่เข้าคิว" />
-        <Stat
-          label="รอโทร"
-          value={funnel.waiting}
-          hint={
-            funnel.retryScheduled > 0
-              ? `นัดโทรซ้ำไว้ ${funnel.retryScheduled.toLocaleString('th-TH')}`
-              : 'ยังไม่มีผลกลับ'
-          }
-          tone="info"
-        />
-        <Stat label="Lumos รับไปแล้ว" value={funnel.delivered} tone="primary" />
-        <Stat label="โทรติด" value={funnel.connected} hint="ได้คุยกับคนจริง" tone="success" />
-        <Stat label="ไม่ติด" value={funnel.unreached} hint="ไม่รับ/สายไม่ว่าง" tone="warn" />
-        <Stat
-          label="ต้องคนตาม"
-          value={funnel.needsHuman}
-          hint="AI เอาไม่อยู่แล้ว"
-          tone={funnel.needsHuman > 0 ? 'danger' : 'neutral'}
-        />
-      </div>
+        <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
+          สถานะการทำงานของการโทร (นับทั้งหมด) — ไม่ใช่ยอด "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
+        </p>
+      </PageHeroStrip>
 
       {/* อัตราแปลงผล — ตัวเลขไว้ประกอบการตัดสินใจเปิด auto ไม่ใช่แค่ความรู้สึก
           นิยามฐาน (หักสายยกเลิก) อยู่ที่ callFunnelMath.ts ที่เดียว มีเทสต์คุม */}
@@ -200,7 +218,7 @@ const CallFunnelPanel: React.FC = () => {
       {outcomesWithCount.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {outcomesWithCount.map((o) => (
-            <span key={o} className={TONE[OUTCOME_TONE[o]].chip}>
+            <span key={o} className={TONE[CALL_OUTCOME_TONE[o]].chip}>
               {OUTCOME_LABEL[o]}{' '}
               <span className="font-mono tabular-nums">
                 {(funnel.byOutcome[o] ?? 0).toLocaleString('th-TH')}

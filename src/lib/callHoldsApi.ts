@@ -34,6 +34,15 @@ export type CallHold = {
   mine: boolean;
 };
 
+/** ลำดับที่ใช้โชว์ผลโทรของ "คน" ทุกหน้า — เรียงตามความสำคัญที่ต้องเห็นก่อน */
+export const CALL_RESULT_OUTCOMES: CallResultOutcome[] = [
+  'confirmed',
+  'declined',
+  'reschedule_requested',
+  'no_answer',
+  'wrong_person',
+];
+
 export const CALL_RESULT_LABEL: Record<CallResultOutcome, string> = {
   confirmed: 'สนใจ',
   declined: 'ไม่สนใจ',

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallTeamBoardSection } from '@/pages/matching/CallTeamBoardPage';
 import CallBatchPanel from '@/components/follow/CallBatchPanel';
@@ -30,14 +31,6 @@ import { Phone, RefreshCw, ArrowRight } from 'lucide-react';
  * ผลโทรใช้ศัพท์ชุดเดียวกับ Lumos (ดู callHoldsApi) → funnel นับรวมกับผลของ AI ได้
  */
 
-/** ผลโทร → โทนสีตามความหมาย (ห้ามเขียนสีสดในหน้า — ดู designTokens) */
-const OUTCOME_TONE: Record<CallResultOutcome, ToneKey> = {
-  confirmed: 'success',
-  declined: 'danger',
-  reschedule_requested: 'warn',
-  no_answer: 'neutral',
-  wrong_person: 'neutral',
-};
 
 const OUTCOME_ORDER: CallResultOutcome[] = [
   'confirmed',
@@ -245,7 +238,7 @@ const MyCallsPage: React.FC = () => {
 
         <div className="mt-3 grid gap-1.5">
           {OUTCOME_ORDER.map((key) => {
-            const tone = TONE[OUTCOME_TONE[key]];
+            const tone = TONE[CALL_OUTCOME_TONE[key]];
             const count =
               key === 'declined'
                 ? tally.declinedByScope.job
@@ -352,7 +345,7 @@ const MyCallsPage: React.FC = () => {
                       <div className={cn('mt-2.5 space-y-2 rounded-xl border px-3 py-2.5', TONE.primary.soft)}>
                         <div className="flex flex-wrap gap-1.5">
                           {OUTCOME_ORDER.map((key) => {
-                            const tone = TONE[OUTCOME_TONE[key]];
+                            const tone = TONE[CALL_OUTCOME_TONE[key]];
                             return (
                               <button
                                 key={key}
@@ -475,7 +468,7 @@ const MyCallsPage: React.FC = () => {
           <p className={DASH.eyebrow}>เพิ่งบันทึกรอบนี้</p>
           <div className="mt-2 grid gap-1.5">
             {Object.entries(justDone).map(([id, key]) => (
-              <p key={id} className={cn('text-xs', TONE[OUTCOME_TONE[key]].value)}>
+              <p key={id} className={cn('text-xs', TONE[CALL_OUTCOME_TONE[key]].value)}>
                 {CALL_RESULT_LABEL[key]} → {CALL_RESULT_DESTINATION[key]}
               </p>
             ))}

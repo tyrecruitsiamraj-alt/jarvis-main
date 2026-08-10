@@ -12,17 +12,10 @@ import {
   type CallResultScope,
 } from '@/lib/callHoldsApi';
 import { PhoneCall } from 'lucide-react';
+import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 
 // ─── "รับไปโทรเอง" — ล็อกสิทธิ์โทร กันเจ้าหน้าที่โทรชนกัน + กัน AI โทรทับ ──────
 
-/** ผลโทร → โทนสีตามความหมาย (ห้ามเขียนสีสดในหน้า — ดู designTokens) */
-const CALL_RESULT_TONE: Record<CallResultOutcome, ToneKey> = {
-  confirmed: 'success',
-  declined: 'danger',
-  reschedule_requested: 'warn',
-  no_answer: 'neutral',
-  wrong_person: 'neutral',
-};
 
 const CALL_RESULT_ORDER: CallResultOutcome[] = [
   'confirmed',
@@ -145,7 +138,7 @@ export default function CallHoldPanel({
         </p>
         <div className="flex flex-wrap gap-1.5">
           {CALL_RESULT_ORDER.map((key) => {
-            const tone = TONE[CALL_RESULT_TONE[key]];
+            const tone = TONE[CALL_OUTCOME_TONE[key]];
             const active = outcome === key;
             return (
               <button

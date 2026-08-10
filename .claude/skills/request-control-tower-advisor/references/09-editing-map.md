@@ -138,6 +138,14 @@ Code:
   (deterministic จากชื่อ ไม่ผูกลำดับแถว) · เทสต์ที่ `tests/api/nameAvatar.test.ts`
 * `src/lib/followApi.ts` — `FOLLOW_STATUS_CLASS`/`FOLLOW_STATUS_BAR` ชี้เข้า TONE แล้ว
   (เดิมเป็นชุดสี `/15` ของตัวเอง ไม่มีคู่ dark)
+* `src/lib/callOutcomeTone.ts` — **โทนของ "ผลโทร" แหล่งเดียวของทั้งระบบ**
+  (เดิมแตกเป็น 4 map ในไฟล์หน้า แล้วเพี้ยนกันจริง: "ไม่รับสาย" เทาใน funnel/หน้างานโทร
+  แต่เหลืองบนหน้าหลัก/การ์ด Matching — เจ้าของกวาดเจอเอง 10 ส.ค. 2569)
+  ทิศทางที่เคาะ: เขียว=จบดี · แดง=จบไม่ดี · เหลือง=ยังไม่จบ รอโทรซ้ำ ·
+  ส้ม=ต้องคนตาม (ชุดเดียวกับถัง needs_human) · เทา=ไม่ใช่ผลการโทร (คนกดยกเลิก)
+  ผู้ใช้: `CallFunnelPanel` · `CallHoldPanel` · `MyCallsPage` · `CallTeamBoardPage`
+  เทสต์บังคับใน `tests/api/statusTones.test.ts` (ห้ามไฟล์หน้าประกาศ map เอง ·
+  ครบทุก outcome · ทิศทางความหมายคงที่)
 * **สีของสถานะ = ประกาศที่ lib เดียวเท่านั้น ห้ามทำตารางสีในไฟล์หน้า** — มีเทสต์บังคับที่
   `tests/api/statusTones.test.ts` (เช็คทั้งว่าชิปมีจริงใน index.css มีคู่ dark และหน้าเว็บ
   ไม่ประกาศ `STATUS_CLASS` ซ้ำ):

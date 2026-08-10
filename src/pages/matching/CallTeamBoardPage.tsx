@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
 import { apiFetch } from '@/lib/apiFetch';
@@ -10,6 +11,7 @@ import {
   fetchTeamCallQueue,
   transferCallHold,
   CALL_RESULT_LABEL,
+  CALL_RESULT_OUTCOMES,
   EMPTY_TALLY,
   type CallHold,
   type CallResultOutcome,
@@ -31,13 +33,6 @@ import { RefreshCw } from 'lucide-react';
  * ส่วนหน้าที่ห่ออยู่จำกัดเป็น admin เท่านั้นตามที่เจ้าของสั่งให้ซ่อนก่อน
  */
 
-const OUTCOME_TONE: Record<CallResultOutcome, ToneKey> = {
-  confirmed: 'success',
-  declined: 'danger',
-  reschedule_requested: 'warn',
-  no_answer: 'neutral',
-  wrong_person: 'neutral',
-};
 
 /** ค้างเกินเท่านี้ = ดองแล้ว ควรทวง/โยกงาน (ล็อกอายุ 1 วัน) */
 const STALE_MS = 20 * 60 * 60 * 1000;
@@ -204,8 +199,8 @@ export const CallTeamBoardSection: React.FC = () => {
           <div>
             <p className={DASH.eyebrow}>ผลโทรของทีมวันนี้</p>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {(Object.keys(OUTCOME_TONE) as CallResultOutcome[]).map((key) => (
-                <span key={key} className={TONE[OUTCOME_TONE[key]].chip}>
+              {CALL_RESULT_OUTCOMES.map((key) => (
+                <span key={key} className={TONE[CALL_OUTCOME_TONE[key]].chip}>
                   {CALL_RESULT_LABEL[key]}{' '}
                   <span className="font-mono tabular-nums">
                     {(tally.byOutcome[key] ?? 0).toLocaleString('th-TH')}
