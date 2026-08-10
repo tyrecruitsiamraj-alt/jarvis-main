@@ -6,7 +6,7 @@
 อ่านก่อนเริ่ม: `docs/SESSION-HANDOFF.md` (กติกา 13 ข้อ + กับดักตอนตรวจงาน +
 คำตัดสินเจ้าของ) และ `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline (10 ส.ค. หลังกวาด type error api/):** test 689 ผ่าน/4 skip (89 ไฟล์) ·
+**Baseline (10 ส.ค. หลังเทสต์ `callBatchStore`):** test 711 ผ่าน/4 skip (90 ไฟล์) ·
 **tsc ต้องเป็น 0 ทั้งสาม config** (app · default · api) ·
 eslint 0 error/16 warning · migration ถึง 073
 
@@ -18,7 +18,7 @@ eslint 0 error/16 warning · migration ถึง 073
 
 | ตัว | ทำไมสำคัญ |
 |---|---|
-| `callBatchStore.ts` (284 บรรทัด) | ตัวสร้าง/อนุมัติ/ปล่อยชุดโทรจริง — claim-then-work กัน race |
+| ~~`callBatchStore.ts`~~ | ✅ เสร็จ 10 ส.ค. — `tests/api/callBatchStore.test.ts` 22 เคส (mutation 12/12) |
 | `authSession.ts` | ออก session หลัง SSO ผ่าน |
 | `roleFunctionGrants.ts` | สิทธิ์รายฟังก์ชัน |
 | `magicLinkLogin.ts` | ทางเข้าอีกทาง |

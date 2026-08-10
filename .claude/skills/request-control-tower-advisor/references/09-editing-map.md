@@ -496,7 +496,13 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 * `api/_lib/callBatchStore.ts` — สร้าง/อนุมัติ/ยกเลิก/ถอนคน/ปล่อย
 * `api/_lib/callBatchDispatcher.ts` — ตัวปล่อยเข้าคิวจริง (แยกไฟล์กัน import วงกลม)
 * `api/_handlers/lumos-call-batches.ts` — `GET/POST/PATCH/DELETE /api/lumos/call-batches`
-* `tests/api/callBatch.test.ts`
+* `tests/api/callBatch.test.ts` — ความหมายของสถานะ/ช่วงถอนคำ (ฝั่ง `src/lib/callBatch.ts`)
+* `tests/api/callBatchStore.test.ts` — **เงื่อนไขที่ยิงลง DB จริง** (22 เคส) ·
+  พังเมื่อไหร่แปลว่ามีคนถอดตัวกันของพวกนี้ออก: `for update skip locked` ·
+  `status = 'approved'` ตอน claim · `release_at` ต้องอยู่ข้างหน้าตอนอนุมัติ ·
+  ยกเลิกต้องล้าง `release_at` · ถอนคนต้องผูก `batch_id` ด้วย ·
+  `releaseDueCallBatches` ต้องเช็ค dispatcher **ก่อน** claim (ไม่งั้นชุดถูก mark
+  `dispatched` ทั้งที่ไม่มีใครส่ง = หายเงียบ) · mutation test แล้ว 12/12 จับได้
 
 ⚠️ **ชื่อ/เบอร์อ่านใหม่ตอนปล่อย ไม่ใช่ snapshot ตอนกดเลือก** — คนอาจย้ายถัง/เปลี่ยนเบอร์
 ระหว่างรออนุมัติ ใช้ค่าเก่าจะโทรผิดเบอร์ · ใช้ `resolveBoardSelection` ชุดเดียวกับการส่งเอง

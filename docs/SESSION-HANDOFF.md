@@ -10,8 +10,8 @@
 | | |
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
-| commit ล่าสุด | `bc43dca` (+ กวาด type error api/ เสร็จ 10 ส.ค.) |
-| `npm run test` | **689 ผ่าน / 4 skipped** (ไฟล์เทสต์ 89) |
+| commit ล่าสุด | `a088dd4` (กวาด type error api/) + เทสต์ `callBatchStore` |
+| `npm run test` | **711 ผ่าน / 4 skipped** (ไฟล์เทสต์ 90) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error (ครอบ `src/`) |
 | `npx tsc --noEmit` | 0 error (**ไม่ครอบทั้ง src/ และ api/** — อย่าหลงว่าเช็คแล้ว) |
 | `npx tsc --noEmit -p tsconfig.api.json` | **0 error** (ครอบ `api/` — กวาดครบ 10 ส.ค. · กติกา: **ต้องเป็น 0**) |
@@ -130,8 +130,9 @@
 ### ทำต่อได้เลย
 - **ดึงเคสให้เจ้าของไปถามคนเก่ง** — เจ้าของพูด "ขอเคสสำหรับ [ชื่อ skill]" →
   ดูวิธีที่ `docs/HOW-TO-COLLECT-CASES.md`
-- ช่องว่างเทสต์ที่เหลือ: `authSession` · `magicLinkLogin` · `roleFunctionGrants` ·
-  `callBatchStore` (284 บรรทัด — เกณฑ์เลือก: "พังแล้วเงียบ" / "ผิดแล้วข้อมูลรั่ว" ก่อน)
+- ช่องว่างเทสต์ที่เหลือ: `authSession` · `magicLinkLogin` · `roleFunctionGrants`
+  (เกณฑ์เลือก: "พังแล้วเงียบ" / "ผิดแล้วข้อมูลรั่ว" ก่อน) ·
+  `callBatchStore` **เสร็จแล้ว** 10 ส.ค. (22 เคส · mutation 12/12)
 
 ### ต้องถามเจ้าของก่อน (ห้ามเดาแทน)
 | เรื่อง | หมายเหตุ |
