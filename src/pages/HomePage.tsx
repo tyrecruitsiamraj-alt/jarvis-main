@@ -55,15 +55,15 @@ function FlowStage({
       type="button"
       onClick={onClick}
       className={cn(
-        'min-w-0 flex-1 rounded-xl border border-white/[0.14] bg-white/[0.07] px-3 py-2 text-left transition-colors hover:bg-white/[0.12] !border-t-[3px]',
+        'min-w-0 flex-1 rounded-2xl border border-white/[0.14] bg-white/[0.07] px-4 py-3 text-left transition-colors hover:bg-white/[0.12] !border-t-4',
         t.bar,
       )}
     >
-      <div className="text-[10px] font-medium leading-tight text-slate-400">{label}</div>
-      <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
+      <div className="text-xs font-medium leading-tight text-slate-400">{label}</div>
+      <div className={cn('mt-1 text-3xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
         {value}
       </div>
-      {sub ? <div className="mt-1 text-[10px] leading-tight text-slate-400">{sub}</div> : null}
+      {sub ? <div className="mt-1.5 text-[11px] leading-snug text-slate-400">{sub}</div> : null}
     </button>
   );
 }
@@ -268,7 +268,7 @@ const HomePage: React.FC = () => {
                 label="จองตัวอยู่ / ลงงาน"
                 value={flow.proposals.reserved_active + flow.proposals.placed_month}
                 sub={`จอง ${flow.proposals.reserved_active} · ลงงานเดือนนี้ ${flow.proposals.placed_month}`}
-                tone="violet"
+                tone="success"
                 onClick={() => navigate('/matching/reservations')}
               />
 
@@ -300,11 +300,13 @@ const HomePage: React.FC = () => {
                 tone="orange"
                 onClick={() => navigate('/matching/job-postings')}
               />
+              {/* ห้ามซ้ำโทนกับ "ผลจากการโทร" (teal) ที่อยู่แถวบน — เจ้าของทักว่าดูแล้วสีเดียวกัน
+                  แถวล่างจึงใช้คู่ ส้ม (Content) / ม่วง (Scraping) ซึ่งไม่ชนกับขั้นไหนในเส้นหลัก */}
               <FlowStage
                 label="ส่ง Scraping"
                 value={flow.postings.scraping ?? 0}
                 sub="ใบขอที่รอไปดูดประกาศหาคน"
-                tone="teal"
+                tone="violet"
                 onClick={() => navigate('/matching/job-postings')}
               />
             </div>

@@ -46,6 +46,24 @@ export type CallFunnel = {
   closed: number;
 };
 
+/**
+ * ต้นทางของงานโทร — แยกจาก `person_ref` (ดู lumosDispatchApi: card-/ir-/follow-)
+ *
+ * ทำไมต้องมี: หน้า Follow เคยโชว์ยอดรวมทั้งระบบ (5,307) ทั้งที่หน้านั้นส่งเองแค่ 1 คน
+ * เจ้าของทักว่า "ส่ง 1 คนเองทำไมขึ้นตั้ง 5307" — ตัวเลขถูกแต่ตอบคนละคำถาม
+ */
+export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
+
+const SOURCE_WHERE: Record<Exclude<CallFunnelSource, 'all'>, string> = {
+  follow: `person_ref like 'follow-%'`,
+  board: `person_ref like 'card-%'`,
+  irecruit: `person_ref like 'ir-%'`,
+};
+
+function isCallFunnelSource(v: string): v is CallFunnelSource {
+  return v === 'all' || v === 'follow' || v === 'board' || v === 'irecruit';
+}
+
 function emptyFunnel(): CallFunnel {
   return {
     queued: 0,
@@ -74,14 +92,20 @@ type StatRow = {
  * นับจากคิวทีเดียวด้วย group by — ไม่ดึงแถวมานับที่ node
  * (คิวมีได้หลายพันแถว · บทเรียนจากเส้นใบขอที่ปิดแล้วที่เคยดึง 2,700 แถวมานับ)
  */
-async function loadFunnel(sinceYmd: string | null): Promise<CallFunnel> {
+async function loadFunnel(
+  sinceYmd: string | null,
+  source: CallFunnelSource,
+): Promise<CallFunnel> {
   const funnel = emptyFunnel();
   const params: unknown[] = [];
-  let sinceClause = '';
+  const conds: string[] = [];
   if (sinceYmd) {
     params.push(`${sinceYmd}T00:00:00+07:00`);
-    sinceClause = `where created_at >= $${params.length}::timestamptz`;
+    conds.push(`created_at >= $${params.length}::timestamptz`);
   }
+  // ต้นทางเป็นค่าคงที่จาก allow-list ไม่ใช่ค่าที่ผู้ใช้ส่งมาตรง ๆ (ไม่มีทาง inject)
+  if (source !== 'all') conds.push(SOURCE_WHERE[source]);
+  const sinceClause = conds.length ? `where ${conds.join(' and ')}` : '';
   try {
     const { rows } = await dbQuery<StatRow>(
       // อ่าน outcome จาก last_outcome ก่อน · ไม่มีก็ถอยไปดู result->>'outcome'
@@ -145,14 +169,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     const since = getQuery(req, 'since').trim();
     const sinceYmd = /^\d{4}-\d{2}-\d{2}$/.test(since) ? since : null;
+    const rawSource = getQuery(req, 'source').trim() || 'all';
+    // ค่าที่ไม่รู้จัก = ทั้งระบบ (พฤติกรรมเดิม) ไม่ใช่ error — ลิงก์เก่ายังใช้ได้
+    const source: CallFunnelSource = isCallFunnelSource(rawSource) ? rawSource : 'all';
 
     const [funnel, needsHuman] = await Promise.all([
-      loadFunnel(sinceYmd),
-      listNeedsHumanQueueItems(100),
+      loadFunnel(sinceYmd, source),
+      listNeedsHumanQueueItems(100, source === 'all' ? null : source),
     ]);
 
     res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json({ funnel, needsHuman });
+    return res.status(200).json({ funnel, needsHuman, source });
   } catch (e) {
     return handleApiError(res, e, 'lumos-call-funnel', { userId: req.user?.sub });
   }

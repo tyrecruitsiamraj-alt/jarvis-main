@@ -380,7 +380,19 @@ function nameFromPayload(payload: unknown): string | null {
   return null;
 }
 
-export async function listNeedsHumanQueueItems(limit = 200): Promise<NeedsHumanItem[]> {
+/** ต้นทางของงานโทร — ตรงกับ prefix ของ `person_ref` (ดู splitPersonRef) */
+const NEEDS_HUMAN_SOURCE_WHERE = {
+  follow: `and person_ref like 'follow-%'`,
+  board: `and person_ref like 'card-%'`,
+  irecruit: `and person_ref like 'ir-%'`,
+} as const;
+
+export async function listNeedsHumanQueueItems(
+  limit = 200,
+  /** null = ทุกต้นทาง (พฤติกรรมเดิม) · ระบุ = เฉพาะงานที่มาจากหน้านั้น */
+  source: keyof typeof NEEDS_HUMAN_SOURCE_WHERE | null = null,
+): Promise<NeedsHumanItem[]> {
+  const sourceClause = source ? NEEDS_HUMAN_SOURCE_WHERE[source] : '';
   try {
     const { rows } = await dbQuery<{
       id: number;
@@ -395,6 +407,7 @@ export async function listNeedsHumanQueueItems(limit = 200): Promise<NeedsHumanI
       `select id, channel, job_ref, person_ref, last_outcome, attempt_count, updated_at, payload
          from ${queueTable}
         where followup_state = 'needs_human'
+              ${sourceClause}
         order by updated_at desc
         limit $1`,
       [Math.min(Math.max(limit, 1), 500)],

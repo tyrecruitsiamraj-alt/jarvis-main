@@ -43,12 +43,22 @@ export const EMPTY_FUNNEL: CallFunnel = {
   closed: 0,
 };
 
+/**
+ * ต้นทางของงานโทร — 'follow' = ที่ส่งจากหน้า Follow เท่านั้น
+ * (หน้า Follow เคยโชว์ยอดทั้งระบบ ทั้งที่หน้านั้นส่งเองแค่ 1 คน)
+ */
+export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
+
 /** โหลดพลาด/ยังไม่ migrate = ศูนย์ทั้งชุด ไม่ให้หน้า Follow พัง */
 export async function fetchCallFunnel(
   sinceYmd?: string,
+  source: CallFunnelSource = 'all',
 ): Promise<{ funnel: CallFunnel; needsHuman: NeedsHumanItem[] }> {
   try {
-    const qs = sinceYmd ? `?since=${encodeURIComponent(sinceYmd)}` : '';
+    const params = new URLSearchParams();
+    if (sinceYmd) params.set('since', sinceYmd);
+    if (source !== 'all') params.set('source', source);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const r = await apiFetch(`/api/lumos/call-funnel${qs}`);
     if (!r.ok) return { funnel: EMPTY_FUNNEL, needsHuman: [] };
     const data = await readJsonSafe<{ funnel?: CallFunnel; needsHuman?: NeedsHumanItem[] }>(r);

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import {
   EMPTY_FUNNEL,
   fetchCallFunnel,
   type CallFunnel,
+  type CallFunnelSource,
   type NeedsHumanItem,
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
@@ -64,19 +65,27 @@ function FlowStage({
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        'min-w-0 flex-1 rounded-xl border border-white/[0.14] bg-white/[0.07] px-3 py-2 text-left transition-colors !border-t-[3px]',
+        'min-w-0 flex-1 rounded-2xl border border-white/[0.14] bg-white/[0.07] px-4 py-3 text-left transition-colors !border-t-4',
         onClick ? 'hover:bg-white/[0.12]' : 'cursor-default',
         t.bar,
       )}
     >
-      <div className="text-[10px] font-medium leading-tight text-slate-400">{label}</div>
-      <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
+      <div className="text-xs font-medium leading-tight text-slate-400">{label}</div>
+      <div className={cn('mt-1 text-3xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
         {value.toLocaleString('th-TH')}
       </div>
-      {sub ? <div className="mt-1 text-[10px] leading-tight text-slate-400">{sub}</div> : null}
+      {sub ? <div className="mt-1.5 text-[11px] leading-snug text-slate-400">{sub}</div> : null}
     </button>
   );
 }
+
+/** ต้นทางที่เลือกดูได้ — เรียงจาก "ของหน้านี้" ไปหาภาพรวม */
+const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> = [
+  { id: 'follow', label: 'จากหน้านี้', hint: 'เฉพาะรายชื่อที่ลงไว้ในหน้า Follow' },
+  { id: 'board', label: 'คนของเรา', hint: 'ที่ส่งจากหน้า Matching (คนบนบอร์ด)' },
+  { id: 'irecruit', label: 'iRecruit', hint: 'ที่ส่งจากผลค้นหา iRecruit' },
+  { id: 'all', label: 'ทั้งระบบ', hint: 'รวมทุกต้นทาง' },
+];
 
 const Arrow = () => (
   <div className="flex items-center justify-center text-slate-500">
@@ -90,6 +99,13 @@ const CallFunnelPanel: React.FC = () => {
   const { hasPermission } = useAuth();
   const canSeeCallDesk = hasPermission('admin');
 
+  /**
+   * ต้นทางที่กำลังดู — **เริ่มที่ 'follow' โดยตั้งใจ**
+   * หน้านี้คือ "ลงรายชื่อคนที่ต้องติดตาม แล้ว AI โทรตามให้" คนเปิดมาย่อมถามว่า
+   * "ที่ฉันส่งไปมันไปถึงไหนแล้ว" — เดิมโชว์ยอดทั้งระบบ 5,307 ทั้งที่หน้านี้ส่งเอง 1 คน
+   * (เจ้าของทัก 10 ส.ค. 2569) · ยอดทั้งระบบยังดูได้จากปุ่มสลับ ไม่ได้หายไป
+   */
+  const [source, setSource] = useState<CallFunnelSource>('follow');
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,16 +115,16 @@ const CallFunnelPanel: React.FC = () => {
   /** id ที่เพิ่งรับไปตามในรอบนี้ — โชว์ผลค้างไว้ ไม่ให้ดูเหมือนกดแล้วไม่มีอะไรเกิด */
   const [taken, setTaken] = useState<Set<number>>(new Set());
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
-    void fetchCallFunnel().then((d) => {
+    void fetchCallFunnel(undefined, source).then((d) => {
       setFunnel(d.funnel);
       setNeedsHuman(d.needsHuman);
       setLoading(false);
     });
-  };
+  }, [source]);
 
-  useEffect(load, []);
+  useEffect(() => load(), [load]);
 
   const outcomesWithCount = CALL_OUTCOMES.filter((o) => (funnel.byOutcome[o] ?? 0) > 0);
 
@@ -144,11 +160,24 @@ const CallFunnelPanel: React.FC = () => {
   return (
     <div className="space-y-3">
       <PageHeroStrip
-        eyebrow="การไหลของการโทร"
+        eyebrow={`การไหลของการโทร · ${SOURCE_TABS.find((t) => t.id === source)?.label ?? ''}`}
         actions={
-          <button type="button" onClick={load} className={cn(heroButton, 'disabled:opacity-50')}>
-            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
-          </button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {SOURCE_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSource(t.id)}
+                title={t.hint}
+                className={cn(heroButton, source === t.id && 'bg-white/25 text-white')}
+              >
+                {t.label}
+              </button>
+            ))}
+            <button type="button" onClick={load} className={cn(heroButton, 'disabled:opacity-50')}>
+              <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
+            </button>
+          </div>
         }
       >
         {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → จบยังไง → ตกถังคน
@@ -192,7 +221,10 @@ const CallFunnelPanel: React.FC = () => {
           />
         </div>
         <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
-          สถานะการทำงานของการโทร (นับทั้งหมด) — ไม่ใช่ยอด "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
+          {source === 'all'
+            ? 'นับงานโทรทุกต้นทางรวมกัน (หน้า Follow + คนของเรา + iRecruit)'
+            : `นับเฉพาะงานโทรที่มาจาก "${SOURCE_TABS.find((t) => t.id === source)?.label}" — กดปุ่มด้านบนเพื่อดูต้นทางอื่น`}
+          {' · '}สถานะการทำงานของการโทร ไม่ใช่ยอด "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
         </p>
       </PageHeroStrip>
 

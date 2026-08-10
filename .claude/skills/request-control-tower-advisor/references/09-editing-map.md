@@ -457,6 +457,15 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 
 * `api/_handlers/lumos-call-funnel.ts` — `GET /api/lumos/call-funnel` (rbac `follow`)
   นับด้วย **group by ในฐาน** ไม่ดึงแถวมานับที่ node (คิวมี 5,300+ แถว)
+  · รับ `?source=follow|board|irecruit|all` แยกต้นทางจาก prefix ของ `person_ref`
+  (`follow-` / `card-` / `ir-`) · ค่าที่ไม่รู้จัก = `all` (ลิงก์เก่าไม่พัง)
+  · **ถัง "ต้องคนตาม" ต้องกรองต้นทางเดียวกัน** ไม่งั้นตัวเลขกับรายชื่อขัดกันเอง
+
+⚠️ **ยอดรวมกับยอดของหน้าเป็นคนละคำถาม** — หน้า Follow เคยโชว์ 5,307 (ทั้งระบบ)
+ทั้งที่หน้านั้นส่งเองแค่ 1 คน เจ้าของทัก 10 ส.ค. 2569 ว่า "ส่ง 1 คนเองทำไมขึ้นตั้ง 5307"
+ตัวเลขถูกแต่ตอบผิดคำถาม · ตอนนี้แผงเริ่มที่ `follow` (ของหน้านั้นเอง) แล้วสลับดูต้นทางอื่นได้
+ข้อมูลจริงตอนแก้: card 5,280 · ir 26 · follow 1 = 5,307
+เทสต์คุมที่ `tests/api/callFunnelSource.test.ts` (8 เคส รวมเคสค่ามั่วต้องไม่หลุดลง SQL)
 * `src/lib/callFunnelApi.ts` · `src/components/follow/CallFunnelPanel.tsx`
   เสียบบนสุดของ `src/pages/follow/FollowPage.tsx`
 
