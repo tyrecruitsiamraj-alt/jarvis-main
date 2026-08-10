@@ -26,6 +26,8 @@ import {
   type FlowSummary,
   type FlowFollowUpItem,
 } from '@/lib/flowSummaryApi';
+import { fetchCallFunnel, type CallFunnel } from '@/lib/callFunnelApi';
+import { conversionRates, resolvedCallBase } from '@/lib/callFunnelMath';
 
 
 /**
@@ -142,6 +144,10 @@ const HomePage: React.FC = () => {
   // กดชื่อคนในการ์ดติดตาม → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
   const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
 
+  // การไหลของการโทร — แถบที่สองใต้การไหลของงาน (ตัวเลขชุดเดียวกับหน้า Follow เป๊ะ
+  // เพราะใช้ API + นิยามฐานจาก callFunnelMath ตัวเดียวกัน) · โหลดไม่ได้ = ซ่อนแถบ ไม่พังหน้า
+  const [callFunnel, setCallFunnel] = useState<CallFunnel | null>(null);
+
   const loadFlow = async () => {
     setFlowLoading(true);
     try {
@@ -150,6 +156,11 @@ const HomePage: React.FC = () => {
       setFlow(null);
     } finally {
       setFlowLoading(false);
+    }
+    try {
+      setCallFunnel((await fetchCallFunnel()).funnel);
+    } catch {
+      setCallFunnel(null);
     }
   };
 
@@ -299,6 +310,84 @@ const HomePage: React.FC = () => {
               "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ
             </p>
           </PageHeroStrip>
+
+          {/* การไหลของการโทร — เจ้าของขอให้โผล่หน้าหลักด้วย ในกล่องแบบเดียวกับการไหลของงาน
+              เลขทุกช่องตรงกับหน้า Follow (API + นิยามฐานเดียวกัน) · กดช่องไหนก็ไป /follow */}
+          {callFunnel ? (
+            <PageHeroStrip eyebrow="การไหลของการโทร · ทั้งหมด">
+              <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
+                <FlowStage
+                  label="ส่งให้ Lumos"
+                  value={callFunnel.queued}
+                  sub="ทั้งหมดที่เข้าคิว"
+                  tone="neutral"
+                  onClick={() => navigate('/follow')}
+                />
+                <div className="flex items-center justify-center text-slate-500">
+                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
+                </div>
+                <FlowStage
+                  label="รอโทร"
+                  value={callFunnel.waiting}
+                  sub={callFunnel.retryScheduled > 0 ? `นัดโทรซ้ำไว้ ${callFunnel.retryScheduled}` : 'ยังไม่มีผลกลับ'}
+                  tone="info"
+                  onClick={() => navigate('/follow')}
+                />
+                <div className="flex items-center justify-center text-slate-500">
+                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
+                </div>
+                <FlowStage
+                  label="มีผลจริง"
+                  value={resolvedCallBase(callFunnel)}
+                  sub="ไม่นับสายที่กดยกเลิก"
+                  tone="primary"
+                  onClick={() => navigate('/follow')}
+                />
+                <div className="flex items-center justify-center text-slate-500">
+                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
+                </div>
+                {/* สามช่องผลลัพธ์ใช้โทนชุดเดียวกับทั้งระบบ — เขียว=สนใจ แดง=ไม่สนใจ เหลือง=ไม่รับ/ไม่ติด */}
+                <FlowStage
+                  label="สนใจ"
+                  value={callFunnel.byOutcome['confirmed'] ?? 0}
+                  sub={(() => { const r = conversionRates(callFunnel); return r ? `${r.confirmedPct}% ของสายที่มีผลจริง` : undefined; })()}
+                  tone="success"
+                  onClick={() => navigate('/follow')}
+                />
+                <FlowStage
+                  label="ไม่สนใจ"
+                  value={callFunnel.byOutcome['declined'] ?? 0}
+                  sub="ปฏิเสธงาน"
+                  tone="danger"
+                  onClick={() => navigate('/follow')}
+                />
+                <FlowStage
+                  label="ไม่รับ / ไม่ติด"
+                  value={callFunnel.unreached}
+                  sub="ควรโทรซ้ำ"
+                  tone="warn"
+                  onClick={() => navigate('/follow')}
+                />
+                <div className="flex items-center justify-center text-slate-500">
+                  <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+                  <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
+                </div>
+                <FlowStage
+                  label="ต้องคนตาม"
+                  value={callFunnel.needsHuman}
+                  sub="AI เอาไม่อยู่แล้ว"
+                  tone="orange"
+                  onClick={() => navigate('/follow')}
+                />
+              </div>
+              <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
+                สถานะการทำงานของการโทร (นับทั้งหมด) — ตัวเลขชุดเดียวกับหน้า Follow · กดช่องไหนก็ได้เพื่อไปดูรายละเอียด
+              </p>
+            </PageHeroStrip>
+          ) : null}
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
