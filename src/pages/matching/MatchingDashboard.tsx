@@ -1,42 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { Users, Search, ClipboardCheck, ArrowRight, Megaphone, type LucideIcon } from 'lucide-react';
+import { Search, ClipboardCheck, ArrowRight, Megaphone, type LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
-import { apiFetch } from '@/lib/apiFetch';
-
-/** ยอดการ์ด active ต่อถังบนบอร์ด iRecruit (To do / ไม่มีงาน / Re Use / In process) */
-type BoardBucket = { column_id: number; label: string | null; count: number };
-
-const BUCKET_DISPLAY: Record<string, { title: string; desc: string; cls: string; bucket: string }> = {
-  'to do': { title: 'รอลงงาน (To do)', desc: 'ผ่านสัมภาษณ์ พร้อมลงงาน — AI แมทถังนี้ก่อนเสมอ', cls: TONE.success.value, bucket: 'todo' },
-  'ไม่มีงาน': { title: 'รองาน (ไม่มีงาน)', desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่ง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า', cls: TONE.warn.value, bucket: 'no_job' },
-  're use': { title: 'คนเก่า (Re Use)', desc: 'เคยผ่านงาน — เลือกส่ง AI โทรเองได้ ไม่เข้า auto', cls: TONE.violet.value, bucket: 'reuse' },
-  'in process': {
-    title: 'กำลังเสนอใบอื่น (In process)',
-    desc: 'ถูกเสนอใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คว่าใบเดิมจบแล้วหรือยัง)',
-    cls: TONE.info.value,
-    bucket: 'in_process',
-  },
-};
 
 const MatchingDashboard: React.FC = () => {
   const navigate = useNavigate();
-
-  const [buckets, setBuckets] = useState<BoardBucket[] | null>(null);
-  const [bucketsLoading, setBucketsLoading] = useState(true);
-
-  useEffect(() => {
-    apiFetch('/api/matching/board-candidates?buckets=1')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (Array.isArray(d?.buckets)) setBuckets(d.buckets);
-      })
-      .catch(() => {})
-      .finally(() => setBucketsLoading(false));
-  }, []);
 
   /**
    * ⚠️ เคยมีเมนู "รายชื่อคนจอง" (`/matching/reservations`) อยู่ในชุดนี้ — เจ้าของสั่งเอาออก
@@ -109,50 +80,9 @@ const MatchingDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* คนของเรา · ตามถังบนบอร์ด iRecruit — ยอดจริง ณ ตอนนี้ */}
-        <div className="glass-card rounded-[1.5rem] border border-white/70 p-3 md:p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              คนของเรา · ตามถังบนบอร์ด
-            </h3>
-            {bucketsLoading ? (
-              <span className="text-xs text-muted-foreground">กำลังโหลด…</span>
-            ) : buckets ? (
-              <span className="text-xs text-muted-foreground">
-                รวม {buckets.reduce((s, b) => s + b.count, 0)} คน
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">โหลดไม่สำเร็จ</span>
-            )}
-          </div>
-          {buckets ? (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {buckets.map((b) => {
-                const meta = BUCKET_DISPLAY[(b.label || '').trim().toLowerCase()] ?? {
-                  title: b.label || `คอลัมน์ ${b.column_id}`,
-                  desc: '',
-                  cls: 'text-foreground',
-                  bucket: '',
-                };
-                return (
-                  <button
-                    key={b.column_id}
-                    type="button"
-                    onClick={() => navigate(meta.bucket ? `/matching/candidates?bucket=${meta.bucket}` : '/matching/candidates')}
-                    className="jarvis-stat-tile"
-                  >
-                    <div className="jarvis-stat-label">{meta.title}</div>
-                    <div className={cn('jarvis-stat-value', meta.cls)}>{b.count}</div>
-                    {meta.desc ? (
-                      <div className="jarvis-stat-sub leading-snug">{meta.desc}</div>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
+        {/* ⚠️ เคยมีการ์ด "คนของเรา · ตามถังบนบอร์ด" ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+            เพราะเป็นข้อมูลชุดเดียวกับหน้า "ผู้สมัคร" ซึ่งโชว์ครบ 6 ถังพร้อมสัดส่วนอยู่แล้ว
+            (ที่นี่มีแค่ 4 ถัง) — เก็บไว้สองที่แล้วจะเพี้ยนกันเวลาแก้ข้างเดียว */}
 
         {/* ⚠️ เคยมีบล็อก "Job Request Summary" (งานด่วน 10 + ใกล้กำหนด 10 + ป๊อปอัป "ดูงานทั้งหมด")
             ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569 · เอาออกทั้งชุดรวม state/ป๊อปอัป/ตัวโหลด

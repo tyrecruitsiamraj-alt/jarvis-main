@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
+import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -1889,7 +1890,21 @@ const MatchingPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader title="Matching — คนของเรา" subtitle="เปิดใบขอ แล้วหาคนที่ผ่านสัมภาษณ์รอลงงานที่สกิลตรง" backPath="/matching" />
+      {/* ช่องค้นหาอยู่แถวเดียวกับหัวเรื่องแบบหน้า Dashboard (เจ้าของสั่ง 10 ส.ค. 2569)
+          เดิมอยู่ในกล่องตัวกรองใต้แผง funnel ซึ่งต้องเลื่อนลงไปหา */}
+      <PageHeader
+        title="Matching — คนของเรา"
+        subtitle="เปิดใบขอ แล้วหาคนที่ผ่านสัมภาษณ์รอลงงานที่สกิลตรง"
+        backPath="/matching"
+        actions={
+          <SearchField
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
+            wrapperClassName="w-full sm:w-[26rem]"
+          />
+        }
+      />
       <div className="px-4 md:px-6 space-y-4">
         {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)
             ใช้คอมโพเนนต์ตัวเดียวกับหน้า Follow ตัวเลข/นิยาม/โทนสีจึงมาจากที่เดียวกัน
@@ -1904,15 +1919,7 @@ const MatchingPage: React.FC = () => {
               จนปุ่ม "ด่วนเท่านั้น" ที่เป็น shrink-0 ทะลุออกนอกจอ · เผื่อ flex-wrap ไว้ให้
               ปุ่มตกบรรทัดใหม่ในจอที่แคบมาก */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="glass-card rounded-xl px-3 py-2 border border-white/70 flex items-center gap-2 flex-1 min-w-0">
-              <Search className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
-                className="bg-transparent text-sm outline-none flex-1 min-w-0"
-              />
-            </div>
+            {/* ช่องค้นหาย้ายขึ้นไปอยู่แถวหัวเรื่องแล้ว — เหลือปุ่มกรองในแถวนี้ */}
             <button
               type="button"
               onClick={() => setUrgentOnly((v) => !v)}

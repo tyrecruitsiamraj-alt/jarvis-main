@@ -80,10 +80,17 @@ function FlowStage({
 /** ต้นทางที่เลือกดูได้ — เรียงจาก "ของหน้านี้" ไปหาภาพรวม */
 const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> = [
   { id: 'follow', label: 'จากหน้านี้', hint: 'เฉพาะรายชื่อที่ลงไว้ในหน้า Follow' },
-  { id: 'board', label: 'คนของเรา', hint: 'ที่ส่งจากหน้า Matching (คนบนบอร์ด)' },
+  { id: 'board', label: 'Job Offer', hint: 'ที่ส่งจากหน้า Matching (คนบนบอร์ด)' },
   { id: 'irecruit', label: 'iRecruit', hint: 'ที่ส่งจากผลค้นหา iRecruit' },
-  { id: 'all', label: 'ทั้งระบบ', hint: 'รวมทุกต้นทาง' },
+  { id: 'all', label: 'ทั้งหมด', hint: 'รวมทุกต้นทาง' },
 ];
+
+/**
+ * ปุ่มที่โชว์ตอนสลับได้ — **ไม่มี "จากหน้านี้"** (เจ้าของสั่ง 10 ส.ค. 2569)
+ * ปุ่มนั้นหมายถึง "หน้า Follow" ซึ่งพอไปโผล่บนหน้า Matching แล้วอ่านไม่รู้เรื่อง
+ * หน้า Follow เองใช้โหมดล็อก ไม่มีปุ่มอยู่แล้ว แต่ยังต้องมี entry นี้ไว้ทำป้ายหัวแผง
+ */
+const SWITCHABLE_TABS = SOURCE_TABS.filter((t) => t.id !== 'follow');
 
 /**
  * โครงคอลัมน์ของแถบ funnel — **หลักการเดียวกับ FLOW_ROW_GRID ในหน้าหลัก**
@@ -187,7 +194,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           <div className="flex flex-wrap items-center gap-1.5">
             {lockSource
               ? null
-              : SOURCE_TABS.map((t) => (
+              : SWITCHABLE_TABS.map((t) => (
                   <button
                     key={t.id}
                     type="button"
@@ -244,9 +251,29 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             tone="orange"
           />
         </div>
+        {/* ผลแยกรายแบบ — เจ้าของสั่ง 10 ส.ค. 2569 ให้มาอยู่ในเส้น funnel ไม่ใช่ลอยอยู่ใต้แผง
+            อยู่บน hero เข้ม จึงใช้ TONE.onDark + พื้นโปร่ง แทนชิปพื้นอ่อนแบบเดิม
+            (ชิปพื้นอ่อนบนพื้นเข้มอ่านไม่ออก — กับดักเดิมของโปรเจกต์) */}
+        {outcomesWithCount.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-white/10 pt-3">
+            {outcomesWithCount.map((o) => (
+              <span
+                key={o}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2.5 py-1 text-[11px]"
+              >
+                <span className={cn('h-1.5 w-1.5 rounded-full', TONE[CALL_OUTCOME_TONE[o]].dot)} aria-hidden />
+                <span className="text-slate-300">{OUTCOME_LABEL[o]}</span>
+                <span className={cn('font-mono font-semibold tabular-nums', TONE[CALL_OUTCOME_TONE[o]].onDark)}>
+                  {(funnel.byOutcome[o] ?? 0).toLocaleString('th-TH')}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
           {source === 'all'
-            ? 'นับงานโทรทุกต้นทางรวมกัน (หน้า Follow + คนของเรา + iRecruit)'
+            ? 'นับงานโทรทุกต้นทางรวมกัน (หน้า Follow + Job Offer + iRecruit)'
             : `นับเฉพาะงานโทรที่มาจาก "${SOURCE_TABS.find((t) => t.id === source)?.label}"${
                 // ล็อกต้นทางแล้วไม่มีปุ่มให้กด — อย่าชี้ทางที่ไม่มีอยู่จริง
                 lockSource ? '' : ' — กดปุ่มด้านบนเพื่อดูต้นทางอื่น'
@@ -273,19 +300,6 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           </p>
         );
       })()}
-
-      {outcomesWithCount.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {outcomesWithCount.map((o) => (
-            <span key={o} className={TONE[CALL_OUTCOME_TONE[o]].chip}>
-              {OUTCOME_LABEL[o]}{' '}
-              <span className="font-mono tabular-nums">
-                {(funnel.byOutcome[o] ?? 0).toLocaleString('th-TH')}
-              </span>
-            </span>
-          ))}
-        </div>
-      ) : null}
 
       {/* ถัง "ต้องคนตาม" — กดขยายเห็นรายชื่อ */}
       {needsHuman.length > 0 ? (
