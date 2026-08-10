@@ -22,6 +22,7 @@ import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
+  callResultsThisMonth,
   type FlowSummary,
   type FlowFollowUpItem,
 } from '@/lib/flowSummaryApi';
@@ -40,7 +41,8 @@ function FlowStage({
 }: {
   label: string;
   value: number;
-  sub?: string;
+  /** รับ node ได้ — ขั้น "ผลจากการโทร" ใช้แต้มสีแยก สนใจ/ไม่สนใจ/ไม่รับ ในบรรทัดย่อย */
+  sub?: React.ReactNode;
   onClick: () => void;
   /** โทนของขั้นนี้ — บอกว่าอยู่ช่วงไหนของสาย กวาดตาแยกได้ก่อนอ่านตัวเลข */
   tone: ToneKey;
@@ -190,8 +192,10 @@ const HomePage: React.FC = () => {
         >
           {/* Funnel อยู่ใน hero เข้มตาม mockup rev.3 ข้อ 01 — เข้าระบบมาเจอการไหลของงานก่อนทุกอย่าง
               5 ขั้นหลัก + เส้นแยก "ไม่มีคนแนะนำ" อยู่ในแถวเดียวกัน (กดตัวเลขไปหน้านั้นได้เหมือนเดิม) */}
+          {/* ไม่ติดป้าย "เดือนนี้" ทั้งแถบ — ตัวเลขปนกันสองแบบ (ของค้างนับทั้งหมด ·
+              การเคลื่อนไหวนับเดือนนี้) ป้ายรวมจะโกหกครึ่งนึงเสมอ ให้บรรทัดท้ายอธิบายแทน */}
           <PageHeroStrip
-            eyebrow="การไหลของงานสรรหา · เดือนนี้"
+            eyebrow="การไหลของงานสรรหา"
             actions={
               <button
                 type="button"
@@ -237,12 +241,22 @@ const HomePage: React.FC = () => {
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
+              {/* เลขใหญ่ = ผลกลับรวมทุกแบบ · บรรทัดย่อยแต้มสีตามความหมายชุดเดียวกับทั้งระบบ
+                  (สนใจ=เขียว · ไม่สนใจ=แดง · ไม่รับ=เหลือง) เห็นปุ๊บรู้เลยว่าใครเป็นอะไร */}
               <FlowStage
-                label="สนใจงาน (จากผลโทร)"
-                value={confirmedThisMonth(flow)}
-                sub={`ปฏิเสธ ${flow.lumos.outcomes_month['declined'] ?? 0} · ไม่รับสาย ${(flow.lumos.outcomes_month['no_answer'] ?? 0) + (flow.lumos.outcomes_month['unresponsive'] ?? 0)}`}
-                tone="success"
-                onClick={() => navigate('/matching/match')}
+                label="ผลจากการโทร"
+                value={callResultsThisMonth(flow)}
+                sub={
+                  <span className="flex flex-wrap gap-x-1.5">
+                    <span className={TONE.success.onDark}>สนใจ {confirmedThisMonth(flow)}</span>
+                    <span className={TONE.danger.onDark}>ไม่สนใจ {flow.lumos.outcomes_month['declined'] ?? 0}</span>
+                    <span className={TONE.warn.onDark}>
+                      ไม่รับ {(flow.lumos.outcomes_month['no_answer'] ?? 0) + (flow.lumos.outcomes_month['unresponsive'] ?? 0)}
+                    </span>
+                  </span>
+                }
+                tone="teal"
+                onClick={() => navigate('/follow')}
               />
               <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />

@@ -61,6 +61,11 @@ export function confirmedThisMonth(s: FlowSummary): number {
   return s.lumos.outcomes_month['confirmed'] ?? 0;
 }
 
+/** ผลโทรที่กลับมาเดือนนี้รวมทุกแบบ — เลขใหญ่ของขั้น "ผลจากการโทร" บนหน้าหลัก */
+export function callResultsThisMonth(s: FlowSummary): number {
+  return Object.values(s.lumos.outcomes_month).reduce((sum, n) => sum + (n || 0), 0);
+}
+
 /** จำนวนเรื่องที่ต้องมีคนตามต่อทั้งหมด — ใช้โชว์ badge รวม */
 export function totalFollowUps(s: FlowSummary): number {
   return (

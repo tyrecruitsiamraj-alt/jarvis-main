@@ -88,11 +88,11 @@ const DashboardFlowViewCard: React.FC<Props> = ({ flow, summary, onSegmentClick 
       <p className="mt-2.5 text-sm leading-relaxed">
         <Num value={flow.startingBacklogPositions} label="ต้นงวด" tone="warn" onClick={click?.('carried_over', 'ยอดค้างต้นงวด')} />
         <span className={cn('px-1', DASH.muted)}>+</span>
-        <Num value={flow.newRequestPositions} label="ขอใหม่" tone="info" onClick={click?.('new_requests', 'ขอใหม่เดือนนี้')} />
+        <Num value={flow.newRequestPositions} label="ขอใหม่" tone="info" onClick={click?.('new_requests', 'ขอใหม่ในงวดที่เลือก')} />
         <span className={cn('px-1', DASH.muted)}>−</span>
         <Num value={flow.filledPositions} label="หาได้แล้ว" tone="success" onClick={click?.('fulfilled', 'หาได้แล้ว')} />
         <span className={cn('px-1', DASH.muted)}>−</span>
-        <Num value={flow.cancelledPositions} label="ยกเลิก" tone="neutral" onClick={click?.('cancelled', 'ยกเลิกเดือนนี้')} />
+        <Num value={flow.cancelledPositions} label="ยกเลิก" tone="neutral" onClick={click?.('cancelled', 'ยกเลิกในงวดที่เลือก')} />
         <span className={cn('px-1', DASH.muted)}>→</span>
         <Num value={flow.endingBacklogPositions} label="ปลายงวด" tone="warn" onClick={click?.('remaining', 'เหลือหา')} />
       </p>
