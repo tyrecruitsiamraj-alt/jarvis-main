@@ -19,6 +19,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
+import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -355,6 +356,11 @@ const HomePage: React.FC = () => {
               "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ
             </p>
           </PageHeroStrip>
+
+          {/* การไหลของการโทร — ย้ายมาจากหน้า Follow (เจ้าของสั่ง 10 ส.ค. 2569)
+              หน้านี้เป็นภาพรวมทั้งระบบ จึงเริ่มที่ "ทั้งระบบ" แล้วกดสลับดูรายต้นทางได้
+              (หน้า Follow เหลือเฉพาะของตัวเอง ล็อกต้นทางไว้ ไม่มีปุ่มสลับ) */}
+          <CallFunnelPanel defaultSource="all" />
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

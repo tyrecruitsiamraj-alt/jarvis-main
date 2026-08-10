@@ -190,8 +190,10 @@ const FollowPage: React.FC = () => {
       />
 
       <div className="px-4 md:px-6 py-4 space-y-4">
-        {/* funnel การโทรทั้งระบบ + ถัง "ต้องคนตาม" (ดู components/follow/CallFunnelPanel) */}
-        <CallFunnelPanel />
+        {/* funnel การโทร "ของหน้านี้เท่านั้น" + ถัง "ต้องคนตาม"
+            เจ้าของสั่ง 10 ส.ค. 2569: หน้านี้เอาแค่ของ Follow พอ ("ตอนนี้มีแค่ 1 พอ")
+            ตัวที่กดสลับดูต้นทางอื่นได้ ย้ายไปอยู่หน้าการไหลของงานแล้ว */}
+        <CallFunnelPanel defaultSource="follow" lockSource />
 
 
         {/* สรุป + ปุ่มเพิ่ม */}

@@ -94,18 +94,31 @@ const Arrow = () => (
   </div>
 );
 
-const CallFunnelPanel: React.FC = () => {
+export type CallFunnelPanelProps = {
+  /**
+   * ต้นทางที่เปิดมาเห็นก่อน — **หน้า Follow ต้องเป็น 'follow' เสมอ**
+   * หน้านั้นคือ "ลงรายชื่อคนที่ต้องติดตาม แล้ว AI โทรตามให้" คนเปิดมาย่อมถามว่า
+   * "ที่ฉันส่งไปมันไปถึงไหนแล้ว" — เดิมโชว์ยอดทั้งระบบ 5,307 ทั้งที่หน้านั้นส่งเอง 1 คน
+   * (เจ้าของทัก 10 ส.ค. 2569) · หน้าการไหลของงานเป็นภาพรวมทั้งระบบ จึงใช้ 'all'
+   */
+  defaultSource?: CallFunnelSource;
+  /**
+   * ล็อกต้นทางไว้ ไม่ให้สลับ — ซ่อนปุ่มสลับต้นทางทิ้ง
+   * เจ้าของสั่ง 10 ส.ค. 2569: หน้า Follow เอาแค่ของตัวเองพอ ("ตอนนี้มีแค่ 1 พอ")
+   * ส่วนตัวที่กดสลับดูต้นทางอื่นได้ ให้ไปอยู่หน้าการไหลของงานแทน
+   */
+  lockSource?: boolean;
+};
+
+const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
+  defaultSource = 'follow',
+  lockSource = false,
+}) => {
   /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
   const { hasPermission } = useAuth();
   const canSeeCallDesk = hasPermission('admin');
 
-  /**
-   * ต้นทางที่กำลังดู — **เริ่มที่ 'follow' โดยตั้งใจ**
-   * หน้านี้คือ "ลงรายชื่อคนที่ต้องติดตาม แล้ว AI โทรตามให้" คนเปิดมาย่อมถามว่า
-   * "ที่ฉันส่งไปมันไปถึงไหนแล้ว" — เดิมโชว์ยอดทั้งระบบ 5,307 ทั้งที่หน้านี้ส่งเอง 1 คน
-   * (เจ้าของทัก 10 ส.ค. 2569) · ยอดทั้งระบบยังดูได้จากปุ่มสลับ ไม่ได้หายไป
-   */
-  const [source, setSource] = useState<CallFunnelSource>('follow');
+  const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,17 +176,19 @@ const CallFunnelPanel: React.FC = () => {
         eyebrow={`การไหลของการโทร · ${SOURCE_TABS.find((t) => t.id === source)?.label ?? ''}`}
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
-            {SOURCE_TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setSource(t.id)}
-                title={t.hint}
-                className={cn(heroButton, source === t.id && 'bg-white/25 text-white')}
-              >
-                {t.label}
-              </button>
-            ))}
+            {lockSource
+              ? null
+              : SOURCE_TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSource(t.id)}
+                    title={t.hint}
+                    className={cn(heroButton, source === t.id && 'bg-white/25 text-white')}
+                  >
+                    {t.label}
+                  </button>
+                ))}
             <button type="button" onClick={load} className={cn(heroButton, 'disabled:opacity-50')}>
               <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
             </button>
@@ -223,7 +238,10 @@ const CallFunnelPanel: React.FC = () => {
         <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
           {source === 'all'
             ? 'นับงานโทรทุกต้นทางรวมกัน (หน้า Follow + คนของเรา + iRecruit)'
-            : `นับเฉพาะงานโทรที่มาจาก "${SOURCE_TABS.find((t) => t.id === source)?.label}" — กดปุ่มด้านบนเพื่อดูต้นทางอื่น`}
+            : `นับเฉพาะงานโทรที่มาจาก "${SOURCE_TABS.find((t) => t.id === source)?.label}"${
+                // ล็อกต้นทางแล้วไม่มีปุ่มให้กด — อย่าชี้ทางที่ไม่มีอยู่จริง
+                lockSource ? '' : ' — กดปุ่มด้านบนเพื่อดูต้นทางอื่น'
+              }`}
           {' · '}สถานะการทำงานของการโทร ไม่ใช่ยอด "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
         </p>
       </PageHeroStrip>

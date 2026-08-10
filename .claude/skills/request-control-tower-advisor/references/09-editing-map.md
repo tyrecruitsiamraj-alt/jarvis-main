@@ -481,7 +481,13 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ข้อมูลจริงตอนแก้: card 5,280 · ir 26 · follow 1 = 5,307
 เทสต์คุมที่ `tests/api/callFunnelSource.test.ts` (8 เคส รวมเคสค่ามั่วต้องไม่หลุดลง SQL)
 * `src/lib/callFunnelApi.ts` · `src/components/follow/CallFunnelPanel.tsx`
-  เสียบบนสุดของ `src/pages/follow/FollowPage.tsx`
+  ⚠️ **แผงนี้ใช้สองหน้าแล้ว** (เจ้าของสั่ง 10 ส.ค. 2569) รับ prop 2 ตัว:
+  - `src/pages/follow/FollowPage.tsx` → `defaultSource="follow" lockSource`
+    (เห็นแค่ของหน้าตัวเอง **ไม่มีปุ่มสลับต้นทาง** — "ตอนนี้มีแค่ 1 พอ")
+  - `src/pages/HomePage.tsx` (หน้าการไหลของงาน) → `defaultSource="all"`
+    (ภาพรวมทั้งระบบ + กดสลับดูรายต้นทางได้ — ตัวที่กดดูได้ย้ายมาอยู่ที่นี่)
+  · `lockSource` ต้องซ่อนทั้งปุ่มสลับ **และ** ข้อความ "กดปุ่มด้านบนเพื่อดูต้นทางอื่น"
+    ไม่งั้นชี้ทางไปหาปุ่มที่ไม่มีอยู่
 
 ⚠️ **อ่าน outcome ด้วย `coalesce(last_outcome, result->>'outcome')`** —
 `last_outcome` เป็นคอลัมน์ใหม่ (migration 070) แถวที่มีผลอยู่ก่อนหน้าจะว่าง
