@@ -290,25 +290,26 @@ const HomePage: React.FC = () => {
                 เยื้องเข้ามาให้เห็นว่าแตกออกจาก "AI แนะนำคนแล้ว" ไม่ใช่ต่อจากขั้นสุดท้าย
 
                 ⚠️ จังหวะของแถวนี้ต้องเท่าแถวบน (เจ้าของทัก 10 ส.ค. 2569 ว่า "จัดให้สวยแบบเส้นหลัก"):
-                แถวบนมี 5 ช่อง flex-1 · แถวนี้จึงต้องมี 5 ช่องเท่ากัน = ป้ายจุดแยก + 3 การ์ด +
-                ตัวคั่นท้ายที่ไม่มีอะไร ไม่งั้นการ์ด 3 ใบจะอ้วนกว่าแถวบนชัดเจน (วัดได้ 400px vs 260px)
-                และป้ายเดิมลอยกลางแนวตั้งเพราะไม่มีกล่องของตัวเอง */}
+                ใช้โครงคอลัมน์ตัวเดียวกัน (FLOW_ROW_GRID) คอลัมน์จึงตรงกันเสมอ
+
+                ⚠️ ช่องแรกวางไว้ใต้ "ใบขอเปิดอยู่" ตั้งใจ — มันคือ **ส่วนต่าง** ของสองช่องแรกแถวบน
+                (ใบขอเปิดอยู่ − AI แนะนำคนแล้ว) การวางตรงคอลัมน์เดียวกันทำให้อ่านการลบออกได้ด้วยตา
+                เจ้าของสั่ง 10 ส.ค. 2569: "ใส่ค่าที่เป็นส่วนต่างสิ ว่าเหลืออีกเท่าไหร่"
+                เดิมช่องนี้เป็นแค่ป้ายข้อความ และมีการ์ด "ยังไม่มีคน" (analyzed − with_recommend)
+                อยู่ช่องถัดไปซึ่ง**ได้เลขเดียวกันเป๊ะเมื่อ AI ประเมินครบทุกใบ** = โชว์ 140 สองที่ติดกัน
+                จึงยุบเหลือใบเดียว แล้วเอาส่วนที่ยังไม่ได้ประเมินไปบอกในบรรทัดย่อยแทน */}
             <div className={cn('mt-2 border-t border-white/10 pt-2', FLOW_ROW_GRID)}>
-              {/* ป้ายจุดแยก — กินหนึ่งช่องเท่าการ์ด ขอบประให้รู้ว่าเป็นคำอธิบาย ไม่ใช่ตัวเลขที่กดได้ */}
-              <div className="min-w-0 flex-1 rounded-2xl border border-dashed border-white/[0.14] px-4 py-3">
-                <div className="text-xs font-medium leading-tight text-slate-400">ไม่มีคนแนะนำ</div>
-                <div className="mt-1 text-[11px] leading-snug text-slate-500">
-                  แยกออกจาก “AI แนะนำคนแล้ว” — ไม่เดินต่อในเส้นหลัก
-                </div>
-              </div>
-              <div className="flex items-center justify-center text-slate-500">
-                <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
-                <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
-              </div>
               <FlowStage
-                label="ยังไม่มีคน"
-                value={Math.max(flow.jobs.analyzed - flow.jobs.with_recommend, 0)}
-                sub="AI ประเมินแล้วไม่พบคนของเรา"
+                label="ไม่มีคนแนะนำ"
+                value={Math.max(flow.jobs.open_total - flow.jobs.with_recommend, 0)}
+                sub={
+                  <>
+                    ใบขอ {flow.jobs.open_total} − แนะนำแล้ว {flow.jobs.with_recommend}
+                    {flow.jobs.open_total > flow.jobs.analyzed ? (
+                      <> · ยังไม่ได้ประเมิน {flow.jobs.open_total - flow.jobs.analyzed}</>
+                    ) : null}
+                  </>
+                }
                 tone="danger"
                 onClick={() => navigate('/matching/match?workflow=none')}
               />
@@ -340,11 +341,13 @@ const HomePage: React.FC = () => {
                 tone="violet"
                 onClick={() => navigate('/matching/job-postings')}
               />
-              {/* ช่องคั่นที่ 4 + ช่องการ์ดที่ 5 ที่เว้นว่างไว้ — แถวนี้จึงมีโครง
-                  "5 การ์ด + 4 ช่องคั่น" เท่าแถวบนเป๊ะ ตำแหน่ง/ความกว้างจึงตรงคอลัมน์กัน
-                  (วัดแล้ว: ก่อนแก้การ์ดกว้าง 221 เยื้องจากแถวบน 15–32px · หลังแก้ตรงทุกคอลัมน์) */}
+              {/* ตัวคั่นเปล่าของคอลัมน์ที่ 6–8 — **ห้ามตัดทิ้ง** ถึงจะไม่มีอะไรให้แสดง
+                  ช่อง `auto` ที่ไม่มีลูกจะยุบเหลือ 0 แล้วความกว้างที่หายไปถูกโยนไปให้ช่อง 1fr
+                  ทำให้การ์ดแถวนี้กว้างกว่าแถวบนทันที (วัดแล้ว: ตัดทิ้ง = 213 vs 206 · คงไว้ = 206 เท่ากัน)
+                  คอลัมน์ 9 ปล่อยว่างได้ เพราะ 1fr กว้างเท่ากันอยู่แล้วไม่ว่ามีลูกหรือไม่ */}
               <div className="hidden w-4 sm:block" aria-hidden />
-              <div className="hidden min-w-0 flex-1 sm:block" aria-hidden />
+              <div className="hidden sm:block" aria-hidden />
+              <div className="hidden w-4 sm:block" aria-hidden />
             </div>
 
             <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
