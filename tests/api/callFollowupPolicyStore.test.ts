@@ -1,11 +1,13 @@
 // @vitest-environment node
 /**
- * ที่เก็บนโยบายการโทร (migration 073) + handler /api/lumos/call-policy
+ * ที่เก็บนโยบายการโทร (migration 073)
+ *
+ * ⚠️ หน้าจอตั้งค่า + `GET/PUT /api/lumos/call-policy` **ถูกถอดออกแล้ว** (เจ้าของสั่ง 10 ส.ค. 2569)
+ * ค่าที่อยู่ในตารางยังคุมการโทรจริงอยู่เหมือนเดิม — ที่เก็บจึงยังต้องมีเทสต์
  *
  * จุดที่ต้องคุมแน่น ๆ:
  * - ตารางยังไม่ migrate = ค่าเริ่มต้นในโค้ด (พฤติกรรม production เดิมเป๊ะ)
- * - DB ล้มเหตุอื่น = โยนต่อ — ไม่งั้นระบบเงียบ ๆ ใช้เพดานโทรคนละชุดกับที่เจ้าของตั้ง
- * - PUT เฉพาะ admin (ค่าพวกนี้คุมการโทรหาคนจริง)
+ * - DB ล้มเหตุอื่น = โยนต่อ — ไม่งั้นระบบเงียบ ๆ ใช้เพดานโทรคนละชุดกับที่ตั้งไว้
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,30 +17,17 @@ vi.mock('../../api/_lib/postgres.js', () => ({
     typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42P01',
 }));
 vi.mock('../../api/_lib/schema.js', () => ({ tableInAppSchema: (n: string) => n }));
-vi.mock('../../api/_lib/audit.js', () => ({ auditFromAuthed: vi.fn(async () => undefined) }));
-vi.mock('../../api/_lib/http.js', async (orig) => {
-  const actual = await orig<typeof import('../../api/_lib/http.js')>();
-  return { ...actual, withRbac: (h: unknown) => h };
-});
 
 const { dbQuery } = await import('../../api/_lib/postgres.js');
-const { auditFromAuthed } = await import('../../api/_lib/audit.js');
 const {
   getCallFollowupPolicy,
   setCallFollowupPolicy,
   clearCallFollowupPolicyCache,
 } = await import('../../api/_lib/callFollowupPolicyStore.js');
-const { default: handler } = await import('../../api/_handlers/lumos-call-policy.js');
 const { DEFAULT_CALL_FOLLOWUP_POLICY } = await import('../../src/lib/callFollowupPolicy.js');
 
 const undefinedTable = Object.assign(new Error('no relation'), { code: '42P01' });
 const otherDbError = Object.assign(new Error('connection terminated'), { code: '57P01' });
-
-function mockRes() {
-  const json = vi.fn();
-  const status = vi.fn(() => ({ json }));
-  return { res: { status, json, setHeader: vi.fn() }, status, json };
-}
 
 beforeEach(() => {
   vi.mocked(dbQuery).mockReset();
@@ -89,46 +78,6 @@ describe('getCallFollowupPolicy — ที่เก็บ', () => {
     // cache ถูกล้าง — อ่านรอบถัดไปยิง DB ใหม่ (insert 1 + select 2)
     await getCallFollowupPolicy();
     expect(dbQuery).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe('handler /api/lumos/call-policy', () => {
-  it('GET คืนนโยบายที่ใช้อยู่', async () => {
-    vi.mocked(dbQuery).mockResolvedValueOnce({ rows: [{ payload: { maxAttempts: 4 } }] } as never);
-    const { res, json } = mockRes();
-    await handler({ method: 'GET', query: {}, user: { role: 'staff' } } as never, res as never);
-    expect(json.mock.calls[0][0].policy.maxAttempts).toBe(4);
-  });
-
-  it('PUT โดยคนที่ไม่ใช่ admin = 403 และไม่เขียน DB', async () => {
-    const { res, status } = mockRes();
-    await handler(
-      { method: 'PUT', query: {}, user: { role: 'supervisor' } } as never,
-      res as never,
-    );
-    expect(status).toHaveBeenCalledWith(403);
-    expect(dbQuery).not.toHaveBeenCalled();
-  });
-
-  it('PUT โดย admin = บันทึก + audit ก่อน/หลัง', async () => {
-    vi.mocked(dbQuery)
-      .mockResolvedValueOnce({ rows: [{ payload: {} }] } as never) // before
-      .mockResolvedValueOnce({ rows: [{ payload: { maxAttempts: 2, quietFromHour: 21, quietToHour: 9 } }] } as never); // insert
-    const req = {
-      method: 'PUT',
-      query: {},
-      user: { role: 'admin', email: 'boss@siamraj.com', sub: 'u1' },
-      body: { policy: { maxAttempts: 2, quietFromHour: 21, quietToHour: 9 } },
-    };
-    const { res, json } = mockRes();
-    await handler(req as never, res as never);
-    const saved = json.mock.calls[0][0].policy;
-    expect(saved.maxAttempts).toBe(2);
-    expect(saved.quietFromHour).toBe(21);
-    expect(vi.mocked(auditFromAuthed)).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ action: 'call-followup-policy.update' }),
-    );
   });
 });
 

@@ -426,9 +426,23 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ทั้งสองใช้ `resolveCallFollowup()` ตัวเดียวกัน — คนกับ AI จึงส่งไม้ต่อกันได้
 (คนโทรไม่ติด → AI รับช่วงโทรซ้ำ) · error ในลูปนี้ **ห้ามทำให้ ingest/บันทึกผลล้ม**
 
-### นโยบายการโทร — ตั้งจากหน้า Follow ได้ (migration 073)
+### นโยบายการโทร (migration 073) — ⚠️ **หน้าจอตั้งค่าถูกถอดออกแล้ว 10 ส.ค. 2569**
 
-เจ้าของขอตั้งเองว่า "คนนึงจะโทรกี่ครั้ง และโทรช่วงเวลากี่โมงบ้าง"
+เจ้าของสั่ง "นโยบายการโทร เอาออก" — ถอด **หน้าจอ + ทางแก้ค่า** ทิ้งทั้งชุด:
+`src/components/follow/CallPolicyPanel.tsx` · `src/lib/callFollowupPolicyApi.ts` ·
+`api/_handlers/lumos-call-policy.ts` (+ route ใน registry) ·
+`allowedCallWindow()`/`withAllowedCallWindow()` ใน `src/lib/callFollowupPolicy.ts`
+(สองตัวหลังมีไว้แปลงมุมคนใช้ ↔ มุมนโยบายให้หน้าจอเท่านั้น — ถ้าจะเอาหน้าจอกลับมา
+ดูของเดิมได้ที่ commit ก่อนหน้า)
+
+⚠️ **ค่าที่อยู่ในตารางยังคุมการโทรจริงอยู่เหมือนเดิมทุกอย่าง** — เพดาน 3 ครั้ง ·
+เว้น 24 ชม. · ห้ามโทร 20:00–08:00 ยังทำงานผ่าน `getCallFollowupPolicy()` ตามเดิม
+ที่หายไปคือ "ทางแก้ค่าจากหน้าเว็บ" เท่านั้น · จะเปลี่ยนค่าต้องแก้ที่แถวใน
+`app_call_followup_policy` ตรง ๆ หรือแก้ค่าเริ่มต้นใน `DEFAULT_CALL_FOLLOWUP_POLICY`
+เทสต์ของที่เก็บยังอยู่ที่ `tests/api/callFollowupPolicyStore.test.ts` (7 เคส)
+
+ประวัติเดิม (ไว้อ่านตอนจะเอากลับมา): เจ้าของเคยขอตั้งเองว่า "คนนึงจะโทรกี่ครั้ง
+และโทรช่วงเวลากี่โมงบ้าง"
 
 * `migrations/073_call_followup_policy.sql` — `app_call_followup_policy` (jsonb แถวเดียว
   แพตเทิร์นเดียวกับ 069) seed = ค่า hardcode เดิมเป๊ะ → deploy แล้วไม่มีอะไรเปลี่ยน

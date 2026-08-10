@@ -71,7 +71,6 @@ import matchingProposalsHandler from './matching-proposals.js';
 import matchingCandidateScreeningHandler from './matching-candidate-screening.js';
 import lumosDispatchModeHandler from './lumos-dispatch-mode.js';
 import lumosCallFunnelHandler from './lumos-call-funnel.js';
-import lumosCallPolicyHandler from './lumos-call-policy.js';
 import lumosCallBatchesHandler from './lumos-call-batches.js';
 import matchingCallHoldsHandler from './matching-call-holds.js';
 import matchingContactHistoryHandler from './matching-contact-history.js';
@@ -126,7 +125,6 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/candidate-screening': matchingCandidateScreeningHandler as ApiHandler,
   '/api/lumos/dispatch-mode': lumosDispatchModeHandler as ApiHandler,
   '/api/lumos/call-funnel': lumosCallFunnelHandler as ApiHandler,
-  '/api/lumos/call-policy': lumosCallPolicyHandler as ApiHandler,
   '/api/lumos/call-batches': lumosCallBatchesHandler as ApiHandler,
   '/api/matching/call-holds': matchingCallHoldsHandler as ApiHandler,
   '/api/matching/contact-history': matchingContactHistoryHandler as ApiHandler,
