@@ -123,7 +123,8 @@ describe('createCallBatch — สร้างชุด', () => {
     expect(roles).toEqual(['admin', 'supervisor']);
     expect(payload.type).toBe('batch_pending');
     expect(payload.dedupeKey).toContain('b-1');
-    expect(payload.link).toBe('/matching/my-calls');
+    // หน้างานโทรถูกปิด — แผงอนุมัติย้ายไปหน้าหลัก แจ้งเตือนต้องพาไปที่ที่กดอนุมัติได้จริง
+    expect(payload.link).toBe('/');
 
     expect(out?.items).toEqual([
       { id: 'i-1', source: 'board', candidateRef: '1805', candidateName: 'สมชาย', removed: false },

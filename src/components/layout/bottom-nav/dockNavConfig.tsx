@@ -20,8 +20,6 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
   { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
   // "โทรของฉัน" + "ภาระโทรทีม" ยุบเป็นหน้าเดียวแล้ว · เจ้าของสั่งซ่อนไว้ให้แอดมินก่อน
-  // จะเปิดให้ทุกคน = ถอด minimumRole ตรงนี้ + แก้ canSeeCallDesk ใน MyCallsPage
-  { path: '/matching/my-calls', label: 'งานโทร', icon: PhoneCall, minimumRole: 'admin', functionId: 'candidates_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },

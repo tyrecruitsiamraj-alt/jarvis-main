@@ -437,7 +437,6 @@ const MatchingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
   /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
-  const canSeeCallDesk = hasPermission('admin');
   // ในโหมด server-side list ไม่ต้องดึง feed 500 ใบมาที่ client — ใช้ serverItems แทน
   // skip=true → hook ไม่ยิง /api/siamraj/unit-requests?limit=500 เลย
   const { jobs: feedJobs, loading: feedLoading } = useUnitRequestsFeed({
@@ -2088,16 +2087,16 @@ const MatchingPage: React.FC = () => {
         ) : null}
 
         {/* งานโทรที่เราถืออยู่ — ล็อกมีอายุ 1 วัน ชิปนี้กันลืมข้ามใบขอ
-            ซ่อนจากคนที่เข้าหน้า "งานโทร" ไม่ได้ ไม่งั้นกดแล้วเจอหน้าปิด */}
-        {myHoldCount > 0 && canSeeCallDesk ? (
+            หน้า "งานโทร" ถูกปิดแล้ว (10 ส.ค. 2569) ชิปจึงเหลือเป็นตัวเลขเตือน ไม่ใช่ลิงก์
+            บันทึกผลทำได้บนการ์ดผู้สมัครในหน้านี้อยู่แล้ว (CallHoldPanel) */}
+        {myHoldCount > 0 ? (
           <div className="px-1">
-            <Link
-              to="/matching/my-calls"
-              className={cn(TONE.primary.chip, 'hover:underline')}
+            <span
+              className={cn(TONE.primary.chip)}
               title={`งานโทรที่คุณถืออยู่:\n${myHoldNames.join('\n')}`}
             >
-              📞 ของฉันถืออยู่ {myHoldCount.toLocaleString('th-TH')} คน · ไปหน้าโทรของฉัน →
-            </Link>
+              📞 ของฉันถืออยู่ {myHoldCount.toLocaleString('th-TH')} คน — บันทึกผลได้ที่การ์ดคนนั้น
+            </span>
           </div>
         ) : null}
 

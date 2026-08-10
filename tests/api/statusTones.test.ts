@@ -112,7 +112,9 @@ describe('โทนผลโทร — แหล่งเดียว ห้า�
   const FILES = [
     'src/components/follow/CallFunnelPanel.tsx',
     'src/components/matching/CallHoldPanel.tsx',
-    'src/pages/matching/MyCallsPage.tsx',
+    // หน้า "งานโทร" (MyCallsPage) ถูกปิดไป 10 ส.ค. 2569 — บล็อก Status ย้ายมาเป็น
+    // CallStatusPanel บนหน้าหลัก ตัวคุมจึงย้ายมาจับไฟล์นี้แทน
+    'src/components/matching/CallStatusPanel.tsx',
     'src/pages/matching/CallTeamBoardPage.tsx',
   ];
 

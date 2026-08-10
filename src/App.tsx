@@ -35,7 +35,6 @@ const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
 const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
-const MyCallsPage = lazy(() => import("@/pages/matching/MyCallsPage"));
 const OurPeoplePage = lazy(() => import("@/pages/matching/OurPeoplePage"));
 const JobDashboard = lazy(() => import("@/pages/jobs/JobDashboard"));
 const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
@@ -102,9 +101,11 @@ const ProtectedRoutes = () => {
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
             <Route path="/matching/job-postings" element={<JobPostingsPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
-            <Route path="/matching/my-calls" element={<MyCallsPage />} />
             {/* ยุบ "ภาระโทรทีม" เข้าไปอยู่ในหน้าเดียวกับ "โทรของฉัน" แล้ว — คง path เดิมไว้ redirect กัน bookmark พัง */}
-            <Route path="/matching/call-team" element={<Navigate to="/matching/my-calls" replace />} />
+            {/* หน้า "งานโทร" ถูกปิด 10 ส.ค. 2569 (เจ้าของสั่ง) — Status ย้ายไปหน้าหลัก
+                แผงอนุมัติชุดย้ายไปหน้าหลักเช่นกัน · bookmark เก่าทั้งสองเส้นเด้งกลับหน้าหลัก */}
+            <Route path="/matching/my-calls" element={<Navigate to="/" replace />} />
+            <Route path="/matching/call-team" element={<Navigate to="/" replace />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />

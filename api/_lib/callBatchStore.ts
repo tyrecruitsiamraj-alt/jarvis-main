@@ -142,7 +142,8 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
       type: 'batch_pending',
       title: `📋 ชุดส่งงานโทรรออนุมัติ — ${input.items.length.toLocaleString('th-TH')} คน`,
       body: `ใบขอ ${input.requestNo || input.jobId} · สร้างโดย ${input.createdByName || 'ระบบ'}`,
-      link: '/matching/my-calls',
+      // หน้างานโทรถูกปิด 10 ส.ค. 2569 — แผงอนุมัติย้ายไปอยู่หน้าหลักแล้ว
+      link: '/',
       dedupeKey: `batch_pending:${batch.id}`,
     });
   }

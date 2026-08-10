@@ -20,6 +20,8 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
+import CallBatchPanel from '@/components/follow/CallBatchPanel';
+import CallStatusPanel from '@/components/matching/CallStatusPanel';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -147,7 +149,7 @@ function FollowUpList({
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
@@ -364,8 +366,18 @@ const HomePage: React.FC = () => {
           </PageHeroStrip>
 
           {/* ⚠️ เคยมี <CallFunnelPanel defaultSource="all" /> ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
-              (ย้ายมาแล้วเอาออกในวันเดียวกัน) หน้านี้จึงเหลือเฉพาะการไหลของ "งานสรรหา"
-              funnel การโทรอยู่หน้า Follow ที่เดียว และล็อกไว้ดูเฉพาะของหน้านั้น */}
+              funnel การโทรอยู่หน้า Follow (ล็อกของหน้านั้น) และหน้า Matching (กดสลับต้นทางได้) */}
+
+          {/* ย้ายมาจากหน้า "งานโทร" ที่ถูกปิดไป (เจ้าของสั่ง 10 ส.ค. 2569)
+              — แผงอนุมัติชุดต้องมีที่ไป ไม่งั้นชุดที่รออนุมัติจะไม่มีใครกดได้เลย
+              ซ่อนให้เห็นเฉพาะ admin เท่าเดิม (หน้างานโทรเดิมก็ admin-only) ไม่ได้ผ่อนสิทธิ์
+              สิทธิ์จริงยังอยู่ที่ API เหมือนเดิม (supervisor/admin) */}
+          {hasPermission('admin') ? (
+            <>
+              <CallBatchPanel />
+              <CallStatusPanel />
+            </>
+          ) : null}
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

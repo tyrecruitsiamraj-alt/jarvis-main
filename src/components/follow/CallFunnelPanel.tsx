@@ -10,8 +10,6 @@ import {
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
 import { conversionRates } from '@/lib/callFunnelMath';
-import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'react-router-dom';
 import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
@@ -129,10 +127,6 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   defaultSource = 'follow',
   lockSource = false,
 }) => {
-  /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
-  const { hasPermission } = useAuth();
-  const canSeeCallDesk = hasPermission('admin');
-
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
@@ -351,17 +345,9 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                   </span>
                   <span className="ml-auto flex items-center gap-2">
                     {taken.has(item.id) ? (
-                      canSeeCallDesk ? (
-                        <Link
-                          to="/matching/my-calls"
-                          className={cn('text-[11px] font-bold underline', TONE.success.value)}
-                        >
-                          รับแล้ว → ไปหน้างานโทร
-                        </Link>
-                      ) : (
-                        /* หน้างานโทรยังซ่อนไว้ให้แอดมิน — คนอื่นบอกแค่ว่ารับแล้ว ไม่ให้ลิงก์ที่กดไปแล้วตัน */
-                        <span className={cn('text-[11px] font-bold', TONE.success.value)}>รับแล้ว</span>
-                      )
+                      /* หน้างานโทรถูกปิดแล้ว (10 ส.ค. 2569) — ไม่มีที่ให้ลิงก์ไป
+                         บันทึกผลทำที่การ์ดผู้สมัครในหน้า Matching */
+                      <span className={cn('text-[11px] font-bold', TONE.success.value)}>รับแล้ว</span>
                     ) : item.candidateRef && item.phone ? (
                       <button
                         type="button"
