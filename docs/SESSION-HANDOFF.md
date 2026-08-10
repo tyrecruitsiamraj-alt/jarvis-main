@@ -10,10 +10,11 @@
 | | |
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
-| commit ล่าสุด | `be33cad` |
-| `npm run test` | **618 ผ่าน / 4 skipped** (ไฟล์เทสต์ 82) |
+| commit ล่าสุด | ดู `git log` (อัปเดตล่าสุด 10 ส.ค. — เลขในตารางนี้อาจตามไม่ทัน commit ย่อย) |
+| `npm run test` | **686 ผ่าน / 4 skipped** (10 ส.ค.) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error ← **ตัวนี้สำคัญกว่า ครอบ src/** |
-| `npx tsc --noEmit` | 0 error (ไม่ครอบ src/) |
+| `npx tsc --noEmit` | 0 error (ไม่ครอบ src/ และไม่ครอบ api/) |
+| `npx tsc --noEmit -p tsconfig.api.json` | **~25 error รอกวาด** (config ใหม่ 10 ส.ค. — ห้ามทำให้เพิ่ม) |
 | `npx eslint .` | 0 error · 16 warning เดิม |
 | migration | ถึง **072** (`app_notifications`) รันบนฐานแล้ว |
 | โหมดโทร | **manual ทุกจุด** — production ยังไม่โทรหาใครเอง |
@@ -67,8 +68,11 @@
 ## 3. ⚠️ กติกาที่ห้ามพลาด (เจ็บมาแล้วทั้งนั้น)
 
 1. **DB local = production** — ทดสอบอะไรที่เขียนต้องคืนค่าเดิม
-2. **เช็ก tsc สอง config เสมอ** — `npx tsc --noEmit` เฉย ๆ **ไม่ครอบ `src/`**
-   เคยลืม import แล้วผ่านเงียบ ๆ
+2. **เช็ก tsc สาม config เสมอ** — ความจริงที่เพิ่งเจอ (10 ส.ค.): สองตัวเดิม
+   **ไม่มีตัวไหนครอบ `api/` เลย** (default = references เปล่า · app = src เท่านั้น)
+   type error ใน api/ ผ่านเงียบมาตลอด — เจอบั๊กจริงซ่อนอยู่ (ชื่อคนin ชุดโทรเพี้ยน ·
+   logError กลืน error+context) · ตัวที่สาม: `npx tsc --noEmit -p tsconfig.api.json`
+   (strictNullChecks — **ยังเหลือ ~25 error รอกวาด** อย่าเพิ่งถือว่าต้องเป็น 0)
 3. **ห้ามแก้ class หลายจุดด้วย regex** — พังมาแล้ว 2 ครั้ง (แทรก `${TONE}` ลง string
    ธรรมดากลายเป็นข้อความดิบ · คอมเมนต์ JSX ผิดที่ทำ JSX พังทั้งไฟล์)
    แก้มือทีละจุด หรือสคริปต์แบบ "เติมท้ายอย่างเดียว"

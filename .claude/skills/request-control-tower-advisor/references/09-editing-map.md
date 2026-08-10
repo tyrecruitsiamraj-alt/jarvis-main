@@ -775,6 +775,29 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 ⚠️ เปลี่ยนหน้าใน SPA ให้ใช้ `history.pushState` + `PopStateEvent` แทน `location.href`
 จะได้ไม่โหลดใหม่ทั้งหน้า และ probe ที่ฝังไว้ใน `window` ไม่หาย
 
+## typecheck ของ api/ (tsconfig.api.json — ใหม่ 10 ส.ค. 2569)
+
+**ความจริงที่เพิ่งเจอ: `api/` ไม่เคยถูก typecheck เลย** — `npx tsc --noEmit` (default)
+มีแต่ references เปล่า · `-p tsconfig.app.json` ครอบแค่ `src/` · เทสต์รันผ่าน esbuild
+ซึ่งถอด type ทิ้งโดยไม่เช็ค · tsx ตอน dev ก็ไม่เช็ค → type error ใน api/ มองไม่เห็นทุกทาง
+
+พิสูจน์ด้วยการยัด `const x: number = 'พัง'` ลง handler แล้วทั้งสอง config เงียบสนิท
+
+* `tsconfig.api.json` — extends app + `strictNullChecks: true` · include `api` + `src/lib` + `src/types`
+* บั๊กจริงที่เปิดเจอและแก้แล้ว (เทสต์คุมที่ `tests/api/loggerAndBatchNames.test.ts`):
+  1. **เส้นปล่อยชุดโทรเรียกชื่อคนผิดทุกราย** — `callBatchDispatcher` อ้าง `c.full_name`
+     ที่ไม่มีในชนิดข้อมูล (มีแต่ first/last/nick) → undefined เสมอ → Lumos เรียก
+     ชื่อเล่นหรือ "การ์ด n" · ฝั่ง iRecruit ส่ง `job_name_th`/`position_name` ขาด
+     → บทพูด AI ไม่มีชื่อตำแหน่ง
+  2. **`logError(msg, e, ctx)` กลืนทั้ง error และ context** — 5 จุดเรียกแบบ 3 arg
+     แต่ signature รับ 2 · Error spread ไม่ออก (non-enumerable) → log วิกฤตว่างเปล่า
+     แก้ที่ signature ของ logger รองรับ (msg, error, fields) จุดเรียกเดิมถูกทันที
+  3. `.replace(a, b, 1)` ใน recruitRegisterSql — arg ที่สามไม่มีจริง (ถูกทิ้งอยู่แล้ว)
+
+⚠️ **ยังเหลือ ~25 error รอกวาด** (ส่วนใหญ่ null-safety ใน driverCareActionValidation ·
+job-staff · role-permissions ฯลฯ) — config นี้ยังไม่ใช่ "ต้องเป็น 0" ใน baseline
+จนกว่าจะกวาดเสร็จ · ระหว่างนี้กติกาคือ **ห้ามทำให้ตัวเลขเพิ่ม** (เช็คก่อน/หลังแก้)
+
 ## เข้าสู่ระบบด้วย Microsoft (Azure AD SSO — ใช้จริงทั้งบริษัทแล้ว)
 
 * `api/_lib/azureAdAuth.ts` — สร้าง state · cookie · ประกอบ URL · แลก code · อ่านโปรไฟล์

@@ -50,7 +50,13 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
       .filter((c) => wanted.has(c.card_id))
       .map((c) => ({
         card_id: c.card_id,
-        full_name: c.full_name || c.nick_name || `การ์ด ${c.card_id}`,
+        // BoardReadyCandidate ไม่มี full_name (มี first/last/nick) — เดิมอ้าง c.full_name
+        // ซึ่ง undefined เสมอ ชื่อในคิวเลยกลายเป็นชื่อเล่นหรือ "การ์ด n" ทุกราย
+        // (Lumos โทรไปเรียกชื่อผิด) · ประกอบแบบเดียวกับ boardCandidateMatcher.fullName
+        full_name:
+          [c.first_name, c.last_name].filter(Boolean).join(' ').trim() ||
+          c.nick_name ||
+          `การ์ด ${c.card_id}`,
         mobile: c.mobile,
       }));
     const missing = [...wanted].filter((id) => !selected.some((s) => s.card_id === id));
@@ -66,7 +72,7 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
       {
         jobId: batch.jobId,
         request_no: stored?.result.request_no ?? batch.requestNo,
-        job_family_label: stored?.result.job_family_label ?? null,
+        job_family_label: stored?.result.job_family_label ?? '',
       },
       selected,
     );
@@ -83,12 +89,16 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
     {
       jobId: batch.jobId,
       request_no: stored?.result.request_no ?? batch.requestNo,
-      job_family_label: stored?.result.job_family_label ?? null,
+      job_family_label: stored?.result.job_family_label ?? '',
     },
     candidates.map((c) => ({
       id: c.id,
-      full_name: c.full_name,
+      // RecruitCandidateForMatch ก็ไม่มี full_name เช่นกัน — และ payload ฝั่ง interview
+      // ต้องการ job_name_th/position_name ด้วย (เดิมส่งขาด บทพูดของ AI ไม่มีชื่อตำแหน่ง)
+      full_name: [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || `ผู้สมัคร ${c.id}`,
       phone_number: c.phone_number,
+      job_name_th: c.job_name_th,
+      position_name: c.position_name,
     })),
   );
   logInfo('call-batch.release.interview', { batchId: batch.id, ...outcome });
