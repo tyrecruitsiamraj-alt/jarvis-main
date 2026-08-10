@@ -4,12 +4,13 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { PhoneOff, Phone, ExternalLink, X } from 'lucide-react';
 import {
-  listActiveProposals,
+  listActiveProposalsWithWarnings,
   cancelProposal,
   declineProposalAfterCall,
   proposalStatusLabel,
   proposalStatusChip,
   type CandidateProposal,
+  type ProposalCallWarning,
   type ProposalSource,
 } from '@/lib/candidateProposalsApi';
 
@@ -30,6 +31,8 @@ function formatWhen(iso: string): string {
 
 const ReservationsPage: React.FC = () => {
   const [items, setItems] = useState<CandidateProposal[]>([]);
+  /** ธง "เพิ่งมีผลโทรว่าไม่สนใจ" ต่อ id การจอง — server แนบมากับลิสต์ */
+  const [callWarnings, setCallWarnings] = useState<Record<string, ProposalCallWarning>>({});
   const [loading, setLoading] = useState(true);
   const [sourceFilter, setSourceFilter] = useState<'all' | ProposalSource>('all');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -39,8 +42,9 @@ const ReservationsPage: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listActiveProposals();
-      setItems(data);
+      const data = await listActiveProposalsWithWarnings();
+      setItems(data.items);
+      setCallWarnings(data.callWarnings);
     } catch {
       setError('โหลดรายการไม่สำเร็จ');
     } finally {
@@ -152,6 +156,32 @@ const ReservationsPage: React.FC = () => {
                   {it.reason ? (
                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">— {it.reason}</p>
                   ) : null}
+                  {(() => {
+                    const w = callWarnings[it.id];
+                    if (!w) return null;
+                    // ผลที่เก่ากว่าการจองล่าสุดไม่ใช่สัญญาณ (คนจองอาจรู้อยู่แล้วตอนกด)
+                    if (new Date(w.at).getTime() <= new Date(it.updated_at).getTime()) return null;
+                    const strong = w.scope === 'all';
+                    return (
+                      <p
+                        className={cn(
+                          'flex flex-wrap items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium',
+                          strong ? TONE.danger.soft : TONE.warn.soft,
+                          strong ? TONE.danger.value : TONE.warn.value,
+                        )}
+                      >
+                        <PhoneOff className="h-3 w-3 shrink-0" />
+                        {strong
+                          ? 'ผลโทรล่าสุด: ไม่หางานแล้ว'
+                          : 'ผลโทรล่าสุด: ไม่สนใจงานนี้'}{' '}
+                        · {formatWhen(w.at)}
+                        {w.byName ? ` · โดย ${w.byName}` : ' · จาก AI'}
+                        <span className="basis-full text-[10px] font-normal opacity-80">
+                          ระบบไม่ถอนจองให้เอง (เบอร์ผิด/คนละคนก็มี) — ถ้าจริงกดปุ่ม "โยนกลับ" ด้านล่าง
+                        </span>
+                      </p>
+                    );
+                  })()}
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     <span>จองไว้กับใบขอ: {it.request_no || it.job_id}</span>
                     <a

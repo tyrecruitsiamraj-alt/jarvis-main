@@ -169,6 +169,33 @@ export async function listActiveProposals(): Promise<CandidateProposal[]> {
 }
 
 /**
+ * ธง "เพิ่งมีผลโทรว่าไม่สนใจ" ต่อเบอร์ E.164 — server แนบมากับลิสต์จอง
+ * ใช้เตือนบนหน้าจองตัวให้คนตัดสินใจกดโยนกลับเอง (ผลโทร **ไม่** เด้งสถานะจองอัตโนมัติ
+ * โดยตั้งใจ — เบอร์ผิด/คนละคนก็มี auto-ยกเลิกเสี่ยงเกิน)
+ */
+export type ProposalCallWarning = {
+  outcome: 'declined';
+  /** job = ไม่เอางานนี้ · all = ไม่หางานแล้ว (แรงกว่า) · null = ฝั่ง AI ไม่มี scope */
+  scope: 'job' | 'all' | null;
+  at: string;
+  byName: string | null;
+};
+
+/** ลิสต์จอง + ธงเตือนผลโทร — หน้าจองตัวใช้ตัวนี้ (ตัวบนคงไว้ให้ผู้เรียกเดิม) */
+export async function listActiveProposalsWithWarnings(): Promise<{
+  items: CandidateProposal[];
+  callWarnings: Record<string, ProposalCallWarning>;
+}> {
+  const r = await apiFetch('/api/matching/proposals?active=1');
+  if (!r.ok) return { items: [], callWarnings: {} };
+  const d = (await r.json().catch(() => ({}))) as {
+    items?: CandidateProposal[];
+    callWarnings?: Record<string, ProposalCallWarning>;
+  };
+  return { items: d.items ?? [], callWarnings: d.callWarnings ?? {} };
+}
+
+/**
  * "โทรแล้วไม่สนใจ" จากหน้าจองตัว — โยนคนออกจากการจอง (status = rejected)
  * ให้เขากลับไปว่างพอที่จะถูกจองกับใบขออื่นได้ · ท่อเดียวกับปุ่ม "ไม่ผ่าน" ในหน้า Matching
  * (logic เดิมทั้งหมด แค่กดได้จากหน้าจองตัวโดยไม่ต้องย้อนกลับไปเปิดใบขอ)

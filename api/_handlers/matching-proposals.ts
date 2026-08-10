@@ -20,6 +20,8 @@ import {
   isActiveProposalStatus,
   type CandidateProposal,
 } from '../_lib/candidateProposals.js';
+import { loadDeclinedCallWarnings } from '../_lib/proposalCallWarnings.js';
+import { toE164Thai } from '../_lib/thaiPhone.js';
 import {
   isSiamrajRequestInScope,
   loadScopedRequestNoSet,
@@ -55,7 +57,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       if (getQuery(req, 'active') === '1') {
         const items = scopeProposals(await listActiveProposals(), scoped);
-        return res.status(200).json({ items });
+        // ธง "เพิ่งมีผลโทรว่าไม่สนใจ" — คีย์ด้วย id ของการจอง (หน้าเว็บไม่ต้องแปลงเบอร์เอง)
+        // ของแถม: พังก็แค่ไม่มีธง ลิสต์ต้องมาเสมอ
+        let callWarnings: Record<string, unknown> = {};
+        try {
+          const list = items as Array<{ id: string; candidate_phone: string | null }>;
+          const map = await loadDeclinedCallWarnings(list.map((i) => i.candidate_phone));
+          for (const it of list) {
+            const w = map.get(toE164Thai(it.candidate_phone) ?? '');
+            if (w) callWarnings[it.id] = w;
+          }
+        } catch {
+          callWarnings = {};
+        }
+        return res.status(200).json({ items, callWarnings });
       }
 
       const jobIds = getQuery(req, 'jobIds');
