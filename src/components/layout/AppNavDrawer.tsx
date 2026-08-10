@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, KeyRound, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
+import { ChevronDown, ExternalLink, KeyRound, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import {
@@ -33,6 +33,13 @@ const AppNavDrawer: React.FC<Props> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  /**
+   * "บอร์ดรับสมัคร" กับ "หน้าสมัครสาธารณะ" เคยเป็นสองแถวเรียงกันในเมนู ซึ่งอ่านแล้วดูเหมือน
+   * เมนูซ้ำกันสองอัน (เจ้าของทัก 10 ส.ค. 2569) — ยุบเป็นหัวข้อเดียวที่กดกางเห็นทั้งสอง
+   * เปิดค้างไว้ให้เองเมื่ออยู่ในบอร์ดอยู่แล้ว จะได้ไม่ต้องกดหาทุกครั้ง
+   */
+  const [boardOpen, setBoardOpen] = useState(() => location.pathname.startsWith('/jobs/board'));
 
   useEffect(() => {
     if (!open) return;
@@ -118,31 +125,52 @@ const AppNavDrawer: React.FC<Props> = ({
                 <span className="truncate">{item.label}</span>
               </button>,
             ];
-            // แทรก "บอร์ดรับสมัคร" ต่อจาก "หน่วยงาน"
+            // แทรกกลุ่ม "บอร์ดรับสมัคร" ต่อจาก "หน่วยงาน" — หัวข้อเดียว กดแล้วกางเห็น 2 ทางเข้า
             if (item.path === '/jobs/list' && showJobBoard) {
+              const inBoard = location.pathname.startsWith('/jobs/board');
               rows.push(
                 <button
-                  key="/jobs/board"
+                  key="board-group"
                   type="button"
-                  onClick={() => go('/jobs/board')}
-                  className={rowClass(location.pathname.startsWith('/jobs/board'))}
+                  onClick={() => setBoardOpen((v) => !v)}
+                  aria-expanded={boardOpen}
+                  className={rowClass(inBoard)}
                 >
                   <LayoutGrid className="h-4 w-4 shrink-0" />
                   <span className="truncate">บอร์ดรับสมัคร</span>
-                </button>,
-                <button
-                  key="apply-public"
-                  type="button"
-                  onClick={() => {
-                    window.open('/apply', '_blank', 'noopener,noreferrer');
-                    onClose();
-                  }}
-                  className={cn(rowClass(false), 'text-muted-foreground')}
-                >
-                  <ExternalLink className="h-4 w-4 shrink-0" />
-                  <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
+                  <ChevronDown
+                    className={cn(
+                      'ml-auto h-4 w-4 shrink-0 transition-transform',
+                      boardOpen && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
                 </button>,
               );
+              if (boardOpen) {
+                rows.push(
+                  <button
+                    key="/jobs/board"
+                    type="button"
+                    onClick={() => go('/jobs/board')}
+                    className={cn(rowClass(inBoard), 'pl-10')}
+                  >
+                    <span className="truncate">เปิดบอร์ด</span>
+                  </button>,
+                  <button
+                    key="apply-public"
+                    type="button"
+                    onClick={() => {
+                      window.open('/apply', '_blank', 'noopener,noreferrer');
+                      onClose();
+                    }}
+                    className={cn(rowClass(false), 'pl-10 text-muted-foreground')}
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                    <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
+                  </button>,
+                );
+              }
             }
             return rows;
           })}
