@@ -7,6 +7,13 @@ vi.mock('../../api/_lib/postgres.js', () => ({
     typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42P01',
 }));
 vi.mock('../../api/_lib/schema.js', () => ({ tableInAppSchema: (n: string) => n }));
+// นโยบายมาจากที่เก็บ (migration 073) แล้ว — mock ให้คืนค่าเริ่มต้นคงที่
+// เทสต์ไฟล์นี้นับลำดับคิวรีด้วย sqlOf(i) ถ้าปล่อยให้ store ยิง select จริงลำดับจะเลื่อนหมด
+// (พฤติกรรมของ store เองมีเทสต์แยกที่ callFollowupPolicyStore.test.ts)
+vi.mock('../../api/_lib/callFollowupPolicyStore.js', async () => {
+  const { DEFAULT_CALL_FOLLOWUP_POLICY } = await import('../../src/lib/callFollowupPolicy.js');
+  return { getCallFollowupPolicy: async () => DEFAULT_CALL_FOLLOWUP_POLICY };
+});
 
 const { dbQuery } = await import('../../api/_lib/postgres.js');
 const {

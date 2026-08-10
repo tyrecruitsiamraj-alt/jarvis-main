@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  allowedCallWindow,
+  withAllowedCallWindow,
   DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
   normalizeCallFollowupPolicy,
@@ -198,5 +200,40 @@ describe('isCallOutcome', () => {
     expect(isCallOutcome('reschedule_requested')).toBe(true);
     expect(isCallOutcome('interested')).toBe(false);
     expect(isCallOutcome(null)).toBe(false);
+  });
+});
+
+describe('allowedCallWindow / withAllowedCallWindow — มุมคนใช้ ↔ มุมนโยบาย', () => {
+  it('ค่าเริ่มต้น (ห้ามโทร 20–8) อ่านเป็น "โทรได้ 8–20"', () => {
+    expect(allowedCallWindow(DEFAULT_CALL_FOLLOWUP_POLICY)).toEqual({ fromHour: 8, toHour: 20 });
+  });
+
+  it('ตั้ง "โทรได้ 9–18" แล้วนโยบายเก็บเป็นห้ามโทร 18–9', () => {
+    const p = withAllowedCallWindow(DEFAULT_CALL_FOLLOWUP_POLICY, 9, 18);
+    expect(p.quietFromHour).toBe(18);
+    expect(p.quietToHour).toBe(9);
+    // ไป-กลับต้องได้ค่าเดิม
+    expect(allowedCallWindow(p)).toEqual({ fromHour: 9, toHour: 18 });
+  });
+
+  it('เริ่ม = สิ้นสุด หมายถึงโทรได้ทั้งวัน — shift ไม่เลื่อนเวลา', () => {
+    const p = withAllowedCallWindow(DEFAULT_CALL_FOLLOWUP_POLICY, 8, 8);
+    const at = new Date('2026-08-08T18:30:00.000Z'); // ตี 1:30 ไทย
+    expect(shiftOutOfQuietHours(at, p).getTime()).toBe(at.getTime());
+  });
+
+  it('ค่าที่ตั้งไหลเข้าตัวเลื่อนเวลาแล้วถูกต้อง — ตั้งโทรได้ 9–17 งานตอน 18:00 ไทยถูกเลื่อนไป 9 โมงพรุ่งนี้', () => {
+    const p = withAllowedCallWindow(DEFAULT_CALL_FOLLOWUP_POLICY, 9, 17);
+    const at = new Date('2026-08-08T11:00:00.000Z'); // 18:00 ไทย
+    const out = shiftOutOfQuietHours(at, p);
+    expect((out.getUTCHours() + 7) % 24).toBe(9);
+    expect(out.getTime()).toBeGreaterThan(at.getTime());
+  });
+
+  it('ค่าหลุดขอบ (ชั่วโมง 25 / ติดลบ) ถูกบีบด้วย normalize เดิม', () => {
+    const p = withAllowedCallWindow(DEFAULT_CALL_FOLLOWUP_POLICY, -3, 25);
+    expect(p.quietToHour).toBeGreaterThanOrEqual(0);
+    expect(p.quietToHour).toBeLessThanOrEqual(23);
+    expect(p.quietFromHour).toBeLessThanOrEqual(23);
   });
 });

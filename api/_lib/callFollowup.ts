@@ -14,12 +14,12 @@ import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
 import { notifyRoles } from './appNotifications.js';
 import {
-  DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
   resolveCallFollowup,
   type CallFollowupDecision,
   type CallOutcome,
 } from '../../src/lib/callFollowupPolicy.js';
+import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const suppressionTable = tableInAppSchema('candidate_call_suppression');
@@ -165,7 +165,8 @@ export async function applyCallFollowupToQueueRow(input: {
     now: input.now ?? new Date(),
     requestedCallbackAt: pickRequestedCallbackAt(input.result),
     declinedScope: input.declinedScope ?? null,
-    policy: DEFAULT_CALL_FOLLOWUP_POLICY,
+    // นโยบายที่เจ้าของตั้งจากหน้า Follow (migration 073) — ตารางยังไม่ migrate = ค่าเดิมในโค้ด
+    policy: await getCallFollowupPolicy(),
   });
 
   try {
@@ -283,7 +284,7 @@ export async function applyHumanCallFollowup(input: {
     now,
     requestedCallbackAt: pickRequestedCallbackAt(input.detail),
     declinedScope: input.declinedScope ?? null,
-    policy: DEFAULT_CALL_FOLLOWUP_POLICY,
+    policy: await getCallFollowupPolicy(),
   });
 
   // มีแถวคิว → เขียนสถานะให้ลูปเดินต่อได้ (คนโทรไม่ติด AI รับช่วงโทรซ้ำได้)

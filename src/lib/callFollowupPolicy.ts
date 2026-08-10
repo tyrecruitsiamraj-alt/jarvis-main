@@ -71,6 +71,24 @@ export function normalizeCallFollowupPolicy(raw: unknown): CallFollowupPolicy {
   return out;
 }
 
+/**
+ * มุมคนใช้กับมุมนโยบายเป็นเลขชุดเดียวกันแต่กลับด้าน:
+ * คนตั้ง "โทรได้ 08:00–20:00" · นโยบายเก็บ "ห้ามโทร 20:00–08:00"
+ * (เก็บเป็น quiet เพราะตรรกะ shiftOutOfQuietHours ใช้แบบนั้นและมีเทสต์คุมอยู่แล้ว)
+ * from == to = โทรได้ทั้งวัน (ช่วงเงียบว่าง)
+ */
+export function allowedCallWindow(policy: CallFollowupPolicy): { fromHour: number; toHour: number } {
+  return { fromHour: policy.quietToHour, toHour: policy.quietFromHour };
+}
+
+export function withAllowedCallWindow(
+  policy: CallFollowupPolicy,
+  fromHour: number,
+  toHour: number,
+): CallFollowupPolicy {
+  return normalizeCallFollowupPolicy({ ...policy, quietToHour: fromHour, quietFromHour: toHour });
+}
+
 export type CallFollowupAction =
   /** นัดโทรซ้ำ — ตั้งคิวกลับเป็น pending พร้อม nextAttemptAt */
   | 'retry'

@@ -25,6 +25,11 @@ import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { toE164Thai } from './thaiPhone.js';
+import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
+import {
+  DEFAULT_CALL_FOLLOWUP_POLICY,
+  shiftOutOfQuietHours,
+} from '../../src/lib/callFollowupPolicy.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
@@ -177,6 +182,20 @@ async function insertQueueItems(
     suppressedPhones = null;
   }
 
+  // "โทรได้ช่วงกี่โมง" ต้องมีผลกับ **ของใหม่** ด้วย ไม่ใช่แค่โทรซ้ำ — เดิมคิวใหม่
+  // ไม่มี next_attempt_at ทำให้งานที่กดส่งตอน 19:55 ถูก Lumos หยิบไปโทรตอน 21:00 ได้
+  // ตั้งเวลาให้พ้นช่วงห้ามโทรตั้งแต่ตอนเข้าคิว (takePendingLumosItems กรองคอลัมน์นี้อยู่แล้ว)
+  // อ่านนโยบายไม่ได้ = ใช้ค่าเริ่มต้น (ห้ามโทร 20:00–08:00) — เข้มไว้ก่อน ปลอดภัยกว่า
+  let nextAttemptAt: string | null = null;
+  try {
+    const policy = await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY);
+    const now = new Date();
+    const shifted = shiftOutOfQuietHours(now, policy);
+    if (shifted.getTime() > now.getTime()) nextAttemptAt = shifted.toISOString();
+  } catch {
+    nextAttemptAt = null;
+  }
+
   for (const item of items) {
     const phone = payloadPhone(item.payload);
     if (phone && heldPhones.has(phone)) {
@@ -193,11 +212,11 @@ async function insertQueueItems(
       continue;
     }
     const { rows } = await dbQuery<{ id: number }>(
-      `insert into ${queueTable} (channel, job_ref, person_ref, payload)
-       values ($1, $2, $3, $4::jsonb)
+      `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at)
+       values ($1, $2, $3, $4::jsonb, $5)
        on conflict (channel, job_ref, person_ref) do nothing
        returning id`,
-      [channel, jobRef, item.personRef, JSON.stringify(item.payload)],
+      [channel, jobRef, item.personRef, JSON.stringify(item.payload), nextAttemptAt],
     );
     if (rows.length > 0) added.push(item.personRef);
   }

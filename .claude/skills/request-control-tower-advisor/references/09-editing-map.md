@@ -418,6 +418,33 @@ Dashboard รอนาน ซึ่งแก้ที่ต้นเหตุไ
 ทั้งสองใช้ `resolveCallFollowup()` ตัวเดียวกัน — คนกับ AI จึงส่งไม้ต่อกันได้
 (คนโทรไม่ติด → AI รับช่วงโทรซ้ำ) · error ในลูปนี้ **ห้ามทำให้ ingest/บันทึกผลล้ม**
 
+### นโยบายการโทร — ตั้งจากหน้า Follow ได้ (migration 073)
+
+เจ้าของขอตั้งเองว่า "คนนึงจะโทรกี่ครั้ง และโทรช่วงเวลากี่โมงบ้าง"
+
+* `migrations/073_call_followup_policy.sql` — `app_call_followup_policy` (jsonb แถวเดียว
+  แพตเทิร์นเดียวกับ 069) seed = ค่า hardcode เดิมเป๊ะ → deploy แล้วไม่มีอะไรเปลี่ยน
+* `src/lib/callFollowupPolicy.ts` — ความหมาย + normalize อยู่ที่เดิม · เพิ่ม
+  `allowedCallWindow()`/`withAllowedCallWindow()` แปลงมุมคนใช้ ("โทรได้ 8–20")
+  ↔ มุมนโยบาย ("ห้ามโทร 20–8") — เลขชุดเดียวกันกลับด้าน
+* `api/_lib/callFollowupPolicyStore.ts` — อ่าน/เขียน + cache 60 วิ · ตารางยังไม่ migrate
+  = ค่าเริ่มต้น · **DB ล้มเหตุอื่น = โยนต่อ** (ไม่งั้นเงียบ ๆ ใช้เพดานโทรคนละชุดกับที่ตั้ง)
+* `api/_handlers/lumos-call-policy.ts` — `GET/PUT /api/lumos/call-policy`
+  (GET ทุก role ที่เห็นหน้า Follow · **PUT เฉพาะ admin** + audit before/after)
+* `src/lib/callFollowupPolicyApi.ts` · `src/components/follow/CallPolicyPanel.tsx`
+* `tests/api/callFollowupPolicyStore.test.ts` (14 เคส) + เคส window ใน
+  `callFollowupPolicy.test.ts`
+
+⚠️ **จุดใช้นโยบายมี 3 ที่ ต้องครบ** (มีเทสต์ source-guard คุม):
+1. `applyCallFollowupToQueueRow` (ผลจาก AI) — `policy: await getCallFollowupPolicy()`
+2. `applyHumanCallFollowup` (ผลจากคน) — เหมือนกัน
+3. **`insertQueueItems` ตั้ง `next_attempt_at` ให้พ้นช่วงห้ามโทรตั้งแต่ตอนเข้าคิว** —
+   เดิมช่วงห้ามโทรคุมเฉพาะ "โทรซ้ำ" ของใหม่ที่กดส่งตอน 19:55 ถูก Lumos หยิบไป
+   โทรตอน 21:00 ได้ · อ่านนโยบายไม่ได้ = ใช้ค่าเริ่มต้น (เข้มไว้ก่อน)
+
+⚠️ เทสต์ `callFollowup.test.ts` นับลำดับคิวรีด้วย `sqlOf(i)` จึง mock store ให้คืน
+ค่าเริ่มต้นคงที่ — พฤติกรรม store จริงมีเทสต์แยกของตัวเอง
+
 ### หน้า Follow — funnel การโทร + ถัง "ต้องคนตาม"
 
 * `api/_handlers/lumos-call-funnel.ts` — `GET /api/lumos/call-funnel` (rbac `follow`)
