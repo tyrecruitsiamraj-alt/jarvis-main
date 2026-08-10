@@ -4,6 +4,7 @@ import {
   PhoneForwarded,
   ArrowRight,
   ArrowDown,
+  CornerDownRight,
   Phone,
   PhoneCall,
   AlertTriangle,
@@ -19,7 +20,6 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
-import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -293,19 +293,27 @@ const HomePage: React.FC = () => {
                 ⚠️ จังหวะของแถวนี้ต้องเท่าแถวบน (เจ้าของทัก 10 ส.ค. 2569 ว่า "จัดให้สวยแบบเส้นหลัก"):
                 ใช้โครงคอลัมน์ตัวเดียวกัน (FLOW_ROW_GRID) คอลัมน์จึงตรงกันเสมอ
 
-                ⚠️ ช่องแรกวางไว้ใต้ "ใบขอเปิดอยู่" ตั้งใจ — มันคือ **ส่วนต่าง** ของสองช่องแรกแถวบน
-                (ใบขอเปิดอยู่ − AI แนะนำคนแล้ว) การวางตรงคอลัมน์เดียวกันทำให้อ่านการลบออกได้ด้วยตา
-                เจ้าของสั่ง 10 ส.ค. 2569: "ใส่ค่าที่เป็นส่วนต่างสิ ว่าเหลืออีกเท่าไหร่"
-                เดิมช่องนี้เป็นแค่ป้ายข้อความ และมีการ์ด "ยังไม่มีคน" (analyzed − with_recommend)
-                อยู่ช่องถัดไปซึ่ง**ได้เลขเดียวกันเป๊ะเมื่อ AI ประเมินครบทุกใบ** = โชว์ 140 สองที่ติดกัน
-                จึงยุบเหลือใบเดียว แล้วเอาส่วนที่ยังไม่ได้ประเมินไปบอกในบรรทัดย่อยแทน */}
+                ⚠️ **การ์ดนี้อยู่ใต้คอลัมน์ "AI แนะนำคนแล้ว" ห้ามย้ายไปคอลัมน์แรก**
+                เคยวางไว้ใต้ "ใบขอเปิดอยู่" แล้วเจ้าของอ่านผิดทันที (10 ส.ค. 2569):
+                "ดูแล้วไม่รู้ว่าไม่มีคนแนะนำคือเหลือมา มันเหมือนทั้งหมด + ไม่มีคนแนะนำ"
+                — เลขสองตัวที่วางซ้อนคอลัมน์กันในแนวตั้งถูกอ่านว่า "เอามาบวกกัน" ไม่ใช่ "หักออก"
+                วางใต้ 174 แทน = 314 แตกเป็น 174 กับ 140 อ่านออกว่าเป็นพี่น้องกัน ไม่ใช่ยอดใหม่
+                ช่องแรกจึงเหลือเป็นป้าย "ที่เหลือจาก 314" พร้อมลูกศรชี้ลงเข้าการ์ด */}
             <div className={cn('mt-2 border-t border-white/10 pt-2', FLOW_ROW_GRID)}>
+              {/* ป้ายบอกที่มาของเลข — ไม่ใช่ตัวเลข จึงไม่ใส่กรอบการ์ด กันสับสนว่าเป็นอีกยอด */}
+              <div className="flex items-center justify-end gap-1.5 pr-1 text-[11px] leading-tight text-slate-400">
+                <span>
+                  ที่เหลือจาก {flow.jobs.open_total.toLocaleString('th-TH')}
+                </span>
+                <CornerDownRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              </div>
+              <div className="hidden w-4 sm:block" aria-hidden />
               <FlowStage
-                label="ไม่มีคนแนะนำ"
+                label="ยังไม่มีคนแนะนำ"
                 value={Math.max(flow.jobs.open_total - flow.jobs.with_recommend, 0)}
                 sub={
                   <>
-                    ใบขอ {flow.jobs.open_total} − แนะนำแล้ว {flow.jobs.with_recommend}
+                    {flow.jobs.open_total} − {flow.jobs.with_recommend} ที่แนะนำแล้ว
                     {flow.jobs.open_total > flow.jobs.analyzed ? (
                       <> · ยังไม่ได้ประเมิน {flow.jobs.open_total - flow.jobs.analyzed}</>
                     ) : null}
@@ -342,12 +350,10 @@ const HomePage: React.FC = () => {
                 tone="violet"
                 onClick={() => navigate('/matching/job-postings')}
               />
-              {/* ตัวคั่นเปล่าของคอลัมน์ที่ 6–8 — **ห้ามตัดทิ้ง** ถึงจะไม่มีอะไรให้แสดง
+              {/* ตัวคั่นเปล่าของคอลัมน์ที่ 8 — **ห้ามตัดทิ้ง** ถึงจะไม่มีอะไรให้แสดง
                   ช่อง `auto` ที่ไม่มีลูกจะยุบเหลือ 0 แล้วความกว้างที่หายไปถูกโยนไปให้ช่อง 1fr
                   ทำให้การ์ดแถวนี้กว้างกว่าแถวบนทันที (วัดแล้ว: ตัดทิ้ง = 213 vs 206 · คงไว้ = 206 เท่ากัน)
                   คอลัมน์ 9 ปล่อยว่างได้ เพราะ 1fr กว้างเท่ากันอยู่แล้วไม่ว่ามีลูกหรือไม่ */}
-              <div className="hidden w-4 sm:block" aria-hidden />
-              <div className="hidden sm:block" aria-hidden />
               <div className="hidden w-4 sm:block" aria-hidden />
             </div>
 
@@ -357,10 +363,9 @@ const HomePage: React.FC = () => {
             </p>
           </PageHeroStrip>
 
-          {/* การไหลของการโทร — ย้ายมาจากหน้า Follow (เจ้าของสั่ง 10 ส.ค. 2569)
-              หน้านี้เป็นภาพรวมทั้งระบบ จึงเริ่มที่ "ทั้งระบบ" แล้วกดสลับดูรายต้นทางได้
-              (หน้า Follow เหลือเฉพาะของตัวเอง ล็อกต้นทางไว้ ไม่มีปุ่มสลับ) */}
-          <CallFunnelPanel defaultSource="all" />
+          {/* ⚠️ เคยมี <CallFunnelPanel defaultSource="all" /> ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+              (ย้ายมาแล้วเอาออกในวันเดียวกัน) หน้านี้จึงเหลือเฉพาะการไหลของ "งานสรรหา"
+              funnel การโทรอยู่หน้า Follow ที่เดียว และล็อกไว้ดูเฉพาะของหน้านั้น */}
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">

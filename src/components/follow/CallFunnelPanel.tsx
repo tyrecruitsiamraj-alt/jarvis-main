@@ -378,11 +378,9 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             </div>
           ) : null}
         </div>
-      ) : funnel.queued > 0 ? (
-        <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.value)}>
-          ยังไม่มีใครตกถัง "ต้องคนตาม" — AI ยังตามงานอยู่
-        </p>
       ) : null}
+      {/* ไม่มีแถบเขียว "ยังไม่มีใครตกถัง ต้องคนตาม" แล้ว (เจ้าของสั่งเอาออก 10 ส.ค. 2569)
+          — ช่อง "ต้องคนตาม" ในแถบตัวเลขด้านบนบอกเลข 0 อยู่แล้ว แถบนี้เลยเป็นการพูดซ้ำ */}
     </div>
   );
 };
