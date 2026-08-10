@@ -1,68 +1,42 @@
-# แผนงานต่อ (อัปเดต 7 ส.ค. 2569 · รอบค่ำ)
+# แผนงานต่อ (อัปเดต 10 ส.ค. 2569)
 
 **วิธีทำงาน (เจ้าของสั่งไว้แล้ว):** ทำทีละข้อ → ตรวจ → commit → push → ข้อถัดไป
 ไม่ต้องรอถามระหว่างทาง
 
-อ่านก่อนเริ่ม: `docs/SESSION-HANDOFF.md` (กติกา 13 ข้อ + กับดักตอนตรวจงาน) และ
-`.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
+อ่านก่อนเริ่ม: `docs/SESSION-HANDOFF.md` (กติกา 13 ข้อ + กับดักตอนตรวจงาน +
+คำตัดสินเจ้าของ) และ `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline ณ commit `be33cad`:** test 618 ผ่าน/4 skip · tsc 0 error **ทั้ง 2 config
-(ต้องเช็คทั้งคู่!)** · eslint 0 error/16 warning · migration ถึง 072
-(เทสต์เพิ่มจาก 567 เป็น 618 — ปิดช่องว่าง 4 จุด · tsc/eslint เท่าเดิม)
-
----
-
-## ✅ เสร็จแล้ว (แผนรอบก่อนปิดครบ 7 ข้อ)
-
-1. เทสต์กันฐานตัวเลข funnel ถอย — `02746fa`
-2. audit contrast ทุกหน้า ตกเกณฑ์ 0 — `d7bc7e1`
-3. เลขประมาณ vs เลขยืนยัน แยกด้วยตา — `6bcfb48`
-4. ยุบภาษาความด่วนเหลือชุดเดียว — `6bcfb48`
-5. จัดลำดับอ่านการ์ดบนลงล่าง — `6bcfb48`
-6. แปล skill เป็นไทย — `f0d2301`
-7. สารบัญ skill ภาษาไทย — `c555527`
-
-**นอกแผนที่ทำเพิ่ม:** แจ้งเตือนในแอป · ประวัติการติดต่อ · โคลนคนเก่ง 5 ตัว ·
-ขยายตัวหนังสือทั้งแอป · แตก MatchingPage 2 ชิ้น
+**Baseline ณ commit `bc43dca`:** test 686 ผ่าน/4 skip (88 ไฟล์) · tsc app + default
+0 error · **tsc api (`tsconfig.api.json`) เหลือ 25 error — ห้ามทำให้เพิ่ม** ·
+eslint 0 error/16 warning · migration ถึง 073
 
 ---
 
-## ✅ แตก MatchingPage — ปิดครบ 3 ชิ้นที่เหลือแล้ว (7 ส.ค. รอบค่ำ)
+## งานที่ทำได้เลย (เรียงตามที่ควรทำก่อน)
 
-| ชิ้น | commit | ผล |
-|---|---|---|
-| `ScreeningEditor` | `7612499` | 4,702 → 4,564 |
-| `LumosSendBar` + `LumosCallBadgeRow` + `LumosJobSummaryStats` + `cardNextAction` | `579abc4` | 4,564 → 4,332 |
-| `TierCriteriaTooltip` + `AiEvaluationStatus` + `TIER_CRITERIA` | `846e53f` | 4,332 → **4,221** |
+### 1. กวาด type error 25 จุดใน api/ (มีชิปวางไว้แล้วจาก session 10 ส.ค.)
 
-รวมทั้งแคมเปญ **5,138 → 4,221 บรรทัด (-917)** · ทุกชิ้นพิสูจน์แล้วว่าเป็น
-**การย้ายล้วน byte-identical** และตรวจของจริงในเบราว์เซอร์ครบทุกตัว
+`npx tsc --noEmit -p tsconfig.api.json` — ส่วนใหญ่ null-safety:
+driverCareActionValidation (9) · job-staff (4) · role-permissions (2) ·
+siamrajUnitRequests (2) · lumos-dispatch (2) · ที่เหลือไฟล์ละ 1
+แก้แบบ narrowing/guard ไม่ใช้ `!`/`as` มั่ว · เจอบั๊กจริงให้บันทึกใน commit
+เสร็จแล้ว: อัปเดต §0 + กติกาข้อ 2 ใน SESSION-HANDOFF ว่า config นี้ต้องเป็น 0
 
-สูตร + กับดักทั้งหมดย้ายไปอยู่ที่
-`.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
-หัวข้อ "แตกไฟล์ MatchingPage" แล้ว (รวมข้อที่เพิ่งเจอ: HMR ทำให้แท็บเก่าโยน error
-ทั้งที่โค้ดไม่พัง — ต้องเช็คในแท็บใหม่)
+### 2. ช่องว่างเทสต์ที่เหลือ (เกณฑ์: "พังแล้วเงียบ" / "ผิดแล้วข้อมูลรั่ว" ก่อน)
 
-**ชิ้นถัดไปต้องถามเจ้าของก่อน:** ที่เหลือในหน้าเป็น JSX ก้อนใหญ่ที่ผูกกับ state
-หลายตัว (การ์ดใบขอ · dialog รายละเอียดผู้สมัคร · แผง iRecruit) แยกต่อได้แต่ต้องส่ง
-props เป็นสิบตัวหรือยกไปเป็น context — ยังไม่ตกลงว่าคุ้มความเสี่ยงไหม
-
----
-
-## งานที่ทำได้เลย
-
-### 1. ดึงเคสให้เจ้าของไปถามคนเก่ง (ถ้าเจ้าของขอ)
-
-เจ้าของพูดว่า "ขอเคสสำหรับ [ชื่อ skill]" → ดึงจากระบบจริงให้:
-
-| skill | ดึงอะไร |
+| ตัว | ทำไมสำคัญ |
 |---|---|
-| `job-request-to-spec` | ใบขอจริง 15 ใบ คละแบบ (ลาออก/เปิดไซต์/เพิ่มอัตรา · หาง่าย/หายาก · เจ้านายไทย/ญี่ปุ่น) |
-| `pick-from-applicants` | ใบขอที่มีผู้สมัครหลายคน + **ผลจริงว่าใครได้งาน อยู่กี่เดือน** |
-| `pick-from-pool` | ใบขอที่ AI หาคนไม่เจอจริง ๆ |
-| `followup-manager` | Dashboard ย้อนหลัง 5 วันที่งานค้างเยอะ |
+| `callBatchStore.ts` (284 บรรทัด) | ตัวสร้าง/อนุมัติ/ปล่อยชุดโทรจริง — claim-then-work กัน race |
+| `authSession.ts` | ออก session หลัง SSO ผ่าน |
+| `roleFunctionGrants.ts` | สิทธิ์รายฟังก์ชัน |
+| `magicLinkLogin.ts` | ทางเข้าอีกทาง |
 
-วิธีการทั้งหมดอยู่ที่ `docs/HOW-TO-COLLECT-CASES.md`
+### 3. ดึงเคสให้เจ้าของไปถามคนเก่ง (เมื่อเจ้าของขอ)
+
+เจ้าของพูด "ขอเคสสำหรับ [ชื่อ skill]" → ดึงจากระบบจริง — วิธีอยู่
+`docs/HOW-TO-COLLECT-CASES.md` (job-request-to-spec 15 ใบคละแบบ ·
+pick-from-applicants ใบที่มีผู้สมัครหลายคน+ผลจริง · pick-from-pool ใบที่ AI
+หาไม่เจอ · followup-manager dashboard ย้อนหลัง 5 วัน)
 
 ---
 
@@ -70,7 +44,10 @@ props เป็นสิบตัวหรือยกไปเป็น context
 
 | เรื่อง | สถานะ |
 |---|---|
-| แผงสีม่วง/น้ำเงินใน MatchingPage ~40 จุด | สีใช้เป็น "ตัวแบ่งกลุ่ม" ไม่ใช่ความหมายใน 9 โทน — ยังไม่ตกลงว่าจะเอายังไง |
-| โคลนคนเก่งให้แม่นขึ้น | ต้องให้เจ้าของเลือกคน + จัดเวลา 1 ชม./คน |
+| hard delete `DELETE /api/candidate-interviews` | ทางลบถาวรทางเดียวที่เหลือ — ต้อง migration + ตกลง visibility |
+| ชุดรออนุมัติค้าง 3 ชุด | รอเจ้าของกดที่หน้างานโทร (ชื่อคนแก้ถูกแล้วใน `bc43dca`) |
+| เปิดหน้างานโทรให้ supervisor | จุดคุมการซ่อน 4 ที่ — จำเป็นต่อการให้ supervisor อนุมัติชุด |
+| แผงสีม่วง/น้ำเงิน MatchingPage ~40 จุด | ยังไม่ตกลง |
+| โคลนคนเก่งให้แม่นขึ้น | ต้องให้เจ้าของเลือกคน + เวลา 1 ชม./คน |
 
 ## ที่เคาะแล้ว — ดูตาราง §4 ใน `docs/SESSION-HANDOFF.md` (อย่าถามซ้ำ)
