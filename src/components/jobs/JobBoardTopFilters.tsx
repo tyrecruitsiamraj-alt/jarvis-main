@@ -191,7 +191,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                       className={cn(
                         'rounded-lg px-4 py-2 text-xs font-semibold transition-all touch-manipulation min-w-[4.5rem]',
                         chip === f.id
-                          ? 'bg-white text-blue-700 shadow-sm'
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
@@ -206,7 +206,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                   className={cn(
                     'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all touch-manipulation lg:hidden',
                     activeFilterCount > 0
-                      ? 'border-blue-300/70 bg-blue-50 text-blue-800 shadow-sm'
+                      ? 'border-blue-300/70 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-700/70 dark:bg-blue-950/60 dark:text-blue-200'
                       : 'border-white/80 bg-white/60 text-foreground hover:bg-white',
                   )}
                 >

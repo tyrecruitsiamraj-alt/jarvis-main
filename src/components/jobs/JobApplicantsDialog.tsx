@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -123,7 +124,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               กำลังโหลดรายชื่อ...
             </div>
           ) : error ? (
-            <p className="rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-600">{error}</p>
+            <p className={cn('rounded-xl border px-3.5 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>{error}</p>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">

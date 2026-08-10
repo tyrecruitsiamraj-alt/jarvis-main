@@ -233,7 +233,7 @@ const WLEmployees: React.FC = () => {
                         type="button"
                         disabled={buSavingId === emp.id}
                         onClick={() => void assignBu(emp, bu)}
-                        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 disabled:cursor-wait disabled:opacity-60"
+                        className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium disabled:cursor-wait disabled:opacity-60', TONE.warn.soft, TONE.warn.value)}
                       >
                         {buSavingId === emp.id ? '…' : bu}
                       </button>
@@ -283,7 +283,7 @@ const WLEmployees: React.FC = () => {
                               type="button"
                               disabled={buSavingId === emp.id}
                               onClick={() => void assignBu(emp, bu)}
-                              className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
+                              className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors disabled:cursor-wait disabled:opacity-60', TONE.warn.soft, TONE.warn.value, TONE.warn.softHover)}
                             >
                               {buSavingId === emp.id ? '…' : bu}
                             </button>

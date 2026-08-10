@@ -978,7 +978,7 @@ const PreCheckPage: React.FC = () => {
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-foreground">{unitRequestCardTitle(jobDetail)}</p>
                           {jobDetail.request_no ? (
-                            <span className="shrink-0 text-[11px] rounded-full border border-blue-200 bg-white px-2 py-0.5 text-blue-700 dark:border-blue-800 dark:text-blue-300">
+                            <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px]', TONE.primary.outline)}>
                               {jobDetail.request_no}
                             </span>
                           ) : null}
@@ -997,16 +997,16 @@ const PreCheckPage: React.FC = () => {
                           <p className="text-xs text-muted-foreground">📍 {jobDetail.location_address}</p>
                         ) : null}
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                          <span className={cn('rounded-full border px-2 py-0.5 text-[11px]', TONE.neutral.outline)}>
                             เพศที่ต้องการ: {jobDetail.gender_requirement || 'ไม่ระบุ'}
                           </span>
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                          <span className={cn('rounded-full border px-2 py-0.5 text-[11px]', TONE.neutral.outline)}>
                             อายุ:{' '}
                             {jobDetail.age_range_min != null || jobDetail.age_range_max != null
                               ? `${jobDetail.age_range_min ?? '—'}–${jobDetail.age_range_max ?? '—'}`
                               : 'ไม่ระบุ'}
                           </span>
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700">
+                          <span className={cn('rounded-full border px-2 py-0.5 text-[11px]', TONE.neutral.outline)}>
                             ต้องการ: {formatYmdDmyBe(jobDetail.required_date)}
                           </span>
                           <span
@@ -1194,7 +1194,7 @@ const PreCheckPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setBranchParserOverride('')}
-                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                                className={cn('rounded-full border px-3 py-1 text-[11px] font-medium', TONE.neutral.outline)}
                               >
                                 กลับไปใช้ข้อความเดิม
                               </button>

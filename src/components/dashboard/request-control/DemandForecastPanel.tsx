@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DASH, TONE } from '@/lib/designTokens';
 import {
   buildDemandForecast,
   FORECAST_GROUPS,
@@ -95,7 +96,7 @@ const DemandForecastPanel: React.FC = () => {
   }, [forecast, tab]);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className={cn('rounded-xl border p-4 shadow-sm', DASH.card)}>
       <div className="mb-3 flex items-start gap-2">
         <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-700">
           <TrendingUp className="h-4 w-4" />
@@ -262,7 +263,7 @@ const DemandForecastPanel: React.FC = () => {
                 {forecast.topResignationUnits.map((u) => (
                   <span
                     key={u.unitName}
-                    className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] tabular-nums text-slate-700"
+                    className={cn('rounded-full border px-2.5 py-1 text-[11px] tabular-nums', TONE.neutral.outline)}
                     title={`${u.requests.toLocaleString('th-TH')} ใบขอ · เกิดขึ้นใน ${u.monthsActive} เดือน`}
                   >
                     {u.unitName}
