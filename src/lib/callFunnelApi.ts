@@ -13,6 +13,12 @@ export type CallFunnel = {
   byOutcome: Record<string, number>;
   needsHuman: number;
   closed: number;
+  /**
+   * สรุปรายรอบโทร (รอบ 4 ขึ้นไปรวบเข้ารอบ 3)
+   * ⚠️ นับตาม **รอบล่าสุดของแต่ละคน** ไม่ใช่ประวัติทุกรอบ — คนหนึ่งอยู่ได้แถวเดียว
+   * อ่านว่า "ตอนนี้แต่ละคนอยู่รอบไหน และรอบนั้นผลเป็นยังไง" ไม่ใช่ "รอบนี้โทรไปกี่สาย"
+   */
+  byAttempt?: { attempt: number; total: number; connected: number; unreached: number; pending: number }[];
 };
 
 export type NeedsHumanItem = {

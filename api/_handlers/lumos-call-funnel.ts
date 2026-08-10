@@ -44,6 +44,8 @@ export type CallFunnel = {
   needsHuman: number;
   /** จบแล้ว */
   closed: number;
+  /** สรุปรายรอบโทร (รอบ 4 ขึ้นไปรวบเข้ารอบ 3) — นับตามรอบล่าสุดของแต่ละคน */
+  byAttempt?: { attempt: number; total: number; connected: number; unreached: number; pending: number }[];
 };
 
 /**
@@ -85,6 +87,7 @@ type StatRow = {
   followup_state: string | null;
   has_result: boolean;
   scheduled_ahead: boolean;
+  attempt_no: number;
   n: string;
 };
 
@@ -97,6 +100,13 @@ async function loadFunnel(
   source: CallFunnelSource,
 ): Promise<CallFunnel> {
   const funnel = emptyFunnel();
+  const byAttempt = [1, 2, 3].map((attempt) => ({
+    attempt,
+    total: 0,
+    connected: 0,
+    unreached: 0,
+    pending: 0,
+  }));
   const params: unknown[] = [];
   const conds: string[] = [];
   if (sinceYmd) {
@@ -116,11 +126,14 @@ async function loadFunnel(
               followup_state,
               (result is not null) as has_result,
               (next_attempt_at is not null and next_attempt_at > now()) as scheduled_ahead,
+              -- รอบที่โทร — เกิน 3 รวบเป็น 3 เพราะเพดานเริ่มต้นคือ 3 ครั้ง
+              least(greatest(coalesce(attempt_count, 1), 1), 3) as attempt_no,
               count(*)::text as n
          from ${queueTable}
          ${sinceClause}
         group by status, coalesce(last_outcome, result->>'outcome'),
-                 followup_state, has_result, scheduled_ahead`,
+                 followup_state, has_result, scheduled_ahead,
+                 least(greatest(coalesce(attempt_count, 1), 1), 3)`,
       params,
     );
 
@@ -139,12 +152,27 @@ async function loadFunnel(
       }
       if (r.followup_state === 'needs_human') funnel.needsHuman += n;
       if (r.followup_state === 'closed') funnel.closed += n;
+
+      // สรุปรายรอบ (เจ้าของสั่ง 10 ส.ค. 2569: "รอบแรกรับไม่รับกี่คน รอบสอง รอบสามด้วย")
+      // ⚠️ `attempt_count` คือรอบ **ล่าสุด** ของแถวนั้น ไม่ใช่ประวัติทุกรอบ — คนที่โทรไปแล้ว
+      // 3 รอบจะนับอยู่ในรอบ 3 อย่างเดียว ไม่ได้ถูกนับซ้ำในรอบ 1-2 · ตัวเลขจึงอ่านว่า
+      // "ตอนนี้แต่ละคนอยู่รอบไหน และรอบนั้นผลเป็นยังไง"
+      const no = Math.min(Math.max(Number(r.attempt_no) || 1, 1), 3);
+      const slot = byAttempt[no - 1];
+      slot.total += n;
+      if (r.last_outcome) {
+        if (CONNECTED_OUTCOMES.includes(r.last_outcome)) slot.connected += n;
+        else if (UNREACHED_OUTCOMES.includes(r.last_outcome)) slot.unreached += n;
+      } else {
+        slot.pending += n;
+      }
     }
   } catch (e) {
     // คอลัมน์ใหม่ยังไม่ถูก migrate → คืน funnel ว่าง หน้าเว็บโชว์ศูนย์ ไม่พัง
     if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return funnel;
     throw e;
   }
+  funnel.byAttempt = byAttempt;
   return funnel;
 }
 

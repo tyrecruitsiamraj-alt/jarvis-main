@@ -301,6 +301,70 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
         );
       })()}
 
+      {/* Status รายรอบ (เจ้าของสั่ง 10 ส.ค. 2569: "เตรียมแล้วกี่คน โทรรอบแรกรับไม่รับกี่คน
+          รอบสอง รอบสามด้วย ส่งโทรทั้งหมดกี่คน โทรไปแล้วกี่คน เหลือโทรกี่คน — ให้เห็นความเป็น
+          visual control") · แถบสัดส่วนอ่านซ้ายไปขวา: ติด (เขียว) / ไม่ติด (เหลือง) / ยังไม่โทร (เทา)
+
+          ⚠️ **ตัวเลขรายรอบนับตามรอบล่าสุดของแต่ละคน ไม่ใช่จำนวนสายที่โทรไปในรอบนั้น**
+          คนที่โทรไปแล้ว 3 รอบจะอยู่ในแถวรอบ 3 อย่างเดียว ไม่ถูกนับซ้ำในรอบ 1-2
+          (ฐานเก็บ `attempt_count` เป็นรอบล่าสุดต่อแถว ไม่ได้เก็บประวัติรายครั้ง)
+          บรรทัดกำกับใต้แผงบอกเรื่องนี้ไว้ กันอ่านผิดว่าเป็นยอดสายต่อรอบ */}
+      {funnel.byAttempt && funnel.byAttempt.some((a) => a.total > 0) ? (
+        <div className={cn('rounded-2xl border p-3', DASH.card)}>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className={DASH.eyebrow}>สถานะการโทรรายรอบ</p>
+            <p className={cn('text-[11px]', DASH.muted)}>
+              {/* เตรียมไว้ = เข้าคิวแล้วแต่ Lumos ยังไม่หยิบไปโทร (queued − delivered)
+                  ⚠️ ห้ามใช้ `waiting` ตรงนี้ — มันคือ "ยังไม่มีผลกลับ" ซึ่งได้เลขเท่า "เหลือโทร"
+                  พอดี กลายเป็นโชว์เลขเดียวกันสองช่อง (เจอตอนตรวจจริง) */}
+              เตรียมไว้{' '}
+              <span className="font-mono font-semibold tabular-nums">
+                {Math.max(funnel.queued - funnel.delivered, 0).toLocaleString('th-TH')}
+              </span>
+              {' · '}ส่งโทรทั้งหมด{' '}
+              <span className="font-mono font-semibold tabular-nums">{funnel.queued.toLocaleString('th-TH')}</span>
+              {' · '}โทรไปแล้ว{' '}
+              <span className="font-mono font-semibold tabular-nums">{funnel.withResult.toLocaleString('th-TH')}</span>
+              {' · '}เหลือโทร{' '}
+              <span className={cn('font-mono font-semibold tabular-nums', TONE.warn.value)}>
+                {Math.max(funnel.queued - funnel.withResult, 0).toLocaleString('th-TH')}
+              </span>
+            </p>
+          </div>
+
+          <div className="mt-2.5 grid gap-2">
+            {funnel.byAttempt.map((a) => {
+              const pct = (v: number) => (a.total > 0 ? (v / a.total) * 100 : 0);
+              return (
+                <div key={a.attempt} className="flex items-center gap-3">
+                  <span className={cn('w-24 shrink-0 text-[11px] font-medium', DASH.cell)}>
+                    รอบที่ {a.attempt}
+                    {a.attempt === 3 ? '+' : ''}
+                  </span>
+                  <div className="flex h-4 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div className={cn('h-full', TONE.success.dot)} style={{ width: `${pct(a.connected)}%` }} />
+                    <div className={cn('h-full', TONE.warn.dot)} style={{ width: `${pct(a.unreached)}%` }} />
+                    <div className="h-full bg-slate-400/70" style={{ width: `${pct(a.pending)}%` }} />
+                  </div>
+                  <span className="w-[13rem] shrink-0 text-right font-mono text-[11px] tabular-nums">
+                    <span className={TONE.success.value}>รับ {a.connected.toLocaleString('th-TH')}</span>
+                    {' · '}
+                    <span className={TONE.warn.value}>ไม่รับ {a.unreached.toLocaleString('th-TH')}</span>
+                    {' · '}
+                    <span className={DASH.muted}>ยังไม่โทร {a.pending.toLocaleString('th-TH')}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className={cn('mt-2 text-[10px] leading-relaxed', DASH.muted)}>
+            นับตาม "รอบล่าสุดของแต่ละคน" — คนที่โทรไปแล้ว 3 รอบจะอยู่ในแถวรอบ 3 แถวเดียว
+            ไม่ถูกนับซ้ำในรอบก่อนหน้า · รอบ 4 ขึ้นไปรวบเข้ารอบ 3
+          </p>
+        </div>
+      ) : null}
+
       {/* ถัง "ต้องคนตาม" — กดขยายเห็นรายชื่อ */}
       {needsHuman.length > 0 ? (
         <div className={cn('overflow-hidden rounded-xl border', TONE.danger.soft)}>
