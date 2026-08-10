@@ -168,6 +168,30 @@ export async function listActiveProposals(): Promise<CandidateProposal[]> {
   return d.items ?? [];
 }
 
+/**
+ * "โทรแล้วไม่สนใจ" จากหน้าจองตัว — โยนคนออกจากการจอง (status = rejected)
+ * ให้เขากลับไปว่างพอที่จะถูกจองกับใบขออื่นได้ · ท่อเดียวกับปุ่ม "ไม่ผ่าน" ในหน้า Matching
+ * (logic เดิมทั้งหมด แค่กดได้จากหน้าจองตัวโดยไม่ต้องย้อนกลับไปเปิดใบขอ)
+ */
+export async function declineProposalAfterCall(
+  id: string,
+  input?: { operatorName?: string | null },
+): Promise<CandidateProposal> {
+  const r = await apiFetch(`/api/matching/proposals?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: 'rejected',
+      reason: 'โทรแล้วไม่สนใจงานนี้ — เอาออกจากการจองเพื่อให้เสนอใบอื่นได้',
+      proposed_by_name: input?.operatorName,
+    }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'บันทึกไม่สำเร็จ');
+  }
+  return (await r.json()) as CandidateProposal;
+}
+
 export async function cancelProposal(
   id: string,
   input?: { reason?: string | null; operatorName?: string | null },

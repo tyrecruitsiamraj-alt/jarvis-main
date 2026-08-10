@@ -216,10 +216,20 @@ type ServerListSummary = {
   urgentTotal: number;
   urgentAnalyzed: number;
   urgentWithGreen: number;
+  /** ยอดในหน่วย "ใบขอ" */
   scopedTotal?: number;
   withGreen?: number;
   withYellow?: number;
   noRecommend?: number;
+  /** ในถัง "ยังไม่มีคน" แยก AI ดูแล้วไม่เจอ vs ยังไม่ได้ดู */
+  noneAnalyzed?: number;
+  noneUnanalyzed?: number;
+  /** ยอดเดียวกันในหน่วย "อัตรา" — การ์ดสรุปโชว์อัตราเป็นเลขหลัก */
+  positionsTotal?: number;
+  positionsUrgent?: number;
+  positionsGreen?: number;
+  positionsYellow?: number;
+  positionsNone?: number;
 };
 
 /**
@@ -1966,8 +1976,9 @@ const MatchingPage: React.FC = () => {
               [
                 {
                   key: 'total',
-                  label: 'ใบขอทั้งหมด',
-                  value: serverSummary?.scopedTotal ?? listTotal,
+                  label: 'อัตราทั้งหมด',
+                  value: serverSummary?.positionsTotal ?? listTotal,
+                  sub: `${(serverSummary?.scopedTotal ?? listTotal).toLocaleString('th-TH')} ใบขอ`,
                   cls: 'border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5',
                   num: TONE.neutral.value,
                   active: !urgentOnly && workflowFilter === 'all',
@@ -1978,8 +1989,9 @@ const MatchingPage: React.FC = () => {
                 },
                 {
                   key: 'urgent',
-                  label: 'ใบขอด่วน',
-                  value: urgentSummary.total,
+                  label: 'อัตราด่วน',
+                  value: serverSummary?.positionsUrgent ?? urgentSummary.total,
+                  sub: `${(serverSummary?.urgentTotal ?? urgentSummary.total).toLocaleString('th-TH')} ใบขอ · นับซ้อนกับ 3 ถังขวา`,
                   cls: TONE.danger.soft,
                   num: TONE.danger.value,
                   active: urgentOnly,
@@ -1991,7 +2003,8 @@ const MatchingPage: React.FC = () => {
                 {
                   key: 'green',
                   label: 'มีคนเขียวแนะนำ',
-                  value: serverSummary?.withGreen ?? urgentSummary.greenSuggested,
+                  value: serverSummary?.positionsGreen ?? urgentSummary.greenSuggested,
+                  sub: `${(serverSummary?.withGreen ?? urgentSummary.greenSuggested).toLocaleString('th-TH')} ใบขอ`,
                   cls: TONE.success.soft,
                   num: TONE.success.value,
                   active: workflowFilter === 'green',
@@ -2003,7 +2016,8 @@ const MatchingPage: React.FC = () => {
                 {
                   key: 'yellow',
                   label: 'มีคนเหลืองแนะนำ',
-                  value: serverSummary?.withYellow ?? 0,
+                  value: serverSummary?.positionsYellow ?? 0,
+                  sub: `${(serverSummary?.withYellow ?? 0).toLocaleString('th-TH')} ใบขอ`,
                   cls: TONE.warn.soft,
                   num: TONE.warn.value,
                   active: workflowFilter === 'yellow',
@@ -2015,7 +2029,15 @@ const MatchingPage: React.FC = () => {
                 {
                   key: 'none',
                   label: 'ยังไม่มีคน',
-                  value: serverSummary?.noRecommend ?? urgentSummary.none,
+                  value: serverSummary?.positionsNone ?? urgentSummary.none,
+                  sub: (() => {
+                    const jobs = serverSummary?.noRecommend ?? urgentSummary.none;
+                    const un = serverSummary?.noneUnanalyzed ?? 0;
+                    // แยกให้เห็นว่า "AI ดูแล้วไม่เจอ" กับ "ยังไม่ได้ดู" คนละงานที่ต้องทำต่อ
+                    return un > 0
+                      ? `${jobs.toLocaleString('th-TH')} ใบขอ · ยังไม่ได้ประเมิน ${un.toLocaleString('th-TH')}`
+                      : `${jobs.toLocaleString('th-TH')} ใบขอ`;
+                  })(),
                   cls: TONE.orange.soft,
                   num: TONE.orange.value,
                   active: workflowFilter === 'none',
@@ -2038,8 +2060,13 @@ const MatchingPage: React.FC = () => {
                   tile.active ? 'ring-2 ring-blue-400/50' : 'hover:border-blue-300/60 dark:hover:border-blue-700/60',
                 )}
               >
-                <div className={cn('text-lg font-bold tabular-nums', tile.num)}>{tile.value}</div>
+                <div className={cn('text-lg font-bold tabular-nums', tile.num)}>
+                  {tile.value.toLocaleString('th-TH')}
+                </div>
                 <div className="text-[11px] text-muted-foreground">{tile.label}</div>
+                {tile.sub ? (
+                  <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground/80">{tile.sub}</div>
+                ) : null}
               </button>
             ))}
           </div>

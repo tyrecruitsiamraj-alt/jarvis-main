@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import { Phone, ExternalLink, X } from 'lucide-react';
+import { PhoneOff, Phone, ExternalLink, X } from 'lucide-react';
 import {
   listActiveProposals,
   cancelProposal,
+  declineProposalAfterCall,
   proposalStatusLabel,
   proposalStatusChip,
   type CandidateProposal,
@@ -65,6 +66,21 @@ const ReservationsPage: React.FC = () => {
       setConfirmingId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** โทรแล้วเขาไม่สนใจ — โยนออกจากการจอง (rejected) ให้เสนอใบอื่นได้ ไม่ต้องย้อนไปเปิดใบขอ */
+  const declineAfterCall = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await declineProposalAfterCall(id);
+      setItems((prev) => prev.filter((it) => it.id !== id));
+      setConfirmingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -174,18 +190,38 @@ const ReservationsPage: React.FC = () => {
                         </button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingId(it.id)}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
-                          TONE.danger.soft,
-                          TONE.danger.value,
-                          TONE.danger.softHover,
-                        )}
-                      >
-                        <X className="h-3 w-3" /> ยกเลิกจอง
-                      </button>
+                      <>
+                        {/* ผลโทรบอกว่าไม่สนใจ → โยนกลับจากหน้านี้ได้เลย (logic เดียวกับ
+                            ปุ่ม "ไม่ผ่าน" ในหน้า Matching แค่ย้ายมาให้กดถึง) · ลงงานแล้วไม่โชว์ */}
+                        {it.status !== 'placed' ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void declineAfterCall(it.id)}
+                            title="เอาออกจากการจอง (ไม่ผ่าน) — เขาจะถูกเสนอกับใบขออื่นได้"
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-60',
+                              TONE.warn.soft,
+                              TONE.warn.value,
+                              TONE.warn.softHover,
+                            )}
+                          >
+                            <PhoneOff className="h-3 w-3" /> {busy ? 'กำลังบันทึก…' : 'โทรแล้วไม่สนใจ — โยนกลับ'}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingId(it.id)}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
+                            TONE.danger.soft,
+                            TONE.danger.value,
+                            TONE.danger.softHover,
+                          )}
+                        >
+                          <X className="h-3 w-3" /> ยกเลิกจอง
+                        </button>
+                      </>
                     )}
                   </div>
                 </li>

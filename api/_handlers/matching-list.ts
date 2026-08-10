@@ -25,6 +25,7 @@ import {
   type MatchingWorkflowFilter,
 } from '@/lib/matchingListFilter';
 import { recommendedCandidateCount } from '@/lib/matchingProgress';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import type { JobRequest } from '@/types';
 import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
 
@@ -123,18 +124,44 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // "เหลือง" = มีเหลืองแต่ไม่มีเขียว (นิยามเดียวกับตัวกรอง workflow=yellow ไม่ให้นับซ้อนกับเขียว)
     const hasYellowOnly = (id: string) =>
       !hasGreen(id) && tiersOf(id).some((t) => t.tier === 'yellow');
+    /**
+     * แบ่งใบขอเป็น 3 ถังที่ **ครอบคลุมทุกใบและไม่ซ้อนกัน** — เขียว + เหลือง + ยังไม่มีคน = ทั้งหมดเสมอ
+     *
+     * เดิม "ยังไม่มีคน" นับเฉพาะใบที่ AI ประเมินแล้วไม่พบ (ต้องมีใน tierMap)
+     * ใบที่ AI ยังไม่ได้ประเมินจึงตกนอกทั้ง 3 ถัง → สามตัวรวมกันไม่เท่ายอดรวม
+     * (ตอนนี้บังเอิญเท่าเพราะทุกใบถูกประเมินหมดพอดี — พังทันทีที่มีใบใหม่เข้ามา)
+     * เจ้าของสั่ง 10 ส.ค. 2569: "แบ่งไปเป็นอะไรก็ได้ แต่รวมกันต้องได้ยอดรวม"
+     * จึงให้ถังที่ 3 = "ที่เหลือทั้งหมด" แล้วแยกรายละเอียดในบรรทัดย่อยแทน
+     */
+    const isGreen = (j: (typeof scopedJobs)[number]) => hasGreen(j.id);
+    const isYellow = (j: (typeof scopedJobs)[number]) => hasYellowOnly(j.id);
+    const noneJobs = scopedJobs.filter((j) => !isGreen(j) && !isYellow(j));
+    const greenJobs = scopedJobs.filter(isGreen);
+    const yellowJobs = scopedJobs.filter(isYellow);
+    /** ในถัง "ยังไม่มีคน" — แยกว่า AI ดูแล้วไม่เจอ vs ยังไม่ได้ดู (คนละงานที่ต้องทำต่อ) */
+    const analyzedNoneJobs = noneJobs.filter((j) => tierMap.has(j.id));
+
+    /** อัตราคงเหลือของชุดใบขอ — หน่วยที่เจ้าของใช้คิดงาน (1 ใบขออาจหลายอัตรา) */
+    const posOf = (list: typeof scopedJobs) => list.reduce((sum, j) => sum + jobPositionUnits(j), 0);
+
     const summary = {
       urgentTotal: urgentJobs.length,
       urgentAnalyzed: urgentJobs.filter((j) => tierMap.has(j.id)).length,
       urgentWithGreen: urgentJobs.filter((j) => hasGreen(j.id)).length,
-      // ยอดทั้งชุด (ตาม BU) สำหรับกล่องสรุปที่กดเพื่อกรองได้
+      // ยอดทั้งชุด (ตาม BU) สำหรับกล่องสรุปที่กดเพื่อกรองได้ — นับเป็น "ใบขอ"
       scopedTotal: scopedJobs.length,
-      withGreen: scopedJobs.filter((j) => hasGreen(j.id)).length,
-      withYellow: scopedJobs.filter((j) => hasYellowOnly(j.id)).length,
-      // ประเมินแล้วแต่ไม่มีใครแนะนำ — ตรงกับตัวกรอง "AI ไม่พบคน"
-      noRecommend: scopedJobs.filter(
-        (j) => tierMap.has(j.id) && recommendedCandidateCount(tiersOf(j.id)) === 0,
-      ).length,
+      withGreen: greenJobs.length,
+      withYellow: yellowJobs.length,
+      noRecommend: noneJobs.length,
+      /** ในถังยังไม่มีคน: AI ประเมินแล้วไม่พบ vs ยังไม่ได้ประเมิน */
+      noneAnalyzed: analyzedNoneJobs.length,
+      noneUnanalyzed: noneJobs.length - analyzedNoneJobs.length,
+      // ยอดเดียวกันในหน่วย "อัตรา" — การ์ดสรุปโชว์อัตราเป็นเลขหลัก
+      positionsTotal: posOf(scopedJobs),
+      positionsUrgent: posOf(urgentJobs),
+      positionsGreen: posOf(greenJobs),
+      positionsYellow: posOf(yellowJobs),
+      positionsNone: posOf(noneJobs),
     };
 
     // ป้าย "AI แนะนำ N" บนการ์ด: ผลที่เก็บไว้ของใบในหน้านี้
