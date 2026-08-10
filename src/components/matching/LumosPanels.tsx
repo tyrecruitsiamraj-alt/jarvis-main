@@ -160,7 +160,7 @@ export function LumosSendBar({
 }: {
   count: number;
   onSend: () => void;
-  /** สร้างชุดรออนุมัติแทนการส่งเข้าคิวทันที — คนอนุมัติที่หน้า Follow */
+  /** สร้างชุดรออนุมัติแทนการส่งเข้าคิวทันที — หัวหน้าอนุมัติที่หน้างานโทร */
   onCreateBatch: () => void;
   onClear: () => void;
   busy: boolean;
@@ -186,7 +186,7 @@ export function LumosSendBar({
           type="button"
           disabled={busy || creatingBatch}
           onClick={onCreateBatch}
-          title="ตั้งเป็นชุดรออนุมัติ — ยังไม่โทร จนกว่าหัวหน้าจะกดอนุมัติที่หน้า Follow"
+          title="ตั้งเป็นชุดรออนุมัติ — ยังไม่โทร จนกว่าหัวหน้าจะกดอนุมัติที่หน้างานโทร"
           className={cn(
             'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
             TONE.warn.outline,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallTeamBoardSection } from '@/pages/matching/CallTeamBoardPage';
+import CallBatchPanel from '@/components/follow/CallBatchPanel';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
@@ -199,6 +200,13 @@ const MyCallsPage: React.FC = () => {
         title="งานโทร"
         subtitle="โทรของฉัน + ภาระงานโทรของทีม อยู่หน้าเดียวกัน"
       />
+
+      {/* ชุดส่งงานที่รออนุมัติ/รอปล่อย — ย้ายมาจากหน้า Follow (เจ้าของสั่ง 10 ส.ค. 2569:
+          "หน้า Follow ไม่ต้องมีอนุมัติ") · การอนุมัติคืองานของหน้างานโทรอยู่แล้ว
+          ซ่อนตัวเองถ้าไม่มีชุด · สิทธิ์จริงอยู่ที่ API เหมือนเดิม (supervisor/admin) */}
+      <div className="px-4 md:px-6 pt-4">
+        <CallBatchPanel />
+      </div>
 
       <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
         <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>โทรของฉัน</h2>

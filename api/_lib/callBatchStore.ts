@@ -134,7 +134,7 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
     );
   }
 
-  // เด้งบอกคนอนุมัติ — เดิมชุดรออนุมัตินอนเงียบจนกว่าจะมีคนเปิดหน้า Follow เอง
+  // เด้งบอกคนอนุมัติ — เดิมชุดรออนุมัตินอนเงียบจนกว่าจะมีคนเปิดหน้าจอเอง
   // ครอบคลุมทุกทางเข้า (ปุ่มในหน้า Matching + โหมด assist จัดชุดเอง) เพราะทุกทางผ่านที่นี่
   // notifyRoles กลืน error เอง — ชุดต้องสร้างสำเร็จแม้ตารางแจ้งเตือนยังไม่ migrate
   if (status === 'pending_approval') {
@@ -142,7 +142,7 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
       type: 'batch_pending',
       title: `📋 ชุดส่งงานโทรรออนุมัติ — ${input.items.length.toLocaleString('th-TH')} คน`,
       body: `ใบขอ ${input.requestNo || input.jobId} · สร้างโดย ${input.createdByName || 'ระบบ'}`,
-      link: '/follow',
+      link: '/matching/my-calls',
       dedupeKey: `batch_pending:${batch.id}`,
     });
   }
@@ -160,7 +160,7 @@ export async function getCallBatch(id: string): Promise<CallBatch | null> {
   }
 }
 
-/** ชุดที่ยังไม่จบ (รออนุมัติ / รอปล่อย) + ชุดที่เพิ่งส่งไป — สำหรับหน้า Follow */
+/** ชุดที่ยังไม่จบ (รออนุมัติ / รอปล่อย) + ชุดที่เพิ่งส่งไป — สำหรับแผงอนุมัติ (หน้างานโทร) */
 export async function listCallBatches(limit = 50): Promise<CallBatch[]> {
   try {
     await releaseDueCallBatches();
