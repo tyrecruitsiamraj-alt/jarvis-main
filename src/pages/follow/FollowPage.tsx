@@ -37,6 +37,17 @@ function nowForInput(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * คำนำหน้าที่ให้เลือก — เก็บเป็นข้อความติดหน้าชื่อตามธรรมเนียมไทย ("นายสมชาย ใจดี")
+ * ค่าว่าง = ไม่ระบุ (บางเคสมีแค่ชื่อเล่น/ชื่อที่คนแนะนำมา)
+ */
+const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as const;
+
+/** ประกอบชื่อที่จะส่งให้ API — API รับ `recipient_name` ก้อนเดียว */
+function composeRecipientName(prefix: string, first: string, last: string): string {
+  return `${prefix}${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, ' ');
+}
+
 const FollowPage: React.FC = () => {
   const [items, setItems] = useState<FollowEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,11 +55,14 @@ const FollowPage: React.FC = () => {
   const [filter, setFilter] = useState<'all' | FollowCallStatus>('all');
 
   const [formOpen, setFormOpen] = useState(false);
-  const [name, setName] = useState('');
+  const [prefix, setPrefix] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [topic, setTopic] = useState('');
   const [note, setNote] = useState('');
-  const [scheduledAt, setScheduledAt] = useState(nowForInput);
+  /** ให้โทรเมื่อไหร่ — หลายรอบได้ เพราะบางเคสต้องโทรมากกว่า 1 ครั้ง (เจ้าของสั่ง 10 ส.ค. 2569) */
+  const [scheduledAts, setScheduledAts] = useState<string[]>(() => [nowForInput()]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -73,33 +87,71 @@ const FollowPage: React.FC = () => {
   }, [reload]);
 
   const resetForm = () => {
-    setName('');
+    setPrefix('');
+    setFirstName('');
+    setLastName('');
     setPhone('');
     setTopic('');
     setNote('');
-    setScheduledAt(nowForInput());
+    setScheduledAts([nowForInput()]);
     setFormError(null);
   };
 
+  const setScheduledAtAt = (i: number, v: string) =>
+    setScheduledAts((prev) => prev.map((x, idx) => (idx === i ? v : x)));
+  const addScheduledAt = () => setScheduledAts((prev) => [...prev, nowForInput()]);
+  const removeScheduledAt = (i: number) =>
+    setScheduledAts((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+
+  /**
+   * หนึ่งเวลา = หนึ่งรายการ — API รับเวลาเดียวต่อรายการ และคิวโทรก็ผูกกับรายการ 1:1
+   * จึงยิงทีละรอบ ไม่ใช่ยัดหลายเวลาลงรายการเดียว (แต่ละรอบมีสถานะ/ผลของตัวเอง ตามงานจริงได้)
+   *
+   * ⚠️ ยิงหลายรอบแล้วรอบท้าย ๆ ล้มได้ — ต้องบอกผู้ใช้ว่า **อะไรสำเร็จไปแล้ว**
+   * ไม่งั้นเขากดซ้ำทั้งชุดแล้วได้รายการซ้อน (บทเรียนเดียวกับตอนสร้างชุดส่งจากหน้า Matching)
+   */
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    // เรียงเวลาจากก่อนไปหลัง + ตัดเวลาซ้ำทิ้ง (กดเพิ่มแล้วลืมแก้ = ได้สองสายเวลาเดียวกัน)
+    const times = [...new Set(scheduledAts.filter(Boolean))].sort();
+    if (times.length === 0) {
+      setFormError('กรุณาระบุเวลาที่ให้โทรอย่างน้อย 1 รอบ');
+      return;
+    }
+
     setSubmitting(true);
+    let done = 0;
     try {
-      await createFollowEntry({
-        recipient_name: name,
-        recipient_phone: phone,
-        topic,
-        note: note || undefined,
-        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
-      });
+      const recipientName = composeRecipientName(prefix, firstName, lastName);
+      for (const t of times) {
+        await createFollowEntry({
+          recipient_name: recipientName,
+          recipient_phone: phone,
+          topic,
+          note: note || undefined,
+          scheduled_at: new Date(t).toISOString(),
+        });
+        done += 1;
+      }
       resetForm();
       setFormOpen(false);
-      setOkMessage('เพิ่มรายชื่อแล้ว — ส่งเข้าคิว AI โทรเรียบร้อย');
+      setOkMessage(
+        times.length > 1
+          ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${times.length} รอบ`
+          : 'เพิ่มรายชื่อแล้ว',
+      );
       window.setTimeout(() => setOkMessage(null), 5000);
       await reload();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ');
+      const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
+      setFormError(
+        done > 0
+          ? `${msg} — แต่บันทึกไปแล้ว ${done} จาก ${times.length} รอบ กรุณาเพิ่มเฉพาะรอบที่ยังขาด อย่ากดซ้ำทั้งชุด`
+          : msg,
+      );
+      if (done > 0) await reload();
     } finally {
       setSubmitting(false);
     }
@@ -178,34 +230,65 @@ const FollowPage: React.FC = () => {
         {/* ฟอร์มเพิ่ม */}
         {formOpen ? (
           <form onSubmit={submit} className="jarvis-frost space-y-3 p-4 sm:p-5">
-            <div className="grid gap-3 sm:grid-cols-2">
+            {/* คำนำหน้า + ชื่อ + นามสกุล — API รับ recipient_name ก้อนเดียว ประกอบตอนส่ง
+                นามสกุลไม่บังคับ บางเคสมีแค่ชื่อที่คนแนะนำมา ไม่ควรบล็อกไม่ให้ลงรายชื่อ */}
+            <div className="grid gap-3 sm:grid-cols-[7rem_1fr_1fr]">
               <div className="space-y-1.5">
-                <label htmlFor="followName" className="ml-1 text-xs font-medium text-muted-foreground">
-                  ชื่อผู้ที่ต้องติดตาม
+                <label htmlFor="followPrefix" className="ml-1 text-xs font-medium text-muted-foreground">
+                  คำนำหน้า
+                </label>
+                <select
+                  id="followPrefix"
+                  value={prefix}
+                  onChange={(e) => setPrefix(e.target.value)}
+                  className="jarvis-soft-field min-h-[46px]"
+                >
+                  {NAME_PREFIXES.map((p) => (
+                    <option key={p || 'none'} value={p}>
+                      {p || 'ไม่ระบุ'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="followFirst" className="ml-1 text-xs font-medium text-muted-foreground">
+                  ชื่อ
                 </label>
                 <input
-                  id="followName"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  id="followFirst"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   required
-                  placeholder="เช่น สมชาย ใจดี"
+                  placeholder="สมชาย"
                   className="jarvis-soft-field min-h-[46px]"
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="followPhone" className="ml-1 text-xs font-medium text-muted-foreground">
-                  เบอร์โทร (มือถือ 10 หลัก)
+                <label htmlFor="followLast" className="ml-1 text-xs font-medium text-muted-foreground">
+                  นามสกุล <span className="text-muted-foreground/70">(ถ้ามี)</span>
                 </label>
                 <input
-                  id="followPhone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  inputMode="tel"
-                  placeholder="0812345678"
+                  id="followLast"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="ใจดี"
                   className="jarvis-soft-field min-h-[46px]"
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="followPhone" className="ml-1 text-xs font-medium text-muted-foreground">
+                เบอร์โทร (มือถือ 10 หลัก)
+              </label>
+              <input
+                id="followPhone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                inputMode="tel"
+                placeholder="0812345678"
+                className="jarvis-soft-field min-h-[46px]"
+              />
             </div>
             <div className="space-y-1.5">
               <label htmlFor="followTopic" className="ml-1 text-xs font-medium text-muted-foreground">
@@ -220,31 +303,63 @@ const FollowPage: React.FC = () => {
                 className="jarvis-soft-field min-h-[46px]"
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label htmlFor="followNote" className="ml-1 text-xs font-medium text-muted-foreground">
-                  รายละเอียดเพิ่มเติม (ถ้ามี)
-                </label>
-                <input
-                  id="followNote"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="ข้อความที่อยากให้ AI พูดเพิ่ม"
-                  className="jarvis-soft-field min-h-[46px]"
-                />
+            <div className="space-y-1.5">
+              <label htmlFor="followNote" className="ml-1 text-xs font-medium text-muted-foreground">
+                รายละเอียดเพิ่มเติม (ถ้ามี)
+              </label>
+              <input
+                id="followNote"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="ข้อความที่อยากให้ AI พูดเพิ่ม"
+                className="jarvis-soft-field min-h-[46px]"
+              />
+            </div>
+
+            {/* ให้โทรเมื่อไหร่ — เพิ่มได้หลายรอบ · หนึ่งรอบ = หนึ่งรายการในคิว มีสถานะ/ผลของตัวเอง */}
+            <div className="space-y-1.5">
+              <label htmlFor="followWhen0" className="ml-1 text-xs font-medium text-muted-foreground">
+                ให้โทรเมื่อไหร่
+              </label>
+              <div className="space-y-2">
+                {scheduledAts.map((v, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      id={`followWhen${i}`}
+                      type="datetime-local"
+                      value={v}
+                      onChange={(e) => setScheduledAtAt(i, e.target.value)}
+                      className="jarvis-soft-field min-h-[46px] flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeScheduledAt(i)}
+                      disabled={scheduledAts.length <= 1}
+                      title={scheduledAts.length <= 1 ? 'ต้องมีอย่างน้อย 1 รอบ' : 'เอารอบนี้ออก'}
+                      aria-label={`เอารอบที่ ${i + 1} ออก`}
+                      className={cn(
+                        'inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border',
+                        'border-white/70 bg-white/60 text-slate-600 hover:text-foreground',
+                        'dark:border-white/15 dark:bg-white/10 dark:text-slate-300',
+                        'disabled:cursor-not-allowed disabled:opacity-40',
+                      )}
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <div className="space-y-1.5">
-                <label htmlFor="followWhen" className="ml-1 text-xs font-medium text-muted-foreground">
-                  ให้โทรเมื่อ
-                </label>
-                <input
-                  id="followWhen"
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="jarvis-soft-field min-h-[46px]"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={addScheduledAt}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบโทร
+              </button>
+              <p className="ml-1 text-[11px] text-muted-foreground">
+                บางเรื่องต้องโทรมากกว่า 1 ครั้ง — ใส่ได้หลายรอบ ระบบจะสร้างเป็นรายการแยกให้รอบละ 1 รายการ
+                (เวลาซ้ำกันจะถูกตัดออกอัตโนมัติ)
+              </p>
             </div>
 
             {formError ? (
