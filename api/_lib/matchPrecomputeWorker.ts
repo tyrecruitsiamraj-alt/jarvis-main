@@ -114,7 +114,9 @@ function sortByPriority(
  * cards get their AI results first.
  */
 export function enqueuePrecomputeJobs(
-  jobs: Array<Record<string, unknown> & { id: string }>,
+  // รับแค่ { id } — interface อย่าง JobRequest ไม่มี index signature จึง assign เข้า
+  // Record<string, unknown> ตรง ๆ ไม่ได้ · ฟิลด์อื่นถูกอ่านแบบ dynamic ผ่าน PrecomputeJob อยู่แล้ว
+  jobs: Array<{ id: string }>,
   opts: { refresh?: boolean; front?: boolean } = {},
 ): void {
   if (!workerStarted) return;

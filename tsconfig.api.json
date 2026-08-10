@@ -7,6 +7,7 @@
   "include": [
     "api",
     "src/lib",
-    "src/types"
+    "src/types",
+    "src/vite-env.d.ts"
   ]
 }

@@ -146,7 +146,7 @@ type ScopeResult =
  * roles only their own department. Without `bu`, fall back to the user's own
  * department (admins → all).
  */
-async function resolveScope(req: AuthedReq, requestedRaw: string): Promise<ScopeResult> {
+async function resolveScope(req: AuthedReq, requestedRaw: string | null): Promise<ScopeResult> {
   const requested = normalizeDepartmentCode(requestedRaw);
   if (requested) {
     if (!isAllowedDepartmentCode(requested)) {
@@ -167,7 +167,7 @@ async function resolveScope(req: AuthedReq, requestedRaw: string): Promise<Scope
 /** Resolve a single BU value the caller is allowed to write to (for set-bu). */
 async function authorizeBu(
   req: AuthedReq,
-  raw: string,
+  raw: string | null,
 ): Promise<{ ok: true; bu: string | null } | { ok: false; status: number; message: string }> {
   const r = await resolveScope(req, raw);
   if (!r.ok) return r;

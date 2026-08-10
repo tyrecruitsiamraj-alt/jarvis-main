@@ -10,11 +10,11 @@
 | | |
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
-| commit ล่าสุด | `bc43dca` |
-| `npm run test` | **686 ผ่าน / 4 skipped** (ไฟล์เทสต์ 88) |
+| commit ล่าสุด | `bc43dca` (+ กวาด type error api/ เสร็จ 10 ส.ค.) |
+| `npm run test` | **689 ผ่าน / 4 skipped** (ไฟล์เทสต์ 89) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error (ครอบ `src/`) |
 | `npx tsc --noEmit` | 0 error (**ไม่ครอบทั้ง src/ และ api/** — อย่าหลงว่าเช็คแล้ว) |
-| `npx tsc --noEmit -p tsconfig.api.json` | **25 error รอกวาด** (ครอบ `api/` — ใหม่ 10 ส.ค. · กติกา: **ห้ามทำให้เพิ่ม**) |
+| `npx tsc --noEmit -p tsconfig.api.json` | **0 error** (ครอบ `api/` — กวาดครบ 10 ส.ค. · กติกา: **ต้องเป็น 0**) |
 | `npx eslint .` | 0 error · 16 warning เดิม |
 | migration | ถึง **073** (`app_call_followup_policy`) รันบนฐานแล้ว |
 | โหมดโทร | **manual ทุกจุด** — production ยังไม่โทรหาใครเอง |
@@ -72,9 +72,9 @@
 ## 3. ⚠️ กติกาที่ห้ามพลาด (เจ็บมาแล้วทั้งนั้น)
 
 1. **DB local = production** — ทดสอบอะไรที่เขียนต้องคืนค่าเดิม
-2. **เช็ก tsc สาม config** — สองตัวเดิม**ไม่มีตัวไหนครอบ `api/`** (default =
-   references เปล่า · app = src เท่านั้น) ตัวที่สาม `tsconfig.api.json` ครอบ api ·
-   ยังเหลือ 25 error รอกวาด — **ห้ามทำให้เพิ่ม** (เช็คก่อน/หลังแก้) ยังไม่ต้องเป็น 0
+2. **เช็ก tsc สาม config — ต้องเป็น 0 ทั้งสาม** — สองตัวเดิม**ไม่มีตัวไหนครอบ `api/`**
+   (default = references เปล่า · app = src เท่านั้น) ตัวที่สาม `tsconfig.api.json`
+   ครอบ api · กวาดครบแล้ว 10 ส.ค. — error โผล่เมื่อไหร่ = ของใหม่พัง
 3. **ห้ามแก้ class หลายจุดด้วย regex** — แก้มือทีละจุด หรือสคริปต์ "เติมท้ายอย่างเดียว"
 4. **สีมาจาก `designTokens.ts` ที่เดียว** — กับดักบ่อยสุด: ใส่ `dark:border`/`dark:text`
    ครบแต่**ลืม `dark:bg`** · โทนผลโทรใช้ `CALL_OUTCOME_TONE` แหล่งเดียว
@@ -126,11 +126,6 @@
 ---
 
 ## 5. งานที่เหลือ
-
-### มีชิปวางไว้แล้ว (กดเริ่มได้จาก session เก่า หรือทำเองตาม prompt ในชิป)
-- **กวาด type error 25 จุดใน `api/`** (`tsconfig.api.json`) — ส่วนใหญ่ null-safety
-  ใน driverCareActionValidation (9) · job-staff · role-permissions · เสร็จแล้วยกเป็น
-  baseline "ต้องเป็น 0" ใน §0 และกติกาข้อ 2
 
 ### ทำต่อได้เลย
 - **ดึงเคสให้เจ้าของไปถามคนเก่ง** — เจ้าของพูด "ขอเคสสำหรับ [ชื่อ skill]" →

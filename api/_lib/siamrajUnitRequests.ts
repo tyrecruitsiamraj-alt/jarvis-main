@@ -113,6 +113,8 @@ export function mapSiamrajRow(r: SiamrajUnitRequestRow) {
     externalId: r.act_saleco_id,
     source: 'siamraj' as const,
     readOnly: true,
+    // เส้น postgres ไม่มีคอลัมน์แผนกให้ดึง — ผู้ใช้ที่ถูกจำกัดแผนกจะไม่เห็นแถวจากเส้นนี้ (fail-closed)
+    department_code: undefined as string | undefined,
     request_no: r.request_no || undefined,
     submittedByName: r.requester_name?.trim() || undefined,
     submittedByEmail: r.requester_email?.trim() || undefined,
@@ -249,7 +251,10 @@ export async function getSiamrajUnitRequestById(
   const source = getSiamrajDbSource();
   if (!source) return null;
 
-  let item =
+  let item:
+    | Awaited<ReturnType<typeof getSiamrajSqlServerUnitRequestById>>
+    | ReturnType<typeof mapSiamrajRow>
+    | null =
     source === 'sqlserver'
       ? await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id))
       : null;

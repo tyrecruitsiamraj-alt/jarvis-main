@@ -40,7 +40,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const parsed = parseErpBranchDemand(parserInput);
 
     const includeMatches = getQuery(req, 'matches') === '1';
-    let branch_matches: Awaited<ReturnType<typeof buildBranchMatchingSuggestions>>['branches'] = [];
+    let branch_matches: NonNullable<Awaited<ReturnType<typeof buildBranchMatchingSuggestions>>>['branches'] = [];
     if (includeMatches) {
       const poolRaw = getQuery(req, 'poolSize');
       const poolSize = poolRaw ? Number(poolRaw) : 200;

@@ -61,7 +61,7 @@ export type LumosReminderPayload = {
 
 export function buildReminderPayload(
   job: Record<string, unknown>,
-  result: Pick<BoardMatchResult, 'jobId' | 'request_no' | 'job_family_label'>,
+  result: Pick<BoardMatchResult, 'jobId' | 'request_no'> & { job_family_label: string | null },
   match: { card_id: number; full_name: string; mobile: string | null },
   now = new Date(),
 ): LumosReminderPayload | null {
@@ -108,7 +108,7 @@ export type LumosInterviewPayload = {
 
 export function buildInterviewPayload(
   job: Record<string, unknown>,
-  result: Pick<IrecruitMatchResult, 'jobId' | 'request_no' | 'job_family_label'>,
+  result: Pick<IrecruitMatchResult, 'jobId' | 'request_no'> & { job_family_label: string | null },
   match: { id: number; full_name: string; phone_number: string | null; job_name_th: string | null; position_name: string | null },
   now = new Date(),
 ): LumosInterviewPayload | null {
@@ -198,18 +198,20 @@ async function insertQueueItems(
 
   for (const item of items) {
     const phone = payloadPhone(item.payload);
-    if (phone && heldPhones.has(phone)) {
-      held.push(item.personRef);
-      continue;
-    }
-    if (phone && suppressedPhones === null) {
-      // อ่านรายการพักเบอร์ไม่ได้ → กันไว้ก่อน (นับเป็น held เพื่อให้รายงานบอกว่ายังไม่ส่ง)
-      held.push(item.personRef);
-      continue;
-    }
-    if (phone && suppressedPhones.has(phone)) {
-      suppressed.push(item.personRef);
-      continue;
+    if (phone) {
+      if (heldPhones.has(phone)) {
+        held.push(item.personRef);
+        continue;
+      }
+      if (suppressedPhones === null) {
+        // อ่านรายการพักเบอร์ไม่ได้ → กันไว้ก่อน (นับเป็น held เพื่อให้รายงานบอกว่ายังไม่ส่ง)
+        held.push(item.personRef);
+        continue;
+      }
+      if (suppressedPhones.has(phone)) {
+        suppressed.push(item.personRef);
+        continue;
+      }
     }
     const { rows } = await dbQuery<{ id: number }>(
       `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at)
@@ -239,7 +241,7 @@ const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู�
 /** ผู้สมัคร "คนของเรา" ที่คนติ๊กเลือก → คิว reminder */
 export async function enqueueLumosReminderForSelected(
   job: Record<string, unknown>,
-  result: Pick<BoardMatchResult, 'jobId' | 'request_no' | 'job_family_label'>,
+  result: Pick<BoardMatchResult, 'jobId' | 'request_no'> & { job_family_label: string | null },
   selected: Array<{ card_id: number; full_name: string; mobile: string | null }>,
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
@@ -278,7 +280,7 @@ export async function enqueueLumosReminderForSelected(
 /** ผู้สมัครจากฐาน iRecruit ที่คนติ๊กเลือก → คิว interview */
 export async function enqueueLumosInterviewForSelected(
   job: Record<string, unknown>,
-  result: Pick<IrecruitMatchResult, 'jobId' | 'request_no' | 'job_family_label'>,
+  result: Pick<IrecruitMatchResult, 'jobId' | 'request_no'> & { job_family_label: string | null },
   selected: Array<{
     id: number;
     full_name: string;

@@ -6,23 +6,15 @@
 อ่านก่อนเริ่ม: `docs/SESSION-HANDOFF.md` (กติกา 13 ข้อ + กับดักตอนตรวจงาน +
 คำตัดสินเจ้าของ) และ `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline ณ commit `bc43dca`:** test 686 ผ่าน/4 skip (88 ไฟล์) · tsc app + default
-0 error · **tsc api (`tsconfig.api.json`) เหลือ 25 error — ห้ามทำให้เพิ่ม** ·
+**Baseline (10 ส.ค. หลังกวาด type error api/):** test 689 ผ่าน/4 skip (89 ไฟล์) ·
+**tsc ต้องเป็น 0 ทั้งสาม config** (app · default · api) ·
 eslint 0 error/16 warning · migration ถึง 073
 
 ---
 
 ## งานที่ทำได้เลย (เรียงตามที่ควรทำก่อน)
 
-### 1. กวาด type error 25 จุดใน api/ (มีชิปวางไว้แล้วจาก session 10 ส.ค.)
-
-`npx tsc --noEmit -p tsconfig.api.json` — ส่วนใหญ่ null-safety:
-driverCareActionValidation (9) · job-staff (4) · role-permissions (2) ·
-siamrajUnitRequests (2) · lumos-dispatch (2) · ที่เหลือไฟล์ละ 1
-แก้แบบ narrowing/guard ไม่ใช้ `!`/`as` มั่ว · เจอบั๊กจริงให้บันทึกใน commit
-เสร็จแล้ว: อัปเดต §0 + กติกาข้อ 2 ใน SESSION-HANDOFF ว่า config นี้ต้องเป็น 0
-
-### 2. ช่องว่างเทสต์ที่เหลือ (เกณฑ์: "พังแล้วเงียบ" / "ผิดแล้วข้อมูลรั่ว" ก่อน)
+### 1. ช่องว่างเทสต์ที่เหลือ (เกณฑ์: "พังแล้วเงียบ" / "ผิดแล้วข้อมูลรั่ว" ก่อน)
 
 | ตัว | ทำไมสำคัญ |
 |---|---|
@@ -31,7 +23,7 @@ siamrajUnitRequests (2) · lumos-dispatch (2) · ที่เหลือไฟ�
 | `roleFunctionGrants.ts` | สิทธิ์รายฟังก์ชัน |
 | `magicLinkLogin.ts` | ทางเข้าอีกทาง |
 
-### 3. ดึงเคสให้เจ้าของไปถามคนเก่ง (เมื่อเจ้าของขอ)
+### 2. ดึงเคสให้เจ้าของไปถามคนเก่ง (เมื่อเจ้าของขอ)
 
 เจ้าของพูด "ขอเคสสำหรับ [ชื่อ skill]" → ดึงจากระบบจริง — วิธีอยู่
 `docs/HOW-TO-COLLECT-CASES.md` (job-request-to-spec 15 ใบคละแบบ ·
