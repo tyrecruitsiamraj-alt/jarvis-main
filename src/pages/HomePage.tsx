@@ -29,6 +29,18 @@ import {
 
 
 /**
+ * โครงคอลัมน์ของ funnel — การ์ด 5 ช่องกว้างเท่ากัน คั่นด้วยช่องลูกศร 4 ช่อง
+ *
+ * ⚠️ ทั้งสองแถว (เส้นหลัก / เส้นที่ไม่มีคนแนะนำ) ต้องใช้ค่านี้ตัวเดียวกัน คอลัมน์จึงตรงกันเสมอ
+ * เดิมใช้ flex ล้วน ซึ่งแบ่งความกว้างตาม **เนื้อหา** ของแต่ละแถว แถวล่างจึงกว้างกว่าและเยื้อง
+ * (วัดจริง: การ์ด 214 vs 206 · เยื้อง 8–32px) `minmax(0,1fr)` บังคับให้ทุกช่องเท่ากันไม่ว่าข้างในยาวแค่ไหน
+ * มือถือถอยเป็นเรียงลงล่างเหมือนเดิม
+ */
+const FLOW_ROW_GRID =
+  'flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
+  'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]';
+
+/**
  * ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง
  * สีทั้งแถบหัวการ์ดและตัวเลขมาจาก token กลางตัวเดียว (@/lib/designTokens) ไม่ประกาศ class สีที่นี่
  */
@@ -209,7 +221,7 @@ const HomePage: React.FC = () => {
               </button>
             }
           >
-            <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-stretch">
+            <div className={cn('mt-3', FLOW_ROW_GRID)}>
               <FlowStage
                 label="ใบขอเปิดอยู่"
                 value={flow.jobs.open_total}
@@ -275,12 +287,23 @@ const HomePage: React.FC = () => {
             </div>
 
             {/* บรรทัดที่ 2 — ใบที่ AI ไม่พบคนของเรา ไม่ได้ไปต่อในเส้นบน แต่ถูกส่งต่อทีมอื่น
-                เยื้องเข้ามาให้เห็นว่าแตกออกจาก "AI แนะนำคนแล้ว" ไม่ใช่ต่อจากขั้นสุดท้าย */}
-            <div className="mt-2 flex flex-col gap-1.5 border-t border-white/10 pt-2 sm:flex-row sm:flex-wrap sm:items-stretch">
-              <div className="flex items-center gap-2 px-1 sm:min-w-[150px]">
-                <span className="text-[10px] font-medium leading-tight text-[#c9b184]">
-                  ไม่มีคนแนะนำ <span aria-hidden>→</span>
-                </span>
+                เยื้องเข้ามาให้เห็นว่าแตกออกจาก "AI แนะนำคนแล้ว" ไม่ใช่ต่อจากขั้นสุดท้าย
+
+                ⚠️ จังหวะของแถวนี้ต้องเท่าแถวบน (เจ้าของทัก 10 ส.ค. 2569 ว่า "จัดให้สวยแบบเส้นหลัก"):
+                แถวบนมี 5 ช่อง flex-1 · แถวนี้จึงต้องมี 5 ช่องเท่ากัน = ป้ายจุดแยก + 3 การ์ด +
+                ตัวคั่นท้ายที่ไม่มีอะไร ไม่งั้นการ์ด 3 ใบจะอ้วนกว่าแถวบนชัดเจน (วัดได้ 400px vs 260px)
+                และป้ายเดิมลอยกลางแนวตั้งเพราะไม่มีกล่องของตัวเอง */}
+            <div className={cn('mt-2 border-t border-white/10 pt-2', FLOW_ROW_GRID)}>
+              {/* ป้ายจุดแยก — กินหนึ่งช่องเท่าการ์ด ขอบประให้รู้ว่าเป็นคำอธิบาย ไม่ใช่ตัวเลขที่กดได้ */}
+              <div className="min-w-0 flex-1 rounded-2xl border border-dashed border-white/[0.14] px-4 py-3">
+                <div className="text-xs font-medium leading-tight text-slate-400">ไม่มีคนแนะนำ</div>
+                <div className="mt-1 text-[11px] leading-snug text-slate-500">
+                  แยกออกจาก “AI แนะนำคนแล้ว” — ไม่เดินต่อในเส้นหลัก
+                </div>
+              </div>
+              <div className="flex items-center justify-center text-slate-500">
+                <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
+                <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
               <FlowStage
                 label="ยังไม่มีคน"
@@ -300,6 +323,14 @@ const HomePage: React.FC = () => {
                 tone="orange"
                 onClick={() => navigate('/matching/job-postings')}
               />
+              {/* Content กับ Scraping เป็น "ปลายทางคู่ขนาน" ของถังเดียวกัน ไม่ใช่ขั้นต่อกัน
+                  จึงคั่นด้วยจุด ไม่ใช่ลูกศร — แต่ต้องกว้าง w-4 เท่าไอคอนลูกศร ไม่งั้นช่องไฟเพี้ยน */}
+              <div
+                className="flex w-4 items-center justify-center text-base leading-none text-slate-600"
+                aria-hidden
+              >
+                ·
+              </div>
               {/* ห้ามซ้ำโทนกับ "ผลจากการโทร" (teal) ที่อยู่แถวบน — เจ้าของทักว่าดูแล้วสีเดียวกัน
                   แถวล่างจึงใช้คู่ ส้ม (Content) / ม่วง (Scraping) ซึ่งไม่ชนกับขั้นไหนในเส้นหลัก */}
               <FlowStage
@@ -309,6 +340,11 @@ const HomePage: React.FC = () => {
                 tone="violet"
                 onClick={() => navigate('/matching/job-postings')}
               />
+              {/* ช่องคั่นที่ 4 + ช่องการ์ดที่ 5 ที่เว้นว่างไว้ — แถวนี้จึงมีโครง
+                  "5 การ์ด + 4 ช่องคั่น" เท่าแถวบนเป๊ะ ตำแหน่ง/ความกว้างจึงตรงคอลัมน์กัน
+                  (วัดแล้ว: ก่อนแก้การ์ดกว้าง 221 เยื้องจากแถวบน 15–32px · หลังแก้ตรงทุกคอลัมน์) */}
+              <div className="hidden w-4 sm:block" aria-hidden />
+              <div className="hidden min-w-0 flex-1 sm:block" aria-hidden />
             </div>
 
             <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
