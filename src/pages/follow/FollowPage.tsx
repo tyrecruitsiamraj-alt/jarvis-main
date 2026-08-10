@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded } from 'lucide-react';
 import {
   listFollowEntries,
@@ -213,7 +214,12 @@ const FollowPage: React.FC = () => {
             type="button"
             onClick={() => void reload()}
             disabled={loading}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 shadow-sm hover:bg-sky-50 disabled:opacity-50"
+            className={cn(
+              'inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium shadow-sm disabled:opacity-50',
+              // เดิมเขียนคลาสเองแบบไม่มีคู่ dark: → โหมดมืดได้ปุ่มขาวทึบบนพื้นดำ
+              // (วัดจริง: rgb(255,255,255) บนพื้น rgb(19,19,22)) · TONE.info.outline คือชุดเดียวกันแต่ครบสองธีม
+              TONE.info.outline,
+            )}
           >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden />
             รีเฟรช
@@ -226,7 +232,9 @@ const FollowPage: React.FC = () => {
         </div>
 
         {okMessage ? (
-          <p className="rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700">{okMessage}</p>
+          <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.success.soft, TONE.success.value)}>
+            {okMessage}
+          </p>
         ) : null}
 
         {/* ฟอร์มเพิ่ม */}
@@ -389,7 +397,10 @@ const FollowPage: React.FC = () => {
                   setFormOpen(false);
                   resetForm();
                 }}
-                className="inline-flex min-h-[46px] items-center rounded-full border border-slate-300 bg-white/70 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-white"
+                className={cn(
+                  'inline-flex min-h-[46px] items-center rounded-full border px-5 py-2.5 text-sm font-medium',
+                  TONE.neutral.outline,
+                )}
               >
                 ยกเลิก
               </button>
@@ -417,7 +428,9 @@ const FollowPage: React.FC = () => {
         </div>
 
         {error ? (
-          <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600">{error}</p>
+          <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
+            {error}
+          </p>
         ) : null}
 
         {/* รายการ */}
@@ -493,7 +506,10 @@ const FollowPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setCancellingId(null)}
-                            className="inline-flex min-h-[36px] items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-[11px] font-medium text-slate-600"
+                            className={cn(
+                              'inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium',
+                              TONE.neutral.outline,
+                            )}
                           >
                             ไม่
                           </button>
