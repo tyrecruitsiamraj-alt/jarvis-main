@@ -60,6 +60,8 @@ const BUCKETS = [
     desc: 'ผ่านสัมภาษณ์ พร้อมลงงานทันที — AI แมทถังนี้ก่อนเสมอ',
     headCls: TONE.success.value,
     boxCls: TONE.success.soft,
+    /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
+    barCls: TONE.success.dot,
   },
   {
     key: 'no_job',
@@ -68,6 +70,8 @@ const BUCKETS = [
     desc: 'ผ่านคัดเลือกแต่ยังไม่มีตำแหน่งให้ลง — AI ค้นต่อเมื่อ To do ไม่ถึงเป้า',
     headCls: TONE.warn.value,
     boxCls: TONE.warn.soft,
+    /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
+    barCls: TONE.warn.dot,
   },
   {
     key: 'reuse',
@@ -76,6 +80,8 @@ const BUCKETS = [
     desc: 'เคยผ่านงานมาแล้ว — เลือกส่ง AI โทรเองได้ ไม่เข้า auto (เช็คสถานะก่อนส่ง)',
     headCls: TONE.violet.value,
     boxCls: TONE.violet.soft,
+    /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
+    barCls: TONE.violet.dot,
   },
   {
     key: 'in_process',
@@ -84,6 +90,30 @@ const BUCKETS = [
     desc: 'ถูกเสนอกับใบขออื่นอยู่ — เลือกส่งเองได้ ไม่เข้า auto (เช็คก่อนว่าใบเดิมจบแล้วหรือยัง)',
     headCls: TONE.info.value,
     boxCls: TONE.info.soft,
+    /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
+    barCls: TONE.info.dot,
+  },
+  // สองถังปลายทาง — เจ้าของสั่งเอามาโชว์ด้วย 10 ส.ค. 2569
+  // ⚠️ ทั้งคู่ "จบเรื่องแล้ว" ไม่ถูกเอาไปแมท/ส่งโทร — มีไว้ให้เห็นภาพรวมว่าคนไหลไปไหน
+  {
+    key: 'done',
+    match: 'done',
+    title: 'ได้งานแล้ว (Done)',
+    desc: 'ลงงานเรียบร้อยแล้ว — ไม่เข้าการแมทและไม่ถูกส่งโทร',
+    headCls: TONE.primary.value,
+    boxCls: TONE.primary.soft,
+    /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
+    barCls: TONE.primary.dot,
+  },
+  {
+    key: 'drop',
+    match: 'drop',
+    title: 'ตกไป (Drop)',
+    desc: 'ไม่ไปต่อแล้ว — เก็บไว้ดูสัดส่วนว่าหลุดไปเท่าไหร่',
+    headCls: TONE.danger.value,
+    boxCls: TONE.danger.soft,
+    /** สีแถบสัดส่วน — ใช้ token `dot` เพราะเป็นคลาส bg จริง ประกอบชื่อคลาสเองไม่ได้ (Tailwind purge ไม่เห็น) */
+    barCls: TONE.danger.dot,
   },
 ] as const;
 
@@ -160,13 +190,20 @@ const OurPeoplePage: React.FC = () => {
 
   return (
     <div className="relative">
-      <PageHeader title="ผู้สมัคร" subtitle="คนของเราแยกตามถังบนบอร์ด — To do · ไม่มีงาน · Re Use · In process" />
+      {/* ช่องค้นหาอยู่แถวเดียวกับหัวเรื่องแบบหน้า Dashboard (เจ้าของสั่ง 10 ส.ค. 2569) */}
+      <PageHeader
+        title="ผู้สมัคร"
+        subtitle="คนของเราแยกตามถังบนบอร์ด"
+        actions={
+          <SearchField
+            value={query}
+            onChange={(e) => setQueryAndResetPages(e.target.value)}
+            placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
+            wrapperClassName="w-full sm:w-[22rem]"
+          />
+        }
+      />
       <div className="px-4 md:px-6 space-y-4 pb-8">
-        <SearchField
-          value={query}
-          onChange={(e) => setQueryAndResetPages(e.target.value)}
-          placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
-        />
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!people && !error ? (
@@ -177,22 +214,44 @@ const OurPeoplePage: React.FC = () => {
 
         {/* แท็บถัง — กดดูทีละถัง */}
         {people ? (
-          <div className="flex flex-wrap gap-1.5">
-            {grouped.map((b) => (
-              <button
-                key={b.key}
-                type="button"
-                onClick={() => setActiveBucket(b.key)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  activeBucket === b.key
-                    ? cn('font-semibold', b.boxCls, b.headCls)
-                    : cn(TONE.neutral.soft, TONE.neutral.value, TONE.neutral.softHover),
-                )}
-              >
-                {b.title} · {b.items.length}
-              </button>
-            ))}
+          /* visual control ของถัง (เจ้าของสั่ง 10 ส.ค. 2569) — ไม่ใช่ชิปตัวเลขเปล่า:
+             แต่ละถังมีเลขใหญ่ + % ของทั้งหมด + แถบสัดส่วน กวาดตาแล้วรู้ทันทีว่าถังไหนหนา
+             ถังที่กดอยู่เข้มและมีวงแหวน ถังอื่นเรียบ (แพตเทิร์นเดียวกับแท่งเดือนบน Dashboard) */
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {grouped.map((b) => {
+              const total = grouped.reduce((sum, x) => sum + x.items.length, 0);
+              const pct = total > 0 ? Math.round((b.items.length / total) * 100) : 0;
+              const active = activeBucket === b.key;
+              return (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => setActiveBucket(b.key)}
+                  title={`${b.title} — ${b.desc}`}
+                  aria-pressed={active}
+                  className={cn(
+                    'rounded-2xl border px-3 py-2.5 text-left transition-all',
+                    active
+                      ? cn(b.boxCls, 'ring-2 ring-offset-1 ring-offset-transparent')
+                      : cn(TONE.neutral.soft, TONE.neutral.softHover, 'opacity-70 hover:opacity-100'),
+                  )}
+                >
+                  <div className={cn('truncate text-[11px] font-medium', active ? b.headCls : TONE.neutral.value)}>
+                    {b.title}
+                  </div>
+                  <div className={cn('mt-0.5 text-2xl font-bold leading-none tabular-nums', active ? b.headCls : TONE.neutral.value)}>
+                    {b.items.length.toLocaleString('th-TH')}
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div
+                      className={cn('h-full rounded-full', active ? b.barCls : 'bg-slate-400')}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">{pct}% ของทั้งหมด</div>
+                </button>
+              );
+            })}
           </div>
         ) : null}
 
@@ -336,7 +395,6 @@ const OurPeoplePage: React.FC = () => {
                 <DetailRow label="วันที่สมัคร" value={thaiDate(detail.application_date)} />
                 <DetailRow label="อัปเดตล่าสุด" value={thaiDate(detail.last_activity_at)} />
                 <DetailRow label="หมายเหตุ" value={detail.remarks} />
-                <DetailRow label="รหัสการ์ด" value={`#${detail.card_id}`} />
               </div>
               <p className="text-[11px] text-muted-foreground">
                 ข้อมูลอ่านจากบอร์ด iRecruit — แก้ไขที่ระบบ iRecruit เท่านั้น

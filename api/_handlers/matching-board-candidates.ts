@@ -21,6 +21,8 @@ import {
   boardFallbackColumnId,
   boardReuseColumnId,
   boardInProcessColumnId,
+  boardDoneColumnId,
+  boardDropColumnId,
 } from '../_lib/boardCandidatesSql.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { filterAvailableBoardMatches } from '@/lib/boardMatchAvailability';
@@ -45,8 +47,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 503, 'Service unavailable', 'ยังไม่ได้ตั้งค่า Siamraj SQL Server (DB_HOST)');
     }
 
-    // โหมด people: รายชื่อคนของเราทั้ง 4 ถัง (To do / ไม่มีงาน / Re Use / In process) — หน้า "ผู้สมัคร"
+    // โหมด people: รายชื่อคนของเราทุกถังบนบอร์ด — หน้า "ผู้สมัคร"
     // ข้อมูลระดับเดียวกับ picker เลือกส่ง AI โทร (ชื่อ+เบอร์+สกิล) — สิทธิ์ staff เท่ากัน
+    // เจ้าของสั่ง 10 ส.ค. 2569: เอา Done/Drop มาด้วย (เดิมมีแค่ 4 ถังที่เอาไปแมทได้)
     if (getQuery(req, 'people') === '1') {
       const people = await listBoardReadyCandidates({
         columnIds: [
@@ -54,6 +57,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           boardFallbackColumnId(),
           boardReuseColumnId(),
           boardInProcessColumnId(),
+          boardDoneColumnId(),
+          boardDropColumnId(),
         ],
         limit: 2000,
       });
@@ -89,13 +94,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
-    // โหมด buckets: ยอดการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use / In process) — สรุปบน Matching Dashboard
+    // โหมด buckets: ยอดการ์ด active ต่อถังบนบอร์ด iRecruit
+    // เจ้าของสั่ง 10 ส.ค. 2569: เอา Done/Drop มาโชว์ด้วย — เดิมมีแค่ 4 ถังที่เอาไปแมทได้
+    // เรียงตามเส้นทางจริงของคน: รอลงงาน → รองาน → คนเก่า → กำลังเสนอ → ได้งาน → ตกไป
     if (getQuery(req, 'buckets') === '1') {
       const buckets = await countBoardCandidatesByColumn([
         boardPrimaryColumnId(),
         boardFallbackColumnId(),
         boardReuseColumnId(),
         boardInProcessColumnId(),
+        boardDoneColumnId(),
+        boardDropColumnId(),
       ]);
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json({ buckets });

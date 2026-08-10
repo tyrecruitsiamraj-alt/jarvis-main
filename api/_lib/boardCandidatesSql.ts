@@ -136,6 +136,20 @@ export function boardInProcessColumnId(): number {
   return Number(process.env.BOARD_IN_PROCESS_COLUMN_ID || 3);
 }
 
+/**
+ * ถังปลายทางของบอร์ด — "Done" (ได้งานแล้ว) กับ "Drop" (ตกไป)
+ * ค่าเริ่มต้นอ่านจากบอร์ดจริงเมื่อ 10 ส.ค. 2569: 1 Checklist · 2 To do · 3 In process ·
+ * **4 Done · 5 Drop** · 6 Re Use · 7 ไม่มีงาน
+ * ⚠️ สองถังนี้ใช้ "โชว์ยอด" อย่างเดียว ไม่ถูกเอาไปแมท/ส่งโทร (คนจบเรื่องไปแล้ว)
+ */
+export function boardDoneColumnId(): number {
+  return Number(process.env.BOARD_DONE_COLUMN_ID || 4);
+}
+
+export function boardDropColumnId(): number {
+  return Number(process.env.BOARD_DROP_COLUMN_ID || 5);
+}
+
 export type BoardColumnCount = { column_id: number; label: string | null; count: number };
 
 /** นับการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — ใช้โชว์สรุปบนหน้า Matching Dashboard */
