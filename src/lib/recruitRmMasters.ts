@@ -122,3 +122,42 @@ export function normalizeRmPhone(raw: unknown): string | null {
   const digits = String(raw).replace(/\D/g, '');
   return digits.length === 10 ? digits : null;
 }
+
+/**
+ * ── เหตุผล (master ของปุ่ม "เหตุผล") ─────────────────────────────────────
+ *
+ * ระบบเดิมเก็บที่ `recruit_master_reason` ผูกกับ `recruit_master_process`
+ * เหตุผลหนึ่งตัวสังกัด **ขั้นตอน** หนึ่ง และเป็นเหตุผลของ **ผล** สำเร็จหรือไม่สำเร็จ
+ *
+ * ⚠️ รหัสเก็บตามระบบเดิมเป๊ะ ('1'/'2'/'3' และ 'A'/'C') ป้ายไทยอยู่ที่นี่ที่เดียว
+ */
+export const RM_REASON_PROCESSES = [
+  { code: '1', label: 'การติดต่อ' },
+  { code: '2', label: 'นัดหมาย' },
+  { code: '3', label: 'ติดตามการนัดหมาย' },
+] as const;
+
+export type RmReasonProcess = (typeof RM_REASON_PROCESSES)[number]['code'];
+
+export const RM_REASON_OUTCOMES = [
+  { code: 'A', label: 'สำเร็จ' },
+  { code: 'C', label: 'ไม่สำเร็จ' },
+] as const;
+
+export type RmReasonOutcome = (typeof RM_REASON_OUTCOMES)[number]['code'];
+
+export function isRmReasonProcess(v: unknown): v is RmReasonProcess {
+  return v === '1' || v === '2' || v === '3';
+}
+
+export function isRmReasonOutcome(v: unknown): v is RmReasonOutcome {
+  return v === 'A' || v === 'C';
+}
+
+export function rmReasonProcessLabel(code: string | null | undefined): string {
+  return RM_REASON_PROCESSES.find((p) => p.code === code)?.label ?? String(code ?? '');
+}
+
+export function rmReasonOutcomeLabel(code: string | null | undefined): string {
+  return RM_REASON_OUTCOMES.find((o) => o.code === code)?.label ?? String(code ?? '');
+}

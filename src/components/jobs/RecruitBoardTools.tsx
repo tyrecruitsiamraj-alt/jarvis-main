@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Loader2, MessageSquareWarning, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Loader2, MessageSquareWarning, Plus, Settings2, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import {
   deleteRecruitChannel,
 } from '@/lib/recruitPostingsApi';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { RM_TOOLBAR_KEYS, RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
 
@@ -24,9 +25,9 @@ const BU_OPTIONS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 const fieldCls =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
 
-/** จัดการช่องทาง (master 2 ระดับ) — อยู่หน้าหลักของบอร์ดตามที่เจ้าของกำหนด */
 const CHANNEL_CHILD_PAGE = 50;
 
+/** จัดการช่องทาง (master 2 ระดับ) — อยู่หน้าหลักของบอร์ดตามที่เจ้าของกำหนด */
 const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const [channels, setChannels] = useState<RecruitChannel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -332,16 +333,16 @@ const StandalonePickerDialog: React.FC<{
 };
 
 /**
- * แถบเครื่องมือของบอร์ดรับสมัคร — **5 ปุ่มชุดเดียวกับระบบเดิม** (เจ้าของสั่ง 11 ส.ค. 2569)
- * ตำแหน่งงาน · ช่องทาง · สร้างลิงก์ · เหตุผล · รายงาน
+ * แถบเครื่องมือของบอร์ดรับสมัคร — ชุดเดียวกับระบบเดิม (เจ้าของสั่ง 11 ส.ค. 2569)
+ * ช่องทาง · สร้างลิงก์ · เหตุผล
  *
- * ⚠️ **สองปุ่มต่อเข้าของที่ทำงานอยู่แล้ว ไม่ได้สร้างของซ้ำ:**
+ * ⚠️ **ทุกปุ่มต่อเข้าของที่ทำงานจริง ไม่ได้สร้างของซ้ำ:**
  *   - "ช่องทาง"    = ปุ่มที่เคยชื่อ "จัดการช่องทาง" → ChannelManagerDialog เดิม
  *   - "สร้างลิงก์"  = ปุ่มที่เคยชื่อ "ประกาศลอย" → StandalonePickerDialog + GenApplyLinkDialog เดิม
+ *   - "เหตุผล"     = master เหตุผลที่ยกมาจาก `recruit_master_reason` → ReasonManagerDialog
  * เปลี่ยนแค่ชื่อบนปุ่มให้ตรงกับระบบเดิมที่ผู้ใช้คุ้น · **ฟังก์ชันไม่หายไปไหน**
  *
- * ⚠️ อีกสามปุ่ม (ตำแหน่งงาน · เหตุผล · รายงาน) **ยังไม่มีของฝั่งนี้** — กดแล้วขึ้น
- * ข้อความบอกตรง ๆ ว่ายังไม่ได้ต่อ ไม่ปล่อยให้กดแล้วเงียบ
+ * ⚠️ **ไม่มีปุ่ม "ตำแหน่งงาน" กับ "รายงาน"** — เจ้าของสั่งเอาออก
  *
  * ⚠️ ชื่อ/ลำดับปุ่มมาจาก `RM_TOOLBAR_KEYS`/`RM_TOOLBAR_LABEL` ใน `lib/recruitRm.ts`
  * **ที่เดียวกับหน้างานสรรหา (RM)** — สองที่จะไม่มีวันเพี้ยนชื่อกันเอง
@@ -351,6 +352,7 @@ const StandalonePickerDialog: React.FC<{
 const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant = 'light' }) => {
   const { isFunctionEnabled } = useRolePermissions();
   const [channelsOpen, setChannelsOpen] = useState(false);
+  const [reasonsOpen, setReasonsOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [standalone, setStandalone] = useState<
@@ -375,13 +377,12 @@ const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant
     channels: Settings2,
     link: Plus,
     reasons: MessageSquareWarning,
-    reports: BarChart3,
   };
 
-  /** ปุ่มไหนต่อของจริงแล้ว — ที่เหลือขึ้นข้อความบอกว่ายังไม่ได้ทำ */
   const onClickKey = (key: RmToolbarKey) => {
     setNotice(null);
     if (key === 'channels') return setChannelsOpen(true);
+    if (key === 'reasons') return setReasonsOpen(true);
     if (key === 'link') return setPickerOpen(true);
     setNotice(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}" — ยังไม่ได้ต่อกับระบบจริง`);
   };
@@ -427,6 +428,7 @@ const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant
       </div>
 
       <ChannelManagerDialog open={channelsOpen} onClose={() => setChannelsOpen(false)} />
+      <ReasonManagerDialog open={reasonsOpen} onClose={() => setReasonsOpen(false)} />
       <StandalonePickerDialog
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}

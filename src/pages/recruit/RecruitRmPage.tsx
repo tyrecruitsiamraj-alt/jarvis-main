@@ -8,6 +8,7 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import RmFilterSidebar from '@/components/recruit-rm/RmFilterSidebar';
 import RmToolbar from '@/components/recruit-rm/RmToolbar';
+import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
@@ -78,6 +79,7 @@ const RecruitRmPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<PageSizeOption>(PAGE_SIZE_DEFAULT);
   /** ข้อความบอกว่ายังไม่ได้ต่อของจริง — ดีกว่าปุ่มที่กดแล้วเงียบ */
   const [notice, setNotice] = useState<string | null>(null);
+  const [reasonsOpen, setReasonsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
   const load = () => {
@@ -125,7 +127,11 @@ const RecruitRmPage: React.FC = () => {
   };
 
   const todo = (what: string) => setNotice(`${what} — ยังไม่ได้ต่อกับระบบจริง`);
-  const onToolbar = (key: RmToolbarKey) => todo(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}"`);
+  const onToolbar = (key: RmToolbarKey) => {
+    setNotice(null);
+    if (key === 'reasons') return setReasonsOpen(true);
+    todo(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}"`);
+  };
   const onRowAction = (action: RmRowAction, row: PublicApplication) =>
     todo(`"${RM_ROW_ACTION_LABEL[action]}" ของ ${row.full_name}`);
 
@@ -262,6 +268,8 @@ const RecruitRmPage: React.FC = () => {
           load(); // ใบใหม่ต้องโผล่ในตารางทันที ไม่ต้องให้กดรีเฟรชเอง
         }}
       />
+
+      <ReasonManagerDialog open={reasonsOpen} onClose={() => setReasonsOpen(false)} />
     </div>
   );
 };

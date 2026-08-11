@@ -142,17 +142,17 @@ export function filterApplications(
  * แถบปุ่มด้านบน
  * ⚠️ **ไม่มีปุ่ม "ตำแหน่งงาน"** — เจ้าของสั่งเอาออก 11 ส.ค. 2569 (ตำแหน่งงานเลือกตอน
  * สร้างลิงก์/เพิ่มผู้สมัครอยู่แล้ว ไม่ต้องมีปุ่มจัดการแยก)
+ * ⚠️ **ไม่มีปุ่ม "รายงาน"** — เจ้าของสั่งเอาออก 11 ส.ค. 2569 รอบสี่
  * ⚠️ อยู่ที่ lib ไม่ใช่ไฟล์ component — ไฟล์ component ที่ export ค่าอื่นนอกจาก
  * ตัว component จะโดน eslint เตือน react-refresh (กติกาเดิมของโปรเจกต์)
  */
-export const RM_TOOLBAR_KEYS = ['channels', 'link', 'reasons', 'reports'] as const;
+export const RM_TOOLBAR_KEYS = ['channels', 'link', 'reasons'] as const;
 export type RmToolbarKey = (typeof RM_TOOLBAR_KEYS)[number];
 
 export const RM_TOOLBAR_LABEL: Record<RmToolbarKey, string> = {
   channels: 'ช่องทาง',
   link: 'สร้างลิงก์',
   reasons: 'เหตุผล',
-  reports: 'รายงาน',
 };
 
 /** ปุ่ม action ต่อแถว — จุดเดียวที่ระบบเดิมให้แต่ละแท็บต่างกัน */

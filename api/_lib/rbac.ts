@@ -53,6 +53,7 @@ export type ApiResource =
   | 'job-applications'
   | 'work-status-master'
   | 'recruit-channels'
+  | 'recruit-reasons'
   | 'recruit-postings';
 
 /**
@@ -118,6 +119,11 @@ export function minimumRoleFor(
 
     case 'recruit-channels':
       // อ่านได้ทุกคน (ฟอร์มสร้างลิงก์ใช้) — เพิ่ม/แก้/ลบ เฉพาะหัวหน้างานขึ้นไป
+      if (isRead) return 'staff';
+      return 'supervisor';
+
+    case 'recruit-reasons':
+      // อ่านได้ทุกคน (ตอนบันทึกผลติดต่อต้องเลือกเหตุผล) — แก้ master เฉพาะหัวหน้างานขึ้นไป
       if (isRead) return 'staff';
       return 'supervisor';
 

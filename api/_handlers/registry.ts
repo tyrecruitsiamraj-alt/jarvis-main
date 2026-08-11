@@ -35,6 +35,7 @@ import publicApplyHandler from './public/apply.js';
 import publicApplyLinkHandler from './public/apply-link.js';
 import recruitChannelsHandler from './recruit-channels.js';
 import recruitPostingsHandler from './recruit-postings.js';
+import recruitReasonsHandler from './recruit-reasons.js';
 import jobApplicationsHandler from './job-applications.js';
 import jobApplicationDocumentHandler from './job-application-document.js';
 import shortLinksHandler from './short-links.js';
@@ -140,6 +141,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
   '/api/recruit/channels': recruitChannelsHandler as ApiHandler,
   '/api/recruit/postings': recruitPostingsHandler as ApiHandler,
+  '/api/recruit/reasons': recruitReasonsHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,
