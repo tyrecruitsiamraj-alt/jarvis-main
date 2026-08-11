@@ -15,6 +15,7 @@ import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
+import RecruitFunnelPanel from '@/components/recruit-rm/RecruitFunnelPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
@@ -276,6 +277,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             </div>
           </div>
         )}
+
+        {/*
+          แผงคุม 9 ตัวเลขของงานสรรหา — เจ้าของชี้มาที่หน้านี้ (ส่ง DOM ช่องค้นหาของบอร์ดมา
+          พร้อมข้อความ "ทำเหมือนหน้า dashboard อะ") · ตัวเดียวกับที่อยู่หน้า /recruit/rm
+          ⚠️ เจ้าหน้าที่เท่านั้น — บอร์ดตัวนี้ใช้เป็นหน้าสาธารณะด้วย ยอดภายในห้ามหลุดออกไป
+        */}
+        {isStaff ? (
+          <div className="mt-4">
+            <RecruitFunnelPanel />
+          </div>
+        ) : null}
 
         {/*
           กล่องลอย (ไม่ผูกใบขอ) — เจ้าของสั่ง 11 ส.ค. 2569 ให้ใช้ **ทรงเดียวกับการ์ดใบขอ**
