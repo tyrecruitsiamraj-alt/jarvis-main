@@ -25,6 +25,7 @@ import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { toE164Thai } from './thaiPhone.js';
+import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import {
   CONFIRMED_FOCUS_DAYS,
@@ -71,8 +72,13 @@ export function buildReminderPayload(
   const position = jobPositionLabel(job, result.job_family_label);
   const unit = str(job.unit_name) || 'หน่วยงานของเรา';
   const income = Number(job.total_income) > 0 ? ` รายได้ ${Number(job.total_income).toLocaleString('th-TH')} บาท` : '';
-  const requiredDate = str(job.required_date);
+  // วันที่ต้อง "พูดออกเสียงแล้วเข้าใจ" — เดิมส่ง 2026-08-01 ดิบ AI เลยอ่านเป็นตัวเลขเรียง
+  const requiredDate = speakableDate(job.required_date);
   const start = requiredDate ? ` เริ่มงาน ${requiredDate}` : '';
+  // รายละเอียดงานที่ผู้สมัครถามเป็นอย่างแรกเสมอ (ที่ไหน · เวลาไหน · ต้องมีรถไหม)
+  // เดิมไม่ได้บอกเลย เขาเลยต้องรอเจ้าหน้าที่โทรกลับมาตอบเรื่องพื้นฐานที่สุด
+  const brief = buildJobBrief(job);
+  const detail = brief.detail ? ` ${brief.detail}` : '';
   return {
     client_contact_id: `${result.jobId}::card-${match.card_id}`,
     recipient_name: match.full_name,
@@ -86,6 +92,7 @@ export function buildReminderPayload(
         message:
           `ระบบคัดเลือกพบว่าคุณเหมาะกับงานตำแหน่ง${position} ที่ ${unit}` +
           `${start}${income} (ใบขอ ${result.request_no || result.jobId})` +
+          `${detail}` +
           ' หากสนใจ ทีมสรรหาจะติดต่อนัดหมายรายละเอียดต่อไป',
         scheduled_at: now.toISOString(),
       },
@@ -120,6 +127,14 @@ export function buildInterviewPayload(
   const skills = [match.job_name_th, match.position_name]
     .map((v) => (v || '').trim())
     .filter(Boolean);
+  const brief = buildJobBrief(job);
+  /**
+   * ฝั่ง interview ไม่มีช่องข้อความอิสระเหมือน reminder — ที่พูดได้คือ `questions`
+   * จึงเอารายละเอียดงานไปผูกกับคำถามให้เป็นคำถามที่ "บอกข้อมูลไปในตัว"
+   * (ถามเรื่องเดินทางโดยระบุสถานที่จริง · ถามเรื่องเวลาโดยบอกเวลาจริง)
+   * ⚠️ schema กำหนด 1–15 ข้อ — ของใหม่เพิ่มมากสุด 2 ข้อ รวมแล้วไม่เกิน 6
+   */
+  const placeForTravel = brief.workPlace && brief.workPlace !== unit ? brief.workPlace : unit;
   return {
     client_candidate_id: `${result.jobId}::ir-${match.id}`,
     client_interview_id: `${result.jobId}::ir-${match.id}::interview`,
@@ -129,7 +144,13 @@ export function buildInterviewPayload(
     scheduled_at: now.toISOString(),
     questions: [
       `เคยทำงานตำแหน่ง${position}หรืองานใกล้เคียงมาก่อนไหม เล่าประสบการณ์ให้ฟังหน่อยครับ`,
-      `สะดวกเดินทางไปทำงานที่ ${unit} ไหมครับ`,
+      `สะดวกเดินทางไปทำงานที่ ${placeForTravel} ไหมครับ`,
+      ...(brief.workSchedule
+        ? [`งานนี้เวลาทำงาน ${brief.workSchedule} สะดวกไหมครับ`]
+        : []),
+      ...(brief.needsOwnVehicle
+        ? ['งานนี้ต้องใช้รถของตัวเองในการทำงาน คุณมีรถพร้อมใช้ไหมครับ']
+        : []),
       'สามารถเริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
       'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
     ],
