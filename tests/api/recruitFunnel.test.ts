@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONTACT_NO_ANSWER_REASONS,
+  RECRUIT_FUNNEL_STEP_PRIMARY,
   CONTACT_UNREACHABLE_REASONS,
   EMPTY_RECRUIT_FUNNEL,
   RECRUIT_FUNNEL_TILES,
@@ -110,6 +111,14 @@ describe('ตัวหารของแต่ละช่อง', () => {
     for (const t of RECRUIT_FUNNEL_TILES) {
       expect(EMPTY_RECRUIT_FUNNEL).toHaveProperty(t.key);
       if (t.ofKey) expect(EMPTY_RECRUIT_FUNNEL).toHaveProperty(t.ofKey);
+    }
+  });
+
+  it('ตัวเลขหน้าปกของแต่ละขั้นตอน ต้องเป็นช่องที่อยู่ในขั้นนั้นจริง', () => {
+    for (const [step, key] of Object.entries(RECRUIT_FUNNEL_STEP_PRIMARY)) {
+      const tile = RECRUIT_FUNNEL_TILES.find((t) => t.key === key);
+      expect(tile, `primary ของ ${step}`).toBeTruthy();
+      expect(tile?.step).toBe(step);
     }
   });
 

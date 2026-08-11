@@ -151,6 +151,21 @@ export const RECRUIT_FUNNEL_STEP_LABEL: Record<RecruitFunnelTile['step'], string
 };
 
 /**
+ * ตัวเลขหน้าปกของแต่ละขั้นตอน — โชว์บนปุ่มขั้นตอนตอนที่ยังไม่ได้กดเข้าไปดูรายละเอียด
+ * (เจ้าของติงว่าแผง 11 ช่องพร้อมกัน "ดูรก" — เลยเหลือ 4 ปุ่ม กดปุ่มไหนค่อยกางช่องของขั้นนั้น)
+ * ⚠️ ต้องเป็นคีย์ที่อยู่ในขั้นตอนนั้นจริง — มีเทสต์คุม
+ */
+export const RECRUIT_FUNNEL_STEP_PRIMARY: Record<
+  RecruitFunnelTile['step'],
+  keyof RecruitFunnelCounts
+> = {
+  intake: 'registered',
+  contact: 'contactSuccess',
+  appointment: 'appointmentSuccess',
+  follow: 'showedUp',
+};
+
+/**
  * สัดส่วนเป็น % — คืน null เมื่อไม่มีตัวหาร หรือตัวหารเป็นศูนย์
  * ⚠️ ห้ามคืน 0 แทน null: "0%" อ่านว่า "โทรแล้วไม่มีใครรับเลย" ซึ่งคนละเรื่องกับ
  * "ยังไม่ได้โทรเลยจึงคิดอัตราไม่ได้"

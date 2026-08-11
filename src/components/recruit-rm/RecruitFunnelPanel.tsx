@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   EMPTY_RECRUIT_FUNNEL,
   RECRUIT_FUNNEL_STEP_LABEL,
+  RECRUIT_FUNNEL_STEP_PRIMARY,
   RECRUIT_FUNNEL_TILES,
   funnelPercent,
   type RecruitFunnelCounts,
@@ -30,12 +31,18 @@ const TILE_TONE: Record<RecruitFunnelTile['key'], ToneKey> = {
 
 const STEPS: RecruitFunnelTile['step'][] = ['intake', 'contact', 'appointment', 'follow'];
 
+function tileLabel(key: RecruitFunnelTile['key']): string {
+  return RECRUIT_FUNNEL_TILES.find((t) => t.key === key)?.label ?? key;
+}
+
 /**
  * แผงคุมงานสรรหา — 9 ตัวเลขที่เจ้าของขอ 11 ส.ค. 2569
  *
- * ⚠️ **ตัวเลขมาจาก iRecruit อ่านอย่างเดียว** เพราะงาน RM จริงยังทำอยู่บนระบบเดิม
- * บอกที่มาไว้บนแผงตรง ๆ จะได้ไม่มีใครเข้าใจว่าเป็นยอดของใบสมัครฝั่งเรา
+ * โครงตามที่เจ้าของติง (11 ส.ค. รอบห้า): 11 ช่องพร้อมกัน "ดูรก" →
+ * เหลือ **ปุ่มขั้นตอน 4 ปุ่ม** (แต่ละปุ่มมีตัวเลขหน้าปกของขั้นนั้น) กดปุ่มไหน
+ * ค่อยกางช่องรายละเอียดของขั้นนั้นข้างล่าง — ภาพรวมยังเห็นครบโดยไม่ต้องกาง
  *
+ * ⚠️ **ตัวเลขมาจาก iRecruit อ่านอย่างเดียว** เพราะงาน RM จริงยังทำอยู่บนระบบเดิม
  * ⚠️ อ่านไม่ได้ = ขึ้นข้อความว่าอ่านไม่ได้ **ไม่โชว์ 0** — "0 คนกรอกมา" กับ
  * "ต่อฐานไม่ติด" คนละเรื่องกันคนละขั้ว (กติกาข้อ 9 ของโปรเจกต์)
  */
@@ -43,6 +50,7 @@ const RecruitFunnelPanel: React.FC = () => {
   const [data, setData] = useState<(RecruitFunnelCounts & { leads: number }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<RecruitFunnelTile['step']>('intake');
 
   const load = () => {
     setLoading(true);
@@ -62,6 +70,7 @@ const RecruitFunnelPanel: React.FC = () => {
   useEffect(load, []);
 
   const counts = data ?? EMPTY_RECRUIT_FUNNEL;
+  const detailTiles = RECRUIT_FUNNEL_TILES.filter((t) => t.step === step);
 
   return (
     <section className="rounded-[1.5rem] border border-border/70 bg-card p-4">
@@ -69,8 +78,7 @@ const RecruitFunnelPanel: React.FC = () => {
         <div>
           <h2 className="text-sm font-semibold text-foreground">ภาพรวมงานสรรหา</h2>
           <p className="text-[11px] text-muted-foreground">
-            ยอดจากระบบเดิม (iRecruit) · อ่านอย่างเดียว
-            {data ? ` · นับหัวคน เอาผลล่าสุดของแต่ละคน · ในนั้นเป็น Lead ${data.leads.toLocaleString('th-TH')} ราย` : null}
+            ยอดจากระบบเดิม (iRecruit) · นับหัวคน เอาผลล่าสุดของแต่ละคน · กดขั้นตอนเพื่อดูรายละเอียด
           </p>
         </div>
         <button
@@ -97,54 +105,82 @@ const RecruitFunnelPanel: React.FC = () => {
           </span>
         </p>
       ) : (
-        <div className="space-y-3">
-          {STEPS.map((step) => {
-            const tiles = RECRUIT_FUNNEL_TILES.filter((t) => t.step === step);
-            return (
-              <div key={step}>
-                <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
-                  {RECRUIT_FUNNEL_STEP_LABEL[step]}
-                </p>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                  {tiles.map((t) => {
-                    const tone = TONE[TILE_TONE[t.key]];
-                    const value = counts[t.key];
-                    const pct = t.ofKey ? funnelPercent(value, counts[t.ofKey]) : null;
-                    return (
-                      <div key={t.key} className={cn('rounded-2xl px-3 py-2.5', tone.tile)}>
-                        <p className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                          {t.label}
+        <div className="space-y-2.5">
+          {/* ปุ่มขั้นตอน 4 ปุ่ม — ตัวเลขหน้าปกของแต่ละขั้นเห็นครบโดยไม่ต้องกด */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {STEPS.map((s) => {
+              const primaryKey = RECRUIT_FUNNEL_STEP_PRIMARY[s];
+              const tone = TONE[TILE_TONE[primaryKey]];
+              const active = s === step;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStep(s)}
+                  aria-pressed={active}
+                  className={cn(
+                    'rounded-2xl px-3 py-2.5 text-left transition-colors',
+                    tone.tile,
+                    active && 'ring-2 ring-sky-400/80',
+                  )}
+                >
+                  <p className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    {RECRUIT_FUNNEL_STEP_LABEL[s]}
+                  </p>
+                  <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
+                    {counts[primaryKey].toLocaleString('th-TH')}
+                  </p>
+                  <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
+                    {tileLabel(primaryKey)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* รายละเอียดของขั้นตอนที่เลือก */}
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5">
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+              {detailTiles.map((t) => {
+                const tone = TONE[TILE_TONE[t.key]];
+                const value = counts[t.key];
+                const pct = t.ofKey ? funnelPercent(value, counts[t.ofKey]) : null;
+                return (
+                  <div key={t.key} className={cn('rounded-2xl px-3 py-2.5', tone.tile)}>
+                    <p className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      {t.label}
+                    </p>
+                    <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
+                      {value.toLocaleString('th-TH')}
+                    </p>
+                    {/* แถบสัดส่วน — ไม่มีตัวหารก็ไม่ขึ้นแถบ ไม่ใช่แถบศูนย์ */}
+                    {pct != null ? (
+                      <>
+                        {/* เนื้อแถบใช้ `tone.dot` ตามแพตเทิร์นเดียวกับ DashboardKpiCard —
+                            `tone.bar` เป็นเส้นขอบบน (border-t) เอามาทำเนื้อแถบไม่ได้ */}
+                        <div
+                          className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-slate-900/10 dark:bg-white/10"
+                          aria-hidden
+                        >
+                          <span
+                            className={cn('block h-full rounded-full', tone.dot)}
+                            style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                          {pct.toLocaleString('th-TH')}% ของ {tileLabel(t.ofKey!)}
                         </p>
-                        <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
-                          {value.toLocaleString('th-TH')}
-                        </p>
-                        {/* แถบสัดส่วน — ไม่มีตัวหารก็ไม่ขึ้นแถบ ไม่ใช่แถบศูนย์ */}
-                        {pct != null ? (
-                          <>
-                            {/* เนื้อแถบใช้ `tone.dot` ตามแพตเทิร์นเดียวกับ DashboardKpiCard —
-                                `tone.bar` เป็นเส้นขอบบน (border-t) เอามาทำเนื้อแถบไม่ได้ */}
-                            <div
-                              className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-slate-900/10 dark:bg-white/10"
-                              aria-hidden
-                            >
-                              <span
-                                className={cn('block h-full rounded-full', tone.dot)}
-                                style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-                              />
-                            </div>
-                            <p className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                              {pct.toLocaleString('th-TH')}% ของ{' '}
-                              {RECRUIT_FUNNEL_TILES.find((x) => x.key === t.ofKey)?.label}
-                            </p>
-                          </>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                      </>
+                    ) : data ? (
+                      <p className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        ในนั้นเป็น Lead {data.leads.toLocaleString('th-TH')} ราย
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </section>
