@@ -79,26 +79,16 @@ import {
   fetchCandidateScreening,
   type CandidateScreeningRecord,
 } from '@/lib/candidateScreeningApi';
-import {
-  acquireCallHold,
-  fetchCallHoldsByPhones,
-  fetchMyCallHolds,
-  recordCallResult,
-  releaseCallHold,
-  CALL_RESULT_DESTINATION,
-  CALL_RESULT_LABEL,
-  type CallHold,
-  type CallHoldSource,
-  type CallResultOutcome,
-  type CallResultScope,
-} from '@/lib/callHoldsApi';
+/* หน้านี้ไม่มี "รับไปโทรเอง" แล้ว (เจ้าของสั่ง 11 ส.ค. 2569) — เหลืออ่านล็อกอย่างเดียว
+   เพื่อบอกว่าใครถูกเจ้าหน้าที่รับไปตามอยู่ AI จะได้ไม่โทรทับ · ตัวจับ/ปล่อย/บันทึกผล
+   ยังอยู่ครบใน callHoldsApi.ts และยังถูกใช้ที่ถัง "ต้องคนตาม" ในแถบการไหลของงาน */
+import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
 import type { BoardCandidateMatch } from '@/lib/boardCandidateTypes';
 import CandidateChecklist from '@/components/matching/CandidateChecklist';
-import CallHoldPanel from '@/components/matching/CallHoldPanel';
 import ScreeningEditor from '@/components/matching/ScreeningEditor';
 import {
   CallBatchUndoStrip,
@@ -110,8 +100,6 @@ import { cardNextAction } from '@/lib/matchingCardAction';
 import TierCriteriaTooltip from '@/components/matching/TierCriteriaTooltip';
 import AiEvaluationStatus from '@/components/matching/AiEvaluationStatus';
 import { TIER_CRITERIA } from '@/lib/matchTierCriteria';
-import { useNowTick } from '@/hooks/useNowTick';
-import { shortTime } from '@/lib/dateTh';
 import {
   areaVerdict,
   boardCandidatePriority,
@@ -661,24 +649,6 @@ const MatchingPage: React.FC = () => {
    * ซึ่งยังปลอดภัยเพราะ server เป็นคนตัดสินตอนกดรับอยู่ดี
    */
   const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
-  const [holdBusyRef, setHoldBusyRef] = useState<string | null>(null);
-  const [holdErrorByRef, setHoldErrorByRef] = useState<Record<string, string>>({});
-  const [myHoldCount, setMyHoldCount] = useState(0);
-  const [myHoldNames, setMyHoldNames] = useState<string[]>([]);
-
-  const holdActive = Object.keys(holdByRef).length > 0;
-  const now = useNowTick(holdActive);
-
-  const refreshMyHolds = useCallback(() => {
-    void fetchMyCallHolds().then((rows) => {
-      setMyHoldCount(rows.length);
-      setMyHoldNames(rows.map((r) => r.candidateName || r.candidateRef));
-    });
-  }, []);
-
-  useEffect(() => {
-    refreshMyHolds();
-  }, [refreshMyHolds]);
 
   /** โหลดสถานะล็อกของผู้สมัครในใบขอที่เปิด (คีย์ด้วยเบอร์ฝั่ง server) */
   useEffect(() => {
@@ -697,85 +667,6 @@ const MatchingPage: React.FC = () => {
       cancelled = true;
     };
   }, [openJobMatches]);
-
-  /** เอาล็อกออกจาก state — การ์ดกลับเป็น "ว่าง" ทันทีโดยไม่ต้องรีเฟรชหน้า */
-  const dropHold = useCallback(
-    (candidateRef: string) => {
-      setHoldByRef((prev) => {
-        if (!prev[candidateRef]) return prev;
-        const next = { ...prev };
-        delete next[candidateRef];
-        return next;
-      });
-      setHoldErrorByRef((prev) => {
-        if (!prev[candidateRef]) return prev;
-        const next = { ...prev };
-        delete next[candidateRef];
-        return next;
-      });
-      refreshMyHolds();
-    },
-    [refreshMyHolds],
-  );
-
-  /**
-   * กดรับไปโทรเอง — คนแรกชนะ (server ตัดสิน)
-   * ชนแล้วอัปเดตการ์ดเป็น "คนอื่นถือ" ทันทีจากข้อมูลที่ 409 ส่งกลับมา ไม่ต้องรีเฟรช
-   * คืน true เมื่อจับล็อกได้ (ตัวเรียกใช้ตัดสินว่าจะต่อสายต่อไหม)
-   */
-  const takeCallHold = useCallback(
-    async (input: {
-      candidateRef: string;
-      source: CallHoldSource;
-      phone: string | null | undefined;
-      candidateName: string | null;
-      jobId: string;
-      requestNo: string | null;
-    }): Promise<boolean> => {
-      const ref = input.candidateRef;
-      if (!input.phone) {
-        setHoldErrorByRef((p) => ({ ...p, [ref]: 'ไม่มีเบอร์ที่โทรได้ — รับไปโทรไม่ได้' }));
-        return false;
-      }
-      setHoldBusyRef(ref);
-      setHoldErrorByRef((p) => {
-        const next = { ...p };
-        delete next[ref];
-        return next;
-      });
-      try {
-        const res = await acquireCallHold({
-          phone: input.phone,
-          source: input.source,
-          candidateRef: ref,
-          candidateName: input.candidateName,
-          jobId: input.jobId,
-          requestNo: input.requestNo,
-        });
-        if (!res.ok || !res.hold) {
-          // ชนกับคนอื่น — อัปเดตการ์ดเป็น "คนอื่นถือ" จากข้อมูลที่ 409 ส่งกลับ ไม่ต้องรีเฟรช
-          const message = res.message ?? 'รับงานโทรไม่สำเร็จ';
-          const heldBy = res.heldBy;
-          setHoldErrorByRef((p) => ({ ...p, [ref]: message }));
-          if (heldBy) setHoldByRef((p) => ({ ...p, [ref]: heldBy }));
-          return false;
-        }
-        const acquired = res.hold;
-        setHoldByRef((p) => ({ ...p, [ref]: acquired }));
-        refreshMyHolds();
-        return true;
-      } catch (e) {
-        setHoldErrorByRef((p) => ({
-          ...p,
-          [ref]: e instanceof Error ? e.message : 'รับงานโทรไม่สำเร็จ',
-        }));
-        return false;
-      } finally {
-        setHoldBusyRef(null);
-      }
-    },
-    [refreshMyHolds],
-  );
 
   const [boardLoadingId, setBoardLoadingId] = useState<string | null>(null);
   const [boardErrorById, setBoardErrorById] = useState<Record<string, string>>({});
@@ -2077,19 +1968,10 @@ const MatchingPage: React.FC = () => {
           </p>
         ) : null}
 
-        {/* งานโทรที่เราถืออยู่ — ล็อกมีอายุ 1 วัน ชิปนี้กันลืมข้ามใบขอ
-            หน้า "งานโทร" ถูกปิดแล้ว (10 ส.ค. 2569) ชิปจึงเหลือเป็นตัวเลขเตือน ไม่ใช่ลิงก์
-            บันทึกผลทำได้บนการ์ดผู้สมัครในหน้านี้อยู่แล้ว (CallHoldPanel) */}
-        {myHoldCount > 0 ? (
-          <div className="px-1">
-            <span
-              className={cn(TONE.primary.chip)}
-              title={`งานโทรที่คุณถืออยู่:\n${myHoldNames.join('\n')}`}
-            >
-              📞 ของฉันถืออยู่ {myHoldCount.toLocaleString('th-TH')} คน — บันทึกผลได้ที่การ์ดคนนั้น
-            </span>
-          </div>
-        ) : null}
+        {/* ⚠️ ชิป "ของฉันถืออยู่ n คน" เคยอยู่ตรงนี้ — เอาออกพร้อมปุ่มรับไปโทรเอง
+            (เจ้าของสั่ง 11 ส.ค. 2569) หน้านี้ไม่มีทางรับงานโทรและไม่มีที่บันทึกผลแล้ว
+            ชิปที่นับงานที่รับไว้จึงชี้ไปที่ที่ไม่มีอยู่ · งานที่ยังถืออยู่ดูได้ที่ถัง
+            "ต้องคนตาม" ในแถบการไหลของงาน ซึ่งเป็นที่ที่กดรับมาแต่แรก */}
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
           <p className="text-sm text-muted-foreground">
@@ -2847,19 +2729,9 @@ const MatchingPage: React.FC = () => {
                         const hold = holdByRef[holdRef];
                         const heldByOther = hold && !hold.mine ? hold : null;
                         const heldByMe = hold && hold.mine ? hold : null;
-                        const holdBusy = holdBusyRef === holdRef;
-                        const holdError = holdErrorByRef[holdRef];
-                        // คนถือไปโทรเองอยู่ = ห้ามส่ง AI ทับ (server กันอีกชั้นที่ insertQueueItems)
+                        // คนที่มีเจ้าหน้าที่รับไปตามอยู่ = ห้ามส่ง AI ทับ
+                        // (server กันอีกชั้นที่ insertQueueItems — ตรงนี้แค่ไม่ให้ติ๊กแล้วงง)
                         const canPickForLumos = Boolean(m.mobile) && !lumosRow && !hold;
-                        const takeThis = () =>
-                          takeCallHold({
-                            candidateRef: holdRef,
-                            source: 'board',
-                            phone: m.mobile,
-                            candidateName: m.full_name,
-                            jobId: jobDetail.id,
-                            requestNo: jobDetail.request_no ?? null,
-                          });
                         return (
                         <div
                           key={m.card_id}
@@ -2952,35 +2824,13 @@ const MatchingPage: React.FC = () => {
                             {m.required_salary ? <span>ขอ {m.required_salary.toLocaleString()} บ.</span> : null}
                             {m.mobile ? (
                               /**
-                               * แตะเบอร์ = รับไปโทรเองอัตโนมัติ (ล็อกก่อน แล้วต่อสาย)
-                               * เดิมเป็นลิงก์ tel: เปล่า ๆ กดโทรได้เลยโดยไม่ผ่านอะไร — ตัวทำให้โทรชนกัน
-                               * ถ้าคนอื่นถืออยู่จะไม่ต่อสายให้ · ถ้าเราถืออยู่แล้วต่อสายได้ทันที
+                               * เบอร์ไว้อ่าน/ก๊อป ไม่ใช่ปุ่มโทร — เจ้าของสั่ง 11 ส.ค. 2569 ว่าหน้านี้
+                               * ไม่มี "รับไปโทรเอง" แล้ว เหลือทางเดียวคือติ๊กเลือกแล้วส่งให้ AI โทร
+                               * (เดิมแตะเบอร์แล้วจับล็อก + ต่อสายให้ทันที)
                                */
-                              <a
-                                href={`tel:${m.mobile}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (heldByMe) return;
-                                  e.preventDefault();
-                                  if (heldByOther || holdBusy) return;
-                                  void takeThis().then((ok) => {
-                                    if (ok) window.location.href = `tel:${m.mobile}`;
-                                  });
-                                }}
-                                title={
-                                  heldByOther
-                                    ? `${heldByOther.heldByName || 'เจ้าหน้าที่อีกคน'} รับไปโทรแล้ว`
-                                    : heldByMe
-                                      ? 'คุณถืออยู่ — แตะเพื่อโทร'
-                                      : 'แตะเพื่อรับไปโทรเอง แล้วต่อสาย'
-                                }
-                                className={cn(
-                                  'inline-flex items-center gap-1 font-medium hover:underline',
-                                  heldByOther ? cn(DASH.muted, 'cursor-not-allowed') : TONE.info.value,
-                                )}
-                              >
-                                <Phone className="h-3 w-3" /> {m.mobile}
-                              </a>
+                              <span className={cn('inline-flex items-center gap-1 font-medium', DASH.cell)}>
+                                <Phone className="h-3 w-3" aria-hidden /> {m.mobile}
+                              </span>
                             ) : null}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -3031,59 +2881,22 @@ const MatchingPage: React.FC = () => {
                           />
                         ) : null}
 
-                        {/* รับไปโทรเอง — 4 สถานะตาม mockup ที่เจ้าของเคาะ */}
-                        {heldByOther ? (
+                        {/* ⚠️ ปุ่ม "รับไปโทรเอง"/"ดึงมาโทรเอง" + แผงบันทึกผลโทร (CallHoldPanel)
+                            เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 11 ส.ค. 2569:
+                            "matching เสร็จ ก็มีติ๊กแล้วมีปุ่มว่าส่ง AI โทรแค่นั้น"
+
+                            หน้านี้จึงเหลือทางเดียว: ติ๊กเลือก → ส่ง AI โทร
+                            ยังโชว์ป้ายว่ามีคนถืออยู่ (ถ้ามี) เพราะเป็นเหตุผลที่ AI จะไม่โทรคนนั้น
+                            — ซ่อนไปเลยจะกลายเป็น "ติ๊กแล้วส่งแต่ไม่มีอะไรเกิดขึ้น" โดยไม่บอกทำไม
+                            ⚠️ ตัวล็อกฝั่ง API ยังอยู่ครบและยังกรองที่ insertQueueItems เหมือนเดิม
+                            (ถังต้องคนตามในหน้า Follow ยังกด "รับไปตาม" ได้) เอาออกแค่หน้านี้ */}
+                        {heldByOther || heldByMe ? (
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                             <span className={TONE.neutral.chip}>
-                              🔒 {heldByOther.heldByName || 'เจ้าหน้าที่อีกคน'} รับไปโทรแล้ว ·{' '}
-                              {shortTime(heldByOther.heldAt)}
-                            </span>
-                            <span className={TONE.warn.chip}>
-                              คายอัตโนมัติ {new Date(heldByOther.expiresAt).toLocaleString('th-TH', {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              🔒 {heldByMe ? 'คุณ' : heldByOther?.heldByName || 'เจ้าหน้าที่อีกคน'}
+                              {' '}รับไปตามอยู่ · AI จะไม่โทรทับ
                             </span>
                           </div>
-                        ) : heldByMe ? (
-                          <CallHoldPanel
-                            hold={heldByMe}
-                            phone={m.mobile}
-                            now={now}
-                            onFinished={dropHold}
-                          />
-                        ) : (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => void takeThis()}
-                              disabled={holdBusy || !m.mobile}
-                              title={!m.mobile ? 'ไม่มีเบอร์ — รับไปโทรไม่ได้' : undefined}
-                              className={cn(
-                                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold disabled:opacity-50',
-                                lumosRow
-                                  ? cn(TONE.info.soft, TONE.info.value, TONE.info.softHover, 'border')
-                                  : TONE.primary.solid,
-                              )}
-                            >
-                              <Phone className="h-3 w-3" />
-                              {holdBusy
-                                ? 'กำลังรับงาน…'
-                                : lumosRow
-                                  ? 'ดึงมาโทรเอง'
-                                  : 'รับไปโทรเอง'}
-                            </button>
-                            {lumosRow ? (
-                              <span className={cn('text-[10px]', DASH.muted)}>
-                                AI จะไม่โทรทับหลังรับ
-                              </span>
-                            ) : null}
-                          </div>
-                        )}
-                        {holdError ? (
-                          <p className={cn('mt-1 text-[11px]', TONE.danger.value)}>{holdError}</p>
                         ) : null}
                         </div>
                         );
