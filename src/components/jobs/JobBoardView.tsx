@@ -43,6 +43,9 @@ function staffAssigneeLine(j: JobRequest): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/** BU ตั้งต้นของกล่องลอยที่ยังไม่มีประกาศ — ผู้ใช้แก้ได้ในฟอร์ม (ชุดเดียวกับ RecruitBoardTools) */
+const BOARD_DEFAULT_BU = 'LBD';
+
 /** สีกล่องลอยต่อประเภท (mockup rev.3 ข้อ 04) — ม่วง/ม่วง/ฟ้า/ส้ม/เขียว ตามลำดับใน STANDALONE_POSTING_KINDS */
 const STANDALONE_KIND_TONE: Record<string, ToneKey> = {
   thai_executive: 'violet',
@@ -113,6 +116,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
+  /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
+  const [genStandalone, setGenStandalone] = useState<
+    { kind: string; kindLabel: string; departmentCode: string } | null
+  >(null);
   // เจ้าหน้าที่: แก้เนื้อหาประกาศที่สร้างไว้แล้ว (mockup rev.3 ข้อ 04)
   const [editPosting, setEditPosting] = useState<RecruitPosting | null>(null);
   // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
@@ -142,14 +149,30 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     };
   }, [isStaff, postingsRev]);
 
-  /** ประเภทกล่องลอย → จำนวนประกาศ/ผู้สมัคร (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น) */
+  /**
+   * ประเภทกล่องลอย → สรุปของจริงต่อประเภท (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น)
+   * เก็บชื่อประกาศ/จังหวัด/BU มาด้วย เพราะการ์ดกล่องลอยใช้โครงเดียวกับการ์ดใบขอ
+   * ซึ่งมีบรรทัดคำบรรยายกับบรรทัดสถานที่ — **ทุกค่ามาจากประกาศจริง ไม่มีค่าตกแต่ง**
+   */
   const standaloneSummary = useMemo(() => {
-    const acc: Record<string, { postings: number; applicants: number }> = {};
-    for (const k of STANDALONE_POSTING_KINDS) acc[k.code] = { postings: 0, applicants: 0 };
+    const acc: Record<
+      string,
+      { postings: number; applicants: number; titles: string[]; provinces: string[]; bus: string[] }
+    > = {};
+    for (const k of STANDALONE_POSTING_KINDS) {
+      acc[k.code] = { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
+    }
     for (const p of postings) {
       if (!p.standaloneKind || !acc[p.standaloneKind]) continue;
-      acc[p.standaloneKind].postings += 1;
-      acc[p.standaloneKind].applicants += p.applicationCount ?? 0;
+      const a = acc[p.standaloneKind];
+      a.postings += 1;
+      a.applicants += p.applicationCount ?? 0;
+      const title = p.title?.trim();
+      if (title && !a.titles.includes(title)) a.titles.push(title);
+      const province = p.province?.trim();
+      if (province && !a.provinces.includes(province)) a.provinces.push(province);
+      const bu = p.departmentCode?.trim();
+      if (bu && !a.bus.includes(bu)) a.bus.push(bu);
     }
     return acc;
   }, [postings]);
@@ -254,30 +277,95 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        {/* กล่องลอย (ไม่ผูกใบขอ) — โชว์เฉพาะเมื่อมีประกาศลอยจริง ไม่งั้นเป็นแถวศูนย์เปล่า ๆ */}
+        {/*
+          กล่องลอย (ไม่ผูกใบขอ) — เจ้าของสั่ง 11 ส.ค. 2569 ให้ใช้ **ทรงเดียวกับการ์ดใบขอ**
+          (`jarvis-interactive-card` · หัวข้อ → ชิป → เนื้อ → แถบล่าง) แทนกล่องเล็กแบน ๆ เดิม
+
+          ⚠️ ไม่มีลิงก์ "ดูรายชื่อ →" เหมือนการ์ดใบขอ — ใบสมัครฝั่งเราผูกกับ `job_id`
+          ไม่ได้ผูกกับประกาศ จึงยังกรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ไม่ได้จริง
+          ใส่ปุ่มไปก็เป็นปุ่มหลอก · การกดการ์ด = สร้างลิงก์ของประเภทนั้น ซึ่งทำได้จริง
+        */}
         {isStaff && postings.some((p) => p.standaloneKind) ? (
           <div className="mt-4">
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
               กล่องลอย (ไม่ผูกใบขอ)
             </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {STANDALONE_POSTING_KINDS.map((k) => {
                 const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
-                const s = standaloneSummary[k.code] ?? { postings: 0, applicants: 0 };
+                const s =
+                  standaloneSummary[k.code] ??
+                  { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
+                const openGen = () =>
+                  setGenStandalone({
+                    kind: k.code,
+                    kindLabel: k.label,
+                    departmentCode: s.bus[0] ?? BOARD_DEFAULT_BU,
+                  });
                 return (
-                  <div
+                  <Card
                     key={k.code}
-                    className={cn('rounded-2xl px-3 py-2.5', tone.tile, s.postings === 0 && 'opacity-60')}
-                    title={`${k.label} · ประกาศ ${s.postings} ใบ · ผู้สมัคร ${s.applicants} คน`}
+                    onClick={openGen}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openGen();
+                      }
+                    }}
+                    className={cn(
+                      'group jarvis-interactive-card cursor-pointer overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                      s.postings === 0 && 'opacity-60',
+                    )}
                   >
-                    <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{k.label}</p>
-                    <p className={cn('mt-0.5 text-lg font-bold tabular-nums', tone.num)}>
-                      {s.applicants.toLocaleString('th-TH')}
-                      <span className="ml-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                        ผู้สมัคร · {s.postings.toLocaleString('th-TH')} ประกาศ
-                      </span>
-                    </p>
-                  </div>
+                    <CardHeader className="space-y-3 pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h2 className="line-clamp-2 text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-blue-600">
+                            {k.label}
+                          </h2>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {s.titles.length > 0 ? s.titles.join(' • ') : 'ยังไม่มีประกาศของประเภทนี้'}
+                          </p>
+                        </div>
+                        <span className={cn('shrink-0', tone.chip)}>
+                          {s.postings.toLocaleString('th-TH')} ประกาศ
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                          กล่องลอย
+                        </span>
+                        {s.bus.map((bu) => (
+                          <span
+                            key={bu}
+                            className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                          >
+                            {bu}
+                          </span>
+                        ))}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2 pb-4">
+                      <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
+                        {s.provinces.length > 0 ? s.provinces.join(' · ') : 'ไม่ได้ระบุจังหวัด'}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                          ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
+                          <Link2 className="h-3.5 w-3.5" />
+                          สร้างลิงก์ →
+                        </span>
+                      </div>
+                    </CardFooter>
+                  </Card>
                 );
               })}
             </div>
@@ -448,7 +536,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             แก้ไข
                           </button>
                         ) : null}
-                        <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
+                        <span className="text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
                           ดูรายชื่อ →
                         </span>
                       </div>
@@ -678,6 +766,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         open={!!genLinkJob}
         job={genLinkJob}
         onClose={() => setGenLinkJob(null)}
+        onCreated={() => setPostingsRev((n) => n + 1)}
+      />
+
+      <GenApplyLinkDialog
+        open={!!genStandalone}
+        job={null}
+        standalone={genStandalone}
+        onClose={() => setGenStandalone(null)}
         onCreated={() => setPostingsRev((n) => n + 1)}
       />
 
