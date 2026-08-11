@@ -725,6 +725,19 @@ const MatchingPage: React.FC = () => {
   const [hideProposed, setHideProposed] = useState(false);
   // แสดงทางเลือกนอกพื้นที่/ห่างไกลเป็นค่าเริ่มต้น แต่ไม่นับรวมเป็น AI แนะนำ
   const [showDistantCandidates, setShowDistantCandidates] = useState(true);
+  /**
+   * คนที่ "ปฏิเสธงานใบนี้" ไปแล้ว — ซ่อนจากรายการของใบนี้ (เจ้าของสั่ง 11 ส.ค. 2569:
+   * "ถ้าปฏิเสธงานไหนก็ไม่ต้องโชว์งานนั้นอีกและบันทึกว่าปฏิเสธงานนั้น ๆ")
+   *
+   * ⚠️ ซ่อน **เฉพาะใบนี้** ไม่ใช่ทั้งระบบ — ปฏิเสธงานนี้ไม่ได้แปลว่าเลิกหางาน
+   * (นิยามเดียวกับ `declinedScope: 'job'` ใน callFollowupPolicy: ใบอื่นยังเสนอได้)
+   * ส่วน "ไม่หางานแล้ว" (`scope: 'all'`) จัดการด้วยการพักเบอร์ที่ฝั่ง server อยู่แล้ว
+   *
+   * ⚠️ ซ่อนแบบ **ยังกดดูได้** ไม่ใช่ลบทิ้งจากสายตา — เจ้าหน้าที่ต้องตอบได้ว่า
+   * "คนที่หายไปคือใคร ทำไมหาย" ไม่งั้นจะกลายเป็นข้อมูลหายเงียบซึ่งเป็นสิ่งที่
+   * โปรเจกต์นี้กันมาตลอด · ค่าเริ่มต้นคือซ่อน ตามที่สั่ง
+   */
+  const [showDeclined, setShowDeclined] = useState(false);
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
   const [branchEditAgeMin, setBranchEditAgeMin] = useState('');
   const [branchEditAgeMax, setBranchEditAgeMax] = useState('');
@@ -775,6 +788,57 @@ const MatchingPage: React.FC = () => {
   const [lumosPoolSearch, setLumosPoolSearch] = useState('');
 
   const lumosSelectedCount = lumosSelectedBoard.length + lumosSelectedIrecruit.length;
+
+  /**
+   * person_ref ของคนที่ปฏิเสธ "ใบขอที่เปิดอยู่" — มาจากผลโทรของใบนี้ที่หน้าโหลดอยู่แล้ว
+   * (`GET /api/lumos/dispatch?jobId=` → `listLumosCallStatusForJob`) ไม่ต้องยิงเพิ่ม
+   *
+   * ⚠️ ฝั่ง server อ่าน outcome ด้วย `coalesce(last_outcome, result->>'outcome')` แล้ว
+   * ถ้าวันไหนมีคนแก้กลับไปอ่าน `result` ทางเดียว คนที่ปฏิเสธจะโผล่กลับมาให้เสนอใหม่
+   * แบบเงียบ ๆ (ผลที่คนบันทึกเขียนแค่ last_outcome · ตั้งโทรซ้ำก็ล้าง result ทิ้ง)
+   */
+  const declinedRefs = useMemo(() => {
+    const out = new Set<string>();
+    for (const row of Object.values(lumosStatusByRef)) {
+      if (row.outcome === 'declined') out.add(row.person_ref);
+    }
+    return out;
+  }, [lumosStatusByRef]);
+
+  /**
+   * ⚠️ **นับเฉพาะคนที่ถูกซ่อนออกจากรายการนี้จริง ๆ** ไม่ใช่ทุกคนที่เคยปฏิเสธใบนี้
+   *
+   * เจอตอนตรวจกับข้อมูลจริง: ใบ OPL6907083 มีคนปฏิเสธ 1 คน (card-1756) แต่คนนั้น
+   * **ไม่ได้อยู่ในผลแมทรอบปัจจุบันแล้ว** — แถบจึงขึ้นว่า "ซ่อนไว้ 1 คน" ทั้งที่ไม่ได้
+   * ซ่อนใครเลย และกด "ดูว่าใครบ้าง" ก็ไม่มีใครโผล่ · เป็นอาการ "เลขถูกแต่ตอบผิดคำถาม"
+   * แบบเดียวกับที่เจ้าของเคยทักเรื่อง funnel หน้า Follow (โชว์ 5,307 ทั้งที่ส่งเอง 1 คน)
+   *
+   * นับจากผลแมทที่กำลังจะแสดงจริง หลังผ่านตัวกรองตัวอื่นครบแล้ว
+   */
+  const hiddenDeclinedCount = useMemo(() => {
+    if (!jobDetail) return 0;
+    const board = (boardMatchById[jobDetail.id]?.matches ?? []).filter(
+      (m) =>
+        (showDistantCandidates || isRecommendedTier(m.tier)) &&
+        !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]) &&
+        declinedRefs.has(boardPersonRef(m.card_id)),
+    ).length;
+    const ir = (irMatchById[jobDetail.id]?.matches ?? []).filter(
+      (m) =>
+        (showDistantCandidates || isRecommendedTier(m.tier)) &&
+        !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]) &&
+        declinedRefs.has(irecruitPersonRef(m.id)),
+    ).length;
+    return board + ir;
+  }, [
+    jobDetail,
+    boardMatchById,
+    irMatchById,
+    declinedRefs,
+    showDistantCandidates,
+    hideProposed,
+    proposedByKey,
+  ]);
 
   /** ชื่อ/เบอร์ของ card_id ที่เลือก — หาจากผลแมทก่อน ไม่เจอค่อยดูใน pool (คนเพิ่มใหม่) */
   const boardPersonLabel = (cardId: number): { name: string; phone: string | null } => {
@@ -2667,6 +2731,25 @@ const MatchingPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* คนที่ปฏิเสธใบนี้ถูกซ่อนไว้ — บอกจำนวนเสมอ และกดดูได้
+                  ⚠️ ห้ามซ่อนแบบไม่บอก: เจ้าหน้าที่ต้องตอบได้ว่า "คนที่หายไปคือใคร"
+                  ไม่งั้นจะกลายเป็นข้อมูลหายเงียบ ซึ่งเป็นสิ่งที่โปรเจกต์นี้กันมาตลอด */}
+              {hiddenDeclinedCount > 0 ? (
+                <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2', TONE.neutral.soft)}>
+                  <span className={cn('text-[11px]', DASH.cell)}>
+                    ปฏิเสธใบขอนี้ไปแล้ว {hiddenDeclinedCount.toLocaleString('th-TH')} คน —{' '}
+                    {showDeclined ? 'กำลังแสดงอยู่ในรายการ' : 'ซ่อนไว้ ไม่เสนอใบนี้ให้เขาอีก'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeclined((v) => !v)}
+                    className="jarvis-btn-ghost ml-auto shrink-0"
+                  >
+                    {showDeclined ? 'ซ่อนอีกครั้ง' : 'ดูว่าใครบ้าง'}
+                  </button>
+                </div>
+              ) : null}
+
               <LumosSendBar
                 count={lumosSelectedCount}
                 busy={lumosSending}
@@ -2705,6 +2788,8 @@ const MatchingPage: React.FC = () => {
                     {boardMatchById[jobDetail.id].matches
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
+                      // ปฏิเสธงานนี้ไปแล้ว → ไม่เสนอใบนี้ให้เขาอีก (เจ้าของสั่ง 11 ส.ค. 2569)
+                      .filter((m) => showDeclined || !declinedRefs.has(boardPersonRef(m.card_id)))
                       .map((m) => ({
                         m,
                         priority: boardCandidatePriority(
@@ -2956,7 +3041,9 @@ const MatchingPage: React.FC = () => {
                           jobDetail,
                           irMatchById[jobDetail.id].matches
                             .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
-                            .filter((m) => !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)])),
+                            .filter((m) => !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]))
+                            // ปฏิเสธงานนี้ไปแล้ว → ไม่เสนอใบนี้อีก (กติกาเดียวกับฝั่งบอร์ด)
+                            .filter((m) => showDeclined || !declinedRefs.has(irecruitPersonRef(m.id))),
                           showDistantCandidates,
                         ).map((row) => {
                             if (row.kind === 'branch') {

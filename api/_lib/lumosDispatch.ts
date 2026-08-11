@@ -442,11 +442,20 @@ type QueueStatusSqlRow = {
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : String(v));
 
-/** สถานะ+ผลการโทรของทุกคนที่ส่งไปแล้วในใบขอนี้ (ทั้ง 2 เส้น) */
+/**
+ * สถานะ+ผลการโทรของทุกคนที่ส่งไปแล้วในใบขอนี้ (ทั้ง 2 เส้น)
+ *
+ * ⚠️ **อ่าน outcome ด้วย `coalesce(last_outcome, result->>'outcome')`** — กับดักเดิม
+ * ของโปรเจกต์ที่โดนมาแล้วสามที่ (funnel หน้า Follow · แถบตัวเลขต่อใบขอ · ที่นี่):
+ * ผลที่ **คน** บันทึกเขียนแค่ `last_outcome` ไม่ได้เขียน `result` และตอนตั้งโทรซ้ำ
+ * ก็ **ล้าง `result` ทิ้ง** → อ่าน `result` อย่างเดียวจะเห็นเป็น "ยังไม่มีผล" เงียบ ๆ
+ * ตรงนี้สำคัญเป็นพิเศษเพราะหน้า Matching ใช้ค่านี้ตัดสินว่าจะซ่อนคนที่ปฏิเสธงานนี้
+ * อ่านพลาด = เอาคนที่ปฏิเสธไปแล้วกลับมาเสนอใหม่
+ */
 export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCallStatusRow[]> {
   const { rows } = await dbQuery<QueueStatusSqlRow>(
     `select channel, person_ref, status, delivery_count, created_at, updated_at,
-            result->>'outcome' as outcome,
+            coalesce(last_outcome, result->>'outcome') as outcome,
             result->>'summary' as summary
        from ${queueTable}
       where job_ref = $1
