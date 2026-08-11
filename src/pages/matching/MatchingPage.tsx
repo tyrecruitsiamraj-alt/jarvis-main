@@ -1922,75 +1922,15 @@ const MatchingPage: React.FC = () => {
             ทางตัน — สร้างชุดได้แต่ไม่มีใครกดต่อได้ · รอเจ้าของเคาะว่าจะถอดปุ่มนั้นด้วยไหม
             หรือให้ชุดที่สร้างจากปุ่มนี้ข้ามขั้นอนุมัติไปเลย (autoApprove ซึ่ง store รองรับอยู่แล้ว) */}
 
-        {/* ตัวกรอง */}
-        <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
-          {/* จอมือถือ: ช่องค้นหาต้องหดได้จริง (`min-w-0`) ไม่งั้น input ดันความกว้างขั้นต่ำ
-              จนปุ่ม "ด่วนเท่านั้น" ที่เป็น shrink-0 ทะลุออกนอกจอ · เผื่อ flex-wrap ไว้ให้
-              ปุ่มตกบรรทัดใหม่ในจอที่แคบมาก */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* ช่องค้นหาย้ายขึ้นไปอยู่แถวหัวเรื่องแล้ว — เหลือปุ่มกรองในแถวนี้ */}
-            <button
-              type="button"
-              onClick={() => setUrgentOnly((v) => !v)}
-              className={cn(
-                'shrink-0 rounded-full border px-3 py-2 text-xs font-medium transition-colors',
-                urgentOnly
-                  ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                  : 'border-white/70 bg-white/50 text-muted-foreground hover:border-destructive/30 dark:border-white/15 dark:bg-white/10',
-              )}
-            >
-              🔴 ด่วนเท่านั้น
-            </button>
-          </div>
-          {/* BU + หน่วยงาน = ตัวกรองคู่กัน · BU ซ้าย (แคบ) เพราะเลือก BU ก่อนแล้วหน่วยงานหดตาม
-              ผู้ใช้ที่ถูกล็อก BU เดียวไม่เห็นช่อง BU — เห็นแค่งาน BU ตัวเองอยู่แล้ว */}
-          <div className={cn('grid gap-2', buOptions.length > 1 ? 'sm:grid-cols-[minmax(0,12rem)_1fr]' : '')}>
-            {buOptions.length > 1 ? (
-              <SearchableSelect
-                value={buFilter}
-                onChange={selectBu}
-                options={buOptions}
-                placeholder="ทุก BU"
-                searchPlaceholder="ค้นหา BU..."
-                emptyText="ไม่พบ BU"
-              />
-            ) : null}
-            <SearchableSelect
-              value={unitFilter}
-              onChange={setUnitFilter}
-              options={unitOptions}
-              placeholder="ทุกหน่วยงาน"
-              searchPlaceholder="ค้นหาหน่วยงาน..."
-              emptyText="ไม่พบหน่วยงาน"
-            />
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-            {(
-              [
-                ['all', 'ทั้งหมด'],
-                ['sla', 'SLA เสี่ยง/เกิน'],
-                ['green', 'มีคนเขียว'],
-                ['yellow', 'มีแต่เหลือง'],
-                ['none', 'AI ไม่พบคน'],
-                ['reserved', 'จองแล้ว'],
-              ] as Array<[WorkflowFilter, string]>
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setWorkflowFilter(value)}
-                className={cn(
-                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                  workflowFilter === value
-                    ? FILTER_PILL_ACTIVE_CLASS
-                    : FILTER_PILL_IDLE_CLASS,
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* ⚠️ กล่องตัวกรอง (ด่วนเท่านั้น · BU · หน่วยงาน · ชิปสถานะ 6 ตัว) เคยอยู่ตรงนี้
+            — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+
+            **state ของตัวกรองยังอยู่ครบและยังทำงาน** (`urgentOnly` · `buFilter` · `unitFilter`
+            · `workflowFilter`) เพราะยังมีทางตั้งค่าจากที่อื่น:
+            - ลิงก์จากหน้าหลัก (`?workflow=none` / `?workflow=green`) และการ์ดสรุปด้านล่าง
+              ซึ่งกดแล้วตั้ง workflowFilter ให้
+            - URL param ที่แชร์กันไว้เดิมยังใช้ได้ ไม่พัง
+            ถ้าวันไหนอยากได้ตัวกรองกลับมา เปิดบล็อกนี้คืนได้เลยโดยไม่ต้องแก้ตรรกะ */}
 
         {/* กล่องสรุป — กดแล้วตั้งตัวกรองให้ตรงกับจำนวนที่โชว์ (ใช้ตัวกรองชุดเดียวกับปุ่มด้านบน) */}
         {(serverSummary?.scopedTotal ?? listTotal) > 0 ? (

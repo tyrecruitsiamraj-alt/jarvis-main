@@ -9,7 +9,6 @@ import {
   type NeedsHumanItem,
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
-import { conversionRates } from '@/lib/callFunnelMath';
 import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
@@ -289,24 +288,9 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
         </p>
       </PageHeroStrip>
 
-      {/* อัตราแปลงผล — ตัวเลขไว้ประกอบการตัดสินใจเปิด auto ไม่ใช่แค่ความรู้สึก
-          นิยามฐาน (หักสายยกเลิก) อยู่ที่ callFunnelMath.ts ที่เดียว มีเทสต์คุม */}
-      {(() => {
-        const rates = conversionRates(funnel);
-        if (!rates) return null;
-        return (
-          <p className={cn('px-1 text-xs', DASH.muted)}>
-            จากสายที่มีผลจริง {rates.base.toLocaleString('th-TH')} สาย (ไม่นับที่กดยกเลิก) — โทรติด{' '}
-            <span className={cn('font-semibold', TONE.success.value)}>{rates.connectedPct}%</span>
-            {' · '}สนใจ{' '}
-            <span className={cn('font-semibold', TONE.success.value)}>{rates.confirmedPct}%</span>
-            {' · '}ต้องคนตาม{' '}
-            <span className={cn('font-semibold', funnel.needsHuman > 0 ? TONE.danger.value : DASH.muted)}>
-              {rates.needsHumanPct}%
-            </span>
-          </p>
-        );
-      })()}
+      {/* ⚠️ บรรทัด "จากสายที่มีผลจริง N สาย — โทรติด x% · สนใจ y% · ต้องคนตาม z%"
+          เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+          นิยามฐาน (หักสายยกเลิก) ยังอยู่ที่ `callFunnelMath.ts` พร้อมเทสต์ ไม่ได้ลบ */}
 
       {/* Status รายรอบ (เจ้าของสั่ง 10 ส.ค. 2569: "เตรียมแล้วกี่คน โทรรอบแรกรับไม่รับกี่คน
           รอบสอง รอบสามด้วย ส่งโทรทั้งหมดกี่คน โทรไปแล้วกี่คน เหลือโทรกี่คน — ให้เห็นความเป็น

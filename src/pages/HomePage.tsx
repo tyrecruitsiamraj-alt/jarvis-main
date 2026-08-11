@@ -353,10 +353,8 @@ const HomePage: React.FC = () => {
               <div className="hidden w-4 sm:block" aria-hidden />
             </div>
 
-            <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
-              ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด · เป็นสถานะการทำงานของทีม Matching ไม่ใช่ยอด
-              "หาได้แล้ว/ปิดครบใบขอ" ทางการจากใบขอ
-            </p>
+          {/* ⚠️ บรรทัดหมายเหตุ "ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด …"
+              เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569 */}
           </PageHeroStrip>
 
           {/* ⚠️ เคยมี <CallFunnelPanel defaultSource="all" /> ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
