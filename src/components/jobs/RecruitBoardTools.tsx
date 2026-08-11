@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Settings2, Trash2 } from 'lucide-react';
+import { BarChart3, Briefcase, Loader2, MessageSquareWarning, Plus, Settings2, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import {
 } from '@/lib/recruitPostingsApi';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import { RM_TOOLBAR_KEYS, RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
 
 const BU_OPTIONS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 
@@ -241,11 +242,28 @@ const StandalonePickerDialog: React.FC<{
   );
 };
 
-/** ปุ่มระดับ "ตั้งค่า" ของบอร์ดรับสมัคร (เฉพาะฝั่งเจ้าหน้าที่) */
+/**
+ * แถบเครื่องมือของบอร์ดรับสมัคร — **5 ปุ่มชุดเดียวกับระบบเดิม** (เจ้าของสั่ง 11 ส.ค. 2569)
+ * ตำแหน่งงาน · ช่องทาง · สร้างลิงก์ · เหตุผล · รายงาน
+ *
+ * ⚠️ **สองปุ่มต่อเข้าของที่ทำงานอยู่แล้ว ไม่ได้สร้างของซ้ำ:**
+ *   - "ช่องทาง"    = ปุ่มที่เคยชื่อ "จัดการช่องทาง" → ChannelManagerDialog เดิม
+ *   - "สร้างลิงก์"  = ปุ่มที่เคยชื่อ "ประกาศลอย" → StandalonePickerDialog + GenApplyLinkDialog เดิม
+ * เปลี่ยนแค่ชื่อบนปุ่มให้ตรงกับระบบเดิมที่ผู้ใช้คุ้น · **ฟังก์ชันไม่หายไปไหน**
+ *
+ * ⚠️ อีกสามปุ่ม (ตำแหน่งงาน · เหตุผล · รายงาน) **ยังไม่มีของฝั่งนี้** — กดแล้วขึ้น
+ * ข้อความบอกตรง ๆ ว่ายังไม่ได้ต่อ ไม่ปล่อยให้กดแล้วเงียบ
+ *
+ * ⚠️ ชื่อ/ลำดับปุ่มมาจาก `RM_TOOLBAR_KEYS`/`RM_TOOLBAR_LABEL` ใน `lib/recruitRm.ts`
+ * **ที่เดียวกับหน้างานสรรหา (RM)** — สองที่จะไม่มีวันเพี้ยนชื่อกันเอง
+ *
+ * ทั้งแถบยังอยู่ใต้สิทธิ์ `recruit_postings` เหมือนเดิม (role ที่ไม่ได้เปิดจะไม่เห็นทั้งแถบ)
+ */
 const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant = 'light' }) => {
   const { isFunctionEnabled } = useRolePermissions();
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [standalone, setStandalone] = useState<
     { kind: string; kindLabel: string; departmentCode: string } | null
   >(null);
@@ -253,31 +271,71 @@ const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant
   // ฟีเจอร์ปิดอยู่ (admin ยังไม่เปิดให้ role นี้) — ไม่ต้องแสดงอะไรเลย
   if (!isFunctionEnabled('recruit_postings')) return null;
 
+  /**
+   * ⚠️ ปุ่ม "สร้างลิงก์" ของแถบนี้ต้องต่อท้ายว่า **(ประกาศลอย)**
+   * เพราะการ์ดใบขอทุกใบบนบอร์ดมีปุ่ม "สร้างลิงก์" ของตัวเองอยู่แล้ว (ลิงก์ของใบนั้น)
+   * ชื่อเหมือนกันแต่ทำคนละอย่างคือปัญหาเดียวกับที่เจ้าของเคยทักเรื่องเมนูซ้ำสองอัน
+   * — อันนี้คือลิงก์ที่ไม่ผูกใบขอ (ของเดิมชื่อ "ประกาศลอย")
+   */
+  const LABEL: Record<RmToolbarKey, string> = {
+    ...RM_TOOLBAR_LABEL,
+    link: `${RM_TOOLBAR_LABEL.link} (ประกาศลอย)`,
+  };
+
+  const ICONS: Record<RmToolbarKey, typeof Settings2> = {
+    positions: Briefcase,
+    channels: Settings2,
+    link: Plus,
+    reasons: MessageSquareWarning,
+    reports: BarChart3,
+  };
+
+  /** ปุ่มไหนต่อของจริงแล้ว — ที่เหลือขึ้นข้อความบอกว่ายังไม่ได้ทำ */
+  const onClickKey = (key: RmToolbarKey) => {
+    setNotice(null);
+    if (key === 'channels') return setChannelsOpen(true);
+    if (key === 'link') return setPickerOpen(true);
+    setNotice(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}" — ยังไม่ได้ต่อกับระบบจริง`);
+  };
+
+  const btnCls = (key: RmToolbarKey) => {
+    // "สร้างลิงก์" เป็นปุ่มหลักของแถบนี้ (เดิม "ประกาศลอย" ใช้ทรงทึบ) — คงน้ำหนักเดิมไว้
+    if (variant === 'onDark') return key === 'link' ? heroButtonSolid : heroButton;
+    return key === 'link'
+      ? 'inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15'
+      : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary';
+  };
+
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setChannelsOpen(true)}
-          className={
-            variant === 'onDark'
-              ? heroButton
-              : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary'
-          }
-        >
-          <Settings2 className="h-3.5 w-3.5" /> จัดการช่องทาง
-        </button>
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className={
-            variant === 'onDark'
-              ? heroButtonSolid
-              : 'inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15'
-          }
-        >
-          <Plus className="h-3.5 w-3.5" /> ประกาศลอย
-        </button>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex flex-wrap gap-2">
+          {RM_TOOLBAR_KEYS.map((key) => {
+            const Icon = ICONS[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onClickKey(key)}
+                title={key === 'link' ? 'สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ' : undefined}
+                className={btnCls(key)}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden /> {LABEL[key]}
+              </button>
+            );
+          })}
+        </div>
+        {notice ? (
+          <p
+            className={
+              variant === 'onDark'
+                ? 'text-[11px] font-medium text-amber-200'
+                : 'text-[11px] font-medium text-amber-700 dark:text-amber-300'
+            }
+          >
+            {notice}
+          </p>
+        ) : null}
       </div>
 
       <ChannelManagerDialog open={channelsOpen} onClose={() => setChannelsOpen(false)} />
