@@ -840,6 +840,64 @@ const MatchingPage: React.FC = () => {
     proposedByKey,
   ]);
 
+  /**
+   * "อนุมัติทั้งใบ" — ทุกคนที่กำลังแสดงอยู่ในใบนี้และส่งได้จริง
+   * (เจ้าของสั่ง 11 ส.ค. 2569: "กดอนุมัติทั้งใบงานให้ AI โทร หรือเลือกแล้วกดส่งก็ได้")
+   *
+   * ⚠️ ใช้เงื่อนไข "ส่งได้" **ชุดเดียวกับช่องติ๊ก** เป๊ะ (มีเบอร์ · ยังไม่เคยเข้าคิวใบนี้ ·
+   * ไม่มีเจ้าหน้าที่ถืออยู่) ไม่งั้นกดอนุมัติทั้งใบแล้วได้จำนวนไม่ตรงกับที่ติ๊กเองทีละคน
+   * ซึ่งอธิบายให้ผู้ใช้ไม่ได้ · และไม่รวมคนที่ปฏิเสธใบนี้ไปแล้ว (ถูกซ่อนอยู่)
+   */
+  const approveAllTargets = useMemo(() => {
+    if (!jobDetail) return { board: [] as number[], irecruit: [] as number[] };
+    const board = (boardMatchById[jobDetail.id]?.matches ?? [])
+      .filter(
+        (m) =>
+          (showDistantCandidates || isRecommendedTier(m.tier)) &&
+          !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]) &&
+          !declinedRefs.has(boardPersonRef(m.card_id)) &&
+          Boolean(m.mobile) &&
+          !lumosStatusByRef[boardPersonRef(m.card_id)] &&
+          !holdByRef[String(m.card_id)],
+      )
+      .map((m) => m.card_id);
+    const irecruit = (irMatchById[jobDetail.id]?.matches ?? [])
+      .filter(
+        (m) =>
+          (showDistantCandidates || isRecommendedTier(m.tier)) &&
+          !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]) &&
+          !declinedRefs.has(irecruitPersonRef(m.id)) &&
+          Boolean(m.phone_number) &&
+          !lumosStatusByRef[irecruitPersonRef(m.id)],
+      )
+      .map((m) => m.id);
+    return { board, irecruit };
+  }, [
+    jobDetail,
+    boardMatchById,
+    irMatchById,
+    declinedRefs,
+    showDistantCandidates,
+    hideProposed,
+    proposedByKey,
+    lumosStatusByRef,
+    holdByRef,
+  ]);
+
+  const approveAllCount = approveAllTargets.board.length + approveAllTargets.irecruit.length;
+
+  /**
+   * กดอนุมัติทั้งใบ = ติ๊กให้ครบแล้วเปิดหน้าต่างยืนยันตัวเดิม
+   * ⚠️ **ต้องผ่านหน้าต่างยืนยันเสมอ** — ปุ่มนี้ยิงสายจริงทีเดียวหลายสิบคน
+   * หน้าต่างนั้นโชว์รายชื่อ+เบอร์ทุกคนและเตือนว่า "AI จะโทรหาคนเหล่านี้จริง" อยู่แล้ว
+   */
+  const approveWholeJob = () => {
+    if (approveAllCount === 0) return;
+    setLumosSelectedBoard(approveAllTargets.board);
+    setLumosSelectedIrecruit(approveAllTargets.irecruit);
+    setLumosConfirmOpen(true);
+  };
+
   /** ชื่อ/เบอร์ของ card_id ที่เลือก — หาจากผลแมทก่อน ไม่เจอค่อยดูใน pool (คนเพิ่มใหม่) */
   const boardPersonLabel = (cardId: number): { name: string; phone: string | null } => {
     const fromMatch = (boardMatchById[jobDetail?.id ?? '']?.matches ?? []).find((m) => m.card_id === cardId);
@@ -2730,6 +2788,26 @@ const MatchingPage: React.FC = () => {
                 </button>
                 </div>
               </div>
+
+              {/* อนุมัติทั้งใบ — ทางลัดของ "ติ๊กให้ครบแล้วกดส่ง" สำหรับใบที่ตรวจแล้วเอาหมด
+                  (เจ้าของสั่ง 11 ส.ค. 2569) · ยังผ่านหน้าต่างยืนยันตัวเดิมที่โชว์รายชื่อ
+                  ครบทุกคนและเตือนว่า AI จะโทรจริง — ไม่มีทางลัดที่ข้ามการยืนยัน */}
+              {approveAllCount > 0 ? (
+                <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2', TONE.success.soft)}>
+                  <span className={cn('text-[11px]', DASH.cell)}>
+                    ใบนี้มีคนที่ส่งได้ทั้งหมด {approveAllCount.toLocaleString('th-TH')} คน —
+                    ตรวจแล้วเอาทั้งใบก็กดปุ่มนี้ได้เลย ไม่ต้องไล่ติ๊กทีละคน
+                  </span>
+                  <button
+                    type="button"
+                    onClick={approveWholeJob}
+                    disabled={lumosSending || batchCreating}
+                    className="jarvis-btn-primary ml-auto shrink-0"
+                  >
+                    <PhoneCall className="h-3 w-3" /> อนุมัติทั้งใบ — ส่ง AI โทร ({approveAllCount})
+                  </button>
+                </div>
+              ) : null}
 
               {/* คนที่ปฏิเสธใบนี้ถูกซ่อนไว้ — บอกจำนวนเสมอ และกดดูได้
                   ⚠️ ห้ามซ่อนแบบไม่บอก: เจ้าหน้าที่ต้องตอบได้ว่า "คนที่หายไปคือใคร"
