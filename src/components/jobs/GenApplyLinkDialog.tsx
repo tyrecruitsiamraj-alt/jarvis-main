@@ -15,6 +15,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/apiFetch';
+import { parseAppUserList } from '@/lib/userApi';
+import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
+import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
+import { createShortLink } from '@/lib/shortLinksApi';
 
 export type GenApplyLinkDialogProps = {
   open: boolean;
@@ -78,9 +84,19 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const [salaryText, setSalaryText] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  // ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
+  const [positionName, setPositionName] = useState('');
+  const [province, setProvince] = useState('');
+  const [responsible, setResponsible] = useState('');
+  const [specificType, setSpecificType] = useState('');
+  const [formType, setFormType] = useState<string>('rm');
+  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<Array<{ code: string; label: string | null }>>([]);
+  /** code เดิม → path สั้น · ระบบเดิมมี checkbox "ตัด URL ให้สั้นลง" */
+  const [shortLinks, setShortLinks] = useState<Record<string, string>>({});
+  const [shortening, setShortening] = useState(false);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -97,9 +113,29 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setSalaryText('');
     setContactName(job?.contact_name ?? '');
     setContactPhone(job?.contact_phone ?? '');
+    // ตำแหน่ง/จังหวัด: ใบขอมีอยู่แล้ว ไม่ต้องให้พิมพ์ซ้ำ (staff_title_name = ตำแหน่งที่ขอ)
+    // ประกาศลอยไม่มีใบขอ ใช้ชื่อกล่องเป็นตำแหน่งตั้งต้นแล้วแก้ได้
+    setPositionName(job?.staff_title_name ?? standalone?.kindLabel ?? '');
+    // จังหวัดไม่มีเป็นฟิลด์เดี่ยวในใบขอ — ถอดจากที่อยู่ด้วยตัวถอดเดิมที่ตัวกรองบอร์ดใช้
+    setProvince(job ? (inferProvinceFromAddress(job.location_address || '') ?? '') : '');
+    setResponsible('');
+    setSpecificType('');
+    setFormType('rm');
+    setShortLinks({});
     void fetchRecruitChannels()
       .then(setChannels)
       .catch(() => setChannels([]));
+    // ผู้รับผิดชอบ = ผู้ใช้ในระบบ (ไม่ใช่ master แยกอีกชุด) — พลาดก็ปล่อยว่างได้ ไม่บังคับ
+    void apiFetch('/api/app-users')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) =>
+        setStaff(
+          parseAppUserList(data)
+            .filter((u) => u.is_active)
+            .map((u) => ({ id: u.id, name: u.full_name || u.email })),
+        ),
+      )
+      .catch(() => setStaff([]));
   }, [open, job, standalone]);
 
   const flatChannels = useMemo(() => {
@@ -111,6 +147,29 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     }
     return out;
   }, [channels]);
+
+  /**
+   * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
+   * (ผู้ใช้จะคัดลอกลิงก์ยาวไปโดยคิดว่าสั้นแล้ว)
+   */
+  const toggleShort = async (want: boolean) => {
+    if (!want) {
+      setShortLinks({});
+      return;
+    }
+    setShortening(true);
+    try {
+      const pairs = await Promise.all(
+        links.map(async (l) => [l.code, (await createShortLink(applyLinkPath(l.code))).path] as const),
+      );
+      setShortLinks(Object.fromEntries(pairs));
+    } catch (e) {
+      setShortLinks({});
+      setError(e instanceof Error ? e.message : 'ตัดลิงก์ให้สั้นไม่สำเร็จ');
+    } finally {
+      setShortening(false);
+    }
+  };
 
   const toggle = (id: string) => {
     setPicked((prev) => {
@@ -139,6 +198,12 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         channels: flatChannels
           .filter((c) => picked.has(c.id))
           .map((c) => ({ channelId: c.id, label: c.label })),
+        positionName: positionName.trim() || null,
+        province: province || null,
+        responsibleName: staff.find((u) => u.id === responsible)?.name ?? null,
+        responsibleUserId: responsible || null,
+        specificType: specificType || null,
+        formType,
       };
       const created = await createRecruitPosting(body);
       setLinks(created.links.map((l) => ({ code: l.code, label: l.channelLabel })));
@@ -180,10 +245,23 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {links.map((l) => (
                 <LinkRow
                   key={l.code}
-                  url={`${origin}${applyLinkPath(l.code)}`}
+                  url={`${origin}${shortLinks[l.code] ?? applyLinkPath(l.code)}`}
                   label={l.label ?? 'ไม่ระบุช่องทาง'}
                 />
               ))}
+              {/* ระบบเดิมมี checkbox "ตัด URL ให้สั้นลง" — ฝั่งเรามี /api/short-links อยู่แล้ว
+                  ติ๊กแล้วแปลงทุกลิงก์พร้อมกัน (ยิงซ้ำได้ ได้ code เดิม ไม่สร้างซ้ำ) */}
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                  checked={Object.keys(shortLinks).length > 0}
+                  disabled={shortening}
+                  onChange={(e) => void toggleShort(e.target.checked)}
+                />
+                ตัด URL ให้สั้นลง
+                {shortening ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              </label>
             </div>
           ) : (
             <>
@@ -235,6 +313,82 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
                   />
+                </div>
+              </div>
+
+              {/* ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
+                  ตำแหน่ง/จังหวัดเติมจากใบขอให้แล้ว · ไม่บังคับกรอกเพื่อไม่ให้ประกาศลอย
+                  ที่รีบส่งออกติดฟอร์ม แต่กรอกไว้แล้วรายงานย้อนหลังตอบได้ว่าลิงก์ไหนของงานไหน */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">ตำแหน่งงาน</label>
+                  <input
+                    className={fieldCls}
+                    value={positionName}
+                    onChange={(e) => setPositionName(e.target.value)}
+                    placeholder="เช่น ขับรถผู้บริหารไทย"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
+                  <select className={fieldCls} value={province} onChange={(e) => setProvince(e.target.value)}>
+                    <option value="">ไม่ระบุ</option>
+                    {THAI_PROVINCE_NAMES_SORTED.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
+                  <select
+                    className={fieldCls}
+                    value={responsible}
+                    onChange={(e) => setResponsible(e.target.value)}
+                  >
+                    <option value="">ไม่ระบุ</option>
+                    {staff.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">ข้อมูลเจาะจง</label>
+                  <select
+                    className={fieldCls}
+                    value={specificType}
+                    onChange={(e) => setSpecificType(e.target.value)}
+                  >
+                    <option value="">ไม่ระบุ</option>
+                    {RM_SPECIFIC_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">ประเภทฟอร์มการสมัคร</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {RM_FORM_TYPES.map((f) => (
+                    <button
+                      key={f.code}
+                      type="button"
+                      onClick={() => setFormType(f.code)}
+                      className={
+                        formType === f.code
+                          ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-semibold text-primary'
+                          : 'rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-secondary'
+                      }
+                    >
+                      {f.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 

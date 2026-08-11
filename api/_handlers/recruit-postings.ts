@@ -105,6 +105,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         salaryText: typeof body.salaryText === 'string' ? body.salaryText : null,
         contactName: typeof body.contactName === 'string' ? body.contactName : null,
         contactPhone: typeof body.contactPhone === 'string' ? body.contactPhone : null,
+        positionName: typeof body.positionName === 'string' ? body.positionName : null,
+        province: typeof body.province === 'string' ? body.province : null,
+        responsibleName: typeof body.responsibleName === 'string' ? body.responsibleName : null,
+        responsibleUserId: typeof body.responsibleUserId === 'string' ? body.responsibleUserId : null,
+        // ค่าที่ไม่อยู่ใน master ถูกทิ้งเป็น null ที่ชั้น store — ไม่ต้องตรวจซ้ำที่นี่
+        specificType: typeof body.specificType === 'string' ? body.specificType : null,
+        formType: typeof body.formType === 'string' ? body.formType : null,
         channels: Array.isArray(body.channels)
           ? body.channels.filter(isPlainObject).map((c) => ({
               channelId: typeof c.channelId === 'string' ? c.channelId : null,

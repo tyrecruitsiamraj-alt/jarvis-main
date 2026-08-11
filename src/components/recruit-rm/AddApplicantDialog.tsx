@@ -1,0 +1,371 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2, UserPlus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { apiFetch } from '@/lib/apiFetch';
+import { parseAppUserList } from '@/lib/userApi';
+import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
+import districtsByProvince from '@/data/thaiDistrictsByProvince.json';
+import { fetchRecruitChannels } from '@/lib/recruitPostingsApi';
+import type { RecruitChannel } from '@/lib/recruitPostings';
+import { createApplicationByStaff } from '@/lib/publicApplicationsApi';
+import {
+  RM_EDUCATION_LEVELS,
+  RM_LICENSE_TYPES,
+  RM_SEX_OPTIONS,
+  RM_SPECIFIC_TYPES,
+  normalizeRmPhone,
+} from '@/lib/recruitRmMasters';
+
+/**
+ * "เพิ่มข้อมูลผู้สมัคร" — เจ้าหน้าที่คีย์ใบสมัครเอง (คนโทรเข้ามาสมัคร ไม่ได้กรอกลิงก์)
+ *
+ * ช่องทั้งหมดตามฟอร์มของระบบเดิมที่เจ้าของส่งมา 11 ส.ค. 2569:
+ * ชื่อ · นามสกุล · อายุ · เพศ · เบอร์โทร · LINE ID · จังหวัด · อำเภอ ·
+ * ตำแหน่งงานที่สนใจ · ประเภทเจาะจง · วุฒิการศึกษา · ผู้รับผิดชอบ ·
+ * ช่องทางการรับสมัคร · ประเภทใบขับขี่
+ *
+ * ⚠️ บันทึกลง**ตารางใบสมัครเดียวกับที่มาจากลิงก์** — ไม่แยกตารางใหม่ ไม่งั้นยอดในหน้า
+ * RM กับบอร์ดนับไม่ตรงกัน · ใบที่คีย์เองจะมี "ผู้บันทึก" ติดไว้
+ *
+ * ⚠️ ตำแหน่งงาน/ผู้รับผิดชอบ/ช่องทาง ดึงจากของที่ระบบมีจริง (ผู้ใช้ในระบบ + master
+ * ช่องทาง) ไม่ทำ master ซ้ำอีกชุด · ตำแหน่งเป็นช่องพิมพ์เพราะฝั่งเรายังไม่มี master ตำแหน่ง
+ */
+
+const fieldCls =
+  'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
+const labelCls = 'text-xs font-medium text-muted-foreground';
+
+const DISTRICTS = districtsByProvince as Record<string, string[]>;
+
+const AddApplicantDialog: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ open, onClose, onSaved }) => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState<string>('');
+  const [phone, setPhone] = useState('');
+  const [lineId, setLineId] = useState('');
+  const [province, setProvince] = useState('');
+  const [district, setDistrict] = useState('');
+  const [positionInterest, setPositionInterest] = useState('');
+  const [specificType, setSpecificType] = useState('');
+  const [education, setEducation] = useState('');
+  const [responsible, setResponsible] = useState('');
+  const [channelId, setChannelId] = useState('');
+  const [licenses, setLicenses] = useState<string[]>([]);
+
+  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
+  const [channels, setChannels] = useState<RecruitChannel[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setFirstName('');
+    setLastName('');
+    setAge('');
+    setGender('');
+    setPhone('');
+    setLineId('');
+    setProvince('');
+    setDistrict('');
+    setPositionInterest('');
+    setSpecificType('');
+    setEducation('');
+    setResponsible('');
+    setChannelId('');
+    setLicenses([]);
+    setError(null);
+    setSaving(false);
+    void apiFetch('/api/app-users')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) =>
+        setStaff(
+          parseAppUserList(data)
+            .filter((u) => u.is_active)
+            .map((u) => ({ id: u.id, name: u.full_name || u.email })),
+        ),
+      )
+      .catch(() => setStaff([]));
+    void fetchRecruitChannels()
+      .then(setChannels)
+      .catch(() => setChannels([]));
+  }, [open]);
+
+  /** ช่องทางหลัก · ช่องทางรอง — แบนเป็นลิสต์เดียวเหมือนตอนสร้างลิงก์ */
+  const flatChannels = useMemo(() => {
+    const out: Array<{ id: string; label: string }> = [];
+    for (const parent of channels) {
+      const kids = parent.children ?? [];
+      if (kids.length === 0) out.push({ id: parent.id, label: parent.name });
+      for (const kid of kids) out.push({ id: kid.id, label: `${parent.name} · ${kid.name}` });
+    }
+    return out;
+  }, [channels]);
+
+  const districts = province ? (DISTRICTS[province] ?? []) : [];
+
+  const toggleLicense = (t: string) =>
+    setLicenses((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+
+  const submit = async () => {
+    setError(null);
+    // ตรวจฝั่งหน้าเว็บด้วยกติกาเดียวกับ API (recruitRmMasters) — ไม่ให้ error สองแบบ
+    if (!firstName.trim()) return setError('กรุณากรอกชื่อ');
+    if (!lastName.trim()) return setError('กรุณากรอกนามสกุล');
+    if (!normalizeRmPhone(phone)) return setError('กรุณากรอกเบอร์โทรให้ครบ 10 หลัก');
+    if (!gender) return setError('กรุณาเลือกเพศ');
+    const ageNum = Number(age);
+    if (!Number.isFinite(ageNum) || ageNum < 15 || ageNum > 80) {
+      return setError('อายุต้องอยู่ระหว่าง 15–80 ปี');
+    }
+
+    setSaving(true);
+    try {
+      await createApplicationByStaff({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        phone,
+        age: ageNum,
+        gender,
+        line_id: lineId.trim() || null,
+        province: province || null,
+        district: district || null,
+        position_interest: positionInterest.trim() || null,
+        specific_type: specificType || null,
+        education: education || null,
+        responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,
+        channel_id: channelId || null,
+        channel_label: flatChannels.find((c) => c.id === channelId)?.label ?? null,
+        license_types: licenses,
+      });
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] p-0">
+        <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
+          <DialogTitle className="text-base font-semibold">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
+          <DialogDescription className="text-xs">
+            สำหรับคนที่โทรเข้ามาสมัคร — ใบนี้จะไปอยู่รวมกับใบสมัครจากลิงก์ และมีชื่อผู้บันทึกติดไว้
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className={labelCls}>ชื่อ *</label>
+              <input className={fieldCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>นามสกุล *</label>
+              <input className={fieldCls} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>อายุ *</label>
+              <input
+                className={fieldCls}
+                type="number"
+                inputMode="numeric"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>เพศ *</label>
+              <div className="flex gap-1.5">
+                {RM_SEX_OPTIONS.map((s) => (
+                  <button
+                    key={s.code}
+                    type="button"
+                    onClick={() => setGender(s.code)}
+                    className={
+                      gender === s.code
+                        ? 'rounded-full border border-primary bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary'
+                        : 'rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary'
+                    }
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>เบอร์โทรติดต่อ * (10 หลัก)</label>
+              <input
+                className={fieldCls}
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="08xxxxxxxx"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>LINE ID</label>
+              <input className={fieldCls} value={lineId} onChange={(e) => setLineId(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>จังหวัด</label>
+              <select
+                className={fieldCls}
+                value={province}
+                onChange={(e) => {
+                  setProvince(e.target.value);
+                  setDistrict(''); // อำเภอของจังหวัดเดิมใช้กับจังหวัดใหม่ไม่ได้
+                }}
+              >
+                <option value="">ไม่ระบุ</option>
+                {THAI_PROVINCE_NAMES_SORTED.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>อำเภอ/เขต</label>
+              <select
+                className={fieldCls}
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                disabled={!province}
+              >
+                <option value="">{province ? 'ไม่ระบุ' : 'เลือกจังหวัดก่อน'}</option>
+                {districts.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>ตำแหน่งงานที่สนใจ</label>
+              <input
+                className={fieldCls}
+                value={positionInterest}
+                onChange={(e) => setPositionInterest(e.target.value)}
+                placeholder="เช่น ขับรถผู้บริหารไทย"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>ประเภทเจาะจง</label>
+              <select
+                className={fieldCls}
+                value={specificType}
+                onChange={(e) => setSpecificType(e.target.value)}
+              >
+                <option value="">ไม่ระบุ</option>
+                {RM_SPECIFIC_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>วุฒิการศึกษา</label>
+              <select className={fieldCls} value={education} onChange={(e) => setEducation(e.target.value)}>
+                <option value="">ไม่ระบุ</option>
+                {RM_EDUCATION_LEVELS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className={labelCls}>ผู้รับผิดชอบ</label>
+              <select
+                className={fieldCls}
+                value={responsible}
+                onChange={(e) => setResponsible(e.target.value)}
+              >
+                <option value="">ไม่ระบุ</option>
+                {staff.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className={labelCls}>ช่องทางการรับสมัคร</label>
+              <select className={fieldCls} value={channelId} onChange={(e) => setChannelId(e.target.value)}>
+                <option value="">ไม่ระบุ</option>
+                {flatChannels.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              {flatChannels.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  ยังไม่มีช่องทาง — เพิ่มได้ที่ปุ่ม "ช่องทาง" ด้านบน
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className={labelCls}>ประเภทใบขับขี่ (ถ้ามี)</label>
+            <div className="flex flex-wrap gap-1.5">
+              {RM_LICENSE_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleLicense(t)}
+                  className={
+                    licenses.includes(t)
+                      ? 'rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary'
+                      : 'rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary'
+                  }
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error ? <p className="text-xs font-medium text-red-600 dark:text-red-400">{error}</p> : null}
+        </div>
+
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border/50 px-5 py-3">
+          <button type="button" onClick={onClose} className="jarvis-btn-secondary">
+            ปิด
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={saving}
+            className="jarvis-btn-primary disabled:opacity-60"
+          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <UserPlus className="h-3.5 w-3.5" aria-hidden />
+            )}
+            {saving ? 'กำลังบันทึก…' : 'บันทึก'}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default AddApplicantDialog;

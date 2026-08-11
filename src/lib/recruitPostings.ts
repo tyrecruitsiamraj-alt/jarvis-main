@@ -62,6 +62,13 @@ export type RecruitPosting = {
   salaryText: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  /** ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) */
+  positionName: string | null;
+  province: string | null;
+  responsibleName: string | null;
+  specificType: string | null;
+  /** 'rm' = ฟอร์มทั่วไป · 'global' = ฟอร์มที่แนบเอกสารได้ */
+  formType: string;
   status: RecruitPostingStatus;
   createdByName: string | null;
   createdAt: string;

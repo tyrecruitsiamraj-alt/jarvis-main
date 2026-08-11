@@ -28,6 +28,15 @@ export type PublicApplication = {
   note?: string;
   status: ApplicationStatus;
   admin_note?: string;
+  /** ช่องที่ระบบเดิม (RM) เก็บ — เติมมาที่ migration 074 · ใบเก่าเป็น undefined */
+  line_id?: string;
+  specific_type?: string;
+  responsible_name?: string;
+  /** ช่องทางจาก master recruit_channels — แม่นกว่า referral_source ที่ผู้สมัครเลือกเอง */
+  channel_label?: string;
+  license_types?: string[];
+  /** เจ้าหน้าที่ที่คีย์ใบนี้ — undefined = ผู้สมัครกรอกเองผ่านลิงก์ */
+  created_by_name?: string;
   created_at: string;
 };
 
@@ -102,6 +111,39 @@ export async function fetchAllJobApplications(): Promise<PublicApplication[]> {
   if (!r.ok) throw new Error('โหลดรายชื่อผู้สมัครไม่สำเร็จ');
   const data = (await r.json()) as { items?: PublicApplication[] };
   return data.items ?? [];
+}
+
+/**
+ * เจ้าหน้าที่คีย์ใบสมัครเอง (ฟอร์ม "เพิ่มข้อมูลผู้สมัคร" ของหน้างานสรรหา RM)
+ * ⚠️ ลงตารางเดียวกับใบสมัครจากลิงก์ — ดูเหตุผลที่ api/_handlers/job-applications.ts
+ */
+export async function createApplicationByStaff(input: {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  age: number;
+  gender: string;
+  line_id?: string | null;
+  province?: string | null;
+  district?: string | null;
+  position_interest?: string | null;
+  specific_type?: string | null;
+  education?: string | null;
+  responsible_name?: string | null;
+  channel_id?: string | null;
+  channel_label?: string | null;
+  license_types?: string[];
+}): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'บันทึกผู้สมัครไม่สำเร็จ');
+  }
+  const body = (await r.json()) as { item: PublicApplication };
+  return body.item;
 }
 
 /** รายชื่อผู้สมัครของงานหนึ่งใบ (ต้องล็อกอิน) */

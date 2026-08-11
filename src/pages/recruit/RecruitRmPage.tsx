@@ -10,6 +10,7 @@ import RmFilterSidebar from '@/components/recruit-rm/RmFilterSidebar';
 import RmToolbar from '@/components/recruit-rm/RmToolbar';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
+import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import {
   EMPTY_RM_FILTERS,
   RM_ROW_ACTION_LABEL,
@@ -49,8 +50,9 @@ import {
  *              "รับไปตาม" ตัวเดียวกับหน้า Matching (acquireCallHold) ไม่สร้างล็อกใหม่
  * TODO(api) 3. วันนัดจริงในแท็บติดตามนัดหมาย — candidate_interviews ตอนนี้ดึงได้ทีละคน
  *              ต้องเพิ่ม endpoint รวม (GET /api/candidate-interviews?all=1) ก่อน
- * TODO(api) 4. แถบเครื่องมือ 5 ปุ่ม (ตำแหน่งงาน/ช่องทาง/สร้างลิงก์/เหตุผล/รายงาน)
- *              — "สร้างลิงก์" มีของอยู่แล้วที่บอร์ด (GenApplyLinkDialog) เอามาเสียบได้เลย
+ * TODO(api) 4. แถบเครื่องมือที่หน้านี้ (ช่องทาง/สร้างลิงก์/เหตุผล/รายงาน) — สองปุ่มแรก
+ *              ต่อของจริงแล้วที่บอร์ดรับสมัคร ยังต้องยกมาเสียบที่หน้านี้ด้วย
+ * ✅ "เพิ่มข้อมูลผู้สมัคร" ต่อของจริงแล้ว (AddApplicantDialog → POST /api/job-applications)
  *
  * ⚠️ ปุ่มที่ยังไม่ได้ต่อ ขึ้นข้อความบอกตรง ๆ — ไม่ปล่อยให้กดแล้วเงียบ
  */
@@ -76,6 +78,7 @@ const RecruitRmPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<PageSizeOption>(PAGE_SIZE_DEFAULT);
   /** ข้อความบอกว่ายังไม่ได้ต่อของจริง — ดีกว่าปุ่มที่กดแล้วเงียบ */
   const [notice, setNotice] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -193,6 +196,7 @@ const RecruitRmPage: React.FC = () => {
                   selectedCount={selectedIds.length}
                   onSaveLead={() => todo(`เก็บ ${selectedIds.length} รายการเข้า Lead`)}
                   onDeleteLead={() => todo(`ลบ ${selectedIds.length} รายการออกจาก Lead`)}
+                  onAddApplicant={() => setAddOpen(true)}
                 />
               </div>
             </div>
@@ -249,6 +253,15 @@ const RecruitRmPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <AddApplicantDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={() => {
+          setNotice('บันทึกผู้สมัครแล้ว');
+          load(); // ใบใหม่ต้องโผล่ในตารางทันที ไม่ต้องให้กดรีเฟรชเอง
+        }}
+      />
     </div>
   );
 };

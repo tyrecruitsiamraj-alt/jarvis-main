@@ -9,6 +9,7 @@ import {
   type RecruitPosting,
   type RecruitPostingLink,
 } from '../../src/lib/recruitPostings.js';
+import { isRmFormType, isRmSpecificType } from '../../src/lib/recruitRmMasters.js';
 
 const channelsTable = tableInAppSchema('recruit_channels');
 const postingsTable = tableInAppSchema('recruit_postings');
@@ -163,6 +164,11 @@ type PostingRow = {
   salary_text: string | null;
   contact_name: string | null;
   contact_phone: string | null;
+  position_name: string | null;
+  province: string | null;
+  responsible_name: string | null;
+  specific_type: string | null;
+  form_type: string | null;
   status: string;
   created_by_name: string | null;
   created_at: string;
@@ -207,6 +213,12 @@ function mapPosting(r: PostingRow, links: RecruitPostingLink[]): RecruitPosting 
     salaryText: r.salary_text,
     contactName: r.contact_name,
     contactPhone: r.contact_phone,
+    positionName: r.position_name ?? null,
+    province: r.province ?? null,
+    responsibleName: r.responsible_name ?? null,
+    specificType: r.specific_type ?? null,
+    // ประกาศเก่าที่สร้างก่อน migration 074 อ่านเป็น "ทั่วไป" ตามพฤติกรรมเดิม
+    formType: isRmFormType(r.form_type) ? r.form_type : 'rm',
     status: r.status === 'closed' ? 'closed' : 'open',
     createdByName: r.created_by_name,
     createdAt: r.created_at,
@@ -217,9 +229,44 @@ function mapPosting(r: PostingRow, links: RecruitPostingLink[]): RecruitPosting 
 }
 
 const POSTING_COLUMNS = `p.id, p.job_id, p.standalone_kind, p.department_code, p.title, p.detail,
-  p.location_text, p.salary_text, p.contact_name, p.contact_phone, p.status,
+  p.location_text, p.salary_text, p.contact_name, p.contact_phone,
+  p.position_name, p.province, p.responsible_name, p.specific_type, p.form_type, p.status,
   p.created_by_name, p.created_at, p.updated_at,
   (SELECT count(*) FROM ${applicationsTable} a WHERE a.posting_id = p.id) AS application_count`;
+
+/**
+ * ชุดคอลัมน์แบบยังไม่ได้รัน migration 074
+ * ⚠️ **ห้ามลบจนกว่าทุก environment รัน 074 แล้ว** — ฐาน local ของเจ้าของชี้ production
+ * ตัวเดียวกัน โค้ดขึ้นก่อน migration แล้ว select คอลัมน์ที่ยังไม่มี = บอร์ดรับสมัครพังทั้งหน้า
+ */
+const POSTING_COLUMNS_LEGACY = `p.id, p.job_id, p.standalone_kind, p.department_code, p.title, p.detail,
+  p.location_text, p.salary_text, p.contact_name, p.contact_phone,
+  null::text AS position_name, null::text AS province, null::text AS responsible_name,
+  null::text AS specific_type, null::text AS form_type, p.status,
+  p.created_by_name, p.created_at, p.updated_at,
+  (SELECT count(*) FROM ${applicationsTable} a WHERE a.posting_id = p.id) AS application_count`;
+
+/** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */
+function isUndefinedColumn(e: unknown): boolean {
+  return (
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703'
+  );
+}
+
+/** ยิงชุดใหม่ก่อน · ยังไม่ migrate ถอยไปชุดเก่า (ฟิลด์ใหม่อ่านเป็น null) */
+async function postingQuery(sql: string, params: unknown[] = []): Promise<PostingRow[]> {
+  try {
+    const { rows } = await dbQuery<PostingRow>(sql.replace(/\{\{cols\}\}/g, POSTING_COLUMNS), params);
+    return rows;
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    const { rows } = await dbQuery<PostingRow>(
+      sql.replace(/\{\{cols\}\}/g, POSTING_COLUMNS_LEGACY),
+      params,
+    );
+    return rows;
+  }
+}
 
 async function attachLinks(postings: PostingRow[]): Promise<RecruitPosting[]> {
   if (postings.length === 0) return [];
@@ -263,8 +310,8 @@ export async function listRecruitPostings(options: {
     where.push(`(p.job_id IS NOT NULL OR p.department_code = ANY($${params.length}::text[]))`);
   }
 
-  const { rows } = await dbQuery<PostingRow>(
-    `SELECT ${POSTING_COLUMNS}
+  const rows = await postingQuery(
+    `SELECT {{cols}}
        FROM ${postingsTable} p
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY p.created_at DESC
@@ -275,10 +322,7 @@ export async function listRecruitPostings(options: {
 }
 
 export async function getRecruitPosting(id: string): Promise<RecruitPosting | null> {
-  const { rows } = await dbQuery<PostingRow>(
-    `SELECT ${POSTING_COLUMNS} FROM ${postingsTable} p WHERE p.id = $1`,
-    [id],
-  );
+  const rows = await postingQuery(`SELECT {{cols}} FROM ${postingsTable} p WHERE p.id = $1`, [id]);
   if (rows.length === 0) return null;
   return (await attachLinks(rows))[0] ?? null;
 }
@@ -315,6 +359,12 @@ export type CreatePostingInput = {
   salaryText?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
+  positionName?: string | null;
+  province?: string | null;
+  responsibleName?: string | null;
+  responsibleUserId?: string | null;
+  specificType?: string | null;
+  formType?: string | null;
   /** ช่องทางที่จะสร้างลิงก์ให้ — 1 ช่องทาง = 1 ลิงก์ */
   channels?: Array<{ channelId?: string | null; label?: string | null; note?: string | null }>;
   createdByUserId?: string | null;
@@ -326,14 +376,19 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
   if (invalid) throw new Error(invalid);
 
   const jobId = trimTo(input.jobId, 128);
-  const { rows } = await dbQuery<PostingRow>(
-    `INSERT INTO ${postingsTable}
+  let rows: PostingRow[];
+  try {
+    ({ rows } = await dbQuery<PostingRow>(
+      `INSERT INTO ${postingsTable}
        (job_id, standalone_kind, department_code, title, detail, location_text, salary_text,
-        contact_name, contact_phone, created_by_user_id, created_by_name)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        contact_name, contact_phone, position_name, province, responsible_name,
+        responsible_user_id, specific_type, form_type, created_by_user_id, created_by_name)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING id, job_id, standalone_kind, department_code, title, detail, location_text,
-               salary_text, contact_name, contact_phone, status, created_by_name, created_at, updated_at`,
-    [
+               salary_text, contact_name, contact_phone, position_name, province,
+               responsible_name, specific_type, form_type, status, created_by_name,
+               created_at, updated_at`,
+      [
       jobId,
       jobId ? null : trimTo(input.standaloneKind, 64),
       trimTo(input.departmentCode, 32),
@@ -343,10 +398,47 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
       trimTo(input.salaryText, MAX_TEXT),
       trimTo(input.contactName, MAX_TEXT),
       trimTo(input.contactPhone, 64),
-      trimTo(input.createdByUserId, 64),
-      trimTo(input.createdByName, MAX_TEXT),
-    ],
-  );
+      trimTo(input.positionName, MAX_TEXT),
+      trimTo(input.province, 128),
+      trimTo(input.responsibleName, MAX_TEXT),
+      trimTo(input.responsibleUserId, 64),
+      // ⚠️ ข้อมูลเจาะจงรับได้แค่ค่าใน master — ค่าอื่นทิ้งเป็น null ไม่เก็บขยะที่เทียบข้ามระบบไม่ได้
+      isRmSpecificType(input.specificType) ? input.specificType : null,
+        isRmFormType(input.formType) ? input.formType : 'rm',
+        trimTo(input.createdByUserId, 64),
+        trimTo(input.createdByName, MAX_TEXT),
+      ],
+    ));
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    // ⚠️ ยังไม่รัน migration 074 — ยังสร้างประกาศ+ลิงก์ได้ตามเดิม แต่ตำแหน่ง/จังหวัด/
+    // ผู้รับผิดชอบ/ข้อมูลเจาะจง/ประเภทฟอร์มยังไม่ถูกเก็บ (อ่านกลับมาเป็น null)
+    // เลือกทางนี้เพราะ "ส่งลิงก์ออกไม่ได้เลย" เจ็บกว่า "ลิงก์ออกได้แต่ยังไม่มีข้อมูลเสริม"
+    ({ rows } = await dbQuery<PostingRow>(
+      `INSERT INTO ${postingsTable}
+         (job_id, standalone_kind, department_code, title, detail, location_text, salary_text,
+          contact_name, contact_phone, created_by_user_id, created_by_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id, job_id, standalone_kind, department_code, title, detail, location_text,
+                 salary_text, contact_name, contact_phone,
+                 null::text AS position_name, null::text AS province,
+                 null::text AS responsible_name, null::text AS specific_type,
+                 null::text AS form_type, status, created_by_name, created_at, updated_at`,
+      [
+        jobId,
+        jobId ? null : trimTo(input.standaloneKind, 64),
+        trimTo(input.departmentCode, 32),
+        trimTo(input.title, MAX_TEXT),
+        trimTo(input.detail, MAX_LONG_TEXT),
+        trimTo(input.locationText, MAX_TEXT),
+        trimTo(input.salaryText, MAX_TEXT),
+        trimTo(input.contactName, MAX_TEXT),
+        trimTo(input.contactPhone, 64),
+        trimTo(input.createdByUserId, 64),
+        trimTo(input.createdByName, MAX_TEXT),
+      ],
+    ));
+  }
   const posting = rows[0];
 
   const channels = (input.channels ?? []).slice(0, 20);

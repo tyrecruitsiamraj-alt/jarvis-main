@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, BookmarkPlus, Trash2, ExternalLink } from 'lucide-react';
+import { UserPlus, BookmarkPlus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -10,8 +10,8 @@ import SearchField from '@/components/shared/SearchField';
  * ⚠️ **แท็บ "ข้อมูลผู้สมัคร" เท่านั้นที่มีเครื่องมือ Lead** (เก็บ Lead / ลบ Lead)
  * อีกสองแท็บมีแค่ ค้นหา + เพิ่มข้อมูลผู้สมัคร · คุมจาก `rmTabHasLeadTools()` ที่ lib
  *
- * "เพิ่มข้อมูลผู้สมัคร" = เปิดหน้า /apply ในแท็บใหม่ — ฟอร์มสมัครมีอยู่แล้วในระบบ
- * ไม่สร้างฟอร์มซ้ำอีกชุดให้ข้อมูลแตกเป็นสองทาง
+ * "เพิ่มข้อมูลผู้สมัคร" = เปิดฟอร์มคีย์เอง (AddApplicantDialog) สำหรับคนที่โทรเข้ามาสมัคร
+ * บันทึกลงตารางใบสมัครเดียวกับที่มาจากลิงก์ ไม่แตกเป็นสองชุด
  *
  * ⚠️ กรองสดขณะพิมพ์ (ข้อมูลอยู่ในหน้าแล้ว) แต่**คงปุ่ม "ค้นหา" ไว้** — ผู้ใช้ระบบเดิม
  * ชินกับการกด และตอนย้ายไปค้นฝั่ง server ปุ่มนี้จะเป็นตัวยิงจริงโดยไม่ต้องรื้อ layout
@@ -24,7 +24,17 @@ const RmSearchBar: React.FC<{
   selectedCount: number;
   onSaveLead: () => void;
   onDeleteLead: () => void;
-}> = ({ keyword, onKeywordChange, onSearch, showLeadTools, selectedCount, onSaveLead, onDeleteLead }) => (
+  onAddApplicant: () => void;
+}> = ({
+  keyword,
+  onKeywordChange,
+  onSearch,
+  showLeadTools,
+  selectedCount,
+  onSaveLead,
+  onDeleteLead,
+  onAddApplicant,
+}) => (
   <div className="flex flex-wrap items-center gap-2">
     <SearchField
       compact
@@ -42,10 +52,9 @@ const RmSearchBar: React.FC<{
 
     <span className={cn('hidden h-6 border-l sm:block', DASH.divider)} aria-hidden />
 
-    <a href="/apply" target="_blank" rel="noopener noreferrer" className="jarvis-btn-secondary shrink-0">
+    <button type="button" onClick={onAddApplicant} className="jarvis-btn-secondary shrink-0">
       <UserPlus className="h-3.5 w-3.5" aria-hidden /> เพิ่มข้อมูลผู้สมัคร
-      <ExternalLink className="h-3 w-3 opacity-60" aria-hidden />
-    </a>
+    </button>
 
     {showLeadTools ? (
       <>

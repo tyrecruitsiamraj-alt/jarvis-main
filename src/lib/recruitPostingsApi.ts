@@ -63,6 +63,13 @@ export type CreatePostingBody = {
   salaryText?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
+  /** ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (ดู src/lib/recruitRmMasters.ts) */
+  positionName?: string | null;
+  province?: string | null;
+  responsibleName?: string | null;
+  responsibleUserId?: string | null;
+  specificType?: string | null;
+  formType?: string | null;
   channels?: Array<{ channelId?: string | null; label?: string | null }>;
 };
 

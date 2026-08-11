@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Briefcase, Loader2, MessageSquareWarning, Plus, Settings2, Trash2 } from 'lucide-react';
+import { BarChart3, Loader2, MessageSquareWarning, Plus, Settings2, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -283,7 +283,6 @@ const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant
   };
 
   const ICONS: Record<RmToolbarKey, typeof Settings2> = {
-    positions: Briefcase,
     channels: Settings2,
     link: Plus,
     reasons: MessageSquareWarning,

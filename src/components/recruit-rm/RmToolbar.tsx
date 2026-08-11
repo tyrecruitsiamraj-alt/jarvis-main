@@ -1,10 +1,10 @@
 import React from 'react';
-import { Briefcase, Radio, Link2, MessageSquareWarning, BarChart3 } from 'lucide-react';
+import { Radio, Link2, MessageSquareWarning, BarChart3 } from 'lucide-react';
 import { RM_TOOLBAR_KEYS, RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
 
 /**
  * แถบปุ่มด้านบนของหน้างานสรรหา (RM) — เหมือนกันทั้งสามแท็บ
- * ตำแหน่งงาน · ช่องทาง · สร้างลิงก์ · เหตุผล · รายงาน
+ * ช่องทาง · สร้างลิงก์ · เหตุผล · รายงาน (เจ้าของสั่งเอาปุ่ม "ตำแหน่งงาน" ออก 11 ส.ค. 2569)
  *
  * ⚠️ ปุ่มพวกนี้เปิดหน้าต่างตั้งค่า/รายงานของระบบเดิม ยังไม่ได้ต่อของจริง
  * ยิง `onOpen(key)` ออกไปให้หน้าจัดการ เพื่อให้เห็นชัดว่าอะไรยังไม่ได้ทำ
@@ -13,8 +13,7 @@ import { RM_TOOLBAR_KEYS, RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recr
  * ไอคอนอยู่ในไฟล์นี้ ส่วนคีย์/ป้ายอยู่ที่ `lib/recruitRm.ts` — ไฟล์ component
  * ห้าม export อย่างอื่นนอกจาก component ไม่งั้น eslint เตือน react-refresh
  */
-const ICONS: Record<RmToolbarKey, typeof Briefcase> = {
-  positions: Briefcase,
+const ICONS: Record<RmToolbarKey, typeof Radio> = {
   channels: Radio,
   link: Link2,
   reasons: MessageSquareWarning,
