@@ -141,11 +141,31 @@ export function buildInterviewPayload(
 
 // ─── Enqueue (คนกดส่งเอง — ต้องรายงานผลกลับให้ผู้ใช้) ───────────────────────
 
-/** อ่านเบอร์ผู้รับออกจาก payload — ใช้เทียบกับล็อก "รับไปโทรเอง" */
+/**
+ * ชื่อคีย์ของเบอร์ใน payload — **ต่างกันตามช่อง**
+ * reminder (คนของเรา) ใช้ `recipient_phone` · interview (iRecruit) ใช้ `phone`
+ *
+ * ⚠️ เดิมอ่านแค่ `recipient_phone` → ฝั่ง iRecruit ได้ null ทุกแถว แปลว่า
+ * **ล็อก "รับไปโทรเอง" และการพักเบอร์ไม่เคยมีผลกับช่อง interview เลย**
+ * (โค้ดข้ามการเช็คทั้งสองอย่างเมื่อไม่มีเบอร์) — อาการคือ AI โทรทับคนที่เจ้าหน้าที่
+ * รับไปโทรเองอยู่ และโทรหาคนที่บอกว่า "ไม่หางานแล้ว" เฉพาะทางฝั่ง iRecruit
+ * ที่เดียวกับที่ `phoneFromPayload()` ใน callFollowup.ts อ่านครบทั้งสองคีย์อยู่แล้ว
+ */
+const PAYLOAD_PHONE_KEYS = ['recipient_phone', 'phone'] as const;
+
+/** เบอร์ผู้รับใน payload ฝั่ง SQL — ต้องตรงกับ PAYLOAD_PHONE_KEYS เสมอ */
+const phoneExprFor = (alias: string): string =>
+  `coalesce(${PAYLOAD_PHONE_KEYS.map((k) => `${alias}.payload->>'${k}'`).join(', ')})`;
+
+/** อ่านเบอร์ผู้รับออกจาก payload — ใช้เทียบกับล็อก "รับไปโทรเอง" และรายการพักเบอร์ */
 function payloadPhone(payload: unknown): string | null {
   if (typeof payload !== 'object' || payload === null) return null;
-  const p = (payload as Record<string, unknown>).recipient_phone;
-  return typeof p === 'string' && p.trim() ? p.trim() : null;
+  const p = payload as Record<string, unknown>;
+  for (const key of PAYLOAD_PHONE_KEYS) {
+    const v = p[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
 }
 
 /**
@@ -659,10 +679,76 @@ const MAX_DELIVERIES = 5;
 const REDELIVER_AFTER_MINUTES = 30;
 
 /**
+ * เงื่อนไข "แถวนี้ถึงคิวเสิร์ฟแล้ว" — ใช้ทั้งกับแถวที่กำลังพิจารณาและแถวคู่แข่งของเบอร์เดียวกัน
+ * ต้องเป็นชุดเดียวกันเป๊ะ ไม่งั้น "ใบที่มาก่อน" จะนับรวมใบที่ยังเสิร์ฟไม่ได้ แล้วบังใบอื่นค้าง
+ */
+const SERVE_ELIGIBLE = (a: string) => `
+  ${a}.result is null
+  and ${a}.delivery_count < ${MAX_DELIVERIES}
+  and (${a}.next_attempt_at is null or ${a}.next_attempt_at <= now())
+  and (
+    ${a}.status = 'pending'
+    or (${a}.status = 'delivered' and ${a}.delivered_at < now() - interval '${REDELIVER_AFTER_MINUTES} minutes')
+  )`;
+
+/**
  * เสิร์ฟรายการให้ Lumos แบบ at-least-once:
  * - pending เสิร์ฟทันที · delivered ที่ยังไม่มีผลกลับเกิน 30 นาที เสิร์ฟซ้ำ (กันของหายเงียบ)
  * - หยุดถาวรเมื่อ Lumos POST ผลกลับ (completed/failed/cancelled) หรือครบ 5 ครั้ง
+ *
+ * ⚠️ **หนึ่งเบอร์ = หนึ่งใบขอที่กำลังเสนออยู่** (เจ้าของกำหนด: เสนอทีละงาน)
+ * คนเดียวอยู่ในผลแมทได้หลายใบมาก — ข้อมูลจริง card 1805 อยู่ใน **113 ใบขอ**
+ * เดิมคิวเสิร์ฟตาม created_at ล้วน ไม่มีเงื่อนไข "เบอร์นี้มีสายค้างอยู่แล้ว"
+ * คนคนเดียวจึงถูกโทรถล่มจากหลายใบพร้อมกัน · กันไว้ 2 ชั้น:
+ *
+ *   1. **สายกำลังเดิน** — เบอร์นี้มีแถวที่เพิ่งส่งให้ Lumos ไปและยังไม่มีผลกลับ → ยังไม่เสิร์ฟใบอื่น
+ *   2. **ใบที่มาก่อนได้ก่อน** — ในบรรดาแถวที่ถึงคิวของเบอร์เดียวกัน เสิร์ฟแถวแรกตาม
+ *      (created_at, id) เท่านั้น · ที่เหลือรอจนใบนั้นได้ผล
+ *
+ * ทั้งสองชั้น **ข้ามช่อง** (reminder ↔ interview) เพราะคนเดียวอยู่ได้ทั้งสองคิว
+ * เบอร์เดียวกันคือคนเดียวกันเสมอ — กันเฉพาะในช่องตัวเองจะกันไม่อยู่จริง
+ *
+ * ⚠️ แถวที่ไม่มีเบอร์ใน payload จะไม่บังใครและไม่ถูกใครบัง (`null = null` เป็นเท็จใน SQL)
+ * ซึ่งถูกแล้ว — ไม่มีเบอร์ก็ไม่รู้ว่าเป็นคนเดียวกันไหม
+ *
+ * วัดกับข้อมูลจริงแล้ว (11 ส.ค. 2569 · อ่านอย่างเดียว): ช่อง reminder มีแถวที่ถึงคิว
+ * **2,816 แถว → เสิร์ฟจริง 126 แถว = 126 คน** (เฉลี่ยคนละ ~22 ใบขอ) · คิวรี 19 ms
+ * ไม่ต้องมี index เพิ่ม — ถ้าวันไหนคิวโตจนช้า ค่อยทำ expression index ของเบอร์
+ *
+ * export ไว้ให้เทสต์อ่าน — เงื่อนไขพวกนี้พังแล้วเงียบสนิท (ยังตอบ 200 · Lumos ยังได้งาน
+ * แค่ได้คนเดิมหลายใบพร้อมกัน) เทสต์โครงสร้าง SQL จึงเป็นด่านเดียวที่จับได้
  */
+export const TAKE_PENDING_SQL = `update ${queueTable} q
+    set status = 'delivered', delivered_at = now(), updated_at = now(),
+        delivery_count = q.delivery_count + 1
+  where q.id in (
+    select c.id from ${queueTable} c
+     where c.channel = $1
+       -- นัดโทรซ้ำไว้แล้ว: ห้ามเสิร์ฟก่อนถึงเวลา (ดู api/_lib/callFollowup.ts)
+       and ${SERVE_ELIGIBLE('c')}
+       -- ชั้นที่ 1: เบอร์นี้มีสายที่ส่งไปแล้วและยังไม่มีผลกลับ (ข้ามช่อง)
+       and not exists (
+         select 1 from ${queueTable} f
+          where f.id <> c.id
+            and ${phoneExprFor('f')} = ${phoneExprFor('c')}
+            and f.result is null
+            and f.status = 'delivered'
+            and f.delivered_at >= now() - interval '${REDELIVER_AFTER_MINUTES} minutes'
+       )
+       -- ชั้นที่ 2: ในบรรดาใบที่ถึงคิวของเบอร์เดียวกัน เอาใบที่มาก่อนใบเดียว (ข้ามช่อง)
+       and not exists (
+         select 1 from ${queueTable} e
+          where e.id <> c.id
+            and ${phoneExprFor('e')} = ${phoneExprFor('c')}
+            and ${SERVE_ELIGIBLE('e')}
+            and (e.created_at, e.id) < (c.created_at, c.id)
+       )
+     order by c.created_at asc
+     limit $2
+     for update skip locked
+  )
+  returning q.payload`;
+
 export async function takePendingLumosItems(
   channel: 'reminder' | 'interview',
   limit: number,
@@ -675,28 +761,10 @@ export async function takePendingLumosItems(
     logError('call-batch.release.failed', e);
   }
 
-  const { rows } = await dbQuery<{ payload: unknown }>(
-    `update ${queueTable} q
-        set status = 'delivered', delivered_at = now(), updated_at = now(),
-            delivery_count = q.delivery_count + 1
-      where q.id in (
-        select id from ${queueTable}
-         where channel = $1
-           and result is null
-           and delivery_count < ${MAX_DELIVERIES}
-           -- นัดโทรซ้ำไว้แล้ว: ห้ามเสิร์ฟก่อนถึงเวลา (ดู api/_lib/callFollowup.ts)
-           and (next_attempt_at is null or next_attempt_at <= now())
-           and (
-             status = 'pending'
-             or (status = 'delivered' and delivered_at < now() - interval '${REDELIVER_AFTER_MINUTES} minutes')
-           )
-         order by created_at asc
-         limit $2
-         for update skip locked
-      )
-      returning q.payload`,
-    [channel, Math.min(Math.max(limit, 1), 500)],
-  );
+  const { rows } = await dbQuery<{ payload: unknown }>(TAKE_PENDING_SQL, [
+    channel,
+    Math.min(Math.max(limit, 1), 500),
+  ]);
   return rows.map((r) => bumpScheduledAtForward(r.payload));
 }
 
