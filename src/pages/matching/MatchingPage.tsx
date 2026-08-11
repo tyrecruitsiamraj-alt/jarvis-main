@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import CallFunnelPanel, { FlowArrow, FlowStage } from '@/components/follow/CallFunnelPanel';
+import CallFunnelPanel, { FlowArrow, FlowSlotFiller, FlowStage, FUNNEL_ROW_GRID } from '@/components/follow/CallFunnelPanel';
 
 /**
  * โครงคอลัมน์ของแถวฝั่งงาน — **ต้องเป็นระบบเดียวกับ FUNNEL_ROW_GRID** ของเส้นการโทร
@@ -11,9 +11,13 @@ import CallFunnelPanel, { FlowArrow, FlowStage } from '@/components/follow/CallF
  * 5 การ์ด: อัตราทั้งหมด · ในนั้นด่วน → มีคนเขียว · มีคนเหลือง · ยังไม่มีคน
  * (ลูกศรคั่นแค่จุดเดียว เพราะสามใบขวาเป็น "ผลลัพธ์คู่ขนาน" ของการที่ AI หาคน ไม่ใช่ลำดับ)
  */
-const DEMAND_ROW_GRID =
-  'mt-2 flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
-  'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]';
+/**
+ * แถวฝั่งงานใช้ **โครงคอลัมน์เดียวกับแถวการโทร** (`FUNNEL_ROW_GRID` 11 ช่อง)
+ * เจ้าของติง 11 ส.ค. 2569 ว่าสองแถว "จัดเรียงดูไม่ไปทิศทางเดียวกัน" — เดิมแถวนี้มีโครง
+ * ของตัวเอง 6 ช่อง การ์ดเลยกว้างไม่เท่ากับแถวล่างและลูกศรไม่ตรงคอลัมน์กัน
+ * ช่องลูกศรที่ไม่ใช้ = `<FlowArrow ghost />` (กินที่เท่าลูกศรจริงแต่มองไม่เห็น)
+ * ช่องการ์ดที่เกิน = `<FlowSlotFiller />` — ห้ามปล่อยว่าง ไม่งั้นคอลัมน์ยุบแล้วเหลื่อมทั้งแถว
+ */
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
@@ -1938,7 +1942,7 @@ const MatchingPage: React.FC = () => {
     const noneJobs = serverSummary?.noRecommend ?? urgentSummary.none;
     const unanalyzed = serverSummary?.noneUnanalyzed ?? 0;
     return (
-      <div className={DEMAND_ROW_GRID}>
+      <div className={FUNNEL_ROW_GRID}>
         <FlowStage
           label="อัตราทั้งหมด"
           value={serverSummary?.positionsTotal ?? listTotal}
@@ -1952,6 +1956,7 @@ const MatchingPage: React.FC = () => {
             setWorkflowFilter('all');
           }}
         />
+        <FlowArrow ghost />
         <FlowStage
           label="ในนั้นเป็นงานด่วน"
           value={serverSummary?.positionsUrgent ?? urgentSummary.total}
@@ -1965,6 +1970,8 @@ const MatchingPage: React.FC = () => {
             setWorkflowFilter('all');
           }}
         />
+        <FlowArrow ghost />
+        <FlowSlotFiller />
         <FlowArrow />
         <FlowStage
           label="มีคนเขียวแนะนำ"
@@ -2010,6 +2017,8 @@ const MatchingPage: React.FC = () => {
             setWorkflowFilter('none');
           }}
         />
+        <FlowArrow ghost />
+        <FlowSlotFiller />
       </div>
     );
   }, [serverSummary, listTotal, urgentSummary, urgentOnly, workflowFilter, serverListLoading]);
@@ -2057,6 +2066,13 @@ const MatchingPage: React.FC = () => {
           defaultSource="all"
           title="การไหลของงาน"
           leadIn={demandFlowRow}
+          // งานฝั่งใบขอที่แผงมองไม่เห็นเอง — ต่อท้ายแถบ "ทำก่อน→หลัง"
+          nextActions={[
+            {
+              label: 'หาคนให้อัตราที่ยังไม่มีคน',
+              value: serverSummary?.positionsNone ?? urgentSummary.none,
+            },
+          ]}
         />
 
         {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569

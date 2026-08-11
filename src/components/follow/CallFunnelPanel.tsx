@@ -116,12 +116,26 @@ const SWITCHABLE_TABS = SOURCE_TABS.filter((t) => t.id !== 'follow');
  * สังเกต: สนใจ / ไม่สนใจ / ไม่รับ อยู่ติดกันโดยไม่มีลูกศรคั่น เพราะเป็น
  * **ผลลัพธ์คู่ขนานของขั้น "มีผลจริง"** ไม่ใช่ขั้นที่ต่อจากกัน
  */
-const FUNNEL_ROW_GRID =
+export const FUNNEL_ROW_GRID =
   'mt-3 flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
   'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)]';
 
-export const FlowArrow = () => (
-  <div className="flex items-center justify-center text-slate-500">
+/**
+ * ช่องเปล่าเติมท้ายแถวที่มีการ์ดน้อยกว่า — โครงคอลัมน์เดียวกันสองแถวต้องมีลูกครบทุกช่อง
+ * ไม่งั้นช่องที่ว่างยุบแล้วการ์ดสองแถวกว้างไม่เท่ากัน (จอเล็กเรียงแนวตั้ง ไม่ต้องมี)
+ */
+export const FlowSlotFiller = () => <div className="hidden sm:block" aria-hidden />;
+
+export const FlowArrow = ({ ghost = false }: { ghost?: boolean }) => (
+  <div
+    className={cn(
+      'flex items-center justify-center text-slate-500',
+      // ghost = ช่องลูกศรที่ "ไม่มีลูกศร" แต่ต้องกินที่เท่าลูกศรจริง — สองแถวใช้โครง
+      // คอลัมน์เดียวกัน ถ้าช่อง auto ของแถวหนึ่งว่างเปล่ามันจะยุบเหลือ 0 แล้วคอลัมน์เหลื่อม
+      // (กับดัก grid เดิมของโปรเจกต์) · จอเล็กเรียงแนวตั้ง ไม่ต้องกินที่ → ซ่อนทิ้ง
+      ghost && 'invisible max-sm:hidden',
+    )}
+  >
     <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
     <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
   </div>
@@ -164,6 +178,11 @@ export type CallFunnelPanelProps = {
   callRowLabel?: string;
   /** หัวแผง — หน้า Matching รวมสองฝั่งแล้วจึงไม่ใช่ "การไหลของการโทร" อย่างเดียว */
   title?: string;
+  /**
+   * งานที่ต้องทำต่อจากฝั่งที่แผงนี้มองไม่เห็นเอง (เช่น "ยังไม่มีคน" ของฝั่งใบขอ)
+   * — เอาไปต่อท้ายแถบ "ทำก่อน→หลัง" หลังสองข้อที่แผงคิดเองจาก funnel
+   */
+  nextActions?: Array<{ label: string; value: number }>;
 };
 
 const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
@@ -171,15 +190,18 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   lockSource = false,
   showAttempts = false,
   leadIn,
-  leadInLabel = 'ฝั่งงาน — อัตราที่ต้องหา',
-  callRowLabel = 'ฝั่งการโทร — คนที่ส่งไปแล้ว',
+  leadInLabel = 'ขั้น 1 · ฝั่งงาน — อัตราที่ต้องหา',
+  callRowLabel = 'ขั้น 2 · ฝั่งการโทร — คนที่ส่งไปแล้ว',
   title = 'การไหลของการโทร',
+  nextActions,
 }) => {
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [openBucket, setOpenBucket] = useState(false);
+  /** ชิปผลโทรรายแบบ — พับไว้ก่อน (เลขส่วนใหญ่ซ้ำกับช่องบนเส้น เจ้าของติงว่ารก) */
+  const [openOutcomes, setOpenOutcomes] = useState(false);
   const [takingId, setTakingId] = useState<number | null>(null);
   const [takeError, setTakeError] = useState<string | null>(null);
   /** id ที่เพิ่งรับไปตามในรอบนี้ — โชว์ผลค้างไว้ ไม่ให้ดูเหมือนกดแล้วไม่มีอะไรเกิด */
@@ -312,23 +334,68 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             tone="orange"
           />
         </div>
-        {/* ผลแยกรายแบบ — เจ้าของสั่ง 10 ส.ค. 2569 ให้มาอยู่ในเส้น funnel ไม่ใช่ลอยอยู่ใต้แผง
-            อยู่บน hero เข้ม จึงใช้ TONE.onDark + พื้นโปร่ง แทนชิปพื้นอ่อนแบบเดิม
-            (ชิปพื้นอ่อนบนพื้นเข้มอ่านไม่ออก — กับดักเดิมของโปรเจกต์) */}
-        {outcomesWithCount.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-white/10 pt-3">
-            {outcomesWithCount.map((o) => (
-              <span
-                key={o}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2.5 py-1 text-[11px]"
-              >
-                <span className={cn('h-1.5 w-1.5 rounded-full', TONE[CALL_OUTCOME_TONE[o]].dot)} aria-hidden />
-                <span className="text-slate-300">{OUTCOME_LABEL[o]}</span>
-                <span className={cn('font-mono font-semibold tabular-nums', TONE[CALL_OUTCOME_TONE[o]].onDark)}>
-                  {(funnel.byOutcome[o] ?? 0).toLocaleString('th-TH')}
-                </span>
+        {/* ทำก่อน→หลัง — ตอบคำถาม "เห็นแผงแล้วต้องขยับอะไรก่อน" (เจ้าของขอ 11 ส.ค. 2569)
+            เรียงตามความเร่ง: คนตอบสนใจหลุดมือง่ายสุด → งานที่ AI เอาไม่อยู่ → ที่เหลือจากฝั่งใบขอ
+            "ไม่รับ/ไม่ติด" ไม่อยู่ในแถบนี้ — AI นัดโทรซ้ำเองอยู่แล้ว ไม่ใช่งานของคน */}
+        {(() => {
+          const actions = [
+            { label: 'จองคนที่ตอบ "สนใจ"', value: funnel.byOutcome['confirmed'] ?? 0 },
+            { label: 'รับงาน "ต้องคนตาม" ไปโทรเอง', value: funnel.needsHuman },
+            ...(nextActions ?? []),
+          ].filter((a) => a.value > 0);
+          if (actions.length === 0) return null;
+          return (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                ทำก่อน → หลัง
               </span>
-            ))}
+              {actions.map((a, i) => (
+                <span
+                  key={a.label}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2.5 py-1 text-[11px] text-slate-200"
+                >
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/15 font-mono text-[10px] font-bold text-white">
+                    {i + 1}
+                  </span>
+                  {a.label}
+                  <span className="font-mono font-semibold tabular-nums text-white">
+                    {a.value.toLocaleString('th-TH')}
+                  </span>
+                </span>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* ผลแยกรายแบบ — พับไว้ก่อน เพราะเลขส่วนใหญ่ซ้ำกับช่องบนเส้น (สนใจ/ไม่สนใจ)
+            ของที่มีเฉพาะในนี้ (รับทราบ · ยกเลิก · แยกไม่รับสาย/สายไม่ว่าง) กดค่อยกาง */}
+        {outcomesWithCount.length > 0 ? (
+          <div className="mt-3 border-t border-white/10 pt-3">
+            <button
+              type="button"
+              onClick={() => setOpenOutcomes((v) => !v)}
+              aria-expanded={openOutcomes}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-200"
+            >
+              ผลโทรแยกรายแบบ ({outcomesWithCount.length.toLocaleString('th-TH')} แบบ)
+              <ChevronDown className={cn('h-3 w-3 transition-transform', openOutcomes && 'rotate-180')} aria-hidden />
+            </button>
+            {openOutcomes ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {outcomesWithCount.map((o) => (
+                  <span
+                    key={o}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2.5 py-1 text-[11px]"
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full', TONE[CALL_OUTCOME_TONE[o]].dot)} aria-hidden />
+                    <span className="text-slate-300">{OUTCOME_LABEL[o]}</span>
+                    <span className={cn('font-mono font-semibold tabular-nums', TONE[CALL_OUTCOME_TONE[o]].onDark)}>
+                      {(funnel.byOutcome[o] ?? 0).toLocaleString('th-TH')}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
