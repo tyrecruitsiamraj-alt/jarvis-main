@@ -1036,3 +1036,59 @@ client id / secret / tenant) — เจอสภาพนั้นเมื่�
 * `tests/api/workStatusMaster.test.ts` — built-in ต้องตรงกัน 3 ที่ + migration seed ก่อน FK
 
 ⚠️ ค่า built-in 9 ตัวลบไม่ได้ (dashboard/KPI อ้าง code ตรง ๆ เช่น `in_progress`) — ปิดใช้งานได้เท่านั้น
+
+## งานสรรหา (RM) — ช่องทาง · เหตุผล · แผงภาพรวม (11 ส.ค. 2569 รอบสี่)
+
+### ช่องทางรับสมัคร — 4,388 ช่องในฐานจริง
+
+* `migrations/075_recruit_channels_source.sql` — `source`/`source_id` + unique `(source, source_id)`
+  · **ผ่อน** `recruit_channels_parent_name_idx` ให้คุมเฉพาะแถวที่คนคีย์เอง (`source is null`)
+* `scripts/import-recruit-channels.mts` — upsert ตาม id ต้นทาง **ยกซ้ำได้** (พิสูจน์แล้ว 4,388 → 4,388)
+  ย้อนกลับ: `delete from recruit_channels where source = 'irecruit'`
+* `api/_lib/recruitPostings.ts` — `searchRecruitChannels()` · `listRecruitChannelRoots()`
+  · `listRecruitChannelChildren()` · เพดาน `RECRUIT_CHANNEL_PAGE_MAX` = 200
+* `src/components/shared/ChannelPicker.tsx` — ใช้ร่วมทั้งสร้างลิงก์และเพิ่มผู้สมัคร
+* เทสต์ `tests/api/recruitChannelSearch.test.ts` (9 เคส · mutation 6/6)
+
+⚠️ **ห้ามเรียก `listRecruitChannels()` (ทรีเต็ม) จากหน้าเว็บ** — วัดจริง **515 KB**
+ต่อการเปิด dialog หนึ่งครั้ง · `?roots=1` = 4.5 KB (เล็กลง 115 เท่า)
+⚠️ **ชื่อช่องทางซ้ำกันได้จริง** — พ่อชื่อ "Facebook Group" มี 2 แถว · ลูกชื่อซ้ำในพ่อเดียวกัน
+53 คู่ · อย่าใช้ชื่อเป็นคีย์ ใช้ `source_id`
+⚠️ **`source_id` ของลูกใส่ prefix `sub:`** — id พ่อ (12–98) กับ id ลูกทับช่วงกันจริง
+
+### เหตุผล (ปุ่ม "เหตุผล")
+
+* `migrations/076_recruit_reasons.sql` · `api/_lib/recruitReasons.ts`
+  · `api/_handlers/recruit-reasons.ts` (`/api/recruit/reasons`)
+* `src/lib/recruitReasons.ts` (จัดกลุ่ม) · `src/lib/recruitRmMasters.ts` (ป้ายไทยของรหัส)
+* `src/components/recruit-rm/ReasonManagerDialog.tsx` — ใช้ทั้งบอร์ดและหน้า RM
+* `scripts/import-recruit-reasons.mts` — เอาเฉพาะ `owner='RM'` (67 จาก 85)
+* เทสต์ `tests/api/recruitReasons.test.ts` (10 เคส · mutation 6/6)
+
+⚠️ **รหัสเก็บตามระบบเดิมเป๊ะ** `'1'/'2'/'3'` (ขั้นตอน) และ `'A'/'C'` (ผล) — ห้ามแปลงเป็น
+คำอังกฤษ เหตุผลเดียวกับ `monix` ตัวเล็ก · มีเทสต์กัน
+⚠️ **DELETE = ปิดการใช้งาน ไม่ลบทิ้ง** — เหตุผลถูกอ้างจากผลติดต่อย้อนหลัง
+
+### แผงภาพรวมงานสรรหา (9 ตัวเลข)
+
+* `src/lib/recruitFunnel.ts` — **pure ล้วน** · แมป "เหตุผล → ถัง" + ตัวหาร + `funnelPercent()`
+* `api/_lib/recruitFunnelSql.ts` — คิวรี iRecruit (อ่านอย่างเดียว) · `api/_handlers/recruit-funnel.ts`
+* `src/components/recruit-rm/RecruitFunnelPanel.tsx` — วางบนหน้า `/recruit/rm`
+* เทสต์ `tests/api/recruitFunnel.test.ts` (21 เคส · mutation 11/11)
+
+⚠️⚠️ **สองกับดักที่ทำให้เลข "ถูกแต่ตอบผิดคำถาม" — เจอบนหน้าจอตอนตรวจงาน:**
+
+1. **นับแถว ≠ นับหัวคน** — ผลติดต่อ 117,158 แถว = 115,714 หัวคน · นัดหมาย 72,637 = 67,048
+   ตารางผลทุกตัวมี `seq` (คนเดียวหลายรอบ) → ต้อง
+   `ROW_NUMBER() PARTITION BY register_id ORDER BY seq DESC, id DESC` แล้วเอา `rn = 1`
+   ไม่งั้นได้ "นัดสำเร็จ + นัดไม่สำเร็จ = 111.6%"
+2. **ตัวหารเป็นทอด ๆ ไม่จริง** — `recruit_logs_call` (108,084 คน) **ไม่ครอบ**
+   คนที่มีผลติดต่อ (115,714 คน) → ได้ "โทรไปแล้ว 304.7% ของกรอกมา"
+   **ทุกช่องหารด้วย "กรอกมา" ช่องเดียว** ซึ่งเป็นประชากรเดียวที่ครอบทุกคนจริง
+
+⚠️ **"กรอกมา" ต้องรวม Lead** — Lead ถูกตีตราทีหลัง (`lead_at` > `created_at` · 77% ของทั้งหมด)
+ตัดออกจากตัวตั้งต้นแล้วขั้นถัดไปเกิน 100% · โชว์จำนวน Lead แยกไว้แทน
+⚠️ **คู่สถานะต้องครอบทุกแถว** — ใช้ `<> 'A'` และ `NOT IN ('A','C')` ไม่ใช่ `= 'C'`/`= 'W'`
+ข้อมูลจริงมีสถานะ `R` โผล่มา 2 แถวใน `recruit_follow_appointment`
+⚠️ **การแบ่งถัง "ไม่รับสาย" / "ติดต่อไม่ได้" อยู่ที่ `recruitFunnel.ts` ไม่ใช่ใน SQL** —
+เจ้าของแก้เกณฑ์ได้โดยไม่ต้องแตะคิวรี · มีเทสต์คุมว่าสามถังรวมกันเท่ายอดจริงเสมอ
