@@ -968,6 +968,36 @@ client id / secret / tenant) — เจอสภาพนั้นเมื่�
 * `src/components/jobs/JobBoardView.tsx` — apply buttons on /apply board
 * `tests/api/publicApply.test.ts` — validation contract tests
 
+## งานสรรหา (RM) — 3 แท็บครอบใบสมัครจริง (11 ส.ค. 2569)
+
+หน้า `/recruit/rm` เอาโครง 3 แท็บของระบบเดิม (iRecruit `recruit_register`) มาครอบ
+**ตารางใบสมัครที่มีอยู่** (`public_job_applications`) — ไม่มีข้อมูลชุดใหม่
+รายละเอียด + งานที่เหลือ: `docs/RM-HANDOFF.md`
+
+* `src/lib/recruitRm.ts` — นิยามแท็บ (`RM_TAB_STATUSES`) · ตัวกรอง · `applicationJobLabel()`
+* `src/lib/recruitRmMasters.ts` — ค่าคัดลอกจากระบบเดิม (เจาะจง 19 · ใบขับขี่ 6 · วุฒิ 8)
+  + `normalizeRmPhone()` / `cleanRmLicenseTypes()` — **ใช้ทั้ง `src/` และ `api/`**
+* `src/pages/recruit/RecruitRmPage.tsx` · `src/components/recruit-rm/*` (5 ไฟล์)
+* `migrations/074_rm_link_and_manual_applicant.sql` — คอลัมน์ใหม่ของประกาศ + ใบสมัคร
+* `tests/api/recruitRm.test.ts` · `tests/api/recruitRmMasters.test.ts`
+
+⚠️ **กับดักที่ต้องรู้ก่อนแตะ**
+
+1. **074 ยังไม่รันบนฐาน** — `LIST_COLUMNS_LEGACY` (`api/_handlers/job-applications.ts`)
+   และ `POSTING_COLUMNS_LEGACY` (`api/_lib/recruitPostings.ts`) **ห้ามลบ**
+   จนแน่ใจว่าทุก env รัน 074 · ฐาน local = production → select คอลัมน์ที่ยังไม่มี
+   ทำให้**บอร์ดรับสมัครพังทั้งหน้า** (แพตเทิร์นเดียวกับ `JOB_SUMMARY_SQL_LEGACY`)
+2. **POST `/api/job-applications`** = เจ้าหน้าที่คีย์ใบสมัครเอง · ลงตารางเดียวกับใบจากลิงก์
+   · `created_by_name` แยกว่าใครคีย์ · ยังไม่ migrate → คืน **503 ไม่บันทึกแบบทิ้งฟิลด์**
+3. **ใบที่คีย์เองไม่มี `job_id`** → คนที่ถูกล็อก BU มองไม่เห็นใบตัวเอง (กติกาเดิมของ GET)
+   จึงกันให้เฉพาะคนที่เห็นทุก BU คีย์ได้
+4. **จังหวัดของใบขอ**ไม่ใช่ฟิลด์เดี่ยว — ใช้ `inferProvinceFromAddress()`
+   · **ตำแหน่งงาน** อยู่ที่ `staff_title_name` ไม่ใช่ `position`
+5. **`RM_TOOLBAR_KEYS` คือแหล่งเดียวของแถบปุ่ม** — ใช้ทั้งบอร์ด (`RecruitBoardTools`)
+   และหน้า RM (`RmToolbar`) · เจ้าของสั่งเอาปุ่ม "ตำแหน่งงาน" ออกแล้ว
+6. **ปุ่ม "สร้างลิงก์" ที่ hero ต้องต่อท้าย "(ประกาศลอย)"** — การ์ดใบขอทุกใบมีปุ่ม
+   "สร้างลิงก์" ของตัวเองอยู่แล้ว ชื่อซ้ำทำคนละอย่างคือปัญหาที่เจ้าของเคยทัก
+
 ## ภาระงานตามรหัสไซต์ (Root Cause ระดับไซต์ — เดิม group ตามชื่อหน่วยงาน)
 
 เจ้าของสั่งเปลี่ยน 4 ส.ค. 2569: แผงนี้ group ด้วย `site_code` ไม่ใช่ `unit_name`
