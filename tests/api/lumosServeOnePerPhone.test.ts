@@ -38,6 +38,7 @@ vi.mock('../../api/_lib/callFollowupPolicyStore.js', () => ({
   })),
 }));
 
+const { CONFIRMED_FOCUS_DAYS } = await import('../../src/lib/callFollowupPolicy.js');
 const { dbQuery } = await import('../../api/_lib/postgres.js');
 const { listHeldPhones } = await import('../../api/_lib/candidateCallHolds.js');
 const { listSuppressedPhones } = await import('../../api/_lib/callFollowup.js');
@@ -66,10 +67,11 @@ function notExistsBlock(sql: string, n: number): string {
 
 const inFlight = notExistsBlock(TAKE_PENDING_SQL, 0);
 const earliestFirst = notExistsBlock(TAKE_PENDING_SQL, 1);
+const confirmedFocus = notExistsBlock(TAKE_PENDING_SQL, 2);
 
 describe('เบอร์เดียวกันต้องมีสายเดียวที่กำลังเดิน', () => {
-  it('มีตัวกันครบสองชั้น', () => {
-    expect(TAKE_PENDING_SQL.match(/not exists/gi)?.length).toBe(2);
+  it('มีตัวกันครบสามชั้น', () => {
+    expect(TAKE_PENDING_SQL.match(/not exists/gi)?.length).toBe(3);
   });
 
   it('ชั้นที่ 1 — เบอร์ที่ส่งไปแล้วยังไม่มีผลกลับ ต้องบังใบอื่นไว้', () => {
@@ -97,29 +99,59 @@ describe('เบอร์เดียวกันต้องมีสายเ�
     }
   });
 
-  it('ทั้งสองชั้นต้องเทียบเบอร์ ไม่ใช่เทียบ person_ref', () => {
+  it('ทุกชั้นต้องเทียบเบอร์ ไม่ใช่เทียบ person_ref', () => {
     // คนเดียวมีหลายรหัส (card-<id> ของบอร์ด · ir-<id> ของ iRecruit) แต่เบอร์ที่ดังมีเบอร์เดียว
     // เทียบด้วย ref จะกันไม่อยู่จริง — กติกาเดียวกับล็อก "รับไปโทรเอง"
-    for (const block of [inFlight, earliestFirst]) {
+    for (const block of [inFlight, earliestFirst, confirmedFocus]) {
       expect(block).toMatch(/payload->>'recipient_phone'/);
       expect(block).toMatch(/payload->>'phone'/);
       expect(block).not.toMatch(/person_ref/);
     }
   });
 
-  it('ทั้งสองชั้นต้องข้ามช่อง — ห้ามกรอง channel ในตัวกัน', () => {
+  it('ทุกชั้นต้องข้ามช่อง — ห้ามกรอง channel ในตัวกัน', () => {
     // คนเดียวอยู่ได้ทั้งคิว reminder และ interview · กันเฉพาะช่องตัวเอง
     // = โดนโทรสองสายพร้อมกันจากคนละช่อง ซึ่งเป็นอาการเดิมเป๊ะ
-    for (const block of [inFlight, earliestFirst]) {
+    for (const block of [inFlight, earliestFirst, confirmedFocus]) {
       expect(block).not.toMatch(/channel/);
     }
     // แต่ตัวเลือกหลักยังต้องกรองช่องของตัวเอง (endpoint แยกกันคนละช่อง)
     expect(TAKE_PENDING_SQL).toMatch(/c\.channel = \$1/);
   });
 
-  it('ทั้งสองชั้นต้องไม่บังตัวเอง', () => {
+  it('สองชั้นแรกต้องไม่บังตัวเอง', () => {
     expect(inFlight).toMatch(/f\.id <> c\.id/);
     expect(earliestFirst).toMatch(/e\.id <> c\.id/);
+  });
+});
+
+/**
+ * "รู้แล้วว่าสนใจใบ A → บังใบอื่นจนกว่าใบ A จะจบ" (เจ้าของเคาะไว้)
+ *
+ * ข้อมูลจริง 11 ส.ค. 2569: คนที่ตอบว่าสนใจไว้ 2 คน มีใบขออื่นค้างในคิว
+ * **73 และ 84 ใบ** ต่อคน — ไม่บังก็คือโทรไล่เสนอใบอื่นทั้ง 84 ใบทั้งที่ดีลใบแรกยังไม่จบ
+ */
+describe('สนใจใบไหนแล้ว บังใบอื่นของคนคนนั้น', () => {
+  it('บังเฉพาะ "ใบอื่น" — ใบที่เขาสนใจต้องเดินต่อได้', () => {
+    expect(confirmedFocus).toMatch(/k\.job_ref <> c\.job_ref/);
+  });
+
+  it('อ่านผลด้วย coalesce(last_outcome, result->>\'outcome\')', () => {
+    // ผลที่ "คน" บันทึกเขียนแค่ last_outcome · แถวก่อน migration 070 มีแต่ result
+    // อ่านทางเดียวจะนับหายเงียบ ๆ แล้วบังไม่ติด (กับดักเดิมของ funnel และแถบต่อใบขอ)
+    expect(confirmedFocus).toMatch(/coalesce\(k\.last_outcome, k\.result->>'outcome'\) = 'confirmed'/);
+  });
+
+  it('ต้องมีเพดานเวลาเสมอ — ไม่งั้นดีลที่เงียบหายทำให้คนหายจากระบบถาวร', () => {
+    // ระบบไม่มีสัญญาณ "ใบ A จบแล้ว" ที่เชื่อถือได้ (การจองอยู่คนละตาราง
+    // และใบที่เงียบหายก็ไม่มีใครมาปิด) — บังแบบไม่มีเพดานคือลบคนออกจากระบบเงียบ ๆ
+    expect(confirmedFocus).toMatch(/k\.updated_at >= now\(\) - interval '\d+ days'/);
+    expect(confirmedFocus).toContain(`interval '${CONFIRMED_FOCUS_DAYS} days'`);
+  });
+
+  it('เพดานต้องอยู่ในช่วงที่สมเหตุสมผล — ยาวไปคนหาย สั้นไปบังไม่ทันดีล', () => {
+    expect(CONFIRMED_FOCUS_DAYS).toBeGreaterThanOrEqual(1);
+    expect(CONFIRMED_FOCUS_DAYS).toBeLessThanOrEqual(30);
   });
 
   it('ยังต้อง claim แบบ skip locked — สอง request พร้อมกันห้ามได้แถวเดียวกัน', () => {

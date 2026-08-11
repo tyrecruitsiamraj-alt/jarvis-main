@@ -27,6 +27,7 @@ import { listHeldPhones } from './candidateCallHolds.js';
 import { toE164Thai } from './thaiPhone.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import {
+  CONFIRMED_FOCUS_DAYS,
   DEFAULT_CALL_FOLLOWUP_POLICY,
   shiftOutOfQuietHours,
 } from '../../src/lib/callFollowupPolicy.js';
@@ -704,6 +705,13 @@ const SERVE_ELIGIBLE = (a: string) => `
  *   1. **สายกำลังเดิน** — เบอร์นี้มีแถวที่เพิ่งส่งให้ Lumos ไปและยังไม่มีผลกลับ → ยังไม่เสิร์ฟใบอื่น
  *   2. **ใบที่มาก่อนได้ก่อน** — ในบรรดาแถวที่ถึงคิวของเบอร์เดียวกัน เสิร์ฟแถวแรกตาม
  *      (created_at, id) เท่านั้น · ที่เหลือรอจนใบนั้นได้ผล
+ *   3. **สนใจใบไหนแล้ว บังใบอื่น** — ตอบ `confirmed` ไว้กับใบไหน ใบอื่นของคนคนนั้น
+ *      หยุดเสนอจนพ้น `CONFIRMED_FOCUS_DAYS` · ใบเดิมยังเดินต่อได้ (`k.job_ref <> c.job_ref`)
+ *
+ * ปลดชั้นที่ 3 ได้ 3 ทาง: มีคนบันทึกผลใหม่ทับใบนั้น (last_outcome เปลี่ยน ไม่ใช่
+ * `confirmed` แล้ว) · ยกเลิกแถวนั้น · หรือพ้นเพดานเวลา — **ไม่มีทางที่คนจะค้างถาวร**
+ * ⚠️ ยังไม่ได้ผูกกับ "คนถูกจองแล้ว" (`candidate_proposals`) — ถูกจองแล้วยังนับเป็น
+ * บังใบอื่นตามเวลาเหมือนเดิม ซึ่งเป็นทิศทางที่ปลอดภัยกว่า (ไม่เสนองานให้คนที่มีงานแล้ว)
  *
  * ทั้งสองชั้น **ข้ามช่อง** (reminder ↔ interview) เพราะคนเดียวอยู่ได้ทั้งสองคิว
  * เบอร์เดียวกันคือคนเดียวกันเสมอ — กันเฉพาะในช่องตัวเองจะกันไม่อยู่จริง
@@ -742,6 +750,16 @@ export const TAKE_PENDING_SQL = `update ${queueTable} q
             and ${phoneExprFor('e')} = ${phoneExprFor('c')}
             and ${SERVE_ELIGIBLE('e')}
             and (e.created_at, e.id) < (c.created_at, c.id)
+       )
+       -- ชั้นที่ 3: ตอบว่าสนใจใบไหนไว้แล้ว → บังใบ**อื่น**ไว้จนพ้นเพดานเวลา
+       and not exists (
+         select 1 from ${queueTable} k
+          where ${phoneExprFor('k')} = ${phoneExprFor('c')}
+            and k.job_ref <> c.job_ref
+            -- ⚠️ coalesce กับ result->>'outcome' — ผลที่คนบันทึกเขียนแค่ last_outcome
+            -- และแถวก่อน migration 070 มีแต่ result · อ่านทางเดียวจะนับหายเงียบ ๆ
+            and coalesce(k.last_outcome, k.result->>'outcome') = 'confirmed'
+            and k.updated_at >= now() - interval '${CONFIRMED_FOCUS_DAYS} days'
        )
      order by c.created_at asc
      limit $2
