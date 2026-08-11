@@ -49,8 +49,10 @@ const AppNavDrawer: React.FC<Props> = ({
    * อยู่ในลูกด้วย ไม่งั้นกดเมนูแล้วไปหน้าจับคู่ไม่ได้เลย
    * ไม่ได้ตัดหน้ารวม /matching ทิ้ง — RoleHubPage กับลิงก์เก่ายังชี้ไปที่นั่นได้เหมือนเดิม
    */
-  const [matchingOpen, setMatchingOpen] = useState(() =>
-    location.pathname.startsWith('/matching') && !location.pathname.startsWith('/matching/candidates'),
+  const [matchingOpen, setMatchingOpen] = useState(
+    () =>
+      location.pathname.startsWith('/recruit/rm') ||
+      (location.pathname.startsWith('/matching') && !location.pathname.startsWith('/matching/candidates')),
   );
 
   useEffect(() => {
@@ -163,6 +165,7 @@ const AppNavDrawer: React.FC<Props> = ({
                       child('/matching/match', 'จับคู่กับงาน'),
                       child('/matching/pre-check', 'Pre-Check'),
                       child('/matching/job-postings', 'คำขอโพสหางานใหม่'),
+                      child('/recruit/rm', 'งานสรรหา (RM)'),
                     ]
                   : []),
               ];

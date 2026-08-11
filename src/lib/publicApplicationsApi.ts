@@ -75,11 +75,15 @@ export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
   rejected: 'ปฏิเสธ',
 };
 
+/**
+ * ⚠️ ทุกค่าต้องมีคู่ `dark:` ครบ — เดิมไม่มีเลย โหมดมืดชิป "ใหม่" วัด contrast ได้ 2.66
+ * (เกณฑ์ 4.5) เจอตอนตรวจหน้า RM 11 ส.ค. 2569 · ใช้ทั้ง dialog บนบอร์ดและหน้า RM
+ */
 export const APPLICATION_STATUS_CLASS: Record<ApplicationStatus, string> = {
-  new: 'bg-blue-500/15 text-blue-700',
-  contacted: 'bg-amber-500/15 text-amber-800',
-  converted: 'bg-emerald-500/15 text-emerald-700',
-  rejected: 'bg-muted text-muted-foreground',
+  new: 'bg-blue-500/15 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300',
+  contacted: 'bg-amber-500/15 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300',
+  converted: 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300',
+  rejected: 'bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-400',
 };
 
 export const GENDER_LABEL: Record<string, string> = {
@@ -87,6 +91,18 @@ export const GENDER_LABEL: Record<string, string> = {
   female: 'หญิง',
   other: 'อื่นๆ',
 };
+
+/**
+ * ใบสมัครทุกงานรวมกัน (ต้องล็อกอิน) — ใช้ที่หน้า "งานสรรหา (RM)"
+ * API เดิมรองรับอยู่แล้ว (ไม่ส่ง job_id = ทั้งหมด · จำกัด 500 แถวล่าสุดฝั่ง server
+ * และตัดตามสิทธิ์ BU ของผู้ใช้ให้เองแล้ว)
+ */
+export async function fetchAllJobApplications(): Promise<PublicApplication[]> {
+  const r = await apiFetch('/api/job-applications');
+  if (!r.ok) throw new Error('โหลดรายชื่อผู้สมัครไม่สำเร็จ');
+  const data = (await r.json()) as { items?: PublicApplication[] };
+  return data.items ?? [];
+}
 
 /** รายชื่อผู้สมัครของงานหนึ่งใบ (ต้องล็อกอิน) */
 export async function fetchJobApplications(jobId: string): Promise<PublicApplication[]> {

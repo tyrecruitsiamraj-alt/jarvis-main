@@ -34,6 +34,7 @@ const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"))
 const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
+const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
 const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
 const OurPeoplePage = lazy(() => import("@/pages/matching/OurPeoplePage"));
 const JobDashboard = lazy(() => import("@/pages/jobs/JobDashboard"));
@@ -100,6 +101,8 @@ const ProtectedRoutes = () => {
             <Route path="/matching/match" element={<MatchingPage />} />
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
             <Route path="/matching/job-postings" element={<JobPostingsPage />} />
+            {/* งานสรรหา (RM) — หน้าเดียว 3 แท็บ · แท็บอยู่ใน ?tab= เพื่อให้แชร์ลิงก์ได้ */}
+            <Route path="/recruit/rm" element={<RecruitRmPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
             {/* ยุบ "ภาระโทรทีม" เข้าไปอยู่ในหน้าเดียวกับ "โทรของฉัน" แล้ว — คง path เดิมไว้ redirect กัน bookmark พัง */}
             {/* หน้า "งานโทร" ถูกปิด 10 ส.ค. 2569 (เจ้าของสั่ง) — Status ย้ายไปหน้าหลัก
