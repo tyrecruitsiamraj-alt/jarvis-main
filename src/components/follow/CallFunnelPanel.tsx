@@ -42,28 +42,42 @@ const OUTCOME_LABEL: Record<CallOutcome, string> = {
  * (เจ้าของสั่ง 10 ส.ค. 2569: "หน้า Follow ทำให้สวยแบบนี้")
  * อยู่บน hero เข้มทั้งสองธีม จึงใช้ TONE.onDark ไม่ใช่ .value
  */
-function FlowStage({
+export function FlowStage({
   label,
   value,
   sub,
   tone,
   onClick,
+  active = false,
+  disabled = false,
+  title,
 }: {
   label: string;
   value: number;
   sub?: React.ReactNode;
   tone: ToneKey;
   onClick?: () => void;
+  /** กดค้างเป็นตัวกรองอยู่ — ใช้ที่หน้า Matching ซึ่งการ์ดแถวบนเป็นตัวกรองรายการด้านล่าง */
+  active?: boolean;
+  disabled?: boolean;
+  title?: string;
 }) {
   const t = TONE[tone];
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={!onClick}
+      disabled={!onClick || disabled}
+      title={title}
+      aria-pressed={onClick ? active : undefined}
       className={cn(
         'min-w-0 flex-1 rounded-2xl border border-white/[0.14] bg-white/[0.07] px-4 py-3 text-left transition-colors !border-t-4',
-        onClick ? 'hover:bg-white/[0.12]' : 'cursor-default',
+        onClick ? 'hover:bg-white/[0.12] disabled:cursor-wait' : 'cursor-default',
+        // ⚠️ เน้นด้วย **วงแหวน** ไม่ใช่พื้นสว่างขึ้น — ลองพื้น white/[0.16] แล้ววัดได้
+        // contrast ตก 3.87 → 2.92 (พื้นสว่างขึ้นแต่ตัวหนังสือยังสีเดิม) ซึ่งแย่กว่าการ์ดอื่น
+        // ในแถบเดียวกัน · วงแหวนเน้นได้เท่ากันโดยไม่แตะพื้น (กติกาเดียวกับปุ่มเลขหน้า)
+        // ring-blue-400/50 ของการ์ดพื้นอ่อนเดิมจมหายบนพื้นเข้ม จึงใช้ sky-300
+        active && 'ring-2 ring-sky-300/80',
         t.bar,
       )}
     >
@@ -106,12 +120,14 @@ const FUNNEL_ROW_GRID =
   'mt-3 flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
   'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)]';
 
-const Arrow = () => (
+export const FlowArrow = () => (
   <div className="flex items-center justify-center text-slate-500">
     <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
     <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
   </div>
 );
+
+const Arrow = FlowArrow;
 
 export type CallFunnelPanelProps = {
   /**
@@ -133,12 +149,31 @@ export type CallFunnelPanelProps = {
    * รายรอบเป็นมุมของคนที่ตามงานทีละคนซึ่งเป็นงานของหน้า Follow)
    */
   showAttempts?: boolean;
+  /**
+   * แถว "ฝั่งงาน" ที่เอามาต่อหัวเส้นการโทรในแผงเดียวกัน (เจ้าของสั่ง 11 ส.ค. 2569:
+   * "เอาเข้าไปรวมกับการไหลของงาน จะได้ติดตามง่าย ๆ แบบ visual ที่ชัดเจน")
+   *
+   * ใช้ที่หน้า Matching ที่เดียว — ส่งการ์ดที่สร้างจาก `FlowStage` เข้ามา
+   * เพื่อให้หน้าตา/โทน/ระยะเป็นชุดเดียวกับเส้นการโทรจริง ๆ ไม่ใช่แค่วางไว้ใกล้กัน
+   *
+   * ⚠️ **หน้า Follow ไม่ส่ง prop นี้** — หน้านั้นไม่มีฝั่งใบขอให้พูดถึง
+   */
+  leadIn?: React.ReactNode;
+  /** ป้ายกำกับแถวฝั่งงาน + แถวการโทร (โผล่เฉพาะตอนมี leadIn) */
+  leadInLabel?: string;
+  callRowLabel?: string;
+  /** หัวแผง — หน้า Matching รวมสองฝั่งแล้วจึงไม่ใช่ "การไหลของการโทร" อย่างเดียว */
+  title?: string;
 };
 
 const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   defaultSource = 'follow',
   lockSource = false,
   showAttempts = false,
+  leadIn,
+  leadInLabel = 'ฝั่งงาน — อัตราที่ต้องหา',
+  callRowLabel = 'ฝั่งการโทร — คนที่ส่งไปแล้ว',
+  title = 'การไหลของการโทร',
 }) => {
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
@@ -195,7 +230,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   return (
     <div className="space-y-3">
       <PageHeroStrip
-        eyebrow={`การไหลของการโทร · ${SOURCE_TABS.find((t) => t.id === source)?.label ?? ''}`}
+        eyebrow={`${title} · ${SOURCE_TABS.find((t) => t.id === source)?.label ?? ''}`}
         actions={
           <div className="flex flex-wrap items-center gap-1.5">
             {lockSource
@@ -217,6 +252,26 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           </div>
         }
       >
+        {/* แถวฝั่งงาน (ถ้ามี) — วางไว้ "ก่อน" เส้นการโทรเพราะงานเกิดก่อนสาย
+            อ่านต่อกันเป็นเรื่องเดียว: มีอัตราเท่าไหร่ → AI หาคนได้แค่ไหน → โทรไปถึงไหนแล้ว
+            เดิมเป็นการ์ดพื้นอ่อนลอยอยู่คนละก้อนใต้แผงนี้ ต้องกวาดตาสองที่แล้วต่อเรื่องเอง */}
+        {leadIn ? (
+          <>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              {leadInLabel}
+            </p>
+            {leadIn}
+            <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                {callRowLabel}
+              </p>
+              <p className="text-[10px] text-slate-500">
+                — คนที่ AI แนะนำแล้วถูกส่งเข้าคิวโทร จะมานับต่อในแถวนี้
+              </p>
+            </div>
+          </>
+        ) : null}
+
         {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → จบยังไง → ตกถังคน
             "มีผลจริง" หักสายที่คนกดยกเลิกออกแล้ว (นิยามเดียวกับอัตราด้านล่าง) */}
         <div className={FUNNEL_ROW_GRID}>

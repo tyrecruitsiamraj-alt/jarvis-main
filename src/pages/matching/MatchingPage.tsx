@@ -1,7 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
+import CallFunnelPanel, { FlowArrow, FlowStage } from '@/components/follow/CallFunnelPanel';
+
+/**
+ * โครงคอลัมน์ของแถวฝั่งงาน — **ต้องเป็นระบบเดียวกับ FUNNEL_ROW_GRID** ของเส้นการโทร
+ * (การ์ด `minmax(0,1fr)` กว้างเท่ากันเป๊ะ · ช่องลูกศร `auto`) ไม่งั้นสองแถวในแผงเดียวกัน
+ * จะดูคนละจังหวะทั้งที่เป็นเรื่องต่อเนื่องกัน
+ *
+ * 5 การ์ด: อัตราทั้งหมด · ในนั้นด่วน → มีคนเขียว · มีคนเหลือง · ยังไม่มีคน
+ * (ลูกศรคั่นแค่จุดเดียว เพราะสามใบขวาเป็น "ผลลัพธ์คู่ขนาน" ของการที่ AI หาคน ไม่ใช่ลำดับ)
+ */
+const DEMAND_ROW_GRID =
+  'mt-2 flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
+  'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
@@ -1893,6 +1905,102 @@ const MatchingPage: React.FC = () => {
     return { total: urgent.length, greenSuggested, none: urgent.length - greenSuggested, analyzedCount };
   }, [rows, quickCounts, boardMatchById, serverSummary]);
 
+  /**
+   * แถว "ฝั่งงาน" ที่ไปต่อหัวเส้นการโทรในแผงเดียวกัน (เจ้าของสั่ง 11 ส.ค. 2569)
+   *
+   * เดิมเป็นการ์ดพื้นอ่อน 5 ใบลอยอยู่ใต้แผง funnel — คนอ่านต้องกวาดตาสองที่แล้วต่อเรื่อง
+   * เอาเองว่า "อัตราที่ยังไม่มีคน" กับ "สายที่โทรไป" เกี่ยวกันยังไง
+   *
+   * ⚠️ **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** — กล่องตัวกรองถูกเอาออกไปแล้ว
+   * (10 ส.ค. 2569) การ์ดพวกนี้คือทางกรองทางเดียวที่เหลืออยู่ · ทำหายเมื่อไหร่
+   * คนจะกรองรายการไม่ได้เลยนอกจากแก้ URL เอง
+   *
+   * ⚠️ อ่านซ้ายไปขวา: อัตราทั้งหมด (+ในนั้นด่วนเท่าไหร่) → แยกตามที่ AI หาคนได้
+   * เขียว + เหลือง + ยังไม่มีคน = อัตราทั้งหมดพอดี · **"ด่วน" นับซ้อน** ไม่ใช่ขั้นในเส้น
+   * จึงวางคู่กับ "อัตราทั้งหมด" ก่อนลูกศร ไม่ใช่คั่นกลางเส้นให้เข้าใจผิดว่าเป็นลำดับ
+   */
+  const demandFlowRow = useMemo(() => {
+    if ((serverSummary?.scopedTotal ?? listTotal) <= 0) return null;
+    const jobs = (n: number) => `${n.toLocaleString('th-TH')} ใบขอ`;
+    const noneJobs = serverSummary?.noRecommend ?? urgentSummary.none;
+    const unanalyzed = serverSummary?.noneUnanalyzed ?? 0;
+    return (
+      <div className={DEMAND_ROW_GRID}>
+        <FlowStage
+          label="อัตราทั้งหมด"
+          value={serverSummary?.positionsTotal ?? listTotal}
+          sub={jobs(serverSummary?.scopedTotal ?? listTotal)}
+          tone="neutral"
+          active={!urgentOnly && workflowFilter === 'all'}
+          disabled={serverListLoading}
+          title='กดเพื่อดูเฉพาะ "อัตราทั้งหมด"'
+          onClick={() => {
+            setUrgentOnly(false);
+            setWorkflowFilter('all');
+          }}
+        />
+        <FlowStage
+          label="ในนั้นเป็นงานด่วน"
+          value={serverSummary?.positionsUrgent ?? urgentSummary.total}
+          sub={`${jobs(serverSummary?.urgentTotal ?? urgentSummary.total)} · นับซ้อนกับ 3 ถังขวา`}
+          tone="danger"
+          active={urgentOnly}
+          disabled={serverListLoading}
+          title='กดเพื่อดูเฉพาะ "อัตราด่วน"'
+          onClick={() => {
+            setUrgentOnly(true);
+            setWorkflowFilter('all');
+          }}
+        />
+        <FlowArrow />
+        <FlowStage
+          label="มีคนเขียวแนะนำ"
+          value={serverSummary?.positionsGreen ?? urgentSummary.greenSuggested}
+          sub={jobs(serverSummary?.withGreen ?? urgentSummary.greenSuggested)}
+          tone="success"
+          active={workflowFilter === 'green'}
+          disabled={serverListLoading}
+          title='กดเพื่อดูเฉพาะ "มีคนเขียวแนะนำ"'
+          onClick={() => {
+            setUrgentOnly(false);
+            setWorkflowFilter('green');
+          }}
+        />
+        <FlowStage
+          label="มีคนเหลืองแนะนำ"
+          value={serverSummary?.positionsYellow ?? 0}
+          sub={jobs(serverSummary?.withYellow ?? 0)}
+          tone="warn"
+          active={workflowFilter === 'yellow'}
+          disabled={serverListLoading}
+          title='กดเพื่อดูเฉพาะ "มีคนเหลืองแนะนำ"'
+          onClick={() => {
+            setUrgentOnly(false);
+            setWorkflowFilter('yellow');
+          }}
+        />
+        <FlowStage
+          label="ยังไม่มีคน"
+          value={serverSummary?.positionsNone ?? urgentSummary.none}
+          // แยกให้เห็นว่า "AI ดูแล้วไม่เจอ" กับ "ยังไม่ได้ดู" คนละงานที่ต้องทำต่อ
+          sub={
+            unanalyzed > 0
+              ? `${jobs(noneJobs)} · ยังไม่ได้ประเมิน ${unanalyzed.toLocaleString('th-TH')}`
+              : jobs(noneJobs)
+          }
+          tone="orange"
+          active={workflowFilter === 'none'}
+          disabled={serverListLoading}
+          title='กดเพื่อดูเฉพาะ "ยังไม่มีคน"'
+          onClick={() => {
+            setUrgentOnly(false);
+            setWorkflowFilter('none');
+          }}
+        />
+      </div>
+    );
+  }, [serverSummary, listTotal, urgentSummary, urgentOnly, workflowFilter, serverListLoading]);
+
   const closeJob = () => {
     setJobDetail(null);
     if (searchParams.get('jobId')) {
@@ -1925,7 +2033,18 @@ const MatchingPage: React.FC = () => {
             เริ่มที่ "ทั้งระบบ" เพราะงานโทรเกือบทั้งหมดออกจากหน้านี้อยู่แล้ว
             (ข้อมูลจริง: คนของเรา 5,280 + iRecruit 26 + Follow 1) แล้วกดสลับดูรายต้นทางได้
             หัวแผงบอกเสมอว่ากำลังดูต้นทางไหน จึงไม่ซ้ำรอย "เลขถูกแต่ตอบผิดคำถาม" */}
-        <CallFunnelPanel defaultSource="all" />
+        {/* เจ้าของสั่ง 11 ส.ค. 2569: เอาการ์ดสรุปฝั่งงานเข้ามารวมกับการไหลของงาน
+            "จะได้ติดตามได้ง่าย ๆ ในแบบ visual ที่ชัดเจน" — เดิมเป็นสองก้อนคนละที่
+            คนอ่านต้องกวาดตาสองรอบแล้วต่อเรื่องเอาเองว่าอัตราที่ยังไม่มีคนกับสายที่โทรไป
+            เกี่ยวกันยังไง · ตอนนี้อ่านรวดเดียว: มีอัตราเท่าไหร่ → AI หาคนได้แค่ไหน →
+            โทรไปถึงไหนแล้ว
+            ⚠️ การ์ดแถวฝั่งงาน **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** (กล่องตัวกรอง
+            ถูกเอาออกไปแล้ว 10 ส.ค. นี่คือทางกรองทางเดียวที่เหลืออยู่ ห้ามทำหาย) */}
+        <CallFunnelPanel
+          defaultSource="all"
+          title="การไหลของงาน"
+          leadIn={demandFlowRow}
+        />
 
         {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
             เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
@@ -1947,108 +2066,9 @@ const MatchingPage: React.FC = () => {
             - URL param ที่แชร์กันไว้เดิมยังใช้ได้ ไม่พัง
             ถ้าวันไหนอยากได้ตัวกรองกลับมา เปิดบล็อกนี้คืนได้เลยโดยไม่ต้องแก้ตรรกะ */}
 
-        {/* กล่องสรุป — กดแล้วตั้งตัวกรองให้ตรงกับจำนวนที่โชว์ (ใช้ตัวกรองชุดเดียวกับปุ่มด้านบน) */}
-        {(serverSummary?.scopedTotal ?? listTotal) > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {(
-              [
-                {
-                  key: 'total',
-                  label: 'อัตราทั้งหมด',
-                  value: serverSummary?.positionsTotal ?? listTotal,
-                  sub: `${(serverSummary?.scopedTotal ?? listTotal).toLocaleString('th-TH')} ใบขอ`,
-                  cls: 'border-slate-200/70 bg-white/60 dark:border-white/10 dark:bg-white/5',
-                  num: TONE.neutral.value,
-                  active: !urgentOnly && workflowFilter === 'all',
-                  apply: () => {
-                    setUrgentOnly(false);
-                    setWorkflowFilter('all');
-                  },
-                },
-                {
-                  key: 'urgent',
-                  label: 'อัตราด่วน',
-                  value: serverSummary?.positionsUrgent ?? urgentSummary.total,
-                  sub: `${(serverSummary?.urgentTotal ?? urgentSummary.total).toLocaleString('th-TH')} ใบขอ · นับซ้อนกับ 3 ถังขวา`,
-                  cls: TONE.danger.soft,
-                  num: TONE.danger.value,
-                  active: urgentOnly,
-                  apply: () => {
-                    setUrgentOnly(true);
-                    setWorkflowFilter('all');
-                  },
-                },
-                {
-                  key: 'green',
-                  label: 'มีคนเขียวแนะนำ',
-                  value: serverSummary?.positionsGreen ?? urgentSummary.greenSuggested,
-                  sub: `${(serverSummary?.withGreen ?? urgentSummary.greenSuggested).toLocaleString('th-TH')} ใบขอ`,
-                  cls: TONE.success.soft,
-                  num: TONE.success.value,
-                  active: workflowFilter === 'green',
-                  apply: () => {
-                    setUrgentOnly(false);
-                    setWorkflowFilter('green');
-                  },
-                },
-                {
-                  key: 'yellow',
-                  label: 'มีคนเหลืองแนะนำ',
-                  value: serverSummary?.positionsYellow ?? 0,
-                  sub: `${(serverSummary?.withYellow ?? 0).toLocaleString('th-TH')} ใบขอ`,
-                  cls: TONE.warn.soft,
-                  num: TONE.warn.value,
-                  active: workflowFilter === 'yellow',
-                  apply: () => {
-                    setUrgentOnly(false);
-                    setWorkflowFilter('yellow');
-                  },
-                },
-                {
-                  key: 'none',
-                  label: 'ยังไม่มีคน',
-                  value: serverSummary?.positionsNone ?? urgentSummary.none,
-                  sub: (() => {
-                    const jobs = serverSummary?.noRecommend ?? urgentSummary.none;
-                    const un = serverSummary?.noneUnanalyzed ?? 0;
-                    // แยกให้เห็นว่า "AI ดูแล้วไม่เจอ" กับ "ยังไม่ได้ดู" คนละงานที่ต้องทำต่อ
-                    return un > 0
-                      ? `${jobs.toLocaleString('th-TH')} ใบขอ · ยังไม่ได้ประเมิน ${un.toLocaleString('th-TH')}`
-                      : `${jobs.toLocaleString('th-TH')} ใบขอ`;
-                  })(),
-                  cls: TONE.orange.soft,
-                  num: TONE.orange.value,
-                  active: workflowFilter === 'none',
-                  apply: () => {
-                    setUrgentOnly(false);
-                    setWorkflowFilter('none');
-                  },
-                },
-              ] as const
-            ).map((tile) => (
-              <button
-                key={tile.key}
-                type="button"
-                onClick={tile.apply}
-                disabled={serverListLoading}
-                title={`กดเพื่อดูเฉพาะ "${tile.label}"`}
-                className={cn(
-                  'glass-card rounded-2xl border px-3 py-2.5 text-center transition-colors disabled:cursor-wait',
-                  tile.cls,
-                  tile.active ? 'ring-2 ring-blue-400/50' : 'hover:border-blue-300/60 dark:hover:border-blue-700/60',
-                )}
-              >
-                <div className={cn('text-lg font-bold tabular-nums', tile.num)}>
-                  {tile.value.toLocaleString('th-TH')}
-                </div>
-                <div className="text-[11px] text-muted-foreground">{tile.label}</div>
-                {tile.sub ? (
-                  <div className="mt-0.5 text-[10px] leading-tight text-muted-foreground/80">{tile.sub}</div>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        {/* ⚠️ กล่องสรุป 5 ใบเคยอยู่ตรงนี้ — ย้ายขึ้นไปรวมในแถบ "การไหลของงาน" ด้านบน
+            (เจ้าของสั่ง 11 ส.ค. 2569) · ตัวสร้างอยู่ที่ `demandFlowRow` ใกล้ ๆ state ของตัวกรอง
+            ตรรกะการกดกรองไม่เปลี่ยนเลย เปลี่ยนแค่ที่วางกับหน้าตาให้เป็นชุดเดียวกับเส้นการโทร */}
         {urgentSummary.total > 0 ? (
           <p className="px-1 text-[11px] text-muted-foreground">
             {urgentSummary.analyzedCount > 0
