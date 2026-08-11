@@ -10,8 +10,8 @@
 | | |
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
-| commit ล่าสุด | `24102da` (เซสชัน 11 ส.ค. **รอบสี่** ทำไป **5 commit** ตั้งแต่ `179f273`) |
-| `npm run test` | **838 ผ่าน / 4 skipped** (ไฟล์เทสต์ 100) |
+| commit ล่าสุด | `da74047` (เซสชัน 11 ส.ค. **รอบห้า** — UI 5 commit: แผงสรรหาแบบกดขั้นตอน · จัดบอร์ด · flow Matching คอลัมน์ตรงกัน+ทำก่อนหลัง · การ์ดผู้สมัครลดรก) |
+| `npm run test` | **839 ผ่าน / 4 skipped** (ไฟล์เทสต์ 100) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error (ครอบ `src/`) |
 | `npx tsc --noEmit` | 0 error (**ไม่ครอบทั้ง src/ และ api/** — อย่าหลงว่าเช็คแล้ว) |
 | `npx tsc --noEmit -p tsconfig.api.json` | **0 error** (ครอบ `api/` · กติกา: **ต้องเป็น 0**) |
