@@ -41,6 +41,7 @@ export type ApiResource =
   | 'siamraj-unit-work-status'
   | 'siamraj-opl-import'
   | 'recruit-registrations'
+  | 'recruit-funnel'
   | 'matching-suggestions'
   | 'matching-parse-branch-demand'
   | 'matching-candidate-spec'
@@ -151,6 +152,7 @@ export function minimumRoleFor(
     case 'siamraj-opl-import':
       return 'admin';
 
+    case 'recruit-funnel':
     case 'recruit-registrations':
     case 'matching-suggestions':
     case 'matching-parse-branch-demand':

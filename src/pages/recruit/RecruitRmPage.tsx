@@ -9,6 +9,7 @@ import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import RmFilterSidebar from '@/components/recruit-rm/RmFilterSidebar';
 import RmToolbar from '@/components/recruit-rm/RmToolbar';
 import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
+import RecruitFunnelPanel from '@/components/recruit-rm/RecruitFunnelPanel';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
@@ -51,9 +52,11 @@ import {
  *              "รับไปตาม" ตัวเดียวกับหน้า Matching (acquireCallHold) ไม่สร้างล็อกใหม่
  * TODO(api) 3. วันนัดจริงในแท็บติดตามนัดหมาย — candidate_interviews ตอนนี้ดึงได้ทีละคน
  *              ต้องเพิ่ม endpoint รวม (GET /api/candidate-interviews?all=1) ก่อน
- * TODO(api) 4. แถบเครื่องมือที่หน้านี้ (ช่องทาง/สร้างลิงก์/เหตุผล/รายงาน) — สองปุ่มแรก
- *              ต่อของจริงแล้วที่บอร์ดรับสมัคร ยังต้องยกมาเสียบที่หน้านี้ด้วย
+ * TODO(api) 4. แถบเครื่องมือที่หน้านี้: "ช่องทาง" กับ "สร้างลิงก์" ต่อของจริงแล้วที่บอร์ด
+ *              รับสมัคร ยังต้องยกมาเสียบที่หน้านี้ด้วย ("รายงาน" เจ้าของสั่งเอาออกแล้ว)
  * ✅ "เพิ่มข้อมูลผู้สมัคร" ต่อของจริงแล้ว (AddApplicantDialog → POST /api/job-applications)
+ * ✅ "เหตุผล" ต่อของจริงแล้ว (ReasonManagerDialog → /api/recruit/reasons)
+ * ✅ แผงภาพรวม 9 ตัวเลข (RecruitFunnelPanel → /api/recruit/funnel · อ่านจาก iRecruit)
  *
  * ⚠️ ปุ่มที่ยังไม่ได้ต่อ ขึ้นข้อความบอกตรง ๆ — ไม่ปล่อยให้กดแล้วเงียบ
  */
@@ -182,6 +185,11 @@ const RecruitRmPage: React.FC = () => {
               </button>
             );
           })}
+        </div>
+
+        {/* แผงคุม 9 ตัวเลขที่เจ้าของขอ — วางเหนือตัวกรอง เพราะเป็นภาพรวมของทั้งหน้า */}
+        <div className="mt-4">
+          <RecruitFunnelPanel />
         </div>
 
         <div className="mt-4 flex flex-col gap-4 lg:flex-row">
