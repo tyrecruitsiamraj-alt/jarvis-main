@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
-import { applyLinkPath, type RecruitChannel } from '@/lib/recruitPostings';
 import {
-  fetchRecruitChannels,
-  createRecruitPosting,
-  type CreatePostingBody,
-} from '@/lib/recruitPostingsApi';
+  applyLinkPath,
+  recruitChannelLabel,
+  type RecruitChannelMatch,
+} from '@/lib/recruitPostings';
+import { createRecruitPosting, type CreatePostingBody } from '@/lib/recruitPostingsApi';
+import ChannelPicker from '@/components/shared/ChannelPicker';
 import {
   Dialog,
   DialogContent,
@@ -76,8 +77,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   standalone = null,
   onCreated,
 }) => {
-  const [channels, setChannels] = useState<RecruitChannel[]>([]);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [locationText, setLocationText] = useState('');
@@ -105,7 +105,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setError(null);
     setLinks([]);
     setSaving(false);
-    setPicked(new Set());
     // เติมค่าจากใบขอให้อัตโนมัติ — ไม่ต้องพิมพ์ซ้ำสิ่งที่ ERP มีอยู่แล้ว
     setTitle(job ? jobBoardCardTitle(job) : standalone ? standalone.kindLabel : '');
     setDetail('');
@@ -122,9 +121,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setSpecificType('');
     setFormType('rm');
     setShortLinks({});
-    void fetchRecruitChannels()
-      .then(setChannels)
-      .catch(() => setChannels([]));
+    setPicked([]);
     // ผู้รับผิดชอบ = ผู้ใช้ในระบบ (ไม่ใช่ master แยกอีกชุด) — พลาดก็ปล่อยว่างได้ ไม่บังคับ
     void apiFetch('/api/app-users')
       .then((r) => (r.ok ? r.json() : []))
@@ -137,16 +134,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
       )
       .catch(() => setStaff([]));
   }, [open, job, standalone]);
-
-  const flatChannels = useMemo(() => {
-    const out: Array<{ id: string; label: string }> = [];
-    for (const parent of channels) {
-      const kids = parent.children ?? [];
-      if (kids.length === 0) out.push({ id: parent.id, label: parent.name });
-      for (const kid of kids) out.push({ id: kid.id, label: `${parent.name} · ${kid.name}` });
-    }
-    return out;
-  }, [channels]);
 
   /**
    * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
@@ -171,15 +158,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     }
   };
 
-  const toggle = (id: string) => {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   const submit = async () => {
     if (saving) return;
     setSaving(true);
@@ -195,9 +173,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         salaryText: salaryText || null,
         contactName: contactName || null,
         contactPhone: contactPhone || null,
-        channels: flatChannels
-          .filter((c) => picked.has(c.id))
-          .map((c) => ({ channelId: c.id, label: c.label })),
+        channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) })),
         positionName: positionName.trim() || null,
         province: province || null,
         responsibleName: staff.find((u) => u.id === responsible)?.name ?? null,
@@ -396,28 +372,10 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 <label className="text-xs font-medium text-muted-foreground">
                   ช่องทางที่จะส่ง (เลือกได้หลายช่อง — ได้ลิงก์แยกช่องละอัน)
                 </label>
-                {flatChannels.length === 0 ? (
-                  <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                    ยังไม่มีช่องทาง — เพิ่มได้ที่ปุ่ม "จัดการช่องทาง" หน้าบอร์ด · ถ้าไม่เลือกจะได้ลิงก์กลาง 1 อัน
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {flatChannels.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggle(c.id)}
-                        className={
-                          picked.has(c.id)
-                            ? 'rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary'
-                            : 'rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary'
-                        }
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <ChannelPicker value={picked} onChange={setPicked} multiple reloadKey={open} />
+                <p className="text-[11px] text-muted-foreground">
+                  ไม่เลือกช่องทางจะได้ลิงก์กลาง 1 อัน
+                </p>
               </div>
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}

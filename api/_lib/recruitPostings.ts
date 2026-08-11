@@ -6,6 +6,7 @@ import {
   isStandalonePostingKind,
   validatePostingInput,
   type RecruitChannel,
+  type RecruitChannelMatch,
   type RecruitPosting,
   type RecruitPostingLink,
 } from '../../src/lib/recruitPostings.js';
@@ -73,6 +74,97 @@ export async function listRecruitChannels(includeInactive = false): Promise<Recr
     byParent.set(c.parentId, list);
   }
   return parents.map((p) => ({ ...p, children: byParent.get(p.id) ?? [] }));
+}
+
+/**
+ * ช่องทางหลักอย่างเดียว + จำนวนลูก — ใช้ตอนกางตัวจัดการช่องทาง
+ * ⚠️ ทรีเต็มมี 4,390 แถวหลังยกของจากระบบเดิม ส่งทั้งก้อนทุกครั้งที่เปิด dialog ไม่ไหว
+ */
+export async function listRecruitChannelRoots(includeInactive = false): Promise<RecruitChannel[]> {
+  const { rows } = await dbQuery<ChannelRow & { child_count: string }>(
+    `SELECT c.id, c.parent_id, c.name, c.sort_order, c.is_active,
+            (SELECT count(*) FROM ${channelsTable} k
+              WHERE k.parent_id = c.id ${includeInactive ? '' : 'AND k.is_active = true'}) AS child_count
+       FROM ${channelsTable} c
+      WHERE c.parent_id IS NULL ${includeInactive ? '' : 'AND c.is_active = true'}
+      ORDER BY c.sort_order, lower(c.name)`,
+  );
+  return rows.map((r) => ({ ...mapChannel(r), childCount: Number(r.child_count) || 0 }));
+}
+
+/** เพดานผลลัพธ์ต่อครั้ง — พ่อบางตัวมีลูก 4,187 ตัว ส่งหมดไม่ไหว */
+export const RECRUIT_CHANNEL_PAGE_MAX = 200;
+
+function clampLimit(value: unknown, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.trunc(n), RECRUIT_CHANNEL_PAGE_MAX);
+}
+
+/** ช่องทางรองของพ่อหนึ่งตัว แบ่งหน้า — คืน total ด้วยเพื่อให้หน้าเว็บบอกได้ว่าเหลืออีกกี่ตัว */
+export async function listRecruitChannelChildren(
+  parentId: string,
+  options: { includeInactive?: boolean; limit?: number; offset?: number; q?: string } = {},
+): Promise<{ items: RecruitChannel[]; total: number }> {
+  const includeInactive = !!options.includeInactive;
+  const limit = clampLimit(options.limit, 50);
+  const offset = Math.max(0, Math.trunc(Number(options.offset) || 0));
+  const q = trimTo(options.q, MAX_TEXT);
+  const params: unknown[] = [parentId];
+  let where = 'parent_id = $1';
+  if (!includeInactive) where += ' AND is_active = true';
+  if (q) {
+    params.push(`%${q}%`);
+    where += ` AND name ILIKE $${params.length}`;
+  }
+  const totalRes = await dbQuery<{ n: string }>(
+    `SELECT count(*) AS n FROM ${channelsTable} WHERE ${where}`,
+    params,
+  );
+  // ⚠️ อย่า push ทับ params ตัวเดิม — คิวรีนับใช้อยู่ ต่อท้ายแล้วจะอ่านย้อนหลังไม่ตรง
+  const pageParams = [...params, limit, offset];
+  const { rows } = await dbQuery<ChannelRow>(
+    `SELECT id, parent_id, name, sort_order, is_active
+       FROM ${channelsTable}
+      WHERE ${where}
+      ORDER BY sort_order, lower(name)
+      LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
+    pageParams,
+  );
+  return { items: rows.map(mapChannel), total: Number(totalRes.rows[0]?.n) || 0 };
+}
+
+type MatchRow = ChannelRow & { parent_name: string | null };
+
+/**
+ * ค้นหาช่องทางด้วยข้อความ — ค้นทั้งชื่อลูกและชื่อพ่อ
+ * ค้นชื่อพ่อด้วยเพราะคนพิมพ์ "Facebook" แล้วคาดว่าจะเจอกลุ่มทั้งหมดใต้ Facebook Group
+ */
+export async function searchRecruitChannels(
+  q: string,
+  options: { includeInactive?: boolean; limit?: number } = {},
+): Promise<RecruitChannelMatch[]> {
+  const term = trimTo(q, MAX_TEXT);
+  if (!term) return [];
+  const includeInactive = !!options.includeInactive;
+  const limit = clampLimit(options.limit, 50);
+  const activeFilter = includeInactive ? '' : 'AND c.is_active = true';
+  const { rows } = await dbQuery<MatchRow>(
+    `SELECT c.id, c.parent_id, c.name, c.sort_order, c.is_active, p.name AS parent_name
+       FROM ${channelsTable} c
+       LEFT JOIN ${channelsTable} p ON p.id = c.parent_id
+      WHERE (c.name ILIKE $1 OR p.name ILIKE $1) ${activeFilter}
+      ORDER BY (c.name ILIKE $1) DESC, lower(coalesce(p.name, '')), c.sort_order, lower(c.name)
+      LIMIT $2`,
+    [`%${term}%`, limit],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    parentId: r.parent_id,
+    parentName: r.parent_name,
+    isActive: !!r.is_active,
+  }));
 }
 
 export async function createRecruitChannel(input: {

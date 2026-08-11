@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, UserPlus } from 'lucide-react';
 import {
   Dialog,
@@ -11,8 +11,8 @@ import { apiFetch } from '@/lib/apiFetch';
 import { parseAppUserList } from '@/lib/userApi';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import districtsByProvince from '@/data/thaiDistrictsByProvince.json';
-import { fetchRecruitChannels } from '@/lib/recruitPostingsApi';
-import type { RecruitChannel } from '@/lib/recruitPostings';
+import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
+import ChannelPicker from '@/components/shared/ChannelPicker';
 import { createApplicationByStaff } from '@/lib/publicApplicationsApi';
 import {
   RM_EDUCATION_LEVELS,
@@ -60,11 +60,10 @@ const AddApplicantDialog: React.FC<{
   const [specificType, setSpecificType] = useState('');
   const [education, setEducation] = useState('');
   const [responsible, setResponsible] = useState('');
-  const [channelId, setChannelId] = useState('');
+  const [channel, setChannel] = useState<RecruitChannelMatch[]>([]);
   const [licenses, setLicenses] = useState<string[]>([]);
 
   const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
-  const [channels, setChannels] = useState<RecruitChannel[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +81,7 @@ const AddApplicantDialog: React.FC<{
     setSpecificType('');
     setEducation('');
     setResponsible('');
-    setChannelId('');
+    setChannel([]);
     setLicenses([]);
     setError(null);
     setSaving(false);
@@ -96,21 +95,7 @@ const AddApplicantDialog: React.FC<{
         ),
       )
       .catch(() => setStaff([]));
-    void fetchRecruitChannels()
-      .then(setChannels)
-      .catch(() => setChannels([]));
   }, [open]);
-
-  /** ช่องทางหลัก · ช่องทางรอง — แบนเป็นลิสต์เดียวเหมือนตอนสร้างลิงก์ */
-  const flatChannels = useMemo(() => {
-    const out: Array<{ id: string; label: string }> = [];
-    for (const parent of channels) {
-      const kids = parent.children ?? [];
-      if (kids.length === 0) out.push({ id: parent.id, label: parent.name });
-      for (const kid of kids) out.push({ id: kid.id, label: `${parent.name} · ${kid.name}` });
-    }
-    return out;
-  }, [channels]);
 
   const districts = province ? (DISTRICTS[province] ?? []) : [];
 
@@ -144,8 +129,8 @@ const AddApplicantDialog: React.FC<{
         specific_type: specificType || null,
         education: education || null,
         responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,
-        channel_id: channelId || null,
-        channel_label: flatChannels.find((c) => c.id === channelId)?.label ?? null,
+        channel_id: channel[0]?.id ?? null,
+        channel_label: channel[0] ? recruitChannelLabel(channel[0]) : null,
         license_types: licenses,
       });
       onSaved();
@@ -306,19 +291,7 @@ const AddApplicantDialog: React.FC<{
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <label className={labelCls}>ช่องทางการรับสมัคร</label>
-              <select className={fieldCls} value={channelId} onChange={(e) => setChannelId(e.target.value)}>
-                <option value="">ไม่ระบุ</option>
-                {flatChannels.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-              {flatChannels.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
-                  ยังไม่มีช่องทาง — เพิ่มได้ที่ปุ่ม "ช่องทาง" ด้านบน
-                </p>
-              ) : null}
+              <ChannelPicker value={channel} onChange={setChannel} reloadKey={open} />
             </div>
           </div>
 

@@ -10,7 +10,8 @@ import {
 import { STANDALONE_POSTING_KINDS, type RecruitChannel } from '@/lib/recruitPostings';
 import { heroButton, heroButtonSolid } from '@/components/shared/PageHeroStrip';
 import {
-  fetchRecruitChannels,
+  fetchRecruitChannelRoots,
+  fetchRecruitChannelChildren,
   createRecruitChannel,
   deleteRecruitChannel,
 } from '@/lib/recruitPostingsApi';
@@ -24,6 +25,8 @@ const fieldCls =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 /** จัดการช่องทาง (master 2 ระดับ) — อยู่หน้าหลักของบอร์ดตามที่เจ้าของกำหนด */
+const CHANNEL_CHILD_PAGE = 50;
+
 const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const [channels, setChannels] = useState<RecruitChannel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,12 +34,23 @@ const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = (
   const [mainName, setMainName] = useState('');
   const [subName, setSubName] = useState('');
   const [subParent, setSubParent] = useState('');
+  /**
+   * กางทีละพ่อ — ⚠️ ห้ามโหลดทรีเต็ม พ่อชื่อ "Facebook Group" มีลูก 4,187 ตัว
+   * (ของจริงจาก iRecruit) เปิด dialog แล้วดึงมาหมดคือแช่ทั้งหน้า
+   */
+  const [openParent, setOpenParent] = useState<string | null>(null);
+  const [childQuery, setChildQuery] = useState('');
+  const [children, setChildren] = useState<{ items: RecruitChannel[]; total: number }>({
+    items: [],
+    total: 0,
+  });
+  const [childLoading, setChildLoading] = useState(false);
 
   const reload = async () => {
     setLoading(true);
     setError(null);
     try {
-      setChannels(await fetchRecruitChannels(true));
+      setChannels(await fetchRecruitChannelRoots(true));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'โหลดช่องทางไม่สำเร็จ');
     } finally {
@@ -44,9 +58,39 @@ const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = (
     }
   };
 
+  const reloadChildren = async (parentId: string, q: string) => {
+    setChildLoading(true);
+    try {
+      setChildren(
+        await fetchRecruitChannelChildren(parentId, {
+          includeInactive: true,
+          limit: CHANNEL_CHILD_PAGE,
+          q: q.trim() || undefined,
+        }),
+      );
+    } catch (e) {
+      setChildren({ items: [], total: 0 });
+      setError(e instanceof Error ? e.message : 'โหลดช่องทางรองไม่สำเร็จ');
+    } finally {
+      setChildLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (open) void reload();
+    if (!open) return;
+    setOpenParent(null);
+    setChildQuery('');
+    setChildren({ items: [], total: 0 });
+    void reload();
   }, [open]);
+
+  useEffect(() => {
+    if (!openParent) return;
+    const parent = openParent;
+    const q = childQuery;
+    const timer = setTimeout(() => void reloadChildren(parent, q), 250);
+    return () => clearTimeout(timer);
+  }, [openParent, childQuery]);
 
   const addMain = async () => {
     if (!mainName.trim()) return;
@@ -65,6 +109,7 @@ const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = (
       await createRecruitChannel({ name: subName.trim(), parentId: subParent });
       setSubName('');
       await reload();
+      if (openParent === subParent) await reloadChildren(subParent, childQuery);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เพิ่มไม่สำเร็จ');
     }
@@ -74,6 +119,7 @@ const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = (
     try {
       await deleteRecruitChannel(id);
       await reload();
+      if (openParent) await reloadChildren(openParent, childQuery);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ลบไม่สำเร็จ');
     }
@@ -145,34 +191,77 @@ const ChannelManagerDialog: React.FC<{ open: boolean; onClose: () => void }> = (
               {channels.map((c) => (
                 <li key={c.id} className="rounded-xl border border-border/70 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-foreground">{c.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChildQuery('');
+                        setChildren({ items: [], total: 0 });
+                        setOpenParent((prev) => (prev === c.id ? null : c.id));
+                      }}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      aria-expanded={openParent === c.id}
+                    >
+                      <span className="truncate text-sm font-medium text-foreground">{c.name}</span>
+                      <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                        {(c.childCount ?? 0).toLocaleString('th-TH')} ช่องรอง
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => void remove(c.id)}
                       title="ลบช่องทางนี้ (ลิงก์ที่สร้างไว้แล้วยังใช้ได้)"
-                      className="text-muted-foreground hover:text-red-600"
+                      className="shrink-0 text-muted-foreground hover:text-red-600"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  {(c.children ?? []).length > 0 ? (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {(c.children ?? []).map((k) => (
-                        <span
-                          key={k.id}
-                          className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"
-                        >
-                          {k.name}
-                          <button
-                            type="button"
-                            onClick={() => void remove(k.id)}
-                            className="hover:text-red-600"
-                            aria-label={`ลบ ${k.name}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
+
+                  {openParent === c.id ? (
+                    <div className="mt-2 space-y-1.5 border-t border-border/50 pt-2">
+                      {(c.childCount ?? 0) > CHANNEL_CHILD_PAGE ? (
+                        <input
+                          className={fieldCls}
+                          placeholder={`ค้นในช่องรองของ ${c.name}`}
+                          value={childQuery}
+                          onChange={(e) => setChildQuery(e.target.value)}
+                        />
+                      ) : null}
+                      {childLoading ? (
+                        <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> กำลังโหลด…
+                        </p>
+                      ) : children.items.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          {childQuery.trim() ? 'ไม่เจอช่องรองที่ตรงกับคำค้น' : 'ยังไม่มีช่องทางรอง'}
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap gap-1.5">
+                            {children.items.map((k) => (
+                              <span
+                                key={k.id}
+                                className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"
+                              >
+                                <span className="truncate">{k.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void remove(k.id)}
+                                  className="shrink-0 hover:text-red-600"
+                                  aria-label={`ลบ ${k.name}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          {children.total > children.items.length ? (
+                            <p className="text-[11px] text-muted-foreground">
+                              แสดง {children.items.length.toLocaleString('th-TH')} จาก{' '}
+                              {children.total.toLocaleString('th-TH')} ช่อง — พิมพ์ค้นหาเพื่อเจาะจง
+                            </p>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
                 </li>

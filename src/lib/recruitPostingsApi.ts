@@ -1,6 +1,11 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { readErrorMessage, readJsonSafe } from '@/lib/api';
-import type { RecruitChannel, RecruitPosting, RecruitPostingLink } from '@/lib/recruitPostings';
+import type {
+  RecruitChannel,
+  RecruitChannelMatch,
+  RecruitPosting,
+  RecruitPostingLink,
+} from '@/lib/recruitPostings';
 
 export async function fetchRecruitChannels(includeInactive = false): Promise<RecruitChannel[]> {
   const r = await apiFetch(`/api/recruit/channels${includeInactive ? '?all=1' : ''}`);
@@ -8,6 +13,45 @@ export async function fetchRecruitChannels(includeInactive = false): Promise<Rec
   const data = await readJsonSafe<RecruitChannel[]>(r);
   return Array.isArray(data) ? data : [];
 }
+
+/** ช่องทางหลักอย่างเดียว + จำนวนลูก (ทรีเต็มใหญ่เกินกว่าจะโหลดทุกครั้ง) */
+export async function fetchRecruitChannelRoots(includeInactive = false): Promise<RecruitChannel[]> {
+  const r = await apiFetch(`/api/recruit/channels?roots=1${includeInactive ? '&all=1' : ''}`);
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดช่องทางไม่สำเร็จ'));
+  const data = await readJsonSafe<RecruitChannel[]>(r);
+  return Array.isArray(data) ? data : [];
+}
+
+/** ค้นหาช่องทาง (ค้นทั้งชื่อช่องย่อยและชื่อช่องหลัก) */
+export async function searchRecruitChannels(
+  q: string,
+  options: { includeInactive?: boolean; limit?: number } = {},
+): Promise<RecruitChannelMatch[]> {
+  const params = new URLSearchParams({ q });
+  if (options.includeInactive) params.set('all', '1');
+  if (options.limit) params.set('limit', String(options.limit));
+  const r = await apiFetch(`/api/recruit/channels?${params.toString()}`);
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'ค้นหาช่องทางไม่สำเร็จ'));
+  const data = await readJsonSafe<RecruitChannelMatch[]>(r);
+  return Array.isArray(data) ? data : [];
+}
+
+/** ช่องทางรองของพ่อหนึ่งตัว แบ่งหน้า */
+export async function fetchRecruitChannelChildren(
+  parentId: string,
+  options: { includeInactive?: boolean; limit?: number; offset?: number; q?: string } = {},
+): Promise<{ items: RecruitChannel[]; total: number }> {
+  const params = new URLSearchParams({ parent: parentId });
+  if (options.includeInactive) params.set('all', '1');
+  if (options.limit) params.set('limit', String(options.limit));
+  if (options.offset) params.set('offset', String(options.offset));
+  if (options.q) params.set('childQ', options.q);
+  const r = await apiFetch(`/api/recruit/channels?${params.toString()}`);
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดช่องทางรองไม่สำเร็จ'));
+  const data = await readJsonSafe<{ items: RecruitChannel[]; total: number }>(r);
+  return { items: Array.isArray(data?.items) ? data.items : [], total: Number(data?.total) || 0 };
+}
+
 
 export async function createRecruitChannel(input: {
   parentId?: string | null;
