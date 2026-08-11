@@ -76,8 +76,11 @@ const RecruitFunnelPanel: React.FC = () => {
     <section className="rounded-[1.5rem] border border-border/70 bg-card p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">ภาพรวมงานสรรหา</h2>
-          <p className="text-[11px] text-muted-foreground">
+          {/* หัวเป็นป้ายทองแบบเดียวกับ section อื่นบนบอร์ด — ภาษาเดียวกันทั้งหน้า */}
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+            ภาพรวมงานสรรหา
+          </h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
             ยอดจากระบบเดิม (iRecruit) · นับหัวคน เอาผลล่าสุดของแต่ละคน · กดขั้นตอนเพื่อดูรายละเอียด
           </p>
         </div>

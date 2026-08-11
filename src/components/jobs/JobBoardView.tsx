@@ -284,7 +284,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           ⚠️ เจ้าหน้าที่เท่านั้น — บอร์ดตัวนี้ใช้เป็นหน้าสาธารณะด้วย ยอดภายในห้ามหลุดออกไป
         */}
         {isStaff ? (
-          <div className="mt-4">
+          <div className="mt-6">
             <RecruitFunnelPanel />
           </div>
         ) : null}
@@ -298,7 +298,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           ใส่ปุ่มไปก็เป็นปุ่มหลอก · การกดการ์ด = สร้างลิงก์ของประเภทนั้น ซึ่งทำได้จริง
         */}
         {isStaff && postings.some((p) => p.standaloneKind) ? (
-          <div className="mt-4">
+          <div className="mt-6">
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
               กล่องลอย (ไม่ผูกใบขอ)
             </p>
@@ -428,7 +428,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {isStaff ? (
+          <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+            ประกาศจากใบขอ
+          </p>
+        ) : null}
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleJobs.map((job) => (
             <Card
               key={job.id}
