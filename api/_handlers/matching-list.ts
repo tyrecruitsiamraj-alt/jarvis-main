@@ -5,7 +5,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { listProposalsForJobs } from '../_lib/candidateProposals.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
 import { loadLumosJobCallSummaryMap, type LumosJobCallSummary } from '../_lib/lumosDispatch.js';
@@ -54,7 +54,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
-    const departmentScope = await loadUserDepartmentScope(req.user);
+    const departmentScope = await loadMatchingBuScope(req.user);
 
     // ท่อเดียวกับ feed หลักของหน้า Matching เดิม: ใบขอเปิด + ผู้รับผิดชอบ/หมายเหตุ/สถานะทำงาน + urgency
     const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];

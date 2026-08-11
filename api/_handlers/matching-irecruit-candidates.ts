@@ -6,7 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchIrecruitCandidatesForJob } from '../_lib/irecruitCandidateMatcher.js';
@@ -43,7 +43,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     // จำกัดตามแผนก — ห้ามอ้าง jobId ข้ามแผนกเพื่อดึงผู้สมัคร iRecruit ของใบขออื่น
-    const job = await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user));
+    const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
     }

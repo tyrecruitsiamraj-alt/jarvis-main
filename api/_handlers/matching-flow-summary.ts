@@ -17,7 +17,7 @@ import {
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
 import { jobPositionLabel } from '../_lib/lumosDispatch.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
@@ -123,7 +123,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
   if (method !== 'GET') return sendError(res, 405, 'Method not allowed', 'Read-only summary');
 
   try {
-    const departmentScope = await loadUserDepartmentScope(req.user);
+    const departmentScope = await loadMatchingBuScope(req.user);
 
     // ── ใบขอเปิดอยู่ (ท่อเดียวกับหน้า Matching — จำกัดตามแผนกเหมือนกัน)
     const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];
