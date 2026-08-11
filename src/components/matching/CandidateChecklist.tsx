@@ -29,6 +29,11 @@ const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
 };
 
 export function CheckChip({ label, verdict }: { label: string; verdict: CheckVerdict }) {
+  /**
+   * ไม่รู้ = ไม่มีชิป — "เพศ ?" ไม่ช่วยตัดสินใจอะไร มีแต่ทำให้การ์ดรก
+   * (เจ้าของติง 11 ส.ค. 2569) · เกณฑ์ที่รู้ผลจริง (✓/!/×) ยังโชว์ครบตามลำดับเดิม
+   */
+  if (verdict === 'unknown') return null;
   const meta = CHECK_META[verdict];
   return (
     <span className={TONE[meta.tone].chip}>

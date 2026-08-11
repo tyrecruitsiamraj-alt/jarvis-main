@@ -297,10 +297,10 @@ function nearestBranchForBoardCandidate(
  * ความมั่นใจว่าผู้สมัครอยู่ใกล้สาขาไหน — สีมาจาก token กลาง (designTokens) ไม่เขียนสีซ้ำที่หน้านี้
  * ฟันธงได้ = success · ยังต้องเช็คเอง = warn · รู้แค่จังหวัด = info (ยังรอได้) · ไม่รู้เลย = neutral
  */
-function boardBranchProximityMeta(assignment: NearestBranchAssignment | null): { label: string; cls: string } {
-  if (!assignment || assignment.proximity_rank === 4) {
-    return { label: 'ยังระบุสาขาใกล้สุดไม่ได้', cls: cn(TONE.neutral.soft, DASH.muted) };
-  }
+function boardBranchProximityMeta(assignment: NearestBranchAssignment | null): { label: string; cls: string } | null {
+  // ระบุไม่ได้ = ไม่มีชิป — ชิปที่บอกว่า "ไม่รู้" ไม่ช่วยตัดสินใจ มีแต่ทำให้การ์ดรก
+  // (เจ้าของติง 11 ส.ค. 2569 ว่าการ์ด "ดูรก ๆ") · เหตุผลเต็มยังดูได้ในรายละเอียด
+  if (!assignment || assignment.proximity_rank === 4) return null;
   const branchName = assignment.branch.branch_name_clean;
   if (assignment.proximity_rank === 0) {
     return { label: `ใกล้สาขา ${branchName} · เขตตรง`, cls: cn(TONE.success.soft, TONE.success.value) };
@@ -2939,6 +2939,8 @@ const MatchingPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setCandDetail(m)}
+                          // บรรทัด "แตะเพื่อดูรายละเอียด →" ถูกถอด (การ์ดรก) — คงคำใบ้ไว้ใน title
+                          title="แตะเพื่อดูรายละเอียด"
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -3012,17 +3014,19 @@ const MatchingPage: React.FC = () => {
                               </span>
                             ) : null}
                           </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span
-                              title={branchAssignment?.proximity_reason || 'ข้อมูลพื้นที่ไม่พอสำหรับเทียบสาขา'}
-                              className={cn(
-                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
-                                branchProximity.cls,
-                              )}
-                            >
-                              <MapPin className="h-2.5 w-2.5" /> {branchProximity.label}
-                            </span>
-                          </div>
+                          {branchProximity ? (
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span
+                                title={branchAssignment?.proximity_reason || undefined}
+                                className={cn(
+                                  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                  branchProximity.cls,
+                                )}
+                              >
+                                <MapPin className="h-2.5 w-2.5" /> {branchProximity.label}
+                              </span>
+                            </div>
+                          ) : null}
                           <div className="mt-1 flex flex-wrap items-center gap-1">
                             {/* คะแนนที่ใช้เรียงลิสต์นี้ — ชี้เมาส์ดูที่มาของคะแนนรายเกณฑ์ */}
                             <span
@@ -3046,8 +3050,7 @@ const MatchingPage: React.FC = () => {
                               screening={screeningByRef[String(m.card_id)]}
                             />
                           </div>
-                          {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 dark:text-slate-300 line-clamp-2">— {m.reason}</p> : null}
-                          <div className="mt-1 text-[10px] font-medium text-sky-600 dark:text-sky-300">แตะเพื่อดูรายละเอียด →</div>
+                          {m.reason ? <p className="mt-1 text-[11px] italic text-slate-600 dark:text-slate-300 line-clamp-1">— {m.reason}</p> : null}
                           </button>
                         </div>
                         {lumosRow ? (
