@@ -107,7 +107,7 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
   // ⚠️ ข้ามขั้นอนุมัติแล้วต้องบันทึกว่า **คนไหน** เป็นคนสั่ง ไม่ใช่ 'ระบบ' ลอย ๆ
   // ข้ามขั้นเพราะเจ้าของสั่งให้ไม่มีลูปอนุมัติ (11 ส.ค. 2569) — ไม่ใช่เพราะไม่มีคนสั่ง
   // ถ้าเขียนว่า 'ระบบ' ทั้งที่คนกดปุ่มเอง audit จะตอบไม่ได้ว่าใครสั่งโทรหาผู้สมัคร
-  // ไม่มีชื่อคนจริง (assist/auto จัดชุดเอง) ค่อยตกไปที่ 'ระบบ (โหมดอัตโนมัติ)'
+  // ไม่มีชื่อคนจริง (ระบบจัดชุดเอง) ค่อยตกไปที่ 'ระบบ (โหมดอัตโนมัติ)'
   const approvedByName = input.autoApprove
     ? (input.createdByName ?? 'ระบบ (โหมดอัตโนมัติ)')
     : null;
@@ -144,7 +144,8 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
   }
 
   // เด้งบอกคนอนุมัติ — เดิมชุดรออนุมัตินอนเงียบจนกว่าจะมีคนเปิดหน้าจอเอง
-  // ครอบคลุมทุกทางเข้า (ปุ่มในหน้า Matching + โหมด assist จัดชุดเอง) เพราะทุกทางผ่านที่นี่
+  // ⚠️ ตั้งแต่ถอดโหมด assist (11 ส.ค. 2569) ไม่มีทางไหนสร้างชุด pending_approval แล้ว
+  // บล็อกนี้จึงไม่ทำงานในทางปฏิบัติ — เก็บไว้เพราะ store ยังรับ autoApprove: false ได้
   // notifyRoles กลืน error เอง — ชุดต้องสร้างสำเร็จแม้ตารางแจ้งเตือนยังไม่ migrate
   if (status === 'pending_approval') {
     await notifyRoles(['admin', 'supervisor'], {

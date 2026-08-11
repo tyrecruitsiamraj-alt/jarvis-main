@@ -59,7 +59,6 @@ const LumosDispatchModeTab: React.FC = () => {
   };
 
   const autoCount = LUMOS_DISPATCH_TRIGGERS.filter((t) => config[t] === 'auto').length;
-  const assistCount = LUMOS_DISPATCH_TRIGGERS.filter((t) => config[t] === 'assist').length;
 
   return (
     <div className="space-y-4">
@@ -78,9 +77,7 @@ const LumosDispatchModeTab: React.FC = () => {
         )}
       >
         {autoCount === 0
-          ? assistCount === 0
-            ? 'ตอนนี้ปิด auto ทุกจุด — ระบบจะไม่โทรหาใครเองจนกว่าจะมีคนกดส่ง'
-            : `ระบบจัดชุดให้ ${assistCount} จุด — ยังไม่โทรจนกว่าจะมีคนอนุมัติที่หน้า Follow`
+          ? 'ตอนนี้ปิด auto ทุกจุด — ระบบจะไม่โทรหาใครเองจนกว่าจะมีคนกดส่ง'
           : `เปิด auto อยู่ ${autoCount} จุด — ระบบจะโทรหาผู้สมัครเองเมื่อถึงจุดนั้น`}
       </div>
 
@@ -99,8 +96,7 @@ const LumosDispatchModeTab: React.FC = () => {
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {modesForTrigger(trigger).map((mode) => {
                   const active = config[trigger] === mode;
-                  const tone =
-                    mode === 'auto' ? TONE.warn : mode === 'assist' ? TONE.info : TONE.neutral;
+                  const tone = mode === 'auto' ? TONE.warn : TONE.neutral;
                   return (
                     <button
                       key={mode}

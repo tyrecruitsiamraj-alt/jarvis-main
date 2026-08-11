@@ -194,17 +194,14 @@ export function LumosSendBar({
   onClear,
   busy,
   creatingBatch,
-  assistOnly,
 }: {
   count: number;
   onSend: () => void;
-  /** สร้างชุดรออนุมัติแทนการส่งเข้าคิวทันที — หัวหน้าอนุมัติที่หน้างานโทร */
+  /** ตั้งเป็นชุดที่หน่วงไว้ก่อน — เข้าคิวเองเมื่อพ้นช่วงถอนคำ */
   onCreateBatch: () => void;
   onClear: () => void;
   busy: boolean;
   creatingBatch: boolean;
-  /** จุดนี้อยู่ใต้โหมด assist — ของใหม่ต้องผ่านอนุมัติเสมอ จึงไม่มีปุ่มส่งเข้าคิวตรง */
-  assistOnly: boolean;
 }) {
   if (count === 0) return null;
   return (
@@ -234,18 +231,17 @@ export function LumosSendBar({
           <ClipboardCheck className="h-3 w-3" />
           {creatingBatch ? 'กำลังตั้งคิว…' : `ตั้งคิวโทร (${count})`}
         </button>
-        {/* จุดที่เปิด assist: ของใหม่ต้องผ่านอนุมัติเสมอ — ซ่อนปุ่มส่งตรง
-            ไม่งั้นมีสองปุ่มที่ขัดนโยบายกันเองให้คนงงว่ากดอันไหน */}
-        {assistOnly ? null : (
-          <button
-            type="button"
-            disabled={busy || creatingBatch}
-            onClick={onSend}
-            className="jarvis-btn-primary"
-          >
-            <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
-          </button>
-        )}
+        {/* ⚠️ เคยซ่อนปุ่มนี้ตอนจุดนั้นเปิดโหมด assist — assist ถูกถอดทิ้ง 11 ส.ค. 2569
+            พร้อมลูปอนุมัติ · สองปุ่มไม่ขัดนโยบายกันเองแล้ว: อันนี้เข้าคิวทันที
+            อีกอันหน่วง 10 นาทีแล้วถอนคำได้ */}
+        <button
+          type="button"
+          disabled={busy || creatingBatch}
+          onClick={onSend}
+          className="jarvis-btn-primary"
+        >
+          <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
+        </button>
       </div>
     </div>
   );

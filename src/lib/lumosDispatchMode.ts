@@ -11,10 +11,14 @@ export type LumosDispatchTrigger = (typeof LUMOS_DISPATCH_TRIGGERS)[number];
 
 /**
  * manual = คนติ๊กเลือกแล้วกดส่งเอง
- * assist = ระบบจัดชุดให้ คนกดอนุมัติทีเดียว (มีช่วงถอนคำก่อนเข้าคิวจริง)
  * auto   = ส่งเองทันทีเมื่อถึงจุดนั้น
+ *
+ * ⚠️ เคยมีโหมด `assist` (ระบบจัดชุดให้ คนกดอนุมัติทีเดียว) — **ถอดออก 11 ส.ค. 2569**
+ * เพราะเจ้าของสั่งเลิกลูปอนุมัติทั้งชุด (แผงอนุมัติถูกเอาออกจากทุกหน้าไปแล้ว)
+ * assist ที่ไม่มีคนอนุมัติ = ชุดค้างถาวรแบบเงียบสนิท ซึ่งเกิดมาแล้วจริงบนฐาน
+ * ค่าเก่าที่อาจค้างในตารางจะถูก normalize เป็น `manual` เอง (ทางที่ปลอดภัยกว่า)
  */
-export const LUMOS_DISPATCH_MODES = ['manual', 'assist', 'auto'] as const;
+export const LUMOS_DISPATCH_MODES = ['manual', 'auto'] as const;
 export type LumosDispatchMode = (typeof LUMOS_DISPATCH_MODES)[number];
 
 export type LumosDispatchModeConfig = Record<LumosDispatchTrigger, LumosDispatchMode>;
@@ -38,7 +42,11 @@ export function isLumosDispatchMode(v: unknown): v is LumosDispatchMode {
   return typeof v === 'string' && (LUMOS_DISPATCH_MODES as readonly string[]).includes(v);
 }
 
-/** กันค่าจาก DB/ผู้ใช้เพี้ยน — คีย์ที่ไม่รู้จักถูกทิ้ง ค่าที่ไม่รู้จักกลับเป็น manual */
+/**
+ * กันค่าจาก DB/ผู้ใช้เพี้ยน — คีย์ที่ไม่รู้จักถูกทิ้ง ค่าที่ไม่รู้จักกลับเป็น manual
+ * ⚠️ รวมถึงค่า `assist` ที่อาจค้างในตารางจากก่อน 11 ส.ค. 2569 — ตกเป็น manual
+ * ไม่ใช่ auto (เดาผิดทาง auto = โทรหาผู้สมัครจริงโดยไม่มีใครสั่ง กู้คืนไม่ได้)
+ */
 export function normalizeLumosDispatchMode(raw: unknown): LumosDispatchModeConfig {
   const out: LumosDispatchModeConfig = { ...DEFAULT_LUMOS_DISPATCH_MODE };
   if (typeof raw !== 'object' || raw === null) return out;
@@ -46,8 +54,6 @@ export function normalizeLumosDispatchMode(raw: unknown): LumosDispatchModeConfi
   for (const trigger of LUMOS_DISPATCH_TRIGGERS) {
     const v = src[trigger];
     if (!isLumosDispatchMode(v)) continue;
-    // assist ที่จุดที่ไม่รองรับ → manual (ปลอดภัยกว่า ไม่ใช่ auto)
-    if (v === 'assist' && !TRIGGERS_WITH_ASSIST.includes(trigger)) continue;
     out[trigger] = v;
   }
   return out;
@@ -71,18 +77,13 @@ export const LUMOS_TRIGGER_DETAIL: Record<LumosDispatchTrigger, string> = {
 
 export const LUMOS_MODE_LABEL: Record<LumosDispatchMode, string> = {
   manual: 'คนกดส่งเอง',
-  assist: 'ระบบจัดชุด คนอนุมัติ',
   auto: 'ส่งอัตโนมัติ',
 };
 
 /**
- * assist ใช้ได้เฉพาะจุดที่ "ระบบเป็นคนเริ่ม" — ถึงมีความหมายว่าจัดชุดรออนุมัติ
- * follow_entry เกิดจากคนกรอกเอง (เท่ากับอนุมัติไปแล้ว) จึงมีแค่ manual/auto
+ * ทุกจุดมีตัวเลือกเท่ากันแล้ว — เหลือฟังก์ชันไว้เพราะหน้าตั้งค่าเรียกอยู่
+ * และถ้าวันไหนมีโหมดที่ใช้ได้เฉพาะบางจุดอีก จะได้เติมที่นี่ที่เดียวเหมือนเดิม
  */
-export const TRIGGERS_WITH_ASSIST: LumosDispatchTrigger[] = ['board_match', 'irecruit_search'];
-
-export function modesForTrigger(trigger: LumosDispatchTrigger): LumosDispatchMode[] {
-  return TRIGGERS_WITH_ASSIST.includes(trigger)
-    ? ['manual', 'assist', 'auto']
-    : ['manual', 'auto'];
+export function modesForTrigger(_trigger: LumosDispatchTrigger): LumosDispatchMode[] {
+  return ['manual', 'auto'];
 }

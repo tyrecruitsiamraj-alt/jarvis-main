@@ -15,8 +15,7 @@ import {
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
 import { saveBoardMatchResult } from './boardMatchStore.js';
 import { enqueueLumosReminderForBoardMatch } from './lumosDispatch.js';
-import { isAssistDispatchEnabled, isAutoDispatchEnabled } from './lumosDispatchMode.js';
-import { createCallBatch } from './callBatchStore.js';
+import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -354,28 +353,6 @@ export async function matchBoardCandidatesForJob(
   // เปลี่ยนที่หน้าตั้งค่า > โหมดส่งงานให้ Lumos — ไม่ต้องแก้โค้ด
   if (await isAutoDispatchEnabled('board_match')) {
     await enqueueLumosReminderForBoardMatch(job, result);
-  } else if (await isAssistDispatchEnabled('board_match')) {
-    // assist: จัดชุดรออนุมัติแทนการเข้าคิวตรง — คนกดอนุมัติทีเดียวแล้วยังถอนคำได้
-    // ล้มก็ไม่ทำให้ flow matching พัง (เหมือน auto ที่ error-safe ภายใน)
-    try {
-      const picked = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
-      if (picked.length > 0) {
-        await createCallBatch({
-          channel: 'reminder',
-          jobId: result.jobId,
-          requestNo: result.request_no ?? null,
-          items: picked.map((m) => ({
-            source: 'board' as const,
-            candidateRef: String(m.card_id),
-            candidateName: m.full_name ?? null,
-          })),
-          note: 'ระบบจัดชุดให้หลัง AI แมทเสร็จ (โหมด assist)',
-          createdByName: 'ระบบ',
-        });
-      }
-    } catch (e) {
-      logError('call-batch.assist.board-match.failed', e, { jobId: result.jobId });
-    }
   }
   return result;
 }

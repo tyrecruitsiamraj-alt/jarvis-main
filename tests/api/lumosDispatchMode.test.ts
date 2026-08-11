@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LUMOS_DISPATCH_MODE,
   LUMOS_DISPATCH_TRIGGERS,
-  TRIGGERS_WITH_ASSIST,
   isLumosDispatchMode,
   isLumosDispatchTrigger,
   modesForTrigger,
@@ -41,7 +40,8 @@ describe('ความหมายของโหมดส่งงานให�
     expect(isLumosDispatchTrigger('อื่น')).toBe(false);
     expect(isLumosDispatchMode('manual')).toBe(true);
     expect(isLumosDispatchMode('auto')).toBe(true);
-    expect(isLumosDispatchMode('assist')).toBe(true);
+    // assist ถูกถอดทิ้ง 11 ส.ค. 2569 — ต้องไม่ถูกรับเป็นค่าที่ใช้ได้อีก
+    expect(isLumosDispatchMode('assist')).toBe(false);
     expect(isLumosDispatchMode('draft')).toBe(false);
   });
 });
@@ -61,18 +61,24 @@ const { getLumosDispatchMode, isAutoDispatchEnabled, setLumosDispatchMode, clear
 
 const undefinedTable = Object.assign(new Error('relation does not exist'), { code: '42P01' });
 
-describe('assist — มีเฉพาะจุดที่ระบบเป็นคนเริ่ม', () => {
-  it('จุดที่ระบบเริ่มเองเลือก assist ได้', () => {
-    for (const t of TRIGGERS_WITH_ASSIST) {
-      expect(modesForTrigger(t)).toContain('assist');
-      expect(normalizeLumosDispatchMode({ [t]: 'assist' })[t]).toBe('assist');
+/**
+ * โหมด assist (ระบบจัดชุด คนอนุมัติ) ถูกถอดทิ้ง 11 ส.ค. 2569 พร้อมลูปอนุมัติ
+ *
+ * ⚠️ **ค่าเก่าที่ค้างในตารางต้องตกเป็น `manual` ไม่ใช่ `auto`** — ตารางบนฐาน
+ * ตั้งค่าไว้ก่อนหน้านี้ได้ ถ้า normalize ผิดทางจะกลายเป็น "ระบบโทรหาผู้สมัครเอง
+ * โดยไม่มีใครสั่ง" ซึ่งกู้คืนไม่ได้ · นี่คือเหตุผลเดียวที่ยังต้องมีเทสต์เรื่อง assist
+ */
+describe('assist ที่ถอดทิ้งแล้ว — ค่าเก่าต้องตกเป็น manual', () => {
+  it('ทุกจุดเลือกได้แค่ manual กับ auto', () => {
+    for (const t of LUMOS_DISPATCH_TRIGGERS) {
+      expect(modesForTrigger(t)).toEqual(['manual', 'auto']);
     }
   });
 
-  it('รายการติดตามที่คนกรอกเอง = อนุมัติแล้วในตัว จึงไม่มี assist', () => {
-    expect(modesForTrigger('follow_entry')).toEqual(['manual', 'auto']);
-    // ยัด assist เข้ามาต้องตกเป็น manual ไม่ใช่ auto (ปลอดภัยกว่า)
-    expect(normalizeLumosDispatchMode({ follow_entry: 'assist' }).follow_entry).toBe('manual');
+  it('ค่า assist ที่ค้างในตาราง → manual ทุกจุด (ห้ามเป็น auto)', () => {
+    for (const t of LUMOS_DISPATCH_TRIGGERS) {
+      expect(normalizeLumosDispatchMode({ [t]: 'assist' })[t]).toBe('manual');
+    }
   });
 
   it('ทุกจุดต้องมี manual กับ auto เสมอ', () => {

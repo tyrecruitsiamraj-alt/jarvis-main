@@ -106,8 +106,6 @@ import {
   normText,
   type CheckVerdict,
 } from '@/lib/candidateVerdicts';
-import { fetchLumosDispatchMode } from '@/lib/lumosDispatchModeApi';
-import type { LumosDispatchModeConfig } from '@/lib/lumosDispatchMode';
 import { JOB_FAMILIES, classifyJobFamily, candidateMatchesFamily, fallbackKeywords } from '@/lib/jobFamilyLexicon';
 import {
   type IrecruitCandidateMatch,
@@ -858,24 +856,10 @@ const MatchingPage: React.FC = () => {
   const [pendingBatches, setPendingBatches] = useState<CallBatch[]>([]);
   const [batchCancellingId, setBatchCancellingId] = useState<string | null>(null);
 
-  /**
-   * โหมดส่งงานของจุด board_match/irecruit_search — ไว้ยุบปุ่มในแถบติ๊กเลือก
-   * จุดไหนเปิด assist = ของใหม่ต้อง "ผ่านการอนุมัติ" เสมอ จึงซ่อนปุ่มส่งเข้าคิวตรง
-   * เหลือแต่ "ตั้งชุดรออนุมัติ" — ไม่งั้นมีสองปุ่มที่ขัดนโยบายกันเองให้คนงง
-   * อ่านค่าไม่ได้ = ถือเป็น manual (โชว์ทั้งสองปุ่มแบบเดิม) ตามหลัก fail-safe
-   */
-  const [dispatchModeCfg, setDispatchModeCfg] = useState<LumosDispatchModeConfig | null>(null);
-  useEffect(() => {
-    void fetchLumosDispatchMode()
-      .then(setDispatchModeCfg)
-      .catch(() => setDispatchModeCfg(null));
-  }, []);
-  // ซ่อนปุ่มส่งตรงเมื่อ "ทุกฝั่งที่ติ๊กไว้" อยู่ใต้ assist — ติ๊กปนฝั่งที่ยัง manual อยู่ก็ยังส่งตรงได้
-  const assistOnly =
-    (lumosSelectedBoard.length === 0 || dispatchModeCfg?.board_match === 'assist') &&
-    (lumosSelectedIrecruit.length === 0 || dispatchModeCfg?.irecruit_search === 'assist') &&
-    (lumosSelectedBoard.length > 0 || lumosSelectedIrecruit.length > 0) &&
-    dispatchModeCfg !== null;
+  /* ⚠️ เคยอ่านโหมดส่งงาน (`dispatchModeCfg`) มาซ่อนปุ่ม "ส่ง AI โทร" ตอนจุดนั้นเปิดโหมด
+     assist — โหมด assist ถูกถอดทิ้ง 11 ส.ค. 2569 พร้อมลูปอนุมัติ ตัวแปรนี้จึงตายตาม
+     ตอนนี้ทั้งสองปุ่มโชว์เสมอ: "ส่ง AI โทร" = เข้าคิวทันที · "ตั้งคิวโทร" = หน่วง 10 นาที
+     ถอนคำได้ — ไม่มีนโยบายอะไรที่ทำให้สองปุ่มขัดกันเองอีกแล้ว */
   const [lumosError, setLumosError] = useState<string | null>(null);
   const [lumosNotice, setLumosNotice] = useState<string | null>(null);
   const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
@@ -1950,9 +1934,8 @@ const MatchingPage: React.FC = () => {
             ปุ่มในแถบติ๊กเลือกจึงเป็น "ตั้งคิวโทร (n)" ที่สร้างชุด `approved` เลย
             แล้วคงช่วงถอนคำ 10 นาทีไว้เป็นตัวกันพลาด (ดู CallBatchUndoStrip ใต้แถบติ๊กเลือก)
 
-            ⚠️ **ที่ยังเป็นทางตันอยู่: ชุดจากโหมด assist** (boardCandidateMatcher /
-            matching-irecruit-candidates สร้างเป็น `pending_approval`) — assist ปิดอยู่ทุกจุด
-            ตอนนี้จึงไม่มีชุดใหม่เกิด แต่ถ้าเปิด assist โดยไม่มีที่อนุมัติ ชุดจะค้างเงียบ ๆ อีก */}
+            โหมด assist (ระบบจัดชุด คนอนุมัติ) ถูกถอดทิ้งในวันเดียวกัน — มันเป็นทางเดียว
+            ที่เหลือที่ยังผลิตชุด `pending_approval` ได้ ซึ่งไม่มีใครอนุมัติได้แล้ว */}
 
         {/* ⚠️ กล่องตัวกรอง (ด่วนเท่านั้น · BU · หน่วยงาน · ชิปสถานะ 6 ตัว) เคยอยู่ตรงนี้
             — เจ้าของสั่งเอาออก 10 ส.ค. 2569
@@ -2787,7 +2770,6 @@ const MatchingPage: React.FC = () => {
                 busy={lumosSending}
                 onClear={clearLumosSelection}
                 creatingBatch={batchCreating}
-                assistOnly={assistOnly}
                 onCreateBatch={() => void createBatchFromSelection()}
                 onSend={() => setLumosConfirmOpen(true)}
               />
@@ -3384,8 +3366,7 @@ const MatchingPage: React.FC = () => {
                     busy={lumosSending}
                     onClear={clearLumosSelection}
                     creatingBatch={batchCreating}
-                    assistOnly={assistOnly}
-                    onCreateBatch={() => void createBatchFromSelection()}
+                        onCreateBatch={() => void createBatchFromSelection()}
                     onSend={() => setLumosConfirmOpen(true)}
                   />
                   {/* แถบถอนคำอยู่ใต้ทั้งสองแถบติ๊กเลือก — ฝั่ง iRecruit อยู่ท้ายหน้า

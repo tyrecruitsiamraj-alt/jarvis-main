@@ -11,8 +11,7 @@ import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchIrecruitCandidatesForJob } from '../_lib/irecruitCandidateMatcher.js';
 import { enqueueLumosInterviewForIrecruit } from '../_lib/lumosDispatch.js';
-import { isAssistDispatchEnabled, isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
-import { createCallBatch } from '../_lib/callBatchStore.js';
+import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { logError } from '../_lib/logger.js';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -59,27 +58,6 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // ค้นเสร็จ → ส่งเข้าคิว Lumos เส้น interview **เฉพาะเมื่อตั้งโหมดเป็น auto** (error-safe ภายใน)
     if (await isAutoDispatchEnabled('irecruit_search')) {
       await enqueueLumosInterviewForIrecruit(job as Record<string, unknown>, result);
-    } else if (await isAssistDispatchEnabled('irecruit_search')) {
-      // assist: จัดชุดรออนุมัติแทนการเข้าคิวตรง — ล้มก็ไม่ทำให้ผลค้นหาพัง
-      try {
-        const picked = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
-        if (picked.length > 0) {
-          await createCallBatch({
-            channel: 'interview',
-            jobId: result.jobId,
-            requestNo: result.request_no ?? null,
-            items: picked.map((m) => ({
-              source: 'irecruit' as const,
-              candidateRef: String(m.id),
-              candidateName: m.full_name ?? null,
-            })),
-            note: 'ระบบจัดชุดให้หลังค้นหา iRecruit (โหมด assist)',
-            createdByName: 'ระบบ',
-          });
-        }
-      } catch (e) {
-        logError('call-batch.assist.irecruit.failed', e, { jobId: result.jobId });
-      }
     }
 
     res.setHeader?.('Cache-Control', 'no-store');
