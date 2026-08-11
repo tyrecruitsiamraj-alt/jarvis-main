@@ -9,6 +9,8 @@
  * `tests/api/callBatch.test.ts` — ไฟล์นี้คุมเฉพาะ "เงื่อนไขที่ยิงลง DB จริง"
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 vi.mock('../../api/_lib/postgres.js', () => ({
   dbQuery: vi.fn(),
@@ -145,6 +147,47 @@ describe('createCallBatch — สร้างชุด', () => {
     expect(String(insert[0])).toContain(`interval '${CALL_BATCH_UNDO_MINUTES} minutes'`);
     // ไม่มีใครต้องอนุมัติแล้ว เด้งไปก็เป็นเสียงรบกวน
     expect(vi.mocked(notifyRoles)).not.toHaveBeenCalled();
+  });
+
+  it('ข้ามขั้นอนุมัติโดยคนกดเอง → audit ต้องได้ชื่อคนนั้น ไม่ใช่ "ระบบ"', async () => {
+    // ข้ามขั้นเพราะไม่มีลูปอนุมัติแล้ว ไม่ใช่เพราะไม่มีคนสั่ง — ถ้าเขียน 'ระบบ' ทับ
+    // จะตอบไม่ได้ว่าใครสั่งโทรหาผู้สมัคร ซึ่งเป็นคำถามแรกเวลามีเรื่อง
+    mockDb({ batchRows: [batchRow({ status: 'approved' })] });
+    await createCallBatch({
+      channel: 'reminder',
+      jobId: 'j1',
+      autoApprove: true,
+      createdByName: 'ตั้ม',
+      items: [{ source: 'board', candidateRef: '1805' }],
+    });
+    const insert = callMatching(/insert into\s+lumos_call_batches/i)!;
+    expect((insert[1] as unknown[])[7]).toBe('ตั้ม');
+    // ชื่อต้องเข้าไปทาง bind param ไม่ใช่ต่อสตริงลง SQL
+    expect(String(insert[0])).not.toContain('ตั้ม');
+  });
+
+  it('ระบบจัดชุดเอง (ไม่มีชื่อคน) → ตกไปที่ "ระบบ (โหมดอัตโนมัติ)" ไม่ใช่ null', async () => {
+    mockDb({ batchRows: [batchRow({ status: 'approved' })] });
+    await createCallBatch({
+      channel: 'reminder',
+      jobId: 'j1',
+      autoApprove: true,
+      items: [{ source: 'board', candidateRef: '1805' }],
+    });
+    expect((callMatching(/insert into\s+lumos_call_batches/i)![1] as unknown[])[7]).toBe(
+      'ระบบ (โหมดอัตโนมัติ)',
+    );
+  });
+
+  it('ไม่ข้ามขั้น → approved_by_name ต้องว่าง (ยังไม่มีใครอนุมัติ)', async () => {
+    mockDb({ batchRows: [batchRow()] });
+    await createCallBatch({
+      channel: 'reminder',
+      jobId: 'j1',
+      createdByName: 'ตั้ม',
+      items: [{ source: 'board', candidateRef: '1805' }],
+    });
+    expect((callMatching(/insert into\s+lumos_call_batches/i)![1] as unknown[])[7]).toBeNull();
   });
 
   it('ติ๊กคนซ้ำในชุดเดียว → กันที่ DB ด้วย on conflict do nothing ไม่ใช่เชื่อฝั่งหน้าเว็บ', async () => {
@@ -360,5 +403,51 @@ describe('อ่านชุด — การจับคู่คนเข้�
     vi.mocked(dbQuery).mockRejectedValue(otherDbError);
     await expect(getCallBatch('b-1')).rejects.toThrow('connection lost');
     await expect(listCallBatches()).rejects.toThrow('connection lost');
+  });
+});
+
+/**
+ * ทางตันที่เพิ่งปิดไป (11 ส.ค. 2569) — กันไม่ให้กลับมาโดยไม่มีใครรู้
+ *
+ * แผงอนุมัติถูกเอาออกจากทุกหน้าเมื่อ 10 ส.ค. ชุดที่สร้างเป็น `pending_approval`
+ * จึงค้างถาวร (ตัวปล่อยแตะเฉพาะ `approved`) — บนฐานจริงค้างไป 1 ชุด 4 วันโดยไม่มีสัญญาณ
+ * เจ้าของเคาะให้เส้นนี้ข้ามขั้นอนุมัติ แล้วใช้ "ช่วงถอนคำ" เป็นตัวกันพลาดแทน
+ *
+ * ถอด `autoApprove` ออกเมื่อไหร่ = ทางตันกลับมาทันทีแบบ **ไม่มี error ไม่มี log**
+ * ผู้ใช้จะเห็นแค่ "กดแล้วไม่มีอะไรเกิดขึ้น" ซึ่งเป็นอาการเดียวกับที่เพิ่งแก้ไป
+ * เทสต์นี้จึงอ่านจากซอร์สตรง ๆ — เป็นด่านเดียวที่จับได้
+ */
+describe('source guard — เส้นสร้างชุดจากหน้า Matching ต้องไม่กลับไปเป็นทางตัน', () => {
+  const handlerSrc = readFileSync(
+    path.resolve(process.cwd(), 'api/_handlers/lumos-call-batches.ts'),
+    'utf8',
+  );
+
+  it('POST ต้องส่ง autoApprove: true เข้า createCallBatch', () => {
+    expect(handlerSrc).toMatch(/autoApprove:\s*true/);
+  });
+
+  it('ยังต้องมีทางยกเลิก และไม่ผูกกับสิทธิ์อนุมัติ — ไม่งั้นช่วงถอนคำถอนไม่ได้จริง', () => {
+    const cancelBlock = handlerSrc.slice(handlerSrc.indexOf("body.action === 'cancel'"));
+    expect(cancelBlock).toContain('cancelCallBatch');
+    expect(cancelBlock.slice(0, cancelBlock.indexOf('cancelCallBatch'))).not.toContain('canApprove');
+  });
+
+  it('หน้า Matching ต้องมีแถบถอนคำจริง ไม่ใช่แค่หน่วงเวลาแล้วไม่มีปุ่ม', () => {
+    // ⚠️ เช็คเป็น "แท็กที่ถูก render จริง" ไม่ใช่ substring ของชื่อ — เคยเขียนแบบ
+    // toContain('CallBatchUndoStrip') แล้ว mutation test ผ่านหน้าตาเฉย (ชื่อที่ถูกแก้
+    // เป็น CallBatchUndoStripXX ก็ยังมีคำนั้นอยู่ในไฟล์)
+    const page = readFileSync(path.resolve(process.cwd(), 'src/pages/matching/MatchingPage.tsx'), 'utf8');
+    const used = page.match(/<CallBatchUndoStrip[\s/>]/g) ?? [];
+    // ต้องมีใต้ทั้งสองแถบติ๊กเลือก (คนของเรา + iRecruit) ไม่งั้นฝั่งหนึ่งถอนคำไม่ได้
+    expect(used.length).toBe(2);
+    expect(page).toMatch(/cancelCallBatch\(/);
+
+    // และคอมโพเนนต์ต้อง export ออกมาจริง — import ตายเงียบตอน build เท่านั้น
+    const panels = readFileSync(
+      path.resolve(process.cwd(), 'src/components/matching/LumosPanels.tsx'),
+      'utf8',
+    );
+    expect(panels).toMatch(/export function CallBatchUndoStrip\b/);
   });
 });

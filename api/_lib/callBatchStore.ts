@@ -93,7 +93,7 @@ export type CreateBatchInput = {
   note?: string | null;
   createdByUserId?: string | null;
   createdByName?: string | null;
-  /** ข้ามขั้นอนุมัติ (โหมด auto ในอนาคต) — อนุมัติให้ทันทีโดยระบบ */
+  /** ข้ามขั้นอนุมัติ — อนุมัติให้ทันที แล้วปล่อยเข้าคิวเมื่อพ้นช่วงถอนคำ */
   autoApprove?: boolean;
 };
 
@@ -104,12 +104,20 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
     ? `now() + interval '${CALL_BATCH_UNDO_MINUTES} minutes'`
     : 'null';
 
+  // ⚠️ ข้ามขั้นอนุมัติแล้วต้องบันทึกว่า **คนไหน** เป็นคนสั่ง ไม่ใช่ 'ระบบ' ลอย ๆ
+  // ข้ามขั้นเพราะเจ้าของสั่งให้ไม่มีลูปอนุมัติ (11 ส.ค. 2569) — ไม่ใช่เพราะไม่มีคนสั่ง
+  // ถ้าเขียนว่า 'ระบบ' ทั้งที่คนกดปุ่มเอง audit จะตอบไม่ได้ว่าใครสั่งโทรหาผู้สมัคร
+  // ไม่มีชื่อคนจริง (assist/auto จัดชุดเอง) ค่อยตกไปที่ 'ระบบ (โหมดอัตโนมัติ)'
+  const approvedByName = input.autoApprove
+    ? (input.createdByName ?? 'ระบบ (โหมดอัตโนมัติ)')
+    : null;
+
   const { rows } = await dbQuery<BatchRow>(
     `insert into ${batchTable}
        (channel, job_id, request_no, status, release_at, created_by_user_id, created_by_name,
         approved_by_name, approved_at, note)
      values ($1,$2,$3,$4, ${releaseSql}, $5,$6,
-             ${input.autoApprove ? "'ระบบ (โหมดอัตโนมัติ)'" : 'null'},
+             $8,
              ${input.autoApprove ? 'now()' : 'null'}, $7)
      returning ${BATCH_COLS}`,
     [
@@ -120,6 +128,7 @@ export async function createCallBatch(input: CreateBatchInput): Promise<CallBatc
       input.createdByUserId ?? null,
       input.createdByName ?? null,
       input.note ?? null,
+      approvedByName,
     ],
   );
   const batch = rows[0];

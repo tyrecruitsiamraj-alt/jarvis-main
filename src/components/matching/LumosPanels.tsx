@@ -6,8 +6,10 @@ import {
   type LumosCallStatus,
   type LumosJobCallSummaryRow,
 } from '@/lib/lumosDispatchApi';
-import { ClipboardCheck, PhoneCall, X } from 'lucide-react';
+import { ClipboardCheck, PhoneCall, Undo2, X } from 'lucide-react';
 import { formatDateTimeTh } from '@/lib/dateTh';
+import { useEffect, useState } from 'react';
+import { CALL_BATCH_UNDO_MINUTES, activeItemCount, undoMsLeft, type CallBatch } from '@/lib/callBatch';
 
 // ─── แผงฝั่ง Lumos ในหน้า Matching — แยกออกจาก MatchingPage.tsx ตอนแตกไฟล์ ──────
 // ไฟล์นี้ export แต่ component เท่านั้น (ฟังก์ชันล้วน `cardNextAction` อยู่ที่
@@ -216,20 +218,21 @@ export function LumosSendBar({
         >
           ล้างที่เลือก
         </button>
-        {/* ทางเลือกที่ 2: ไม่ส่งเข้าคิวทันที แต่ตั้งเป็นชุดให้หัวหน้าอนุมัติก่อน
-            เดิมชุดเกิดได้จากโหมด assist อย่างเดียว ทั้งที่ API รองรับสร้างเองมาตั้งแต่แรก */}
+        {/* ทางเลือกที่ 2: ไม่ยิงเข้าคิวทันที แต่หน่วงไว้ก่อน — ระหว่างหน่วงยังถอนคำได้
+            เดิมปุ่มนี้ตั้งเป็น "ชุดรออนุมัติ" ซึ่งกลายเป็นทางตันตอนแผงอนุมัติถูกเอาออก
+            เจ้าของเคาะ 11 ส.ค. 2569: ข้ามขั้นอนุมัติ แต่คงช่วงถอนคำไว้เป็นตัวกันพลาด */}
         <button
           type="button"
           disabled={busy || creatingBatch}
           onClick={onCreateBatch}
-          title="ตั้งเป็นชุดรออนุมัติ — ยังไม่โทร จนกว่าหัวหน้าจะกดอนุมัติที่หน้างานโทร"
+          title={`ตั้งคิวไว้ก่อน — เข้าคิวจริงอีก ${CALL_BATCH_UNDO_MINUTES} นาที ระหว่างนี้กดยกเลิกได้`}
           className={cn(
             'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
             TONE.warn.outline,
           )}
         >
           <ClipboardCheck className="h-3 w-3" />
-          {creatingBatch ? 'กำลังสร้างชุด…' : `ตั้งชุดรออนุมัติ (${count})`}
+          {creatingBatch ? 'กำลังตั้งคิว…' : `ตั้งคิวโทร (${count})`}
         </button>
         {/* จุดที่เปิด assist: ของใหม่ต้องผ่านอนุมัติเสมอ — ซ่อนปุ่มส่งตรง
             ไม่งั้นมีสองปุ่มที่ขัดนโยบายกันเองให้คนงงว่ากดอันไหน */}
@@ -244,6 +247,72 @@ export function LumosSendBar({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** เหลือเวลา → "9:58" (ไม่ใช้ Intl/toLocaleString — ตัวนี้เดินทุกวินาที ดูกติกาข้อ 10) */
+function mmss(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const s = total % 60;
+  return `${Math.floor(total / 60)}:${s < 10 ? '0' : ''}${s}`;
+}
+
+/**
+ * แถบ "ถอนคำ" ของชุดที่เพิ่งตั้งคิวไป — นับถอยหลังจนถึงเวลาเข้าคิวจริง
+ *
+ * ⚠️ **แถบนี้คือเหตุผลที่ช่วงถอนคำยังมีความหมาย** — ปุ่ม "ตั้งคิวโทร" ข้ามขั้นอนุมัติแล้ว
+ * (เจ้าของเคาะ 11 ส.ค. 2569) ถ้าไม่มีที่กดยกเลิก ช่วง 10 นาทีจะเป็นแค่การหน่วงเฉย ๆ
+ * ที่ไม่มีใครถอนได้ = ทางตันแบบเดียวกับแผงอนุมัติที่เพิ่งเอาออก
+ *
+ * นี่ **ไม่ใช่แผงอนุมัติที่เจ้าของสั่งเอาออก** — ไม่มีปุ่มอนุมัติ ไม่ดึงรายการชุดของคนอื่น
+ * โผล่เฉพาะชุดที่ผู้ใช้คนนี้เพิ่งกดในหน้านี้ แล้วหายไปเองเมื่อหมดเวลา
+ */
+export function CallBatchUndoStrip({
+  batches,
+  onCancel,
+  cancellingId,
+}: {
+  batches: CallBatch[];
+  onCancel: (batchId: string) => void;
+  cancellingId: string | null;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  // เดินนาฬิกาเฉพาะตอนมีชุดค้างอยู่จริง — ไม่มีชุดก็ไม่ต้องมี interval ลอยอยู่เบื้องหลัง
+  useEffect(() => {
+    if (batches.length === 0) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [batches.length]);
+
+  const live = batches.filter((b) => undoMsLeft(b, now) > 0);
+  if (live.length === 0) return null;
+
+  return (
+    <div className={cn('space-y-1.5 rounded-xl border px-3 py-2', TONE.warn.soft)}>
+      {live.map((b) => (
+        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+            ตั้งคิวโทร {activeItemCount(b)} คน ·{' '}
+            <span className={TONE.warn.num}>เข้าคิวจริงในอีก {mmss(undoMsLeft(b, now))}</span>{' '}
+            <span className="font-medium text-slate-500 dark:text-slate-400">
+              (ยกเลิกได้จนกว่าจะครบ {CALL_BATCH_UNDO_MINUTES} นาที)
+            </span>
+          </p>
+          <button
+            type="button"
+            disabled={cancellingId === b.id}
+            onClick={() => onCancel(b.id)}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
+              TONE.danger.outline,
+            )}
+          >
+            <Undo2 className="h-3 w-3" />
+            {cancellingId === b.id ? 'กำลังยกเลิก…' : 'ยกเลิกชุดนี้'}
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

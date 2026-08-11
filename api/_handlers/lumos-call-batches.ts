@@ -2,16 +2,25 @@
  * ชุดส่งงานโทร — สร้าง / อนุมัติ / ยกเลิก / ถอนคนออก
  *
  * GET    /api/lumos/call-batches                    → { batches: [...] }
- * POST   { jobId, boardCardIds?, irecruitIds?, note? } → สร้างชุดรออนุมัติ
+ * POST   { jobId, boardCardIds?, irecruitIds?, note? } → สร้างชุด **อนุมัติแล้ว** (ดูด้านล่าง)
  * PATCH  { batchId, action: 'approve'|'cancel', reason? }
  * DELETE ?batchId=&itemId=                          → ถอนคนออกจากชุด
  *
  * อนุมัติแล้ว **ยังไม่เข้าคิวทันที** — ตั้ง release_at ไว้ข้างหน้า (ช่วงถอนคำ)
  * ระหว่างนั้นยกเลิก/ถอนคนได้ · พ้นเวลาแล้ว releaseDueCallBatches() ค่อยส่งเข้าคิวจริง
  *
- * สิทธิ์: สร้างได้ทุกคนที่ใช้หน้า Matching ได้ · **อนุมัติเฉพาะ supervisor/admin**
- * (การอนุมัติ = ระบบจะโทรหาผู้สมัครจริง — สมมติฐานนี้ยังไม่ได้ยืนยันจากเจ้าของ
- *  ถ้าจะให้ staff อนุมัติเองแก้ที่ canApprove() ที่เดียว)
+ * ⚠️ **POST ข้ามขั้นอนุมัติเสมอ (เจ้าของเคาะ 11 ส.ค. 2569)**
+ * แผงอนุมัติถูกเอาออกจากทุกหน้าไปแล้ว ชุดที่สร้างเป็น `pending_approval` จึงค้างถาวร
+ * (ตัวปล่อยแตะเฉพาะชุดที่ `approved`) — บนฐานจริงมีค้างแบบนั้น 1 ชุดตั้งแต่ 7 ส.ค.
+ * ทางที่เลือก: ให้เส้นนี้เป็น `autoApprove` แล้ว **คงช่วงถอนคำ 10 นาทีไว้เหมือนเดิม**
+ * เป็นตัวกันพลาดแทนการอนุมัติ · หน้า Matching มีแถบนับถอยหลัง + ปุ่มยกเลิกอยู่
+ *
+ * ไม่ใช่การผ่อนสิทธิ์: ปุ่ม "ส่ง AI โทร" บนหน้าเดียวกันยิงเข้าคิว**ทันที**ด้วย rbac ชุดนี้อยู่แล้ว
+ * เส้นนี้จึงยังเข้มกว่าเดิม (หน่วง 10 นาที + ยกเลิกได้) ไม่ใช่หลวมกว่า
+ *
+ * สิทธิ์: สร้างได้ทุกคนที่ใช้หน้า Matching ได้ · **`action:'approve'` เฉพาะ supervisor/admin**
+ * (เหลือไว้สำหรับชุดที่โหมด assist จัดให้ ซึ่งยังเป็น pending_approval — ถ้าจะให้ staff
+ *  อนุมัติเองแก้ที่ canApprove() ที่เดียว)
  */
 import {
   withRbac,
@@ -101,6 +110,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         note: typeof body.note === 'string' ? body.note : null,
         createdByUserId: req.user?.sub ?? null,
         createdByName: req.user?.email ?? null,
+        // ⚠️ ห้ามถอดออกโดยไม่มีที่อนุมัติกลับมาก่อน — ถอดแล้วชุดจะค้างถาวรเงียบ ๆ
+        // เหมือนก่อน 11 ส.ค. 2569 (มีเทสต์ source-guard คุมที่ callBatchStore.test.ts)
+        autoApprove: true,
       });
       if (!batch) return sendError(res, 400, 'Bad request', 'สร้างชุดไม่สำเร็จ');
 
@@ -108,7 +120,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         action: 'call-batch.create',
         entityType: 'lumos_call_batch',
         entityId: batch.id,
-        after: { channel, jobId, count: refs.length },
+        // releaseAt เข้า audit ด้วย — "โทรเมื่อไหร่" เป็นข้อมูลที่ต้องตอบได้ย้อนหลัง
+        after: { channel, jobId, count: refs.length, autoApproved: true, releaseAt: batch.releaseAt },
       });
       return res.status(201).json({ batch });
     }

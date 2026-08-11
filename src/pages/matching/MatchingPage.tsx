@@ -81,13 +81,15 @@ import {
   type CallResultScope,
 } from '@/lib/callHoldsApi';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
-import { createCallBatch } from '@/lib/callBatchApi';
+import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
+import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
 import type { BoardCandidateMatch } from '@/lib/boardCandidateTypes';
 import CandidateChecklist from '@/components/matching/CandidateChecklist';
 import CallHoldPanel from '@/components/matching/CallHoldPanel';
 import ScreeningEditor from '@/components/matching/ScreeningEditor';
 import {
+  CallBatchUndoStrip,
   LumosCallBadgeRow,
   LumosJobSummaryStats,
   LumosSendBar,
@@ -846,8 +848,15 @@ const MatchingPage: React.FC = () => {
   const [lumosSelectedIrecruit, setLumosSelectedIrecruit] = useState<number[]>([]);
   const [lumosConfirmOpen, setLumosConfirmOpen] = useState(false);
   const [lumosSending, setLumosSending] = useState(false);
-  /** กำลังสร้างชุดรออนุมัติ — แยกจาก lumosSending เพราะเป็นคนละปุ่มคนละปลายทาง */
+  /** กำลังตั้งคิวเป็นชุด — แยกจาก lumosSending เพราะเป็นคนละปุ่มคนละปลายทาง */
   const [batchCreating, setBatchCreating] = useState(false);
+  /**
+   * ชุดที่ "ผู้ใช้คนนี้เพิ่งตั้งคิวในหน้านี้" — ไว้โชว์แถบนับถอยหลัง + ปุ่มยกเลิก
+   * ไม่ได้ไปดึงรายการชุดทั้งระบบมา (นั่นคือแผงอนุมัติที่เจ้าของสั่งเอาออก)
+   * ออกจากหน้าไปแล้วแถบหาย — ชุดยังเดินตามเวลาของมันต่อ ซึ่งตั้งใจให้เป็นแบบนั้น
+   */
+  const [pendingBatches, setPendingBatches] = useState<CallBatch[]>([]);
+  const [batchCancellingId, setBatchCancellingId] = useState<string | null>(null);
 
   /**
    * โหมดส่งงานของจุด board_match/irecruit_search — ไว้ยุบปุ่มในแถบติ๊กเลือก
@@ -929,12 +938,15 @@ const MatchingPage: React.FC = () => {
   };
 
   /**
-   * ตั้งคนที่ติ๊กไว้เป็น "ชุดรออนุมัติ" แทนการยิงเข้าคิวทันที
+   * ตั้งคนที่ติ๊กไว้เป็น "ชุดคิวโทร" — เข้าคิวจริงเมื่อพ้นช่วงถอนคำ
+   *
+   * ⚠️ ไม่มีขั้นอนุมัติแล้ว (เจ้าของเคาะ 11 ส.ค. 2569) — API ตอบกลับมาเป็นชุดที่
+   * `approved` พร้อม `releaseAt` อยู่ข้างหน้า · ตัวกันพลาดคือแถบถอนคำ ไม่ใช่คนอนุมัติ
    *
    * ⚠️ หนึ่งชุด = หนึ่งช่อง (บอร์ด→reminder · iRecruit→interview) API ตอบ 400 ถ้าส่งปนกัน
    * เลือกปนสองฝั่งจึงต้องยิงสองครั้ง = ได้ 2 ชุด ไม่ใช่ชุดเดียว
    * ถ้าครั้งที่สองล้ม ชุดแรกที่สร้างไปแล้วยังอยู่ — บอกผู้ใช้ตรง ๆ ว่าอะไรสำเร็จไปแล้ว
-   * จะได้ไม่กดซ้ำจนเกิดชุดซ้อน
+   * จะได้ไม่กดซ้ำจนเกิดชุดซ้อน (และชุดแรกก็ยังโผล่ในแถบถอนคำให้กดยกเลิกได้)
    */
   const createBatchFromSelection = async () => {
     if (!jobDetail || lumosSelectedCount === 0) return;
@@ -942,24 +954,42 @@ const MatchingPage: React.FC = () => {
     setLumosError(null);
     setLumosNotice(null);
     const done: string[] = [];
+    const created: CallBatch[] = [];
     try {
       if (lumosSelectedBoard.length > 0) {
-        await createCallBatch({ jobId: jobDetail.id, boardCardIds: lumosSelectedBoard });
+        created.push(await createCallBatch({ jobId: jobDetail.id, boardCardIds: lumosSelectedBoard }));
         done.push(`คนของเรา ${lumosSelectedBoard.length} คน`);
       }
       if (lumosSelectedIrecruit.length > 0) {
-        await createCallBatch({ jobId: jobDetail.id, irecruitIds: lumosSelectedIrecruit });
+        created.push(await createCallBatch({ jobId: jobDetail.id, irecruitIds: lumosSelectedIrecruit }));
         done.push(`iRecruit ${lumosSelectedIrecruit.length} คน`);
       }
       clearLumosSelection();
       setLumosNotice(
-        `ตั้งชุดรออนุมัติแล้ว — ${done.join(' · ')} · ยังไม่โทรจนกว่าจะอนุมัติที่หน้า Follow`,
+        `ตั้งคิวโทรแล้ว — ${done.join(' · ')} · เข้าคิวจริงในอีก ${CALL_BATCH_UNDO_MINUTES} นาที ยกเลิกได้จากแถบด้านล่าง`,
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'สร้างชุดส่งไม่สำเร็จ';
-      setLumosError(done.length > 0 ? `${msg} (ที่สร้างสำเร็จแล้ว: ${done.join(' · ')})` : msg);
+      const msg = e instanceof Error ? e.message : 'ตั้งคิวไม่สำเร็จ';
+      setLumosError(done.length > 0 ? `${msg} (ที่ตั้งคิวสำเร็จแล้ว: ${done.join(' · ')})` : msg);
     } finally {
+      // ชุดที่สร้างทันก่อนล้มต้องเข้าแถบถอนคำด้วย ไม่งั้นของที่ยิงไปแล้วไม่มีทางถอน
+      if (created.length > 0) setPendingBatches((prev) => [...prev, ...created]);
       setBatchCreating(false);
+    }
+  };
+
+  /** ถอนคำ — ยกเลิกชุดที่ยังไม่ถึงเวลาปล่อย (ชุดที่ปล่อยไปแล้ว API ตอบ 409) */
+  const cancelPendingBatch = async (batchId: string) => {
+    setBatchCancellingId(batchId);
+    setLumosError(null);
+    try {
+      await cancelCallBatch(batchId, 'ถอนคำจากหน้า Matching');
+      setPendingBatches((prev) => prev.filter((b) => b.id !== batchId));
+      setLumosNotice('ยกเลิกชุดแล้ว — ไม่มีใครถูกโทรจากชุดนี้');
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setBatchCancellingId(null);
     }
   };
 
@@ -1916,11 +1946,13 @@ const MatchingPage: React.FC = () => {
         {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
             เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
 
-            ⚠️ **ผลที่ตามมาที่ต้องรู้:** ตอนนี้ไม่มีหน้าจอไหนอนุมัติ/ยกเลิกชุดได้อีก
-            ชุดที่สถานะ `pending_approval` จะค้างถาวร (ตัวปล่อยอัตโนมัติแตะเฉพาะชุดที่
-            `approved` แล้วเท่านั้น) · ปุ่ม "ตั้งชุดรออนุมัติ (n)" ใน LumosSendBar จึงกลายเป็น
-            ทางตัน — สร้างชุดได้แต่ไม่มีใครกดต่อได้ · รอเจ้าของเคาะว่าจะถอดปุ่มนั้นด้วยไหม
-            หรือให้ชุดที่สร้างจากปุ่มนี้ข้ามขั้นอนุมัติไปเลย (autoApprove ซึ่ง store รองรับอยู่แล้ว) */}
+            **ทางตันที่ตามมาถูกปิดแล้ว 11 ส.ค. 2569** — เจ้าของเคาะว่าให้ข้ามขั้นอนุมัติ
+            ปุ่มในแถบติ๊กเลือกจึงเป็น "ตั้งคิวโทร (n)" ที่สร้างชุด `approved` เลย
+            แล้วคงช่วงถอนคำ 10 นาทีไว้เป็นตัวกันพลาด (ดู CallBatchUndoStrip ใต้แถบติ๊กเลือก)
+
+            ⚠️ **ที่ยังเป็นทางตันอยู่: ชุดจากโหมด assist** (boardCandidateMatcher /
+            matching-irecruit-candidates สร้างเป็น `pending_approval`) — assist ปิดอยู่ทุกจุด
+            ตอนนี้จึงไม่มีชุดใหม่เกิด แต่ถ้าเปิด assist โดยไม่มีที่อนุมัติ ชุดจะค้างเงียบ ๆ อีก */}
 
         {/* ⚠️ กล่องตัวกรอง (ด่วนเท่านั้น · BU · หน่วยงาน · ชิปสถานะ 6 ตัว) เคยอยู่ตรงนี้
             — เจ้าของสั่งเอาออก 10 ส.ค. 2569
@@ -2759,6 +2791,11 @@ const MatchingPage: React.FC = () => {
                 onCreateBatch={() => void createBatchFromSelection()}
                 onSend={() => setLumosConfirmOpen(true)}
               />
+              <CallBatchUndoStrip
+                batches={pendingBatches}
+                cancellingId={batchCancellingId}
+                onCancel={(id) => void cancelPendingBatch(id)}
+              />
 
               {boardLoadingId === jobDetail.id ? (
                 <AiEvaluationStatus source="board" />
@@ -3350,6 +3387,13 @@ const MatchingPage: React.FC = () => {
                     assistOnly={assistOnly}
                     onCreateBatch={() => void createBatchFromSelection()}
                     onSend={() => setLumosConfirmOpen(true)}
+                  />
+                  {/* แถบถอนคำอยู่ใต้ทั้งสองแถบติ๊กเลือก — ฝั่ง iRecruit อยู่ท้ายหน้า
+                      ถ้ามีที่เดียวข้างบน คนที่ตั้งคิวจากตรงนี้จะไม่เห็นปุ่มยกเลิกเลย */}
+                  <CallBatchUndoStrip
+                    batches={pendingBatches}
+                    cancellingId={batchCancellingId}
+                    onCancel={(id) => void cancelPendingBatch(id)}
                   />
                   {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                 </div>
