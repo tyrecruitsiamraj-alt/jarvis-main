@@ -41,6 +41,18 @@ const AppNavDrawer: React.FC<Props> = ({
    */
   const [boardOpen, setBoardOpen] = useState(() => location.pathname.startsWith('/jobs/board'));
 
+  /**
+   * "Matching" ใช้แพตเทิร์นเดียวกับบอร์ด (เจ้าของสั่ง 11 ส.ค. 2569) — หัวข้อเดียวกดกาง
+   * เห็นทางเข้าทั้งสามของโมดูล แทนที่จะต้องเข้าหน้ารวม /matching แล้วกดต่ออีกที
+   *
+   * ⚠️ หัวข้อ**กางอย่างเดียว ไม่พาไปไหน** (เหมือนบอร์ด) ทางเข้าหน้า Matching จริงจึงต้อง
+   * อยู่ในลูกด้วย ไม่งั้นกดเมนูแล้วไปหน้าจับคู่ไม่ได้เลย
+   * ไม่ได้ตัดหน้ารวม /matching ทิ้ง — RoleHubPage กับลิงก์เก่ายังชี้ไปที่นั่นได้เหมือนเดิม
+   */
+  const [matchingOpen, setMatchingOpen] = useState(() =>
+    location.pathname.startsWith('/matching') && !location.pathname.startsWith('/matching/candidates'),
+  );
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -59,8 +71,8 @@ const AppNavDrawer: React.FC<Props> = ({
     cn(
       'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors touch-manipulation',
       active
-        ? 'bg-blue-500/12 text-blue-700'
-        : 'text-foreground/80 hover:bg-white/60 hover:text-foreground',
+        ? 'bg-blue-500/12 text-blue-700 dark:bg-sky-400/15 dark:text-sky-200'
+        : 'text-foreground/80 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10',
     );
 
   return (
@@ -81,11 +93,11 @@ const AppNavDrawer: React.FC<Props> = ({
         aria-label="เมนูหลัก"
         aria-modal={open}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full w-[17rem] max-w-[85vw] flex-col border-r border-white/60 bg-white/85 shadow-2xl backdrop-blur-xl transition-transform duration-250 ease-out safe-area-pt',
+          'fixed inset-y-0 left-0 z-50 flex h-full w-[17rem] max-w-[85vw] flex-col border-r border-white/60 bg-white/85 shadow-2xl dark:border-slate-700/70 dark:bg-slate-900/90 backdrop-blur-xl transition-transform duration-250 ease-out safe-area-pt',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-white/60 px-4 py-3">
+        <div className="flex items-center justify-between gap-2 border-b border-white/60 px-4 py-3 dark:border-slate-700/70">
           <button type="button" onClick={() => go('/')} className="flex min-w-0 items-center gap-2">
             <BrandMark size="sm" />
             <BrandTitle className="truncate text-base font-bold text-foreground" />
@@ -94,14 +106,14 @@ const AppNavDrawer: React.FC<Props> = ({
             type="button"
             onClick={onClose}
             aria-label="ปิดเมนู"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/70 hover:text-foreground"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {userName ? (
-          <div className="flex items-center gap-2 border-b border-white/50 px-4 py-2.5">
+          <div className="flex items-center gap-2 border-b border-white/50 px-4 py-2.5 dark:border-slate-700/70">
             <span className="truncate text-sm font-medium text-foreground">{userName}</span>
             {userRole ? (
               <span className="ml-auto rounded-full bg-[#141210] px-2 py-0.5 text-[10px] font-medium uppercase text-white">
@@ -114,6 +126,48 @@ const AppNavDrawer: React.FC<Props> = ({
         <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="เมนูหลัก">
           {items.map((item) => {
             const Icon = item.icon;
+
+            // "Matching" เป็นหัวข้อกดกาง ไม่ใช่ปุ่มพาไปหน้า — ทางเข้าทั้งสามอยู่ในลูก
+            if (item.path === '/matching') {
+              const inMatching = isDockPathActive('/matching', location.pathname);
+              const child = (path: string, label: string) => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => go(path)}
+                  className={cn(rowClass(location.pathname.startsWith(path)), 'pl-10')}
+                >
+                  <span className="truncate">{label}</span>
+                </button>
+              );
+              return [
+                <button
+                  key="matching-group"
+                  type="button"
+                  onClick={() => setMatchingOpen((v) => !v)}
+                  aria-expanded={matchingOpen}
+                  className={rowClass(inMatching)}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                  <ChevronDown
+                    className={cn(
+                      'ml-auto h-4 w-4 shrink-0 transition-transform',
+                      matchingOpen && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
+                </button>,
+                ...(matchingOpen
+                  ? [
+                      child('/matching/match', 'จับคู่กับงาน'),
+                      child('/matching/pre-check', 'Pre-Check'),
+                      child('/matching/job-postings', 'คำขอโพสหางานใหม่'),
+                    ]
+                  : []),
+              ];
+            }
+
             const rows = [
               <button
                 key={item.path}
@@ -176,7 +230,7 @@ const AppNavDrawer: React.FC<Props> = ({
           })}
         </nav>
 
-        <div className="space-y-1 border-t border-white/60 p-3">
+        <div className="space-y-1 border-t border-white/60 p-3 dark:border-slate-700/70">
           {showSettings ? (
             <button
               type="button"
