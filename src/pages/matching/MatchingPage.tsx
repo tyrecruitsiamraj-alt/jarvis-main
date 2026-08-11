@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import SearchField from '@/components/shared/SearchField';
-import CallBatchPanel from '@/components/follow/CallBatchPanel';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -1914,10 +1913,14 @@ const MatchingPage: React.FC = () => {
             หัวแผงบอกเสมอว่ากำลังดูต้นทางไหน จึงไม่ซ้ำรอย "เลขถูกแต่ตอบผิดคำถาม" */}
         <CallFunnelPanel defaultSource="all" />
 
-        {/* ชุดส่งงานโทรที่รออนุมัติ — ย้ายมาจากหน้าหลัก (เจ้าของสั่ง 10 ส.ค. 2569)
-            ที่นี่คือที่ที่ชุดถูกสร้าง (ปุ่ม "ตั้งชุดรออนุมัติ") จึงเป็นที่ที่ตรงกับงานที่สุด
-            แผงซ่อนตัวเองเมื่อไม่มีชุด · ยังจำกัดให้เห็นเฉพาะ admin เท่าเดิม ไม่ได้ผ่อนสิทธิ์ */}
-        {hasPermission('admin') ? <CallBatchPanel /> : null}
+        {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+            เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
+
+            ⚠️ **ผลที่ตามมาที่ต้องรู้:** ตอนนี้ไม่มีหน้าจอไหนอนุมัติ/ยกเลิกชุดได้อีก
+            ชุดที่สถานะ `pending_approval` จะค้างถาวร (ตัวปล่อยอัตโนมัติแตะเฉพาะชุดที่
+            `approved` แล้วเท่านั้น) · ปุ่ม "ตั้งชุดรออนุมัติ (n)" ใน LumosSendBar จึงกลายเป็น
+            ทางตัน — สร้างชุดได้แต่ไม่มีใครกดต่อได้ · รอเจ้าของเคาะว่าจะถอดปุ่มนั้นด้วยไหม
+            หรือให้ชุดที่สร้างจากปุ่มนี้ข้ามขั้นอนุมัติไปเลย (autoApprove ซึ่ง store รองรับอยู่แล้ว) */}
 
         {/* ตัวกรอง */}
         <div className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">

@@ -4,7 +4,6 @@ import {
   PhoneForwarded,
   ArrowRight,
   ArrowDown,
-  CornerDownRight,
   Phone,
   PhoneCall,
   AlertTriangle,
@@ -20,7 +19,6 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
-import CallStatusPanel from '@/components/matching/CallStatusPanel';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -301,13 +299,10 @@ const HomePage: React.FC = () => {
                 วางใต้ 174 แทน = 314 แตกเป็น 174 กับ 140 อ่านออกว่าเป็นพี่น้องกัน ไม่ใช่ยอดใหม่
                 ช่องแรกจึงเหลือเป็นป้าย "ที่เหลือจาก 314" พร้อมลูกศรชี้ลงเข้าการ์ด */}
             <div className={cn('mt-2 border-t border-white/10 pt-2', FLOW_ROW_GRID)}>
-              {/* ป้ายบอกที่มาของเลข — ไม่ใช่ตัวเลข จึงไม่ใส่กรอบการ์ด กันสับสนว่าเป็นอีกยอด */}
-              <div className="flex items-center justify-end gap-1.5 pr-1 text-[11px] leading-tight text-slate-400">
-                <span>
-                  ที่เหลือจาก {flow.jobs.open_total.toLocaleString('th-TH')}
-                </span>
-                <CornerDownRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              </div>
+              {/* ⚠️ เคยมีป้าย "ที่เหลือจาก N ↳" ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+                  **ต้องคงกล่องเปล่าไว้** ไม่ใช่ลบทิ้ง เพราะคอลัมน์แรกเป็นช่อง `1fr` ของ grid
+                  ถ้าไม่มีลูก การ์ด "ยังไม่มีคนแนะนำ" จะเลื่อนไปคอลัมน์ 1 แล้วหลุดจากใต้ 174 */}
+              <div aria-hidden />
               <div className="hidden w-4 sm:block" aria-hidden />
               <FlowStage
                 label="ยังไม่มีคนแนะนำ"
@@ -371,7 +366,9 @@ const HomePage: React.FC = () => {
               **ย้ายไปหน้า Matching ไม่ได้ลบ** เพราะชุดที่รออนุมัติต้องมีที่ให้กด
               ไม่งั้นจะค้างถาวร (ตอนนี้มีค้างจริงบนฐาน) · หน้า Matching คือที่ที่ชุดถูกสร้าง
               จึงเป็นที่ที่ตรงกับงานที่สุด */}
-          {hasPermission('admin') ? <CallStatusPanel /> : null}
+          {/* ⚠️ กล่อง "งานโทรของฉัน" (CallStatusPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก
+              10 ส.ค. 2569 · ลบคอมโพเนนต์ทิ้งด้วย ไม่มีหน้าไหนใช้แล้ว
+              งานโทรที่ตัวเองถืออยู่ยังเห็นได้ที่การ์ดผู้สมัครในหน้า Matching (CallHoldPanel) */}
 
           {/* ต้องติดตาม + สำเร็จ */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
