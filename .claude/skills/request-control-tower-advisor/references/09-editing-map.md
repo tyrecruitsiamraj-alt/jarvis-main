@@ -400,12 +400,13 @@ reminder รับแค่ 7 ฟิลด์ตายตัว — ช่อง
   10 คน/คน · แดงเมื่อค้างเกิน 20 ชม. · โอนรายคน · คืน AI ทั้งกอง · เทกอง
 * `/matching/call-team` เหลือเป็น **redirect** ไป `/matching/my-calls` (กัน bookmark เก่าพัง)
 
-⚠️ **จุดที่คุมการซ่อน มี 4 ที่ ต้องแก้พร้อมกันตอนจะเปิดให้ทุกคน**
-1. `canSeeCallDesk` ใน `MyCallsPage` (หน้าจะขึ้น "ยังไม่เปิดให้ใช้งาน")
-2. `minimumRole: 'admin'` ของ `/matching/my-calls` ใน `dockNavConfig.tsx` (เมนู)
-3. `canSeeCallDesk` ใน `MatchingPage` (ชิป "ของฉันถืออยู่ n คน")
-4. `canSeeCallDesk` ใน `CallFunnelPanel` (ลิงก์ "รับแล้ว → ไปหน้างานโทร")
-ลืมข้อ 3-4 = คนที่เข้าหน้าไม่ได้จะเห็นลิงก์แล้วกดไปเจอหน้าปิด
+⚠️ **(อัปเดต 11 ส.ค. 2569 รอบหก — `canSeeCallDesk` ไม่มีแล้ว)** หน้าเคยถูกปิดทั้งหน้า
+(10 ส.ค.) แล้วเจ้าของกลับคำ: เปิดใหม่แบบ **ทุกคนเห็นถังตัวเอง** ไม่มี gate ระดับหน้าอีก
+· ที่เหลือคือ `canSeeTeamBoard = hasPermission('supervisor')` ใน `MyCallsPage`
+คุมเฉพาะบอร์ดทีม (สิทธิ์จริงอยู่ API: `?team=1` → 403) · เมนูอยู่ AppNavDrawer
+กลุ่ม Matching ("โทรของฉัน") · ปุ่ม "รับไปตาม" ใน `CallFunnelPanel` รับแล้วเป็นลิงก์
+ไปหน้านี้ · แหล่งงานเข้าถัง: ปุ่ม "เก็บไปโทรเอง" (MatchingPage) · "ดึงเข้าถังโทร"
+(RmWorkspace มุมมองรายชื่อบนบอร์ด · source 'application') · "รับไปตาม" (Follow)
 
 ⚠️ นี่คือการซ่อน **หน้าจอ** เท่านั้น — สิทธิ์จริงยังอยู่ที่ API เหมือนเดิม
 (`?team=1` ต้อง supervisor+ · จับล็อกใช้ rbac `matching-proposals`) ไม่ได้ผ่อนหรือรัดเพิ่ม

@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  canHoldApplication,
   RM_TABS,
   RM_TAB_STATUSES,
   applicationJobLabel,
@@ -137,5 +138,25 @@ describe('ตัวช่วยเล็ก', () => {
   it('toggleInList — ติ๊กซ้ำ = เอาออก', () => {
     expect(toggleInList(['a'], 'b')).toEqual(['a', 'b']);
     expect(toggleInList(['a', 'b'], 'a')).toEqual(['b']);
+  });
+});
+
+describe('ดึงไปโทร (call hold) จากแถวรายชื่อ — เงื่อนไขที่จับได้', () => {
+  it('มีทั้งเบอร์และใบขอ = จับได้', () => {
+    expect(canHoldApplication({ phone: '0812345678', job_id: 'siamraj-sql:X1' })).toEqual({ ok: true });
+  });
+
+  it('ไม่มีเบอร์ = จับไม่ได้ พร้อมเหตุผล', () => {
+    const r = canHoldApplication({ phone: '  ', job_id: 'siamraj-sql:X1' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('เบอร์');
+  });
+
+  it('ใบคีย์เอง (job_id ว่าง) = จับไม่ได้ — ห้ามผ่อน ไม่งั้นล็อกเบอร์ข้ามแผนกได้', () => {
+    for (const job_id of [null, undefined, '', '  ']) {
+      const r = canHoldApplication({ phone: '0812345678', job_id });
+      expect(r.ok, String(job_id)).toBe(false);
+      if (!r.ok) expect(r.reason).toContain('ใบขอ');
+    }
   });
 });

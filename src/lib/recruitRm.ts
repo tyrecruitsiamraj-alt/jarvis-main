@@ -171,3 +171,27 @@ export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
   rule: 'บันทึกผลนัดหมาย',
   remove: 'เอาออกจากรายการ',
 };
+
+/**
+ * ── "ดึงไปโทร" จากแถวรายชื่อผู้สมัคร (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก) ──────────
+ *
+ * จับ call hold (ล็อกตัวเดียวกับหน้า Matching — ผูกเบอร์ ไม่ใช่ ref) ได้เฉพาะใบที่
+ *   1. มีเบอร์ — server จะแปลง E.164 เอง แต่ใบไม่มีเบอร์เลยไม่มีอะไรให้ล็อก
+ *   2. **ผูกใบขอ (`job_id`)** — POST บังคับ jobId เพื่อเช็ค BU scope
+ *      ใบที่เจ้าหน้าที่คีย์เอง (job_id ว่าง) จับไม่ได้ **โดยตั้งใจ** — ผ่อนเมื่อไหร่
+ *      ล็อกเบอร์ข้ามแผนกได้ (ขัด fail-safe) · ปุ่มต้อง disable พร้อมบอกเหตุผล
+ */
+export type RmHoldability =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+export function canHoldApplication(row: {
+  phone?: string | null;
+  job_id?: string | null;
+}): RmHoldability {
+  if (!row.phone?.trim()) return { ok: false, reason: 'ไม่มีเบอร์โทร' };
+  if (!row.job_id?.trim()) {
+    return { ok: false, reason: 'ใบคีย์เอง ไม่ผูกใบขอ — เก็บเข้าถังโทรไม่ได้ (ล็อกต้องเช็คสิทธิ์ BU จากใบขอ)' };
+  }
+  return { ok: true };
+}

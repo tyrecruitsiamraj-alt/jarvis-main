@@ -13,10 +13,12 @@ import {
   RM_ROW_ACTIONS,
   RM_ROW_ACTION_LABEL,
   applicationJobLabel,
+  canHoldApplication,
   splitApplicantName,
   type RmRowAction,
   type RmTab,
 } from '@/lib/recruitRm';
+import type { CallHold } from '@/lib/callHoldsApi';
 import { TONE } from '@/lib/designTokens';
 
 /**
@@ -50,7 +52,9 @@ const RmTable: React.FC<{
   onToggleRow: (id: string) => void;
   onToggleAll: () => void;
   onAction: (action: RmRowAction, row: PublicApplication) => void;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction }) => {
+  /** ล็อกโทรที่มีอยู่ (คีย์ = application id) — ไว้โชว์ 🔒 และกันกด "โทร" ซ้ำ */
+  holdByRef?: Record<string, CallHold>;
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {} }) => {
   const actions = RM_ROW_ACTIONS[tab];
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
 
@@ -141,15 +145,35 @@ const RmTable: React.FC<{
                     <div className="flex items-center justify-end gap-1">
                       {actions.map((a) => {
                         const Icon = ACTION_ICON[a];
-                        const label = RM_ROW_ACTION_LABEL[a];
+                        let label: string = RM_ROW_ACTION_LABEL[a];
+                        let disabled = false;
+                        // "โทร" = ดึงเข้าถังโทรของตัวเอง (call hold) — ใบที่จับไม่ได้
+                        // ปุ่มต้อง disable พร้อมบอกเหตุผล ไม่ใช่กดแล้วค่อยไปพังที่ API
+                        if (a === 'call') {
+                          const held = holdByRef[r.id];
+                          const can = canHoldApplication(r);
+                          if (held) {
+                            disabled = true;
+                            label = `${held.heldByName || 'มีคน'} รับไปตามอยู่ · AI จะไม่โทรทับ`;
+                          } else if (can.ok === false) {
+                            disabled = true;
+                            label = can.reason;
+                          } else {
+                            label = 'ดึงเข้าถังโทรของฉัน (AI จะไม่โทรทับ)';
+                          }
+                        }
                         return (
                           <button
                             key={a}
                             type="button"
                             onClick={() => onAction(a, r)}
+                            disabled={disabled}
                             title={label}
                             aria-label={`${label} — ${r.full_name}`}
-                            className={cn('rounded-full border p-1.5 transition-colors', TONE.primary.outline)}
+                            className={cn(
+                              'rounded-full border p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                              TONE.primary.outline,
+                            )}
                           >
                             <Icon className="h-3.5 w-3.5" aria-hidden />
                           </button>

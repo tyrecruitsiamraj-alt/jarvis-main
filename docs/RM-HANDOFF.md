@@ -141,6 +141,19 @@ tests/api/recruitRm.test.ts / recruitRmMasters.test.ts  (28 เคส · mutatio
 ⚠️ **id ของ `recruit_master_channel` กับ `recruit_master_sub_channel` เป็นคนละ sequence
 แต่ช่วง 12–98 ทับกัน** — `source_id` ฝั่งเราจึงใส่ prefix `sub:` ให้ลูก
 
+## 5.5 รอบหก (11 ส.ค. 2569) — หน้า RM ยุบเป็นมุมมองบนบอร์ดแล้ว
+
+- เนื้อหน้าอยู่ที่ `src/components/recruit-rm/RmWorkspace.tsx` — mount โดย
+  `StaffJobBoardPage` เป็นมุมมอง `/jobs/board?view=list` (แท็บสลับกับ "กล่องงาน")
+  · `/recruit/rm` เหลือเป็น redirect (คง `?tab=`) · **ห้าม import RmWorkspace ใน
+  JobBoardView** — ไฟล์นั้นใช้ร่วมกับหน้าสมัครสาธารณะ
+- **ปุ่ม "โทร" ต่อแถว + "ดึงเข้าถังโทร" (bulk) ต่อของจริงแล้ว** — จับ call hold
+  (source `'application'` · ref = application id · ล็อกจริงผูกเบอร์) ใบคีย์เอง
+  (job_id ว่าง) ปุ่ม disable พร้อมเหตุผล เพราะ POST เช็ค BU scope จากใบขอ
+- ⚠️ migration 077: ตาราง `candidate_call_holds` **มี CHECK constraint บน source**
+  (ไม่เหมือน recruit_postings ที่จงใจไม่ใส่) — เพิ่ม source ใหม่ต้องแก้ทั้ง
+  `isCallHoldSource()` และ CHECK · เจอตอนตรวจจริง: insert 500 ทั้งที่โค้ดผ่านหมด
+
 ## 6. งานที่เหลือของเรื่อง RM (เรียงตามที่ควรทำ)
 
 1. **ระบบ Lead** — เจ้าของเคาะแล้ว 11 ส.ค.: **"ตามระบบเดิมเป๊ะ — ปัดออกจากคิว"**
@@ -148,8 +161,7 @@ tests/api/recruitRm.test.ts / recruitRmMasters.test.ts  (28 เคส · mutatio
    `lead_at` เกิด**หลัง** `created_at` · แถวที่เป็น Lead แทบทั้งหมด `process_status='C'`
    → "เก็บ Lead" = ย้ายใบออกจากรายชื่อทำงานไปกองคลังสำรอง + บันทึกคนกดกับเวลา
    **ยังไม่ได้ทำ** (ปุ่มเก็บ/ลบ Lead ยังขึ้นข้อความว่ายังไม่ต่อ)
-2. **ปุ่ม action ต่อแถว** (โทร/ดูรายละเอียด/บันทึกผลนัด) — "โทร" ต้องผูกล็อก
-   `acquireCallHold` ตัวเดียวกับหน้า Matching **ห้ามสร้างล็อกใหม่**
+2. ~~ปุ่ม "โทร" ต่อแถว~~ ✅ ต่อแล้วรอบหก (ใช้ `acquireCallHold` ตัวเดิม) · เหลือ "ดูรายละเอียด" กับ "บันทึกผลนัด"
 3. **บันทึกผลติดต่อ/นัดหมาย** โดยเลือกจาก master เหตุผลที่ยกมาแล้ว — ยังไม่มีตารางฝั่งเรา
 4. **วันนัดจริงในแท็บติดตามนัดหมาย** — `candidate_interviews` ดึงได้ทีละคน
    ต้องเพิ่ม endpoint รวมก่อน (`GET /api/candidate-interviews?all=1`)

@@ -30,6 +30,18 @@ import {
   fetchAllJobApplications,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import {
+  acquireCallHold,
+  fetchCallHoldsByPhones,
+  type CallHold,
+} from '@/lib/callHoldsApi';
+import {
+  partitionHoldTargets,
+  summarizeAcquireResults,
+  type HoldTarget,
+} from '@/lib/callHoldsBulk';
+import { canHoldApplication } from '@/lib/recruitRm';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * พื้นที่ทำงาน "รายชื่อผู้สมัคร" — เนื้อของหน้างานสรรหา (RM) เดิมทั้งก้อน
@@ -72,6 +84,10 @@ const RmWorkspace: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [reasonsOpen, setReasonsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const { user } = useAuth();
+  /** ล็อกโทรของแถวในหน้า (คีย์ = application id) — โชว์ 🔒 + กันกดซ้ำ */
+  const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
+  const [holdingSelected, setHoldingSelected] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -107,6 +123,32 @@ const RmWorkspace: React.FC = () => {
     [filtered, currentPage, pageSize],
   );
 
+  /**
+   * โหลดสถานะล็อกของแถวในหน้านี้ — server จับคู่ด้วยเบอร์ E.164 แล้วคืน map คีย์ ref
+   * อ่านไม่ได้ = ทุกแถวดูเป็น "ว่าง" ซึ่งยังปลอดภัย เพราะ server เป็นคนตัดสินตอนกดจริง
+   */
+  useEffect(() => {
+    if (pageRows.length === 0) return;
+    let cancelled = false;
+    void fetchCallHoldsByPhones(pageRows.map((r) => r.phone)).then((map) => {
+      if (cancelled || map.size === 0) return;
+      setHoldByRef((prev) => {
+        // map จาก client คีย์ด้วย candidateRef ของล็อก — เจอเฉพาะล็อกที่จับจากมุมมองนี้
+        // (ref = application id) · ล็อกจากหน้าอื่นบนเบอร์เดียวกันจะไม่ขึ้น 🔒 ที่นี่
+        // แต่ตอนกดจริง server ตัดสินที่เบอร์และตอบชื่อคนถือกลับมาอยู่ดี
+        const next = { ...prev };
+        for (const row of pageRows) {
+          const hold = map.get(row.id);
+          if (hold) next[row.id] = hold;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageRows]);
+
   const setTab = (next: RmTab) => {
     // ⚠️ ต่อยอดจาก params เดิมเสมอ — ?view= ของบอร์ดต้องรอด ไม่งั้นสลับแท็บแล้วเด้งกลับกล่องงาน
     const params = new URLSearchParams(searchParams);
@@ -124,8 +166,68 @@ const RmWorkspace: React.FC = () => {
     if (key === 'reasons') return setReasonsOpen(true);
     todo(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}"`);
   };
-  const onRowAction = (action: RmRowAction, row: PublicApplication) =>
+  /** สร้าง HoldTarget จากใบสมัคร — source 'application' · ref = application id (แค่ display) */
+  const toHoldTarget = (row: PublicApplication): HoldTarget => ({
+    candidateRef: row.id,
+    candidateName: row.full_name,
+    phone: row.phone ?? null,
+    jobId: row.job_id ?? null,
+    requestNo: null,
+    source: 'application',
+  });
+
+  /** ยิงจับล็อกเป็นชุด (sequential — DB ตัดสินการชนที่เบอร์) แล้วสรุปเป็น notice เดียว */
+  const acquireTargets = async (targets: HoldTarget[]) => {
+    const { ready, noPhone, noJob } = partitionHoldTargets(targets);
+    const results: Array<{ target: HoldTarget; result: Awaited<ReturnType<typeof acquireCallHold>> }> = [];
+    for (const t of ready) {
+      const result = await acquireCallHold({
+        phone: t.phone!,
+        source: t.source,
+        candidateRef: t.candidateRef,
+        candidateName: t.candidateName,
+        jobId: t.jobId!,
+        requestNo: t.requestNo ?? null,
+      });
+      results.push({ target: t, result });
+      const hold = result.ok ? result.hold : result.heldBy;
+      if (hold) setHoldByRef((prev) => ({ ...prev, [t.candidateRef]: hold }));
+    }
+    const summary = summarizeAcquireResults({
+      results,
+      viewerName: user?.email ?? null,
+      skippedNoPhone: noPhone.length,
+      skippedNoJob: noJob.length,
+    });
+    setNotice(`${summary} — ไปโทร+บันทึกผลที่หน้า "โทรของฉัน"`);
+  };
+
+  const onRowAction = (action: RmRowAction, row: PublicApplication) => {
+    if (action === 'call') {
+      // ปุ่มถูก disable ไว้แล้วถ้าจับไม่ได้ — เช็คซ้ำกันหลุดจาก keyboard/สคริปต์
+      if (!canHoldApplication(row).ok || holdByRef[row.id]) return;
+      setNotice(null);
+      void acquireTargets([toHoldTarget(row)]);
+      return;
+    }
     todo(`"${RM_ROW_ACTION_LABEL[action]}" ของ ${row.full_name}`);
+  };
+
+  /** "ดึงเข้าถังโทร" จากแถวที่ติ๊ก — ทำงานได้ทุกแท็บ (นิยาม "ดึงเก็บไป" ที่เจ้าของเคาะ) */
+  const holdSelectedForSelf = async () => {
+    if (selectedIds.length === 0 || holdingSelected) return;
+    setHoldingSelected(true);
+    setNotice(null);
+    try {
+      const targets = pageRows.filter((r) => selectedIds.includes(r.id)).map(toHoldTarget);
+      await acquireTargets(targets);
+      setSelectedIds([]);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'ดึงเข้าถังโทรไม่สำเร็จ');
+    } finally {
+      setHoldingSelected(false);
+    }
+  };
 
   const toggleRow = (id: string) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -192,6 +294,8 @@ const RmWorkspace: React.FC = () => {
                 onSaveLead={() => todo(`เก็บ ${selectedIds.length} รายการเข้า Lead`)}
                 onDeleteLead={() => todo(`ลบ ${selectedIds.length} รายการออกจาก Lead`)}
                 onAddApplicant={() => setAddOpen(true)}
+                onHoldSelected={() => void holdSelectedForSelf()}
+                holdingSelected={holdingSelected}
               />
             </div>
           </div>
@@ -229,6 +333,7 @@ const RmWorkspace: React.FC = () => {
                 onToggleRow={toggleRow}
                 onToggleAll={toggleAll}
                 onAction={onRowAction}
+                holdByRef={holdByRef}
               />
               <ListPaginationBar
                 page={currentPage}

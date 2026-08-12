@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, BookmarkPlus, Trash2 } from 'lucide-react';
+import { UserPlus, BookmarkPlus, PhoneCall, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -25,6 +25,9 @@ const RmSearchBar: React.FC<{
   onSaveLead: () => void;
   onDeleteLead: () => void;
   onAddApplicant: () => void;
+  /** "ดึงเข้าถังโทร" ทีละหลายคน (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: ดึงเก็บไป = call hold) */
+  onHoldSelected?: () => void;
+  holdingSelected?: boolean;
 }> = ({
   keyword,
   onKeywordChange,
@@ -34,6 +37,8 @@ const RmSearchBar: React.FC<{
   onSaveLead,
   onDeleteLead,
   onAddApplicant,
+  onHoldSelected,
+  holdingSelected = false,
 }) => (
   <div className="flex flex-wrap items-center gap-2">
     <SearchField
@@ -55,6 +60,23 @@ const RmSearchBar: React.FC<{
     <button type="button" onClick={onAddApplicant} className="jarvis-btn-secondary shrink-0">
       <UserPlus className="h-3.5 w-3.5" aria-hidden /> เพิ่มข้อมูลผู้สมัคร
     </button>
+
+    {onHoldSelected ? (
+      <button
+        type="button"
+        onClick={onHoldSelected}
+        disabled={selectedCount === 0 || holdingSelected}
+        title={
+          selectedCount === 0
+            ? 'ติ๊กเลือกแถวก่อน'
+            : `ล็อก ${selectedCount} คนเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่หน้าโทรของฉัน`
+        }
+        className="jarvis-btn-primary shrink-0 disabled:opacity-50"
+      >
+        <PhoneCall className="h-3.5 w-3.5" aria-hidden />
+        {holdingSelected ? 'กำลังเก็บ…' : `ดึงเข้าถังโทร${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+      </button>
+    ) : null}
 
     {showLeadTools ? (
       <>
