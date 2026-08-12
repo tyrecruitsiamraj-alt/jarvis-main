@@ -7,9 +7,20 @@
 + **ทางตัน 3 เรื่องที่ต้องเคาะ**) และ
 `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline (12 ส.ค. รอบหก):** test **852 ผ่าน/4 skip (101 ไฟล์)** ·
+**Baseline (12 ส.ค. รอบเจ็ด):** test **875 ผ่าน/4 skip (103 ไฟล์)** ·
 **tsc ต้องเป็น 0 ทั้งสาม config** · eslint 0 error/16 warning ·
-verify-api-registry ผ่าน (**75 route**) · migration **บนฐานถึง 077 แล้ว**
+verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 078 แล้ว** ·
+precompute **เปิดแล้ว** (.env.local — server จริงต้องใส่เองตอน deploy)
+
+## 🎯 งานถัดไป (เรียงแล้ว — เคาะครบ ห้ามถามซ้ำ · สเปคเต็มใน SESSION-HANDOFF §0.4)
+
+1. **drawer "คนของเรา" เหลือ 3 ทางจริง** — ส่งโทรทั้งหมด / ติ๊กเลือกส่งโทร
+   (+popup เลือกงานสำหรับคนแมทหลายงาน — ใช้ jobMatchesByCard ที่มีแล้ว) /
+   เก็บไปโทรเอง · ถอดปุ่มเสนอ/จองตัว/ลงงานออกจาก drawer — **ต้องหาที่ไปให้การจองก่อนถอด**
+2. **ระบบ Lead** — เคาะครบ: ปัดออกจากทุกแท็บ + ตัวกรอง "คลังสำรอง (Lead)" เรียกคืน
+   · migration 079 (is_lead/lead_by/lead_at) · ปุ่มเก็บ/ลบ Lead ใน RmSearchBar ต่อจริง
+3. เรียงคิวโทรตาม tier AI (คอลัมน์ match_rank + migration — เคาะแล้วใช้ tier)
+4. ยกใบสมัคร 154,820 ใบจาก iRecruit (dry-run ให้ดูก่อนเสมอ)
 
 ---
 
