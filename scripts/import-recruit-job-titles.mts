@@ -109,14 +109,20 @@ async function main() {
     return;
   }
 
-  const after = await dbQuery<{ n: number; active: number; names: number }>(
+  // ⚠️ `names` ต้องมี `as` — เป็นคำสงวนตอนใช้เป็น alias เปล่า ๆ (เจอจริง: `uniq` ผ่าน
+  // แต่ `names` ตอบ 42601 syntax error) · คิวรีสรุปพังหลัง insert สำเร็จแล้ว อ่านง่ายเป็น
+  // "ยกไม่สำเร็จ" ทั้งที่ข้อมูลเข้าครบ
+  const after = await dbQuery<{ n: number; active: number; names: number; dup_names: number }>(
     `select count(*)::int n,
             count(*) filter (where is_active)::int active,
-            count(distinct lower(trim(name)))::int names
+            count(distinct lower(trim(name)))::int as names,
+            (count(*) - count(distinct lower(trim(name))))::int as dup_names
        from recruit_job_titles`,
   );
   const a = after.rows[0];
-  console.log(`หลังยก: ${a.n} แถว (ใช้งานอยู่ ${a.active} · ชื่อไม่ซ้ำ ${a.names})`);
+  console.log(
+    `หลังยก: ${a.n} แถว (ใช้งานอยู่ ${a.active} · ชื่อไม่ซ้ำ ${a.names} · แถวที่ชื่อซ้ำกับแถวอื่น ${a.dup_names})`,
+  );
   const byDept = await dbQuery<{ department_code: string | null; n: number }>(
     `select department_code, count(*)::int n from recruit_job_titles group by 1 order by 2 desc`,
   );
