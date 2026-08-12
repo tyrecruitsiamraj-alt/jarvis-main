@@ -2042,7 +2042,23 @@ const MatchingPage: React.FC = () => {
           }}
         />
         <FlowArrow ghost />
-        <FlowSlotFiller />
+        {/* การ์ด "มีคนแนะนำ" (เขียว∪เหลือง) — เดิมช่องนี้เป็นช่องโบ๋ (FlowSlotFiller)
+            เจ้าของทัก 12 ส.ค. 2569 ว่าแถวนี้เละ · ตำแหน่งนี้อยู่ตรงกับ "มีผลจริง" ของ
+            เส้นการโทรพอดี ซึ่งเป็นการ์ด "ยอดรวมก่อนแตกถัง" เหมือนกัน — อ่านสองแถวขนานกันได้
+            · เป็นบ้านของตัวกรอง workflow=recommended (ลิงก์ "AI แนะนำคนแล้ว" จากหน้าแรกเข้าที่นี่) */}
+        <FlowStage
+          label="มีคนแนะนำ"
+          value={(serverSummary?.positionsGreen ?? urgentSummary.greenSuggested) + (serverSummary?.positionsYellow ?? 0)}
+          sub={jobs((serverSummary?.withGreen ?? urgentSummary.greenSuggested) + (serverSummary?.withYellow ?? 0))}
+          tone="info"
+          active={workflowFilter === 'recommended'}
+          disabled={serverListLoading}
+          title='กดเพื่อดูเฉพาะ "มีคนแนะนำ" (เขียวหรือเหลือง)'
+          onClick={() => {
+            setUrgentOnly(false);
+            setWorkflowFilter('recommended');
+          }}
+        />
         <FlowArrow />
         <FlowStage
           label="มีคนเขียวแนะนำ"
@@ -2216,9 +2232,9 @@ const MatchingPage: React.FC = () => {
               </button>
             ))}
           </div>
-          <p className="w-full text-xs text-muted-foreground">
-            · เรียง SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน · กดเพื่อหาคนของเราที่ตรง
-          </p>
+          {/* ⚠️ บรรทัด "· เรียง SLA เกิน/เสี่ยง… · กดเพื่อหาคนของเราที่ตรง" เคยอยู่ตรงนี้ —
+              เจ้าของทัก 12 ส.ค. 2569 ว่าส่วนหัวลิสต์เละ · ข้อความซ้ำกับป้าย "SLA / ด่วนก่อน"
+              ที่เป็นค่าเริ่มต้นของแถวเรียงข้างล่างอยู่แล้ว จึงตัดทิ้ง */}
           {/* เรียงลิสต์ — ค่าเริ่มต้นคงพฤติกรรมเดิม (SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน) */}
           <div className="flex w-full flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-semibold text-muted-foreground">เรียงตาม:</span>
@@ -2265,13 +2281,12 @@ const MatchingPage: React.FC = () => {
                 </span>
               </span>
             ))}
+            {/* ⚠️ ชิป "AI พร้อมแล้ว" (สถานะ idle) เคยอยู่ระหว่างสองชิปนี้ — เจ้าของสั่งเอาออก
+                12 ส.ค. 2569 ("AI พร้อมแล้ว ไม่ต้องเอามาโชว์") · idle = ไม่มีข้อมูลให้ทำอะไรต่อ
+                คงไว้เฉพาะสถานะที่คนต้องรู้: กำลังประมวลผล (มีของกำลังวิ่ง) กับ ปิดอยู่ */}
             {workerStatus?.started && workerStatus.queueSize > 0 ? (
               <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.warn.soft, TONE.warn.value)}>
                 <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
-              </span>
-            ) : workerStatus?.started && workerStatus.isIdle ? (
-              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.success.soft, TONE.success.value)}>
-                <span className={cn('h-1.5 w-1.5 rounded-full', TONE.success.dot)} /> AI พร้อมแล้ว
               </span>
             ) : workerStatus && !workerStatus.enabled ? (
               <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', TONE.neutral.soft, DASH.muted)}>

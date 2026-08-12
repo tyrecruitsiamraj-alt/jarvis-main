@@ -10,7 +10,7 @@ import {
   type NeedsHumanItem,
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
-import { CALL_OUTCOMES, type CallOutcome } from '@/lib/callFollowupPolicy';
+import { type CallOutcome } from '@/lib/callFollowupPolicy';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
@@ -201,8 +201,6 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [openBucket, setOpenBucket] = useState(false);
-  /** ชิปผลโทรรายแบบ — พับไว้ก่อน (เลขส่วนใหญ่ซ้ำกับช่องบนเส้น เจ้าของติงว่ารก) */
-  const [openOutcomes, setOpenOutcomes] = useState(false);
   const [takingId, setTakingId] = useState<number | null>(null);
   const [takeError, setTakeError] = useState<string | null>(null);
   /** id ที่เพิ่งรับไปตามในรอบนี้ — โชว์ผลค้างไว้ ไม่ให้ดูเหมือนกดแล้วไม่มีอะไรเกิด */
@@ -219,7 +217,36 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
 
   useEffect(() => load(), [load]);
 
-  const outcomesWithCount = CALL_OUTCOMES.filter((o) => (funnel.byOutcome[o] ?? 0) > 0);
+  /**
+   * ชิ้น "ผลรายแบบ" สำหรับบรรทัดย่อยของการ์ดขั้น 2 — `ป้าย จำนวน` เฉพาะแบบที่มีจริง
+   * (เจ้าของสั่ง 12 ส.ค. 2569: รวมผลแยกรายแบบเข้าขั้น 2 แทนแถวชิปพับเก็บ)
+   * ตัวเลขติดสีจาก CALL_OUTCOME_TONE — กติกาโทนกลาง: สีเดียวกันแปลว่าเรื่องเดียวกันทุกหน้า
+   * (มีเทสต์คุมใน statusTones.test.ts ว่าไฟล์นี้ต้องใช้โทนกลาง ห้ามทำข้อความไร้สี/สีของตัวเอง)
+   */
+  const outcomePart = (o: CallOutcome): React.ReactNode | null => {
+    const n = funnel.byOutcome[o] ?? 0;
+    if (n <= 0) return null;
+    return (
+      <span className="whitespace-nowrap">
+        {OUTCOME_LABEL[o]}{' '}
+        <span className={cn('font-semibold tabular-nums', TONE[CALL_OUTCOME_TONE[o]].onDark)}>
+          {n.toLocaleString('th-TH')}
+        </span>
+      </span>
+    );
+  };
+  /** ต่อชิ้นเป็นบรรทัดเดียว ทิ้งตัวที่เป็น null — คืน null เมื่อไม่มีอะไรเลย (ให้ผู้เรียก fallback) */
+  const joinParts = (parts: Array<React.ReactNode | null>): React.ReactNode | null => {
+    const list = parts.filter((p) => p !== null && p !== '');
+    if (list.length === 0) return null;
+    return (
+      <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+        {list.map((p, i) => (
+          <React.Fragment key={i}>{p}</React.Fragment>
+        ))}
+      </span>
+    );
+  };
 
   /**
    * รับงานตามจากถังนี้ตรง ๆ — ใช้ล็อกตัวเดียวกับหน้า Matching (ผูกกับเบอร์)
@@ -296,28 +323,43 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
         ) : null}
 
         {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → จบยังไง → ตกถังคน
-            "มีผลจริง" หักสายที่คนกดยกเลิกออกแล้ว (นิยามเดียวกับอัตราด้านล่าง) */}
+            "มีผลจริง" หักสายที่คนกดยกเลิกออกแล้ว (นิยามเดียวกับอัตราด้านล่าง)
+
+            ⚠️ ผลโทรแยกรายแบบ (10 แบบ) **รวมอยู่ในบรรทัดย่อยของการ์ดขั้นนี้แล้ว**
+            (เจ้าของสั่ง 12 ส.ค. 2569 — เดิมเป็นแถวชิปพับเก็บใต้แผง ต้องกดกางถึงเห็น):
+            สนใจ+รับทราบ → การ์ดสนใจ · ปฏิเสธ → ไม่สนใจ · ไม่รับสาย/ไม่ว่าง/ไม่ตอบ/
+            โทรไม่สำเร็จ → ไม่รับ/ไม่ติด · ขอเลื่อน → รอโทร · เบอร์ผิด → ต้องคนตาม ·
+            ยกเลิก → มีผลจริง (บอกว่าหักออกกี่สาย) — ครบทุกแบบ ไม่มีตัวไหนหาย */}
         <div className={FUNNEL_ROW_GRID}>
           <FlowStage label="ส่งให้ Lumos" value={funnel.queued} sub="ทั้งหมดที่เข้าคิว" tone="neutral" />
           <Arrow />
           <FlowStage
             label="รอโทร"
             value={funnel.waiting}
-            sub={funnel.retryScheduled > 0 ? `นัดโทรซ้ำไว้ ${funnel.retryScheduled.toLocaleString('th-TH')}` : 'ยังไม่มีผลกลับ'}
+            sub={joinParts([
+              funnel.retryScheduled > 0
+                ? `นัดโทรซ้ำไว้ ${funnel.retryScheduled.toLocaleString('th-TH')}`
+                : 'ยังไม่มีผลกลับ',
+              outcomePart('reschedule_requested'),
+            ])}
             tone="info"
           />
           <Arrow />
           <FlowStage
             label="มีผลจริง"
             value={resolvedCallBase(funnel)}
-            sub="ไม่นับสายที่กดยกเลิก"
+            sub={joinParts([
+              (funnel.byOutcome['cancelled'] ?? 0) > 0
+                ? `หักสายที่กดยกเลิก ${(funnel.byOutcome['cancelled'] ?? 0).toLocaleString('th-TH')}`
+                : 'ไม่นับสายที่กดยกเลิก',
+            ])}
             tone="primary"
           />
           <Arrow />
           <FlowStage
             label="สนใจ"
             value={funnel.byOutcome['confirmed'] ?? 0}
-            sub="พร้อมให้กดจอง"
+            sub={joinParts(['พร้อมให้กดจอง', outcomePart('acknowledged')])}
             tone="success"
           />
           <FlowStage
@@ -326,12 +368,24 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             sub="ปฏิเสธงาน"
             tone="danger"
           />
-          <FlowStage label="ไม่รับ / ไม่ติด" value={funnel.unreached} sub="ควรโทรซ้ำ" tone="warn" />
+          <FlowStage
+            label="ไม่รับ / ไม่ติด"
+            value={funnel.unreached}
+            sub={
+              joinParts([
+                outcomePart('no_answer'),
+                outcomePart('busy'),
+                outcomePart('unresponsive'),
+                outcomePart('failed'),
+              ]) ?? 'ควรโทรซ้ำ'
+            }
+            tone="warn"
+          />
           <Arrow />
           <FlowStage
             label="ต้องคนตาม"
             value={funnel.needsHuman}
-            sub="AI เอาไม่อยู่แล้ว"
+            sub={joinParts(['AI เอาไม่อยู่แล้ว', outcomePart('wrong_person')])}
             tone="orange"
           />
         </div>
@@ -368,37 +422,9 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           );
         })()}
 
-        {/* ผลแยกรายแบบ — พับไว้ก่อน เพราะเลขส่วนใหญ่ซ้ำกับช่องบนเส้น (สนใจ/ไม่สนใจ)
-            ของที่มีเฉพาะในนี้ (รับทราบ · ยกเลิก · แยกไม่รับสาย/สายไม่ว่าง) กดค่อยกาง */}
-        {outcomesWithCount.length > 0 ? (
-          <div className="mt-3 border-t border-white/10 pt-3">
-            <button
-              type="button"
-              onClick={() => setOpenOutcomes((v) => !v)}
-              aria-expanded={openOutcomes}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-200"
-            >
-              ผลโทรแยกรายแบบ ({outcomesWithCount.length.toLocaleString('th-TH')} แบบ)
-              <ChevronDown className={cn('h-3 w-3 transition-transform', openOutcomes && 'rotate-180')} aria-hidden />
-            </button>
-            {openOutcomes ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {outcomesWithCount.map((o) => (
-                  <span
-                    key={o}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2.5 py-1 text-[11px]"
-                  >
-                    <span className={cn('h-1.5 w-1.5 rounded-full', TONE[CALL_OUTCOME_TONE[o]].dot)} aria-hidden />
-                    <span className="text-slate-300">{OUTCOME_LABEL[o]}</span>
-                    <span className={cn('font-mono font-semibold tabular-nums', TONE[CALL_OUTCOME_TONE[o]].onDark)}>
-                      {(funnel.byOutcome[o] ?? 0).toLocaleString('th-TH')}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {/* ⚠️ แถวชิป "ผลโทรแยกรายแบบ" (พับเก็บ) เคยอยู่ตรงนี้ — เจ้าของสั่ง 12 ส.ค. 2569
+            ให้รวมเข้าขั้น 2 · ตอนนี้ทุกแบบอยู่ในบรรทัดย่อยของการ์ดบนเส้นแล้ว (ดูคอมเมนต์
+            เหนือ FUNNEL_ROW_GRID ข้างบน) — ไม่มีตัวเลขไหนหาย แค่ย้ายบ้าน */}
 
         <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
           {source === 'all'
