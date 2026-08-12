@@ -165,7 +165,8 @@ const AppNavDrawer: React.FC<Props> = ({
                       child('/matching/match', 'จับคู่กับงาน'),
                       child('/matching/pre-check', 'Pre-Check'),
                       child('/matching/job-postings', 'คำขอโพสหางานใหม่'),
-                      child('/recruit/rm', 'งานสรรหา (RM)'),
+                      // "งานสรรหา (RM)" ยุบเข้าบอร์ดรับสมัครแล้ว (11 ส.ค. 2569 รอบหก)
+                      // — ทางเข้าอยู่กลุ่ม "บอร์ดรับสมัคร" ข้างล่าง
                       child('/matching/my-calls', 'โทรของฉัน'),
                     ]
                   : []),
@@ -213,7 +214,16 @@ const AppNavDrawer: React.FC<Props> = ({
                     onClick={() => go('/jobs/board')}
                     className={cn(rowClass(inBoard), 'pl-10')}
                   >
-                    <span className="truncate">เปิดบอร์ด</span>
+                    <span className="truncate">กล่องงาน (เปิดบอร์ด)</span>
+                  </button>,
+                  // มุมมอง "รายชื่อผู้สมัคร" = หน้างานสรรหา (RM) เดิมที่ยุบเข้าบอร์ด (11 ส.ค. รอบหก)
+                  <button
+                    key="/jobs/board?view=list"
+                    type="button"
+                    onClick={() => go('/jobs/board?view=list')}
+                    className={cn(rowClass(inBoard), 'pl-10')}
+                  >
+                    <span className="truncate">รายชื่อผู้สมัคร (RM)</span>
                   </button>,
                   <button
                     key="apply-public"

@@ -65,6 +65,15 @@ export type JobBoardViewProps = {
   onRefresh?: () => void;
   refreshing?: boolean;
   detailReturnTo?: string;
+  /**
+   * มุมมองของบอร์ดฝั่งเจ้าหน้าที่ (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด)
+   * 'board' = กล่องงาน (การ์ดใบขอเดิม) · 'list' = รายชื่อผู้สมัคร (เนื้อ RM ส่งมาทาง listContent)
+   * ⚠️ ตัวเนื้อ list ถูก import ที่ StaffJobBoardPage ไม่ใช่ที่นี่ — ไฟล์นี้ใช้ร่วมกับ
+   * หน้าสมัครสาธารณะ ห้ามลากโค้ด RM เข้ามาใน bundle
+   */
+  view?: 'board' | 'list';
+  onViewChange?: (view: 'board' | 'list') => void;
+  listContent?: React.ReactNode;
 };
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
@@ -76,6 +85,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onRefresh,
   refreshing,
   detailReturnTo = '/jobs/board',
+  view = 'board',
+  onViewChange,
+  listContent,
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -289,6 +301,44 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         ) : null}
 
+        {/* แท็บสลับมุมมอง (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด)
+            "กล่องงาน" = การ์ดใบขอเดิม · "รายชื่อผู้สมัคร" = เนื้อหน้างานสรรหา (RM)
+            โผล่เฉพาะเจ้าหน้าที่ที่ส่ง onViewChange มา — หน้าสาธารณะไม่มีทางเห็น */}
+        {isStaff && onViewChange ? (
+          <div className="mt-6 flex flex-wrap items-center gap-1 border-b border-border/60">
+            {(
+              [
+                { id: 'board', label: 'กล่องงาน' },
+                { id: 'list', label: 'รายชื่อผู้สมัคร' },
+              ] as const
+            ).map((v) => {
+              const active = view === v.id;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onViewChange(v.id)}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'px-4 py-2.5 text-sm font-semibold transition-colors',
+                    active
+                      ? cn(TONE.primary.value, 'border-b-2 border-current')
+                      : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {/* มุมมองรายชื่อผู้สมัคร — แทนที่ก้อนกล่องลอย+ตัวกรอง+การ์ดทั้งหมด
+            hero + แผงภาพรวมข้างบนคงอยู่ทั้งสองมุมมอง ไม่ render ซ้ำ */}
+        {isStaff && view === 'list' && listContent ? (
+          <div className="mt-4 pb-10">{listContent}</div>
+        ) : (
+          <>
         {/*
           กล่องลอย (ไม่ผูกใบขอ) — เจ้าของสั่ง 11 ส.ค. 2569 ให้ใช้ **ทรงเดียวกับการ์ดใบขอ**
           (`jarvis-interactive-card` · หัวข้อ → ชิป → เนื้อ → แถบล่าง) แทนกล่องเล็กแบน ๆ เดิม
@@ -601,6 +651,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             />
           </div>
         ) : null}
+          </>
+        )}
 
         {!isStaff ? (
           <div className="mx-auto max-w-md pb-14 pt-2 text-center">
