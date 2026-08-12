@@ -19,7 +19,8 @@ const table = tableInAppSchema('candidate_call_holds');
 const MAX_TEXT = 200;
 const MAX_NOTE = 2000;
 
-export type CallHoldSource = 'board' | 'irecruit';
+/** 'application' = ใบสมัครจากบอร์ดรับสมัคร (public_job_applications) — เพิ่ม 11 ส.ค. 2569 รอบหก */
+export type CallHoldSource = 'board' | 'irecruit' | 'application';
 
 /** ศัพท์เดียวกับ Lumos outcome — เพิ่มใหม่ต้องแก้ CHECK ใน migration ด้วย */
 export const CALL_RESULT_OUTCOMES = [
@@ -81,7 +82,7 @@ export function isCallResultOutcome(v: unknown): v is CallResultOutcome {
 }
 
 export function isCallHoldSource(v: unknown): v is CallHoldSource {
-  return v === 'board' || v === 'irecruit';
+  return v === 'board' || v === 'irecruit' || v === 'application';
 }
 
 function trimTo(v: unknown, max: number): string | null {

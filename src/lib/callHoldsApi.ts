@@ -6,7 +6,19 @@ import { readErrorMessage, readJsonSafe } from '@/lib/api';
  * ล็อกผูกกับเบอร์ (ฝั่ง server normalize เป็น E.164 เอง) · อายุ 1 วัน
  * ดู api/_lib/candidateCallHolds.ts
  */
-export type CallHoldSource = 'board' | 'irecruit';
+/** 'application' = ใบสมัครจากบอร์ดรับสมัคร — เพิ่ม 11 ส.ค. 2569 รอบหก (ดึงเก็บไปโทรจากแถวรายชื่อ) */
+export type CallHoldSource = 'board' | 'irecruit' | 'application';
+
+/**
+ * ป้ายที่มาของงานโทร — **แหล่งเดียวของทั้งระบบ** ห้าม ternary สองทางในไฟล์หน้า
+ * (บั๊กเดิม: หน้าโทรเขียน `source === 'board' ? 'คนของเรา' : 'iRecruit'`
+ * ซึ่งจะโชว์ผิดทันทีที่มี source ที่สาม)
+ */
+export const CALL_HOLD_SOURCE_LABEL: Record<CallHoldSource, string> = {
+  board: 'คนของเรา',
+  irecruit: 'iRecruit',
+  application: 'ใบสมัคร',
+};
 
 /** ศัพท์เดียวกับ Lumos outcome — funnel จึงนับ "ผลจากคน" รวมกับ "ผลจาก AI" ได้ */
 export type CallResultOutcome =

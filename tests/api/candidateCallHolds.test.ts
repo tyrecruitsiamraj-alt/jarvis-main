@@ -14,6 +14,7 @@ import { dbQuery } from '../../api/_lib/postgres.js';
 import {
   acquireCallHold,
   callHoldKey,
+  isCallHoldSource,
   getActiveCallHoldsByPhones,
   isCallResultOutcome,
   recordCallResult,
@@ -58,6 +59,29 @@ function sqlOf(i: number) {
 function paramsOf(i: number) {
   return (vi.mocked(dbQuery).mock.calls[i]?.[1] ?? []) as unknown[];
 }
+
+describe('source ของล็อก (11 ส.ค. 2569 รอบหก: เพิ่ม application)', () => {
+  it('รับสามค่า: board · irecruit · application', () => {
+    expect(isCallHoldSource('board')).toBe(true);
+    expect(isCallHoldSource('irecruit')).toBe(true);
+    expect(isCallHoldSource('application')).toBe(true);
+  });
+
+  it('ค่าขยะไม่ผ่าน — กันคนยัด source ประดิษฐ์เข้าฐาน', () => {
+    expect(isCallHoldSource('follow')).toBe(false);
+    expect(isCallHoldSource('')).toBe(false);
+    expect(isCallHoldSource(null)).toBe(false);
+    expect(isCallHoldSource(1)).toBe(false);
+  });
+
+  it("mapRow ไม่ coerce 'application' ทิ้งเป็น 'board' — ป้ายที่มาบนหน้าโทรจะผิดทันที", async () => {
+    vi.mocked(dbQuery).mockResolvedValue({
+      rows: [row({ source: 'application' })],
+    } as never);
+    const holds = await getActiveCallHoldsByPhones(['0812345678']);
+    expect(holds.get('+66812345678')?.source).toBe('application');
+  });
+});
 
 describe('กุญแจล็อกคือเบอร์ ไม่ใช่ ref', () => {
   it('callHoldKey ใช้สูตรเดียวกับที่ใส่ลง payload ของ Lumos', () => {

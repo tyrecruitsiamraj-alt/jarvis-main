@@ -130,7 +130,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!isPlainObject(body)) return sendError(res, 400, 'Bad request');
 
       const source = isCallHoldSource(body.source) ? body.source : null;
-      if (!source) return sendError(res, 400, 'Bad request', 'source ต้องเป็น board หรือ irecruit');
+      if (!source) {
+        return sendError(res, 400, 'Bad request', 'source ต้องเป็น board, irecruit หรือ application');
+      }
       const phone = typeof body.phone === 'string' ? body.phone : '';
       const candidateRef = typeof body.candidateRef === 'string' ? body.candidateRef.trim() : '';
       const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : '';
