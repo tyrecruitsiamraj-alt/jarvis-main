@@ -93,6 +93,7 @@ import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
 import type { BoardCandidateMatch } from '@/lib/boardCandidateTypes';
+import { fetchCandidateJobMatches, type CandidateJobMatchItem } from '@/lib/candidateJobMatchesApi';
 import CandidateChecklist from '@/components/matching/CandidateChecklist';
 import ScreeningEditor from '@/components/matching/ScreeningEditor';
 import {
@@ -629,6 +630,12 @@ const MatchingPage: React.FC = () => {
   /** แถว iRecruit ที่กางฟอร์มบันทึกผลคัดกรองอยู่ (ทีละคน — กันลิสต์ยาวเกินจนอ่านไม่ไหว) */
   const [screeningOpenIrId, setScreeningOpenIrId] = useState<number | null>(null);
 
+  /**
+   * "คนนี้แมทอยู่กี่งาน" — คีย์ = card_id (string) · ค่า = ใบขอเปิดที่คนนั้นถูกแนะนำ
+   * (เจ้าของสั่ง 12 ส.ค. 2569: บอกบนรายชื่อว่าคนนี้ match อยู่กี่งาน)
+   */
+  const [jobMatchesByCard, setJobMatchesByCard] = useState<Record<string, CandidateJobMatchItem[]>>({});
+
   /** โหลดผลคัดกรองของผู้สมัครทุกคนในใบขอที่เปิด — รอผลแมทมาก่อนจึงรู้ว่ามีใคร */
   const openJobMatches = jobDetail ? boardMatchById[jobDetail.id]?.matches : undefined;
   useEffect(() => {
@@ -642,6 +649,19 @@ const MatchingPage: React.FC = () => {
         for (const [ref, rec] of map) next[ref] = rec;
         return next;
       });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openJobMatches]);
+
+  /** โหลด "แมทอยู่กี่งาน" ของผู้สมัครในใบขอที่เปิด — จังหวะเดียวกับผลคัดกรองข้างบน */
+  useEffect(() => {
+    if (!openJobMatches?.length) return;
+    let cancelled = false;
+    void fetchCandidateJobMatches(openJobMatches.map((m) => m.card_id)).then((map) => {
+      if (cancelled || Object.keys(map).length === 0) return;
+      setJobMatchesByCard((prev) => ({ ...prev, ...map }));
     });
     return () => {
       cancelled = true;
@@ -3046,6 +3066,26 @@ const MatchingPage: React.FC = () => {
                               {m.nick_name ? ` (${m.nick_name})` : ''}
                             </span>
                             <div className="flex shrink-0 items-center gap-1">
+                              {/* ป้าย "แมทอยู่ N งาน" — เฉพาะคนที่แมทเกิน 1 ใบ (เจ้าของสั่ง 12 ส.ค. 2569)
+                                  hover เห็นเลขใบขอทั้งหมด · N นับเฉพาะใบเปิดใน BU + tier เขียว/เหลือง */}
+                              {(() => {
+                                const others = jobMatchesByCard[String(m.card_id)] ?? [];
+                                if (others.length < 2) return null;
+                                return (
+                                  <span
+                                    title={`แมทอยู่ ${others.length} งาน: ${others
+                                      .map((j) => j.requestNo || j.jobId)
+                                      .join(' · ')}`}
+                                    className={cn(
+                                      'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                      TONE.violet.soft,
+                                      TONE.violet.value,
+                                    )}
+                                  >
+                                    แมท {others.length} งาน
+                                  </span>
+                                );
+                              })()}
                               {(() => {
                                 const colBadge = boardColumnBadge(m.column_label);
                                 return colBadge ? (
