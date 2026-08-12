@@ -200,8 +200,13 @@ type WorkerConfig = {
   startupDelayMs: number;
 };
 
-function parseIntEnv(raw: string | undefined, def: number, min: number): number {
-  const n = Number(String(raw ?? '').trim());
+export function parseIntEnv(raw: string | undefined, def: number, min: number): number {
+  const s = String(raw ?? '').trim();
+  // ⚠️ ว่าง = ไม่ได้ตั้ง → ใช้ default — ห้ามปล่อยไป Number('') ซึ่งได้ 0 (finite!)
+  // บั๊กเดิม: env ที่ไม่ได้ตั้งทุกตัวตกไปที่ค่า min แทน default → scan ได้แค่ 1 ใบ/แผนก
+  // ทุก 10 วิ แทน 2,000 ใบทุก 5 นาที (เจอตอนเปิด precompute ครั้งแรก 12 ส.ค. 2569)
+  if (!s) return def;
+  const n = Number(s);
   if (!Number.isFinite(n)) return def;
   return Math.max(min, Math.floor(n));
 }

@@ -121,3 +121,31 @@ describe('applyEnqueue', () => {
     expect(q.size).toBe(0);
   });
 });
+
+// eslint-disable-next-line import/first -- ต่อท้ายไฟล์เดิม (import รวมอยู่บนสุดไม่ได้เพราะ append)
+import { parseIntEnv } from '../../api/_lib/matchPrecomputeWorker';
+
+describe('parseIntEnv — env ที่ไม่ได้ตั้งต้องได้ default ไม่ใช่ min', () => {
+  it('ไม่ได้ตั้ง/ว่าง → default (บั๊กเดิม: Number("") = 0 เป็น finite เลยตกไปที่ min)', () => {
+    // เคสจริงที่เจอ 12 ส.ค. 2569: SCAN_LIMIT ไม่ได้ตั้ง ควรได้ 2000 แต่ได้ 1
+    expect(parseIntEnv(undefined, 2000, 1)).toBe(2000);
+    expect(parseIntEnv('', 300_000, 10_000)).toBe(300_000);
+    expect(parseIntEnv('   ', 15_000, 0)).toBe(15_000);
+  });
+
+  it('ตั้งค่าจริงยังทำงานตามเดิม — ค่าต่ำกว่าเพดานโดน clamp ที่ min', () => {
+    expect(parseIntEnv('60000', 300_000, 10_000)).toBe(60_000);
+    expect(parseIntEnv('5', 2000, 1)).toBe(5);
+    expect(parseIntEnv('500', 300_000, 10_000)).toBe(10_000); // clamp ขึ้น min
+    expect(parseIntEnv('7.9', 2000, 1)).toBe(7); // ปัดลงเป็นจำนวนเต็ม
+  });
+
+  it('ค่าที่อ่านไม่ออก → default', () => {
+    expect(parseIntEnv('abc', 2000, 1)).toBe(2000);
+    expect(parseIntEnv('1e999', 2000, 1)).toBe(2000); // Infinity ไม่ finite
+  });
+
+  it('ตั้ง "0" โดยตั้งใจ = ใช้ 0 ได้เมื่อ min เป็น 0 (เช่น THROTTLE_MS=0)', () => {
+    expect(parseIntEnv('0', 30_000, 0)).toBe(0);
+  });
+});
