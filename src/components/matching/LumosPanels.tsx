@@ -6,7 +6,7 @@ import {
   type LumosCallStatus,
   type LumosJobCallSummaryRow,
 } from '@/lib/lumosDispatchApi';
-import { ClipboardCheck, PhoneCall, Undo2, X } from 'lucide-react';
+import { ClipboardCheck, PhoneCall, Undo2, UserRound, X } from 'lucide-react';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { useEffect, useState } from 'react';
 import { CALL_BATCH_UNDO_MINUTES, activeItemCount, undoMsLeft, type CallBatch } from '@/lib/callBatch';
@@ -194,6 +194,8 @@ export function LumosSendBar({
   onClear,
   busy,
   creatingBatch,
+  onHoldSelf,
+  holdingSelf = false,
 }: {
   count: number;
   onSend: () => void;
@@ -202,6 +204,12 @@ export function LumosSendBar({
   onClear: () => void;
   busy: boolean;
   creatingBatch: boolean;
+  /**
+   * "เก็บไปโทรเอง" — จับ call hold ให้ตัวเองแทนส่ง AI (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก:
+   * "matching เสร็จก็เลือกได้ว่าอนุมัติให้ ai โทรหรือเก็บไปโทรเอง")
+   */
+  onHoldSelf?: () => void;
+  holdingSelf?: boolean;
 }) {
   if (count === 0) return null;
   return (
@@ -234,9 +242,24 @@ export function LumosSendBar({
         {/* ⚠️ เคยซ่อนปุ่มนี้ตอนจุดนั้นเปิดโหมด assist — assist ถูกถอดทิ้ง 11 ส.ค. 2569
             พร้อมลูปอนุมัติ · สองปุ่มไม่ขัดนโยบายกันเองแล้ว: อันนี้เข้าคิวทันที
             อีกอันหน่วง 10 นาทีแล้วถอนคำได้ */}
+        {onHoldSelf ? (
+          <button
+            type="button"
+            disabled={busy || creatingBatch || holdingSelf}
+            onClick={onHoldSelf}
+            title="ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่หน้าโทรของฉัน"
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              TONE.success.outline,
+            )}
+          >
+            <UserRound className="h-3 w-3" />
+            {holdingSelf ? 'กำลังเก็บ…' : `เก็บไปโทรเอง (${count})`}
+          </button>
+        ) : null}
         <button
           type="button"
-          disabled={busy || creatingBatch}
+          disabled={busy || creatingBatch || holdingSelf}
           onClick={onSend}
           className="jarvis-btn-primary"
         >

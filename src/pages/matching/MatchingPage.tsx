@@ -86,7 +86,8 @@ import {
 /* หน้านี้ไม่มี "รับไปโทรเอง" แล้ว (เจ้าของสั่ง 11 ส.ค. 2569) — เหลืออ่านล็อกอย่างเดียว
    เพื่อบอกว่าใครถูกเจ้าหน้าที่รับไปตามอยู่ AI จะได้ไม่โทรทับ · ตัวจับ/ปล่อย/บันทึกผล
    ยังอยู่ครบใน callHoldsApi.ts และยังถูกใช้ที่ถัง "ต้องคนตาม" ในแถบการไหลของงาน */
-import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
+import { acquireCallHold, fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
+import { partitionHoldTargets, summarizeAcquireResults, type HoldTarget } from '@/lib/callHoldsBulk';
 import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
@@ -782,6 +783,8 @@ const MatchingPage: React.FC = () => {
      ถอนคำได้ — ไม่มีนโยบายอะไรที่ทำให้สองปุ่มขัดกันเองอีกแล้ว */
   const [lumosError, setLumosError] = useState<string | null>(null);
   const [lumosNotice, setLumosNotice] = useState<string | null>(null);
+  /** กำลังวนจับล็อก "เก็บไปโทรเอง" — กันกดซ้ำระหว่างลูป */
+  const [holdingSelf, setHoldingSelf] = useState(false);
   const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
   const [lumosCancellingRef, setLumosCancellingRef] = useState<string | null>(null);
   // หน้าต่างเลือกคนจาก pool "คนของเรา" — ใช้ตอนมีคนเพิ่มเข้ามาทีหลังแล้วใบขอด่วน
@@ -1037,6 +1040,74 @@ const MatchingPage: React.FC = () => {
       setLumosError(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
     } finally {
       setLumosSending(false);
+    }
+  };
+
+  /**
+   * "เก็บไปโทรเอง" — จับ call hold ให้ตัวเองแทนส่ง AI (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก)
+   * วน**ทีละคน** (sequential) — เลือกคนเดียวกันจากสองแหล่ง เบอร์เดียวกันตัวหลังจะเจอ
+   * 409 ของตัวเราเอง ซึ่ง summarize นับเป็น "อยู่ในถังอยู่แล้ว" ไม่ใช่ conflict
+   * ล็อกสำเร็จ = AI ไม่โทรทับ (insertQueueItems กรองเบอร์ที่ถูกถือทุกเส้นอยู่แล้ว)
+   */
+  const holdSelectedForSelf = async () => {
+    if (!jobDetail || lumosSelectedCount === 0 || holdingSelf) return;
+    setHoldingSelf(true);
+    setLumosError(null);
+    setLumosNotice(null);
+    try {
+      const targets: HoldTarget[] = [
+        ...lumosSelectedBoard.map((cardId): HoldTarget => {
+          const m = openJobMatches?.find((x) => x.card_id === cardId);
+          return {
+            candidateRef: String(cardId),
+            candidateName: m?.full_name ?? null,
+            phone: m?.mobile ?? null,
+            jobId: jobDetail.id,
+            requestNo: jobDetail.request_no ?? null,
+            source: 'board',
+          };
+        }),
+        ...lumosSelectedIrecruit.map((id): HoldTarget => {
+          const m = openJobIrMatches?.find((x) => x.id === id);
+          return {
+            candidateRef: String(id),
+            candidateName: m?.full_name ?? null,
+            phone: m?.phone_number ?? null,
+            jobId: jobDetail.id,
+            requestNo: jobDetail.request_no ?? null,
+            source: 'irecruit',
+          };
+        }),
+      ];
+      const { ready, noPhone, noJob } = partitionHoldTargets(targets);
+      const results: Array<{ target: HoldTarget; result: Awaited<ReturnType<typeof acquireCallHold>> }> = [];
+      for (const t of ready) {
+        const result = await acquireCallHold({
+          phone: t.phone!,
+          source: t.source,
+          candidateRef: t.candidateRef,
+          candidateName: t.candidateName,
+          jobId: t.jobId!,
+          requestNo: t.requestNo ?? null,
+        });
+        results.push({ target: t, result });
+        // อัปเดตป้าย 🔒 ทันทีทั้งเคสสำเร็จและเคสมีคนถือ (คีย์ด้วย ref ของการ์ดที่เลือก
+        // ไม่ใช่ ref ในล็อก — คนเดียวกันคนละแหล่ง ref คนละชุดแต่เบอร์เดียวกัน)
+        const hold = result.ok ? result.hold : result.heldBy;
+        if (hold) setHoldByRef((prev) => ({ ...prev, [t.candidateRef]: hold }));
+      }
+      clearLumosSelection();
+      const summary = summarizeAcquireResults({
+        results,
+        viewerName: user?.email ?? null,
+        skippedNoPhone: noPhone.length,
+        skippedNoJob: noJob.length,
+      });
+      setLumosNotice(`${summary} — ไปโทร+บันทึกผลที่หน้า "โทรของฉัน"`);
+    } catch (e) {
+      setLumosError(e instanceof Error ? e.message : 'เก็บเข้าถังโทรไม่สำเร็จ');
+    } finally {
+      setHoldingSelf(false);
     }
   };
 
@@ -2851,6 +2922,8 @@ const MatchingPage: React.FC = () => {
                 creatingBatch={batchCreating}
                 onCreateBatch={() => void createBatchFromSelection()}
                 onSend={() => setLumosConfirmOpen(true)}
+                onHoldSelf={() => void holdSelectedForSelf()}
+                holdingSelf={holdingSelf}
               />
               <CallBatchUndoStrip
                 batches={pendingBatches}
@@ -3383,8 +3456,10 @@ const MatchingPage: React.FC = () => {
                     busy={lumosSending}
                     onClear={clearLumosSelection}
                     creatingBatch={batchCreating}
-                        onCreateBatch={() => void createBatchFromSelection()}
+                    onCreateBatch={() => void createBatchFromSelection()}
                     onSend={() => setLumosConfirmOpen(true)}
+                    onHoldSelf={() => void holdSelectedForSelf()}
+                    holdingSelf={holdingSelf}
                   />
                   {/* แถบถอนคำอยู่ใต้ทั้งสองแถบติ๊กเลือก — ฝั่ง iRecruit อยู่ท้ายหน้า
                       ถ้ามีที่เดียวข้างบน คนที่ตั้งคิวจากตรงนี้จะไม่เห็นปุ่มยกเลิกเลย */}
