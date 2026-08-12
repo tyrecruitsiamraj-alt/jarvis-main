@@ -112,9 +112,8 @@ describe('โทนผลโทร — แหล่งเดียว ห้า�
   const FILES = [
     'src/components/follow/CallFunnelPanel.tsx',
     'src/components/matching/CallHoldPanel.tsx',
-    // หน้า "งานโทร" (MyCallsPage) ถูกปิด และกล่อง "งานโทรของฉัน" (CallStatusPanel)
-    // ถูกเอาออกจากหน้าหลักตามมา (เจ้าของสั่ง 10 ส.ค. 2569) — ไม่มีไฟล์ให้คุมแล้ว
-    // กฎ "ห้ามไฟล์หน้าประกาศตารางโทนเอง" ยังคุมไฟล์ที่เหลือในลิสต์นี้ตามเดิม
+    // หน้า "โทรของฉัน" เปิดกลับมา 11 ส.ค. 2569 รอบหก — กลับเข้าลิสต์คุมโทนตามเดิม
+    'src/pages/matching/MyCallsPage.tsx',
     'src/pages/matching/CallTeamBoardPage.tsx',
   ];
 

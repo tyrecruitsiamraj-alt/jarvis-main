@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, PhoneCall } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';

@@ -166,6 +166,7 @@ const AppNavDrawer: React.FC<Props> = ({
                       child('/matching/pre-check', 'Pre-Check'),
                       child('/matching/job-postings', 'คำขอโพสหางานใหม่'),
                       child('/recruit/rm', 'งานสรรหา (RM)'),
+                      child('/matching/my-calls', 'โทรของฉัน'),
                     ]
                   : []),
               ];

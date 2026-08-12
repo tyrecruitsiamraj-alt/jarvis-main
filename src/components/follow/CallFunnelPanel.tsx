@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import {
@@ -536,9 +537,14 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                   </span>
                   <span className="ml-auto flex items-center gap-2">
                     {taken.has(item.id) ? (
-                      /* หน้างานโทรถูกปิดแล้ว (10 ส.ค. 2569) — ไม่มีที่ให้ลิงก์ไป
-                         บันทึกผลทำที่การ์ดผู้สมัครในหน้า Matching */
-                      <span className={cn('text-[11px] font-bold', TONE.success.value)}>รับแล้ว</span>
+                      /* หน้าโทรของฉันเปิดกลับมาแล้ว (11 ส.ค. 2569 รอบหก) —
+                         รับแล้วต้องมีที่ไปโทร+บันทึกผล ไม่งั้นล็อกค้างจนหมดอายุเอง */
+                      <Link
+                        to="/matching/my-calls"
+                        className={cn('text-[11px] font-bold underline-offset-2 hover:underline', TONE.success.value)}
+                      >
+                        รับแล้ว → ไปหน้าโทรของฉัน
+                      </Link>
                     ) : item.candidateRef && item.phone ? (
                       <button
                         type="button"
