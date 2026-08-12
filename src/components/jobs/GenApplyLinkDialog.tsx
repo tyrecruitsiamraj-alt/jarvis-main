@@ -8,6 +8,7 @@ import {
 } from '@/lib/recruitPostings';
 import { createRecruitPosting, type CreatePostingBody } from '@/lib/recruitPostingsApi';
 import ChannelPicker from '@/components/shared/ChannelPicker';
+import JobTitleField from '@/components/shared/JobTitleField';
 import {
   Dialog,
   DialogContent,
@@ -296,15 +297,14 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   ตำแหน่ง/จังหวัดเติมจากใบขอให้แล้ว · ไม่บังคับกรอกเพื่อไม่ให้ประกาศลอย
                   ที่รีบส่งออกติดฟอร์ม แต่กรอกไว้แล้วรายงานย้อนหลังตอบได้ว่าลิงก์ไหนของงานไหน */}
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">ตำแหน่งงาน</label>
-                  <input
-                    className={fieldCls}
-                    value={positionName}
-                    onChange={(e) => setPositionName(e.target.value)}
-                    placeholder="เช่น ขับรถผู้บริหารไทย"
-                  />
-                </div>
+                {/* ตำแหน่งของประกาศ — ลิสต์กรองตาม BU ของใบขอ/กล่องงานที่กำลังสร้างลิงก์ */}
+                <JobTitleField
+                  value={positionName}
+                  onChange={setPositionName}
+                  departmentCode={job?.department_code ?? standalone?.departmentCode ?? null}
+                  inputClassName={fieldCls}
+                  labelClassName="text-xs font-medium text-muted-foreground"
+                />
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
                   <select className={fieldCls} value={province} onChange={(e) => setProvince(e.target.value)}>

@@ -13,6 +13,7 @@ import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import districtsByProvince from '@/data/thaiDistrictsByProvince.json';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
 import ChannelPicker from '@/components/shared/ChannelPicker';
+import JobTitleField from '@/components/shared/JobTitleField';
 import { createApplicationByStaff } from '@/lib/publicApplicationsApi';
 import {
   RM_EDUCATION_LEVELS,
@@ -239,15 +240,14 @@ const AddApplicantDialog: React.FC<{
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className={labelCls}>ตำแหน่งงานที่สนใจ</label>
-              <input
-                className={fieldCls}
-                value={positionInterest}
-                onChange={(e) => setPositionInterest(e.target.value)}
-                placeholder="เช่น ขับรถผู้บริหารไทย"
-              />
-            </div>
+            {/* ฟอร์มนี้ไม่ผูก BU (คนโทรเข้ามาสมัครลอย) — ลิสต์จึงเป็นทุก BU */}
+            <JobTitleField
+              value={positionInterest}
+              onChange={setPositionInterest}
+              label="ตำแหน่งงานที่สนใจ"
+              inputClassName={fieldCls}
+              labelClassName={labelCls}
+            />
             <div className="space-y-1.5">
               <label className={labelCls}>ประเภทเจาะจง</label>
               <select

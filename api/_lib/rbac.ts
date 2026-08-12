@@ -55,6 +55,7 @@ export type ApiResource =
   | 'work-status-master'
   | 'recruit-channels'
   | 'recruit-reasons'
+  | 'recruit-job-titles'
   | 'recruit-postings';
 
 /**
@@ -127,6 +128,13 @@ export function minimumRoleFor(
       // อ่านได้ทุกคน (ตอนบันทึกผลติดต่อต้องเลือกเหตุผล) — แก้ master เฉพาะหัวหน้างานขึ้นไป
       if (isRead) return 'staff';
       return 'supervisor';
+
+    case 'recruit-job-titles':
+      // อ่านได้ทุกคน (ช่องตำแหน่งงานในฟอร์มเพิ่มผู้สมัคร/สร้างลิงก์ใช้)
+      // ⚠️ ยังไม่มีทางเขียน — handler ตอบ 405 อยู่แล้ว แต่ตั้ง admin ไว้เป็นชั้นที่สอง
+      // เผื่อวันหน้ามีคนเพิ่ม POST เข้าไปโดยไม่ได้กลับมาดูตารางสิทธิ์นี้
+      if (isRead) return 'staff';
+      return 'admin';
 
     case 'recruit-postings':
       return 'staff';
