@@ -7,9 +7,9 @@
 + **ทางตัน 3 เรื่องที่ต้องเคาะ**) และ
 `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline (11 ส.ค. รอบสี่):** test **838 ผ่าน/4 skip (100 ไฟล์)** ·
+**Baseline (12 ส.ค. รอบหก):** test **852 ผ่าน/4 skip (101 ไฟล์)** ·
 **tsc ต้องเป็น 0 ทั้งสาม config** · eslint 0 error/16 warning ·
-verify-api-registry ผ่าน (**75 route**) · migration **บนฐานถึง 076 แล้ว**
+verify-api-registry ผ่าน (**75 route**) · migration **บนฐานถึง 077 แล้ว**
 
 ---
 
