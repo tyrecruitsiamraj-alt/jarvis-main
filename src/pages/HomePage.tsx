@@ -7,7 +7,6 @@ import {
   Phone,
   PhoneCall,
   AlertTriangle,
-  CheckCircle2,
   RefreshCw,
   LoaderCircle,
 } from 'lucide-react';
@@ -29,7 +28,8 @@ import {
 
 
 /**
- * โครงคอลัมน์ของ funnel — การ์ด 5 ช่องกว้างเท่ากัน คั่นด้วยช่องลูกศร 4 ช่อง
+ * โครงคอลัมน์ของ funnel — การ์ด 4 ช่องกว้างเท่ากัน คั่นด้วยช่องลูกศร 3 ช่อง
+ * (เหลือ 4 ขั้นตั้งแต่ 12 ส.ค. 2569 — เจ้าของสั่งเอากล่อง "จองตัวอยู่ / ลงงาน" ออก)
  *
  * ⚠️ ทั้งสองแถว (เส้นหลัก / เส้นที่ไม่มีคนแนะนำ) ต้องใช้ค่านี้ตัวเดียวกัน คอลัมน์จึงตรงกันเสมอ
  * เดิมใช้ flex ล้วน ซึ่งแบ่งความกว้างตาม **เนื้อหา** ของแต่ละแถว แถวล่างจึงกว้างกว่าและเยื้อง
@@ -38,7 +38,7 @@ import {
  */
 const FLOW_ROW_GRID =
   'flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
-  'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]';
+  'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]';
 
 /**
  * ก้อนตัวเลข 1 ขั้นใน funnel — กดแล้วพาไปหน้าที่เกี่ยวข้อง
@@ -80,43 +80,54 @@ function FlowStage({
   );
 }
 
-/** สถานะของรายการติดตาม — ผูกกับโทนกลาง: สำเร็จ=พร้อม/สนใจ · รอ=โทรซ้ำ · ติดขัด=ต้องมีคนตัดสินใจ */
+/**
+ * โทนของ 4 กล่องผลโทร (เจ้าของกำหนด 12 ส.ค. 2569) — ทิศทางสีชุดเดียวกับ callOutcomeTone:
+ * เขียว=จบดี · เหลือง=ยังไม่จบ รอโทรซ้ำ · ส้ม=ต้องคนตาม · แดง=จบไม่ดี
+ */
 const FOLLOW_UP_TONE = {
   good: {
     tone: 'success',
     dot: '🟢',
-    hint: 'พร้อม — กดจองได้เลย',
+    hint: 'สนใจงาน — พร้อมให้จอง',
   },
   warn: {
     tone: 'warn',
     dot: '🟡',
-    hint: 'รอโทรซ้ำ',
+    hint: 'ไม่สะดวก — รอ AI โทรซ้ำตามนัด',
+  },
+  act: {
+    tone: 'orange',
+    dot: '🟠',
+    hint: 'ไม่สะดวก — ต้องคนเร่งจัดการ',
   },
   bad: {
     tone: 'danger',
     dot: '🔴',
-    hint: 'ติดขัด — ต้องมีคนตัดสินใจ',
+    hint: 'ไม่สนใจงาน',
   },
 } as const satisfies Record<string, { tone: ToneKey; dot: string; hint: string }>;
 type FollowUpTone = keyof typeof FOLLOW_UP_TONE;
 
-/** รายการคนที่ต้องตามต่อจากผลโทร — สีของแถวบอกสถานะเอง กดแล้วเปิดใบขอนั้นในหน้า Matching */
+/** รายชื่อคนในกล่องผลโทร — สีของแถวบอกปลายทางเอง กดแล้วเปิดรายละเอียดคน */
 function FollowUpList({
   items,
   tone,
-  emptyHidden,
   onOpen,
+  max = 3,
 }: {
   items: FlowFollowUpItem[];
   tone: FollowUpTone;
-  emptyHidden?: boolean;
   onOpen: (item: FlowFollowUpItem) => void;
+  /** จำนวนชื่อที่โชว์ก่อนยุบเป็น "…และอีก N" */
+  max?: number;
 }) {
-  if (items.length === 0 && emptyHidden) return null;
   const t = FOLLOW_UP_TONE[tone];
+  if (items.length === 0) {
+    return <p className="mt-1.5 px-1 text-[11px] text-muted-foreground">— ไม่มีรายชื่อ</p>;
+  }
   return (
     <div className="mt-1.5 space-y-1">
-      {items.slice(0, 3).map((it) => (
+      {items.slice(0, max).map((it) => (
         <button
           key={`${it.job_ref}:${it.person_ref}`}
           type="button"
@@ -137,8 +148,8 @@ function FollowUpList({
           {it.summary ? <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground">{it.summary}</p> : null}
         </button>
       ))}
-      {items.length > 3 ? (
-        <p className="text-[10px] text-muted-foreground">…และอีก {items.length - 3} รายการ</p>
+      {items.length > max ? (
+        <p className="text-[10px] text-muted-foreground">…และอีก {items.length - max} รายการ</p>
       ) : null}
     </div>
   );
@@ -151,8 +162,12 @@ const HomePage: React.FC = () => {
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [flowLoading, setFlowLoading] = useState(true);
-  // กดชื่อคนในการ์ดติดตาม → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
+  // กดชื่อคนในกล่องผลโทร → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
   const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
+  // กดขั้น "ผลจากการโทร" → dialog 4 กล่อง (สนใจ/รอโทรซ้ำ/ต้องเร่งจัดการ/ไม่สนใจ) พร้อมชื่อคน
+  const [callResultsOpen, setCallResultsOpen] = useState(false);
+  // กดขั้น "ส่ง AI โทร" → dialog รายชื่อคนที่ถูกส่งไปแล้วและยังไม่มีผลกลับ
+  const [activeCallsOpen, setActiveCallsOpen] = useState(false);
 
   const loadFlow = async () => {
     setFlowLoading(true);
@@ -233,30 +248,33 @@ const HomePage: React.FC = () => {
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
+              {/* ?workflow=recommended = เขียว+เหลือง — นิยามเดียวกับตัวเลข with_recommend
+                  (เดิมลิงก์ไป green อย่างเดียว เลขบนการ์ดกับหน้าที่เปิดมาไม่ตรงกัน) */}
               <FlowStage
                 label="AI แนะนำคนแล้ว"
                 value={flow.jobs.with_recommend}
                 sub={`จากที่ประเมิน ${flow.jobs.analyzed} ใบ`}
                 tone="info"
-                onClick={() => navigate('/matching/match?workflow=green')}
+                onClick={() => navigate('/matching/match?workflow=recommended')}
               />
               <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
+              {/* กดแล้วเปิดรายชื่อคนที่ถูกส่งไปแล้ว (เจ้าของสั่ง 12 ส.ค. 2569) ไม่ใช่พาไปหน้าอื่น */}
               <FlowStage
                 label="ส่ง AI โทร"
                 value={flow.lumos.sent_month}
                 sub={`รอโทรอีก ${flow.lumos.waiting_call + flow.lumos.delivered_waiting}`}
                 tone="primary"
-                onClick={() => navigate('/matching/match')}
+                onClick={() => setActiveCallsOpen(true)}
               />
               <div className="flex items-center justify-center text-slate-500">
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
-              {/* เลขใหญ่ = ผลกลับรวมทุกแบบ · บรรทัดย่อยแต้มสีตามความหมายชุดเดียวกับทั้งระบบ
-                  (สนใจ=เขียว · ไม่สนใจ=แดง · ไม่รับ=เหลือง) เห็นปุ๊บรู้เลยว่าใครเป็นอะไร */}
+              {/* เลขใหญ่ = ผลกลับรวมทุกแบบ · กดแล้วเปิด 4 กล่องปลายทางพร้อมชื่อคน
+                  (เจ้าของสั่ง 12 ส.ค. 2569 — แทนกล่องติดตามที่เคยอยู่ท้ายหน้า) */}
               <FlowStage
                 label="ผลจากการโทร"
                 value={callResultsThisMonth(flow)}
@@ -270,19 +288,10 @@ const HomePage: React.FC = () => {
                   </span>
                 }
                 tone="teal"
-                onClick={() => navigate('/follow')}
+                onClick={() => setCallResultsOpen(true)}
               />
-              <div className="flex items-center justify-center text-slate-500">
-                <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
-                <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
-              </div>
-              <FlowStage
-                label="จองตัวอยู่ / ลงงาน"
-                value={flow.proposals.reserved_active + flow.proposals.placed_month}
-                sub={`จอง ${flow.proposals.reserved_active} · ลงงานเดือนนี้ ${flow.proposals.placed_month}`}
-                tone="success"
-                onClick={() => navigate('/matching/reservations')}
-              />
+              {/* ⚠️ กล่อง "จองตัวอยู่ / ลงงาน" เคยเป็นขั้นที่ 5 ตรงนี้ — เจ้าของสั่งเอาออก
+                  12 ส.ค. 2569 · ตัวเลขจอง/ลงงานยังดูได้ที่หน้า "การจอง" (/matching/reservations) */}
 
             </div>
 
@@ -312,6 +321,14 @@ const HomePage: React.FC = () => {
                     {flow.jobs.open_total} − {flow.jobs.with_recommend} ที่แนะนำแล้ว
                     {flow.jobs.open_total > flow.jobs.analyzed ? (
                       <> · ยังไม่ได้ประเมิน {flow.jobs.open_total - flow.jobs.analyzed}</>
+                    ) : null}
+                    {/* ตัวเลขจากกล่อง "ติดขัด" เดิม (ถอดออก 12 ส.ค. 2569) — ย้ายบ้านมาที่นี่
+                        เพราะเป็นเรื่องของใบขอไม่ใช่ผลโทร: ใบด่วนที่ AI ไม่พบคนและยังไม่ส่งโพส */}
+                    {flow.jobs.urgent_stuck > 0 ? (
+                      <>
+                        {' · '}
+                        <span className={TONE.danger.onDark}>ใบด่วนค้าง {flow.jobs.urgent_stuck}</span>
+                      </>
                     ) : null}
                   </>
                 }
@@ -346,11 +363,9 @@ const HomePage: React.FC = () => {
                 tone="violet"
                 onClick={() => navigate('/matching/job-postings')}
               />
-              {/* ตัวคั่นเปล่าของคอลัมน์ที่ 8 — **ห้ามตัดทิ้ง** ถึงจะไม่มีอะไรให้แสดง
-                  ช่อง `auto` ที่ไม่มีลูกจะยุบเหลือ 0 แล้วความกว้างที่หายไปถูกโยนไปให้ช่อง 1fr
-                  ทำให้การ์ดแถวนี้กว้างกว่าแถวบนทันที (วัดแล้ว: ตัดทิ้ง = 213 vs 206 · คงไว้ = 206 เท่ากัน)
-                  คอลัมน์ 9 ปล่อยว่างได้ เพราะ 1fr กว้างเท่ากันอยู่แล้วไม่ว่ามีลูกหรือไม่ */}
-              <div className="hidden w-4 sm:block" aria-hidden />
+              {/* grid เหลือ 7 คอลัมน์ (4 การ์ด + 3 ช่องคั่น) — แถวนี้เต็มทุกช่องพอดี
+                  ช่อง auto (2·4·6) มีลูกครบทั้งสองแถว จึงไม่มีช่องยุบให้ความกว้างเพี้ยน
+                  (กับดักเดิมของช่อง auto เปล่ายังจริงอยู่ ถ้าเพิ่มขั้นในอนาคตให้ดู FLOW_ROW_GRID) */}
             </div>
 
           {/* ⚠️ บรรทัดหมายเหตุ "ตัวเลขการเคลื่อนไหวนับเดือนนี้ · ของค้างนับทั้งหมด …"
@@ -368,83 +383,111 @@ const HomePage: React.FC = () => {
               10 ส.ค. 2569 · ลบคอมโพเนนต์ทิ้งด้วย ไม่มีหน้าไหนใช้แล้ว
               งานโทรที่ตัวเองถืออยู่ยังเห็นได้ที่การ์ดผู้สมัครในหน้า Matching (CallHoldPanel) */}
 
-          {/* ต้องติดตาม + สำเร็จ */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {flow.follow_ups.confirmed_waiting.length > 0 ? (
-              <div className={cn('glass-card rounded-2xl border p-3', TONE.success.soft)}>
-                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.success.num)}>
-                  <PhoneCall className="h-3.5 w-3.5" />
-                  สนใจงานแล้ว — รอคนกดจอง ({flow.follow_ups.confirmed_waiting.length})
-                </div>
-                <FollowUpList
-                  items={flow.follow_ups.confirmed_waiting}
-                  tone="good"
-                  onOpen={(it) => setPersonDetail({ item: it, tone: 'good' })}
-                />
-              </div>
-            ) : null}
-
-            {flow.follow_ups.no_answer.length > 0 ? (
-              <div className={cn('glass-card rounded-2xl border p-3', TONE.warn.soft)}>
-                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.warn.num)}>
-                  <PhoneForwarded className="h-3.5 w-3.5" />
-                  ไม่รับสาย — ควรโทรซ้ำ ({flow.follow_ups.no_answer.length})
-                </div>
-                <FollowUpList
-                  items={flow.follow_ups.no_answer}
-                  tone="warn"
-                  onOpen={(it) => setPersonDetail({ item: it, tone: 'warn' })}
-                />
-              </div>
-            ) : null}
-
-            {flow.jobs.urgent_stuck > 0 || flow.lumos.stale_delivered > 0 ? (
-              <div className={cn('glass-card rounded-2xl border p-3 space-y-1.5', TONE.danger.soft)}>
-                <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE.danger.num)}>
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  ติดขัด — ต้องมีคนตัดสินใจ
-                </div>
-                {flow.jobs.urgent_stuck > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/matching/match?urgent=1&workflow=none')}
-                    className={cn(
-                      'w-full rounded-lg border px-2 py-1.5 text-left text-[11px] text-foreground',
-                      TONE.danger.soft,
-                      TONE.danger.softHover,
-                    )}
-                  >
-                    <span aria-hidden>🔴</span> ใบด่วนที่ AI ไม่พบคน และยังไม่ส่งโพสหาคนใหม่ —{' '}
-                    <span className={cn('font-bold', TONE.danger.value)}>{flow.jobs.urgent_stuck} ใบ</span>
-                  </button>
-                ) : null}
-                {flow.lumos.stale_delivered > 0 ? (
-                  <div className={cn('rounded-lg border px-2 py-1.5 text-[11px] text-foreground', TONE.danger.soft)}>
-                    <span aria-hidden>🔴</span> ส่ง AI โทรแล้วเกิน 2 วันยังไม่มีผลกลับ —{' '}
-                    <span className={cn('font-bold', TONE.danger.value)}>{flow.lumos.stale_delivered} ราย</span>
-                    <span className="text-muted-foreground"> · ควรเช็คกับทีม Lumos</span>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {flow.follow_ups.confirmed_waiting.length === 0 &&
-            flow.follow_ups.no_answer.length === 0 &&
-            flow.jobs.urgent_stuck === 0 &&
-            flow.lumos.stale_delivered === 0 ? (
-              <div className={cn('glass-card rounded-2xl border p-3 lg:col-span-3', TONE.success.soft)}>
-                <div className={cn('flex items-center gap-1.5 text-xs font-medium', TONE.success.value)}>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  ไม่มีเรื่องค้างที่ต้องตามตอนนี้ — ผลโทรที่สนใจถูกจองครบ และใบด่วนมีคนดูแลแล้ว
-                </div>
-              </div>
-            ) : null}
-          </div>
+          {/* ⚠️ กล่องติดตามท้ายหน้า ("สนใจงานแล้ว — รอคนกดจอง" · "ไม่รับสาย — ควรโทรซ้ำ" ·
+              "ติดขัด — ต้องมีคนตัดสินใจ") เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 12 ส.ค. 2569
+              เพราะหลักการเดียวกับ "ผลจากการโทร": รายชื่อทั้งหมดย้ายเข้า dialog 4 กล่อง
+              (กดที่ขั้น "ผลจากการโทร") · ใบด่วนค้าง → บรรทัดย่อยของ "ยังไม่มีคนแนะนำ" ·
+              ค้างเกิน 2 วัน → ธงแดงใน dialog "ส่ง AI โทร" — ทุกตัวเลขมีที่ไป ไม่มีตัวไหนหาย */}
         </motion.section>
       ) : null}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}
 
-      {/* กดชื่อคนในการ์ดติดตาม → รายละเอียดคน + แมทกับงานอะไรไป ก่อนเปิดใบขอ */}
+      {/* dialog "ผลจากการโทร" — 4 กล่องปลายทางพร้อมชื่อคน (เจ้าของกำหนดชุดกล่อง 12 ส.ค. 2569)
+          กดชื่อ → เปิด personDetail ต่อ (dialog ซ้อนกัน — ตัวนี้ยังเปิดค้างไว้ให้กดคนถัดไป) */}
+      <Dialog open={callResultsOpen} onOpenChange={setCallResultsOpen}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">ผลจากการโทร — ใครอยู่ปลายทางไหน</DialogTitle>
+            <DialogDescription>
+              สนใจ/ไม่สนใจนับของเดือนนี้ · รอโทรซ้ำ/ต้องเร่งจัดการคือของค้างตอนนี้ · กดชื่อเพื่อดูรายละเอียด
+            </DialogDescription>
+          </DialogHeader>
+          {flow ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(
+                [
+                  { key: 'confirmed', label: 'สนใจงาน', tone: 'good', icon: PhoneCall },
+                  { key: 'retry', label: 'ไม่สะดวก — รอ AI โทรซ้ำ', tone: 'warn', icon: PhoneForwarded },
+                  { key: 'needs_human', label: 'ไม่สะดวก — ต้องเร่งจัดการ', tone: 'act', icon: AlertTriangle },
+                  { key: 'declined', label: 'ไม่สนใจงาน', tone: 'bad', icon: Phone },
+                ] as const
+              ).map(({ key, label, tone, icon: Icon }) => {
+                const items = flow.call_boxes[key];
+                const t = FOLLOW_UP_TONE[tone];
+                return (
+                  <div key={key} className={cn('rounded-2xl border p-3', TONE[t.tone].soft)}>
+                    <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE[t.tone].num)}>
+                      <Icon className="h-3.5 w-3.5" aria-hidden />
+                      {label} ({items.length})
+                    </div>
+                    <FollowUpList
+                      items={items}
+                      tone={tone}
+                      max={5}
+                      onOpen={(it) => setPersonDetail({ item: it, tone })}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* dialog "ส่ง AI โทร" — รายชื่อคนที่ถูกส่งไปแล้วตอนนี้ (ยังไม่มีผลกลับ)
+          แถวที่ค้างเกิน 2 วันขึ้นธงแดงให้เช็คกับทีม Lumos — แทนกล่อง "ติดขัด" เดิม */}
+      <Dialog open={activeCallsOpen} onOpenChange={setActiveCallsOpen}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            {/* ยอดจริงมาจากตัวนับในคิว ไม่ใช่ความยาวลิสต์ — ลิสต์ถูกตัดที่ 100 รายการแรก
+                (ใช้ length จะโกหกทันทีที่ของจริงเกิน 100 — เจอจริง: ค้าง 1,484 โชว์ "100") */}
+            <DialogTitle className="text-foreground">
+              ส่ง AI โทร — รายชื่อที่รอผลอยู่ตอนนี้ (
+              {((flow?.lumos.waiting_call ?? 0) + (flow?.lumos.delivered_waiting ?? 0)).toLocaleString('th-TH')})
+            </DialogTitle>
+            <DialogDescription>
+              เรียงคนที่ค้างนานขึ้นก่อน · 🔴 = เกิน 2 วันยังไม่มีผลกลับ ควรเช็คกับทีม Lumos
+              {flow && (flow.lumos.waiting_call + flow.lumos.delivered_waiting) > flow.active_calls.length
+                ? ` · โชว์ ${flow.active_calls.length} รายการแรก`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {flow ? (
+            flow.active_calls.length === 0 ? (
+              <p className="text-sm text-muted-foreground">ไม่มีสายที่รอผลอยู่ตอนนี้</p>
+            ) : (
+              <div className="space-y-1">
+                {flow.active_calls.map((it) => (
+                  <button
+                    key={`${it.job_ref}:${it.person_ref}`}
+                    type="button"
+                    onClick={() => setPersonDetail({ item: it, tone: it.stale ? 'bad' : 'warn' })}
+                    className={cn(
+                      'w-full rounded-lg border px-2 py-1.5 text-left',
+                      it.stale ? TONE.danger.soft : TONE.primary.soft,
+                      it.stale ? TONE.danger.softHover : TONE.primary.softHover,
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[11px] font-medium text-foreground">
+                        <span aria-hidden>{it.stale ? '🔴' : '📞'}</span> {it.name || it.person_ref}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{it.request_no}</span>
+                    </div>
+                    {it.stale ? (
+                      <p className={cn('mt-0.5 text-[10px] font-medium', TONE.danger.value)}>
+                        เกิน 2 วันยังไม่มีผลกลับ — ควรเช็คกับทีม Lumos
+                      </p>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            )
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* กดชื่อคนในกล่องผลโทร → รายละเอียดคน + แมทกับงานอะไรไป ก่อนเปิดใบขอ */}
       <Dialog open={!!personDetail} onOpenChange={(o) => !o && setPersonDetail(null)}>
         <DialogContent className="max-w-sm">
           {personDetail ? (

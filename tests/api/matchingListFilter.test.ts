@@ -116,6 +116,9 @@ describe('filterAndSortMatchingJobs', () => {
     expect(run('green')).toEqual(['g']);
     expect(run('yellow')).toEqual(['y']); // มี green แล้วไม่นับ yellow
     expect(run('none')).toEqual(['n']); // วิเคราะห์แล้วแต่ไม่มีแนะนำ — ใบที่ยังไม่วิเคราะห์ไม่โผล่
+    // recommended = เขียว**หรือ**เหลือง — ลิงก์ "AI แนะนำคนแล้ว" จากหน้าแรกใช้
+    // ต้องนับตรงกับ with_recommend ของ flow-summary (green ∪ yellow ไม่ใช่ green อย่างเดียว)
+    expect(run('recommended')).toEqual(['g', 'y']);
   });
 
   it('sorts breached SLA first, then urgent, then earliest required date', () => {

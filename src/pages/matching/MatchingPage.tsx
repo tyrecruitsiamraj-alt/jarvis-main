@@ -1342,7 +1342,7 @@ const MatchingPage: React.FC = () => {
   useEffect(() => {
     if (searchParams.get('urgent') === '1') setUrgentOnly(true);
     const wf = searchParams.get('workflow');
-    if (wf && (['all', 'sla', 'green', 'yellow', 'none', 'reserved'] as const).includes(wf as WorkflowFilter)) {
+    if (wf && (['all', 'sla', 'green', 'yellow', 'recommended', 'none', 'reserved'] as const).includes(wf as WorkflowFilter)) {
       setWorkflowFilter(wf as WorkflowFilter);
     }
     const bu = (searchParams.get('bu') || '').trim().toUpperCase();

@@ -55,6 +55,8 @@ export type FlowFollowUpItem = {
   /** ตำแหน่ง+หน่วยงานของใบขอที่คนนี้ถูกแมทไป — โชว์ใน dialog รายละเอียดบนหน้าแรก */
   job_position: string | null;
   job_unit: string | null;
+  /** เฉพาะรายการ "ส่งไปแล้วรอผล": ค้างเกิน 2 วัน = ควรเช็คกับทีม Lumos */
+  stale?: boolean;
 };
 
 type FollowUpSqlRow = {
@@ -66,6 +68,7 @@ type FollowUpSqlRow = {
   summary: string | null;
   outcome: string | null;
   updated_at: string | Date;
+  stale?: boolean;
 };
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : String(v));
@@ -83,7 +86,75 @@ function toFollowUp(r: FollowUpSqlRow): FlowFollowUpItem {
     updated_at: iso(r.updated_at),
     job_position: null,
     job_unit: null,
+    ...(r.stale !== undefined ? { stale: r.stale === true } : {}),
   };
+}
+
+/** คอลัมน์ชื่อ/เบอร์จาก payload — ชื่อคีย์ต่างกันตามช่อง (reminder ↔ interview) เหมือน PAYLOAD_PHONE_KEYS */
+const PERSON_COLS = `
+  coalesce(q.payload->>'recipient_name', q.payload->>'candidate_name') as name,
+  coalesce(q.payload->>'recipient_phone', q.payload->>'phone') as phone
+`;
+
+/**
+ * รายชื่อที่ "ส่ง AI โทรแล้ว ยังไม่มีผลกลับ" — กดจากขั้น "ส่ง AI โทร" บนหน้าแรก
+ * แถวที่ค้างเกิน 2 วันติดธง `stale` (นิยามเดียวกับตัวเลข `stale_delivered`)
+ */
+async function listActiveCalls(jobIds: string[], limit: number): Promise<FlowFollowUpItem[]> {
+  const { rows } = await dbQuery<FollowUpSqlRow>(
+    `select q.job_ref, q.person_ref, q.channel, q.updated_at, ${PERSON_COLS},
+            null as summary,
+            q.last_outcome as outcome,
+            (q.status = 'delivered' and q.delivered_at < now() - interval '2 days') as stale
+       from ${queueTable} q
+      where q.job_ref = any($1)
+        and q.result is null
+        and q.status in ('pending', 'delivered')
+      order by (q.status = 'delivered' and q.delivered_at < now() - interval '2 days') desc,
+               q.updated_at desc
+      limit $2`,
+    [jobIds, limit],
+  );
+  return rows.map(toFollowUp);
+}
+
+/**
+ * รายชื่อตามสถานะลูปโทรซ้ำ — 'retry_scheduled' = รอ AI โทรซ้ำ · 'needs_human' = ต้องคนเร่งจัดการ
+ * (ค่าตาม CHECK ของ migration 070 · ธงถูกตั้งโดย applyLumosResult/applyHumanCallFollowup)
+ */
+async function listByFollowupState(
+  state: 'retry_scheduled' | 'needs_human',
+  jobIds: string[],
+  limit: number,
+): Promise<FlowFollowUpItem[]> {
+  const { rows } = await dbQuery<FollowUpSqlRow>(
+    `select q.job_ref, q.person_ref, q.channel, q.updated_at, ${PERSON_COLS},
+            q.result->>'summary' as summary,
+            coalesce(q.last_outcome, q.result->>'outcome') as outcome
+       from ${queueTable} q
+      where q.job_ref = any($1) and q.followup_state = $3
+      order by q.updated_at desc
+      limit $2`,
+    [jobIds, limit, state],
+  );
+  return rows.map(toFollowUp);
+}
+
+/** รายชื่อ "ไม่สนใจงาน" เดือนนี้ — ไว้ให้เห็นว่าใครปฏิเสธ (ไม่มีงานต้องทำต่อ แค่รู้ไว้) */
+async function listDeclinedThisMonth(jobIds: string[], limit: number): Promise<FlowFollowUpItem[]> {
+  const { rows } = await dbQuery<FollowUpSqlRow>(
+    `select q.job_ref, q.person_ref, q.channel, q.updated_at, ${PERSON_COLS},
+            q.result->>'summary' as summary,
+            q.result->>'outcome' as outcome
+       from ${queueTable} q
+      where q.job_ref = any($1)
+        and q.result->>'outcome' = 'declined'
+        and q.updated_at >= date_trunc('month', now())
+      order by q.updated_at desc
+      limit $2`,
+    [jobIds, limit],
+  );
+  return rows.map(toFollowUp);
 }
 
 /**
@@ -198,10 +269,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (r.outcome) outcomesMonth[r.outcome] = Number(r.n) || 0;
     }
 
-    // ── ต้องติดตาม: สนใจแล้วยังไม่มีใครจอง / ไม่รับสาย (เฉพาะใบขอเปิดของ BU ตัวเอง)
-    const [confirmedRaw, noAnswerRaw] = await Promise.all([
-      listCallsAwaitingAction(['confirmed'], scopedJobIds, 20),
-      listCallsAwaitingAction(['no_answer', 'unresponsive'], scopedJobIds, 20),
+    // ── 4 กล่องผลโทร (เจ้าของกำหนด 12 ส.ค. 2569 — กดขั้น "ผลจากการโทร" แล้วเห็นชื่อคน):
+    //    สนใจ (ยังไม่มีคนรับช่วง) · รอ AI โทรซ้ำ · ต้องเร่งจัดการ · ไม่สนใจงาน
+    //    + รายชื่อที่ส่ง AI โทรค้างอยู่ (กดขั้น "ส่ง AI โทร")
+    const [confirmedRaw, retryRaw, needsHumanRaw, declinedRaw, activeCallsRaw] = await Promise.all([
+      listCallsAwaitingAction(['confirmed'], scopedJobIds, 50),
+      listByFollowupState('retry_scheduled', scopedJobIds, 50),
+      listByFollowupState('needs_human', scopedJobIds, 50),
+      listDeclinedThisMonth(scopedJobIds, 50),
+      listActiveCalls(scopedJobIds, 100),
     ]);
     // เติมว่าแมทกับงานอะไร (ตำแหน่ง+หน่วยงาน) จากใบขอในลิสต์ที่โหลดมาแล้ว
     const jobById = new Map(jobs.map((j) => [j.id, j as unknown as Record<string, unknown>]));
@@ -214,8 +290,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         job_unit: typeof job.unit_name === 'string' ? job.unit_name : null,
       };
     };
-    const confirmedWaiting = confirmedRaw.map(enrich);
-    const noAnswerWaiting = noAnswerRaw.map(enrich);
+    const callBoxes = {
+      confirmed: confirmedRaw.map(enrich),
+      retry: retryRaw.map(enrich),
+      needs_human: needsHumanRaw.map(enrich),
+      declined: declinedRaw.map(enrich),
+    };
+    const activeCalls = activeCallsRaw.map(enrich);
 
     // ── การเสนอ/จอง/ลงงาน (สถานะทีม Matching — ไม่ใช่ตัวเลขทางการ ERP)
     const { rows: propAgg } = await dbQuery<{
@@ -259,10 +340,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         content: contentJobIds.size,
         scraping: scrapingJobIds.size,
       },
-      follow_ups: {
-        confirmed_waiting: confirmedWaiting,
-        no_answer: noAnswerWaiting,
-      },
+      call_boxes: callBoxes,
+      active_calls: activeCalls,
     });
   } catch (e) {
     return handleApiError(res, e, 'matching-flow-summary');

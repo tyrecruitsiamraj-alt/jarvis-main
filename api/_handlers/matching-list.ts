@@ -36,7 +36,15 @@ function getQuery(req: AuthedReq, key: string): string {
   return '';
 }
 
-const WORKFLOWS: MatchingWorkflowFilter[] = ['all', 'sla', 'green', 'yellow', 'none', 'reserved'];
+const WORKFLOWS: MatchingWorkflowFilter[] = [
+  'all',
+  'sla',
+  'green',
+  'yellow',
+  'recommended',
+  'none',
+  'reserved',
+];
 
 function normalizeWorkflow(v: string): MatchingWorkflowFilter {
   return (WORKFLOWS as string[]).includes(v) ? (v as MatchingWorkflowFilter) : 'all';

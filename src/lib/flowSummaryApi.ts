@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 
-/** รายการ "ต้องติดตาม" 1 คนจากผลโทร AI ที่ยังไม่มีใครรับช่วงต่อ */
+/** 1 คนในลิสต์รายชื่อของหน้าแรก (กล่องผลโทร / รายชื่อที่ส่ง AI โทรค้างอยู่) */
 export type FlowFollowUpItem = {
   job_ref: string;
   request_no: string;
@@ -14,6 +14,24 @@ export type FlowFollowUpItem = {
   /** ตำแหน่ง+หน่วยงานของใบขอที่คนนี้ถูกแมทไป */
   job_position: string | null;
   job_unit: string | null;
+  /** เฉพาะรายการ "ส่งไปแล้วรอผล": ค้างเกิน 2 วัน = ควรเช็คกับทีม Lumos */
+  stale?: boolean;
+};
+
+/**
+ * 4 กล่องผลโทร (เจ้าของกำหนด 12 ส.ค. 2569) — กดขั้น "ผลจากการโทร" บนหน้าแรกแล้วเห็น
+ * ชื่อคนแยกตามปลายทาง · ทิศทางสีชุดเดียวกับ callOutcomeTone:
+ * เขียว=สนใจ · เหลือง=รอ AI โทรซ้ำ · ส้ม=ต้องคนเร่งจัดการ · แดง=ไม่สนใจงาน
+ */
+export type FlowCallBoxes = {
+  /** สนใจงาน — ผล confirmed ที่ยังไม่มีใครรับช่วงต่อ (จอง/ติดต่อ) */
+  confirmed: FlowFollowUpItem[];
+  /** ไม่สะดวก — ระบบนัดให้ AI โทรซ้ำแล้ว (followup_state = retry_scheduled) */
+  retry: FlowFollowUpItem[];
+  /** ไม่สะดวก/ครบเพดาน — ต้องคนเร่งจัดการ (followup_state = needs_human) */
+  needs_human: FlowFollowUpItem[];
+  /** ไม่สนใจงาน — เดือนนี้ (ไม่มีงานต้องทำต่อ แค่รู้ไว้) */
+  declined: FlowFollowUpItem[];
 };
 
 export type FlowSummary = {
@@ -41,10 +59,9 @@ export type FlowSummary = {
   };
   /** คำขอโพสหาคนที่ยังเปิดอยู่ — แยกตามประเภท (content = ให้ทีมคิดคอนเทนต์ · scraping = ให้ไปดูดประกาศ) */
   postings: { active: number; content?: number; scraping?: number };
-  follow_ups: {
-    confirmed_waiting: FlowFollowUpItem[];
-    no_answer: FlowFollowUpItem[];
-  };
+  call_boxes: FlowCallBoxes;
+  /** รายชื่อที่ส่ง AI โทรแล้วยังไม่มีผลกลับ — แถวที่ค้างเกิน 2 วันติดธง stale */
+  active_calls: FlowFollowUpItem[];
 };
 
 export async function fetchFlowSummary(): Promise<FlowSummary> {
@@ -66,12 +83,3 @@ export function callResultsThisMonth(s: FlowSummary): number {
   return Object.values(s.lumos.outcomes_month).reduce((sum, n) => sum + (n || 0), 0);
 }
 
-/** จำนวนเรื่องที่ต้องมีคนตามต่อทั้งหมด — ใช้โชว์ badge รวม */
-export function totalFollowUps(s: FlowSummary): number {
-  return (
-    s.follow_ups.confirmed_waiting.length +
-    s.follow_ups.no_answer.length +
-    s.jobs.urgent_stuck +
-    (s.lumos.stale_delivered > 0 ? 1 : 0)
-  );
-}

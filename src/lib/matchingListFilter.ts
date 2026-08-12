@@ -11,7 +11,15 @@ import { jobToRequestControlRecord } from '@/lib/requestControl';
 import { recommendedCandidateCount, type CandidateMatchTier } from '@/lib/matchingProgress';
 import { getJobRequestAgeDays } from '@/lib/jobUrgency';
 
-export type MatchingWorkflowFilter = 'all' | 'sla' | 'green' | 'yellow' | 'none' | 'reserved';
+/** `recommended` = มีคนแนะนำ (เขียว**หรือ**เหลือง) — คู่กับตัวเลข "AI แนะนำคนแล้ว" บนหน้าแรก */
+export type MatchingWorkflowFilter =
+  | 'all'
+  | 'sla'
+  | 'green'
+  | 'yellow'
+  | 'recommended'
+  | 'none'
+  | 'reserved';
 
 /**
  * การเรียงลิสต์ใบขอ
@@ -86,6 +94,9 @@ export function filterAndSortMatchingJobs(
       if (query.workflowFilter === 'yellow') {
         return !matches.some((match) => match.tier === 'green') && matches.some((match) => match.tier === 'yellow');
       }
+      // 'recommended' = เขียวหรือเหลือง — ต้องนับตรงกับ with_recommend ของ flow-summary
+      // (นิยามเดียวกับ recommendedCandidateCount ที่ตัวเลขบนการ์ดใช้)
+      if (query.workflowFilter === 'recommended') return recommendedCandidateCount(matches) > 0;
       return recommendedCandidateCount(matches) === 0;
     })
     .sort((a, b) => {
