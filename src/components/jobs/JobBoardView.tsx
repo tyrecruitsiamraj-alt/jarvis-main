@@ -303,9 +303,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     wrapperClassName="w-full min-w-0 sm:w-72 lg:w-80"
                   />
                 ) : null}
-                {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย */}
-                <RecruitBoardTools variant="onDark" />
-                {onRefresh ? (
+                {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย + เหตุผล
+                    ⚠️ **เฉพาะมุมมอง "กล่องงาน"** (เจ้าของสั่ง 13 ส.ค. 2569:
+                    "นอกจากหน้ากล่องงาน หน้าอื่นไม่ต้องมี") — ทั้งสามปุ่มทำงานกับ
+                    ประกาศ/ช่องทางรับสมัคร ซึ่งเป็นเรื่องของฝั่งใบขอ ไม่ใช่ของรายชื่อคน */}
+                {view === 'board' ? <RecruitBoardTools variant="onDark" /> : null}
+                {/* ปุ่มรีเฟรชนี้โหลด feed **ใบขอ** ใหม่ — แท็บอื่นแสดงรายชื่อคนคนละชุด
+                    และมีปุ่มรีเฟรชของตัวเองใน RmWorkspace อยู่แล้ว */}
+                {onRefresh && view === 'board' ? (
                   <button
                     type="button"
                     onClick={() => void onRefresh()}
