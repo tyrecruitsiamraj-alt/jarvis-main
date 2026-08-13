@@ -83,6 +83,35 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
 }
 
 /**
+ * มุมมองย่อยของแท็บ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569: "แบ่ง 3 อัน")
+ * ทั้งหมด / คนที่สนใจ / คนที่ไม่สนใจ — แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร
+ */
+export const RM_LIST_VIEWS = ['all', 'interested', 'declined'] as const;
+export type RmListView = (typeof RM_LIST_VIEWS)[number];
+
+export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
+  all: 'รายชื่อทั้งหมด',
+  interested: 'รายชื่อคนที่สนใจ',
+  declined: 'รายชื่อคนที่ไม่สนใจ',
+};
+
+/**
+ * ⚠️ **"สนใจ" กับ "ไม่สนใจ" ต้องมาจากผลโทรเท่านั้น** — สถานะใบสมัครมีแค่
+ * ใหม่/ติดต่อแล้ว/รับเข้าทำงาน/ปฏิเสธ ซึ่งเป็นคนละเรื่อง (สถานะการทำงานของเจ้าหน้าที่
+ * ไม่ใช่คำตอบของผู้สมัคร) · คนที่ยังไม่ได้โทรจะไม่อยู่ในสองมุมมองหลัง — ตั้งใจ
+ * เพราะยังไม่มีใครรู้ว่าเขาสนใจไหม การเดาแทนคือการโกหกตัวเลข
+ */
+export function isInRmListView(r: PublicApplication, view: RmListView): boolean {
+  if (view === 'interested') return r.last_call_outcome === 'confirmed';
+  if (view === 'declined') return r.last_call_outcome === 'declined';
+  return true;
+}
+
+export function isRmListView(v: string | null | undefined): v is RmListView {
+  return !!v && (RM_LIST_VIEWS as readonly string[]).includes(v);
+}
+
+/**
  * ⚠️ **แถวเครื่องมือของแท็บแรกไม่เหมือนอีกสองแท็บ** — ตาม HTML เดิม
  * แท็บ "ข้อมูลผู้สมัคร" เท่านั้นที่มีเครื่องมือ Lead (เก็บ Lead / ลบ Lead)
  */

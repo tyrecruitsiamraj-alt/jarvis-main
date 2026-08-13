@@ -14,6 +14,8 @@ import {
   countActiveRmFilters,
   EMPTY_RM_FILTERS,
   filterApplications,
+  isInRmListView,
+  isRmListView,
   provincesFromApplications,
   rmTabHasLeadTools,
   splitApplicantName,
@@ -119,6 +121,51 @@ describe('คนที่ตอบ "ไม่สนใจ" กลับเข้
   it('ไม่มีผลโทร = พฤติกรรมเดิมทุกอย่าง', () => {
     const noCall = { ...declined, last_call_outcome: undefined };
     expect(filterApplications([noCall], 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+  });
+});
+
+describe('แท็บย่อย 3 อันของ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569)', () => {
+  const rows = [
+    app({ id: 'y1', last_call_outcome: 'confirmed' }),
+    app({ id: 'n1', last_call_outcome: 'declined' }),
+    app({ id: 'w1', last_call_outcome: 'no_answer' }),
+    app({ id: 'x1' }), // ยังไม่เคยโทร
+  ];
+
+  it('ทั้งหมด = ทุกคน ไม่ว่าผลโทรเป็นอะไรหรือยังไม่ได้โทร', () => {
+    expect(rows.filter((r) => isInRmListView(r, 'all')).map((r) => r.id)).toEqual(['y1', 'n1', 'w1', 'x1']);
+  });
+
+  it('คนที่สนใจ = ตอบ confirmed เท่านั้น', () => {
+    expect(rows.filter((r) => isInRmListView(r, 'interested')).map((r) => r.id)).toEqual(['y1']);
+  });
+
+  it('คนที่ไม่สนใจ = ตอบ declined เท่านั้น', () => {
+    expect(rows.filter((r) => isInRmListView(r, 'declined')).map((r) => r.id)).toEqual(['n1']);
+  });
+
+  it('⚠️ คนที่ยังไม่ได้โทร/ไม่รับสาย ต้องไม่ถูกเดาว่าสนใจหรือไม่สนใจ', () => {
+    // ยังไม่มีใครรู้คำตอบของเขา — การเดาแทนคือการโกหกตัวเลข
+    for (const view of ['interested', 'declined'] as const) {
+      const ids = rows.filter((r) => isInRmListView(r, view)).map((r) => r.id);
+      expect(ids).not.toContain('x1');
+      expect(ids).not.toContain('w1');
+    }
+  });
+
+  it('สองมุมมองย่อยรวมกันต้องไม่เกิน "ทั้งหมด" และไม่ทับกันเอง', () => {
+    const y = rows.filter((r) => isInRmListView(r, 'interested'));
+    const n = rows.filter((r) => isInRmListView(r, 'declined'));
+    expect(y.filter((r) => n.some((o) => o.id === r.id))).toEqual([]);
+    expect(y.length + n.length).toBeLessThanOrEqual(rows.length);
+  });
+
+  it('isRmListView — ค่าจาก URL ที่มั่วต้องตกไปที่ "ทั้งหมด" ไม่ใช่พัง', () => {
+    expect(isRmListView('interested')).toBe(true);
+    expect(isRmListView('declined')).toBe(true);
+    expect(isRmListView('all')).toBe(true);
+    expect(isRmListView('ไม่รู้จัก')).toBe(false);
+    expect(isRmListView(null)).toBe(false);
   });
 });
 

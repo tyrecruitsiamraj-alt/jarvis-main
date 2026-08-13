@@ -19,6 +19,11 @@ import {
   RM_TOOLBAR_LABEL,
   filterApplications,
   isInRmTab,
+  isInRmListView,
+  isRmListView,
+  RM_LIST_VIEWS,
+  RM_LIST_VIEW_LABEL,
+  type RmListView,
   provincesFromApplications,
   rmTabHasLeadTools,
   type RmFilters,
@@ -78,6 +83,12 @@ const RmWorkspace: React.FC<{
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
+  /**
+   * มุมมองย่อยของแท็บ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569 ให้แบ่ง 3 อัน)
+   * เก็บใน `?list=` เพื่อให้ refresh/แชร์ลิงก์แล้วยังอยู่มุมมองเดิม — แพตเทิร์นเดียวกับ ?tab=
+   */
+  const listParam = searchParams.get('list');
+  const listView: RmListView = isRmListView(listParam) ? listParam : 'all';
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,10 +126,29 @@ const RmWorkspace: React.FC<{
     return out;
   }, [rows]);
 
-  const filtered = useMemo(
-    () => filterApplications(rows, tab, filters, keyword),
-    [rows, tab, filters, keyword],
-  );
+  const filtered = useMemo(() => {
+    const base = filterApplications(rows, tab, filters, keyword);
+    // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
+    if (tab !== 'candidates') return base;
+    return base.filter((r) => isInRmListView(r, listView));
+  }, [rows, tab, filters, keyword, listView]);
+
+  /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
+  const listViewCounts = useMemo(() => {
+    const base = filterApplications(rows, 'candidates', filters, keyword);
+    const out = {} as Record<RmListView, number>;
+    for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
+    return out;
+  }, [rows, filters, keyword]);
+
+  const setListView = (next: RmListView) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'all') params.delete('list');
+    else params.set('list', next);
+    setSearchParams(params, { replace: true });
+    setSelectedIds([]);
+    setPage(1);
+  };
 
   const totalPages = getTotalPages(filtered.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -290,6 +320,36 @@ const RmWorkspace: React.FC<{
           </button>
         </div>
       )}
+
+      {/* แท็บย่อย 3 อันของ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569)
+          แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร · เห็นครบทั้ง 3 เสมอแม้ยอดเป็น 0
+          (0 คือคำตอบ ไม่ใช่ช่องว่าง) · โผล่เฉพาะแท็บนี้ — แท็บอื่นมีความหมายของตัวเอง */}
+      {tab === 'candidates' ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {RM_LIST_VIEWS.map((v) => {
+            const active = v === listView;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setListView(v)}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : cn('bg-muted hover:bg-muted/70', DASH.muted),
+                )}
+              >
+                {RM_LIST_VIEW_LABEL[v]}
+                <span className="ml-1.5 font-mono text-[11px] tabular-nums">
+                  {loading ? '…' : listViewCounts[v].toLocaleString('th-TH')}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-4 lg:flex-row">
         <RmFilterSidebar filters={filters} onChange={setFilters} provinces={provinces} />
