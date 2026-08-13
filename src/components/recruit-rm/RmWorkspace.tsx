@@ -16,9 +16,9 @@ import {
   RM_ROW_ACTION_LABEL,
   RM_TABS,
   RM_TAB_LABEL,
-  RM_TAB_STATUSES,
   RM_TOOLBAR_LABEL,
   filterApplications,
+  isInRmTab,
   provincesFromApplications,
   rmTabHasLeadTools,
   type RmFilters,
@@ -108,13 +108,10 @@ const RmWorkspace: React.FC<{
 
   const provinces = useMemo(() => provincesFromApplications(rows), [rows]);
 
-  /** จำนวนต่อแท็บ — โชว์บนหัวแท็บให้เห็นงานค้างโดยไม่ต้องกดเข้าไปดู */
+  /** จำนวนต่อแท็บ — นิยามเดียวกับตัวกรอง (isInRmTab) เลขบนแท็บจึงตรงกับที่เห็นเสมอ */
   const tabCounts = useMemo(() => {
     const out = {} as Record<RmTab, number>;
-    for (const t of RM_TABS) {
-      const st = RM_TAB_STATUSES[t];
-      out[t] = st ? rows.filter((r) => st.includes(r.status)).length : rows.length;
-    }
+    for (const t of RM_TABS) out[t] = rows.filter((r) => isInRmTab(r, t)).length;
     return out;
   }, [rows]);
 

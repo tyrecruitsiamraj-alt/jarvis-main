@@ -50,6 +50,21 @@ export const RM_TAB_STATUSES: Record<RmTab, ApplicationStatus[] | null> = {
 };
 
 /**
+ * ใบนี้อยู่ในแท็บนี้ไหม — นิยามแท็บที่เดียวของทั้งระบบ (ตัวนับบนแท็บ + ตัวกรองใช้ร่วมกัน)
+ *
+ * เจ้าของเปลี่ยนความหมายแท็บ "การติดต่อ" 13 ส.ค. 2569: จาก "สถานะ new+contacted"
+ * เป็น **"ใบที่ฉันเก็บมาติดต่อ"** (เลือกจากกล่องงานแล้วมาโผล่ที่นี่ · ของใครของมัน —
+ * server กรองใบที่คนอื่นเก็บออกจาก feed อยู่แล้ว ฝั่งนี้แค่แยก "ของฉัน" ออกจาก "ยังว่าง")
+ * · ใบที่เก็บแล้วออกจากแท็บ "ข้อมูลผู้สมัคร" (ไปอยู่การติดต่อแทน — ไม่โผล่สองที่ให้งง)
+ */
+export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
+  if (tab === 'contact') return r.claimed_by_me === true;
+  if (tab === 'candidates') return r.claimed_by_me !== true;
+  const st = RM_TAB_STATUSES[tab];
+  return !st || st.includes(r.status);
+}
+
+/**
  * ⚠️ **แถวเครื่องมือของแท็บแรกไม่เหมือนอีกสองแท็บ** — ตาม HTML เดิม
  * แท็บ "ข้อมูลผู้สมัคร" เท่านั้นที่มีเครื่องมือ Lead (เก็บ Lead / ลบ Lead)
  */
@@ -119,10 +134,9 @@ export function filterApplications(
   filters: RmFilters,
   keyword: string,
 ): PublicApplication[] {
-  const tabStatuses = RM_TAB_STATUSES[tab];
   const kw = keyword.trim().toLowerCase();
   return rows.filter((r) => {
-    if (tabStatuses && !tabStatuses.includes(r.status)) return false;
+    if (!isInRmTab(r, tab)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(r.status)) return false;
     if (filters.channels.length > 0) {
       if (!r.referral_source || !filters.channels.includes(r.referral_source)) return false;

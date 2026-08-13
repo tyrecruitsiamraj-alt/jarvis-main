@@ -38,6 +38,11 @@ export type PublicApplication = {
   /** เจ้าหน้าที่ที่คีย์ใบนี้ — undefined = ผู้สมัครกรอกเองผ่านลิงก์ */
   created_by_name?: string;
   created_at: string;
+  /** "เก็บไปติดต่อ" (13 ส.ค. 2569) — claimed = มีคนเก็บแล้ว · claimed_by_me = ของฉัน
+   * ชื่อคนเก็บ server ส่งมาเฉพาะของตัวเอง (คนอื่นไม่เห็นชื่อ — เจ้าของสั่ง) */
+  claimed?: boolean;
+  claimed_by_me?: boolean;
+  claimed_by_name?: string;
 };
 
 export type ApplicationReferralSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
@@ -183,6 +188,23 @@ export async function updateJobApplication(
   if (!r.ok) {
     const body = (await r.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message || 'อัปเดตสถานะไม่สำเร็จ');
+  }
+  const body = (await r.json()) as { item: PublicApplication };
+  return body.item;
+}
+
+/**
+ * "เก็บไปติดต่อ" / คืน — เก็บแล้วใบไปโผล่แท็บการติดต่อของคนเก็บคนเดียว
+ * (เจ้าของสั่ง 13 ส.ค. 2569) · 409 = มีคนอื่นเก็บไปก่อน · 503 = ยังไม่รัน migration 079
+ */
+export async function claimJobApplication(id: string, claim: boolean): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, claim }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || (claim ? 'เก็บไปติดต่อไม่สำเร็จ' : 'คืนไม่สำเร็จ'));
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;

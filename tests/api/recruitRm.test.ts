@@ -38,15 +38,35 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
     app({ id: 'r1', status: 'rejected' }),
   ];
 
-  it('ข้อมูลผู้สมัคร = ทุกใบ · การติดต่อ = ใหม่+ติดต่อแล้ว · นัดหมาย = รับเข้าทำงาน', () => {
+  it('ข้อมูลผู้สมัคร = ใบที่ยังไม่ถูกเก็บ · การติดต่อ = ใบที่ฉันเก็บ · นัดหมาย = รับเข้าทำงาน', () => {
+    // เจ้าของเปลี่ยนนิยาม 13 ส.ค. 2569: การติดต่อไม่ใช่ "สถานะ new+contacted" แล้ว
+    // แต่คือ "ใบที่ฉันเก็บมาติดต่อ" (เลือกจากกล่องงาน) — ของใครของมัน
     expect(filterApplications(rows, 'candidates', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual([
       'n1',
       'c1',
       'v1',
       'r1',
     ]);
-    expect(filterApplications(rows, 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['n1', 'c1']);
+    // ยังไม่มีใครเก็บ = แท็บการติดต่อว่าง
+    expect(filterApplications(rows, 'contact', EMPTY_RM_FILTERS, '')).toEqual([]);
     expect(filterApplications(rows, 'appointments', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['v1']);
+  });
+
+  it('ใบที่ฉันเก็บ: ออกจากข้อมูลผู้สมัคร → เข้าการติดต่อ (ไม่โผล่สองที่)', () => {
+    const claimed = rows.map((r) => (r.id === 'c1' ? { ...r, claimed: true, claimed_by_me: true } : r));
+    expect(filterApplications(claimed, 'candidates', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual([
+      'n1',
+      'v1',
+      'r1',
+    ]);
+    expect(filterApplications(claimed, 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['c1']);
+  });
+
+  it('ใบที่คนอื่นเก็บ (claimed แต่ไม่ใช่ของฉัน) ไม่โผล่ในการติดต่อของฉัน', () => {
+    // server กรองใบของคนอื่นออกจาก feed อยู่แล้ว — เทสต์นี้กันชั้นที่สอง
+    // เผื่อแถวหลุดมา (เช่นจาก ?job_id= ที่ไม่กรอง)
+    const claimed = rows.map((r) => (r.id === 'c1' ? { ...r, claimed: true, claimed_by_me: false } : r));
+    expect(filterApplications(claimed, 'contact', EMPTY_RM_FILTERS, '')).toEqual([]);
   });
 
   it('คนที่ถูกปฏิเสธต้องไม่โผล่ในแท็บงาน (การติดต่อ/นัดหมาย) — จบแล้วคือจบ', () => {

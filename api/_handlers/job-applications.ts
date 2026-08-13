@@ -60,6 +60,9 @@ type Row = {
   license_types: string[] | null;
   created_by_name: string | null;
   created_at: string | Date;
+  claimed_by: string | null;
+  claimed_by_name: string | null;
+  claimed_at: string | Date | null;
 };
 
 function toNum(v: string | number | null): number | undefined {
@@ -74,8 +77,19 @@ function toIso(value: string | Date): string {
   return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
 }
 
-function toApplication(r: Row) {
+/**
+ * แปลงแถวเป็น payload — เรื่อง "เก็บไปติดต่อ" (13 ส.ค. 2569) ส่งเฉพาะ:
+ *   claimed        = มีคนเก็บแล้ว (boolean — ทุกคนรู้ได้ว่า "ถูกเก็บแล้ว" เพื่อนับจำนวน)
+ *   claimed_by_me  = คนเก็บคือ viewer
+ *   claimed_by_name = **เฉพาะของตัวเอง** — เจ้าของสั่ง "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป"
+ */
+function toApplication(r: Row, viewerId?: string) {
+  const claimed = Boolean(r.claimed_by);
+  const mine = claimed && !!viewerId && r.claimed_by === viewerId;
   return {
+    claimed,
+    claimed_by_me: mine,
+    claimed_by_name: mine ? (r.claimed_by_name ?? undefined) : undefined,
     id: r.id,
     full_name: r.full_name,
     title_prefix: r.title_prefix || undefined,
@@ -120,7 +134,24 @@ const LIST_COLUMNS = `
   document_filename, document_mime, (document_bytes is not null) as has_document,
   job_id, job_title, unit_name, position_interest, note, status, admin_note,
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
-  created_at
+  created_at,
+  claimed_by, claimed_by_name, claimed_at
+`;
+
+/**
+ * ชุดคอลัมน์แบบรัน 074 แล้วแต่**ยังไม่รัน 079** (คอลัมน์ "เก็บไปติดต่อ") —
+ * ฟิลด์ 074 ต้องยังมาจริง ถอยไปชุด legacy ล่างไม่ได้ (มันจะ null ฟิลด์ 074 ทิ้ง
+ * ทั้งที่ฐานมีข้อมูล — เจอกับดักนี้ตอนเขียน 079: ฐานจริงอยู่กึ่งกลางพอดี)
+ */
+const LIST_COLUMNS_NO_CLAIM = `
+  id, full_name, title_prefix, first_name, last_name, phone, age, gender,
+  province, district, subdistrict, postal_code,
+  weight_kg, height_cm, education, referral_source,
+  document_filename, document_mime, (document_bytes is not null) as has_document,
+  job_id, job_title, unit_name, position_interest, note, status, admin_note,
+  line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
+  created_at,
+  null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at
 `;
 
 /**
@@ -139,7 +170,8 @@ const LIST_COLUMNS_LEGACY = `
   job_id, job_title, unit_name, position_interest, note, status, admin_note,
   null::text as line_id, null::text as specific_type, null::text as responsible_name,
   null::text as channel_label, null::text[] as license_types, null::text as created_by_name,
-  created_at
+  created_at,
+  null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at
 `;
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */
@@ -149,16 +181,44 @@ function isUndefinedColumn(e: unknown): boolean {
   );
 }
 
-/** ยิงด้วยคอลัมน์ชุดใหม่ก่อน · ยังไม่ migrate ค่อยถอยไปชุดเก่า (คอลัมน์ใหม่เป็น null) */
-async function queryWithLegacyFallback(sql: string, params: unknown[]): Promise<Row[]> {
+/**
+ * ยิงด้วยคอลัมน์ชุดใหม่ก่อน · ยังไม่ migrate ค่อยถอยไปชุดเก่า (คอลัมน์ใหม่เป็น null)
+ * `{{claimWhere}}` = เงื่อนไขที่อ้างคอลัมน์ claim (079) — ชุด legacy แทนด้วย true
+ * เพราะคอลัมน์ยังไม่มีให้อ้าง (ยังไม่มีใครเก็บได้ = ไม่ต้องซ่อนใคร)
+ */
+async function queryWithLegacyFallback(
+  sql: string,
+  params: unknown[],
+  claimWhere = 'true',
+  // ⚠️ legacy ต้อง**ยังใช้ param ครบทุกตัว** — pg นับ param ที่ส่งมากับที่ SQL อ้างต้องเท่ากัน
+  // ('bind message supplies N parameters') จึงแทนด้วยเงื่อนไข no-op ที่อ้าง param เดิม
+  legacyClaimWhere = 'true',
+): Promise<Row[]> {
+  // ไล่สามชั้นตามอายุ schema: 074+079 → 074 เท่านั้น → ก่อน 074
+  // (กลืนเฉพาะ 42703 คอลัมน์หาย — error อื่นโยนต่อ ตามกติกาข้อ 9)
   try {
-    const { rows } = await dbQuery<Row>(sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS), params);
+    const { rows } = await dbQuery<Row>(
+      sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS).replace(/\{\{claimWhere\}\}/g, claimWhere),
+      params,
+    );
     return rows;
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
-    const { rows } = await dbQuery<Row>(sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS_LEGACY), params);
-    return rows;
   }
+  try {
+    const { rows } = await dbQuery<Row>(
+      sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS_NO_CLAIM).replace(/\{\{claimWhere\}\}/g, legacyClaimWhere),
+      params,
+    );
+    return rows;
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+  }
+  const { rows } = await dbQuery<Row>(
+    sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS_LEGACY).replace(/\{\{claimWhere\}\}/g, legacyClaimWhere),
+    params,
+  );
+  return rows;
 }
 
 /** GET /api/job-applications
@@ -273,7 +333,72 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
     after: { phone, specific_type: specificType, license_types: licenses },
   });
 
-  return res.status(201).json({ item: toApplication(row) });
+  return res.status(201).json({ item: toApplication(row, req.user.sub) });
+}
+
+/**
+ * "เก็บผู้สมัครไปติดต่อ" — เจ้าของสั่ง 13 ส.ค. 2569 (กล่องงาน → เลือก → โผล่แท็บการติดต่อ
+ * เห็นเฉพาะคนเก็บ) · เก็บ = claimed_by/claimed_at + สถานะขยับเป็น contacted ถ้ายัง new
+ * · คืน = ล้าง claim (เฉพาะคนที่เก็บเอง) — สถานะไม่ย้อนกลับเอง ไม่เดาแทนคน
+ */
+async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolean) {
+  let curRows: Array<{ claimed_by: string | null; status: string }>;
+  try {
+    ({ rows: curRows } = await dbQuery<{ claimed_by: string | null; status: string }>(
+      `select claimed_by, status from ${tbl} where id = $1 limit 1`,
+      [id],
+    ));
+  } catch (e) {
+    // ยังไม่รัน 079 → บอกตรง ๆ (แพตเทิร์นเดียวกับฟอร์มเพิ่มผู้สมัคร/074 — ไม่เก็บแบบทิ้งข้อมูล)
+    if (isUndefinedColumn(e)) {
+      return sendError(
+        res,
+        503,
+        'Migration required',
+        'ปุ่มเก็บไปติดต่อต้องรัน migration 079 ก่อน (node scripts/migrate.mjs) — ยังใช้ไม่ได้',
+      );
+    }
+    throw e;
+  }
+  const cur = curRows[0];
+  if (!cur) return sendError(res, 404, 'Not found');
+
+  if (claim) {
+    if (cur.claimed_by && cur.claimed_by !== req.user.sub) {
+      // DB ตัดสินการชนอีกชั้นด้วยเงื่อนไขใน UPDATE — ตรงนี้แค่ตอบให้อ่านรู้เรื่อง
+      return sendError(res, 409, 'Conflict', 'มีเจ้าหน้าที่คนอื่นเก็บใบนี้ไปแล้ว');
+    }
+    const { rows } = await dbQuery<{ id: string }>(
+      `update ${tbl}
+          set claimed_by = $2, claimed_by_name = $3, claimed_at = now(),
+              status = case when status = 'new' then 'contacted' else status end,
+              updated_at = now()
+        where id = $1 and (claimed_by is null or claimed_by = $2)
+        returning id`,
+      [id, req.user.sub, req.user.email || null],
+    );
+    if (rows.length === 0) return sendError(res, 409, 'Conflict', 'มีเจ้าหน้าที่คนอื่นเก็บใบนี้ไปแล้ว');
+  } else {
+    const { rows } = await dbQuery<{ id: string }>(
+      `update ${tbl}
+          set claimed_by = null, claimed_by_name = null, claimed_at = null, updated_at = now()
+        where id = $1 and claimed_by = $2
+        returning id`,
+      [id, req.user.sub],
+    );
+    if (rows.length === 0) {
+      return sendError(res, 403, 'Forbidden', 'คืนได้เฉพาะใบที่ตัวเองเก็บ');
+    }
+  }
+  await auditFromAuthed(req, {
+    action: claim ? 'job_application.claim' : 'job_application.unclaim',
+    entityType: 'job_application',
+    entityId: id,
+    after: { claim },
+  });
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} where id = $1`, [id]);
+  if (!rows[0]) return sendError(res, 404, 'Not found');
+  return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
 }
 
 async function patchStatus(req: AuthedReq, res: ApiRes) {
@@ -284,6 +409,9 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
   const b = raw as Record<string, unknown>;
   const id = getString(b.id);
   if (!id) return sendError(res, 400, 'Bad request', 'id required');
+
+  // "เก็บไปติดต่อ / คืน" — action แยกจากการแก้สถานะ/โน้ต
+  if (typeof b.claim === 'boolean') return patchClaim(req, res, id, b.claim);
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
@@ -336,7 +464,7 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
     after: { status: row.status, admin_note: row.admin_note },
   });
 
-  return res.status(200).json({ item: toApplication(row) });
+  return res.status(200).json({ item: toApplication(row, req.user.sub) });
 }
 
 async function handler(req: AuthedReq, res: ApiRes) {
@@ -387,20 +515,31 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
     }
     const params: unknown[] = [];
-    let where = '';
+    const conds: string[] = [];
     if (jobId) {
       params.push(jobId);
-      where = `where job_id = $1`;
+      conds.push(`job_id = $${params.length}`);
     } else if (scopedJobIds) {
       params.push([...scopedJobIds]);
-      where = `where job_id = any($1::text[])`;
+      conds.push(`job_id = any($${params.length}::text[])`);
     }
+    // "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป มีแค่ฉันที่เห็น" (เจ้าของสั่ง 13 ส.ค. 2569) —
+    // feed รายชื่อรวมซ่อนใบที่คนอื่นเก็บ · แต่ **มุมมองรายใบ (?job_id=) ไม่ซ่อน** เพราะ
+    // dialog บนกล่องงานต้องบอกได้ว่า "ถูกเก็บแล้ว N คน" ไม่ให้ลิสต์หดแบบอ่านไม่ออก
+    // (ชื่อคนเก็บถูกตัดที่ toApplication อยู่แล้ว — ที่หลุดไปคือธง claimed เท่านั้น)
+    params.push(req.user.sub);
+    const claimWhere = `(claimed_by is null or claimed_by::text = $${params.length})`;
+    const legacyClaimWhere = `($${params.length} = $${params.length})`;
+    if (!jobId) conds.push('{{claimWhere}}');
 
     const rows = await queryWithLegacyFallback(
-      `select {{cols}} from ${tbl} ${where} order by created_at desc limit 500`,
+      `select {{cols}} from ${tbl} ${conds.length ? `where ${conds.join(' and ')}` : ''}
+        order by created_at desc limit 500`,
       params,
+      claimWhere,
+      legacyClaimWhere,
     );
-    return res.status(200).json({ items: rows.map(toApplication) });
+    return res.status(200).json({ items: rows.map((r) => toApplication(r, req.user.sub)) });
   } catch (e) {
     return handleApiError(res, e, 'job-applications GET', { userId: req.user.sub });
   }

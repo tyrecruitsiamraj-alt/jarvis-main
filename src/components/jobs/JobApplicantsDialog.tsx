@@ -12,6 +12,7 @@ import {
   GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
   updateJobApplication,
+  claimJobApplication,
   type ApplicationStatus,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
@@ -67,6 +68,20 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
       setItems((prev) => prev.map((a) => (a.id === id ? updated : a)));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  /** เก็บไปติดต่อ / คืน — ไม่ optimistic เพราะอาจชนกับเพื่อน (409) ให้ server ตัดสินก่อน */
+  const toggleClaim = async (a: PublicApplication) => {
+    setSavingId(a.id);
+    setError(null);
+    try {
+      const updated = await claimJobApplication(a.id, !a.claimed_by_me);
+      setItems((prev) => prev.map((x) => (x.id === a.id ? updated : x)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'เก็บไปติดต่อไม่สำเร็จ');
     } finally {
       setSavingId(null);
     }
@@ -226,6 +241,28 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                         {APPLICATION_STATUS_LABEL[s]}
                       </button>
                     ))}
+                    {/* "เก็บไปติดต่อ" (เจ้าของสั่ง 13 ส.ค. 2569) — เก็บแล้วใบไปโผล่แท็บ
+                        การติดต่อของคนเก็บคนเดียว · ถูกคนอื่นเก็บ = บอกว่าใครไม่ได้ (server
+                        ไม่ส่งชื่อ) แต่ต้องบอกว่า "ถูกเก็บแล้ว" ไม่ให้กดชนเงียบ ๆ */}
+                    {a.claimed && !a.claimed_by_me ? (
+                      <span className="ml-auto rounded-full bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                        🔒 เพื่อนเก็บไปติดต่อแล้ว
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={savingId === a.id}
+                        onClick={() => void toggleClaim(a)}
+                        className={cn(
+                          'ml-auto inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50',
+                          a.claimed_by_me
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            : 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
+                        )}
+                      >
+                        {a.claimed_by_me ? '✓ อยู่ในการติดต่อของฉัน — กดเพื่อคืน' : 'เก็บไปติดต่อ'}
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
