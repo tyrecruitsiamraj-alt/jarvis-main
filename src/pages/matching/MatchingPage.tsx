@@ -819,6 +819,24 @@ const MatchingPage: React.FC = () => {
   const lumosSelectedCount = lumosSelectedBoard.length + lumosSelectedIrecruit.length;
 
   /**
+   * ในจำนวนที่ติ๊ก มีกี่คนที่ **ส่ง AI ได้จริง** (ยังไม่เคยเข้าคิวใบนี้) และกี่คนที่
+   * **เก็บไปโทรเองได้** (ยังไม่มีใครถือ) — ตั้งแต่ 13 ส.ค. 2569 ติ๊กได้ทุกคนที่มีเบอร์
+   * แล้วมาแยกที่ปุ่มแทน (เจ้าของทักว่า "กดติ๊กเลือกไม่ได้" เพราะเดิมปิดช่องติ๊ก
+   * ตั้งแต่แรกเมื่อส่ง AI ไปแล้ว ทำให้เก็บไปโทรเองไม่ได้ไปด้วยทั้งที่เป็นคนละเรื่อง)
+   */
+  const lumosSelectedSendable = useMemo(() => {
+    const board = lumosSelectedBoard.filter((id) => !lumosStatusByRef[boardPersonRef(id)]).length;
+    const ir = lumosSelectedIrecruit.filter((id) => !lumosStatusByRef[irecruitPersonRef(id)]).length;
+    return board + ir;
+  }, [lumosSelectedBoard, lumosSelectedIrecruit, lumosStatusByRef]);
+
+  const lumosSelectedHoldable = useMemo(() => {
+    const board = lumosSelectedBoard.filter((id) => !holdByRef[boardPersonRef(id)]).length;
+    const ir = lumosSelectedIrecruit.filter((id) => !holdByRef[irecruitPersonRef(id)]).length;
+    return board + ir;
+  }, [lumosSelectedBoard, lumosSelectedIrecruit, holdByRef]);
+
+  /**
    * person_ref ของคนที่ปฏิเสธ "ใบขอที่เปิดอยู่" — มาจากผลโทรของใบนี้ที่หน้าโหลดอยู่แล้ว
    * (`GET /api/lumos/dispatch?jobId=` → `listLumosCallStatusForJob`) ไม่ต้องยิงเพิ่ม
    *
@@ -2810,6 +2828,18 @@ const MatchingPage: React.FC = () => {
                 );
               })()}
 
+              {/* ── ขั้น 1 · คนของเรา (ผ่านสัมภาษณ์ รอลงงาน) ──────────────────────
+                  เจ้าของทัก 13 ส.ค. 2569 ว่า drawer "ดูกลมกลืนกันมาก" — ทุกกล่องหน้าตา
+                  คล้ายกันจนไม่รู้ว่าอ่านถึงไหนแล้ว · คั่นเป็นขั้นตามลำดับที่งานเดินจริง:
+                  คนของเรา → ส่งโทร → หาคนที่ยังไม่สมัคร → หาไม่พอส่งต่อทีมอื่น
+                  ⚠️ ใช้ "1./2./3./4." ไม่ใช่ "ขั้น N" — แถบการไหลของงานด้านบนของหน้า
+                  ใช้คำว่า "ขั้น 1 · ฝั่งงาน / ขั้น 2 · ฝั่งการโทร" อยู่แล้ว ซ้ำกันแล้วสับสน */}
+              <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
+                <span className={cn('shrink-0 text-[11px] font-bold', TONE.primary.value)}>
+                  1. คนของเรา
+                </span>
+                <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
+              </div>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   {boardMatchById[jobDetail.id]
@@ -2890,86 +2920,10 @@ const MatchingPage: React.FC = () => {
                 </p>
               ) : null}
 
-              {/* กติกาเป้า 3 เท่า: To do หาไม่ถึงเป้า → ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว
-                  ถ้ายังไม่ถึงเป้าอีก บอกทางไปต่อ (iRecruit / Re Use / โพสหาคนใหม่) */}
-              {(() => {
-                const bm = boardMatchById[jobDetail.id];
-                // ขึ้นเมื่อรู้เป้าแล้ว และ (เคยค้นถังสำรอง หรือหาได้ไม่ถึงเป้า) — ไม่ครบต้องเห็นคำแนะนำเสมอ
-                if (!bm?.recommended_target) return null;
-                if (!bm.fallback_used && recommendedCandidateCount(bm.matches) >= bm.recommended_target) {
-                  return null;
-                }
-                const got = recommendedCandidateCount(bm.matches);
-                const short = got < bm.recommended_target;
-                const active = jobPostingsByJobId[jobDetail.id] ?? [];
-                const sentContent = active.some((p) => p.request_type !== 'scraping');
-                const sentScraping = active.some((p) => p.request_type === 'scraping');
-                return (
-                  <div
-                    className={cn(
-                      'rounded-lg border px-2.5 py-2 text-[10px] space-y-1.5',
-                      short
-                        ? cn(TONE.warn.soft, TONE.warn.num)
-                        : cn(TONE.info.soft, TONE.info.num),
-                    )}
-                  >
-                    {/* คำอธิบายยาวพับเก็บไว้ (เจ้าของสั่ง 13 ส.ค. 2569: "ทำเป็นแบบถ้ากดค่อยโชว์")
-                        — บรรทัดสรุปกับปุ่มลงมือยังเห็นเสมอ เพราะเป็นของที่ต้องตัดสินใจ */}
-                    <details>
-                      <summary className="cursor-pointer list-none font-semibold marker:hidden">
-                        {short
-                          ? `หาได้ ${got} คน จากเป้า ${bm.recommended_target} คน — กดดูว่าทำอะไรต่อได้`
-                          : `หาได้ครบเป้าแล้ว ${got} คน — กดดูรายละเอียด`}
-                      </summary>
-                      <p className="mt-1.5">
-                        เป้าคือ “อัตราที่ขอ × 3” · ระบบค้นถัง “ไม่มีงาน” เพิ่มให้แล้ว
-                        {short
-                          ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นหาคนที่ยังไม่สมัครด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
-                          : ` → รวมแนะนำ ${got} คน`}
-                      </p>
-                    </details>
-                    {/* หาไม่ครบเป้า = แนะนำให้ส่งต่อทีมอื่นตรงนี้เลย ไม่ต้องเลื่อนไปหาปุ่มด้านล่าง
-                        ⚠️ ส่งประเภทไหนไปแล้วซ่อน**เฉพาะปุ่มนั้น** อีกปุ่มยังกดได้
-                        (เจ้าของสั่ง 13 ส.ค. 2569 — เดิมส่งอันเดียวแล้วปุ่มหายทั้งคู่
-                        และถ้ากดอีกอันก็ได้คำขอเดิมกลับมาเงียบ ๆ ดูข้างบน migration 080) */}
-                    {short ? (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {sentContent && sentScraping ? (
-                          <span className="font-semibold">ส่งคำขอครบทั้ง Content และ Scraping แล้ว — รอทีมรับไปทำ</span>
-                        ) : (
-                          <span className="font-semibold">
-                            {active.length > 0
-                              ? `ส่ง ${sentScraping ? 'Scraping' : 'Content'} ไปแล้ว — ส่งอีกทางเพิ่มได้:`
-                              : 'แนะนำ: หาคนของเราไม่ครบ ส่งต่อทีมอื่นเลย →'}
-                          </span>
-                        )}
-                        {!sentContent ? (
-                          <button
-                            type="button"
-                            disabled={creatingPosting}
-                            onClick={() => void createPosting(jobDetail, 'content')}
-                            className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold disabled:opacity-60', TONE.orange.solid)}
-                          >
-                            <Megaphone className="h-3 w-3" />
-                            {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
-                          </button>
-                        ) : null}
-                        {!sentScraping ? (
-                          <button
-                            type="button"
-                            disabled={creatingPosting}
-                            onClick={() => void createPosting(jobDetail, 'scraping')}
-                            className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold disabled:opacity-60', TONE.teal.solid)}
-                          >
-                            <Search className="h-3 w-3" />
-                            {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })()}
+              {/* ⚠️ กล่อง "หาได้ไม่ถึงเป้า + ปุ่มส่ง Content/Scraping" ย้ายไปรวมกับกล่อง
+                  "หาคนไม่ได้เลย?" ท้าย drawer แล้ว (เจ้าของสั่ง 13 ส.ค. 2569: "ไปไว้ด้วยกัน")
+                  — สองกล่องพูดเรื่องเดียวกันคือ "หาคนไม่พอ ทำไงต่อ" แต่เดิมอยู่คนละที่
+                  ห่างกันครึ่งหน้าจอ และมีปุ่มส่งคำขอโพสคนละชุด */}
 
               {lumosNotice ? (
                 <p className={cn('rounded-lg border px-2.5 py-1.5 text-[11px]', TONE.success.soft, TONE.success.num)}>
@@ -3026,6 +2980,14 @@ const MatchingPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {/* ── ขั้น 2 · เลือกทางที่จะทำกับคนที่แมท ─────────────────────────── */}
+              <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
+                <span className={cn('shrink-0 text-[11px] font-bold', TONE.primary.value)}>
+                  2. เลือกทางที่จะทำต่อ
+                </span>
+                <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
+              </div>
+
               {/* สี่ทางเลือกหลังเห็นคนที่แมท — เห็นเสมอ ไม่ว่าจะติ๊กใครหรือยัง
                   (เดิมแถบนี้หายทั้งแถบเมื่อยังไม่ติ๊ก ผู้ใช้จึงไม่รู้ว่ามีทางอะไรบ้าง)
                   ⚠️ แถบเดียวคุมทั้งฝั่งคนของเราและ iRecruit — selection เป็นก้อนเดียวกัน */}
@@ -3040,6 +3002,8 @@ const MatchingPage: React.FC = () => {
                 onSendAll={approveWholeJob}
                 onHoldSelf={() => void holdSelectedForSelf()}
                 holdingSelf={holdingSelf}
+                sendableCount={lumosSelectedSendable}
+                holdableCount={lumosSelectedHoldable}
               />
               <CallBatchUndoStrip
                 batches={pendingBatches}
@@ -3099,7 +3063,14 @@ const MatchingPage: React.FC = () => {
                         const heldByMe = hold && hold.mine ? hold : null;
                         // คนที่มีเจ้าหน้าที่รับไปตามอยู่ = ห้ามส่ง AI ทับ
                         // (server กันอีกชั้นที่ insertQueueItems — ตรงนี้แค่ไม่ให้ติ๊กแล้วงง)
-                        const canPickForLumos = Boolean(m.mobile) && !lumosRow && !hold;
+                        /**
+                         * ⚠️ **ติ๊กได้ทุกคนที่มีเบอร์** — เจ้าของทัก 13 ส.ค. 2569 ว่า
+                         * "มันกดติ๊กเลือกไม่ได้" · เดิมปิดช่องติ๊กเมื่อส่ง AI ไปแล้วหรือมีคนถือ
+                         * ซึ่งทำให้ **"เก็บไปโทรเอง" ทำไม่ได้ไปด้วย** ทั้งที่เป็นคนละเรื่องกัน
+                         * ตอนนี้ปิดเฉพาะ "ไม่มีเบอร์" (ทำอะไรกับคนนี้ไม่ได้เลยจริง ๆ)
+                         * ส่วนปุ่มไหนใช้กับใครได้ ไปตัดสินที่แถบปุ่มแทน (lumosSendActions)
+                         */
+                        const canPickForLumos = Boolean(m.mobile);
                         return (
                         <div
                           key={m.card_id}
@@ -3120,7 +3091,7 @@ const MatchingPage: React.FC = () => {
                               !m.mobile
                                 ? 'ไม่มีเบอร์มือถือ — ให้ AI โทรไม่ได้'
                                 : lumosRow
-                                  ? 'ส่ง AI โทรไปแล้ว'
+                                  ? 'ส่ง AI โทรไปแล้ว — ติ๊กได้ เผื่อเก็บไปโทรเอง'
                                   : 'เลือกให้ AI โทร'
                             }
                             className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
@@ -3304,6 +3275,14 @@ const MatchingPage: React.FC = () => {
 
               {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
               {boardMatchById[jobDetail.id] && !boardErrorById[jobDetail.id] ? (
+                <div className="space-y-2.5">
+                  {/* ── ขั้น 3 · คนที่ยังไม่สมัครงานนี้ ───────────────────────────── */}
+                  <div className={cn('flex items-center gap-2 border-t pt-3', DASH.divider)}>
+                    <span className={cn('shrink-0 text-[11px] font-bold', TONE.primary.value)}>
+                      3. คนที่ยังไม่สมัครงานนี้
+                    </span>
+                    <span className={cn('h-px flex-1', DASH.divider, 'border-t')} aria-hidden />
+                  </div>
                 <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/50">
                   <div className="flex items-center justify-between gap-2">
                     {/* เจ้าของสั่ง 13 ส.ค. 2569: เลิกเรียกชื่อระบบ ("iRecruit") มาเป็นคำที่บอก
@@ -3388,7 +3367,8 @@ const MatchingPage: React.FC = () => {
                             const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                             const lumosRef = irecruitPersonRef(m.id);
                             const lumosRow = lumosStatusByRef[lumosRef];
-                            const canPickForLumos = Boolean(m.phone_number) && !lumosRow;
+                            // เหตุผลเดียวกับฝั่งบอร์ด — ติ๊กได้ถ้ามีเบอร์ ปุ่มค่อยตัดสินว่าใครทำอะไรได้
+                            const canPickForLumos = Boolean(m.phone_number);
                             return (
                               <div
                                 key={row.key}
@@ -3562,55 +3542,124 @@ const MatchingPage: React.FC = () => {
                   />
                   {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                 </div>
+                </div>
               ) : null}
 
-              {/* #1 หาคนไม่ได้ / คนที่มีไม่โอเค → สร้างคำขอโพสหางานใหม่ (ID ให้ทีมคอนเทนต์รับไปทำต่อ) */}
+              {/* ── ขั้น 4 · หาคนไม่พอ — ส่งต่อทีมอื่น ────────────────────────────
+                  เจ้าของสั่ง 13 ส.ค. 2569: เอากล่อง "หาได้ไม่ถึงเป้า" มารวมที่นี่
+                  ("ไปไว้ด้วยกัน") — เดิมแยกกันอยู่คนละที่ทั้งที่พูดเรื่องเดียวกัน
+                  และมีปุ่มส่งคำขอโพสคนละชุดจนไม่รู้ว่าอันไหนใช้ทำอะไร */}
               {boardMatchById[jobDetail.id] ? (
-                <div className={cn('rounded-xl border px-3 py-3 space-y-2', TONE.danger.soft)}>
-                  <p className={cn('text-xs font-semibold', TONE.danger.num)}>หาคนไม่ได้เลย หรือคนที่มีไม่โอเค?</p>
-                  {jobPostingByJobId[jobDetail.id] ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        title={jobPostingByJobId[jobDetail.id].id}
-                        className={cn('rounded-full border px-2 py-0.5 text-[10px] font-mono', TONE.danger.soft, TONE.danger.value, 'bg-white dark:bg-transparent')}
-                      >
-                        ID: {jobPostingByJobId[jobDetail.id].id.slice(0, 8)}
-                      </span>
-                      <span
-                        className={cn(
-                          jobPostingStatusChip(jobPostingByJobId[jobDetail.id].status),
-                          'jarvis-chip-sm',
+                <div className={cn('rounded-xl border px-3 py-3 space-y-2.5', TONE.danger.soft)}>
+                  <p className={cn('text-xs font-semibold', TONE.danger.num)}>
+                    4. หาคนไม่พอ — ส่งต่อทีมอื่น
+                  </p>
+
+                  {/* สรุปว่าตอนนี้ได้เท่าไหร่จากเป้า — รายละเอียดพับเก็บ */}
+                  {(() => {
+                    const bm = boardMatchById[jobDetail.id];
+                    if (!bm?.recommended_target) return null;
+                    const got = recommendedCandidateCount(bm.matches);
+                    const short = got < bm.recommended_target;
+                    if (!short && !bm.fallback_used) return null;
+                    return (
+                      <details className="text-[11px]">
+                        <summary className="cursor-pointer list-none font-semibold marker:hidden">
+                          {short
+                            ? `หาได้ ${got} คน จากเป้า ${bm.recommended_target} คน — กดดูว่าทำอะไรต่อได้`
+                            : `หาได้ครบเป้าแล้ว ${got} คน — กดดูรายละเอียด`}
+                        </summary>
+                        <p className="mt-1.5 text-muted-foreground">
+                          เป้าคือ “อัตราที่ขอ × 3” · ระบบค้นถัง “ไม่มีงาน” เพิ่มให้แล้ว
+                          {short
+                            ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นหาคนที่ยังไม่สมัคร (หัวข้อ 3) · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
+                            : ` → รวมแนะนำ ${got} คน`}
+                        </p>
+                      </details>
+                    );
+                  })()}
+                  {/* คำขอที่ส่งไปแล้ว — โชว์ ID + สถานะ เพื่อให้ตามงานกับทีมคอนเทนต์ได้
+                      ⚠️ ส่งประเภทไหนไปแล้วซ่อน**เฉพาะปุ่มนั้น** อีกทางยังส่งเพิ่มได้
+                      (migration 080 เปิดให้ใบเดียวมีทั้ง Content และ Scraping) */}
+                  {(() => {
+                    const active = jobPostingsByJobId[jobDetail.id] ?? [];
+                    const sentContent = active.some((x) => x.request_type !== 'scraping');
+                    const sentScraping = active.some((x) => x.request_type === 'scraping');
+                    return (
+                      <>
+                        {active.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {active.map((x) => (
+                              <span key={x.id} className="inline-flex items-center gap-1">
+                                <span
+                                  title={x.id}
+                                  className={cn(
+                                    'rounded-full border px-2 py-0.5 text-[10px] font-mono',
+                                    TONE.danger.soft,
+                                    TONE.danger.value,
+                                    'bg-white dark:bg-transparent',
+                                  )}
+                                >
+                                  {x.id.slice(0, 8)}
+                                </span>
+                                <span className={cn(jobPostingStatusChip(x.status), 'jarvis-chip-sm')}>
+                                  {x.request_type === 'scraping' ? 'Scraping' : 'Content'} ·{' '}
+                                  {jobPostingStatusLabel(x.status)}
+                                </span>
+                              </span>
+                            ))}
+                            <a
+                              href="/matching/job-postings"
+                              className="text-[11px] text-blue-700 hover:underline dark:text-blue-300"
+                            >
+                              ดูคำขอทั้งหมด →
+                            </a>
+                          </div>
+                        ) : null}
+                        {!sentContent || !sentScraping ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {active.length > 0 ? (
+                              <span className="text-[11px] font-medium text-muted-foreground">
+                                ส่งอีกทางเพิ่มได้:
+                              </span>
+                            ) : null}
+                            {!sentContent ? (
+                              <button
+                                type="button"
+                                disabled={creatingPosting}
+                                onClick={() => void createPosting(jobDetail, 'content')}
+                                className={cn(
+                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60',
+                                  TONE.orange.solid,
+                                )}
+                              >
+                                <Megaphone className="h-3.5 w-3.5" />
+                                {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
+                              </button>
+                            ) : null}
+                            {!sentScraping ? (
+                              <button
+                                type="button"
+                                disabled={creatingPosting}
+                                onClick={() => void createPosting(jobDetail, 'scraping')}
+                                className={cn(
+                                  'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60',
+                                  TONE.teal.solid,
+                                )}
+                              >
+                                <Search className="h-3.5 w-3.5" />
+                                {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] font-medium text-muted-foreground">
+                            ส่งครบทั้ง Content และ Scraping แล้ว — รอทีมรับไปทำ
+                          </p>
                         )}
-                      >
-                        {jobPostingByJobId[jobDetail.id].request_type === 'scraping' ? 'Scraping' : 'Content'} ·{' '}
-                        {jobPostingStatusLabel(jobPostingByJobId[jobDetail.id].status)}
-                      </span>
-                      <a href="/matching/job-postings" className="text-[11px] text-blue-700 hover:underline dark:text-blue-300">
-                        ดูคำขอทั้งหมด →
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={creatingPosting}
-                        onClick={() => void createPosting(jobDetail, 'content')}
-                        className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.orange.solid)}
-                      >
-                        <Megaphone className="h-3.5 w-3.5" />
-                        {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={creatingPosting}
-                        onClick={() => void createPosting(jobDetail, 'scraping')}
-                        className={cn('inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60', TONE.teal.solid)}
-                      >
-                        <Search className="h-3.5 w-3.5" />
-                        {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
-                      </button>
-                    </div>
-                  )}
+                      </>
+                    );
+                  })()}
                   {postingError ? <p className="text-[11px] text-destructive">{postingError}</p> : null}
                 </div>
               ) : null}

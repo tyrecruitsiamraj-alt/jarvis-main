@@ -199,6 +199,8 @@ export function LumosSendBar({
   creatingBatch,
   onHoldSelf,
   holdingSelf = false,
+  sendableCount,
+  holdableCount,
 }: {
   count: number;
   /** คนทั้งใบที่ส่งได้จริง — ปุ่ม "ส่งทั้งหมดที่แมท" ใช้ยอดนี้ ไม่เกี่ยวกับการติ๊ก */
@@ -218,10 +220,16 @@ export function LumosSendBar({
    */
   onHoldSelf: () => void;
   holdingSelf?: boolean;
+  /** ในจำนวนที่ติ๊ก ส่ง AI ได้จริงกี่คน (ยังไม่เคยเข้าคิวใบนี้) — ไม่ส่ง = เท่ากับที่ติ๊ก */
+  sendableCount?: number;
+  /** ในจำนวนที่ติ๊ก เก็บไปโทรเองได้กี่คน (ยังไม่มีใครถือ) */
+  holdableCount?: number;
 }) {
   const act = lumosSendActionStates({
     allCount,
     selectedCount: count,
+    selectedSendable: sendableCount,
+    selectedHoldable: holdableCount,
     sending: busy,
     creatingBatch,
     holdingSelf,

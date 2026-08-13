@@ -85,3 +85,85 @@ describe('lumosSendActionStates — ปุ่มที่ใช้ไม่ไ�
     expect(s.sendAll.disabled).toBe(true);
   });
 });
+
+describe('ติ๊กได้ทุกคนที่มีเบอร์ — ปุ่มค่อยแยกว่าใครทำอะไรได้ (เจ้าของทัก 13 ส.ค. 2569)', () => {
+  const base = { sending: false, creatingBatch: false, holdingSelf: false };
+
+  it('ติ๊ก 3 คน · ส่ง AI ได้ 1 (อีก 2 ส่งไปแล้ว) → ปุ่มส่งขึ้น 1 · ปุ่มเก็บยังเป็น 3', () => {
+    const a = lumosSendActionStates({
+      ...base,
+      allCount: 5,
+      selectedCount: 3,
+      selectedSendable: 1,
+      selectedHoldable: 3,
+    });
+    expect(a.sendSelected.count).toBe(1);
+    expect(a.sendSelected.disabled).toBe(false);
+    expect(a.queueSelected.count).toBe(1);
+    expect(a.holdSelf.count).toBe(3);
+    expect(a.holdSelf.disabled).toBe(false);
+  });
+
+  it('**ติ๊กคนที่ส่ง AI ไปแล้วล้วน → เก็บไปโทรเองยังกดได้** (เคสที่เจ้าของเจอ)', () => {
+    const a = lumosSendActionStates({
+      ...base,
+      allCount: 0,
+      selectedCount: 2,
+      selectedSendable: 0,
+      selectedHoldable: 2,
+    });
+    expect(a.sendSelected.disabled).toBe(true);
+    expect(a.sendSelected.reason).toContain('ส่งเข้าคิว AI ไปแล้ว');
+    expect(a.holdSelf.disabled).toBe(false);
+    expect(a.holdSelf.count).toBe(2);
+  });
+
+  it('ติ๊กคนที่มีเจ้าหน้าที่ถืออยู่ล้วน → เก็บไปโทรเองปิด พร้อมเหตุผลที่ตรง', () => {
+    const a = lumosSendActionStates({
+      ...base,
+      allCount: 3,
+      selectedCount: 2,
+      selectedSendable: 2,
+      selectedHoldable: 0,
+    });
+    expect(a.holdSelf.disabled).toBe(true);
+    expect(a.holdSelf.reason).toContain('เจ้าหน้าที่ถืออยู่');
+    expect(a.sendSelected.disabled).toBe(false);
+  });
+
+  it('⚠️ ยังไม่ติ๊กใคร ต้องบอกให้ไปติ๊ก ไม่ใช่บอกว่า "ส่งไปแล้วทั้งหมด"', () => {
+    const a = lumosSendActionStates({
+      ...base,
+      allCount: 4,
+      selectedCount: 0,
+      selectedSendable: 0,
+      selectedHoldable: 0,
+    });
+    expect(a.sendSelected.reason).toContain('ติ๊กเลือก');
+    expect(a.holdSelf.reason).toContain('ติ๊กเลือก');
+  });
+
+  it('ไม่ส่งยอดแยกมา = พฤติกรรมเดิมทุกอย่าง (ไม่ทำของเก่าพัง)', () => {
+    const a = lumosSendActionStates({ ...base, allCount: 4, selectedCount: 2 });
+    expect(a.sendSelected.count).toBe(2);
+    expect(a.holdSelf.count).toBe(2);
+    expect(a.sendSelected.disabled).toBe(false);
+  });
+
+  it('invariant เดิมยังอยู่: disabled === (reason !== null) ทุกปุ่มทุกเคส', () => {
+    for (const sendable of [0, 1, 3]) {
+      for (const holdable of [0, 2]) {
+        const a = lumosSendActionStates({
+          ...base,
+          allCount: 3,
+          selectedCount: 3,
+          selectedSendable: sendable,
+          selectedHoldable: holdable,
+        });
+        for (const k of LUMOS_SEND_ACTION_KEYS) {
+          expect(a[k].disabled).toBe(a[k].reason !== null);
+        }
+      }
+    }
+  });
+});
