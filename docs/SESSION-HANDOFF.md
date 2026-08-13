@@ -10,14 +10,14 @@
 | | |
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
-| commit ล่าสุด | `f0d5e11` (รอบเจ็ด 12 ส.ค. กลางคืน — 6 commit: master ตำแหน่งงาน 479 · หน้าหลัก funnel 4 ขั้น+dialog · จัดแถบการไหลของงาน Matching · ป้าย "แมท N งาน" · เปิด precompute+แก้บั๊ก config) |
-| `npm run test` | **875 ผ่าน / 4 skipped** (ไฟล์เทสต์ 103) |
+| commit ล่าสุด | `c7e5b61` (รอบแปด 13 ส.ค. — 8 commit: drawer เหลือทางส่งโทร · ยุบแถบการไหลของงาน 4+4 การ์ด · โทรของฉันเข้าหน้าหลัก · แท็บบอร์ด 4 อัน · ค้นหาขึ้นบน+กล่องลอยลงล่าง · เก็บไปติดต่อเฉพาะของฉัน) · ก่อนหน้า `f0d5e11` (รอบเจ็ด 12 ส.ค. กลางคืน — 6 commit: master ตำแหน่งงาน 479 · หน้าหลัก funnel 4 ขั้น+dialog · จัดแถบการไหลของงาน Matching · ป้าย "แมท N งาน" · เปิด precompute+แก้บั๊ก config) |
+| `npm run test` | **877 ผ่าน / 4 skipped** (ไฟล์เทสต์ 103) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error (ครอบ `src/`) |
 | `npx tsc --noEmit` | 0 error (**ไม่ครอบทั้ง src/ และ api/** — อย่าหลงว่าเช็คแล้ว) |
 | `npx tsc --noEmit -p tsconfig.api.json` | **0 error** (ครอบ `api/` · กติกา: **ต้องเป็น 0**) |
 | `npx eslint .` | 0 error · 16 warning เดิม |
 | `npx tsx scripts/verify-api-registry.mjs` | ผ่าน (**77 route**) |
-| migration | ไฟล์ถึง **078** · **บนฐานรันครบถึง 078 แล้ว** ✅ (078 = ตาราง `recruit_job_titles` · ยกแล้ว 479 แถว) |
+| migration | ไฟล์ถึง **079** · **บนฐานรันครบถึง 079 แล้ว** ✅ (079 = คอลัมน์ claim "เก็บไปติดต่อ" บน public_job_applications) |
 | โหมดโทร | **manual ทุกจุด** — production ยังไม่โทรหาใครเอง |
 | precompute AI | **เปิดแล้ว** ✅ (เจ้าของเคาะ 12 ส.ค.) — `MATCH_PRECOMPUTE_ENABLED=true` ใน `.env.local` (git ignore) · ⚠️ **server จริงต้องใส่ใน `.env` เองตอน deploy** · precompute แค่คิดผลแมท ไม่โทรหาใคร |
 
