@@ -254,27 +254,54 @@ async function handler(req: AuthedReq, res: ApiRes) {
     );
 
     // ── คิว AI โทร (เฉพาะใบขอของ BU ตัวเอง ไม่รวมหน้า Follow) — เดือนนี้ + ของค้างทั้งหมด
+    //
+    // ⚠️ **นับ "แถว" กับนับ "หัวคน" ไม่เท่ากัน** — คนเดียวอยู่ในผลแมทได้หลายใบ
+    // (วัดจริง: 2,816 แถวถึงคิว = 126 คน เฉลี่ยคนละ ~22 ใบ) เจ้าหน้าที่ถามว่า
+    // "ส่งไปกี่คน" ต้องตอบด้วย distinct เบอร์ ไม่ใช่จำนวนแถว
+    // คีย์เบอร์ต่างกันตามช่อง (reminder=recipient_phone · interview=phone)
+    // — แพตเทิร์นเดียวกับ PAYLOAD_PHONE_KEYS ใน lumosDispatch.ts
+    const phoneExpr = `coalesce(payload->>'recipient_phone', payload->>'phone')`;
     const { rows: lumosAgg } = await dbQuery<{
       sent_month: string;
+      sent_month_people: string;
       waiting_call: string;
       delivered_waiting: string;
       stale_delivered: string;
+      stale_pending: string;
+      retry_scheduled: string;
+      attempts_total: string;
+      last_result_at: string | null;
+      last_sent_at: string | null;
     }>(
       `select
          count(*) filter (where created_at >= date_trunc('month', now()))                        as sent_month,
+         count(distinct ${phoneExpr}) filter (where created_at >= date_trunc('month', now()))    as sent_month_people,
          count(*) filter (where status = 'pending' and result is null)                           as waiting_call,
          count(*) filter (where status = 'delivered' and result is null)                         as delivered_waiting,
          count(*) filter (where status = 'delivered' and result is null
-                            and delivered_at < now() - interval '2 days')                        as stale_delivered
+                            and delivered_at < now() - interval '2 days')                        as stale_delivered,
+         count(*) filter (where status = 'pending' and result is null
+                            and coalesce(next_attempt_at, created_at) < now() - interval '2 days')
+                                                                                                 as stale_pending,
+         count(*) filter (where followup_state = 'retry_scheduled')                              as retry_scheduled,
+         coalesce(sum(attempt_count) filter (where updated_at >= date_trunc('month', now())), 0) as attempts_total,
+         max(updated_at) filter (where coalesce(last_outcome, result->>'outcome') is not null)   as last_result_at,
+         max(created_at)                                                                          as last_sent_at
        from ${queueTable}
       where job_ref = any($1)`,
       [scopedJobIds],
     );
 
+    // ⚠️ **อ่าน outcome ด้วย coalesce(last_outcome, result->>'outcome')** — กับดักเดิม
+    // ที่ไฟล์อื่นแก้ไปแล้วแต่ตกหล่นที่นี่: ผลที่ **คน** บันทึกเขียนแค่ last_outcome
+    // และตอนตั้งโทรซ้ำระบบ **ล้าง result ทิ้ง** → อ่าน result อย่างเดียวจะนับหายเงียบ ๆ
+    // ⚠️ ตัด cancelled ออก — ไม่ใช่ผลการโทร (คนกดยกเลิกเอง) กติกาเดียวกับ resolvedCallBase()
     const { rows: outcomeRows } = await dbQuery<{ outcome: string; n: string }>(
-      `select result->>'outcome' as outcome, count(*) as n
+      `select coalesce(last_outcome, result->>'outcome') as outcome, count(*) as n
          from ${queueTable}
-        where job_ref = any($1) and result is not null
+        where job_ref = any($1)
+          and coalesce(last_outcome, result->>'outcome') is not null
+          and coalesce(last_outcome, result->>'outcome') <> 'cancelled'
           and updated_at >= date_trunc('month', now())
         group by 1`,
       [scopedJobIds],
@@ -340,9 +367,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
       },
       lumos: {
         sent_month: Number(lumosAgg[0]?.sent_month) || 0,
+        /** ส่งไปกี่ "คน" (distinct เบอร์) — ต่างจาก sent_month ที่นับแถว = คน × ใบขอ */
+        sent_month_people: Number(lumosAgg[0]?.sent_month_people) || 0,
         waiting_call: Number(lumosAgg[0]?.waiting_call) || 0,
         delivered_waiting: Number(lumosAgg[0]?.delivered_waiting) || 0,
         stale_delivered: Number(lumosAgg[0]?.stale_delivered) || 0,
+        /** ค้างในคิวเกิน 2 วันโดยยังไม่ถูกหยิบไปโทรเลย — เดิมไม่มีใครเห็นเคสนี้ */
+        stale_pending: Number(lumosAgg[0]?.stale_pending) || 0,
+        /** ตั้งโทรซ้ำไว้แล้ว รอถึงเวลานัด */
+        retry_scheduled: Number(lumosAgg[0]?.retry_scheduled) || 0,
+        /** จำนวนสายที่โทรออกจริงเดือนนี้ (รวมโทรซ้ำ) — ต่างจากจำนวนคน */
+        attempts_month: Number(lumosAgg[0]?.attempts_total) || 0,
+        /** ผลกลับล่าสุดที่ Lumos ส่งเข้ามา — ใช้ตอบ "เขาส่งผลมาไหม" */
+        last_result_at: lumosAgg[0]?.last_result_at ?? null,
+        /** เข้าคิวล่าสุดเมื่อไหร่ — คู่กับตัวบน ทำให้แยกออกว่า "เงียบเพราะไม่มีงาน" หรือ "เงียบเพราะสายไม่เดิน" */
+        last_sent_at: lumosAgg[0]?.last_sent_at ?? null,
         outcomes_month: outcomesMonth,
       },
       proposals: {

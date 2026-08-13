@@ -27,3 +27,21 @@ export const CALL_OUTCOME_TONE: Record<CallOutcome, ToneKey> = {
   wrong_person: 'orange',
   cancelled: 'neutral',
 };
+
+/**
+ * ป้ายไทยของผลโทร — อยู่คู่กับโทนที่นี่ที่เดียวด้วยเหตุผลเดียวกัน
+ * (เดิมเป็น local ใน CallFunnelPanel ไฟล์ไหนอยากใช้ต้องก๊อป แล้วคำจะเพี้ยนกันเอง
+ * แบบเดียวกับที่สีเคยเพี้ยนมาแล้ว)
+ */
+export const CALL_OUTCOME_LABEL: Record<CallOutcome, string> = {
+  confirmed: 'สนใจ',
+  acknowledged: 'รับทราบ',
+  declined: 'ไม่สนใจ',
+  reschedule_requested: 'ขอเลื่อน',
+  wrong_person: 'เบอร์ผิด',
+  no_answer: 'ไม่รับสาย',
+  busy: 'สายไม่ว่าง',
+  unresponsive: 'ไม่ตอบ',
+  failed: 'โทรไม่สำเร็จ',
+  cancelled: 'ยกเลิก',
+};

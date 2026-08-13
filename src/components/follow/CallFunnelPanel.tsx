@@ -11,7 +11,7 @@ import {
 } from '@/lib/callFunnelApi';
 import { acquireCallHold } from '@/lib/callHoldsApi';
 import { type CallOutcome } from '@/lib/callFollowupPolicy';
-import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
+import { CALL_OUTCOME_LABEL, CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import { resolvedCallBase } from '@/lib/callFunnelMath';
@@ -24,18 +24,8 @@ import { resolvedCallBase } from '@/lib/callFunnelMath';
  * ⚠️ ตัวเลขที่นี่คือการทำงานของการโทร ไม่ใช่ "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
  */
 
-const OUTCOME_LABEL: Record<CallOutcome, string> = {
-  confirmed: 'สนใจ',
-  acknowledged: 'รับทราบ',
-  declined: 'ไม่สนใจ',
-  reschedule_requested: 'ขอเลื่อน',
-  wrong_person: 'เบอร์ผิด',
-  no_answer: 'ไม่รับสาย',
-  busy: 'สายไม่ว่าง',
-  unresponsive: 'ไม่ตอบ',
-  failed: 'โทรไม่สำเร็จ',
-  cancelled: 'ยกเลิก',
-};
+/** ป้ายไทยย้ายไป lib กลางแล้ว (คู่กับโทนสี) — ไฟล์หน้าไม่ประกาศเอง */
+const OUTCOME_LABEL = CALL_OUTCOME_LABEL;
 
 
 /**

@@ -49,10 +49,22 @@ export type FlowSummary = {
   };
   lumos: {
     sent_month: number;
+    /** ส่งไปกี่ "คน" (distinct เบอร์) — sent_month นับแถว = คน × ใบขอ ซึ่งมากกว่ามาก */
+    sent_month_people?: number;
     waiting_call: number;
     delivered_waiting: number;
     /** Lumos รับไปแล้วเกิน 2 วันยังไม่มีผลกลับ */
     stale_delivered: number;
+    /** ค้างในคิวเกิน 2 วันโดยยังไม่ถูกหยิบไปโทรเลย */
+    stale_pending?: number;
+    /** ตั้งโทรซ้ำไว้ รอถึงเวลานัด */
+    retry_scheduled?: number;
+    /** จำนวนสายที่โทรออกจริงเดือนนี้ (รวมโทรซ้ำ) */
+    attempts_month?: number;
+    /** ผลกลับล่าสุดที่ Lumos ส่งเข้ามา (ISO) — ตอบคำถาม "เขาส่งผลมาไหม" */
+    last_result_at?: string | null;
+    /** เข้าคิวล่าสุดเมื่อไหร่ (ISO) — คู่กับตัวบนเพื่อแยก "ไม่มีงาน" ออกจาก "สายไม่เดิน" */
+    last_sent_at?: string | null;
     outcomes_month: Record<string, number>;
   };
   proposals: {
