@@ -541,6 +541,40 @@ reminder รับแค่ 7 ฟิลด์ตายตัว — ช่อง
 ⚠️ เทสต์ `callFollowup.test.ts` นับลำดับคิวรีด้วย `sqlOf(i)` จึง mock store ให้คืน
 ค่าเริ่มต้นคงที่ — พฤติกรรม store จริงมีเทสต์แยกของตัวเอง
 
+## "ทุกใบต้องเหมือนกัน" — โครงการ์ด/แถบปุ่มที่คงที่ (13 ส.ค. 2569 รอบเก้า)
+
+เจ้าของสั่ง: *"ทุกใบก็ต้องเหมือนกันสิกันงง · Format ก็ทำให้มันเท่ากัน ไม่ใช่ข้อมูล
+ไม่เท่ากันก็ขยับเอง คงมันไว้ให้ตรงกัน"* — หลักที่ใช้ตัดสินทุกจุด:
+**ทุกแถวเป็น "ช่องที่จองไว้" ไม่ใช่ "ช่องที่งอกตามข้อมูล"**
+
+* `src/lib/lumosStatCells.ts` — ช่องตัวเลขผลโทร **6 ช่องเสมอทุกกรณี**
+  (`lumosFixedStatCells` คืน 6 ตัวแม้ `s` เป็น undefined) · ช่องพิเศษ
+  (รออนุมัติ/ขอเลื่อน/ต้องคนตาม) ออกมาเป็นชิปผ่าน `lumosExtraStatChips` ·
+  `lumosProgressChip` = ที่ไปของแถบ ติดต่อ/จอง/ลงงาน เดิม
+  เทสต์ `tests/api/lumosStatCells.test.ts` (13 เคส) **บังคับว่าต้องคืน 6 ตัวเสมอ**
+* `src/lib/lumosSendActions.ts` — สถานะ 4 ปุ่มส่งโทร · invariant
+  `disabled === (reason !== null)` (จะปิดปุ่มต้องมีเหตุผลให้ผู้ใช้อ่านเสมอ)
+  เทสต์ `tests/api/lumosSendActions.test.ts` (6 เคส)
+* `src/lib/displayFallback.ts` — `EM_DASH` + `dashIfEmpty()`
+* `src/lib/applicantDisplay.ts` — `applicantFactLine()` / `applicantAddressLine()`
+* ผู้ใช้: `MatchingPage` (การ์ดใบขอ + drawer) · `LumosPanels` ·
+  `JobApplicantsDialog` · `JobBoardView` · `RmTable`
+
+⚠️ **จอง "ที่ยืน" ด้วย element จริงที่มองไม่เห็น ดีกว่า `min-h` ค่าคงที่**
+วัดเจอว่า `min-h-[22px]` ที่เดาไว้ต่างจากชิปจริง 23px อยู่ 1px — ใช้ชิป/ปุ่มตัวเดียวกัน
+`invisible w-0 overflow-hidden px-0` แล้วความสูงเดินตามเองเมื่อขนาดชิปเปลี่ยน
+**spacer ต้องมี text content** ไม่งั้นไม่มี line-box (วัดได้ 6.5px แทน 23px)
+
+⚠️ **`EM_DASH` ห้ามตั้งชื่อ `DASH`** — ชนกับ token พื้นผิว dashboard ใน `designTokens.ts`
+⚠️ **`dashIfEmpty` ห้ามเป็น `v || EM_DASH`** — ฟิลด์ตัวเลขที่เป็น 0 คือคำตอบจริง
+(ต่างจาก `applicantFactLine` ที่ อายุ/นน./สส. เป็น 0 = ข้อมูลเสีย โดยตั้งใจ · มีเทสต์ล็อกทั้งคู่)
+⚠️ **ป้ายปุ่มที่ยาวไม่เท่ากันบีบ layout ข้าง ๆ** — "ดูคนของเรา (0)" กับ
+"AI กำลังคิดที่หลังบ้าน…" ทำให้กล่องซ้ายกว้างคนละขนาด เลขในแถบไม่ตรงคอลัมน์ข้ามใบ
+(วัดได้ 544.9–549.1px) · ล็อกความกว้างปุ่มแก้ได้
+⚠️ **`truncate` ใน `<td>` ต้องมีกล่องกว้างแน่นอน** — `inline-flex` ใช้ไม่ได้ ต้อง `flex` + `max-w`
+⚠️ **`beginSendFlow` รับ `boardIds` ได้** เพราะ "ส่งทั้งหมดที่แมท" เพิ่งเรียก setState
+ใน tick เดียวกัน อ่านจาก state จะได้ค่าเก่าแล้วข้าม popup "แมทหลายงาน"
+
 ### แถบตัวเลขการโทร "ต่อใบขอ" (ข้างการ์ดในหน้า Matching)
 
 * `api/_lib/lumosDispatch.ts` → `loadLumosJobCallSummaryMap()` — คิวรีเดียว group by `job_ref`

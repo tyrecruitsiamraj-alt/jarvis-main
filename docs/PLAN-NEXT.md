@@ -7,17 +7,19 @@
 + **ทางตัน 3 เรื่องที่ต้องเคาะ**) และ
 `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline (12 ส.ค. รอบเจ็ด):** test **875 ผ่าน/4 skip (103 ไฟล์)** ·
+**Baseline (13 ส.ค. รอบเก้า):** test **911 ผ่าน/4 skip (106 ไฟล์)** ·
 **tsc ต้องเป็น 0 ทั้งสาม config** · eslint 0 error/16 warning ·
-verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 078 แล้ว** ·
+verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 079 แล้ว** ·
 precompute **เปิดแล้ว** (.env.local — server จริงต้องใส่เองตอน deploy)
 
-## 🎯 งานถัดไป (เรียงแล้ว — เคาะครบ ห้ามถามซ้ำ · ความรู้เต็มใน SESSION-HANDOFF §0.3)
+## 🎯 งานถัดไป (เรียงแล้ว — เคาะครบ ห้ามถามซ้ำ · ความรู้เต็มใน SESSION-HANDOFF §0.2–0.3)
 
 1. **"ที่จอง" ใหม่จากผลโทร "สนใจ"** — สำคัญสุด: หลังถอดปุ่มจองจาก drawer
    **การจอง iRecruit ไม่มีปุ่มเหลือเลย** (บอร์ดยังจองได้จาก dialog รายละเอียดคน)
    แผน: กล่อง "สนใจ" ใน dialog ผลจากการโทรบนหน้าหลัก + section โทรของฉัน ให้กดจองได้
    · ตัวจัดการฝั่ง Matching เก็บไว้แล้ว (openIrecruitProposalAction ฯลฯ — ไม่มีใครเรียก)
+   · ⚠️ ชิป "ทำต่อเลย" บนการ์ดพูดว่า "มีคนสนใจ N — กดจองตัวเลย" อยู่แล้ว
+     (`src/lib/matchingCardAction.ts`) แต่ยังไม่มีปุ่มจองรออยู่ปลายทาง
 2. **ระบบ Lead** — เคาะครบ: ปัดออกจาก**ทุกแท็บ** + ตัวกรอง "คลังสำรอง (Lead)" เรียกคืน
    · migration 080 (is_lead/lead_by/lead_at บน public_job_applications — แพตเทิร์น
    เดียวกับ claim 079 เป๊ะ) · ปุ่มเก็บ/ลบ Lead ใน RmSearchBar ต่อจริง
