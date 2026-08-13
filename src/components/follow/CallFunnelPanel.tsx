@@ -107,25 +107,21 @@ const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> 
 const SWITCHABLE_TABS = SOURCE_TABS.filter((t) => t.id !== 'follow');
 
 /**
- * โครงคอลัมน์ของแถบ funnel — **หลักการเดียวกับ FLOW_ROW_GRID ในหน้าหลัก**
- * (เจ้าของสั่ง 10 ส.ค. 2569: "ทำ Tone ให้เหมือนกับหน้าหลัก")
+ * โครงคอลัมน์ของแถบ funnel — **โครงเดียวกับ FLOW_ROW_GRID บนหน้าหลักเป๊ะ**:
+ * การ์ด 4 ช่อง `minmax(0,1fr)` สลับช่องลูกศร `auto` 3 ช่อง
  *
- * 7 ช่องการ์ด `minmax(0,1fr)` กว้างเท่ากันเป๊ะ สลับกับช่องลูกศร `auto` 4 ช่อง
- * เดิมเป็น flex ล้วน ซึ่งแบ่งความกว้างตามเนื้อหาแต่ละใบ การ์ดจึงกว้างไม่เท่ากัน
- * และดูคนละจังหวะกับ funnel หน้าหลักทั้งที่เป็นของชุดเดียวกัน
- *
- * สังเกต: สนใจ / ไม่สนใจ / ไม่รับ อยู่ติดกันโดยไม่มีลูกศรคั่น เพราะเป็น
- * **ผลลัพธ์คู่ขนานของขั้น "มีผลจริง"** ไม่ใช่ขั้นที่ต่อจากกัน
+ * เจ้าของทัก 13 ส.ค. 2569 ว่าแผงเดิม (แถวละ 7 การ์ด) "ดูรกมาก" — ยุบเหลือแถวละ 4:
+ * ผลลัพธ์คู่ขนาน (สนใจ/ไม่สนใจ/ไม่รับ · เขียว/เหลือง) ไม่เป็นการ์ดของตัวเองแล้ว
+ * ย้ายเป็น**บรรทัดย่อยติดสี**ในการ์ดแม่ (มีผลจริง / มีคนแนะนำ) แทน —
+ * เลขทุกตัวยังอยู่ครบ แค่ย่อชั้น · รายละเอียดรายแบบเต็ม ๆ อยู่ใน title (ชี้เมาส์ดู)
  */
 export const FUNNEL_ROW_GRID =
   'mt-3 flex flex-col gap-1.5 sm:grid sm:items-stretch ' +
-  'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)]';
+  'sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]';
 
-/**
- * ช่องเปล่าเติมท้ายแถวที่มีการ์ดน้อยกว่า — โครงคอลัมน์เดียวกันสองแถวต้องมีลูกครบทุกช่อง
- * ไม่งั้นช่องที่ว่างยุบแล้วการ์ดสองแถวกว้างไม่เท่ากัน (จอเล็กเรียงแนวตั้ง ไม่ต้องมี)
- */
-export const FlowSlotFiller = () => <div className="hidden sm:block" aria-hidden />;
+// FlowSlotFiller (ช่องเปล่าเติมคอลัมน์) ถูกลบ 13 ส.ค. 2569 — สองแถวเหลือแถวละ 4 การ์ด
+// เต็มทุกช่องพอดี ไม่มีช่องให้เติมแล้ว · ถ้าเพิ่มการ์ดไม่เท่ากันสองแถวอีก ให้ระวังกับดักเดิม:
+// ช่อง auto ที่ไม่มีลูกจะยุบเหลือ 0 แล้วคอลัมน์เหลื่อมทั้งแถว
 
 export const FlowArrow = ({ ghost = false }: { ghost?: boolean }) => (
   <div
@@ -322,14 +318,13 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           </>
         ) : null}
 
-        {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → จบยังไง → ตกถังคน
-            "มีผลจริง" หักสายที่คนกดยกเลิกออกแล้ว (นิยามเดียวกับอัตราด้านล่าง)
+        {/* เส้นเดียวอ่านซ้ายไปขวา: เข้าคิว → รอโทร → มีผลจริง → ตกถังคน
+            (เจ้าของทัก 13 ส.ค. 2569 ว่ารก — ยุบเหลือ 4 การ์ด โครงเดียวกับหน้าหลัก)
 
-            ⚠️ ผลโทรแยกรายแบบ (10 แบบ) **รวมอยู่ในบรรทัดย่อยของการ์ดขั้นนี้แล้ว**
-            (เจ้าของสั่ง 12 ส.ค. 2569 — เดิมเป็นแถวชิปพับเก็บใต้แผง ต้องกดกางถึงเห็น):
-            สนใจ+รับทราบ → การ์ดสนใจ · ปฏิเสธ → ไม่สนใจ · ไม่รับสาย/ไม่ว่าง/ไม่ตอบ/
-            โทรไม่สำเร็จ → ไม่รับ/ไม่ติด · ขอเลื่อน → รอโทร · เบอร์ผิด → ต้องคนตาม ·
-            ยกเลิก → มีผลจริง (บอกว่าหักออกกี่สาย) — ครบทุกแบบ ไม่มีตัวไหนหาย */}
+            ⚠️ ผลโทรแยกรายแบบ (10 แบบ) **อยู่ในบรรทัดย่อย/ tooltip ของการ์ด ไม่มีตัวไหนหาย**:
+            สนใจ/รับทราบ/ไม่สนใจ/ไม่รับ → บรรทัดย่อยติดสีของ "มีผลจริง" (แยกละเอียด
+            รายแบบใน title) · ขอเลื่อน → รอโทร · เบอร์ผิด → ต้องคนตาม ·
+            ยกเลิก → title ของมีผลจริง (หักออกจากฐานอยู่แล้ว) */}
         <div className={FUNNEL_ROW_GRID}>
           <FlowStage label="ส่งให้ Lumos" value={funnel.queued} sub="ทั้งหมดที่เข้าคิว" tone="neutral" />
           <Arrow />
@@ -348,38 +343,30 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           <FlowStage
             label="มีผลจริง"
             value={resolvedCallBase(funnel)}
-            sub={joinParts([
-              (funnel.byOutcome['cancelled'] ?? 0) > 0
-                ? `หักสายที่กดยกเลิก ${(funnel.byOutcome['cancelled'] ?? 0).toLocaleString('th-TH')}`
-                : 'ไม่นับสายที่กดยกเลิก',
-            ])}
-            tone="primary"
-          />
-          <Arrow />
-          <FlowStage
-            label="สนใจ"
-            value={funnel.byOutcome['confirmed'] ?? 0}
-            sub={joinParts(['พร้อมให้กดจอง', outcomePart('acknowledged')])}
-            tone="success"
-          />
-          <FlowStage
-            label="ไม่สนใจ"
-            value={funnel.byOutcome['declined'] ?? 0}
-            sub="ปฏิเสธงาน"
-            tone="danger"
-          />
-          <FlowStage
-            label="ไม่รับ / ไม่ติด"
-            value={funnel.unreached}
+            title={[
+              `ไม่รับสาย ${funnel.byOutcome['no_answer'] ?? 0}`,
+              `สายไม่ว่าง ${funnel.byOutcome['busy'] ?? 0}`,
+              `ไม่ตอบ ${funnel.byOutcome['unresponsive'] ?? 0}`,
+              `โทรไม่สำเร็จ ${funnel.byOutcome['failed'] ?? 0}`,
+              `รับทราบ ${funnel.byOutcome['acknowledged'] ?? 0}`,
+              `สายที่กดยกเลิก (หักออกแล้ว) ${funnel.byOutcome['cancelled'] ?? 0}`,
+            ].join(' · ')}
             sub={
               joinParts([
-                outcomePart('no_answer'),
-                outcomePart('busy'),
-                outcomePart('unresponsive'),
-                outcomePart('failed'),
-              ]) ?? 'ควรโทรซ้ำ'
+                outcomePart('confirmed'),
+                outcomePart('acknowledged'),
+                outcomePart('declined'),
+                funnel.unreached > 0 ? (
+                  <span className="whitespace-nowrap">
+                    ไม่รับ/ไม่ติด{' '}
+                    <span className={cn('font-semibold tabular-nums', TONE.warn.onDark)}>
+                      {funnel.unreached.toLocaleString('th-TH')}
+                    </span>
+                  </span>
+                ) : null,
+              ]) ?? 'ไม่นับสายที่กดยกเลิก'
             }
-            tone="warn"
+            tone="primary"
           />
           <Arrow />
           <FlowStage
@@ -426,15 +413,8 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             ให้รวมเข้าขั้น 2 · ตอนนี้ทุกแบบอยู่ในบรรทัดย่อยของการ์ดบนเส้นแล้ว (ดูคอมเมนต์
             เหนือ FUNNEL_ROW_GRID ข้างบน) — ไม่มีตัวเลขไหนหาย แค่ย้ายบ้าน */}
 
-        <p className="mt-2.5 text-[10px] leading-relaxed text-slate-400">
-          {source === 'all'
-            ? 'นับงานโทรทุกต้นทางรวมกัน (หน้า Follow + Job Offer + iRecruit)'
-            : `นับเฉพาะงานโทรที่มาจาก "${SOURCE_TABS.find((t) => t.id === source)?.label}"${
-                // ล็อกต้นทางแล้วไม่มีปุ่มให้กด — อย่าชี้ทางที่ไม่มีอยู่จริง
-                lockSource ? '' : ' — กดปุ่มด้านบนเพื่อดูต้นทางอื่น'
-              }`}
-          {' · '}สถานะการทำงานของการโทร ไม่ใช่ยอด "หาได้แล้ว/ปิดครบใบขอ" ทางการจาก ERP
-        </p>
+        {/* ⚠️ บรรทัดหมายเหตุ "นับงานโทรทุกต้นทาง… ไม่ใช่ยอดทางการจาก ERP" เคยอยู่ตรงนี้ —
+            ตัดออก 13 ส.ค. 2569 (เจ้าของทักว่าแผงรก) · ต้นทางที่เลือกมีบอกอยู่ที่หัวแผงแล้ว */}
       </PageHeroStrip>
 
       {/* ⚠️ บรรทัด "จากสายที่มีผลจริง N สาย — โทรติด x% · สนใจ y% · ต้องคนตาม z%"

@@ -1,22 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import CallFunnelPanel, { FlowArrow, FlowSlotFiller, FlowStage, FUNNEL_ROW_GRID } from '@/components/follow/CallFunnelPanel';
+import CallFunnelPanel, { FlowArrow, FlowStage, FUNNEL_ROW_GRID } from '@/components/follow/CallFunnelPanel';
 
 /**
- * โครงคอลัมน์ของแถวฝั่งงาน — **ต้องเป็นระบบเดียวกับ FUNNEL_ROW_GRID** ของเส้นการโทร
- * (การ์ด `minmax(0,1fr)` กว้างเท่ากันเป๊ะ · ช่องลูกศร `auto`) ไม่งั้นสองแถวในแผงเดียวกัน
- * จะดูคนละจังหวะทั้งที่เป็นเรื่องต่อเนื่องกัน
- *
- * 5 การ์ด: อัตราทั้งหมด · ในนั้นด่วน → มีคนเขียว · มีคนเหลือง · ยังไม่มีคน
- * (ลูกศรคั่นแค่จุดเดียว เพราะสามใบขวาเป็น "ผลลัพธ์คู่ขนาน" ของการที่ AI หาคน ไม่ใช่ลำดับ)
- */
-/**
- * แถวฝั่งงานใช้ **โครงคอลัมน์เดียวกับแถวการโทร** (`FUNNEL_ROW_GRID` 11 ช่อง)
- * เจ้าของติง 11 ส.ค. 2569 ว่าสองแถว "จัดเรียงดูไม่ไปทิศทางเดียวกัน" — เดิมแถวนี้มีโครง
- * ของตัวเอง 6 ช่อง การ์ดเลยกว้างไม่เท่ากับแถวล่างและลูกศรไม่ตรงคอลัมน์กัน
- * ช่องลูกศรที่ไม่ใช้ = `<FlowArrow ghost />` (กินที่เท่าลูกศรจริงแต่มองไม่เห็น)
- * ช่องการ์ดที่เกิน = `<FlowSlotFiller />` — ห้ามปล่อยว่าง ไม่งั้นคอลัมน์ยุบแล้วเหลื่อมทั้งแถว
+ * แถวฝั่งงานใช้ **โครงคอลัมน์เดียวกับแถวการโทร** (`FUNNEL_ROW_GRID` — การ์ด 4 ช่อง
+ * สลับลูกศร 3 ช่อง โครงเดียวกับหน้าหลัก) — เจ้าของทัก 13 ส.ค. 2569 ว่าแผงเดิมรก
+ * จึงยุบเหลือแถวละ 4 การ์ด: อัตราทั้งหมด → ด่วน → มีคนแนะนำ (เขียว/เหลืองเป็น
+ * บรรทัดย่อยติดสี) → ยังไม่มีคน · ลูกศรตัวแรกเป็น ghost (ด่วนเป็น subset ไม่ใช่ขั้นถัดไป)
+ * ทั้งสองแถวต้องมีลูกครบทุกช่อง — ช่อง auto ที่ว่างจะยุบแล้วคอลัมน์เหลื่อม (กับดัก grid เดิม)
  */
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -2107,7 +2099,7 @@ const MatchingPage: React.FC = () => {
         <FlowStage
           label="ในนั้นเป็นงานด่วน"
           value={serverSummary?.positionsUrgent ?? urgentSummary.total}
-          sub={`${jobs(serverSummary?.urgentTotal ?? urgentSummary.total)} · นับซ้อนกับ 3 ถังขวา`}
+          sub={`${jobs(serverSummary?.urgentTotal ?? urgentSummary.total)} · นับซ้อนกับ 2 ถังขวา`}
           tone="danger"
           active={urgentOnly}
           disabled={serverListLoading}
@@ -2117,17 +2109,26 @@ const MatchingPage: React.FC = () => {
             setWorkflowFilter('all');
           }}
         />
-        <FlowArrow ghost />
-        {/* การ์ด "มีคนแนะนำ" (เขียว∪เหลือง) — เดิมช่องนี้เป็นช่องโบ๋ (FlowSlotFiller)
-            เจ้าของทัก 12 ส.ค. 2569 ว่าแถวนี้เละ · ตำแหน่งนี้อยู่ตรงกับ "มีผลจริง" ของ
-            เส้นการโทรพอดี ซึ่งเป็นการ์ด "ยอดรวมก่อนแตกถัง" เหมือนกัน — อ่านสองแถวขนานกันได้
-            · เป็นบ้านของตัวกรอง workflow=recommended (ลิงก์ "AI แนะนำคนแล้ว" จากหน้าแรกเข้าที่นี่) */}
+        <FlowArrow />
+        {/* เจ้าของทัก 13 ส.ค. 2569 ว่าแถวนี้รก — ยุบ "เขียว/เหลือง" จากการ์ดของตัวเอง
+            เป็นบรรทัดย่อยติดสีของ "มีคนแนะนำ" (เลขยังครบ) · ตัวกรอง green/yellow
+            ยังใช้ผ่าน URL (?workflow=green|yellow) ได้เหมือนเดิม แค่ไม่มีการ์ดให้กด */}
         <FlowStage
           label="มีคนแนะนำ"
           value={(serverSummary?.positionsGreen ?? urgentSummary.greenSuggested) + (serverSummary?.positionsYellow ?? 0)}
-          sub={jobs((serverSummary?.withGreen ?? urgentSummary.greenSuggested) + (serverSummary?.withYellow ?? 0))}
+          sub={
+            <span className="flex flex-wrap gap-x-1.5">
+              <span>{jobs((serverSummary?.withGreen ?? urgentSummary.greenSuggested) + (serverSummary?.withYellow ?? 0))}</span>
+              <span className={TONE.success.onDark}>
+                เขียว {(serverSummary?.positionsGreen ?? urgentSummary.greenSuggested).toLocaleString('th-TH')}
+              </span>
+              <span className={TONE.warn.onDark}>
+                เหลือง {(serverSummary?.positionsYellow ?? 0).toLocaleString('th-TH')}
+              </span>
+            </span>
+          }
           tone="info"
-          active={workflowFilter === 'recommended'}
+          active={workflowFilter === 'recommended' || workflowFilter === 'green' || workflowFilter === 'yellow'}
           disabled={serverListLoading}
           title='กดเพื่อดูเฉพาะ "มีคนแนะนำ" (เขียวหรือเหลือง)'
           onClick={() => {
@@ -2136,32 +2137,6 @@ const MatchingPage: React.FC = () => {
           }}
         />
         <FlowArrow />
-        <FlowStage
-          label="มีคนเขียวแนะนำ"
-          value={serverSummary?.positionsGreen ?? urgentSummary.greenSuggested}
-          sub={jobs(serverSummary?.withGreen ?? urgentSummary.greenSuggested)}
-          tone="success"
-          active={workflowFilter === 'green'}
-          disabled={serverListLoading}
-          title='กดเพื่อดูเฉพาะ "มีคนเขียวแนะนำ"'
-          onClick={() => {
-            setUrgentOnly(false);
-            setWorkflowFilter('green');
-          }}
-        />
-        <FlowStage
-          label="มีคนเหลืองแนะนำ"
-          value={serverSummary?.positionsYellow ?? 0}
-          sub={jobs(serverSummary?.withYellow ?? 0)}
-          tone="warn"
-          active={workflowFilter === 'yellow'}
-          disabled={serverListLoading}
-          title='กดเพื่อดูเฉพาะ "มีคนเหลืองแนะนำ"'
-          onClick={() => {
-            setUrgentOnly(false);
-            setWorkflowFilter('yellow');
-          }}
-        />
         <FlowStage
           label="ยังไม่มีคน"
           value={serverSummary?.positionsNone ?? urgentSummary.none}
@@ -2180,8 +2155,6 @@ const MatchingPage: React.FC = () => {
             setWorkflowFilter('none');
           }}
         />
-        <FlowArrow ghost />
-        <FlowSlotFiller />
       </div>
     );
   }, [serverSummary, listTotal, urgentSummary, urgentOnly, workflowFilter, serverListLoading]);
