@@ -27,6 +27,11 @@ import {
   type PostingStages,
 } from '@/lib/flowSummaryApi';
 import { jobPostingStatusLabel } from '@/lib/jobPostingRequestsApi';
+import {
+  bookingActionFor,
+  bookingTargetFromPersonRef,
+} from '@/lib/callResultBooking';
+import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import LumosCallHealthPanel from '@/components/home/LumosCallHealthPanel';
 import { lumosConnectRate } from '@/lib/lumosLinkHealth';
@@ -195,6 +200,14 @@ const HomePage: React.FC = () => {
   const [callResultsOpen, setCallResultsOpen] = useState(false);
   // กดขั้น "ส่ง AI โทร" → dialog รายชื่อคนที่ถูกส่งไปแล้วและยังไม่มีผลกลับ
   const [activeCallsOpen, setActiveCallsOpen] = useState(false);
+  /**
+   * ปุ่ม "จองตัวเลย" ในกล่อง "สนใจงาน" — ปลายทางที่ `CALL_RESULT_DESTINATION.confirmed`
+   * สัญญาไว้ว่า "เข้าเส้นจองตัว" แต่ไม่เคยมีปุ่มรออยู่จริง (ดู src/lib/callResultBooking.ts)
+   * เก็บคีย์ที่จองแล้วไว้เพื่อกันกดซ้ำ — flow-summary จะตัดคนที่จองแล้วออกจากกล่องเองตอนโหลดใหม่
+   */
+  const [bookingBusy, setBookingBusy] = useState(false);
+  const [bookedKeys, setBookedKeys] = useState<Record<string, true>>({});
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   const loadFlow = async () => {
     setFlowLoading(true);
@@ -211,6 +224,46 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     void loadFlow();
   }, []);
+
+  /** คีย์กันกดซ้ำ — คนเดียวโผล่ได้หลายใบขอ จึงต้องผูกกับใบด้วย ไม่ใช่แค่ตัวคน */
+  const bookingKeyOf = (item: FlowFollowUpItem) => `${item.job_ref}::${item.person_ref}`;
+
+  /**
+   * จองตัวจากผลโทร "สนใจ" — ใช้เส้นเดียวกับปุ่มจองในหน้า Matching (`saveProposal`)
+   * จึงติดกติกาเดิมครบ: 1 คนจองได้ใบเดียว (backend ตอบ 409 พร้อมบอกว่าติดใบไหน)
+   */
+  const bookFromCallResult = async (item: FlowFollowUpItem) => {
+    const target = bookingTargetFromPersonRef(item.person_ref);
+    if (!target || bookingBusy) return;
+    setBookingBusy(true);
+    setBookingError(null);
+    try {
+      await saveProposal({
+        jobId: item.job_ref,
+        requestNo: item.request_no || null,
+        source: target.source,
+        candidateRef: target.candidateRef,
+        candidateName: item.name,
+        candidatePhone: item.phone,
+        // ⚠️ ไม่ส่ง candidatePosition — `job_position` คือตำแหน่งของ **ใบขอ** ไม่ใช่ของผู้สมัคร
+        //    ยัดลงไปจะได้ประวัติการจองที่บอกอาชีพผู้สมัครผิดโดยไม่มีใครทัก
+        operatorName: user?.full_name || user?.username || null,
+        status: 'reserved',
+      });
+      setBookedKeys((prev) => ({ ...prev, [bookingKeyOf(item)]: true }));
+      // กล่อง "สนใจงาน" นับเฉพาะคนที่ยังไม่มีใครรับช่วงต่อ — โหลดใหม่แล้วคนนี้จะหลุดออกเอง
+      void loadFlow();
+    } catch (e) {
+      if (e instanceof ProposalConflictError) {
+        const where = e.conflict.request_no || e.conflict.job_id;
+        setBookingError(`จองไม่ได้ — ติดจองอยู่กับใบขอ ${where} อยู่แล้ว ต้องยกเลิกใบนั้นก่อน`);
+      } else {
+        setBookingError(e instanceof Error ? e.message : 'จองตัวไม่สำเร็จ');
+      }
+    } finally {
+      setBookingBusy(false);
+    }
+  };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
@@ -475,7 +528,11 @@ const HomePage: React.FC = () => {
                       items={items}
                       tone={tone}
                       max={5}
-                      onOpen={(it) => setPersonDetail({ item: it, tone })}
+                      onOpen={(it) => {
+                        // ล้าง error ของคนก่อนหน้า ไม่งั้นข้อความ "ติดจองใบอื่น" ค้างข้ามคน
+                        setBookingError(null);
+                        setPersonDetail({ item: it, tone });
+                      }}
                     />
                   </div>
                 );
@@ -573,6 +630,45 @@ const HomePage: React.FC = () => {
                     })}
                   </p>
                 </div>
+                {/* ปุ่มจอง — เฉพาะกล่อง "สนใจงาน" (tone good) ตามที่เจ้าของกำหนดปลายทางของผลนี้
+                    ปิดปุ่มเมื่อไหร่ต้องมีเหตุผลให้อ่านเสมอ (bookingActionFor · มีเทสต์บังคับ) */}
+                {personDetail.tone === 'good'
+                  ? (() => {
+                      const item = personDetail.item;
+                      const target = bookingTargetFromPersonRef(item.person_ref);
+                      const action = bookingActionFor({
+                        target,
+                        jobId: item.job_ref,
+                        personRef: item.person_ref,
+                        alreadyBooked: bookedKeys[bookingKeyOf(item)] === true,
+                        busy: bookingBusy,
+                      });
+                      return (
+                        <div className={cn('rounded-xl border px-3 py-2.5 space-y-1.5', TONE.violet.soft)}>
+                          <p className={cn('text-[11px] font-semibold', TONE.violet.num)}>
+                            สนใจงานแล้ว — จองตัวไว้เลย
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void bookFromCallResult(item)}
+                            disabled={action.disabled}
+                            className={cn(
+                              'w-full rounded-full px-3 py-1.5 text-xs font-bold disabled:opacity-50',
+                              TONE.violet.solid,
+                            )}
+                          >
+                            {bookedKeys[bookingKeyOf(item)] ? 'จองตัวแล้ว ✓' : 'จองตัวเลย'}
+                          </button>
+                          {action.reason ? (
+                            <p className="text-[10px] text-muted-foreground">{action.reason}</p>
+                          ) : null}
+                          {bookingError ? (
+                            <p className={cn('text-[10px] font-medium', TONE.danger.value)}>{bookingError}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })()
+                  : null}
                 <div className="flex flex-wrap justify-end gap-2">
                   {personDetail.item.phone ? (
                     <a href={`tel:${personDetail.item.phone}`} className="jarvis-btn-secondary">

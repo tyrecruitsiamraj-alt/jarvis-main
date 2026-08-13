@@ -327,6 +327,30 @@ reminder รับแค่ 7 ฟิลด์ตายตัว — ช่อง
 ⚠️ `new Intl.DateTimeFormat` ของ `speakableDate()` ประกาศระดับโมดูล (กติกาข้อ 10)
 มีเทสต์ความเร็ว 30,000 ครั้ง — ย้ายกลับเข้าฟังก์ชันแล้วช้าจาก 0.1 วิ เป็น 4.9 วิ
 
+### "โทรแล้วสนใจ → จองตัวเลย" (14 ส.ค. 2569)
+
+หลังถอดปุ่มจอง/เสนอ/ลงงานออกจาก drawer หน้า Matching (รอบแปด) **การจองฝั่ง iRecruit
+ไม่มีปุ่มเหลือเลย** ทั้งที่ `CALL_RESULT_DESTINATION.confirmed` บอกผู้ใช้ว่า "เข้าเส้นจองตัว"
+และชิปบนการ์ดพูดว่า "มีคนสนใจ N — กดจองตัวเลย" (`matchingCardAction.ts`) — คำสัญญาที่ไม่มีปลายทาง
+
+* `src/lib/callResultBooking.ts` — **ตรรกะล้วนที่เดียว** · `bookingTargetFromPersonRef()`
+  (คิว Lumos) · `bookingTargetFromHold()` (ล็อกโทร) · `bookingActionFor()`
+  · เทสต์ `tests/api/callResultBooking.test.ts` (16 เคส · mutation 7/7)
+* จุดใช้ 2 ที่: `src/pages/HomePage.tsx` (dialog รายละเอียดคน — **เฉพาะกล่อง "สนใจงาน"**)
+  · `src/pages/matching/MyCallsPage.tsx` (แถวใน "เพิ่งบันทึกรอบนี้" ที่ผลเป็น `confirmed`)
+* ทั้งสองที่ยิง `saveProposal()` เส้นเดียวกับปุ่มจองในหน้า Matching → ติดกติกาเดิมครบ
+  (1 คนจองได้ใบเดียว · backend ตอบ 409 พร้อมบอกว่าติดใบไหน)
+
+⚠️ **`bookingTargetFromPersonRef` ต้องตรงกับ `splitPersonRef()` ใน `api/_lib/callFollowup.ts` เป๊ะ**
+(`card-` 5 ตัว · `ir-` 3 ตัว) — ตัดผิดความยาวแล้วได้ ref ที่ชี้ไปหาคนอื่นโดยไม่มี error
+⚠️ **`application` (ใบสมัครที่ดึงเข้าถังโทร) จองไม่ได้** — `candidate_proposals.source`
+รับแค่ `board`/`irecruit` และ ref ของใบสมัครเป็นคนละชุดกับ `card_id` ของบอร์ด
+⚠️ **ห้ามส่ง `job_position` ไปเป็น `candidate_position`** — อันแรกเป็นตำแหน่งของ**ใบขอ**
+ไม่ใช่ของผู้สมัคร · ใส่ไปจะได้ประวัติการจองที่บอกอาชีพผู้สมัครผิดโดยไม่มีใครทัก
+⚠️ ล็อกโทรที่ API คืนมา **ไม่มีเบอร์** (กันเบอร์แผนกอื่นรั่ว) แถวจองจากถังโทรจึงไม่มีเบอร์
+⚠️ invariant `disabled === (reason !== null)` เหมือน `lumosSendActions.ts` — มีเทสต์บังคับ
+  · เหตุผลต้อง**ตรงกรณี**: Follow / ใบสมัคร / ไม่รู้ต้นทาง เป็นคนละข้อความ (เทสต์คุมทั้งสามทาง)
+
 ### ล้างคิวโทรค้างเป็นชุด (`scripts/cancel-stale-lumos-queue.mts` · 13 ส.ค. 2569)
 
 เจ้าของเคาะ "ล้างทั้งหมด เริ่มใหม่" ก่อนเปิดใช้จริง — คิวค้าง 4,849 แถว = 140 คน

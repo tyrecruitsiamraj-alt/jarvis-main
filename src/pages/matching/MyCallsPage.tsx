@@ -19,6 +19,8 @@ import {
   type CallResultScope,
   type CallResultTally,
 } from '@/lib/callHoldsApi';
+import { bookingActionFor, bookingTargetFromHold } from '@/lib/callResultBooking';
+import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
 import { Phone, RefreshCw, ArrowRight } from 'lucide-react';
 
 /**
@@ -82,8 +84,16 @@ export const MyCallsSection: React.FC = () => {
   const [note, setNote] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** ผลที่เพิ่งบันทึก — โชว์ปลายทางค้างไว้ให้เห็นว่างานวิ่งไปไหน */
-  const [justDone, setJustDone] = useState<Record<string, CallResultOutcome>>({});
+  /**
+   * ผลที่เพิ่งบันทึก — โชว์ปลายทางค้างไว้ให้เห็นว่างานวิ่งไปไหน
+   * เก็บตัวล็อกไว้ด้วย (ไม่ใช่แค่ผล) เพราะแถวที่ตอบ "สนใจ" ต้องมีปุ่มจองตัวต่อท้าย
+   * ซึ่งต้องใช้ jobId/source/candidateRef ของคนนั้น — ดู src/lib/callResultBooking.ts
+   */
+  const [justDone, setJustDone] = useState<Record<string, { hold: CallHold; outcome: CallResultOutcome }>>({});
+  /** ปุ่มจองตัวหลังผล "สนใจ" — คีย์กันกดซ้ำใช้ id ของล็อก (ผูกคน+ใบขออยู่แล้ว) */
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [bookedIds, setBookedIds] = useState<Record<string, true>>({});
+  const [bookingError, setBookingError] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -151,7 +161,7 @@ export const MyCallsSection: React.FC = () => {
         scope: outcome === 'declined' ? (scope ?? 'job') : undefined,
         note: note.trim() || null,
       });
-      setJustDone((prev) => ({ ...prev, [hold.id]: outcome }));
+      setJustDone((prev) => ({ ...prev, [hold.id]: { hold, outcome } }));
       setHolds((prev) => prev.filter((h) => h.id !== hold.id));
       setOpenRef(null);
       void fetchMyCallQueue().then((d) => setTally(d.tally));
@@ -159,6 +169,46 @@ export const MyCallsSection: React.FC = () => {
       setError(e instanceof Error ? e.message : 'บันทึกผลโทรไม่สำเร็จ');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  /**
+   * "โทรแล้วสนใจ → จองตัวเลย" — ใช้เส้นเดียวกับปุ่มจองในหน้า Matching (`saveProposal`)
+   * จึงติดกติกาเดิมครบ: 1 คนจองได้ใบเดียว (backend ตอบ 409 พร้อมบอกว่าติดใบไหน)
+   *
+   * ⚠️ ล็อกโทรที่ API ส่งกลับ **ไม่มีเบอร์** (กันเบอร์ของแผนกอื่นรั่ว) แถวจองจึงไม่มีเบอร์
+   * ซึ่งถูกกว่าการเดา — หน้าจองมีทางเปิดดูรายละเอียดคนอยู่แล้ว
+   */
+  const bookFromResult = async (hold: CallHold) => {
+    const target = bookingTargetFromHold(hold.source, hold.candidateRef);
+    if (!target || bookingId) return;
+    setBookingId(hold.id);
+    setBookingError((prev) => {
+      const next = { ...prev };
+      delete next[hold.id];
+      return next;
+    });
+    try {
+      await saveProposal({
+        jobId: hold.jobId,
+        requestNo: hold.requestNo,
+        source: target.source,
+        candidateRef: target.candidateRef,
+        candidateName: hold.candidateName,
+        operatorName: hold.heldByName,
+        status: 'reserved',
+      });
+      setBookedIds((prev) => ({ ...prev, [hold.id]: true }));
+    } catch (e) {
+      const msg =
+        e instanceof ProposalConflictError
+          ? `จองไม่ได้ — ติดจองอยู่กับใบขอ ${e.conflict.request_no || e.conflict.job_id} อยู่แล้ว`
+          : e instanceof Error
+            ? e.message
+            : 'จองตัวไม่สำเร็จ';
+      setBookingError((prev) => ({ ...prev, [hold.id]: msg }));
+    } finally {
+      setBookingId(null);
     }
   };
 
@@ -450,11 +500,51 @@ export const MyCallsSection: React.FC = () => {
         <div className={cn('rounded-2xl border p-4', DASH.card)}>
           <p className={DASH.eyebrow}>เพิ่งบันทึกรอบนี้</p>
           <div className="mt-2 grid gap-1.5">
-            {Object.entries(justDone).map(([id, key]) => (
-              <p key={id} className={cn('text-xs', TONE[CALL_OUTCOME_TONE[key]].value)}>
-                {CALL_RESULT_LABEL[key]} → {CALL_RESULT_DESTINATION[key]}
-              </p>
-            ))}
+            {Object.entries(justDone).map(([id, { hold, outcome: key }]) => {
+              // ผล "สนใจ" คือผลเดียวที่มีงานให้ทำต่อทันที — ปลายทางที่ CALL_RESULT_DESTINATION
+              // สัญญาไว้ว่า "เข้าเส้นจองตัว" · ก่อนหน้านี้ไม่มีปุ่มรออยู่จริง
+              const target = key === 'confirmed' ? bookingTargetFromHold(hold.source, hold.candidateRef) : null;
+              const action = bookingActionFor({
+                target,
+                jobId: hold.jobId,
+                holdSource: hold.source,
+                alreadyBooked: bookedIds[id] === true,
+                busy: bookingId === id,
+              });
+              return (
+                <div key={id} className="space-y-1">
+                  <p className={cn('text-xs', TONE[CALL_OUTCOME_TONE[key]].value)}>
+                    <span className={cn('font-semibold', DASH.cellStrong)}>
+                      {hold.candidateName || `ผู้สมัคร #${hold.candidateRef}`}
+                    </span>{' '}
+                    · {CALL_RESULT_LABEL[key]} → {CALL_RESULT_DESTINATION[key]}
+                  </p>
+                  {key === 'confirmed' ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void bookFromResult(hold)}
+                        disabled={action.disabled}
+                        className={cn(
+                          'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+                          TONE.violet.solid,
+                        )}
+                      >
+                        {bookedIds[id] ? 'จองตัวแล้ว ✓' : 'จองตัวเลย'}
+                      </button>
+                      {action.reason ? (
+                        <span className={cn('text-[10px]', DASH.muted)}>{action.reason}</span>
+                      ) : null}
+                      {bookingError[id] ? (
+                        <span className={cn('text-[10px] font-medium', TONE.danger.value)}>
+                          {bookingError[id]}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
