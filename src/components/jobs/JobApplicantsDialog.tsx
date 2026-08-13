@@ -17,6 +17,8 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { cn } from '@/lib/utils';
+import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
+import { applicantAddressLine, applicantFactLine } from '@/lib/applicantDisplay';
 import {
   Dialog,
   DialogContent,
@@ -31,10 +33,6 @@ export type JobApplicantsDialogProps = {
   job: JobRequest | null;
   onClose: () => void;
 };
-
-function addressLine(a: PublicApplication): string {
-  return [a.subdistrict, a.district, a.province, a.postal_code].filter(Boolean).join(' ');
-}
 
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, onClose }) => {
   const [items, setItems] = useState<PublicApplication[]>([]);
@@ -107,9 +105,14 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     };
   }, [open, job]);
 
+  /**
+   * ⚠️ อ่านวันที่ไม่ได้ต้องคืนขีด ไม่ใช่สตริงว่าง — ว่างแล้ว span สูง 0
+   * คอลัมน์ขวาเหลือแถวเดียวขณะที่การ์ดอื่นมีสองแถว
+   * (ไม่แก้ที่ formatYmdDmyBe — ตัวนั้นคืน ASCII '-' มีเทสต์คุมและคนเรียกทั้งระบบ)
+   */
   const dateLabel = (iso: string): string => {
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '' : formatYmdDmyBe(d.toISOString().slice(0, 10));
+    return Number.isNaN(d.getTime()) ? EM_DASH : formatYmdDmyBe(d.toISOString().slice(0, 10));
   };
 
   return (
@@ -158,15 +161,16 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                   className="rounded-2xl border border-border/70 bg-background/60 p-3.5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    {/* บล็อกซ้าย = 2 บรรทัดเสมอ (ชื่อ + ข้อมูลย่อ) ไม่ว่าข้อมูลจะครบแค่ไหน
+                        เดิมบรรทัดข้อมูลย่อหายทั้งบรรทัดเมื่อไม่มีค่า และ wrap เป็น 2 บรรทัด
+                        เมื่อครบ — การ์ดของแต่ละคนจึงสูงไม่เท่ากัน (เจ้าของทัก 13 ส.ค. 2569) */}
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-foreground">{a.full_name}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                        {a.age ? <span>อายุ {a.age} ปี</span> : null}
-                        {a.gender ? <span>· {GENDER_LABEL[a.gender] ?? a.gender}</span> : null}
-                        {a.weight_kg ? <span>· {a.weight_kg} กก.</span> : null}
-                        {a.height_cm ? <span>· {a.height_cm} ซม.</span> : null}
-                        {a.education ? <span>· {a.education}</span> : null}
-                        {a.position_interest ? <span>· สนใจ {a.position_interest}</span> : null}
+                      <p
+                        title={applicantFactLine(a) || undefined}
+                        className="mt-0.5 truncate text-xs leading-4 text-muted-foreground"
+                      >
+                        {dashIfEmpty(applicantFactLine(a))}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
@@ -182,24 +186,35 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                     </div>
                   </div>
 
+                  {/* บล็อกติดต่อ = 3 แถวเสมอ (เบอร์ · ที่อยู่ · แถวชิป) — ระยะห่างมาจาก
+                      gap ที่เดียว ไม่ใส่ mt-* ซ้อนอีก ไม่งั้นคำนวณตำแหน่งแต่ละแถวไม่ได้ */}
                   <div className="mt-2 flex flex-col gap-1 text-xs">
                     <a
                       href={`tel:${a.phone}`}
                       className="inline-flex w-fit items-center gap-1.5 font-medium text-primary hover:underline"
                     >
                       <Phone className="h-3.5 w-3.5" />
-                      {a.phone}
+                      {dashIfEmpty(a.phone)}
                     </a>
-                    {addressLine(a) ? (
-                      <span className="flex items-start gap-1.5 text-muted-foreground">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        {addressLine(a)}
+                    <span
+                      title={applicantAddressLine(a) || undefined}
+                      className="flex items-center gap-1.5 text-muted-foreground"
+                    >
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{dashIfEmpty(applicantAddressLine(a))}</span>
+                    </span>
+                    {/* แถวชิปจองที่ไว้เสมอ — เดิม div นี้ยังอยู่แต่สูง 0 พร้อม mt-1 ค้าง
+                        กลายเป็นช่องว่างผีที่บางการ์ดมีบางการ์ดไม่มี
+                        ⚠️ ตัวตั้งความสูงเป็น "ปุ่มจริงที่มองไม่เห็น" ไม่ใช่ min-h ค่าคงที่ —
+                        ของในแถวนี้สูงไม่เท่ากันเอง (ปุ่มเอกสาร 23.3 · ชิป 21.4 · ข้อความ 20.9)
+                        ใช้ตัวที่สูงสุดเป็นตัวตั้ง ความสูงจึงเดินตามถ้าวันหลังปุ่มเปลี่ยนขนาด */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="invisible w-0 overflow-hidden rounded-full border px-0 py-0.5 text-[11px] font-medium"
+                      >
+                        0
                       </span>
-                    ) : null}
-                    {a.note ? (
-                      <p className="mt-1 rounded-lg bg-muted/50 px-2.5 py-1.5 text-muted-foreground">{a.note}</p>
-                    ) : null}
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
                       {a.referral_source ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
                           เห็นจาก {REFERRAL_SOURCE_LABEL[a.referral_source] ?? a.referral_source}
@@ -220,6 +235,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                           เอกสารแนบ
                         </button>
                       ) : null}
+                      {!a.referral_source && !a.has_document ? (
+                        <span className="text-[11px] text-muted-foreground">ไม่มีข้อมูลช่องทาง/เอกสารแนบ</span>
+                      ) : null}
                     </div>
                   </div>
 
@@ -232,7 +250,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                         disabled={savingId === a.id}
                         onClick={() => void changeStatus(a.id, s)}
                         className={cn(
-                          'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
+                          // border-transparent ให้ box model เท่ากับปุ่ม "เก็บไปติดต่อ" ที่มี border
+                          // (ต่างกัน 2px ทำให้ขอบล่างของแถวเหลื่อมกันระหว่างการ์ด)
+                          'rounded-full border border-transparent px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
                           a.status === s
                             ? APPLICATION_STATUS_CLASS[s]
                             : 'bg-muted/60 text-muted-foreground hover:bg-muted',
@@ -245,7 +265,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                         การติดต่อของคนเก็บคนเดียว · ถูกคนอื่นเก็บ = บอกว่าใครไม่ได้ (server
                         ไม่ส่งชื่อ) แต่ต้องบอกว่า "ถูกเก็บแล้ว" ไม่ให้กดชนเงียบ ๆ */}
                     {a.claimed && !a.claimed_by_me ? (
-                      <span className="ml-auto rounded-full bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                      <span className="ml-auto rounded-full border border-transparent bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                         🔒 เพื่อนเก็บไปติดต่อแล้ว
                       </span>
                     ) : (
@@ -264,6 +284,15 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                       </button>
                     )}
                   </div>
+
+                  {/* หมายเหตุยาวไม่จำกัด = ตัวเดียวที่ความสูงคาดเดาไม่ได้ — เจ้าของเคาะ
+                      13 ส.ค. 2569 ให้ "เห็นเต็ม ย้ายไปล่างสุด" ความแปรผันจึงกองอยู่
+                      จุดเดียวท้ายการ์ด ไม่ไปดันบรรทัดข้างบนของใครให้เลื่อน */}
+                  {a.note ? (
+                    <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
+                      {a.note}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
