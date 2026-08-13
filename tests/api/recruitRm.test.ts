@@ -86,6 +86,42 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
   });
 });
 
+describe('คนที่ตอบ "ไม่สนใจ" กลับเข้าคลังกลาง (เจ้าของสั่ง 13 ส.ค. 2569)', () => {
+  // "กรณีคนไม่สนใจให้ไปอยู่ในนี้" — ชี้ที่แท็บรายชื่อผู้สมัคร
+  // เหตุผล: งานใบนั้นจบแล้ว แต่ **คนยังอยู่ในระบบ** เอาไปเสนองานอื่นได้
+  // ถ้าปล่อยค้างในถัง "การติดต่อ" ของคนเก็บ = งานค้างที่ไม่มีวันจบ และคนหายจากคลัง
+  const declined = app({
+    id: 'd1',
+    status: 'contacted',
+    claimed: true,
+    claimed_by_me: true,
+    last_call_outcome: 'declined',
+  });
+
+  it('ใบที่ฉันเก็บไว้ แต่โทรแล้วได้ "ไม่สนใจ" → ออกจากการติดต่อ กลับเข้ารายชื่อผู้สมัคร', () => {
+    expect(filterApplications([declined], 'contact', EMPTY_RM_FILTERS, '')).toEqual([]);
+    expect(filterApplications([declined], 'candidates', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+  });
+
+  it('⚠️ "ไม่รับสาย/ขอเลื่อน" ยังไม่จบ — ต้องค้างอยู่ในถังคนตามต่อเหมือนเดิม', () => {
+    for (const outcome of ['no_answer', 'reschedule_requested', 'busy']) {
+      const pending = { ...declined, last_call_outcome: outcome };
+      expect(filterApplications([pending], 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+      expect(filterApplications([pending], 'candidates', EMPTY_RM_FILTERS, '')).toEqual([]);
+    }
+  });
+
+  it('⚠️ คนที่รับเข้าทำงานแล้วยังอยู่แท็บนัดหมาย แม้ผลโทรจะเป็นไม่สนใจ', () => {
+    const converted = { ...declined, status: 'converted' as const };
+    expect(filterApplications([converted], 'appointments', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+  });
+
+  it('ไม่มีผลโทร = พฤติกรรมเดิมทุกอย่าง', () => {
+    const noCall = { ...declined, last_call_outcome: undefined };
+    expect(filterApplications([noCall], 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['d1']);
+  });
+});
+
 describe('applicationJobLabel — "ใครสมัครมางานไหน" ห้ามว่างเงียบ', () => {
   it('มีทั้งงานและหน่วยงาน → ต่อกันให้อ่านรวดเดียว', () => {
     expect(applicationJobLabel(app({ job_title: 'พนักงานขับรถ', unit_name: 'รพ.รามคำแหง' }))).toBe(

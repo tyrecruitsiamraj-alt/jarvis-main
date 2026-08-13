@@ -10,6 +10,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
+import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -205,16 +206,29 @@ export function buildApplicationsListQuery(input: {
   jobId?: string | null;
   scopedJobIds: Set<string> | null;
   viewerId: string;
+  /** รหัสแผนกของผู้ใช้ (null = เห็นทุกแผนก) — ใช้คู่กับ department_code บนใบสมัคร */
+  viewerDepartment?: string | null;
 }): { sql: string; params: unknown[]; claimWhere: string; legacyClaimWhere: string } {
-  const { jobId, scopedJobIds, viewerId } = input;
+  const { jobId, scopedJobIds, viewerId, viewerDepartment } = input;
   const params: unknown[] = [];
   const conds: string[] = [];
   if (jobId) {
     params.push(jobId);
     conds.push(`job_id = $${params.length}`);
   } else if (scopedJobIds) {
+    // ⚠️ **คลังกลาง: ใบขอปิดแล้วรายชื่อต้องไม่หาย** (เจ้าของเคาะ 13 ส.ค. 2569)
+    // `scopedJobIds` สร้างจาก **ใบขอที่เปิดอยู่เท่านั้น** — ยึดตัวเดียวแปลว่าพอใบขอปิด
+    // คนที่ถูกล็อก BU มองไม่เห็นใบสมัครนั้นอีกเลยทั้งระบบ · จึงยอมรับอีกทาง:
+    // ใบที่ **จำแผนกของตัวเองไว้** (migration 082) และตรงกับแผนกผู้ใช้ ก็เห็นได้
+    // สิทธิ์ไม่ได้ผ่อน — ยังเป็นแผนกเดียวกันเป๊ะ แค่ไม่ผูกกับ "ใบขอยังเปิดอยู่ไหม"
     params.push([...scopedJobIds]);
-    conds.push(`job_id = any($${params.length}::text[])`);
+    const byJob = `job_id = any($${params.length}::text[])`;
+    if (viewerDepartment) {
+      params.push(viewerDepartment);
+      conds.push(`(${byJob} or department_code = $${params.length})`);
+    } else {
+      conds.push(byJob);
+    }
   }
   let claimWhere = 'true';
   let legacyClaimWhere = 'true';
@@ -562,7 +576,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (jobId && scopedJobIds && !scopedJobIds.has(jobId)) {
       return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
     }
-    const q = buildApplicationsListQuery({ jobId, scopedJobIds, viewerId: req.user.sub });
+    // แผนกของผู้ใช้ — คู่กับ department_code บนใบสมัคร ทำให้ใบขอปิดแล้วรายชื่อยังอยู่
+    const deptScope = await loadUserDepartmentScope(req.user);
+    const q = buildApplicationsListQuery({
+      jobId,
+      scopedJobIds,
+      viewerId: req.user.sub,
+      viewerDepartment: deptScope.mode === 'code' ? deptScope.code : null,
+    });
     const rows = await queryWithLegacyFallback(q.sql, q.params, q.claimWhere, q.legacyClaimWhere);
     const items = rows.map((r) => toApplication(r, req.user.sub));
 

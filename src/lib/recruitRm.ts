@@ -58,10 +58,28 @@ export const RM_TAB_STATUSES: Record<RmTab, ApplicationStatus[] | null> = {
  * · ใบที่เก็บแล้วออกจากแท็บ "ข้อมูลผู้สมัคร" (ไปอยู่การติดต่อแทน — ไม่โผล่สองที่ให้งง)
  */
 export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
+  // ⚠️ **คนที่ตอบว่าไม่สนใจ กลับเข้าคลังกลาง** (เจ้าของสั่ง 13 ส.ค. 2569:
+  // "กรณีคนไม่สนใจให้ไปอยู่ในนี้" ชี้ที่แท็บรายชื่อผู้สมัคร)
+  // เหตุผล: งาน**ใบนั้น**จบแล้ว ไม่ต้องตามต่อ แต่ **คนยังอยู่ในระบบ** เอาไปเสนอ
+  // งานอื่นได้ · ถ้าปล่อยค้างในถัง "การติดต่อ" ของคนเก็บ จะเป็นงานค้างที่ไม่มีวันจบ
+  // และคนคนนั้นจะหายจากคลังกลางไปเฉย ๆ
+  if (isClosedByCallOutcome(r)) return tab === 'candidates';
   if (tab === 'contact') return r.claimed_by_me === true;
   if (tab === 'candidates') return r.claimed_by_me !== true;
   const st = RM_TAB_STATUSES[tab];
   return !st || st.includes(r.status);
+}
+
+/**
+ * ผลโทรที่แปลว่า "จบเรื่องกับใบนี้แล้ว" — ไม่ต้องตามต่อ แต่คนยังอยู่ในคลัง
+ *
+ * ⚠️ เอาเฉพาะผลที่ **จบจริง** · "ไม่รับสาย/ขอเลื่อน" ยังไม่จบ ต้องอยู่ในถังคนตามต่อ
+ * ⚠️ ใบที่ **รับเข้าทำงานแล้ว** (converted) ไม่เข้าเงื่อนไขนี้ — ไปแท็บติดตามนัดหมาย
+ * ตามเดิม แม้ผลโทรจะเป็นอะไรก็ตาม
+ */
+export function isClosedByCallOutcome(r: PublicApplication): boolean {
+  if (r.status === 'converted') return false;
+  return r.last_call_outcome === 'declined';
 }
 
 /**

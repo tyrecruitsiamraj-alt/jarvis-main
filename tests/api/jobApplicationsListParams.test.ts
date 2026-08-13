@@ -76,3 +76,54 @@ describe('buildApplicationsListQuery — param ต้องตรงกับ SQ
     expect(resolvedSql(q)).toContain('claimed_by is null');
   });
 });
+
+describe('คลังกลาง — ใบขอปิดแล้วรายชื่อต้องไม่หาย', () => {
+  it('**ผู้ใช้ที่ถูกล็อก BU เห็นใบที่จำแผนกตัวเองไว้ แม้ใบขอไม่อยู่ในลิสต์ที่เปิดอยู่**', () => {
+    // เจ้าของเคาะ 13 ส.ค. 2569: "เก็บคนไว้ที่คลังกลาง" — scopedJobIds สร้างจาก
+    // ใบขอที่ **เปิดอยู่** เท่านั้น ยึดตัวเดียวแปลว่าใบขอปิด = คนหายจากระบบ
+    const q = buildApplicationsListQuery({
+      jobId: null,
+      scopedJobIds: new Set(['siamraj-sql:OPEN1']),
+      viewerId: VIEWER,
+      viewerDepartment: 'LBD',
+    });
+    const sql = resolvedSql(q);
+    expect(sql).toContain('department_code');
+    expect(q.params).toContain('LBD');
+    expect(q.params).toHaveLength(highestParamIndex(sql));
+  });
+
+  it('⚠️ สิทธิ์ต้องไม่ผ่อน — เทียบแผนกตรงตัว ไม่ใช่ปล่อยผ่านทุกใบ', () => {
+    const q = buildApplicationsListQuery({
+      jobId: null,
+      scopedJobIds: new Set(['siamraj-sql:OPEN1']),
+      viewerId: VIEWER,
+      viewerDepartment: 'LBD',
+    });
+    const sql = resolvedSql(q);
+    // ต้องเป็น "ใบขอที่เห็นได้ **หรือ** แผนกตรงกัน" ไม่ใช่เงื่อนไขที่จริงเสมอ
+    expect(sql).toMatch(/job_id = any\(\$\d+::text\[\]\) or department_code = \$\d+/);
+  });
+
+  it('admin (เห็นทุกแผนก) ไม่ต้องมีเงื่อนไขแผนก — เห็นครบอยู่แล้ว', () => {
+    const q = buildApplicationsListQuery({
+      jobId: null,
+      scopedJobIds: null,
+      viewerId: VIEWER,
+      viewerDepartment: null,
+    });
+    expect(resolvedSql(q)).not.toContain('department_code');
+  });
+
+  it('ไม่รู้แผนกผู้ใช้ → ถอยไปใช้ job_id อย่างเดียว (พฤติกรรมเดิม ไม่ regress)', () => {
+    const q = buildApplicationsListQuery({
+      jobId: null,
+      scopedJobIds: new Set(['siamraj-sql:A']),
+      viewerId: VIEWER,
+      viewerDepartment: null,
+    });
+    const sql = resolvedSql(q);
+    expect(sql).not.toContain('department_code');
+    expect(q.params).toHaveLength(highestParamIndex(sql));
+  });
+});
