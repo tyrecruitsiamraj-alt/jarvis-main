@@ -170,6 +170,12 @@ export type CallFunnelPanelProps = {
    * — เอาไปต่อท้ายแถบ "ทำก่อน→หลัง" หลังสองข้อที่แผงคิดเองจาก funnel
    */
   nextActions?: Array<{ label: string; value: number }>;
+  /**
+   * โชว์แถบ "ทำก่อน → หลัง" ไหม (ค่าเริ่มต้น: โชว์)
+   * เจ้าของสั่ง 13 ส.ค. 2569 ให้ปิดที่หน้า Matching — หน้านั้นมีชิป "ทำต่อเลย"
+   * บนการ์ดแต่ละใบซึ่งบอกก้าวถัดไป **ต่อใบ** ตรงกว่าการบอกรวมทั้งหน้า
+   */
+  showNextActions?: boolean;
 };
 
 const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
@@ -181,6 +187,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   callRowLabel = 'ขั้น 2 · ฝั่งการโทร — คนที่ส่งไปแล้ว',
   title = 'การไหลของการโทร',
   nextActions,
+  showNextActions = true,
 }) => {
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
@@ -370,6 +377,9 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             เรียงตามความเร่ง: คนตอบสนใจหลุดมือง่ายสุด → งานที่ AI เอาไม่อยู่ → ที่เหลือจากฝั่งใบขอ
             "ไม่รับ/ไม่ติด" ไม่อยู่ในแถบนี้ — AI นัดโทรซ้ำเองอยู่แล้ว ไม่ใช่งานของคน */}
         {(() => {
+          // เจ้าของสั่ง 13 ส.ค. 2569: หน้า Matching ไม่ต้องโชว์แถบนี้ (ส่ง showNextActions={false})
+          // — หน้านั้นมีชิป "ทำต่อเลย" บนการ์ดแต่ละใบซึ่งบอกก้าวถัดไปตรงกว่าอยู่แล้ว
+          if (!showNextActions) return null;
           const actions = [
             { label: 'จองคนที่ตอบ "สนใจ"', value: funnel.byOutcome['confirmed'] ?? 0 },
             { label: 'รับงาน "ต้องคนตาม" ไปโทรเอง', value: funnel.needsHuman },

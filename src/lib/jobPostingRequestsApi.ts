@@ -82,6 +82,22 @@ export async function getActiveJobPostingForJob(jobId: string): Promise<JobPosti
   return d.item ?? null;
 }
 
+/**
+ * คำขอ active ทุกประเภทของใบขอนี้ — ใบเดียวมีได้ทั้ง Content และ Scraping (migration 080)
+ * ใช้ตัดสินว่าปุ่มไหนควรซ่อน: ส่งประเภทไหนไปแล้วซ่อนปุ่มนั้น อีกปุ่มยังกดได้
+ * (เจ้าของสั่ง 13 ส.ค. 2569 — เดิมส่งอันเดียวแล้วปุ่มหายทั้งคู่)
+ */
+export async function listActiveJobPostingsForJob(jobId: string): Promise<JobPostingRequest[]> {
+  const r = await apiFetch(`/api/matching/job-postings?jobId=${encodeURIComponent(jobId)}`);
+  if (!r.ok) return [];
+  const d = (await r.json().catch(() => ({}))) as {
+    active?: JobPostingRequest[];
+    item?: JobPostingRequest | null;
+  };
+  // server เก่ายังไม่มี `active` → ถอยไปใช้ `item` เดี่ยว ๆ (หน้าเว็บไม่พังระหว่าง deploy)
+  return d.active ?? (d.item ? [d.item] : []);
+}
+
 export async function listJobPostingRequests(status?: JobPostingStatus): Promise<JobPostingRequest[]> {
   const params = status ? `?status=${encodeURIComponent(status)}` : '';
   const r = await apiFetch(`/api/matching/job-postings${params}`);

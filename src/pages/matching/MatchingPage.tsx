@@ -115,7 +115,7 @@ import {
   matchTierLabel,
 } from '@/lib/irecruitMatchTypes';
 import {
-  getActiveJobPostingForJob,
+  listActiveJobPostingsForJob,
   createJobPostingRequest,
   jobPostingStatusChip,
   jobPostingStatusLabel,
@@ -768,6 +768,8 @@ const MatchingPage: React.FC = () => {
   const [branchEditorError, setBranchEditorError] = useState<string | null>(null);
   // #1 คำขอโพสหางานใหม่ — สร้าง ID ให้ทีมคอนเทนต์/สรรหารับไปทำต่อ
   const [jobPostingByJobId, setJobPostingByJobId] = useState<Record<string, JobPostingRequest>>({});
+  /** คำขอ active ทุกประเภทต่อใบ — ใบเดียวมีได้ทั้ง Content และ Scraping (migration 080) */
+  const [jobPostingsByJobId, setJobPostingsByJobId] = useState<Record<string, JobPostingRequest[]>>({});
   const [creatingPosting, setCreatingPosting] = useState(false);
   const [postingError, setPostingError] = useState<string | null>(null);
   // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วสั่งคิดใหม่ทับผลเดิมโดยไม่ตั้งใจ
@@ -1388,8 +1390,9 @@ const MatchingPage: React.FC = () => {
       });
       setProposalsByJobId((prev) => ({ ...prev, [j.id]: items }));
     });
-    void getActiveJobPostingForJob(j.id).then((item) => {
-      if (item) setJobPostingByJobId((prev) => ({ ...prev, [j.id]: item }));
+    void listActiveJobPostingsForJob(j.id).then((items) => {
+      if (items.length > 0) setJobPostingByJobId((prev) => ({ ...prev, [j.id]: items[0] }));
+      setJobPostingsByJobId((prev) => ({ ...prev, [j.id]: items }));
     });
   };
 
@@ -1540,6 +1543,11 @@ const MatchingPage: React.FC = () => {
         jobSnapshot: composeJobSnapshot(job),
       });
       setJobPostingByJobId((prev) => ({ ...prev, [job.id]: item }));
+      // เก็บรายประเภทด้วย — ปุ่มอีกทางต้องยังกดได้ ปุ่มที่เพิ่งส่งต้องหายทันที
+      setJobPostingsByJobId((prev) => {
+        const list = prev[job.id] ?? [];
+        return { ...prev, [job.id]: [item, ...list.filter((p) => p.id !== item.id)] };
+      });
     } catch (e) {
       setPostingError(e instanceof Error ? e.message : 'สร้างคำขอไม่สำเร็จ');
     } finally {
@@ -2185,7 +2193,8 @@ const MatchingPage: React.FC = () => {
           เดิมอยู่ในกล่องตัวกรองใต้แผง funnel ซึ่งต้องเลื่อนลงไปหา */}
       <PageHeader
         title="Matching — คนของเรา"
-        subtitle="เปิดใบขอ แล้วหาคนที่ผ่านสัมภาษณ์รอลงงานที่สกิลตรง"
+        /* คำโปรยใต้หัวเรื่องเอาออก (เจ้าของสั่ง 13 ส.ค. 2569) — หน้านี้คนใช้ทุกวันอยู่แล้ว */
+        subtitle=""
         backPath="/matching"
         actions={
           <SearchField
@@ -2209,17 +2218,14 @@ const MatchingPage: React.FC = () => {
             โทรไปถึงไหนแล้ว
             ⚠️ การ์ดแถวฝั่งงาน **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** (กล่องตัวกรอง
             ถูกเอาออกไปแล้ว 10 ส.ค. นี่คือทางกรองทางเดียวที่เหลืออยู่ ห้ามทำหาย) */}
+        {/* ⚠️ แถบ "ทำก่อน → หลัง" ปิดที่หน้านี้ (เจ้าของสั่ง 13 ส.ค. 2569) — ชิป "ทำต่อเลย"
+            บนการ์ดแต่ละใบบอกก้าวถัดไปต่อใบอยู่แล้ว ตรงกว่าการสรุปรวมทั้งหน้า
+            (prop nextActions จึงไม่ต้องส่งแล้ว — ไม่มีที่ไปแสดง) */}
         <CallFunnelPanel
           defaultSource="all"
           title="การไหลของงาน"
           leadIn={demandFlowRow}
-          // งานฝั่งใบขอที่แผงมองไม่เห็นเอง — ต่อท้ายแถบ "ทำก่อน→หลัง"
-          nextActions={[
-            {
-              label: 'หาคนให้อัตราที่ยังไม่มีคน',
-              value: serverSummary?.positionsNone ?? urgentSummary.none,
-            },
-          ]}
+          showNextActions={false}
         />
 
         {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
@@ -2245,102 +2251,69 @@ const MatchingPage: React.FC = () => {
         {/* ⚠️ กล่องสรุป 5 ใบเคยอยู่ตรงนี้ — ย้ายขึ้นไปรวมในแถบ "การไหลของงาน" ด้านบน
             (เจ้าของสั่ง 11 ส.ค. 2569) · ตัวสร้างอยู่ที่ `demandFlowRow` ใกล้ ๆ state ของตัวกรอง
             ตรรกะการกดกรองไม่เปลี่ยนเลย เปลี่ยนแค่ที่วางกับหน้าตาให้เป็นชุดเดียวกับเส้นการโทร */}
-        {urgentSummary.total > 0 ? (
-          <p className="px-1 text-[11px] text-muted-foreground">
-            {urgentSummary.analyzedCount > 0
-              ? `AI วิเคราะห์แล้ว ${urgentSummary.analyzedCount} ใบ · ที่เหลือประมาณจากสกิล (ยังไม่ใช่การยืนยันว่าพร้อมลงงาน)`
-              : 'ประมาณการจากสกิล (ยังไม่ผ่าน AI) — กดใบขอเพื่อให้ AI คัดจริง'}
-          </p>
-        ) : null}
+        {/* ⚠️ บรรทัด "AI วิเคราะห์แล้ว N ใบ · ที่เหลือประมาณจากสกิล…" เคยอยู่ตรงนี้ —
+            เจ้าของสั่งเอาออก 13 ส.ค. 2569 · ความหมายเดิมยังบอกอยู่ที่ชิปบนการ์ดแต่ละใบ
+            ("AI แนะนำ N" ทึบ = ผ่าน AI แล้ว · "~N (ยังไม่ผ่าน AI)" เส้นประ = ประมาณ) */}
 
         {/* ⚠️ ชิป "ของฉันถืออยู่ n คน" เคยอยู่ตรงนี้ — เอาออกพร้อมปุ่มรับไปโทรเอง
             (เจ้าของสั่ง 11 ส.ค. 2569) หน้านี้ไม่มีทางรับงานโทรและไม่มีที่บันทึกผลแล้ว
             ชิปที่นับงานที่รับไว้จึงชี้ไปที่ที่ไม่มีอยู่ · งานที่ยังถืออยู่ดูได้ที่ถัง
             "ต้องคนตาม" ในแถบการไหลของงาน ซึ่งเป็นที่ที่กดรับมาแต่แรก */}
 
+        {/* หัวลิสต์ — เจ้าของสั่ง 13 ส.ค. 2569 ให้เหลือแค่ของที่ใช้จริง:
+            ตัดบรรทัด "ใบขอ N รายการ · แสดงลำดับ…" ออก (ยอดรวมอยู่บนแถบการไหลของงานแล้ว
+            เลขหน้าอยู่ที่แถบเลขหน้าท้ายลิสต์) · "หน้าละ" กับ "เรียงตาม" เป็น dropdown
+            แทนแถบปุ่ม 5 อัน (กินที่ทั้งบรรทัดโดยที่คนเลือกครั้งเดียวแล้วไม่แตะอีก) ·
+            คู่มือ "สีบอกอายุใบขอ" ตัดออก (แถบสีซ้ายการ์ดมี title บอกเกณฑ์อยู่แล้ว) */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
-          <p className="text-sm text-muted-foreground">
-            {loadingJobs || serverListLoading ? (
-              <span className="inline-flex items-center gap-1.5">
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin text-blue-500" />
-                <span>กำลังโหลดรายการ…</span>
-              </span>
-            ) : (
-              <>
-                ใบขอ <span className="text-blue-600 font-bold tabular-nums dark:text-blue-300">{listTotal}</span> รายการ
-                {totalPages > 1 ? ` · แสดงลำดับ ${pageRangeStart}–${pageRangeEnd} (หน้า ${currentPage}/${totalPages})` : ''}
-              </>
-            )}
-          </p>
-          {/* เลือกจำนวนต่อหน้า — จำค่าไว้ในเครื่อง กลับมาเปิดหน้านี้อีกครั้งได้ค่าเดิม */}
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <span className="text-[11px] text-muted-foreground">หน้าละ</span>
-            {MATCHING_PAGE_SIZE_OPTIONS.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => changePageSize(size)}
+          {loadingJobs || serverListLoading ? (
+            <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-blue-500" />
+              <span>กำลังโหลดรายการ…</span>
+            </p>
+          ) : null}
+          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span>หน้าละ</span>
+              <select
+                value={pageSize}
                 disabled={serverListLoading}
-                className={cn(
-                  'rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums transition-colors disabled:cursor-wait',
-                  pageSize === size
-                    ? FILTER_PILL_ACTIVE_CLASS
-                    : FILTER_PILL_IDLE_CLASS,
-                )}
+                onChange={(e) => changePageSize(Number(e.target.value))}
+                className="rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-medium tabular-nums text-foreground disabled:cursor-wait"
               >
-                {size}
-              </button>
-            ))}
-          </div>
-          {/* ⚠️ บรรทัด "· เรียง SLA เกิน/เสี่ยง… · กดเพื่อหาคนของเราที่ตรง" เคยอยู่ตรงนี้ —
-              เจ้าของทัก 12 ส.ค. 2569 ว่าส่วนหัวลิสต์เละ · ข้อความซ้ำกับป้าย "SLA / ด่วนก่อน"
-              ที่เป็นค่าเริ่มต้นของแถวเรียงข้างล่างอยู่แล้ว จึงตัดทิ้ง */}
-          {/* เรียงลิสต์ — ค่าเริ่มต้นคงพฤติกรรมเดิม (SLA เกิน/เสี่ยงและงานด่วนขึ้นก่อน) */}
-          <div className="flex w-full flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-muted-foreground">เรียงตาม:</span>
-            {(
-              [
-                ['default', 'SLA / ด่วนก่อน'],
-                ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
-                ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
-                ['recommend', 'มีคนแนะนำก่อน'],
-                ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
-              ] as Array<[MatchingListSort, string]>
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setSortBy(value)}
+                {MATCHING_PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span>เรียงตาม</span>
+              <select
+                value={sortBy}
                 disabled={serverListLoading}
-                className={cn(
-                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-wait',
-                  sortBy === value
-                    ? FILTER_PILL_ACTIVE_CLASS
-                    : FILTER_PILL_IDLE_CLASS,
-                )}
+                onChange={(e) => setSortBy(e.target.value as MatchingListSort)}
+                className="rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground disabled:cursor-wait"
               >
-                {label}
-              </button>
-            ))}
+                {(
+                  [
+                    ['default', 'SLA / ด่วนก่อน'],
+                    ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
+                    ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
+                    ['recommend', 'มีคนแนะนำก่อน'],
+                    ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
+                  ] as Array<[MatchingListSort, string]>
+                ).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
-          {/* คู่มือสีสั้น ๆ — แถบสีซ้ายการ์ดบอกว่าใบขอค้างมานานแค่ไหน */}
           <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-            <span className="font-medium">สีบอกอายุใบขอ:</span>
-            {(['fresh', 'warming', 'urgent', 'critical'] as const).map((lv) => (
-              <span key={lv} className="inline-flex items-center gap-1">
-                <span
-                  className={cn('h-2 w-2.5 rounded-sm', JOB_AGE_URGENCY_META[lv].barCls)}
-                  aria-hidden
-                />
-                {JOB_AGE_URGENCY_META[lv].label}
-                {/* ตัด /70 ออก — ความจางทำให้ contrast เหลือ 4.06 ตกเกณฑ์ AA
-                    ป้ายนี้เป็นเกณฑ์ของถังอายุ ไม่ใช่ของประดับ ต้องอ่านออก */}
-                <span className="text-muted-foreground">
-                  {lv === 'fresh' ? '≤7 วัน' : lv === 'warming' ? '8–30' : lv === 'urgent' ? '31–60' : '60+'}
-                </span>
-              </span>
-            ))}
             {/* ⚠️ ชิป "AI พร้อมแล้ว" (สถานะ idle) เคยอยู่ระหว่างสองชิปนี้ — เจ้าของสั่งเอาออก
                 12 ส.ค. 2569 ("AI พร้อมแล้ว ไม่ต้องเอามาโชว์") · idle = ไม่มีข้อมูลให้ทำอะไรต่อ
                 คงไว้เฉพาะสถานะที่คนต้องรู้: กำลังประมวลผล (มีของกำลังวิ่ง) กับ ปิดอยู่ */}
@@ -2904,7 +2877,9 @@ const MatchingPage: React.FC = () => {
                 }
                 const got = recommendedCandidateCount(bm.matches);
                 const short = got < bm.recommended_target;
-                const posting = jobPostingByJobId[jobDetail.id];
+                const active = jobPostingsByJobId[jobDetail.id] ?? [];
+                const sentContent = active.some((p) => p.request_type !== 'scraping');
+                const sentScraping = active.some((p) => p.request_type === 'scraping');
                 return (
                   <div
                     className={cn(
@@ -2914,22 +2889,37 @@ const MatchingPage: React.FC = () => {
                         : cn(TONE.info.soft, TONE.info.num),
                     )}
                   >
-                    <p>
-                      To do หาได้ไม่ถึงเป้า {bm.recommended_target} คน (อัตราที่ขอ × 3) — ค้นถัง “ไม่มีงาน” เพิ่มแล้ว
-                      {short
-                        ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
-                        : ` → รวมแนะนำ ${got} คน (ครบเป้า)`}
-                    </p>
-                    {/* หาไม่ครบเป้า = แนะนำให้ส่งต่อทีมอื่นตรงนี้เลย ไม่ต้องเลื่อนไปหาปุ่มด้านล่าง */}
+                    {/* คำอธิบายยาวพับเก็บไว้ (เจ้าของสั่ง 13 ส.ค. 2569: "ทำเป็นแบบถ้ากดค่อยโชว์")
+                        — บรรทัดสรุปกับปุ่มลงมือยังเห็นเสมอ เพราะเป็นของที่ต้องตัดสินใจ */}
+                    <details>
+                      <summary className="cursor-pointer list-none font-semibold marker:hidden">
+                        {short
+                          ? `หาได้ ${got} คน จากเป้า ${bm.recommended_target} คน — กดดูว่าทำอะไรต่อได้`
+                          : `หาได้ครบเป้าแล้ว ${got} คน — กดดูรายละเอียด`}
+                      </summary>
+                      <p className="mt-1.5">
+                        เป้าคือ “อัตราที่ขอ × 3” · ระบบค้นถัง “ไม่มีงาน” เพิ่มให้แล้ว
+                        {short
+                          ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
+                          : ` → รวมแนะนำ ${got} คน`}
+                      </p>
+                    </details>
+                    {/* หาไม่ครบเป้า = แนะนำให้ส่งต่อทีมอื่นตรงนี้เลย ไม่ต้องเลื่อนไปหาปุ่มด้านล่าง
+                        ⚠️ ส่งประเภทไหนไปแล้วซ่อน**เฉพาะปุ่มนั้น** อีกปุ่มยังกดได้
+                        (เจ้าของสั่ง 13 ส.ค. 2569 — เดิมส่งอันเดียวแล้วปุ่มหายทั้งคู่
+                        และถ้ากดอีกอันก็ได้คำขอเดิมกลับมาเงียบ ๆ ดูข้างบน migration 080) */}
                     {short ? (
-                      posting ? (
-                        <p className="font-semibold">
-                          ส่งคำขอโพสหาคนไปแล้ว ({posting.request_type === 'scraping' ? 'Scraping' : 'Content'}) —
-                          รอทีมรับไปทำ
-                        </p>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-semibold">แนะนำ: หาคนของเราไม่ครบ ส่งต่อทีมอื่นเลย →</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {sentContent && sentScraping ? (
+                          <span className="font-semibold">ส่งคำขอครบทั้ง Content และ Scraping แล้ว — รอทีมรับไปทำ</span>
+                        ) : (
+                          <span className="font-semibold">
+                            {active.length > 0
+                              ? `ส่ง ${sentScraping ? 'Scraping' : 'Content'} ไปแล้ว — ส่งอีกทางเพิ่มได้:`
+                              : 'แนะนำ: หาคนของเราไม่ครบ ส่งต่อทีมอื่นเลย →'}
+                          </span>
+                        )}
+                        {!sentContent ? (
                           <button
                             type="button"
                             disabled={creatingPosting}
@@ -2939,6 +2929,8 @@ const MatchingPage: React.FC = () => {
                             <Megaphone className="h-3 w-3" />
                             {creatingPosting ? 'กำลังสร้าง…' : 'ให้สร้าง Content'}
                           </button>
+                        ) : null}
+                        {!sentScraping ? (
                           <button
                             type="button"
                             disabled={creatingPosting}
@@ -2948,8 +2940,8 @@ const MatchingPage: React.FC = () => {
                             <Search className="h-3 w-3" />
                             {creatingPosting ? 'กำลังสร้าง…' : 'Scraping งาน'}
                           </button>
-                        </div>
-                      )
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 );
