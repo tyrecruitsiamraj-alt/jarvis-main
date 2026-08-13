@@ -19,6 +19,8 @@ import {
 import { cn } from '@/lib/utils';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { applicantAddressLine, applicantFactLine } from '@/lib/applicantDisplay';
+import { isKnownOutcome, splitInterested } from '@/lib/applicantCallOutcome';
+import { CALL_OUTCOME_LABEL, CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import {
   Dialog,
   DialogContent,
@@ -34,8 +36,12 @@ export type JobApplicantsDialogProps = {
   onClose: () => void;
 };
 
+/** แท็บใน dialog — เจ้าของสั่ง 13 ส.ค. 2569: "กดเข้าไปอยากแยกหน้าแบบนี้" */
+type ApplicantTab = 'all' | 'interested';
+
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, onClose }) => {
   const [items, setItems] = useState<PublicApplication[]>([]);
+  const [tab, setTab] = useState<ApplicantTab>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -88,6 +94,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   useEffect(() => {
     if (!open || !job) return;
     let cancelled = false;
+    setTab('all'); // เปิดใบใหม่เริ่มที่ "ทั้งหมด" เสมอ ไม่ค้างแท็บของใบก่อน
     setLoading(true);
     setError(null);
     fetchJobApplications(job.id)
@@ -115,6 +122,10 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     return Number.isNaN(d.getTime()) ? EM_DASH : formatYmdDmyBe(d.toISOString().slice(0, 10));
   };
 
+  // กติกา "ใครนับว่าสนใจ" อยู่ที่ lib ที่เดียว (ไฟล์หน้าไม่ตัดสินเอง)
+  const { interested } = splitInterested(items);
+  const visible = tab === 'interested' ? interested : items;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] border-border/70 p-0">
@@ -133,6 +144,33 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               </DialogDescription>
             </div>
           </div>
+
+          {/* แท็บ ทั้งหมด / ที่สนใจ (เจ้าของสั่ง 13 ส.ค. 2569)
+              ⚠️ "ที่สนใจ" = คนที่ตอบสนใจ **ตอนโทร** (ผลจาก AI หรือคนก็ได้)
+              ไม่ใช่สถานะใบสมัคร ซึ่งมีแค่ ใหม่/ติดต่อแล้ว/รับเข้าทำงาน/ปฏิเสธ
+              · เห็นทั้งสองแท็บเสมอแม้ยอดเป็น 0 — เลข 0 คือคำตอบ ไม่ใช่ช่องว่าง */}
+          <div className="mt-3 flex items-center gap-1">
+            {(
+              [
+                ['all', 'รายชื่อผู้สมัครทั้งหมด', items.length],
+                ['interested', 'รายชื่อที่สนใจ', interested.length],
+              ] as Array<[ApplicantTab, string, number]>
+            ).map(([id, label, n]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+                  tab === id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                )}
+              >
+                {label} <span className="tabular-nums">({n})</span>
+              </button>
+            ))}
+          </div>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
@@ -143,19 +181,32 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             </div>
           ) : error ? (
             <p className={cn('rounded-xl border px-3.5 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>{error}</p>
-          ) : items.length === 0 ? (
+          ) : visible.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
                 <Users className="h-7 w-7 text-muted-foreground/50" />
               </span>
-              <p className="text-sm font-medium text-foreground">ยังไม่มีผู้สมัครสำหรับงานนี้</p>
-              <p className="max-w-xs text-xs text-muted-foreground">
-                เมื่อมีผู้กรอกใบสมัครผ่านหน้าประกาศงาน รายชื่อจะแสดงที่นี่
-              </p>
+              {/* ข้อความว่างต้องตรงกับแท็บที่เปิดอยู่ — ไม่งั้นแท็บ "ที่สนใจ" จะบอกว่า
+                  "ยังไม่มีผู้สมัคร" ทั้งที่มีคนสมัครอยู่ แค่ยังไม่มีใครตอบว่าสนใจ */}
+              {tab === 'interested' ? (
+                <>
+                  <p className="text-sm font-medium text-foreground">ยังไม่มีใครตอบว่าสนใจ</p>
+                  <p className="max-w-xs text-xs text-muted-foreground">
+                    เมื่อโทรหาผู้สมัคร (ด้วย AI หรือโทรเอง) แล้วได้ผลว่า “สนใจ” ชื่อจะมาอยู่ที่นี่
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-foreground">ยังไม่มีผู้สมัครสำหรับงานนี้</p>
+                  <p className="max-w-xs text-xs text-muted-foreground">
+                    เมื่อมีผู้กรอกใบสมัครผ่านหน้าประกาศงาน รายชื่อจะแสดงที่นี่
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <ul className="space-y-2.5">
-              {items.map((a) => (
+              {visible.map((a) => (
                 <li
                   key={a.id}
                   className="rounded-2xl border border-border/70 bg-background/60 p-3.5 shadow-sm"
@@ -182,6 +233,15 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                       >
                         {APPLICATION_STATUS_LABEL[a.status]}
                       </span>
+                      {/* ผลโทรล่าสุด — ต้องเห็นคู่กับสถานะใบสมัคร ไม่งั้นเปิดแท็บ "ที่สนใจ"
+                          แล้วไม่มีอะไรบอกว่าทำไมคนนี้ถึงมาอยู่ในลิสต์
+                          ⚠️ โทนสี/ป้ายมาจาก lib กลาง (ห้ามไฟล์หน้าทำ map เอง — มีเทสต์คุม)
+                          ค่าที่ไม่ใช่ outcome จริงไม่โชว์ (ข้อมูลเก่าเคยมีค่าแปลกปลอม) */}
+                      {isKnownOutcome(a.last_call_outcome) ? (
+                        <span className={cn('text-[10px]', TONE[CALL_OUTCOME_TONE[a.last_call_outcome]].chip)}>
+                          โทรแล้ว · {CALL_OUTCOME_LABEL[a.last_call_outcome]}
+                        </span>
+                      ) : null}
                       <span className="text-[11px] text-muted-foreground">{dateLabel(a.created_at)}</span>
                     </div>
                   </div>

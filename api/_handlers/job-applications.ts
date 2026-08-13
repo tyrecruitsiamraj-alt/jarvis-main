@@ -15,6 +15,9 @@ import {
   isRmSpecificType,
   normalizeRmPhone,
 } from '../../src/lib/recruitRmMasters.js';
+import { loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
+import { toE164Thai } from '../_lib/thaiPhone.js';
+import { logError } from '../_lib/logger.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบสมัครของแผนกอื่น';
@@ -186,6 +189,51 @@ function isUndefinedColumn(e: unknown): boolean {
  * `{{claimWhere}}` = เงื่อนไขที่อ้างคอลัมน์ claim (079) — ชุด legacy แทนด้วย true
  * เพราะคอลัมน์ยังไม่มีให้อ้าง (ยังไม่มีใครเก็บได้ = ไม่ต้องซ่อนใคร)
  */
+/**
+ * ประกอบคิวรีลิสต์ใบสมัคร — แยกออกมาเป็นฟังก์ชันล้วนเพื่อให้เทสต์จับได้
+ *
+ * ⚠️ **จำนวน param ที่ส่งลง pg ต้องเท่ากับ `$n` สูงสุดที่ SQL อ้างเสมอ**
+ * ไม่งั้นได้ `bind message supplies 2 parameters, but prepared statement requires 1`
+ * แล้ว **ทั้ง endpoint ตาย 500** · บั๊กจริงที่เจ้าของเจอเอง 13 ส.ค. 2569
+ * ("โหลดรายชื่อผู้สมัครไม่สำเร็จ") — เดิม push viewerId ทุกครั้งแต่ใส่เงื่อนไข claim
+ * ลง WHERE เฉพาะตอนไม่มี jobId → มุมมองรายใบ (dialog บนกล่องงาน) เปิดไม่ได้เลยสักใบ
+ *
+ * กติกาที่ต้องคงไว้: feed รวมซ่อนใบที่ **คนอื่น** เก็บไปแล้ว · มุมมองรายใบ **ไม่ซ่อน**
+ * (dialog ต้องนับได้ว่า "ถูกเก็บแล้ว N คน" — ชื่อคนเก็บถูกตัดที่ toApplication อยู่แล้ว)
+ */
+export function buildApplicationsListQuery(input: {
+  jobId?: string | null;
+  scopedJobIds: Set<string> | null;
+  viewerId: string;
+}): { sql: string; params: unknown[]; claimWhere: string; legacyClaimWhere: string } {
+  const { jobId, scopedJobIds, viewerId } = input;
+  const params: unknown[] = [];
+  const conds: string[] = [];
+  if (jobId) {
+    params.push(jobId);
+    conds.push(`job_id = $${params.length}`);
+  } else if (scopedJobIds) {
+    params.push([...scopedJobIds]);
+    conds.push(`job_id = any($${params.length}::text[])`);
+  }
+  let claimWhere = 'true';
+  let legacyClaimWhere = 'true';
+  if (!jobId) {
+    params.push(viewerId);
+    claimWhere = `(claimed_by is null or claimed_by::text = $${params.length})`;
+    // legacy ต้องยังอ้าง param เดิมครบ (เหตุผลเดียวกับข้างบน)
+    legacyClaimWhere = `($${params.length} = $${params.length})`;
+    conds.push('{{claimWhere}}');
+  }
+  return {
+    sql: `select {{cols}} from ${tbl} ${conds.length ? `where ${conds.join(' and ')}` : ''}
+        order by created_at desc limit 500`,
+    params,
+    claimWhere,
+    legacyClaimWhere,
+  };
+}
+
 async function queryWithLegacyFallback(
   sql: string,
   params: unknown[],
@@ -514,32 +562,28 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (jobId && scopedJobIds && !scopedJobIds.has(jobId)) {
       return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
     }
-    const params: unknown[] = [];
-    const conds: string[] = [];
-    if (jobId) {
-      params.push(jobId);
-      conds.push(`job_id = $${params.length}`);
-    } else if (scopedJobIds) {
-      params.push([...scopedJobIds]);
-      conds.push(`job_id = any($${params.length}::text[])`);
-    }
-    // "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป มีแค่ฉันที่เห็น" (เจ้าของสั่ง 13 ส.ค. 2569) —
-    // feed รายชื่อรวมซ่อนใบที่คนอื่นเก็บ · แต่ **มุมมองรายใบ (?job_id=) ไม่ซ่อน** เพราะ
-    // dialog บนกล่องงานต้องบอกได้ว่า "ถูกเก็บแล้ว N คน" ไม่ให้ลิสต์หดแบบอ่านไม่ออก
-    // (ชื่อคนเก็บถูกตัดที่ toApplication อยู่แล้ว — ที่หลุดไปคือธง claimed เท่านั้น)
-    params.push(req.user.sub);
-    const claimWhere = `(claimed_by is null or claimed_by::text = $${params.length})`;
-    const legacyClaimWhere = `($${params.length} = $${params.length})`;
-    if (!jobId) conds.push('{{claimWhere}}');
+    const q = buildApplicationsListQuery({ jobId, scopedJobIds, viewerId: req.user.sub });
+    const rows = await queryWithLegacyFallback(q.sql, q.params, q.claimWhere, q.legacyClaimWhere);
+    const items = rows.map((r) => toApplication(r, req.user.sub));
 
-    const rows = await queryWithLegacyFallback(
-      `select {{cols}} from ${tbl} ${conds.length ? `where ${conds.join(' and ')}` : ''}
-        order by created_at desc limit 500`,
-      params,
-      claimWhere,
-      legacyClaimWhere,
-    );
-    return res.status(200).json({ items: rows.map((r) => toApplication(r, req.user.sub)) });
+    // แนบผลโทรล่าสุดต่อคน — แท็บ "รายชื่อที่สนใจ" ของกล่องงานใช้ตัวนี้กรอง
+    // (เจ้าของเคาะ 13 ส.ค. 2569: สนใจ = ตอบสนใจ **ตอนโทร** ไม่ใช่สถานะใบสมัคร)
+    // ⚠️ คิวรีเดียวสำหรับทั้งลิสต์ · ล้มก็ไม่ทำให้รายชื่อหาย แค่ไม่มีผลโทรให้กรอง
+    try {
+      const byPhone = await loadLatestCallOutcomeByPhone(items.map((i) => i.phone));
+      if (byPhone.size > 0) {
+        for (const item of items) {
+          const hit = byPhone.get(toE164Thai(item.phone || '') || '');
+          if (hit) {
+            (item as Record<string, unknown>).last_call_outcome = hit.outcome;
+            (item as Record<string, unknown>).last_call_at = hit.at;
+          }
+        }
+      }
+    } catch (e) {
+      logError('job-applications: load call outcomes failed', e, { userId: req.user.sub });
+    }
+    return res.status(200).json({ items });
   } catch (e) {
     return handleApiError(res, e, 'job-applications GET', { userId: req.user.sub });
   }

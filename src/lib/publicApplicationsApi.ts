@@ -4,6 +4,12 @@ import { apiFetch } from '@/lib/apiFetch';
 export type PublicApplication = {
   id: string;
   full_name: string;
+  /**
+   * ผลโทรล่าสุดของเบอร์นี้ (รวมทั้งที่ AI โทรและที่คนโทรเอง) — server แนบมาให้
+   * ใช้ทำแท็บ "รายชื่อที่สนใจ" ในกล่องงาน · ไม่มีค่า = ยังไม่เคยมีผลโทร
+   */
+  last_call_outcome?: string | null;
+  last_call_at?: string | null;
   title_prefix?: string;
   first_name?: string;
   last_name?: string;
