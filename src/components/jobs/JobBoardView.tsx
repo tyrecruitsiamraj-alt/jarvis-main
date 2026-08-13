@@ -6,6 +6,7 @@ import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } fr
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
@@ -439,7 +440,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   : undefined
               }
               className={cn(
-                'group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                // flex-col + h-full: grid ยืดกล่องสูงเท่ากันอยู่แล้ว แต่ลูกเรียงชิดบน
+                // พื้นที่เหลือจึงกองใต้ footer → แถบ "ผู้สมัคร N คน" ของแต่ละใบลอยคนละระดับ
+                // (⚠️ ใส่ที่จุดเรียกใช้เท่านั้น ห้ามแก้ ui/card.tsx ซึ่งทั้งแอปใช้ร่วมกัน)
+                'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
                 isStaff && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
               )}
             >
@@ -449,11 +453,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                       {jobBoardCardTitle(job)}
                     </h2>
-                    {unitRequestCardSubtitle(job) ? (
-                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{unitRequestCardSubtitle(job)}</p>
-                    ) : null}
-                    {isStaff && job.request_no?.trim() ? (
-                      <p className="mt-0.5 text-[11px] text-muted-foreground/80 font-mono">{job.request_no.trim()}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                      {unitRequestCardSubtitle(job) || EM_DASH}
+                    </p>
+                    {/* เลขที่ใบขอโชว์เฉพาะเจ้าหน้าที่ (หน้าสมัครสาธารณะไม่ต้องเห็น จึงไม่จองที่)
+                        แต่ในฝั่งเจ้าหน้าที่ต้องมีที่ยืนทุกใบ ไม่งั้นแถวล่างเลื่อนไม่ตรงกัน */}
+                    {isStaff ? (
+                      <p className="mt-0.5 font-mono text-[11px] leading-4 text-muted-foreground/80">
+                        {dashIfEmpty(job.request_no)}
+                      </p>
                     ) : null}
                   </div>
                   {job.urgency === 'urgent' && (
@@ -477,10 +485,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 pb-4">
-                <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
+              {/* flex-1: ดูดพื้นที่เหลือของกล่องไว้ที่นี่ ให้ footer ถูกตรึงก้นการ์ด
+                  ความแปรผันของเนื้อด้านบน (ชิปช่องทางที่หายทั้งบล็อกในบางใบ ฯลฯ)
+                  จึงไม่ทำให้แถบ "ผู้สมัคร N คน" ของแต่ละใบอยู่คนละระดับอีก */}
+              <CardContent className="flex-1 space-y-2 pb-4">
+                <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
                   <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
-                  {job.location_address}
+                  {/* ข้อความสำรองแบบเดียวกับการ์ดกล่องลอย ('ไม่ได้ระบุจังหวัด') —
+                      คำที่ผู้สมัครทั่วไปอ่านรู้เรื่อง เพราะโผล่บนหน้าสมัครสาธารณะด้วย */}
+                  {job.location_address?.trim() || 'ไม่ได้ระบุสถานที่'}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                   <span className="inline-flex items-center gap-1 text-foreground font-semibold">
@@ -493,7 +506,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </span>
                 </div>
               </CardContent>
-              <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
+              <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (
                   <>
                     {/* ชิปช่องทางที่ปล่อยลิงก์ไว้ + ยอดคลิก (mockup rev.3 ข้อ 04) */}

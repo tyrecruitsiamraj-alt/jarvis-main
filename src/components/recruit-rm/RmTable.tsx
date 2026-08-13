@@ -1,7 +1,9 @@
 import React from 'react';
 import { BookmarkPlus, Phone, Eye, ClipboardCheck, UserMinus, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DASH } from '@/lib/designTokens';
+// ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
+import { DASH, TONE } from '@/lib/designTokens';
+import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   APPLICATION_STATUS_CLASS,
@@ -19,7 +21,6 @@ import {
   type RmTab,
 } from '@/lib/recruitRm';
 import type { CallHold } from '@/lib/callHoldsApi';
-import { TONE } from '@/lib/designTokens';
 
 /**
  * ตารางใบสมัครของหน้างานสรรหา (RM) — แถวคือ **ใบสมัครจริงจากหน้า /apply**
@@ -85,7 +86,9 @@ const RmTable: React.FC<{
               <th className="px-3 py-2 font-semibold">ชื่อ</th>
               <th className="px-3 py-2 font-semibold">นามสกุล</th>
               <th className="px-3 py-2 font-semibold">เบอร์โทร</th>
-              <th className="px-3 py-2 font-semibold">สมัครงาน</th>
+              {/* กว้างคงที่ — ค่า "ตำแหน่ง — หน่วยงาน" ยาวมาก ถ้าปล่อยให้ auto-layout
+                  จัดเอง แถวนั้นจะสูง 2–3 บรรทัดขณะที่แถวข้าง ๆ สูงบรรทัดเดียว */}
+              <th className="w-[20rem] px-3 py-2 font-semibold">สมัครงาน</th>
               <th className="px-3 py-2 font-semibold">จังหวัด</th>
               <th className="px-3 py-2 font-semibold">ช่องทาง</th>
               <th className="px-3 py-2 font-semibold">วันที่สมัคร</th>
@@ -97,8 +100,10 @@ const RmTable: React.FC<{
             {rows.map((r) => {
               const checked = selectedIds.includes(r.id);
               const { firstName, lastName } = splitApplicantName(r);
+              // align-middle ที่ tr คุมทุกคอลัมน์ในจุดเดียว — default ของ td คือ
+              // baseline ซึ่งทำให้แถวที่มีสองบรรทัดดูเหลื่อมกับแถวข้าง ๆ
               return (
-                <tr key={r.id} className={cn('border-t', DASH.tableRow)}>
+                <tr key={r.id} className={cn('border-t [&>td]:align-middle', DASH.tableRow)}>
                   <td className="px-3 py-2">
                     <input
                       type="checkbox"
@@ -108,14 +113,16 @@ const RmTable: React.FC<{
                       className="h-3.5 w-3.5 cursor-pointer accent-sky-600"
                     />
                   </td>
-                  <td className={cn('px-3 py-2', DASH.cellStrong)}>{firstName || '—'}</td>
-                  <td className={cn('px-3 py-2', DASH.cellStrong)}>{lastName || '—'}</td>
+                  <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(firstName)}</td>
+                  <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(lastName)}</td>
                   <td className={cn('px-3 py-2 font-mono text-[12px] whitespace-nowrap', DASH.cell)}>
-                    {r.phone}
+                    {dashIfEmpty(r.phone)}
                   </td>
-                  <td className={cn('px-3 py-2', DASH.cell)}>
-                    <span className="inline-flex items-center gap-1.5">
-                      {applicationJobLabel(r)}
+                  {/* ⚠️ truncate ต้องการกล่องที่มีความกว้างแน่นอน — inline-flex เดิมใช้ไม่ได้
+                      ใส่ title ไว้ให้อ่านเต็มตอน hover ข้อมูลจึงไม่หายไปกับการตัด */}
+                  <td className={cn('px-3 py-2', DASH.cell)} title={applicationJobLabel(r)}>
+                    <span className="flex max-w-[20rem] items-center gap-1.5">
+                      <span className="truncate">{dashIfEmpty(applicationJobLabel(r))}</span>
                       {r.has_document ? (
                         <FileText
                           className={cn('h-3.5 w-3.5 shrink-0', DASH.muted)}
@@ -124,12 +131,13 @@ const RmTable: React.FC<{
                       ) : null}
                     </span>
                   </td>
-                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>{r.province || '—'}</td>
+                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>{dashIfEmpty(r.province)}</td>
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellMuted)}>
-                    {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : '—'}
+                    {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH}
                   </td>
+                  {/* created_at ที่หายไปทำให้ .slice พังทั้งหน้า — gate ก่อนเสมอ */}
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
-                    {formatYmdDmyBe(r.created_at.slice(0, 10))}
+                    {r.created_at ? formatYmdDmyBe(r.created_at.slice(0, 10)) : EM_DASH}
                   </td>
                   <td className="px-3 py-2">
                     <span
