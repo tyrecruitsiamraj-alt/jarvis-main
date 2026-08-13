@@ -35,6 +35,12 @@ type Props = {
   searchPlaceholder?: string;
   resultCount?: number;
   totalCount?: number;
+  /**
+   * ซ่อนช่องค้นหาในแถบนี้ — ใช้ตอนหน้าแม่ยกช่องค้นหาขึ้นไปไว้บนสุดเอง
+   * (เจ้าของสั่ง 13 ส.ค. 2569: บอร์ดเจ้าหน้าที่ให้ค้นหาอยู่ด้านบนแบบหน้า Dashboard
+   * · หน้าสาธารณะไม่ส่ง prop นี้ = ช่องค้นหาอยู่ที่เดิม)
+   */
+  hideSearch?: boolean;
 };
 
 function countActiveFilters(
@@ -89,6 +95,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
   searchPlaceholder = 'ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน...',
   resultCount,
   totalCount,
+  hideSearch = false,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = useMemo(
@@ -170,14 +177,16 @@ const JobBoardTopFilters: React.FC<Props> = ({
         <div className="jarvis-frost rounded-2xl border border-white/70 p-4 shadow-sm md:rounded-[1.25rem] md:p-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <SearchField
-                wrapperClassName="flex-1 min-w-0"
-                placeholder={searchPlaceholder}
-                value={search}
-                onChange={(e) => onSearchChange(e.target.value)}
-              />
+              {hideSearch ? null : (
+                <SearchField
+                  wrapperClassName="flex-1 min-w-0"
+                  placeholder={searchPlaceholder}
+                  value={search}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                />
+              )}
 
-              <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+              <div className={cn('flex flex-wrap items-center gap-2 lg:shrink-0', hideSearch && 'flex-1')}>
                 <div
                   className="inline-flex rounded-xl border border-white/80 bg-white/55 p-1 shadow-sm"
                   role="group"
