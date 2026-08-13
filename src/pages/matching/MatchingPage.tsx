@@ -97,6 +97,7 @@ import {
 } from '@/components/matching/LumosPanels';
 import { cardNextAction } from '@/lib/matchingCardAction';
 import { lumosProgressChip } from '@/lib/lumosStatCells';
+import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import TierCriteriaTooltip from '@/components/matching/TierCriteriaTooltip';
 import AiEvaluationStatus from '@/components/matching/AiEvaluationStatus';
 import { TIER_CRITERIA } from '@/lib/matchTierCriteria';
@@ -2405,8 +2406,11 @@ const MatchingPage: React.FC = () => {
                   บรรทัดแรก = "สิ่งที่ต้องตัดสินใจ" ตามหลักคนอ่านบนลงล่างที่เจ้าของยึด
                   ด่วนแค่ไหน → ต้องทำอะไรต่อ → เหลือหากี่คน
                   ชื่อหน่วยงาน/ตำแหน่ง/ที่อยู่เป็นของประกอบ ลงไปอยู่บรรทัดถัดไป
+
+                  ⚠️ แถวนี้ nowrap — ชิปด่วนหดได้ (truncate) ส่วน "เหลือหา" ไม่หด
+                  ถ้าปล่อย wrap ใบที่ข้อความยาวจะตกบรรทัดแล้วการ์ดสูงกระโดดใบเดียว
                 */}
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <div className="flex flex-nowrap items-center gap-x-2">
                   <span
                     title={
                       ageDays == null
@@ -2414,7 +2418,7 @@ const MatchingPage: React.FC = () => {
                         : `ใบขอนี้ค้างมา ${ageDays} วัน · เกณฑ์: ≤7 ยังไม่ด่วน · 8–30 เริ่มด่วน · 31–60 ด่วน · 60+ ด่วนมาก`
                     }
                     className={cn(
-                      'inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tabular-nums',
+                      'inline-flex min-w-0 items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tabular-nums',
                       ageMeta.chipCls,
                     )}
                   >
@@ -2422,10 +2426,28 @@ const MatchingPage: React.FC = () => {
                     {ageMeta.label}
                     {ageDays != null ? ` · ค้าง ${ageDays} วัน` : ''}
                   </span>
+                  <span className="ml-auto shrink-0 text-[11px] text-slate-600 dark:text-slate-300">
+                    เหลือหา <b className={cn('text-[15px] tabular-nums', TONE.warn.value)}>{remaining}</b>
+                    <span className="text-muted-foreground"> / {requested} อัตรา</span>
+                  </span>
+                </div>
+
+                {/*
+                  แถวชิป — **จองที่ไว้เสมอแม้ไม่มีชิปสักอัน** (เจ้าของเคาะ 13 ส.ค. 2569:
+                  "ข้อมูลไม่เท่ากันก็ขยับเอง คงมันไว้ให้ตรงกัน") ทุกอย่างที่โผล่ ๆ หาย ๆ
+                  มากองอยู่แถวนี้แถวเดียว การ์ดจึงสูงเท่ากันไม่ว่าใบไหนจะมีชิปกี่อัน
+                */}
+                <div className="mt-1 flex flex-nowrap items-center gap-x-1.5 overflow-hidden">
+                  {/* ตัวตั้งความสูงของแถว — เป็นชิปจริงที่มองไม่เห็นและกว้าง 0
+                      ใช้แทน min-h ค่าคงที่ เพราะความสูงจะเดินตามชิปจริงเองถ้าวันหลัง
+                      ขนาดชิปเปลี่ยน (วัดเจอ: min-h-[22px] ต่างจากชิปจริง 23px อยู่ 1px) */}
+                  <span aria-hidden className={cn(TONE.neutral.chip, 'invisible w-0 overflow-hidden px-0')}>
+                    0
+                  </span>
                   {(() => {
                     const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
                     return action ? (
-                      <span title={action.text} className={cn(TONE[action.tone].chip, 'shrink-0')}>
+                      <span title={action.text} className={cn(TONE[action.tone].chip, 'min-w-0 truncate')}>
                         → {action.text}
                       </span>
                     ) : null;
@@ -2436,19 +2458,18 @@ const MatchingPage: React.FC = () => {
                     // ซึ่งกลับด้านกับความจริง) ตอนนี้เป็นชิปที่ขึ้นเมื่อมีค่าจริงเท่านั้น
                     const chip = lumosProgressChip(progress);
                     return chip ? (
-                      <span className={cn(TONE[chip.tone].chip, 'shrink-0 tabular-nums')}>{chip.text}</span>
+                      <span className={cn(TONE[chip.tone].chip, 'shrink-0 whitespace-nowrap tabular-nums')}>
+                        {chip.text}
+                      </span>
                     ) : null;
                   })()}
-                  <span className="ml-auto shrink-0 text-[11px] text-slate-600 dark:text-slate-300">
-                    เหลือหา <b className={cn('text-[15px] tabular-nums', TONE.warn.value)}>{remaining}</b>
-                    <span className="text-muted-foreground"> / {requested} อัตรา</span>
-                  </span>
                 </div>
 
                 <div className="mt-1 flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    {/* ชื่อหน่วยงาน + ป้ายผลคัดคน — ของประกอบการตัดสินใจ ไม่ใช่ตัวตัดสินใจเอง */}
-                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    {/* ชื่อหน่วยงาน + ป้ายผลคัดคน — ของประกอบการตัดสินใจ ไม่ใช่ตัวตัดสินใจเอง
+                        nowrap: ชื่อยาวให้ truncate ไม่ใช่ดันป้ายตกบรรทัด */}
+                    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
                       <span className="truncate text-sm font-semibold text-blue-600 dark:text-blue-300">{unitRequestCardTitle(j)}</span>
                       {matchCount != null ? (
                         <span
@@ -2468,9 +2489,10 @@ const MatchingPage: React.FC = () => {
                         </span>
                       ) : null}
                     </div>
-                    {unitRequestCardSubtitle(j) ? (
-                      <div className="text-[11px] text-muted-foreground truncate">{unitRequestCardSubtitle(j)}</div>
-                    ) : null}
+                    {/* ไม่มี subtitle ก็ต้องกินที่บรรทัดเดิม — ไม่งั้นที่อยู่เลื่อนขึ้นมาใบเดียว */}
+                    <div className="truncate text-[11px] leading-4 text-muted-foreground">
+                      {unitRequestCardSubtitle(j) || EM_DASH}
+                    </div>
                     <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                       <MapPin className="w-3 h-3 shrink-0" />
                       <span className="truncate">{j.location_address}</span>
@@ -2487,12 +2509,11 @@ const MatchingPage: React.FC = () => {
                         {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
                       </span>
                       {/* ยอด ขอมา/เหลือหา ย้ายขึ้นบรรทัดแรกแล้ว ตรงนี้เหลือเลขที่ใบขอ
-                          ซึ่งเป็นของอ้างอิง — ตามหลักบนลงล่าง ของอ้างอิงอยู่ล่างสุด */}
-                      {j.request_no ? (
-                        <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
-                          {j.request_no}
-                        </span>
-                      ) : null}
+                          ซึ่งเป็นของอ้างอิง — ตามหลักบนลงล่าง ของอ้างอิงอยู่ล่างสุด
+                          ใบที่ไม่มีเลขที่ก็ต้องกินที่บรรทัดเดิม (คงไว้ให้ตรงกัน) */}
+                      <span className="mt-0.5 block font-mono text-[10px] leading-4 text-muted-foreground">
+                        {dashIfEmpty(j.request_no)}
+                      </span>
                     </div>
                     {/* หัวข้อกับจำนวนช่องคงที่ทุกใบ — ใบที่ยังไม่เคยส่งโทรได้ 0 ทั้งแถว
                         (เจ้าของสั่ง: ข้อมูลไม่เท่ากันก็คงไว้ให้ตรงกัน อย่าให้มันขยับเอง)
@@ -2504,23 +2525,29 @@ const MatchingPage: React.FC = () => {
                       <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {/* ⚠️ ความกว้างคงที่ — ป้ายปุ่มยาวไม่เท่ากัน ("ดูคนของเรา (0)" กับ
+                      "AI กำลังคิดที่หลังบ้าน…") ถ้าปล่อยให้กว้างตามข้อความ มันจะไปบีบ
+                      กล่องซ้ายคนละขนาด แล้วเลขในแถบ 6 ช่องของแต่ละใบไม่ตรงคอลัมน์กัน
+                      (วัดเจอจริง: แถบกว้าง 544.9–549.1px ต่างกันข้ามใบ) */}
+                  <div className="flex w-[168px] shrink-0 items-center justify-end">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         openJob(j);
                       }}
-                      className="jarvis-btn-secondary shrink-0"
+                      className="jarvis-btn-secondary w-full justify-center"
                     >
-                      <Users className="h-3 w-3" />
-                      {matchCount != null
-                        ? `ดูคนของเรา (${matchCount})`
-                        : boardLoadingId === j.id
-                          ? 'กำลังโหลดผล…'
-                          : boardWaitingById[j.id]
-                            ? 'AI กำลังคิดที่หลังบ้าน…'
-                            : 'หาคนของเรา'}
+                      <Users className="h-3 w-3 shrink-0" />
+                      <span className="truncate">
+                        {matchCount != null
+                          ? `ดูคนของเรา (${matchCount})`
+                          : boardLoadingId === j.id
+                            ? 'กำลังโหลดผล…'
+                            : boardWaitingById[j.id]
+                              ? 'AI กำลังคิดที่หลังบ้าน…'
+                              : 'หาคนของเรา'}
+                      </span>
                     </button>
                   </div>
                 </div>
