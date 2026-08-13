@@ -88,7 +88,7 @@ import {
    ยังอยู่ครบใน callHoldsApi.ts และยังถูกใช้ที่ถัง "ต้องคนตาม" ในแถบการไหลของงาน */
 import { acquireCallHold, fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { partitionHoldTargets, summarizeAcquireResults, type HoldTarget } from '@/lib/callHoldsBulk';
-import { CheckCircle2, UserPlus, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
+import { CheckCircle2, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
 import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
@@ -1618,6 +1618,9 @@ const MatchingPage: React.FC = () => {
 
   // เปิดฟอร์มเพิ่มผู้สมัครโดยเติมข้อมูลจาก iRecruit ให้ก่อน
   // ยังไม่สร้างข้อมูลจนกว่าผู้ใช้จะตรวจสอบและกดบันทึกในฟอร์ม
+  // ⚠️ ตอนนี้**ไม่มีปุ่มไหนเรียกแล้ว** (ปุ่มต่อแถว iRecruit ถูกถอด 13 ส.ค. 2569
+  // ตามคำสั่ง "ใต้ชื่อคนเหลือแค่ปุ่มที่บอก") — เก็บไว้เพราะจะกลับมาใช้ตอนสร้าง
+  // "ที่จอง/เก็บรายละเอียดจากผลโทรสนใจ" · ถ้าถึงตอนนั้นไม่ใช้ ให้ลบทั้งฟังก์ชัน
   const openIrecruitCandidatePrefill = (
     job: JobRequest,
     match: IrecruitCandidateMatch,
@@ -1826,6 +1829,8 @@ const MatchingPage: React.FC = () => {
     );
   };
 
+  // ⚠️ ตอนนี้**ไม่มีปุ่มไหนเรียกแล้ว** (ปุ่มต่อแถว iRecruit ถูกถอด 13 ส.ค. 2569) —
+  // เก็บไว้เพราะการจอง iRecruit จะย้ายไปทำจากผลโทร "สนใจ" · ถึงตอนนั้นไม่ใช้ให้ลบ
   const openIrecruitProposalAction = (
     job: JobRequest,
     candidate: IrecruitCandidateMatch,
@@ -3475,67 +3480,15 @@ const MatchingPage: React.FC = () => {
                                      <p className="mt-0.5 text-slate-600 dark:text-slate-300">เหตุผล: {proposed.reason || 'ไม่ระบุ'}</p>
                                   </div>
                                 ) : null}
-                                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => openIrecruitCandidatePrefill(jobDetail, m, branchName)}
-                                    className={cn(
-                                      CANDIDATE_ACTION_BUTTON_CLASS,
-                                      cn(TONE.violet.outline, 'focus-visible:ring-violet-400'),
-                                    )}
-                                  >
-                                    <UserPlus className="h-3 w-3" /> เพิ่มรายละเอียดผู้สมัคร
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={busy || !!activeElsewhere}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'contacted', branchId, branchName)}
-                                    className={proposalActionButtonClass('contacted')}
-                                  >
-                                    <PhoneCall className="h-3 w-3" />
-                                    {busy ? 'บันทึก…' : proposed?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={busy || !!activeElsewhere}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'reserved', branchId, branchName)}
-                                    className={proposalActionButtonClass('reserved')}
-                                  >
-                                    <UserCheck className="h-3 w-3" />
-                                    {busy ? 'บันทึก…' : proposed?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={busy || !!activeElsewhere}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'placed', branchId, branchName)}
-                                    className={proposalActionButtonClass('placed')}
-                                  >
-                                    <CheckCircle2 className="h-3 w-3" />
-                                    {busy ? 'บันทึก…' : proposed?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={busy}
-                                    onClick={() => openIrecruitProposalAction(jobDetail, m, 'rejected', branchId, branchName)}
-                                    className={proposalActionButtonClass('rejected')}
-                                  >
-                                    <UserX className="h-3 w-3" />
-                                    {proposed?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
-                                  </button>
-                                  {proposed && isActiveWorkflowStatus(proposed.status) ? (
-                                    <button
-                                      type="button"
-                                      disabled={busy}
-                                      onClick={() => openCancelProposalAction(jobDetail, key, m.full_name)}
-                                      className={cn(
-                                        CANDIDATE_ACTION_BUTTON_CLASS,
-                                        cn(TONE.danger.outline, 'focus-visible:ring-red-400'),
-                                      )}
-                                    >
-                                      <X className="h-3 w-3" /> ยกเลิก
-                                    </button>
-                                  ) : null}
-                                </div>
+                                {/* ⚠️ แถบปุ่มต่อแถว (เพิ่มรายละเอียดผู้สมัคร · ติดต่อแล้ว · จองตัว ·
+                                    ลงงานแล้ว · ไม่ผ่าน · ยกเลิก) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก
+                                    13 ส.ค. 2569: "ใต้ชื่อคนเอาปุ่มที่ฉันบอกไปไว้แค่นั้น"
+                                    (3 ทาง: อนุมัติทั้งใบ / ติ๊กส่งโทร / เก็บไปโทรเอง — อยู่ที่แถบ
+                                    LumosSendBar ใต้ลิสต์ ไม่ใช่ต่อแถว)
+                                    ⚠️ ตัวจัดการ (openIrecruitProposalAction ฯลฯ) ยังอยู่ —
+                                    การจอง/ลงงานฝั่ง iRecruit **ไม่มีปุ่มเหลือแล้ว** จนกว่าจะมี
+                                    ที่จองใหม่จากผลโทร "สนใจ" (แจ้งเจ้าของแล้ว) · ฝั่งบอร์ดยังจอง
+                                    ได้จาก dialog รายละเอียดคน (กดที่ชื่อ) */}
                                 {lumosRow ? (
                                   <LumosCallBadgeRow
                                     row={lumosRow}
@@ -3554,7 +3507,7 @@ const MatchingPage: React.FC = () => {
                     )
                   ) : (
                     <p className="text-[11px] text-muted-foreground">
-                      กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วกดจองตัว/ลงงานได้เลยในหน้านี้
+                      กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วติ๊กเลือกส่ง AI โทรได้เลย
                     </p>
                   )}
                   <LumosSendBar
