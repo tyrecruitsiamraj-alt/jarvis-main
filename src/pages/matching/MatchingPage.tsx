@@ -934,6 +934,18 @@ const MatchingPage: React.FC = () => {
   const approveAllCount = approveAllTargets.board.length + approveAllTargets.irecruit.length;
 
   /**
+   * คนที่ AI แมทให้ทั้งหมด (ก่อนตัดคนที่ส่งแล้ว/ถูกถือ) — ใช้เลือกเหตุผลของปุ่ม
+   * "ส่งทั้งหมดที่แมท" ตอนเป็น 0: มีคนแมทแต่ส่งครบแล้ว ≠ ยังไม่มีคนแมทเลย
+   */
+  const matchedTotalCount = useMemo(() => {
+    if (!jobDetail) return 0;
+    return (
+      (boardMatchById[jobDetail.id]?.matches ?? []).length +
+      (irMatchById[jobDetail.id]?.matches ?? []).length
+    );
+  }, [jobDetail, boardMatchById, irMatchById]);
+
+  /**
    * "ส่งทั้งหมดที่แมท" = ติ๊กให้ครบแล้วเข้าเส้นทางส่งเส้นเดียวกับการติ๊กเอง
    * ⚠️ **ต้องผ่านหน้าต่างยืนยันเสมอ** — ปุ่มนี้ยิงสายจริงทีเดียวหลายสิบคน
    * หน้าต่างนั้นโชว์รายชื่อ+เบอร์ทุกคนและเตือนว่า "AI จะโทรหาคนเหล่านี้จริง" อยู่แล้ว
@@ -3501,6 +3513,36 @@ const MatchingPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {/* ── แถบสรุป + ปุ่มลงมือ — **ติดก้น drawer เห็นตลอด** ─────────────────
+                  เจ้าของทัก 13 ส.ค. 2569: "พอติ๊กแล้วข้อ 2 กลับไม่ขึ้นให้กด แต่ไปขึ้นข้อ 3"
+                  เดิมมีแถบเดียวกัน **สองที่** (ใต้หัวข้อ 2 กับในกล่องหัวข้อ 3) ใช้ selection
+                  ก้อนเดียวกัน ติ๊กที่ไหนก็ขยับทั้งคู่ — แต่ตัวเลขคนละชุด เพราะแถบล่าง
+                  ไม่ได้รับยอด sendable/holdable ที่แยกแล้ว ผู้ใช้จึงเห็นเลขสวนทางกัน
+                  ⚠️ ตอนนี้เหลือแถบเดียว sticky ที่ก้น — ติ๊กจากลิสต์ไหนก็เห็นปุ่มทันที
+                  ไม่ต้องเลื่อนกลับขึ้นไปหา และไม่มีเลขสองชุดให้สับสนอีก */}
+              <div className="sticky bottom-0 -mx-4 mt-1 space-y-1.5 border-t border-border/60 bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6">
+                <LumosSendBar
+                  count={lumosSelectedCount}
+                  allCount={approveAllCount}
+                  matchedCount={matchedTotalCount}
+                  busy={lumosSending}
+                  onClear={clearLumosSelection}
+                  creatingBatch={batchCreating}
+                  onCreateBatch={() => void createBatchFromSelection()}
+                  onSend={beginSendFlow}
+                  onSendAll={approveWholeJob}
+                  onHoldSelf={() => void holdSelectedForSelf()}
+                  holdingSelf={holdingSelf}
+                  sendableCount={lumosSelectedSendable}
+                  holdableCount={lumosSelectedHoldable}
+                />
+                <CallBatchUndoStrip
+                  batches={pendingBatches}
+                  cancellingId={batchCancellingId}
+                  onCancel={(id) => void cancelPendingBatch(id)}
+                />
+              </div>
+
               {/* ── ขั้น 4 · หาคนไม่พอ — ส่งต่อทีมอื่น ────────────────────────────
                   เจ้าของสั่ง 13 ส.ค. 2569: เอากล่อง "หาได้ไม่ถึงเป้า" มารวมที่นี่
                   ("ไปไว้ด้วยกัน") — เดิมแยกกันอยู่คนละที่ทั้งที่พูดเรื่องเดียวกัน
@@ -3620,34 +3662,6 @@ const MatchingPage: React.FC = () => {
                 </div>
               ) : null}
 
-              {/* ── แถบสรุป + ปุ่มลงมือ — **ติดก้น drawer เห็นตลอด** ─────────────────
-                  เจ้าของทัก 13 ส.ค. 2569: "พอติ๊กแล้วข้อ 2 กลับไม่ขึ้นให้กด แต่ไปขึ้นข้อ 3"
-                  เดิมมีแถบเดียวกัน **สองที่** (ใต้หัวข้อ 2 กับในกล่องหัวข้อ 3) ใช้ selection
-                  ก้อนเดียวกัน ติ๊กที่ไหนก็ขยับทั้งคู่ — แต่ตัวเลขคนละชุด เพราะแถบล่าง
-                  ไม่ได้รับยอด sendable/holdable ที่แยกแล้ว ผู้ใช้จึงเห็นเลขสวนทางกัน
-                  ⚠️ ตอนนี้เหลือแถบเดียว sticky ที่ก้น — ติ๊กจากลิสต์ไหนก็เห็นปุ่มทันที
-                  ไม่ต้องเลื่อนกลับขึ้นไปหา และไม่มีเลขสองชุดให้สับสนอีก */}
-              <div className="sticky bottom-0 -mx-4 mt-1 space-y-1.5 border-t border-border/60 bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6">
-                <LumosSendBar
-                  count={lumosSelectedCount}
-                  allCount={approveAllCount}
-                  busy={lumosSending}
-                  onClear={clearLumosSelection}
-                  creatingBatch={batchCreating}
-                  onCreateBatch={() => void createBatchFromSelection()}
-                  onSend={beginSendFlow}
-                  onSendAll={approveWholeJob}
-                  onHoldSelf={() => void holdSelectedForSelf()}
-                  holdingSelf={holdingSelf}
-                  sendableCount={lumosSelectedSendable}
-                  holdableCount={lumosSelectedHoldable}
-                />
-                <CallBatchUndoStrip
-                  batches={pendingBatches}
-                  cancellingId={batchCancellingId}
-                  onCancel={(id) => void cancelPendingBatch(id)}
-                />
-              </div>
             </div>
           ) : null}
         </SheetContent>

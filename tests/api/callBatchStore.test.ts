@@ -439,8 +439,10 @@ describe('source guard — เส้นสร้างชุดจากหน�
     // เป็น CallBatchUndoStripXX ก็ยังมีคำนั้นอยู่ในไฟล์)
     const page = readFileSync(path.resolve(process.cwd(), 'src/pages/matching/MatchingPage.tsx'), 'utf8');
     const used = page.match(/<CallBatchUndoStrip[\s/>]/g) ?? [];
-    // ต้องมีใต้ทั้งสองแถบติ๊กเลือก (คนของเรา + iRecruit) ไม่งั้นฝั่งหนึ่งถอนคำไม่ได้
-    expect(used.length).toBe(2);
+    // **หนึ่งเดียว** ในแถบ sticky ก้น drawer (13 ส.ค. 2569: ยุบสองแถบเหลือแถบเดียว
+    // หลังเจ้าของเจอเลขสองชุดสวนทางกัน) — แถบเดียวเห็นตลอดจึงครอบทั้งสองลิสต์
+    // ถ้าเลขนี้ขยับ = มีคนเพิ่ม/ลบแถบโดยไม่ได้ตั้งใจ ให้กลับไปอ่าน commit 72345fd ก่อน
+    expect(used.length).toBe(1);
     expect(page).toMatch(/cancelCallBatch\(/);
 
     // และคอมโพเนนต์ต้อง export ออกมาจริง — import ตายเงียบตอน build เท่านั้น

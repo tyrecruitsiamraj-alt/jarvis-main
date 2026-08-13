@@ -55,7 +55,8 @@ describe('lumosSendActionStates — ปุ่มที่ใช้ไม่ไ�
   it('ติ๊กแล้วแต่ทั้งใบไม่มีใครส่งได้ → 3 ปุ่มที่ใช้ยอดติ๊กยังกดได้ · ส่งทั้งหมดปิด', () => {
     const s = states({ allCount: 0, selectedCount: 2 });
     expect(s.sendAll.disabled).toBe(true);
-    expect(s.sendAll.reason).toContain('ยังไม่มีคนที่ส่งได้');
+    // ไม่ส่ง matchedCount = ถือว่าแมทเท่ากับส่งได้ (0) → เหตุผลคือยังไม่มีคนแมท
+    expect(s.sendAll.reason).toContain('ยังไม่มีคนที่ AI แมทให้');
     for (const key of SELECTION_KEYS) {
       expect(s[key].disabled).toBe(false);
       expect(s[key].count).toBe(2);
@@ -165,5 +166,28 @@ describe('ติ๊กได้ทุกคนที่มีเบอร์ —
         }
       }
     }
+  });
+});
+
+describe('เหตุผลของ "ส่งทั้งหมดที่แมท" ต้องแยกสองเคส (เจ้าของงง 13 ส.ค. 2569)', () => {
+  const base = { selectedCount: 0, sending: false, creatingBatch: false, holdingSelf: false };
+
+  it('**มีคนแมทแต่ส่งครบแล้ว → บอกว่า "ส่งไปแล้ว" ไม่ใช่ "ไม่มีคน"**', () => {
+    // เคสจริงที่เจ้าของเจอ: แมท 1 คนแต่ถูกส่ง AI ไปแล้ว → (0) ถูกอ่านว่าปุ่มพัง
+    const s = lumosSendActionStates({ ...base, allCount: 0, matchedCount: 1 });
+    expect(s.sendAll.disabled).toBe(true);
+    expect(s.sendAll.reason).toContain('ถูกส่ง AI ไปแล้ว');
+    expect(s.sendAll.reason).not.toContain('ยังไม่มีคน');
+  });
+
+  it('ไม่มีคนแมทเลย → ชวนไปกดค้นหา', () => {
+    const s = lumosSendActionStates({ ...base, allCount: 0, matchedCount: 0 });
+    expect(s.sendAll.reason).toContain('กดค้นหาก่อน');
+  });
+
+  it('มีคนส่งได้ → กดได้ ไม่มีเหตุผล', () => {
+    const s = lumosSendActionStates({ ...base, allCount: 3, matchedCount: 5 });
+    expect(s.sendAll.disabled).toBe(false);
+    expect(s.sendAll.reason).toBeNull();
   });
 });

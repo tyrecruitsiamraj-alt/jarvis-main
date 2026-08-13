@@ -28,9 +28,15 @@ export const LUMOS_SEND_ACTION_KEYS: LumosSendActionKey[] = [
   'holdSelf',
 ];
 
-const NO_TARGET_REASON =
-  'ใบนี้ยังไม่มีคนที่ส่งได้ — ไม่มีเบอร์ / ส่งไปแล้ว / มีเจ้าหน้าที่ถืออยู่';
-const NO_SELECTION_REASON = 'ติ๊กเลือกคนจากรายชื่อด้านล่างก่อน';
+const NO_MATCH_REASON = 'ใบนี้ยังไม่มีคนที่ AI แมทให้ — กดค้นหาก่อน';
+/**
+ * มีคนแมทอยู่จริงแต่ส่งไม่ได้สักคน — ต้องบอกว่า "ส่งครบแล้ว" ไม่ใช่ "ไม่มีคน"
+ * (เจ้าของงง 13 ส.ค. 2569: "ส่งทั้งหมดที่แมท ก็ควรจะพร้อมให้กดเลยสิ" — ใบนั้น
+ * ทุกคนที่แมทถูกส่ง AI ไปแล้ว เลข (0) เลยถูกอ่านว่าปุ่มพัง)
+ */
+const ALL_TARGETS_DONE_REASON =
+  'ทุกคนที่แมทถูกส่ง AI ไปแล้ว / มีเจ้าหน้าที่ถืออยู่ — ไม่มีใครเหลือให้ส่งซ้ำ';
+const NO_SELECTION_REASON = 'ติ๊กเลือกคนจากรายชื่อก่อน';
 /** ติ๊กไว้แล้วแต่ทุกคนที่ติ๊กทำทางนี้ไม่ได้ — ต้องบอกให้ชัด ไม่ใช่บอกให้ไปติ๊ก(ซ้ำ) */
 const ALL_SENT_REASON = 'คนที่ติ๊กไว้ถูกส่งเข้าคิว AI ไปแล้วทั้งหมด';
 const ALL_HELD_REASON = 'คนที่ติ๊กไว้มีเจ้าหน้าที่ถืออยู่แล้วทั้งหมด';
@@ -38,6 +44,8 @@ const ALL_HELD_REASON = 'คนที่ติ๊กไว้มีเจ้า�
 export function lumosSendActionStates(input: {
   /** คนทั้งใบที่ส่งได้จริง (approveAllCount) */
   allCount: number;
+  /** คนที่ AI แมทให้ทั้งหมดในใบ (ก่อนตัดคนที่ส่งแล้ว/ถูกถือ) — ไว้เลือกเหตุผลตอน allCount = 0 */
+  matchedCount?: number;
   /** คนที่ติ๊กเลือกไว้ (บอร์ด + iRecruit รวมกัน) */
   selectedCount: number;
   /**
@@ -56,6 +64,7 @@ export function lumosSendActionStates(input: {
   holdingSelf: boolean;
 }): Record<LumosSendActionKey, LumosSendActionState> {
   const { allCount, selectedCount, sending, creatingBatch, holdingSelf } = input;
+  const matchedCount = input.matchedCount ?? allCount;
   const selectedSendable = input.selectedSendable ?? selectedCount;
   const selectedHoldable = input.selectedHoldable ?? selectedCount;
   // กำลังทำงานอยู่ = ปิดทุกปุ่มพร้อมกัน กันยิงซ้อน (ปุ่มพวกนี้โทรหาคนจริง)
@@ -79,7 +88,7 @@ export function lumosSendActionStates(input: {
   return {
     // ⚠️ sendAll ผูกกับ allCount เท่านั้น — ไม่เกี่ยวกับการติ๊ก (นั่นคือจุดที่ทำให้
     // "ส่งทั้งหมดที่แมท" กดได้ตั้งแต่ยังไม่ได้ติ๊กใคร ซึ่งเป็นทางที่เจ้าของอยากได้)
-    sendAll: build(allCount, NO_TARGET_REASON),
+    sendAll: build(allCount, matchedCount > 0 ? ALL_TARGETS_DONE_REASON : NO_MATCH_REASON),
     sendSelected: build(selectedSendable, selectedReason(selectedSendable, ALL_SENT_REASON)),
     queueSelected: build(selectedSendable, selectedReason(selectedSendable, ALL_SENT_REASON)),
     holdSelf: build(selectedHoldable, selectedReason(selectedHoldable, ALL_HELD_REASON)),

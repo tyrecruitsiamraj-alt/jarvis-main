@@ -199,6 +199,7 @@ export function LumosSendBar({
   creatingBatch,
   onHoldSelf,
   holdingSelf = false,
+  matchedCount,
   sendableCount,
   holdableCount,
 }: {
@@ -220,6 +221,8 @@ export function LumosSendBar({
    */
   onHoldSelf: () => void;
   holdingSelf?: boolean;
+  /** คนที่แมททั้งหมดก่อนตัดคนที่ส่งแล้ว — เลือกเหตุผลตอน "ส่งทั้งหมด" เป็น 0 */
+  matchedCount?: number;
   /** ในจำนวนที่ติ๊ก ส่ง AI ได้จริงกี่คน (ยังไม่เคยเข้าคิวใบนี้) — ไม่ส่ง = เท่ากับที่ติ๊ก */
   sendableCount?: number;
   /** ในจำนวนที่ติ๊ก เก็บไปโทรเองได้กี่คน (ยังไม่มีใครถือ) */
@@ -227,6 +230,7 @@ export function LumosSendBar({
 }) {
   const act = lumosSendActionStates({
     allCount,
+    matchedCount,
     selectedCount: count,
     selectedSendable: sendableCount,
     selectedHoldable: holdableCount,
