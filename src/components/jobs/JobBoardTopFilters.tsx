@@ -27,6 +27,16 @@ type Props = {
   lockPosition?: boolean;
   subtypeFilter: string;
   onSubtypeFilterChange: (v: string) => void;
+  /**
+   * ตัวกรองฝั่งเจ้าหน้าที่ (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569) — ไม่ส่ง = ไม่แสดงช่อง
+   * ⚠️ **หน้าสาธารณะห้ามส่ง** ชื่อเจ้าหน้าที่สรรหาเป็นข้อมูลภายใน
+   */
+  recruiterFilter?: string;
+  onRecruiterFilterChange?: (v: string) => void;
+  recruiterOptions?: readonly string[];
+  contractTypeFilter?: string;
+  onContractTypeFilterChange?: (v: string) => void;
+  contractTypeOptions?: readonly string[];
   provinceOptions: readonly string[];
   districtOptions: readonly string[];
   positionOptions: readonly string[];
@@ -43,13 +53,8 @@ type Props = {
   hideSearch?: boolean;
 };
 
-function countActiveFilters(
-  province: string,
-  district: string,
-  position: string,
-  subtype: string,
-): number {
-  return [province, district, position, subtype].filter(Boolean).length;
+function countActiveFilters(...values: string[]): number {
+  return values.filter(Boolean).length;
 }
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -87,6 +92,12 @@ const JobBoardTopFilters: React.FC<Props> = ({
   lockPosition = false,
   subtypeFilter,
   onSubtypeFilterChange,
+  recruiterFilter = '',
+  onRecruiterFilterChange,
+  recruiterOptions,
+  contractTypeFilter = '',
+  onContractTypeFilterChange,
+  contractTypeOptions,
   provinceOptions,
   districtOptions,
   positionOptions,
@@ -99,8 +110,16 @@ const JobBoardTopFilters: React.FC<Props> = ({
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = useMemo(
-    () => countActiveFilters(provinceFilter, districtFilter, positionFilter, subtypeFilter),
-    [provinceFilter, districtFilter, positionFilter, subtypeFilter],
+    () =>
+      countActiveFilters(
+        provinceFilter,
+        districtFilter,
+        positionFilter,
+        subtypeFilter,
+        recruiterFilter,
+        contractTypeFilter,
+      ),
+    [provinceFilter, districtFilter, positionFilter, subtypeFilter, recruiterFilter, contractTypeFilter],
   );
 
   const clearAllFilters = () => {
@@ -108,10 +127,18 @@ const JobBoardTopFilters: React.FC<Props> = ({
     onDistrictFilterChange('');
     if (!lockPosition) onPositionFilterChange('');
     onSubtypeFilterChange('');
+    onRecruiterFilterChange?.('');
+    onContractTypeFilterChange?.('');
   };
 
+  /**
+   * ทุกช่องอยู่ **แถวเดียวกัน** (เจ้าของสั่ง 13 ส.ค. 2569: "ทำให้อยู่บรรทัดเดียวกันได้ไหม")
+   * — เดิมเป็น grid 2 คอลัมน์ ทำให้ตัวกรอง 4 ช่องกินความสูง 2 แถวเต็ม ๆ
+   * ⚠️ ใช้ flex-wrap ไม่ใช่แถวตายตัว — จอแคบต้องตกบรรทัดเอง ไม่ใช่ทะลุขอบ
+   * (กับดักเดิมของโปรเจกต์: shrink-0 คู่กับแถวที่ไม่ wrap = ทะลุ)
+   */
   const filterFields = (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="flex flex-wrap items-end gap-3">
       <LocationFilterSelect
         label="จังหวัด"
         placeholder="เลือกจังหวัด"
@@ -144,6 +171,27 @@ const JobBoardTopFilters: React.FC<Props> = ({
         options={subtypeOptions}
         disabled={loading || subtypeOptions.length === 0}
       />
+      {/* สองช่องล่างมีเฉพาะฝั่งเจ้าหน้าที่ — ไม่ส่ง prop มา = ไม่แสดง (หน้าสาธารณะ) */}
+      {onContractTypeFilterChange ? (
+        <LocationFilterSelect
+          label="ประเภทงาน"
+          placeholder="เลือกประเภทงาน"
+          value={contractTypeFilter}
+          onChange={onContractTypeFilterChange}
+          options={contractTypeOptions ?? []}
+          disabled={loading || (contractTypeOptions?.length ?? 0) === 0}
+        />
+      ) : null}
+      {onRecruiterFilterChange ? (
+        <LocationFilterSelect
+          label="เจ้าหน้าที่สรรหา"
+          placeholder="เลือกเจ้าหน้าที่"
+          value={recruiterFilter}
+          onChange={onRecruiterFilterChange}
+          options={recruiterOptions ?? []}
+          disabled={loading || (recruiterOptions?.length ?? 0) === 0}
+        />
+      ) : null}
     </div>
   );
 

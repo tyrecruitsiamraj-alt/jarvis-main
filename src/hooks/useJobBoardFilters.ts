@@ -15,6 +15,7 @@ import {
 import {
   DRIVING_POSITION_LABEL,
   jobMatchesPositionFilter,
+  jobMatchesStaffFilters,
 } from '@/lib/jobBoardPositionPreset';
 
 export type JobBoardUrgencyChip = 'all' | 'urgent';
@@ -38,6 +39,14 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
   const [districtFilter, setDistrictFilter] = useState('');
   const [positionFilter, setPositionFilter] = useState(initialPosition);
   const [subtypeFilter, setSubtypeFilter] = useState('');
+  /**
+   * ตัวกรองที่เจ้าของขอเพิ่ม 13 ส.ค. 2569 — **ฝั่งเจ้าหน้าที่เท่านั้น**
+   * (หน้าสาธารณะไม่ส่งมาแสดง · ชื่อเจ้าหน้าที่เป็นข้อมูลภายใน)
+   * วัดกับฐานจริง 292 ใบ: recruiter_name กรอกมา 179 ใบ (9 คน) ·
+   * contract_type_name กรอกครบ 292 ใบ (คนอย่างเดียว 216 · คน+รถ 76)
+   */
+  const [recruiterFilter, setRecruiterFilter] = useState('');
+  const [contractTypeFilter, setContractTypeFilter] = useState('');
   const [chip, setChip] = useState<JobBoardUrgencyChip>('all');
 
   useEffect(() => {
@@ -74,10 +83,35 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     return [...set].sort((a, b) => a.localeCompare(b, 'th'));
   }, [visible, positionFilter, drivingPositionGroup]);
 
+  /** ⚠️ เอาเฉพาะค่าที่มีจริงในใบขอที่มองเห็น — ใบที่ไม่ได้กรอกชื่อไม่สร้างตัวเลือกว่าง */
+  const recruiterOptions = useMemo(() => {
+    const set = new Set(
+      visible.map((j) => (j.recruiter_name || '').trim()).filter(Boolean),
+    );
+    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [visible]);
+
+  const contractTypeOptions = useMemo(() => {
+    const set = new Set(
+      visible.map((j) => (j.contract_type_name || '').trim()).filter(Boolean),
+    );
+    return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [visible]);
+
   useEffect(() => {
     if (!districtFilter) return;
     if (!districtOptions.includes(districtFilter)) setDistrictFilter('');
   }, [districtFilter, districtOptions]);
+
+  useEffect(() => {
+    if (recruiterFilter && !recruiterOptions.includes(recruiterFilter)) setRecruiterFilter('');
+  }, [recruiterFilter, recruiterOptions]);
+
+  useEffect(() => {
+    if (contractTypeFilter && !contractTypeOptions.includes(contractTypeFilter)) {
+      setContractTypeFilter('');
+    }
+  }, [contractTypeFilter, contractTypeOptions]);
 
   useEffect(() => {
     if (!positionFilter) return;
@@ -110,6 +144,10 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
           return false;
         }
         if (subtypeFilter && extractJobSubtypeLabel(j) !== subtypeFilter) return false;
+        // กติกาของสองตัวกรองนี้อยู่ที่ lib ที่เดียว (เทสต์คุมที่นั่น)
+        if (!jobMatchesStaffFilters(j, { recruiter: recruiterFilter, contractType: contractTypeFilter })) {
+          return false;
+        }
         return true;
       });
     if (!q) return { filtered: baseRows, usedRelatedFallback: false };
@@ -135,6 +173,8 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     districtFilter,
     positionFilter,
     subtypeFilter,
+    recruiterFilter,
+    contractTypeFilter,
     drivingPositionGroup,
   ]);
 
@@ -161,6 +201,12 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     setPositionFilter: onPositionFilterChange,
     subtypeFilter,
     setSubtypeFilter,
+    recruiterFilter,
+    setRecruiterFilter,
+    contractTypeFilter,
+    setContractTypeFilter,
+    recruiterOptions,
+    contractTypeOptions,
     chip,
     setChip,
     provinceOptions,

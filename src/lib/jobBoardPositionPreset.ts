@@ -64,3 +64,23 @@ export function jobMatchesPositionFilter(
   }
   return publicJobPositionLabel(job) === positionFilter;
 }
+
+/**
+ * ตัวกรองฝั่งเจ้าหน้าที่ของบอร์ด (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569):
+ * ประเภทงาน (`contract_type_name`) และเจ้าหน้าที่สรรหา (`recruiter_name`)
+ *
+ * ⚠️ **เทียบค่าตรงตัวหลัง trim เท่านั้น ห้ามเทียบแบบ "มีคำนี้อยู่"** — ชื่อเล่นเจ้าหน้าที่
+ * สั้นและซ้อนกันได้ (ข้อมูลจริงมี "หมิว" กับ "หมี") ถ้าใช้ includes จะกรองมาปนกัน
+ * ⚠️ ค่ากรองว่าง = ไม่กรอง · ใบที่ไม่ได้กรอกฟิลด์นั้นจะไม่เข้าเงื่อนไขเมื่อมีการกรอง
+ * (ตั้งใจ — "ไม่รู้ว่าใครดูแล" ไม่ควรถูกนับเป็นของใครสักคน)
+ */
+export function jobMatchesStaffFilters(
+  job: { recruiter_name?: string | null; contract_type_name?: string | null },
+  filters: { recruiter?: string; contractType?: string },
+): boolean {
+  const recruiter = (filters.recruiter || '').trim();
+  const contractType = (filters.contractType || '').trim();
+  if (recruiter && (job.recruiter_name || '').trim() !== recruiter) return false;
+  if (contractType && (job.contract_type_name || '').trim() !== contractType) return false;
+  return true;
+}

@@ -110,6 +110,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   });
   const isStaff = variant === 'staff';
 
+  /**
+   * ตัวกรอง "ประเภทงาน" + "เจ้าหน้าที่สรรหา" (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569)
+   * ⚠️ **ส่งเฉพาะฝั่งเจ้าหน้าที่** — ชื่อเจ้าหน้าที่สรรหาเป็นข้อมูลภายใน
+   * ห้ามหลุดออกหน้าสมัครสาธารณะ ซึ่งใช้ component ตัวเดียวกันนี้
+   */
+  const staffOnlyFilterProps = isStaff
+    ? {
+        recruiterFilter: filters.recruiterFilter,
+        onRecruiterFilterChange: filters.setRecruiterFilter,
+        recruiterOptions: filters.recruiterOptions,
+        contractTypeFilter: filters.contractTypeFilter,
+        onContractTypeFilterChange: filters.setContractTypeFilter,
+        contractTypeOptions: filters.contractTypeOptions,
+      }
+    : {};
+
   // จำนวนผู้สมัครต่อใบ (เจ้าหน้าที่) — ประกาศตรงนี้เพราะการเรียงการ์ดข้างล่างต้องใช้
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
 
@@ -398,6 +414,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           districtOptions={filters.districtOptions}
           positionOptions={filters.positionOptions}
           subtypeOptions={filters.subtypeOptions}
+          {...staffOnlyFilterProps}
           loading={loading}
           searchPlaceholder={searchPlaceholder}
           hideSearch={isStaff}

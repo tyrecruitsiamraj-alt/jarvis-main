@@ -4,6 +4,7 @@ import {
   isDrivingJobPosition,
   isDrivingPositionPreset,
   jobMatchesPositionFilter,
+  jobMatchesStaffFilters,
   resolveApplyPositionPreset,
 } from '../../src/lib/jobBoardPositionPreset';
 import type { JobRequest } from '@/types';
@@ -50,5 +51,44 @@ describe('jobBoardPositionPreset', () => {
         isDrivingGroup: true,
       }),
     ).toBe(true);
+  });
+});
+
+describe('ตัวกรองฝั่งเจ้าหน้าที่ — ประเภทงาน + เจ้าหน้าที่สรรหา (เจ้าของสั่ง 13 ส.ค. 2569)', () => {
+  const j = (recruiter?: string, contract?: string) => ({
+    recruiter_name: recruiter,
+    contract_type_name: contract,
+  });
+
+  it('ไม่ได้กรองอะไร = ผ่านทุกใบ', () => {
+    expect(jobMatchesStaffFilters(j('คิว', 'คน+รถ'), {})).toBe(true);
+    expect(jobMatchesStaffFilters(j(), { recruiter: '', contractType: '' })).toBe(true);
+  });
+
+  it('กรองประเภทงานได้ตรงตัว', () => {
+    expect(jobMatchesStaffFilters(j('คิว', 'คน+รถ'), { contractType: 'คน+รถ' })).toBe(true);
+    expect(jobMatchesStaffFilters(j('คิว', 'คนอย่างเดียว'), { contractType: 'คน+รถ' })).toBe(false);
+  });
+
+  it('⚠️ ชื่อเจ้าหน้าที่ต้องเทียบตรงตัว ไม่ใช่ "มีคำนี้อยู่"', () => {
+    // ชื่อเล่นเจ้าหน้าที่สั้นและเป็นคำนำหน้าของกันได้ (ฐานจริงมี "กร" · เพิ่มคน
+    // ชื่อ "กรกฎ" เมื่อไหร่ ถ้าเทียบแบบ includes จะกรอง "กร" แล้วได้ใบของ "กรกฎ" ปนมา)
+    expect(jobMatchesStaffFilters(j('กร'), { recruiter: 'กร' })).toBe(true);
+    expect(jobMatchesStaffFilters(j('กรกฎ'), { recruiter: 'กร' })).toBe(false);
+    expect(jobMatchesStaffFilters(j('หมิว'), { recruiter: 'หมี' })).toBe(false);
+  });
+
+  it('ใบที่ไม่ได้กรอกชื่อเจ้าหน้าที่ ต้องไม่ถูกนับเป็นของใครสักคน', () => {
+    expect(jobMatchesStaffFilters(j(undefined, 'คน+รถ'), { recruiter: 'คิว' })).toBe(false);
+  });
+
+  it('เว้นวรรคหัวท้ายไม่ทำให้กรองพลาด', () => {
+    expect(jobMatchesStaffFilters(j('  คิว  '), { recruiter: 'คิว' })).toBe(true);
+    expect(jobMatchesStaffFilters(j('คิว'), { recruiter: ' คิว ' })).toBe(true);
+  });
+
+  it('กรองสองตัวพร้อมกัน = ต้องเข้าเงื่อนไขทั้งคู่', () => {
+    expect(jobMatchesStaffFilters(j('คิว', 'คน+รถ'), { recruiter: 'คิว', contractType: 'คน+รถ' })).toBe(true);
+    expect(jobMatchesStaffFilters(j('คิว', 'คนอย่างเดียว'), { recruiter: 'คิว', contractType: 'คน+รถ' })).toBe(false);
   });
 });
