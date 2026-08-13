@@ -1,51 +1,61 @@
-# Workflow And Validation
+# ขั้นตอนทำงานและการตรวจสอบ
 
-## Before Editing
+## ก่อนแก้อะไร
 
-1. Run `git status --short` and do not overwrite user changes.
-2. Read nearby code and tests before changing behavior.
-3. For Request Control Tower work, read the `.claude/skills/request-control-tower-advisor/` references required by `AGENTS.md`.
-4. Identify whether the change affects a position metric, request metric, UI label, event-date rule, API contract, or database schema.
-5. Choose the smallest compatible surface: pure helper, adapter, read-only API, UI component, or test.
+1. รัน `git status --short` และห้ามเขียนทับงานที่ผู้ใช้แก้ค้างไว้
+2. อ่านโค้ดข้างเคียงและเทสต์ก่อนเปลี่ยนพฤติกรรม
+3. งานฝั่งศูนย์ควบคุมใบขอ ให้อ่าน references ใน
+   `.claude/skills/request-control-tower-advisor/` ตามที่ `AGENTS.md` กำหนด
+4. ระบุให้ได้ว่าการแก้กระทบอะไร: metric ระดับอัตรา, metric ระดับใบขอ, ป้ายบน UI,
+   กติกาวันที่ของเหตุการณ์, contract ของ API หรือ schema ของฐานข้อมูล
+5. เลือกพื้นที่แก้ที่เล็กที่สุดและเข้ากันได้: ฟังก์ชันล้วน, adapter, read-only API,
+   คอมโพเนนต์ UI หรือเทสต์
 
-## Request Control Tower Metric Rules
+## กติกา metric ของศูนย์ควบคุมใบขอ
 
-Use these labels and meanings consistently:
+ใช้ป้ายและความหมายชุดนี้ให้ตรงกันเสมอ:
 
-- `ขอมา` = requested positions.
-- `หาได้แล้ว` = fulfilled/informed positions.
-- `ปิดครบใบขอ` = requests where fulfilled positions cover the full request.
-- `ยกเลิก` = cancelled positions.
-- `จบงานแล้ว` = requests with no remaining positions, whether by fulfillment or cancellation.
-- `เหลือหา` = remaining positions.
-- `งานค้าง / ยอดยกมา` = backlog.
-- `หาได้บางส่วน` = partial fulfillment.
+- `ขอมา` = จำนวนอัตราที่ขอมา
+- `หาได้แล้ว` = อัตราที่หาคนได้/แจ้งเข้าไปแล้ว
+- `ปิดครบใบขอ` = ใบขอที่อัตราหาได้ครอบคลุมครบตามที่ขอ
+- `ยกเลิก` = อัตราที่ถูกยกเลิก
+- `จบงานแล้ว` = ใบขอที่ไม่เหลืออัตราต้องหาแล้ว ไม่ว่าจะเพราะหาได้ครบหรือถูกยกเลิก
+- `เหลือหา` = อัตราที่ยังต้องหาอีก
+- `งานค้าง / ยอดยกมา` = backlog
+- `หาได้บางส่วน` = หาได้ไม่ครบตามที่ขอ
 
-Minimum acceptance cases:
+เคสยืนยันผลขั้นต่ำ:
 
-| ขอมา | หาได้แล้ว | ยกเลิก | เหลือหา | Status |
+| ขอมา | หาได้แล้ว | ยกเลิก | เหลือหา | สถานะ |
 | ---: | ---: | ---: | ---: | --- |
 | 5 | 3 | 0 | 2 | `partial` |
 | 5 | 5 | 0 | 0 | `fully_fulfilled` |
 | 5 | 2 | 3 | 0 | `partially_fulfilled_cancelled_remaining` |
 | 5 | 0 | 5 | 0 | `cancelled_full` |
 
-Monthly `หาได้แล้ว` must use fulfillment event dates when available. If only a current snapshot such as `inform_qty` exists, mark the result as `snapshot_fallback` and avoid claiming exact monthly fulfillment.
+ยอด `หาได้แล้ว` รายเดือนต้องใช้วันที่ของเหตุการณ์หาได้เมื่อมีข้อมูล
+ถ้ามีแต่ snapshot ปัจจุบันอย่าง `inform_qty` ให้ติดธงผลลัพธ์เป็น `snapshot_fallback`
+และห้ามอ้างว่าเป็นยอดหาได้รายเดือนที่เป๊ะ
 
-## Safe Implementation
+## การ implement อย่างปลอดภัย
 
-- Preserve `DashboardData` fields and existing dashboard consumers.
-- Add new data through backward-compatible extension fields.
-- Prefer pure functions for calculation logic; tests should not need a live DB unless the change is explicitly integration-level.
-- Keep dashboard API read-only.
-- Use existing component patterns in `src/components/dashboard/analytics/` and shared UI primitives.
-- When adding a route, register it in `api/_handlers/registry.ts` and ensure local and Vercel runtimes both see it.
-- When adding migrations, keep numbering monotonic and update tests/adapters that assume schema shape.
-- When adding internal project files for Request Control Tower, update `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`.
+- คงฟิลด์ของ `DashboardData` และผู้ใช้แดชบอร์ดเดิมไว้
+- เพิ่มข้อมูลใหม่ผ่านฟิลด์ส่วนขยายที่เข้ากันได้ย้อนหลัง
+- เลือกใช้ฟังก์ชันล้วนกับตรรกะการคำนวณ — เทสต์ไม่ควรต้องพึ่ง DB จริง
+  เว้นแต่ตั้งใจทำระดับ integration
+- API ของแดชบอร์ดต้องเป็นอ่านอย่างเดียว
+- ใช้แพตเทิร์นคอมโพเนนต์ที่มีอยู่ใน `src/components/dashboard/analytics/`
+  และชิ้นส่วน UI ที่ใช้ร่วมกัน
+- เพิ่ม route ใหม่เมื่อไหร่ ต้องลงทะเบียนใน `api/_handlers/registry.ts`
+  และเช็คว่า runtime ทั้งในเครื่องและ Vercel เห็นเหมือนกัน
+- เพิ่ม migration เมื่อไหร่ ให้เลขเรียงต่อเนื่อง และอัปเดตเทสต์/adapter
+  ที่ยึดรูปร่าง schema เดิม
+- เพิ่มไฟล์ภายในของศูนย์ควบคุมใบขอเมื่อไหร่ ต้องอัปเดต
+  `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-## Validation Commands
+## คำสั่งตรวจสอบ
 
-Use targeted validation first:
+เริ่มด้วยการตรวจเฉพาะจุดก่อน:
 
 ```bash
 npx vitest run tests/api/requestControlLedger.test.ts
@@ -54,7 +64,7 @@ npx vitest run tests/api/demandFulfillmentBacklog.test.ts
 npx vitest run tests/api/demandForecast.test.ts
 ```
 
-Use broader checks when touching shared APIs, routing, auth, types, or UI:
+ตรวจชุดกว้างเมื่อไปแตะ API ที่ใช้ร่วม, routing, auth, type หรือ UI:
 
 ```bash
 npm test
@@ -62,7 +72,7 @@ npm run build
 npm run lint
 ```
 
-Database and integration commands may require environment variables:
+คำสั่งฝั่งฐานข้อมูลและ integration อาจต้องมีตัวแปรสภาพแวดล้อม:
 
 ```bash
 npm run db:ping
@@ -70,16 +80,17 @@ npm run db:ping:mssql
 npm run db:migrate:status
 ```
 
-If a validation command cannot run because environment variables, network, or external databases are unavailable, report that plainly and describe the targeted tests that did run.
+ถ้ารันคำสั่งตรวจสอบไม่ได้เพราะไม่มีตัวแปรสภาพแวดล้อม เน็ต หรือฐานข้อมูลภายนอก
+ให้บอกตรง ๆ แล้วระบุว่าเทสต์เฉพาะจุดตัวไหนที่รันไปแล้วบ้าง
 
-## Review Checklist
+## เช็คลิสต์ตอนรีวิว
 
-- Metric unit is explicit: positions vs requests.
-- Cancelled positions are not counted as fulfilled.
-- `หาได้แล้ว`, `ปิดครบใบขอ`, `จบงานแล้ว`, and `ยกเลิก` remain separate.
-- Backlog equation reconciles or exposes `diff` and reason.
-- Missing event dates surface `snapshot_fallback`.
-- SLA status uses request kind and correct due date.
-- Drill-down can trace KPI values back to request records.
-- Rollback path remains usable.
-- Tests cover the changed business rule.
+- ระบุหน่วยของ metric ชัดเจน: นับอัตรา หรือ นับใบขอ
+- อัตราที่ถูกยกเลิกไม่ถูกนับเป็นอัตราที่หาได้
+- `หาได้แล้ว`, `ปิดครบใบขอ`, `จบงานแล้ว` และ `ยกเลิก` ยังแยกจากกัน
+- สมการงานค้างกระทบยอดได้ หรือเปิดเผย `diff` พร้อมเหตุผล
+- ไม่มีวันที่ของเหตุการณ์ ต้องขึ้นธง `snapshot_fallback`
+- สถานะ SLA ใช้ประเภทใบขอและวันครบกำหนดที่ถูกต้อง
+- drill-down ย้อนจากค่า KPI กลับไปหาใบขอต้นทางได้
+- ทางถอย (rollback) ยังใช้งานได้
+- มีเทสต์คุมกติกาธุรกิจที่เปลี่ยนไป

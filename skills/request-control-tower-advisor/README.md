@@ -1,15 +1,15 @@
-# Request Control Tower Advisor (pointer)
+# ที่ปรึกษาศูนย์ควบคุมใบขอ (ป้ายชี้ทาง)
 
-Canonical skill pack for Claude Code / Cursor lives here:
+ชุด skill ตัวจริงสำหรับ Claude Code / Cursor อยู่ที่นี่:
 
 ```text
 .claude/skills/request-control-tower-advisor/
 ```
 
-Claude Code auto-discovers project skills only under `.claude/skills/`.  
-Do not edit a duplicate under this folder — update the `.claude/skills/` copy.
+Claude Code ค้นหา skill ของโปรเจกต์เฉพาะใต้ `.claude/skills/` เท่านั้น
+ห้ามแก้สำเนาใต้โฟลเดอร์นี้ — ให้ไปแก้ตัวจริงใน `.claude/skills/`
 
-See also:
+ดูเพิ่มเติม:
 
 * `CLAUDE.md`
 * `docs/request-control-tower/HANDBOOK.md`

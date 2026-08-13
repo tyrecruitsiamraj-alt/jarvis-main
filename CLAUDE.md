@@ -1,6 +1,8 @@
-# Project Skill Router: Request Control Tower
+# ตัวชี้ทาง Skill ของโปรเจกต์: ศูนย์ควบคุมใบขอ (Request Control Tower)
 
-When working on the Request Control Tower, staffing request dashboard, SLA dashboard, backlog dashboard, fulfillment logic, cancellation logic, lifecycle trend, root cause ranking, or any related Cursor/Claude implementation task, always read the following files first:
+เมื่อทำงานเกี่ยวกับศูนย์ควบคุมใบขอ แดชบอร์ดใบขอกำลังคน แดชบอร์ด SLA แดชบอร์ดงานค้าง
+ตรรกะการหาได้ ตรรกะการยกเลิก แนวโน้มวงจรชีวิตใบขอ อันดับต้นเหตุ
+หรืองาน implement ใด ๆ ที่เกี่ยวข้อง (ทั้ง Cursor และ Claude) ให้อ่านไฟล์เหล่านี้ก่อนเสมอ:
 
 1. .claude/skills/request-control-tower-advisor/SKILL.md
 2. .claude/skills/request-control-tower-advisor/references/01-business-context.md
@@ -10,25 +12,26 @@ When working on the Request Control Tower, staffing request dashboard, SLA dashb
 6. .claude/skills/request-control-tower-advisor/references/06-safe-implementation-rules.md
 7. .claude/skills/request-control-tower-advisor/references/09-editing-map.md
 
-> **Claude Code discovery:** project skills must live under `.claude/skills/` (not repo-root `skills/`).  
-> A short pointer remains at `skills/request-control-tower-advisor/README.md`.
+> **การค้นหา skill ของ Claude Code:** skill ของโปรเจกต์ต้องอยู่ใต้ `.claude/skills/`
+> เท่านั้น (ไม่ใช่ `skills/` ที่ root ของ repo)
+> ที่ `skills/request-control-tower-advisor/README.md` เหลือไว้เป็นป้ายชี้ทางสั้น ๆ
 
-Core non-negotiable rules:
+กติกาหลักที่ห้ามละเมิด:
 
-* Do not mix “หาได้แล้ว” with “ปิดครบใบขอ”.
-* Do not count cancelled positions as fulfilled.
-* Do not silently treat snapshot inform_qty as exact monthly fulfillment.
-* If fulfillment event date is missing, mark affected metrics as snapshot_fallback.
-* Do not rewrite the existing dashboard directly.
-* Use parallel layer + feature flag + adapter + read-only API.
-* Existing dashboard must remain usable as rollback.
-* Always update tests when changing calculation logic.
-* Always update 09-editing-map.md if new internal files are added.
+* ห้ามปน "หาได้แล้ว" กับ "ปิดครบใบขอ"
+* ห้ามนับอัตราที่ถูกยกเลิกเป็นอัตราที่หาได้
+* ห้ามเอา inform_qty จาก snapshot มาใช้เป็นยอดหาได้รายเดือนแบบเป๊ะ ๆ โดยไม่บอกใคร
+* ถ้าไม่มีวันที่ของเหตุการณ์หาได้ ให้ติดธง snapshot_fallback กับ metric ที่กระทบ
+* ห้ามเขียนทับแดชบอร์ดเดิมตรง ๆ
+* ใช้ parallel layer + feature flag + adapter + read-only API
+* แดชบอร์ดเดิมต้องยังใช้งานได้เสมอ เป็นทางถอย (rollback)
+* เปลี่ยนตรรกะการคำนวณเมื่อไหร่ ต้องอัปเดตเทสต์ด้วยเสมอ
+* เพิ่มไฟล์ภายในใหม่เมื่อไหร่ ต้องอัปเดต 09-editing-map.md ด้วยเสมอ
 
-Primary equation:
+สมการหลัก:
 ยอดค้างต้นงวด + ขอใหม่ - หาได้แล้ว - ยกเลิก = เหลือหา
 
-Preferred UI vocabulary:
+คำศัพท์บนหน้าจอที่ใช้ประจำ:
 
 * ขอมา = requested positions
 * หาได้แล้ว = fulfilled/informed positions
@@ -39,8 +42,8 @@ Preferred UI vocabulary:
 * งานค้าง / ยอดยกมา = backlog
 * หาได้บางส่วน = partial fulfillment
 
-## Project handbook
+## คู่มือโปรเจกต์
 
-Human-readable project guide:
+คู่มือฉบับอ่านง่ายสำหรับคน:
 
 * docs/request-control-tower/HANDBOOK.md

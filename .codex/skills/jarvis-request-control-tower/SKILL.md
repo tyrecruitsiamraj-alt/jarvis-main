@@ -1,59 +1,76 @@
 ---
 name: jarvis-request-control-tower
-description: Work safely in the Jarvis Workforce Management project, especially Request Control Tower, staffing request dashboards, SLA/backlog/fulfillment/cancellation metrics, matching, public apply, Siamraj/Lumos API adapters, Vercel API handlers, React dashboard UI, tests, and implementation planning. Use when Codex needs to inspect, explain, modify, test, or review this repo.
+description: Work safely in the Jarvis Workforce Management project, especially Request Control Tower, staffing request dashboards, SLA/backlog/fulfillment/cancellation metrics, matching, public apply, Siamraj/Lumos API adapters, Vercel API handlers, React dashboard UI, tests, and implementation planning. Use when Codex needs to inspect, explain, modify, test, or review this repo. ใช้เมื่อทำงานกับโปรเจกต์ Jarvis ศูนย์ควบคุมใบขอ แดชบอร์ดใบขอกำลังคน SLA งานค้าง การหาได้ การยกเลิก matching การรับสมัครสาธารณะ
 ---
 
 # Jarvis Request Control Tower
 
-## Overview
+## ภาพรวม
 
-Use this skill as the project onboarding and safety rail for Jarvis. It combines the repo architecture map with the non-negotiable Request Control Tower business rules so implementation stays aligned with the dashboard semantics, tests, rollback expectations, and Thai UI vocabulary.
+ใช้ skill นี้เป็นทั้งคู่มือเริ่มงาน (onboarding) และราวกันตกของโปรเจกต์ Jarvis
+มันรวมแผนที่สถาปัตยกรรมของ repo เข้ากับกติกาธุรกิจของศูนย์ควบคุมใบขอที่ห้ามละเมิด
+เพื่อให้งาน implement สอดคล้องกับความหมายบนแดชบอร์ด เทสต์ แผนถอยกลับ (rollback)
+และคำศัพท์ไทยบนหน้าจอ
 
-The source of truth for Request Control Tower domain rules remains `.claude/skills/request-control-tower-advisor/`. This `.codex` skill is a Codex-facing project adapter: read it first, then load the linked `.claude` references when work touches those rules.
+แหล่งความจริงของกติกาโดเมนศูนย์ควบคุมใบขอยังคงเป็น
+`.claude/skills/request-control-tower-advisor/` — skill ฝั่ง `.codex` นี้เป็นตัวเชื่อม
+(adapter) สำหรับ Codex: อ่านตัวนี้ก่อน แล้วค่อยโหลด references ฝั่ง `.claude`
+เมื่องานแตะกติกาพวกนั้น
 
-## First Reads
+## อ่านก่อนเสมอ
 
-Always start by reading:
+เริ่มด้วยการอ่าน:
 
 - `AGENTS.md`
 - `references/01-project-overview.md`
 - `references/02-code-map.md`
 - `references/03-workflow-and-validation.md`
 
-For Request Control Tower metric, dashboard, SLA, backlog, lifecycle, fulfillment, cancellation, or forecast work, also read the `.claude` source-of-truth bundle listed in `AGENTS.md` before changing code.
+งานที่แตะ metric ของศูนย์ควบคุมใบขอ แดชบอร์ด SLA งานค้าง วงจรชีวิต การหาได้
+การยกเลิก หรือพยากรณ์ — ให้อ่านชุดแหล่งความจริงฝั่ง `.claude` ตามรายการใน
+`AGENTS.md` ก่อนแก้โค้ดด้วย
 
-## Non-Negotiables
+## กติกาที่ห้ามละเมิด
 
-- Do not mix `หาได้แล้ว` with `ปิดครบใบขอ`.
-- Do not count cancelled positions as fulfilled.
-- Do not silently treat snapshot `inform_qty` as exact monthly fulfillment.
-- If a fulfillment/cancellation event date is missing, mark affected metrics as `snapshot_fallback`.
-- Preserve the existing dashboard and types as rollback. Use parallel layer, adapter, read-only API, feature flag, tests, and reconciliation.
-- Update tests whenever calculation logic changes.
-- Update `.claude/skills/request-control-tower-advisor/references/09-editing-map.md` when adding new internal project files.
+- ห้ามปน `หาได้แล้ว` กับ `ปิดครบใบขอ`
+- ห้ามนับอัตราที่ถูกยกเลิกเป็นอัตราที่หาได้
+- ห้ามเอา `inform_qty` จาก snapshot มาใช้เป็นยอดหาได้รายเดือนแบบเป๊ะ ๆ โดยไม่บอกใคร
+- ถ้าไม่มีวันที่ของเหตุการณ์หาได้/ยกเลิก ให้ติดธง `snapshot_fallback` กับ metric ที่กระทบ
+- เก็บแดชบอร์ดและ type เดิมไว้เป็นทางถอยเสมอ — ใช้ parallel layer, adapter,
+  read-only API, feature flag, เทสต์ และการกระทบยอด (reconciliation)
+- เปลี่ยนตรรกะการคำนวณเมื่อไหร่ อัปเดตเทสต์ด้วยเสมอ
+- เพิ่มไฟล์ภายในใหม่เมื่อไหร่ อัปเดต
+  `.claude/skills/request-control-tower-advisor/references/09-editing-map.md` ด้วยเสมอ
 
-Core equation:
+สมการหลัก:
 
 ```text
 ยอดค้างต้นงวด + ขอใหม่ - หาได้แล้ว - ยกเลิก = เหลือหา
 ```
 
-## Standard Workflow
+## ขั้นตอนทำงานมาตรฐาน
 
-1. Classify the request: dashboard metric, API, matching, public apply, auth/RBAC, UI, data import, documentation, or test-only.
-2. Read the relevant code paths from `references/02-code-map.md`; use `rg` to confirm current symbols and callers.
-3. For Request Control Tower work, restate the metric unit: positions or requests. Name data source fields and event dates before coding.
-4. Add or update acceptance tests before or alongside calculation changes.
-5. Keep changes narrow and backward-compatible. Do not rename/delete existing `DashboardData` fields or SQL write behavior unless explicitly asked.
-6. Run targeted tests first, then broader tests or build when risk justifies it.
-7. Summarize changed files, business impact, validation run, and remaining risk.
+1. จำแนกคำขอก่อน: metric ของแดชบอร์ด · API · matching · การรับสมัครสาธารณะ ·
+   auth/RBAC · UI · การนำเข้าข้อมูล · เอกสาร · หรือเทสต์อย่างเดียว
+2. อ่านเส้นทางโค้ดที่เกี่ยวข้องจาก `references/02-code-map.md` แล้วใช้ `rg`
+   ยืนยันว่า symbol กับจุดเรียกใช้ปัจจุบันตรงกับที่เข้าใจ
+3. งานฝั่งศูนย์ควบคุมใบขอ ให้พูดหน่วยของ metric ให้ชัดก่อน: นับ "อัตรา" หรือ "ใบขอ"
+   ระบุฟิลด์ต้นทางข้อมูลและวันที่ของเหตุการณ์ก่อนเขียนโค้ด
+4. เพิ่ม/อัปเดตเทสต์ยืนยันผล ก่อนหรือพร้อมกับการแก้การคำนวณ
+5. แก้ให้แคบและเข้ากันได้ย้อนหลัง — ห้ามเปลี่ยนชื่อ/ลบฟิลด์ `DashboardData` เดิม
+   หรือพฤติกรรมเขียน SQL เดิม เว้นแต่ถูกสั่งอย่างชัดเจน
+6. รันเทสต์เฉพาะจุดก่อน แล้วค่อยรันชุดกว้างหรือ build เมื่อความเสี่ยงคุ้ม
+7. สรุปไฟล์ที่แก้ ผลกระทบทางธุรกิจ การตรวจที่รันไป และความเสี่ยงที่เหลือ
 
-## Response Style
+## สไตล์การตอบ
 
-For the project owner, start with an executive summary, give one recommendation, explain business impact, then list implementation or verification steps. Include Cursor-ready prompts only when useful.
+สำหรับเจ้าของโปรเจกต์: ขึ้นต้นด้วยสรุปผู้บริหาร ให้คำแนะนำเดียว อธิบายผลกระทบ
+ทางธุรกิจ แล้วค่อยไล่ขั้นตอน implement หรือการตรวจ · แนบ prompt พร้อมใช้กับ Cursor
+เฉพาะตอนที่มีประโยชน์จริง
 
-## References
+## เอกสารอ้างอิง
 
-- `references/01-project-overview.md` - stack, runtime, routes, data sources, commands.
-- `references/02-code-map.md` - code paths and tests by feature area.
-- `references/03-workflow-and-validation.md` - safe implementation workflow, metric rules, validation commands.
+- `references/01-project-overview.md` — stack, runtime, routes, แหล่งข้อมูล, คำสั่ง
+- `references/02-code-map.md` — เส้นทางโค้ดและเทสต์แยกตามฟีเจอร์
+- `references/03-workflow-and-validation.md` — ขั้นตอน implement อย่างปลอดภัย,
+  กติกา metric, คำสั่งตรวจสอบ

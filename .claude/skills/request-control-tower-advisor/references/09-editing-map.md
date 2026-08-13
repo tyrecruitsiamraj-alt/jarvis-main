@@ -1,23 +1,23 @@
-# Editing Map
+# แผนที่การแก้ไข (Editing Map)
 
-Use this file to know where to change the inside logic later.
+ใช้ไฟล์นี้เพื่อรู้ว่าจะไปแก้ตรรกะภายในเรื่องไหนที่ไฟล์ไหน
 
-## Business wording / dashboard labels
+## ถ้อยคำทางธุรกิจ / ป้ายบนแดชบอร์ด
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/02-dashboard-metric-definitions.md
 * .cursor/rules/request-control-tower.mdc
 
-Future code:
+โค้ดที่จะเกิดในอนาคต:
 
 * src/components/dashboard/request-control/
-* KPI card components
-* work queue table labels
+* คอมโพเนนต์การ์ด KPI
+* ป้ายตารางคิวงาน
 
-## Request date / effective date logic
+## ตรรกะวันที่ของใบขอ / วันที่มีผล
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
@@ -27,9 +27,9 @@ Future code:
 * src/lib/dashboard/request-control/calculations.ts
 * src/lib/jobUrgency.ts
 
-## SLA days and SLA status
+## จำนวนวัน SLA และสถานะ SLA
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/04-sla-rules.md
 
@@ -37,9 +37,9 @@ Future code:
 
 * src/lib/dashboard/request-control/sla.ts
 
-## Lifecycle mapping
+## การแมปวงจรชีวิตใบขอ (Lifecycle)
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
@@ -47,9 +47,9 @@ Future code:
 
 * src/lib/dashboard/request-control/lifecycle.ts
 
-## Backlog equation / calculation
+## สมการ/การคำนวณงานค้าง (Backlog)
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
@@ -90,13 +90,13 @@ feed Siamraj ปิด/ERP ล่มเมื่อไหร่ จะถอย�
 * `tests/api/siamrajStaffingOpen.test.ts` — `requestPositionTotal()` ไม่มีทางคืน 0/ติดลบ
   และ `staffingPositionBreakdown()` ต้องครบสมการ ขอมา = หาได้ + ยกเลิก + เหลือหา
 
-## UI style / layout
+## สไตล์/เลย์เอาต์ของ UI
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/05-ui-design-rules.md
 
-Code:
+โค้ด:
 
 * `src/lib/designTokens.ts` — **token กลางของสี** (แหล่งเดียวของความหมายสีทั้งแอป)
   * `TONE` 9 โทน × variant (`bar` / `tile` / `num` / `value` / `soft` / `softHover` / `solid` / `dot` / `chip` / `hex`)
@@ -757,45 +757,47 @@ reminder รับแค่ 7 ฟิลด์ตายตัว — ช่อง
 (แถวก่อน migration 070 ไม่มี `last_outcome` ถ้าไม่ถอยไปอ่าน `result` จะเห็น
 "มีผลกลับ แต่โทรติด 0" ซึ่งดูเหมือนพัง)
 
-## Safe implementation / feature flag
+## การ implement อย่างปลอดภัย / feature flag
 
-Edit documentation:
+แก้เอกสาร:
 
 * .claude/skills/request-control-tower-advisor/references/06-safe-implementation-rules.md
 * .cursor/rules/request-control-tower.mdc
 
 Future code:
 
-* feature flag config
-* dashboard routing/render logic
+* คอนฟิก feature flag
+* ตรรกะ routing/render ของแดชบอร์ด
 
-## Cursor prompt patterns
+## แพตเทิร์น prompt สำหรับ Cursor
 
-Edit:
+แก้ที่:
 
 * .claude/skills/request-control-tower-advisor/references/07-cursor-prompt-patterns.md
 
-## Codex project skill adapter
+## ตัวเชื่อม skill ของโปรเจกต์ฝั่ง Codex
 
-Edit:
+แก้ที่:
 
 * .codex/skills/jarvis-request-control-tower/SKILL.md
 * .codex/skills/jarvis-request-control-tower/references/01-project-overview.md
 * .codex/skills/jarvis-request-control-tower/references/02-code-map.md
 * .codex/skills/jarvis-request-control-tower/references/03-workflow-and-validation.md
 
-Rule:
-Keep `.claude/skills/request-control-tower-advisor/` as the domain source of truth. The `.codex` skill may summarize repo structure and route Codex to the `.claude` references, but it must not introduce conflicting metric rules.
+กติกา:
+ให้ `.claude/skills/request-control-tower-advisor/` เป็นแหล่งความจริงเดียวของโดเมน
+skill ฝั่ง `.codex` สรุปโครง repo และชี้ทาง Codex มาที่ references ฝั่ง `.claude` ได้
+แต่ห้ามสร้างกติกา metric ที่ขัดกันเอง
 
-## Redteam / SWOT / pre-mortem checklist
+## เช็คลิสต์ Redteam / SWOT / pre-mortem
 
-Edit:
+แก้ที่:
 
 * .claude/skills/request-control-tower-advisor/references/08-redteam-premortem-checklist.md
 
-## SQL mapping changes
+## การแก้การแมป SQL
 
-Edit documentation first:
+แก้เอกสารก่อน:
 
 * .claude/skills/request-control-tower-advisor/references/03-request-ledger-logic.md
 
@@ -804,12 +806,12 @@ Future code:
 * api/_lib/siamrajRequestControlAdapter.ts
 * api/_handlers/request-control-dashboard.ts
 
-Rule:
-If new internal files are added later, update this editing map.
+กติกา:
+ถ้ามีไฟล์ภายในเพิ่มใหม่ภายหลัง ต้องอัปเดตแผนที่ฉบับนี้ด้วย
 
-## Current related code (already in repo — do not rewrite blindly)
+## โค้ดที่เกี่ยวข้องที่มีอยู่แล้ว (อยู่ใน repo แล้ว — ห้ามเขียนทับสุ่มสี่สุ่มห้า)
 
-Existing Control Tower / analytics paths (read before parallel-layer work):
+เส้นทางโค้ด Control Tower / analytics ที่มีอยู่ (อ่านก่อนทำงาน parallel layer):
 
 * `src/lib/dashboard/requestControlLedger.ts`
 * `src/lib/dashboard/requestControlBridge.ts`
@@ -826,27 +828,27 @@ Existing Control Tower / analytics paths (read before parallel-layer work):
 * `migrations/047_candidate_proposals_branch.sql`
 * `tests/api/unitBranchOverride.test.ts`
 
-## Scrap & Content work requests from Matching
+## คำขอ Scrap & Content จากหน้า Matching
 
-* `migrations/045_job_posting_requests.sql` — original request table
-* `migrations/050_job_posting_request_type.sql` — backward-compatible Content/Scraping discriminator
-* `api/_lib/jobPostingRequests.ts` — request adapter and validation
-* `api/_handlers/matching-job-postings.ts` — read/write API
-* `src/lib/jobPostingRequestsApi.ts` — frontend API adapter
+* `migrations/045_job_posting_requests.sql` — ตารางคำขอตัวแรก
+* `migrations/050_job_posting_request_type.sql` — ตัวแยกประเภท Content/Scraping แบบเข้ากันได้ย้อนหลัง
+* `api/_lib/jobPostingRequests.ts` — adapter ของคำขอ + การ validate
+* `api/_handlers/matching-job-postings.ts` — API อ่าน/เขียน
+* `src/lib/jobPostingRequestsApi.ts` — adapter เรียก API ฝั่งหน้าเว็บ
 * `src/pages/matching/MatchingPage.tsx` — request-type selection at source
-* `src/pages/matching/JobPostingsPage.tsx` — request tracking UI
-* `tests/api/jobPostingRequests.test.ts` — request type/status contract tests
+* `src/pages/matching/JobPostingsPage.tsx` — หน้าติดตามคำขอ
+* `tests/api/jobPostingRequests.test.ts` — เทสต์ contract ของประเภท/สถานะคำขอ
 
-## Demand forecast (พยากรณ์ใบขอเข้าใหม่ตามประเภท — แทนที่ตาราง Life Cycle เมื่อ flag เปิด)
+## พยากรณ์ความต้องการ (ใบขอเข้าใหม่ตามประเภท — แทนที่ตาราง Life Cycle เมื่อ flag เปิด)
 
-* `api/_handlers/request-control-forecast.ts` — read-only API: aggregate 3y+YTD by month × lifecycle (net = intake − cancelled), per-year in-memory cache
-* `src/lib/dashboard/request-control/demandForecast.ts` — pure forecast calc: avg/min/max per month per group, current-month expectedMore
-* `src/lib/dashboard/request-control/demandForecastApi.ts` — frontend fetch adapter
-* `src/components/dashboard/request-control/DemandForecastPanel.tsx` — dashboard panel UI
-* `src/components/dashboard/analytics/DashboardChartSection.tsx` — flag switch (VITE_REQUEST_CONTROL_FORECAST_ENABLED !== 'false'; ปิด flag = ตาราง Life Cycle เดิม)
+* `api/_handlers/request-control-forecast.ts` — API อ่านอย่างเดียว: รวมยอด 3 ปี + YTD รายเดือน × วงจรชีวิต (net = เข้าใหม่ − ยกเลิก) · cache ในหน่วยความจำรายปี
+* `src/lib/dashboard/request-control/demandForecast.ts` — คำนวณพยากรณ์แบบ pure: เฉลี่ย/ต่ำสุด/สูงสุด รายเดือนรายกลุ่ม + expectedMore ของเดือนปัจจุบัน
+* `src/lib/dashboard/request-control/demandForecastApi.ts` — adapter ดึงข้อมูลฝั่งหน้าเว็บ
+* `src/components/dashboard/request-control/DemandForecastPanel.tsx` — แผงบนแดชบอร์ด
+* `src/components/dashboard/analytics/DashboardChartSection.tsx` — สวิตช์ flag (VITE_REQUEST_CONTROL_FORECAST_ENABLED !== 'false' · ปิด flag = ตาราง Life Cycle เดิม)
 * `tests/api/demandForecast.test.ts` — aggregation + forecast contract tests
 
-## Matching list server-side pagination (zero-drift)
+## แบ่งหน้าลิสต์ Matching ฝั่ง server (zero-drift)
 
 * `src/lib/matchingListFilter.ts` — filter+sort ของลิสต์ Matching เป็น pure fn ชุดเดียว รันทั้ง client และ server (ห้าม logic แตกกัน — แก้ที่นี่ที่เดียว)
 * `api/_handlers/matching-list.ts` — GET /api/matching/list: ท่อเดียวกับ feed หลัก (fetch+attach) + enrich + proposals/stored-matches จาก PG + shared filter/sort + slice; คืน items/total/unitOptions/summary/storedMatches
@@ -993,15 +995,15 @@ client id / secret / tenant) — เจอสภาพนั้นเมื่�
 `authSession.ts` · `magicLinkLogin.ts` · `roleFunctionGrants.ts` — ยังไม่มีเทสต์แตะเลย
 เกณฑ์เลือกอันถัดไป: **"พังแล้วเงียบ"** กับ **"ผิดแล้วข้อมูลรั่ว"** ก่อนเสมอ
 
-## Public applications from /apply
+## ใบสมัครสาธารณะจากหน้า /apply
 
-* `migrations/048_public_job_applications.sql` — application table
-* `migrations/049_public_job_applications_structured.sql` — structured fields (prefix/name/age/gender/address)
-* `api/_lib/publicApplications.ts` — validation + Thai phone/age normalization
-* `api/_handlers/public/apply.ts` — public POST endpoint (rate-limited)
-* `src/components/jobs/PublicApplyDialog.tsx` — application form dialog
-* `src/components/jobs/JobBoardView.tsx` — apply buttons on /apply board
-* `tests/api/publicApply.test.ts` — validation contract tests
+* `migrations/048_public_job_applications.sql` — ตารางใบสมัคร
+* `migrations/049_public_job_applications_structured.sql` — ฟิลด์แบบมีโครงสร้าง (คำนำหน้า/ชื่อ/อายุ/เพศ/ที่อยู่)
+* `api/_lib/publicApplications.ts` — การ validate + normalize เบอร์ไทย/อายุ
+* `api/_handlers/public/apply.ts` — endpoint POST สาธารณะ (มี rate limit)
+* `src/components/jobs/PublicApplyDialog.tsx` — dialog ฟอร์มใบสมัคร
+* `src/components/jobs/JobBoardView.tsx` — ปุ่มสมัครงานบนบอร์ด /apply
+* `tests/api/publicApply.test.ts` — เทสต์ contract ของการ validate
 
 ## งานสรรหา (RM) — 3 แท็บครอบใบสมัครจริง (11 ส.ค. 2569)
 
@@ -1055,7 +1057,7 @@ client id / secret / tenant) — เจอสภาพนั้นเมื่�
 ⚠️ helper รวมชื่อ (`buildOrganizationKeyResolver` / `pickUnitOrganizationDisplayName`) ยังใช้อยู่ —
 ใช้เลือกชื่อลูกค้าที่จะโชว์ใน tooltip และใช้ที่ตัวกรองหน่วยงาน ไม่ใช่ที่การ group แล้ว
 
-## Work status master (สถานะทำงานของใบขอ — Admin แก้ได้เอง)
+## Master สถานะทำงานของใบขอ (Admin แก้ได้เอง)
 
 ก่อนหน้านี้สถานะทำงาน hardcode ไว้ 3 ที่ (CHECK constraint + array ฝั่ง API + labels ฝั่ง client)
 ทำให้ต้องเขียน migration ใหม่ทุกครั้งที่เพิ่มสถานะ (039/053/054/056) — ย้ายมาเก็บใน DB แล้ว
