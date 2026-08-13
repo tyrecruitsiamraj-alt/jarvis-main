@@ -2975,25 +2975,9 @@ const MatchingPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* อนุมัติทั้งใบ — ทางลัดของ "ติ๊กให้ครบแล้วกดส่ง" สำหรับใบที่ตรวจแล้วเอาหมด
-                  (เจ้าของสั่ง 11 ส.ค. 2569) · ยังผ่านหน้าต่างยืนยันตัวเดิมที่โชว์รายชื่อ
-                  ครบทุกคนและเตือนว่า AI จะโทรจริง — ไม่มีทางลัดที่ข้ามการยืนยัน */}
-              {approveAllCount > 0 ? (
-                <div className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2', TONE.success.soft)}>
-                  <span className={cn('text-[11px]', DASH.cell)}>
-                    ใบนี้มีคนที่ส่งได้ทั้งหมด {approveAllCount.toLocaleString('th-TH')} คน —
-                    ตรวจแล้วเอาทั้งใบก็กดปุ่มนี้ได้เลย ไม่ต้องไล่ติ๊กทีละคน
-                  </span>
-                  <button
-                    type="button"
-                    onClick={approveWholeJob}
-                    disabled={lumosSending || batchCreating}
-                    className="jarvis-btn-primary ml-auto shrink-0"
-                  >
-                    <PhoneCall className="h-3 w-3" /> อนุมัติทั้งใบ — ส่ง AI โทร ({approveAllCount})
-                  </button>
-                </div>
-              ) : null}
+              {/* ปุ่ม "อนุมัติทั้งใบ" เดิมย้ายไปอยู่ในแถบส่งโทรใต้ลิสต์แล้ว (ชื่อใหม่
+                  "ส่งทั้งหมดที่แมท") — สี่ทางเลือกจึงอยู่ที่เดียวกัน เห็นพร้อมกันเสมอ
+                  แทนที่จะกระจายเป็นกล่องที่โผล่ ๆ หาย ๆ คนละที่ */}
 
               {/* คนที่ปฏิเสธใบนี้ถูกซ่อนไว้ — บอกจำนวนเสมอ และกดดูได้
                   ⚠️ ห้ามซ่อนแบบไม่บอก: เจ้าหน้าที่ต้องตอบได้ว่า "คนที่หายไปคือใคร"
@@ -3014,13 +2998,18 @@ const MatchingPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {/* สี่ทางเลือกหลังเห็นคนที่แมท — เห็นเสมอ ไม่ว่าจะติ๊กใครหรือยัง
+                  (เดิมแถบนี้หายทั้งแถบเมื่อยังไม่ติ๊ก ผู้ใช้จึงไม่รู้ว่ามีทางอะไรบ้าง)
+                  ⚠️ แถบเดียวคุมทั้งฝั่งคนของเราและ iRecruit — selection เป็นก้อนเดียวกัน */}
               <LumosSendBar
                 count={lumosSelectedCount}
+                allCount={approveAllCount}
                 busy={lumosSending}
                 onClear={clearLumosSelection}
                 creatingBatch={batchCreating}
                 onCreateBatch={() => void createBatchFromSelection()}
                 onSend={beginSendFlow}
+                onSendAll={approveWholeJob}
                 onHoldSelf={() => void holdSelectedForSelf()}
                 holdingSelf={holdingSelf}
               />
@@ -3518,13 +3507,19 @@ const MatchingPage: React.FC = () => {
                       กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วติ๊กเลือกส่ง AI โทรได้เลย
                     </p>
                   )}
+                  {/* ⚠️ แถบเดียวกับข้างบนเป๊ะ — props ต้องเหมือนกันทุกตัว
+                      เดิมตัวนี้ส่ง onSend={() => setLumosConfirmOpen(true)} ซึ่งข้าม
+                      beginSendFlow → ติ๊กคนชุดเดียวกันแต่กดคนละแถบได้ flow ไม่เหมือนกัน
+                      (ฝั่งนี้ไม่มี popup "คนนี้แมทหลายงาน") */}
                   <LumosSendBar
                     count={lumosSelectedCount}
+                    allCount={approveAllCount}
                     busy={lumosSending}
                     onClear={clearLumosSelection}
                     creatingBatch={batchCreating}
                     onCreateBatch={() => void createBatchFromSelection()}
-                    onSend={() => setLumosConfirmOpen(true)}
+                    onSend={beginSendFlow}
+                    onSendAll={approveWholeJob}
                     onHoldSelf={() => void holdSelectedForSelf()}
                     holdingSelf={holdingSelf}
                   />

@@ -7,6 +7,7 @@ import {
   type LumosJobCallSummaryRow,
 } from '@/lib/lumosDispatchApi';
 import { lumosExtraStatChips, lumosFixedStatCells } from '@/lib/lumosStatCells';
+import { lumosSendActionStates } from '@/lib/lumosSendActions';
 import { ClipboardCheck, PhoneCall, Undo2, UserRound, X } from 'lucide-react';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { useEffect, useState } from 'react';
@@ -176,10 +177,22 @@ export function LumosJobStatChips({ s, className }: { s?: LumosJobCallSummaryRow
   );
 }
 
-/** แถบ "ส่งให้ Lumos โทร" — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 คน (ใช้ทั้งฝั่งคนของเราและ iRecruit) */
+/**
+ * แถบทางเลือกหลังดูรายชื่อที่ AI แมทให้ — flow ที่เจ้าของกำหนด 13 ส.ค. 2569:
+ * "ส่งโทรทั้งหมดเลยที่ match เจอ / ส่งบางคนด้วยการติ๊กเลือก / เก็บไปโทรเอง"
+ *
+ * ⚠️ **แถบนี้เห็นเสมอ ไม่ว่าจะติ๊กใครหรือยัง** — เดิมทั้งแถบหายไปเมื่อ count = 0
+ * ผู้ใช้จึงไม่รู้ว่ามีทางเลือกอะไรบ้างจนกว่าจะเผลอไปติ๊กถูก · ปุ่มที่ใช้ไม่ได้
+ * ให้ disable พร้อมบอกเหตุผล (ไม่ซ่อน) — สถานะทั้งหมดมาจาก lumosSendActionStates()
+ * ที่เดียว ห้ามเขียน `count === 0` กระจายในปุ่ม
+ *
+ * ลำดับปุ่มไล่จากผลเบาไปหนัก ตัวขวาสุด (ส่งทั้งหมด) ผลหนักสุดและเป็น primary ตัวเดียว
+ */
 export function LumosSendBar({
   count,
+  allCount,
   onSend,
+  onSendAll,
   onCreateBatch,
   onClear,
   busy,
@@ -188,7 +201,11 @@ export function LumosSendBar({
   holdingSelf = false,
 }: {
   count: number;
+  /** คนทั้งใบที่ส่งได้จริง — ปุ่ม "ส่งทั้งหมดที่แมท" ใช้ยอดนี้ ไม่เกี่ยวกับการติ๊ก */
+  allCount: number;
   onSend: () => void;
+  /** ส่งทุกคนที่แมทเจอในใบนี้ — ยังผ่านหน้าต่างยืนยันตัวเดิม ไม่มีทางลัด */
+  onSendAll: () => void;
   /** ตั้งเป็นชุดที่หน่วงไว้ก่อน — เข้าคิวเองเมื่อพ้นช่วงถอนคำ */
   onCreateBatch: () => void;
   onClear: () => void;
@@ -197,65 +214,95 @@ export function LumosSendBar({
   /**
    * "เก็บไปโทรเอง" — จับ call hold ให้ตัวเองแทนส่ง AI (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก:
    * "matching เสร็จก็เลือกได้ว่าอนุมัติให้ ai โทรหรือเก็บไปโทรเอง")
+   * เจ้าของเคาะ 13 ส.ค. 2569: ทำเฉพาะคนที่ติ๊ก ไม่ต้องมีแบบทั้งใบ
    */
-  onHoldSelf?: () => void;
+  onHoldSelf: () => void;
   holdingSelf?: boolean;
 }) {
-  if (count === 0) return null;
+  const act = lumosSendActionStates({
+    allCount,
+    selectedCount: count,
+    sending: busy,
+    creatingBatch,
+    holdingSelf,
+  });
+  // บรรทัดเหตุผลมีเสมอ — title บนปุ่มที่ disabled ไม่ขึ้นบนมือถือ
+  const hint =
+    act.sendAll.reason && act.sendSelected.reason
+      ? act.sendSelected.reason
+      : (act.sendSelected.reason ?? act.sendAll.reason ?? 'เลือกทางที่จะทำต่อกับคนที่ AI แมทให้');
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2 dark:border-sky-700 dark:bg-sky-950/50">
-      <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">ติ๊กเลือกไว้ {count} คน</p>
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onClear}
-          className="jarvis-btn-ghost"
-        >
-          ล้างที่เลือก
-        </button>
-        {/* ทางเลือกที่ 2: ไม่ยิงเข้าคิวทันที แต่หน่วงไว้ก่อน — ระหว่างหน่วงยังถอนคำได้
-            เดิมปุ่มนี้ตั้งเป็น "ชุดรออนุมัติ" ซึ่งกลายเป็นทางตันตอนแผงอนุมัติถูกเอาออก
-            เจ้าของเคาะ 11 ส.ค. 2569: ข้ามขั้นอนุมัติ แต่คงช่วงถอนคำไว้เป็นตัวกันพลาด */}
-        <button
-          type="button"
-          disabled={busy || creatingBatch}
-          onClick={onCreateBatch}
-          title={`ตั้งคิวไว้ก่อน — เข้าคิวจริงอีก ${CALL_BATCH_UNDO_MINUTES} นาที ระหว่างนี้กดยกเลิกได้`}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
-            TONE.warn.outline,
-          )}
-        >
-          <ClipboardCheck className="h-3 w-3" />
-          {creatingBatch ? 'กำลังตั้งคิว…' : `ตั้งคิวโทร (${count})`}
-        </button>
-        {/* ⚠️ เคยซ่อนปุ่มนี้ตอนจุดนั้นเปิดโหมด assist — assist ถูกถอดทิ้ง 11 ส.ค. 2569
-            พร้อมลูปอนุมัติ · สองปุ่มไม่ขัดนโยบายกันเองแล้ว: อันนี้เข้าคิวทันที
-            อีกอันหน่วง 10 นาทีแล้วถอนคำได้ */}
-        {onHoldSelf ? (
+    <div className="space-y-1 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2 dark:border-sky-700 dark:bg-sky-950/50">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">
+          {count > 0 ? `ติ๊กเลือกไว้ ${count} คน` : 'ยังไม่ได้ติ๊กใคร'}
+        </p>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <button type="button" onClick={onClear} disabled={count === 0} className="jarvis-btn-ghost disabled:opacity-50">
+            ล้างที่เลือก
+          </button>
+          {/* ทางเลือกที่ 2: ไม่ยิงเข้าคิวทันที แต่หน่วงไว้ก่อน — ระหว่างหน่วงยังถอนคำได้
+              เดิมปุ่มนี้ตั้งเป็น "ชุดรออนุมัติ" ซึ่งกลายเป็นทางตันตอนแผงอนุมัติถูกเอาออก
+              เจ้าของเคาะ 11 ส.ค. 2569: ข้ามขั้นอนุมัติ แต่คงช่วงถอนคำไว้เป็นตัวกันพลาด
+              (13 ส.ค. 2569 เคาะซ้ำว่าเก็บปุ่มนี้ไว้) */}
           <button
             type="button"
-            disabled={busy || creatingBatch || holdingSelf}
+            disabled={act.queueSelected.disabled}
+            onClick={onCreateBatch}
+            title={
+              act.queueSelected.reason ??
+              `ตั้งคิวไว้ก่อน — เข้าคิวจริงอีก ${CALL_BATCH_UNDO_MINUTES} นาที ระหว่างนี้กดยกเลิกได้`
+            }
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              TONE.warn.outline,
+            )}
+          >
+            <ClipboardCheck className="h-3 w-3" />
+            {creatingBatch ? 'กำลังตั้งคิว…' : `ตั้งคิวโทร (${act.queueSelected.count})`}
+          </button>
+          <button
+            type="button"
+            disabled={act.holdSelf.disabled}
             onClick={onHoldSelf}
-            title="ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่หน้าโทรของฉัน"
+            title={
+              act.holdSelf.reason ??
+              'ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่หน้าโทรของฉัน'
+            }
             className={cn(
               'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
               TONE.success.outline,
             )}
           >
             <UserRound className="h-3 w-3" />
-            {holdingSelf ? 'กำลังเก็บ…' : `เก็บไปโทรเอง (${count})`}
+            {holdingSelf ? 'กำลังเก็บ…' : `เก็บไปโทรเอง (${act.holdSelf.count})`}
           </button>
-        ) : null}
-        <button
-          type="button"
-          disabled={busy || creatingBatch || holdingSelf}
-          onClick={onSend}
-          className="jarvis-btn-primary"
-        >
-          <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
-        </button>
+          <button
+            type="button"
+            disabled={act.sendSelected.disabled}
+            onClick={onSend}
+            title={act.sendSelected.reason ?? 'ส่งเฉพาะคนที่ติ๊กไว้เข้าคิว AI โทร'}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              TONE.primary.outline,
+            )}
+          >
+            <PhoneCall className="h-3 w-3" /> ส่ง AI โทร (ติ๊ก {act.sendSelected.count})
+          </button>
+          {/* ผลหนักสุด — ยิงสายจริงทีเดียวทั้งใบ จึงเป็น primary ตัวเดียวและอยู่ขวาสุด
+              (ยังผ่านหน้าต่างยืนยันที่โชว์รายชื่อ+เบอร์ครบทุกคนเหมือนเดิม) */}
+          <button
+            type="button"
+            disabled={act.sendAll.disabled}
+            onClick={onSendAll}
+            title={act.sendAll.reason ?? 'ส่งทุกคนที่ AI แมทเจอในใบนี้ — ยังมีหน้าต่างยืนยันก่อนโทรจริง'}
+            className="jarvis-btn-primary disabled:opacity-50"
+          >
+            <PhoneCall className="h-3 w-3" /> ส่งทั้งหมดที่แมท ({act.sendAll.count})
+          </button>
+        </div>
       </div>
+      <p className="min-h-4 text-[10px] leading-4 text-sky-900/70 dark:text-sky-200/70">{hint}</p>
     </div>
   );
 }
