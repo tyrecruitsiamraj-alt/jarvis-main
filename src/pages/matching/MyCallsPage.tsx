@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import PageHeader from '@/components/shared/PageHeader';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallTeamBoardSection } from '@/pages/matching/CallTeamBoardPage';
@@ -56,7 +55,13 @@ function countdown(ms: number): string {
 /** ใกล้คายภายใน 2 ชม. = ต้องรีบโทร (ไฮไลต์แถว) */
 const DUE_SOON_MS = 2 * 60 * 60 * 1000;
 
-const MyCallsPage: React.FC = () => {
+/**
+ * "โทรของฉัน" — **เป็น section บนหน้าหลักแล้ว** (เจ้าของสั่ง 13 ส.ค. 2569:
+ * "หน้าโทรของฉันก็ย้ายไปรวมกับหน้าหลัก แต่จัดวางให้ดูสวยๆ ไม่รก")
+ * `/matching/my-calls` เหลือเป็น redirect เข้าหน้าหลัก · เมนูเดิมถูกถอด
+ * ทุกอย่างข้างในเหมือนหน้าเดิม: ถังของตัวเอง + บันทึกผล + บอร์ดทีมของหัวหน้า
+ */
+export const MyCallsSection: React.FC = () => {
   /**
    * เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: **ทุกคนเห็นถังของตัวเอง** (ของใครของมัน)
    * ส่วนบอร์ดทีมข้างล่างเห็นเฉพาะหัวหน้าขึ้นไป — API คุมสิทธิ์จริงอยู่แล้ว
@@ -172,18 +177,17 @@ const MyCallsPage: React.FC = () => {
     }
   };
 
-  return (
-    <div className="space-y-4 pb-10">
-      <PageHeader
-        title="งานโทร"
-        subtitle="ถังงานโทรของฉัน — เก็บมาจากหน้า Matching หรือรายชื่อผู้สมัคร แล้วมาโทร+บันทึกผลที่นี่"
-      />
+  // ไม่มีงานค้างและไม่มียอดวันนี้ = ไม่กินที่บนหน้าหลักเลย (เจ้าของสั่งว่าห้ามรก)
+  // มีของค่อยโผล่ทั้งแผง · หัวหน้าเห็นบอร์ดทีมเสมอ (งานของลูกทีมไม่ใช่ของตัวเอง)
+  if (!loading && holds.length === 0 && tally.total === 0 && !canSeeTeamBoard) return null;
 
-      {/* แผงชุดส่งงาน (CallBatchPanel) เคยอยู่ตรงนี้ — ถูกลบถาวรพร้อมลูปอนุมัติ 11 ส.ค. 2569 */}
+  return (
+    <div className="space-y-4">
+      {/* PageHeader เดิมถูกถอด — ตอนนี้เป็น section บนหน้าหลัก ใช้หัวเรื่องบรรทัดเดียว */}
       <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
-        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>โทรของฉัน</h2>
+        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>📞 โทรของฉัน</h2>
         <p className={cn('text-xs', DASH.muted)}>
-          งานโทรที่รับมาจากหน้า Matching — เรียงให้แล้วว่าโทรใครก่อน
+          งานที่เก็บมาโทรเอง — เรียงให้แล้วว่าโทรใครก่อน · โทรเสร็จบันทึกผลที่นี่
         </p>
       </div>
 
@@ -462,4 +466,5 @@ const MyCallsPage: React.FC = () => {
   );
 };
 
-export default MyCallsPage;
+// ⚠️ ไม่มี default export แล้ว — เนื้อทั้งหมดเป็น `MyCallsSection` บนหน้าหลัก
+// `/matching/my-calls` เป็น redirect ใน App.tsx (กัน bookmark เก่าพัง)

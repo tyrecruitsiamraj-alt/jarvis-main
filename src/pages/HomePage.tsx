@@ -27,6 +27,7 @@ import {
   type PostingStages,
 } from '@/lib/flowSummaryApi';
 import { jobPostingStatusLabel } from '@/lib/jobPostingRequestsApi';
+import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 
 
 /**
@@ -410,6 +411,11 @@ const HomePage: React.FC = () => {
               เพราะหลักการเดียวกับ "ผลจากการโทร": รายชื่อทั้งหมดย้ายเข้า dialog 4 กล่อง
               (กดที่ขั้น "ผลจากการโทร") · ใบด่วนค้าง → บรรทัดย่อยของ "ยังไม่มีคนแนะนำ" ·
               ค้างเกิน 2 วัน → ธงแดงใน dialog "ส่ง AI โทร" — ทุกตัวเลขมีที่ไป ไม่มีตัวไหนหาย */}
+
+          {/* "โทรของฉัน" ย้ายมาจาก /matching/my-calls (เจ้าของสั่ง 13 ส.ค. 2569:
+              "ย้ายไปรวมกับหน้าหลักแต่จัดวางให้ดูสวยๆ ไม่รก") — ตัว section ซ่อนตัวเอง
+              เมื่อไม่มีงานค้าง/ไม่มียอดวันนี้ (ยกเว้นหัวหน้าที่ต้องเห็นบอร์ดทีม) */}
+          <MyCallsSection />
         </motion.section>
       ) : null}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}

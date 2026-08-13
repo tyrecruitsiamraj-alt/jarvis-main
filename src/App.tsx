@@ -32,7 +32,6 @@ const MatchingDashboard = lazy(() => import("@/pages/matching/MatchingDashboard"
 const CandidateProfile = lazy(() => import("@/pages/matching/CandidateProfile"));
 const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"));
 const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
-const MyCallsPage = lazy(() => import("@/pages/matching/MyCallsPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
 const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
@@ -105,11 +104,11 @@ const ProtectedRoutes = () => {
             {/* งานสรรหา (RM) — หน้าเดียว 3 แท็บ · แท็บอยู่ใน ?tab= เพื่อให้แชร์ลิงก์ได้ */}
             <Route path="/recruit/rm" element={<RecruitRmPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
-            {/* หน้า "โทรของฉัน" เปิดกลับมา 11 ส.ค. 2569 รอบหก (เจ้าของกลับคำจากที่สั่งปิด 10 ส.ค.)
-                — ทุกคนเห็นถังตัวเอง · บอร์ดทีมในหน้าเดียวกันเห็นเฉพาะหัวหน้าขึ้นไป
-                · /matching/call-team ยุบเป็น redirect กัน bookmark เก่าพัง */}
-            <Route path="/matching/my-calls" element={<MyCallsPage />} />
-            <Route path="/matching/call-team" element={<Navigate to="/matching/my-calls" replace />} />
+            {/* "โทรของฉัน" ย้ายเป็น section บนหน้าหลักแล้ว (เจ้าของสั่ง 13 ส.ค. 2569:
+                "ย้ายไปรวมกับหน้าหลักแต่จัดวางให้ดูสวยๆ ไม่รก") — สอง path เดิม
+                redirect เข้าหน้าหลัก กัน bookmark เก่าพัง */}
+            <Route path="/matching/my-calls" element={<Navigate to="/" replace />} />
+            <Route path="/matching/call-team" element={<Navigate to="/" replace />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />

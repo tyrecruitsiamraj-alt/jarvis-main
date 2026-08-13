@@ -543,13 +543,13 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                   </span>
                   <span className="ml-auto flex items-center gap-2">
                     {taken.has(item.id) ? (
-                      /* หน้าโทรของฉันเปิดกลับมาแล้ว (11 ส.ค. 2569 รอบหก) —
+                      /* "โทรของฉัน" อยู่บนหน้าหลักแล้ว (13 ส.ค. 2569) —
                          รับแล้วต้องมีที่ไปโทร+บันทึกผล ไม่งั้นล็อกค้างจนหมดอายุเอง */
                       <Link
-                        to="/matching/my-calls"
+                        to="/"
                         className={cn('text-[11px] font-bold underline-offset-2 hover:underline', TONE.success.value)}
                       >
-                        รับแล้ว → ไปหน้าโทรของฉัน
+                        รับแล้ว → ไปที่ "โทรของฉัน" บนหน้าหลัก
                       </Link>
                     ) : item.candidateRef && item.phone ? (
                       <button
