@@ -66,15 +66,20 @@ export type JobBoardViewProps = {
   refreshing?: boolean;
   detailReturnTo?: string;
   /**
-   * มุมมองของบอร์ดฝั่งเจ้าหน้าที่ (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด)
-   * 'board' = กล่องงาน (การ์ดใบขอเดิม) · 'list' = รายชื่อผู้สมัคร (เนื้อ RM ส่งมาทาง listContent)
+   * มุมมองของบอร์ดฝั่งเจ้าหน้าที่ (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด
+   * · 13 ส.ค. 2569: ยก "การติดต่อ"/"ติดตามนัดหมาย" ขึ้นเป็นแท็บระดับบอร์ด)
+   * 'board' = กล่องงาน · ที่เหลือ = เนื้อ RM คนละแท็บ (ส่งมาทาง listContent —
+   * StaffJobBoardPage เป็นคนเลือกแท็บให้ RmWorkspace ตาม view)
    * ⚠️ ตัวเนื้อ list ถูก import ที่ StaffJobBoardPage ไม่ใช่ที่นี่ — ไฟล์นี้ใช้ร่วมกับ
    * หน้าสมัครสาธารณะ ห้ามลากโค้ด RM เข้ามาใน bundle
    */
-  view?: 'board' | 'list';
-  onViewChange?: (view: 'board' | 'list') => void;
+  view?: BoardViewId;
+  onViewChange?: (view: BoardViewId) => void;
   listContent?: React.ReactNode;
 };
+
+/** แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace */
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments';
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -302,14 +307,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         ) : null}
 
         {/* แท็บสลับมุมมอง (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด)
-            "กล่องงาน" = การ์ดใบขอเดิม · "รายชื่อผู้สมัคร" = เนื้อหน้างานสรรหา (RM)
-            โผล่เฉพาะเจ้าหน้าที่ที่ส่ง onViewChange มา — หน้าสาธารณะไม่มีทางเห็น */}
+            เจ้าของสั่งเพิ่ม 13 ส.ค. 2569: ยก "การติดต่อ" กับ "ติดตามนัดหมาย" จากแท็บย่อย
+            ของ RM ขึ้นมาอยู่ระดับเดียวกับกล่องงาน/รายชื่อผู้สมัคร (แท็บย่อยใน RmWorkspace
+            ถูกซ่อนเมื่อคุมจากข้างนอก) · โผล่เฉพาะเจ้าหน้าที่ — หน้าสาธารณะไม่มีทางเห็น */}
         {isStaff && onViewChange ? (
           <div className="mt-6 flex flex-wrap items-center gap-1 border-b border-border/60">
             {(
               [
                 { id: 'board', label: 'กล่องงาน' },
                 { id: 'list', label: 'รายชื่อผู้สมัคร' },
+                { id: 'contact', label: 'การติดต่อ' },
+                { id: 'appointments', label: 'ติดตามนัดหมาย' },
               ] as const
             ).map((v) => {
               const active = view === v.id;
@@ -333,9 +341,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         ) : null}
 
-        {/* มุมมองรายชื่อผู้สมัคร — แทนที่ก้อนกล่องลอย+ตัวกรอง+การ์ดทั้งหมด
-            hero + แผงภาพรวมข้างบนคงอยู่ทั้งสองมุมมอง ไม่ render ซ้ำ */}
-        {isStaff && view === 'list' && listContent ? (
+        {/* มุมมองฝั่ง RM (รายชื่อผู้สมัคร/การติดต่อ/ติดตามนัดหมาย) — แทนที่ก้อน
+            กล่องลอย+ตัวกรอง+การ์ดทั้งหมด · hero + แผงภาพรวมข้างบนคงอยู่ทุกมุมมอง */}
+        {isStaff && view !== 'board' && listContent ? (
           <div className="mt-4 pb-10">{listContent}</div>
         ) : (
           <>

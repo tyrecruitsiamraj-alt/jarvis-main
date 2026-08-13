@@ -67,10 +67,17 @@ function isRmTab(v: string | null): v is RmTab {
   return !!v && (RM_TABS as readonly string[]).includes(v);
 }
 
-const RmWorkspace: React.FC = () => {
+const RmWorkspace: React.FC<{
+  /**
+   * แท็บที่ถูกคุมจากข้างนอก (เจ้าของสั่ง 13 ส.ค. 2569: "การติดต่อ"/"ติดตามนัดหมาย"
+   * เป็นแท็บระดับบอร์ดแล้ว) — ส่งมา = ล็อกแท็บนั้นและซ่อนแถบแท็บย่อยข้างใน
+   * ไม่ส่ง = พฤติกรรมเดิม (อ่านจาก ?tab= · มีแถบแท็บของตัวเอง)
+   */
+  tab?: RmTab;
+}> = ({ tab: controlledTab }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab: RmTab = isRmTab(tabParam) ? tabParam : 'candidates';
+  const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,39 +248,51 @@ const RmWorkspace: React.FC = () => {
 
   return (
     <div>
-      {/* แถบแท็บ — ระบบเดิมใช้ radio+CSS · ที่นี่ผูกกับ ?tab= เพื่อแชร์ลิงก์/กด back ได้ */}
-      <div className={cn('flex flex-wrap items-center gap-1 border-b', DASH.divider)}>
-        {RM_TABS.map((t) => {
-          const active = t === tab;
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'relative px-4 py-2.5 text-sm font-semibold transition-colors',
-                active
-                  ? cn(TONE.primary.value, 'border-b-2 border-current')
-                  : cn(DASH.muted, 'border-b-2 border-transparent hover:text-foreground'),
-              )}
-            >
-              {RM_TAB_LABEL[t]}
-              <span className={cn('ml-1.5 font-mono text-[11px] tabular-nums', active ? '' : DASH.muted)}>
-                {loading ? '…' : tabCounts[t].toLocaleString('th-TH')}
-              </span>
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="jarvis-btn-secondary ml-auto"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
-        </button>
-      </div>
+      {/* แถบแท็บย่อย — โผล่เฉพาะโหมดไม่ถูกคุมจากข้างนอก (ตอนนี้บอร์ดคุมด้วย ?view= แล้ว
+          แถบนี้จึงไม่ขึ้นบนบอร์ด — คงไว้เผื่อ RmWorkspace ถูกใช้เดี่ยว ๆ ที่อื่น) */}
+      {controlledTab ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className={cn('text-xs', DASH.muted)}>
+            {RM_TAB_LABEL[tab]} · {loading ? '…' : tabCounts[tab].toLocaleString('th-TH')} รายการ
+          </p>
+          <button type="button" onClick={load} disabled={loading} className="jarvis-btn-secondary">
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
+          </button>
+        </div>
+      ) : (
+        <div className={cn('flex flex-wrap items-center gap-1 border-b', DASH.divider)}>
+          {RM_TABS.map((t) => {
+            const active = t === tab;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'relative px-4 py-2.5 text-sm font-semibold transition-colors',
+                  active
+                    ? cn(TONE.primary.value, 'border-b-2 border-current')
+                    : cn(DASH.muted, 'border-b-2 border-transparent hover:text-foreground'),
+                )}
+              >
+                {RM_TAB_LABEL[t]}
+                <span className={cn('ml-1.5 font-mono text-[11px] tabular-nums', active ? '' : DASH.muted)}>
+                  {loading ? '…' : tabCounts[t].toLocaleString('th-TH')}
+                </span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="jarvis-btn-secondary ml-auto"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
+          </button>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-col gap-4 lg:flex-row">
         <RmFilterSidebar filters={filters} onChange={setFilters} provinces={provinces} />

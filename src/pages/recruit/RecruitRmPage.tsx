@@ -12,8 +12,9 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 const RecruitRmPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const tab = searchParams.get('tab');
-  const target = `/jobs/board?view=list${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
-  return <Navigate to={target} replace />;
+  // แท็บย่อยเดิม (?tab=) กลายเป็นแท็บระดับบอร์ด (?view=) แล้ว — 13 ส.ค. 2569
+  const view = tab === 'contact' ? 'contact' : tab === 'appointments' ? 'appointments' : 'list';
+  return <Navigate to={`/jobs/board?view=${view}`} replace />;
 };
 
 export default RecruitRmPage;
