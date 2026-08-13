@@ -786,6 +786,10 @@ const MatchingPage: React.FC = () => {
   const [lumosSelectedBoard, setLumosSelectedBoard] = useState<number[]>([]);
   const [lumosSelectedIrecruit, setLumosSelectedIrecruit] = useState<number[]>([]);
   const [lumosConfirmOpen, setLumosConfirmOpen] = useState(false);
+  /** popup "คนนี้แมทหลายงาน — ส่งไปงานไหนบ้าง" (เจ้าของสั่ง 12 ส.ค. 2569) */
+  const [jobPickOpen, setJobPickOpen] = useState(false);
+  /** งาน "อื่น" (นอกจากใบที่เปิด) ที่เลือกส่งเพิ่มต่อคน — คีย์ = card_id */
+  const [extraJobsByCard, setExtraJobsByCard] = useState<Record<number, string[]>>({});
   const [lumosSending, setLumosSending] = useState(false);
   /** กำลังตั้งคิวเป็นชุด — แยกจาก lumosSending เพราะเป็นคนละปุ่มคนละปลายทาง */
   const [batchCreating, setBatchCreating] = useState(false);
@@ -954,6 +958,8 @@ const MatchingPage: React.FC = () => {
   const clearLumosSelection = () => {
     setLumosSelectedBoard([]);
     setLumosSelectedIrecruit([]);
+    // งานอื่นที่เลือกไว้ใน popup ผูกกับการติ๊กรอบนี้ — ล้างพร้อมกันเสมอ
+    setExtraJobsByCard({});
   };
 
   const toggleLumosBoard = (cardId: number) =>
@@ -1029,6 +1035,25 @@ const MatchingPage: React.FC = () => {
     }
   };
 
+  /**
+   * ก่อนเปิดหน้าต่างยืนยันส่ง AI โทร — คนที่ติ๊กไว้ถ้าแมทหลายงาน ต้องมี popup
+   * ให้เลือกก่อนว่าจะส่งไปงานไหนบ้าง (เจ้าของสั่ง 12 ส.ค. 2569)
+   * ไม่มีใครแมทหลายงาน = ข้ามไปหน้าต่างยืนยันเลยเหมือนเดิม
+   */
+  const beginSendFlow = () => {
+    const multi = lumosSelectedBoard.filter(
+      (cardId) => (jobMatchesByCard[String(cardId)] ?? []).length >= 2,
+    );
+    if (multi.length === 0) {
+      setExtraJobsByCard({});
+      setLumosConfirmOpen(true);
+      return;
+    }
+    // ค่าเริ่มต้น: ส่งเฉพาะใบที่เปิดอยู่ (ใบอื่นให้คนเลือกติ๊กเพิ่มเอง — ไม่เดาแทน)
+    setExtraJobsByCard({});
+    setJobPickOpen(true);
+  };
+
   const sendSelectedToLumos = async () => {
     if (!jobDetail || lumosSelectedCount === 0) return;
     setLumosSending(true);
@@ -1040,6 +1065,30 @@ const MatchingPage: React.FC = () => {
         boardCardIds: lumosSelectedBoard,
         irecruitIds: lumosSelectedIrecruit,
       });
+      // ส่งไป "งานอื่น" ที่เลือกไว้ใน popup — ยิงทีละใบ (API รับทีละ jobId)
+      // ใบไหนล้มไม่ดึงทั้งก้อนลง: รวมผลแล้วรายงานตรง ๆ ว่าใบไหนไม่สำเร็จ
+      const extraByJob = new Map<string, number[]>();
+      for (const [cardIdStr, jobIds] of Object.entries(extraJobsByCard)) {
+        const cardId = Number(cardIdStr);
+        if (!lumosSelectedBoard.includes(cardId)) continue;
+        for (const jid of jobIds) {
+          if (jid === jobDetail.id) continue;
+          extraByJob.set(jid, [...(extraByJob.get(jid) ?? []), cardId]);
+        }
+      }
+      let extraQueued = 0;
+      const extraFailed: string[] = [];
+      for (const [jid, cardIds] of extraByJob) {
+        try {
+          const r = await dispatchLumosCalls({ jobId: jid, boardCardIds: cardIds, irecruitIds: [] });
+          extraQueued += r.queued;
+        } catch {
+          const label =
+            (jobMatchesByCard[String(cardIds[0])] ?? []).find((j) => j.jobId === jid)?.requestNo ?? jid;
+          extraFailed.push(label);
+        }
+      }
+      setExtraJobsByCard({});
       setLumosStatusByRef(indexLumosCallStatus(result.items));
       // pool ที่โหลดไว้ต้องรู้ว่าคนเหล่านี้ส่งแล้ว ไม่งั้นเปิด picker ซ้ำจะยังติ๊กได้
       const justSent = new Set(lumosSelectedBoard);
@@ -1055,6 +1104,8 @@ const MatchingPage: React.FC = () => {
           `ส่งไม่ได้ ${result.skipped.length} คน: ${result.skipped.map((s) => s.name).join(', ')} — ${result.skipped[0].reason}`,
         );
       }
+      if (extraQueued > 0) parts.push(`ส่งไปงานอื่นที่เลือกไว้อีก ${extraQueued} รายการ`);
+      if (extraFailed.length > 0) parts.push(`⚠️ ส่งไปงาน ${extraFailed.join(', ')} ไม่สำเร็จ`);
       setLumosNotice(parts.join(' · '));
     } catch (e) {
       setLumosError(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
@@ -2956,7 +3007,7 @@ const MatchingPage: React.FC = () => {
                 onClear={clearLumosSelection}
                 creatingBatch={batchCreating}
                 onCreateBatch={() => void createBatchFromSelection()}
-                onSend={() => setLumosConfirmOpen(true)}
+                onSend={beginSendFlow}
                 onHoldSelf={() => void holdSelectedForSelf()}
                 holdingSelf={holdingSelf}
               />
@@ -4178,6 +4229,98 @@ const MatchingPage: React.FC = () => {
       </Dialog>
 
       {/* ยืนยันก่อนส่งให้ Lumos โทร — AI จะโทรหาคนจริง จึงต้องเห็นรายชื่อครบก่อนกด */}
+      {/* popup "คนนี้แมทหลายงาน — ส่งไปงานไหนบ้าง" (เจ้าของสั่ง 12 ส.ค. 2569)
+          เด้งก่อนหน้าต่างยืนยัน เมื่อคนที่ติ๊กมีอย่างน้อย 1 คนแมท ≥ 2 งาน
+          ใบที่เปิดอยู่ถูกส่งเสมอ (ติ๊กถาวร) · ใบอื่นเลือกเพิ่มได้ ไม่เดาแทน */}
+      <Dialog open={jobPickOpen} onOpenChange={(o) => !o && setJobPickOpen(false)}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">บางคนแมทอยู่หลายงาน — ส่งไปงานไหนบ้าง</DialogTitle>
+            <DialogDescription>
+              ใบที่เปิดอยู่ ({jobDetail?.request_no || jobDetail?.id}) ถูกส่งเสมอ · ติ๊กเพิ่มได้ถ้าจะให้
+              AI เสนองานอื่นให้เขาด้วย (ระบบเสนอทีละงานอยู่แล้ว ไม่โทรถล่ม)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {jobDetail
+              ? lumosSelectedBoard
+                  .filter((cardId) => (jobMatchesByCard[String(cardId)] ?? []).length >= 2)
+                  .map((cardId) => {
+                    const person = boardPersonLabel(cardId);
+                    const jobs = jobMatchesByCard[String(cardId)] ?? [];
+                    const chosen = extraJobsByCard[cardId] ?? [];
+                    return (
+                      <div key={cardId} className={cn('rounded-xl border p-3', TONE.neutral.soft)}>
+                        <p className="text-sm font-semibold text-foreground">
+                          {person.name}{' '}
+                          <span className="text-[11px] font-normal text-muted-foreground">
+                            แมทอยู่ {jobs.length} งาน
+                          </span>
+                        </p>
+                        <div className="mt-1.5 space-y-1">
+                          {jobs.map((j) => {
+                            const isCurrent = j.jobId === jobDetail.id;
+                            const checked = isCurrent || chosen.includes(j.jobId);
+                            return (
+                              <label
+                                key={j.jobId}
+                                className={cn(
+                                  'flex cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1 text-[12px]',
+                                  isCurrent ? 'opacity-70' : 'hover:bg-slate-100 dark:hover:bg-slate-800',
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={isCurrent}
+                                  onChange={() =>
+                                    setExtraJobsByCard((prev) => {
+                                      const cur = prev[cardId] ?? [];
+                                      return {
+                                        ...prev,
+                                        [cardId]: cur.includes(j.jobId)
+                                          ? cur.filter((x) => x !== j.jobId)
+                                          : [...cur, j.jobId],
+                                      };
+                                    })
+                                  }
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-default"
+                                />
+                                <span className="min-w-0">
+                                  <span className="font-mono text-[11px]">{j.requestNo || j.jobId}</span>{' '}
+                                  {j.position}
+                                  {j.unit ? <span className="text-muted-foreground"> · {j.unit}</span> : null}
+                                  {isCurrent ? (
+                                    <span className={cn('ml-1 font-semibold', TONE.info.value)}>(ใบนี้)</span>
+                                  ) : null}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+              : null}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setJobPickOpen(false)} className="jarvis-btn-ghost">
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setJobPickOpen(false);
+                  setLumosConfirmOpen(true);
+                }}
+                className="jarvis-btn-primary"
+              >
+                ถัดไป — ไปหน้ายืนยัน
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={lumosConfirmOpen} onOpenChange={(o) => !o && setLumosConfirmOpen(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
