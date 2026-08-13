@@ -232,15 +232,21 @@ export function LumosSendBar({
       ? act.sendSelected.reason
       : (act.sendSelected.reason ?? act.sendAll.reason ?? 'เลือกทางที่จะทำต่อกับคนที่ AI แมทให้');
   return (
-    <div className="space-y-1 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2 dark:border-sky-700 dark:bg-sky-950/50">
+    <div className="space-y-1.5 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2 dark:border-sky-700 dark:bg-sky-950/50">
+      {/* แถวบน = สถานะการติ๊ก + ล้าง · แถวล่าง = ปุ่มการกระทำเต็มความกว้าง
+          ⚠️ เดิมยัด 5 ปุ่มไว้แถวเดียวกับข้อความโดยใส่ shrink-0 ให้กลุ่มปุ่ม
+          → กลุ่มไม่ยอมหด ปุ่มขวาสุด ("ส่งทั้งหมดที่แมท") ทะลุขอบแผงจนตัวหนังสือโดนตัด
+          (กับดักเดิมของโปรเจกต์: shrink-0 คู่กับ flex ที่พื้นที่ไม่พอ = ทะลุ ไม่ใช่แค่ล้น) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">
+        <p className="min-w-0 text-[11px] font-semibold text-sky-900 dark:text-sky-200">
           {count > 0 ? `ติ๊กเลือกไว้ ${count} คน` : 'ยังไม่ได้ติ๊กใคร'}
         </p>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-          <button type="button" onClick={onClear} disabled={count === 0} className="jarvis-btn-ghost disabled:opacity-50">
-            ล้างที่เลือก
-          </button>
+        <button type="button" onClick={onClear} disabled={count === 0} className="jarvis-btn-ghost shrink-0 disabled:opacity-50">
+          ล้างที่เลือก
+        </button>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {/* ปุ่มไม่มี shrink-0 — พื้นที่ไม่พอให้ตกบรรทัดใหม่ ห้ามทะลุขอบ */}
           {/* ทางเลือกที่ 2: ไม่ยิงเข้าคิวทันที แต่หน่วงไว้ก่อน — ระหว่างหน่วงยังถอนคำได้
               เดิมปุ่มนี้ตั้งเป็น "ชุดรออนุมัติ" ซึ่งกลายเป็นทางตันตอนแผงอนุมัติถูกเอาออก
               เจ้าของเคาะ 11 ส.ค. 2569: ข้ามขั้นอนุมัติ แต่คงช่วงถอนคำไว้เป็นตัวกันพลาด
@@ -300,7 +306,6 @@ export function LumosSendBar({
           >
             <PhoneCall className="h-3 w-3" /> ส่งทั้งหมดที่แมท ({act.sendAll.count})
           </button>
-        </div>
       </div>
       <p className="min-h-4 text-[10px] leading-4 text-sky-900/70 dark:text-sky-200/70">{hint}</p>
     </div>
