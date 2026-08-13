@@ -1415,6 +1415,30 @@ const MatchingPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, jobs, serverListLoading]);
 
+  /**
+   * `?ir=1` — เปิดใบขอแล้ว **ค้นหาคนที่ยังไม่สมัครให้เลย** (ปุ่มบนการ์ดของบอร์ดรับสมัครงาน
+   * เจ้าของสั่ง 13 ส.ค. 2569) · แพตเทิร์นเดียวกับ `openJobAndFindCandidates()` ใน PreCheckPage
+   *
+   * ⚠️ ต้องรอ **ผลค้น "คนของเรา" (boardMatch) มาก่อน** เพราะกล่อง iRecruit ทั้งกล่อง
+   * ถูกซ่อนจนกว่าจะมีผลนั้น — ยิงก่อนแล้วผู้ใช้จะไม่เห็นอะไรเกิดขึ้นเลย
+   * ⚠️ ล้าง `ir` ออกจาก URL ทันทีที่ยิง เพื่อไม่ให้ยิงซ้ำทุก re-render (คิวรี AI แพง)
+   */
+  const irAutoFiredRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (searchParams.get('ir') !== '1') return;
+    const jobId = searchParams.get('jobId');
+    if (!jobId || jobDetail?.id !== jobId) return;
+    if (!boardMatchById[jobId]) return; // ยังไม่มีผลคนของเรา → กล่องยังไม่โผล่
+    if (irAutoFiredRef.current === jobId) return;
+    if (irMatchById[jobId] || irLoadingId === jobId) return;
+    irAutoFiredRef.current = jobId;
+    void fetchIrecruit(jobId);
+    const next = new URLSearchParams(searchParams);
+    next.delete('ir');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, jobDetail?.id, boardMatchById, irMatchById, irLoadingId]);
+
   // ตัวกรองจาก URL (?urgent=1&workflow=...&bu=LBD) — ลิงก์จากหน้าสรุปการไหลของงานบน HomePage
   useEffect(() => {
     if (searchParams.get('urgent') === '1') setUrgentOnly(true);
@@ -2900,7 +2924,7 @@ const MatchingPage: React.FC = () => {
                       <p className="mt-1.5">
                         เป้าคือ “อัตราที่ขอ × 3” · ระบบค้นถัง “ไม่มีงาน” เพิ่มให้แล้ว
                         {short
-                          ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นฐาน iRecruit ด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
+                          ? ` ก็ยังได้ ${got} คน · ทางไปต่อ: ค้นหาคนที่ยังไม่สมัครด้านล่าง · ดูคนเก่า Re Use ใน “เลือกคนส่ง AI โทร”`
                           : ` → รวมแนะนำ ${got} คน`}
                       </p>
                     </details>
@@ -3038,7 +3062,7 @@ const MatchingPage: React.FC = () => {
                 {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
                   <p className={cn('rounded-xl border px-3 py-3 text-xs', TONE.warn.soft, TONE.warn.num)}>
-                    ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองหาจากฐาน iRecruit ด้านล่าง แล้วเสนอได้เลย
+                    ยังไม่มีคนของเราที่เข้าข่ายกับใบขอนี้ — ลองค้นหาคนที่ยังไม่สมัครด้านล่าง แล้วเสนอได้เลย
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -3282,10 +3306,12 @@ const MatchingPage: React.FC = () => {
               {boardMatchById[jobDetail.id] && !boardErrorById[jobDetail.id] ? (
                 <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3 space-y-2 dark:border-blue-800 dark:bg-blue-950/50">
                   <div className="flex items-center justify-between gap-2">
+                    {/* เจ้าของสั่ง 13 ส.ค. 2569: เลิกเรียกชื่อระบบ ("iRecruit") มาเป็นคำที่บอก
+                        ว่าได้อะไร — คนกลุ่มนี้คือคนในฐานที่ **ยังไม่ได้สมัครใบขอนี้** */}
                     <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">
                       {irMatchById[jobDetail.id]
-                        ? `ผู้สมัครจากฐาน iRecruit → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
-                        : 'ไม่พอ? หาผู้สมัครจากฐาน iRecruit'}
+                        ? `คนที่ยังไม่สมัคร → แนะนำ ${recommendedCandidateCount(irMatchById[jobDetail.id].matches)}`
+                        : 'ไม่พอ? หาคนที่ยังไม่สมัครงานนี้'}
                     </p>
                     <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                       <button
@@ -3302,7 +3328,7 @@ const MatchingPage: React.FC = () => {
                           </>
                         ) : (
                           <>
-                            <Search className="h-3 w-3" /> ค้นหา iRecruit
+                            <Search className="h-3 w-3" /> ค้นหาคนที่ยังไม่สมัคร
                           </>
                         )}
                       </button>
@@ -3316,7 +3342,7 @@ const MatchingPage: React.FC = () => {
                   ) : irMatchById[jobDetail.id] ? (
                     recommendedCandidateCount(irMatchById[jobDetail.id].matches) === 0 &&
                     !(showDistantCandidates && distantCandidateCount(irMatchById[jobDetail.id].matches) > 0) ? (
-                      <p className="text-[11px] text-muted-foreground">ไม่พบผู้สมัครที่ใกล้เคียงในฐาน iRecruit</p>
+                      <p className="text-[11px] text-muted-foreground">ไม่พบคนที่ยังไม่สมัครที่ใกล้เคียงกับใบขอนี้</p>
                     ) : (
                       <div className="space-y-2">
                         {buildIrecruitDisplayRows(
@@ -3508,7 +3534,7 @@ const MatchingPage: React.FC = () => {
                     )
                   ) : (
                     <p className="text-[11px] text-muted-foreground">
-                      กดค้นหาเพื่อดึงผู้สมัครที่ตรงจากฐาน iRecruit แล้วติ๊กเลือกส่ง AI โทรได้เลย
+                      กดค้นหาเพื่อดึงคนที่ยังไม่สมัครแต่คุณสมบัติตรง แล้วติ๊กเลือกส่ง AI โทรได้เลย
                     </p>
                   )}
                   {/* ⚠️ แถบเดียวกับข้างบนเป๊ะ — props ต้องเหมือนกันทุกตัว

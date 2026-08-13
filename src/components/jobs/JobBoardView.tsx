@@ -34,7 +34,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -529,6 +529,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
                       </span>
                       <div className="flex items-center gap-2">
+                        {/* ค้นหาคนที่ยังไม่สมัคร (เจ้าของสั่ง 13 ส.ค. 2569: "ขอปุ่มนี้ใน
+                            บอร์ดรับสมัครงาน ตามกล่องงานแต่ละงานด้วย") — พาไปหน้า Matching
+                            ของใบนั้นแล้วค้นให้เลยด้วย `?ir=1`
+                            ⚠️ ที่นี่ทำได้แค่ navigate เป็นสตริง **ห้าม import อะไรจาก
+                            pages/matching เข้าไฟล์นี้** เพราะไฟล์นี้ใช้ร่วมกับหน้าสมัคร
+                            สาธารณะ /apply (bundle ฝั่ง public จะบวมและลากโค้ดหลังบ้านไปด้วย)
+                            · อยู่ในบล็อก isStaff จึงไม่มีทางโผล่บนหน้าสาธารณะ */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/matching/match?jobId=${encodeURIComponent(job.id)}&ir=1`);
+                          }}
+                          title="เปิดใบขอนี้ในหน้า Matching แล้วค้นหาคนในฐานที่ยังไม่ได้สมัครงานนี้"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                          ค้นหาคนที่ยังไม่สมัคร
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {

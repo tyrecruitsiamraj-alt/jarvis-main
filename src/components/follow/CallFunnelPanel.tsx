@@ -85,7 +85,8 @@ export function FlowStage({
 const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> = [
   { id: 'follow', label: 'จากหน้านี้', hint: 'เฉพาะรายชื่อที่ลงไว้ในหน้า Follow' },
   { id: 'board', label: 'Job Offer', hint: 'ที่ส่งจากหน้า Matching (คนบนบอร์ด)' },
-  { id: 'irecruit', label: 'iRecruit', hint: 'ที่ส่งจากผลค้นหา iRecruit' },
+  // ป้ายคงชื่อระบบต้นทางไว้ (เป็นตัวกรอง "มาจากไหน") แต่คำอธิบายใช้ภาษาเดียวกับปุ่ม
+  { id: 'irecruit', label: 'iRecruit', hint: 'ที่ส่งจากผลค้นหาคนที่ยังไม่สมัคร' },
   { id: 'all', label: 'ทั้งหมด', hint: 'รวมทุกต้นทาง' },
 ];
 
