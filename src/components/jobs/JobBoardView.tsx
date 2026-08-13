@@ -273,6 +273,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             meta={loading ? undefined : `· ${filters.visibleCount.toLocaleString('th-TH')} ตำแหน่ง`}
             actions={
               <>
+                {/* ค้นหาอยู่ในแถบหัวเดียวกับชื่อหน้า+ปุ่ม แบบหน้า Dashboard
+                    (เจ้าของสั่ง 13 ส.ค. 2569: "ย้ายไปด้านบนแบบของหน้า Dashboard")
+                    — เดิมอยู่ใต้แผงตัวเลข 9 ช่อง ต้องกวาดตาลงไปหา
+                    ⚠️ เฉพาะมุมมอง "กล่องงาน" — แท็บอื่น (รายชื่อ/ติดต่อ/นัดหมาย) มีช่องค้นหา
+                    ของตัวเองใน RmWorkspace ถ้าโชว์ตัวนี้ด้วยจะมีสองช่องที่ค้นคนละเรื่อง */}
+                {view === 'board' ? (
+                  <SearchField
+                    compact
+                    placeholder={searchPlaceholder}
+                    value={filters.search}
+                    onChange={(e) => filters.setSearch(e.target.value)}
+                    wrapperClassName="w-full min-w-0 sm:w-72 lg:w-80"
+                  />
+                ) : null}
                 {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย */}
                 <RecruitBoardTools variant="onDark" />
                 {onRefresh ? (
@@ -318,18 +332,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         ) : null}
 
-        {/* ช่องค้นหาอยู่บนสุดแบบหน้า Dashboard (เจ้าของสั่ง 13 ส.ค. 2569 — เดิมจมอยู่ใน
-            กล่องตัวกรองใต้กล่องลอย ต้องเลื่อนหา) · เฉพาะเจ้าหน้าที่+มุมมองกล่องงาน
-            หน้าสาธารณะช่องค้นหาอยู่ที่เดิมในแถบตัวกรอง */}
-        {isStaff && view === 'board' ? (
-          <div className="mt-4">
-            <SearchField
-              placeholder={searchPlaceholder}
-              value={filters.search}
-              onChange={(e) => filters.setSearch(e.target.value)}
-            />
-          </div>
-        ) : null}
+        {/* ⚠️ ช่องค้นหาของเจ้าหน้าที่เคยอยู่ตรงนี้ (ใต้แผงตัวเลข 9 ช่อง) — ย้ายขึ้นไปอยู่ใน
+            แถบหัวข้าง ๆ ปุ่มแล้ว แบบหน้า Dashboard (เจ้าของสั่ง 13 ส.ค. 2569)
+            หน้าสาธารณะช่องค้นหายังอยู่ที่เดิมในแถบตัวกรอง — คนนอกไม่มีแถบหัวเข้ม */}
 
         {/* แท็บสลับมุมมอง (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด)
             เจ้าของสั่งเพิ่ม 13 ส.ค. 2569: ยก "การติดต่อ" กับ "ติดตามนัดหมาย" จากแท็บย่อย

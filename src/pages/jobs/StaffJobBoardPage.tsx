@@ -53,7 +53,9 @@ const StaffJobBoardPage: React.FC = () => {
         onRefresh={refetch}
         refreshing={refreshing}
         detailReturnTo="/jobs/board"
-        searchPlaceholder="ค้นหาชื่อหน่วยงาน, ที่อยู่, ตำแหน่ง, ลักษณะงานย่อย..."
+        // ช่องค้นหาย้ายไปอยู่ในแถบหัวแล้ว (แคบกว่าเดิม) — ข้อความยาวจะถูกตัดกลางคัน
+        // ค้นได้เหมือนเดิมทุกฟิลด์ (หน่วยงาน/ที่อยู่/ตำแหน่ง/ลักษณะงานย่อย) แค่ป้ายสั้นลง
+        searchPlaceholder="ค้นหาหน่วยงาน, ตำแหน่ง, ที่อยู่…"
         view={view}
         onViewChange={setView}
         listContent={
