@@ -32,3 +32,6 @@ dist-ssr
 
 # Machine-local mirror of .claude/skills (see AGENTS.md) — do not commit
 .agents/
+
+# ไฟล์สำรองก่อนล้างคิวโทร (มี person_ref ของผู้สมัครจริง) — เก็บไว้บนเครื่อง ห้าม commit
+lumos-queue-cancel-backup-*.json

@@ -327,6 +327,31 @@ reminder รับแค่ 7 ฟิลด์ตายตัว — ช่อง
 ⚠️ `new Intl.DateTimeFormat` ของ `speakableDate()` ประกาศระดับโมดูล (กติกาข้อ 10)
 มีเทสต์ความเร็ว 30,000 ครั้ง — ย้ายกลับเข้าฟังก์ชันแล้วช้าจาก 0.1 วิ เป็น 4.9 วิ
 
+### ล้างคิวโทรค้างเป็นชุด (`scripts/cancel-stale-lumos-queue.mts` · 13 ส.ค. 2569)
+
+เจ้าของเคาะ "ล้างทั้งหมด เริ่มใหม่" ก่อนเปิดใช้จริง — คิวค้าง 4,849 แถว = 140 คน
+อายุ 8–30 วัน ที่ Lumos รับไปแล้วแต่เงียบตั้งแต่ 4 ส.ค.
+
+```
+npx tsx scripts/cancel-stale-lumos-queue.mts --dry     # ค่าเริ่มต้น ดูอย่างเดียว
+npx tsx scripts/cancel-stale-lumos-queue.mts --apply   # ลงมือจริง
+```
+
+* ขอบเขต: `result is null and last_outcome is null and status <> 'cancelled'`
+  — **แถวที่มีผลโทรจริงห้ามแตะ** (เป็นประวัติ) · มี `--older-than-days N` ถ้าอยากล้างเฉพาะของเก่า
+* **ไม่ลบแถว** แค่ `status = 'cancelled'` (แพตเทิร์นเดียวกับ `cancelLumosQueueItem`)
+  → `SERVE_ELIGIBLE` ไม่รับ `cancelled` จึงไม่ถูกเสิร์ฟอีก · ตัวเลขบนแผงหน้าหลัก
+  (`waiting_call` / `delivered_waiting` / `stale_*` ใน `matching-flow-summary.ts`)
+  กรองด้วย `status in ('pending','delivered')` อยู่แล้ว จึงตกไปเองทั้งชุด
+* เขียนไฟล์สำรอง id + สถานะเดิมก่อนอัปเดตเสมอ (`lumos-queue-cancel-backup-<id>.json`
+  ที่ root · **อยู่ใน .gitignore** เพราะมี `person_ref` ของผู้สมัครจริง)
+
+⚠️ **ยกเลิกฝั่งเราไม่ได้เรียกสายคืนจาก Lumos** — แถวที่ `delivered` แล้วอยู่ในระบบเขา
+ต้องขอให้ทีมเขาล้างฝั่งเขาด้วย ไม่งั้นเขากลับมาเดินคิวเก่าเมื่อไหร่สายยังออกได้
+⚠️ **ตรวจ `followup_state` ก่อนล้างเสมอ** — แถวที่เป็น `retry_scheduled`/`needs_human`
+ถูกนับบนแผงโดย**ไม่ดู status** ยกเลิกแล้วเลขจะค้างโชว์ทั้งที่ไม่มีใครโทรอีก
+(รอบนี้วัดแล้วเป็น 0 ทุกแถวที่ล้าง จึงไม่เจอปัญหา — รอบหน้าอาจไม่ใช่)
+
 ### "เสนอทีละงาน" — หนึ่งเบอร์ = หนึ่งใบขอที่กำลังเสนอ
 
 `TAKE_PENDING_SQL` ใน `lumosDispatch.ts` (export ไว้ให้เทสต์อ่าน) · เทสต์ที่
