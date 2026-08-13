@@ -28,6 +28,8 @@ import {
 } from '@/lib/flowSummaryApi';
 import { jobPostingStatusLabel } from '@/lib/jobPostingRequestsApi';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
+import LumosCallHealthPanel from '@/components/home/LumosCallHealthPanel';
+import { lumosConnectRate } from '@/lib/lumosLinkHealth';
 
 
 /**
@@ -184,6 +186,9 @@ const HomePage: React.FC = () => {
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [flowLoading, setFlowLoading] = useState(true);
+  // เวลาที่ใช้คิด "Lumos เงียบมานานแค่ไหน" — ตั้งใหม่ทุกครั้งที่โหลดข้อมูล
+  // (ไม่ใช้ Date.now() ตอน render ตรง ๆ เพื่อให้เลขนิ่ง ไม่ขยับทุก re-render)
+  const [nowMs, setNowMs] = useState(() => Date.now());
   // กดชื่อคนในกล่องผลโทร → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
   const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
   // กดขั้น "ผลจากการโทร" → dialog 4 กล่อง (สนใจ/รอโทรซ้ำ/ต้องเร่งจัดการ/ไม่สนใจ) พร้อมชื่อคน
@@ -195,6 +200,7 @@ const HomePage: React.FC = () => {
     setFlowLoading(true);
     try {
       setFlow(await fetchFlowSummary());
+      setNowMs(Date.now());
     } catch {
       setFlow(null);
     } finally {
@@ -301,13 +307,20 @@ const HomePage: React.FC = () => {
                 label="ผลจากการโทร"
                 value={callResultsThisMonth(flow)}
                 sub={
-                  <span className="flex flex-wrap gap-x-1.5">
-                    <span className={TONE.success.onDark}>สนใจ {confirmedThisMonth(flow)}</span>
-                    <span className={TONE.danger.onDark}>ไม่สนใจ {flow.lumos.outcomes_month['declined'] ?? 0}</span>
-                    <span className={TONE.warn.onDark}>
-                      ไม่รับ {(flow.lumos.outcomes_month['no_answer'] ?? 0) + (flow.lumos.outcomes_month['unresponsive'] ?? 0)}
-                    </span>
-                  </span>
+                  /* ⚠️ เลขย่อยต้องบวกได้เท่าเลขใหญ่ — เดิมโชว์ 3 แบบ (สนใจ/ไม่สนใจ/ไม่รับ)
+                     แต่เลขใหญ่รวมผลทุกแบบ จึงบวกไม่เท่ากันจริง (เจอบนหน้าจอ: 0+1+14 ≠ 17)
+                     ตอนนี้แบ่งเป็น "คุยได้ / ไม่ติด" ซึ่งครอบคลุมทุก outcome เสมอ
+                     รายละเอียดครบทุกแบบดูได้ที่แผงผลโทรใต้แถบนี้ */
+                  (() => {
+                    const c = lumosConnectRate(flow.lumos.outcomes_month);
+                    return (
+                      <span className="flex flex-wrap gap-x-1.5">
+                        <span className={TONE.success.onDark}>สนใจ {confirmedThisMonth(flow)}</span>
+                        <span className={TONE.primary.onDark}>คุยได้ {c.connected}</span>
+                        <span className={TONE.warn.onDark}>ไม่ติด {c.unreached}</span>
+                      </span>
+                    );
+                  })()
                 }
                 tone="teal"
                 onClick={() => setCallResultsOpen(true)}
@@ -411,6 +424,16 @@ const HomePage: React.FC = () => {
               เพราะหลักการเดียวกับ "ผลจากการโทร": รายชื่อทั้งหมดย้ายเข้า dialog 4 กล่อง
               (กดที่ขั้น "ผลจากการโทร") · ใบด่วนค้าง → บรรทัดย่อยของ "ยังไม่มีคนแนะนำ" ·
               ค้างเกิน 2 วัน → ธงแดงใน dialog "ส่ง AI โทร" — ทุกตัวเลขมีที่ไป ไม่มีตัวไหนหาย */}
+
+          {/* แผงผลโทรจาก AI (เจ้าของสั่ง 13 ส.ค. 2569: "ดูว่าเขาส่งผลลัพมาไหม ส่งไปกี่คน
+              โทรไปกี่คน ผลเป็นยังไง") — วางใต้แถบการไหลของงานเพราะเป็นการซูมเข้าไปที่
+              ขั้น "ส่ง AI โทร → ผลจากการโทร" ของแถบนั้น ไม่ใช่เรื่องใหม่คนละเรื่อง */}
+          <LumosCallHealthPanel
+            flow={flow}
+            nowMs={nowMs}
+            onOpenWaiting={() => setActiveCallsOpen(true)}
+            onOpenResults={() => setCallResultsOpen(true)}
+          />
 
           {/* "โทรของฉัน" ย้ายมาจาก /matching/my-calls (เจ้าของสั่ง 13 ส.ค. 2569:
               "ย้ายไปรวมกับหน้าหลักแต่จัดวางให้ดูสวยๆ ไม่รก") — ตัว section ซ่อนตัวเอง

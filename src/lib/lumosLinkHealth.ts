@@ -38,10 +38,16 @@ function hoursBetween(fromIso: string | null | undefined, nowMs: number): number
   return Math.max(0, (nowMs - t) / 3_600_000);
 }
 
-function speakHours(h: number): string {
-  if (h < 1) return `${Math.max(1, Math.round(h * 60))} นาทีที่แล้ว`;
-  if (h < 48) return `${Math.round(h)} ชั่วโมงที่แล้ว`;
-  return `${Math.round(h / 24)} วันที่แล้ว`;
+/** ระยะเวลาเปล่า ๆ ("9 วัน") — ใช้ต่อท้ายคำอย่าง "เงียบมา" */
+function speakSpan(h: number): string {
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} นาที`;
+  if (h < 48) return `${Math.round(h)} ชั่วโมง`;
+  return `${Math.round(h / 24)} วัน`;
+}
+
+/** จุดเวลาในอดีต ("9 วันที่แล้ว") — ใช้กับ "ผลกลับล่าสุด …" */
+function speakAgo(h: number): string {
+  return `${speakSpan(h)}ที่แล้ว`;
 }
 
 /**
@@ -77,7 +83,7 @@ export function lumosLinkStatus(input: {
       return {
         level: 'stalled',
         label: 'ส่งแล้วแต่ยังไม่เคยมีผลกลับเลย',
-        detail: `รออยู่ ${pending.toLocaleString('th-TH')} สาย · เข้าคิวล่าสุด ${speakHours(hoursSinceSent)} — ควรเช็คกับทีม Lumos ว่ารับคิวไปหรือยัง`,
+        detail: `รออยู่ ${pending.toLocaleString('th-TH')} สาย · เข้าคิวล่าสุด ${speakAgo(hoursSinceSent)} — ควรเช็คกับทีม Lumos ว่ารับคิวไปหรือยัง`,
         tone: 'danger',
         hoursSinceResult: null,
       };
@@ -91,11 +97,11 @@ export function lumosLinkStatus(input: {
     };
   }
 
-  const since = speakHours(hoursSinceResult);
+  const since = speakAgo(hoursSinceResult);
   if (hoursSinceResult >= LUMOS_QUIET_HOURS && pending > 0) {
     return {
       level: 'stalled',
-      label: `เงียบมา ${since}`,
+      label: `เงียบมา ${speakSpan(hoursSinceResult)}`,
       detail: `ยังมี ${pending.toLocaleString('th-TH')} สายรออยู่แต่ไม่มีผลกลับเลย — ควรเช็คกับทีม Lumos`,
       tone: 'danger',
       hoursSinceResult,

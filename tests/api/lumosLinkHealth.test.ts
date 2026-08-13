@@ -28,6 +28,8 @@ describe('lumosLinkStatus — ตอบให้ได้ว่า Lumos ยั�
     expect(s.level).toBe('stalled');
     expect(s.tone).toBe('danger');
     expect(s.detail).toContain('25');
+    // ป้ายต้องเป็น "ระยะเวลา" ไม่ใช่ "จุดเวลา" — "เงียบมา 3 วันที่แล้ว" อ่านไม่รู้เรื่อง
+    expect(s.label).toBe('เงียบมา 3 วัน');
   });
 
   it('เงียบนานเท่ากันแต่ไม่มีใครรออยู่ → ไม่ใช่สายขาด (idle)', () => {
