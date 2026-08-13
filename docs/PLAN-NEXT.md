@@ -7,9 +7,9 @@
 + **ทางตัน 3 เรื่องที่ต้องเคาะ**) และ
 `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline (13 ส.ค. รอบเก้า):** test **939 ผ่าน/4 skip (109 ไฟล์)** ·
+**Baseline (13 ส.ค. รอบเก้า):** test **962 ผ่าน/4 skip (112 ไฟล์)** ·
 **tsc ต้องเป็น 0 ทั้งสาม config** · eslint 0 error/16 warning ·
-verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 081 แล้ว** ·
+verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 082 แล้ว** ·
 precompute **เปิดแล้ว** (.env.local — server จริงต้องใส่เองตอน deploy)
 
 ## 🎯 งานถัดไป (เรียงแล้ว — เคาะครบ ห้ามถามซ้ำ · ความรู้เต็มใน SESSION-HANDOFF §0.2–0.3)
@@ -21,10 +21,10 @@ precompute **เปิดแล้ว** (.env.local — server จริงต�
    · ⚠️ ชิป "ทำต่อเลย" บนการ์ดพูดว่า "มีคนสนใจ N — กดจองตัวเลย" อยู่แล้ว
      (`src/lib/matchingCardAction.ts`) แต่ยังไม่มีปุ่มจองรออยู่ปลายทาง
 2. **ระบบ Lead** — เคาะครบ: ปัดออกจาก**ทุกแท็บ** + ตัวกรอง "คลังสำรอง (Lead)" เรียกคืน
-   · **migration 082** (is_lead/lead_by/lead_at บน public_job_applications — แพตเทิร์น
-   เดียวกับ claim 079 เป๊ะ) ⚠️ เลข 080/081 ถูกใช้ไปแล้วในรอบเก้า
+   · **migration 083** (is_lead/lead_by/lead_at บน public_job_applications — แพตเทิร์น
+   เดียวกับ claim 079 เป๊ะ) ⚠️ เลข 080–082 ถูกใช้ไปแล้วในรอบเก้า
    · ปุ่มเก็บ/ลบ Lead ใน RmSearchBar ต่อจริง
-3. **เรียงคิวโทรตาม tier AI** — เคาะแล้วใช้ tier · ต้องคอลัมน์ match_rank + migration (083)
+3. **เรียงคิวโทรตาม tier AI** — เคาะแล้วใช้ tier · ต้องคอลัมน์ match_rank + migration (084)
    (แก้ ORDER BY ใน TAKE_PENDING_SQL · เทสต์ serve-one-per-phone 13 เคสคุมอยู่)
 4. **วันนัดจริงในแท็บติดตามนัดหมาย** — GET /api/candidate-interviews?all=1
    (⚠️ ตาราง candidate_interviews ตอนนี้ **ว่าง 0 แถว** — ทำแล้วคอลัมน์จะยังว่าง

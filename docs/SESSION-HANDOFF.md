@@ -11,13 +11,13 @@
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
 | commit ล่าสุด | `d762ba7` (รอบเก้า 13 ส.ค. — 14 commit · ดู §0.2) · ก่อนหน้า `c7e5b61` (รอบแปด 13 ส.ค. — 8 commit: drawer เหลือทางส่งโทร · ยุบแถบการไหลของงาน 4+4 การ์ด · โทรของฉันเข้าหน้าหลัก · แท็บบอร์ด 4 อัน · ค้นหาขึ้นบน+กล่องลอยลงล่าง · เก็บไปติดต่อเฉพาะของฉัน) |
-| `npm run test` | **939 ผ่าน / 4 skipped** (ไฟล์เทสต์ 109) |
+| `npm run test` | **962 ผ่าน / 4 skipped** (ไฟล์เทสต์ 112) |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error (ครอบ `src/`) |
 | `npx tsc --noEmit` | 0 error (**ไม่ครอบทั้ง src/ และ api/** — อย่าหลงว่าเช็คแล้ว) |
 | `npx tsc --noEmit -p tsconfig.api.json` | **0 error** (ครอบ `api/` · กติกา: **ต้องเป็น 0**) |
 | `npx eslint .` | 0 error · 16 warning เดิม |
 | `npx tsx scripts/verify-api-registry.mjs` | ผ่าน (**77 route**) |
-| migration | ไฟล์ถึง **081** · **บนฐานรันครบถึง 081 แล้ว** ✅ (079 = claim "เก็บไปติดต่อ" · 080 = ผ่อน unique ของคำขอโพสเป็น (ใบขอ, ประเภท) · 081 = `staff_phone` บน follow_entries) |
+| migration | ไฟล์ถึง **082** · **บนฐานรันครบถึง 082 แล้ว** ✅ (079 = claim "เก็บไปติดต่อ" · 080 = ผ่อน unique คำขอโพสเป็น (ใบขอ, ประเภท) · 081 = `staff_phone` บน follow_entries · 082 = `department_code` บนใบสมัคร = คลังกลาง) |
 | โหมดโทร | **manual ทุกจุด** — production ยังไม่โทรหาใครเอง |
 | precompute AI | **เปิดแล้ว** ✅ (เจ้าของเคาะ 12 ส.ค.) — `MATCH_PRECOMPUTE_ENABLED=true` ใน `.env.local` (git ignore) · ⚠️ **server จริงต้องใส่ใน `.env` เองตอน deploy** · precompute แค่คิดผลแมท ไม่โทรหาใคร |
 
@@ -82,6 +82,26 @@
 | **แผง "ผลโทรจาก AI (Lumos)" บนหน้าหลัก** | `src/components/home/LumosCallHealthPanel.tsx` + `src/lib/lumosLinkHealth.ts` (เทสต์ 17 เคส · mutation 2/2) · flow-summary เพิ่ม `last_result_at` / `last_sent_at` / `sent_month_people` / `attempts_month` / `stale_pending` / `retry_scheduled` |
 | ลิสต์ 9 ข้อหน้า Matching | หัวลิสต์เหลือ dropdown 2 อัน · ตัดข้อความ 5 ชุดที่สั่งเอาออก · กล่อง To do เป็น `<details>` · **ปุ่ม Content/Scraping ส่งอันไหนซ่อนอันนั้น** (ต้อง migration 080 + แก้ guard ฝั่ง server) |
 | ช่อง Follow → เบอร์เจ้าหน้าที่ | migration 081 `staff_phone` (คอลัมน์ใหม่ ไม่ทับ `note`) · ต่อท้ายบทที่ AI พูด "ติดต่อกลับได้ที่ …" |
+
+### งานช่วงท้ายรอบเก้า (`0116e47`–`61204ee`)
+
+| งาน | อยู่ไหน |
+|---|---|
+| ปุ่ม "ค้นหาคนที่ยังไม่สมัคร" | เปลี่ยนคำจาก "ค้นหา iRecruit" ทั้งกล่อง · **เพิ่มปุ่มที่การ์ดงานทุกใบบนบอร์ด** → `?jobId=..&ir=1` เปิดใบขอแล้วค้นให้เลย (effect ใหม่ใน MatchingPage รอ boardMatch ก่อนยิง + ล้าง `ir` ออกจาก URL กันยิงซ้ำ) |
+| ช่องค้นหาขึ้นแถบหัว | แบบหน้า Dashboard — อยู่แถวเดียวกับชื่อหน้า+ปุ่ม · เฉพาะมุมมอง "กล่องงาน" (แท็บอื่นมีช่องของ RmWorkspace เอง) |
+| **dialog กล่องงานพัง 500** | `?job_id=` ตายมาตั้งแต่ `c7e5b61` — `bind message supplies 2 parameters` · แยก `buildApplicationsListQuery()` เป็น pure + เทสต์ที่จำลองวิธีนับ param ของ pg |
+| dialog แยก 2 แท็บ | "รายชื่อผู้สมัครทั้งหมด" / "รายชื่อที่สนใจ" · ที่สนใจ = **ตอบสนใจตอนโทร** (`src/lib/applicantCallOutcome.ts`) · ผลโทรรวมสองแหล่ง AI+คน ผ่าน `api/_lib/applicantCallOutcomes.ts` (คีย์ = เบอร์ E.164) |
+| **คลังกลาง** | migration 082 `department_code` บนใบสมัคร → ใบขอปิดแล้วคนที่ล็อก BU ยังเห็น · คนตอบ "ไม่สนใจ" กลับเข้าแท็บรายชื่อผู้สมัคร (`isClosedByCallOutcome()`) |
+
+### ⚠️ กับดักเพิ่มจากช่วงนี้
+
+- **จำนวน param ที่ส่งลง pg ต้องเท่ากับ `$n` สูงสุดที่ SQL อ้างเป๊ะ** — push param
+  ไว้แต่ไม่ได้ใส่เงื่อนไขลง WHERE = `bind message supplies N parameters` แล้ว
+  **ทั้ง endpoint ตาย 500** ไม่ใช่แค่ผลลัพธ์เพี้ยน (เจ้าของเจอเอง "โหลดรายชื่อไม่สำเร็จ")
+- **`/api/public/apply` ห้ามยิง ERP และห้ามพังเพราะ schema** — เป็นเส้นสาธารณะ
+  ที่คนจริงกดส่งใบสมัคร · คอลัมน์ใหม่ต้องมี fallback insert เสมอ
+- **สิทธิ์ BU ที่คำนวณจาก "ใบขอที่เปิดอยู่" จะทำข้อมูลหายเมื่อใบขอปิด** — ของที่ต้อง
+  อยู่ถาวรต้องจำ BU ไว้กับตัวมันเอง ไม่ใช่ไปถามจากรายการที่เปลี่ยนตามเวลา
 
 **ของจริงที่เจอทันทีที่แผงขึ้น** (ข้อมูลบนฐาน): *"เงียบมา 9 วัน · ยังมี 3,276 สายรออยู่
 แต่ไม่มีผลกลับเลย"* — ผลกลับล่าสุด 4 ส.ค. 18:11 · ส่ง 1,496 แถว = **138 คน** ·
