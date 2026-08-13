@@ -29,6 +29,8 @@ type FollowRow = {
   recipient_phone: string;
   topic: string;
   note: string | null;
+  /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI บอกผู้สมัครไว้โทรกลับ (migration 081) */
+  staff_phone: string | null;
   scheduled_at: string | Date;
   created_by_name: string | null;
   cancelled_at: string | Date | null;
@@ -49,6 +51,7 @@ function toResponse(r: FollowRow) {
     recipient_phone: r.recipient_phone,
     topic: r.topic,
     note: r.note,
+    staff_phone: r.staff_phone ?? null,
     scheduled_at: iso(r.scheduled_at),
     created_by_name: r.created_by_name,
     created_at: iso(r.created_at),
@@ -88,6 +91,8 @@ export type ParsedFollowInput = {
   phone: string;
   topic: string;
   note: string | null;
+  /** เบอร์เจ้าหน้าที่ผู้ติดตาม — ไว้ให้ AI บอกผู้สมัครโทรกลับ ไม่ใช่เบอร์ที่ระบบโทรออก */
+  staffPhone: string | null;
   when: Date;
 };
 
@@ -107,6 +112,7 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   const phoneRaw = getString(body.recipient_phone) ?? '';
   const topic = getString(body.topic) ?? '';
   const note = getString(body.note) || null;
+  const staffPhoneRaw = getString(body.staff_phone) || '';
   const scheduledAt = getString(body.scheduled_at) ?? '';
 
   if (!name) return fail('กรุณากรอกชื่อผู้ที่ต้องติดตาม');
@@ -117,12 +123,23 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     return fail('เบอร์โทรไม่ถูกต้อง — ใช้เบอร์มือถือ 10 หลัก เช่น 0812345678');
   }
 
+  // ⚠️ เบอร์เจ้าหน้าที่เป็น **เบอร์ที่ AI พูดให้ฟัง** ไม่ใช่เบอร์ที่ระบบโทรออก
+  // จึงไม่บังคับรูปแบบ E.164 (เบอร์บ้าน/เบอร์ต่อภายในก็ใช้ได้) แต่ต้องมีตัวเลขจริง
+  // ไม่งั้นผู้สมัครจะได้ยินข้อความที่โทรกลับไม่ได้
+  let staffPhone: string | null = null;
+  if (staffPhoneRaw) {
+    if ((staffPhoneRaw.match(/\d/g) ?? []).length < 8) {
+      return fail('เบอร์เจ้าหน้าที่ไม่ถูกต้อง — ใส่เบอร์ที่ผู้สมัครโทรกลับได้จริง');
+    }
+    staffPhone = staffPhoneRaw;
+  }
+
   const when = scheduledAt ? new Date(scheduledAt) : now;
   if (Number.isNaN(when.getTime())) {
     return fail('วันเวลาที่ให้โทรไม่ถูกต้อง');
   }
 
-  return { error: null, value: { name, phone, topic, note, when } };
+  return { error: null, value: { name, phone, topic, note, staffPhone, when } };
 }
 
 async function createFollow(req: AuthedReq, res: ApiRes) {
@@ -130,14 +147,14 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   if (parsed.error || !parsed.value) {
     return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
   }
-  const { name, phone, topic, note, when } = parsed.value;
+  const { name, phone, topic, note, staffPhone, when } = parsed.value;
 
   const { rows } = await dbQuery<FollowRow>(
     `insert into ${followTable}
-       (recipient_name, recipient_phone, topic, note, scheduled_at, created_by, created_by_name)
-     values ($1, $2, $3, $4, $5, $6, $7)
+       (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at, created_by, created_by_name)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
      returning *`,
-    [name, phone, topic, note, when.toISOString(), req.user.sub, req.user.email],
+    [name, phone, topic, note, staffPhone, when.toISOString(), req.user.sub, req.user.email],
   );
   const created = rows[0];
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
@@ -151,6 +168,7 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
       recipient_phone: phone,
       topic,
       note,
+      staffPhone,
       scheduled_at: when,
     });
   }

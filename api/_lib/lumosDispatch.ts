@@ -636,11 +636,18 @@ export type FollowEntryInput = {
   recipient_phone: string;
   topic: string;
   note?: string | null;
+  /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI พูดให้ผู้สมัครโทรกลับ (ไม่ใช่เบอร์ที่ระบบโทรออก) */
+  staffPhone?: string | null;
   scheduled_at: Date;
 };
 
 export function buildFollowReminderPayload(entry: FollowEntryInput): LumosReminderPayload {
   const note = (entry.note || '').trim();
+  const staffPhone = (entry.staffPhone || '').trim();
+  // ⚠️ schema ของ Lumos ไม่มีช่องใส่เบอร์ติดต่อกลับ — ช่องเดียวที่ถึงหูผู้สมัครคือ
+  // `steps[].message` (ดู docs/lumos-api.md · ห้ามเพิ่มฟิลด์ใหม่เข้า payload
+  // เพราะเราคุมฝั่ง Lumos ไม่ได้) จึงต่อเข้าไปในบทพูดแทน
+  const parts = [entry.topic, note, staffPhone ? `ติดต่อกลับได้ที่ ${staffPhone}` : ''].filter(Boolean);
   return {
     client_contact_id: `follow::${entry.id}`,
     recipient_name: entry.recipient_name,
@@ -651,7 +658,7 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
     steps: [
       {
         type: 'follow_up',
-        message: note ? `${entry.topic} — ${note}` : entry.topic,
+        message: parts.join(' — '),
         scheduled_at: entry.scheduled_at.toISOString(),
       },
     ],

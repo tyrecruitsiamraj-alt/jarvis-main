@@ -9,6 +9,8 @@ export type FollowEntry = {
   recipient_phone: string;
   topic: string;
   note: string | null;
+  /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI บอกผู้สมัครไว้โทรกลับ */
+  staff_phone?: string | null;
   scheduled_at: string | null;
   created_by_name: string | null;
   created_at: string | null;
@@ -24,6 +26,7 @@ export type NewFollowEntry = {
   recipient_phone: string;
   topic: string;
   note?: string;
+  staff_phone?: string;
   scheduled_at?: string;
 };
 

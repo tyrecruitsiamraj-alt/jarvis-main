@@ -62,6 +62,8 @@ const FollowPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [topic, setTopic] = useState('');
   const [note, setNote] = useState('');
+  /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI พูดให้ผู้สมัครโทรกลับ (เจ้าของสั่ง 13 ส.ค. 2569) */
+  const [staffPhone, setStaffPhone] = useState('');
   /** ให้โทรเมื่อไหร่ — หลายรอบได้ เพราะบางเคสต้องโทรมากกว่า 1 ครั้ง (เจ้าของสั่ง 10 ส.ค. 2569) */
   const [scheduledAts, setScheduledAts] = useState<string[]>(() => [nowForInput()]);
   const [submitting, setSubmitting] = useState(false);
@@ -94,6 +96,7 @@ const FollowPage: React.FC = () => {
     setPhone('');
     setTopic('');
     setNote('');
+    setStaffPhone('');
     setScheduledAts([nowForInput()]);
     setFormError(null);
   };
@@ -132,6 +135,7 @@ const FollowPage: React.FC = () => {
           recipient_phone: phone,
           topic,
           note: note || undefined,
+          staff_phone: staffPhone || undefined,
           scheduled_at: new Date(t).toISOString(),
         });
         done += 1;
@@ -313,17 +317,24 @@ const FollowPage: React.FC = () => {
                 className="jarvis-soft-field min-h-[46px]"
               />
             </div>
+            {/* เจ้าของสั่ง 13 ส.ค. 2569: เปลี่ยนช่อง "รายละเอียดเพิ่มเติม" เป็นเบอร์เจ้าหน้าที่
+                — ผู้สมัครที่รับสายจาก AI ต้องมีเบอร์คนจริงให้โทรกลับ
+                ⚠️ เก็บเป็นคอลัมน์ใหม่ (staff_phone) ไม่ทับ note เดิมซึ่งคนละความหมาย */}
             <div className="space-y-1.5">
-              <label htmlFor="followNote" className="ml-1 text-xs font-medium text-muted-foreground">
-                รายละเอียดเพิ่มเติม (ถ้ามี)
+              <label htmlFor="followStaffPhone" className="ml-1 text-xs font-medium text-muted-foreground">
+                เบอร์โทรเจ้าหน้าที่ที่ติดตาม (ถ้ามี)
               </label>
               <input
-                id="followNote"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="ข้อความที่อยากให้ AI พูดเพิ่ม"
+                id="followStaffPhone"
+                value={staffPhone}
+                onChange={(e) => setStaffPhone(e.target.value)}
+                inputMode="tel"
+                placeholder="เบอร์ที่ให้ผู้สมัครโทรกลับ เช่น 021234567 ต่อ 101"
                 className="jarvis-soft-field min-h-[46px]"
               />
+              <p className="ml-1 text-[10px] text-muted-foreground">
+                AI จะบอกเบอร์นี้ตอนท้ายสาย — ไม่ใช่เบอร์ที่ระบบใช้โทรออก
+              </p>
             </div>
 
             {/* ให้โทรเมื่อไหร่ — เพิ่มได้หลายรอบ · หนึ่งรอบ = หนึ่งรายการในคิว มีสถานะ/ผลของตัวเอง */}
@@ -475,6 +486,9 @@ const FollowPage: React.FC = () => {
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       ให้โทร {formatWhen(it.scheduled_at)}
                       {it.created_by_name ? ` · ลงโดย ${it.created_by_name}` : ''}
+                      {/* เบอร์ที่ AI บอกให้ผู้สมัครโทรกลับ — ต้องเห็นได้ในรายการ
+                          ไม่งั้นเจ้าหน้าที่ตอบไม่ได้ว่าสายที่โทรเข้ามาบอกเบอร์ใครไป */}
+                      {it.staff_phone ? ` · โทรกลับ ${it.staff_phone}` : ''}
                     </p>
                     {it.call_outcome || it.call_summary ? (
                       <p className="mt-1.5 rounded-lg bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700">
