@@ -807,7 +807,8 @@ const MatchingPage: React.FC = () => {
   const [lumosExpandedRef, setLumosExpandedRef] = useState<string | null>(null);
   const [lumosCancellingRef, setLumosCancellingRef] = useState<string | null>(null);
   // หน้าต่างเลือกคนจาก pool "คนของเรา" — ใช้ตอนมีคนเพิ่มเข้ามาทีหลังแล้วใบขอด่วน
-  // (auto-send ส่งเฉพาะคนที่อยู่ในผล AI แมทตอนนั้น คนเพิ่มใหม่ต้องดันเข้าคิวเอง)
+  // (รายชื่อในใบคือผลแมทรอบล่าสุด คนที่เพิ่งเข้าฐานทีหลังยังไม่อยู่ในนั้น
+  //  ต้องค้นจาก pool แล้วดันเข้าคิวเอง — ไม่ใช่เพราะ auto-send เพราะโหมด auto ปิดอยู่ทุกจุด)
   const [lumosPickerOpen, setLumosPickerOpen] = useState(false);
   const [lumosPool, setLumosPool] = useState<LumosPoolCandidate[]>([]);
   const [lumosPoolLoading, setLumosPoolLoading] = useState(false);
@@ -913,15 +914,17 @@ const MatchingPage: React.FC = () => {
   const approveAllCount = approveAllTargets.board.length + approveAllTargets.irecruit.length;
 
   /**
-   * กดอนุมัติทั้งใบ = ติ๊กให้ครบแล้วเปิดหน้าต่างยืนยันตัวเดิม
+   * "ส่งทั้งหมดที่แมท" = ติ๊กให้ครบแล้วเข้าเส้นทางส่งเส้นเดียวกับการติ๊กเอง
    * ⚠️ **ต้องผ่านหน้าต่างยืนยันเสมอ** — ปุ่มนี้ยิงสายจริงทีเดียวหลายสิบคน
    * หน้าต่างนั้นโชว์รายชื่อ+เบอร์ทุกคนและเตือนว่า "AI จะโทรหาคนเหล่านี้จริง" อยู่แล้ว
+   * ⚠️ ส่ง targets.board เข้า beginSendFlow ตรง ๆ — state เพิ่งถูก set ใน tick นี้
+   * ยังอ่านค่าใหม่ไม่ได้ (เดิมข้าม beginSendFlow ไปเลย จึงไม่มี popup เลือกงานเพิ่ม)
    */
   const approveWholeJob = () => {
     if (approveAllCount === 0) return;
     setLumosSelectedBoard(approveAllTargets.board);
     setLumosSelectedIrecruit(approveAllTargets.irecruit);
-    setLumosConfirmOpen(true);
+    beginSendFlow(approveAllTargets.board);
   };
 
   /** ชื่อ/เบอร์ของ card_id ที่เลือก — หาจากผลแมทก่อน ไม่เจอค่อยดูใน pool (คนเพิ่มใหม่) */
@@ -1035,8 +1038,13 @@ const MatchingPage: React.FC = () => {
    * ให้เลือกก่อนว่าจะส่งไปงานไหนบ้าง (เจ้าของสั่ง 12 ส.ค. 2569)
    * ไม่มีใครแมทหลายงาน = ข้ามไปหน้าต่างยืนยันเลยเหมือนเดิม
    */
-  const beginSendFlow = () => {
-    const multi = lumosSelectedBoard.filter(
+  /**
+   * ⚠️ รับ boardIds เข้ามาได้ เพราะ "ส่งทั้งหมดที่แมท" เพิ่งเรียก setLumosSelectedBoard
+   * ใน tick เดียวกัน — อ่านจาก state ตรง ๆ จะได้ค่าเก่า (stale) แล้วข้าม popup
+   * "คนนี้แมทหลายงาน" ทั้งที่เป็นทางที่เจอเคสนั้นบ่อยที่สุด
+   */
+  const beginSendFlow = (boardIds: number[] = lumosSelectedBoard) => {
+    const multi = boardIds.filter(
       (cardId) => (jobMatchesByCard[String(cardId)] ?? []).length >= 2,
     );
     if (multi.length === 0) {
@@ -2958,12 +2966,16 @@ const MatchingPage: React.FC = () => {
                 </p>
               ) : null}
 
-              {/* ใบขอด่วน + มีคนเพิ่มเข้า pool ทีหลัง → ดันเข้าคิวโทรเองได้ ไม่ต้องรอ AI แมทรอบใหม่ */}
+              {/* ใบขอด่วน + มีคนเพิ่มเข้า pool ทีหลัง → ดันเข้าคิวโทรเองได้ ไม่ต้องรอ AI แมทรอบใหม่
+                  ⚠️ ข้อความเดิมบอกว่า "ถูกส่ง AI โทรอัตโนมัติแล้ว" ซึ่งไม่จริง —
+                  โหมด auto ปิดอยู่ทุกจุด (manual ทุกทางตามที่เจ้าของเคาะ) ไม่มีใครถูกโทร
+                  จนกว่าจะมีคนกดส่งเอง · ตัวเลขข้างล่างคือ 6 ช่องชุดเดียวกับบนการ์ด */}
               <div className="space-y-1.5 rounded-xl border border-sky-200 bg-white/70 dark:bg-white/5 px-3 py-2 dark:border-sky-800">
                 <LumosJobSummaryStats s={summarizeLumosCallStatus(Object.values(lumosStatusByRef))} />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-slate-600 dark:text-slate-300">
-                  คนที่ AI แนะนำถูกส่ง AI โทรอัตโนมัติแล้ว — ถ้ามีคนเพิ่มเข้ามาทีหลังและใบขอด่วน เลือกส่งเองได้
+                  รายชื่อด้านล่างคือผลแมทรอบล่าสุด — คนที่เพิ่งเข้าฐานทีหลังยังไม่อยู่ในนั้น
+                  กดปุ่มนี้เพื่อค้นจากคนของเราทั้งหมดแล้วเลือกส่งเอง
                 </p>
                 <button
                   type="button"
