@@ -7,9 +7,9 @@
 + **ทางตัน 3 เรื่องที่ต้องเคาะ**) และ
 `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
 
-**Baseline (13 ส.ค. รอบสิบ):** test **983 ผ่าน/4 skip (111 ไฟล์)** ·
+**Baseline (14 ส.ค. รอบสิบเอ็ด):** test **1,009 ผ่าน/4 skip (113 ไฟล์)** ·
 **tsc ต้องเป็น 0 ทั้งสาม config** · eslint 0 error/16 warning ·
-verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 082 แล้ว** ·
+verify-api-registry ผ่าน (**77 route**) · migration **บนฐานถึง 083 แล้ว** ·
 precompute **เปิดแล้ว** (.env.local — server จริงต้องใส่เองตอน deploy)
 
 ## 🔴 มีหมุดวันเปิดใช้จริงแล้ว — อ่าน `docs/ROADMAP.md` ก่อน
@@ -31,10 +31,11 @@ precompute **เปิดแล้ว** (.env.local — server จริงต�
    · ⚠️ **ยังเหลือ**: ตัวจัดการใน MatchingPage (`openIrecruitProposalAction` ฯลฯ)
      ยังไม่มีใครเรียก — ปุ่มจองใน drawer ยังไม่ได้เอากลับ (เจ้าของสั่งถอดไว้รอบแปด)
      ถ้าอยากได้ปุ่มจองใน drawer ด้วยต้องสั่ง
-2. **ระบบ Lead** — เคาะครบ: ปัดออกจาก**ทุกแท็บ** + ตัวกรอง "คลังสำรอง (Lead)" เรียกคืน
-   · **migration 083** (is_lead/lead_by/lead_at บน public_job_applications — แพตเทิร์น
-   เดียวกับ claim 079 เป๊ะ) ⚠️ เลข 080–082 ถูกใช้ไปแล้วในรอบเก้า
-   · ปุ่มเก็บ/ลบ Lead ใน RmSearchBar ต่อจริง
+2. ~~**ระบบ Lead**~~ ✅ **ทำแล้ว 14 ส.ค. 2569** · **migration 083 รันบนฐานแล้ว**
+   · ปัดแล้วหายจากทุกแท็บ (กรองที่คิวรีฝั่ง server ไม่ใช่ที่หน้าเว็บ)
+   · ปุ่ม "ดูคลังสำรอง (Lead)" → `?lead=1` · ในคลังสำรองปุ่ม "เก็บ Lead" ซ่อน เหลือ "ลบ Lead"
+   · ตรรกะล้วน `src/lib/recruitLead.ts` (เทสต์ 10 เคส · mutation 6/6)
+   · ตรวจกับฐานจริงครบวง (seed ZZ 2 ใบ → ปัด → หาย → คลังสำรองเห็น → เรียกคืน → ลบคืน 0 แถว)
 3. **เรียงคิวโทรตาม tier AI** — เคาะแล้วใช้ tier · ต้องคอลัมน์ match_rank + migration (084)
    (แก้ ORDER BY ใน TAKE_PENDING_SQL · เทสต์ serve-one-per-phone 13 เคสคุมอยู่)
 4. **วันนัดจริงในแท็บติดตามนัดหมาย** — GET /api/candidate-interviews?all=1

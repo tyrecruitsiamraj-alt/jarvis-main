@@ -1,8 +1,9 @@
 import React from 'react';
-import { UserPlus, BookmarkPlus, PhoneCall, Trash2 } from 'lucide-react';
+import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DASH } from '@/lib/designTokens';
+import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
+import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 
 /**
  * แถวค้นหา + เครื่องมือ — ตาม HTML ของระบบเดิม
@@ -28,6 +29,11 @@ const RmSearchBar: React.FC<{
   /** "ดึงเข้าถังโทร" ทีละหลายคน (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: ดึงเก็บไป = call hold) */
   onHoldSelected?: () => void;
   holdingSelected?: boolean;
+  /** กำลังยิงเก็บ/ลบ Lead อยู่ — ปิดปุ่มกันกดซ้อน (ยิงทีละใบหลายใบพร้อมกัน) */
+  leadBusy?: boolean;
+  /** อยู่ในมุมมอง "คลังสำรอง (Lead)" อยู่ไหม — สลับป้ายปุ่มและตัวที่เน้น */
+  leadView?: boolean;
+  onToggleLeadView?: () => void;
 }> = ({
   keyword,
   onKeywordChange,
@@ -39,6 +45,9 @@ const RmSearchBar: React.FC<{
   onAddApplicant,
   onHoldSelected,
   holdingSelected = false,
+  leadBusy = false,
+  leadView = false,
+  onToggleLeadView,
 }) => (
   <div className="flex flex-wrap items-center gap-2">
     <SearchField
@@ -82,25 +91,53 @@ const RmSearchBar: React.FC<{
       <>
         {/* ⚠️ ทำกับ "แถวที่ติ๊กไว้" — ปิดไว้ตอนยังไม่ได้ติ๊ก · ระบบเดิมกดได้ตลอด
             แล้วเงียบเมื่อไม่ได้เลือก ซึ่งอ่านไม่ออกว่าทำงานไหม */}
-        <button
-          type="button"
-          onClick={onSaveLead}
-          disabled={selectedCount === 0}
-          title={selectedCount === 0 ? 'ติ๊กเลือกแถวก่อน' : `เก็บ ${selectedCount} รายการเข้า Lead`}
-          className="jarvis-btn-primary shrink-0 disabled:opacity-50"
-        >
-          <BookmarkPlus className="h-3.5 w-3.5" aria-hidden /> เก็บ Lead
-          {selectedCount > 0 ? ` (${selectedCount})` : ''}
-        </button>
+        {/* อยู่คลังสำรองแล้วปุ่ม "เก็บ Lead" ไม่มีความหมาย (ทุกแถวเป็น Lead อยู่แล้ว)
+            — ซ่อนไปเลยดีกว่าปุ่มที่กดแล้วไม่เกิดอะไร */}
+        {!leadView ? (
+          <button
+            type="button"
+            onClick={onSaveLead}
+            disabled={selectedCount === 0 || leadBusy}
+            title={
+              selectedCount === 0
+                ? 'ติ๊กเลือกแถวก่อน'
+                : `ปัด ${selectedCount} รายการเข้าคลังสำรอง — หายจากรายชื่อทำงานทุกแท็บ`
+            }
+            className="jarvis-btn-primary shrink-0 disabled:opacity-50"
+          >
+            <BookmarkPlus className="h-3.5 w-3.5" aria-hidden />
+            {leadBusy ? 'กำลังเก็บ…' : 'เก็บ Lead'}
+            {selectedCount > 0 ? ` (${selectedCount})` : ''}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onDeleteLead}
-          disabled={selectedCount === 0}
-          title={selectedCount === 0 ? 'ติ๊กเลือกแถวก่อน' : `เอา ${selectedCount} รายการออกจาก Lead`}
+          disabled={selectedCount === 0 || leadBusy}
+          title={
+            selectedCount === 0
+              ? 'ติ๊กเลือกแถวก่อน'
+              : `เรียก ${selectedCount} รายการกลับเข้ารายชื่อทำงาน`
+          }
           className="jarvis-btn-secondary shrink-0 disabled:opacity-50"
         >
-          <Trash2 className="h-3.5 w-3.5" aria-hidden /> ลบ Lead
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          {leadBusy ? 'กำลังลบ…' : 'ลบ Lead'}
+          {leadView && selectedCount > 0 ? ` (${selectedCount})` : ''}
         </button>
+        {onToggleLeadView ? (
+          <button
+            type="button"
+            onClick={onToggleLeadView}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold',
+              leadView ? TONE.violet.solid : cn(TONE.violet.soft, TONE.violet.value, TONE.violet.softHover),
+            )}
+          >
+            <Archive className="h-3.5 w-3.5" aria-hidden />
+            {leadView ? LEAD_VIEW_LABEL.exit : LEAD_VIEW_LABEL.enter}
+          </button>
+        ) : null}
       </>
     ) : null}
   </div>

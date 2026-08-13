@@ -33,8 +33,14 @@ import {
 } from '@/lib/recruitRm';
 import {
   fetchAllJobApplications,
+  setJobApplicationLead,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import {
+  LEAD_VIEW_HINT,
+  summarizeLeadUpdate,
+  type LeadUpdateResult,
+} from '@/lib/recruitLead';
 import {
   acquireCallHold,
   fetchCallHoldsByPhones,
@@ -106,16 +112,60 @@ const RmWorkspace: React.FC<{
   /** ล็อกโทรของแถวในหน้า (คีย์ = application id) — โชว์ 🔒 + กันกดซ้ำ */
   const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
   const [holdingSelected, setHoldingSelected] = useState(false);
+  /**
+   * มุมมอง "คลังสำรอง (Lead)" — ใบที่ถูกปัดออกจากรายชื่อทำงาน
+   * เก็บใน `?lead=1` เพื่อให้ refresh/แชร์ลิงก์แล้วยังอยู่มุมมองเดิม (แพตเทิร์นเดียวกับ ?tab=)
+   * ⚠️ การกรองอยู่ฝั่ง server — ลิสต์ปกติไม่เคยมีแถว Lead ติดมาให้ต้องกรองซ้ำ
+   */
+  const leadView = searchParams.get('lead') === '1';
+  const [leadBusy, setLeadBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
     setLoadError(null);
-    fetchAllJobApplications()
+    fetchAllJobApplications(leadView)
       .then(setRows)
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้สมัครไม่สำเร็จ'))
       .finally(() => setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(load, [leadView]);
+
+  /** สลับมุมมอง — ต้องคง query param อื่นไว้ (`?view=` ของบอร์ด · `?tab=` · `?list=`) */
+  const setLeadView = (on: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (on) next.set('lead', '1');
+    else next.delete('lead');
+    setSearchParams(next, { replace: true });
+    setSelectedIds([]);
+    setPage(1);
+    setNotice(null);
+  };
+
+  /**
+   * เก็บ/ลบ Lead เป็นชุด — ยิงทีละใบแล้วสรุปผลรวม (ไม่มี endpoint bulk)
+   * ⚠️ ล้มบางใบต้องรายงาน ไม่ใช่กลืน (summarizeLeadUpdate มีเทสต์คุม)
+   */
+  const applyLead = async (lead: boolean) => {
+    if (selectedIds.length === 0 || leadBusy) return;
+    setLeadBusy(true);
+    setNotice(null);
+    const results: LeadUpdateResult[] = await Promise.all(
+      selectedIds.map((id) =>
+        setJobApplicationLead(id, lead)
+          .then((): LeadUpdateResult => ({ ok: true }))
+          .catch(
+            (e): LeadUpdateResult => ({
+              ok: false,
+              message: e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ',
+            }),
+          ),
+      ),
+    );
+    setNotice(summarizeLeadUpdate(results, lead).message);
+    setSelectedIds([]);
+    setLeadBusy(false);
+    load();
+  };
 
   const provinces = useMemo(() => provincesFromApplications(rows), [rows]);
 
@@ -367,8 +417,11 @@ const RmWorkspace: React.FC<{
                 onSearch={() => setPage(1)}
                 showLeadTools={rmTabHasLeadTools(tab)}
                 selectedCount={selectedIds.length}
-                onSaveLead={() => todo(`เก็บ ${selectedIds.length} รายการเข้า Lead`)}
-                onDeleteLead={() => todo(`ลบ ${selectedIds.length} รายการออกจาก Lead`)}
+                onSaveLead={() => void applyLead(true)}
+                onDeleteLead={() => void applyLead(false)}
+                leadBusy={leadBusy}
+                leadView={leadView}
+                onToggleLeadView={() => setLeadView(!leadView)}
                 onAddApplicant={() => setAddOpen(true)}
                 onHoldSelected={() => void holdSelectedForSelf()}
                 holdingSelected={holdingSelected}
@@ -379,6 +432,13 @@ const RmWorkspace: React.FC<{
           {notice ? (
             <p className={cn('rounded-xl border px-3 py-2 text-[12px]', TONE.warn.soft, TONE.warn.value)}>
               {notice}
+            </p>
+          ) : null}
+
+          {/* อยู่คลังสำรองต้องบอกให้รู้ตัว ไม่งั้นอ่านว่า "รายชื่อหายไปไหนหมด" */}
+          {leadView ? (
+            <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.violet.soft, TONE.violet.value)}>
+              {LEAD_VIEW_HINT}
             </p>
           ) : null}
 

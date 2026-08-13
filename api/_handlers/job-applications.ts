@@ -67,6 +67,9 @@ type Row = {
   claimed_by: string | null;
   claimed_by_name: string | null;
   claimed_at: string | Date | null;
+  is_lead: boolean | null;
+  lead_by_name: string | null;
+  lead_at: string | Date | null;
 };
 
 function toNum(v: string | number | null): number | undefined {
@@ -94,6 +97,11 @@ function toApplication(r: Row, viewerId?: string) {
     claimed,
     claimed_by_me: mine,
     claimed_by_name: mine ? (r.claimed_by_name ?? undefined) : undefined,
+    // Lead เป็นสถานะระดับระบบ (ไม่ใช่ของใครคนหนึ่ง) — ชื่อคนปัดจึงส่งให้ทุกคนเห็นได้
+    // ต่างจาก claim ที่เจ้าของสั่งว่า "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป"
+    is_lead: Boolean(r.is_lead),
+    lead_by_name: r.lead_by_name ?? undefined,
+    lead_at: r.lead_at ? toIso(r.lead_at) : undefined,
     id: r.id,
     full_name: r.full_name,
     title_prefix: r.title_prefix || undefined,
@@ -139,7 +147,27 @@ const LIST_COLUMNS = `
   job_id, job_title, unit_name, position_interest, note, status, admin_note,
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
-  claimed_by, claimed_by_name, claimed_at
+  claimed_by, claimed_by_name, claimed_at,
+  is_lead, lead_by_name, lead_at
+`;
+
+/**
+ * ชุดคอลัมน์แบบรัน 074+079 แล้วแต่**ยังไม่รัน 083** (คอลัมน์ Lead)
+ *
+ * ⚠️ ต้องมีชั้นนี้แยก ไม่ใช่ถอยไปชั้นล่างสุด — ฐานแต่ละ environment อยู่คนละอายุ
+ * (ตอนเขียน 083: local รันครบ · server จริงยังไม่รันแม้แต่ 080) ถอยข้ามชั้น
+ * จะ null ฟิลด์ 079 ที่ฐานมีข้อมูลจริงทิ้ง — กับดักเดิมจากตอนเขียน 079 เป๊ะ
+ */
+const LIST_COLUMNS_NO_LEAD = `
+  id, full_name, title_prefix, first_name, last_name, phone, age, gender,
+  province, district, subdistrict, postal_code,
+  weight_kg, height_cm, education, referral_source,
+  document_filename, document_mime, (document_bytes is not null) as has_document,
+  job_id, job_title, unit_name, position_interest, note, status, admin_note,
+  line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
+  created_at,
+  claimed_by, claimed_by_name, claimed_at,
+  false as is_lead, null::text as lead_by_name, null::timestamptz as lead_at
 `;
 
 /**
@@ -155,7 +183,8 @@ const LIST_COLUMNS_NO_CLAIM = `
   job_id, job_title, unit_name, position_interest, note, status, admin_note,
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
-  null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at
+  null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
+  false as is_lead, null::text as lead_by_name, null::timestamptz as lead_at
 `;
 
 /**
@@ -175,7 +204,8 @@ const LIST_COLUMNS_LEGACY = `
   null::text as line_id, null::text as specific_type, null::text as responsible_name,
   null::text as channel_label, null::text[] as license_types, null::text as created_by_name,
   created_at,
-  null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at
+  null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
+  false as is_lead, null::text as lead_by_name, null::timestamptz as lead_at
 `;
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */
@@ -208,7 +238,18 @@ export function buildApplicationsListQuery(input: {
   viewerId: string;
   /** รหัสแผนกของผู้ใช้ (null = เห็นทุกแผนก) — ใช้คู่กับ department_code บนใบสมัคร */
   viewerDepartment?: string | null;
-}): { sql: string; params: unknown[]; claimWhere: string; legacyClaimWhere: string } {
+  /**
+   * `?lead=1` — ดู **คลังสำรอง (Lead)** แทนรายชื่อทำงาน (เจ้าของเคาะ 12 ส.ค. 2569:
+   * "ปัดแล้วหายจากทุกแท็บ + มีตัวกรองเรียกคืนดู") · ไม่ส่ง = ลิสต์ปกติที่ซ่อน Lead
+   */
+  leadView?: boolean;
+}): {
+  sql: string;
+  params: unknown[];
+  claimWhere: string;
+  legacyClaimWhere: string;
+  leadWhere: string;
+} {
   const { jobId, scopedJobIds, viewerId, viewerDepartment } = input;
   const params: unknown[] = [];
   const conds: string[] = [];
@@ -239,12 +280,22 @@ export function buildApplicationsListQuery(input: {
     legacyClaimWhere = `($${params.length} = $${params.length})`;
     conds.push('{{claimWhere}}');
   }
+  /**
+   * ⚠️ **Lead ซ่อนทุกแท็บ ไม่ใช่แค่แท็บเดียว** — แท็บของหน้า RM เป็นตัวกรองฝั่งหน้าเว็บ
+   * ที่หั่นลิสต์ก้อนเดียวกัน จึงต้องกรองที่ต้นทาง (คิวรีนี้) ไม่ใช่ที่ตัวกรองแต่ละแท็บ
+   *
+   * ⚠️ เงื่อนไขนี้ **ไม่มี param** โดยตั้งใจ — ชุด legacy จึงแทนด้วย `true` ได้ตรง ๆ
+   * ไม่ต้องทำ no-op ที่อ้าง param เหมือน claimWhere (กติกา "ส่ง param เท่ากับที่อ้าง")
+   */
+  const leadWhere = input.leadView ? 'is_lead' : 'not is_lead';
+  conds.push('{{leadWhere}}');
   return {
     sql: `select {{cols}} from ${tbl} ${conds.length ? `where ${conds.join(' and ')}` : ''}
         order by created_at desc limit 500`,
     params,
     claimWhere,
     legacyClaimWhere,
+    leadWhere,
   };
 }
 
@@ -255,31 +306,42 @@ async function queryWithLegacyFallback(
   // ⚠️ legacy ต้อง**ยังใช้ param ครบทุกตัว** — pg นับ param ที่ส่งมากับที่ SQL อ้างต้องเท่ากัน
   // ('bind message supplies N parameters') จึงแทนด้วยเงื่อนไข no-op ที่อ้าง param เดิม
   legacyClaimWhere = 'true',
+  leadWhere = 'true',
 ): Promise<Row[]> {
-  // ไล่สามชั้นตามอายุ schema: 074+079 → 074 เท่านั้น → ก่อน 074
+  // ไล่สี่ชั้นตามอายุ schema: 074+079+083 → 074+079 → 074 เท่านั้น → ก่อน 074
   // (กลืนเฉพาะ 42703 คอลัมน์หาย — error อื่นโยนต่อ ตามกติกาข้อ 9)
+  //
+  // ⚠️ ชั้นที่ยังไม่มีคอลัมน์ Lead ใช้ `true` แทนเงื่อนไข — ยังไม่มีใครปัด Lead ได้
+  // = ไม่มีใครต้องถูกซ่อน · แต่ถ้าเป็นมุมมอง "คลังสำรอง" จะได้ทุกแถวแทนที่จะได้ศูนย์
+  // จึงต้องส่ง `false` มาแทน (ดูจุดเรียกใน handler)
+  const fill = (cols: string, cw: string, lw: string) =>
+    sql
+      .replace(/\{\{cols\}\}/g, cols)
+      .replace(/\{\{claimWhere\}\}/g, cw)
+      .replace(/\{\{leadWhere\}\}/g, lw);
   try {
-    const { rows } = await dbQuery<Row>(
-      sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS).replace(/\{\{claimWhere\}\}/g, claimWhere),
-      params,
-    );
+    const { rows } = await dbQuery<Row>(fill(LIST_COLUMNS, claimWhere, leadWhere), params);
+    return rows;
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+  }
+  const legacyLead = leadWhere === 'is_lead' ? 'false' : 'true';
+  try {
+    const { rows } = await dbQuery<Row>(fill(LIST_COLUMNS_NO_LEAD, claimWhere, legacyLead), params);
     return rows;
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
   }
   try {
     const { rows } = await dbQuery<Row>(
-      sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS_NO_CLAIM).replace(/\{\{claimWhere\}\}/g, legacyClaimWhere),
+      fill(LIST_COLUMNS_NO_CLAIM, legacyClaimWhere, legacyLead),
       params,
     );
     return rows;
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
   }
-  const { rows } = await dbQuery<Row>(
-    sql.replace(/\{\{cols\}\}/g, LIST_COLUMNS_LEGACY).replace(/\{\{claimWhere\}\}/g, legacyClaimWhere),
-    params,
-  );
+  const { rows } = await dbQuery<Row>(fill(LIST_COLUMNS_LEGACY, legacyClaimWhere, legacyLead), params);
   return rows;
 }
 
@@ -463,6 +525,70 @@ async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolea
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
 }
 
+/**
+ * PATCH `{ id, lead }` — "เก็บ Lead" / "ลบ Lead"
+ *
+ * ต่างจาก claim ตรงที่ Lead เป็นสถานะ **ระดับระบบ**: ใครปัดก็หายจากรายชื่อของทุกคน
+ * (ตามระบบเดิม iRecruit) จึงไม่มีการชนแบบ 409 — คนหลังเขียนทับได้ · `lead_by`
+ * เก็บไว้เพื่อสาวกลับว่าใครปัด ไม่ได้เอาไปคุมว่าใครเห็น
+ *
+ * ⚠️ **ไม่แตะ `status`** — ต่างจาก claim ที่ขยับ new → contacted · การปัดเข้าคลังสำรอง
+ * ไม่ได้แปลว่าคุยกับเขาแล้ว การเดาแทนคนตรงนี้จะทำให้ยอด funnel เพี้ยน
+ */
+async function patchLead(req: AuthedReq, res: ApiRes, id: string, lead: boolean) {
+  // จำกัดตาม BU ก่อนเสมอ — กันปัดใบสมัครของแผนกอื่นด้วยการเดา id (กติกาเดียวกับ patchStatus)
+  const { rows: beforeRows } = await dbQuery<{ job_id: string | null }>(
+    `select job_id from ${tbl} where id = $1 limit 1`,
+    [id],
+  );
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found');
+  const scopedJobIds = await loadScopedJobIdSet(req.user);
+  if (scopedJobIds && !(before.job_id && scopedJobIds.has(before.job_id))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
+
+  const operator =
+    (req.user as { full_name?: string; username?: string }).full_name ||
+    (req.user as { username?: string }).username ||
+    null;
+  try {
+    await dbQuery(
+      lead
+        ? `update ${tbl}
+              set is_lead = true, lead_by = $2, lead_by_name = $3, lead_at = now(),
+                  updated_at = now()
+            where id = $1`
+        : `update ${tbl}
+              set is_lead = false, lead_by = null, lead_by_name = null, lead_at = null,
+                  updated_at = now()
+            where id = $1`,
+      lead ? [id, req.user.sub, operator] : [id],
+    );
+  } catch (e) {
+    // ยังไม่รัน 083 → บอกตรง ๆ ไม่เงียบ (แพตเทิร์นเดียวกับ claim/079)
+    if (isUndefinedColumn(e)) {
+      return sendError(
+        res,
+        503,
+        'Migration required',
+        'ปุ่มเก็บ Lead ต้องรัน migration 083 ก่อน (node scripts/migrate.mjs) — ยังใช้ไม่ได้',
+      );
+    }
+    throw e;
+  }
+
+  await auditFromAuthed(req, {
+    action: lead ? 'job_application.lead_add' : 'job_application.lead_remove',
+    entityType: 'job_application',
+    entityId: id,
+    after: { lead },
+  });
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} where id = $1`, [id]);
+  if (!rows[0]) return sendError(res, 404, 'Not found');
+  return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
+}
+
 async function patchStatus(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
   if (typeof raw !== 'object' || raw === null) {
@@ -474,6 +600,8 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
 
   // "เก็บไปติดต่อ / คืน" — action แยกจากการแก้สถานะ/โน้ต
   if (typeof b.claim === 'boolean') return patchClaim(req, res, id, b.claim);
+  // "เก็บ Lead / ลบ Lead" — ปัดออกจากรายชื่อทำงาน (ดู migration 083)
+  if (typeof b.lead === 'boolean') return patchLead(req, res, id, b.lead);
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
@@ -583,8 +711,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       scopedJobIds,
       viewerId: req.user.sub,
       viewerDepartment: deptScope.mode === 'code' ? deptScope.code : null,
+      leadView: getString(req.query?.lead) === '1',
     });
-    const rows = await queryWithLegacyFallback(q.sql, q.params, q.claimWhere, q.legacyClaimWhere);
+    const rows = await queryWithLegacyFallback(
+      q.sql,
+      q.params,
+      q.claimWhere,
+      q.legacyClaimWhere,
+      q.leadWhere,
+    );
     const items = rows.map((r) => toApplication(r, req.user.sub));
 
     // แนบผลโทรล่าสุดต่อคน — แท็บ "รายชื่อที่สนใจ" ของกล่องงานใช้ตัวนี้กรอง

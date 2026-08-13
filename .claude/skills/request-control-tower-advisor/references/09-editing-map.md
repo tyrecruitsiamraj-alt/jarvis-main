@@ -327,6 +327,32 @@ reminder รับแค่ 7 ฟิลด์ตายตัว — ช่อง
 ⚠️ `new Intl.DateTimeFormat` ของ `speakableDate()` ประกาศระดับโมดูล (กติกาข้อ 10)
 มีเทสต์ความเร็ว 30,000 ครั้ง — ย้ายกลับเข้าฟังก์ชันแล้วช้าจาก 0.1 วิ เป็น 4.9 วิ
 
+### ระบบ Lead — ปัดใบสมัครเข้าคลังสำรอง (migration 083 · 14 ส.ค. 2569)
+
+เจ้าของเคาะ: *"ตามระบบเดิมเป๊ะ — ปัดออกจากคิว"* + **ปัดแล้วหายจากทุกแท็บ + มีตัวกรองเรียกคืน**
+
+* `migrations/083_application_leads.sql` — `is_lead` / `lead_by` / `lead_by_name` / `lead_at`
+  บน `public_job_applications` (แพตเทิร์นเดียวกับ claim 079) · partial index บนฝั่ง Lead
+* `api/_handlers/job-applications.ts` — `{{leadWhere}}` ใน `buildApplicationsListQuery()`
+  (`not is_lead` ปกติ · `is_lead` เมื่อ `?lead=1`) · `patchLead()` รับ `PATCH {id, lead}`
+* `src/lib/publicApplicationsApi.ts` — `fetchAllJobApplications(leadView)` · `setJobApplicationLead()`
+* `src/lib/recruitLead.ts` — `summarizeLeadUpdate()` + ป้าย · เทสต์ `tests/api/recruitLead.test.ts`
+  (10 เคส · mutation 6/6)
+* `src/components/recruit-rm/RmWorkspace.tsx` (`?lead=1` + `applyLead()`) · `RmSearchBar.tsx`
+
+⚠️ **กรองที่คิวรีฝั่ง server ไม่ใช่ที่หน้าเว็บ** — แท็บของหน้า RM เป็นตัวกรองที่หั่นลิสต์
+ก้อนเดียวกัน กรองทีหลังจะหลุดบางแท็บ ("หายจากทุกแท็บ" จึงต้องหายตั้งแต่ต้นทาง)
+⚠️ **เงื่อนไข Lead ห้ามกิน param** — คิวรีนี้เคยตาย 500 มาแล้วจาก `bind message supplies
+N parameters` (ดูหัวข้อ claim) · `not is_lead` เป็นเงื่อนไขล้วน ไม่ต้องมี `$n` · มีเทสต์
+เช็คว่า `$n` สูงสุดที่ SQL อ้าง = จำนวน param ที่ส่ง ครบทุกชุดเงื่อนไข
+⚠️ **fallback คอลัมน์เป็น 4 ชั้นแล้ว** (074+079+083 → 074+079 → 074 → ก่อน 074)
+· ชั้นที่ยังไม่มีคอลัมน์ Lead ใช้ `true` แทนเงื่อนไข **ยกเว้นมุมมองคลังสำรองที่ต้องเป็น
+`false`** ไม่งั้นฐานที่ยังไม่รัน 083 จะโชว์ทุกแถวเป็น "คลังสำรอง"
+⚠️ **Lead เป็นสถานะระดับระบบ ไม่ใช่ของใครคนหนึ่ง** (ต่างจาก claim) — ใครปัดก็หายจาก
+ลิสต์ของทุกคน จึงไม่มี 409 · ชื่อคนปัดส่งให้ทุกคนเห็นได้
+⚠️ **ไม่แตะ `status`** ตอนปัด — ต่างจาก claim ที่ขยับ new → contacted · ปัดเข้าคลังสำรอง
+ไม่ได้แปลว่าคุยกับเขาแล้ว เดาแทนคนตรงนี้จะทำให้ยอด funnel เพี้ยน
+
 ### "โทรแล้วสนใจ → จองตัวเลย" (14 ส.ค. 2569)
 
 หลังถอดปุ่มจอง/เสนอ/ลงงานออกจาก drawer หน้า Matching (รอบแปด) **การจองฝั่ง iRecruit

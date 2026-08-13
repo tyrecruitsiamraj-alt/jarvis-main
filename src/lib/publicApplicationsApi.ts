@@ -49,6 +49,14 @@ export type PublicApplication = {
   claimed?: boolean;
   claimed_by_me?: boolean;
   claimed_by_name?: string;
+  /**
+   * "เก็บ Lead" (migration 083) — ปัดใบออกจากรายชื่อทำงานไปคลังสำรอง
+   * ⚠️ ต่างจาก claim: เป็นสถานะ **ระดับระบบ** ใครปัดก็หายจากลิสต์ของทุกคน
+   * ชื่อคนปัดจึงส่งให้ทุกคนเห็นได้ (claim ส่งเฉพาะของตัวเอง)
+   */
+  is_lead?: boolean;
+  lead_by_name?: string;
+  lead_at?: string;
 };
 
 export type ApplicationReferralSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
@@ -117,8 +125,11 @@ export const GENDER_LABEL: Record<string, string> = {
  * API เดิมรองรับอยู่แล้ว (ไม่ส่ง job_id = ทั้งหมด · จำกัด 500 แถวล่าสุดฝั่ง server
  * และตัดตามสิทธิ์ BU ของผู้ใช้ให้เองแล้ว)
  */
-export async function fetchAllJobApplications(): Promise<PublicApplication[]> {
-  const r = await apiFetch('/api/job-applications');
+export async function fetchAllJobApplications(
+  /** true = ดู **คลังสำรอง (Lead)** แทนรายชื่อทำงาน (ลิสต์ปกติซ่อน Lead เสมอ) */
+  leadView = false,
+): Promise<PublicApplication[]> {
+  const r = await apiFetch(`/api/job-applications${leadView ? '?lead=1' : ''}`);
   if (!r.ok) throw new Error('โหลดรายชื่อผู้สมัครไม่สำเร็จ');
   const data = (await r.json()) as { items?: PublicApplication[] };
   return data.items ?? [];
@@ -152,6 +163,27 @@ export async function createApplicationByStaff(input: {
   if (!r.ok) {
     const body = (await r.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message || 'บันทึกผู้สมัครไม่สำเร็จ');
+  }
+  const body = (await r.json()) as { item: PublicApplication };
+  return body.item;
+}
+
+/**
+ * "เก็บ Lead" / "ลบ Lead" — ปัดใบออกจากรายชื่อทำงาน (หายจากทุกแท็บ) หรือเรียกกลับ
+ * เจ้าของเคาะ 11–12 ส.ค. 2569: "ตามระบบเดิมเป๊ะ — ปัดออกจากคิว" + มีตัวกรองเรียกคืนดู
+ * · 503 = ยังไม่รัน migration 083 · 403 = ใบของแผนกอื่น
+ */
+export async function setJobApplicationLead(
+  id: string,
+  lead: boolean,
+): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, lead }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || (lead ? 'เก็บ Lead ไม่สำเร็จ' : 'ลบ Lead ไม่สำเร็จ'));
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;
