@@ -217,8 +217,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     );
 
     // ใบด่วนที่ AI ประเมินแล้วไม่มีคนแนะนำ และยังไม่ได้ส่งโพสหาคนใหม่ → ค้างจริง ต้องมีคนตัดสินใจ
-    const { rows: activePostingRows } = await dbQuery<{ job_id: string; request_type: string }>(
-      `select job_id, request_type from ${postingsTable}
+    // (ดึง status มาด้วย — การ์ด Content/Scraping บนหน้าแรกต้องบอกว่าไปถึงขั้นไหนแล้ว
+    //  เจ้าของสั่ง 13 ส.ค. 2569)
+    const { rows: activePostingRows } = await dbQuery<{
+      job_id: string;
+      request_type: string;
+      status: string;
+    }>(
+      `select job_id, request_type, status from ${postingsTable}
         where status in ('pending', 'in_progress', 'posted') and job_id = any($1)`,
       [scopedJobIds],
     );
@@ -230,6 +236,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scrapingJobIds = new Set(
       activePostingRows.filter((r) => r.request_type === 'scraping').map((r) => r.job_id),
     );
+    // สถานะของคำขอแต่ละประเภท — บอกว่า "ไปถึงขั้นไหนแล้ว" (รอดำเนินการ/กำลังทำ/โพสแล้ว)
+    // นับเป็นรายคำขอ ไม่ใช่รายใบขอ (ใบเดียวมีได้หลายคำขอ — เลขต้องตรงกับหน้าคำขอโพส)
+    const postingStages = (type: 'content' | 'scraping') => {
+      const rows = activePostingRows.filter((r) =>
+        type === 'scraping' ? r.request_type === 'scraping' : r.request_type !== 'scraping',
+      );
+      const by = (s: string) => rows.filter((r) => r.status === s).length;
+      return { pending: by('pending'), in_progress: by('in_progress'), posted: by('posted') };
+    };
     const urgentStuck = jobs.filter(
       (j) =>
         j.urgency === 'urgent' &&
@@ -339,6 +354,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         active: postedJobIds.size,
         content: contentJobIds.size,
         scraping: scrapingJobIds.size,
+        content_stages: postingStages('content'),
+        scraping_stages: postingStages('scraping'),
       },
       call_boxes: callBoxes,
       active_calls: activeCalls,

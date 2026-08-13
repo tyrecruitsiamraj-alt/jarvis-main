@@ -34,6 +34,9 @@ export type FlowCallBoxes = {
   declined: FlowFollowUpItem[];
 };
 
+/** สถานะคำขอโพสหาคน — ป้ายภาษาไทยใช้ JOB_POSTING_STATUS_LABEL ชุดเดียวกับหน้าคำขอโพส */
+export type PostingStages = { pending: number; in_progress: number; posted: number };
+
 export type FlowSummary = {
   month: string;
   jobs: {
@@ -58,7 +61,14 @@ export type FlowSummary = {
     placed_month: number;
   };
   /** คำขอโพสหาคนที่ยังเปิดอยู่ — แยกตามประเภท (content = ให้ทีมคิดคอนเทนต์ · scraping = ให้ไปดูดประกาศ) */
-  postings: { active: number; content?: number; scraping?: number };
+  postings: {
+    active: number;
+    content?: number;
+    scraping?: number;
+    /** ไปถึงขั้นไหนแล้ว (เจ้าของสั่ง 13 ส.ค. 2569) — นับเป็นรายคำขอ */
+    content_stages?: PostingStages;
+    scraping_stages?: PostingStages;
+  };
   call_boxes: FlowCallBoxes;
   /** รายชื่อที่ส่ง AI โทรแล้วยังไม่มีผลกลับ — แถวที่ค้างเกิน 2 วันติดธง stale */
   active_calls: FlowFollowUpItem[];

@@ -24,7 +24,9 @@ import {
   callResultsThisMonth,
   type FlowSummary,
   type FlowFollowUpItem,
+  type PostingStages,
 } from '@/lib/flowSummaryApi';
+import { jobPostingStatusLabel } from '@/lib/jobPostingRequestsApi';
 
 
 /**
@@ -153,6 +155,25 @@ function FollowUpList({
       ) : null}
     </div>
   );
+}
+
+/**
+ * บรรทัดสถานะของการ์ด Content/Scraping — "รอดำเนินการ X · กำลังทำ Y · โพสแล้ว Z"
+ * (เจ้าของสั่ง 13 ส.ค. 2569: ต้องบอกด้วยว่าไปถึงขั้นไหนแล้ว) · โชว์เฉพาะขั้นที่มีจริง
+ * ป้ายใช้ชุดเดียวกับหน้าคำขอโพส (jobPostingStatusLabel) — เห็นคำเดียวกันทุกหน้า
+ */
+function postingStagesSub(stages: PostingStages | undefined): string | null {
+  if (!stages) return null;
+  const parts = (
+    [
+      ['pending', stages.pending],
+      ['in_progress', stages.in_progress],
+      ['posted', stages.posted],
+    ] as const
+  )
+    .filter(([, n]) => n > 0)
+    .map(([key, n]) => `${jobPostingStatusLabel(key)} ${n}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 const HomePage: React.FC = () => {
@@ -339,10 +360,11 @@ const HomePage: React.FC = () => {
                 <ArrowRight className="hidden h-4 w-4 sm:block" aria-hidden />
                 <ArrowDown className="h-4 w-4 sm:hidden" aria-hidden />
               </div>
+              {/* sub บอกว่าไปถึงขั้นไหนแล้ว (เจ้าของสั่ง 13 ส.ค. 2569) — ป้ายชุดเดียวกับหน้าคำขอโพส */}
               <FlowStage
                 label="ส่งคิด Content"
                 value={flow.postings.content ?? 0}
-                sub="ใบขอที่รอทีมคอนเทนต์ทำโพส"
+                sub={postingStagesSub(flow.postings.content_stages) ?? 'ใบขอที่รอทีมคอนเทนต์ทำโพส'}
                 tone="orange"
                 onClick={() => navigate('/matching/job-postings')}
               />
@@ -359,7 +381,7 @@ const HomePage: React.FC = () => {
               <FlowStage
                 label="ส่ง Scraping"
                 value={flow.postings.scraping ?? 0}
-                sub="ใบขอที่รอไปดูดประกาศหาคน"
+                sub={postingStagesSub(flow.postings.scraping_stages) ?? 'ใบขอที่รอไปดูดประกาศหาคน'}
                 tone="violet"
                 onClick={() => navigate('/matching/job-postings')}
               />
