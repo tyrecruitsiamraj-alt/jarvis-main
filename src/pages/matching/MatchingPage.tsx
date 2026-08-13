@@ -91,10 +91,12 @@ import ScreeningEditor from '@/components/matching/ScreeningEditor';
 import {
   CallBatchUndoStrip,
   LumosCallBadgeRow,
+  LumosJobStatChips,
   LumosJobSummaryStats,
   LumosSendBar,
 } from '@/components/matching/LumosPanels';
 import { cardNextAction } from '@/lib/matchingCardAction';
+import { lumosProgressChip } from '@/lib/lumosStatCells';
 import TierCriteriaTooltip from '@/components/matching/TierCriteriaTooltip';
 import AiEvaluationStatus from '@/components/matching/AiEvaluationStatus';
 import { TIER_CRITERIA } from '@/lib/matchTierCriteria';
@@ -2423,7 +2425,18 @@ const MatchingPage: React.FC = () => {
                   {(() => {
                     const action = cardNextAction(matchCount, serverLumosSummary[j.id]);
                     return action ? (
-                      <span className={cn(TONE[action.tone].chip, 'shrink-0')}>→ {action.text}</span>
+                      <span title={action.text} className={cn(TONE[action.tone].chip, 'shrink-0')}>
+                        → {action.text}
+                      </span>
+                    ) : null;
+                  })()}
+                  <LumosJobStatChips s={serverLumosSummary[j.id]} />
+                  {(() => {
+                    // ยอดคนในใบ — เดิมเป็นแถบที่มาแทนที่ผลโทร (จึงโชว์เฉพาะใบที่ยังไม่มีการโทร
+                    // ซึ่งกลับด้านกับความจริง) ตอนนี้เป็นชิปที่ขึ้นเมื่อมีค่าจริงเท่านั้น
+                    const chip = lumosProgressChip(progress);
+                    return chip ? (
+                      <span className={cn(TONE[chip.tone].chip, 'shrink-0 tabular-nums')}>{chip.text}</span>
                     ) : null;
                   })()}
                   <span className="ml-auto shrink-0 text-[11px] text-slate-600 dark:text-slate-300">
@@ -2481,19 +2494,14 @@ const MatchingPage: React.FC = () => {
                         </span>
                       ) : null}
                     </div>
+                    {/* หัวข้อกับจำนวนช่องคงที่ทุกใบ — ใบที่ยังไม่เคยส่งโทรได้ 0 ทั้งแถว
+                        (เจ้าของสั่ง: ข้อมูลไม่เท่ากันก็คงไว้ให้ตรงกัน อย่าให้มันขยับเอง)
+                        ยอด ติดต่อ/จอง/ลงงาน ที่เคยแทนที่แถบนี้ ย้ายไปเป็นชิปในแถวบน */}
                     <div className="min-w-0 border-slate-100 dark:border-slate-700/60 sm:border-l sm:pl-2.5">
                       <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
-                        {serverLumosSummary[j.id] ? 'ผลโทรในใบนี้' : 'คนในใบนี้'}
+                        ผลโทรในใบนี้
                       </p>
-                      {serverLumosSummary[j.id] ? (
-                        <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
-                      ) : (
-                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-600 dark:text-slate-300">
-                          <span>ติดต่อ <b className="tabular-nums">{progress.contacted}</b></span>
-                          <span>จอง <b className="tabular-nums">{progress.reserved}</b></span>
-                          <span>ลงงาน <b className="tabular-nums">{progress.placed}</b></span>
-                        </div>
-                      )}
+                      <LumosJobSummaryStats s={serverLumosSummary[j.id]} variant="column" />
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">

@@ -6,6 +6,7 @@ import {
   type LumosCallStatus,
   type LumosJobCallSummaryRow,
 } from '@/lib/lumosDispatchApi';
+import { lumosExtraStatChips, lumosFixedStatCells } from '@/lib/lumosStatCells';
 import { ClipboardCheck, PhoneCall, Undo2, UserRound, X } from 'lucide-react';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { useEffect, useState } from 'react';
@@ -86,67 +87,31 @@ export function LumosCallBadgeRow({
 
 /**
  * กล่องสรุปผลโทรของใบขอ 1 ใบ — อ่านซ้ายไปขวาตามลำดับที่งานเดินจริง:
- * รออนุมัติ → ส่ง → โทรแล้ว → เหลือ → โอเค / ไม่ไป / ไม่รับ / ขอเลื่อน / ต้องคนตาม
+ * ส่ง → โทรแล้ว → เหลือ → โอเค / ไม่ไป / ไม่รับ
  * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ระบบยกเลิกเอง)
  *
- * ⚠️ **3 ช่องท้าย (ขอเลื่อน · ต้องคนตาม) กับช่องแรก (รออนุมัติ) โผล่เฉพาะตอนมีค่า**
- * ตั้งใจ — ถ้าโชว์ตลอดจะได้แถบ 9 ช่องที่เป็น 0 อยู่ 3 ช่องแทบทุกใบ กวาดตาแล้วหาของจริงไม่เจอ
- * (ช่องที่โชว์ตลอดคือช่องที่ตอบคำถามหลักของการ์ด: ส่งกี่คน โทรไปกี่คน ได้ผลยังไง)
+ * ⚠️ **6 ช่องเสมอทุกใบ ทุกกรณี — component นี้ต้องไม่มีทางคืน null**
+ * เจ้าของสั่ง 13 ส.ค. 2569: "ทุกใบก็ต้องเหมือนกันสิกันงง" · ใบที่ยังไม่เคยส่งโทรโชว์ 0
+ * เดิมประกอบช่องตามข้อมูล (5–8 ช่อง) แต่ละช่อง flex-1 หารตามจำนวนช่องจริง
+ * → เลขของสองใบไม่ตรงคอลัมน์กัน · และเดิมคืน null เมื่อ sent=0 ทำให้การ์ดขึ้นหัวข้อ
+ * "ผลโทรในใบนี้" แล้วใต้หัวข้อว่างเปล่า
+ * ช่องพิเศษ (รออนุมัติ/ขอเลื่อน/ต้องคนตาม) ย้ายไป <LumosJobStatChips /> ในแถวที่จองไว้
+ * ตัวเลือกช่องอยู่ที่ src/lib/lumosStatCells.ts ที่เดียว (มีเทสต์บังคับว่าต้อง 6 ตัวเสมอ)
  */
 export function LumosJobSummaryStats({
   s,
   className,
   variant = 'pill',
 }: {
-  s: LumosJobCallSummaryRow;
+  /** ไม่มีแถวสรุป (ใบที่ยังไม่เคยเข้าคิว) ก็ส่ง undefined มาได้ — ได้ 6 ช่องเป็น 0 */
+  s?: LumosJobCallSummaryRow;
   className?: string;
   /** pill = ก้อนลอยพื้นจาง (ในใบขอ/หน้ารายละเอียด) · column = เต็มความกว้างคอลัมน์ขวาของการ์ด */
   variant?: 'pill' | 'column';
 }) {
-  // ใบที่ยังไม่เคยส่งแต่มีชุดรออนุมัติค้างอยู่ ต้องขึ้นแถบด้วย ไม่งั้นการ์ดจะว่าง
-  // ทั้งที่มีคนรอให้กดอนุมัติ (เดิมเช็คแค่ sent === 0)
-  if (s.sent === 0 && s.pendingApproval === 0) return null;
-  const waiting = Math.max(0, s.sent - s.called);
-  const cells = [
-    // สีของแต่ละช่องมาจาก token กลาง: รออนุมัติ=ต้องคนตัดสินใจ · ส่ง=กลาง · โทรแล้ว=กำลังดำเนินการ ·
-    // เหลือ/ไม่รับ/ขอเลื่อน=รอคนทำต่อ · โอเค=สนใจงาน (หาได้แล้ว) · ไม่ไป=ติดขัด · ต้องคนตาม=ถัง needs_human
-    ...(s.pendingApproval > 0
-      ? [
-          {
-            label: 'รออนุมัติ',
-            value: s.pendingApproval,
-            cls: TONE.orange.value,
-            title: 'ตั้งชุดไว้แล้วแต่ยังไม่ได้โทร — รอคนกดอนุมัติ (หรืออยู่ในช่วงถอนคำ 10 นาที)',
-          },
-        ]
-      : []),
-    { label: 'ส่ง', value: s.sent, cls: TONE.neutral.value, title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
-    { label: 'โทรแล้ว', value: s.called, cls: TONE.primary.value, title: 'มีผลโทรกลับมาจริง' },
-    { label: 'เหลือ', value: waiting, cls: TONE.warn.value, title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
-    { label: 'โอเค', value: s.confirmed, cls: TONE.success.value, title: 'สนใจงาน' },
-    { label: 'ไม่ไป', value: s.declined, cls: TONE.danger.value, title: 'ไม่สนใจ/ปฏิเสธ' },
-    { label: 'ไม่รับ', value: s.no_answer, cls: TONE.warn.value, title: 'ไม่รับสาย — ควรโทรซ้ำ' },
-    ...(s.reschedule > 0
-      ? [
-          {
-            label: 'ขอเลื่อน',
-            value: s.reschedule,
-            cls: TONE.warn.value,
-            title: 'ผู้สมัครขอให้โทรกลับ — นัดเวลาใหม่ไว้แล้ว',
-          },
-        ]
-      : []),
-    ...(s.needsHuman > 0
-      ? [
-          {
-            label: 'ต้องคนตาม',
-            value: s.needsHuman,
-            cls: TONE.orange.value,
-            title: 'AI โทรจนสุดมือแล้ว (ครบเพดาน / เบอร์ผิด) — ต้องให้คนตามต่อ',
-          },
-        ]
-      : []),
-  ];
+  // สีของแต่ละช่องมาจาก token กลางผ่าน tone key: ส่ง=กลาง · โทรแล้ว=กำลังดำเนินการ ·
+  // เหลือ/ไม่รับ=รอคนทำต่อ · โอเค=สนใจงาน (หาได้แล้ว) · ไม่ไป=ติดขัด
+  const cells = lumosFixedStatCells(s);
   // สไตล์เรียบแบบ Apple: พื้นจางชิ้นเดียว ไม่มีเส้นแบ่ง เลขน้ำหนักกลางตัวใหญ่ขึ้นเล็กน้อย
   // ป้ายตัวจิ๋วโทนเทา ค่า 0 จางลงทั้งช่องให้ตาไหลผ่านไปหาช่องที่มีค่า
   return (
@@ -161,18 +126,20 @@ export function LumosJobSummaryStats({
     >
       {cells.map((c) => (
         <div
-          key={c.label}
+          key={c.key}
           title={c.title}
           className={cn(
             'px-1 text-center',
-            variant === 'pill' ? 'min-w-[42px]' : 'min-w-0 flex-1',
+            // basis-0 คู่กับ flex-1 — ไม่งั้นช่องป้ายยาว ("โทรแล้ว") กินความกว้างไปจาก
+            // ช่องป้ายสั้น ("ส่ง") แล้วเลขของสองการ์ดไม่ตรงคอลัมน์กันทั้งที่ช่องเท่ากันแล้ว
+            variant === 'pill' ? 'min-w-[42px]' : 'min-w-0 flex-1 basis-0',
             c.value === 0 && 'opacity-35',
           )}
         >
           <div
             className={cn(
               'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
-              c.value === 0 ? DASH.muted : c.cls,
+              c.value === 0 ? DASH.muted : TONE[c.tone].value,
             )}
           >
             {c.value}
@@ -183,6 +150,29 @@ export function LumosJobSummaryStats({
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * ชิปของช่องพิเศษ (รออนุมัติ / ขอเลื่อน / ต้องคนตาม) — เดิมเบียดเข้าไปในแถบ 6 ช่อง
+ * ทำให้ความกว้างต่อช่องของแต่ละการ์ดไม่เท่ากัน · ตอนนี้ออกมาอยู่ในแถวที่จองที่ไว้แล้ว
+ * คืน null ได้ (แถวแม่จองความสูงไว้เอง จึงไม่ทำให้การ์ดสูงไม่เท่ากัน)
+ */
+export function LumosJobStatChips({ s, className }: { s?: LumosJobCallSummaryRow; className?: string }) {
+  const chips = lumosExtraStatChips(s);
+  if (chips.length === 0) return null;
+  return (
+    <>
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          title={c.title}
+          className={cn('shrink-0 whitespace-nowrap tabular-nums', TONE[c.tone].chip, className)}
+        >
+          {c.label} {c.value}
+        </span>
+      ))}
+    </>
   );
 }
 
