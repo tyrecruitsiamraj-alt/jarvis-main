@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyEnqueue, selectPrecomputeQueue, type QueueEntry } from '../../api/_lib/matchPrecomputeWorker';
+import {
+  applyEnqueue,
+  parseIntEnv,
+  selectPrecomputeQueue,
+  type QueueEntry,
+} from '../../api/_lib/matchPrecomputeWorker';
 import type { BoardMatchTierEntry } from '../../api/_lib/boardMatchStore';
 
 const NOW = Date.UTC(2026, 6, 24, 3, 0, 0); // fixed clock (Date.now ไม่เกี่ยว — pure)
@@ -121,9 +126,6 @@ describe('applyEnqueue', () => {
     expect(q.size).toBe(0);
   });
 });
-
-// eslint-disable-next-line import/first -- ต่อท้ายไฟล์เดิม (import รวมอยู่บนสุดไม่ได้เพราะ append)
-import { parseIntEnv } from '../../api/_lib/matchPrecomputeWorker';
 
 describe('parseIntEnv — env ที่ไม่ได้ตั้งต้องได้ default ไม่ใช่ min', () => {
   it('ไม่ได้ตั้ง/ว่าง → default (บั๊กเดิม: Number("") = 0 เป็น finite เลยตกไปที่ min)', () => {
