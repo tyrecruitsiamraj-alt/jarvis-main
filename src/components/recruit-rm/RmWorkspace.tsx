@@ -10,6 +10,7 @@ import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
+import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
 import {
   EMPTY_RM_FILTERS,
   RM_ROW_ACTION_LABEL,
@@ -103,6 +104,8 @@ const RmWorkspace: React.FC<{
   /** ข้อความบอกว่ายังไม่ได้ต่อของจริง — ดีกว่าปุ่มที่กดแล้วเงียบ */
   const [notice, setNotice] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  /** dialog รายละเอียด+บันทึกผลติดต่อ (ลิสต์ข้อ 7) — เปิดจากปุ่ม "ดูรายละเอียด"/"บันทึกผลนัดหมาย" */
+  const [contactApp, setContactApp] = useState<PublicApplication | null>(null);
   const { user } = useAuth();
   /** ล็อกโทรของแถวในหน้า (คีย์ = application id) — โชว์ 🔒 + กันกดซ้ำ */
   const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
@@ -284,6 +287,11 @@ const RmWorkspace: React.FC<{
       if (!canHoldApplication(row).ok || holdByRef[row.id]) return;
       setNotice(null);
       void acquireTargets([toHoldTarget(row)]);
+      return;
+    }
+    // ดูรายละเอียด/บันทึกผล → dialog ติดต่อสำเร็จ-ไม่สำเร็จ (ลิสต์ข้อ 7 · 14 ส.ค. 2569)
+    if (action === 'view' || action === 'rule') {
+      setContactApp(row);
       return;
     }
     todo(`"${RM_ROW_ACTION_LABEL[action]}" ของ ${row.full_name}`);
@@ -503,6 +511,15 @@ const RmWorkspace: React.FC<{
         }}
       />
 
+      {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
+      <ApplicantContactDialog
+        application={contactApp}
+        onClose={() => setContactApp(null)}
+        onSaved={() => {
+          setNotice('บันทึกผลติดต่อแล้ว');
+          load(); // สถานะใบเปลี่ยน (นัดได้ = converted) แถวอาจย้ายแท็บ — โหลดใหม่ให้เห็นทันที
+        }}
+      />
     </div>
   );
 };
