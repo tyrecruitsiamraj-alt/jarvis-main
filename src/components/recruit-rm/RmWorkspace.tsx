@@ -441,10 +441,19 @@ const RmWorkspace: React.FC<{
           ) : null}
 
           {tab === 'appointments' ? (
-            <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.info.soft, TONE.info.value)}>
-              แท็บนี้คือคนที่สถานะ "รับเข้าทำงาน" แล้ว · คอลัมน์ <b>วันนัด</b> มาจากตอนกดผลโทร
-              "สนใจ → นัดได้เลย" — ขีดกลางแปลว่ายังไม่มีนัด
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 rm-appointments-head">
+              {/* เจ้าของนิยาม 14 ส.ค. 2569: "ติดตามการนัดหมายเป็นแค่หน้าเอาไว้ดูว่านัดที่ไหน
+                  วันไหน และกี่คน โหลดเป็น PDF ได้" — สรุปหัว + ปุ่มพิมพ์ (window.print
+                  ฝั่งเบราว์เซอร์ — เจ้าของเคาะ ไม่เพิ่ม lib) · print CSS ซ่อนส่วนอื่นของหน้า */}
+              <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.info.soft, TONE.info.value)}>
+                นัดสัมภาษณ์ <b>{filtered.filter((r) => r.appointment_at).length.toLocaleString('th-TH')}</b> คน
+                จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
+                วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
+              </p>
+              <button type="button" onClick={() => window.print()} className="jarvis-btn-secondary shrink-0">
+                🖨 โหลดเป็น PDF
+              </button>
+            </div>
           ) : null}
 
           {/* แท็บ "การติดต่อ" มี 2 ส่วนที่ **ทำงานคนละแบบ** (เจ้าของสั่ง 14 ส.ค. 2569):
@@ -475,6 +484,9 @@ const RmWorkspace: React.FC<{
             </p>
           ) : (
             <>
+              {/* rm-print-area: ตอนกด "โหลดเป็น PDF" print CSS จะโชว์เฉพาะก้อนนี้
+                  (เฉพาะแท็บนัดหมาย — แท็บอื่นพิมพ์ทั้งหน้าตามปกติ) */}
+              <div className={tab === 'appointments' ? 'rm-print-area' : undefined}>
               <RmTable
                 tab={tab}
                 rows={pageRows}
@@ -484,6 +496,7 @@ const RmWorkspace: React.FC<{
                 onAction={onRowAction}
                 holdByRef={holdByRef}
               />
+              </div>
               <ListPaginationBar
                 page={currentPage}
                 totalPages={totalPages}

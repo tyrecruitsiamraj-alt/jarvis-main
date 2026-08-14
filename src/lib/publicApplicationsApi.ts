@@ -15,6 +15,9 @@ export type PublicApplication = {
    * ไม่มีค่า = ยังไม่มีนัด (ยังไม่โทร · โทรแล้วแต่ยังนัดไม่ได้ · หรือผลอื่น)
    */
   appointment_at?: string | null;
+  /** สถานที่นัด + ใบขอที่จะลง — มีเฉพาะนัดจากบันทึกผลติดต่อ (migration 086) */
+  appointment_place?: string | null;
+  appointment_job?: string | null;
   title_prefix?: string;
   first_name?: string;
   last_name?: string;

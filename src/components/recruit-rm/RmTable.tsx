@@ -95,7 +95,11 @@ const RmTable: React.FC<{
               {/* วันนัดโผล่เฉพาะแท็บติดตามนัดหมาย — แท็บอื่นไม่มีใครถามคำถามนี้
                   (คอลัมน์ที่ว่างทั้งแถวทุกแท็บทำให้ตารางกว้างขึ้นโดยไม่ได้อะไร) */}
               {tab === 'appointments' ? (
-                <th className="px-3 py-2 font-semibold">วันนัด</th>
+                <>
+                  <th className="px-3 py-2 font-semibold">วันนัด</th>
+                  {/* "นัดที่ไหน + ลงใบไหน" (ลิสต์ข้อ 9) — มีเฉพาะนัดจากบันทึกผลติดต่อ */}
+                  <th className="px-3 py-2 font-semibold">นัดที่ไหน</th>
+                </>
               ) : null}
               {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
                   "ปุ่มโทร เพื่อ Stamp ว่าโทรตอนไหน") · กดปุ่มโทร = จับ hold (heldAt =
@@ -160,6 +164,13 @@ const RmTable: React.FC<{
                               timeZone: 'Asia/Bangkok',
                             }),
                           )
+                        : EM_DASH}
+                    </td>
+                  ) : null}
+                  {tab === 'appointments' ? (
+                    <td className={cn('px-3 py-2 text-[11px]', DASH.cellMuted)} title={r.appointment_job || undefined}>
+                      {r.appointment_place || r.appointment_job
+                        ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
                         : EM_DASH}
                     </td>
                   ) : null}

@@ -567,3 +567,30 @@
     @apply bg-slate-800;
   }
 }
+
+/* ═══ พิมพ์ตารางนัดหมายเป็น PDF (ลิสต์ข้อ 9 · 14 ส.ค. 2569) ═══
+   เจ้าของเคาะ: โหลด PDF ฝั่งเบราว์เซอร์ (window.print — ไม่เพิ่ม lib)
+   หน้าที่มี .rm-print-area (เฉพาะแท็บติดตามนัดหมาย) พิมพ์เฉพาะก้อนนั้น
+   ⚠️ ใช้ :has() — เบราว์เซอร์เก่าที่ไม่รองรับจะพิมพ์ทั้งหน้า (ยังใช้งานได้ แค่ไม่สวย) */
+@media print {
+  body:has(.rm-print-area) > *:not(#root),
+  body:has(.rm-print-area) #root > *:not(:has(.rm-print-area)) {
+    display: none !important;
+  }
+  body:has(.rm-print-area) .rm-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+  }
+  /* ซ่อนทุกอย่างแล้วโชว์เฉพาะตารางนัด — ตัวหนังสือดำบนขาวเสมอ (หมึกจริง) */
+  body:has(.rm-print-area) * {
+    visibility: hidden;
+  }
+  body:has(.rm-print-area) .rm-print-area,
+  body:has(.rm-print-area) .rm-print-area * {
+    visibility: visible;
+  }
+  body:has(.rm-print-area) .rm-print-area table {
+    color: #000;
+  }
+}

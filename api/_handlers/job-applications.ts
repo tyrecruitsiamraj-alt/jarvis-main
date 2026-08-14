@@ -17,6 +17,7 @@ import {
   normalizeRmPhone,
 } from '../../src/lib/recruitRmMasters.js';
 import { loadAppointmentByPhone, loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
+import { loadContactAppointments } from '../_lib/applicationContacts.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError } from '../_lib/logger.js';
 
@@ -744,12 +745,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
           }
         }
       }
-      // วันนัดสัมภาษณ์ที่ตกลงได้ตอนโทร (migration 085) — แท็บติดตามนัดหมายโชว์คอลัมน์นี้
-      const apptByPhone = await loadAppointmentByPhone(items.map((i) => i.phone));
-      if (apptByPhone.size > 0) {
-        for (const item of items) {
-          const at = apptByPhone.get(toE164Thai(item.phone || '') || '');
-          if (at) (item as Record<string, unknown>).appointment_at = at;
+      // วันนัดสัมภาษณ์ — มาได้ 2 ทาง (แท็บติดตามนัดหมายโชว์คอลัมน์นี้):
+      // 1) ตกลงตอนโทร (call hold · migration 085 · คีย์เบอร์)
+      // 2) บันทึกผลติดต่อ "สำเร็จ+นัดได้" (contact log · migration 086 · คีย์ใบ)
+      // ⚠️ contact log ชนะ — เป็นการบันทึกที่เจาะจงใบนี้ตรง ๆ (มีสถานที่+ใบขอด้วย)
+      const [apptByPhone, apptByApp] = await Promise.all([
+        loadAppointmentByPhone(items.map((i) => i.phone)),
+        loadContactAppointments(items.map((i) => i.id)),
+      ]);
+      for (const item of items) {
+        const fromLog = apptByApp.get(item.id);
+        const fromCall = apptByPhone.get(toE164Thai(item.phone || '') || '');
+        const at = fromLog?.at ?? fromCall;
+        if (at) {
+          (item as Record<string, unknown>).appointment_at = at;
+          if (fromLog?.place) (item as Record<string, unknown>).appointment_place = fromLog.place;
+          if (fromLog?.jobLabel) (item as Record<string, unknown>).appointment_job = fromLog.jobLabel;
         }
       }
     } catch (e) {
