@@ -444,6 +444,43 @@ npx tsx scripts/cancel-stale-lumos-queue.mts --apply   # ลงมือจร�
 แต่เก่ากว่า 7 วันจึงไม่บังใคร — ลองขยายหน้าต่างเป็น 10 ปีแล้วรันคิวรีเดิม
 ได้ 125 (จาก 126) = บังจริง · สองคนนั้นมีใบขออื่นค้างในคิว **73 และ 84 ใบ** ต่อคน
 
+### ชุบชีวิตแถวที่ยกเลิก + แผง visual รอบสิบสอง (14 ส.ค. 2569)
+
+**revive cancelled** — `insertQueueItems()` ใน `api/_lib/lumosDispatch.ts`
+`on conflict do update ... where status='cancelled'` (ค่าคงที่ `REVIVE_CANCELLED_*`)
+⚠️ unique `(channel, job_ref, person_ref)` เต็มตาราง (059) แถว cancelled กินสิทธิ์คู่
+(คน, ใบ) อยู่ · `do nothing` เดิม = ส่งซ้ำคนเดิม+ใบเดิมได้ 0 แถวเงียบ ๆ · revive แถวยกเลิก
+(reset result/delivery_count/attempt_count/followup_state) แถว active ยังกันซ้ำ ·
+มีเส้น fallback ไม่มี match_rank (ฐานยังไม่รัน 084) · เทสต์ `lumosServeOnePerPhone` +2 เคส
+⚠️ `listLumosCallStatusForJob` กรอง `status <> 'cancelled'` → UI เลิกนับแถวยกเลิกว่า "ส่งแล้ว"
+⚠️ บั๊กคีย์ hold: `MatchingPage` line ~830 อ่าน `holdByRef[String(id)]` (candidateRef ดิบ)
+ไม่ใช่ `boardPersonRef(id)` ('card-N') — map คีย์ด้วย candidateRef ดิบ
+
+**ล้างประวัติทดลอง** — `scripts/wipe-call-history.mts` (--dry default · --apply)
+ลบจริง 3 ตาราง (`lumos_dispatch_queue` · `candidate_call_holds` · `candidate_call_suppression`)
+· backup ทุกคอลัมน์ก่อนลบ (`wipe-backup-*.json` gitignore) · **DELETE ไม่ TRUNCATE**
+(id เดินต่อ ไม่งั้น dedupe_key ของ app_notifications ชน) · รันแล้ว 14 ส.ค. คิว 5,307→0
+
+**ตัวกรองปีใบขอ** — `api/_lib/siamrajSqlServerRequests.ts` `OPEN_REQUEST_MIN_DATE`
+(env `SIAMRAJ_OPEN_REQUEST_MIN_DATE` default 2024-01-01) · กรองที่ CTE `recent` จุดเดียว
+⚠️ **ห้ามแตะ `BASE_SQL_BY_ID`** — เปิดใบเก่ารายใบต้องยังได้ · เทสต์ `siamrajOpenRequestMinDate`
+
+**แผง AI โทร** — `src/components/matching/AiCallFlowPanel.tsx` (2 แถว AI+คน 8 ช่อง) ·
+ความหมายช่อง `src/lib/aiCallFlowCells.ts` (เทสต์ 6) · backend `lumos-call-funnel` เพิ่ม
+`queuedActive` (ไม่นับ cancelled) · `retryScheduledState` (followup_state) · `byAttempt.cancelled`
+· `human` block (candidate_call_holds) · แทน `CallFunnelPanel` **เฉพาะหน้า Matching**
+(หน้า Follow ยังใช้ CallFunnelPanel เดิม)
+
+**ชิปกรอง** แทน "ขั้น 1 ฝั่งงาน" — `filterChips` ใน MatchingPage (ทั้งหมด/ด่วน/มีคนแนะนำ/
+ไม่มี) · "มีคนแนะนำ" ตั้ง sort `green_desc` · sort ใหม่ใน `matchingListFilter.ts`
+(`greenCandidateCount` · เรียงเขียวมากสุด) · matching-list response เพิ่ม `green` ต่อใบ
+
+**หน้าหลัก** — `FollowTodayPanel` (วันนี้ส่งกี่คน + 3 รอบ snapshot: ส่ง/โทรติด/ไม่ติด/
+ยกเลิก · ไม่มี "กำลังเดินทาง") แทน MyCallsSection · MyCallsSection ย้ายไปหน้า Matching
+
+⚠️ **"ภาระงานโทรของทีม" ถูกตัด** — `CallTeamBoardPage.tsx` ลบทิ้ง · ปุ่มหัวหน้า (โอน/
+เทกอง/คืน AI ทั้งกอง) ไม่มี UI เหลือ · API (`?team=1` · PATCH transfer · DELETE dump) ยังอยู่
+
 ### เรียงคิวตาม tier ของ AI (migration 084 · 14 ส.ค. 2569)
 
 เจ้าของเคาะแล้วว่าใช้ **tier ของ AI** (เขียว/เหลือง/แดง) ไม่ใช่ % บนการ์ด
