@@ -261,3 +261,68 @@ describe('ล็อก "รับไปโทรเอง" + พักเบอ�
     expect(out.queued).toBe(1);
   });
 });
+
+/**
+ * แถวที่ถูกยกเลิก (`status='cancelled'`) ต้องส่งซ้ำได้ — unique เต็มตารางทำให้ `do nothing`
+ * เดิมเงียบ ๆ ได้ 0 แถว (เจอตอนล้างคิว 4,849 แถวก่อนเปิดใช้ 18 ส.ค.)
+ */
+describe('ชุบชีวิตแถวที่ยกเลิก (on conflict do update)', () => {
+  beforeEach(() => {
+    vi.mocked(dbQuery).mockClear();
+    vi.mocked(listHeldPhones).mockResolvedValue(new Set());
+    vi.mocked(listSuppressedPhones).mockResolvedValue(new Set());
+  });
+
+  const insertSql = () => {
+    const call = vi
+      .mocked(dbQuery)
+      .mock.calls.find((c) => /insert into\s+lumos_dispatch_queue/i.test(String(c[0])));
+    return String(call?.[0] ?? '');
+  };
+
+  it('insert ต้อง revive เฉพาะแถวที่ยกเลิก ไม่ใช่ do nothing', async () => {
+    await enqueueLumosInterviewForSelected(
+      { unit_name: 'ก' },
+      { jobId: 'siamraj-sql:J1', request_no: 'J1', job_family_label: 'x' },
+      [{ id: 7, full_name: 'ก', phone_number: '0812345678', job_name_th: null, position_name: null }],
+    );
+    const sql = insertSql();
+    expect(sql).toMatch(/on conflict \(channel, job_ref, person_ref\) do update/i);
+    // ⚠️ ต้องบังคับเฉพาะแถวยกเลิก — ไม่งั้น revive แถว active ที่มีผลกลับไปแล้ว
+    expect(sql).toMatch(/where\s+lumos_dispatch_queue\.status = 'cancelled'/i);
+    // ⚠️ ต้อง reset result + delivery_count ไม่งั้น takePending ไม่หยิบแถวที่ revive
+    expect(sql).toMatch(/result = null/i);
+    expect(sql).toMatch(/delivery_count = 0/i);
+    expect(sql).toMatch(/status = 'pending'/i);
+    // ต้องไม่เหลือ do nothing (บั๊กเดิม)
+    expect(sql).not.toMatch(/do nothing/i);
+  });
+
+  it('เส้น fallback (ยังไม่รัน 084) ก็ต้อง revive เหมือนกัน — ไม่ปล่อยให้เงียบ', async () => {
+    // insert แรกโยน 42703 (ไม่มี match_rank) → ถอยไปคิวรีที่สอง
+    const undefinedColumn = Object.assign(new Error('no column'), { code: '42703' });
+    let insertCount = 0;
+    vi.mocked(dbQuery).mockImplementation(async (sql: string) => {
+      if (/insert into\s+lumos_dispatch_queue/i.test(sql)) {
+        insertCount += 1;
+        if (insertCount === 1 && /match_rank/i.test(sql)) throw undefinedColumn;
+        return { rows: [{ id: 1 }] };
+      }
+      return { rows: [] };
+    });
+    await enqueueLumosInterviewForSelected(
+      { unit_name: 'ก' },
+      { jobId: 'siamraj-sql:J1', request_no: 'J1', job_family_label: 'x' },
+      [{ id: 7, full_name: 'ก', phone_number: '0812345678', job_name_th: null, position_name: null }],
+    );
+    const fallback = vi
+      .mocked(dbQuery)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((s) => /insert into\s+lumos_dispatch_queue/i.test(s))
+      .find((s) => !/match_rank/i.test(s));
+    expect(fallback).toBeTruthy();
+    expect(fallback).toMatch(/do update/i);
+    expect(fallback).toMatch(/where\s+lumos_dispatch_queue\.status = 'cancelled'/i);
+    expect(fallback).not.toMatch(/do nothing/i);
+  });
+});

@@ -192,6 +192,29 @@ function payloadPhone(payload: unknown): string | null {
 }
 
 /**
+ * on-conflict ที่ **ชุบชีวิตแถวที่ถูกยกเลิก** แทนการเงียบ (`do nothing` เดิม)
+ *
+ * ⚠️ unique `(channel, job_ref, person_ref)` เป็น constraint เต็มตาราง (migration 059)
+ * แถว `cancelled` จึงยังกินสิทธิ์คู่ (คน, ใบ) นั้นอยู่ · `do nothing` เดิมทำให้ส่งซ้ำ
+ * คนเดิม+ใบเดิมไม่ได้เลย — เงียบ ๆ ได้ 0 แถว (เจอตอนล้างคิว 4,849 แถวเป็น cancelled)
+ *
+ * `where ... status = 'cancelled'` = revive เฉพาะแถวที่ยกเลิกแล้ว · แถว active
+ * (pending/delivered/มีผล) ยังกันซ้ำเหมือนเดิม (update ไม่ผ่านเงื่อนไข → ไม่ returning →
+ * นับเป็น duplicated) · **ต้อง reset `result` + `delivery_count` ด้วย** ไม่งั้น
+ * `takePendingLumosItems()` ไม่หยิบ (มันกรอง `result is null` และ `delivery_count < MAX`)
+ */
+const REVIVE_CANCELLED_SET = `set status = 'pending', result = null, last_outcome = null,
+        delivered_at = null, delivery_count = 0, attempt_count = 1,
+        followup_state = null, next_attempt_at = excluded.next_attempt_at,
+        payload = excluded.payload, updated_at = now()`;
+const REVIVE_CANCELLED_ON_CONFLICT = `on conflict (channel, job_ref, person_ref) do update
+        ${REVIVE_CANCELLED_SET}, match_rank = excluded.match_rank
+        where ${queueTable}.status = 'cancelled'`;
+const REVIVE_CANCELLED_ON_CONFLICT_NO_RANK = `on conflict (channel, job_ref, person_ref) do update
+        ${REVIVE_CANCELLED_SET}
+        where ${queueTable}.status = 'cancelled'`;
+
+/**
  * insert คิว — คืน ref ที่เข้าคิวใหม่จริง (`added`) กับ ref ที่ไม่ส่งเพราะคนถือไปโทรเอง (`held`)
  *
  * **คอขวดเดียวของการเข้าคิวทุกเส้น** (auto / คนติ๊กเลือก / หน้า Follow) — กรองล็อกที่นี่
@@ -264,7 +287,7 @@ async function insertQueueItems(
       ({ rows } = await dbQuery<{ id: number }>(
         `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at, match_rank)
          values ($1, $2, $3, $4::jsonb, $5, $6)
-         on conflict (channel, job_ref, person_ref) do nothing
+         ${REVIVE_CANCELLED_ON_CONFLICT}
          returning id`,
         [...base, rank],
       ));
@@ -274,7 +297,7 @@ async function insertQueueItems(
       ({ rows } = await dbQuery<{ id: number }>(
         `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at)
          values ($1, $2, $3, $4::jsonb, $5)
-         on conflict (channel, job_ref, person_ref) do nothing
+         ${REVIVE_CANCELLED_ON_CONFLICT_NO_RANK}
          returning id`,
         base,
       ));
@@ -482,7 +505,7 @@ export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCal
             coalesce(last_outcome, result->>'outcome') as outcome,
             result->>'summary' as summary
        from ${queueTable}
-      where job_ref = $1
+      where job_ref = $1 and status <> 'cancelled'
       order by created_at asc`,
     [jobId],
   );

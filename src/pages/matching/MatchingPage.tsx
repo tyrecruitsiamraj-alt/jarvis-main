@@ -831,8 +831,11 @@ const MatchingPage: React.FC = () => {
   }, [lumosSelectedBoard, lumosSelectedIrecruit, lumosStatusByRef]);
 
   const lumosSelectedHoldable = useMemo(() => {
-    const board = lumosSelectedBoard.filter((id) => !holdByRef[boardPersonRef(id)]).length;
-    const ir = lumosSelectedIrecruit.filter((id) => !holdByRef[irecruitPersonRef(id)]).length;
+    // ⚠️ `holdByRef` คีย์ด้วย **candidateRef ดิบ** (`String(id)`) เหมือนตอน render การ์ด
+    // (บรรทัด 3042) และ approveAllTargets — เดิมหลุดไปใช้ `boardPersonRef` ('card-N')
+    // ที่ไม่มีวันตรง map → ปุ่ม "เก็บไปโทรเอง" นับทุกคนว่ายังว่างเสมอ (ALL_HELD ไม่เคยขึ้น)
+    const board = lumosSelectedBoard.filter((id) => !holdByRef[String(id)]).length;
+    const ir = lumosSelectedIrecruit.filter((id) => !holdByRef[String(id)]).length;
     return board + ir;
   }, [lumosSelectedBoard, lumosSelectedIrecruit, holdByRef]);
 
@@ -915,7 +918,8 @@ const MatchingPage: React.FC = () => {
           !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]) &&
           !declinedRefs.has(irecruitPersonRef(m.id)) &&
           Boolean(m.phone_number) &&
-          !lumosStatusByRef[irecruitPersonRef(m.id)],
+          !lumosStatusByRef[irecruitPersonRef(m.id)] &&
+          !holdByRef[String(m.id)],
       )
       .map((m) => m.id);
     return { board, irecruit };
