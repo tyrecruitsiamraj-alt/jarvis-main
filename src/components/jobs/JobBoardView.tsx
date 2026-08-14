@@ -553,19 +553,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ))}
                       </div>
                     ) : null}
-                    <div className="flex w-full items-center justify-between gap-2">
+                    {/* เจ้าของสั่ง 14 ส.ค. 2569: จัดเรียงให้สวย · "สร้างลิงก์" → "Gen link"
+                        · 2 ปุ่มคนละสี (ค้นหา = ฟ้า · Gen link = ม่วง) — สีมาจาก TONE ที่เดียว
+                        แถวเดียว wrap ได้ · "ผู้สมัคร N คน" ซ้าย · ปุ่ม+ดูรายชื่อ ขวา */}
+                    <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                        <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                         ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
                       </span>
-                      <div className="flex items-center gap-2">
-                        {/* ค้นหาคนที่ยังไม่สมัคร (เจ้าของสั่ง 13 ส.ค. 2569: "ขอปุ่มนี้ใน
-                            บอร์ดรับสมัครงาน ตามกล่องงานแต่ละงานด้วย") — พาไปหน้า Matching
-                            ของใบนั้นแล้วค้นให้เลยด้วย `?ir=1`
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* ค้นหาคนที่ยังไม่สมัคร — พาไปหน้า Matching ของใบนั้นแล้วค้นให้เลยด้วย `?ir=1`
                             ⚠️ ที่นี่ทำได้แค่ navigate เป็นสตริง **ห้าม import อะไรจาก
                             pages/matching เข้าไฟล์นี้** เพราะไฟล์นี้ใช้ร่วมกับหน้าสมัคร
-                            สาธารณะ /apply (bundle ฝั่ง public จะบวมและลากโค้ดหลังบ้านไปด้วย)
-                            · อยู่ในบล็อก isStaff จึงไม่มีทางโผล่บนหน้าสาธารณะ */}
+                            สาธารณะ /apply (bundle ฝั่ง public จะบวมและลากโค้ดหลังบ้านไปด้วย) */}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -573,7 +573,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             navigate(`/matching/match?jobId=${encodeURIComponent(job.id)}&ir=1`);
                           }}
                           title="เปิดใบขอนี้ในหน้า Matching แล้วค้นหาคนในฐานที่ยังไม่ได้สมัครงานนี้"
-                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.info.outline,
+                          )}
                         >
                           <Search className="h-3.5 w-3.5" />
                           ค้นหาคนที่ยังไม่สมัคร
@@ -584,12 +587,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             e.stopPropagation();
                             setGenLinkJob(job);
                           }}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.violet.outline,
+                          )}
                         >
                           <Link2 className="h-3.5 w-3.5" />
-                          สร้างลิงก์
+                          Gen link
                         </button>
-                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "สร้างลิงก์" ก่อน */}
+                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
                         {latestPostingByJob.has(job.id) ? (
                           <button
                             type="button"
