@@ -6,14 +6,11 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
-  APPLICATION_STATUSES,
   fetchApplicationDocument,
   fetchJobApplications,
   GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
-  updateJobApplication,
   claimJobApplication,
-  type ApplicationStatus,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { cn } from '@/lib/utils';
@@ -61,19 +58,6 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
       setError(e instanceof Error ? e.message : 'โหลดไฟล์แนบไม่สำเร็จ');
     } finally {
       setDownloadingId(null);
-    }
-  };
-
-  const changeStatus = async (id: string, status: ApplicationStatus) => {
-    setSavingId(id);
-    setItems((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-    try {
-      const updated = await updateJobApplication(id, { status });
-      setItems((prev) => prev.map((a) => (a.id === id ? updated : a)));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'อัปเดตสถานะไม่สำเร็จ');
-    } finally {
-      setSavingId(null);
     }
   };
 
@@ -301,49 +285,35 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5">
-                    <span className="mr-1 text-[11px] text-muted-foreground">สถานะ:</span>
-                    {APPLICATION_STATUSES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        disabled={savingId === a.id}
-                        onClick={() => void changeStatus(a.id, s)}
-                        className={cn(
-                          // border-transparent ให้ box model เท่ากับปุ่ม "เก็บไปติดต่อ" ที่มี border
-                          // (ต่างกัน 2px ทำให้ขอบล่างของแถวเหลื่อมกันระหว่างการ์ด)
-                          'rounded-full border border-transparent px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50',
-                          a.status === s
-                            ? APPLICATION_STATUS_CLASS[s]
-                            : 'bg-muted/60 text-muted-foreground hover:bg-muted',
-                        )}
-                      >
-                        {APPLICATION_STATUS_LABEL[s]}
-                      </button>
-                    ))}
-                    {/* "เก็บไปติดต่อ" (เจ้าของสั่ง 13 ส.ค. 2569) — เก็บแล้วใบไปโผล่แท็บ
-                        การติดต่อของคนเก็บคนเดียว · ถูกคนอื่นเก็บ = บอกว่าใครไม่ได้ (server
-                        ไม่ส่งชื่อ) แต่ต้องบอกว่า "ถูกเก็บแล้ว" ไม่ให้กดชนเงียบ ๆ */}
-                    {a.claimed && !a.claimed_by_me ? (
-                      <span className="ml-auto rounded-full border border-transparent bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                        🔒 เพื่อนเก็บไปติดต่อแล้ว
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={savingId === a.id}
-                        onClick={() => void toggleClaim(a)}
-                        className={cn(
-                          'ml-auto inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50',
-                          a.claimed_by_me
-                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-                            : 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
-                        )}
-                      >
-                        {a.claimed_by_me ? '✓ อยู่ในการติดต่อของฉัน — กดเพื่อคืน' : 'เก็บไปติดต่อ'}
-                      </button>
-                    )}
-                  </div>
+                  {/* ⚠️ ปุ่ม "เลือกสถานะ" ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569): "คำว่าสถานะ
+                      ไม่ได้ให้คนเลือก แต่มันจะสอดคล้องกันหลังจากคนเก็บไปโทร" — สถานะมาจาก
+                      "ขั้นที่คนทำ" (ผลโทร/เก็บ Lead/จอง) ไม่ใช่กดมั่ว · ป้าย read-only + ชิป
+                      "โทรแล้ว · [ผล]" ในหัวการ์ดสื่อสถานะจริงอยู่แล้ว
+                      "เก็บไปติดต่อ" ย้ายมาอยู่ **เฉพาะแท็บ "รายชื่อที่สนใจ"** เพราะเจ้าของสั่ง
+                      "ให้เก็บหลังจากที่เขาสนใจ" — โทรแล้วสนใจถึงค่อยเก็บไปติดต่อ */}
+                  {tab === 'interested' ? (
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-border/50 pt-2.5">
+                      {a.claimed && !a.claimed_by_me ? (
+                        <span className="rounded-full border border-transparent bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                          🔒 เพื่อนเก็บไปติดต่อแล้ว
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={savingId === a.id}
+                          onClick={() => void toggleClaim(a)}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50',
+                            a.claimed_by_me
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                              : 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
+                          )}
+                        >
+                          {a.claimed_by_me ? '✓ อยู่ในการติดต่อของฉัน — กดเพื่อคืน' : 'เก็บไปติดต่อ'}
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
 
                   {/* หมายเหตุยาวไม่จำกัด = ตัวเดียวที่ความสูงคาดเดาไม่ได้ — เจ้าของเคาะ
                       13 ส.ค. 2569 ให้ "เห็นเต็ม ย้ายไปล่างสุด" ความแปรผันจึงกองอยู่
