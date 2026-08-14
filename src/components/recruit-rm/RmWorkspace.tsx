@@ -10,6 +10,7 @@ import RmToolbar from '@/components/recruit-rm/RmToolbar';
 import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
+import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import {
   EMPTY_RM_FILTERS,
@@ -446,6 +447,21 @@ const RmWorkspace: React.FC<{
               แท็บนี้คือคนที่สถานะ "รับเข้าทำงาน" แล้ว · คอลัมน์ <b>วันนัด</b> มาจากตอนกดผลโทร
               "สนใจ → นัดได้เลย" — ขีดกลางแปลว่ายังไม่มีนัด
             </p>
+          ) : null}
+
+          {/* แท็บ "การติดต่อ" มี 2 ส่วนที่ **ทำงานคนละแบบ** (เจ้าของสั่ง 14 ส.ค. 2569):
+              1. เก็บไปโทรเอง (call hold ผูกเบอร์ · มาจากหน้า Matching + ปุ่มโทรในแท็บนี้) — MyCallsSection
+                 เจ้าของ pain: "เก็บไปโทรเองแล้วไปอยู่ไหนหาไม่เจอ" → ให้มีที่ถาวรตรงนี้
+              2. เก็บไปติดต่อ (claim บนใบสมัคร) — RmTable ด้านล่าง
+              ⚠️ MyCallsSection ซ่อนตัวเองเมื่อไม่มีงานโทรค้าง (holds=0) — hint จึงบอกไว้เสมอ */}
+          {tab === 'contact' ? (
+            <>
+              <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.primary.soft, TONE.primary.value)}>
+                <b>2 ส่วนที่ทำงานคนละแบบ:</b> ① เก็บไปโทรเอง (จากหน้า Matching — ผูกเบอร์
+                มีเวลาโทร) โผล่ด้านบนตอนมีงานค้าง · ② เก็บไปติดต่อ (ใบที่คุณเก็บ) อยู่ในตารางด้านล่าง
+              </p>
+              <MyCallsSection />
+            </>
           ) : null}
 
           {loadError ? (

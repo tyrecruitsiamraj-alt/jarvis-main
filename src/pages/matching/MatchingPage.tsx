@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
-import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
@@ -2265,10 +2264,11 @@ const MatchingPage: React.FC = () => {
           })}
         </div>
 
-        {/* โทรของฉัน — ย้ายมาจากหน้าหลัก (เจ้าของสั่ง 14 ส.ค. 2569) เพื่อให้ "เก็บไปโทร"
-            กับ "ถังที่เก็บไปแล้ว" อยู่ที่เดียวกัน · ซ่อนตัวเองเมื่อไม่มีงาน (ไม่กินที่)
-            ⚠️ เก็บแล้วไม่กดผลภายใน 1 วัน ระบบคืนเข้าคิวอัตโนมัติ (releaseExpiredCallHolds) */}
-        <MyCallsSection />
+        {/* ⚠️ MyCallsSection ("โทรของฉัน") เคยอยู่ตรงนี้ (14 ส.ค. เช้า) — เจ้าของสั่งย้าย
+            (14 ส.ค.): "เก็บไปโทรเองแล้วไปอยู่ไหนหาไม่เจอ · ให้ไปอยู่หน้าการติดต่อ"
+            → Matching = ที่ "เก็บ" (action) · แท็บการติดต่อบนบอร์ด = ที่ "ดู+โทร" (ปลายทาง)
+            เหมือนบอร์ด: เก็บไปติดต่อที่ dialog แล้วไปดูที่แท็บการติดต่อ · ตอนนี้ MyCallsSection
+            อยู่ในแท็บการติดต่อ (RmWorkspace) แยกส่วนจาก list "เก็บไปติดต่อ" (claim) */}
 
         {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
             เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
