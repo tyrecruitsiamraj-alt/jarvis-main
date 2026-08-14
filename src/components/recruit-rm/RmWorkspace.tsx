@@ -6,8 +6,6 @@ import { DASH, TONE } from '@/lib/designTokens';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import RmFilterSidebar from '@/components/recruit-rm/RmFilterSidebar';
-import RmToolbar from '@/components/recruit-rm/RmToolbar';
-import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
@@ -17,7 +15,6 @@ import {
   RM_ROW_ACTION_LABEL,
   RM_TABS,
   RM_TAB_LABEL,
-  RM_TOOLBAR_LABEL,
   filterApplications,
   isInRmTab,
   isInRmListView,
@@ -30,7 +27,6 @@ import {
   type RmFilters,
   type RmRowAction,
   type RmTab,
-  type RmToolbarKey,
 } from '@/lib/recruitRm';
 import {
   fetchAllJobApplications,
@@ -106,7 +102,6 @@ const RmWorkspace: React.FC<{
   const [pageSize, setPageSize] = useState<PageSizeOption>(PAGE_SIZE_DEFAULT);
   /** ข้อความบอกว่ายังไม่ได้ต่อของจริง — ดีกว่าปุ่มที่กดแล้วเงียบ */
   const [notice, setNotice] = useState<string | null>(null);
-  const [reasonsOpen, setReasonsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const { user } = useAuth();
   /** ล็อกโทรของแถวในหน้า (คีย์ = application id) — โชว์ 🔒 + กันกดซ้ำ */
@@ -244,12 +239,9 @@ const RmWorkspace: React.FC<{
     setPage(1);
   };
 
+  /** ปุ่มแถวที่ยังไม่ต่อของจริง — ขึ้นข้อความ ดีกว่ากดแล้วเงียบ */
   const todo = (what: string) => setNotice(`${what} — ยังไม่ได้ต่อกับระบบจริง`);
-  const onToolbar = (key: RmToolbarKey) => {
-    setNotice(null);
-    if (key === 'reasons') return setReasonsOpen(true);
-    todo(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}"`);
-  };
+
   /** สร้าง HoldTarget จากใบสมัคร — source 'application' · ref = application id (แค่ display) */
   const toHoldTarget = (row: PublicApplication): HoldTarget => ({
     candidateRef: row.id,
@@ -327,11 +319,10 @@ const RmWorkspace: React.FC<{
     <div>
       {/* แถบแท็บย่อย — โผล่เฉพาะโหมดไม่ถูกคุมจากข้างนอก (ตอนนี้บอร์ดคุมด้วย ?view= แล้ว
           แถบนี้จึงไม่ขึ้นบนบอร์ด — คงไว้เผื่อ RmWorkspace ถูกใช้เดี่ยว ๆ ที่อื่น) */}
+      {/* ⚠️ ป้าย "ข้อมูลผู้สมัคร · N รายการ" ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569) —
+          ซ้ำกับ tab bar ระดับบอร์ดที่มีชื่อแท็บ+จำนวนอยู่แล้ว · เหลือแค่ปุ่มรีเฟรช */}
       {controlledTab ? (
-        <div className="flex items-center justify-between gap-2">
-          <p className={cn('text-xs', DASH.muted)}>
-            {RM_TAB_LABEL[tab]} · {loading ? '…' : tabCounts[tab].toLocaleString('th-TH')} รายการ
-          </p>
+        <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={load} disabled={loading} className="jarvis-btn-secondary">
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </button>
@@ -405,28 +396,28 @@ const RmWorkspace: React.FC<{
         <RmFilterSidebar filters={filters} onChange={setFilters} provinces={provinces} />
 
         <div className="min-w-0 flex-1 space-y-3">
-          <div className={cn('space-y-3 rounded-2xl border p-3', DASH.card)}>
-            <RmToolbar onOpen={onToolbar} />
-            <div className={cn('border-t pt-3', DASH.divider)}>
-              <RmSearchBar
-                keyword={keyword}
-                onKeywordChange={(v) => {
-                  setKeyword(v);
-                  setPage(1);
-                }}
-                onSearch={() => setPage(1)}
-                showLeadTools={rmTabHasLeadTools(tab)}
-                selectedCount={selectedIds.length}
-                onSaveLead={() => void applyLead(true)}
-                onDeleteLead={() => void applyLead(false)}
-                leadBusy={leadBusy}
-                leadView={leadView}
-                onToggleLeadView={() => setLeadView(!leadView)}
-                onAddApplicant={() => setAddOpen(true)}
-                onHoldSelected={() => void holdSelectedForSelf()}
-                holdingSelected={holdingSelected}
-              />
-            </div>
+          {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
+              "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools
+              บนกล่องงาน (view=board) เท่านั้น · เหลือแค่ค้นหา + เพิ่มผู้สมัคร + Lead */}
+          <div className={cn('rounded-2xl border p-3', DASH.card)}>
+            <RmSearchBar
+              keyword={keyword}
+              onKeywordChange={(v) => {
+                setKeyword(v);
+                setPage(1);
+              }}
+              onSearch={() => setPage(1)}
+              showLeadTools={rmTabHasLeadTools(tab)}
+              selectedCount={selectedIds.length}
+              onSaveLead={() => void applyLead(true)}
+              onDeleteLead={() => void applyLead(false)}
+              leadBusy={leadBusy}
+              leadView={leadView}
+              onToggleLeadView={() => setLeadView(!leadView)}
+              onAddApplicant={() => setAddOpen(true)}
+              onHoldSelected={() => void holdSelectedForSelf()}
+              holdingSelected={holdingSelected}
+            />
           </div>
 
           {notice ? (
@@ -513,7 +504,6 @@ const RmWorkspace: React.FC<{
         }}
       />
 
-      <ReasonManagerDialog open={reasonsOpen} onClose={() => setReasonsOpen(false)} />
     </div>
   );
 };
