@@ -11,13 +11,13 @@
 |---|---|
 | branch | `main` · sync กับ remote แล้ว · **working tree สะอาด** |
 | commit ล่าสุด | `1f2e4d0` (รอบสิบ 13 ส.ค. — 14 commit · **ดู §0.1 ก่อน**) · ก่อนหน้า `d762ba7` (รอบเก้า · ดู §0.2) · ก่อนหน้า `c7e5b61` (รอบแปด 13 ส.ค. — 8 commit: drawer เหลือทางส่งโทร · ยุบแถบการไหลของงาน 4+4 การ์ด · โทรของฉันเข้าหน้าหลัก · แท็บบอร์ด 4 อัน · ค้นหาขึ้นบน+กล่องลอยลงล่าง · เก็บไปติดต่อเฉพาะของฉัน) |
-| `npm run test` | **1,054 ผ่าน / 4 skipped** (ไฟล์เทสต์ **117**) — 14 ส.ค. รอบสิบสอง |
+| `npm run test` | **1,063 ผ่าน / 4 skipped** (ไฟล์เทสต์ **118**) — 14 ส.ค. รอบสิบสาม |
 | `npx tsc --noEmit -p tsconfig.app.json` | 0 error (ครอบ `src/`) |
 | `npx tsc --noEmit` | 0 error (**ไม่ครอบทั้ง src/ และ api/** — อย่าหลงว่าเช็คแล้ว) |
 | `npx tsc --noEmit -p tsconfig.api.json` | **0 error** (ครอบ `api/` · กติกา: **ต้องเป็น 0**) |
 | `npx eslint .` | 0 error · 16 warning เดิม |
-| `npx tsx scripts/verify-api-registry.mjs` | ผ่าน (**77 route**) |
-| migration | ไฟล์ถึง **085** · **บนฐานรันครบถึง 085 แล้ว** ✅ (079 = claim "เก็บไปติดต่อ" · 080 = ผ่อน unique คำขอโพสเป็น (ใบขอ, ประเภท) · 081 = `staff_phone` บน follow_entries · 082 = `department_code` บนใบสมัคร = คลังกลาง · **083 = Lead** บนใบสมัคร · **084 = `match_rank`** บนคิวโทร · **085 = วันนัด + scope "สนใจ"** บนแถวผลโทร) |
+| `npx tsx scripts/verify-api-registry.mjs` | ผ่าน (**78 route**) |
+| migration | ไฟล์ถึง **086** · **บนฐานรันครบถึง 086 แล้ว** ✅ (079 = claim "เก็บไปติดต่อ" · 080 = ผ่อน unique คำขอโพสเป็น (ใบขอ, ประเภท) · 081 = `staff_phone` บน follow_entries · 082 = `department_code` บนใบสมัคร = คลังกลาง · **083 = Lead** บนใบสมัคร · **084 = `match_rank`** บนคิวโทร · **085 = วันนัด + scope "สนใจ"** บนแถวผลโทร · **086 = log ผลติดต่อ** ของใบสมัคร) |
 | โหมดโทร | **manual ทุกจุด** — production ยังไม่โทรหาใครเอง |
 | precompute AI | **เปิดแล้ว** ✅ (เจ้าของเคาะ 12 ส.ค.) — `MATCH_PRECOMPUTE_ENABLED=true` ใน `.env.local` (git ignore) · ⚠️ **server จริงต้องใส่ใน `.env` เองตอน deploy** · precompute แค่คิดผลแมท ไม่โทรหาใคร |
 

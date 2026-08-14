@@ -444,6 +444,36 @@ npx tsx scripts/cancel-stale-lumos-queue.mts --apply   # ลงมือจร�
 แต่เก่ากว่า 7 วันจึงไม่บังใคร — ลองขยายหน้าต่างเป็น 10 ปีแล้วรันคิวรีเดิม
 ได้ 125 (จาก 126) = บังจริง · สองคนนั้นมีใบขออื่นค้างในคิว **73 และ 84 ใบ** ต่อคน
 
+### หน้ากล่องงาน/รายชื่อ/การติดต่อ/นัดหมาย — รอบสิบสาม (14 ส.ค. 2569)
+
+เจ้าของส่งลิสต์ 9 ข้อ + โจทย์ "เก็บไปโทรเองหาไม่เจอ" — ทำครบแล้ว:
+
+* **เก็บไปโทรเอง → แท็บการติดต่อ** — `MyCallsSection` ย้ายไป `RmWorkspace` แท็บ contact
+  (Matching = ที่เก็บ · การติดต่อ = ที่ดู+โทร) · hint บอก 2 ส่วนทำงานคนละแบบ
+  (① call hold ผูกเบอร์ ② claim บนใบสมัคร)
+* **Lead → การติดต่อ** (แทนคลังสำรอง) — server `leadWhere='true'` ที่ default list
+  (dialog กล่องงานยังซ่อน Lead) · client `isInRmTab`: kept = claimed_by_me **หรือ** is_lead
+  · Lead+declined กลับ candidates · ปุ่ม "ดูคลังสำรอง" ถอดแล้ว (?lead=1 ยังใช้ได้)
+* **dialog ติดต่อสำเร็จ/ไม่สำเร็จ** (migration 086 `application_contact_logs`) —
+  `api/_lib/applicationContacts.ts` + `/api/application-contacts` (registry **78 route**)
+  · `ApplicantContactDialog` เปิดจากปุ่ม view/rule · สำเร็จ→นัดได้ไหม→วัน/ที่/dropdown
+  ใบขอเปิด (ค่าเริ่มต้น "ยังไม่ระบุ — หาล่วงหน้า") · ไม่สำเร็จ→เหตุผล master (1×C)
+  ⚠️ server เคลียร์ฟิลด์ข้ามฝั่ง (ไม่สำเร็จห้ามมีนัดติดไป ฯลฯ — เทสต์ 7 เคส mutation 3/3)
+  ⚠️ สถานะใบตาม "ขั้นที่คนทำ" (เจ้าของเคาะ): นัดได้=converted · ที่เหลือ=contacted
+  ⚠️ reason_label/job_label เป็น **snapshot** — master ปิดใช้ได้/ใบขอปิดได้
+* **วันนัดมี 2 แหล่ง** — call hold (085 คีย์เบอร์) + contact log (086 คีย์ใบ) ·
+  job-applications GET รวมให้แล้ว (**log ชนะ** — เจาะจงใบ + มีสถานที่/ใบขอ)
+* **แท็บนัดหมาย + PDF** — หัวสรุป "นัด N จาก M คน" + ปุ่ม window.print ·
+  print CSS `:has(.rm-print-area)` ใน index.css โชว์เฉพาะตาราง (เบราว์เซอร์เก่าพิมพ์ทั้งหน้า)
+  · คอลัมน์ "นัดที่ไหน" (สถานที่ · ใบขอ/หาล่วงหน้า) · คอลัมน์ "โทรล่าสุด" ในแท็บ contact
+  (hold.heldAt ถ้าถืออยู่ · last_call_at ถ้ามีผล)
+* **ปุ่มเลือกสถานะใน dialog ผู้สมัครถูกถอด** — สถานะมาจากขั้นที่คนทำ ไม่ใช่กดมั่ว
+  · "เก็บไปติดต่อ" เหลือเฉพาะแท็บ "รายชื่อที่สนใจ" (เก็บหลังโทรแล้วสนใจ)
+* **RmToolbar (ช่องทาง/ลิงก์/เหตุผล) ถอดจากหน้า RM** — เครื่องมือเหลือที่กล่องงานเท่านั้น
+  · ReasonManagerDialog ตายตาม (เปิดได้จาก toolbar เดียว) ถอดด้วย
+* **tab bar บอร์ดอยู่ position เดียวกันทุกแท็บ** — ย้ายเหนือ RecruitFunnelPanel
+* ปุ่มการ์ดกล่องงาน: "สร้างลิงก์"→"Gen link" · 2 ปุ่มคนละสี (info/violet outline)
+
 ### ชุบชีวิตแถวที่ยกเลิก + แผง visual รอบสิบสอง (14 ส.ค. 2569)
 
 **revive cancelled** — `insertQueueItems()` ใน `api/_lib/lumosDispatch.ts`
