@@ -114,7 +114,7 @@ describe('โทนผลโทร — แหล่งเดียว ห้า�
     'src/components/matching/CallHoldPanel.tsx',
     // หน้า "โทรของฉัน" เปิดกลับมา 11 ส.ค. 2569 รอบหก — กลับเข้าลิสต์คุมโทนตามเดิม
     'src/pages/matching/MyCallsPage.tsx',
-    'src/pages/matching/CallTeamBoardPage.tsx',
+    // CallTeamBoardPage ลบทิ้ง 14 ส.ค. 2569 (ตัดบอร์ดทีมออก — เจ้าของสั่ง)
   ];
 
   it('ไม่มีไฟล์หน้าไหนประกาศตารางโทนผลโทรของตัวเอง', () => {

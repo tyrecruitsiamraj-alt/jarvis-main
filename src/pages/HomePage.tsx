@@ -32,7 +32,7 @@ import {
   bookingTargetFromPersonRef,
 } from '@/lib/callResultBooking';
 import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
-import { MyCallsSection } from '@/pages/matching/MyCallsPage';
+import FollowTodayPanel from '@/components/home/FollowTodayPanel';
 import LumosCallHealthPanel from '@/components/home/LumosCallHealthPanel';
 import { lumosConnectRate } from '@/lib/lumosLinkHealth';
 
@@ -488,10 +488,9 @@ const HomePage: React.FC = () => {
             onOpenResults={() => setCallResultsOpen(true)}
           />
 
-          {/* "โทรของฉัน" ย้ายมาจาก /matching/my-calls (เจ้าของสั่ง 13 ส.ค. 2569:
-              "ย้ายไปรวมกับหน้าหลักแต่จัดวางให้ดูสวยๆ ไม่รก") — ตัว section ซ่อนตัวเอง
-              เมื่อไม่มีงานค้าง/ไม่มียอดวันนี้ (ยกเว้นหัวหน้าที่ต้องเห็นบอร์ดทีม) */}
-          <MyCallsSection />
+          {/* "งาน Follow วันนี้" (เจ้าของสั่ง 14 ส.ค. 2569) — แทนที่ "โทรของฉัน" ที่ย้าย
+              ไปหน้า Matching แล้ว · เห็นทันทีว่าวันนี้ส่งกี่คน + ผลราย 3 รอบ */}
+          <FollowTodayPanel />
         </motion.section>
       ) : null}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}

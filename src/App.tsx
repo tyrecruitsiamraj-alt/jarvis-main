@@ -105,10 +105,10 @@ const ProtectedRoutes = () => {
             <Route path="/recruit/rm" element={<RecruitRmPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
             {/* "โทรของฉัน" ย้ายเป็น section บนหน้าหลักแล้ว (เจ้าของสั่ง 13 ส.ค. 2569:
-                "ย้ายไปรวมกับหน้าหลักแต่จัดวางให้ดูสวยๆ ไม่รก") — สอง path เดิม
-                redirect เข้าหน้าหลัก กัน bookmark เก่าพัง */}
-            <Route path="/matching/my-calls" element={<Navigate to="/" replace />} />
-            <Route path="/matching/call-team" element={<Navigate to="/" replace />} />
+                14 ส.ค. ย้ายไปหน้า Matching) — สอง path เดิม redirect เข้าหน้า Matching
+                กัน bookmark เก่าพัง · call-team ไม่มีบอร์ดทีมแล้ว (เอาออก 14 ส.ค.) */}
+            <Route path="/matching/my-calls" element={<Navigate to="/matching/match" replace />} />
+            <Route path="/matching/call-team" element={<Navigate to="/matching/match" replace />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />

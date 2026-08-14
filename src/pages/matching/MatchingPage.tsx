@@ -1,15 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import CallFunnelPanel, { FlowArrow, FlowStage, FUNNEL_ROW_GRID } from '@/components/follow/CallFunnelPanel';
-
-/**
- * แถวฝั่งงานใช้ **โครงคอลัมน์เดียวกับแถวการโทร** (`FUNNEL_ROW_GRID` — การ์ด 4 ช่อง
- * สลับลูกศร 3 ช่อง โครงเดียวกับหน้าหลัก) — เจ้าของทัก 13 ส.ค. 2569 ว่าแผงเดิมรก
- * จึงยุบเหลือแถวละ 4 การ์ด: อัตราทั้งหมด → ด่วน → มีคนแนะนำ (เขียว/เหลืองเป็น
- * บรรทัดย่อยติดสี) → ยังไม่มีคน · ลูกศรตัวแรกเป็น ghost (ด่วนเป็น subset ไม่ใช่ขั้นถัดไป)
- * ทั้งสองแถวต้องมีลูกครบทุกช่อง — ช่อง auto ที่ว่างจะยุบแล้วคอลัมน์เหลื่อม (กับดัก grid เดิม)
- */
+import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
+import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
@@ -247,7 +240,7 @@ let lastServerList: {
   unitOptions: string[];
   buCounts: Record<string, number>;
   summary: ServerListSummary | null;
-  storedMatches: Record<string, { recommended: number; computedAt: string }>;
+  storedMatches: Record<string, { recommended: number; green?: number; computedAt: string }>;
   lumosSummary: Record<string, LumosJobCallSummaryRow>;
 } | null = null;
 
@@ -477,7 +470,7 @@ const MatchingPage: React.FC = () => {
     () => lastServerList?.summary ?? null,
   );
   const [serverStoredMatches, setServerStoredMatches] = useState<
-    Record<string, { recommended: number; computedAt: string }>
+    Record<string, { recommended: number; green?: number; computedAt: string }>
   >(() => lastServerList?.storedMatches ?? {});
   /** สรุปผลโทร Lumos ต่อใบ (จาก /api/matching/list) — โชว์ข้างการ์ดในลิสต์ */
   const [serverLumosSummary, setServerLumosSummary] = useState<Record<string, LumosJobCallSummaryRow>>(
@@ -547,7 +540,7 @@ const MatchingPage: React.FC = () => {
         unitOptions?: string[];
         buCounts?: Record<string, number>;
         summary?: ServerListSummary;
-        storedMatches?: Record<string, { recommended: number; computedAt: string }>;
+        storedMatches?: Record<string, { recommended: number; green?: number; computedAt: string }>;
         lumosSummary?: Record<string, LumosJobCallSummaryRow>;
       };
       if (seq !== serverFetchSeq.current) return;
@@ -2139,102 +2132,68 @@ const MatchingPage: React.FC = () => {
   }, [rows, quickCounts, boardMatchById, serverSummary]);
 
   /**
-   * แถว "ฝั่งงาน" ที่ไปต่อหัวเส้นการโทรในแผงเดียวกัน (เจ้าของสั่ง 11 ส.ค. 2569)
+   * แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (เจ้าของสั่ง 14 ส.ค. 2569:
+   * "ขั้นฝั่งงานที่ต้องหา เอาออก แต่เพิ่ม Filter เป็น งานที่มีคนแนะนำ เรียงจากใบที่มี
+   * คนเขียวแนะนำมากที่สุดลงมา กับ ไม่มีคนแนะนำ")
    *
-   * เดิมเป็นการ์ดพื้นอ่อน 5 ใบลอยอยู่ใต้แผง funnel — คนอ่านต้องกวาดตาสองที่แล้วต่อเรื่อง
-   * เอาเองว่า "อัตราที่ยังไม่มีคน" กับ "สายที่โทรไป" เกี่ยวกันยังไง
-   *
-   * ⚠️ **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** — กล่องตัวกรองถูกเอาออกไปแล้ว
-   * (10 ส.ค. 2569) การ์ดพวกนี้คือทางกรองทางเดียวที่เหลืออยู่ · ทำหายเมื่อไหร่
-   * คนจะกรองรายการไม่ได้เลยนอกจากแก้ URL เอง
-   *
-   * ⚠️ อ่านซ้ายไปขวา: อัตราทั้งหมด (+ในนั้นด่วนเท่าไหร่) → แยกตามที่ AI หาคนได้
-   * เขียว + เหลือง + ยังไม่มีคน = อัตราทั้งหมดพอดี · **"ด่วน" นับซ้อน** ไม่ใช่ขั้นในเส้น
-   * จึงวางคู่กับ "อัตราทั้งหมด" ก่อนลูกศร ไม่ใช่คั่นกลางเส้นให้เข้าใจผิดว่าเป็นลำดับ
+   * ⚠️ นี่คือ **ทางกรองรายการทางเดียวที่เหลือ** (กล่องตัวกรองถูกถอด 10 ส.ค.) — ห้ามทำหาย
+   * "มีคนแนะนำ" ตั้ง sort=green_desc อัตโนมัติ (เรียงเขียวมากสุดตามที่เจ้าของสั่ง)
    */
-  const demandFlowRow = useMemo(() => {
-    if ((serverSummary?.scopedTotal ?? listTotal) <= 0) return null;
-    const jobs = (n: number) => `${n.toLocaleString('th-TH')} ใบขอ`;
-    const noneJobs = serverSummary?.noRecommend ?? urgentSummary.none;
-    const unanalyzed = serverSummary?.noneUnanalyzed ?? 0;
-    return (
-      <div className={FUNNEL_ROW_GRID}>
-        <FlowStage
-          label="อัตราทั้งหมด"
-          value={serverSummary?.positionsTotal ?? listTotal}
-          sub={jobs(serverSummary?.scopedTotal ?? listTotal)}
-          tone="neutral"
-          active={!urgentOnly && workflowFilter === 'all'}
-          disabled={serverListLoading}
-          title='กดเพื่อดูเฉพาะ "อัตราทั้งหมด"'
-          onClick={() => {
-            setUrgentOnly(false);
-            setWorkflowFilter('all');
-          }}
-        />
-        <FlowArrow ghost />
-        <FlowStage
-          label="ในนั้นเป็นงานด่วน"
-          value={serverSummary?.positionsUrgent ?? urgentSummary.total}
-          sub={`${jobs(serverSummary?.urgentTotal ?? urgentSummary.total)} · นับซ้อนกับ 2 ถังขวา`}
-          tone="danger"
-          active={urgentOnly}
-          disabled={serverListLoading}
-          title='กดเพื่อดูเฉพาะ "อัตราด่วน"'
-          onClick={() => {
-            setUrgentOnly(true);
-            setWorkflowFilter('all');
-          }}
-        />
-        <FlowArrow />
-        {/* เจ้าของทัก 13 ส.ค. 2569 ว่าแถวนี้รก — ยุบ "เขียว/เหลือง" จากการ์ดของตัวเอง
-            เป็นบรรทัดย่อยติดสีของ "มีคนแนะนำ" (เลขยังครบ) · ตัวกรอง green/yellow
-            ยังใช้ผ่าน URL (?workflow=green|yellow) ได้เหมือนเดิม แค่ไม่มีการ์ดให้กด */}
-        <FlowStage
-          label="มีคนแนะนำ"
-          value={(serverSummary?.positionsGreen ?? urgentSummary.greenSuggested) + (serverSummary?.positionsYellow ?? 0)}
-          sub={
-            <span className="flex flex-wrap gap-x-1.5">
-              <span>{jobs((serverSummary?.withGreen ?? urgentSummary.greenSuggested) + (serverSummary?.withYellow ?? 0))}</span>
-              <span className={TONE.success.onDark}>
-                เขียว {(serverSummary?.positionsGreen ?? urgentSummary.greenSuggested).toLocaleString('th-TH')}
-              </span>
-              <span className={TONE.warn.onDark}>
-                เหลือง {(serverSummary?.positionsYellow ?? 0).toLocaleString('th-TH')}
-              </span>
-            </span>
-          }
-          tone="info"
-          active={workflowFilter === 'recommended' || workflowFilter === 'green' || workflowFilter === 'yellow'}
-          disabled={serverListLoading}
-          title='กดเพื่อดูเฉพาะ "มีคนแนะนำ" (เขียวหรือเหลือง)'
-          onClick={() => {
-            setUrgentOnly(false);
-            setWorkflowFilter('recommended');
-          }}
-        />
-        <FlowArrow />
-        <FlowStage
-          label="ยังไม่มีคน"
-          value={serverSummary?.positionsNone ?? urgentSummary.none}
-          // แยกให้เห็นว่า "AI ดูแล้วไม่เจอ" กับ "ยังไม่ได้ดู" คนละงานที่ต้องทำต่อ
-          sub={
-            unanalyzed > 0
-              ? `${jobs(noneJobs)} · ยังไม่ได้ประเมิน ${unanalyzed.toLocaleString('th-TH')}`
-              : jobs(noneJobs)
-          }
-          tone="orange"
-          active={workflowFilter === 'none'}
-          disabled={serverListLoading}
-          title='กดเพื่อดูเฉพาะ "ยังไม่มีคน"'
-          onClick={() => {
-            setUrgentOnly(false);
-            setWorkflowFilter('none');
-          }}
-        />
-      </div>
-    );
-  }, [serverSummary, listTotal, urgentSummary, urgentOnly, workflowFilter, serverListLoading]);
+  const filterChips = useMemo(() => {
+    const withRecommend =
+      (serverSummary?.withGreen ?? urgentSummary.greenSuggested) + (serverSummary?.withYellow ?? 0);
+    return [
+      {
+        key: 'all',
+        label: 'ทั้งหมด',
+        count: serverSummary?.scopedTotal ?? listTotal,
+        tone: 'neutral' as const,
+        active: !urgentOnly && workflowFilter === 'all',
+        on: () => {
+          setUrgentOnly(false);
+          setWorkflowFilter('all');
+          setSortBy('default');
+        },
+      },
+      {
+        key: 'urgent',
+        label: 'งานด่วน',
+        count: serverSummary?.urgentTotal ?? urgentSummary.total,
+        tone: 'danger' as const,
+        active: urgentOnly,
+        on: () => {
+          setUrgentOnly(true);
+          setWorkflowFilter('all');
+        },
+      },
+      {
+        key: 'recommended',
+        label: 'มีคนแนะนำ',
+        count: withRecommend,
+        tone: 'success' as const,
+        active:
+          workflowFilter === 'recommended' ||
+          workflowFilter === 'green' ||
+          workflowFilter === 'yellow',
+        on: () => {
+          setUrgentOnly(false);
+          setWorkflowFilter('recommended');
+          setSortBy('green_desc'); // เรียงเขียวมากสุดก่อน (เจ้าของสั่ง)
+        },
+      },
+      {
+        key: 'none',
+        label: 'ไม่มีคนแนะนำ',
+        count: serverSummary?.noRecommend ?? urgentSummary.none,
+        tone: 'orange' as const,
+        active: workflowFilter === 'none',
+        on: () => {
+          setUrgentOnly(false);
+          setWorkflowFilter('none');
+        },
+      },
+    ];
+  }, [serverSummary, listTotal, urgentSummary, urgentOnly, workflowFilter]);
 
   const closeJob = () => {
     setJobDetail(null);
@@ -2276,15 +2235,40 @@ const MatchingPage: React.FC = () => {
             โทรไปถึงไหนแล้ว
             ⚠️ การ์ดแถวฝั่งงาน **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** (กล่องตัวกรอง
             ถูกเอาออกไปแล้ว 10 ส.ค. นี่คือทางกรองทางเดียวที่เหลืออยู่ ห้ามทำหาย) */}
-        {/* ⚠️ แถบ "ทำก่อน → หลัง" ปิดที่หน้านี้ (เจ้าของสั่ง 13 ส.ค. 2569) — ชิป "ทำต่อเลย"
-            บนการ์ดแต่ละใบบอกก้าวถัดไปต่อใบอยู่แล้ว ตรงกว่าการสรุปรวมทั้งหน้า
-            (prop nextActions จึงไม่ต้องส่งแล้ว — ไม่มีที่ไปแสดง) */}
-        <CallFunnelPanel
-          defaultSource="all"
-          title="การไหลของงาน"
-          leadIn={demandFlowRow}
-          showNextActions={false}
-        />
+        {/* แผง "AI โทร" — 2 แถวสถานะเดียวกัน (AI · คนเก็บไปโทร) ในกรอบเดียว
+            (เจ้าของสั่ง 14 ส.ค. 2569 · แทน CallFunnelPanel เดิมที่เป็น funnel 4 ช่อง)
+            ⚠️ หน้า Follow ยังใช้ CallFunnelPanel อยู่ — แผงนี้เฉพาะหน้า Matching */}
+        <AiCallFlowPanel defaultSource="all" />
+
+        {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย) */}
+        <div className="flex flex-wrap items-center gap-1.5 px-1">
+          {filterChips.map((c) => {
+            const t = TONE[c.tone];
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={c.on}
+                disabled={serverListLoading}
+                aria-pressed={c.active}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50',
+                  c.active ? cn(t.soft, t.value, 'ring-2 ring-ring') : cn(t.soft, t.value, t.softHover),
+                )}
+              >
+                <span>{c.label}</span>
+                <span className={cn('tabular-nums font-bold', t.num)}>
+                  {c.count.toLocaleString('th-TH')}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* โทรของฉัน — ย้ายมาจากหน้าหลัก (เจ้าของสั่ง 14 ส.ค. 2569) เพื่อให้ "เก็บไปโทร"
+            กับ "ถังที่เก็บไปแล้ว" อยู่ที่เดียวกัน · ซ่อนตัวเองเมื่อไม่มีงาน (ไม่กินที่)
+            ⚠️ เก็บแล้วไม่กดผลภายใน 1 วัน ระบบคืนเข้าคิวอัตโนมัติ (releaseExpiredCallHolds) */}
+        <MyCallsSection />
 
         {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
             เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
@@ -2360,6 +2344,7 @@ const MatchingPage: React.FC = () => {
                     ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
                     ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
                     ['recommend', 'มีคนแนะนำก่อน'],
+                    ['green_desc', 'คนเขียวมากสุดก่อน'],
                     ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
                   ] as Array<[MatchingListSort, string]>
                 ).map(([value, label]) => (

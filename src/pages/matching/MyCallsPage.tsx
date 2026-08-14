@@ -7,8 +7,6 @@ import {
   CONFIRMED_SCOPES,
   resolveAppointment,
 } from '@/lib/callAppointment';
-import { useAuth } from '@/contexts/AuthContext';
-import { CallTeamBoardSection } from '@/pages/matching/CallTeamBoardPage';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
@@ -72,12 +70,9 @@ const DUE_SOON_MS = 2 * 60 * 60 * 1000;
 export const MyCallsSection: React.FC = () => {
   /**
    * เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: **ทุกคนเห็นถังของตัวเอง** (ของใครของมัน)
-   * ส่วนบอร์ดทีมข้างล่างเห็นเฉพาะหัวหน้าขึ้นไป — API คุมสิทธิ์จริงอยู่แล้ว
-   * (`?mine=1` คืนเฉพาะของ viewer · `?team=1` ต้อง supervisor+ ไม่งั้น 403)
+   * ⚠️ "ภาระงานโทรของทีม" (บอร์ดหัวหน้า) ถูกเอาออก 14 ส.ค. 2569 (เจ้าของสั่ง) —
+   * API `?team=1` / โอน / เทกอง ยังอยู่ แค่ไม่มี UI เข้าถึง (ดู docs ถ้าจะเอากลับ)
    */
-  const { hasPermission } = useAuth();
-  const canSeeTeamBoard = hasPermission('supervisor');
-
   const [holds, setHolds] = useState<CallHold[]>([]);
   const [tally, setTally] = useState<CallResultTally>(EMPTY_TALLY);
   const [loading, setLoading] = useState(true);
@@ -257,7 +252,8 @@ export const MyCallsSection: React.FC = () => {
 
   // ไม่มีงานค้างและไม่มียอดวันนี้ = ไม่กินที่บนหน้าหลักเลย (เจ้าของสั่งว่าห้ามรก)
   // มีของค่อยโผล่ทั้งแผง · หัวหน้าเห็นบอร์ดทีมเสมอ (งานของลูกทีมไม่ใช่ของตัวเอง)
-  if (!loading && holds.length === 0 && tally.total === 0 && !canSeeTeamBoard) return null;
+  // ไม่มีงานค้างและไม่มียอดวันนี้ = ซ่อนตัวเอง ไม่กินที่ (ทุก role เท่ากันหลังตัดบอร์ดทีม)
+  if (!loading && holds.length === 0 && tally.total === 0) return null;
 
   return (
     <div className="space-y-4">
@@ -624,9 +620,6 @@ export const MyCallsSection: React.FC = () => {
         </div>
       ) : null}
 
-      {/* บอร์ดทีมเฉพาะหัวหน้าขึ้นไป — "admin ก็รู้ว่าใครเก็บไป" (เจ้าของเคาะ 11 ส.ค. รอบหก)
-          เช็ค client แค่ไม่ให้ยิง request เสีย · สิทธิ์จริง API คุม (?team=1 → 403) */}
-      {canSeeTeamBoard ? <CallTeamBoardSection /> : null}
     </div>
   );
 };

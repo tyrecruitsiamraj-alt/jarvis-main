@@ -173,12 +173,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     };
 
     // ป้าย "AI แนะนำ N" บนการ์ด: ผลที่เก็บไว้ของใบในหน้านี้
-    const storedMatches: Record<string, { recommended: number; computedAt: string }> = {};
+    // `green` แยกออกมาด้วย (14 ส.ค. 2569) — คู่กับ sort green_desc และเผื่อโชว์บนการ์ด
+    const storedMatches: Record<string, { recommended: number; green: number; computedAt: string }> = {};
     for (const j of items) {
       const entry = tierMap.get(j.id);
       if (entry) {
         storedMatches[j.id] = {
           recommended: recommendedCandidateCount(entry.tiers),
+          green: entry.tiers.filter((t) => t.tier === 'green').length,
           computedAt: entry.computedAt,
         };
       }
