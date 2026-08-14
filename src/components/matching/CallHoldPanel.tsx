@@ -13,6 +13,11 @@ import {
 } from '@/lib/callHoldsApi';
 import { PhoneCall } from 'lucide-react';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
+import {
+  CONFIRMED_SCOPE_HINT,
+  CONFIRMED_SCOPE_LABEL,
+  CONFIRMED_SCOPES,
+} from '@/lib/callAppointment';
 
 // ─── "รับไปโทรเอง" — ล็อกสิทธิ์โทร กันเจ้าหน้าที่โทรชนกัน + กัน AI โทรทับ ──────
 
@@ -46,6 +51,8 @@ export default function CallHoldPanel({
 }) {
   const [outcome, setOutcome] = useState<CallResultOutcome | null>(null);
   const [scope, setScope] = useState<CallResultScope | null>(null);
+  /** วันนัดสัมภาษณ์ — ใช้เมื่อเลือก "สนใจ + นัดได้เลย" (ดู src/lib/callAppointment.ts) */
+  const [appointmentAt, setAppointmentAt] = useState('');
   const [note, setNote] = useState('');
   const [agreedSalary, setAgreedSalary] = useState('');
   const [callbackAt, setCallbackAt] = useState('');
@@ -63,6 +70,10 @@ export default function CallHoldPanel({
 
   const save = async () => {
     if (!outcome || busy) return;
+    if (outcome === 'confirmed' && !scope) {
+      setError('เลือกก่อนว่า “นัดได้เลย” หรือ “สนใจ แต่ยังนัดไม่ได้”');
+      return;
+    }
     if (outcome === 'declined' && !scope) {
       setError('เลือกก่อนว่า “ไม่สนใจงานนี้” หรือ “ไม่หางานแล้ว”');
       return;
@@ -77,7 +88,8 @@ export default function CallHoldPanel({
       await recordCallResult({
         holdId: hold.id,
         outcome,
-        scope: outcome === 'declined' ? (scope ?? 'job') : undefined,
+        scope: scope ?? undefined,
+        appointmentAt: appointmentAt || null,
         note: note.trim() || null,
         detail: Object.keys(detail).length > 0 ? detail : undefined,
       });
@@ -183,6 +195,40 @@ export default function CallHoldPanel({
                   </span>
                 </label>
               ))}
+            </div>
+          ) : null}
+
+          {outcome === 'confirmed' ? (
+            <div className="space-y-1">
+              {CONFIRMED_SCOPES.map((value) => (
+                <label key={value} className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name={`confirmed-scope-${hold.id}`}
+                    checked={scope === value}
+                    onChange={() => {
+                      setScope(value);
+                      if (value === 'unscheduled') setAppointmentAt('');
+                    }}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
+                  />
+                  <span>
+                    <span className={cn('font-semibold', DASH.cellStrong)}>
+                      {CONFIRMED_SCOPE_LABEL[value]}
+                    </span>
+                    <span className={cn('ml-1', DASH.muted)}>— {CONFIRMED_SCOPE_HINT[value]}</span>
+                  </span>
+                </label>
+              ))}
+              {scope === 'scheduled' ? (
+                <input
+                  type="date"
+                  value={appointmentAt}
+                  onChange={(e) => setAppointmentAt(e.target.value)}
+                  aria-label="วันนัดสัมภาษณ์"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              ) : null}
             </div>
           ) : null}
 

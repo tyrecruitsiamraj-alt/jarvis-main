@@ -68,3 +68,48 @@ export async function loadLatestCallOutcomeByPhone(
 
   return out;
 }
+
+/**
+ * วันนัดสัมภาษณ์ล่าสุดของ "หลายเบอร์" — แท็บติดตามนัดหมายใช้ตัวนี้
+ *
+ * ⚠️ **จงใจไม่อ่านจาก `candidate_interviews`** — ตารางนั้นผูกด้วย `candidate_id`
+ * (ตาราง `candidates` ซึ่งบนฐานมีแถวเดียว) ส่วนแถวในแท็บคือ **ใบสมัคร** ที่ไม่มี
+ * คอลัมน์ `candidate_id` เลย ต่อกันไม่ได้จริง ๆ · วันนัดจึงเก็บที่แถวผลโทร
+ * (migration 085) แล้วจับคู่ด้วยเบอร์ เหมือนผลโทรด้านบน
+ *
+ * ⚠️ คีย์เป็นเบอร์ **ไม่ใช่ id ใบสมัคร** — คนเดียวถูกดึงไปโทรได้จากหลายต้นทาง
+ * (source `application` / `board` / `irecruit`) นัดที่เกิดจากต้นทางไหนก็ต้องเห็น
+ */
+export async function loadAppointmentByPhone(
+  phones: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const keys = [...new Set(phones.map((p) => toE164Thai(p || '')).filter((p): p is string => !!p))];
+  const out = new Map<string, string>();
+  if (keys.length === 0) return out;
+
+  try {
+    const { rows } = await dbQuery<{ phone: string; at: string }>(
+      `select phone_e164 as phone, appointment_at as at
+         from candidate_call_holds
+        where phone_e164 = any($1::text[]) and appointment_at is not null`,
+      [keys],
+    );
+    // นัดล่าสุดชนะ — นัดใหม่ทับนัดเก่าเสมอ (เลื่อนนัดคือเรื่องปกติของงานนี้)
+    for (const r of rows) {
+      const prev = out.get(r.phone);
+      if (!prev || r.at > prev) out.set(r.phone, r.at);
+    }
+  } catch (e) {
+    // ตาราง/คอลัมน์ยังไม่ migrate = ยังไม่มีวันนัดให้แสดง ไม่ใช่เหตุให้ทั้งลิสต์พัง
+    if (!isPgUndefinedTable(e) && !isUndefinedColumn(e)) throw e;
+  }
+
+  return out;
+}
+
+/** 42703 undefined_column — ยังไม่รัน migration 085 (กติกาข้อ 9: กลืนเฉพาะเคสนี้) */
+function isUndefinedColumn(e: unknown): boolean {
+  return (
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703'
+  );
+}

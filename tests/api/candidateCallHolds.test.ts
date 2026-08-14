@@ -52,6 +52,7 @@ function row(over: Record<string, unknown> = {}) {
 
 const uniqueViolation = Object.assign(new Error('duplicate key'), { code: '23505' });
 const undefinedTable = Object.assign(new Error('relation does not exist'), { code: '42P01' });
+const undefinedColumn = Object.assign(new Error('column does not exist'), { code: '42703' });
 
 function sqlOf(i: number) {
   return String(vi.mocked(dbQuery).mock.calls[i]?.[0] ?? '');
@@ -198,6 +199,73 @@ describe('บันทึกผลโทร', () => {
     vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
     await recordCallResult({ holdId: HOLD_ID, outcome: 'declined' });
     expect(paramsOf(0)[2]).toBe('job');
+  });
+
+  it('"สนใจ + นัดได้เลย" ต้องเขียนทั้ง scope และวันนัดลงฐาน (14 ส.ค. 2569)', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+    const r = await recordCallResult({
+      holdId: HOLD_ID,
+      outcome: 'confirmed',
+      scope: 'scheduled',
+      appointmentAt: '2026-08-20',
+      now: '2026-08-14T03:00:00.000Z',
+    });
+    expect(r.ok).toBe(true);
+    expect(sqlOf(0)).toContain('appointment_at = $6');
+    expect(paramsOf(0)[2]).toBe('scheduled');
+    expect(String(paramsOf(0)[5])).toContain('2026-08-20');
+  });
+
+  it('"สนใจ แต่ยังนัดไม่ได้" → scope ลงฐาน แต่วันนัดเป็น null', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+    const r = await recordCallResult({
+      holdId: HOLD_ID,
+      outcome: 'confirmed',
+      scope: 'unscheduled',
+      appointmentAt: '2026-08-20',
+      now: '2026-08-14T03:00:00.000Z',
+    });
+    expect(r.ok).toBe(true);
+    expect(paramsOf(0)[2]).toBe('unscheduled');
+    expect(paramsOf(0)[5]).toBeNull();
+  });
+
+  it('"นัดได้เลย" โดยไม่ใส่วันนัด → ไม่บันทึกอะไรเลย ต้องตอบเหตุผลกลับ', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [row()] });
+    const r = await recordCallResult({
+      holdId: HOLD_ID,
+      outcome: 'confirmed',
+      scope: 'scheduled',
+      now: '2026-08-14T03:00:00.000Z',
+    });
+    expect(r.ok).toBe(false);
+    // ⚠️ ต้องไม่แตะฐานเลย — ไม่ใช่บันทึกผลแล้วค่อยบ่นเรื่องวันนัด
+    expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();
+  });
+
+  it('⚠️ ยังไม่รัน 085: ไม่มีวันนัดให้เสีย → ถอยไปบันทึกแบบเดิมได้', async () => {
+    vi.mocked(dbQuery)
+      .mockRejectedValueOnce(undefinedColumn)
+      .mockResolvedValueOnce({ rows: [row()] });
+    const r = await recordCallResult({ holdId: HOLD_ID, outcome: 'no_answer' });
+    expect(r.ok).toBe(true);
+    expect(sqlOf(1)).not.toContain('appointment_at');
+  });
+
+  it('⚠️ ยังไม่รัน 085 แต่มีวันนัด → ห้ามบันทึกแบบทิ้งวันนัดเงียบ ๆ', async () => {
+    // เจ้าหน้าที่จะเห็นว่า "บันทึกแล้ว" ทั้งที่วันนัดหายไป — แพตเทิร์นเดียวกับ
+    // ฟอร์มเพิ่มผู้สมัครที่เลือกคืน 503 แทนการบันทึกแบบทิ้งฟิลด์
+    vi.mocked(dbQuery).mockRejectedValueOnce(undefinedColumn);
+    const r = await recordCallResult({
+      holdId: HOLD_ID,
+      outcome: 'confirmed',
+      scope: 'scheduled',
+      appointmentAt: '2026-08-20',
+      now: '2026-08-14T03:00:00.000Z',
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('085');
+    expect(vi.mocked(dbQuery)).toHaveBeenCalledTimes(1);
   });
 
   it('ผลที่ไม่ใช่ปฏิเสธไม่มี scope', async () => {

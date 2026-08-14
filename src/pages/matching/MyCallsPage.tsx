@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
+import {
+  CONFIRMED_SCOPE_HINT,
+  CONFIRMED_SCOPE_LABEL,
+  CONFIRMED_SCOPES,
+  resolveAppointment,
+} from '@/lib/callAppointment';
 import { useAuth } from '@/contexts/AuthContext';
 import { CallTeamBoardSection } from '@/pages/matching/CallTeamBoardPage';
 import { cn } from '@/lib/utils';
@@ -82,6 +88,8 @@ export const MyCallsSection: React.FC = () => {
   const [outcome, setOutcome] = useState<CallResultOutcome | null>(null);
   const [scope, setScope] = useState<CallResultScope | null>(null);
   const [note, setNote] = useState('');
+  /** วันนัดสัมภาษณ์ (`YYYY-MM-DD` จากช่อง date) — ใช้เมื่อเลือก "สนใจ + นัดได้เลย" */
+  const [appointmentAt, setAppointmentAt] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /**
@@ -143,6 +151,7 @@ export const MyCallsSection: React.FC = () => {
     setOutcome(null);
     setScope(null);
     setNote('');
+    setAppointmentAt('');
     setError(null);
   };
 
@@ -152,13 +161,32 @@ export const MyCallsSection: React.FC = () => {
       setError('เลือกก่อนว่า “ไม่สนใจงานนี้” หรือ “ไม่หางานแล้ว”');
       return;
     }
+    if (outcome === 'confirmed' && !scope) {
+      setError('เลือกก่อนว่า “นัดได้เลย” หรือ “สนใจ แต่ยังนัดไม่ได้”');
+      return;
+    }
+    /**
+     * ตรวจด้วยตัวตัดสินตัวเดียวกับฝั่ง server — ผิดตรงไหนบอกตรงนั้นตั้งแต่ยังไม่ยิง
+     * (ถ้าปล่อยไปให้ server ตอบ 400 ผู้ใช้จะเห็นข้อความเดียวกันแต่ช้ากว่าหนึ่งรอบ)
+     */
+    const decided = resolveAppointment({
+      outcome,
+      scope,
+      appointmentAt,
+      now: new Date().toISOString(),
+    });
+    if (!decided.ok) {
+      setError(decided.reason);
+      return;
+    }
     setBusyId(hold.id);
     setError(null);
     try {
       await recordCallResult({
         holdId: hold.id,
         outcome,
-        scope: outcome === 'declined' ? (scope ?? 'job') : undefined,
+        scope: scope ?? undefined,
+        appointmentAt: appointmentAt || null,
         note: note.trim() || null,
       });
       setJustDone((prev) => ({ ...prev, [hold.id]: { hold, outcome } }));
@@ -385,7 +413,10 @@ export const MyCallsSection: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                   setOutcome(key);
-                                  if (key !== 'declined') setScope(null);
+                                  // scope มีความหมายเฉพาะ "สนใจ" กับ "ไม่สนใจ"
+                                  // สลับไปผลอื่นแล้วไม่ล้าง = ค่าเก่าติดไปกับผลใหม่
+                                  if (key !== 'declined' && key !== 'confirmed') setScope(null);
+                                  if (key !== 'confirmed') setAppointmentAt('');
                                   setError(null);
                                 }}
                                 className={cn(
@@ -405,6 +436,50 @@ export const MyCallsSection: React.FC = () => {
                           <p className={cn('text-[11px]', DASH.muted)}>
                             ผลนี้จะไปต่อที่: {CALL_RESULT_DESTINATION[outcome]}
                           </p>
+                        ) : null}
+
+                        {outcome === 'confirmed' ? (
+                          <div className="space-y-1 text-[11px]">
+                            {CONFIRMED_SCOPES.map((value) => (
+                              <label key={value} className="flex cursor-pointer items-start gap-2">
+                                <input
+                                  type="radio"
+                                  name={`confirm-${hold.id}`}
+                                  checked={scope === value}
+                                  onChange={() => {
+                                    setScope(value);
+                                    if (value === 'unscheduled') setAppointmentAt('');
+                                    setError(null);
+                                  }}
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
+                                />
+                                <span>
+                                  <span className={cn('font-semibold', DASH.cellStrong)}>
+                                    {CONFIRMED_SCOPE_LABEL[value]}
+                                  </span>
+                                  <span className={cn('ml-1', DASH.muted)}>
+                                    — {CONFIRMED_SCOPE_HINT[value]}
+                                  </span>
+                                </span>
+                              </label>
+                            ))}
+                            {scope === 'scheduled' ? (
+                              <label className="flex flex-wrap items-center gap-2 pt-1">
+                                <span className={cn('font-semibold', DASH.cellStrong)}>
+                                  วันนัดสัมภาษณ์
+                                </span>
+                                <input
+                                  type="date"
+                                  value={appointmentAt}
+                                  onChange={(e) => {
+                                    setAppointmentAt(e.target.value);
+                                    setError(null);
+                                  }}
+                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                />
+                              </label>
+                            ) : null}
+                          </div>
                         ) : null}
 
                         {outcome === 'declined' ? (

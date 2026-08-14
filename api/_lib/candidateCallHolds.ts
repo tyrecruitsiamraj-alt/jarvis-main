@@ -13,6 +13,11 @@
 import { dbQuery, isPgUniqueViolation, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
+import {
+  isDeclinedScope,
+  resolveAppointment,
+  type CallResultScope as ResultScope,
+} from '../../src/lib/callAppointment.js';
 
 const table = tableInAppSchema('candidate_call_holds');
 
@@ -32,8 +37,12 @@ export const CALL_RESULT_OUTCOMES = [
 ] as const;
 export type CallResultOutcome = (typeof CALL_RESULT_OUTCOMES)[number];
 
-/** ปฏิเสธแบบไหน — job = ไม่เอางานนี้ (AI เสนองานอื่นต่อได้) · all = ไม่หางานแล้ว (พักเบอร์) */
-export type CallResultScope = 'job' | 'all';
+/**
+ * รายละเอียดของผลโทร — ความหมายทั้งชุดอยู่ที่ `src/lib/callAppointment.ts` ที่เดียว
+ * ไม่สนใจ: `job` = ไม่เอางานนี้ · `all` = ไม่หางานแล้ว (พักเบอร์)
+ * สนใจ: `scheduled` = นัดวันสัมภาษณ์ได้แล้ว · `unscheduled` = สนใจแต่ยังนัดไม่ได้
+ */
+export type { CallResultScope } from '../../src/lib/callAppointment.js';
 
 export type CallHold = {
   id: string;
@@ -50,8 +59,10 @@ export type CallHold = {
   releasedAt: string | null;
   releaseReason: string | null;
   resultOutcome: CallResultOutcome | null;
-  resultScope: CallResultScope | null;
+  resultScope: ResultScope | null;
   resultNote: string | null;
+  /** วันนัดสัมภาษณ์ที่ตกลงได้ตอนโทร (ISO) — มีเฉพาะผล "สนใจ + นัดได้เลย" */
+  appointmentAt: string | null;
 };
 
 type Row = {
@@ -71,11 +82,18 @@ type Row = {
   result_outcome: string | null;
   result_scope: string | null;
   result_note: string | null;
+  appointment_at?: string | null;
 };
 
-const COLS = `id, phone_e164, source, candidate_ref, candidate_name, job_id, request_no,
+const COLS_BASE = `id, phone_e164, source, candidate_ref, candidate_name, job_id, request_no,
   held_by_user_id, held_by_name, held_at, expires_at, released_at, release_reason,
   result_outcome, result_scope, result_note`;
+
+/**
+ * ⚠️ `appointment_at` มาทีหลัง (migration 085) — ฐานที่ยังไม่รันต้องอ่านได้เหมือนเดิม
+ * ไม่งั้นหน้า "โทรของฉัน" ตายทั้งหน้าเพราะคอลัมน์เสริมตัวเดียว
+ */
+const COLS = `${COLS_BASE}, appointment_at`;
 
 export function isCallResultOutcome(v: unknown): v is CallResultOutcome {
   return typeof v === 'string' && (CALL_RESULT_OUTCOMES as readonly string[]).includes(v);
@@ -88,6 +106,29 @@ export function isCallHoldSource(v: unknown): v is CallHoldSource {
 function trimTo(v: unknown, max: number): string | null {
   const s = typeof v === 'string' ? v.trim() : '';
   return s ? s.slice(0, max) : null;
+}
+
+/** 42703 undefined_column — ยังไม่รัน migration 085 (กติกาข้อ 9: กลืนเฉพาะเคสนี้) */
+function isUndefinedColumn(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703';
+}
+
+/**
+ * ยิงคิวรีด้วยชุดคอลัมน์ใหม่ก่อน เจอ `42703` ค่อยถอยไปชุดเดิม (แพตเทิร์นเดียวกับ
+ * `LIST_COLUMNS_LEGACY` ของ job-applications) — ฐานที่ยังไม่รัน 085 ต้องใช้งานได้ครบ
+ * ทุกอย่างยกเว้นวันนัด · **ห้ามปล่อยให้ทั้งหน้าพังเพราะคอลัมน์เสริมตัวเดียว**
+ */
+async function queryHolds(build: (cols: string) => string, params?: unknown[]) {
+  try {
+    return await dbQuery<Row>(build(COLS), params);
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    return await dbQuery<Row>(build(COLS_BASE), params);
+  }
+}
+
+function isResultScope(v: unknown): v is ResultScope {
+  return isDeclinedScope(v) || v === 'scheduled' || v === 'unscheduled';
 }
 
 function mapRow(r: Row): CallHold {
@@ -106,8 +147,9 @@ function mapRow(r: Row): CallHold {
     releasedAt: r.released_at,
     releaseReason: r.release_reason,
     resultOutcome: isCallResultOutcome(r.result_outcome) ? r.result_outcome : null,
-    resultScope: r.result_scope === 'job' || r.result_scope === 'all' ? r.result_scope : null,
+    resultScope: isResultScope(r.result_scope) ? r.result_scope : null,
     resultNote: r.result_note,
+    appointmentAt: r.appointment_at ?? null,
   };
 }
 
@@ -144,8 +186,8 @@ export async function getActiveCallHoldsByPhones(
   if (keys.length === 0) return map;
   try {
     await releaseExpiredCallHolds();
-    const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table}
+    const { rows } = await queryHolds(
+      (c) => `select ${c} from ${table}
         where released_at is null and phone_e164 = any($1::text[])`,
       [keys],
     );
@@ -204,12 +246,12 @@ export async function acquireCallHold(input: AcquireInput): Promise<AcquireOutco
   await releaseExpiredCallHolds();
 
   try {
-    const { rows } = await dbQuery<Row>(
-      `insert into ${table}
+    const { rows } = await queryHolds(
+      (c) => `insert into ${table}
          (phone_e164, source, candidate_ref, candidate_name, job_id, request_no,
           held_by_user_id, held_by_name)
        values ($1,$2,$3,$4,$5,$6,$7,$8)
-       returning ${COLS}`,
+       returning ${c}`,
       [
         phone,
         input.source,
@@ -225,8 +267,8 @@ export async function acquireCallHold(input: AcquireInput): Promise<AcquireOutco
   } catch (e) {
     if (!isPgUniqueViolation(e)) throw e;
     // มีคนถือไปแล้ว — คืนข้อมูลว่าใครถือ ให้หน้าเว็บโชว์ได้เลย
-    const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table} where phone_e164 = $1 and released_at is null limit 1`,
+    const { rows } = await queryHolds(
+      (c) => `select ${c} from ${table} where phone_e164 = $1 and released_at is null limit 1`,
       [phone],
     );
     if (!rows[0]) {
@@ -249,11 +291,11 @@ export async function releaseCallHold(
   holdId: string,
   reason: 'manual' | 'transferred' | 'to_ai',
 ): Promise<CallHold | null> {
-  const { rows } = await dbQuery<Row>(
-    `update ${table}
+  const { rows } = await queryHolds(
+    (c) => `update ${table}
         set released_at = now(), release_reason = $2, updated_at = now()
       where id = $1 and released_at is null
-      returning ${COLS}`,
+      returning ${c}`,
     [holdId, reason],
   );
   return rows[0] ? mapRow(rows[0]) : null;
@@ -262,49 +304,89 @@ export async function releaseCallHold(
 export type RecordResultInput = {
   holdId: string;
   outcome: CallResultOutcome;
-  scope?: CallResultScope | null;
+  scope?: ResultScope | null;
+  /** วันนัดสัมภาษณ์ (`YYYY-MM-DD` หรือ ISO) — ใช้เฉพาะ "สนใจ + นัดได้เลย" */
+  appointmentAt?: unknown;
   note?: unknown;
   detail?: unknown;
+  /** เวลาอ้างอิงตอนตรวจวันนัด — ไม่ส่ง = now() (เทสต์ส่งเข้ามาเพื่อคุมผล) */
+  now?: string;
 };
+
+export type RecordResultOutcome =
+  | { ok: true; hold: CallHold | null }
+  | { ok: false; reason: string };
 
 /**
  * บันทึกผลโทร + ปล่อยล็อก (ผลโทรจบ = ไม่ต้องถือต่อ)
  *
- * "ปฏิเสธ" ต้องระบุ scope เสมอ:
- *   job = ไม่เอางานนี้ → AI ยังเสนองานอื่นให้เขาได้
- *   all = ไม่หางานแล้ว → ต้องพักเบอร์ ห้ามโทรอีก (คนเรียกจัดการ suppression ต่อ)
- * ถ้าไม่ส่งมาให้ถือเป็น 'job' ซึ่งปลอดภัยกว่า (ไม่ตัดคนออกจากระบบโดยไม่ได้ตั้งใจ)
+ * ความหมายของ scope/วันนัดทั้งชุดตัดสินที่ `resolveAppointment()` ที่เดียว
+ * (ใช้ร่วมกับฝั่งฟอร์ม จึงไม่มีทางที่หน้าเว็บกับ API เข้าใจกติกาต่างกัน)
  */
-export async function recordCallResult(input: RecordResultInput): Promise<CallHold | null> {
-  const scope = input.outcome === 'declined' ? (input.scope === 'all' ? 'all' : 'job') : null;
-  const { rows } = await dbQuery<Row>(
-    `update ${table}
-        set result_outcome = $2,
+export async function recordCallResult(input: RecordResultInput): Promise<RecordResultOutcome> {
+  const decided = resolveAppointment({
+    outcome: input.outcome,
+    scope: input.scope,
+    appointmentAt: input.appointmentAt,
+    now: input.now ?? new Date().toISOString(),
+  });
+  // ⚠️ invariant ของ resolveAppointment: ok === (reason === null) — ตกที่นี่ต้องมีเหตุผลเสมอ
+  if (!decided.ok) return { ok: false, reason: decided.reason ?? 'ผลโทรไม่ถูกต้อง' };
+
+  const params = [
+    input.holdId,
+    input.outcome,
+    decided.scope,
+    trimTo(input.note, MAX_NOTE),
+    input.detail === undefined ? null : JSON.stringify(input.detail),
+  ];
+  const setBase = `result_outcome = $2,
             result_scope   = $3,
             result_note    = $4,
             result_detail  = $5::jsonb,
             released_at    = now(),
             release_reason = 'result',
-            updated_at     = now()
-      where id = $1 and released_at is null
-      returning ${COLS}`,
-    [
-      input.holdId,
-      input.outcome,
-      scope,
-      trimTo(input.note, MAX_NOTE),
-      input.detail === undefined ? null : JSON.stringify(input.detail),
-    ],
-  );
-  return rows[0] ? mapRow(rows[0]) : null;
+            updated_at     = now()`;
+
+  try {
+    const { rows } = await dbQuery<Row>(
+      `update ${table}
+          set ${setBase}, appointment_at = $6
+        where id = $1 and released_at is null
+        returning ${COLS}`,
+      [...params, decided.appointmentAt],
+    );
+    return { ok: true, hold: rows[0] ? mapRow(rows[0]) : null };
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    /**
+     * ⚠️ ยังไม่รัน 085 — ถอยได้เฉพาะเมื่อ **ไม่มีวันนัดจะเสีย**
+     * มีวันนัดแล้วถอยเงียบ ๆ = เจ้าหน้าที่เห็นว่า "บันทึกแล้ว" แต่วันนัดหายไปเฉย ๆ
+     * (แพตเทิร์นเดียวกับฟอร์มเพิ่มผู้สมัครที่เลือกคืน 503 แทนการบันทึกแบบทิ้งฟิลด์)
+     */
+    if (decided.appointmentAt) {
+      return {
+        ok: false,
+        reason: 'ฐานข้อมูลยังไม่มีช่องวันนัด — รัน migration 085 ก่อน (ผลโทรยังไม่ถูกบันทึก)',
+      };
+    }
+    const { rows } = await dbQuery<Row>(
+      `update ${table}
+          set ${setBase}
+        where id = $1 and released_at is null
+        returning ${COLS_BASE}`,
+      params,
+    );
+    return { ok: true, hold: rows[0] ? mapRow(rows[0]) : null };
+  }
 }
 
 /** ล็อกที่คนนี้ถืออยู่ — หน้า "โทรของฉัน" (เรียงใกล้หมดอายุก่อน) */
 export async function listCallHoldsForUser(userId: string): Promise<CallHold[]> {
   try {
     await releaseExpiredCallHolds();
-    const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table}
+    const { rows } = await queryHolds(
+      (c) => `select ${c} from ${table}
         where released_at is null and held_by_user_id = $1
         order by expires_at asc`,
       [userId],
@@ -320,8 +402,8 @@ export async function listCallHoldsForUser(userId: string): Promise<CallHold[]> 
 export async function listAllActiveCallHolds(): Promise<CallHold[]> {
   try {
     await releaseExpiredCallHolds();
-    const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table}
+    const { rows } = await queryHolds(
+      (c) => `select ${c} from ${table}
         where released_at is null
         order by expires_at asc`,
     );
@@ -412,12 +494,12 @@ export async function transferCallHold(input: {
     [input.holdId],
   );
 
-  const { rows } = await dbQuery<Row>(
-    `insert into ${table}
+  const { rows } = await queryHolds(
+    (c) => `insert into ${table}
        (phone_e164, source, candidate_ref, candidate_name, job_id, request_no,
         held_by_user_id, held_by_name, expires_at)
      values ($1,$2,$3,$4,$5,$6,$7,$8, now() + interval '1 day')
-     returning ${COLS}`,
+     returning ${c}`,
     [
       current.phone,
       current.source,
@@ -459,7 +541,7 @@ export async function releaseAllCallHoldsForUser(
 /** ล็อกเดียวด้วย id — ใช้เช็คสิทธิ์ก่อนบันทึกผล/คืนงาน */
 export async function getCallHoldById(id: string): Promise<CallHold | null> {
   try {
-    const { rows } = await dbQuery<Row>(`select ${COLS} from ${table} where id = $1`, [id]);
+    const { rows } = await queryHolds((c) => `select ${c} from ${table} where id = $1`, [id]);
     return rows[0] ? mapRow(rows[0]) : null;
   } catch (e) {
     if (isPgUndefinedTable(e)) return null;

@@ -10,6 +10,11 @@ export type PublicApplication = {
    */
   last_call_outcome?: string | null;
   last_call_at?: string | null;
+  /**
+   * วันนัดสัมภาษณ์ที่ตกลงได้ตอนโทร (ISO) — server แนบมาให้จากแถวผลโทร (migration 085)
+   * ไม่มีค่า = ยังไม่มีนัด (ยังไม่โทร · โทรแล้วแต่ยังนัดไม่ได้ · หรือผลอื่น)
+   */
+  appointment_at?: string | null;
   title_prefix?: string;
   first_name?: string;
   last_name?: string;

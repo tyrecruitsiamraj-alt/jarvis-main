@@ -28,8 +28,14 @@ export type CallResultOutcome =
   | 'no_answer'
   | 'wrong_person';
 
-/** ปฏิเสธแบบไหน — job = ไม่เอางานนี้ (AI เสนองานอื่นต่อได้) · all = ไม่หางานแล้ว (พักเบอร์) */
-export type CallResultScope = 'job' | 'all';
+/**
+ * รายละเอียดของผลโทร — **ความหมายทั้งชุดอยู่ที่ `src/lib/callAppointment.ts` ที่เดียว**
+ * ไม่สนใจ: job = ไม่เอางานนี้ · all = ไม่หางานแล้ว (พักเบอร์)
+ * สนใจ: scheduled = นัดวันสัมภาษณ์ได้แล้ว · unscheduled = สนใจแต่ยังนัดไม่ได้
+ */
+import type { CallResultScope } from '@/lib/callAppointment';
+
+export type { CallResultScope };
 
 /** ล็อกที่ server ส่งกลับ — **ไม่มีเบอร์** เพื่อไม่ให้ล็อกของแผนกอื่นรั่วเบอร์ออกมา */
 export type CallHold = {
@@ -237,8 +243,13 @@ export async function acquireCallHold(
 export type RecordCallResultInput = {
   holdId: string;
   outcome: CallResultOutcome;
-  /** บังคับใส่เมื่อ outcome = declined — ไม่ใส่ถือเป็น 'job' */
+  /**
+   * บังคับใส่เมื่อ outcome = declined (ไม่ใส่ถือเป็น 'job')
+   * · outcome = confirmed ใส่ scheduled/unscheduled ได้ (ไม่ใส่ = ไม่ระบุ)
+   */
   scope?: CallResultScope;
+  /** วันนัดสัมภาษณ์ (`YYYY-MM-DD`) — บังคับเมื่อ scope = 'scheduled' */
+  appointmentAt?: string | null;
   note?: string | null;
   /** ข้อมูลต่อท้ายตามชนิดผล เช่น { callbackAt } · { agreedSalary } · { newPhone } */
   detail?: Record<string, unknown>;

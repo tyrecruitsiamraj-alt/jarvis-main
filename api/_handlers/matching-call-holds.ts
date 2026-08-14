@@ -219,15 +219,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 403, 'Forbidden', 'บันทึกผลได้เฉพาะงานโทรที่ตัวเองถืออยู่');
       }
 
-      const scope = body.scope === 'all' ? 'all' : body.scope === 'job' ? 'job' : null;
-      const saved = await recordCallResult({
+      /**
+       * scope มีสองชุดตามชนิดผล — ไม่สนใจ (job/all) กับ สนใจ (scheduled/unscheduled)
+       * ตัวตัดสินจริงอยู่ที่ `resolveAppointment()` ข้างใน recordCallResult
+       * ตรงนี้แค่ส่งค่าดิบผ่านไป **ห้ามคัดกรองซ้ำ** ไม่งั้นกติกาแตกเป็นสองที่
+       */
+      const rawScope = typeof body.scope === 'string' ? body.scope : null;
+      const result = await recordCallResult({
         holdId,
         outcome: body.outcome,
-        scope,
+        scope: rawScope as never,
+        appointmentAt: body.appointmentAt,
         note: body.note,
         detail: isPlainObject(body.detail) ? body.detail : undefined,
       });
+      if (!result.ok) return sendError(res, 400, 'Bad request', result.reason);
+      const saved = result.hold;
       if (!saved) return sendError(res, 409, 'Conflict', 'งานโทรนี้ถูกปล่อยไปก่อนแล้ว');
+      // ลูปโทรซ้ำสนใจแค่ "ไม่สนใจแบบไหน" — scope ของ "สนใจ" ไม่เกี่ยวกับการพักเบอร์
+      const declinedScope = saved.resultScope === 'all' ? 'all' : saved.resultScope === 'job' ? 'job' : null;
 
       // ผลที่คนกดเดินนโยบายเดียวกับผลของ AI — ไม่รับสายก็เข้าคิวโทรซ้ำ ขอเลื่อนก็นัดใหม่
       // "ไม่หางานแล้ว" พักเบอร์ · ครบเพดานตกถังต้องคนตาม (ดู src/lib/callFollowupPolicy.ts)
@@ -239,7 +249,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           jobId: saved.jobId,
           candidateRef: saved.candidateRef,
           outcome: body.outcome,
-          declinedScope: scope,
+          declinedScope,
           detail: isPlainObject(body.detail) ? body.detail : undefined,
           byName: req.user?.email ?? null,
         });
@@ -254,6 +264,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         after: {
           outcome: saved.resultOutcome,
           scope: saved.resultScope,
+          appointmentAt: saved.appointmentAt,
           jobId: saved.jobId,
           followup: followup?.action ?? null,
         },

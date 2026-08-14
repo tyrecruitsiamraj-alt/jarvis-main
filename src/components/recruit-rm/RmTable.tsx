@@ -92,6 +92,11 @@ const RmTable: React.FC<{
               <th className="px-3 py-2 font-semibold">จังหวัด</th>
               <th className="px-3 py-2 font-semibold">ช่องทาง</th>
               <th className="px-3 py-2 font-semibold">วันที่สมัคร</th>
+              {/* วันนัดโผล่เฉพาะแท็บติดตามนัดหมาย — แท็บอื่นไม่มีใครถามคำถามนี้
+                  (คอลัมน์ที่ว่างทั้งแถวทุกแท็บทำให้ตารางกว้างขึ้นโดยไม่ได้อะไร) */}
+              {tab === 'appointments' ? (
+                <th className="px-3 py-2 font-semibold">วันนัด</th>
+              ) : null}
               <th className="px-3 py-2 font-semibold">สถานะ</th>
               <th className="px-3 py-2 text-right font-semibold">ตัวเลือก</th>
             </tr>
@@ -139,6 +144,19 @@ const RmTable: React.FC<{
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
                     {r.created_at ? formatYmdDmyBe(r.created_at.slice(0, 10)) : EM_DASH}
                   </td>
+                  {tab === 'appointments' ? (
+                    <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
+                      {/* วันนัดเก็บเป็น ISO เต็ม (เที่ยงวันไทย) — ตัดเอาเฉพาะวันที่ฝั่งไทย
+                          ห้าม .slice(0,10) ตรง ๆ เพราะนั่นคือวันที่ฝั่ง UTC */}
+                      {r.appointment_at
+                        ? formatYmdDmyBe(
+                            new Date(r.appointment_at).toLocaleDateString('en-CA', {
+                              timeZone: 'Asia/Bangkok',
+                            }),
+                          )
+                        : EM_DASH}
+                    </td>
+                  ) : null}
                   <td className="px-3 py-2">
                     <span
                       className={cn(

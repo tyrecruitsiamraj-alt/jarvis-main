@@ -16,7 +16,7 @@ import {
   isRmSpecificType,
   normalizeRmPhone,
 } from '../../src/lib/recruitRmMasters.js';
-import { loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
+import { loadAppointmentByPhone, loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError } from '../_lib/logger.js';
 
@@ -734,6 +734,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
             (item as Record<string, unknown>).last_call_outcome = hit.outcome;
             (item as Record<string, unknown>).last_call_at = hit.at;
           }
+        }
+      }
+      // วันนัดสัมภาษณ์ที่ตกลงได้ตอนโทร (migration 085) — แท็บติดตามนัดหมายโชว์คอลัมน์นี้
+      const apptByPhone = await loadAppointmentByPhone(items.map((i) => i.phone));
+      if (apptByPhone.size > 0) {
+        for (const item of items) {
+          const at = apptByPhone.get(toE164Thai(item.phone || '') || '');
+          if (at) (item as Record<string, unknown>).appointment_at = at;
         }
       }
     } catch (e) {
