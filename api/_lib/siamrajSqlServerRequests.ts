@@ -313,6 +313,20 @@ function boardRequestTypeExtraWhere(alias = 'A'): string {
 /** จำนวนสูงสุดต่อครั้งเมื่อดึง feed ใบขอหน่วยงาน */
 export const SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT = 2000;
 
+/**
+ * ดึงใบขอเปิดเฉพาะที่ยื่นตั้งแต่วันนี้เป็นต้นไป (เจ้าของเคาะ 14 ส.ค. 2569: **1 ม.ค. 2567**)
+ *
+ * เหตุ: ERP ยังมีใบเปิดค้างข้ามปี — วัดจริง 14 ส.ค. เจอใบเปิด 298 ใบ ในนั้น 5 ใบ
+ * เก่ากว่าปี 2566 (เก่าสุด 18 ธ.ค. 2015 ค้างมา 10 ปี) · เปิดใช้ AI โทรโดยไม่กรอง =
+ * โทรหาคนเรื่องงานที่ค้างมาหลายปี · ยังพลอยลากช่วงกราฟ Dashboard ย้อนไปปีเก่าด้วย
+ *
+ * ⚠️ **กรองที่ CTE `recent` (ตัวคัดว่าจะแสดงใบไหน) จุดเดียว** — `getSiamrajSqlServerUnitRequestById`
+ * ไม่ผ่าน `recent` เลย (มี base CTE ตรง) จึงเปิดใบเก่ารายใบ/ค้นด้วยเลขที่ใบยังได้เสมอ
+ * ⚠️ env ว่าง = default (ห้ามให้ว่างกลายเป็น "ไม่กรอง")
+ */
+const OPEN_REQUEST_MIN_DATE =
+  (process.env.SIAMRAJ_OPEN_REQUEST_MIN_DATE || '').trim() || '2024-01-01';
+
 function clampUnitRequestLimit(limit?: number): number {
   const n = limit ?? 200;
   return Math.min(Math.max(n, 1), SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT);
@@ -337,6 +351,7 @@ export async function listSiamrajSqlServerUnitRequests(options: {
       FROM st_request_head A
       INNER JOIN ms_site SS ON A.site_code = SS.site_code
       WHERE ${openStaffingRequestWhere()}
+        AND A.request_date >= CONVERT(datetime, @minRequestDate, 120)
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
         ${clsExclude}
@@ -354,7 +369,7 @@ export async function listSiamrajSqlServerUnitRequests(options: {
     WHERE rn = 1
     ORDER BY act_saleco_datetime DESC
   `,
-    { limit, ...filters, ...deptScope.params },
+    { limit, minRequestDate: OPEN_REQUEST_MIN_DATE, ...filters, ...deptScope.params },
   );
 
   return rows.map(mapSqlServerRow);
