@@ -1,12 +1,26 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { readJsonSafe } from '@/lib/api';
 
+/** งานโทรฝั่ง "คน" (candidate_call_holds) — คู่กับ AI ในแผงเดียว */
+export type HumanCallSummary = {
+  total: number;
+  holding: number;
+  withResult: number;
+  toAi: number;
+  byOutcome: Record<string, number>;
+};
+
 /** funnel การโทร + ถัง "ต้องคนตาม" — ดู api/_handlers/lumos-call-funnel.ts */
 export type CallFunnel = {
+  /** เข้าคิวทั้งหมด (รวมยกเลิก) */
   queued: number;
+  /** ส่ง AI โทรจริง = queued ที่ยังไม่ยกเลิก */
+  queuedActive: number;
   delivered: number;
   waiting: number;
   retryScheduled: number;
+  /** "ไม่สะดวกคุย รอ AI โทรใหม่" = followup_state='retry_scheduled' */
+  retryScheduledState: number;
   withResult: number;
   connected: number;
   unreached: number;
@@ -18,7 +32,16 @@ export type CallFunnel = {
    * ⚠️ นับตาม **รอบล่าสุดของแต่ละคน** ไม่ใช่ประวัติทุกรอบ — คนหนึ่งอยู่ได้แถวเดียว
    * อ่านว่า "ตอนนี้แต่ละคนอยู่รอบไหน และรอบนั้นผลเป็นยังไง" ไม่ใช่ "รอบนี้โทรไปกี่สาย"
    */
-  byAttempt?: { attempt: number; total: number; connected: number; unreached: number; pending: number }[];
+  byAttempt?: {
+    attempt: number;
+    total: number;
+    connected: number;
+    unreached: number;
+    pending: number;
+    cancelled: number;
+  }[];
+  /** ฝั่ง "คนเก็บไปโทรเอง" — โผล่เฉพาะแผง AI โทร (หน้า Matching) */
+  human?: HumanCallSummary;
 };
 
 export type NeedsHumanItem = {
@@ -38,9 +61,11 @@ export type NeedsHumanItem = {
 
 export const EMPTY_FUNNEL: CallFunnel = {
   queued: 0,
+  queuedActive: 0,
   delivered: 0,
   waiting: 0,
   retryScheduled: 0,
+  retryScheduledState: 0,
   withResult: 0,
   connected: 0,
   unreached: 0,

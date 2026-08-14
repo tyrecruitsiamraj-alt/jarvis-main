@@ -165,6 +165,35 @@ describe('การเรียงลิสต์ (sort)', () => {
     ).toEqual(['none', 'has']);
   });
 
+  it('green_desc = ใบที่มีคนเขียวมากสุดขึ้นก่อน (เจ้าของสั่ง 14 ส.ค. 2569)', () => {
+    const g = (id: string, greens: number, yellows = 0) =>
+      Array.from({ length: greens }, () => ({ tier: 'green' as const })).concat(
+        Array.from({ length: yellows }, () => ({ tier: 'yellow' as const })),
+      );
+    const byId: Record<string, ReturnType<typeof g>> = {
+      three: g('three', 3),
+      one: g('one', 1, 5), // เหลืองเยอะแต่เขียวน้อย → ต้องอยู่หลัง three
+      zero: g('zero', 0, 2), // ไม่มีเขียวเลย → ท้ายสุด
+    };
+    const rows = [job({ id: 'one' }), job({ id: 'zero' }), job({ id: 'three' })];
+    const ctx = { ...noCtx, today, matchesFor: (id: string) => byId[id] };
+    expect(
+      filterAndSortMatchingJobs(rows, { ...baseQuery, sort: 'green_desc' }, ctx).map((j) => j.id),
+    ).toEqual(['three', 'one', 'zero']);
+  });
+
+  it('green_desc — ใบที่ AI ยังไม่ประเมิน (undefined) นับเป็น 0 เขียว ไปท้าย', () => {
+    const rows = [job({ id: 'unanalyzed' }), job({ id: 'hasgreen' })];
+    const ctx = {
+      ...noCtx,
+      today,
+      matchesFor: (id: string) => (id === 'hasgreen' ? [{ tier: 'green' as const }] : undefined),
+    };
+    expect(
+      filterAndSortMatchingJobs(rows, { ...baseQuery, sort: 'green_desc' }, ctx).map((j) => j.id),
+    ).toEqual(['hasgreen', 'unanalyzed']);
+  });
+
   it('ไม่ส่ง sort = พฤติกรรมเดิม (SLA เกินขึ้นก่อน) ต้องไม่เปลี่ยน', () => {
     const out = filterAndSortMatchingJobs(jobs, baseQuery, { ...noCtx, today });
     expect(out[0].id).toBe('old'); // retroactive เก่ามาก → breached

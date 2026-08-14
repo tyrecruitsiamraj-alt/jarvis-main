@@ -103,3 +103,81 @@ describe('?source= — กรองต้นทางด้วย prefix ขอ�
     expect(needsHumanSql).not.toMatch(/person_ref like/);
   });
 });
+
+/**
+ * แผง "AI โทร" หน้า Matching — field ใหม่ 14 ส.ค. 2569 (ข้อ 5 ของรอบสิบสอง)
+ * queuedActive แยกยกเลิก · human block จาก candidate_call_holds · byAttempt มี cancelled
+ */
+describe('field ฝั่ง AI โทร + คนเก็บไปโทร', () => {
+  const holdsSqlOf = () =>
+    vi
+      .mocked(dbQuery)
+      .mock.calls.map((c) => String(c[0]))
+      .find((q) => q.includes('candidate_call_holds'));
+
+  it('human: board รวม application · irecruit แยก · follow ไม่ยิงคิวรีเลย', async () => {
+    await handler({ method: 'GET', query: { source: 'board' } } as never, mockRes().res as never);
+    expect(holdsSqlOf()).toMatch(/source in \('board','application'\)/);
+
+    vi.mocked(dbQuery).mockReset();
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] } as never);
+    await handler({ method: 'GET', query: { source: 'irecruit' } } as never, mockRes().res as never);
+    expect(holdsSqlOf()).toMatch(/source = 'irecruit'/);
+
+    vi.mocked(dbQuery).mockReset();
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] } as never);
+    await handler({ method: 'GET', query: { source: 'follow' } } as never, mockRes().res as never);
+    // Follow ไม่มีล็อก "รับไปโทรเอง" — ต้องไม่แตะตาราง holds เลย
+    expect(holdsSqlOf()).toBeUndefined();
+  });
+
+  it('queuedActive แยกแถวยกเลิกออก · byAttempt มีถัง cancelled', async () => {
+    // mock: queue คืน 2 กลุ่ม (active pending + cancelled) · holds คืนว่าง
+    vi.mocked(dbQuery).mockImplementation((async (sql: string) => {
+      if (String(sql).includes('attempt_no')) {
+        return {
+          rows: [
+            {
+              status: 'pending', last_outcome: null, followup_state: null,
+              has_result: false, scheduled_ahead: false, attempt_no: 1, n: '10',
+            },
+            {
+              status: 'cancelled', last_outcome: null, followup_state: null,
+              has_result: false, scheduled_ahead: false, attempt_no: 1, n: '3',
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    }) as never);
+    const { res, json } = mockRes();
+    await handler({ method: 'GET', query: {} } as never, res as never);
+    const { funnel } = json.mock.calls[0][0];
+    expect(funnel.queued).toBe(13); // รวมยกเลิก
+    expect(funnel.queuedActive).toBe(10); // ไม่รวมยกเลิก
+    const round1 = funnel.byAttempt.find((a: { attempt: number }) => a.attempt === 1);
+    expect(round1.cancelled).toBe(3);
+    expect(round1.pending).toBe(10); // ยกเลิกไม่ตกไปปนกับ pending
+  });
+
+  it('retryScheduledState นับจาก followup_state ไม่ใช่ next_attempt_at', async () => {
+    vi.mocked(dbQuery).mockImplementation((async (sql: string) => {
+      if (String(sql).includes('attempt_no')) {
+        return {
+          rows: [
+            {
+              status: 'pending', last_outcome: 'no_answer', followup_state: 'retry_scheduled',
+              has_result: false, scheduled_ahead: false, attempt_no: 2, n: '5',
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    }) as never);
+    const { res, json } = mockRes();
+    await handler({ method: 'GET', query: {} } as never, res as never);
+    const { funnel } = json.mock.calls[0][0];
+    expect(funnel.retryScheduledState).toBe(5);
+    expect(funnel.retryScheduled).toBe(0); // scheduled_ahead=false → ตัวเก่าไม่นับ
+  });
+});
