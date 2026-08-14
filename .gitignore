@@ -35,3 +35,4 @@ dist-ssr
 
 # ไฟล์สำรองก่อนล้างคิวโทร (มี person_ref ของผู้สมัครจริง) — เก็บไว้บนเครื่อง ห้าม commit
 lumos-queue-cancel-backup-*.json
+wipe-backup-*.json
