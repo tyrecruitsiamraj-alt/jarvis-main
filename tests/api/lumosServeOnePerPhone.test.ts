@@ -44,6 +44,7 @@ const { listHeldPhones } = await import('../../api/_lib/candidateCallHolds.js');
 const { listSuppressedPhones } = await import('../../api/_lib/callFollowup.js');
 const {
   TAKE_PENDING_SQL,
+  TAKE_PENDING_SQL_NO_RANK,
   buildInterviewPayload,
   buildReminderPayload,
   enqueueLumosInterviewForSelected,
@@ -81,10 +82,31 @@ describe('เบอร์เดียวกันต้องมีสายเ�
     expect(inFlight).toMatch(/f\.delivered_at >= now\(\) - interval/);
   });
 
-  it('ชั้นที่ 2 — ในบรรดาใบที่ถึงคิวของเบอร์เดียวกัน เสิร์ฟใบที่มาก่อนใบเดียว', () => {
+  it('ชั้นที่ 2 — เสิร์ฟใบเดียว: คะแนน AI ก่อน แล้วค่อยใบที่มาก่อน (14 ส.ค. 2569)', () => {
     // เทียบเป็น row comparison — เทียบ created_at อย่างเดียวจะเสมอกันได้เมื่อเข้าคิวพร้อมกัน
     // (เข้าคิวทีเดียวหลายใบเป็นเรื่องปกติของหน้านี้) แล้วจะไม่มีใครถูกเสิร์ฟเลย หรือถูกเสิร์ฟทั้งคู่
-    expect(earliestFirst).toMatch(/\(e\.created_at, e\.id\) < \(c\.created_at, c\.id\)/);
+    // ⚠️ คะแนนต้องอยู่ **หน้าสุด** ของ tuple ไม่งั้น tier ไม่มีผลกับลำดับจริง
+    expect(earliestFirst).toMatch(
+      /\(coalesce\(e\.match_rank, \d+\), e\.created_at, e\.id\) < \(coalesce\(c\.match_rank, \d+\), c\.created_at, c\.id\)/,
+    );
+  });
+
+  it('⚠️ match_rank ต้องผ่าน coalesce ทุกจุด — NULL ใน row comparison ทำตัวกันหลุด', () => {
+    // match_rank เป็น null ได้ (คิวเก่า · งาน Follow) · row comparison ที่มี NULL
+    // ให้ผลเป็น NULL ไม่ใช่ true → แถวคู่แข่งไม่ถูกตัด แล้วคนเดียวโดนหลายสายพร้อมกัน
+    const bare = TAKE_PENDING_SQL.match(/(?<!coalesce\()\b[cef]\.match_rank/g) ?? [];
+    expect(bare).toEqual([]);
+    expect(TAKE_PENDING_SQL).toMatch(/coalesce\(c\.match_rank, \d+\) asc, c\.created_at asc/);
+  });
+
+  it('ฐานที่ยังไม่รัน 084 ต้องได้พฤติกรรมเดิมเป๊ะ (ไม่อ้าง match_rank เลย)', () => {
+    // คิวหยุดเดินแย่กว่าเรียงผิด — takePendingLumosItems ถอยมาใช้ตัวนี้เมื่อเจอ 42703
+    expect(TAKE_PENDING_SQL_NO_RANK).not.toMatch(/match_rank/);
+    expect(TAKE_PENDING_SQL_NO_RANK.match(/not exists/gi)?.length).toBe(3);
+    // ค่าคงที่เท่ากันสองฝั่ง = เงื่อนไขยุบเหลือการเทียบ (created_at, id) แบบเดิม
+    expect(TAKE_PENDING_SQL_NO_RANK).toMatch(
+      /\(\d+, e\.created_at, e\.id\) < \(\d+, c\.created_at, c\.id\)/,
+    );
   });
 
   it('ชั้นที่ 2 ต้องนับเฉพาะแถวที่ "ถึงคิว" ด้วยเกณฑ์เดียวกับแถวที่กำลังพิจารณา', () => {

@@ -238,6 +238,11 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
       );
     }
     const stored = await getStoredBoardMatch(jobId);
+    // ลำดับคิวใช้ tier ของ AI (เจ้าของเคาะ) — pool สดไม่มี tier จึงต้องหยิบจากผลที่เก็บไว้
+    // ⚠️ ไม่มีผลเก็บไว้ = ส่งได้ตามปกติ แค่ไม่มีคะแนน (matchRankFromTier คืนระดับกลาง)
+    const tierByCard = new Map<number, string>(
+      (stored?.result.matches ?? []).map((m) => [m.card_id, m.tier]),
+    );
     outcomes.push(
       await enqueueLumosReminderForSelected(
         jobRecord,
@@ -246,7 +251,7 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
           request_no: stored?.result.request_no ?? requestNo,
           job_family_label: stored?.result.job_family_label ?? spec?.job_family_label ?? null,
         },
-        selected,
+        selected.map((s) => ({ ...s, tier: tierByCard.get(s.card_id) ?? null })),
       ),
     );
   }

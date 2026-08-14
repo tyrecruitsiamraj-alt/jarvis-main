@@ -25,6 +25,7 @@ import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { toE164Thai } from './thaiPhone.js';
+import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import {
@@ -200,7 +201,8 @@ function payloadPhone(payload: unknown): string | null {
 async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
-  items: Array<{ personRef: string; payload: unknown }>,
+  /** `matchRank` = ลำดับจาก tier ของ AI (ดู src/lib/matchRank.ts) · ไม่ส่ง = ท้ายแถว */
+  items: Array<{ personRef: string; payload: unknown; matchRank?: number | null }>,
 ): Promise<{ added: string[]; held: string[]; suppressed: string[] }> {
   const added: string[] = [];
   const held: string[] = [];
@@ -255,13 +257,28 @@ async function insertQueueItems(
         continue;
       }
     }
-    const { rows } = await dbQuery<{ id: number }>(
-      `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at)
-       values ($1, $2, $3, $4::jsonb, $5)
-       on conflict (channel, job_ref, person_ref) do nothing
-       returning id`,
-      [channel, jobRef, item.personRef, JSON.stringify(item.payload), nextAttemptAt],
-    );
+    const base = [channel, jobRef, item.personRef, JSON.stringify(item.payload), nextAttemptAt];
+    const rank = item.matchRank ?? null;
+    let rows: Array<{ id: number }>;
+    try {
+      ({ rows } = await dbQuery<{ id: number }>(
+        `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at, match_rank)
+         values ($1, $2, $3, $4::jsonb, $5, $6)
+         on conflict (channel, job_ref, person_ref) do nothing
+         returning id`,
+        [...base, rank],
+      ));
+    } catch (e) {
+      // ⚠️ ยังไม่รัน 084 → **ต้องยังเข้าคิวได้** ไม่งั้นการส่งงานพังทั้งระบบเพราะคอลัมน์เสริม
+      if (!isUndefinedColumnError(e)) throw e;
+      ({ rows } = await dbQuery<{ id: number }>(
+        `insert into ${queueTable} (channel, job_ref, person_ref, payload, next_attempt_at)
+         values ($1, $2, $3, $4::jsonb, $5)
+         on conflict (channel, job_ref, person_ref) do nothing
+         returning id`,
+        base,
+      ));
+    }
     if (rows.length > 0) added.push(item.personRef);
   }
   return { added, held, suppressed };
@@ -284,17 +301,23 @@ const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู�
 export async function enqueueLumosReminderForSelected(
   job: Record<string, unknown>,
   result: Pick<BoardMatchResult, 'jobId' | 'request_no'> & { job_family_label: string | null },
-  selected: Array<{ card_id: number; full_name: string; mobile: string | null }>,
+  /** `tier` มาจากผล AI แมท — ไม่มีก็ส่งได้ แค่ไปต่อท้ายคิว (ดู src/lib/matchRank.ts) */
+  selected: Array<{
+    card_id: number;
+    full_name: string;
+    mobile: string | null;
+    tier?: string | null;
+  }>,
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
-  const items: Array<{ personRef: string; payload: LumosReminderPayload }> = [];
+  const items: Array<{ personRef: string; payload: LumosReminderPayload; matchRank: number }> = [];
   for (const m of selected) {
     const payload = buildReminderPayload(job, result, m);
     if (!payload) {
       skipped.push({ ref: `card-${m.card_id}`, name: m.full_name, reason: NO_PHONE_REASON });
       continue;
     }
-    items.push({ personRef: `card-${m.card_id}`, payload });
+    items.push({ personRef: `card-${m.card_id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
   const { added, held, suppressed } = await insertQueueItems('reminder', result.jobId, items);
   const addedSet = new Set(added);
@@ -329,17 +352,18 @@ export async function enqueueLumosInterviewForSelected(
     phone_number: string | null;
     job_name_th: string | null;
     position_name: string | null;
+    tier?: string | null;
   }>,
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
-  const items: Array<{ personRef: string; payload: LumosInterviewPayload }> = [];
+  const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number }> = [];
   for (const m of selected) {
     const payload = buildInterviewPayload(job, result, m);
     if (!payload) {
       skipped.push({ ref: `ir-${m.id}`, name: m.full_name, reason: NO_PHONE_REASON });
       continue;
     }
-    items.push({ personRef: `ir-${m.id}`, payload });
+    items.push({ personRef: `ir-${m.id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
   const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
@@ -763,7 +787,27 @@ const SERVE_ELIGIBLE = (a: string) => `
  * export ไว้ให้เทสต์อ่าน — เงื่อนไขพวกนี้พังแล้วเงียบสนิท (ยังตอบ 200 · Lumos ยังได้งาน
  * แค่ได้คนเดิมหลายใบพร้อมกัน) เทสต์โครงสร้าง SQL จึงเป็นด่านเดียวที่จับได้
  */
-export const TAKE_PENDING_SQL = `update ${queueTable} q
+/**
+ * นิพจน์ลำดับความสำคัญ — `withRank = false` แทนด้วยค่าคงที่เดียวกันทั้งสองฝั่ง
+ * ผลลัพธ์จึงเท่ากับพฤติกรรมเดิมเป๊ะ (เรียงตามคิวเก่าก่อน) สำหรับฐานที่ยังไม่รัน 084
+ *
+ * ⚠️ **ต้อง coalesce เสมอ** — `match_rank` เป็น null ได้ (คิวเก่า · งานจาก Follow)
+ * ปล่อย NULL เข้า row comparison แล้วผลเป็น NULL ไม่ใช่ true → ชั้นกัน
+ * "หนึ่งเบอร์ = หนึ่งใบขอที่กำลังเสนอ" หลุด แล้วคนเดียวจะโดนหลายสายพร้อมกัน
+ */
+/** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration (กติกาข้อ 9: กลืนเฉพาะเคสนี้) */
+function isUndefinedColumnError(e: unknown): boolean {
+  return (
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703'
+  );
+}
+
+const rankExprFor = (alias: string, withRank: boolean) =>
+  withRank ? `coalesce(${alias}.match_rank, ${MATCH_RANK_UNKNOWN})` : String(MATCH_RANK_UNKNOWN);
+
+export function buildTakePendingSql(withRank: boolean): string {
+  const rank = (a: string) => rankExprFor(a, withRank);
+  return `update ${queueTable} q
     set status = 'delivered', delivered_at = now(), updated_at = now(),
         delivery_count = q.delivery_count + 1
   where q.id in (
@@ -786,7 +830,9 @@ export const TAKE_PENDING_SQL = `update ${queueTable} q
           where e.id <> c.id
             and ${phoneExprFor('e')} = ${phoneExprFor('c')}
             and ${SERVE_ELIGIBLE('e')}
-            and (e.created_at, e.id) < (c.created_at, c.id)
+            -- ⚠️ คะแนนนำหน้าลำดับเวลา — คนที่ AI ให้เขียวต้องได้เสนอก่อน
+            -- แม้ใบขอนั้นจะเข้าคิวทีหลัง (เจ้าของเคาะ: ใช้ tier ของ AI)
+            and (${rank('e')}, e.created_at, e.id) < (${rank('c')}, c.created_at, c.id)
        )
        -- ชั้นที่ 3: ตอบว่าสนใจใบไหนไว้แล้ว → บังใบ**อื่น**ไว้จนพ้นเพดานเวลา
        and not exists (
@@ -798,11 +844,19 @@ export const TAKE_PENDING_SQL = `update ${queueTable} q
             and coalesce(k.last_outcome, k.result->>'outcome') = 'confirmed'
             and k.updated_at >= now() - interval '${CONFIRMED_FOCUS_DAYS} days'
        )
-     order by c.created_at asc
+     order by ${rank('c')} asc, c.created_at asc
      limit $2
      for update skip locked
   )
   returning q.payload`;
+}
+
+/**
+ * คิวรีเสิร์ฟตัวจริง — export ไว้ให้เทสต์อ่านโครงสร้าง (เงื่อนไขพวกนี้พังแล้วเงียบสนิท)
+ * ⚠️ ฐานที่ยังไม่รัน 084 ใช้ `TAKE_PENDING_SQL_NO_RANK` แทน (ดู takePendingLumosItems)
+ */
+export const TAKE_PENDING_SQL = buildTakePendingSql(true);
+export const TAKE_PENDING_SQL_NO_RANK = buildTakePendingSql(false);
 
 export async function takePendingLumosItems(
   channel: 'reminder' | 'interview',
@@ -816,10 +870,19 @@ export async function takePendingLumosItems(
     logError('call-batch.release.failed', e);
   }
 
-  const { rows } = await dbQuery<{ payload: unknown }>(TAKE_PENDING_SQL, [
-    channel,
-    Math.min(Math.max(limit, 1), 500),
-  ]);
+  const params = [channel, Math.min(Math.max(limit, 1), 500)];
+  let rows: Array<{ payload: unknown }>;
+  try {
+    ({ rows } = await dbQuery<{ payload: unknown }>(TAKE_PENDING_SQL, params));
+  } catch (e) {
+    // ⚠️ ยังไม่รัน 084 → **ห้ามให้คิวหยุดเดิน** (Lumos จะไม่ได้งานเลย ซึ่งแย่กว่าเรียงผิด)
+    // ถอยไปคิวรีที่ไม่มี match_rank = พฤติกรรมเดิมเป๊ะ (เรียงตามคิวเก่าก่อน)
+    if (!isUndefinedColumnError(e)) throw e;
+    logError('lumos.serve.match_rank.missing', {
+      hint: 'ยังไม่ได้รัน migration 084 — คิวยังเดินแต่เรียงตามลำดับเข้าคิว ไม่ใช่คะแนน AI',
+    });
+    ({ rows } = await dbQuery<{ payload: unknown }>(TAKE_PENDING_SQL_NO_RANK, params));
+  }
   return rows.map((r) => bumpScheduledAtForward(r.payload));
 }
 
