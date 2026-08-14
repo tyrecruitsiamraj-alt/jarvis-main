@@ -64,6 +64,22 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
     expect(filterApplications(claimed, 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toEqual(['c1']);
   });
 
+  it('เก็บ Lead → เข้าการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569 · แทนคลังสำรองเดิม)', () => {
+    // ใช้ n1 (status new · ยังไม่ claim) — Lead ออกจากข้อมูลผู้สมัคร ไปโผล่ในการติดต่อ
+    const lead = rows.map((r) => (r.id === 'n1' ? { ...r, is_lead: true } : r));
+    expect(filterApplications(lead, 'candidates', EMPTY_RM_FILTERS, '').map((r) => r.id)).not.toContain('n1');
+    expect(filterApplications(lead, 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).toContain('n1');
+  });
+
+  it('⚠️ Lead ที่ถูกปฏิเสธ (declined) กลับข้อมูลผู้สมัคร ไม่ค้างในการติดต่อ', () => {
+    // งานใบนั้นจบแล้ว (declined ชนะ isClosedByCallOutcome) — คนกลับคลังกลาง แม้ถูกตี Lead
+    const leadDeclined = rows.map((r) =>
+      r.id === 'n1' ? { ...r, is_lead: true, last_call_outcome: 'declined' as const } : r,
+    );
+    expect(filterApplications(leadDeclined, 'contact', EMPTY_RM_FILTERS, '').map((r) => r.id)).not.toContain('n1');
+    expect(filterApplications(leadDeclined, 'candidates', EMPTY_RM_FILTERS, '').map((r) => r.id)).toContain('n1');
+  });
+
   it('ใบที่คนอื่นเก็บ (claimed แต่ไม่ใช่ของฉัน) ไม่โผล่ในการติดต่อของฉัน', () => {
     // server กรองใบของคนอื่นออกจาก feed อยู่แล้ว — เทสต์นี้กันชั้นที่สอง
     // เผื่อแถวหลุดมา (เช่นจาก ?job_id= ที่ไม่กรอง)

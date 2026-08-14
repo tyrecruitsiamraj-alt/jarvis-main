@@ -64,8 +64,11 @@ export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
   // งานอื่นได้ · ถ้าปล่อยค้างในถัง "การติดต่อ" ของคนเก็บ จะเป็นงานค้างที่ไม่มีวันจบ
   // และคนคนนั้นจะหายจากคลังกลางไปเฉย ๆ
   if (isClosedByCallOutcome(r)) return tab === 'candidates';
-  if (tab === 'contact') return r.claimed_by_me === true;
-  if (tab === 'candidates') return r.claimed_by_me !== true;
+  // "เก็บไว้ทำงานต่อ" = เก็บไปติดต่อ (claim) **หรือ** เก็บ Lead (เจ้าของสั่ง 14 ส.ค. 2569:
+  // "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน" · เดิม Lead หายเข้าคลังสำรอง)
+  const kept = r.claimed_by_me === true || r.is_lead === true;
+  if (tab === 'contact') return kept;
+  if (tab === 'candidates') return !kept;
   const st = RM_TAB_STATUSES[tab];
   return !st || st.includes(r.status);
 }

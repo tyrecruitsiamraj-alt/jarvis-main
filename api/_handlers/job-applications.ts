@@ -287,7 +287,15 @@ export function buildApplicationsListQuery(input: {
    * ⚠️ เงื่อนไขนี้ **ไม่มี param** โดยตั้งใจ — ชุด legacy จึงแทนด้วย `true` ได้ตรง ๆ
    * ไม่ต้องทำ no-op ที่อ้าง param เหมือน claimWhere (กติกา "ส่ง param เท่ากับที่อ้าง")
    */
-  const leadWhere = input.leadView ? 'is_lead' : 'not is_lead';
+  /**
+   * ⚠️ เปลี่ยน 14 ส.ค. 2569 (เจ้าของสั่ง): "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน"
+   * (เดิม Lead หายจากทุกแท็บไปคลังสำรอง ?lead=1)
+   * - default list (RmWorkspace) → **ส่ง Lead มาด้วย** (`true`) แล้วให้ isInRmTab
+   *   ฝั่งหน้าเว็บแบ่ง Lead เข้าแท็บ "การติดต่อ" (คู่กับ claim)
+   * - dialog กล่องงาน (jobId) → **ยังซ่อน Lead** (เก็บ Lead แล้วออกจากที่สนใจ ไปการติดต่อ)
+   * - ?lead=1 ยังใช้ได้ (แสดงเฉพาะ Lead) เผื่อดูอย่างเดียว แม้เอาปุ่มออกจากหน้าแล้ว
+   */
+  const leadWhere = jobId ? 'not is_lead' : input.leadView ? 'is_lead' : 'true';
   conds.push('{{leadWhere}}');
   return {
     sql: `select {{cols}} from ${tbl} ${conds.length ? `where ${conds.join(' and ')}` : ''}

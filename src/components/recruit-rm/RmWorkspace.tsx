@@ -413,7 +413,6 @@ const RmWorkspace: React.FC<{
               onDeleteLead={() => void applyLead(false)}
               leadBusy={leadBusy}
               leadView={leadView}
-              onToggleLeadView={() => setLeadView(!leadView)}
               onAddApplicant={() => setAddOpen(true)}
               onHoldSelected={() => void holdSelectedForSelf()}
               holdingSelected={holdingSelected}

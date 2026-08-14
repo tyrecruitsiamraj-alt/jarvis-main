@@ -45,11 +45,14 @@ describe('summarizeLeadUpdate — ปัดเป็นชุดแล้วล�
   });
 });
 
-describe('buildApplicationsListQuery — Lead ต้องหายจากลิสต์ปกติทุกกรณี', () => {
+describe('buildApplicationsListQuery — Lead ไปแท็บการติดต่อ (เปลี่ยน 14 ส.ค. 2569)', () => {
   const base = { scopedJobIds: null, viewerId: 'u1' };
 
-  it('ลิสต์ปกติกรอง not is_lead · มุมมองคลังสำรองกรอง is_lead', () => {
-    expect(buildApplicationsListQuery({ ...base }).leadWhere).toBe('not is_lead');
+  it('⚠️ ลิสต์ปกติ (RmWorkspace) ต้อง **ส่ง Lead มาด้วย** (true) — client แบ่งไปแท็บการติดต่อ', () => {
+    // เจ้าของสั่ง: "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน" (เดิม Lead หายเข้าคลังสำรอง)
+    // isInRmTab ฝั่งหน้าเว็บแบ่ง is_lead → contact · ถ้า server กรอง Lead ออก จะไม่มีมาแบ่ง
+    expect(buildApplicationsListQuery({ ...base }).leadWhere).toBe('true');
+    // ?lead=1 ยังใช้ได้ (ดูเฉพาะ Lead) เผื่อ bookmark เก่า
     expect(buildApplicationsListQuery({ ...base, leadView: true }).leadWhere).toBe('is_lead');
   });
 
