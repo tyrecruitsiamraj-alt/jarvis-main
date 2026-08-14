@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatDateTimeTh, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
@@ -97,6 +97,12 @@ const RmTable: React.FC<{
               {tab === 'appointments' ? (
                 <th className="px-3 py-2 font-semibold">วันนัด</th>
               ) : null}
+              {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
+                  "ปุ่มโทร เพื่อ Stamp ว่าโทรตอนไหน") · กดปุ่มโทร = จับ hold (heldAt =
+                  เวลาที่กด) · มีผลแล้ว = last_call_at (เวลาบันทึกผลล่าสุด) */}
+              {tab === 'contact' ? (
+                <th className="px-3 py-2 font-semibold">โทรล่าสุด</th>
+              ) : null}
               <th className="px-3 py-2 font-semibold">สถานะ</th>
               <th className="px-3 py-2 text-right font-semibold">ตัวเลือก</th>
             </tr>
@@ -155,6 +161,16 @@ const RmTable: React.FC<{
                             }),
                           )
                         : EM_DASH}
+                    </td>
+                  ) : null}
+                  {tab === 'contact' ? (
+                    <td className={cn('px-3 py-2 whitespace-nowrap text-[11px]', DASH.cellMuted)}>
+                      {/* ถืออยู่ (เพิ่งกดโทร) = heldAt · มีผลแล้ว = last_call_at · ไม่เคยโทร = ขีด */}
+                      {holdByRef[r.id]
+                        ? `📞 ${formatDateTimeTh(holdByRef[r.id].heldAt)}`
+                        : r.last_call_at
+                          ? formatDateTimeTh(r.last_call_at)
+                          : EM_DASH}
                     </td>
                   ) : null}
                   <td className="px-3 py-2">
