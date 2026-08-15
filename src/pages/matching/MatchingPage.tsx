@@ -143,6 +143,16 @@ import {
   type LumosJobCallSummaryRow,
 } from '@/lib/lumosDispatchApi';
 
+/**
+ * คีย์ของ `holdByRef` — person_ref เต็มตัวตาม source ให้ตรงกับ boardPersonRef/irecruitPersonRef
+ * ที่ฝั่ง read ใช้ · ห้ามใช้ id ดิบ (board 1805 กับ ir 1805 ชนกัน คนละคน)
+ */
+function holdRefKey(source: string, ref: string | number): string {
+  if (source === 'irecruit') return `ir-${ref}`;
+  if (source === 'application') return `app-${ref}`;
+  return `card-${ref}`;
+}
+
 /** สถานะการเสนอ + id แถวจริงใน DB (ไว้ยกเลิก) — คีย์ = source#ref */
 type ProposedRef = {
   id: string;
@@ -662,7 +672,14 @@ const MatchingPage: React.FC = () => {
    */
   const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
 
-  /** โหลดสถานะล็อกของผู้สมัครในใบขอที่เปิด (คีย์ด้วยเบอร์ฝั่ง server) */
+  /**
+   * โหลดสถานะล็อกของผู้สมัครในใบขอที่เปิด (คีย์ด้วยเบอร์ฝั่ง server)
+   *
+   * ⚠️ **holdByRef คีย์ด้วย person_ref เต็มตัว (`card-N`/`ir-N`/`app-N`) ห้ามใช้ id ดิบ**
+   * — `card_id` ของบอร์ดกับ `id` ของ iRecruit เป็นเลขคนละชุดที่ชนกันได้ (1805 มีทั้งสอง
+   * ฝั่ง แต่คนละคน) · คีย์ด้วย id ดิบ = เก็บ iRecruit 1805 ไปโทร แล้วการ์ดบอร์ด 1805
+   * (คนละคน) ขึ้น 🔒 ผิด + หลุดจาก "ส่งทั้งหมด" เงียบ ๆ (กับดักเดียวกับ screeningByRef)
+   */
   useEffect(() => {
     if (!openJobMatches?.length) return;
     const phones = openJobMatches.map((m) => m.mobile);
@@ -671,7 +688,8 @@ const MatchingPage: React.FC = () => {
       if (cancelled || map.size === 0) return;
       setHoldByRef((prev) => {
         const next = { ...prev };
-        for (const [ref, hold] of map) next[ref] = hold;
+        // map คีย์ด้วย candidateRef ดิบ — ประกอบ person_ref ตาม source ก่อนเก็บ
+        for (const hold of map.values()) next[holdRefKey(hold.source, hold.candidateRef)] = hold;
         return next;
       });
     });
@@ -823,11 +841,9 @@ const MatchingPage: React.FC = () => {
   }, [lumosSelectedBoard, lumosSelectedIrecruit, lumosStatusByRef]);
 
   const lumosSelectedHoldable = useMemo(() => {
-    // ⚠️ `holdByRef` คีย์ด้วย **candidateRef ดิบ** (`String(id)`) เหมือนตอน render การ์ด
-    // (บรรทัด 3042) และ approveAllTargets — เดิมหลุดไปใช้ `boardPersonRef` ('card-N')
-    // ที่ไม่มีวันตรง map → ปุ่ม "เก็บไปโทรเอง" นับทุกคนว่ายังว่างเสมอ (ALL_HELD ไม่เคยขึ้น)
-    const board = lumosSelectedBoard.filter((id) => !holdByRef[String(id)]).length;
-    const ir = lumosSelectedIrecruit.filter((id) => !holdByRef[String(id)]).length;
+    // `holdByRef` คีย์ด้วย person_ref เต็มตัว (card-N/ir-N) — board กับ ir แยกคีย์ ไม่ชนกัน
+    const board = lumosSelectedBoard.filter((id) => !holdByRef[boardPersonRef(id)]).length;
+    const ir = lumosSelectedIrecruit.filter((id) => !holdByRef[irecruitPersonRef(id)]).length;
     return board + ir;
   }, [lumosSelectedBoard, lumosSelectedIrecruit, holdByRef]);
 
@@ -900,7 +916,7 @@ const MatchingPage: React.FC = () => {
           !declinedRefs.has(boardPersonRef(m.card_id)) &&
           Boolean(m.mobile) &&
           !lumosStatusByRef[boardPersonRef(m.card_id)] &&
-          !holdByRef[String(m.card_id)],
+          !holdByRef[boardPersonRef(m.card_id)],
       )
       .map((m) => m.card_id);
     const irecruit = (irMatchById[jobDetail.id]?.matches ?? [])
@@ -911,7 +927,7 @@ const MatchingPage: React.FC = () => {
           !declinedRefs.has(irecruitPersonRef(m.id)) &&
           Boolean(m.phone_number) &&
           !lumosStatusByRef[irecruitPersonRef(m.id)] &&
-          !holdByRef[String(m.id)],
+          !holdByRef[irecruitPersonRef(m.id)],
       )
       .map((m) => m.id);
     return { board, irecruit };
@@ -1193,10 +1209,10 @@ const MatchingPage: React.FC = () => {
           requestNo: t.requestNo ?? null,
         });
         results.push({ target: t, result });
-        // อัปเดตป้าย 🔒 ทันทีทั้งเคสสำเร็จและเคสมีคนถือ (คีย์ด้วย ref ของการ์ดที่เลือก
-        // ไม่ใช่ ref ในล็อก — คนเดียวกันคนละแหล่ง ref คนละชุดแต่เบอร์เดียวกัน)
+        // อัปเดตป้าย 🔒 ทันที — คีย์ด้วย person_ref เต็มตัวตาม source ของการ์ดที่เลือก
+        // (card-N/ir-N) ให้ตรงกับฝั่ง read · id ดิบชนกันข้าม board/iRecruit
         const hold = result.ok ? result.hold : result.heldBy;
-        if (hold) setHoldByRef((prev) => ({ ...prev, [t.candidateRef]: hold }));
+        if (hold) setHoldByRef((prev) => ({ ...prev, [holdRefKey(t.source, t.candidateRef)]: hold }));
       }
       clearLumosSelection();
       const summary = summarizeAcquireResults({
@@ -3028,7 +3044,7 @@ const MatchingPage: React.FC = () => {
                         const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                         const lumosRef = boardPersonRef(m.card_id);
                         const lumosRow = lumosStatusByRef[lumosRef];
-                        const holdRef = String(m.card_id);
+                        const holdRef = boardPersonRef(m.card_id);
                         const hold = holdByRef[holdRef];
                         const heldByOther = hold && !hold.mine ? hold : null;
                         const heldByMe = hold && hold.mine ? hold : null;
