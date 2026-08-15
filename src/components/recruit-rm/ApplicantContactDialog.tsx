@@ -16,6 +16,7 @@ import { formatDateTimeTh } from '@/lib/dateTh';
 import { fetchRecruitReasons } from '@/lib/recruitReasonsApi';
 import type { RecruitReason } from '@/lib/recruitReasons';
 import { fetchContactLogs, saveContactLog, type ContactLog } from '@/lib/applicationContactsApi';
+import { fixApplicationPhone } from '@/lib/publicApplicationsApi';
 import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { unitRequestCardTitle } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
@@ -60,6 +61,11 @@ export default function ApplicantContactDialog({
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   const [logs, setLogs] = useState<ContactLog[]>([]);
 
+  /** แก้เบอร์ (ใบที่ติดธง "เบอร์ใช้โทรไม่ได้" — migration 087) */
+  const [phoneDraft, setPhoneDraft] = useState('');
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
   // โหลดของประกอบเมื่อเปิด dialog เท่านั้น (ใบขอ 500 ใบ + เหตุผล 67 — ไม่โหลดค้างทั้งหน้า)
   // ⚠️ ต้อง reset `logs` + กัน race (`cancelled`) ด้วย — เปิดคนใหม่ต้องไม่เห็นประวัติคนเก่า
   // และถ้ากดไล่แถวเร็ว ๆ response ที่มาช้ากว่าต้องไม่ทับของคนที่เปิดอยู่ (fetchContactLogs
@@ -76,6 +82,9 @@ export default function ApplicantContactDialog({
     setNote('');
     setError(null);
     setLogs([]);
+    setPhoneDraft('');
+    setPhoneBusy(false);
+    setPhoneError(null);
     void fetchContactLogs(application.id).then((v) => {
       if (!cancelled) setLogs(v);
     });
@@ -310,6 +319,41 @@ export default function ApplicantContactDialog({
               <p className={DASH.muted}>{dashIfEmpty(applicantAddressLine(a))}</p>
               {a.note ? <p className={DASH.muted}>หมายเหตุ: {a.note}</p> : null}
             </div>
+
+            {/* เบอร์ใช้โทรไม่ได้ (087) — ช่องแก้โผล่เฉพาะใบที่ติดธง · แก้แล้วใบกลับเข้า
+                เกณฑ์ส่ง AI โทร/เก็บไปโทรเอง (=== false เพราะ server เก่าไม่ส่ง field) */}
+            {a.phone_callable === false ? (
+              <div className={cn('space-y-1.5 rounded-xl border px-3 py-2.5 text-xs', TONE.danger.soft)}>
+                <p className={cn('font-semibold', TONE.danger.value)}>
+                  ⚠️ เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — ส่ง AI โทร/เก็บไปโทรไม่ได้
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={phoneDraft}
+                    onChange={(e) => setPhoneDraft(e.target.value)}
+                    placeholder="เบอร์มือถือ 10 หลัก เช่น 0812345678"
+                    inputMode="tel"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    disabled={phoneBusy || phoneDraft.replace(/\D/g, '').length < 10}
+                    onClick={() => {
+                      setPhoneBusy(true);
+                      setPhoneError(null);
+                      fixApplicationPhone(a.id, phoneDraft)
+                        .then(() => onSaved())
+                        .catch((e) => setPhoneError(e instanceof Error ? e.message : 'แก้เบอร์ไม่สำเร็จ'))
+                        .finally(() => setPhoneBusy(false));
+                    }}
+                    className="jarvis-btn-primary shrink-0 justify-center disabled:opacity-50"
+                  >
+                    {phoneBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} แก้เบอร์
+                  </button>
+                </div>
+                {phoneError ? <p className={cn('text-[11px]', TONE.danger.value)}>{phoneError}</p> : null}
+              </div>
+            ) : null}
 
             {/* ประวัติการติดต่อ (log รายครั้ง — ล่าสุดก่อน) */}
             {logs.length > 0 ? (

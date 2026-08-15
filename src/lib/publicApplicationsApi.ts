@@ -22,6 +22,12 @@ export type PublicApplication = {
   first_name?: string;
   last_name?: string;
   phone: string;
+  /**
+   * เบอร์ใช้กับระบบโทรได้ไหม (แปลง E.164 ได้ — migration 087) · false = ส่ง AI โทร/
+   * เก็บไปโทร/จับผลโทรไม่ได้ ต้องแก้เบอร์ก่อน (ชิป "เบอร์ใช้โทรไม่ได้")
+   * undefined = server รุ่นเก่ายังไม่ส่งมา — อย่าเดาว่าผิด
+   */
+  phone_callable?: boolean;
   age?: number;
   gender?: 'male' | 'female' | 'other';
   province?: string;
@@ -234,6 +240,23 @@ export async function updateJobApplication(
   if (!r.ok) {
     const body = (await r.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message || 'อัปเดตสถานะไม่สำเร็จ');
+  }
+  const body = (await r.json()) as { item: PublicApplication };
+  return body.item;
+}
+
+/**
+ * แก้เบอร์โทรของใบสมัคร (ใบที่ติดธง "เบอร์ใช้โทรไม่ได้" — migration 087)
+ * server บังคับให้เบอร์ใหม่เป็นมือถือที่แปลง E.164 ได้ (400 ถ้าไม่ผ่าน) + audit ให้
+ */
+export async function fixApplicationPhone(id: string, phone: string): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, phone }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'แก้เบอร์ไม่สำเร็จ');
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;

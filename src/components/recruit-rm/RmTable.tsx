@@ -131,7 +131,19 @@ const RmTable: React.FC<{
                   <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(firstName)}</td>
                   <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(lastName)}</td>
                   <td className={cn('px-3 py-2 font-mono text-[12px] whitespace-nowrap', DASH.cell)}>
-                    {dashIfEmpty(r.phone)}
+                    <span className="inline-flex items-center gap-1.5">
+                      {dashIfEmpty(r.phone)}
+                      {/* เบอร์แปลง E.164 ไม่ได้ (087) — ส่ง AI/เก็บไปโทร/จับผลโทรไม่ได้
+                          แก้ได้ที่ปุ่มดูรายละเอียด · เช็ค === false เพราะ server เก่าไม่ส่ง field */}
+                      {r.phone_callable === false ? (
+                        <span
+                          className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-semibold', TONE.danger.soft, TONE.danger.value)}
+                          title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
+                        >
+                          เบอร์ใช้โทรไม่ได้
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   {/* ⚠️ truncate ต้องการกล่องที่มีความกว้างแน่นอน — inline-flex เดิมใช้ไม่ได้
                       ใส่ title ไว้ให้อ่านเต็มตอน hover ข้อมูลจึงไม่หายไปกับการตัด */}

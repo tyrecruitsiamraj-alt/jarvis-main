@@ -110,6 +110,10 @@ function toApplication(r: Row, viewerId?: string) {
     first_name: r.first_name || undefined,
     last_name: r.last_name || undefined,
     phone: r.phone,
+    // เบอร์ใช้กับระบบโทรได้ไหม — คำนวณจาก phone ตรง ๆ (สูตรเดียวกับ generated column
+    // ของ migration 087 · มีเทสต์ parity ล็อก) จะได้ไม่ต้องเพิ่ม fallback tier ของ select
+    // · false = โชว์ชิป "เบอร์ใช้โทรไม่ได้" + นับเข้ากล่อง "เบอร์โทรผิด" บน dashboard
+    phone_callable: toE164Thai(r.phone) !== null,
     age: r.age ?? undefined,
     gender: r.gender || undefined,
     province: r.province || undefined,
@@ -605,6 +609,47 @@ async function patchLead(req: AuthedReq, res: ApiRes, id: string, lead: boolean)
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
 }
 
+/**
+ * แก้เบอร์โทรของใบสมัคร — ทางแก้ใบที่ติดธง "เบอร์ใช้โทรไม่ได้" (migration 087)
+ * เบอร์ใหม่ต้องเป็นมือถือที่แปลง E.164 ได้เท่านั้น (แก้แล้วต้องโทรได้จริง ไม่ใช่แก้ให้พ้นธง)
+ * · phone_e164 เป็น generated column — อัปเดต phone แล้วฐานคำนวณให้เอง
+ */
+async function patchPhone(req: AuthedReq, res: ApiRes, id: string, rawPhone: string) {
+  const digits = rawPhone.replace(/\D/g, '');
+  const e164 = toE164Thai(digits);
+  if (!e164) {
+    return sendError(res, 400, 'Bad request', 'เบอร์ต้องเป็นมือถือ 10 หลัก (ขึ้นต้น 0) ถึงจะใช้กับระบบโทรได้');
+  }
+  // เก็บรูปไทย 0XXXXXXXXX เหมือน intake (คอลัมน์ phone ทั้งตารางเป็นรูปนี้)
+  const normalized = digits.startsWith('66') ? `0${digits.slice(2)}` : digits;
+
+  const { rows: beforeRows } = await dbQuery<{
+    phone: string;
+    job_id: string | null;
+    department_code: string | null;
+  }>(`select phone, job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found');
+  if (!(await isApplicationInWriteScope(req.user, before))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
+
+  await dbQuery(`update ${tbl} set phone = $2, updated_at = now() where id = $1`, [id, normalized]);
+
+  // เบอร์คือกุญแจจับคู่ผลโทร/ล็อกทั้งระบบ — ต้องมีร่องรอยว่าใครแก้จากอะไรเป็นอะไร
+  await auditFromAuthed(req, {
+    action: 'job_application.phone_fix',
+    entityType: 'job_application',
+    entityId: id,
+    before: { phone: before.phone },
+    after: { phone: normalized },
+  });
+
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} where id = $1`, [id]);
+  if (!rows[0]) return sendError(res, 404, 'Not found');
+  return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
+}
+
 async function patchStatus(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
   if (typeof raw !== 'object' || raw === null) {
@@ -618,6 +663,8 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
   if (typeof b.claim === 'boolean') return patchClaim(req, res, id, b.claim);
   // "เก็บ Lead / ลบ Lead" — ปัดออกจากรายชื่อทำงาน (ดู migration 083)
   if (typeof b.lead === 'boolean') return patchLead(req, res, id, b.lead);
+  // แก้เบอร์ (ใบที่ติดธงเบอร์ใช้โทรไม่ได้ — migration 087)
+  if (typeof b.phone === 'string') return patchPhone(req, res, id, b.phone);
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
