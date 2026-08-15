@@ -180,8 +180,10 @@ export const MyCallsSection: React.FC = () => {
       await recordCallResult({
         holdId: hold.id,
         outcome,
-        scope: scope ?? undefined,
-        appointmentAt: appointmentAt || null,
+        // ส่งค่าที่ resolveAppointment ตัดสินแล้ว ไม่ใช่ค่า state ดิบ — กันชุด scope/วันนัด
+        // ผิดฝั่งหลุดไป (เช่น confirmed แต่ scope ยังเป็น 'all' ที่ค้างจาก declined)
+        scope: decided.scope ?? undefined,
+        appointmentAt: decided.appointmentAt,
         note: note.trim() || null,
       });
       setJustDone((prev) => ({ ...prev, [hold.id]: { hold, outcome } }));
@@ -408,10 +410,12 @@ export const MyCallsSection: React.FC = () => {
                                 key={key}
                                 type="button"
                                 onClick={() => {
+                                  // สลับผลโทรต้องล้าง scope เสมอ — scope ของ "สนใจ"
+                                  // (scheduled/unscheduled) กับ "ไม่สนใจ" (job/all) เป็นคนละชุด
+                                  // ถ้าไม่ล้างตอนสลับ confirmed↔declined ค่าชุดผิดจะติดไป
+                                  // แล้ว guard `!scope` ผ่าน → ด่านบังคับเลือกถูกข้ามเงียบ ๆ
+                                  if (key !== outcome) setScope(null);
                                   setOutcome(key);
-                                  // scope มีความหมายเฉพาะ "สนใจ" กับ "ไม่สนใจ"
-                                  // สลับไปผลอื่นแล้วไม่ล้าง = ค่าเก่าติดไปกับผลใหม่
-                                  if (key !== 'declined' && key !== 'confirmed') setScope(null);
                                   if (key !== 'confirmed') setAppointmentAt('');
                                   setError(null);
                                 }}

@@ -17,6 +17,7 @@ import {
   CONFIRMED_SCOPE_HINT,
   CONFIRMED_SCOPE_LABEL,
   CONFIRMED_SCOPES,
+  resolveAppointment,
 } from '@/lib/callAppointment';
 
 // ─── "รับไปโทรเอง" — ล็อกสิทธิ์โทร กันเจ้าหน้าที่โทรชนกัน + กัน AI โทรทับ ──────
@@ -63,9 +64,12 @@ export default function CallHoldPanel({
   const msLeft = new Date(hold.expiresAt).getTime() - now;
 
   const pick = (next: CallResultOutcome) => {
+    // สลับผลโทรต้องล้าง scope เสมอ — scope ของ "สนใจ" (scheduled/unscheduled) กับ
+    // "ไม่สนใจ" (job/all) เป็นคนละชุด · ล้างเฉพาะตอนออกจาก declined (เดิม) ไม่พอ:
+    // สลับ confirmed→declined แล้ว scope 'scheduled' ค้าง → guard ผ่าน → server coerce 'job'
+    if (next !== outcome) setScope(null);
     setOutcome(next);
     setError(null);
-    if (next !== 'declined') setScope(null);
   };
 
   const save = async () => {
@@ -78,6 +82,17 @@ export default function CallHoldPanel({
       setError('เลือกก่อนว่า “ไม่สนใจงานนี้” หรือ “ไม่หางานแล้ว”');
       return;
     }
+    // ตัดสินด้วยด่านเดียวกับ server — ได้ scope/วันนัดที่ผ่านการ coerce แล้ว (ไม่ส่งค่าดิบ)
+    const decided = resolveAppointment({
+      outcome,
+      scope,
+      appointmentAt,
+      now: new Date().toISOString(),
+    });
+    if (!decided.ok) {
+      setError(decided.reason);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -88,8 +103,8 @@ export default function CallHoldPanel({
       await recordCallResult({
         holdId: hold.id,
         outcome,
-        scope: scope ?? undefined,
-        appointmentAt: appointmentAt || null,
+        scope: decided.scope ?? undefined,
+        appointmentAt: decided.appointmentAt,
         note: note.trim() || null,
         detail: Object.keys(detail).length > 0 ? detail : undefined,
       });
