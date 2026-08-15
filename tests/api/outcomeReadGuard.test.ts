@@ -25,6 +25,10 @@ const READERS = [
   'api/_handlers/lumos-call-funnel.ts',
   'api/_handlers/matching-contact-history.ts',
   'api/_lib/callFollowup.ts',
+  // เพิ่ม 15 ส.ค. 2569 — สองไฟล์นี้เคยตกหล่น: กล่อง "สนใจ/ไม่สนใจ" หน้าแรกกับรายการ
+  // Follow อ่าน result ทางเดียว → ผลที่คนบันทึก/หลัง retry หายเงียบ (บั๊กรอบ 4-5)
+  'api/_handlers/matching-flow-summary.ts',
+  'api/_handlers/follow.ts',
 ];
 
 describe('อ่านผลโทรต้อง coalesce เสมอ ห้ามอ่าน result ทางเดียว', () => {
@@ -75,7 +79,7 @@ describe('อ่านผลโทรต้อง coalesce เสมอ ห้�
   }
 
   it('รายการไฟล์ที่ต้องคุมต้องไม่ว่าง (กันเทสต์ผ่านเพราะไม่ได้เช็คอะไรเลย)', () => {
-    expect(READERS.length).toBeGreaterThanOrEqual(4);
+    expect(READERS.length).toBeGreaterThanOrEqual(6);
     for (const f of READERS) {
       expect(readFileSync(path.resolve(process.cwd(), f), 'utf8').length).toBeGreaterThan(0);
     }

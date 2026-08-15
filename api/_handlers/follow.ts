@@ -70,10 +70,10 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
 
   const { rows } = await dbQuery<FollowRow>(
     `select f.*,
-            q.status                     as call_status,
-            q.result->>'outcome'         as call_outcome,
-            q.result->>'summary'         as call_summary,
-            q.updated_at                 as called_at
+            q.status                                       as call_status,
+            coalesce(q.last_outcome, q.result->>'outcome') as call_outcome,
+            q.result->>'summary'                           as call_summary,
+            q.updated_at                                   as called_at
        from ${followTable} f
        left join ${queueTable} q
               on q.channel = 'reminder'

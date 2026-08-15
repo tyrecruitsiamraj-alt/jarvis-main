@@ -142,13 +142,15 @@ async function listByFollowupState(
 
 /** รายชื่อ "ไม่สนใจงาน" เดือนนี้ — ไว้ให้เห็นว่าใครปฏิเสธ (ไม่มีงานต้องทำต่อ แค่รู้ไว้) */
 async function listDeclinedThisMonth(jobIds: string[], limit: number): Promise<FlowFollowUpItem[]> {
+  // อ่าน outcome ด้วย coalesce(last_outcome, result->>'outcome') — ผลที่คนบันทึกเขียนแค่
+  // last_outcome และตอนตั้งโทรซ้ำระบบล้าง result ทิ้ง (กับดักเดียวกับ outcomesMonth ด้านล่าง)
   const { rows } = await dbQuery<FollowUpSqlRow>(
     `select q.job_ref, q.person_ref, q.channel, q.updated_at, ${PERSON_COLS},
             q.result->>'summary' as summary,
-            q.result->>'outcome' as outcome
+            coalesce(q.last_outcome, q.result->>'outcome') as outcome
        from ${queueTable} q
       where q.job_ref = any($1)
-        and q.result->>'outcome' = 'declined'
+        and coalesce(q.last_outcome, q.result->>'outcome') = 'declined'
         and q.updated_at >= date_trunc('month', now())
       order by q.updated_at desc
       limit $2`,
@@ -171,10 +173,10 @@ async function listCallsAwaitingAction(
             coalesce(q.payload->>'recipient_name', q.payload->>'candidate_name') as name,
             coalesce(q.payload->>'recipient_phone', q.payload->>'phone') as phone,
             q.result->>'summary' as summary,
-            q.result->>'outcome' as outcome
+            coalesce(q.last_outcome, q.result->>'outcome') as outcome
        from ${queueTable} q
       where q.job_ref = any($3)
-        and q.result->>'outcome' = any($1)
+        and coalesce(q.last_outcome, q.result->>'outcome') = any($1)
         and not exists (
           select 1 from ${proposalsTable} p
            where p.job_id = q.job_ref
