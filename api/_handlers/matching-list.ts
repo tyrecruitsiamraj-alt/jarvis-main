@@ -78,7 +78,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       listProposalsForJobs(jobs.map((j) => j.id)),
       loadBoardMatchTierMap(),
       loadBoardAvailabilityContext(),
-      loadLumosJobCallSummaryMap().catch(() => new Map<string, LumosJobCallSummary>()),
+      // ⚠️ ห้ามครอบ .catch(() => empty) — loadLumosJobCallSummaryMap กลืน 42P01 (ตารางยังไม่
+      // migrate) ให้ข้างในแล้ว · ที่เหลือคือ DB ล้มจริง ถ้ากลืนที่นี่การ์ดจะเขียน "รออนุมัติ 0"
+      // ทั้งหน้าแทนที่จะขึ้น error ให้รู้ว่าอ่านไม่ได้ (โกหกในทางที่อันตราย — ดู lumosDispatch.ts:622)
+      loadLumosJobCallSummaryMap(),
     ]);
 
     // กรองผลที่เก็บไว้ให้เหลือเฉพาะ "คนที่ยังพร้อม" ก่อนนับป้าย/summary/workflow filter

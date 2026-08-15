@@ -534,7 +534,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                   <span className="inline-flex items-center gap-1 text-foreground font-semibold">
                     <Banknote className="h-3.5 w-3.5 text-success" />
-                    ฿{job.total_income.toLocaleString()}
+                    ฿{job.total_income.toLocaleString('th-TH')}
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
@@ -854,7 +854,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">ฐานเงินเดือน</dt>
-                  <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString()}</dd>
+                  <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString('th-TH')}</dd>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">วันที่ต้องการคน</dt>

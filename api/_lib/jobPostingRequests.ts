@@ -240,7 +240,10 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
     return mapRow(rows[0]);
   } catch (e) {
     if (isPgUniqueViolation(e)) {
-      const race = await getActiveJobPostingForJob(jobId);
+      // unique index ระดับ (job_id, request_type) ตั้งแต่ migration 080 — ต้องกู้ด้วย
+      // requestType เดิม ไม่งั้นคืนคำขอ active "ประเภทไหนก็ได้" (ล่าสุด) กลับไป → กด Scraping
+      // แต่ได้ id ของคำขอ Content คนละใบ (เหมือนตอนเช็คก่อน insert ที่ :203)
+      const race = await getActiveJobPostingForJob(jobId, input.requestType ?? 'content');
       if (race) return race;
     }
     throw e;
