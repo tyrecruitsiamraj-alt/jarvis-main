@@ -37,7 +37,7 @@ describe('bookingTargetFromPersonRef — ต้องตรงกับ splitPer
   });
 });
 
-describe('bookingTargetFromHold — ล็อกโทรเป็นได้ทั้ง 3 ต้นทาง แต่จองได้ 2', () => {
+describe('bookingTargetFromHold — จองได้ทั้ง 3 ต้นทาง (S9 · application เปิดแล้ว)', () => {
   it('board / irecruit จองได้ตรงตัว', () => {
     expect(bookingTargetFromHold('board', '1805')).toEqual({
       source: 'board',
@@ -49,12 +49,16 @@ describe('bookingTargetFromHold — ล็อกโทรเป็นได้�
     });
   });
 
-  it('⚠️ application จองไม่ได้ — ref ของใบสมัครเป็นคนละชุดกับ card_id ของบอร์ด', () => {
-    expect(bookingTargetFromHold('application', 'abc-123')).toBeNull();
+  it('application จองได้แล้ว (migration 091 · ref = application id · คนละ namespace กับ card_id)', () => {
+    expect(bookingTargetFromHold('application', 'a506aa87-7502-4886-8607-ccbb799b215c')).toEqual({
+      source: 'application',
+      candidateRef: 'a506aa87-7502-4886-8607-ccbb799b215c',
+    });
   });
 
   it('ref ว่าง = ไม่รู้ว่าใคร', () => {
     expect(bookingTargetFromHold('board', '   ')).toBeNull();
+    expect(bookingTargetFromHold('application', '  ')).toBeNull();
   });
 });
 
@@ -106,22 +110,21 @@ describe('bookingActionFor — invariant: ปิดปุ่มเมื่อ�
     expect(a.reason).toContain('จองตัวไม่ได้');
   });
 
-  it('ล็อกโทรที่มาจากใบสมัคร → เหตุผลต้องบอกว่าเป็นใบสมัคร ไม่ใช่ "ไม่รู้ว่ามาจากไหน"', () => {
+  it('ล็อกโทรจากใบสมัคร → จองได้แล้ว (S9) — มี target จริง ปุ่มเปิด', () => {
     const a = bookingActionFor({
-      target: null,
+      target: bookingTargetFromHold('application', 'a506aa87-7502-4886-8607-ccbb799b215c'),
       jobId: 'siamraj-sql:OPL6908018',
       holdSource: 'application',
     });
-    expect(a.reason).toContain('ใบสมัคร');
-    expect(a.reason).not.toContain('ไม่รู้ว่าคนนี้');
+    expect(a.disabled).toBe(false);
+    expect(a.reason).toBeNull();
   });
 
-  it('⚠️ เหตุผลของ Follow ต้องชนะ holdSource — คนละที่มา ห้ามสลับข้อความกัน', () => {
+  it('⚠️ เหตุผลของ Follow ต้องชนะ (follow ไม่มี target) — คนละที่มา ห้ามสลับข้อความกัน', () => {
     const a = bookingActionFor({
       target: null,
       jobId: 'x',
       personRef: 'follow-9',
-      holdSource: 'application',
     });
     expect(a.reason).toContain('Follow');
   });

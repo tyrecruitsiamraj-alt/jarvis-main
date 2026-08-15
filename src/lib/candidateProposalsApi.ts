@@ -2,7 +2,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 
 /** การเสนอ/จองตัว/ลงงานผู้สมัคร (board/iRecruit) ต่อใบขอ — client helper */
-export type ProposalSource = 'board' | 'irecruit';
+export type ProposalSource = 'board' | 'irecruit' | 'application';
 export type ProposalTier = 'green' | 'yellow' | 'red';
 export type ProposalStatus =
   | 'proposed'

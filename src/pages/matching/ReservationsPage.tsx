@@ -21,6 +21,8 @@ import {
 const SOURCE_META: Record<ProposalSource, { label: string; cls: string }> = {
   board: { label: 'คนของเรา', cls: TONE.info.chip },
   irecruit: { label: 'iRecruit', cls: TONE.primary.chip },
+  // ใบสมัครจากบอร์ดรับสมัคร (S9) — จองจากใบที่โทรแล้วสนใจ
+  application: { label: 'ใบสมัคร', cls: TONE.success.chip },
 };
 
 function formatWhen(iso: string): string {

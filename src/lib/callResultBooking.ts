@@ -42,9 +42,10 @@ export function bookingTargetFromPersonRef(personRef: string): BookingTarget | n
 /**
  * ล็อกโทร (`CallHold`) → เป้าหมายการจอง
  *
- * ⚠️ `application` (ใบสมัครที่ดึงเข้าถังโทรจากมุมมองรายชื่อ) **จองไม่ได้** —
- * `candidate_proposals.source` รับแค่ `board` / `irecruit` และ ref ของใบสมัคร
- * เป็นคนละชุดกับ `card_id` ของบอร์ด · ยัดลงไปจะได้แถวจองที่ชี้ไปหาคนผิด
+ * `application` (ใบสมัครจากบอร์ดรับสมัคร) จองได้แล้ว (S9 · migration 091 ผ่อน CHECK
+ * ของ candidate_proposals.source) · ref = application id (uuid) · unique
+ * (job_id, source, candidate_ref) กันจองซ้ำต่อใบขอ — คนละ namespace กับ card_id/ir id
+ * จึงไม่ชนกัน
  */
 export function bookingTargetFromHold(
   source: CallHoldSource,
@@ -54,6 +55,7 @@ export function bookingTargetFromHold(
   if (!ref) return null;
   if (source === 'board') return { source: 'board', candidateRef: ref };
   if (source === 'irecruit') return { source: 'irecruit', candidateRef: ref };
+  if (source === 'application') return { source: 'application', candidateRef: ref };
   return null;
 }
 
@@ -87,9 +89,8 @@ export function bookingActionFor(input: {
     if (input.personRef && input.personRef.startsWith('follow-')) {
       return { disabled: true, reason: 'รายชื่อจากหน้า Follow ยังไม่ใช่ผู้สมัครในระบบ จองตัวไม่ได้' };
     }
-    if (input.holdSource === 'application') {
-      return { disabled: true, reason: 'ใบสมัครจากบอร์ดรับสมัคร ยังไม่มีเส้นจองตัว' };
-    }
+    // หมายเหตุ: source 'application' จองได้แล้ว (S9 · migration 091) — มาถึง target
+    // จึงไม่ null แล้ว ไม่ตกที่นี่อีก
     return { disabled: true, reason: 'ไม่รู้ว่าคนนี้เป็นผู้สมัครจากที่ไหน จองตัวไม่ได้' };
   }
   return OK;
