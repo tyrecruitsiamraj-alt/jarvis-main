@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
-import { formatDateTimeTh, formatYmdDmyBe } from '@/lib/dateTh';
+import { formatDateTimeTh, formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
@@ -150,9 +150,11 @@ const RmTable: React.FC<{
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellMuted)}>
                     {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH}
                   </td>
-                  {/* created_at ที่หายไปทำให้ .slice พังทั้งหน้า — gate ก่อนเสมอ */}
+                  {/* created_at ที่หายไปทำให้ .slice พังทั้งหน้า — gate ก่อนเสมอ
+                      ⚠️ ห้าม .slice(0,10) ตรง ๆ = วันที่ฝั่ง UTC · ใบกรอกเที่ยงคืน–07:00 น.
+                      ไทยจะถอยไป 1 วัน — ต้องตัดตามปฏิทินกรุงเทพ (แบบเดียวกับคอลัมน์วันนัด) */}
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
-                    {r.created_at ? formatYmdDmyBe(r.created_at.slice(0, 10)) : EM_DASH}
+                    {r.created_at ? formatYmdDmyBe(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
                   </td>
                   {tab === 'appointments' ? (
                     <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>

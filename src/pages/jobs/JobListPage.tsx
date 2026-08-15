@@ -21,7 +21,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   UNIT_REQUEST_WORK_STATUS_OPTIONS,
 } from '@/lib/unitRequestWorkStatus';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import { DASH } from '@/lib/designTokens';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
@@ -71,7 +71,9 @@ import { saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState'
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
   if (!d) return '—';
-  return formatYmdDmyBe(d.toISOString().slice(0, 10));
+  // ตัดวันตามปฏิทินกรุงเทพ (เหมือน jobUrgency.submittedDateYmd) — toISOString (UTC) เลื่อน
+  // ย้อน 1 วันทุกแถว ไม่ตรงกับหน้ารายละเอียดที่ใช้ formatYmdDmyBe(job.request_date) ตรง ๆ
+  return formatYmdDmyBe(toYmdBangkok(d));
 }
 
 function ageDaysLabel(job: JobRequest): string {
