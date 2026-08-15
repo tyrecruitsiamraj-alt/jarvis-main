@@ -285,7 +285,7 @@ export function LumosSendBar({
             onClick={onHoldSelf}
             title={
               act.holdSelf.reason ??
-              'ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่แท็บ "การติดต่อ" บนบอร์ดรับสมัคร'
+              'ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่แท็บ "การโทรของฉัน" บนบอร์ดรับสมัคร'
             }
             className={cn(
               'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',

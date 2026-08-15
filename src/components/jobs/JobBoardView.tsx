@@ -367,7 +367,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               [
                 { id: 'board', label: 'กล่องงาน' },
                 { id: 'list', label: 'รายชื่อผู้สมัคร' },
-                { id: 'contact', label: 'การติดต่อ' },
+                { id: 'contact', label: 'การโทรของฉัน' },
                 { id: 'appointments', label: 'ติดตามนัดหมาย' },
               ] as const
             ).map((v) => {

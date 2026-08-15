@@ -38,7 +38,7 @@ export type RmTab = (typeof RM_TABS)[number];
 
 export const RM_TAB_LABEL: Record<RmTab, string> = {
   candidates: 'ข้อมูลผู้สมัคร',
-  contact: 'การติดต่อ',
+  contact: 'การโทรของฉัน',
   appointments: 'ติดตามนัดหมาย',
 };
 
