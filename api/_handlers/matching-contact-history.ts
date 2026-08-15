@@ -108,10 +108,12 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
       last_outcome: string | null;
       result_outcome: string | null;
     }>(
+      // เบอร์อยู่คนละคีย์ตามช่องทาง: reminder/board ใช้ recipient_phone · interview/iRecruit
+      // ใช้ phone — coalesce สองคีย์ ไม่งั้นประวัติฝั่ง iRecruit หายทั้งหมด (โทรทับทันที)
       `select updated_at, job_ref, status, attempt_count,
               last_outcome, result->>'outcome' as result_outcome
          from lumos_dispatch_queue
-        where payload->>'recipient_phone' = $1
+        where coalesce(payload->>'recipient_phone', payload->>'phone') = $1
         order by updated_at desc
         limit $2`,
       [phone, LIMIT_PER_SOURCE],

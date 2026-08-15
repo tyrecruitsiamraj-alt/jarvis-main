@@ -72,13 +72,16 @@ export async function loadDeclinedCallWarnings(
 
   // ฝั่ง AI — คิว Lumos (อ่าน outcome แบบ coalesce ตามกับดัก migration 070)
   try {
+    // เบอร์อยู่คนละคีย์: reminder/board ใช้ recipient_phone · interview/iRecruit ใช้ phone
+    // coalesce ทุกจุด (select/distinct on/where/order by) ไม่งั้นธงเตือน "เพิ่งปฏิเสธ"
+    // มองไม่เห็นผลฝั่ง iRecruit → จองคนที่ปฏิเสธไปแล้ว
     const { rows } = await dbQuery<{ phone: string; updated_at: string }>(
-      `select distinct on (payload->>'recipient_phone')
-              payload->>'recipient_phone' as phone, updated_at
+      `select distinct on (coalesce(payload->>'recipient_phone', payload->>'phone'))
+              coalesce(payload->>'recipient_phone', payload->>'phone') as phone, updated_at
          from ${queueTable}
-        where payload->>'recipient_phone' = any($1::text[])
+        where coalesce(payload->>'recipient_phone', payload->>'phone') = any($1::text[])
           and coalesce(last_outcome, result->>'outcome') = 'declined'
-        order by payload->>'recipient_phone', updated_at desc`,
+        order by coalesce(payload->>'recipient_phone', payload->>'phone'), updated_at desc`,
       [phones],
     );
     for (const r of rows) {

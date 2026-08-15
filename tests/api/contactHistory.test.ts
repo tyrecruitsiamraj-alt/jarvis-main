@@ -90,7 +90,8 @@ describe('contact-history — ข้อห้ามเรื่องข้อ�
     const lumosSql = sqlOf(1);
     expect(lumosSql).toMatch(/from lumos_dispatch_queue/);
     // ใช้ payload เป็นเงื่อนไขค้นหาได้ แต่ห้ามอยู่ในรายการคอลัมน์ที่ดึงออกมา
-    expect(lumosSql).toMatch(/where payload->>'recipient_phone' = \$1/);
+    // coalesce สองคีย์ (recipient_phone/phone) — จับผลฝั่ง iRecruit ที่ payload ใช้คีย์ phone
+    expect(lumosSql).toMatch(/where coalesce\(payload->>'recipient_phone', payload->>'phone'\) = \$1/);
     const selectClause = lumosSql.slice(
       lumosSql.toLowerCase().indexOf('select'),
       lumosSql.toLowerCase().indexOf(' from '),
