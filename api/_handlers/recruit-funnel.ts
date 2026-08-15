@@ -50,15 +50,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const from = getQuery(req, 'from');
     const to = getQuery(req, 'to');
+    // ⚠️ ตัดช่วงวันตามเวลาไทย — created_at เป็น timestamptz · `$n::date` ตีความตาม session tz
+    // (UTC) = 07:00 น. ไทย → ใบที่กรอกเที่ยงคืน–ตี 7 ถูกนับผิดวัน (แพตเทิร์นเดียวกับ
+    // lumos-call-funnel/candidateCallHolds ที่ผูก +07:00 ไว้แล้ว)
     const params: unknown[] = [];
     const where: string[] = [];
     if (isYmd(from)) {
-      params.push(from);
-      where.push(`created_at >= $${params.length}::date`);
+      params.push(`${from}T00:00:00+07:00`);
+      where.push(`created_at >= $${params.length}::timestamptz`);
     }
     if (isYmd(to)) {
-      params.push(to);
-      where.push(`created_at < $${params.length}::date`);
+      params.push(`${to}T00:00:00+07:00`);
+      where.push(`created_at < $${params.length}::timestamptz`);
     }
 
     const { rows } = await dbQuery<{ status: string; n: string }>(

@@ -706,9 +706,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scopedJobIds = await loadScopedJobIdSet(req.user);
 
     if (getString(req.query?.counts) === '1') {
-      const { rows } = await dbQuery<{ job_id: string; n: string }>(
-        `select job_id, count(*)::text as n from ${tbl} where job_id is not null group by job_id`,
-      );
+      // ⚠️ ต้องกรอง `not is_lead` ให้ตรงกับ dialog กล่องงาน (?job_id= ใช้ leadWhere='not is_lead')
+      // ไม่งั้นเก็บ Lead แล้วเลขบนการ์ด (8) ไม่ตรงกับที่กดเข้าไปเห็น (5) — เชื่อไม่ได้
+      // ฐานที่ยังไม่รัน 083 (ไม่มีคอลัมน์ is_lead) → ถอยเป็นนับทั้งหมด (42703)
+      const countsSql = (leadFilter: string) =>
+        `select job_id, count(*)::text as n from ${tbl}
+          where job_id is not null ${leadFilter} group by job_id`;
+      let rows: Array<{ job_id: string; n: string }>;
+      try {
+        ({ rows } = await dbQuery<{ job_id: string; n: string }>(countsSql('and not is_lead')));
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
+        ({ rows } = await dbQuery<{ job_id: string; n: string }>(countsSql('')));
+      }
       const counts: Record<string, number> = {};
       for (const r of rows) {
         if (scopedJobIds && !scopedJobIds.has(r.job_id)) continue;

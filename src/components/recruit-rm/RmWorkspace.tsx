@@ -213,15 +213,17 @@ const RmWorkspace: React.FC<{
     if (pageRows.length === 0) return;
     let cancelled = false;
     void fetchCallHoldsByPhones(pageRows.map((r) => r.phone)).then((map) => {
-      if (cancelled || map.size === 0) return;
+      if (cancelled) return;
       setHoldByRef((prev) => {
-        // map จาก client คีย์ด้วย candidateRef ของล็อก — เจอเฉพาะล็อกที่จับจากมุมมองนี้
-        // (ref = application id) · ล็อกจากหน้าอื่นบนเบอร์เดียวกันจะไม่ขึ้น 🔒 ที่นี่
-        // แต่ตอนกดจริง server ตัดสินที่เบอร์และตอบชื่อคนถือกลับมาอยู่ดี
+        // เขียนสถานะของ "แถวในหน้านี้" ใหม่ทั้งก้อน — มีล็อก = ตั้ง · ไม่มี = ลบคีย์ออก
+        // ⚠️ ห้าม merge ทางเดียว: เดิมพอคืน/หมดอายุล็อก แถวยังโชว์ 📞 + ปุ่มโทร disabled
+        // ค้างจนกว่าจะ reload ทั้งหน้า (กด "รีเฟรช" ก็ไม่ช่วยเพราะ load() ไม่แตะ holdByRef)
+        // · map คีย์ด้วย candidateRef ของล็อก (= application id) → map.get(row.id)
         const next = { ...prev };
         for (const row of pageRows) {
           const hold = map.get(row.id);
           if (hold) next[row.id] = hold;
+          else delete next[row.id];
         }
         return next;
       });

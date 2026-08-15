@@ -1439,23 +1439,32 @@ const MatchingPage: React.FC = () => {
   };
 
   // เปิดจาก URL (?jobId=...) — เช่นลิงก์ "เปิดใบขอ" จากหน้ารายชื่อคนจอง/คำขอโพสหางาน
+  // ⚠️ openJob() ไม่ idempotent (ล้าง lumosSelection/lumosStatusByRef/notice) — ต้องมี
+  // fired-guard แบบเดียวกับ ?ir=1 · ไม่งั้นตอน ?ir=1 ถูกลบจาก URL (setSearchParams) effect
+  // นี้ยิงซ้ำ → openJob เดิมอีกรอบ → ป้ายผลโทร Lumos ทั้งใบหาย + ติ๊กที่เลือกไว้ถูกล้าง
+  const openedJobIdRef = React.useRef<string | null>(null);
   useEffect(() => {
     const jobId = searchParams.get('jobId');
     if (!jobId) return;
+    if (openedJobIdRef.current === jobId || jobDetail?.id === jobId) return;
     // หาจาก items ที่มีอยู่ก่อน (เร็ว)
     const job = jobs.find((j) => j.id === jobId);
     if (job) {
+      openedJobIdRef.current = jobId;
       openJob(job);
       return;
     }
     // ในโหมด server: serverItems มีแค่หน้าปัจจุบัน → fetch เดี่ยวถ้ายังไม่โหลด
     if (MATCHING_SERVER_LIST_ENABLED && !serverListLoading) {
+      openedJobIdRef.current = jobId;
       void fetchSiamrajUnitRequest(jobId)
         .then((j) => openJob(j))
-        .catch(() => {});
+        .catch(() => {
+          openedJobIdRef.current = null; // ล้มเหลว → ให้ลองใหม่ได้
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, jobs, serverListLoading]);
+  }, [searchParams, jobs, serverListLoading, jobDetail?.id]);
 
   /**
    * `?ir=1` — เปิดใบขอแล้ว **ค้นหาคนที่ยังไม่สมัครให้เลย** (ปุ่มบนการ์ดของบอร์ดรับสมัครงาน

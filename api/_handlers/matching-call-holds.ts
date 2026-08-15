@@ -20,6 +20,7 @@ import {
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { isPgUndefinedTable } from '../_lib/postgres.js';
+import { logError } from '../_lib/logger.js';
 import { applyHumanCallFollowup } from '../_lib/callFollowup.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 import { isApplicationInWriteScope, loadApplicationScopeRow } from '../_lib/applicationScope.js';
@@ -262,7 +263,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
           byName: req.user?.email ?? null,
         });
       } catch (e) {
-        void e;
+        // ผลหลักบันทึกไปแล้ว (ตอบ 200) — followup ล้มไม่ควรทำให้ทั้ง request พัง
+        // แต่ต้อง log: applyHumanCallFollowup ทำ suppressPhone (พักเบอร์) + ตั้งโทรซ้ำ
+        // ถ้ากลืนเงียบ เบอร์ "ไม่หางานแล้ว" อาจไม่ถูกพัก แล้ว AI โทรซ้ำโดยไม่มีร่องรอย
+        logError('call-hold.followup.failed', {
+          holdId,
+          message: e instanceof Error ? e.message : String(e),
+        });
       }
 
       void auditFromAuthed(req, {
