@@ -22,6 +22,7 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import { isPgUndefinedTable } from '../_lib/postgres.js';
 import { applyHumanCallFollowup } from '../_lib/callFollowup.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
+import { isApplicationInWriteScope, loadApplicationScopeRow } from '../_lib/applicationScope.js';
 import { bangkokBusinessDateYmd } from '../_lib/businessDate.js';
 import {
   acquireCallHold,
@@ -140,7 +141,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!jobId) return sendError(res, 400, 'Bad request', 'ต้องระบุใบขอ');
 
       // รับงานโทรได้เฉพาะใบขอในแผนกตัวเอง — กติกาเดียวกับการจองตัว
-      if (!(await isSiamrajRequestInScope(req.user, jobId))) {
+      // ใบสมัคร (source='application'): ใบขออาจปิดแล้ว → isSiamrajRequestInScope คืน false
+      // ทั้งที่เป็นแผนกตัวเอง · เช็คจากแผนกที่ใบจำไว้ (082) แทน (candidateRef = application id)
+      const inScope =
+        source === 'application'
+          ? await isApplicationInWriteScope(req.user, await loadApplicationScopeRow(candidateRef, jobId))
+          : await isSiamrajRequestInScope(req.user, jobId);
+      if (!inScope) {
         return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น');
       }
 

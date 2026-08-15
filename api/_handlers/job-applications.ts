@@ -11,6 +11,7 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -546,14 +547,14 @@ async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolea
  */
 async function patchLead(req: AuthedReq, res: ApiRes, id: string, lead: boolean) {
   // จำกัดตาม BU ก่อนเสมอ — กันปัดใบสมัครของแผนกอื่นด้วยการเดา id (กติกาเดียวกับ patchStatus)
-  const { rows: beforeRows } = await dbQuery<{ job_id: string | null }>(
-    `select job_id from ${tbl} where id = $1 limit 1`,
+  // ต้องยอมใบที่จำแผนกตัวเองไว้ด้วย (082) ไม่งั้นใบขอปิดแล้วกดไม่ได้ทั้งที่แผนกตัวเอง
+  const { rows: beforeRows } = await dbQuery<{ job_id: string | null; department_code: string | null }>(
+    `select job_id, department_code from ${tbl} where id = $1 limit 1`,
     [id],
   );
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
-  const scopedJobIds = await loadScopedJobIdSet(req.user);
-  if (scopedJobIds && !(before.job_id && scopedJobIds.has(before.job_id))) {
+  if (!(await isApplicationInWriteScope(req.user, before))) {
     return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
   }
 
@@ -631,13 +632,14 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
     status: string;
     admin_note: string | null;
     job_id: string | null;
-  }>(`select status, admin_note, job_id from ${tbl} where id = $1 limit 1`, [id]);
+    department_code: string | null;
+  }>(`select status, admin_note, job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
 
   // จำกัดตาม BU — กันเปลี่ยนสถานะ/โน้ตใบสมัครของงานแผนกอื่นด้วยการเดา id
-  const scopedJobIds = await loadScopedJobIdSet(req.user);
-  if (scopedJobIds && !(before.job_id && scopedJobIds.has(before.job_id))) {
+  // (ยอมใบที่จำแผนกตัวเองไว้ด้วย — ใบขอปิดแล้วต้องยังกดได้ถ้าเป็นแผนกตัวเอง)
+  if (!(await isApplicationInWriteScope(req.user, before))) {
     return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
   }
 
