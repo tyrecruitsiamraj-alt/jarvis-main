@@ -61,8 +61,12 @@ export default function ApplicantContactDialog({
   const [logs, setLogs] = useState<ContactLog[]>([]);
 
   // โหลดของประกอบเมื่อเปิด dialog เท่านั้น (ใบขอ 500 ใบ + เหตุผล 67 — ไม่โหลดค้างทั้งหน้า)
+  // ⚠️ ต้อง reset `logs` + กัน race (`cancelled`) ด้วย — เปิดคนใหม่ต้องไม่เห็นประวัติคนเก่า
+  // และถ้ากดไล่แถวเร็ว ๆ response ที่มาช้ากว่าต้องไม่ทับของคนที่เปิดอยู่ (fetchContactLogs
+  // กลืน error เป็น [] ไม่มีสัญญาณเตือน — ต้องกันเองที่นี่)
   useEffect(() => {
     if (!application) return;
+    let cancelled = false;
     setMode('idle');
     setCanSchedule(null);
     setAppointmentAt('');
@@ -71,14 +75,28 @@ export default function ApplicantContactDialog({
     setReasonId('');
     setNote('');
     setError(null);
-    void fetchContactLogs(application.id).then(setLogs);
+    setLogs([]);
+    void fetchContactLogs(application.id).then((v) => {
+      if (!cancelled) setLogs(v);
+    });
     // เหตุผล "การติดต่อ × ไม่สำเร็จ" ตาม master ระบบเดิม
     void fetchRecruitReasons({ processCode: '1', outcomeCode: 'C' })
-      .then(setReasons)
-      .catch(() => setReasons([]));
+      .then((v) => {
+        if (!cancelled) setReasons(v);
+      })
+      .catch(() => {
+        if (!cancelled) setReasons([]);
+      });
     void fetchSiamrajUnitRequests(500)
-      .then(setOpenJobs)
-      .catch(() => setOpenJobs([]));
+      .then((v) => {
+        if (!cancelled) setOpenJobs(v);
+      })
+      .catch(() => {
+        if (!cancelled) setOpenJobs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [application]);
 
   const selectedReason = useMemo(
