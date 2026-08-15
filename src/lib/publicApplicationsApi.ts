@@ -18,6 +18,9 @@ export type PublicApplication = {
   /** สถานที่นัด + ใบขอที่จะลง — มีเฉพาะนัดจากบันทึกผลติดต่อ (migration 086) */
   appointment_place?: string | null;
   appointment_job?: string | null;
+  /** ผลติดตามนัดล่าสุด (migration 089) — 'showed' | 'no_show' | 'rescheduled' */
+  attendance_result?: string | null;
+  attendance_at?: string | null;
   title_prefix?: string;
   first_name?: string;
   last_name?: string;
@@ -243,6 +246,26 @@ export async function updateJobApplication(
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;
+}
+
+/**
+ * บันทึกผลติดตามนัด "มาตามนัด/ไม่มา/เลื่อนนัด" (migration 089) — append-only ล่าสุดชนะ
+ * server บังคับ: บันทึกได้ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป · 503 = ยังไม่รัน 089
+ */
+export async function recordAppointmentAttendance(input: {
+  applicationId: string;
+  appointmentAt: string;
+  result: 'showed' | 'no_show' | 'rescheduled';
+  note?: string | null;
+}): Promise<void> {
+  const r = await apiFetch('/api/application-attendance', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'บันทึกผลนัดไม่สำเร็จ');
+  }
 }
 
 /**

@@ -4,6 +4,13 @@ import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
+import {
+  ATTENDANCE_LABEL,
+  ATTENDANCE_RESULTS,
+  ATTENDANCE_TONE,
+  canRecordAttendance,
+  type AttendanceResult,
+} from '@/lib/appointmentAttendance';
 import { formatDateTimeTh, formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
   APPLICATION_STATUS_CLASS,
@@ -55,7 +62,9 @@ const RmTable: React.FC<{
   onAction: (action: RmRowAction, row: PublicApplication) => void;
   /** ล็อกโทรที่มีอยู่ (คีย์ = application id) — ไว้โชว์ 🔒 และกันกด "โทร" ซ้ำ */
   holdByRef?: Record<string, CallHold>;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {} }) => {
+  /** บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) */
+  onAttendance?: (row: PublicApplication, result: AttendanceResult) => void;
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance }) => {
   const actions = RM_ROW_ACTIONS[tab];
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
 
@@ -99,6 +108,8 @@ const RmTable: React.FC<{
                   <th className="px-3 py-2 font-semibold">วันนัด</th>
                   {/* "นัดที่ไหน + ลงใบไหน" (ลิสต์ข้อ 9) — มีเฉพาะนัดจากบันทึกผลติดต่อ */}
                   <th className="px-3 py-2 font-semibold">นัดที่ไหน</th>
+                  {/* ผลติดตามนัด มา/ไม่มา (migration 089) — ปุ่มโผล่ตั้งแต่วันนัดเป็นต้นไป */}
+                  <th className="px-3 py-2 font-semibold">มาตามนัด</th>
                 </>
               ) : null}
               {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
@@ -186,6 +197,40 @@ const RmTable: React.FC<{
                       {r.appointment_place || r.appointment_job
                         ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ?? ''}`
                         : EM_DASH}
+                    </td>
+                  ) : null}
+                  {tab === 'appointments' ? (
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
+                          กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) — ปุ่มที่เลือกอยู่ติดสีเต็ม */}
+                      {r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
+                        <span className="inline-flex items-center gap-1">
+                          {ATTENDANCE_RESULTS.filter((k) => k !== 'rescheduled').map((k) => {
+                            const tone = TONE[ATTENDANCE_TONE[k]];
+                            const active = r.attendance_result === k;
+                            return (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => onAttendance?.(r, k)}
+                                title={`บันทึกว่า${ATTENDANCE_LABEL[k]} — กดซ้ำอันอื่นเพื่อแก้ได้`}
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                                  tone.soft,
+                                  tone.value,
+                                  active ? 'ring-2 ring-ring' : 'opacity-75 hover:opacity-100',
+                                )}
+                              >
+                                {k === 'showed' ? '✓ มาแล้ว' : '✗ ไม่มา'}
+                              </button>
+                            );
+                          })}
+                        </span>
+                      ) : (
+                        <span className={DASH.muted} title="บันทึกผลได้ตั้งแต่วันนัดเป็นต้นไป">
+                          {EM_DASH}
+                        </span>
+                      )}
                     </td>
                   ) : null}
                   {tab === 'contact' ? (

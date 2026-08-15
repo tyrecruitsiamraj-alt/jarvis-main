@@ -31,9 +31,11 @@ import {
 } from '@/lib/recruitRm';
 import {
   fetchAllJobApplications,
+  recordAppointmentAttendance,
   setJobApplicationLead,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
 import {
   LEAD_VIEW_HINT,
   summarizeLeadUpdate,
@@ -163,6 +165,25 @@ const RmWorkspace: React.FC<{
     setSelectedIds([]);
     setLeadBusy(false);
     load();
+  };
+
+  /**
+   * บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) — append-only ล่าสุดชนะ
+   * server เป็นด่านตัดสิน (ก่อนวันนัด = 400) · เสร็จแล้ว reload ให้ชิปบนแถวอัปเดต
+   */
+  const onAttendance = (row: PublicApplication, result: AttendanceResult) => {
+    if (!row.appointment_at) return;
+    setNotice(null);
+    void recordAppointmentAttendance({
+      applicationId: row.id,
+      appointmentAt: row.appointment_at,
+      result,
+    })
+      .then(() => {
+        setNotice(`บันทึกผลนัดของ ${row.full_name}: ${ATTENDANCE_LABEL[result]} แล้ว`);
+        load();
+      })
+      .catch((e) => setNotice(e instanceof Error ? e.message : 'บันทึกผลนัดไม่สำเร็จ'));
   };
 
   const provinces = useMemo(() => provincesFromApplications(rows), [rows]);
@@ -497,6 +518,7 @@ const RmWorkspace: React.FC<{
                 onToggleAll={toggleAll}
                 onAction={onRowAction}
                 holdByRef={holdByRef}
+                onAttendance={onAttendance}
               />
               </div>
               <ListPaginationBar

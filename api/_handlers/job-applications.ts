@@ -19,6 +19,7 @@ import {
 } from '../../src/lib/recruitRmMasters.js';
 import { loadAppointmentByPhone, loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments } from '../_lib/applicationContacts.js';
+import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError } from '../_lib/logger.js';
 
@@ -826,6 +827,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
           (item as Record<string, unknown>).appointment_at = at;
           if (fromLog?.place) (item as Record<string, unknown>).appointment_place = fromLog.place;
           if (fromLog?.jobLabel) (item as Record<string, unknown>).appointment_job = fromLog.jobLabel;
+        }
+      }
+      // ผลติดตามนัดล่าสุด (มา/ไม่มา/เลื่อน — migration 089) — แท็บนัดหมายโชว์ชิป/ปุ่ม
+      const attendance = await loadLatestAttendanceByApplication(items.map((i) => i.id));
+      for (const item of items) {
+        const hit = attendance.get(item.id);
+        if (hit) {
+          (item as Record<string, unknown>).attendance_result = hit.result;
+          (item as Record<string, unknown>).attendance_at = hit.createdAt;
         }
       }
     } catch (e) {
