@@ -340,18 +340,33 @@ export async function recordCallResult(input: RecordResultInput): Promise<Record
     trimTo(input.note, MAX_NOTE),
     input.detail === undefined ? null : JSON.stringify(input.detail),
   ];
-  const setBase = `result_outcome = $2,
+  // `result_at` (088) = เวลาบันทึกผลแบบเขียนครั้งเดียว — updated_at ขยับได้ทีหลัง
+  // ใช้เทียบเวลา "ผลล่าสุด" ข้ามแหล่งบน dashboard · ฐานยังไม่รัน 088 ถอยชุดไม่มี stamp
+  const setBase = (withStamp: boolean) => `result_outcome = $2,
             result_scope   = $3,
             result_note    = $4,
-            result_detail  = $5::jsonb,
+            result_detail  = $5::jsonb,${withStamp ? `\n            result_at      = now(),` : ''}
             released_at    = now(),
             release_reason = 'result',
             updated_at     = now()`;
 
+  // ไล่สามชั้นตามอายุฐาน: (088+085) → (085 ไม่มี 088) → (ก่อน 085)
   try {
     const { rows } = await dbQuery<Row>(
       `update ${table}
-          set ${setBase}, appointment_at = $6
+          set ${setBase(true)}, appointment_at = $6
+        where id = $1 and released_at is null
+        returning ${COLS}`,
+      [...params, decided.appointmentAt],
+    );
+    return { ok: true, hold: rows[0] ? mapRow(rows[0]) : null };
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+  }
+  try {
+    const { rows } = await dbQuery<Row>(
+      `update ${table}
+          set ${setBase(false)}, appointment_at = $6
         where id = $1 and released_at is null
         returning ${COLS}`,
       [...params, decided.appointmentAt],
@@ -372,7 +387,7 @@ export async function recordCallResult(input: RecordResultInput): Promise<Record
     }
     const { rows } = await dbQuery<Row>(
       `update ${table}
-          set ${setBase}
+          set ${setBase(false)}
         where id = $1 and released_at is null
         returning ${COLS_BASE}`,
       params,

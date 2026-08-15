@@ -203,6 +203,9 @@ function payloadPhone(payload: unknown): string | null {
  * นับเป็น duplicated) · **ต้อง reset `result` + `delivery_count` ด้วย** ไม่งั้น
  * `takePendingLumosItems()` ไม่หยิบ (มันกรอง `result is null` และ `delivery_count < MAX`)
  */
+// ⚠️ **ห้ามเพิ่ม first_delivered_at / first_result_at / last_result_at ลงรายการ reset นี้**
+// (migration 088) — สามคอลัมน์นั้นคือหลักฐานประวัติแบบเขียนครั้งเดียว ใช้คิด "โทรแล้ว/
+// เวลารอโทร" บน dashboard · revive แล้วล้าง = ประวัติการโทรจริงหายเงียบ (มีเทสต์ guard คุม)
 const REVIVE_CANCELLED_SET = `set status = 'pending', result = null, last_outcome = null,
         delivered_at = null, delivery_count = 0, attempt_count = 1,
         followup_state = null, next_attempt_at = excluded.next_attempt_at,
@@ -871,7 +874,7 @@ export function buildTakePendingSql(withRank: boolean): string {
      limit $2
      for update skip locked
   )
-  returning q.payload`;
+  returning q.id, q.payload`;
 }
 
 /**
@@ -894,9 +897,9 @@ export async function takePendingLumosItems(
   }
 
   const params = [channel, Math.min(Math.max(limit, 1), 500)];
-  let rows: Array<{ payload: unknown }>;
+  let rows: Array<{ id: number; payload: unknown }>;
   try {
-    ({ rows } = await dbQuery<{ payload: unknown }>(TAKE_PENDING_SQL, params));
+    ({ rows } = await dbQuery<{ id: number; payload: unknown }>(TAKE_PENDING_SQL, params));
   } catch (e) {
     // ⚠️ ยังไม่รัน 084 → **ห้ามให้คิวหยุดเดิน** (Lumos จะไม่ได้งานเลย ซึ่งแย่กว่าเรียงผิด)
     // ถอยไปคิวรีที่ไม่มี match_rank = พฤติกรรมเดิมเป๊ะ (เรียงตามคิวเก่าก่อน)
@@ -904,7 +907,27 @@ export async function takePendingLumosItems(
     logError('lumos.serve.match_rank.missing', {
       hint: 'ยังไม่ได้รัน migration 084 — คิวยังเดินแต่เรียงตามลำดับเข้าคิว ไม่ใช่คะแนน AI',
     });
-    ({ rows } = await dbQuery<{ payload: unknown }>(TAKE_PENDING_SQL_NO_RANK, params));
+    ({ rows } = await dbQuery<{ id: number; payload: unknown }>(TAKE_PENDING_SQL_NO_RANK, params));
+  }
+
+  // stamp "Lumos ดึงงานไปครั้งแรก" (088) — post-update แยกจากคิวรีเสิร์ฟ โดยตั้งใจ:
+  // ยัด first_delivered_at เข้า SET ของ TAKE_PENDING_SQL จะต้องมี variant คูณสอง
+  // (084×088) · coalesce = idempotent เสิร์ฟซ้ำไม่ทับค่าแรก · ล้ม/ยังไม่รัน 088
+  // ห้ามกระทบการเสิร์ฟ (delivered_at เดิมยังบอกรอบล่าสุดอยู่)
+  if (rows.length > 0) {
+    try {
+      await dbQuery(
+        `update ${queueTable}
+            set first_delivered_at = coalesce(first_delivered_at, now())
+          where id = any($1::bigint[])`,
+        [rows.map((r) => r.id)],
+      );
+    } catch (e) {
+      if (!isUndefinedColumnError(e)) throw e;
+      logError('lumos.serve.stamps.missing', {
+        hint: 'ยังไม่ได้รัน migration 088 — เสิร์ฟได้ปกติแต่ไม่มี first_delivered_at',
+      });
+    }
   }
   return rows.map((r) => bumpScheduledAtForward(r.payload));
 }
@@ -917,13 +940,31 @@ export async function applyLumosResult(
   result: unknown,
 ): Promise<boolean> {
   const idField = channel === 'reminder' ? 'client_contact_id' : 'client_candidate_id';
-  const { rows } = await dbQuery<{ id: number }>(
+  // ⚠️ stamp `first_result_at` **ใน UPDATE เดียวกับผล** (migration 088) — เวลานี้คือ
+  // หลักฐาน "ถูกโทรแล้ว" ของ dashboard เขียนครั้งเดียวด้วย coalesce แล้วห้ามมี reset
+  // ที่ไหนล้าง (มีเทสต์ guard คุม) · ฐานยังไม่รัน 088 → ถอยไป SQL เดิม (คิวห้ามหยุดเดิน)
+  const applySql = (withStamps: boolean) =>
     `update ${queueTable}
-        set status = $3, result = $4::jsonb, updated_at = now()
+        set status = $3, result = $4::jsonb, updated_at = now()${
+          withStamps
+            ? `,
+            first_result_at = coalesce(first_result_at, now()),
+            last_result_at = now()`
+            : ''
+        }
       where channel = $1 and payload->>'${idField}' = $2
-      returning id`,
-    [channel, clientId, status, JSON.stringify(result ?? null)],
-  );
+      returning id`;
+  const params = [channel, clientId, status, JSON.stringify(result ?? null)];
+  let rows: Array<{ id: number }>;
+  try {
+    ({ rows } = await dbQuery<{ id: number }>(applySql(true), params));
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) throw e;
+    logError('lumos.result.stamps.missing', {
+      hint: 'ยังไม่ได้รัน migration 088 — ผลถูกบันทึกแต่ไม่มี first_result_at (เวลารอโทรจะไม่แม่น)',
+    });
+    ({ rows } = await dbQuery<{ id: number }>(applySql(false), params));
+  }
   if (rows.length === 0) return false;
 
   // ได้ผลแล้วต้องมีคนทำอะไรต่อ — ไม่รับสายก็โทรซ้ำ ขอเลื่อนก็นัดใหม่ ครบเพดานก็ส่งให้คนตาม

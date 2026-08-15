@@ -171,6 +171,8 @@ export async function applyCallFollowupToQueueRow(input: {
 
   try {
     if (decision.action === 'retry') {
+      // ⚠️ ห้ามเพิ่ม first_delivered_at/first_result_at/last_result_at ลง reset นี้ (088)
+      // — เป็นหลักฐานประวัติเขียนครั้งเดียว ล้างแล้ว "โทรแล้ว/เวลารอโทร" บน dashboard พัง
       await dbQuery(
         `update ${queueTable}
             set status = 'pending', result = null, delivered_at = null, delivery_count = 0,
@@ -297,6 +299,7 @@ export async function applyHumanCallFollowup(input: {
   if (queueId != null) {
     try {
       if (decision.action === 'retry') {
+        // ⚠️ ห้ามเพิ่ม first_delivered_at/first_result_at/last_result_at ลง reset นี้ (088)
         await dbQuery(
           `update ${queueTable}
               set status = 'pending', result = null, delivered_at = null, delivery_count = 0,

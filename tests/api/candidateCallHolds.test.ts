@@ -243,19 +243,40 @@ describe('บันทึกผลโทร', () => {
     expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();
   });
 
-  it('⚠️ ยังไม่รัน 085: ไม่มีวันนัดให้เสีย → ถอยไปบันทึกแบบเดิมได้', async () => {
+  it('⚠️ ยังไม่รัน 088: ถอยไปชุดไม่มี result_at แต่วันนัดยังลง (085 มี)', async () => {
     vi.mocked(dbQuery)
-      .mockRejectedValueOnce(undefinedColumn)
-      .mockResolvedValueOnce({ rows: [row()] });
+      .mockRejectedValueOnce(undefinedColumn) // ชั้น 088+085 (มี result_at)
+      .mockResolvedValueOnce({ rows: [row()] }); // ชั้น 085 (ไม่มี result_at)
+    const r = await recordCallResult({
+      holdId: HOLD_ID,
+      outcome: 'confirmed',
+      scope: 'scheduled',
+      appointmentAt: '2026-08-20',
+      now: '2026-08-14T03:00:00.000Z',
+    });
+    expect(r.ok).toBe(true);
+    expect(sqlOf(0)).toContain('result_at');
+    expect(sqlOf(1)).not.toContain('result_at');
+    expect(sqlOf(1)).toContain('appointment_at = $6');
+  });
+
+  it('⚠️ ยังไม่รัน 085: ไม่มีวันนัดให้เสีย → ถอยไปบันทึกแบบเดิมได้ (สามชั้น)', async () => {
+    vi.mocked(dbQuery)
+      .mockRejectedValueOnce(undefinedColumn) // ชั้น 088+085
+      .mockRejectedValueOnce(undefinedColumn) // ชั้น 085
+      .mockResolvedValueOnce({ rows: [row()] }); // ชั้นก่อน 085
     const r = await recordCallResult({ holdId: HOLD_ID, outcome: 'no_answer' });
     expect(r.ok).toBe(true);
-    expect(sqlOf(1)).not.toContain('appointment_at');
+    expect(sqlOf(2)).not.toContain('appointment_at');
+    expect(sqlOf(2)).not.toContain('result_at');
   });
 
   it('⚠️ ยังไม่รัน 085 แต่มีวันนัด → ห้ามบันทึกแบบทิ้งวันนัดเงียบ ๆ', async () => {
     // เจ้าหน้าที่จะเห็นว่า "บันทึกแล้ว" ทั้งที่วันนัดหายไป — แพตเทิร์นเดียวกับ
     // ฟอร์มเพิ่มผู้สมัครที่เลือกคืน 503 แทนการบันทึกแบบทิ้งฟิลด์
-    vi.mocked(dbQuery).mockRejectedValueOnce(undefinedColumn);
+    vi.mocked(dbQuery)
+      .mockRejectedValueOnce(undefinedColumn) // ชั้น 088+085
+      .mockRejectedValueOnce(undefinedColumn); // ชั้น 085
     const r = await recordCallResult({
       holdId: HOLD_ID,
       outcome: 'confirmed',
@@ -265,7 +286,7 @@ describe('บันทึกผลโทร', () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain('085');
-    expect(vi.mocked(dbQuery)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(dbQuery)).toHaveBeenCalledTimes(2);
   });
 
   it('ผลที่ไม่ใช่ปฏิเสธไม่มี scope', async () => {
