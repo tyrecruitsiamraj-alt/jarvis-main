@@ -162,6 +162,101 @@ export function buildInterviewPayload(
   };
 }
 
+/**
+ * payload สำหรับ **ใบสมัครจากบอร์ดรับสมัคร** (S8 · เจ้าของเคาะ 15 ส.ค. 2569:
+ * "เมื่อมีคนกรอกรายชื่อเข้ามาผ่านหน้าสาธารณะ...ส่งให้ Lumos โทร" — อัตโนมัติทันทีที่กรอก)
+ *
+ * ใช้ช่อง interview (โทรถามความสนใจ-คัดกรอง) · personRef = `app-<uuid>`
+ * ข้อมูลงานใช้ snapshot บนใบ (job_title/unit_name) — ไม่ต้องยิง ERP (เส้นนี้ถูกเรียก
+ * จาก /api/public/apply ซึ่งห้ามแตะ ERP เด็ดขาด)
+ */
+export function buildApplicationInterviewPayload(
+  app: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    job_id: string | null;
+    job_title?: string | null;
+    unit_name?: string | null;
+    position_interest?: string | null;
+  },
+  now = new Date(),
+): LumosInterviewPayload | null {
+  const phone = toE164Thai(app.phone);
+  if (!phone || !app.full_name?.trim() || !app.job_id) return null;
+  const position = (app.job_title || app.position_interest || 'งานที่เปิดรับ').trim();
+  const unit = (app.unit_name || '').trim() || 'หน่วยงานของเรา';
+  return {
+    client_candidate_id: `${app.job_id}::app-${app.id}`,
+    client_interview_id: `${app.job_id}::app-${app.id}::interview`,
+    candidate_name: app.full_name.trim(),
+    phone,
+    position,
+    scheduled_at: now.toISOString(),
+    questions: [
+      `คุณได้กรอกใบสมัครตำแหน่ง${position}ที่ ${unit} ไว้ ยังสนใจงานนี้อยู่ไหมครับ`,
+      `เคยทำงานตำแหน่ง${position}หรืองานใกล้เคียงมาก่อนไหม เล่าให้ฟังหน่อยครับ`,
+      `สะดวกเดินทางไปทำงานที่ ${unit} ไหมครับ`,
+      'สามารถเริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
+      'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
+    ],
+    type: 'phone',
+    language: 'th',
+    tone: 'professional',
+  };
+}
+
+/**
+ * ส่งใบสมัครเข้าคิว AI โทร — ใช้ทั้งเส้น auto (ตอนกรอกเสร็จ · flag
+ * APPLICATION_AUTO_DISPATCH_ENABLED) และปุ่ม manual ในกล่องงาน
+ * กันชั้นเดิมครบที่ insertQueueItems (held + suppressed) · แถวยกเลิก revive ได้
+ */
+export async function enqueueLumosInterviewForApplications(
+  jobId: string,
+  applications: Array<{
+    id: string;
+    full_name: string;
+    phone: string | null;
+    job_id: string | null;
+    job_title?: string | null;
+    unit_name?: string | null;
+    position_interest?: string | null;
+  }>,
+): Promise<LumosDispatchOutcome> {
+  const skipped: LumosDispatchOutcome['skipped'] = [];
+  const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
+  for (const app of applications) {
+    const payload = buildApplicationInterviewPayload(app);
+    if (!payload) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_PHONE_REASON });
+      continue;
+    }
+    // ใบสมัครไม่มี tier จาก AI แมท — null = MATCH_RANK_UNKNOWN (เท่าเหลือง) ตอนเสิร์ฟ
+    items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
+  }
+  const { added, held, suppressed } = await insertQueueItems('interview', jobId, items);
+  const addedSet = new Set(added);
+  const heldSet = new Set(held);
+  const nameByRef = new Map(applications.map((a) => [`app-${a.id}`, a.full_name]));
+  for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+  for (const ref of suppressed) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
+  }
+  const duplicated = items
+    .map((i) => i.personRef)
+    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+  logInfo('lumos.dispatch.application', {
+    jobId,
+    requested: applications.length,
+    queued: added.length,
+    duplicated: duplicated.length,
+    held: held.length,
+    suppressed: suppressed.length,
+    skipped: skipped.length,
+  });
+  return { queued: added.length, duplicated, skipped };
+}
+
 // ─── Enqueue (คนกดส่งเอง — ต้องรายงานผลกลับให้ผู้ใช้) ───────────────────────
 
 /**

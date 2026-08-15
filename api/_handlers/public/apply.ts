@@ -5,6 +5,8 @@ import { tableInAppSchema } from '../../_lib/schema.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { validatePublicApplication } from '../../_lib/publicApplications.js';
 import { resolveApplicationDepartment } from '../../_lib/applicationDepartment.js';
+import { enqueueLumosInterviewForApplications } from '../../_lib/lumosDispatch.js';
+import { logError } from '../../_lib/logger.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -88,6 +90,36 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     }
     const id = rows[0]?.id;
     if (!id) return sendError(res, 500, 'Failed to submit application');
+
+    /**
+     * ส่งเข้าคิว AI โทร **อัตโนมัติทันทีที่กรอก** (เจ้าของเคาะ 15 ส.ค. 2569)
+     * - kill-switch: env APPLICATION_AUTO_DISPATCH_ENABLED (ไม่ตั้ง/ไม่ใช่ true = ปิด
+     *   — fail-safe ไปทาง manual · ใบที่ตกหล่นส่งได้จากปุ่มในกล่องงาน)
+     * - ⚠️ **enqueue ล้มห้ามทำให้ /apply ล้ม** — ใบสมัครของคนจริงถูกบันทึกไปแล้วข้างบน
+     *   ที่เหลือแค่ log · กันชั้น held/suppressed อยู่ใน insertQueueItems แล้ว
+     * - แค่เข้าคิว ไม่ใช่โทรทันที — Lumos มาดึงคิวเองเป็นระยะ (โหมดโทรยัง manual ฝั่งเขา)
+     */
+    if ((process.env.APPLICATION_AUTO_DISPATCH_ENABLED || '').trim().toLowerCase() === 'true') {
+      try {
+        if (v.jobId) {
+          await enqueueLumosInterviewForApplications(v.jobId, [
+            {
+              id,
+              full_name: v.fullName,
+              phone: v.phone,
+              job_id: v.jobId,
+              job_title: v.jobTitle,
+              unit_name: v.unitName,
+              position_interest: v.positionInterest,
+            },
+          ]);
+        }
+      } catch (e) {
+        logError('public/apply auto-dispatch failed (ใบสมัครถูกบันทึกแล้ว — ส่งซ้ำได้จากกล่องงาน)', e, {
+          applicationId: id,
+        });
+      }
+    }
 
     return res.status(201).json({ ok: true, id });
   } catch (e) {

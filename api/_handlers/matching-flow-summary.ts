@@ -180,7 +180,9 @@ async function listCallsAwaitingAction(
         and not exists (
           select 1 from ${proposalsTable} p
            where p.job_id = q.job_ref
-             and p.source = case when q.person_ref like 'card-%' then 'board' else 'irecruit' end
+             and p.source = case when q.person_ref like 'card-%' then 'board'
+                                 when q.person_ref like 'app-%' then 'application'
+                                 else 'irecruit' end
              and p.candidate_ref = regexp_replace(q.person_ref, '^(card|ir)-', '')
              and p.status in ('contacted', 'reserved', 'placed')
         )

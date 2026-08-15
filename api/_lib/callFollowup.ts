@@ -361,9 +361,9 @@ export type NeedsHumanItem = {
   channel: string;
   jobRef: string;
   personRef: string;
-  /** ref ของผู้สมัครโดยตัด prefix (card-/ir-/follow-) — ใช้กดรับไปตามต่อ */
+  /** ref ของผู้สมัครโดยตัด prefix (card-/ir-/app-) — ใช้กดรับไปตามต่อ */
   candidateRef: string | null;
-  source: 'board' | 'irecruit' | null;
+  source: 'board' | 'irecruit' | 'application' | null;
   candidateName: string | null;
   /** เบอร์สำหรับกด "รับไปตาม" — จำเป็นเพราะล็อกผูกกับเบอร์ */
   phone: string | null;
@@ -373,9 +373,14 @@ export type NeedsHumanItem = {
 };
 
 /** person_ref → (source, ref) · follow-xxx ไม่ใช่ผู้สมัครในบอร์ด จึงรับไปตามแบบนี้ไม่ได้ */
-function splitPersonRef(personRef: string): { source: 'board' | 'irecruit' | null; ref: string | null } {
+function splitPersonRef(personRef: string): {
+  source: 'board' | 'irecruit' | 'application' | null;
+  ref: string | null;
+} {
   if (personRef.startsWith('card-')) return { source: 'board', ref: personRef.slice(5) };
   if (personRef.startsWith('ir-')) return { source: 'irecruit', ref: personRef.slice(3) };
+  // ใบสมัครจากบอร์ดรับสมัคร (S8) — hold รองรับ source 'application' อยู่แล้ว (077)
+  if (personRef.startsWith('app-')) return { source: 'application', ref: personRef.slice(4) };
   return { source: null, ref: null };
 }
 
