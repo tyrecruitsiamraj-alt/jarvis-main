@@ -36,6 +36,7 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
+import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import {
   LEAD_VIEW_HINT,
   summarizeLeadUpdate,
@@ -120,15 +121,30 @@ const RmWorkspace: React.FC<{
   const leadView = searchParams.get('lead') === '1';
   const [leadBusy, setLeadBusy] = useState(false);
 
+  /**
+   * drill-down จากกล่อง Dashboard (`?bucket=` — S6) · เงื่อนไขกรองอยู่ฝั่ง server
+   * (นิยามเดียวกับตัวนับบนกล่อง — เลขบนกล่องจึงเท่ากับแถวที่เห็นเสมอ)
+   * โหมดนี้ **ข้ามตัวแบ่งแท็บ** — ถังหนึ่งมีได้ทั้ง Lead/claim/แถวปกติ ถ้าปล่อยให้
+   * isInRmTab หั่นต่อ เลขจะไม่ตรงกล่องแล้วเหมือนของหาย
+   */
+  const bucket = isRmBucket(searchParams.get('bucket')) ? searchParams.get('bucket') : null;
+  const clearBucket = () => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('bucket');
+    setSearchParams(params, { replace: true });
+    setSelectedIds([]);
+    setPage(1);
+  };
+
   const load = () => {
     setLoading(true);
     setLoadError(null);
-    fetchAllJobApplications(leadView)
+    fetchAllJobApplications(leadView, bucket)
       .then(setRows)
       .catch((e) => setLoadError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้สมัครไม่สำเร็จ'))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [leadView]);
+  useEffect(load, [leadView, bucket]);
 
   /** สลับมุมมอง — ต้องคง query param อื่นไว้ (`?view=` ของบอร์ด · `?tab=` · `?list=`) */
   const setLeadView = (on: boolean) => {
@@ -196,11 +212,14 @@ const RmWorkspace: React.FC<{
   }, [rows]);
 
   const filtered = useMemo(() => {
+    // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
+    // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
+    if (bucket) return rows;
     const base = filterApplications(rows, tab, filters, keyword);
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
-  }, [rows, tab, filters, keyword, listView]);
+  }, [rows, tab, filters, keyword, listView, bucket]);
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
@@ -507,6 +526,23 @@ const RmWorkspace: React.FC<{
             </p>
           ) : (
             <>
+              {/* แถบบอกโหมด drill-down จากกล่อง dashboard — เลขต้องเท่ากล่องที่กดมา */}
+              {bucket ? (
+                <div
+                  className={cn(
+                    'flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs',
+                    TONE.primary.soft,
+                  )}
+                >
+                  <span>
+                    กำลังดูจากกล่อง: <b>{RM_BUCKET_LABEL[bucket]}</b> ({filtered.length} ใบ) —
+                    มุมมองนี้รวมทุกแท็บ/ทุกสถานะ
+                  </span>
+                  <button type="button" onClick={clearBucket} className="jarvis-btn-ghost shrink-0">
+                    ✕ ล้าง
+                  </button>
+                </div>
+              ) : null}
               {/* rm-print-area: ตอนกด "โหลดเป็น PDF" print CSS จะโชว์เฉพาะก้อนนี้
                   (เฉพาะแท็บนัดหมาย — แท็บอื่นพิมพ์ทั้งหน้าตามปกติ) */}
               <div className={tab === 'appointments' ? 'rm-print-area' : undefined}>

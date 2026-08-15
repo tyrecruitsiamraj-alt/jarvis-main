@@ -17,7 +17,7 @@ import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
-import RecruitFunnelPanel from '@/components/recruit-rm/RecruitFunnelPanel';
+import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
@@ -397,7 +397,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             "ภาพรวมงานสรรหา อยู่แค่หน้ารายชื่อผู้สมัครก็พอ" (13 ส.ค.) — คงเงื่อนไข view==='list' */}
         {isStaff && view === 'list' ? (
           <div className="mt-4">
-            <RecruitFunnelPanel />
+            {/* Dashboard ศูนย์คุมงานสรรหา (S6 · 15 ส.ค. 2569) — แทนแผงภาพรวมเดิม
+                แผงเดิมยังเป็นทางถอยข้างใน (?panel=classic หรือ endpoint พัง) */}
+            <RecruitControlPanel />
           </div>
         ) : null}
 

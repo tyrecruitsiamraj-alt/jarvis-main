@@ -145,8 +145,13 @@ export const GENDER_LABEL: Record<string, string> = {
 export async function fetchAllJobApplications(
   /** true = ดู **คลังสำรอง (Lead)** แทนรายชื่อทำงาน (ลิสต์ปกติซ่อน Lead เสมอ) */
   leadView = false,
+  /** drill-down จากกล่อง dashboard (`?bucket=` — นิยามที่ applicantOverviewSql ฝั่ง server) */
+  bucket?: string | null,
 ): Promise<PublicApplication[]> {
-  const r = await apiFetch(`/api/job-applications${leadView ? '?lead=1' : ''}`);
+  const qs = new URLSearchParams();
+  if (leadView) qs.set('lead', '1');
+  if (bucket) qs.set('bucket', bucket);
+  const r = await apiFetch(`/api/job-applications${qs.size > 0 ? `?${qs}` : ''}`);
   if (!r.ok) throw new Error('โหลดรายชื่อผู้สมัครไม่สำเร็จ');
   const data = (await r.json()) as { items?: PublicApplication[] };
   return data.items ?? [];
