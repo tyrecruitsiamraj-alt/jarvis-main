@@ -248,6 +248,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           phone: existing.phone,
           jobId: saved.jobId,
           candidateRef: saved.candidateRef,
+          source: saved.source,
           outcome: body.outcome,
           declinedScope,
           detail: isPlainObject(body.detail) ? body.detail : undefined,

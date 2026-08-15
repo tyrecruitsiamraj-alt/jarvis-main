@@ -153,11 +153,64 @@ describe('ผลที่คนกดเอง → เดินนโยบา�
       phone: '0812345678',
       jobId: 'siamraj-sql:DS1',
       candidateRef: '1834',
+      source: 'board',
       outcome: 'no_answer',
     });
 
     expect(d?.action).toBe('retry');
     expect(sqlOf(1)).toContain("status = 'pending'");
+  });
+
+  it('จับแถวคิวด้วย person_ref เต็มตัว ไม่ใช่ like — กัน card-1805 ชน ir-1805/card-11805', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [{ id: 11, attempt_count: 1 }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await applyHumanCallFollowup({
+      phone: '0812345678',
+      jobId: 'siamraj-sql:DS1',
+      candidateRef: '1805',
+      source: 'board',
+      outcome: 'no_answer',
+    });
+
+    // คิวรีหาแถวต้องเทียบ person_ref = 'card-1805' เป๊ะ (ไม่มี %)
+    expect(sqlOf(0)).toContain('person_ref = $2');
+    expect(sqlOf(0)).not.toContain('like');
+    expect(paramsOf(0)[1]).toBe('card-1805');
+  });
+
+  it('source iRecruit → person_ref = ir-<ref>', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await applyHumanCallFollowup({
+      phone: '0812345678',
+      jobId: 'j',
+      candidateRef: '1805',
+      source: 'irecruit',
+      outcome: 'declined',
+      declinedScope: 'job',
+    });
+
+    expect(paramsOf(0)[1]).toBe('ir-1805');
+  });
+
+  it('ไม่มี source → ข้ามการหาแถวคิว (application ยังไม่มีคิว) แต่ยังพักเบอร์ถ้าไม่หางานแล้ว', async () => {
+    vi.mocked(dbQuery).mockResolvedValueOnce({ rows: [] }); // insert suppression เท่านั้น
+
+    const d = await applyHumanCallFollowup({
+      phone: '0812345678',
+      jobId: 'j',
+      candidateRef: '1',
+      outcome: 'declined',
+      declinedScope: 'all',
+    });
+
+    expect(d?.action).toBe('suppress');
+    // ไม่มี select หาแถวคิว — คิวรีแรกคือ suppression เลย
+    expect(allSql().every((q) => !q.includes('select id, attempt_count'))).toBe(true);
   });
 
   it('ไม่มีแถวคิว แต่บอกว่าไม่หางานแล้ว → ยังพักเบอร์ให้ถูก', async () => {
@@ -169,6 +222,7 @@ describe('ผลที่คนกดเอง → เดินนโยบา�
       phone: '081-234-5678',
       jobId: 'siamraj-sql:DS1',
       candidateRef: '1834',
+      source: 'board',
       outcome: 'declined',
       declinedScope: 'all',
       byName: 'ตั้ม',
@@ -192,6 +246,7 @@ describe('ผลที่คนกดเอง → เดินนโยบา�
       phone: '0812345678',
       jobId: 'j',
       candidateRef: '1',
+      source: 'board',
       outcome: 'declined',
       declinedScope: 'job',
     });

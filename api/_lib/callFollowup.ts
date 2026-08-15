@@ -251,6 +251,8 @@ export async function applyHumanCallFollowup(input: {
   phone: string | null | undefined;
   jobId: string;
   candidateRef: string;
+  /** ต้นทางของงานโทร — ใช้ประกอบ person_ref ให้ตรงแถวคิว (board/irecruit/application) */
+  source?: string | null;
   outcome: string;
   declinedScope?: 'job' | 'all' | null;
   detail?: unknown;
@@ -260,22 +262,26 @@ export async function applyHumanCallFollowup(input: {
   if (!isCallOutcome(input.outcome)) return null;
   const now = input.now ?? new Date();
 
-  // หาแถวคิวของคู่ (ใบขอ, คน) ถ้ามี — person_ref ของฝั่งบอร์ดคือ card-<id>
+  // หาแถวคิวของคู่ (ใบขอ, คน) ถ้ามี — จับด้วย person_ref เต็มตัวตาม source
+  // ⚠️ ต้อง match เป๊ะ (person_ref = $2) ไม่ใช่ like '%'||ref — ดู queuePersonRefFromSource
   let queueId: number | null = null;
   let attemptCount = 1;
-  try {
-    const { rows } = await dbQuery<{ id: number; attempt_count: number }>(
-      `select id, attempt_count from ${queueTable}
-        where job_ref = $1 and person_ref like $2
-        order by id desc limit 1`,
-      [input.jobId, `%${input.candidateRef}`],
-    );
-    if (rows[0]) {
-      queueId = rows[0].id;
-      attemptCount = Number(rows[0].attempt_count) || 1;
+  const personRef = input.source ? queuePersonRefFromSource(input.source, input.candidateRef) : null;
+  if (personRef) {
+    try {
+      const { rows } = await dbQuery<{ id: number; attempt_count: number }>(
+        `select id, attempt_count from ${queueTable}
+          where job_ref = $1 and person_ref = $2
+          order by id desc limit 1`,
+        [input.jobId, personRef],
+      );
+      if (rows[0]) {
+        queueId = rows[0].id;
+        attemptCount = Number(rows[0].attempt_count) || 1;
+      }
+    } catch (e) {
+      if (!isPgUndefinedTable(e) && !isUndefinedColumn(e)) throw e;
     }
-  } catch (e) {
-    if (!isPgUndefinedTable(e) && !isUndefinedColumn(e)) throw e;
   }
 
   const decision = resolveCallFollowup({
@@ -368,6 +374,23 @@ function splitPersonRef(personRef: string): { source: 'board' | 'irecruit' | nul
   if (personRef.startsWith('card-')) return { source: 'board', ref: personRef.slice(5) };
   if (personRef.startsWith('ir-')) return { source: 'irecruit', ref: personRef.slice(3) };
   return { source: null, ref: null };
+}
+
+/**
+ * prefix ของ `person_ref` ตาม source ของงานโทร — inverse ของ `splitPersonRef`
+ *
+ * ⚠️ ต้องประกอบ prefix ตรงตัวแล้วจับด้วย `person_ref = $n` เท่านั้น
+ * **ห้ามใช้ `like '%'||ref`** — `%1805` จับ `card-11805`/`ir-1805` (คนละคน คนละฐาน)
+ * แล้ว `order by id desc` เลือกแถวที่ insert ทีหลัง → เขียนผลทับแถวของคนที่ไม่เคยถูกโทร
+ * · `application` ยังไม่มีแถวคิว (auto-dispatch ยังไม่เปิด) จึง match 0 แถว = ปลอดภัย
+ */
+function queuePersonRefFromSource(source: string, ref: string): string | null {
+  const r = (ref || '').trim();
+  if (!r) return null;
+  if (source === 'board') return `card-${r}`;
+  if (source === 'irecruit') return `ir-${r}`;
+  if (source === 'application') return `app-${r}`;
+  return null;
 }
 
 function nameFromPayload(payload: unknown): string | null {
