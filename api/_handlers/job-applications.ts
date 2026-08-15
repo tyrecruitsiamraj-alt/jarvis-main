@@ -12,6 +12,7 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
+import { bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -250,6 +251,12 @@ export function buildApplicationsListQuery(input: {
    * "ปัดแล้วหายจากทุกแท็บ + มีตัวกรองเรียกคืนดู") · ไม่ส่ง = ลิสต์ปกติที่ซ่อน Lead
    */
   leadView?: boolean;
+  /**
+   * `?bucket=` — drill-down จากกล่อง Dashboard (S5/S6) · เงื่อนไข SQL ดิบจาก
+   * `bucketCondition()` ใน applicantOverviewSql.ts **เท่านั้น** (ไม่มี param · อ้าง alias a)
+   * — นิยามเดียวกับตัวนับ เลขบนกล่องจึงเท่ากับจำนวนแถวที่กดเข้ามาเห็นเสมอ
+   */
+  bucketWhere?: string | null;
 }): {
   sql: string;
   params: unknown[];
@@ -304,8 +311,10 @@ export function buildApplicationsListQuery(input: {
    */
   const leadWhere = jobId ? 'not is_lead' : input.leadView ? 'is_lead' : 'true';
   conds.push('{{leadWhere}}');
+  // drill-down จากกล่อง dashboard — เงื่อนไขอ้าง alias `a` จึงต้องตั้ง alias ที่ FROM
+  if (input.bucketWhere) conds.push(input.bucketWhere);
   return {
-    sql: `select {{cols}} from ${tbl} ${conds.length ? `where ${conds.join(' and ')}` : ''}
+    sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
         order by created_at desc limit 500`,
     params,
     claimWhere,
@@ -787,6 +796,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
       viewerId: req.user.sub,
       viewerDepartment: deptScope.mode === 'code' ? deptScope.code : null,
       leadView: getString(req.query?.lead) === '1',
+      // drill-down จากกล่อง dashboard — รับเฉพาะชื่อถังที่รู้จัก (เงื่อนไขมาจาก
+      // bucketCondition ที่เดียว ห้ามรับ SQL จาก client)
+      bucketWhere: isOverviewBucket(getString(req.query?.bucket))
+        ? bucketCondition(getString(req.query?.bucket) as OverviewBucket)
+        : null,
     });
     const rows = await queryWithLegacyFallback(
       q.sql,
