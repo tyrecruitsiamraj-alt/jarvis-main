@@ -476,10 +476,10 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
  * · คืน = ล้าง claim (เฉพาะคนที่เก็บเอง) — สถานะไม่ย้อนกลับเอง ไม่เดาแทนคน
  */
 async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolean) {
-  let curRows: Array<{ claimed_by: string | null; status: string }>;
+  let curRows: Array<{ claimed_by: string | null; status: string; job_id: string | null; department_code: string | null }>;
   try {
-    ({ rows: curRows } = await dbQuery<{ claimed_by: string | null; status: string }>(
-      `select claimed_by, status from ${tbl} where id = $1 limit 1`,
+    ({ rows: curRows } = await dbQuery<{ claimed_by: string | null; status: string; job_id: string | null; department_code: string | null }>(
+      `select claimed_by, status, job_id, department_code from ${tbl} where id = $1 limit 1`,
       [id],
     ));
   } catch (e) {
@@ -496,6 +496,12 @@ async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolea
   }
   const cur = curRows[0];
   if (!cur) return sendError(res, 404, 'Not found');
+
+  // จำกัดตาม BU — patchClaim แตกแขนงก่อนถึงด่าน scope ของ patchStatus จึงต้องเช็คเองที่นี่
+  // (ไม่งั้น staff แผนกอื่นยิง {id, claim:true} เก็บใบข้ามแผนก + ดัน new→contacted ได้ด้วย id)
+  if (!(await isApplicationInWriteScope(req.user, cur))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
 
   if (claim) {
     if (cur.claimed_by && cur.claimed_by !== req.user.sub) {

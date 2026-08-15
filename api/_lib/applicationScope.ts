@@ -39,6 +39,33 @@ export async function isApplicationInWriteScope(
 }
 
 /**
+ * โหลดแถวสำหรับตัดสินสิทธิ์ · คืน null ถ้าไม่พบใบ (ให้ handler ตอบ 404 แยกจาก 403)
+ * · ตารางหาย (42P01) → null · คอลัมน์ department_code ยังไม่มี (42703) → ถอยอ่าน job_id
+ */
+export async function loadApplicationScopeRowOrNull(
+  applicationId: string,
+): Promise<ApplicationScopeRow | null> {
+  const id = (applicationId || '').trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  try {
+    const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null }>(
+      `select job_id, department_code from ${applicationsTable} where id = $1 limit 1`,
+      [id],
+    );
+    return rows[0] ?? null;
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === '42P01') return null;
+    if (code !== '42703') throw e;
+    const { rows } = await dbQuery<{ job_id: string | null }>(
+      `select job_id from ${applicationsTable} where id = $1 limit 1`,
+      [id],
+    );
+    return rows[0] ? { job_id: rows[0].job_id } : null;
+  }
+}
+
+/**
  * โหลดแถวสำหรับตัดสินสิทธิ์เมื่อมีแค่ application id (เช่น "เก็บไปโทรเอง" ฝั่งใบสมัคร)
  * · ถ้าคอลัมน์ department_code ยังไม่ migrate (082) → ถอยไปใช้ job_id ที่ส่งมาแทน
  * · id ไม่ใช่ uuid / ไม่พบแถว → คืน job_id ที่ส่งมา (ให้ด่านเดิมตัดสินตามใบขอ)
