@@ -1423,3 +1423,63 @@ mutation 2/2 (สลับลำดับคำนำหน้าให้ "น�
 วัดบนหน้าจอจริง 16 ส.ค. (อ่านอย่างเดียว): 563 คนใน 6 ถัง (In process · Re Use · To do ·
 Done · Drop · ไม่มีงาน) ทุกคนมีเบอร์ · ค้น "ขับรถ ชลบุรี" เหลือ 41 · กดแล้วชื่อ/เบอร์
 ลงช่องถูกต้อง · ไม่มี request ที่ไม่ใช่ GET
+
+## เก็บตกไฟล์รอบสิบสี่–สิบหก (14–16 ส.ค. 2569) — S1-S9 · A · R · F
+
+รอบนั้นทำ 3 ก้อนใหญ่ (ระบบใบสมัคร S1-S9 · เส้นแบ่งสรรหา→คัดสรร A · ตารางโทร Follow F)
+แต่ยังไม่ได้ลงแผนที่ไฟล์ — เก็บตกไว้ที่นี่
+
+### Dashboard "ศูนย์คุมงานสรรหา" (S5 · 15 ส.ค.)
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `api/_lib/applicantOverviewSql.ts` | **นิยามตัวเลขที่เดียว** — ถังไม่ทับกัน + `bucketCondition()` ใช้ทั้งตัวนับและ drill-down |
+| `api/_handlers/recruit-rm-overview.ts` | `/api/recruit-rm-overview` (+`?bucket=` drill-down) |
+| `src/lib/recruitRmOverviewApi.ts` | ตัวเรียกฝั่งหน้าเว็บ |
+| `src/components/recruit-rm/RecruitControlPanel.tsx` | แผงบนหน้ารายชื่อ · ทางถอย `?panel=classic` (RecruitFunnelPanel เดิม) |
+
+⚠️ **หน่วยนับ = "ใบ" ไม่ใช่ "คน/เบอร์"** — กดกล่องแล้วต้องเจอแถวเท่ากันเป๊ะ
+⚠️ **temporal guard** — ผลโทรบนเบอร์เดียวกันจากช่องอื่น (`card-`/`ir-`/`follow-`) นับเป็น
+หลักฐานของใบเฉพาะเมื่อเวลาเหตุการณ์ **≥ เวลากรอกใบ** ไม่งั้นใบใหม่ของเบอร์เดิมเกิดมา
+พร้อมสถานะ "โทรแล้ว" จากผลเมื่อ 3 เดือนก่อน
+⚠️ หลักฐาน "โทรแล้ว" ใช้ stamp ที่เขียนครั้งเดียว (088) ห้ามใช้สถานะที่ reset ได้
+
+### เส้นแบ่งสรรหา → คัดสรร (A · 16 ส.ค.)
+
+* `api/_lib/applicationBoardLink.ts` — `loadBoardPhoneSet()` เบอร์คนบนบอร์ดทุกถัง (cache 60 วินาที)
+  · ใบสนใจที่เบอร์อยู่ในเซ็ต = **ได้ใบสมัครแล้ว** (derived ตอนอ่าน ไม่ stamp)
+* ⚠️ จับคู่ด้วย **เบอร์** = proxy (ฝั่งเราไม่มี citizen_id) ต้องติดธง "จับคู่ด้วยเบอร์" บนจอ
+* ⚠️ ERP อ่านไม่ได้คืน **null** ไม่ใช่เซ็ตว่าง — ผู้เรียกต้องแยกสองเคส (ขีด+ธง vs 0)
+
+### สวัสดิการที่ AI พูดได้ (benefits · 15 ส.ค.)
+
+* `api/_lib/siamrajJobBenefits.ts` — ERP `st_request_p3_rate` × `wg2_ms_fee` → ประโยคพูด
+  · เติมตอน **เสิร์ฟคิว** ไม่ใช่ตอนเข้าคิว (ใบขอแก้อัตราแล้วสายที่ยังไม่ออกได้ค่าใหม่)
+* ⚠️ **whitelist เท่านั้น** — ตารางเดียวกันมีค่าปรับขาดงาน/มาสาย/เงินชดเชย ที่ห้ามพูด
+* ⚠️ โอทีบอกตัวเลขเฉพาะ 1.5 เท่า (อัตราอื่นพูดรวม ๆ)
+
+### ผลติดตามนัด (089) + ผลติดต่อ (086)
+
+* `api/_lib/applicationAttendance.ts` (append-only · ผลล่าสุดต่อ (ใบ, วันนัด) ชนะ)
+  · `api/_handlers/application-attendance.ts` · `src/lib/appointmentAttendance.ts` (ตรรกะล้วน)
+* `api/_lib/applicationContacts.ts` · `api/_handlers/application-contacts.ts`
+* ⚠️ **ไม่แตะ `status` ใบ** — สถานะมาจาก "ขั้นที่คนทำ" ไม่ใช่ผลติดตาม
+* ⚠️ ค่าที่ยอมรับคุมที่ตรรกะฝั่ง TS ที่เดียว (ไม่ใส่ CHECK ที่ฐาน — บทเรียน 077/085
+  CHECK หลุด sync กับ validator แล้ว 500)
+
+### ตารางโทรตาม Follow (F1-F5 · migration 092)
+
+* `follow_entries` + `group_id uuid` + `call_times text[]` (1 แถว = 1 คน × 1 วัน)
+* `lumosDispatch.buildFollowReminderPayload()` หลายรอบ/วัน · `cancelFollowGroup()`
+* ⚠️ **1 วัน = 1 plan** — Lumos steps หลายอันข้ามวันในแถวเดียวอันตราย
+  (`bumpScheduledAtForward` ยุบ step ที่เลยเวลามากองพร้อมกัน + ผลกลับ match ด้วย
+  `client_contact_id` ตัวเดียวจึงทับกัน)
+* ⚠️ `next_attempt_at` = รอบแรกของวันนั้น — กันแถววันอนาคตถูกเสิร์ฟแล้ว bump มาโทรวันนี้
+* ⚠️ ผลกลุ่ม: `no_answer`/`busy` → **ปิด ไม่ retry** (ตารางคือ retry อยู่แล้ว) ·
+  `declined`/`wrong_person` → needs_human + ยกเลิกทั้งชุด
+
+### ใบสมัคร → คิว AI (S8 · migration 090)
+
+* `api/_handlers/application-dispatch.ts` · `lumosDispatch.buildApplicationInterviewPayload()`
+  · person_ref = `app-<uuid>` · flag `APPLICATION_AUTO_DISPATCH_ENABLED` (auto ตอนกรอกเสร็จ)
+* ⚠️ เส้นนี้ถูกเรียกจาก `/api/public/apply` ซึ่ง **ห้ามยิง ERP** — payload ใช้ snapshot บนใบ
