@@ -24,6 +24,7 @@ import { countPendingApprovalByJob, releaseDueCallBatches } from './callBatchSto
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
+import { fetchJobBenefitLines, requestNoFromJobRef } from './siamrajJobBenefits.js';
 import { toE164Thai } from './thaiPhone.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
@@ -969,7 +970,7 @@ export function buildTakePendingSql(withRank: boolean): string {
      limit $2
      for update skip locked
   )
-  returning q.id, q.payload`;
+  returning q.id, q.job_ref, q.payload`;
 }
 
 /**
@@ -992,9 +993,9 @@ export async function takePendingLumosItems(
   }
 
   const params = [channel, Math.min(Math.max(limit, 1), 500)];
-  let rows: Array<{ id: number; payload: unknown }>;
+  let rows: Array<{ id: number; job_ref: string; payload: unknown }>;
   try {
-    ({ rows } = await dbQuery<{ id: number; payload: unknown }>(TAKE_PENDING_SQL, params));
+    ({ rows } = await dbQuery<{ id: number; job_ref: string; payload: unknown }>(TAKE_PENDING_SQL, params));
   } catch (e) {
     // ⚠️ ยังไม่รัน 084 → **ห้ามให้คิวหยุดเดิน** (Lumos จะไม่ได้งานเลย ซึ่งแย่กว่าเรียงผิด)
     // ถอยไปคิวรีที่ไม่มี match_rank = พฤติกรรมเดิมเป๊ะ (เรียงตามคิวเก่าก่อน)
@@ -1002,7 +1003,10 @@ export async function takePendingLumosItems(
     logError('lumos.serve.match_rank.missing', {
       hint: 'ยังไม่ได้รัน migration 084 — คิวยังเดินแต่เรียงตามลำดับเข้าคิว ไม่ใช่คะแนน AI',
     });
-    ({ rows } = await dbQuery<{ id: number; payload: unknown }>(TAKE_PENDING_SQL_NO_RANK, params));
+    ({ rows } = await dbQuery<{ id: number; job_ref: string; payload: unknown }>(
+      TAKE_PENDING_SQL_NO_RANK,
+      params,
+    ));
   }
 
   // stamp "Lumos ดึงงานไปครั้งแรก" (088) — post-update แยกจากคิวรีเสิร์ฟ โดยตั้งใจ:
@@ -1024,6 +1028,41 @@ export async function takePendingLumosItems(
       });
     }
   }
+
+  /**
+   * เติมข้อมูลสวัสดิการหน่วยงานให้ช่อง interview **ตอนเสิร์ฟ** (เจ้าของสั่ง 15 ส.ค. 2569:
+   * "OT ชั่วโมงละเท่าไหร่ เบี้ยขยัน ค่าโทรศัพท์ ถ้าหน่วยงานไหนมีส่งไปด้วย")
+   *
+   * ทำไมตอนเสิร์ฟ ไม่ใช่ตอนเข้าคิว:
+   * - เส้น auto เข้าคิวจาก /api/public/apply ซึ่ง **ห้ามยิง ERP เด็ดขาด** — เติมตรงนี้
+   *   ทั้งเส้น auto/manual/iRecruit ได้ข้อมูลเท่ากันหมด
+   * - ข้อมูลสดเสมอ (อัตราเปลี่ยนก็ได้ค่าล่าสุด ไม่ค้างใน payload เก่า)
+   * ⚠️ ERP ล่ม/ช้า = เสิร์ฟแบบไม่มีข้อมูลเสริมต่อ (คิวหยุดเดินแย่กว่าขาดสวัสดิการ)
+   */
+  if (channel === 'interview' && rows.length > 0) {
+    try {
+      const byNo = await fetchJobBenefitLines(
+        rows.map((r) => requestNoFromJobRef(r.job_ref)).filter((v): v is string => Boolean(v)),
+      );
+      if (byNo.size > 0) {
+        for (const r of rows) {
+          const no = requestNoFromJobRef(r.job_ref);
+          const line = no ? byNo.get(no) : undefined;
+          const p = r.payload as { questions?: unknown } | null;
+          if (!line || !p || !Array.isArray(p.questions)) continue;
+          const q = p.questions as string[];
+          // schema Lumos รับ questions 1–15 ข้อ — ของเรามากสุด 6+1 = 7 · กันเติมซ้ำด้วย marker
+          if (q.length >= 15 || q.some((s) => typeof s === 'string' && s.startsWith('แจ้งเพิ่มเติมครับ'))) continue;
+          q.push(`แจ้งเพิ่มเติมครับ งานนี้${line}`);
+        }
+      }
+    } catch (e) {
+      logError('lumos.serve.benefits.failed', e, {
+        hint: 'อ่านสวัสดิการจาก ERP ไม่ได้ — เสิร์ฟแบบไม่มีข้อมูลเสริม (คิวยังเดินปกติ)',
+      });
+    }
+  }
+
   return rows.map((r) => bumpScheduledAtForward(r.payload));
 }
 

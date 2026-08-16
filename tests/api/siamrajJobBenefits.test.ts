@@ -1,0 +1,83 @@
+// @vitest-environment node
+/**
+ * สวัสดิการที่ AI พูดได้ (15 ส.ค. 2569) — จุดที่ห้ามหลุด:
+ * ตาราง st_request_p3_rate มีแถว "ค่าปรับขาดงาน / มาสาย / เงินชดเชย" ปนกับสวัสดิการ
+ * ถ้าหลุดไปในบทพูด = AI บอกผู้สมัครว่า "งานนี้มีค่าปรับขาดงาน 533 บาท" ทันทีที่โทร
+ * → whitelist เท่านั้น: รู้จักถึงพูด ไม่รู้จัก = เงียบ
+ */
+import { describe, expect, it } from 'vitest';
+import { requestNoFromJobRef, speakableBenefitLine } from '../../api/_lib/siamrajJobBenefits.js';
+
+// ชุดจริงจากฐาน 15 ส.ค. (ใบ LMO6908004) — มีทั้งของพูดได้และห้ามพูดปนกัน
+const REAL_ROWS = [
+  { fee_name: 'นขฤ.ฟรี (ปกส.)', fee_rate: 410 },
+  { fee_name: 'เงินชดเชยลาป่วย (ปกส)', fee_rate: 410 },
+  { fee_name: 'เงินชดเชยพักร้อน (ปกส)', fee_rate: 410 },
+  { fee_name: 'ค่าปรับขาดงาน (ตามอัตรา)', fee_rate: 410 },
+  { fee_name: 'ค่าล่วงเวลา(สูตร)', fee_rate: 51.25 },
+  { fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 76.88 },
+  { fee_name: 'ค่าล่วงเวลา 2.0 เท่า', fee_rate: 102.5 },
+  { fee_name: 'ค่าล่วงเวลา 3.0 เท่า', fee_rate: 153.75 },
+  { fee_name: 'ค่าเบี้ยขยัน', fee_rate: 13.64 },
+  { fee_name: 'ค่ารถ/ค่าเดินทาง/TAXI', fee_rate: 30 },
+  { fee_name: 'ค่าแทนงาน (ไซด์)', fee_rate: 550 },
+];
+
+describe('speakableBenefitLine — whitelist เท่านั้น', () => {
+  it('ใบจริง: ได้โอทีชม.ละ (ปัดเต็ม) + เบี้ยขยัน + ค่าเดินทาง — ไม่มีค่าปรับ/ชดเชยหลุด', () => {
+    const line = speakableBenefitLine(REAL_ROWS);
+    expect(line).toContain('โอทีชั่วโมงละประมาณ 77 บาท');
+    expect(line).toContain('เบี้ยขยัน');
+    expect(line).toContain('ค่าเดินทาง');
+    // 🔴 ของห้ามพูด — หลุดเมื่อไหร่คือหายนะทางโทรศัพท์
+    expect(line).not.toContain('ปรับ');
+    expect(line).not.toContain('ชดเชย');
+    expect(line).not.toContain('มาสาย');
+    expect(line).not.toContain('แทนงาน');
+    expect(line).not.toContain('นขฤ');
+  });
+
+  it('ค่าโทรศัพท์/ค่ากะ/ค่าอาหาร/ค่าครองชีพ → บอกว่า "มี" (ไม่บอกเลข — หน่วยไม่แน่)', () => {
+    const line = speakableBenefitLine([
+      { fee_name: 'ค่าโทรศัพท์', fee_rate: 300 },
+      { fee_name: 'ค่ากะ (ดึก)', fee_rate: 80 },
+      { fee_name: 'ค่าอาหาร', fee_rate: 40 },
+      { fee_name: 'ค่าครองชีพ', fee_rate: 66.67 },
+    ]);
+    expect(line).toContain('ค่าโทรศัพท์');
+    expect(line).toContain('ค่ากะ');
+    expect(line).toContain('ค่าอาหาร');
+    expect(line).toContain('ค่าครองชีพ');
+    expect(line).not.toContain('300');
+    expect(line).not.toContain('80');
+  });
+
+  it('ไม่มีอะไรพูดได้ → คืนสตริงว่าง (ไม่พูดว่า "ไม่มี")', () => {
+    expect(speakableBenefitLine([{ fee_name: 'ค่าปรับขาดงาน (ตามอัตรา)', fee_rate: 500 }])).toBe('');
+    expect(speakableBenefitLine([])).toBe('');
+  });
+
+  it('อัตรา 0/ติดลบ ไม่นับว่ามี', () => {
+    expect(speakableBenefitLine([{ fee_name: 'ค่าเบี้ยขยัน', fee_rate: 0 }])).toBe('');
+    expect(speakableBenefitLine([{ fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 0 }])).toBe('');
+  });
+
+  it('โอทีเลือกเฉพาะ 1.5 เท่า (หน่วยต่อชั่วโมงแน่นอน) — 2.0/3.0/สูตร ไม่เอาเลขมาปน', () => {
+    const line = speakableBenefitLine([
+      { fee_name: 'ค่าล่วงเวลา 2.0 เท่า', fee_rate: 102.5 },
+      { fee_name: 'ค่าล่วงเวลา 3.0 เท่า', fee_rate: 153.75 },
+    ]);
+    expect(line).toBe(''); // ไม่มี 1.5 = ไม่พูดเรื่องโอที (กันเข้าใจผิดว่าเรตปกติ)
+  });
+});
+
+describe('requestNoFromJobRef', () => {
+  it('siamraj-sql:OPL6908026 → OPL6908026', () => {
+    expect(requestNoFromJobRef('siamraj-sql:OPL6908026')).toBe('OPL6908026');
+  });
+  it('รูปอื่น → null (ใบขอฝั่งเราเอง/ขยะ ไม่ยิง ERP มั่ว)', () => {
+    expect(requestNoFromJobRef('internal-123')).toBeNull();
+    expect(requestNoFromJobRef('siamraj-sql:')).toBeNull();
+    expect(requestNoFromJobRef('')).toBeNull();
+  });
+});
