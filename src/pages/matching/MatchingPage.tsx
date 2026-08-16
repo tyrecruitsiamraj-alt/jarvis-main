@@ -704,6 +704,8 @@ const MatchingPage: React.FC = () => {
   const [irMatchById, setIrMatchById] = useState<Record<string, IrecruitMatchResult>>({});
   const [irLoadingId, setIrLoadingId] = useState<string | null>(null);
   const [irErrorById, setIrErrorById] = useState<Record<string, string>>({});
+  /** สรุปผล "หาคนเพิ่ม + ส่ง AI ทันที" ต่อใบขอ (เลนคัดสรร · R2/R3) */
+  const [irSendNotice, setIrSendNotice] = useState<Record<string, string>>({});
 
   /**
    * โหลดผลคัดกรองฝั่ง iRecruit ของใบขอที่เปิด — คู่กับ effect ของบอร์ดข้างบน
@@ -1631,23 +1633,40 @@ const MatchingPage: React.FC = () => {
   };
 
   // ค้นหาผู้สมัครจากฐาน iRecruit สำหรับใบขอนี้ (inline ในหน้า match)
-  const fetchIrecruit = async (jobId: string, refresh = false) => {
+  /**
+   * ค้นหาผู้สมัคร iRecruit · `send=true` = เลนคัดสรรกด "หาคนเพิ่ม + ส่ง AI ทันที"
+   * (เจ้าของเคาะ 16 ส.ค.) — server ค้นเสร็จส่งเขียว+เหลืองเข้าคิว Lumos ทันที กัน 30 วัน
+   * ไม่ต้องอนุมัติ · สรุปผลส่งขึ้น irSendNotice
+   */
+  const fetchIrecruit = async (jobId: string, refresh = false, send = false) => {
     setIrLoadingId(jobId);
     setIrErrorById((prev) => {
       const next = { ...prev };
       delete next[jobId];
       return next;
     });
+    if (send) setIrSendNotice((prev) => ({ ...prev, [jobId]: '' }));
     try {
       const params = new URLSearchParams({ jobId });
       if (refresh) params.set('refresh', '1');
+      if (send) params.set('send', '1');
       const r = await apiFetch(`/api/matching/irecruit-candidates?${params.toString()}`);
       if (!r.ok) {
         const data = (await r.json().catch(() => ({}))) as { message?: string; detail?: string; error?: string };
         throw new Error(data.message || data.detail || data.error || `ค้นหาไม่สำเร็จ (HTTP ${r.status})`);
       }
-      const data = (await r.json()) as IrecruitMatchResult;
+      const data = (await r.json()) as IrecruitMatchResult & {
+        dispatch?: { queued: number; duplicated: string[]; skipped: Array<{ reason: string }>; cooldownSkipped: number } | null;
+      };
       setIrMatchById((prev) => ({ ...prev, [jobId]: data }));
+      if (send && data.dispatch) {
+        const d = data.dispatch;
+        const parts = [`ส่ง AI โทร ${d.queued} คน`];
+        if (d.cooldownSkipped > 0) parts.push(`ข้าม ${d.cooldownSkipped} (เพิ่งติดต่อใน 30 วัน)`);
+        if (d.duplicated.length > 0) parts.push(`เคยส่งแล้ว ${d.duplicated.length}`);
+        if (d.skipped.length > 0) parts.push(`ส่งไม่ได้ ${d.skipped.length}`);
+        setIrSendNotice((prev) => ({ ...prev, [jobId]: parts.join(' · ') }));
+      }
     } catch (e) {
       setIrErrorById((prev) => ({ ...prev, [jobId]: e instanceof Error ? e.message : 'ค้นหาไม่สำเร็จ' }));
     } finally {
@@ -3293,7 +3312,7 @@ const MatchingPage: React.FC = () => {
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
-                        className="jarvis-btn-primary"
+                        className="jarvis-btn-ghost"
                       >
                         {irLoadingId === jobDetail.id ? (
                           'กำลังค้นหา…'
@@ -3307,8 +3326,24 @@ const MatchingPage: React.FC = () => {
                           </>
                         )}
                       </button>
+                      {/* เลนคัดสรร (16 ส.ค.): โทรหมดแล้วไม่มีคน → ค้นเจอส่ง AI ทันที
+                          เขียว+เหลือง · ไม่ต้องอนุมัติ · กัน 30 วัน (server) */}
+                      <button
+                        type="button"
+                        disabled={irLoadingId === jobDetail.id}
+                        onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id], true)}
+                        className="jarvis-btn-primary"
+                        title="ค้นหาคนที่ยังไม่สมัคร แล้วส่งคนที่ AI แนะนำ (เขียว/เหลือง) เข้าคิว Lumos โทรทันที"
+                      >
+                        <Search className="h-3 w-3" /> หาคนเพิ่ม + ส่ง AI โทร
+                      </button>
                     </div>
                   </div>
+                  {irSendNotice[jobDetail.id] ? (
+                    <p className="mt-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
+                      🤖 {irSendNotice[jobDetail.id]}
+                    </p>
+                  ) : null}
 
                   {irLoadingId === jobDetail.id ? (
                     <AiEvaluationStatus source="irecruit" />
