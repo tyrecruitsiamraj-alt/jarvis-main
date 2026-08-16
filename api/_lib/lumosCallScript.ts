@@ -1,19 +1,23 @@
 /**
- * บทพูดของ AI — 3 ชุด (เจ้าของสั่ง 16 ส.ค. 2569:
- * *"ต้องการสคริปการสัมภาษณ์แบ่งเป็น 2 part … และสุดท้าย การ Follow
- * ลองดูจากของ Lumos แล้วทำให้ดีขึ้น"*)
+ * ตัวประกอบบทพูดของ AI — **ข้อความทั้งหมดอยู่ที่ `lumosCallScript.templates.ts`**
+ * (เจ้าของเคาะ 16 ส.ค. 2569: *"ขอเป็นไฟล์ที่แก้ไขได้ที"* — แก้คำที่ไฟล์นั้นไฟล์เดียว
+ * ไม่ต้องแตะไฟล์นี้)
  *
- *   1. **สัมภาษณ์เบื้องต้น** (`buildScreeningQuestions`) — เลนสรรหา · เรา**โทรไปหาเขา**
- *      เขายังไม่ได้สมัครงานใบนี้ ต้องแนะนำตัวก่อนเสมอ แล้วค่อยคัดกรอง
- *   2. **เสนองาน** (`buildOfferQuestions` / `buildOfferMessage`) — คนที่**ติดต่อเรามาแล้ว**
- *      (ฝากใบสมัคร/อยู่บนบอร์ด) ไม่ต้องแนะนำตัวใหม่ ตรงเข้าเรื่องงานแล้วปิดด้วยการนัด
- *   3. **Follow** (`buildFollowMessage`) — ข้อความติดตามที่เจ้าหน้าที่ตั้งเอง
+ * ไฟล์นี้มีแต่ "กฎการประกอบ":
+ *   1. เติมค่าลงตัวแปร `{แบบนี้}`
+ *   2. **ตัวแปรไหนไม่มีค่า = ทิ้งทั้งบรรทัด** — ใบขอที่ไม่ได้กรอกเวลาทำงานจะไม่ถูกถาม
+ *      ว่า "เวลาทำงาน สะดวกไหม" (คำถามลอย ๆ ทำให้คนรับสายงงว่าเวลาไหน)
+ *   3. คุมเพดานจำนวนคำถามตาม schema ของ Lumos
+ *
+ * บททั้ง 3 ชุด:
+ *   1. **สัมภาษณ์เบื้องต้น** — เลนสรรหา · เราโทรไปหาเขา เขายังไม่ได้สมัครงานใบนี้
+ *   2. **เสนองาน** — คนที่ติดต่อเรามาแล้ว (ฝากใบสมัคร/อยู่บนบอร์ด)
+ *   3. **Follow** — ข้อความติดตามที่เจ้าหน้าที่ตั้งเอง
  *
  * ⚠️ **ช่อง interview ไม่มีที่ใส่ข้อความอิสระ** — ทุกอย่างที่ AI พูดต้องอยู่ใน `questions[]`
  * (schema รับ 1–15 ข้อ) ส่วนช่อง reminder พูดยาวได้ใน `steps[].message`
- * บทสองช่องจึงหน้าตาไม่เหมือนกัน แต่ **ข้อเท็จจริงที่พูดต้องชุดเดียวกัน**
  *
- * 🔴 **ห้ามใส่ตัวเลขรายได้ในไฟล์นี้** — ตอนประกอบ payload เรายังไม่รู้ "หน่วย" ของค่าแรง
+ * 🔴 **ห้ามมีตัวเลขรายได้ในบท** — ตอนประกอบ payload ยังไม่รู้ "หน่วย" ของค่าแรง
  * (`total_income` = `payment_rate` ดิบ) วัดจากฐาน 16 ส.ค. 2569: แถวค่าแรงหลัก 16,264 แถว
  * เป็นรายเดือน 13,646 · **รายวัน 2,608** · รายชั่วโมง 5 → พูด "รายได้ 500 บาท" ให้คนที่
  * งานจ่าย 500 **ต่อวัน** = บอกเลขผิด 30 เท่า (บั๊กเดียวกับที่แก้ไปแล้วบนหน้าสาธารณะ)
@@ -22,47 +26,126 @@
  *
  * ไฟล์นี้ pure ทั้งไฟล์ — ไม่แตะ DB/เวลาจริง · เทสต์ที่ `tests/api/lumosCallScript.test.ts`
  */
+import { CALL_SCRIPT_TEMPLATES as T } from './lumosCallScript.templates.js';
 
-/**
- * ชื่อที่ AI ใช้แนะนำตัว — เดิม**ไม่มีการแนะนำตัวเลย** ทั้งสองบท คนรับสายจึงไม่รู้ว่า
- * ใครโทรมาและไปเอาเบอร์มาจากไหน (เหตุผลอันดับต้น ๆ ที่คนวางสาย)
- * ⚠️ เปลี่ยนที่นี่ที่เดียวถ้าเจ้าของอยากให้เรียกชื่ออื่น
- */
-export const CALLER_ORG = 'สยามราชธานี';
+/** ชื่อที่ AI ใช้แนะนำตัว — ค่าจริงอยู่ในไฟล์ template */
+export const CALLER_ORG: string = T.ผู้โทร;
 
 /**
  * ช้อยส์เหตุผล "ไม่สนใจ" (ML ขั้น 1 · เจ้าของสั่ง 16 ส.ค. 2569)
- *
- * ทำไมต้องอ่านช้อยส์ให้ฟังทางโทรศัพท์แทนที่จะปล่อยให้ตอบอิสระ: schema ของ Lumos
- * ไม่มีช่องส่ง "เหตุผล" กลับมาเป็นค่าคงที่ — ที่กลับมาคือ `summary`/`transcript`
- * เป็นภาษาคน การอ่านช้อยส์ให้ฟังทำให้คำตอบเกาะกลุ่มคำเดิม พอเอาไปจัดหมวดทีหลังได้
  * ⚠️ ต้องเป็นชุดเดียวกับฝั่ง**คนโทรเอง** (ข้อ 4) ไม่งั้นสองทางเก็บคนละหมวด รวมกันไม่ได้
  */
-export const DECLINE_REASON_CHOICES = [
-  'ค่าตอบแทนน้อยไป',
-  'ที่ทำงานไกล',
-  'ได้งานอื่นแล้ว',
-  'เวลาทำงานไม่สะดวก',
-  'งานไม่ตรงกับที่ทำ',
-] as const;
+export const DECLINE_REASON_CHOICES: readonly string[] = T.เหตุผลที่ไม่สนใจ;
 
-const DECLINE_REASON_PROMPT = `ถ้ายังไม่สนใจงานนี้ ขอทราบเหตุผลสั้น ๆ ได้ไหมครับ เช่น ${DECLINE_REASON_CHOICES.join(' หรือ ')}`;
+/** ขึ้นต้นด้วยคำนี้เสมอ = marker กันเติมซ้ำตอน Lumos ดึงคิวรอบที่สอง */
+export const EXTRA_INFO_PREFIX: string = T.ของแถม.ขึ้นต้น;
+
+/**
+ * เพดานคำถามต่อบท — schema ของ Lumos รับ 1–15 ข้อ กันไว้ 1 ข้อให้ประโยครายได้
+ * ที่เติมตอนเสิร์ฟ · เกินแล้วตัดท้ายทิ้ง (payload ที่ schema ไม่ผ่าน = Lumos ปัดทิ้ง
+ * **ทั้งรายการ** เงียบ ๆ ซึ่งแย่กว่าคำถามหายไปข้อสองข้อ)
+ */
+export const MAX_QUESTIONS = 14;
+
+// ─── ตัวเติมค่าลงบท ───────────────────────────────────────────────────────────
+
+/**
+ * `undefined`/`null` = **ไม่มีข้อมูล → ทิ้งทั้งบรรทัด**
+ * `''` = มีแต่ไม่ต้องพิมพ์อะไร → **เก็บบรรทัดไว้** (ใช้กับตัวแปรธงอย่าง `{ต้องมีรถ}`
+ * และกับ `{ชื่อผู้รับ}` ตอนไม่รู้ชื่อ)
+ */
+export type ScriptValues = Record<string, string | null | undefined>;
+
+/**
+ * ตัวแปรทั้งหมดที่ไฟล์ template ใช้ได้
+ *
+ * 🔴 **มีไว้กันพิมพ์ผิด** — ถ้าใครพิมพ์ `{ตำแน่ง}` ตกตัวอักษร ระบบจะถือว่า "ไม่มีค่า"
+ * แล้ว**ทิ้งคำถามข้อนั้นทั้งข้อเงียบ ๆ** ไม่มี error ไม่มี log · เทสต์
+ * `tests/api/lumosCallScript.test.ts` สแกนไฟล์ template เทียบกับลิสต์นี้ทุกครั้ง
+ * เพิ่มตัวแปรใหม่ต้องมาเพิ่มที่นี่ด้วย
+ */
+export const KNOWN_PLACEHOLDERS: readonly string[] = [
+  'ผู้โทร',
+  'ชื่อผู้รับ',
+  'ตำแหน่ง',
+  'หน่วยงาน',
+  'สถานที่ทำงาน',
+  'เวลาทำงาน',
+  'วันเริ่มงาน',
+  'ช้อยส์เหตุผล',
+  'เลขที่ใบขอ',
+  'รายละเอียดงาน',
+  'รายได้ต่อเดือน',
+  'สวัสดิการ',
+  'เรื่อง',
+  'เบอร์เจ้าหน้าที่',
+  // ตัวแปรธง — ไม่พิมพ์อะไรออกมา แค่บอกว่าบรรทัดนี้ใช้กับใบแบบไหน
+  'ต้องมีรถ',
+  'ไม่มีวันเริ่มงาน',
+  'เคยปฏิเสธงานอื่น',
+];
+
+const PLACEHOLDER = /\{([^{}]+)\}/g;
+
+const clean = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/** ค่าที่ว่างจริง ๆ ให้กลายเป็น undefined (= ทิ้งบรรทัด) ไม่ใช่ช่องว่างค้างในประโยค */
+const orDrop = (v: unknown): string | undefined => clean(v) || undefined;
+
+/** ธง: true = เก็บบรรทัด · false = ทิ้งบรรทัด */
+const flag = (on: boolean | undefined): string | undefined => (on ? '' : undefined);
+
+/** คืน null เมื่อบรรทัดนี้ใช้ไม่ได้กับใบขอนี้ (มีตัวแปรที่ไม่มีค่า) */
+export function renderLine(template: string, values: ScriptValues): string | null {
+  let dropped = false;
+  const out = template.replace(PLACEHOLDER, (_m, name: string) => {
+    const v = values[name];
+    if (v === undefined || v === null) {
+      dropped = true;
+      return '';
+    }
+    return v;
+  });
+  if (dropped) return null;
+  // ตัวแปรที่แทนด้วยค่าว่างทิ้งช่องว่างซ้อนไว้ — เก็บกวาดก่อนส่งให้ AI อ่าน
+  const tidy = out.replace(/\s{2,}/g, ' ').trim();
+  return tidy || null;
+}
+
+/** ประกอบทั้งบท · ตัดบรรทัดที่ใช้ไม่ได้ทิ้ง แล้วคุมเพดานจำนวนข้อ */
+export function renderLines(
+  templates: readonly string[],
+  values: ScriptValues,
+  max = MAX_QUESTIONS,
+): string[] {
+  const lines: string[] = [];
+  for (const t of templates) {
+    const line = renderLine(t, values);
+    if (line) lines.push(line);
+  }
+  // ลบคำถามหมดทุกข้อในไฟล์ template = สายเงียบ · ถอยไปใช้คำถามสำรอง
+  if (lines.length === 0) {
+    const fallback = renderLine(T.คำถามสำรอง, values);
+    return fallback ? [fallback] : [];
+  }
+  return lines.slice(0, max);
+}
+
+// ─── ค่าที่ใช้ร่วมกันทุกบท ────────────────────────────────────────────────────
 
 export type CallScriptFacts = {
   /** ชื่อผู้รับสาย — ว่างได้ (บทจะข้ามการเรียกชื่อ ไม่ใช่พูดคำว่า "คุณ" ลอย ๆ) */
-  candidateName?: string;
+  candidateName?: string | null;
   position: string;
   unit: string;
   /** สถานที่ทำงานจริง (ถ้าต่างจากชื่อหน่วยงาน) — ตัดความยาวมาแล้วจาก buildJobBrief */
-  placeForTravel: string;
-  /** เวลาทำงาน — ว่าง = ไม่ถาม (ห้ามถามลอย ๆ ว่า "เวลาทำงานสะดวกไหม" โดยไม่บอกเวลา) */
-  workSchedule?: string;
+  placeForTravel?: string | null;
+  /** เวลาทำงาน — ว่าง = บรรทัดที่ถามเรื่องเวลาหายไปเอง */
+  workSchedule?: string | null;
   needsOwnVehicle?: boolean;
-  /** วันเริ่มงานที่พูดออกเสียงได้แล้ว (`speakableDate`) — ว่าง = ถามแบบปลายเปิด */
-  startDate?: string;
+  /** วันเริ่มงานที่พูดออกเสียงได้แล้ว (`speakableDate`) — ว่าง = ใช้บรรทัดถามปลายเปิดแทน */
+  startDate?: string | null;
 };
-
-const clean = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
 /** "คุณสมชาย " เมื่อมีชื่อ · "" เมื่อไม่มี — กันประโยคขึ้นต้นว่า "สวัสดีครับ คุณ ผมโทรจาก…" */
 function polite(name?: string | null): string {
@@ -71,7 +154,7 @@ function polite(name?: string | null): string {
 }
 
 /**
- * ต่อท้ายคำว่า "ตำแหน่ง" — เว้นวรรคให้เมื่อชื่อตำแหน่งขึ้นต้นด้วยอักษรอังกฤษ/ตัวเลข
+ * `{ตำแหน่ง}` = คำว่า "ตำแหน่ง" + ชื่อตำแหน่ง — เว้นวรรคให้เมื่อขึ้นต้นด้วยอักษรอังกฤษ
  * ("ตำแหน่งCall Center" ติดกันคืออ่านยากทั้งกับคนและกับ TTS · ชื่อตำแหน่งจริงในฐาน
  * เป็นอังกฤษเยอะ: Call Center · Programmer · IT Support)
  */
@@ -79,75 +162,39 @@ function positionPhrase(position: string): string {
   return /^[A-Za-z0-9]/.test(position) ? `ตำแหน่ง ${position}` : `ตำแหน่ง${position}`;
 }
 
-/**
- * เบอร์โทรที่ "พูดออกเสียงแล้วเข้าใจ" — บทเรียนเดียวกับ `speakableDate`
- * (`2026-08-01` เคยถูกอ่านว่า "สองพันยี่สิบหกขีดศูนย์แปด…")
- * `0812345678` ติดกัน 10 หลักเสี่ยงถูกอ่านเป็นจำนวนเต็มก้อนเดียว → คั่นเป็นกลุ่ม
- * ⚠️ ใช้ **เว้นวรรค ไม่ใช่ขีด** — ขีดมีโอกาสถูกอ่านออกเสียงว่า "ลบ"
- */
-export function speakablePhoneTh(phone: string): string {
-  const s = clean(phone);
-  if (!s) return '';
-  const digits = s.replace(/\D/g, '');
-  const local = digits.startsWith('66') && digits.length === 11 ? `0${digits.slice(2)}` : digits;
-  if (local.length === 10) return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
-  if (local.length === 9) return `${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`;
-  return s;
-}
-
-// ─── ท่อนที่ใช้ร่วมกันสองบท ───────────────────────────────────────────────────
-
-/** คำถามเรื่องสถานที่ — ระบุที่จริงเสมอ ไม่ถามลอย ๆ ว่า "เดินทางสะดวกไหม" */
-const travelQuestion = (f: CallScriptFacts) =>
-  `งานนี้ทำที่ ${clean(f.placeForTravel) || clean(f.unit)} สะดวกเดินทางไปทำงานไหมครับ`;
-
-/** เวลาทำงาน/รถ — ใส่เฉพาะเมื่อใบขอมีข้อมูล (ไม่มีข้อมูล = ไม่ถาม ดีกว่าถามเปล่า) */
-function conditionQuestions(f: CallScriptFacts): string[] {
-  const out: string[] = [];
-  const schedule = clean(f.workSchedule);
-  if (schedule) out.push(`เวลาทำงาน ${schedule} สะดวกไหมครับ`);
-  if (f.needsOwnVehicle) out.push('งานนี้ต้องใช้รถของตัวเองในการทำงาน คุณมีรถพร้อมใช้ไหมครับ');
-  return out;
-}
-
-/** วันเริ่มงาน — รู้วันที่ลูกค้าต้องการก็ถามตรง ๆ ว่าทันไหม ไม่รู้ก็ถามปลายเปิด */
-function startDateQuestion(f: CallScriptFacts): string {
-  const d = clean(f.startDate);
-  return d
-    ? `ทางหน่วยงานอยากให้เริ่มงานประมาณวันที่ ${d} สะดวกไหมครับ ถ้าไม่ทันเริ่มได้เร็วสุดวันไหนครับ`
-    : 'ถ้าตกลงรับงานนี้ เริ่มงานได้เร็วที่สุดวันไหนครับ';
-}
-
-// ─── Part 1 · สัมภาษณ์เบื้องต้น (เลนสรรหา) ───────────────────────────────────
-
-/**
- * คนกลุ่มนี้**ยังไม่ได้สมัครงานใบนี้** — เราไปหาเขาเอง บทจึงต้อง
- *   1. บอกว่าใครโทรมา (เดิมไม่บอก)
- *   2. ขออนุญาตใช้เวลา — ไม่ใช่ยิงคำถามใส่ทันที
- *   3. คัดกรองพอรู้ว่า "ไปต่อได้ไหม" แล้วจบ — ที่เหลือเป็นงานของเจ้าหน้าที่
- *   4. **ถามเหตุผลเมื่อไม่สนใจ** (ML ขั้น 1) และ **บอกขั้นถัดไป** ก่อนวางสาย
- * สูงสุด 9 ข้อ + ที่เติมตอนเสิร์ฟอีก 1 = 10 (เพดาน schema 15)
- */
-export function buildScreeningQuestions(f: CallScriptFacts): string[] {
+function jobValues(f: CallScriptFacts): ScriptValues {
   const position = clean(f.position) || 'ที่เปิดรับ';
   const unit = clean(f.unit) || 'หน่วยงานของเรา';
-  return [
-    `สวัสดีครับ ${polite(f.candidateName)}ผมติดต่อจาก${CALLER_ORG}นะครับ ตอนนี้มีงาน${positionPhrase(position)} ที่ ${unit} อยากเรียนเสนอ ขอเวลาสัก 2-3 นาที สนใจฟังรายละเอียดไหมครับ`,
-    travelQuestion(f),
-    ...conditionQuestions(f),
-    `เคยทำงาน${positionPhrase(position)} หรืองานใกล้เคียงมาก่อนไหมครับ`,
-    startDateQuestion(f),
-    'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
-    DECLINE_REASON_PROMPT,
-    'ถ้าสนใจ เดี๋ยวเจ้าหน้าที่จะติดต่อกลับไปนัดหมายและขอเอกสารสมัครงานนะครับ ขอบคุณที่สละเวลาครับ',
-  ];
+  const startDate = orDrop(f.startDate);
+  return {
+    ผู้โทร: CALLER_ORG,
+    ชื่อผู้รับ: polite(f.candidateName),
+    ตำแหน่ง: positionPhrase(position),
+    หน่วยงาน: unit,
+    สถานที่ทำงาน: clean(f.placeForTravel) || unit,
+    เวลาทำงาน: orDrop(f.workSchedule),
+    วันเริ่มงาน: startDate,
+    ไม่มีวันเริ่มงาน: flag(!startDate),
+    ต้องมีรถ: flag(f.needsOwnVehicle),
+    ช้อยส์เหตุผล: DECLINE_REASON_CHOICES.join(' หรือ '),
+  };
 }
 
-// ─── Part 2 · เสนองานให้คนที่สมัครไว้แล้ว ────────────────────────────────────
+// ─── บทที่ 1 · สัมภาษณ์เบื้องต้น (เลนสรรหา) ──────────────────────────────────
+
+/**
+ * คนกลุ่มนี้**ยังไม่ได้สมัครงานใบนี้** — เราไปหาเขาเอง บทจึงต้องแนะนำตัว ขอเวลา
+ * คัดกรองพอรู้ว่าไปต่อได้ไหม **ถามเหตุผลเมื่อไม่สนใจ** (ML ขั้น 1) แล้วบอกขั้นถัดไป
+ */
+export function buildScreeningQuestions(f: CallScriptFacts): string[] {
+  return renderLines(T.สัมภาษณ์เบื้องต้น, jobValues(f));
+}
+
+// ─── บทที่ 2 · เสนองานให้คนที่สมัครไว้แล้ว ───────────────────────────────────
 
 export type OfferOptions = {
   /**
-   * เคยปฏิเสธงานอื่นไปแล้ว (เส้นชวนกลับ) — ต้องถามก่อนว่ายังหางานอยู่ไหม
+   * เคยปฏิเสธงานอื่นไปแล้ว (เส้นชวนกลับ) — เปิดบรรทัด "ตอนนี้ยังหางานอยู่ไหม"
    * ไม่งั้นเสนอทับคนที่ได้งานไปแล้วซ้ำ ๆ
    */
   askStillLooking?: boolean;
@@ -155,52 +202,36 @@ export type OfferOptions = {
 
 /**
  * คนกลุ่มนี้**ติดต่อเรามาก่อนแล้ว** (ฝากใบสมัคร / อยู่บนบอร์ด) — ห้ามพูดเหมือนโทรหาคนแปลกหน้า
- * ต่างจาก Part 1 สองเรื่อง:
- *   - **ไม่ถามค่าแรงที่คาดหวัง** — เขาเห็นเงื่อนไขงานตอนสมัครแล้ว ถามซ้ำเหมือนจะต่อรองใหม่
- *   - **ปิดด้วยการนัด** ไม่ใช่ปิดด้วย "เดี๋ยวเจ้าหน้าที่ติดต่อกลับ" (เขาเลยขั้นนั้นมาแล้ว)
- * สูงสุด 8 ข้อ + ที่เติมตอนเสิร์ฟอีก 1 = 9
+ * ต่างจากบทที่ 1 สองเรื่อง: **ไม่ถามค่าแรงที่คาดหวัง/ประสบการณ์ซ้ำ** (เขาเห็นเงื่อนไข
+ * ตอนสมัครแล้วและเรามีโปรไฟล์อยู่) · **ปิดด้วยการนัด** ไม่ใช่ "เดี๋ยวเจ้าหน้าที่ติดต่อกลับ"
  */
 export function buildOfferQuestions(f: CallScriptFacts, opts: OfferOptions = {}): string[] {
-  const position = clean(f.position) || 'ที่เปิดรับ';
-  const unit = clean(f.unit) || 'หน่วยงานของเรา';
-  return [
-    `สวัสดีครับ ${polite(f.candidateName)}ผมติดต่อจาก${CALLER_ORG}นะครับ คุณเคยฝากใบสมัครไว้กับเรา ตอนนี้มี${positionPhrase(position)} ที่ ${unit} ที่น่าจะตรงกับที่คุณสมัครไว้ สนใจรับงานนี้ไหมครับ`,
-    ...(opts.askStillLooking ? ['ตอนนี้ยังหางานอยู่ไหมครับ'] : []),
-    travelQuestion(f),
-    ...conditionQuestions(f),
-    startDateQuestion(f),
-    DECLINE_REASON_PROMPT,
-    'ถ้าตกลงรับงานนี้ เดี๋ยวเจ้าหน้าที่จะโทรกลับไปนัดวันสัมภาษณ์ สะดวกให้ติดต่อกลับช่วงไหนครับ',
-  ];
+  return renderLines(T.เสนองาน, {
+    ...jobValues(f),
+    เคยปฏิเสธงานอื่น: flag(opts.askStillLooking),
+  });
 }
 
 /**
- * เวอร์ชันข้อความของ Part 2 สำหรับช่อง **reminder** (คนของเราบนบอร์ด)
+ * เวอร์ชันข้อความของบทที่ 2 สำหรับช่อง **reminder** (คนของเราบนบอร์ด)
  * ข้อเท็จจริงชุดเดียวกับ `buildOfferQuestions` — ต่างแค่รูปประโยค เพราะช่องนี้พูดยาวได้
  * (เจ้าของ: *"Format ก็ทำให้มันเท่ากัน"*)
- *
- * `detail` = ท่อนจาก `buildJobBrief` (สถานที่ · เวลาทำงาน · ต้องมีรถ · ช่วงอายุ)
- * 🔴 ไม่มีตัวเลขรายได้ที่นี่ — เติมตอนเสิร์ฟ (ดูหัวไฟล์)
  */
 export function buildOfferMessage(
-  f: CallScriptFacts & { requestNo?: string; detail?: string },
+  f: CallScriptFacts & { requestNo?: string | null; detail?: string | null },
 ): string {
-  const position = clean(f.position) || 'ที่เปิดรับ';
-  const unit = clean(f.unit) || 'หน่วยงานของเรา';
-  const start = clean(f.startDate) ? ` เริ่มงาน ${clean(f.startDate)}` : '';
-  const ref = clean(f.requestNo) ? ` (ใบขอ ${clean(f.requestNo)})` : '';
-  const detail = clean(f.detail) ? ` ${clean(f.detail)}` : '';
-  return (
-    `สวัสดีครับ ${polite(f.candidateName)}ติดต่อจาก${CALLER_ORG}นะครับ ` +
-    `ระบบคัดเลือกพบว่าคุณเหมาะกับงาน${positionPhrase(position)} ที่ ${unit}${start}${ref}${detail} ` +
-    'หากสนใจ ทีมสรรหาจะติดต่อกลับไปนัดหมายรายละเอียดต่อไปครับ'
-  );
+  return renderLines(
+    T.แจ้งงาน,
+    {
+      ...jobValues(f),
+      เลขที่ใบขอ: orDrop(f.requestNo),
+      รายละเอียดงาน: orDrop(f.detail),
+    },
+    T.แจ้งงาน.length,
+  ).join(' ');
 }
 
 // ─── ท่อนที่เติมตอนเสิร์ฟคิว (รายได้ + สวัสดิการ — ต้องยิง ERP) ──────────────
-
-/** ขึ้นต้นด้วยคำนี้เสมอ = marker กันเติมซ้ำตอน Lumos ดึงคิวรอบที่สอง */
-export const EXTRA_INFO_PREFIX = 'แจ้งเพิ่มเติมครับ';
 
 /**
  * ประโยค "ของแถม" ที่เติมตอนเสิร์ฟ — รวมรายได้กับสวัสดิการไว้ **ข้อเดียว**
@@ -213,16 +244,19 @@ export const EXTRA_INFO_PREFIX = 'แจ้งเพิ่มเติมคร�
  */
 export function buildExtraInfoSentence(input: {
   monthlyIncome?: number | null;
-  benefitLine?: string;
+  benefitLine?: string | null;
 }): string {
   const parts: string[] = [];
   const income = Number(input.monthlyIncome);
   if (Number.isFinite(income) && income > 0) {
-    parts.push(`รายได้ประมาณ ${Math.round(income).toLocaleString('th-TH')} บาทต่อเดือน`);
+    const line = renderLine(T.ของแถม.รายได้, {
+      รายได้ต่อเดือน: Math.round(income).toLocaleString('th-TH'),
+    });
+    if (line) parts.push(line);
   }
-  const benefits = clean(input.benefitLine);
+  const benefits = renderLine(T.ของแถม.สวัสดิการ, { สวัสดิการ: orDrop(input.benefitLine) });
   if (benefits) parts.push(benefits);
-  return parts.length > 0 ? `${EXTRA_INFO_PREFIX} งานนี้${parts.join(' และ')}` : '';
+  return parts.length > 0 ? `${T.ของแถม.ขึ้นต้น}${parts.join(T.ของแถม.ตัวเชื่อม)}` : '';
 }
 
 /**
@@ -254,7 +288,7 @@ export function appendExtraInfoToPayload(payload: unknown, sentence: string): vo
   }
 }
 
-// ─── Part 3 · Follow (ข้อความติดตามที่เจ้าหน้าที่ตั้งเอง) ────────────────────
+// ─── บทที่ 3 · Follow (ข้อความติดตามที่เจ้าหน้าที่ตั้งเอง) ───────────────────
 
 export type FollowMessageInput = {
   recipientName?: string | null;
@@ -267,26 +301,39 @@ export type FollowMessageInput = {
 };
 
 /**
+ * เบอร์โทรที่ "พูดออกเสียงแล้วเข้าใจ" — บทเรียนเดียวกับ `speakableDate`
+ * (`2026-08-01` เคยถูกอ่านว่า "สองพันยี่สิบหกขีดศูนย์แปด…")
+ * `0812345678` ติดกัน 10 หลักเสี่ยงถูกอ่านเป็นจำนวนเต็มก้อนเดียว → คั่นเป็นกลุ่ม
+ * ⚠️ ใช้ **เว้นวรรค ไม่ใช่ขีด** — ขีดมีโอกาสถูกอ่านออกเสียงว่า "ลบ"
+ */
+export function speakablePhoneTh(phone: string): string {
+  const s = clean(phone);
+  if (!s) return '';
+  const digits = s.replace(/\D/g, '');
+  const local = digits.startsWith('66') && digits.length === 11 ? `0${digits.slice(2)}` : digits;
+  if (local.length === 10) return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+  if (local.length === 9) return `${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`;
+  return s;
+}
+
+/**
  * ของเดิมต่อสามท่อนด้วย `—` เฉย ๆ: `"นัดสัมภาษณ์ — พรุ่งนี้ 9 โมง — ติดต่อกลับได้ที่ 0812345678"`
- * ฟังทางโทรศัพท์แล้วเป็นคำพูดห้วน ๆ ไม่มีหัวไม่มีท้าย · ปรับ 4 อย่าง:
- *   1. **แนะนำตัว + เรียกชื่อผู้รับ** (เดิมไม่มีเลย ผู้รับไม่รู้ว่าใครโทรมา)
- *   2. **บอกให้ชัดว่าต้องทำอะไรต่อ** — "รบกวนยืนยันกลับ" (เดิมเป็นการแจ้งลอย ๆ)
- *   3. **เบอร์อ่านเป็นกลุ่มตัวเลข** (`speakablePhoneTh`)
- *   4. **กันพูดซ้ำ** เมื่อโน้ตเหมือนหัวเรื่อง
+ * ฟังทางโทรศัพท์แล้วเป็นคำพูดห้วน ๆ ไม่มีหัวไม่มีท้าย · บทใหม่แนะนำตัว เรียกชื่อ
+ * บอกให้ยืนยันกลับ และอ่านเบอร์เป็นกลุ่มตัวเลข
  */
 export function buildFollowMessage(input: FollowMessageInput): string {
   const topic = clean(input.topic);
   const note = clean(input.note);
-  const phone = speakablePhoneTh(clean(input.staffPhone));
   // โน้ตที่พิมพ์ซ้ำหัวเรื่อง (หรือคลุมหัวเรื่องอยู่แล้ว) — พูดรอบเดียวพอ
   const sameAsTopic = Boolean(note) && (note === topic || note.includes(topic) || topic.includes(note));
-  const body = [topic, sameAsTopic ? '' : note].filter(Boolean).join(' ');
-  return [
-    `สวัสดีครับ ${polite(input.recipientName)}ติดต่อจาก${CALLER_ORG}นะครับ`,
-    body ? `เรื่อง${body}` : '',
-    'รบกวนยืนยันกลับด้วยนะครับ',
-    phone ? `หากต้องการติดต่อเจ้าหน้าที่ โทร ${phone} ครับ` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  return renderLines(
+    T.ติดตาม,
+    {
+      ผู้โทร: CALLER_ORG,
+      ชื่อผู้รับ: polite(input.recipientName),
+      เรื่อง: orDrop([topic, sameAsTopic ? '' : note].filter(Boolean).join(' ')),
+      เบอร์เจ้าหน้าที่: orDrop(speakablePhoneTh(clean(input.staffPhone))),
+    },
+    T.ติดตาม.length,
+  ).join(' ');
 }

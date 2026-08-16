@@ -11,14 +11,19 @@ import {
   CALLER_ORG,
   DECLINE_REASON_CHOICES,
   EXTRA_INFO_PREFIX,
+  KNOWN_PLACEHOLDERS,
+  MAX_QUESTIONS,
   appendExtraInfoToPayload,
   buildExtraInfoSentence,
   buildFollowMessage,
   buildOfferMessage,
   buildOfferQuestions,
   buildScreeningQuestions,
+  renderLine,
+  renderLines,
   speakablePhoneTh,
 } from '../../api/_lib/lumosCallScript.js';
+import { CALL_SCRIPT_TEMPLATES } from '../../api/_lib/lumosCallScript.templates.js';
 
 const FACTS = {
   candidateName: 'สมชาย ใจดี',
@@ -29,6 +34,72 @@ const FACTS = {
   needsOwnVehicle: true,
   startDate: '1 ก.ย. 2569',
 };
+
+describe('ไฟล์ template ที่เจ้าของแก้เอง — ด่านกันพิมพ์ผิด', () => {
+  /** ทุกข้อความในไฟล์ template (ทั้งที่เป็นลิสต์และที่เป็นก้อน) */
+  function allTemplateStrings(): string[] {
+    const out: string[] = [];
+    const walk = (v: unknown) => {
+      if (typeof v === 'string') out.push(v);
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+    };
+    walk(CALL_SCRIPT_TEMPLATES);
+    return out;
+  }
+
+  it('🔴 ไม่มีตัวแปรที่ระบบไม่รู้จัก — พิมพ์ผิดแล้วคำถามข้อนั้นจะหายเงียบ ๆ', () => {
+    const unknown: string[] = [];
+    for (const s of allTemplateStrings()) {
+      for (const m of s.matchAll(/\{([^{}]+)\}/g)) {
+        if (!KNOWN_PLACEHOLDERS.includes(m[1])) unknown.push(`${m[1]} (ในบรรทัด "${s.slice(0, 40)}…")`);
+      }
+    }
+    expect(unknown).toEqual([]);
+  });
+
+  it('🔴 ไม่มีใครพิมพ์ตัวเลขรายได้ลงไปในบทเอง (ต้องใช้ {รายได้ต่อเดือน} เท่านั้น)', () => {
+    const offenders = allTemplateStrings().filter((s) => /\d[\d,]*\s*บาท/.test(s) && !s.includes('{รายได้ต่อเดือน}'));
+    expect(offenders).toEqual([]);
+  });
+
+  it('🔴 ไม่มีคำฝั่งหักหลุดเข้าบท (ค่าปรับ · มาสาย · ขาดงาน · ภาษี · ประกันสังคม)', () => {
+    const banned = /ค่าปรับ|มาสาย|ขาดงาน|ภาษี|ประกันสังคม/;
+    expect(allTemplateStrings().filter((s) => banned.test(s))).toEqual([]);
+  });
+
+  it('แต่ละบทไม่เกินเพดาน (เผื่อ 1 ข้อให้ประโยครายได้ที่เติมตอนโทร)', () => {
+    expect(CALL_SCRIPT_TEMPLATES.สัมภาษณ์เบื้องต้น.length).toBeLessThanOrEqual(MAX_QUESTIONS);
+    expect(CALL_SCRIPT_TEMPLATES.เสนองาน.length).toBeLessThanOrEqual(MAX_QUESTIONS);
+    expect(MAX_QUESTIONS).toBeLessThan(15);
+  });
+
+  it('คำว่า "แจ้งเพิ่มเติมครับ" ยังอยู่ — เป็นตัวกันไม่ให้พูดซ้ำตอนเสิร์ฟรอบสอง', () => {
+    expect(EXTRA_INFO_PREFIX).toContain('แจ้งเพิ่มเติมครับ');
+  });
+});
+
+describe('กฎการประกอบบท', () => {
+  it('ตัวแปรไม่มีค่า = ทิ้งทั้งบรรทัด (ไม่ใช่เหลือช่องว่างค้าง)', () => {
+    expect(renderLine('เวลาทำงาน {เวลาทำงาน} สะดวกไหมครับ', {})).toBeNull();
+    expect(renderLine('เวลาทำงาน {เวลาทำงาน} สะดวกไหมครับ', { เวลาทำงาน: null })).toBeNull();
+  });
+
+  it('ตัวแปรที่เป็นค่าว่าง = เก็บบรรทัดไว้ (ใช้กับตัวแปรธง/ตอนไม่รู้ชื่อ)', () => {
+    expect(renderLine('สวัสดีครับ {ชื่อผู้รับ}ยินดีครับ', { ชื่อผู้รับ: '' })).toBe('สวัสดีครับ ยินดีครับ');
+  });
+
+  it('ลบคำถามในไฟล์จนหมด = ถอยไปใช้คำถามสำรอง ไม่ปล่อยให้สายเงียบ', () => {
+    const out = renderLines([], { ผู้โทร: 'ก', ชื่อผู้รับ: '', ตำแหน่ง: 'ตำแหน่งข', หน่วยงาน: 'ค' });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain('สนใจฟังรายละเอียดไหมครับ');
+  });
+
+  it('ใส่คำถามเกินเพดาน = ตัดท้ายทิ้ง (schema ไม่ผ่าน = Lumos ปัดทิ้งทั้งรายการ)', () => {
+    const many = Array.from({ length: 30 }, (_, i) => `ข้อ ${i}`);
+    expect(renderLines(many, {})).toHaveLength(MAX_QUESTIONS);
+  });
+});
 
 describe('Part 1 · สัมภาษณ์เบื้องต้น (เลนสรรหา)', () => {
   it('แนะนำตัวว่าโทรจากไหน + เรียกชื่อ + บอกตำแหน่งกับหน่วยงานในข้อแรก', () => {
