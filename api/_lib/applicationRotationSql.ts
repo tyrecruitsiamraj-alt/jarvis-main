@@ -109,6 +109,56 @@ export async function phonesContactedAnyJob(
 }
 
 /**
+ * SQL คืนเบอร์ที่ **เคยปฏิเสธงานนี้** — ถาวร ไม่มีหน้าต่างเวลา (เจ้าของสั่ง 16 ส.ค. 2569:
+ * *"จะไม่เอาคนที่ลงงานแล้วและเคยปฏิเสธงานนั้นๆ มา match แล้วส่งให้ Lumos โทร"*)
+ * param: $1 = jobId · $2 = phones text[]
+ *
+ * ⚠️ ต่างจาก cooldown 30 วันข้างบนสองอย่าง: (1) **ไม่มี cutoff** — ปฏิเสธเมื่อไหร่ก็ตาม
+ * = ไม่เสนอใบนั้นอีกตลอด (2) นับเฉพาะ outcome `declined` เท่านั้น ไม่ใช่ทุกการติดต่อ
+ * · แหล่งผลมี 2 ทาง (คิว AI + ถังที่คนรับไปโทร) — contact log ไม่มีคอลัมน์ outcome ตรง
+ * จึงไม่นับ (ผลจากคนถูกเขียนลง holds อยู่แล้ว)
+ */
+export function buildDeclinedThisJobSql(): string {
+  return `
+    select distinct ${QUEUE_PHONE} as phone
+      from ${QUEUE} q
+     where q.job_ref = $1
+       and ${QUEUE_PHONE} = any($2::text[])
+       and ${QUEUE_OUTCOME} = 'declined'
+    union
+    select distinct h.phone_e164 as phone
+      from ${HOLDS} h
+     where h.job_id = $1
+       and h.phone_e164 = any($2::text[])
+       and h.result_outcome = 'declined'`;
+}
+
+/**
+ * เบอร์ที่เคยปฏิเสธงานนี้ (Set E.164) — ใช้กันเสนอซ้ำถาวรที่คอขวดเข้าคิว
+ * ตารางยังไม่ migrate (42P01/42703) → Set ว่าง · error อื่นโยนต่อ (ผู้เรียกตัดสินใจ)
+ */
+export async function phonesDeclinedThisJob(
+  jobId: string,
+  phones: string[],
+): Promise<Set<string>> {
+  const uniq = [...new Set(phones.filter(Boolean))];
+  if (!jobId.trim() || uniq.length === 0) return new Set();
+  try {
+    const { rows } = await dbQuery<{ phone: string | null }>(buildDeclinedThisJobSql(), [
+      jobId,
+      uniq,
+    ]);
+    const out = new Set<string>();
+    for (const r of rows) if (r.phone) out.add(r.phone);
+    return out;
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === '42P01' || code === '42703') return new Set();
+    throw e;
+  }
+}
+
+/**
  * เบอร์ที่ต้องข้ามเพราะเพิ่งติดต่อเรื่องงานนี้ (Set E.164) · phones ว่าง = Set ว่าง
  * days = หน้าต่าง cooldown (default 30) · now ฉีดได้เพื่อเทสต์
  */

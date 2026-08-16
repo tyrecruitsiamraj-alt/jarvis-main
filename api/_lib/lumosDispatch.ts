@@ -25,7 +25,11 @@ import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { fetchJobBenefitLines, requestNoFromJobRef } from './siamrajJobBenefits.js';
-import { phonesContactedAboutJob, phonesContactedAnyJob } from './applicationRotationSql.js';
+import {
+  phonesContactedAboutJob,
+  phonesContactedAnyJob,
+  phonesDeclinedThisJob,
+} from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
@@ -279,7 +283,7 @@ export async function enqueueLumosInterviewForApplications(
     // ใบสมัครไม่มี tier จาก AI แมท — null = MATCH_RANK_UNKNOWN (เท่าเหลือง) ตอนเสิร์ฟ
     items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
   }
-  const { added, held, suppressed } = await insertQueueItems('interview', jobId, items);
+  const { added, held, suppressed, declined } = await insertQueueItems('interview', jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   const nameByRef = new Map(applications.map((a) => [`app-${a.id}`, a.full_name]));
@@ -287,9 +291,13 @@ export async function enqueueLumosInterviewForApplications(
   for (const ref of suppressed) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
   }
+  for (const ref of declined) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
+  }
+  const declinedSet = new Set(declined);
   const duplicated = items
     .map((i) => i.personRef)
-    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
   logInfo('lumos.dispatch.application', {
     jobId,
     requested: applications.length,
@@ -364,6 +372,11 @@ const REVIVE_CANCELLED_ON_CONFLICT_NO_RANK = `on conflict (channel, job_ref, per
  * ที่เดียวจึงครอบทุกทางเข้า: เบอร์ที่เจ้าหน้าที่กด "รับไปโทรเอง" ไว้ AI จะไม่แตะ
  * ตารางล็อกยังไม่ถูก migrate ก็ไม่พัง — listHeldPhones() คืนเซ็ตว่าง
  */
+/**
+ * 🔴 กันเสนอซ้ำใบที่เคยปฏิเสธ — **ถาวร** (เจ้าของสั่ง 16 ส.ค. 2569) วางที่คอขวดนี้
+ * เพื่อครอบทุกทางเข้า (auto / คนติ๊กเลือก / เส้นชวนกลับ) · ยกเว้น job_ref='follow'
+ * (ตารางโทรตามคนละเรื่อง — ปฏิเสธหัวข้อหนึ่งไม่ได้แปลว่าห้ามตามเรื่องอื่นตลอดไป)
+ */
 async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
@@ -373,11 +386,12 @@ async function insertQueueItems(
    * ตั้งตาราง (แถววันอนาคตต้องไม่ถูกเสิร์ฟ+bump มาโทรวันนี้) · จะ max กับ quiet-hours
    */
   items: Array<{ personRef: string; payload: unknown; matchRank?: number | null; scheduledFor?: string | null }>,
-): Promise<{ added: string[]; held: string[]; suppressed: string[] }> {
+): Promise<{ added: string[]; held: string[]; suppressed: string[]; declined: string[] }> {
   const added: string[] = [];
   const held: string[] = [];
   const suppressed: string[] = [];
-  if (items.length === 0) return { added, held, suppressed };
+  const declined: string[] = [];
+  if (items.length === 0) return { added, held, suppressed, declined };
 
   let heldPhones: Set<string>;
   try {
@@ -394,6 +408,21 @@ async function insertQueueItems(
     suppressedPhones = await listSuppressedPhones();
   } catch {
     suppressedPhones = null;
+  }
+
+  // เบอร์ที่เคยปฏิเสธ "งานนี้" — ไม่เสนอซ้ำตลอดไป (ไม่ใช่แค่ 30 วัน)
+  // อ่านไม่ได้ = ไม่กรอง (ตารางเดียวกับคิวเอง — ถ้าพังจริง insert ข้างล่างก็พังอยู่ดี)
+  let declinedPhones: Set<string>;
+  try {
+    declinedPhones =
+      jobRef === 'follow'
+        ? new Set()
+        : await phonesDeclinedThisJob(
+            jobRef,
+            items.map((i) => payloadPhone(i.payload)).filter((p): p is string => Boolean(p)),
+          );
+  } catch {
+    declinedPhones = new Set();
   }
 
   // "โทรได้ช่วงกี่โมง" ต้องมีผลกับ **ของใหม่** ด้วย ไม่ใช่แค่โทรซ้ำ — เดิมคิวใหม่
@@ -424,6 +453,10 @@ async function insertQueueItems(
       }
       if (suppressedPhones.has(phone)) {
         suppressed.push(item.personRef);
+        continue;
+      }
+      if (declinedPhones.has(phone)) {
+        declined.push(item.personRef);
         continue;
       }
     }
@@ -461,7 +494,7 @@ async function insertQueueItems(
     }
     if (rows.length > 0) added.push(item.personRef);
   }
-  return { added, held, suppressed };
+  return { added, held, suppressed, declined };
 }
 
 export type LumosDispatchOutcome = {
@@ -476,6 +509,7 @@ export type LumosDispatchOutcome = {
 const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที่ใช้โทรได้ (ต้องเป็นมือถือ 10 หลัก)';
 const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
 const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
+const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';
 
 /** ผู้สมัคร "คนของเรา" ที่คนติ๊กเลือก → คิว reminder */
 export async function enqueueLumosReminderForSelected(
@@ -499,7 +533,7 @@ export async function enqueueLumosReminderForSelected(
     }
     items.push({ personRef: `card-${m.card_id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
-  const { added, held, suppressed } = await insertQueueItems('reminder', result.jobId, items);
+  const { added, held, suppressed, declined } = await insertQueueItems('reminder', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   const nameByRef = new Map(selected.map((m) => [`card-${m.card_id}`, m.full_name]));
@@ -507,9 +541,13 @@ export async function enqueueLumosReminderForSelected(
   for (const ref of suppressed) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
   }
+  for (const ref of declined) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
+  }
+  const declinedSet = new Set(declined);
   const duplicated = items
     .map((i) => i.personRef)
-    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
   logInfo('lumos.dispatch.reminder.manual', {
     jobId: result.jobId,
     requested: selected.length,
@@ -545,7 +583,7 @@ export async function enqueueLumosInterviewForSelected(
     }
     items.push({ personRef: `ir-${m.id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
-  const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
+  const { added, held, suppressed, declined } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   const nameByRef = new Map(selected.map((m) => [`ir-${m.id}`, m.full_name]));
@@ -553,9 +591,13 @@ export async function enqueueLumosInterviewForSelected(
   for (const ref of suppressed) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
   }
+  for (const ref of declined) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
+  }
+  const declinedSet = new Set(declined);
   const duplicated = items
     .map((i) => i.personRef)
-    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
   logInfo('lumos.dispatch.interview.manual', {
     jobId: result.jobId,
     requested: selected.length,
@@ -781,16 +823,20 @@ export async function enqueueLumosInterviewForRecruitLane(
       items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
     }
 
-    const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
+    const { added, held, suppressed, declined } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
     for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
     for (const ref of suppressed) {
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
     }
+    for (const ref of declined) {
+      skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
+    }
+    const declinedSet = new Set(declined);
     const duplicated = items
       .map((i) => i.personRef)
-      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
 
     const queuedBySource = { irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 };
     for (const ref of added) {
@@ -883,16 +929,20 @@ export async function enqueueLumosInterviewForRecall(
       items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
     }
 
-    const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
+    const { added, held, suppressed, declined } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
     for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
     for (const ref of suppressed) {
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
     }
+    for (const ref of declined) {
+      skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
+    }
+    const declinedSet = new Set(declined);
     const duplicated = items
       .map((i) => i.personRef)
-      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
 
     logInfo('lumos.dispatch.recall', {
       jobId: result.jobId,
