@@ -892,7 +892,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">ฐานเงินเดือน</dt>
+                  {/* ⚠️ ค่านี้คือ `total_income` = **รายได้รวม** ไม่ใช่ฐานเงินเดือน
+                      (เจ้าของสั่งแก้ 16 ส.ค. 2569) — ที่อื่นทั้งระบบใช้คำว่า "รายได้รวม"
+                      อยู่แล้ว (JobDetailPage · AddJobPage) เหลือจุดนี้จุดเดียวที่หลุด
+                      · จอนี้โผล่บนหน้าสมัครสาธารณะด้วย ผู้สมัครอ่านแล้วเข้าใจผิดเรื่องเงินได้ */}
+                  <dt className="text-muted-foreground">รายได้รวม</dt>
                   <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString('th-TH')}</dd>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
