@@ -32,6 +32,49 @@ describe('parseFollowInput', () => {
     }
   });
 
+  it('ตารางโทร (092): group_id uuid + call_times กรอง HH:MM + dedupe + เพดาน 5 รอบ', () => {
+    const gid = 'a506aa87-7502-4886-8607-ccbb799b215c';
+    const r = parseFollowInput(
+      {
+        recipient_name: 'ก',
+        recipient_phone: '0800000000',
+        topic: 'ข',
+        group_id: gid,
+        call_times: ['07:00', '08:00', '07:00', 'บ่าย', ''],
+      },
+      NOW,
+    );
+    expect(r.error).toBeNull();
+    expect(r.value!.groupId).toBe(gid);
+    expect(r.value!.callTimes).toEqual(['07:00', '08:00']); // dedupe + กรองรูปผิด
+  });
+
+  it('ตารางโทร: group_id ผิดรูป → error · call_times เกิน 5 → error', () => {
+    expect(
+      parseFollowInput(
+        { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', group_id: 'not-uuid' },
+        NOW,
+      ).error,
+    ).toBeTruthy();
+    expect(
+      parseFollowInput(
+        {
+          recipient_name: 'ก',
+          recipient_phone: '0800000000',
+          topic: 'ข',
+          call_times: ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+        },
+        NOW,
+      ).error,
+    ).toBeTruthy();
+  });
+
+  it('ไม่ส่ง group_id/call_times → null ทั้งคู่ (รอบเดี่ยวแบบเดิม)', () => {
+    const r = parseFollowInput({ recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข' }, NOW);
+    expect(r.value!.groupId).toBeNull();
+    expect(r.value!.callTimes).toBeNull();
+  });
+
   it('เก็บ note ที่กรอกมาและ trim ให้', () => {
     const r = parseFollowInput(
       { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', note: '  ถามวันสะดวก  ' },

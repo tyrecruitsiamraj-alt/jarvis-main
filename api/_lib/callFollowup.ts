@@ -159,6 +159,11 @@ export async function applyCallFollowupToQueueRow(input: {
   }
   if (!row) return null;
 
+  // Follow ตั้งตาราง (migration 092): person_ref = follow-<id> ที่มี group_id
+  // → **ตารางคือ retry อยู่แล้ว** (หลายรอบ/วัน + วันถัดไปเป็นแถวใหม่) ห้ามให้ policy
+  // ตั้ง +24 ชม.retry ทับ ไม่งั้นได้สายนอกตารางเพิ่ม · confirmed = ปิดวันนั้นตามเดิม
+  const followGroupId = await followGroupIdForPersonRef(row.person_ref);
+
   const decision = resolveCallFollowup({
     outcome: input.outcome as CallOutcome,
     attemptCount: Number(row.attempt_count) || 1,
@@ -169,8 +174,12 @@ export async function applyCallFollowupToQueueRow(input: {
     policy: await getCallFollowupPolicy(),
   });
 
+  // แถวตั้งตาราง: retry ของ policy → ปิดแทน (ไม่โทรซ้ำนอกตาราง) · ผลอื่นคงเดิม
+  const scheduledFollow = followGroupId !== null;
+  const effectiveRetry = decision.action === 'retry' && !scheduledFollow;
+
   try {
-    if (decision.action === 'retry') {
+    if (effectiveRetry) {
       // ⚠️ ห้ามเพิ่ม first_delivered_at/first_result_at/last_result_at ลง reset นี้ (088)
       // — เป็นหลักฐานประวัติเขียนครั้งเดียว ล้างแล้ว "โทรแล้ว/เวลารอโทร" บน dashboard พัง
       await dbQuery(
@@ -239,7 +248,50 @@ export async function applyCallFollowupToQueueRow(input: {
     });
   }
 
+  // Follow ตั้งตาราง + ปฏิเสธ/เบอร์เสีย → ยกเลิกทั้งชุด (ไม่ต้องโทรวันที่เหลือของตาราง)
+  // (เจ้าของเคาะ 16 ส.ค.: "บอกยกเลิก = หยุดทั้งชุด") · confirmed ไม่ยกเลิกชุด — วันถัดไป
+  // ยังอาจต้องยืนยันซ้ำตามเดิม (stop_early ของ Lumos หยุดแค่วันนั้น)
+  if (followGroupId && (input.outcome === 'declined' || input.outcome === 'wrong_person')) {
+    await cancelFollowGroup(followGroupId).catch(() => {});
+  }
+
   return decision;
+}
+
+const followTable = tableInAppSchema('follow_entries');
+
+/** person_ref (follow-<id>) → group_id ของตาราง Follow · null = ไม่ใช่ follow/ไม่มีกลุ่ม/ตารางยังไม่ migrate */
+async function followGroupIdForPersonRef(personRef: string): Promise<string | null> {
+  if (typeof personRef !== 'string' || !personRef.startsWith('follow-')) return null;
+  const id = personRef.slice('follow-'.length);
+  try {
+    const { rows } = await dbQuery<{ group_id: string | null }>(
+      `select group_id from ${followTable} where id = $1 limit 1`,
+      [id],
+    );
+    return rows[0]?.group_id ?? null;
+  } catch (e) {
+    if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return null; // ยังไม่รัน 092
+    throw e;
+  }
+}
+
+/**
+ * ยกเลิกทุกแถวคิวที่ยังไม่โทรของชุดตาราง Follow เดียวกัน (declined/เบอร์เสีย → หยุดทั้งชุด)
+ * — ยกเลิกเฉพาะ pending (Lumos ดึงไปแล้วยกเลิกฝั่งเราไม่ได้) · ผูกด้วย group_id
+ */
+export async function cancelFollowGroup(groupId: string): Promise<number> {
+  const { rows } = await dbQuery<{ id: number }>(
+    `update ${queueTable}
+        set status = 'cancelled', updated_at = now()
+      where channel = 'reminder' and job_ref = 'follow' and status = 'pending'
+        and person_ref in (
+          select 'follow-' || id::text from ${followTable} where group_id = $1
+        )
+      returning id`,
+    [groupId],
+  );
+  return rows.length;
 }
 
 /**

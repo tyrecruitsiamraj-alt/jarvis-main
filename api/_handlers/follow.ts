@@ -6,6 +6,11 @@
  * DELETE /api/follow?id=<uuid>  → ยกเลิก (soft cancel + ยกเลิกในคิวถ้ายังไม่ถูกดึง)
  */
 import { dbQuery } from '../_lib/postgres.js';
+
+/** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 092 (group_id/call_times) */
+function isUndefinedColumn(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703';
+}
 import {
   withRbac,
   sendError,
@@ -94,7 +99,14 @@ export type ParsedFollowInput = {
   /** เบอร์เจ้าหน้าที่ผู้ติดตาม — ไว้ให้ AI บอกผู้สมัครโทรกลับ ไม่ใช่เบอร์ที่ระบบโทรออก */
   staffPhone: string | null;
   when: Date;
+  /** ชุดตารางโทร (migration 092) — client gen uuid เดียวต่อ 1 คน แล้วยิง 1 แถว/วัน · null = รอบเดี่ยว */
+  groupId: string | null;
+  /** รอบเวลาของวันนั้น (HH:MM) — payload สร้าง steps ตามนี้ · ว่าง = 1 รอบที่ when */
+  callTimes: string[] | null;
 };
+
+const HHMM_RE = /^\d{1,2}:\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * อ่าน/ตรวจ body ของ POST /api/follow — pure เพื่อคุมด้วย unit test
@@ -139,7 +151,25 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     return fail('วันเวลาที่ให้โทรไม่ถูกต้อง');
   }
 
-  return { error: null, value: { name, phone, topic, note, staffPhone, when } };
+  // ตารางโทร (092): group_id (client gen · 1 คน 1 uuid) + call_times (รอบของวันนั้น)
+  let groupId: string | null = null;
+  const groupRaw = getString(body.group_id) || '';
+  if (groupRaw) {
+    if (!UUID_RE.test(groupRaw)) return fail('group_id ไม่ถูกต้อง');
+    groupId = groupRaw;
+  }
+  let callTimes: string[] | null = null;
+  if (Array.isArray(body.call_times)) {
+    const times = body.call_times
+      .map((t) => (typeof t === 'string' ? t.trim() : ''))
+      .filter((t) => HHMM_RE.test(t));
+    const uniq = [...new Set(times)];
+    if (uniq.length === 0) return fail('รอบเวลาโทรไม่ถูกต้อง (เช่น 07:00)');
+    if (uniq.length > 5) return fail('รอบโทรต่อวันมากสุด 5 รอบ');
+    callTimes = uniq;
+  }
+
+  return { error: null, value: { name, phone, topic, note, staffPhone, when, groupId, callTimes } };
 }
 
 async function createFollow(req: AuthedReq, res: ApiRes) {
@@ -147,16 +177,31 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   if (parsed.error || !parsed.value) {
     return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
   }
-  const { name, phone, topic, note, staffPhone, when } = parsed.value;
+  const { name, phone, topic, note, staffPhone, when, groupId, callTimes } = parsed.value;
 
-  const { rows } = await dbQuery<FollowRow>(
-    `insert into ${followTable}
-       (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at, created_by, created_by_name)
-     values ($1, $2, $3, $4, $5, $6, $7, $8)
-     returning *`,
-    [name, phone, topic, note, staffPhone, when.toISOString(), req.user.sub, req.user.email],
-  );
-  const created = rows[0];
+  // ฐานที่รัน 092 แล้วเก็บ group_id/call_times · ยังไม่รัน → ถอยไป insert ชุดเดิม (42703)
+  let created: FollowRow | undefined;
+  try {
+    const { rows } = await dbQuery<FollowRow>(
+      `insert into ${followTable}
+         (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
+          group_id, call_times, created_by, created_by_name)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       returning *`,
+      [name, phone, topic, note, staffPhone, when.toISOString(), groupId, callTimes, req.user.sub, req.user.email],
+    );
+    created = rows[0];
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    const { rows } = await dbQuery<FollowRow>(
+      `insert into ${followTable}
+         (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at, created_by, created_by_name)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
+       returning *`,
+      [name, phone, topic, note, staffPhone, when.toISOString(), req.user.sub, req.user.email],
+    );
+    created = rows[0];
+  }
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
 
   // ส่งให้ Lumos โทรตาม **เฉพาะเมื่อตั้งโหมดเป็น auto**
@@ -170,6 +215,7 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
       note,
       staffPhone,
       scheduled_at: when,
+      callTimes,
     });
   }
 
