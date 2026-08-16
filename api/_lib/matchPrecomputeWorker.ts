@@ -380,6 +380,11 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
         // matchBoardCandidatesForJob succeeded but DB write was silently dropped
         logWarn('match-precompute.job.not-stored', { jobId: id, queueRemaining: queue.size });
       }
+
+      // เลนคัดสรรวิ่งขนาน (16 ส.ค. 2569) — ใบขอเข้ามาแล้วไปหาคนจากกอง "เคยตอบไม่สนใจ"
+      // ให้เองด้วย แล้วส่ง AI โทรทันที · ปิดไว้เป็นค่าเริ่มต้น (trigger selection_recall)
+      // ⚠️ กลืน error เสมอ — เส้นนี้เป็นของแถม ห้ามทำให้ precompute ของบอร์ดล้ม
+      await runSelectionRecall(id, entry.job);
     } catch (e) {
       workerStats.totalProcessed++;
       workerStats.totalFailed++;
@@ -395,6 +400,33 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
   }
 
   logInfo('match-precompute.consumer.stop', workerStats);
+}
+
+/**
+ * เส้น "ชวนกลับ" ของเลนคัดสรร — เรียกหลังคิดผลบอร์ดของใบขอนั้นเสร็จ
+ * import แบบ dynamic เพื่อไม่ให้ worker ลาก matcher + ollama เข้ามาตอน boot
+ */
+async function runSelectionRecall(jobId: string, job: Record<string, unknown>): Promise<void> {
+  try {
+    const { isAutoDispatchEnabled } = await import('./lumosDispatchMode.js');
+    if (!(await isAutoDispatchEnabled('selection_recall'))) return;
+    const { matchDeclinedApplicantsForJob } = await import('./selectionRecallMatcher.js');
+    const { enqueueLumosInterviewForRecall } = await import('./lumosDispatch.js');
+    const result = await matchDeclinedApplicantsForJob(jobId, job);
+    if (result.matches.length === 0) return;
+    const outcome = await enqueueLumosInterviewForRecall(job, result);
+    logInfo('match-precompute.recall.done', {
+      jobId,
+      matched: result.matches.length,
+      queued: outcome.queued,
+      cooldownSkipped: outcome.cooldownSkipped,
+    });
+  } catch (e) {
+    logError('match-precompute.recall.fail', {
+      jobId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
 }
 
 // ─── Module-level stats (readable via getWorkerStatus) ───────────────────────

@@ -5,8 +5,18 @@
  * ดู migrations/069_lumos_dispatch_mode.sql ว่าทำไมต้องมีตารางนี้
  */
 
-/** จุดที่ทำให้เกิดการส่งเข้าคิว Lumos — ตรงกับ 3 จุดที่เคย hardcode ไว้ */
-export const LUMOS_DISPATCH_TRIGGERS = ['board_match', 'irecruit_search', 'follow_entry'] as const;
+/**
+ * จุดที่ทำให้เกิดการส่งเข้าคิว Lumos
+ * `selection_recall` เพิ่ม 16 ส.ค. 2569 — เลนคัดสรรวิ่งขนาน: ใบขอเข้ามาแล้วไปหาคน
+ * จากกองที่เคยตอบไม่สนใจงานอื่นให้เอง (เจ้าของสั่ง "อันที่ AI หามาก็โทรไปเลย")
+ * ⚠️ ค่าเริ่มต้นยังเป็น `manual` — เปิดเมื่อสาย Lumos พร้อมจริง
+ */
+export const LUMOS_DISPATCH_TRIGGERS = [
+  'board_match',
+  'irecruit_search',
+  'follow_entry',
+  'selection_recall',
+] as const;
 export type LumosDispatchTrigger = (typeof LUMOS_DISPATCH_TRIGGERS)[number];
 
 /**
@@ -32,6 +42,7 @@ export const DEFAULT_LUMOS_DISPATCH_MODE: LumosDispatchModeConfig = {
   board_match: 'manual',
   irecruit_search: 'manual',
   follow_entry: 'manual',
+  selection_recall: 'manual',
 };
 
 export function isLumosDispatchTrigger(v: unknown): v is LumosDispatchTrigger {
@@ -64,6 +75,7 @@ export const LUMOS_TRIGGER_LABEL: Record<LumosDispatchTrigger, string> = {
   board_match: 'AI แมท "คนของเรา" เสร็จ',
   irecruit_search: 'กดค้นหาผู้สมัครจาก iRecruit',
   follow_entry: 'สร้างรายการติดตามในหน้า Follow',
+  selection_recall: 'ใบขอเข้ามา → ชวนคนที่เคยตอบไม่สนใจกลับมา',
 };
 
 export const LUMOS_TRIGGER_DETAIL: Record<LumosDispatchTrigger, string> = {
@@ -73,6 +85,8 @@ export const LUMOS_TRIGGER_DETAIL: Record<LumosDispatchTrigger, string> = {
     'ส่งผู้สมัครที่ค้นเจอเข้าคิวให้ Lumos โทรสัมภาษณ์ทันทีที่ค้นเสร็จ · ปิดอยู่ = ติ๊กเลือกแล้วกดส่งเอง',
   follow_entry:
     'พอกรอกรายชื่อในหน้า Follow แล้วส่งให้ Lumos โทรตามทันที · ปิดอยู่ = รายการถูกบันทึกไว้แต่ยังไม่มีใครโทร',
+  selection_recall:
+    'ใบขอใหม่เข้ามาแล้วไปหาคนจากกอง "เคยตอบไม่สนใจงานอื่น" ให้เอง แล้วส่ง Lumos โทรทันที (วิ่งขนานกับใบสมัครใหม่) · ปิดอยู่ = ต้องกดปุ่มที่การ์ดใบขอเอง',
 };
 
 export const LUMOS_MODE_LABEL: Record<LumosDispatchMode, string> = {

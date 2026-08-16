@@ -26,7 +26,7 @@ const dispatch = (over: Partial<RecruitLaneDispatch> = {}): RecruitLaneDispatch 
   skipped: [],
   cooldownSkipped: 0,
   leadCooldownSkipped: 0,
-  queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0 },
+  queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 },
   ...over,
 });
 
@@ -81,7 +81,7 @@ describe('recruitLanePoolSummary', () => {
 describe('recruitLaneSendSummary', () => {
   it('บอกยอดส่งพร้อมป้ายแหล่งของคนที่เข้าคิวจริง', () => {
     const s = recruitLaneSendSummary(
-      dispatch({ queued: 7, queuedBySource: { irecruit: 3, so_recruit: 1, checklist: 3 } }),
+      dispatch({ queued: 7, queuedBySource: { irecruit: 3, so_recruit: 1, checklist: 3, declined: 0 } }),
     );
     expect(s).toContain('ส่ง AI โทร 7 คน');
     expect(s).toContain('จาก iRecruit 3');
@@ -91,7 +91,7 @@ describe('recruitLaneSendSummary', () => {
 
   it('แหล่งที่ส่งได้ 0 ไม่ต้องรกในสรุป', () => {
     const s = recruitLaneSendSummary(
-      dispatch({ queued: 3, queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 3 } }),
+      dispatch({ queued: 3, queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 3, declined: 0 } }),
     );
     expect(s).toContain('จาก Checklist 3');
     expect(s).not.toContain('จาก iRecruit');
@@ -128,6 +128,8 @@ describe('ป้าย/สี', () => {
       irecruit: 'จาก iRecruit',
       so_recruit: 'จากฐานใหม่',
       checklist: 'จาก Checklist',
+      // `declined` เป็นของเลนคัดสรร (เส้นชวนกลับ) ใช้รูปข้อมูลร่วมกันเท่านั้น
+      declined: 'เคยปฏิเสธงานอื่น',
     });
   });
 

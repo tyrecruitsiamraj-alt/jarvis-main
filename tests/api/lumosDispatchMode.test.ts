@@ -22,6 +22,8 @@ describe('ความหมายของโหมดส่งงานให�
       board_match: 'auto',
       irecruit_search: 'manual',
       follow_entry: 'manual',
+      // จุดใหม่ 16 ส.ค. 2569 — เลนคัดสรรวิ่งขนาน (ค่าเริ่มต้นต้องเป็น manual เสมอ)
+      selection_recall: 'manual',
     });
     expect(normalizeLumosDispatchMode({ board_match: 'AUTO' }).board_match).toBe('manual');
     expect(normalizeLumosDispatchMode({ ไม่รู้จัก: 'auto' })).toEqual(DEFAULT_LUMOS_DISPATCH_MODE);
@@ -103,6 +105,8 @@ describe('lumosDispatchMode store', () => {
       board_match: 'auto',
       irecruit_search: 'manual',
       follow_entry: 'manual',
+      // จุดใหม่ 16 ส.ค. 2569 — เลนคัดสรรวิ่งขนาน (ค่าเริ่มต้นต้องเป็น manual เสมอ)
+      selection_recall: 'manual',
     });
   });
 

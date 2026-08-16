@@ -13,7 +13,11 @@ import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
 import { bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
-import { applicationOriginColumn, isApplicationOrigin } from '../_lib/applicationOriginSql.js';
+import {
+  applicationOriginColumn,
+  applicationOriginExpr,
+  isApplicationOrigin,
+} from '../_lib/applicationOriginSql.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -792,7 +796,33 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (scopedJobIds && !scopedJobIds.has(r.job_id)) continue;
         counts[r.job_id] = Number(r.n);
       }
-      return res.status(200).json({ counts });
+
+      /**
+       * แยกยอดตาม **ที่มา** ต่อใบขอ (เจ้าของสั่ง 16 ส.ค. 2569: *"บอกในใบขอนั้น ๆ ว่า
+       * AI หากี่คน สมัครใหม่มากี่คน"*) — นิยามเดียวกับชิปบนรายชื่อ (applicationOriginSql)
+       * ⚠️ อ่านไม่ได้/schema เก่า = ไม่ส่ง `countsByOrigin` มาเลย ไม่ใช่ส่งศูนย์
+       * (ศูนย์แปลว่า "ไม่มีคนกลุ่มนั้น" คนละเรื่องกับ "ยังบอกไม่ได้")
+       */
+      let countsByOrigin: Record<string, Record<string, number>> | undefined;
+      try {
+        const { rows: originRows } = await dbQuery<{ job_id: string; origin: string; n: string }>(
+          `select a.job_id, ${applicationOriginExpr('a')} as origin, count(*)::text as n
+             from ${tbl} a
+            where a.job_id is not null and not a.is_lead
+            group by a.job_id, ${applicationOriginExpr('a')}`,
+        );
+        countsByOrigin = {};
+        for (const r of originRows) {
+          if (scopedJobIds && !scopedJobIds.has(r.job_id)) continue;
+          if (!isApplicationOrigin(r.origin)) continue;
+          (countsByOrigin[r.job_id] ||= {})[r.origin] = Number(r.n);
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
+        countsByOrigin = undefined;
+      }
+
+      return res.status(200).json({ counts, ...(countsByOrigin ? { countsByOrigin } : {}) });
     }
 
     const jobId = getString(req.query?.job_id);

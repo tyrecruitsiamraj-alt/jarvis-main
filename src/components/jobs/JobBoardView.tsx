@@ -24,7 +24,11 @@ const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLane
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
-import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
+import {
+  applicantOriginSummary,
+  fetchJobApplicantBreakdown,
+  type ApplicationOrigin,
+} from '@/lib/publicApplicationsApi';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
@@ -133,6 +137,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
   // จำนวนผู้สมัครต่อใบ (เจ้าหน้าที่) — ประกาศตรงนี้เพราะการเรียงการ์ดข้างล่างต้องใช้
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
+  /** แยกยอดตามที่มาต่อใบขอ — "AI หามากี่คน สมัครใหม่กี่คน" (เจ้าของสั่ง 16 ส.ค. 2569) */
+  const [originCounts, setOriginCounts] = useState<
+    Record<string, Partial<Record<ApplicationOrigin, number>>>
+  >({});
 
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
@@ -263,9 +271,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   useEffect(() => {
     if (!isStaff) return;
     let cancelled = false;
-    fetchJobApplicationCounts()
-      .then((c) => {
-        if (!cancelled) setApplicantCounts(c);
+    fetchJobApplicantBreakdown()
+      .then((b) => {
+        if (cancelled) return;
+        setApplicantCounts(b.counts);
+        setOriginCounts(b.byOrigin);
       })
       .catch(() => {
         /* badge is optional — ignore */
@@ -589,9 +599,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         · 2 ปุ่มคนละสี (ค้นหา = ฟ้า · Gen link = ม่วง) — สีมาจาก TONE ที่เดียว
                         แถวเดียว wrap ได้ · "ผู้สมัคร N คน" ซ้าย · ปุ่ม+ดูรายชื่อ ขวา */}
                     <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
                         <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                         ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
+                        {/* แยกที่มาให้เห็นบนใบขอเลย — ไม่รู้ที่มา = ไม่ขึ้นบรรทัดนี้ */}
+                        {applicantOriginSummary(originCounts[job.id]) ? (
+                          <span className="font-normal text-muted-foreground">
+                            ({applicantOriginSummary(originCounts[job.id])})
+                          </span>
+                        ) : null}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {/* ค้นหาคนที่ยังไม่สมัคร — พาไปหน้า Matching ของใบนั้นแล้วค้นให้เลยด้วย `?ir=1`

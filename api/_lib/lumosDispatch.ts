@@ -642,9 +642,48 @@ export async function enqueueLumosInterviewForIrecruit(
   }
 }
 
+/**
+ * payload ของเส้น "ชวนกลับ" ในเลนคัดสรร (16 ส.ค. 2569) — คนที่**สมัครไว้แล้ว**
+ * แต่เคยปฏิเสธงานอื่น · คำถามแรกต้องอ้างว่าเขาเคยสมัครกับเรา ไม่ใช่แนะนำตัวใหม่
+ * (ถ้าใช้ประโยคของเลนสรรหา เขาจะงงว่าไปเอาเบอร์มาจากไหน ทั้งที่เขากรอกให้เราเอง)
+ */
+export function buildRecallInterviewPayload(
+  job: Record<string, unknown>,
+  result: { jobId: string; job_family_label: string | null },
+  candidate: { ref: string; full_name: string; phone_number: string | null; position_text: string },
+  now = new Date(),
+): LumosInterviewPayload | null {
+  const phone = toE164Thai(candidate.phone_number);
+  if (!phone || !candidate.full_name.trim() || !candidate.ref.trim()) return null;
+  const position = jobPositionLabel(job, result.job_family_label);
+  const unit = str(job.unit_name) || 'หน่วยงานของเรา';
+  const brief = buildJobBrief(job);
+  const placeForTravel = brief.workPlace && brief.workPlace !== unit ? brief.workPlace : unit;
+  const skills = candidate.position_text.trim() ? [candidate.position_text.trim()] : [];
+  return {
+    client_candidate_id: `${result.jobId}::${candidate.ref}`,
+    client_interview_id: `${result.jobId}::${candidate.ref}::interview`,
+    candidate_name: candidate.full_name.trim(),
+    phone,
+    position,
+    scheduled_at: now.toISOString(),
+    questions: [
+      `คุณเคยสมัครงานไว้กับเรา ตอนนี้มีตำแหน่ง${position}ที่ ${unit} เปิดใหม่ สนใจฟังรายละเอียดไหมครับ`,
+      `งานนี้อยู่ที่ ${placeForTravel} สะดวกเดินทางไหมครับ`,
+      ...(brief.workSchedule ? [`เวลาทำงาน ${brief.workSchedule} สะดวกไหมครับ`] : []),
+      'ตอนนี้ยังหางานอยู่ไหมครับ',
+      'ถ้าสนใจ เริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
+    ],
+    type: 'phone',
+    language: 'th',
+    tone: 'professional',
+    ...(skills.length ? { skills } : {}),
+  };
+}
+
 /** คนหนึ่งคนในผลแมทเลนสรรหา — รับเป็นรูปโครงสร้าง ไม่ import type ข้ามไฟล์ (กันวง import) */
 type RecruitLaneDispatchInput = {
-  source: 'irecruit' | 'so_recruit' | 'checklist';
+  source: 'irecruit' | 'so_recruit' | 'checklist' | 'declined';
   ref: string;
   full_name: string;
   phone_number: string | null;
@@ -659,7 +698,7 @@ export type RecruitLaneDispatchOutcome = LumosDispatchOutcome & {
   /** ข้ามเพราะเป็นใบสนใจของฐานใหม่ที่เพิ่งถูกโทรเรื่องงานอื่นภายใน 30 วัน */
   leadCooldownSkipped: number;
   /** เข้าคิวได้กี่คนต่อแหล่ง — ป้ายบอกแหล่งบนสรุปตอนส่ง (เจ้าของขอ) */
-  queuedBySource: Record<'irecruit' | 'so_recruit' | 'checklist', number>;
+  queuedBySource: Record<'irecruit' | 'so_recruit' | 'checklist' | 'declined', number>;
 };
 
 /**
@@ -682,7 +721,7 @@ export async function enqueueLumosInterviewForRecruitLane(
     skipped: [],
     cooldownSkipped: 0,
     leadCooldownSkipped: 0,
-    queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0 },
+    queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 },
   };
   try {
     const auto = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
@@ -753,7 +792,7 @@ export async function enqueueLumosInterviewForRecruitLane(
       .map((i) => i.personRef)
       .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
 
-    const queuedBySource = { irecruit: 0, so_recruit: 0, checklist: 0 };
+    const queuedBySource = { irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 };
     for (const ref of added) {
       const s = sourceByRef.get(ref);
       if (s) queuedBySource[s] += 1;
@@ -781,6 +820,100 @@ export async function enqueueLumosInterviewForRecruitLane(
     };
   } catch (e) {
     logError('lumos.dispatch.recruit-lane.fail', {
+      jobId: result.jobId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return empty;
+  }
+}
+
+/**
+ * ผลแมทเส้น "ชวนกลับ" (เขียว/เหลือง) → คิว interview ทันที (เลนคัดสรร · 16 ส.ค. 2569)
+ *
+ * กติกาตัด: cooldown 30 วัน**ต่องานนี้** (คนละงานกับที่เขาเคยปฏิเสธอยู่แล้ว —
+ * คนที่ปฏิเสธใบนี้ถูกตัดตั้งแต่คิวรีของกอง) + ล็อก/พักเบอร์ที่คอขวดเดิม
+ */
+export async function enqueueLumosInterviewForRecall(
+  job: Record<string, unknown>,
+  result: { jobId: string; job_family_label: string | null; matches: RecruitLaneDispatchInput[] },
+): Promise<RecruitLaneDispatchOutcome> {
+  const empty: RecruitLaneDispatchOutcome = {
+    queued: 0,
+    duplicated: [],
+    skipped: [],
+    cooldownSkipped: 0,
+    leadCooldownSkipped: 0,
+    queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 },
+  };
+  try {
+    const auto = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
+    if (auto.length === 0) return empty;
+
+    const e164ByRef = new Map<string, string>();
+    for (const m of auto) {
+      const e164 = toE164Thai(m.phone_number);
+      if (e164) e164ByRef.set(m.ref, e164);
+    }
+    const recentlyContacted = await phonesContactedAboutJob(result.jobId, [
+      ...new Set(e164ByRef.values()),
+    ]);
+
+    let cooldownSkipped = 0;
+    const eligible: RecruitLaneDispatchInput[] = [];
+    for (const m of auto) {
+      const e164 = e164ByRef.get(m.ref);
+      if (e164 && recentlyContacted.has(e164)) {
+        cooldownSkipped += 1;
+        continue;
+      }
+      eligible.push(m);
+    }
+    if (eligible.length === 0) return { ...empty, cooldownSkipped };
+
+    const skipped: LumosDispatchOutcome['skipped'] = [];
+    const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number }> = [];
+    const nameByRef = new Map<string, string>();
+    for (const m of eligible) {
+      nameByRef.set(m.ref, `${m.full_name} (${m.source_label})`);
+      const payload = buildRecallInterviewPayload(job, result, m);
+      if (!payload) {
+        skipped.push({ ref: m.ref, name: nameByRef.get(m.ref) || m.ref, reason: NO_PHONE_REASON });
+        continue;
+      }
+      items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
+    }
+
+    const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
+    const addedSet = new Set(added);
+    const heldSet = new Set(held);
+    for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+    for (const ref of suppressed) {
+      skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
+    }
+    const duplicated = items
+      .map((i) => i.personRef)
+      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+
+    logInfo('lumos.dispatch.recall', {
+      jobId: result.jobId,
+      matched: auto.length,
+      queued: added.length,
+      duplicated: duplicated.length,
+      cooldownSkipped,
+      held: held.length,
+      suppressed: suppressed.length,
+    });
+
+    return {
+      queued: added.length,
+      duplicated,
+      skipped,
+      cooldownSkipped,
+      leadCooldownSkipped: 0,
+      queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0, declined: added.length },
+    };
+  } catch (e) {
+    logError('lumos.dispatch.recall.fail', {
       jobId: result.jobId,
       message: e instanceof Error ? e.message : String(e),
     });

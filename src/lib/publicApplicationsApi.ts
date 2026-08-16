@@ -286,10 +286,42 @@ export async function fetchJobApplications(jobId: string): Promise<PublicApplica
 
 /** จำนวนผู้สมัครต่อ job_id ทั้งบอร์ด (สำหรับ badge) */
 export async function fetchJobApplicationCounts(): Promise<Record<string, number>> {
+  return (await fetchJobApplicantBreakdown()).counts;
+}
+
+/** ยอดผู้สมัครต่อใบขอ + แยกตามที่มา (AI หามา / สมัครใหม่ / เจ้าหน้าที่คีย์) */
+export type JobApplicantBreakdown = {
+  counts: Record<string, number>;
+  /** ไม่มีคีย์ของใบไหน = server ยังบอกที่มาไม่ได้ (ห้ามตีความว่าเป็นศูนย์) */
+  byOrigin: Record<string, Partial<Record<ApplicationOrigin, number>>>;
+};
+
+export async function fetchJobApplicantBreakdown(): Promise<JobApplicantBreakdown> {
   const r = await apiFetch('/api/job-applications?counts=1');
-  if (!r.ok) return {};
-  const body = (await r.json()) as { counts?: Record<string, number> };
-  return body.counts ?? {};
+  if (!r.ok) return { counts: {}, byOrigin: {} };
+  const body = (await r.json()) as {
+    counts?: Record<string, number>;
+    countsByOrigin?: Record<string, Partial<Record<ApplicationOrigin, number>>>;
+  };
+  return { counts: body.counts ?? {}, byOrigin: body.countsByOrigin ?? {} };
+}
+
+/**
+ * ข้อความสรุปที่มาไว้แปะบนการ์ดใบขอ — "AI หามา 3 · สมัครใหม่ 5"
+ * คืน null เมื่อยังไม่รู้ที่มาเลย (ไม่ขึ้นบรรทัดดีกว่าขึ้นเลขที่เชื่อไม่ได้)
+ */
+export function applicantOriginSummary(
+  byOrigin: Partial<Record<ApplicationOrigin, number>> | undefined,
+): string | null {
+  if (!byOrigin) return null;
+  const parts: string[] = [];
+  const ai = byOrigin.ai_found ?? 0;
+  const self = byOrigin.self_apply ?? 0;
+  const staff = byOrigin.staff_added ?? 0;
+  if (ai > 0) parts.push(`AI หามา ${ai}`);
+  if (self > 0) parts.push(`สมัครใหม่ ${self}`);
+  if (staff > 0) parts.push(`เจ้าหน้าที่คีย์ ${staff}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /** ดึงไฟล์แนบของใบสมัคร (base64) เพื่อดาวน์โหลด (ต้องล็อกอิน) */

@@ -10,12 +10,13 @@ import { apiFetch } from '@/lib/apiFetch';
  * บนผลค้นกับบนสรุปตอนส่งตรงกันเสมอ (เจ้าของขอ)
  */
 
-export type RecruitLaneSource = 'irecruit' | 'so_recruit' | 'checklist';
+export type RecruitLaneSource = 'irecruit' | 'so_recruit' | 'checklist' | 'declined';
 
 export const RECRUIT_LANE_SOURCE_LABEL: Record<RecruitLaneSource, string> = {
   irecruit: 'จาก iRecruit',
   so_recruit: 'จากฐานใหม่',
   checklist: 'จาก Checklist',
+  declined: 'เคยปฏิเสธงานอื่น',
 };
 
 export type RecruitLaneMatch = {
@@ -126,4 +127,51 @@ export function tierChipClass(tier: RecruitLaneMatch['tier']): string {
   if (tier === 'green') return 'jarvis-chip jarvis-chip-success';
   if (tier === 'red') return 'jarvis-chip jarvis-chip-danger';
   return 'jarvis-chip jarvis-chip-warn';
+}
+
+/**
+ * เลนคัดสรร — เส้น "ชวนกลับ" (16 ส.ค. 2569) · กองคนที่เคยตอบไม่สนใจงานอื่น
+ * ⚠️ คนละเส้นกับเลนสรรหา — คนกลุ่มนี้ **สมัครกับเราแล้ว** ไม่ต้องเก็บใบสมัครใหม่
+ */
+export type SelectionRecallResult = {
+  jobId: string;
+  job_family_label: string;
+  pool_size: number;
+  pool_unavailable: boolean;
+  duplicates_dropped: number;
+  shortlisted: number;
+  matches: RecruitLaneMatch[];
+  dispatch: RecruitLaneDispatch | null;
+};
+
+export async function fetchSelectionRecall(
+  jobId: string,
+  options?: { send?: boolean; refresh?: boolean },
+): Promise<SelectionRecallResult> {
+  const params = new URLSearchParams({ jobId });
+  if (options?.send) params.set('send', '1');
+  if (options?.refresh) params.set('refresh', '1');
+  const r = await apiFetch(`/api/matching/selection-recall?${params.toString()}`);
+  if (!r.ok) {
+    const data = (await r.json().catch(() => ({}))) as {
+      message?: string;
+      detail?: string;
+      error?: string;
+    };
+    throw new Error(data.message || data.detail || data.error || `ค้นหาไม่สำเร็จ (HTTP ${r.status})`);
+  }
+  return (await r.json()) as SelectionRecallResult;
+}
+
+/** สรุปกองของเส้นชวนกลับ — กองว่างกับอ่านกองไม่ได้ ต้องพูดคนละแบบ */
+export function selectionRecallPoolSummary(r: {
+  pool_size: number;
+  pool_unavailable: boolean;
+  duplicates_dropped: number;
+}): string {
+  if (r.pool_unavailable) return '⚠️ อ่านกองคนที่เคยปฏิเสธไม่ได้ — ลองใหม่อีกครั้ง';
+  if (r.pool_size === 0) return 'ยังไม่มีใครในกอง "เคยตอบไม่สนใจงานอื่น"';
+  const parts = [`ค้นจากกอง ${r.pool_size.toLocaleString('th-TH')} คนที่เคยตอบไม่สนใจงานอื่น`];
+  if (r.duplicates_dropped > 0) parts.push(`ตัดคนซ้ำ ${r.duplicates_dropped}`);
+  return parts.join(' · ');
 }

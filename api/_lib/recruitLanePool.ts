@@ -13,21 +13,37 @@
  * ไฟล์นี้ **pure ล้วน** (ไม่มี I/O) — mapper + dedupe + ป้าย เพื่อเทสต์ได้ตรง ๆ
  */
 
-/** ต้นทางของคนในกองเลนสรรหา — ค่าคงที่ ห้ามเปลี่ยนสตริง (ป้าย/สรุป/เทสต์ผูกอยู่) */
-export type RecruitPoolSource = 'irecruit' | 'so_recruit' | 'checklist';
+/**
+ * ต้นทางของคนในกอง — ค่าคงที่ ห้ามเปลี่ยนสตริง (ป้าย/สรุป/เทสต์ผูกอยู่)
+ *
+ * ⚠️ **สามตัวแรกเป็นของเลนสรรหา** (คนยังไม่สมัคร) · `declined` เป็นของ**เลนคัดสรร**
+ * (คนสมัครแล้วแต่เคยปฏิเสธงานอื่น) — ใช้รูปข้อมูลร่วมกันเพื่อไม่ต้องเขียน prescore/
+ * prompt สองชุด แต่ **matcher ของเลนสรรหาต้องไม่โหลด `declined` เด็ดขาด**
+ * ไม่งั้นเส้นแบ่งสองเลนที่เจ้าของย้ำไว้จะพังทันที (มีเทสต์คุม)
+ */
+export type RecruitPoolSource = 'irecruit' | 'so_recruit' | 'checklist' | 'declined';
 
 /** ป้ายบอกแหล่งบนจอ — ที่เดียวของทั้งระบบ (ผลค้น + สรุปตอนส่ง ต้องใช้ตัวเดียวกัน) */
 export const RECRUIT_SOURCE_LABEL: Record<RecruitPoolSource, string> = {
   irecruit: 'จาก iRecruit',
   so_recruit: 'จากฐานใหม่',
   checklist: 'จาก Checklist',
+  declined: 'เคยปฏิเสธงานอื่น',
 };
+
+/** แหล่งที่เป็นของเลนสรรหาเท่านั้น — matcher เลนสรรหาต้องใช้แค่ชุดนี้ */
+export const RECRUIT_LANE_SOURCES: readonly RecruitPoolSource[] = [
+  'irecruit',
+  'so_recruit',
+  'checklist',
+];
 
 /** คำอธิบายยาวสำหรับ tooltip/สรุป — บอกว่าต้องตามเอกสารแบบไหน */
 export const RECRUIT_SOURCE_HINT: Record<RecruitPoolSource, string> = {
   irecruit: 'ฐาน iRecruit เดิม — ยังไม่มีใบสมัครกับเรา ต้องเก็บใบสมัครใหม่ทั้งชุด',
   so_recruit: 'ใบ "สนใจ" จากหน้าสาธารณะ — มีข้อมูลเบื้องต้นแล้ว เหลือเก็บใบสมัครจริง',
   checklist: 'อยู่ถัง Checklist บนบอร์ด — เริ่มสมัครแล้ว เหลือตามเอกสารให้ครบ',
+  declined: 'สมัครกับเราแล้ว แต่เคยตอบว่าไม่สนใจงานอื่นที่เสนอไป — งานนี้คนละที่คนละค่าแรง',
 };
 
 /**
@@ -36,6 +52,7 @@ export const RECRUIT_SOURCE_HINT: Record<RecruitPoolSource, string> = {
  * เลขน้อย = ชนะ
  */
 const SOURCE_PRIORITY: Record<RecruitPoolSource, number> = {
+  declined: 0, // มีใบสมัครจริงอยู่แล้ว = ใกล้ที่สุด (ไม่ปนกองสรรหาอยู่แล้ว แต่ตั้งไว้ให้ครบ)
   checklist: 1,
   so_recruit: 2,
   irecruit: 3,
@@ -152,6 +169,27 @@ export function fromSoRecruitLead(a: {
   };
 }
 
+/**
+ * คนที่เคยปฏิเสธงานอื่น (เลนคัดสรร) — `DeclinedApplicantRow` จาก declinedApplicantsSql
+ * `ref` = `app-<uuid>` เหมือนใบสมัครปกติ เพราะเขาคือใบสมัครใบเดิมนั่นแหละ
+ */
+export function fromDeclinedApplicant(a: {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  phone_e164: string | null;
+  position_interest: string | null;
+  job_title: string | null;
+  province: string | null;
+  district: string | null;
+  gender: string | null;
+  age: number | null;
+  license_types: string[] | null;
+  created_at: string | null;
+}): RecruitPoolCandidate {
+  return { ...fromSoRecruitLead(a), source: 'declined' };
+}
+
 /** ถัง Checklist บนบอร์ด ERP — `BoardReadyCandidate` จาก boardCandidatesSql */
 export function fromChecklistCard(c: {
   card_id: number;
@@ -231,7 +269,12 @@ export function dedupePoolByPhone(
 
 /** นับคนต่อแหล่ง — ใช้โชว์ "กองมาจากไหนบ้าง" บนจอ (คืนครบ 3 แหล่งเสมอ รวมแหล่งที่ 0) */
 export function countBySource(candidates: RecruitPoolCandidate[]): Record<RecruitPoolSource, number> {
-  const out: Record<RecruitPoolSource, number> = { irecruit: 0, so_recruit: 0, checklist: 0 };
+  const out: Record<RecruitPoolSource, number> = {
+    irecruit: 0,
+    so_recruit: 0,
+    checklist: 0,
+    declined: 0,
+  };
   for (const c of candidates) out[c.source] += 1;
   return out;
 }

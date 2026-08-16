@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   RECRUIT_SOURCE_LABEL,
+  RECRUIT_LANE_SOURCES,
   countBySource,
   dedupePoolByPhone,
   fromChecklistCard,
@@ -19,15 +20,28 @@ import {
   type RecruitPoolCandidate,
 } from '../../api/_lib/recruitLanePool.js';
 import { toE164Thai } from '../../api/_lib/thaiPhone.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.join(import.meta.dirname, '../..');
 
 describe('ป้ายบอกแหล่ง — เจ้าของขอให้เห็นทุกคน', () => {
-  it('มีครบ 3 แหล่ง และเป็นข้อความไทยที่คนอ่านรู้เรื่อง', () => {
+  it('มีป้ายครบทุกแหล่ง และเป็นข้อความไทยที่คนอ่านรู้เรื่อง', () => {
     expect(RECRUIT_SOURCE_LABEL).toEqual({
       irecruit: 'จาก iRecruit',
       so_recruit: 'จากฐานใหม่',
       checklist: 'จาก Checklist',
+      declined: 'เคยปฏิเสธงานอื่น',
     });
     expect(recruitSourceLabel('checklist')).toBe('จาก Checklist');
+  });
+
+  it('🔴 กองของเลนสรรหามีแค่ 3 แหล่ง — `declined` เป็นของเลนคัดสรร ห้ามปน', () => {
+    expect(RECRUIT_LANE_SOURCES).toEqual(['irecruit', 'so_recruit', 'checklist']);
+    expect(RECRUIT_LANE_SOURCES).not.toContain('declined');
+    // matcher ของเลนสรรหาต้องไม่แตะกองคนที่ปฏิเสธเลย (เส้นแบ่งสองเลนที่เจ้าของย้ำ)
+    const src = fs.readFileSync(path.join(root, 'api/_lib/recruitLaneMatcher.ts'), 'utf8');
+    expect(src).not.toMatch(/declinedApplicantsSql|fromDeclinedApplicant/);
   });
 });
 
@@ -194,7 +208,7 @@ describe('dedupePoolByPhone — คนเดียวกันข้ามแห
 });
 
 describe('countBySource', () => {
-  it('คืนครบ 3 แหล่งเสมอ แม้แหล่งนั้นจะไม่มีใคร (ช่องบนจอต้องไม่หาย)', () => {
-    expect(countBySource([])).toEqual({ irecruit: 0, so_recruit: 0, checklist: 0 });
+  it('คืนครบทุกแหล่งเสมอ แม้แหล่งนั้นจะไม่มีใคร (ช่องบนจอต้องไม่หาย)', () => {
+    expect(countBySource([])).toEqual({ irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 });
   });
 });
