@@ -25,7 +25,7 @@ import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { fetchJobBenefitLines, requestNoFromJobRef } from './siamrajJobBenefits.js';
-import { phonesContactedAboutJob } from './applicationRotationSql.js';
+import { phonesContactedAboutJob, phonesContactedAnyJob } from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
@@ -205,6 +205,49 @@ export function buildApplicationInterviewPayload(
     type: 'phone',
     language: 'th',
     tone: 'professional',
+  };
+}
+
+/**
+ * payload ของ **เลนสรรหา** (R2b) — คนที่ยังไม่สมัคร จาก 3 แหล่งรวมกัน
+ *
+ * ใช้ตัวเดียวทุกแหล่งเพื่อให้คนที่รับสายได้ยินเหมือนกันหมด (เจ้าของ: *"Format ก็ทำให้
+ * มันเท่ากัน"*) — ต่างกันแค่ `ref` ที่ผูกกลับไปยังฐานต้นทาง
+ * `ref` ต้องเป็น person_ref เต็ม (`ir-` / `app-` / `card-`) แล้ว client_candidate_id
+ * จะออกมาเป็น `<jobId>::<ref>` = รูปแบบเดียวกับเส้นเดิมเป๊ะ
+ */
+export function buildRecruitLaneInterviewPayload(
+  job: Record<string, unknown>,
+  result: { jobId: string; job_family_label: string | null },
+  candidate: { ref: string; full_name: string; phone_number: string | null; position_text: string },
+  now = new Date(),
+): LumosInterviewPayload | null {
+  const phone = toE164Thai(candidate.phone_number);
+  if (!phone || !candidate.full_name.trim() || !candidate.ref.trim()) return null;
+  const position = jobPositionLabel(job, result.job_family_label);
+  const unit = str(job.unit_name) || 'หน่วยงานของเรา';
+  const brief = buildJobBrief(job);
+  const placeForTravel = brief.workPlace && brief.workPlace !== unit ? brief.workPlace : unit;
+  const skills = candidate.position_text.trim() ? [candidate.position_text.trim()] : [];
+  return {
+    client_candidate_id: `${result.jobId}::${candidate.ref}`,
+    client_interview_id: `${result.jobId}::${candidate.ref}::interview`,
+    candidate_name: candidate.full_name.trim(),
+    phone,
+    position,
+    scheduled_at: now.toISOString(),
+    questions: [
+      `ตอนนี้เรามีงานตำแหน่ง${position}ที่ ${unit} สนใจฟังรายละเอียดไหมครับ`,
+      `เคยทำงานตำแหน่ง${position}หรืองานใกล้เคียงมาก่อนไหมครับ`,
+      `สะดวกเดินทางไปทำงานที่ ${placeForTravel} ไหมครับ`,
+      ...(brief.workSchedule ? [`งานนี้เวลาทำงาน ${brief.workSchedule} สะดวกไหมครับ`] : []),
+      'สามารถเริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
+      'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
+    ],
+    type: 'phone',
+    language: 'th',
+    tone: 'professional',
+    ...(skills.length ? { skills } : {}),
   };
 }
 
@@ -592,6 +635,152 @@ export async function enqueueLumosInterviewForIrecruit(
     return { ...outcome, cooldownSkipped };
   } catch (e) {
     logError('lumos.dispatch.interview.fail', {
+      jobId: result.jobId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return empty;
+  }
+}
+
+/** คนหนึ่งคนในผลแมทเลนสรรหา — รับเป็นรูปโครงสร้าง ไม่ import type ข้ามไฟล์ (กันวง import) */
+type RecruitLaneDispatchInput = {
+  source: 'irecruit' | 'so_recruit' | 'checklist';
+  ref: string;
+  full_name: string;
+  phone_number: string | null;
+  position_text: string;
+  source_label: string;
+  tier: string;
+};
+
+export type RecruitLaneDispatchOutcome = LumosDispatchOutcome & {
+  /** ข้ามเพราะเพิ่งติดต่อเรื่องงานนี้ภายใน 30 วัน */
+  cooldownSkipped: number;
+  /** ข้ามเพราะเป็นใบสนใจของฐานใหม่ที่เพิ่งถูกโทรเรื่องงานอื่นภายใน 30 วัน */
+  leadCooldownSkipped: number;
+  /** เข้าคิวได้กี่คนต่อแหล่ง — ป้ายบอกแหล่งบนสรุปตอนส่ง (เจ้าของขอ) */
+  queuedBySource: Record<'irecruit' | 'so_recruit' | 'checklist', number>;
+};
+
+/**
+ * ผลแมท **เลนสรรหา** (green/yellow) → คิว interview ทันที (R2b · เจ้าของเคาะ 16 ส.ค.)
+ *
+ * กติกาตัด — ชุดเดียวกับเลนคัดสรร บวกข้อพิเศษของกองใบสนใจ:
+ *   1. เพิ่งติดต่อ**เรื่องงานนี้**ใน 30 วัน → ข้าม (ทุกแหล่ง · R1)
+ *   2. เป็นใบสนใจฐานใหม่ (`so_recruit`) ที่เพิ่งถูกโทร**เรื่องงานไหนก็ได้**ใน 30 วัน → ข้าม
+ *      (คนกลุ่มนี้แค่ทิ้งเบอร์ว่าสนใจ ยังไม่ได้สมัครใบไหน — กันโดนหลายสายวันเดียวกัน)
+ *   3. ล็อก "รับไปโทรเอง" + เบอร์ที่ถูกพัก → กันที่ `insertQueueItems` เหมือนทุกเส้น
+ * คืนผลให้ผู้เรียกรายงาน · error กลืน (ปุ่มค้นหาต้องไม่พังเพราะคิวมีปัญหา)
+ */
+export async function enqueueLumosInterviewForRecruitLane(
+  job: Record<string, unknown>,
+  result: { jobId: string; job_family_label: string | null; matches: RecruitLaneDispatchInput[] },
+): Promise<RecruitLaneDispatchOutcome> {
+  const empty: RecruitLaneDispatchOutcome = {
+    queued: 0,
+    duplicated: [],
+    skipped: [],
+    cooldownSkipped: 0,
+    leadCooldownSkipped: 0,
+    queuedBySource: { irecruit: 0, so_recruit: 0, checklist: 0 },
+  };
+  try {
+    const auto = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
+    if (auto.length === 0) return empty;
+
+    const e164ByRef = new Map<string, string>();
+    for (const m of auto) {
+      const e164 = toE164Thai(m.phone_number);
+      if (e164) e164ByRef.set(m.ref, e164);
+    }
+    const phones = [...new Set(e164ByRef.values())];
+
+    const [contactedThisJob, contactedAnyJob] = await Promise.all([
+      phonesContactedAboutJob(result.jobId, phones),
+      // ยิงเฉพาะตอนมีใบสนใจอยู่ในกอง — กองอื่นไม่ใช้เกณฑ์นี้
+      auto.some((m) => m.source === 'so_recruit')
+        ? phonesContactedAnyJob(
+            auto
+              .filter((m) => m.source === 'so_recruit')
+              .map((m) => e164ByRef.get(m.ref))
+              .filter((p): p is string => Boolean(p)),
+          )
+        : Promise.resolve(new Set<string>()),
+    ]);
+
+    let cooldownSkipped = 0;
+    let leadCooldownSkipped = 0;
+    const eligible: RecruitLaneDispatchInput[] = [];
+    for (const m of auto) {
+      const e164 = e164ByRef.get(m.ref);
+      // เบอร์แปลงไม่ได้ปล่อยผ่าน — โดนคัดที่ payload อยู่แล้ว (รายงานเป็น "ส่งไม่ได้")
+      if (e164 && contactedThisJob.has(e164)) {
+        cooldownSkipped += 1;
+        continue;
+      }
+      if (e164 && m.source === 'so_recruit' && contactedAnyJob.has(e164)) {
+        leadCooldownSkipped += 1;
+        continue;
+      }
+      eligible.push(m);
+    }
+    if (eligible.length === 0) return { ...empty, cooldownSkipped, leadCooldownSkipped };
+
+    const skipped: LumosDispatchOutcome['skipped'] = [];
+    const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number }> = [];
+    const sourceByRef = new Map<string, RecruitLaneDispatchInput['source']>();
+    const nameByRef = new Map<string, string>();
+    for (const m of eligible) {
+      sourceByRef.set(m.ref, m.source);
+      // ชื่อในรายงานติดป้ายแหล่งไว้ด้วย — คนอ่านสรุปจะได้รู้ว่าต้องตามเอกสารแบบไหน
+      nameByRef.set(m.ref, `${m.full_name} (${m.source_label})`);
+      const payload = buildRecruitLaneInterviewPayload(job, result, m);
+      if (!payload) {
+        skipped.push({ ref: m.ref, name: nameByRef.get(m.ref) || m.ref, reason: NO_PHONE_REASON });
+        continue;
+      }
+      items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
+    }
+
+    const { added, held, suppressed } = await insertQueueItems('interview', result.jobId, items);
+    const addedSet = new Set(added);
+    const heldSet = new Set(held);
+    for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
+    for (const ref of suppressed) {
+      skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
+    }
+    const duplicated = items
+      .map((i) => i.personRef)
+      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref));
+
+    const queuedBySource = { irecruit: 0, so_recruit: 0, checklist: 0 };
+    for (const ref of added) {
+      const s = sourceByRef.get(ref);
+      if (s) queuedBySource[s] += 1;
+    }
+
+    logInfo('lumos.dispatch.recruit-lane', {
+      jobId: result.jobId,
+      matched: auto.length,
+      queued: added.length,
+      ...queuedBySource,
+      duplicated: duplicated.length,
+      cooldownSkipped,
+      leadCooldownSkipped,
+      held: held.length,
+      suppressed: suppressed.length,
+    });
+
+    return {
+      queued: added.length,
+      duplicated,
+      skipped,
+      cooldownSkipped,
+      leadCooldownSkipped,
+      queuedBySource,
+    };
+  } catch (e) {
+    logError('lumos.dispatch.recruit-lane.fail', {
       jobId: result.jobId,
       message: e instanceof Error ? e.message : String(e),
     });

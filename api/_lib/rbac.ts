@@ -46,6 +46,7 @@ export type ApiResource =
   | 'matching-parse-branch-demand'
   | 'matching-candidate-spec'
   | 'matching-irecruit-candidates'
+  | 'matching-recruit-lane'
   | 'matching-board-candidates'
   | 'matching-proposals'
   | 'matching-job-postings'
@@ -160,12 +161,15 @@ export function minimumRoleFor(
     case 'siamraj-opl-import':
       return 'admin';
 
+    // `matching-recruit-lane` = เลนสรรหา — ระดับเดียวกับเลนคัดสรร (staff)
+    // A4 จะมาแยกทีมสรรหา/คัดสรรด้วย function grant ไม่ใช่ที่ระดับ role ตรงนี้
     case 'recruit-funnel':
     case 'recruit-registrations':
     case 'matching-suggestions':
     case 'matching-parse-branch-demand':
     case 'matching-candidate-spec':
     case 'matching-irecruit-candidates':
+    case 'matching-recruit-lane':
     case 'matching-board-candidates':
     case 'matching-proposals':
     case 'matching-job-postings':

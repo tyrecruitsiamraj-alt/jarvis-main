@@ -1357,3 +1357,42 @@ client id / secret / tenant) — เจอสภาพนั้นเมื่�
 ข้อมูลจริงมีสถานะ `R` โผล่มา 2 แถวใน `recruit_follow_appointment`
 ⚠️ **การแบ่งถัง "ไม่รับสาย" / "ติดต่อไม่ได้" อยู่ที่ `recruitFunnel.ts` ไม่ใช่ใน SQL** —
 เจ้าของแก้เกณฑ์ได้โดยไม่ต้องแตะคิวรี · มีเทสต์คุมว่าสามถังรวมกันเท่ายอดจริงเสมอ
+
+## เลนสรรหา — "หาคนเพิ่ม + ส่ง AI โทร" ข้าม 3 แหล่ง (R2b · 16 ส.ค. 2569)
+
+**นิยามถาวรที่เจ้าของสั่งให้จำ:** สรรหา = จัดการ **คนที่ยังไม่สมัคร** (Lumos โทรก่อน
+แล้วคนตามเก็บใบสมัคร) · คัดสรร = จัดการ **คนที่สมัครแล้ว** (คนโทรก่อน หมดคนค่อยกดหาเพิ่ม)
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `api/_lib/recruitLanePool.ts` | **pure ล้วน** — รูปคนกลางของ 3 แหล่ง + mapper + ป้ายบอกแหล่ง + ตัดคนซ้ำข้ามแหล่ง |
+| `api/_lib/soRecruitLeadsSql.ts` | กองใบ "สนใจ" ของฐานใหม่ที่ยังว่าง (pg) |
+| `api/_lib/recruitLaneMatcher.ts` | โหลด 3 แหล่งพร้อมกัน → ตัดซ้ำ/ตัดคนได้ใบสมัครแล้ว → AI จัดอันดับ |
+| `api/_handlers/matching-recruit-lane.ts` | `/api/matching/recruit-lane?jobId=..&send=1` (registry **82 route**) |
+| `src/lib/recruitLaneApi.ts` | ตัวเรียก API + ข้อความสรุปทั้งหมด (pure) |
+| `src/components/jobs/RecruitLaneDialog.tsx` | กล่องผลค้น — ชิป tier + **ชิปบอกแหล่งทุกคน** |
+| `scripts/probe-recruit-lane-pool.mjs` | ตรวจกองกับฐานจริง อ่านอย่างเดียว ไม่แตะคิว |
+
+แก้ของเดิม: `boardCandidatesSql.ts` (+`boardChecklistColumnId()` +`excludeInformed`) ·
+`applicationRotationSql.ts` (+`phonesContactedAnyJob`) · `lumosDispatch.ts`
+(+`buildRecruitLaneInterviewPayload` +`enqueueLumosInterviewForRecruitLane`) ·
+`rbac.ts` (+resource `matching-recruit-lane`) · `JobBoardView.tsx` (ปุ่มบนการ์ด — lazy dialog)
+
+เทสต์: `tests/api/recruitLanePool.test.ts` (12) · `tests/api/recruitLaneMatcher.test.ts` (20)
+· `tests/api/recruitLaneDispatch.test.ts` (13) · `src/lib/recruitLaneApi.test.ts` (12)
+mutation 3/3 (สลับลำดับแหล่งตอนตัดซ้ำ · ตัดข้อยกเว้น Checklist · ปล่อยเลขนอกช่วงจาก AI)
+
+⚠️ **person_ref ต้องคง prefix เดิม** (`ir-` / `app-` / `card-`) — `splitPersonRef()` ใน
+`callFollowup.ts` แปลงกลับเป็น source ตอนคนกด "รับไปตามต่อ" · ตั้ง prefix ใหม่ = ปุ่มนั้นพังเงียบ
+⚠️ **AI ต้องอ้างคนด้วยเลขลำดับ ไม่ใช่ id ของฐาน** — id ข้ามฐานชนกันได้ (iRecruit id 1234
+กับ card_id 1234 คนละคน) แล้ว join กลับผิดตัวเงียบ ๆ → โทรผิดคน
+⚠️ **ตัดคนซ้ำข้ามแหล่งด้วยเบอร์** — คิวกันซ้ำที่ `person_ref` ช่วยไม่ได้ (คนละ ref)
+ลำดับที่เก็บไว้: Checklist > ฐานใหม่ > iRecruit (ใกล้ได้ใบสมัครที่สุดชนะ)
+⚠️ **ERP อ่านไม่ได้ = ไม่ตัดใครแล้วติดธง** (`board_check_unavailable`) — "เช็คไม่ได้"
+ไม่เท่ากับ "ไม่มีใครบนบอร์ด" · ตัดมั่วแล้วกองหายทั้งกอง
+⚠️ **แหล่งที่อ่านไม่ได้ต้องขึ้นคำเตือน ห้ามโชว์ 0** — 0 = ไม่มีคน คนละเรื่องกับฐานล่ม
+⚠️ **ถัง Checklist ต้องตัดคน `is_inform='Y'`** — วัดจริง 16 ส.ค.: 1,102 คนในถัง
+เป็นคนแจ้งเข้าแล้ว 512 เหลือกองจริง 590
+
+วัดกับฐานจริง 16 ส.ค. (อ่านอย่างเดียว): iRecruit 800 (ชนเพดาน) · ฐานใหม่ 0 · Checklist 590
+· ตัดซ้ำข้ามแหล่ง 37 · ตัดคนได้ใบสมัครแล้ว 11 → **กองสุดท้าย 1,342 คน** (โทรได้จริง 1,247)

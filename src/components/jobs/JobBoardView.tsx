@@ -16,6 +16,11 @@ import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
+/**
+ * เลนสรรหา — lazy ตั้งใจ: ไฟล์นี้ใช้ร่วมกับหน้าสมัครสาธารณะ /apply
+ * กล่องผลค้น (+ ตัวเรียก API หลังบ้าน) ต้องไม่ถูกลากเข้า bundle ฝั่ง public
+ */
+const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
@@ -162,6 +167,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
+  /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
+  const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
   /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
   const [genStandalone, setGenStandalone] = useState<
     { kind: string; kindLabel: string; departmentCode: string } | null
@@ -589,6 +596,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           <Search className="h-3.5 w-3.5" />
                           ค้นหาคนที่ยังไม่สมัคร
                         </button>
+                        {/* เลนสรรหา (R2b · 16 ส.ค. 2569): ค้น 3 แหล่งรวด (Checklist +
+                            ฐานใหม่ + iRecruit) แล้วส่ง AI โทรทันที ไม่ต้องอนุมัติ
+                            — ต่างจากปุ่มซ้ายที่พาไปหน้า Matching ให้ดูก่อน (เลนคัดสรร) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLaneJob(job);
+                          }}
+                          title="ค้นคนที่ยังไม่สมัครจาก Checklist + ฐานใหม่ + iRecruit แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos โทรทันที"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.success.outline,
+                          )}
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          หาคนเพิ่ม + ส่ง AI โทร
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -962,6 +987,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         onClose={() => setEditPosting(null)}
         onSaved={() => setPostingsRev((n) => n + 1)}
       />
+
+      {/* เลนสรรหา (R2b) — โหลดเมื่อกดเท่านั้น ไม่ให้ติดไปกับ bundle ของ /apply */}
+      {laneJob ? (
+        <React.Suspense fallback={null}>
+          <RecruitLaneDialog open job={laneJob} onClose={() => setLaneJob(null)} />
+        </React.Suspense>
+      ) : null}
     </div>
   );
 };

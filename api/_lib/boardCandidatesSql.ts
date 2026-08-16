@@ -101,8 +101,16 @@ LEFT JOIN dbo.ms_province_tambon      AS tb ON tb.province_code = ra.province_co
 WHERE c.board_id    = @boardId
   AND c.is_archived = 'N'
   AND c.column_id   IN (/*COLUMN_IDS*/)
+  /*EXCLUDE_INFORMED*/
 ORDER BY c.last_activity_at DESC, c.card_id DESC
 `;
+
+/**
+ * เงื่อนไขตัด "แจ้งเข้าแล้ว" — `hr_recruitment.is_inform = 'Y'` (probe P0 16 ส.ค.)
+ * มีคอลัมน์ตรง ไม่ต้อง join st_inform_detail · คนที่แจ้งเข้าแล้วคือได้งานแล้ว
+ * ห้ามเอาไปเสนองานใหม่/ตั้งตารางโทรตาม
+ */
+const EXCLUDE_INFORMED_SQL = `AND ISNULL(r.is_inform, 'N') <> 'Y'`;
 
 function toIso(v: Date | string | null): string | null {
   if (v == null) return null;
@@ -150,6 +158,14 @@ export function boardDropColumnId(): number {
   return Number(process.env.BOARD_DROP_COLUMN_ID || 5);
 }
 
+/**
+ * คอลัมน์ "Checklist" — คนเริ่มสมัครแล้วแต่เอกสารยังไม่ครบ (ยังไม่นับว่าได้ใบสมัคร)
+ * = กองของ **เลนสรรหา** (R2b) · ห้ามเอาไปปนกับ To do ซึ่งเป็นกองของคัดสรร
+ */
+export function boardChecklistColumnId(): number {
+  return Number(process.env.BOARD_CHECKLIST_COLUMN_ID || 1);
+}
+
 export type BoardColumnCount = { column_id: number; label: string | null; count: number };
 
 /** นับการ์ด active ต่อถัง (To do / ไม่มีงาน / Re Use) — ใช้โชว์สรุปบนหน้า Matching Dashboard */
@@ -186,6 +202,8 @@ export async function listBoardReadyCandidates(options?: {
   /** หลายคอลัมน์พร้อมกัน (ชนะ columnId) — ใช้กับ picker เลือกส่งเอง */
   columnIds?: number[];
   limit?: number;
+  /** ตัดคนที่ "แจ้งเข้าแล้ว" (is_inform='Y') ออก — ใช้กับกองเลนสรรหา/ตารางโทรตาม */
+  excludeInformed?: boolean;
 }): Promise<BoardReadyCandidate[]> {
   const boardId = options?.boardId ?? Number(process.env.BOARD_READY_BOARD_ID || 1);
   const columnIds = (
@@ -198,7 +216,10 @@ export async function listBoardReadyCandidates(options?: {
     inputs[`col${i}`] = id;
     return `@col${i}`;
   });
-  const sql = LIST_SQL.replace('/*COLUMN_IDS*/', placeholders.join(', '));
+  const sql = LIST_SQL.replace('/*COLUMN_IDS*/', placeholders.join(', ')).replace(
+    '/*EXCLUDE_INFORMED*/',
+    options?.excludeInformed ? EXCLUDE_INFORMED_SQL : '',
+  );
 
   const rows = await siamrajSqlQuery<Row>(sql, inputs);
   return rows.map((r) => ({
