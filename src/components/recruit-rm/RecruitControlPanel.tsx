@@ -124,7 +124,7 @@ export default function RecruitControlPanel() {
     setSearchParams(params, { replace: true });
   };
 
-  const { intake, calling, contact, appointment, attendance, waiting, stale, meta } = data;
+  const { intake, calling, contact, appointment, attendance, waiting, stale, meta, recruit } = data;
 
   const row1: BoxDef[] = [
     {
@@ -164,6 +164,23 @@ export default function RecruitControlPanel() {
       tone: 'success',
     },
     { bucket: 'contact_failed', label: 'ติดต่อไม่สำเร็จ', value: contact.failed, tone: 'danger' },
+    // เส้นแบ่งสรรหา→คัดสรร (16 ส.ค.) — สนใจแล้วแต่ยังไม่มาสมัคร vs มาสมัครแล้ว (ขึ้นบอร์ด)
+    {
+      bucket: null,
+      label: 'รอเก็บใบสมัคร',
+      value: recruit ? (recruit.waitingCollect < 0 ? null : recruit.waitingCollect) : null,
+      sub: 'สนใจแล้วแต่ยังไม่มาสมัคร (งานสรรหา) — ดูรายชื่อที่ชิป "รอเก็บใบสมัคร"',
+      tone: 'warn',
+      title: 'คนตอบสนใจตอนโทร แต่ชื่อยังไม่ขึ้นบอร์ด (ยังไม่ได้มาสมัคร)',
+    },
+    {
+      bucket: null,
+      label: 'ได้ใบสมัครแล้ว',
+      value: recruit ? (recruit.collected < 0 ? null : recruit.collected) : null,
+      sub: 'ชื่อขึ้นบอร์ดแล้ว (เป็นงานคัดสรรต่อ)',
+      tone: 'success',
+      title: 'จับคู่ด้วยเบอร์กับรายชื่อบนบอร์ด ERP',
+    },
     { bucket: 'scheduled', label: 'สำเร็จ · นัดได้', value: appointment.scheduled, tone: 'success' },
     {
       bucket: 'success_unscheduled',

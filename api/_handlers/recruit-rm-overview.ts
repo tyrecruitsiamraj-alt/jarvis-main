@@ -17,10 +17,13 @@ import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import {
+  bucketCondition,
   buildAttendanceSummarySql,
   buildClaimedIdleSql,
   buildOverviewSql,
 } from '../_lib/applicantOverviewSql.js';
+import { tableInAppSchema } from '../_lib/schema.js';
+import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { logError } from '../_lib/logger.js';
 
 type Flag = { metric: string; flag: 'unavailable' | 'partial-history' | 'proxy'; note: string };
@@ -126,10 +129,37 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
+    // เส้นแบ่งสรรหา→คัดสรร (16 ส.ค.): คนสนใจจริงที่ยังไม่ขึ้นบอร์ด = "รอเก็บใบสมัคร"
+    // ขึ้นบอร์ดแล้ว = "ได้ใบสมัครแล้ว" (conversion ของสรรหา) · จับคู่ด้วยเบอร์ (proxy)
+    // นับใน JS เพราะ board membership เป็น ERP (ใส่ SQL pg ไม่ได้) · interested เป็น subset เล็ก
+    let recruit: { interested: number; collected: number; waitingCollect: number } | null = null;
+    try {
+      const boardPhones = await loadBoardPhoneSet();
+      const { rows: interestedRows } = await dbQuery<{ phone_e164: string | null }>(
+        `select a.phone_e164 from ${tableInAppSchema('public_job_applications')} a
+          where ($1::text[] is null or a.job_id = any($1::text[])
+                 or ($2::text is not null and a.department_code = $2::text))
+            and ${bucketCondition('contact_success')}`,
+        params,
+      );
+      const interested = interestedRows.length;
+      if (boardPhones === null) {
+        recruit = { interested, collected: -1, waitingCollect: -1 }; // -1 = อ่านบอร์ดไม่ได้
+        flags.push({ metric: 'recruit', flag: 'unavailable', note: 'อ่านรายชื่อบนบอร์ด ERP ไม่ได้ — ยอดเก็บใบสมัครเช็คไม่ได้ชั่วคราว' });
+      } else {
+        const collected = interestedRows.filter((r) => r.phone_e164 && boardPhones.has(r.phone_e164)).length;
+        recruit = { interested, collected, waitingCollect: interested - collected };
+        flags.push({ metric: 'recruit', flag: 'proxy', note: 'จับคู่ "ได้ใบสมัครแล้ว" ด้วยเบอร์โทรกับรายชื่อบนบอร์ด' });
+      }
+    } catch (e) {
+      if (!isPgUndefinedTable(e)) throw e;
+    }
+
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json({
       version: 1,
       scope: { departmentLimited: scopedJobIds !== null },
+      recruit,
       intake: {
         total: o.total,
         distinctPhones: o.distinct_phones,

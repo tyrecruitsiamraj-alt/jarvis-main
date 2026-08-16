@@ -7,6 +7,8 @@ import { apiFetch } from './apiFetch';
 export type RecruitRmOverview = {
   version: number;
   scope: { departmentLimited: boolean };
+  /** เส้นแบ่งสรรหา→คัดสรร · collected/waitingCollect = -1 เมื่ออ่านบอร์ด ERP ไม่ได้ */
+  recruit: { interested: number; collected: number; waitingCollect: number } | null;
   intake: { total: number; distinctPhones: number; leads: number; invalidPhone: number };
   calling: {
     called: number;
