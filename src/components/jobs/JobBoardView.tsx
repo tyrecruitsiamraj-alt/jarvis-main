@@ -892,11 +892,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  {/* ⚠️ ค่านี้คือ `total_income` = **รายได้รวม** ไม่ใช่ฐานเงินเดือน
-                      (เจ้าของสั่งแก้ 16 ส.ค. 2569) — ที่อื่นทั้งระบบใช้คำว่า "รายได้รวม"
-                      อยู่แล้ว (JobDetailPage · AddJobPage) เหลือจุดนี้จุดเดียวที่หลุด
-                      · จอนี้โผล่บนหน้าสมัครสาธารณะด้วย ผู้สมัครอ่านแล้วเข้าใจผิดเรื่องเงินได้ */}
-                  <dt className="text-muted-foreground">รายได้รวม</dt>
+                  {/**
+                   * ⚠️ **ค่านี้ไม่ใช่ยอดรวม** — วัดจาก ERP 16 ส.ค. 2569:
+                   * `total_income` = `payment_rate` ของแถว `is_wage='Y'` **แถวเดียว**
+                   * (ดู siamrajSqlServerRequests.ts — ROW_NUMBER เลือกแถวค่าแรงหลัก)
+                   * ใบ LAO6908007 มี 12 แถว: ค่าแรงหลัก 16,000 + อีก 11 แถวที่เป็น
+                   * **คนละหน่วย** (โอทีต่อชั่วโมง · เบี้ยเลี้ยงต่อวัน) และมี **รายการหัก**
+                   * ปนอยู่ด้วย (ค่าปรับขาดงาน) → บวกกันตรง ๆ ได้เลขที่ไม่มีความหมาย
+                   * จึงห้ามเรียกว่า "รายได้รวม" · ของแถมที่เหลือโชว์เป็นชิปสวัสดิการแทน
+                   * (ต่างจาก JobDetailPage/AddJobPage ที่เป็นใบขอฝั่งเราซึ่งคนกรอกยอดรวมเอง)
+                   */}
+                  <dt className="text-muted-foreground">เงินเดือน (ไม่รวมโอที/เบี้ยเลี้ยง)</dt>
                   <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString('th-TH')}</dd>
                 </div>
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
