@@ -5,6 +5,66 @@
 
 ---
 
+## 🔴 0.00 รอบสิบสี่–สิบหก (16 ส.ค. 2569) — สองเลนสรรหา/คัดสรร + Dashboard + Follow ตาราง
+
+**อ่านก่อน:** memory `recruit-vs-selection-lanes.md` = นิยามถาวรที่เจ้าของสั่ง "จำไว้"
+> **สรรหา = จัดการคนที่ยังไม่สมัคร** (Lumos โทรก่อนทั้งหมด แล้วคนตามเก็บใบสมัคร)
+> **คัดสรร = จัดการคนที่สมัครแล้ว** (คนโทรก่อน หมดคนค่อยกดหาเพิ่มแล้วส่ง Lumos ทันที)
+> หน้าสาธารณะ = "คนบอกว่าสนใจ" (Lead) **ยังไม่ใช่ใบสมัคร** · "ได้ใบสมัคร" = ชื่อขึ้นถัง To do บนบอร์ด ERP
+
+| | |
+|---|---|
+| commit ล่าสุด | `7c67f78` (F5) · ~20 commit รอบนี้ (บั๊ก 20 ตัว + S1-S9 + benefits + A/R/F) |
+| test | **1,138 ผ่าน / 6 skip (128 ไฟล์)** |
+| tsc 3 config | 0 ทั้งสาม |
+| registry | **81 route** |
+| migration บนไฟล์+บนฐาน | ถึง **092** (087 phone_e164 · 088 call stamps · 089 attendance · 090 app dispatch marker · 091 proposal source application · 092 follow group+call_times) |
+
+**ทำเสร็จ+push แล้ว (ทำตามแผน `~/.claude/plans/merry-popping-blum.md`):**
+1. **บั๊ก 20 ตัว** (critical 2 · high 7 · med 8 · low 3) — verify + เทสต์คุมทุกตัว
+2. **S1-S9** ระบบใบสมัคร: rename "การติดต่อ"→"การโทรของฉัน" · phone_e164 (087 generated col) +
+   ธงเบอร์ผิด+แก้เบอร์ · call stamps immutable (088) · attendance มา/ไม่มา (089) ·
+   endpoint `/api/recruit-rm-overview` + drill-down `?bucket=` · แผง `RecruitControlPanel`
+   แทนภาพรวมงานสรรหา (ทางถอย `?panel=classic`) · เส้น Lumos จากใบสมัคร `app-<uuid>` (090) +
+   auto-enqueue ที่ /apply (flag `APPLICATION_AUTO_DISPATCH_ENABLED`) + dialog 2 กล่องคู่ ·
+   จองจากใบสมัคร (091)
+3. **benefits:** ช่อง interview บอก OT ชม.ละ/เบี้ยขยัน/ค่าเดินทาง/ค่าโทรศัพท์ — เติมตอน
+   **เสิร์ฟคิว** (`siamrajJobBenefits.ts` · whitelist กันพูดค่าปรับ/มาสาย · โอทีบอกเลขเฉพาะ 1.5 เท่า)
+4. **A (เส้นแบ่งสรรหา→คัดสรร):** `applicationBoardLink.loadBoardPhoneSet()` (เบอร์คนบนบอร์ด
+   → derived `on_board`) · คิวสรรหา `?list=collect` "รอเก็บใบสมัคร" · Dashboard 2 กล่อง
+   (รอเก็บ/ได้ใบสมัคร · จับคู่เบอร์=proxy · ERP ล่ม=null ไม่ใช่ 0)
+5. **R (หาคนเพิ่มส่ง AI ทันที):** `applicationRotationSql.phonesContactedAboutJob()` กัน 30 วัน
+   ต่องาน · เลนคัดสรร: `matching-irecruit-candidates?send=1` ส่งเขียว+เหลืองทันที (ไม่ต้องอนุมัติ)
+   + ปุ่ม "หาคนเพิ่ม + ส่ง AI โทร" บน MatchingPage
+6. **F (Follow ตารางโทร):** 1 วัน=1 plan (Lumos stop_early หยุดรอบที่เหลือของวัน) · migration 092
+   group_id+call_times · payload หลายรอบ/วัน · next_attempt_at=รอบแรก (กันวันอนาคต bump มาวันนี้) ·
+   นโยบายกลุ่ม (retry→ปิด · declined→`cancelFollowGroup` ยกเลิกทั้งชุด) · UI โหมด "ตารางหลายวัน"
+
+**เหลือ 3 ชิ้น (ยังไม่ทำ — ระบุชัดในแผน):**
+- **R2b** ปุ่มหาคนเพิ่ม**เลนสรรหา** (รวม iRecruit + ฐานใหม่ So Recruit + ถัง Checklist + ป้ายบอกแหล่ง)
+  — ต้องต่อ AI matcher ให้ค้นข้าม 3 แหล่ง (ก้อนใหญ่)
+- **F5b** ปุ่มเลือกชื่อจากบอร์ด ERP ในหน้า Follow (ทุกถัง**ยกเว้น** Checklist + คนที่ `is_inform='Y'`)
+  — ตอนนี้คีย์ชื่อเองได้
+- **A4** แยกสิทธิ์ทีมสรรหา/คัดสรร — grant เดิมไม่มี function แยกบอร์ด↔Matching ต้องเพิ่ม
+  function ใหม่ + gate หน้า (เสี่ยงล็อกคนออก) **รอเจ้าของเคาะขอบเขต**
+
+**กับดักใหม่รอบนี้ (เพิ่มจากที่มี):**
+- **generated column** (087 phone_e164) ฆ่าบั๊ก sync — สูตร SQL ต้องเท่ากับ `toE164Thai` (เทสต์ parity คุม)
+- **stamps 088 ห้ามอยู่ในชุด reset** ใด ๆ (retry/revive) — เทสต์ `callStampsGuard` คุม
+- **Lumos steps หลายอันในแถวเดียว = อันตราย** ถ้าข้ามวัน (`bumpScheduledAtForward` ยุบ step เลยเวลา
+  มากองพร้อมกัน + ผลกลับ match ด้วย client_contact_id ตัวเดียว ทับกัน) → Follow ใช้ 1 วัน=1 plan
+- **board membership เช็คใน SQL pg ไม่ได้** (คนละ DB) → จับคู่ด้วยเบอร์ใน JS · ERP ล่ม = null ไม่ใช่ 0
+- **hr_recruitment.is_inform='Y'** = แจ้งเข้าแล้ว (มีคอลัมน์ตรง ไม่ต้อง join st_inform_detail)
+- **⚠️ ห้ามยิงสายจริงตอนตรวจ** — R/F แตะเส้น Lumos: ตรวจด้วยใบ test เบอร์ 9 หลัก (ถูกคัด) +
+  เทสต์ unit + ไม่ submit ฟอร์มจริง · แถวคิวที่เผลอสร้างต้อง cancel+ลบคืน
+
+**ยังไม่อัปเดต:** `09-editing-map.md` (แผนที่ไฟล์รอบนี้) — ไฟล์ใหม่: `applicationBoardLink.ts` ·
+`applicationRotationSql.ts` · `siamrajJobBenefits.ts` · `applicantOverviewSql.ts` (S5) ·
+`applicationAttendance.ts` (089) · `applicationContacts.ts` เดิม · `RecruitControlPanel.tsx` ·
+`appointmentAttendance.ts` · `recruitRmOverviewApi.ts`
+
+---
+
 ## 0. สถานะ ณ ตอนส่งต่อ
 
 | | |
