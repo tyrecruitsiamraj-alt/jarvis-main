@@ -42,8 +42,6 @@ const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
 const StaffJobBoardPage = lazy(() => import("@/pages/jobs/StaffJobBoardPage"));
 const JobDetailPage = lazy(() => import("@/pages/jobs/JobDetailPage"));
 const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
-// หน้า "คนที่จับคู่ได้" ของใบขอ (16 ส.ค. 2569) — แท็บที่สองของหน้าใบขอ
-const UnitRequestMatchingPage = lazy(() => import("@/pages/jobs/UnitRequestMatchingPage"));
 const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
@@ -119,7 +117,6 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/board" element={<StaffJobBoardPage />} />
             <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
-            <Route path="/jobs/siamraj/:id/matching" element={<UnitRequestMatchingPage />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />
             <Route path="/settings" element={<AdminSettings />} />

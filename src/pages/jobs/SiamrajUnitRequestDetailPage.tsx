@@ -13,7 +13,6 @@ import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOption
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
-import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
 import { UnitRequestReplacementDetail } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
   UnitRequestWorkStatusBadge,
@@ -147,9 +146,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
       />
 
       <div className="px-4 md:px-6 space-y-4">
-        {/* แท็บสองหน้าของใบขอ (16 ส.ค. 2569) — หน้านี้ตอบ "งานนี้คืออะไร"
-            อีกหน้าตอบ "ตอนนี้มีใครแล้วบ้าง" */}
-        {id ? <UnitRequestTabs jobId={id} active="detail" /> : null}
         {isLoading && <p className="text-sm text-muted-foreground">กำลังโหลด…</p>}
         {error && (
           <p className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
