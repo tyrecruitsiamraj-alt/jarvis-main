@@ -4,6 +4,12 @@ import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
+  APPLICATION_ORIGIN_CLASS,
+  APPLICATION_ORIGIN_HINT,
+  APPLICATION_ORIGIN_LABEL,
+  countApplicationsByOrigin,
+  filterApplicationsByOrigin,
+  type ApplicationOrigin,
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
   fetchApplicationDocument,
@@ -40,6 +46,11 @@ type ApplicantTab = 'all' | 'interested';
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, onClose }) => {
   const [items, setItems] = useState<PublicApplication[]>([]);
   const [tab, setTab] = useState<ApplicantTab>('all');
+  /**
+   * กรองตาม "ที่มา" (เจ้าของสั่ง 16 ส.ค.: *"แยกให้หน่อยว่าอันไหนมาจากการสมัครใหม่
+   * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองคอลัมน์จึงตรงกันเสมอ
+   */
+  const [originFilter, setOriginFilter] = useState<ApplicationOrigin | 'all'>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -163,15 +174,34 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   };
 
   // กติกา "ใครนับว่าสนใจ" อยู่ที่ lib ที่เดียว (ไฟล์หน้าไม่ตัดสินเอง)
-  const { interested } = splitInterested(items);
-  const visible = tab === 'interested' ? interested : items;
+  // ⚠️ นับที่มาจาก `items` (ก้อนเต็ม) ไม่ใช่ก้อนที่กรองแล้ว — ไม่งั้นกดกรองแล้วเลขบนชิป
+  // เปลี่ยนตามจนกดกลับไม่ได้
+  const originCounts = countApplicationsByOrigin(items);
+  const shownItems = filterApplicationsByOrigin(items, originFilter);
+  const { interested } = splitInterested(shownItems);
+  const visible = tab === 'interested' ? interested : shownItems;
 
   /** การ์ดผู้สมัคร 1 ใบ — แยกออกมาเพื่อ reuse ทั้งมุมมองแท็บ (มือถือ) และ 2 คอลัมน์ (จอใหญ่) */
   const renderCard = (a: PublicApplication, inInterestedColumn: boolean) => (
     <li key={a.id} className="rounded-2xl border border-border/70 bg-background/60 p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">{a.full_name}</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate text-sm font-semibold text-foreground">{a.full_name}</p>
+            {/* ที่มาของคนนี้ (เจ้าของสั่ง 16 ส.ค.): สมัครใหม่ / AI หาให้ / เจ้าหน้าที่คีย์
+                ⚠️ ไม่รู้ที่มา = ไม่ขึ้นชิป (ห้ามเดาว่า "สมัครใหม่") */}
+            {a.origin ? (
+              <span
+                title={APPLICATION_ORIGIN_HINT[a.origin]}
+                className={cn(
+                  'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                  APPLICATION_ORIGIN_CLASS[a.origin],
+                )}
+              >
+                {APPLICATION_ORIGIN_LABEL[a.origin]}
+              </span>
+            ) : null}
+          </div>
           <p
             title={applicantFactLine(a) || undefined}
             className="mt-0.5 truncate text-xs leading-4 text-muted-foreground"
@@ -307,13 +337,49 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             {sendNotice ? <span className="text-[11px] text-muted-foreground">{sendNotice}</span> : null}
           </div>
 
+          {/* ที่มาของคน (16 ส.ค.) — "ใบขอเข้ามาก็ยังหาคนให้เอง แต่แยกให้เห็นว่าใครมาจากไหน"
+              เห็นทุกช่องเสมอแม้ยอด 0 · ช่อง "ไม่รู้ที่มา" โผล่เฉพาะเมื่อมีจริง */}
+          <div className="mt-3 flex flex-wrap items-center gap-1">
+            {(
+              [
+                ['all', 'ทั้งหมด', items.length],
+                ['self_apply', APPLICATION_ORIGIN_LABEL.self_apply, originCounts.self_apply],
+                ['ai_found', APPLICATION_ORIGIN_LABEL.ai_found, originCounts.ai_found],
+                ['staff_added', APPLICATION_ORIGIN_LABEL.staff_added, originCounts.staff_added],
+              ] as Array<[ApplicationOrigin | 'all', string, number]>
+            ).map(([id, label, n]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setOriginFilter(id)}
+                title={id === 'all' ? 'ดูทุกที่มา' : APPLICATION_ORIGIN_HINT[id]}
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  originFilter === id
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                )}
+              >
+                {label} <span className="tabular-nums">({n})</span>
+              </button>
+            ))}
+            {originCounts.unknown > 0 ? (
+              <span
+                title="ยังบอกที่มาไม่ได้ (ใบเก่า/server ยังไม่อัปเดต) — ไม่ได้แปลว่าสมัครเอง"
+                className="rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground"
+              >
+                ไม่รู้ที่มา <span className="tabular-nums">({originCounts.unknown})</span>
+              </span>
+            ) : null}
+          </div>
+
           {/* แท็บ — เฉพาะจอเล็ก (จอ ≥lg แสดง 2 คอลัมน์คู่กันแทน · เจ้าของเคาะ 15 ส.ค.)
               ⚠️ "ที่สนใจ" = คนที่ตอบสนใจ **ตอนโทร** ไม่ใช่สถานะใบสมัคร
               · เห็นทั้งสองแท็บเสมอแม้ยอด 0 — เลข 0 คือคำตอบ ไม่ใช่ช่องว่าง */}
           <div className="mt-3 flex items-center gap-1 lg:hidden">
             {(
               [
-                ['all', 'รายชื่อผู้สมัครทั้งหมด', items.length],
+                ['all', 'รายชื่อผู้สมัครทั้งหมด', shownItems.length],
                 ['interested', 'รายชื่อที่สนใจ', interested.length],
               ] as Array<[ApplicantTab, string, number]>
             ).map(([id, label, n]) => (
@@ -371,9 +437,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               <div className="hidden gap-4 lg:grid lg:grid-cols-2">
                 <section className="min-w-0">
                   <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
-                    รายชื่อผู้สมัครทั้งหมด <span className="tabular-nums">({items.length})</span>
+                    รายชื่อผู้สมัครทั้งหมด <span className="tabular-nums">({shownItems.length})</span>
                   </h3>
-                  <ul className="space-y-2.5">{items.map((a) => renderCard(a, false))}</ul>
+                  <ul className="space-y-2.5">{shownItems.map((a) => renderCard(a, false))}</ul>
                 </section>
                 <section className="min-w-0 rounded-2xl bg-emerald-50/40 p-2 dark:bg-emerald-950/20">
                   <h3 className="mb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">

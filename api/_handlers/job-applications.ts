@@ -13,6 +13,7 @@ import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
 import { bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
+import { applicationOriginColumn, isApplicationOrigin } from '../_lib/applicationOriginSql.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -75,6 +76,8 @@ type Row = {
   is_lead: boolean | null;
   lead_by_name: string | null;
   lead_at: string | Date | null;
+  /** ที่มาของคนนี้ (derived — ดู applicationOriginSql) · schema เก่าไม่มี = undefined */
+  origin?: string | null;
 };
 
 function toNum(v: string | number | null): number | undefined {
@@ -143,6 +146,12 @@ function toApplication(r: Row, viewerId?: string) {
     channel_label: r.channel_label || undefined,
     license_types: r.license_types && r.license_types.length > 0 ? r.license_types : undefined,
     created_by_name: r.created_by_name || undefined,
+    /**
+     * "คนนี้มาจากไหน" (เจ้าของสั่ง 16 ส.ค.) — สมัครเอง / AI หาให้ / เจ้าหน้าที่คีย์
+     * ⚠️ ค่าที่ไม่รู้จัก (schema เก่ายังไม่มีคอลัมน์นี้) ส่ง undefined **ห้ามเดาเป็น
+     * 'self_apply'** — "ไม่รู้" ต้องต่างจาก "รู้ว่าเขามาเอง" ไม่งั้นป้ายโกหก
+     */
+    origin: isApplicationOrigin(r.origin) ? r.origin : undefined,
     created_at: toIso(r.created_at),
   };
 }
@@ -157,7 +166,8 @@ const LIST_COLUMNS = `
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
-  is_lead, lead_by_name, lead_at
+  is_lead, lead_by_name, lead_at,
+  ${applicationOriginColumn('a')}
 `;
 
 /**

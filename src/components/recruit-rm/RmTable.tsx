@@ -13,6 +13,9 @@ import {
 } from '@/lib/appointmentAttendance';
 import { formatDateTimeTh, formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
+  APPLICATION_ORIGIN_CLASS,
+  APPLICATION_ORIGIN_HINT,
+  APPLICATION_ORIGIN_LABEL,
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
   REFERRAL_SOURCE_LABEL,
@@ -244,14 +247,28 @@ const RmTable: React.FC<{
                     </td>
                   ) : null}
                   <td className="px-3 py-2">
-                    <span
-                      className={cn(
-                        'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                        APPLICATION_STATUS_CLASS[r.status],
-                      )}
-                    >
-                      {APPLICATION_STATUS_LABEL[r.status]}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span
+                        className={cn(
+                          'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                          APPLICATION_STATUS_CLASS[r.status],
+                        )}
+                      >
+                        {APPLICATION_STATUS_LABEL[r.status]}
+                      </span>
+                      {/* ที่มา (16 ส.ค.) — ไม่รู้ที่มา = ไม่ขึ้นชิป ห้ามเดา */}
+                      {r.origin ? (
+                        <span
+                          title={APPLICATION_ORIGIN_HINT[r.origin]}
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                            APPLICATION_ORIGIN_CLASS[r.origin],
+                          )}
+                        >
+                          {APPLICATION_ORIGIN_LABEL[r.origin]}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-1">

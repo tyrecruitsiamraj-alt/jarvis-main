@@ -6,6 +6,8 @@
  * → whitelist เท่านั้น: รู้จักถึงพูด ไม่รู้จัก = เงียบ
  */
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { requestNoFromJobRef, speakableBenefitLine } from '../../api/_lib/siamrajJobBenefits.js';
 
 // ชุดจริงจากฐาน 15 ส.ค. (ใบ LMO6908004) — มีทั้งของพูดได้และห้ามพูดปนกัน
@@ -79,5 +81,28 @@ describe('requestNoFromJobRef', () => {
     expect(requestNoFromJobRef('internal-123')).toBeNull();
     expect(requestNoFromJobRef('siamraj-sql:')).toBeNull();
     expect(requestNoFromJobRef('')).toBeNull();
+  });
+});
+
+/**
+ * 🔴 เจ้าของย้ำ 16 ส.ค. 2569: "โชว์อัตราจ่ายนะไม่ใช่อัตราเบิก"
+ * `payment_rate` = จ่ายพนักงาน · `draw_rate` = เบิกลูกค้า — คนละเลขจริง ๆ
+ * (วัดฐาน 16 ส.ค.: 309,977 แถว เบิกสูงกว่าจ่าย 154,362 · เบิกต่ำกว่าจ่าย 140,173)
+ * หยิบผิดคอลัมน์ = บอกเลขผิดให้ผู้สมัคร + เผยราคาขายให้คนนอก
+ */
+describe('ห้ามหยิบอัตราเบิกมาใช้', () => {
+  const src = fs.readFileSync(
+    path.join(import.meta.dirname, '../../api/_lib/siamrajJobBenefits.ts'),
+    'utf8',
+  );
+
+  it('คิวรีดึง payment_rate (อัตราจ่าย)', () => {
+    expect(src).toContain('C.payment_rate as fee_rate');
+  });
+
+  it('ไม่มี draw_rate / draw_tor_percent อยู่ในคิวรีเลย', () => {
+    const sqlOnly = src.slice(src.indexOf('SELECT'), src.indexOf('`,', src.indexOf('SELECT')));
+    expect(sqlOnly).not.toMatch(/draw_rate/);
+    expect(sqlOnly).not.toMatch(/draw_tor_percent/);
   });
 });

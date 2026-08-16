@@ -65,6 +65,11 @@ export type PublicApplication = {
   license_types?: string[];
   /** เจ้าหน้าที่ที่คีย์ใบนี้ — undefined = ผู้สมัครกรอกเองผ่านลิงก์ */
   created_by_name?: string;
+  /**
+   * ที่มาของคนนี้ — 'self_apply' สมัครเอง · 'ai_found' AI หาให้ · 'staff_added' คีย์เอง
+   * undefined = server/schema เก่ายังไม่ส่ง (ไม่ใช่ "สมัครเอง")
+   */
+  origin?: ApplicationOrigin;
   created_at: string;
   /** "เก็บไปติดต่อ" (13 ส.ค. 2569) — claimed = มีคนเก็บแล้ว · claimed_by_me = ของฉัน
    * ชื่อคนเก็บ server ส่งมาเฉพาะของตัวเอง (คนอื่นไม่เห็นชื่อ — เจ้าของสั่ง) */
@@ -108,6 +113,61 @@ export const EDUCATION_LEVELS = [
   'สูงกว่าปริญญาตรี',
   'อื่นๆ',
 ];
+
+/**
+ * "คนนี้มาจากไหน" (เจ้าของสั่ง 16 ส.ค. 2569: *"แยกให้หน่อยว่าอันไหนมาจากการสมัครใหม่
+ * อันไหนมาจาก AI หาให้"*) — server คิดให้ (ดู api/_lib/applicationOriginSql.ts)
+ * `undefined` = ยังไม่รู้ (server/schema เก่า) — **ห้ามเดาว่าสมัครเอง**
+ */
+export type ApplicationOrigin = 'self_apply' | 'ai_found' | 'staff_added';
+
+export const APPLICATION_ORIGIN_LABEL: Record<ApplicationOrigin, string> = {
+  self_apply: 'สมัครใหม่',
+  ai_found: 'AI หาให้',
+  staff_added: 'เจ้าหน้าที่คีย์',
+};
+
+/** คำอธิบายยาว — ใช้เป็น title ของชิป (บอกว่าทำไมคนนี้มาอยู่ตรงนี้) */
+export const APPLICATION_ORIGIN_HINT: Record<ApplicationOrigin, string> = {
+  self_apply: 'ผู้สมัครกรอกใบสมัครเข้ามาเอง ผ่านลิงก์ประกาศ/หน้าสมัครสาธารณะ',
+  ai_found: 'AI ไปหามาจากฐาน (iRecruit/บอร์ด) แล้วโทรตามก่อน จึงได้ใบสมัครนี้',
+  staff_added: 'เจ้าหน้าที่คีย์เข้าระบบเอง (เช่น โทรเข้ามาสมัครทางโทรศัพท์)',
+};
+
+/** ⚠️ ทุกค่าต้องมีคู่ `dark:` ครบ (กติกาเดียวกับชิปสถานะ) */
+export const APPLICATION_ORIGIN_CLASS: Record<ApplicationOrigin, string> = {
+  self_apply: 'bg-sky-500/15 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300',
+  ai_found: 'bg-violet-500/15 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300',
+  staff_added: 'bg-slate-500/15 text-slate-700 dark:bg-slate-400/15 dark:text-slate-300',
+};
+
+/**
+ * นับคนตามที่มา — คืนครบทุกช่องเสมอ (0 = ไม่มีคนกลุ่มนั้น ซึ่งเป็นคำตอบ ไม่ใช่ช่องว่าง)
+ * `unknown` = ใบที่ server ยังไม่บอกที่มา — แยกออกมาให้เห็น ห้ามยัดรวมกับ "สมัครใหม่"
+ */
+export function countApplicationsByOrigin(
+  items: Array<{ origin?: ApplicationOrigin }>,
+): Record<ApplicationOrigin | 'unknown', number> {
+  const out = { self_apply: 0, ai_found: 0, staff_added: 0, unknown: 0 };
+  for (const it of items) {
+    if (it.origin && isApplicationOrigin(it.origin)) out[it.origin] += 1;
+    else out.unknown += 1;
+  }
+  return out;
+}
+
+/** กรองตามที่มา · 'all' = ไม่กรอง */
+export function filterApplicationsByOrigin<T extends { origin?: ApplicationOrigin }>(
+  items: T[],
+  origin: ApplicationOrigin | 'all',
+): T[] {
+  if (origin === 'all') return items;
+  return items.filter((it) => it.origin === origin);
+}
+
+export function isApplicationOrigin(v: unknown): v is ApplicationOrigin {
+  return v === 'self_apply' || v === 'ai_found' || v === 'staff_added';
+}
 
 export type ApplicationStatus = 'new' | 'contacted' | 'converted' | 'rejected';
 
