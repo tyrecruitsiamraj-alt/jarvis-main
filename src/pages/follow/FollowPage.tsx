@@ -66,6 +66,15 @@ const FollowPage: React.FC = () => {
   const [staffPhone, setStaffPhone] = useState('');
   /** ให้โทรเมื่อไหร่ — หลายรอบได้ เพราะบางเคสต้องโทรมากกว่า 1 ครั้ง (เจ้าของสั่ง 10 ส.ค. 2569) */
   const [scheduledAts, setScheduledAts] = useState<string[]>(() => [nowForInput()]);
+  /**
+   * โหมดตารางโทร (16 ส.ค. · migration 092): ช่วงวัน × รอบเวลา/วัน
+   * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → ระบบยิง 1 แถว/วัน ผูก group เดียว
+   * รับสายยืนยันแล้ว Lumos หยุดรอบที่เหลือของวันนั้น (stop_early) พรุ่งนี้โทรต่อ
+   */
+  const [scheduleMode, setScheduleMode] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [roundTimes, setRoundTimes] = useState<string[]>(() => ['07:00']);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -98,6 +107,9 @@ const FollowPage: React.FC = () => {
     setNote('');
     setStaffPhone('');
     setScheduledAts([nowForInput()]);
+    setDateFrom('');
+    setDateTo('');
+    setRoundTimes(['07:00']);
     setFormError(null);
   };
 
@@ -106,6 +118,25 @@ const FollowPage: React.FC = () => {
   const addScheduledAt = () => setScheduledAts((prev) => [...prev, nowForInput()]);
   const removeScheduledAt = (i: number) =>
     setScheduledAts((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+
+  const setRoundAt = (i: number, v: string) =>
+    setRoundTimes((prev) => prev.map((x, idx) => (idx === i ? v : x)));
+  const addRound = () => setRoundTimes((prev) => (prev.length >= 5 ? prev : [...prev, '08:00']));
+  const removeRound = (i: number) =>
+    setRoundTimes((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+
+  /** วันในช่วง [from, to] เป็น YYYY-MM-DD (สูงสุด 31 วัน) — คืน [] ถ้าช่วงผิด */
+  const daysInRange = (from: string, to: string): string[] => {
+    if (!from || !to) return [];
+    const start = new Date(`${from}T00:00:00+07:00`);
+    const end = new Date(`${to}T00:00:00+07:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return [];
+    const out: string[] = [];
+    for (let d = new Date(start); d <= end && out.length < 31; d.setDate(d.getDate() + 1)) {
+      out.push(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }));
+    }
+    return out;
+  };
 
   /**
    * หนึ่งเวลา = หนึ่งรายการ — API รับเวลาเดียวต่อรายการ และคิวโทรก็ผูกกับรายการ 1:1
@@ -117,6 +148,52 @@ const FollowPage: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    const recipientName = composeRecipientName(prefix, firstName, lastName);
+
+    // โหมดตาราง: ช่วงวัน × รอบเวลา/วัน → 1 แถว/วัน ผูก group เดียว (Lumos หยุดรอบที่เหลือ
+    // ของวันเมื่อยืนยัน · declined ยกเลิกทั้งชุด — server จัดการ)
+    if (scheduleMode) {
+      const days = daysInRange(dateFrom, dateTo);
+      if (days.length === 0) {
+        setFormError('เลือกช่วงวันให้ถูกต้อง (ไม่เกิน 31 วัน · วันเริ่มต้องไม่หลังวันจบ)');
+        return;
+      }
+      const rounds = [...new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t)))].sort();
+      if (rounds.length === 0) {
+        setFormError('ระบุรอบเวลาอย่างน้อย 1 รอบ (เช่น 07:00)');
+        return;
+      }
+      const groupId = crypto.randomUUID();
+      setSubmitting(true);
+      let done = 0;
+      try {
+        for (const day of days) {
+          await createFollowEntry({
+            recipient_name: recipientName,
+            recipient_phone: phone,
+            topic,
+            note: note || undefined,
+            staff_phone: staffPhone || undefined,
+            scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
+            group_id: groupId,
+            call_times: rounds,
+          });
+          done += 1;
+        }
+        resetForm();
+        setFormOpen(false);
+        setOkMessage(`ตั้งตารางโทรแล้ว — ${days.length} วัน วันละ ${rounds.length} รอบ (รวม ${days.length * rounds.length} สาย)`);
+        window.setTimeout(() => setOkMessage(null), 6000);
+        await reload();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
+        setFormError(done > 0 ? `${msg} — ตั้งไปแล้ว ${done} จาก ${days.length} วัน อย่ากดซ้ำทั้งชุด` : msg);
+        if (done > 0) await reload();
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     // เรียงเวลาจากก่อนไปหลัง + ตัดเวลาซ้ำทิ้ง (กดเพิ่มแล้วลืมแก้ = ได้สองสายเวลาเดียวกัน)
     const times = [...new Set(scheduledAts.filter(Boolean))].sort();
@@ -128,7 +205,6 @@ const FollowPage: React.FC = () => {
     setSubmitting(true);
     let done = 0;
     try {
-      const recipientName = composeRecipientName(prefix, firstName, lastName);
       for (const t of times) {
         await createFollowEntry({
           recipient_name: recipientName,
@@ -337,7 +413,83 @@ const FollowPage: React.FC = () => {
               </p>
             </div>
 
-            {/* ให้โทรเมื่อไหร่ — เพิ่มได้หลายรอบ · หนึ่งรอบ = หนึ่งรายการในคิว มีสถานะ/ผลของตัวเอง */}
+            {/* สลับโหมด: รอบเดี่ยว/หลายรอบ (เวลาเจาะจง) vs ตารางหลายวัน (ช่วงวัน × รอบ/วัน) */}
+            <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/40 p-1 text-xs dark:border-white/15 dark:bg-white/5">
+              <button
+                type="button"
+                onClick={() => setScheduleMode(false)}
+                className={cn('flex-1 rounded-full px-3 py-1.5 font-medium', !scheduleMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}
+              >
+                ระบุเวลาเอง
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleMode(true)}
+                className={cn('flex-1 rounded-full px-3 py-1.5 font-medium', scheduleMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}
+              >
+                ตารางหลายวัน
+              </button>
+            </div>
+
+            {scheduleMode ? (
+              /* ตารางโทร: ช่วงวัน × รอบเวลา/วัน (เจ้าของสั่ง 16 ส.ค. — เช่น 1-7 วันละ 2 รอบ) */
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label htmlFor="followFrom" className="ml-1 text-xs font-medium text-muted-foreground">ตั้งแต่วันที่</label>
+                    <input id="followFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="jarvis-soft-field min-h-[46px] w-full" />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="followTo" className="ml-1 text-xs font-medium text-muted-foreground">ถึงวันที่</label>
+                    <input id="followTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="jarvis-soft-field min-h-[46px] w-full" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">รอบเวลาต่อวัน (สูงสุด 5 รอบ)</span>
+                  {roundTimes.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={v}
+                        onChange={(e) => setRoundAt(i, e.target.value)}
+                        aria-label={`รอบที่ ${i + 1}`}
+                        className="jarvis-soft-field min-h-[46px] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeRound(i)}
+                        disabled={roundTimes.length <= 1}
+                        aria-label={`เอารอบที่ ${i + 1} ออก`}
+                        className="inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/60 text-slate-600 hover:text-foreground disabled:opacity-40 dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                  {roundTimes.length < 5 ? (
+                    <button
+                      type="button"
+                      onClick={addRound}
+                      className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-4 py-1.5 text-xs font-medium text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบต่อวัน
+                    </button>
+                  ) : null}
+                </div>
+                {(() => {
+                  const days = daysInRange(dateFrom, dateTo).length;
+                  const rounds = new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size;
+                  return days > 0 && rounds > 0 ? (
+                    <p className="ml-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
+                      รวม {days} วัน × {rounds} รอบ = {days * rounds} สาย · รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ
+                    </p>
+                  ) : (
+                    <p className="ml-1 text-[11px] text-muted-foreground">เลือกช่วงวัน + รอบเวลา แล้วระบบจะสรุปจำนวนสายให้</p>
+                  );
+                })()}
+              </div>
+            ) : (
+            /* ให้โทรเมื่อไหร่ — เพิ่มได้หลายรอบ · หนึ่งรอบ = หนึ่งรายการในคิว มีสถานะ/ผลของตัวเอง */
             <div className="space-y-1.5">
               <label htmlFor="followWhen0" className="ml-1 text-xs font-medium text-muted-foreground">
                 ให้โทรเมื่อไหร่
@@ -382,6 +534,7 @@ const FollowPage: React.FC = () => {
                 (เวลาซ้ำกันจะถูกตัดออกอัตโนมัติ)
               </p>
             </div>
+            )}
 
             {formError ? (
               <p className="text-xs font-medium text-destructive" role="alert">

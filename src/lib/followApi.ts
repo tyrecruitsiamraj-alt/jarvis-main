@@ -28,6 +28,10 @@ export type NewFollowEntry = {
   note?: string;
   staff_phone?: string;
   scheduled_at?: string;
+  /** ตารางโทร (092) — uuid เดียวต่อ 1 คน (client gen · ยิง 1 แถว/วัน ผูก group เดียว) */
+  group_id?: string;
+  /** รอบเวลาของวันนั้น (HH:MM) — หลายรอบในวันเดียว (Lumos หยุดที่เหลือเมื่อยืนยัน) */
+  call_times?: string[];
 };
 
 async function readError(r: Response): Promise<string> {
