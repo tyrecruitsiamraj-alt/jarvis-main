@@ -1716,3 +1716,34 @@ AI แนะนำซึ่งยังไม่ใช่ใบสมัคร �
 หมายเหตุความจริงจาก mutation test: ตัว tiebreaker ใน `applyNavPreferences` กับการเขียน
 `order` ให้ทุกตัวใน `moveNavItem` เป็นการเขียนเจตนาให้ชัด — ถอดออกแล้วเทสต์ยังผ่าน
 (เพราะ `Array.sort` ของ JS stable อยู่แล้ว) เทสต์จึงคุม "ผลลัพธ์" ไม่ได้พิสูจน์ว่าจำเป็น
+
+## ขั้นในกระบวนการจ้าง + เช็คลิสต์เตรียมเข้างาน (094 · ข้อ 5–7 · 16 ส.ค. 2569)
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `migrations/094_selection_progress.sql` | `selection_status` text + `prep_checklist` jsonb บนใบสมัคร |
+| `src/lib/selectionProgress.ts` | **pure** — 6 ขั้น + 5 ช่องติ๊ก + normalize/toggle/progress |
+| `src/lib/followPrefill.ts` | ส่งชื่อ/เบอร์ไปหน้า Follow ผ่าน query (ข้อ 7) |
+| `api/_handlers/job-applications.ts` | `patchSelectionProgress` — action แยกจาก patchStatus |
+| `src/components/recruit-rm/SelectionProgressControls.tsx` | dropdown + ช่องติ๊ก (บันทึกทันทีที่กด) |
+
+6 ขั้น: รอนายพิจารณา · รอนัดวันสัมภาษณ์ · รอผลสัมภาษณ์ · รอเริ่มงาน · ช่วงประเมิน · รอแจ้งเข้า
+5 ช่องติ๊ก: ลงแผนแจ้งเข้า · ผลคดี · ผลตรวจสุขภาพ · เบิกเสื้อ · แจ้งประกัน
+
+⚠️ 🔴 **`selection_status` คนละตัวกับ `status`** (new/contacted/converted/rejected)
+ตัวหลังคือ "ขั้นที่คนทำกับใบ" ที่ dashboard/แท็บ RM/ตัวนับทั้งระบบใช้อยู่ · ตัวใหม่คือ
+"ขั้นของคนในกระบวนการจ้าง" · เอาไปทับกันเมื่อไหร่ตัวเลขทุกหน้าเพี้ยนพร้อมกัน (มีเทสต์คุม
+ว่าค่าสองชุดไม่ทับกัน)
+⚠️ เช็คลิสต์เป็น jsonb ไม่ใช่ 5 คอลัมน์ — เจ้าของเติมรายการเรื่อย ๆ · **ไม่เก็บ `false`**
+(คีย์ที่ไม่มี = ยังไม่ติ๊ก อยู่แล้ว · เก็บ false ทำให้ "ไม่เคยแตะ" กับ "ติ๊กแล้วเอาออก" แยกไม่ออก)
+⚠️ ติ๊ก "ลงแผนแจ้งเข้า" แล้วพาไป `/follow?pf_name=…` — **เอาติ๊กออกไม่พาไปไหน**
+(ไม่งั้นกดพลาดแล้วเด้งออกจากหน้าที่ทำอยู่) · Follow อ่านค่าแล้วล้าง query ทิ้งทันที
+
+### 🔴 บั๊กที่เจอระหว่างทาง — alias `a` ของชุดคอลัมน์
+
+เพิ่มคอลัมน์ derived `origin` (อ้าง `a.job_id`) เข้า `LIST_COLUMNS` เมื่อ commit a1a93eb
+แต่คิวรีอื่นที่ใช้ `{{cols}}` ชุดเดียวกัน **ไม่ได้ตั้ง alias** → `missing FROM-clause
+entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม่ใช่แค่คอลัมน์นั้นหาย
+· เส้นที่พังพร้อมกัน: claim / คืน / เก็บ Lead / แก้เบอร์ / เปลี่ยนสถานะ
+· แก้: ทุก `select {{cols}} from ${tbl} a` และ `update ${tbl} a … returning {{cols}}`
+· เทสต์กันซ้ำ: `tests/api/applicationColumnsAlias.test.ts` (mutation 2/2)

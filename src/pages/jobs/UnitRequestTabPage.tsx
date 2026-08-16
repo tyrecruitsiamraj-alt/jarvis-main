@@ -14,6 +14,8 @@ import {
   unitMatchStatus,
 } from '@/lib/unitMatchingView';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import SelectionProgressControls from '@/components/recruit-rm/SelectionProgressControls';
+import { isInterestedOutcome } from '@/lib/applicantCallOutcome';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { EM_DASH } from '@/lib/displayFallback';
 import { TONE } from '@/lib/designTokens';
@@ -177,6 +179,20 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
                         <span className="sm:text-right">
                           <span className={STATUS_CLASS[st.tone]}>{st.text}</span>
                         </span>
+                        {/* ขั้นในกระบวนการจ้าง + เช็คลิสต์ (ข้อ 5–7) — โผล่เฉพาะคนที่
+                            คุยแล้วสนใจหรือมีนัดแล้ว · คนที่ยังไม่ได้โทรไม่ต้องรก */}
+                        {a.appointment_at || isInterestedOutcome(a.last_call_outcome) || a.selection_status ? (
+                          <div className="sm:col-span-3">
+                            <SelectionProgressControls
+                              application={a}
+                              onSaved={(next) =>
+                                setItems((cur) =>
+                                  (cur ?? []).map((x) => (x.id === next.id ? next : x)),
+                                )
+                              }
+                            />
+                          </div>
+                        ) : null}
                       </li>
                     );
                   })}

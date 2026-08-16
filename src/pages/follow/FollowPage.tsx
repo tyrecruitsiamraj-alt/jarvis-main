@@ -17,6 +17,8 @@ import {
 import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
+import { useSearchParams } from 'react-router-dom';
+import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
 
 const FILTERS: Array<{ id: 'all' | FollowCallStatus; label: string }> = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -90,6 +92,28 @@ const FollowPage: React.FC = () => {
    */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+
+  /**
+   * ค่าที่ส่งมาจากปุ่ม "ลงแผนแจ้งเข้า" ในหน้าคัดสรร (ข้อ 7) — กรอกชื่อ/เบอร์/เรื่องให้เลย
+   * เหลือแค่เลือกวัน–เวลา · อ่านครั้งเดียวตอนเข้าหน้า แล้วล้าง query ทิ้ง
+   * (ไม่ล้าง = กดรีเฟรชแล้วฟอร์มเด้งเปิดใหม่ทุกครั้ง)
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const prefill = readFollowPrefill(searchParams);
+    if (!hasFollowPrefill(prefill)) return;
+    if (prefill.name) {
+      const { prefix: pre, first, last } = splitPrefillName(prefill.name);
+      setPrefix(pre);
+      setFirstName(first);
+      setLastName(last);
+    }
+    if (prefill.phone) setPhone(prefill.phone);
+    if (prefill.topic) setTopic(prefill.topic);
+    setPickedFrom('มาจากหน้าคัดสรร — เหลือเลือกวันและเวลา');
+    setFormOpen(true);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
   const pickPerson = (p: BoardPickerPerson) => {
     const { prefix: pre, first, last } = splitPickerName(p);
     setPrefix(pre);

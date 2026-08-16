@@ -11,13 +11,20 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
-import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
+import {
+  isApplicationInWriteScope,
+  loadApplicationScopeRowOrNull,
+} from '../_lib/applicationScope.js';
 import { bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
 import {
   applicationOriginColumn,
   applicationOriginExpr,
   isApplicationOrigin,
 } from '../_lib/applicationOriginSql.js';
+import {
+  isSelectionStatus,
+  normalizePrepChecklist,
+} from '../../src/lib/selectionProgress.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -82,6 +89,9 @@ type Row = {
   lead_at: string | Date | null;
   /** ที่มาของคนนี้ (derived — ดู applicationOriginSql) · schema เก่าไม่มี = undefined */
   origin?: string | null;
+  /** ขั้นในกระบวนการจ้าง + เช็คลิสต์เตรียมเข้างาน (migration 094) */
+  selection_status?: string | null;
+  prep_checklist?: unknown;
 };
 
 function toNum(v: string | number | null): number | undefined {
@@ -156,11 +166,25 @@ function toApplication(r: Row, viewerId?: string) {
      * 'self_apply'** — "ไม่รู้" ต้องต่างจาก "รู้ว่าเขามาเอง" ไม่งั้นป้ายโกหก
      */
     origin: isApplicationOrigin(r.origin) ? r.origin : undefined,
+    /**
+     * ขั้นในกระบวนการจ้าง (094) — **คนละตัวกับ `status`** ข้างบน
+     * ค่าที่ไม่รู้จัก/ยังไม่ตั้ง = undefined (ไม่เดาให้เป็นขั้นแรก)
+     */
+    selection_status: isSelectionStatus(r.selection_status) ? r.selection_status : undefined,
+    prep_checklist: normalizePrepChecklist(r.prep_checklist),
     created_at: toIso(r.created_at),
   };
 }
 
-// explicit columns (never select document_bytes — it is fetched on demand)
+/**
+ * explicit columns (never select document_bytes — it is fetched on demand)
+ *
+ * 🔴 **ทุกคิวรีที่ใช้ `{{cols}}` ต้องตั้ง alias `a` ให้ตาราง** — ชุดนี้มีคอลัมน์ derived
+ * (`applicationOriginColumn('a')`) ที่อ้าง `a.job_id` / `a.phone_e164` / `a.created_at`
+ * ลืม alias = `missing FROM-clause entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500**
+ * ไม่ใช่แค่คอลัมน์นั้นหาย · เจอจริง 16 ส.ค. 2569: claim / lead / แก้เบอร์ / เปลี่ยนสถานะ
+ * พังพร้อมกันหมดหลังเพิ่มคอลัมน์ origin (มีเทสต์ guard คุมแล้ว)
+ */
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
   province, district, subdistrict, postal_code,
@@ -171,6 +195,7 @@ const LIST_COLUMNS = `
   created_at,
   claimed_by, claimed_by_name, claimed_at,
   is_lead, lead_by_name, lead_at,
+  selection_status, prep_checklist,
   ${applicationOriginColumn('a')}
 `;
 
@@ -565,9 +590,60 @@ async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolea
     entityId: id,
     after: { claim },
   });
-  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} where id = $1`, [id]);
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} a where a.id = $1`, [id]);
   if (!rows[0]) return sendError(res, 404, 'Not found');
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
+}
+
+/**
+ * PATCH `{ id, selection_status?, prep_checklist? }` — ขั้นในกระบวนการจ้าง + เช็คลิสต์ (094)
+ *
+ * ⚠️ **ไม่แตะ `status` เดิม** — คนละความหมาย (ดู selectionProgress.ts) เอาไปทับกัน
+ * เมื่อไหร่ตัวเลขทุกหน้าที่นับจาก status เพี้ยนพร้อมกัน
+ * ⚠️ `selection_status: null` = ล้างขั้น (ยังไม่ถึงขั้นไหน) — ต่างจากไม่ส่งฟิลด์มาเลย
+ */
+async function patchSelectionProgress(
+  req: AuthedReq,
+  res: ApiRes,
+  id: string,
+  b: Record<string, unknown>,
+) {
+  const hasStatus = b.selection_status !== undefined;
+  const hasChecklist = b.prep_checklist !== undefined;
+  if (hasStatus && b.selection_status !== null && !isSelectionStatus(b.selection_status)) {
+    return sendError(res, 400, 'Bad request', 'ขั้นไม่ถูกต้อง');
+  }
+
+  const scopeRow = await loadApplicationScopeRowOrNull(id);
+  if (!scopeRow) return sendError(res, 404, 'Not found');
+  if (!(await isApplicationInWriteScope(req.user, scopeRow))) {
+    return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+  }
+
+  const nextStatus = hasStatus ? (b.selection_status as string | null) : null;
+  const nextChecklist = hasChecklist ? normalizePrepChecklist(b.prep_checklist) : null;
+
+  const rows = await queryWithLegacyFallback(
+    `
+    update ${tbl} a
+    set selection_status = case when $2::boolean then $3 else selection_status end,
+        prep_checklist = case when $4::boolean then $5::jsonb else prep_checklist end,
+        updated_at = now()
+    where a.id = $1
+    returning {{cols}}
+    `,
+    [id, hasStatus, nextStatus, hasChecklist, nextChecklist ? JSON.stringify(nextChecklist) : null],
+  );
+  const row = rows[0];
+  if (!row) return sendError(res, 404, 'Not found');
+
+  await auditFromAuthed(req, {
+    action: 'job_application.selection_progress',
+    entityType: 'job_application',
+    entityId: id,
+    after: { selection_status: nextStatus, prep_checklist: nextChecklist },
+  });
+  return res.status(200).json({ item: toApplication(row, req.user.sub) });
 }
 
 /**
@@ -629,7 +705,7 @@ async function patchLead(req: AuthedReq, res: ApiRes, id: string, lead: boolean)
     entityId: id,
     after: { lead },
   });
-  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} where id = $1`, [id]);
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} a where a.id = $1`, [id]);
   if (!rows[0]) return sendError(res, 404, 'Not found');
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
 }
@@ -670,7 +746,7 @@ async function patchPhone(req: AuthedReq, res: ApiRes, id: string, rawPhone: str
     after: { phone: normalized },
   });
 
-  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} where id = $1`, [id]);
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} a where a.id = $1`, [id]);
   if (!rows[0]) return sendError(res, 404, 'Not found');
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
 }
@@ -690,6 +766,10 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
   if (typeof b.lead === 'boolean') return patchLead(req, res, id, b.lead);
   // แก้เบอร์ (ใบที่ติดธงเบอร์ใช้โทรไม่ได้ — migration 087)
   if (typeof b.phone === 'string') return patchPhone(req, res, id, b.phone);
+  // ขั้นในกระบวนการจ้าง + เช็คลิสต์ (094) — action แยก ไม่ปนกับ status เดิม
+  if (b.selection_status !== undefined || b.prep_checklist !== undefined) {
+    return patchSelectionProgress(req, res, id, b);
+  }
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
@@ -723,11 +803,11 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
 
   const rows = await queryWithLegacyFallback(
     `
-    update ${tbl}
+    update ${tbl} a
     set status = coalesce($2, status),
         admin_note = case when $3::boolean then $4 else admin_note end,
         updated_at = now()
-    where id = $1
+    where a.id = $1
     returning {{cols}}
     `,
     [id, hasStatus ? (b.status as string) : null, hasNote, adminNote],

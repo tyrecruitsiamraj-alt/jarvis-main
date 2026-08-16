@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/apiFetch';
+import type { PrepChecklist, SelectionStatus } from '@/lib/selectionProgress';
 
 /** ใบสมัครที่ผู้สมัครกรอกผ่านฟอร์มหน้า /apply */
 export type PublicApplication = {
@@ -70,6 +71,13 @@ export type PublicApplication = {
    * undefined = server/schema เก่ายังไม่ส่ง (ไม่ใช่ "สมัครเอง")
    */
   origin?: ApplicationOrigin;
+  /**
+   * ขั้นในกระบวนการจ้าง (094) — **คนละตัวกับ `status`** ซึ่งเป็นขั้นที่คนทำกับใบ
+   * undefined = ยังไม่ตั้งขั้น (ไม่ใช่ขั้นแรก)
+   */
+  selection_status?: SelectionStatus;
+  /** เช็คลิสต์เตรียมเข้างาน — คีย์ที่ไม่มี = ยังไม่ติ๊ก */
+  prep_checklist?: PrepChecklist;
   created_at: string;
   /** "เก็บไปติดต่อ" (13 ส.ค. 2569) — claimed = มีคนเก็บแล้ว · claimed_by_me = ของฉัน
    * ชื่อคนเก็บ server ส่งมาเฉพาะของตัวเอง (คนอื่นไม่เห็นชื่อ — เจ้าของสั่ง) */
@@ -402,4 +410,24 @@ export async function claimJobApplication(id: string, claim: boolean): Promise<P
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;
+}
+
+/**
+ * บันทึกขั้นในกระบวนการจ้าง / เช็คลิสต์ (094)
+ * ส่งเฉพาะฟิลด์ที่ต้องการเปลี่ยน — ไม่ส่ง = ไม่แตะของเดิม
+ */
+export async function saveSelectionProgress(
+  id: string,
+  patch: { selection_status?: SelectionStatus | null; prep_checklist?: PrepChecklist },
+): Promise<PublicApplication> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, ...patch }),
+  });
+  if (!r.ok) {
+    const data = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
+    throw new Error(data.message || data.error || `บันทึกไม่สำเร็จ (HTTP ${r.status})`);
+  }
+  const data = (await r.json()) as { item: PublicApplication };
+  return data.item;
 }

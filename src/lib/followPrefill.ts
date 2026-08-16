@@ -1,0 +1,61 @@
+/**
+ * ส่งชื่อ/เบอร์ไปตั้งตารางโทรที่หน้า Follow (เจ้าของสั่ง 16 ส.ค. 2569 ข้อ 7:
+ * *"กรณีลงแผนแจ้งเข้าพอกดแล้วไปหน้า Follow เอาชื่อคนคนนั้นตั้งแล้วให้เลือกแค่พวกวันที่ เวลา"*)
+ *
+ * ส่งผ่าน query string ไม่ใช่ state ของ router — คนจะได้ส่งลิงก์ให้กันได้ และกด
+ * ปุ่มย้อนกลับแล้วค่ายังอยู่ (state ของ router หายตอน reload)
+ *
+ * ⚠️ **ห้ามใส่ข้อมูลอ่อนไหวเกินชื่อ/เบอร์/หัวข้อ** — query string ไปโผล่ใน log ของ
+ * เบราว์เซอร์และ proxy ได้ · แค่นี้พอให้ฟอร์มกรอกให้เอง
+ */
+export const FOLLOW_PREFILL_KEYS = { name: 'pf_name', phone: 'pf_phone', topic: 'pf_topic' } as const;
+
+export type FollowPrefill = { name?: string; phone?: string; topic?: string };
+
+/** สร้าง path ไปหน้า Follow พร้อมค่าที่จะให้ฟอร์มกรอกให้ */
+export function buildFollowPrefillPath(prefill: FollowPrefill): string {
+  const params = new URLSearchParams();
+  if (prefill.name?.trim()) params.set(FOLLOW_PREFILL_KEYS.name, prefill.name.trim().slice(0, 200));
+  if (prefill.phone?.trim()) params.set(FOLLOW_PREFILL_KEYS.phone, prefill.phone.trim().slice(0, 20));
+  if (prefill.topic?.trim()) params.set(FOLLOW_PREFILL_KEYS.topic, prefill.topic.trim().slice(0, 200));
+  const qs = params.toString();
+  return qs ? `/follow?${qs}` : '/follow';
+}
+
+/** อ่านค่าที่ส่งมา — ไม่มี = undefined (ฟอร์มใช้ค่าเดิมของตัวเอง) */
+export function readFollowPrefill(search: string | URLSearchParams): FollowPrefill {
+  const p = typeof search === 'string' ? new URLSearchParams(search) : search;
+  const pick = (k: string) => {
+    const v = (p.get(k) ?? '').trim();
+    return v ? v : undefined;
+  };
+  return {
+    name: pick(FOLLOW_PREFILL_KEYS.name),
+    phone: pick(FOLLOW_PREFILL_KEYS.phone),
+    topic: pick(FOLLOW_PREFILL_KEYS.topic),
+  };
+}
+
+/** มีค่าอะไรส่งมาบ้างไหม — ใช้ตัดสินว่าจะเปิดฟอร์มให้เองหรือเปล่า */
+export function hasFollowPrefill(prefill: FollowPrefill): boolean {
+  return Boolean(prefill.name || prefill.phone || prefill.topic);
+}
+
+/**
+ * แยกชื่อเต็มเป็น คำนำหน้า/ชื่อ/นามสกุล ให้ฟอร์ม Follow
+ * (ใช้ตรรกะเดียวกับ picker เลือกชื่อจากบอร์ด — คำนำหน้าติดมากับชื่อได้)
+ */
+export function splitPrefillName(full: string): { prefix: string; first: string; last: string } {
+  const PREFIXES = ['นางสาว', 'นาย', 'นาง'] as const; // ยาวก่อนสั้น ("นางสาว" ต้องชนะ "นาง")
+  let rest = (full || '').trim();
+  let prefix = '';
+  for (const pre of PREFIXES) {
+    if (rest.startsWith(pre)) {
+      prefix = pre;
+      rest = rest.slice(pre.length).trim();
+      break;
+    }
+  }
+  const [first = '', ...others] = rest.split(/\s+/).filter(Boolean);
+  return { prefix, first, last: others.join(' ') };
+}
