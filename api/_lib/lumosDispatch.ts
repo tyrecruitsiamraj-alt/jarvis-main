@@ -324,8 +324,12 @@ const REVIVE_CANCELLED_ON_CONFLICT_NO_RANK = `on conflict (channel, job_ref, per
 async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
-  /** `matchRank` = ลำดับจาก tier ของ AI (ดู src/lib/matchRank.ts) · ไม่ส่ง = ท้ายแถว */
-  items: Array<{ personRef: string; payload: unknown; matchRank?: number | null }>,
+  /**
+   * `matchRank` = ลำดับจาก tier ของ AI (ดู src/lib/matchRank.ts) · ไม่ส่ง = ท้ายแถว
+   * `scheduledFor` = เวลาที่ **เร็วสุด**ที่จะเสิร์ฟแถวนี้ให้ Lumos (ISO) — ใช้กับ Follow
+   * ตั้งตาราง (แถววันอนาคตต้องไม่ถูกเสิร์ฟ+bump มาโทรวันนี้) · จะ max กับ quiet-hours
+   */
+  items: Array<{ personRef: string; payload: unknown; matchRank?: number | null; scheduledFor?: string | null }>,
 ): Promise<{ added: string[]; held: string[]; suppressed: string[] }> {
   const added: string[] = [];
   const held: string[] = [];
@@ -380,7 +384,17 @@ async function insertQueueItems(
         continue;
       }
     }
-    const base = [channel, jobRef, item.personRef, JSON.stringify(item.payload), nextAttemptAt];
+    // เวลาเสิร์ฟเร็วสุด = ช้ากว่าเสมอระหว่าง quiet-hours (nextAttemptAt) กับ scheduledFor
+    // ของรายการ (Follow ตั้งตาราง: วันอนาคตต้องรอถึงวันนั้นก่อนเสิร์ฟ ไม่งั้น bump มาโทรวันนี้)
+    let itemNextAttempt = nextAttemptAt;
+    if (item.scheduledFor) {
+      const sched = new Date(item.scheduledFor);
+      if (!Number.isNaN(sched.getTime())) {
+        const base = nextAttemptAt ? new Date(nextAttemptAt) : new Date();
+        itemNextAttempt = (sched.getTime() > base.getTime() ? sched : base).toISOString();
+      }
+    }
+    const base = [channel, jobRef, item.personRef, JSON.stringify(item.payload), itemNextAttempt];
     const rank = item.matchRank ?? null;
     let rows: Array<{ id: number }>;
     try {
@@ -809,7 +823,22 @@ export type FollowEntryInput = {
   /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI พูดให้ผู้สมัครโทรกลับ (ไม่ใช่เบอร์ที่ระบบโทรออก) */
   staffPhone?: string | null;
   scheduled_at: Date;
+  /**
+   * รอบเวลาของวันนั้น (HH:MM) — 1 แถว = 1 วัน = 1 plan (16 ส.ค.) · หลาย step ในวันเดียว
+   * รับสายยืนยัน → Lumos `stop_early` หยุด step ที่เหลือของวันนั้น (พรุ่งนี้เป็นแถว/plan ใหม่)
+   * ว่าง/ไม่ส่ง = รอบเดียวที่ scheduled_at (แบบเดิม)
+   */
+  callTimes?: string[] | null;
 };
+
+/** ประกอบ ISO ของ "วันเดียวกับ scheduled_at + เวลา HH:MM (เวลาไทย)" */
+function dayAtTime(day: Date, hhmm: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  const ymd = day.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  if (!m) return day.toISOString();
+  const hh = String(Math.min(23, Number(m[1]))).padStart(2, '0');
+  return new Date(`${ymd}T${hh}:${m[2]}:00+07:00`).toISOString();
+}
 
 export function buildFollowReminderPayload(entry: FollowEntryInput): LumosReminderPayload {
   const note = (entry.note || '').trim();
@@ -817,7 +846,15 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
   // ⚠️ schema ของ Lumos ไม่มีช่องใส่เบอร์ติดต่อกลับ — ช่องเดียวที่ถึงหูผู้สมัครคือ
   // `steps[].message` (ดู docs/lumos-api.md · ห้ามเพิ่มฟิลด์ใหม่เข้า payload
   // เพราะเราคุมฝั่ง Lumos ไม่ได้) จึงต่อเข้าไปในบทพูดแทน
-  const parts = [entry.topic, note, staffPhone ? `ติดต่อกลับได้ที่ ${staffPhone}` : ''].filter(Boolean);
+  const message = [entry.topic, note, staffPhone ? `ติดต่อกลับได้ที่ ${staffPhone}` : '']
+    .filter(Boolean)
+    .join(' — ');
+  // หลายรอบในวันเดียว → หลาย step (เวลาต่างกัน) · Lumos หยุดที่เหลือเองเมื่อยืนยัน (stop_early)
+  const times = (entry.callTimes || []).filter((t) => /^\d{1,2}:\d{2}$/.test((t || '').trim()));
+  const steps =
+    times.length > 0
+      ? times.map((t) => ({ type: 'follow_up' as const, message, scheduled_at: dayAtTime(entry.scheduled_at, t) }))
+      : [{ type: 'follow_up' as const, message, scheduled_at: entry.scheduled_at.toISOString() }];
   return {
     client_contact_id: `follow::${entry.id}`,
     recipient_name: entry.recipient_name,
@@ -825,20 +862,17 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
     title: entry.topic,
     language: 'th',
     tone: 'professional',
-    steps: [
-      {
-        type: 'follow_up',
-        message: parts.join(' — '),
-        scheduled_at: entry.scheduled_at.toISOString(),
-      },
-    ],
+    steps,
   };
 }
 
 /** รายชื่อ Follow ที่คนกรอก → คิว reminder (throw ให้ handler จัดการ เพราะผู้ใช้ต้องรู้ว่าเข้าคิวไหม) */
 export async function enqueueFollowReminder(entry: FollowEntryInput): Promise<void> {
+  const payload = buildFollowReminderPayload(entry);
+  // แถวตั้งตาราง (มีหลายรอบ) เสิร์ฟเร็วสุด = รอบแรกของวันนั้น (step แรก) — กันวันอนาคตถูก bump มาโทรก่อน
+  const scheduledFor = payload.steps[0]?.scheduled_at ?? entry.scheduled_at.toISOString();
   const { added, held, suppressed } = await insertQueueItems('reminder', 'follow', [
-    { personRef: `follow-${entry.id}`, payload: buildFollowReminderPayload(entry) },
+    { personRef: `follow-${entry.id}`, payload, scheduledFor },
   ]);
   logInfo('lumos.dispatch.follow', { followId: entry.id, added, held, suppressed });
 }
