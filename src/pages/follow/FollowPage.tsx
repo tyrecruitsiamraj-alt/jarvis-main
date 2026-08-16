@@ -3,7 +3,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded } from 'lucide-react';
+import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowEntry,
@@ -15,6 +15,8 @@ import {
   type FollowCallStatus,
 } from '@/lib/followApi';
 import NameAvatar from '@/components/shared/NameAvatar';
+import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
+import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 
 const FILTERS: Array<{ id: 'all' | FollowCallStatus; label: string }> = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -82,6 +84,23 @@ const FollowPage: React.FC = () => {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  /**
+   * เลือกชื่อจากบอร์ด ERP (F5b · 16 ส.ค. 2569) — เดิมต้องคีย์ชื่อ+เบอร์เอง พิมพ์ผิด = โทรผิดคน
+   * เลือกแล้วเติมช่องชื่อ/เบอร์ให้ · ช่อง "เรื่องที่จะให้โทร" ยังต้องพิมพ์เอง (คนละเรื่องกันทุกครั้ง)
+   */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+  const pickPerson = (p: BoardPickerPerson) => {
+    const { prefix: pre, first, last } = splitPickerName(p);
+    setPrefix(pre);
+    setFirstName(first);
+    setLastName(last);
+    setPhone((p.mobile || '').trim());
+    setPickedFrom(p.column_label ? `เลือกจากบอร์ด · ถัง ${p.column_label}` : 'เลือกจากบอร์ด');
+    setPickerOpen(false);
+    setFormError(null);
+  };
+
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -106,6 +125,7 @@ const FollowPage: React.FC = () => {
     setTopic('');
     setNote('');
     setStaffPhone('');
+    setPickedFrom(null);
     setScheduledAts([nowForInput()]);
     setDateFrom('');
     setDateTo('');
@@ -320,6 +340,26 @@ const FollowPage: React.FC = () => {
         {/* ฟอร์มเพิ่ม */}
         {formOpen ? (
           <form onSubmit={submit} className="jarvis-frost space-y-3 p-4 sm:p-5">
+            {/* เลือกจากบอร์ด (F5b) — คีย์ชื่อเองก็ยังได้เหมือนเดิม ปุ่มนี้เป็นทางลัดกันพิมพ์ผิด */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className={cn(
+                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold',
+                  TONE.info.outline,
+                )}
+              >
+                <Users className="h-3.5 w-3.5" aria-hidden />
+                เลือกชื่อจากบอร์ด
+              </button>
+              {pickedFrom ? (
+                <span className="jarvis-chip jarvis-chip-info">{pickedFrom}</span>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">หรือคีย์ชื่อเองด้านล่าง</span>
+              )}
+            </div>
+
             {/* คำนำหน้า + ชื่อ + นามสกุล — API รับ recipient_name ก้อนเดียว ประกอบตอนส่ง
                 นามสกุลไม่บังคับ บางเคสมีแค่ชื่อที่คนแนะนำมา ไม่ควรบล็อกไม่ให้ลงรายชื่อ */}
             <div className="grid gap-3 sm:grid-cols-[7rem_1fr_1fr]">
@@ -699,6 +739,12 @@ const FollowPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <BoardPersonPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={pickPerson}
+      />
     </div>
   );
 };

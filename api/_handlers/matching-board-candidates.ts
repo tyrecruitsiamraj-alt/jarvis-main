@@ -94,6 +94,45 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
+    /**
+     * โหมด picker: รายชื่อสำหรับ **ตั้งตารางโทรตาม** ในหน้า Follow (F5b · 16 ส.ค. 2569)
+     * ต่างจาก `people=1` สามข้อ — เจ้าของกำหนดเอง:
+     *   1. ตัดคนที่ **แจ้งเข้าแล้ว** (`is_inform='Y'`) — ได้งานแล้ว ไม่ต้องตามอีก
+     *   2. เอาเฉพาะคนที่มีเบอร์ (ไม่มีเบอร์ = ตั้งตารางโทรไม่ได้อยู่ดี)
+     *   3. ส่งเฉพาะฟิลด์ที่ picker ใช้ — ไม่หลุดที่อยู่/ค่าจ้างที่ขอ ออกไปหน้าอื่น
+     * ถัง Checklist (1) ไม่อยู่ในลิสต์อยู่แล้ว (คนยังสมัครไม่เสร็จ = งานของเลนสรรหา)
+     */
+    if (getQuery(req, 'picker') === '1') {
+      const rows = await listBoardReadyCandidates({
+        columnIds: [
+          boardPrimaryColumnId(),
+          boardFallbackColumnId(),
+          boardReuseColumnId(),
+          boardInProcessColumnId(),
+          boardDoneColumnId(),
+          boardDropColumnId(),
+        ],
+        limit: 2000,
+        excludeInformed: true,
+      });
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({
+        people: rows
+          .filter((c) => (c.mobile || '').trim())
+          .map((c) => ({
+            card_id: c.card_id,
+            first_name: c.first_name,
+            last_name: c.last_name,
+            nick_name: c.nick_name,
+            mobile: c.mobile,
+            skills: [c.job1_name, c.job2_name].filter(Boolean).join(' / ') || null,
+            area: [c.amphur_name, c.province_name].filter(Boolean).join(' ') || null,
+            column_label: c.column_label,
+            last_activity_at: c.last_activity_at,
+          })),
+      });
+    }
+
     // โหมด buckets: ยอดการ์ด active ต่อถังบนบอร์ด iRecruit
     // เจ้าของสั่ง 10 ส.ค. 2569: เอา Done/Drop มาโชว์ด้วย — เดิมมีแค่ 4 ถังที่เอาไปแมทได้
     // เรียงตามเส้นทางจริงของคน: รอลงงาน → รองาน → คนเก่า → กำลังเสนอ → ได้งาน → ตกไป
