@@ -43,7 +43,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -451,6 +451,27 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           resultCount={loading ? undefined : filters.filtered.length}
           totalCount={loading ? undefined : filters.visibleCount}
         />
+
+        {/* Pre-Check ย้ายมาอยู่ท้ายแถบตัวกรอง (เจ้าของสั่ง 16 ส.ค. 2569 เย็น:
+            "หน้า Pre-check ก็ย้ายไปไว้ในหน้ากล่องงาน เอาไว้ตรง Filter")
+            — เมนูเดิมถูกถอดออกแล้ว · route /matching/pre-check ยังอยู่ ลิงก์เก่าไม่พัง
+            ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
+        {isStaff && view === 'board' ? (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => navigate('/matching/pre-check')}
+              title="ตรวจใบขอก่อนเริ่มหาคน — เปิดหน้า Pre-Check"
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold',
+                TONE.neutral.outline,
+              )}
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Pre-Check
+            </button>
+          </div>
+        ) : null}
 
         {loadError ? <p className="mt-4 text-sm text-destructive">{loadError}</p> : null}
 

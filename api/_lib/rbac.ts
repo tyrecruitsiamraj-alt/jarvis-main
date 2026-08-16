@@ -33,6 +33,7 @@ export type ApiResource =
   | 'follow'
   | 'job-staff'
   | 'app-users'
+  | 'app-nav-preferences'
   | 'audit-logs'
   | 'branding'
   | 'siamraj-unit-requests'
@@ -119,6 +120,11 @@ export function minimumRoleFor(
     case 'app-users':
     case 'audit-logs':
     case 'branding':
+      return 'admin';
+
+    case 'app-nav-preferences':
+      // อ่านได้ทุกคน (ทุกหน้าต้องใช้ตอน render เมนู) · เขียนเฉพาะ admin
+      if (isRead) return 'staff';
       return 'admin';
 
     case 'recruit-channels':

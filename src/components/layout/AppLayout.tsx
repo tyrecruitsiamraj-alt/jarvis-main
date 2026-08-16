@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { KeyRound, LogOut, Menu, Moon, Settings, Sun, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,9 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
+import { applyNavPreferences, type NavPreferences } from '@/lib/navPreferences';
+import { fetchNavPreferences } from '@/lib/navPreferencesApi';
+import { NAV_PREFERENCES_CHANGED_EVENT } from '@/lib/navPreferencesEvent';
 import { Switch } from '@/components/ui/switch';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -22,7 +25,28 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
-  const navItems = filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
+  /**
+   * เมนูที่แอดมินจัดเอง (093) — ทับลำดับ/ชื่อ/ซ่อน ของลิสต์ตั้งต้น
+   * ⚠️ โหลดไม่ได้ = ใช้ตั้งต้น (fetchNavPreferences ไม่ throw) — เมนูต้องขึ้นเสมอ
+   */
+  const [navPrefs, setNavPrefs] = useState<NavPreferences>({});
+  useEffect(() => {
+    let cancelled = false;
+    void fetchNavPreferences().then((p) => {
+      if (!cancelled) setNavPrefs(p);
+    });
+    // ฟังสัญญาณจากหน้าตั้งค่า — บันทึกแล้วเมนูเปลี่ยนทันที ไม่ต้องรีเฟรช
+    const onChanged = () => void fetchNavPreferences().then((p) => setNavPrefs(p));
+    window.addEventListener(NAV_PREFERENCES_CHANGED_EVENT, onChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NAV_PREFERENCES_CHANGED_EVENT, onChanged);
+    };
+  }, []);
+  const navItems = applyNavPreferences(
+    filterByMinimumRole(DOCK_NAV_ITEMS, user?.role),
+    navPrefs,
+  );
   const showJobBoardMenu = isFunctionEnabled('unit_requests_read');
   const showSettings = isFunctionEnabled('settings_access');
   const [navOpen, setNavOpen] = useState(false);

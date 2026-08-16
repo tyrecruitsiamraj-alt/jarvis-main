@@ -12,12 +12,13 @@ import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
 import LumosDispatchModeTab from '@/pages/settings/LumosDispatchModeTab';
+import NavMenuTab from '@/pages/settings/NavMenuTab';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'matchWeights' | 'lumosMode' | 'reference' | 'audit';
+type SettingsTab = 'appearance' | 'navMenu' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'matchWeights' | 'lumosMode' | 'reference' | 'audit';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -38,6 +39,7 @@ const DEFAULT_REF_DATA: Record<ReferenceCategory, string[]> = {
 
 const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminOnly: boolean }[] = [
   { id: 'appearance', label: 'ธีม / โลโก้', icon: Palette, adminOnly: false },
+  { id: 'navMenu', label: 'จัดเมนู', icon: ListChecks, adminOnly: true },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
@@ -267,6 +269,8 @@ const AdminSettings: React.FC = () => {
         </div>
 
         {activeTab === 'appearance' && <BrandingAppearanceTab />}
+
+        {activeTab === 'navMenu' && <NavMenuTab />}
 
         {activeTab === 'users' &&
           (usersLoading ? (
