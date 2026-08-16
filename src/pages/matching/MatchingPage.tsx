@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -2265,6 +2266,10 @@ const MatchingPage: React.FC = () => {
           />
         }
       />
+      <div className="px-4 md:px-6">
+        {/* ทางเข้าคู่กับหน้าหน่วยงาน (16 ส.ค. 2569 เย็น) — สองหน้าเป็นที่เดียวกันในสายตาคนใช้ */}
+        <UnitSectionTabs active="matching" />
+      </div>
       <div className="px-4 md:px-6 space-y-4">
         {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)
             ใช้คอมโพเนนต์ตัวเดียวกับหน้า Follow ตัวเลข/นิยาม/โทนสีจึงมาจากที่เดียวกัน

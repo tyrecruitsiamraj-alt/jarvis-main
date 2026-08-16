@@ -9,13 +9,15 @@ import { CALL_LANE_LABEL, filterHoldsByLane, holdLane } from '@/lib/callLane';
 import type { CallHoldSource } from '@/lib/callHoldsApi';
 
 describe('holdLane — ตัดสินจากชนิดคน ไม่ใช่คนที่กดเก็บ', () => {
-  it('iRecruit = คนยังไม่สมัคร → เลนสรรหา', () => {
+  it('iRecruit + ใบจากหน้าสาธารณะ = ยังไม่ขึ้นถัง To do → เลนสรรหา', () => {
+    // เจ้าของย้ำ 16 ส.ค. เย็น: ใบจากหน้าสาธารณะคือของสรรหา (Lumos โทรถามสนใจ)
+    // "สมัครแล้ว" ของคัดสรร = ชื่อขึ้นถัง To do บนบอร์ดเท่านั้น
     expect(holdLane('irecruit')).toBe('recruit');
+    expect(holdLane('application')).toBe('recruit');
   });
 
-  it('คนบนบอร์ด + ใบสมัคร = คนสมัครแล้ว → เลนคัดสรร', () => {
+  it('คนบนบอร์ด (ถึงถัง To do แล้ว) → เลนคัดสรร', () => {
     expect(holdLane('board')).toBe('selection');
-    expect(holdLane('application')).toBe('selection');
   });
 
   it('ทุก source ต้องตกเลนใดเลนหนึ่ง — เพิ่ม source ใหม่แล้วลืมจัดเลน = เทสต์นี้เตือน', () => {
@@ -36,8 +38,8 @@ describe('filterHoldsByLane', () => {
   it('สองเลนรวมกันได้ครบทุกแถว — ไม่มีใครหาย ไม่มีใครโผล่สองหน้า', () => {
     const recruit = filterHoldsByLane(holds, 'recruit');
     const selection = filterHoldsByLane(holds, 'selection');
-    expect(recruit.map((h) => h.id)).toEqual(['1']);
-    expect(selection.map((h) => h.id)).toEqual(['2', '3']);
+    expect(recruit.map((h) => h.id)).toEqual(['1', '3']);
+    expect(selection.map((h) => h.id)).toEqual(['2']);
     expect(recruit.length + selection.length).toBe(holds.length);
   });
 

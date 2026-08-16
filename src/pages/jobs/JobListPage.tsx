@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
+import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import SearchField from '@/components/shared/SearchField';
@@ -405,6 +406,10 @@ const JobListPage: React.FC = () => {
           </div>
         }
       />
+
+      <div className="px-4 md:px-6">
+        <UnitSectionTabs active="units" />
+      </div>
 
       <div className="px-4 md:px-6 space-y-4">
         {loadError && (

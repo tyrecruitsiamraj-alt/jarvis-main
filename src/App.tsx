@@ -43,6 +43,8 @@ const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
 const StaffJobBoardPage = lazy(() => import("@/pages/jobs/StaffJobBoardPage"));
 const JobDetailPage = lazy(() => import("@/pages/jobs/JobDetailPage"));
 const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
+// แท็บย่อยของใบขอ (16 ส.ค. 2569 เย็น) — ผู้สมัคร / AI Match / การติดต่อ
+const UnitRequestTabPage = lazy(() => import("@/pages/jobs/UnitRequestTabPage"));
 const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
@@ -120,6 +122,9 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/board" element={<StaffJobBoardPage />} />
             <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
+            <Route path="/jobs/siamraj/:id/applicants" element={<UnitRequestTabPage tab="applicants" />} />
+            <Route path="/jobs/siamraj/:id/ai-match" element={<UnitRequestTabPage tab="ai-match" />} />
+            <Route path="/jobs/siamraj/:id/contact" element={<UnitRequestTabPage tab="contact" />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />
             <Route path="/settings" element={<AdminSettings />} />
