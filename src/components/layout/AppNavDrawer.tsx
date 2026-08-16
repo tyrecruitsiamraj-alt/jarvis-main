@@ -163,6 +163,9 @@ const AppNavDrawer: React.FC<Props> = ({
                 ...(matchingOpen
                   ? [
                       child('/matching/match', 'จับคู่กับงาน'),
+                      // การติดต่อของเลนคัดสรร (16 ส.ค. 2569) — แยกจากแท็บการติดต่อ
+                      // บนบอร์ดรับสมัครซึ่งเป็นของเลนสรรหา (เจ้าของสั่ง "ไม่ปนกัน")
+                      child('/matching/contact', 'การติดต่อ (คัดสรร)'),
                       child('/matching/pre-check', 'Pre-Check'),
                       child('/matching/job-postings', 'คำขอโพสหางานใหม่'),
                       // "งานสรรหา (RM)" ยุบเข้าบอร์ดรับสมัครแล้ว (11 ส.ค. 2569 รอบหก)

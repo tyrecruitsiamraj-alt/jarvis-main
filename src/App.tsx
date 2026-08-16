@@ -32,6 +32,7 @@ const MatchingDashboard = lazy(() => import("@/pages/matching/MatchingDashboard"
 const CandidateProfile = lazy(() => import("@/pages/matching/CandidateProfile"));
 const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"));
 const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
+const SelectionContactPage = lazy(() => import("@/pages/matching/SelectionContactPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
 const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
@@ -108,6 +109,8 @@ const ProtectedRoutes = () => {
                 14 ส.ค. ย้ายไปหน้า Matching) — สอง path เดิม redirect เข้าหน้า Matching
                 กัน bookmark เก่าพัง · call-team ไม่มีบอร์ดทีมแล้ว (เอาออก 14 ส.ค.) */}
             <Route path="/matching/my-calls" element={<Navigate to="/matching/match" replace />} />
+            {/* การติดต่อของเลนคัดสรร (16 ส.ค. 2569) — เลนสรรหาอยู่บนบอร์ดรับสมัคร ไม่ปนกัน */}
+            <Route path="/matching/contact" element={<SelectionContactPage />} />
             <Route path="/matching/call-team" element={<Navigate to="/matching/match" replace />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />

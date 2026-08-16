@@ -8,6 +8,7 @@ import {
   resolveAppointment,
 } from '@/lib/callAppointment';
 import { cn } from '@/lib/utils';
+import { CALL_LANE_HINT, CALL_LANE_LABEL, filterHoldsByLane, type CallLane } from '@/lib/callLane';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import NameAvatar from '@/components/shared/NameAvatar';
 import {
@@ -67,7 +68,14 @@ const DUE_SOON_MS = 2 * 60 * 60 * 1000;
  * `/matching/my-calls` เหลือเป็น redirect เข้าหน้าหลัก · เมนูเดิมถูกถอด
  * ทุกอย่างข้างในเหมือนหน้าเดิม: ถังของตัวเอง + บันทึกผล + บอร์ดทีมของหัวหน้า
  */
-export const MyCallsSection: React.FC = () => {
+/**
+ * แยกเลน (เจ้าของสั่ง 16 ส.ค. 2569: "งานคัดสรรก็ให้มีหน้าการติดต่อของเขาเอง ไม่ปนกัน")
+ * `lane` = โชว์เฉพาะงานโทรของเลนนั้น (สรรหา = คนยังไม่สมัคร · คัดสรร = คนสมัครแล้ว)
+ * ไม่ส่ง = ทั้งหมด (พฤติกรรมเดิม — หน้า redirect เก่ายังใช้)
+ * ⚠️ ยอด "วันนี้" ในแผนผังปลายทางเป็นยอดรวมของคนคนนั้น ไม่แยกเลน (เป็นสถิติส่วนตัว
+ * ไม่ใช่ของเลน) — แยกเมื่อไหร่ต้องแยกที่ server เพราะ tally นับจากผลที่บันทึกแล้ว
+ */
+export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
   /**
    * เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: **ทุกคนเห็นถังของตัวเอง** (ของใครของมัน)
    * ⚠️ "ภาระงานโทรของทีม" (บอร์ดหัวหน้า) ถูกเอาออก 14 ส.ค. 2569 (เจ้าของสั่ง) —
@@ -101,11 +109,12 @@ export const MyCallsSection: React.FC = () => {
   const load = useCallback(() => {
     setLoading(true);
     void fetchMyCallQueue().then((data) => {
-      setHolds(data.holds);
+      // กรองที่จุดโหลดจุดเดียว — ทุกยอด/ทุกกลุ่มข้างล่างจะเป็นของเลนนี้โดยอัตโนมัติ
+      setHolds(filterHoldsByLane(data.holds, lane));
       setTally(data.tally);
       setLoading(false);
     });
-  }, []);
+  }, [lane]);
 
   useEffect(() => {
     load();
@@ -261,9 +270,12 @@ export const MyCallsSection: React.FC = () => {
     <div className="space-y-4">
       {/* PageHeader เดิมถูกถอด — ตอนนี้เป็น section บนหน้าหลัก ใช้หัวเรื่องบรรทัดเดียว */}
       <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
-        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>📞 โทรของฉัน</h2>
+        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>
+          📞 {lane ? CALL_LANE_LABEL[lane] : 'โทรของฉัน'}
+        </h2>
         <p className={cn('text-xs', DASH.muted)}>
-          งานที่เก็บมาโทรเอง — เรียงให้แล้วว่าโทรใครก่อน · โทรเสร็จบันทึกผลที่นี่
+          {lane ? CALL_LANE_HINT[lane] : 'งานที่เก็บมาโทรเอง'} — เรียงให้แล้วว่าโทรใครก่อน ·
+          โทรเสร็จบันทึกผลที่นี่
         </p>
       </div>
 
