@@ -21,6 +21,7 @@ import {
 import { loadAppointmentByPhone, loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
+import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError } from '../_lib/logger.js';
 
@@ -850,6 +851,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (hit) {
           (item as Record<string, unknown>).attendance_result = hit.result;
           (item as Record<string, unknown>).attendance_at = hit.createdAt;
+        }
+      }
+      // "ได้ใบสมัครแล้ว" = ชื่อขึ้นบอร์ด ERP (16 ส.ค. · เส้นแบ่งสรรหา→คัดสรร)
+      // จับคู่ด้วยเบอร์ E.164 · ERP อ่านไม่ได้ = null → ไม่แนบ flag (หน้าถือว่า "ยังไม่รู้")
+      const boardPhones = await loadBoardPhoneSet();
+      if (boardPhones) {
+        for (const item of items) {
+          const e164 = toE164Thai(item.phone || '');
+          if (e164 && boardPhones.has(e164)) {
+            (item as Record<string, unknown>).on_board = true;
+          }
         }
       }
     } catch (e) {

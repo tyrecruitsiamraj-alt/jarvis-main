@@ -21,6 +21,11 @@ export type PublicApplication = {
   /** ผลติดตามนัดล่าสุด (migration 089) — 'showed' | 'no_show' | 'rescheduled' */
   attendance_result?: string | null;
   attendance_at?: string | null;
+  /**
+   * ชื่อขึ้นถังบนบอร์ด ERP แล้ว = "ได้ใบสมัครแล้ว" (16 ส.ค. · จับคู่ด้วยเบอร์)
+   * true = ออกจากคิวสรรหา (เป็นงานคัดสรรต่อ) · undefined = server เก่า/ERP อ่านไม่ได้
+   */
+  on_board?: boolean;
   title_prefix?: string;
   first_name?: string;
   last_name?: string;

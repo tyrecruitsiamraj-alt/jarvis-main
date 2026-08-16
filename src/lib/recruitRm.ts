@@ -89,13 +89,16 @@ export function isClosedByCallOutcome(r: PublicApplication): boolean {
  * มุมมองย่อยของแท็บ "รายชื่อผู้สมัคร" (เจ้าของสั่ง 13 ส.ค. 2569: "แบ่ง 3 อัน")
  * ทั้งหมด / คนที่สนใจ / คนที่ไม่สนใจ — แบ่งด้วย **ผลโทร** ไม่ใช่สถานะใบสมัคร
  */
-export const RM_LIST_VIEWS = ['all', 'interested', 'declined'] as const;
+export const RM_LIST_VIEWS = ['all', 'interested', 'declined', 'collect'] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
 export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   all: 'รายชื่อทั้งหมด',
   interested: 'รายชื่อคนที่สนใจ',
   declined: 'รายชื่อคนที่ไม่สนใจ',
+  // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
+  // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
+  collect: 'รอเก็บใบสมัคร',
 };
 
 /**
@@ -107,6 +110,9 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
 export function isInRmListView(r: PublicApplication, view: RmListView): boolean {
   if (view === 'interested') return r.last_call_outcome === 'confirmed';
   if (view === 'declined') return r.last_call_outcome === 'declined';
+  // คิวสรรหา: ตอบสนใจตอนโทร แต่ยังไม่ขึ้นบอร์ด (ยังไม่มาสมัคร) — พอสรรหาเก็บใบสมัคร
+  // (ชื่อขึ้นบอร์ด) on_board = true → หลุดจากคิวเอง
+  if (view === 'collect') return r.last_call_outcome === 'confirmed' && r.on_board !== true;
   return true;
 }
 
