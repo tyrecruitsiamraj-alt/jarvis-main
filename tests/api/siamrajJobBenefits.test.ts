@@ -8,7 +8,8 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { requestNoFromJobRef, speakableBenefitLine } from '../../api/_lib/siamrajJobBenefits.js';
+import { requestNoFromJobRef, speakableBenefitLine,
+  speakableBenefitChips } from '../../api/_lib/siamrajJobBenefits.js';
 
 // ชุดจริงจากฐาน 15 ส.ค. (ใบ LMO6908004) — มีทั้งของพูดได้และห้ามพูดปนกัน
 const REAL_ROWS = [
@@ -104,5 +105,58 @@ describe('ห้ามหยิบอัตราเบิกมาใช้', (
     const sqlOnly = src.slice(src.indexOf('SELECT'), src.indexOf('`,', src.indexOf('SELECT')));
     expect(sqlOnly).not.toMatch(/draw_rate/);
     expect(sqlOnly).not.toMatch(/draw_tor_percent/);
+  });
+});
+
+/**
+ * ชิปบนหน้าสมัครสาธารณะ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
+ * ⚠️ ต้องเดินตามกติกาเดียวกับประโยคเป๊ะ — สองจอพูดคนละเลข = เรื่องใหญ่
+ */
+describe('speakableBenefitChips — หน้าสาธารณะ', () => {
+  it('โอที 1.5 บอกเลข (ปัดจำนวนเต็ม) · รายการอื่นบอกแค่ชื่อ', () => {
+    expect(
+      speakableBenefitChips([
+        { fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 76.88 },
+        { fee_name: 'ค่าเบี้ยขยัน', fee_rate: 500 },
+        { fee_name: 'ค่ารถ/ค่าเดินทาง/TAXI (อัตรา 1)', fee_rate: 50 },
+      ]),
+    ).toEqual(['โอที ~77 บาท/ชม.', 'เบี้ยขยัน', 'ค่าเดินทาง']);
+  });
+
+  it('ไม่มีอะไรพูดได้ = ชิปว่าง (ไม่ใช่ชิปว่า "ไม่มีสวัสดิการ")', () => {
+    expect(speakableBenefitChips([{ fee_name: 'ค่าปรับขาดงาน (ตามจำนวนเงิน)', fee_rate: 500 }])).toEqual([]);
+    expect(speakableBenefitChips([])).toEqual([]);
+  });
+
+  it('ห้ามหลุดรายการต้องห้าม — ค่าปรับ/มาสาย/ชดเชย/เงินเดือน', () => {
+    const chips = speakableBenefitChips([
+      { fee_name: 'ค่าปรับขาดงาน (ตามจำนวนเงิน)', fee_rate: 500 },
+      { fee_name: 'ค่าปรับมาสาย (ตามอัตรา)', fee_rate: 50 },
+      { fee_name: 'ชดเชยพักร้อน (ไม่ใช้แล้ว)', fee_rate: 400 },
+      { fee_name: 'เงินเดือน (1)', fee_rate: 15000 },
+      { fee_name: 'ค่าเบี้ยขยัน', fee_rate: 500 },
+    ]);
+    expect(chips).toEqual(['เบี้ยขยัน']);
+  });
+
+  it('โอที 2.0/3.0 ไม่โผล่เป็นตัวเลข (หน่วยไม่ชัดเท่า 1.5)', () => {
+    expect(speakableBenefitChips([{ fee_name: 'ค่าล่วงเวลา 2.0 เท่า', fee_rate: 102.5 }])).toEqual([]);
+  });
+
+  it('parity กับประโยคที่ AI พูด — มีชิป ⟺ มีประโยค (สองจอห้ามพูดคนละเรื่อง)', () => {
+    const cases = [
+      [{ fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 76.88 }],
+      [{ fee_name: 'ค่าเบี้ยขยัน', fee_rate: 500 }],
+      [{ fee_name: 'ค่าปรับขาดงาน (ตามจำนวนเงิน)', fee_rate: 500 }],
+      [{ fee_name: 'ค่าโทรศัพท์', fee_rate: 0 }],
+      [],
+    ];
+    for (const rates of cases) {
+      expect(speakableBenefitChips(rates).length > 0).toBe(speakableBenefitLine(rates) !== '');
+    }
+  });
+
+  it('อัตรา 0 = ไม่มีจริง ไม่นับ (ทั้งชิปและประโยค)', () => {
+    expect(speakableBenefitChips([{ fee_name: 'ค่าเบี้ยขยัน', fee_rate: 0 }])).toEqual([]);
   });
 });

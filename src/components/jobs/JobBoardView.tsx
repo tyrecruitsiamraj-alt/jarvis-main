@@ -550,6 +550,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     ต้องการ {formatYmdDmyBe(job.required_date)}
                   </span>
                 </div>
+                {/* สวัสดิการ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
+                    ⚠️ ตัวเลขทั้งหมดเป็น **อัตราจ่าย** ที่พนักงานได้จริง ไม่ใช่อัตราเบิก
+                    ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
+                {job.benefits && job.benefits.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {job.benefits.map((b) => (
+                      <span key={b} className={TONE.success.chip}>
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
               <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (

@@ -62,15 +62,33 @@ export function speakableBenefitLine(rates: JobBenefitRate[]): string {
 }
 
 /**
+ * เวอร์ชัน "ชิป" ของประโยคเดียวกัน — ใช้บน **หน้าสมัครสาธารณะ** (เจ้าของเคาะ 16 ส.ค. 2569:
+ * *"หน้าสาธารณะโชว์ OT ได้ — เอาเหมือนที่ AI พูด"*)
+ *
+ * ⚠️ ต้องเดินตาม **กติกาเดียวกับ `speakableBenefitLine` เป๊ะ** (whitelist ตัวเดียวกัน ·
+ * บอกเลขเฉพาะโอที 1.5 เท่า) — สองจอพูดคนละเลขคือเรื่องใหญ่กว่าจอไหนสวยกว่า
+ * มีเทสต์ parity ล็อกว่า "มีชิป ⟺ มีประโยค" เสมอ
+ */
+export function speakableBenefitChips(rates: JobBenefitRate[]): string[] {
+  const chips: string[] = [];
+  const ot = rates.find((r) => OT_15.test(r.fee_name) && Number(r.fee_rate) > 0);
+  if (ot) chips.push(`โอที ~${Math.round(Number(ot.fee_rate))} บาท/ชม.`);
+  for (const g of SPEAKABLE_GROUPS) {
+    if (rates.some((r) => g.test.test(r.fee_name) && Number(r.fee_rate) > 0)) chips.push(g.label);
+  }
+  return chips;
+}
+
+/**
  * ดึงอัตราของหลายใบขอในคิวรีเดียว (อ่านอย่างเดียว) — คีย์ = เลขที่ใบขอ (request_no)
  * ล้ม = คืน map ว่าง (ผู้เรียกเสิร์ฟต่อแบบไม่มีข้อมูลเสริม — ERP ล่มห้ามทำให้คิวหยุด)
  */
-export async function fetchJobBenefitLines(
+export async function fetchJobBenefitRates(
   requestNos: string[],
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+): Promise<Map<string, JobBenefitRate[]>> {
+  const byNo = new Map<string, JobBenefitRate[]>();
   const nos = [...new Set(requestNos.map((s) => (s || '').trim()).filter(Boolean))];
-  if (nos.length === 0) return out;
+  if (nos.length === 0) return byNo;
   // mssql ไม่มี array param — ประกอบ IN ด้วย placeholder ต่อค่า (ห้ามต่อสตริงค่าดิบ)
   const placeholders = nos.map((_, i) => `@p${i}`).join(', ');
   const params = Object.fromEntries(nos.map((v, i) => [`p${i}`, v]));
@@ -82,16 +100,43 @@ export async function fetchJobBenefitLines(
       WHERE RTRIM(C.is_wage) <> 'Y' AND C.request_no IN (${placeholders})`,
     params,
   );
-  const byNo = new Map<string, JobBenefitRate[]>();
   for (const r of rows) {
     if (!r.fee_name) continue;
     const list = byNo.get(r.request_no) ?? [];
     list.push({ fee_name: r.fee_name, fee_rate: Number(r.fee_rate) });
     byNo.set(r.request_no, list);
   }
-  for (const [no, list] of byNo) {
+  return byNo;
+}
+
+/** ประโยคสำหรับ AI พูด (คีย์ = เลขที่ใบขอ) — ใบที่ไม่มีอะไรพูด ไม่มีคีย์ */
+export async function fetchJobBenefitLines(
+  requestNos: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const [no, list] of await fetchJobBenefitRates(requestNos)) {
     const line = speakableBenefitLine(list);
     if (line) out.set(no, line);
+  }
+  return out;
+}
+
+/**
+ * ชิปสำหรับ **หน้าสมัครสาธารณะ** — กติกาเดียวกับประโยคที่ AI พูด
+ * ⚠️ **error-safe**: ERP ล่ม/ยังไม่ตั้งค่า → คืน map ว่าง ไม่ throw
+ * (หน้าประกาศงานสาธารณะห้ามล่มเพราะข้อมูลเสริม — คนจริงกำลังจะสมัคร)
+ */
+export async function fetchJobBenefitChips(
+  requestNos: string[],
+): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  try {
+    for (const [no, list] of await fetchJobBenefitRates(requestNos)) {
+      const chips = speakableBenefitChips(list);
+      if (chips.length > 0) out.set(no, chips);
+    }
+  } catch {
+    return out;
   }
   return out;
 }

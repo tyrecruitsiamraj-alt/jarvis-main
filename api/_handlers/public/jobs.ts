@@ -6,6 +6,7 @@ import {
 import { dbQuery } from '../../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { getString } from '../../_lib/body.js';
+import { fetchJobBenefitChips } from '../../_lib/siamrajJobBenefits.js';
 
 type JobRow = {
   id: string;
@@ -76,7 +77,29 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     status: r.status,
     source: r.source || undefined,
     created_at: toIsoString(r.created_at),
+    /**
+     * สวัสดิการที่โชว์ได้ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
+     * เติมทีหลังด้วย `withBenefits()` เพราะต้องยิง ERP รวมทีเดียวทั้งชุด
+     * ⚠️ ทุกตัวเลขมาจาก **อัตราจ่าย** (`payment_rate`) เท่านั้น ห้ามแตะอัตราเบิก
+     */
+    benefits: undefined as string[] | undefined,
   };
+}
+
+/**
+ * เติมชิปสวัสดิการให้ประกาศงาน — คิวรีเดียวทั้งชุด (วัดจริง 200 ใบ = 236 ms)
+ * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChips` — ERP ล่ม = ประกาศงานยังขึ้นครบ
+ * แค่ไม่มีชิป (หน้านี้เป็นเส้นสาธารณะที่คนจริงกำลังจะสมัคร ห้ามล่มเพราะข้อมูลเสริม)
+ */
+async function withBenefits(jobs: PublicJob[]): Promise<PublicJob[]> {
+  const nos = jobs.map((j) => (j.request_no ? String(j.request_no) : '')).filter(Boolean);
+  if (nos.length === 0) return jobs;
+  const chips = await fetchJobBenefitChips(nos);
+  if (chips.size === 0) return jobs;
+  return jobs.map((j) => {
+    const found = j.request_no ? chips.get(String(j.request_no)) : undefined;
+    return found && found.length > 0 ? { ...j, benefits: found } : j;
+  });
 }
 
 function isPublicVisible(job: { status?: string }) {
@@ -111,10 +134,10 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       if (id) {
         const job = await getPublicSiamrajJob(id);
         if (!job) return sendError(res, 404, 'Not found', 'Job not found');
-        return res.status(200).json(job);
+        return res.status(200).json((await withBenefits([job]))[0]);
       }
       const jobs = await listPublicSiamrajJobs(limit);
-      return res.status(200).json(jobs);
+      return res.status(200).json(await withBenefits(jobs));
     }
 
     if (id) {

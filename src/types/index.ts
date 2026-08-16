@@ -196,6 +196,12 @@ export interface JobRequest {
   age_range_max?: number;
   vehicle_required?: string;
   work_schedule?: string;
+  /**
+   * สวัสดิการที่โชว์บนประกาศได้ เช่น ["โอที ~75 บาท/ชม.", "เบี้ยขยัน", "ค่าเดินทาง"]
+   * (เจ้าของเคาะ 16 ส.ค. 2569 — กติกาเดียวกับที่ AI พูดตอนโทร)
+   * ⚠️ ทุกตัวเลขเป็น **อัตราจ่าย** ไม่ใช่อัตราเบิก · undefined = ใบนี้ไม่มีข้อมูล/ERP อ่านไม่ได้
+   */
+  benefits?: string[];
   penalty_per_day: number;
   days_without_worker: number;
   total_penalty: number;
