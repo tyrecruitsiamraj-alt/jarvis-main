@@ -28,8 +28,10 @@ describe('buildApplicationInterviewPayload', () => {
     expect(p!.type).toBe('phone');
     expect(p!.questions.length).toBeGreaterThanOrEqual(1);
     expect(p!.questions.length).toBeLessThanOrEqual(15); // schema Lumos
-    // คำถามแรกยืนยันความสนใจ (โจทย์เจ้าของ: โทรถามว่ายังสนใจอยู่ไหม)
-    expect(p!.questions[0]).toContain('ยังสนใจ');
+    // คำถามแรกยืนยันความสนใจ โดยอ้างใบสมัครที่เขากรอกไว้เอง
+    // (บท Part 2 · 16 ส.ค. 2569 — เขาติดต่อเรามาแล้ว ห้ามพูดเหมือนโทรหาคนแปลกหน้า)
+    expect(p!.questions[0]).toContain('ใบสมัคร');
+    expect(p!.questions[0]).toContain('สนใจ');
   });
 
   it('เบอร์บ้าน 9 หลัก (แปลง E.164 ไม่ได้) → null (ไปกล่องเบอร์ผิด ไม่หลุดเข้าคิว)', () => {

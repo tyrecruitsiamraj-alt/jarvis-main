@@ -51,8 +51,12 @@ describe('buildRecruitLaneInterviewPayload', () => {
       { ref: 'ir-1', full_name: 'สมชาย', phone_number: '0812345678', position_text: '' },
       at,
     );
-    expect(p?.questions[0]).toContain('ตอนนี้เรามีงานตำแหน่ง');
+    // บท Part 1 (16 ส.ค. 2569): แนะนำตัวว่าโทรจากไหนก่อน แล้วค่อยเสนองาน
+    // ห้ามมีคำว่า "ใบสมัคร" — คนกลุ่มนี้ยังไม่เคยสมัคร พูดแล้วเขางงว่าไปเอาเบอร์มาจากไหน
+    expect(p?.questions[0]).toContain('สยามราชธานี');
+    expect(p?.questions[0]).toContain('มีงานตำแหน่ง');
     expect(p?.questions[0]).toContain('ศูนย์กระจายสินค้าชลบุรี');
+    expect(p?.questions[0]).not.toContain('ใบสมัคร');
     // schema ของ Lumos รับ 1–15 ข้อ
     expect(p!.questions.length).toBeGreaterThanOrEqual(1);
     expect(p!.questions.length).toBeLessThanOrEqual(15);

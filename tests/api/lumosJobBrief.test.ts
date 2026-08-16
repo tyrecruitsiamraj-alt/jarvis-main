@@ -94,6 +94,16 @@ describe('buildJobBrief — เลือกว่าจะพูดอะไร�
       expect(b.workSchedule.length).toBeLessThanOrEqual(95);
     });
 
+    it('⚠️ ตัดแล้วต้องไม่เหลือวรรคตอนห้อย — "08.30 -…" AI อ่านว่า "ลบ" แล้วเงียบ', () => {
+      // ของจริงจากใบ LAO6908007 (16 ส.ค. 2569) ตัดตรงกลางวงเล็บพอดี
+      const b = buildJobBrief({
+        work_schedule:
+          '5 วัน/สัปดาห์ วันจันทร์ - วันศุกร์ บังคับทำงานล่วงเวลา • 9 ชม. รวมพัก ตามตารางกะ (ในช่วงเวลา 08.30 - 20.30 น.)',
+      });
+      expect(b.workSchedule).not.toMatch(/[-–—·,;:/(]…/);
+      expect(b.workSchedule).not.toMatch(/\s…/);
+    });
+
     it('ไม่มีตัวคั่น • ก็ยังตัดได้ ไม่พัง', () => {
       const b = buildJobBrief({ work_schedule: 'ก'.repeat(400) });
       expect(b.workSchedule.length).toBeLessThanOrEqual(95);
@@ -169,7 +179,9 @@ describe('ต่อเข้า payload จริง', () => {
 
   it('interview — ไม่มีข้อมูลเวลา/รถ ก็ไม่ถามคำถามลอย ๆ', () => {
     const p = buildInterviewPayload({ unit_name: 'ลูกค้า ก' }, RESULT, IR)!;
-    expect(p.questions.some((q) => q.includes('เวลาทำงาน'))).toBe(false);
+    // ⚠️ เทียบหัวข้อ ไม่ใช่ substring — "เวลาทำงานไม่สะดวก" เป็นหนึ่งในช้อยส์เหตุผล
+    // ที่บทใหม่อ่านให้ฟังตอนปฏิเสธ (ML ขั้น 1) assert หลวมจะล้มทั้งที่ถูก
+    expect(p.questions.some((q) => q.startsWith('เวลาทำงาน '))).toBe(false);
     expect(p.questions.some((q) => q.includes('มีรถ'))).toBe(false);
   });
 

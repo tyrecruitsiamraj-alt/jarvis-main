@@ -140,7 +140,13 @@ describe('buildFollowReminderPayload', () => {
     expect(p.title).toBe('ยืนยันวันเริ่มงาน 15 ส.ค.');
     expect(p.steps).toHaveLength(1);
     expect(p.steps[0].type).toBe('follow_up');
-    expect(p.steps[0].message).toBe('ยืนยันวันเริ่มงาน 15 ส.ค. — ถ้ายังไม่พร้อมให้ถามวันที่สะดวก');
+    // บทใหม่ 16 ส.ค. 2569 (lumosCallScript.buildFollowMessage) — แนะนำตัว + เรียกชื่อ +
+    // บอกให้ยืนยันกลับ · เดิมต่อสามท่อนด้วย "—" เฉย ๆ ฟังแล้วห้วนไม่มีหัวไม่มีท้าย
+    expect(p.steps[0].message).toContain('สยามราชธานี');
+    expect(p.steps[0].message).toContain('คุณสมชาย ใจดี');
+    expect(p.steps[0].message).toContain('ยืนยันวันเริ่มงาน 15 ส.ค.');
+    expect(p.steps[0].message).toContain('ถ้ายังไม่พร้อมให้ถามวันที่สะดวก');
+    expect(p.steps[0].message).toContain('ยืนยันกลับ');
     expect(p.steps[0].scheduled_at).toBe(WHEN.toISOString());
   });
 
@@ -153,7 +159,9 @@ describe('buildFollowReminderPayload', () => {
       note: null,
       scheduled_at: WHEN,
     });
-    expect(p.steps[0].message).toBe('ตามเอกสาร');
+    expect(p.steps[0].message).toContain('ตามเอกสาร');
+    // ไม่มีเบอร์เจ้าหน้าที่ = ไม่พูดท่อนติดต่อกลับ (ไม่ใช่พูดว่า "โทร ว่าง")
+    expect(p.steps[0].message).not.toContain('โทร');
   });
 
   it('มีเบอร์เจ้าหน้าที่ → ต่อท้ายบทพูดให้ผู้สมัครโทรกลับได้', () => {
@@ -168,10 +176,11 @@ describe('buildFollowReminderPayload', () => {
       staffPhone: '021234567',
       scheduled_at: WHEN,
     });
-    expect(p.steps[0].message).toBe('ตามเอกสาร — ติดต่อกลับได้ที่ 021234567');
+    // เบอร์อ่านเป็นกลุ่มตัวเลข — 021234567 ติดกันเสี่ยงถูก TTS อ่านเป็นจำนวนเต็มก้อนเดียว
+    expect(p.steps[0].message).toContain('02 123 4567');
   });
 
-  it('มีทั้งหมายเหตุและเบอร์ → เรียงหัวเรื่อง → หมายเหตุ → เบอร์', () => {
+  it('มีทั้งหมายเหตุและเบอร์ → พูดครบทั้งสามท่อน เรียงหัวเรื่อง → หมายเหตุ → เบอร์', () => {
     const p = buildFollowReminderPayload({
       id: 'abc',
       recipient_name: 'ก',
@@ -181,7 +190,9 @@ describe('buildFollowReminderPayload', () => {
       staffPhone: '021234567',
       scheduled_at: WHEN,
     });
-    expect(p.steps[0].message).toBe('ตามเอกสาร — ถามวันสะดวก — ติดต่อกลับได้ที่ 021234567');
+    const msg = p.steps[0].message;
+    expect(msg.indexOf('ตามเอกสาร')).toBeLessThan(msg.indexOf('ถามวันสะดวก'));
+    expect(msg.indexOf('ถามวันสะดวก')).toBeLessThan(msg.indexOf('02 123 4567'));
   });
 });
 

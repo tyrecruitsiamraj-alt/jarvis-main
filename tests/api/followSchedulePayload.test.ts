@@ -33,7 +33,8 @@ describe('buildFollowReminderPayload — หลายรอบต่อวัน
     expect(p.steps[1].scheduled_at).toBe('2026-08-20T01:00:00.000Z');
     // ทุก step พูดบทเดียวกัน (topic + เบอร์ติดต่อกลับ)
     expect(p.steps[0].message).toContain('ติดตามนัดสัมภาษณ์');
-    expect(p.steps[0].message).toContain('0891112222');
+    // เบอร์ถูกอ่านเป็นกลุ่มตัวเลข (16 ส.ค. 2569 — ดู lumosCallScript.speakablePhoneTh)
+    expect(p.steps[0].message).toContain('089 111 2222');
     expect(p.steps[1].message).toBe(p.steps[0].message);
   });
 

@@ -36,9 +36,17 @@ function usable(v: unknown): string {
  */
 const MAX_PART = 90;
 
+/**
+ * ⚠️ ตัดแล้วต้อง**เก็บเศษวรรคตอนที่ห้อยอยู่ทิ้งด้วย** — ข้อมูลจริงตัดกลางคันแล้วได้
+ * `"(ในช่วงเวลา 08.30 -…"` ซึ่งพอ AI พูดออกมาเป็น "แปดจุดสามศูนย์ ลบ" แล้วเงียบ
+ * ฟังเหมือนสายหลุด · ตัดขีด/วงเล็บเปิด/จุลภาคท้ายออกก่อนเติม "…"
+ */
+const DANGLING_TAIL = /[\s\-–—·,;:/(]+$/;
+
 function trimPart(v: string, max = MAX_PART): string {
   const s = v.replace(/\s+/g, ' ').trim();
-  return s.length <= max ? s : `${s.slice(0, max - 1).trimEnd()}…`;
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1).replace(DANGLING_TAIL, '')}…`;
 }
 
 /**

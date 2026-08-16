@@ -99,8 +99,10 @@ describe('buildRecallInterviewPayload', () => {
       { ref: 'app-1', full_name: 'สมชาย', phone_number: '0812345678', position_text: 'ขับรถ' },
       at,
     );
-    expect(p?.questions[0]).toContain('เคยสมัครงานไว้กับเรา');
+    expect(p?.questions[0]).toContain('เคยฝากใบสมัครไว้กับเรา');
     expect(p?.questions[0]).toContain('พนักงานขับรถ');
+    // เส้นชวนกลับต้องถามด้วยว่ายังหางานอยู่ไหม — ไม่งั้นเสนอทับคนที่ได้งานไปแล้ว
+    expect(p?.questions.some((q) => q.includes('ยังหางาน'))).toBe(true);
   });
 
   it('client_candidate_id รูปเดียวกับเส้นอื่น', () => {

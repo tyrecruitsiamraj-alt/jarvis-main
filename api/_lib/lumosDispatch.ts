@@ -24,7 +24,12 @@ import { countPendingApprovalByJob, releaseDueCallBatches } from './callBatchSto
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
-import { fetchJobBenefitLines, requestNoFromJobRef } from './siamrajJobBenefits.js';
+import {
+  fetchJobBenefitRates,
+  monthlyGuaranteedIncome,
+  requestNoFromJobRef,
+  speakableBenefitLine,
+} from './siamrajJobBenefits.js';
 import {
   phonesContactedAboutJob,
   phonesContactedAnyJob,
@@ -33,6 +38,14 @@ import {
 import { toE164Thai } from './thaiPhone.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
+import {
+  appendExtraInfoToPayload,
+  buildExtraInfoSentence,
+  buildFollowMessage,
+  buildOfferMessage,
+  buildOfferQuestions,
+  buildScreeningQuestions,
+} from './lumosCallScript.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import {
   CONFIRMED_FOCUS_DAYS,
@@ -78,14 +91,11 @@ export function buildReminderPayload(
   if (!phone || !match.full_name) return null;
   const position = jobPositionLabel(job, result.job_family_label);
   const unit = str(job.unit_name) || 'หน่วยงานของเรา';
-  const income = Number(job.total_income) > 0 ? ` รายได้ ${Number(job.total_income).toLocaleString('th-TH')} บาท` : '';
   // วันที่ต้อง "พูดออกเสียงแล้วเข้าใจ" — เดิมส่ง 2026-08-01 ดิบ AI เลยอ่านเป็นตัวเลขเรียง
   const requiredDate = speakableDate(job.required_date);
-  const start = requiredDate ? ` เริ่มงาน ${requiredDate}` : '';
   // รายละเอียดงานที่ผู้สมัครถามเป็นอย่างแรกเสมอ (ที่ไหน · เวลาไหน · ต้องมีรถไหม)
   // เดิมไม่ได้บอกเลย เขาเลยต้องรอเจ้าหน้าที่โทรกลับมาตอบเรื่องพื้นฐานที่สุด
   const brief = buildJobBrief(job);
-  const detail = brief.detail ? ` ${brief.detail}` : '';
   return {
     client_contact_id: `${result.jobId}::card-${match.card_id}`,
     recipient_name: match.full_name,
@@ -96,11 +106,17 @@ export function buildReminderPayload(
     steps: [
       {
         type: 'remind',
-        message:
-          `ระบบคัดเลือกพบว่าคุณเหมาะกับงานตำแหน่ง${position} ที่ ${unit}` +
-          `${start}${income} (ใบขอ ${result.request_no || result.jobId})` +
-          `${detail}` +
-          ' หากสนใจ ทีมสรรหาจะติดต่อนัดหมายรายละเอียดต่อไป',
+        // 🔴 ไม่มีตัวเลขรายได้ตรงนี้ — เดิมพูด `total_income` ดิบซึ่งเป็น payment_rate
+        // ที่ยังไม่รู้หน่วย (รายวัน 2,608 แถวจาก 16,264) → เติมตอนเสิร์ฟจาก ERP แทน
+        message: buildOfferMessage({
+          candidateName: match.full_name,
+          position,
+          unit,
+          placeForTravel: brief.workPlace || unit,
+          startDate: requiredDate,
+          requestNo: result.request_no || result.jobId,
+          detail: brief.detail,
+        }),
         scheduled_at: now.toISOString(),
       },
     ],
@@ -139,7 +155,8 @@ export function buildInterviewPayload(
    * ฝั่ง interview ไม่มีช่องข้อความอิสระเหมือน reminder — ที่พูดได้คือ `questions`
    * จึงเอารายละเอียดงานไปผูกกับคำถามให้เป็นคำถามที่ "บอกข้อมูลไปในตัว"
    * (ถามเรื่องเดินทางโดยระบุสถานที่จริง · ถามเรื่องเวลาโดยบอกเวลาจริง)
-   * ⚠️ schema กำหนด 1–15 ข้อ — ของใหม่เพิ่มมากสุด 2 ข้อ รวมแล้วไม่เกิน 6
+   *
+   * คนจาก iRecruit **ยังไม่ได้สมัครงานใบนี้** → บท Part 1 (สัมภาษณ์เบื้องต้น)
    */
   const placeForTravel = brief.workPlace && brief.workPlace !== unit ? brief.workPlace : unit;
   return {
@@ -149,18 +166,15 @@ export function buildInterviewPayload(
     phone,
     position,
     scheduled_at: now.toISOString(),
-    questions: [
-      `เคยทำงานตำแหน่ง${position}หรืองานใกล้เคียงมาก่อนไหม เล่าประสบการณ์ให้ฟังหน่อยครับ`,
-      `สะดวกเดินทางไปทำงานที่ ${placeForTravel} ไหมครับ`,
-      ...(brief.workSchedule
-        ? [`งานนี้เวลาทำงาน ${brief.workSchedule} สะดวกไหมครับ`]
-        : []),
-      ...(brief.needsOwnVehicle
-        ? ['งานนี้ต้องใช้รถของตัวเองในการทำงาน คุณมีรถพร้อมใช้ไหมครับ']
-        : []),
-      'สามารถเริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
-      'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
-    ],
+    questions: buildScreeningQuestions({
+      candidateName: match.full_name,
+      position,
+      unit,
+      placeForTravel,
+      workSchedule: brief.workSchedule,
+      needsOwnVehicle: brief.needsOwnVehicle,
+      startDate: speakableDate(job.required_date),
+    }),
     type: 'phone',
     language: 'th',
     tone: 'professional',
@@ -199,13 +213,15 @@ export function buildApplicationInterviewPayload(
     phone,
     position,
     scheduled_at: now.toISOString(),
-    questions: [
-      `คุณได้กรอกใบสมัครตำแหน่ง${position}ที่ ${unit} ไว้ ยังสนใจงานนี้อยู่ไหมครับ`,
-      `เคยทำงานตำแหน่ง${position}หรืองานใกล้เคียงมาก่อนไหม เล่าให้ฟังหน่อยครับ`,
-      `สะดวกเดินทางไปทำงานที่ ${unit} ไหมครับ`,
-      'สามารถเริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
-      'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
-    ],
+    // เขากรอกใบสมัครมาเองแล้ว → บท Part 2 (เสนองาน) ไม่ใช่บทแนะนำตัวหาคนแปลกหน้า
+    // ⚠️ เส้นนี้ถูกเรียกจาก /api/public/apply ซึ่งห้ามยิง ERP — ข้อมูลงานมีแค่ snapshot
+    // บนใบ (ไม่มีเวลาทำงาน/เงื่อนไขรถ) บทจึงสั้นกว่าเส้นอื่นโดยตั้งใจ
+    questions: buildOfferQuestions({
+      candidateName: app.full_name,
+      position,
+      unit,
+      placeForTravel: unit,
+    }),
     type: 'phone',
     language: 'th',
     tone: 'professional',
@@ -240,14 +256,16 @@ export function buildRecruitLaneInterviewPayload(
     phone,
     position,
     scheduled_at: now.toISOString(),
-    questions: [
-      `ตอนนี้เรามีงานตำแหน่ง${position}ที่ ${unit} สนใจฟังรายละเอียดไหมครับ`,
-      `เคยทำงานตำแหน่ง${position}หรืองานใกล้เคียงมาก่อนไหมครับ`,
-      `สะดวกเดินทางไปทำงานที่ ${placeForTravel} ไหมครับ`,
-      ...(brief.workSchedule ? [`งานนี้เวลาทำงาน ${brief.workSchedule} สะดวกไหมครับ`] : []),
-      'สามารถเริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
-      'ค่าแรงหรือเงินเดือนที่คาดหวังประมาณเท่าไหร่ครับ',
-    ],
+    // เลนสรรหา = คนที่ยังไม่ได้สมัครงานใบนี้ → บท Part 1 (สัมภาษณ์เบื้องต้น)
+    questions: buildScreeningQuestions({
+      candidateName: candidate.full_name,
+      position,
+      unit,
+      placeForTravel,
+      workSchedule: brief.workSchedule,
+      needsOwnVehicle: brief.needsOwnVehicle,
+      startDate: speakableDate(job.required_date),
+    }),
     type: 'phone',
     language: 'th',
     tone: 'professional',
@@ -709,13 +727,19 @@ export function buildRecallInterviewPayload(
     phone,
     position,
     scheduled_at: now.toISOString(),
-    questions: [
-      `คุณเคยสมัครงานไว้กับเรา ตอนนี้มีตำแหน่ง${position}ที่ ${unit} เปิดใหม่ สนใจฟังรายละเอียดไหมครับ`,
-      `งานนี้อยู่ที่ ${placeForTravel} สะดวกเดินทางไหมครับ`,
-      ...(brief.workSchedule ? [`เวลาทำงาน ${brief.workSchedule} สะดวกไหมครับ`] : []),
-      'ตอนนี้ยังหางานอยู่ไหมครับ',
-      'ถ้าสนใจ เริ่มงานได้เร็วที่สุดเมื่อไหร่ครับ',
-    ],
+    // สมัครไว้แล้วแต่เคยปฏิเสธงานอื่น → บท Part 2 + ถามก่อนว่ายังหางานอยู่ไหม
+    questions: buildOfferQuestions(
+      {
+        candidateName: candidate.full_name,
+        position,
+        unit,
+        placeForTravel,
+        workSchedule: brief.workSchedule,
+        needsOwnVehicle: brief.needsOwnVehicle,
+        startDate: speakableDate(job.required_date),
+      },
+      { askStillLooking: true },
+    ),
     type: 'phone',
     language: 'th',
     tone: 'professional',
@@ -1213,14 +1237,15 @@ function dayAtTime(day: Date, hhmm: string): string {
 }
 
 export function buildFollowReminderPayload(entry: FollowEntryInput): LumosReminderPayload {
-  const note = (entry.note || '').trim();
-  const staffPhone = (entry.staffPhone || '').trim();
   // ⚠️ schema ของ Lumos ไม่มีช่องใส่เบอร์ติดต่อกลับ — ช่องเดียวที่ถึงหูผู้สมัครคือ
   // `steps[].message` (ดู docs/lumos-api.md · ห้ามเพิ่มฟิลด์ใหม่เข้า payload
   // เพราะเราคุมฝั่ง Lumos ไม่ได้) จึงต่อเข้าไปในบทพูดแทน
-  const message = [entry.topic, note, staffPhone ? `ติดต่อกลับได้ที่ ${staffPhone}` : '']
-    .filter(Boolean)
-    .join(' — ');
+  const message = buildFollowMessage({
+    recipientName: entry.recipient_name,
+    topic: entry.topic,
+    note: entry.note,
+    staffPhone: entry.staffPhone,
+  });
   // หลายรอบในวันเดียว → หลาย step (เวลาต่างกัน) · Lumos หยุดที่เหลือเองเมื่อยืนยัน (stop_early)
   const times = (entry.callTimes || []).filter((t) => /^\d{1,2}:\d{2}$/.test((t || '').trim()));
   const steps =
@@ -1460,35 +1485,42 @@ export async function takePendingLumosItems(
   }
 
   /**
-   * เติมข้อมูลสวัสดิการหน่วยงานให้ช่อง interview **ตอนเสิร์ฟ** (เจ้าของสั่ง 15 ส.ค. 2569:
-   * "OT ชั่วโมงละเท่าไหร่ เบี้ยขยัน ค่าโทรศัพท์ ถ้าหน่วยงานไหนมีส่งไปด้วย")
+   * เติม **รายได้ต่อเดือน + สวัสดิการ** ตอนเสิร์ฟ (เจ้าของสั่ง 15 ส.ค. 2569:
+   * "OT ชั่วโมงละเท่าไหร่ เบี้ยขยัน ค่าโทรศัพท์ ถ้าหน่วยงานไหนมีส่งไปด้วย"
+   * · 16 ส.ค.: บทพูดต้องบอกรายได้ด้วย)
    *
    * ทำไมตอนเสิร์ฟ ไม่ใช่ตอนเข้าคิว:
    * - เส้น auto เข้าคิวจาก /api/public/apply ซึ่ง **ห้ามยิง ERP เด็ดขาด** — เติมตรงนี้
    *   ทั้งเส้น auto/manual/iRecruit ได้ข้อมูลเท่ากันหมด
    * - ข้อมูลสดเสมอ (อัตราเปลี่ยนก็ได้ค่าล่าสุด ไม่ค้างใน payload เก่า)
-   * ⚠️ ERP ล่ม/ช้า = เสิร์ฟแบบไม่มีข้อมูลเสริมต่อ (คิวหยุดเดินแย่กว่าขาดสวัสดิการ)
+   * - 🔴 **หน่วยของค่าแรงรู้ได้ที่นี่ที่เดียว** — `total_income` ตอนประกอบ payload คือ
+   *   `payment_rate` ดิบ ไม่มีหน่วย (รายวัน 2,608 แถวจาก 16,264) พูดออกไปตรง ๆ
+   *   = บอกเลขผิดสูงสุด 30 เท่า · ที่นี่มี `fee_unit_code_1` จึงคิดเป็นรายเดือนได้
+   * ⚠️ ERP ล่ม/ช้า = เสิร์ฟแบบไม่พูดเรื่องเงินเลย (คิวหยุดเดินแย่กว่าขาดข้อมูลเสริม
+   *   และ "ไม่พูด" ปลอดภัยกว่า "พูดเลขที่ไม่รู้หน่วย")
+   * ⚠️ ทำทั้งสองช่อง — reminder ก็ต้องมี เพราะเลขรายได้ถูกถอดออกจากบทตอนประกอบแล้ว
    */
-  if (channel === 'interview' && rows.length > 0) {
+  if (rows.length > 0) {
     try {
-      const byNo = await fetchJobBenefitLines(
+      const byNo = await fetchJobBenefitRates(
         rows.map((r) => requestNoFromJobRef(r.job_ref)).filter((v): v is string => Boolean(v)),
       );
       if (byNo.size > 0) {
         for (const r of rows) {
           const no = requestNoFromJobRef(r.job_ref);
-          const line = no ? byNo.get(no) : undefined;
-          const p = r.payload as { questions?: unknown } | null;
-          if (!line || !p || !Array.isArray(p.questions)) continue;
-          const q = p.questions as string[];
-          // schema Lumos รับ questions 1–15 ข้อ — ของเรามากสุด 6+1 = 7 · กันเติมซ้ำด้วย marker
-          if (q.length >= 15 || q.some((s) => typeof s === 'string' && s.startsWith('แจ้งเพิ่มเติมครับ'))) continue;
-          q.push(`แจ้งเพิ่มเติมครับ งานนี้${line}`);
+          const rates = no ? byNo.get(no) : undefined;
+          if (!rates || rates.length === 0) continue;
+          const sentence = buildExtraInfoSentence({
+            monthlyIncome: monthlyGuaranteedIncome(rates).total,
+            benefitLine: speakableBenefitLine(rates),
+          });
+          if (!sentence) continue;
+          appendExtraInfoToPayload(r.payload, sentence);
         }
       }
     } catch (e) {
       logError('lumos.serve.benefits.failed', e, {
-        hint: 'อ่านสวัสดิการจาก ERP ไม่ได้ — เสิร์ฟแบบไม่มีข้อมูลเสริม (คิวยังเดินปกติ)',
+        hint: 'อ่านอัตราจาก ERP ไม่ได้ — เสิร์ฟแบบไม่มีรายได้/สวัสดิการ (คิวยังเดินปกติ)',
       });
     }
   }
