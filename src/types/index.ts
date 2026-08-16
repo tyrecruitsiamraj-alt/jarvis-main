@@ -202,6 +202,15 @@ export interface JobRequest {
    * ⚠️ ทุกตัวเลขเป็น **อัตราจ่าย** ไม่ใช่อัตราเบิก · undefined = ใบนี้ไม่มีข้อมูล/ERP อ่านไม่ได้
    */
   benefits?: string[];
+  /**
+   * รายได้ต่อเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของนิยาม 16 ส.ค. 2569)
+   * ⚠️ **ต่างจาก `total_income`** ซึ่งเป็นอัตราค่าแรงหลักดิบจาก ERP (บางใบเป็น**ต่อวัน**
+   * เช่น 410 = ค่าแรงรายวัน วัดเจอ 20 จาก 200 ใบ) — ฟิลด์นี้แปลงเป็นต่อเดือนแล้วเสมอ
+   * undefined = คิดไม่ได้/ERP อ่านไม่ได้ → ให้ถอยไปแสดง total_income เหมือนเดิม
+   */
+  monthly_income?: number;
+  monthly_income_base?: number;
+  monthly_income_items?: Array<{ label: string; monthly: number }>;
   penalty_per_day: number;
   days_without_worker: number;
   total_penalty: number;

@@ -32,7 +32,14 @@
  */
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 
-export type JobBenefitRate = { fee_name: string; fee_rate: number };
+export type JobBenefitRate = {
+  fee_name: string;
+  fee_rate: number;
+  /** หน่วยของอัตรา: `M` ต่อเดือน · `D` ต่อวัน · `H` ต่อชั่วโมง · `T` ต่อครั้ง (จาก `fee_unit_code_1`) */
+  unit?: string | null;
+  /** แถวค่าแรงหลักของใบขอ (`is_wage='Y'`) — มีได้แถวเดียวต่อใบ */
+  is_wage?: boolean;
+};
 
 /** กลุ่มที่พูดได้ — คีย์เวิร์ดจับชื่อ fee จริงในฐาน (ดูตัวอย่างจริงใน header) */
 const SPEAKABLE_GROUPS: Array<{ label: string; test: RegExp }> = [
@@ -53,6 +60,9 @@ const OT_15 = /ล่วงเวลา\s*1\.5/;
  */
 export function speakableBenefitLine(rates: JobBenefitRate[]): string {
   const parts: string[] = [];
+  // ⚠️ แถวค่าแรงหลักไม่นับเป็น "ของแถม" — พูดไปแล้วตอนบอกเงินเดือน (คิวรีดึงมาด้วย
+  // ตั้งแต่ทำยอดรายเดือน จึงต้องกรองที่นี่ ไม่ใช่พึ่ง WHERE ของ SQL เหมือนเดิม)
+  rates = rates.filter((r) => !r.is_wage);
 
   const ot = rates.find((r) => OT_15.test(r.fee_name) && Number(r.fee_rate) > 0);
   if (ot) {
@@ -79,12 +89,95 @@ export function speakableBenefitLine(rates: JobBenefitRate[]): string {
  */
 export function speakableBenefitChips(rates: JobBenefitRate[]): string[] {
   const chips: string[] = [];
+  rates = rates.filter((r) => !r.is_wage); // เหตุผลเดียวกับ speakableBenefitLine
   const ot = rates.find((r) => OT_15.test(r.fee_name) && Number(r.fee_rate) > 0);
   if (ot) chips.push(`โอที ~${Math.round(Number(ot.fee_rate))} บาท/ชม.`);
   for (const g of SPEAKABLE_GROUPS) {
     if (rates.some((r) => g.test.test(r.fee_name) && Number(r.fee_rate) > 0)) chips.push(g.label);
   }
   return chips;
+}
+
+// ─── รายได้ต่อเดือน (เจ้าของสั่ง 16 ส.ค. 2569: "เงินเดือน + รายได้มั่นคง เอาเป็นรายเดือน") ──
+
+/** วันทำงานต่อเดือนที่ ERP ใช้เอง — ยืนยันจากฐาน: เงินเดือน 16,000 (M) ↔ 533.33 (D) = 16000/30 */
+export const DAYS_PER_MONTH = 30;
+
+/**
+ * "รายได้มั่นคง" = ได้ทุกเดือนโดยไม่ขึ้นกับว่าทำอะไรเพิ่ม (เจ้าของนิยาม 16 ส.ค. 2569)
+ *
+ * ⚠️ **whitelist เท่านั้น** เหมือนฝั่งที่ AI พูด — ไม่รู้จัก = ไม่นับ (นับเกินแย่กว่าไม่นับ
+ * เพราะเลขบนประกาศคือสิ่งที่ผู้สมัครเอาไปคาดหวัง แล้วมาเจอสลิปจริงน้อยกว่า)
+ *
+ * ที่ **จงใจไม่นับ** (วัดจาก 200 ใบจริง 16 ส.ค.):
+ * - `เบี้ยขยัน` — มีเงื่อนไข (ขาด/สาย/ลา แล้วหลุด) ไม่ใช่ของที่ได้แน่
+ * - `เบี้ยเลี้ยงค้างคืน/ไม่ค้างคืน` · `ค่าห้องพักค้างคืน` — ได้เฉพาะวันที่ออกต่างจังหวัดจริง
+ * - `ค่ากะ` · `ค่าทำงานวันนักขัตฤกษ์` · `ค่าแทนงาน` — ขึ้นกับเวรที่ได้จริง
+ * - โอทีทุกเรต — ขึ้นกับชั่วโมงที่ทำจริง (โชว์แยกเป็นชิปอยู่แล้ว)
+ * - `เงินชดเชยลาป่วย/พักร้อน/ลากิจ (ปกส)` — เป็น**อัตราที่ใช้ตอนลา** ไม่ใช่รายได้เพิ่ม
+ * - `เงินรางวัลพิเศษ` · `Incentive` · `คอมมิชชั่น` (หน่วย `T` ต่อครั้ง) — ไม่การันตี
+ */
+const STABLE_INCOME_GROUPS: Array<{ label: string; test: RegExp }> = [
+  { label: 'ค่าครองชีพ', test: /ค่าครองชีพ/ },
+  { label: 'ค่าโทรศัพท์', test: /โทรศัพท์/ },
+  { label: 'ค่าเดินทาง', test: /ค่ารถ|ค่าเดินทาง|taxi|พาหนะ/i },
+  { label: 'ค่าตำแหน่ง', test: /ค่าตำแหน่ง/ },
+  { label: 'ค่าภาษา', test: /ค่าภาษา/ },
+  { label: 'ค่าทักษะ', test: /ค่าทักษะ|ความสามารถพิเศษ/ },
+  { label: 'ค่าอาหาร', test: /ค่าอาหาร|คูปองอาหาร/ },
+  { label: 'ค่าเช่าบ้าน', test: /ค่าเช่าบ้าน/ },
+];
+
+export type MonthlyIncomeItem = { label: string; monthly: number };
+
+export type MonthlyIncome = {
+  /** ค่าแรงหลักต่อเดือน */
+  base: number;
+  /** รายได้มั่นคงที่บวกเพิ่ม (แปลงเป็นต่อเดือนแล้ว) */
+  items: MonthlyIncomeItem[];
+  /** base + items — 0 = คิดไม่ได้ (ไม่มีแถวค่าแรงหลัก) */
+  total: number;
+};
+
+/** แปลงอัตราเป็น "ต่อเดือน" ตามหน่วยของ ERP · หน่วยที่แปลงไม่ได้ = null (ไม่เดา) */
+export function toMonthlyAmount(rate: number, unit: string | null | undefined): number | null {
+  const n = Number(rate);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const u = (unit || '').trim().toUpperCase();
+  if (u === 'M') return n;
+  if (u === 'D') return n * DAYS_PER_MONTH;
+  // `H` ต่อชั่วโมง (โอที) และ `T` ต่อครั้ง = ไม่การันตี แปลงเป็นรายเดือนไม่ได้อย่างซื่อสัตย์
+  return null;
+}
+
+/**
+ * รายได้ต่อเดือน = ค่าแรงหลัก + รายได้มั่นคง (pure · มี unit test)
+ *
+ * ⚠️ **แถว `เงินเดือน` ที่หน่วยเป็นวันคือเงินก้อนเดียวกับค่าแรงหลัก** (16,000/30 = 533.33)
+ * วัดจากฐาน: 180 ใบมีทั้งคู่ · บวกทั้งสองแถว = นับเงินเดือนสองรอบ
+ * → ค่าแรงหลักเอาจาก `is_wage='Y'` แถวเดียว · แถวอื่นที่ชื่อเงินเดือน/ค่าแรง **ทิ้ง**
+ *
+ * ⚠️ ไม่มีแถวค่าแรงหลัก = คืน total 0 ให้ผู้เรียกไปแสดงค่าเดิมแทน (ห้ามเดา)
+ */
+export function monthlyGuaranteedIncome(rates: JobBenefitRate[]): MonthlyIncome {
+  const wageRow = rates.find((r) => r.is_wage && Number(r.fee_rate) > 0);
+  const base = wageRow ? toMonthlyAmount(wageRow.fee_rate, wageRow.unit) ?? 0 : 0;
+
+  const items: MonthlyIncomeItem[] = [];
+  for (const g of STABLE_INCOME_GROUPS) {
+    // แถวที่เข้ากลุ่มเดียวกันหลายแถว (เช่น "ค่ารถ" กับ "ค่ารถ (อัตรา 1)") เอาก้อนที่มากสุด
+    // ไม่ใช่บวกกัน — ของจริงคือเรตเดียวกันที่ตั้งไว้หลายแบบให้ไซต์เลือกใช้
+    let best = 0;
+    for (const r of rates) {
+      if (r.is_wage || !g.test.test(r.fee_name)) continue;
+      const monthly = toMonthlyAmount(r.fee_rate, r.unit);
+      if (monthly !== null && monthly > best) best = monthly;
+    }
+    if (best > 0) items.push({ label: g.label, monthly: Math.round(best) });
+  }
+
+  const total = base > 0 ? Math.round(base) + items.reduce((sum, i) => sum + i.monthly, 0) : 0;
+  return { base: Math.round(base), items, total };
 }
 
 /**
@@ -100,19 +193,31 @@ export async function fetchJobBenefitRates(
   // mssql ไม่มี array param — ประกอบ IN ด้วย placeholder ต่อค่า (ห้ามต่อสตริงค่าดิบ)
   const placeholders = nos.map((_, i) => `@p${i}`).join(', ');
   const params = Object.fromEntries(nos.map((v, i) => [`p${i}`, v]));
-  const rows = await siamrajSqlQuery<{ request_no: string; fee_name: string; fee_rate: number }>(
-    `SELECT RTRIM(C.request_no) as request_no, RTRIM(F.fee_name) as fee_name, C.payment_rate as fee_rate
+  const rows = await siamrajSqlQuery<{
+    request_no: string;
+    fee_name: string;
+    fee_rate: number;
+    unit: string | null;
+    is_wage: string | null;
+  }>(
+    `SELECT RTRIM(C.request_no) as request_no, RTRIM(F.fee_name) as fee_name, C.payment_rate as fee_rate,
+            RTRIM(ISNULL(F.fee_unit_code_1, '')) as unit, RTRIM(C.is_wage) as is_wage
        FROM st_request_p3_rate C
        LEFT JOIN wg2_ms_fee F
          ON F.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)
-      WHERE RTRIM(C.is_wage) <> 'Y' AND C.request_no IN (${placeholders})
+      WHERE C.request_no IN (${placeholders})
         AND RTRIM(ISNULL(F.what_side, '')) <> '2'`,
     params,
   );
   for (const r of rows) {
     if (!r.fee_name) continue;
     const list = byNo.get(r.request_no) ?? [];
-    list.push({ fee_name: r.fee_name, fee_rate: Number(r.fee_rate) });
+    list.push({
+      fee_name: r.fee_name,
+      fee_rate: Number(r.fee_rate),
+      unit: r.unit || null,
+      is_wage: (r.is_wage || '').trim().toUpperCase() === 'Y',
+    });
     byNo.set(r.request_no, list);
   }
   return byNo;
@@ -126,6 +231,25 @@ export async function fetchJobBenefitLines(
   for (const [no, list] of await fetchJobBenefitRates(requestNos)) {
     const line = speakableBenefitLine(list);
     if (line) out.set(no, line);
+  }
+  return out;
+}
+
+/**
+ * รายได้ต่อเดือนของหลายใบขอ (คีย์ = เลขที่ใบขอ) — **error-safe** เหมือนชิป
+ * ใบที่คิดไม่ได้ (ไม่มีแถวค่าแรงหลัก) จะไม่มีคีย์ ผู้เรียกต้องถอยไปใช้เลขเดิม
+ */
+export async function fetchMonthlyIncomes(
+  requestNos: string[],
+): Promise<Map<string, MonthlyIncome>> {
+  const out = new Map<string, MonthlyIncome>();
+  try {
+    for (const [no, list] of await fetchJobBenefitRates(requestNos)) {
+      const income = monthlyGuaranteedIncome(list);
+      if (income.total > 0) out.set(no, income);
+    }
+  } catch {
+    return out;
   }
   return out;
 }

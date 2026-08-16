@@ -6,7 +6,11 @@ import {
 import { dbQuery } from '../../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { getString } from '../../_lib/body.js';
-import { fetchJobBenefitChips } from '../../_lib/siamrajJobBenefits.js';
+import {
+  fetchJobBenefitChips,
+  fetchMonthlyIncomes,
+  type MonthlyIncomeItem,
+} from '../../_lib/siamrajJobBenefits.js';
 
 type JobRow = {
   id: string;
@@ -83,6 +87,14 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
      * ⚠️ ทุกตัวเลขมาจาก **อัตราจ่าย** (`payment_rate`) เท่านั้น ห้ามแตะอัตราเบิก
      */
     benefits: undefined as string[] | undefined,
+    /**
+     * รายได้ต่อเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
+     * ⚠️ **ไม่ทับ `total_income`** — ฟิลด์เดิมมีคนใช้ทั้งระบบ (AI แมท · เทียบเงินเดือน
+     * ที่ผู้สมัครขอ · prompt ของ Lumos) เปลี่ยนความหมายกลางทางคือพังเงียบหลายจุด
+     */
+    monthly_income: undefined as number | undefined,
+    monthly_income_base: undefined as number | undefined,
+    monthly_income_items: undefined as MonthlyIncomeItem[] | undefined,
   };
 }
 
@@ -94,11 +106,23 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
 async function withBenefits(jobs: PublicJob[]): Promise<PublicJob[]> {
   const nos = jobs.map((j) => (j.request_no ? String(j.request_no) : '')).filter(Boolean);
   if (nos.length === 0) return jobs;
-  const chips = await fetchJobBenefitChips(nos);
-  if (chips.size === 0) return jobs;
+  const [chips, incomes] = await Promise.all([fetchJobBenefitChips(nos), fetchMonthlyIncomes(nos)]);
+  if (chips.size === 0 && incomes.size === 0) return jobs;
   return jobs.map((j) => {
-    const found = j.request_no ? chips.get(String(j.request_no)) : undefined;
-    return found && found.length > 0 ? { ...j, benefits: found } : j;
+    const no = j.request_no ? String(j.request_no) : '';
+    const found = no ? chips.get(no) : undefined;
+    const income = no ? incomes.get(no) : undefined;
+    return {
+      ...j,
+      ...(found && found.length > 0 ? { benefits: found } : {}),
+      ...(income
+        ? {
+            monthly_income: income.total,
+            monthly_income_base: income.base,
+            monthly_income_items: income.items,
+          }
+        : {}),
+    };
   });
 }
 

@@ -9,7 +9,10 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { requestNoFromJobRef, speakableBenefitLine,
-  speakableBenefitChips } from '../../api/_lib/siamrajJobBenefits.js';
+  speakableBenefitChips,
+  monthlyGuaranteedIncome,
+  toMonthlyAmount,
+  DAYS_PER_MONTH } from '../../api/_lib/siamrajJobBenefits.js';
 
 // ชุดจริงจากฐาน 15 ส.ค. (ใบ LMO6908004) — มีทั้งของพูดได้และห้ามพูดปนกัน
 const REAL_ROWS = [
@@ -162,5 +165,102 @@ describe('speakableBenefitChips — หน้าสาธารณะ', () => {
 
   it('อัตรา 0 = ไม่มีจริง ไม่นับ (ทั้งชิปและประโยค)', () => {
     expect(speakableBenefitChips([{ fee_name: 'ค่าเบี้ยขยัน', fee_rate: 0 }])).toEqual([]);
+  });
+});
+
+/**
+ * รายได้ต่อเดือน (เจ้าของสั่ง 16 ส.ค. 2569: "เงินเดือน + รายได้มั่นคง เอาเป็นรายเดือนมาเลย")
+ *
+ * พังเงียบที่คุมไว้:
+ * - นับเงินเดือนสองรอบ (แถว M กับแถว D คือเงินก้อนเดียวกัน 16000 ↔ 533.33)
+ * - เอาโอที/เบี้ยเลี้ยง/เบี้ยขยัน มาบวก ทั้งที่ไม่การันตี → ประกาศสัญญาเกินจริง
+ * - ค่าแรงรายวันไม่ถูกคูณ 30 → ประกาศโชว์ "฿410" ทั้งที่เป็นค่าแรงต่อวัน (เจอจริง 20/200 ใบ)
+ */
+describe('monthlyGuaranteedIncome', () => {
+  const wageM = { fee_name: 'เงินเดือน', fee_rate: 16000, unit: 'M', is_wage: true };
+  const wageDup = { fee_name: 'เงินเดือน', fee_rate: 533.33, unit: 'D', is_wage: false };
+
+  it('ฐานต่อเดือน + รายได้มั่นคงต่อวัน × 30', () => {
+    const out = monthlyGuaranteedIncome([
+      wageM,
+      { fee_name: 'ค่าครองชีพ', fee_rate: 66.67, unit: 'D', is_wage: false },
+    ]);
+    expect(out.base).toBe(16000);
+    expect(out.items).toEqual([{ label: 'ค่าครองชีพ', monthly: 2000 }]);
+    expect(out.total).toBe(18000);
+  });
+
+  it('🔴 ไม่นับเงินเดือนซ้ำ — แถวเงินเดือนหน่วยวันคือเงินก้อนเดียวกับค่าแรงหลัก', () => {
+    const out = monthlyGuaranteedIncome([wageM, wageDup]);
+    expect(out.total).toBe(16000);
+    expect(out.items).toEqual([]);
+  });
+
+  it('ค่าแรงรายวัน (is_wage + หน่วย D) ต้องคูณ 30 — ของจริง 410/วัน = 12,300/เดือน', () => {
+    const out = monthlyGuaranteedIncome([{ fee_name: 'ค่าแรง', fee_rate: 410, unit: 'D', is_wage: true }]);
+    expect(out.base).toBe(12300);
+    expect(out.total).toBe(12300);
+  });
+
+  it('ไม่นับของที่ไม่การันตี — โอที เบี้ยขยัน เบี้ยเลี้ยง ค่ากะ นักขัตฤกษ์ รางวัลพิเศษ', () => {
+    const out = monthlyGuaranteedIncome([
+      wageM,
+      { fee_name: 'ค่าล่วงเวลา 1.5 เท่า', fee_rate: 100, unit: 'H', is_wage: false },
+      { fee_name: 'ค่าเบี้ยขยัน', fee_rate: 66.67, unit: 'D', is_wage: false },
+      { fee_name: 'เบี้ยเลี้ยงค้างคืน', fee_rate: 500, unit: 'D', is_wage: false },
+      { fee_name: 'ค่ากะ (ดึก)', fee_rate: 200, unit: 'D', is_wage: false },
+      { fee_name: 'ค่าทำงานวันนักขัตฤกษ์', fee_rate: 600, unit: 'D', is_wage: false },
+      { fee_name: 'เงินรางวัลพิเศษ', fee_rate: 4500, unit: 'T', is_wage: false },
+    ]);
+    expect(out.total).toBe(16000);
+    expect(out.items).toEqual([]);
+  });
+
+  it('ไม่นับเงินชดเชยวันลา (ปกส) — เป็นอัตราตอนลา ไม่ใช่รายได้เพิ่ม', () => {
+    const out = monthlyGuaranteedIncome([
+      wageM,
+      { fee_name: 'เงินชดเชยลาป่วย (ปกส)', fee_rate: 533.33, unit: 'D', is_wage: false },
+      { fee_name: 'เงินชดเชยพักร้อน (ปกส)', fee_rate: 533.33, unit: 'D', is_wage: false },
+    ]);
+    expect(out.total).toBe(16000);
+  });
+
+  it('กลุ่มเดียวกันหลายแถว = เอาก้อนมากสุด ไม่บวกกัน (เรตเดียวตั้งไว้หลายแบบ)', () => {
+    const out = monthlyGuaranteedIncome([
+      wageM,
+      { fee_name: 'ค่ารถ/ค่าเดินทาง/TAXI', fee_rate: 50, unit: 'D', is_wage: false },
+      { fee_name: 'ค่ารถ/ค่าเดินทาง/TAXI (อัตรา 1)', fee_rate: 60, unit: 'D', is_wage: false },
+    ]);
+    expect(out.items).toEqual([{ label: 'ค่าเดินทาง', monthly: 1800 }]);
+  });
+
+  it('ไม่มีแถวค่าแรงหลัก = total 0 (ห้ามเดา — ผู้เรียกถอยไปใช้เลขเดิม)', () => {
+    expect(monthlyGuaranteedIncome([]).total).toBe(0);
+    expect(
+      monthlyGuaranteedIncome([{ fee_name: 'ค่าครองชีพ', fee_rate: 66.67, unit: 'D', is_wage: false }]).total,
+    ).toBe(0);
+  });
+
+  it('หน่วยที่แปลงเป็นรายเดือนไม่ได้ = null (ไม่เดา)', () => {
+    expect(toMonthlyAmount(100, 'H')).toBeNull();
+    expect(toMonthlyAmount(2000, 'T')).toBeNull();
+    expect(toMonthlyAmount(100, '')).toBeNull();
+    expect(toMonthlyAmount(0, 'M')).toBeNull();
+    expect(toMonthlyAmount(16000, 'M')).toBe(16000);
+    expect(toMonthlyAmount(100, 'd')).toBe(3000);
+  });
+
+  it('ยอดรวมต้องเท่ากับฐาน + รายการย่อยเสมอ (ไม่มีเลขโผล่จากไหนไม่รู้)', () => {
+    const out = monthlyGuaranteedIncome([
+      wageM,
+      { fee_name: 'ค่าครองชีพ', fee_rate: 66.67, unit: 'D', is_wage: false },
+      { fee_name: 'ค่าโทรศัพท์', fee_rate: 10, unit: 'D', is_wage: false },
+      { fee_name: 'ค่าตำแหน่ง', fee_rate: 200, unit: 'D', is_wage: false },
+    ]);
+    expect(out.total).toBe(out.base + out.items.reduce((s, i) => s + i.monthly, 0));
+  });
+
+  it('DAYS_PER_MONTH = 30 (ตรงกับ fee_divide ที่ ERP ใช้เอง)', () => {
+    expect(DAYS_PER_MONTH).toBe(30);
   });
 });

@@ -541,9 +541,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   {job.location_address?.trim() || 'ไม่ได้ระบุสถานที่'}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs">
+                  {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
+                      ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
+                      (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
                   <span className="inline-flex items-center gap-1 text-foreground font-semibold">
                     <Banknote className="h-3.5 w-3.5 text-success" />
-                    ฿{job.total_income.toLocaleString('th-TH')}
+                    {job.monthly_income
+                      ? `฿${job.monthly_income.toLocaleString('th-TH')} / เดือน`
+                      : `฿${job.total_income.toLocaleString('th-TH')}`}
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
@@ -902,9 +907,37 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                    * จึงห้ามเรียกว่า "รายได้รวม" · ของแถมที่เหลือโชว์เป็นชิปสวัสดิการแทน
                    * (ต่างจาก JobDetailPage/AddJobPage ที่เป็นใบขอฝั่งเราซึ่งคนกรอกยอดรวมเอง)
                    */}
-                  <dt className="text-muted-foreground">เงินเดือน (ไม่รวมโอที/เบี้ยเลี้ยง)</dt>
-                  <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString('th-TH')}</dd>
+                  <dt className="text-muted-foreground">
+                    {selected.monthly_income ? 'รายได้ต่อเดือน' : 'ค่าแรง (อัตราจาก ERP)'}
+                  </dt>
+                  <dd className="text-success font-semibold">
+                    ฿{(selected.monthly_income ?? selected.total_income).toLocaleString('th-TH')}
+                  </dd>
                 </div>
+                {/* แจกแจงที่มาของยอด — ผู้สมัครต้องเห็นว่าเลขมาจากไหน ไม่ใช่เชื่อยอดรวมลอย ๆ
+                    ⚠️ ไม่รวมโอที/เบี้ยเลี้ยง/เบี้ยขยัน เพราะไม่การันตี (โชว์เป็นชิปแยก) */}
+                {selected.monthly_income ? (
+                  <div className="border-b border-border/60 py-2.5">
+                    <dt className="text-muted-foreground">คิดจาก</dt>
+                    <dd className="mt-0.5 space-y-0.5 text-xs">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">ค่าแรงหลัก</span>
+                        <span className="font-medium">
+                          ฿{(selected.monthly_income_base ?? 0).toLocaleString('th-TH')}
+                        </span>
+                      </div>
+                      {(selected.monthly_income_items ?? []).map((it) => (
+                        <div key={it.label} className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">+ {it.label}</span>
+                          <span className="font-medium">฿{it.monthly.toLocaleString('th-TH')}</span>
+                        </div>
+                      ))}
+                      <p className="pt-1 text-[11px] text-muted-foreground">
+                        ยังไม่รวมโอที เบี้ยขยัน และเบี้ยเลี้ยง ซึ่งได้เพิ่มตามงานจริง
+                      </p>
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">วันที่ต้องการคน</dt>
                   <dd>{formatYmdDmyBe(selected.required_date)}</dd>
