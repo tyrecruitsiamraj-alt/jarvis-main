@@ -55,13 +55,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
       refresh,
     });
 
-    // ค้นเสร็จ → ส่งเข้าคิว Lumos เส้น interview **เฉพาะเมื่อตั้งโหมดเป็น auto** (error-safe ภายใน)
-    if (await isAutoDispatchEnabled('irecruit_search')) {
-      await enqueueLumosInterviewForIrecruit(job as Record<string, unknown>, result);
+    // ค้นเสร็จ → ส่งเข้าคิว Lumos เส้น interview (เขียว+เหลือง · กัน 30 วัน · error-safe)
+    // - `send=1` = เลนคัดสรรกด "หาคนเพิ่ม" → ส่งทันทีไม่ต้องอนุมัติ (เจ้าของเคาะ 16 ส.ค.)
+    // - หรือโหมด auto เดิม (`irecruit_search`) ก็ยังส่ง
+    // OT/สวัสดิการติดไปเองตอนเสิร์ฟคิว (siamrajJobBenefits)
+    const forceSend = getQuery(req, 'send') === '1';
+    let dispatch: (Awaited<ReturnType<typeof enqueueLumosInterviewForIrecruit>>) | null = null;
+    if (forceSend || (await isAutoDispatchEnabled('irecruit_search'))) {
+      dispatch = await enqueueLumosInterviewForIrecruit(job as Record<string, unknown>, result);
     }
 
     res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json(result);
+    return res.status(200).json({ ...result, dispatch });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (

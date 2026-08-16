@@ -25,6 +25,7 @@ import type { BoardMatchResult } from './boardCandidateMatcher.js';
 import type { IrecruitMatchResult } from './irecruitCandidateMatcher.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { fetchJobBenefitLines, requestNoFromJobRef } from './siamrajJobBenefits.js';
+import { phonesContactedAboutJob } from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
@@ -537,27 +538,50 @@ export async function enqueueLumosReminderForBoardMatch(
   }
 }
 
-/** ผลกดค้นหา iRecruit (green/yellow) → คิว interview อัตโนมัติ */
+/**
+ * ผลกดค้นหา iRecruit (green/yellow) → คิว interview
+ * เจ้าของเคาะ 16 ส.ค.: เลนคัดสรร "ค้นเจอแล้วส่ง AI ทันที ไม่ต้องอนุมัติ" (เขียว+เหลือง)
+ * · กัน 30 วันต่องาน (R1) — คนเพิ่งถูกโทรเรื่องงานนี้ไม่ส่งซ้ำ
+ * · OT/สวัสดิการติดไปเองตอนเสิร์ฟคิว (takePendingLumosItems · ช่อง interview)
+ * คืน outcome ให้ผู้เรียกรายงาน (ถ้าเรียกจาก auto flow เดิมไม่สนใจค่าคืนก็ได้)
+ */
 export async function enqueueLumosInterviewForIrecruit(
   job: Record<string, unknown>,
   result: IrecruitMatchResult,
-): Promise<void> {
+): Promise<LumosDispatchOutcome & { cooldownSkipped: number }> {
+  const empty = { queued: 0, duplicated: [] as string[], skipped: [], cooldownSkipped: 0 };
   try {
     const auto = result.matches.filter((m) => m.tier === 'green' || m.tier === 'yellow');
-    if (auto.length === 0) return;
-    const outcome = await enqueueLumosInterviewForSelected(job, result, auto);
+    if (auto.length === 0) return empty;
+
+    // กัน 30 วัน — เบอร์ที่เพิ่งถูกติดต่อเรื่องงานนี้ ตัดออกก่อนเข้าคิว
+    const phones = auto
+      .map((m) => toE164Thai(m.phone_number))
+      .filter((p): p is string => Boolean(p));
+    const recentlyContacted = await phonesContactedAboutJob(result.jobId, phones);
+    const eligible = auto.filter((m) => {
+      const e164 = toE164Thai(m.phone_number);
+      return !e164 || !recentlyContacted.has(e164); // เบอร์แปลงไม่ได้ปล่อยผ่าน (โดนคัดที่ payload อยู่แล้ว)
+    });
+    const cooldownSkipped = auto.length - eligible.length;
+    if (eligible.length === 0) return { ...empty, cooldownSkipped };
+
+    const outcome = await enqueueLumosInterviewForSelected(job, result, eligible);
     if (outcome.queued > 0) {
       logInfo('lumos.dispatch.interview.auto', {
         jobId: result.jobId,
         queued: outcome.queued,
         matched: auto.length,
+        cooldownSkipped,
       });
     }
+    return { ...outcome, cooldownSkipped };
   } catch (e) {
     logError('lumos.dispatch.interview.fail', {
       jobId: result.jobId,
       message: e instanceof Error ? e.message : String(e),
     });
+    return empty;
   }
 }
 
