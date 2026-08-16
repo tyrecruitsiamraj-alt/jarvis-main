@@ -101,6 +101,10 @@ describe('ห้ามหยิบอัตราเบิกมาใช้', (
     expect(src).toContain('C.payment_rate as fee_rate');
   });
 
+  it("ตัดฝั่งหักที่ต้นทาง SQL ด้วย what_side <> '2' (ชั้นที่ 1 · เจ้าของสั่ง 'พวกหักๆ ไม่ต้องโชว์')", () => {
+    expect(src).toContain(`RTRIM(ISNULL(F.what_side, '')) <> '2'`);
+  });
+
   it('ไม่มี draw_rate / draw_tor_percent อยู่ในคิวรีเลย', () => {
     const sqlOnly = src.slice(src.indexOf('SELECT'), src.indexOf('`,', src.indexOf('SELECT')));
     expect(sqlOnly).not.toMatch(/draw_rate/);

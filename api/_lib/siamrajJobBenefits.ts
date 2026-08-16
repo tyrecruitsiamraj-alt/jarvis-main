@@ -11,6 +11,14 @@
  * ลาป่วย/พักร้อน (ปกส) · เงินเดือน (ซ้ำกับที่พูดไปแล้ว) — จึงใช้ **whitelist**
  * เท่านั้น: พูดเฉพาะที่รู้จัก ไม่รู้จัก = เงียบ (พูดผิดแย่กว่าไม่พูด)
  *
+ * 🔴 **กัน 2 ชั้น** (เจ้าของสั่ง 16 ส.ค. 2569: *"ไอพวกหักๆ ไม่ต้องเอามาโชว์"*):
+ *   ชั้น 1 = ตัดฝั่งหักที่ต้นทาง SQL ด้วย `wg2_ms_fee.what_side <> '2'`
+ *   ชั้น 2 = whitelist ชื่อ (ของเดิม)
+ * `what_side='2'` คือฝั่งหักของ ERP — วัดจาก master 16 ส.ค.: 72 รายการ ครอบทั้ง
+ * มาสาย · ค่าปรับขาดงาน · ภาษี · กองทุนสำรองเลี้ยงชีพ · ค่าเครื่องแบบ · ค่าความเสียหาย
+ * ชั้นเดียวไม่พอ: whitelist กันชื่อที่ **รู้จัก** · `what_side` กันของ **ที่ยังไม่รู้จัก**
+ * ที่ใครจะเพิ่มเข้า master วันหลัง
+ *
  * 🔴 **ใช้ `payment_rate` = อัตราจ่าย (จ่ายพนักงาน) เท่านั้น** (เจ้าของย้ำ 16 ส.ค. 2569:
  * *"โชว์อัตราจ่ายนะไม่ใช่อัตราเบิก"*) — ตารางเดียวกันมี `draw_rate` = **อัตราเบิก**
  * (เบิกจากลูกค้า) ซึ่งเป็นคนละเลขจริง ๆ วัดจากฐาน 16 ส.ค.: 309,977 แถวที่มีทั้งสองค่า
@@ -97,7 +105,8 @@ export async function fetchJobBenefitRates(
        FROM st_request_p3_rate C
        LEFT JOIN wg2_ms_fee F
          ON F.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)
-      WHERE RTRIM(C.is_wage) <> 'Y' AND C.request_no IN (${placeholders})`,
+      WHERE RTRIM(C.is_wage) <> 'Y' AND C.request_no IN (${placeholders})
+        AND RTRIM(ISNULL(F.what_side, '')) <> '2'`,
     params,
   );
   for (const r of rows) {
