@@ -101,6 +101,7 @@ export type LumosInterviewPayload = {
   language: string;
   tone: string;
   skills?: string[];
+  priority?: 'high' | 'medium' | 'low';
 };
 
 export function buildInterviewPayload(
@@ -108,6 +109,7 @@ export function buildInterviewPayload(
   result: Pick<IrecruitMatchResult, 'jobId' | 'request_no' | 'job_family_label'>,
   match: { id: number; full_name: string; phone_number: string | null; job_name_th: string | null; position_name: string | null },
   now = new Date(),
+  priority?: 'high' | 'medium' | 'low',
 ): LumosInterviewPayload | null {
   const phone = toE164Thai(match.phone_number);
   if (!phone || !match.full_name) return null;
@@ -133,6 +135,7 @@ export function buildInterviewPayload(
     language: 'th',
     tone: 'professional',
     ...(skills.length ? { skills } : {}),
+    ...(priority ? { priority } : {}),
   };
 }
 
@@ -209,11 +212,12 @@ export async function enqueueLumosInterviewForSelected(
     job_name_th: string | null;
     position_name: string | null;
   }>,
+  priority?: 'high' | 'medium' | 'low',
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload }> = [];
   for (const m of selected) {
-    const payload = buildInterviewPayload(job, result, m);
+    const payload = buildInterviewPayload(job, result, m, new Date(), priority);
     if (!payload) {
       skipped.push({ ref: `ir-${m.id}`, name: m.full_name, reason: NO_PHONE_REASON });
       continue;
@@ -286,6 +290,13 @@ export async function enqueueLumosInterviewForIrecruit(
 
 // ─── สถานะการโทรต่อคน (ระดับ 1: badge ในการ์ด Matching) ──────────────────────
 
+export type LumosNextAction = {
+  type: string;
+  urgency: 'urgent' | 'normal' | 'not urgent';
+  due_at: string;
+  reason: string;
+};
+
 export type LumosCallStatusRow = {
   channel: 'reminder' | 'interview';
   /** 'card-<id>' สำหรับคนของเรา · 'ir-<id>' สำหรับผู้สมัคร iRecruit */
@@ -293,6 +304,7 @@ export type LumosCallStatusRow = {
   status: 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
   outcome: string | null;
   summary: string | null;
+  next_action: LumosNextAction | null;
   delivery_count: number;
   sent_at: string;
   updated_at: string;
@@ -304,6 +316,7 @@ type QueueStatusSqlRow = {
   status: string;
   outcome: string | null;
   summary: string | null;
+  next_action_raw: LumosNextAction | null;
   delivery_count: number;
   created_at: string | Date;
   updated_at: string | Date;

@@ -91,6 +91,7 @@ export async function dispatchLumosCalls(input: {
   jobId: string;
   boardCardIds: number[];
   irecruitIds: number[];
+  priority?: 'high' | 'medium' | 'low';
 }): Promise<LumosDispatchResult> {
   const r = await apiFetch('/api/lumos/dispatch', { method: 'POST', body: JSON.stringify(input) });
   if (!r.ok) throw new Error(await readError(r));

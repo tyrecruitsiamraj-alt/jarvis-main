@@ -1036,6 +1036,7 @@ const MatchingPage: React.FC = () => {
   const [lumosPool, setLumosPool] = useState<LumosPoolCandidate[]>([]);
   const [lumosPoolLoading, setLumosPoolLoading] = useState(false);
   const [lumosPoolSearch, setLumosPoolSearch] = useState('');
+  const [lumosInterviewPriority, setLumosInterviewPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   const lumosSelectedCount = lumosSelectedBoard.length + lumosSelectedIrecruit.length;
 
@@ -1097,6 +1098,7 @@ const MatchingPage: React.FC = () => {
         jobId: jobDetail.id,
         boardCardIds: lumosSelectedBoard,
         irecruitIds: lumosSelectedIrecruit,
+        ...(lumosSelectedIrecruit.length > 0 ? { priority: lumosInterviewPriority } : {}),
       });
       setLumosStatusByRef(indexLumosCallStatus(result.items));
       // pool ที่โหลดไว้ต้องรู้ว่าคนเหล่านี้ส่งแล้ว ไม่งั้นเปิด picker ซ้ำจะยังติ๊กได้

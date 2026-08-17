@@ -138,6 +138,7 @@ export type ParsedDispatchInput = {
   jobId: string;
   boardCardIds: number[];
   irecruitIds: number[];
+  priority?: 'high' | 'medium' | 'low';
 };
 
 export type DispatchInputResult = { error: string | null; value: ParsedDispatchInput | null };
@@ -159,7 +160,13 @@ export function parseDispatchInput(raw: unknown): DispatchInputResult {
     return fail(`ส่งได้ครั้งละไม่เกิน ${MAX_PER_REQUEST} คน (เลือกมา ${total} คน)`);
   }
 
-  return { error: null, value: { jobId, boardCardIds, irecruitIds } };
+  const priorityRaw = getString(body.priority);
+  const priority =
+    priorityRaw === 'high' || priorityRaw === 'medium' || priorityRaw === 'low'
+      ? priorityRaw
+      : undefined;
+
+  return { error: null, value: { jobId, boardCardIds, irecruitIds, priority } };
 }
 
 function mergeOutcomes(parts: LumosDispatchOutcome[]): LumosDispatchOutcome {
@@ -214,7 +221,7 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
   if (parsed.error || !parsed.value) {
     return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
   }
-  const { jobId, boardCardIds, irecruitIds } = parsed.value;
+  const { jobId, boardCardIds, irecruitIds, priority } = parsed.value;
 
   const job = await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user));
   if (!job) return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
@@ -277,6 +284,7 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
           job_name_th: c.job_name_th,
           position_name: c.position_name,
         })),
+        priority,
       ),
     );
   }
