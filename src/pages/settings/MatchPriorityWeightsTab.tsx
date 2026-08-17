@@ -10,7 +10,11 @@ import {
   type PriorityConfig,
   type PriorityCriterion,
 } from '@/lib/candidatePriority';
-import { fetchMatchPriorityConfig, saveMatchPriorityConfig } from '@/lib/matchPriorityWeightsApi';
+import {
+  fetchMatchPriorityState,
+  resetMatchPriorityConfig,
+  saveMatchPriorityConfig,
+} from '@/lib/matchPriorityWeightsApi';
 
 /**
  * ตั้งน้ำหนักเกณฑ์เรียงผู้สมัครหน้า Matching (Settings › น้ำหนักเรียงผู้สมัคร)
@@ -18,8 +22,18 @@ import { fetchMatchPriorityConfig, saveMatchPriorityConfig } from '@/lib/matchPr
  * เลขน้ำหนักไม่ต้องรวมกันได้ 100 — ระบบ normalize ตามเกณฑ์ที่ "มีข้อมูลจริง" ของผู้สมัครคนนั้น
  * จึงโชว์สัดส่วน % ที่คำนวณให้ดูข้าง ๆ กันเข้าใจผิดว่าเลขคือเปอร์เซ็นต์
  */
-const MatchPriorityWeightsTab: React.FC = () => {
+const MatchPriorityWeightsTab: React.FC<{
+  /**
+   * id เต็มของใบขอ (`siamraj-sql:` / `siamraj-pre:`) — ตั้งน้ำหนัก**เฉพาะใบนั้น**
+   * ไม่ส่ง = แก้ **ค่ากลาง** ที่เป็น Default ของทุกใบ (พฤติกรรมเดิมของหน้า Settings)
+   * เจ้าของสั่ง 17 ส.ค. 2569: *"ค่าที่ตั้งไว้ตั้งเป็น Default แล้วถ้าจะแก้ไขไรก็ไปแก้เอง"*
+   */
+  requestNo?: string;
+}> = ({ requestNo }) => {
+  const perRequest = Boolean(requestNo?.trim());
   const [config, setConfig] = useState<PriorityConfig>(DEFAULT_PRIORITY_CONFIG);
+  const [defaultConfig, setDefaultConfig] = useState<PriorityConfig>(DEFAULT_PRIORITY_CONFIG);
+  const [overridden, setOverridden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -27,9 +41,13 @@ const MatchPriorityWeightsTab: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchMatchPriorityConfig()
-      .then((c) => {
-        if (!cancelled) setConfig(c);
+    setLoading(true);
+    void fetchMatchPriorityState(requestNo)
+      .then((st) => {
+        if (cancelled) return;
+        setConfig(st.config);
+        setDefaultConfig(st.defaultConfig);
+        setOverridden(st.overridden);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -37,7 +55,26 @@ const MatchPriorityWeightsTab: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestNo]);
+
+  /** รีเซ็ตใบนี้กลับไปใช้ค่ากลาง — ค่ากลางเองรีเซ็ตไม่ได้ (ปุ่มจึงโผล่เฉพาะโหมดต่อใบ) */
+  const resetToDefault = async () => {
+    if (!requestNo?.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await resetMatchPriorityConfig(requestNo);
+      const st = await fetchMatchPriorityState(requestNo);
+      setConfig(st.config);
+      setDefaultConfig(st.defaultConfig);
+      setOverridden(st.overridden);
+      setSavedAt(new Date().toLocaleTimeString('th-TH', { timeStyle: 'short' }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'รีเซ็ตไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const totalWeight = useMemo(
     () => PRIORITY_CRITERIA.reduce((sum, k) => sum + (config.weights[k] ?? 0), 0),
@@ -64,8 +101,10 @@ const MatchPriorityWeightsTab: React.FC = () => {
     setSaving(true);
     setError(null);
     try {
-      const saved = await saveMatchPriorityConfig(config);
+      const saved = await saveMatchPriorityConfig(config, requestNo);
       setConfig(saved);
+      // บันทึกต่อใบสำเร็จ = ใบนี้กลายเป็น "ตั้งเอง" ทันที (ไม่ต้องรอโหลดรอบใหม่)
+      if (perRequest) setOverridden(true);
       setSavedAt(new Date().toLocaleTimeString('th-TH', { timeStyle: 'short' }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -85,9 +124,44 @@ const MatchPriorityWeightsTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* โหมดต่อใบ — ต้องบอกให้ชัดว่ากำลังแก้ของใบเดียว ไม่ใช่ค่ากลางของทุกใบ
+          ไม่บอก = คนเข้าใจผิดว่าแก้ทั้งระบบ (หรือกลับกัน) แล้วลำดับผู้สมัครเพี้ยนทั้งบอร์ด */}
+      {perRequest ? (
+        <div
+          className={cn(
+            'rounded-[1.5rem] border p-3 text-xs',
+            overridden ? TONE.primary.soft : TONE.neutral.soft,
+          )}
+        >
+          <p className="font-semibold text-foreground">
+            {overridden ? 'ใบนี้ตั้งน้ำหนักเองไว้' : 'ใบนี้ยังใช้ค่ากลาง'}
+          </p>
+          <p className="mt-0.5 text-muted-foreground">
+            แก้ที่นี่มีผล <b className="text-foreground">เฉพาะใบขอนี้</b> ·{' '}
+            ค่ากลางของทุกใบตั้งที่ Settings › น้ำหนักเรียงผู้สมัคร
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            ค่ากลางตอนนี้:{' '}
+            {PRIORITY_CRITERIA.map((k) => `${PRIORITY_LABELS[k]} ${defaultConfig.weights[k] ?? 0}`).join(' · ')}
+          </p>
+          {overridden ? (
+            <button
+              type="button"
+              onClick={() => void resetToDefault()}
+              disabled={saving}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold hover:bg-secondary disabled:opacity-50"
+            >
+              <RotateCcw className="h-3 w-3" aria-hidden />
+              กลับไปใช้ค่ากลาง
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="glass-card rounded-[1.5rem] border border-white/70 p-4 text-sm text-muted-foreground dark:border-slate-700/70">
         <p>
-          หน้า Matching เรียงผู้สมัครในใบขอจากเกณฑ์ข้างล่างนี้ — ยิ่งน้ำหนักมาก ยิ่งมีผลต่อลำดับมาก
+          {perRequest
+            ? 'หน้า Matching เรียงผู้สมัครในใบขอนี้จากเกณฑ์ข้างล่างนี้ — ยิ่งน้ำหนักมาก ยิ่งมีผลต่อลำดับมาก'
+            : 'หน้า Matching เรียงผู้สมัครในใบขอจากเกณฑ์ข้างล่างนี้ — ยิ่งน้ำหนักมาก ยิ่งมีผลต่อลำดับมาก'}
         </p>
         <p className="mt-1 text-xs">
           ไม่ต้องรวมกันได้ 100 · ระบบคิดสัดส่วนเฉพาะเกณฑ์ที่ผู้สมัครคนนั้น "มีข้อมูลจริง"

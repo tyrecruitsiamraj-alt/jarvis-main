@@ -2095,3 +2095,24 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
 
 **กติกา:** ไม่ส่งช่องไหนมาใน upsert = **คงค่าเดิม** — ยืนยันกับของจริงแล้วว่าอัปเดต
 `online_name` อย่างเดียวไม่ล้างสรรหา/คัดสรร/OPL ที่มีอยู่ (หมิว/น้ำหวาน/สมปอง อยู่ครบ)
+
+### รอบ 17 ส.ค. 2569 (เย็น ต่อ) — น้ำหนักเรียงผู้สมัครตั้งได้ต่อใบขอ
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `api/_handlers/match-priority-weights.ts` | `?request_no=` → อ่าน/เขียน/ลบน้ำหนักของใบนั้น · GET คืน `config` + `defaultConfig` + `overridden` |
+| `src/lib/matchPriorityWeightsApi.ts` | `fetchMatchPriorityState` · `saveMatchPriorityConfig(config, requestNo)` · `resetMatchPriorityConfig` |
+| `src/pages/settings/MatchPriorityWeightsTab.tsx` | รับ prop `requestNo` — ไม่ส่ง = แก้ค่ากลาง (เดิม) · ส่ง = แก้ของใบนั้น + ปุ่มกลับไปใช้ค่ากลาง |
+| `src/pages/matching/MatchingPage.tsx` | โหลดน้ำหนักตามใบที่เปิด + ปุ่ม "น้ำหนักของใบนี้" + ป้ายบอกว่าเรียงด้วยชุดไหน |
+
+**ไม่ต้องสร้างตารางใหม่** — `app_match_priority_weights.id` เป็น primary key อยู่แล้ว
+ใช้ `id = 'default'` เป็นค่ากลาง และ `id = <id เต็มของใบขอ>` เป็นชั้น override
+
+**กติกา**
+
+* 🔴 คีย์ของใบต้องเป็น **id เต็ม** (`siamraj-sql:` / `siamraj-pre:`) — เลขที่ใบซ้ำกันได้ 23 ใบ
+  คีย์ด้วยเลขเปล่า = ใบสองใบใช้น้ำหนักก้อนเดียวกัน
+* 🔴 **ลบแถว `'default'` ไม่ได้** (API ตอบ 400) — ลบแล้วทุกใบร่วงไปใช้ค่า hardcode พร้อมกัน
+* `overridden` มาจาก "มีแถวของใบไหม" **ไม่ใช่เทียบค่ากับค่ากลาง** — ตั้งเท่ากันก็ยังนับว่าตั้งเอง
+  (ไม่งั้นกดบันทึกค่าเดิมแล้วป้ายไม่ขึ้น คนงงว่าบันทึกติดหรือไม่)
+* หน้า Matching ต้องยิงโหลดใหม่ทุกครั้งที่เปลี่ยนใบขอ — ห้าม cache ข้ามใบ

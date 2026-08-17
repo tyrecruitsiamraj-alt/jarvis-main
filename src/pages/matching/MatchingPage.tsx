@@ -64,7 +64,8 @@ import {
   type PriorityConfig,
   type PriorityVerdict,
 } from '@/lib/candidatePriority';
-import { fetchMatchPriorityConfig } from '@/lib/matchPriorityWeightsApi';
+import { fetchMatchPriorityState } from '@/lib/matchPriorityWeightsApi';
+import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
 import {
   fetchCandidateScreening,
   type CandidateScreeningRecord,
@@ -74,7 +75,7 @@ import {
    ยังอยู่ครบใน callHoldsApi.ts และยังถูกใช้ที่ถัง "ต้องคนตาม" ในแถบการไหลของงาน */
 import { acquireCallHold, fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { partitionHoldTargets, summarizeAcquireResults, type HoldTarget } from '@/lib/callHoldsBulk';
-import { CheckCircle2, Megaphone, X, PhoneCall, UserCheck, UserX } from 'lucide-react';
+import { CheckCircle2, Megaphone, X, PhoneCall, UserCheck, UserX, SlidersHorizontal } from 'lucide-react';
 import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
@@ -632,18 +633,29 @@ const MatchingPage: React.FC = () => {
   }, [search, urgentOnly, unitFilter, workflowFilter, buFilter, pageSize, sortBy]);
 
   const [boardMatchById, setBoardMatchById] = useState<Record<string, BoardMatchResult>>({});
-  /** น้ำหนักเรียงผู้สมัครที่ตั้งไว้ที่ Settings — โหลดพลาดใช้ค่าเริ่มต้นในโค้ด */
+  /**
+   * น้ำหนักเรียงผู้สมัคร — **ของใบขอที่เปิดอยู่ ถ้าใบนั้นตั้งเอง ไม่งั้นใช้ค่ากลาง**
+   * (เจ้าของสั่ง 17 ส.ค. 2569: *"เอาไปใส่ตามใบขอได้ปะ เผื่อแต่ละใบให้น้ำหนักไม่เท่ากัน ·
+   * ค่าที่ตั้งไว้ตั้งเป็น Default แล้วถ้าจะแก้ไขไรก็ไปแก้เอง"*)
+   * โหลดพลาดใช้ค่าเริ่มต้นในโค้ด — ลิสต์ต้องเรียงได้เสมอ
+   */
   const [priorityConfig, setPriorityConfig] = useState<PriorityConfig>(DEFAULT_PRIORITY_CONFIG);
+  const [priorityOverridden, setPriorityOverridden] = useState(false);
+  const [weightsDialogOpen, setWeightsDialogOpen] = useState(false);
+  const priorityJobId = jobDetail?.id ?? null;
 
   useEffect(() => {
     let cancelled = false;
-    void fetchMatchPriorityConfig().then((c) => {
-      if (!cancelled) setPriorityConfig(c);
+    // ยิงใหม่ทุกครั้งที่เปลี่ยนใบขอ — ใบละน้ำหนักได้ ห้าม cache ข้ามใบ
+    void fetchMatchPriorityState(priorityJobId ?? undefined).then((st) => {
+      if (cancelled) return;
+      setPriorityConfig(st.config);
+      setPriorityOverridden(st.overridden);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [priorityJobId]);
 
   /**
    * ผลคัดกรอง (เหล้า/บุหรี่ + คดี) ของผู้สมัครในใบขอที่เปิดอยู่ — คีย์เป็น card_id (string)
@@ -3090,6 +3102,27 @@ const MatchingPage: React.FC = () => {
                   </p>
                 ) : (
                   <div className="space-y-2">
+                    {/* น้ำหนักที่ใช้เรียงลิสต์นี้ — ใบไหนตั้งเองได้ (เจ้าของสั่ง 17 ส.ค. 2569)
+                        ต้องบอกให้เห็นว่ากำลังเรียงด้วยน้ำหนักชุดไหน ไม่งั้นเรียงเปลี่ยนแล้วไม่รู้ว่าทำไม */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 px-3 py-1.5">
+                      <span className="text-[11px] text-muted-foreground">
+                        เรียงด้วยน้ำหนัก{' '}
+                        <b className="text-foreground">
+                          {priorityOverridden ? 'ของใบนี้' : 'ค่ากลาง'}
+                        </b>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setWeightsDialogOpen(true)}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                          TONE.info.outline,
+                        )}
+                      >
+                        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                        น้ำหนักของใบนี้
+                      </button>
+                    </div>
                     {/* เรียงตามลำดับความสำคัญของเจ้าของ: อายุ → ที่อยู่ → ประสบการณ์ → รายได้
                         (เกณฑ์แข็งพังตกท้าย · คะแนนเท่ากันคงลำดับจาก AI — sort ของ JS เป็น stable) */}
                     {boardMatchById[jobDetail.id].matches
@@ -4679,6 +4712,22 @@ const MatchingPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* น้ำหนักเรียงผู้สมัคร **ของใบขอที่เปิดอยู่** (เจ้าของสั่ง 17 ส.ค. 2569)
+          ใช้ตัวแก้ตัวเดียวกับหน้า Settings — ส่ง requestNo เข้าไปเท่านั้น
+          ไม่ทำตัวแก้ใหม่ เพราะกติกาการ normalize/เกณฑ์แข็งต้องเหมือนกันเป๊ะทั้งสองที่ */}
+      <Dialog open={weightsDialogOpen} onOpenChange={setWeightsDialogOpen}>
+        <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">น้ำหนักเรียงผู้สมัครของใบนี้</DialogTitle>
+            <DialogDescription className="text-xs">
+              {jobDetail?.request_no ? `${jobDetail.request_no} · ` : ''}
+              {jobDetail?.unit_name ?? ''}
+            </DialogDescription>
+          </DialogHeader>
+          {jobDetail ? <MatchPriorityWeightsTab requestNo={jobDetail.id} /> : null}
         </DialogContent>
       </Dialog>
     </div>
