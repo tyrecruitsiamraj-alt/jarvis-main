@@ -495,12 +495,6 @@ function CandidateChecklist({
   );
 }
 
-function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; cls: string } {
-  if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', cls: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/50' };
-  if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', cls: 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/50' };
-  return { icon: '🟡', label: 'พอได้ ต้องเช็ค', cls: 'border-amber-200 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/50' };
-}
-
 function formatCallWhen(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -716,6 +710,8 @@ function LumosSendBar({
       </div>
     </div>
   );
+}
+
 function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; tone: ToneKey } {
   if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', tone: 'success' };
   if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', tone: 'danger' };
