@@ -103,6 +103,7 @@ import {
   type LumosCallStatus,
   type LumosPoolCandidate,
   type LumosJobCallSummaryRow,
+  type LumosNextAction,
 } from '@/lib/lumosDispatchApi';
 
 /** สถานะการเสนอ + id แถวจริงใน DB (ไว้ยกเลิก) — คีย์ = source#ref */
@@ -595,6 +596,19 @@ function formatCallWhen(iso: string | null): string {
   return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+/** ป้ายแดง "โทรกลับด่วน" — แสดงเมื่อ next_action.urgency === 'urgent' */
+function LumosUrgentBadge({ nextAction }: { nextAction: LumosNextAction | null | undefined }) {
+  if (nextAction?.urgency !== 'urgent') return null;
+  return (
+    <span
+      title={nextAction.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
+      className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
+    >
+      📞 โทรกลับด่วน
+    </span>
+  );
+}
+
 /**
  * ป้ายผลการโทร Lumos ต่อคน (ระดับ 1) — รอโทร → Lumos รับไปแล้ว → สนใจ/ปฏิเสธ/ไม่รับสาย
  * กดขยายเห็นสรุปบทสนทนา + ยกเลิกได้ถ้า Lumos ยังไม่ส่งผลกลับ
@@ -644,6 +658,12 @@ function LumosCallBadgeRow({
           ) : (
             <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก AI</p>
           )}
+          {row.next_action?.urgency === 'urgent' ? (
+            <p className="text-[10px] text-red-700 dark:text-red-300">
+              <span className="font-semibold">AI แนะนำ:</span> {row.next_action.reason || 'โทรกลับหาคนนี้ด่วน'}
+              {row.next_action.due_at ? ` (ภายใน ${formatCallWhen(row.next_action.due_at)})` : ''}
+            </p>
+          ) : null}
           <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatCallWhen(row.updated_at)}</p>
           {canCancelLumosCall(row) ? (
             <button
@@ -2940,7 +2960,8 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               </TierCriteriaTooltip>{' '}
                               {m.full_name}
-                              {m.nick_name ? ` (${m.nick_name})` : ''}
+                              {m.nick_name ? ` (${m.nick_name})` : ''}{' '}
+                              <LumosUrgentBadge nextAction={lumosRow?.next_action} />
                             </span>
                             <div className="flex shrink-0 items-center gap-1">
                               {(() => {
@@ -3174,7 +3195,8 @@ const MatchingPage: React.FC = () => {
                                         {matchTierEmoji(m.tier)}
                                       </span>
                                     </TierCriteriaTooltip>{' '}
-                                    {m.full_name}
+                                    {m.full_name}{' '}
+                                    <LumosUrgentBadge nextAction={lumosRow?.next_action} />
                                   </span>
                                   <div className="flex shrink-0 items-center gap-1">
                                     {proposed ? (
@@ -4036,6 +4058,36 @@ const MatchingPage: React.FC = () => {
                 </div>
               );
             })()}
+            {lumosSelectedIrecruit.length > 0 ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 py-2 dark:border-blue-800 dark:bg-blue-950/40">
+                <p className="mb-1.5 text-[11px] font-semibold text-blue-800 dark:text-blue-200">
+                  ระดับความสำคัญ AI สัมภาษณ์
+                </p>
+                <div className="flex gap-2">
+                  {(
+                    [
+                      { value: 'high', label: 'สูง', cls: 'border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300' },
+                      { value: 'medium', label: 'ปกติ', cls: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+                      { value: 'low', label: 'ต่ำ', cls: 'border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-400' },
+                    ] as const
+                  ).map(({ value, label, cls }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setLumosInterviewPriority(value)}
+                      className={cn(
+                        'rounded-full border px-3 py-0.5 text-[11px] font-semibold transition-all',
+                        lumosInterviewPriority === value
+                          ? cn(cls, 'ring-2 ring-offset-1')
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"

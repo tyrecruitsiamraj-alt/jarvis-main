@@ -331,6 +331,14 @@ const FollowPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-2">
                       <NameAvatar name={it.recipient_name} />
                       <span className="font-bold text-foreground">{it.recipient_name}</span>
+                      {it.next_action?.urgency === 'urgent' ? (
+                        <span
+                          title={it.next_action.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
+                        >
+                          📞 โทรกลับด่วน
+                        </span>
+                      ) : null}
                       <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
                         {FOLLOW_STATUS_LABEL[it.call_status]}
                       </span>
@@ -346,6 +354,12 @@ const FollowPage: React.FC = () => {
                         ผลการโทร{it.call_outcome ? ` (${it.call_outcome})` : ''}
                         {it.call_summary ? `: ${it.call_summary}` : ''}
                         {it.called_at ? ` · ${formatWhen(it.called_at)}` : ''}
+                      </p>
+                    ) : null}
+                    {it.next_action?.urgency === 'urgent' && it.next_action.reason ? (
+                      <p className="mt-1 rounded-lg border border-red-200 bg-red-50/70 px-2.5 py-1 text-[11px] font-medium text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300">
+                        AI แนะนำ: {it.next_action.reason}
+                        {it.next_action.due_at ? ` · ภายใน ${formatWhen(it.next_action.due_at)}` : ''}
                       </p>
                     ) : null}
                   </div>

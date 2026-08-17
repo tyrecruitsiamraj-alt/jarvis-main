@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import type { LumosNextAction } from '@/lib/lumosDispatchApi';
 
 export type FollowCallStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 
@@ -16,6 +17,7 @@ export type FollowEntry = {
   call_status: FollowCallStatus;
   call_outcome: string | null;
   call_summary: string | null;
+  next_action: LumosNextAction | null;
   called_at: string | null;
 };
 

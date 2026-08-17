@@ -329,7 +329,8 @@ export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCal
   const { rows } = await dbQuery<QueueStatusSqlRow>(
     `select channel, person_ref, status, delivery_count, created_at, updated_at,
             result->>'outcome' as outcome,
-            result->>'summary' as summary
+            result->>'summary' as summary,
+            result->'next_action' as next_action_raw
        from ${queueTable}
       where job_ref = $1
       order by created_at asc`,
@@ -345,6 +346,7 @@ export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCal
       : 'pending',
     outcome: r.outcome,
     summary: r.summary,
+    next_action: r.next_action_raw ?? null,
     delivery_count: Number(r.delivery_count) || 0,
     sent_at: iso(r.created_at),
     updated_at: iso(r.updated_at),
