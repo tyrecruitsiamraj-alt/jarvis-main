@@ -21,10 +21,10 @@ const excludedTable = tableInAppSchema('job_staff_picker_excluded');
 const jobsTable = tableInAppSchema('jobs');
 const unitAssignmentsTable = tableInAppSchema('siamraj_unit_assignments');
 
-type Role = 'recruiter' | 'screener' | 'opl';
+type Role = 'recruiter' | 'screener' | 'opl' | 'online';
 
 function isRole(v: unknown): v is Role {
-  return v === 'recruiter' || v === 'screener' || v === 'opl';
+  return v === 'recruiter' || v === 'screener' || v === 'opl' || v === 'online';
 }
 
 function normName(s: string): string {
@@ -63,9 +63,11 @@ async function fetchState(scope: DepartmentScope) {
     recruiters: [] as string[],
     screeners: [] as string[],
     opls: [] as string[],
+    onlines: [] as string[],
     pickerExcludedRecruiters: [] as string[],
     pickerExcludedScreeners: [] as string[],
     pickerExcludedOpls: [] as string[],
+    pickerExcludedOnlines: [] as string[],
     bu: scope.mode === 'code' ? scope.code : null,
     buMode: scope.mode,
   };
@@ -84,28 +86,34 @@ async function fetchState(scope: DepartmentScope) {
   const recruiters: string[] = [];
   const screeners: string[] = [];
   const opls: string[] = [];
+  const onlines: string[] = [];
   for (const r of rosterRows) {
     if (r.role === 'recruiter') recruiters.push(r.display_name);
     else if (r.role === 'screener') screeners.push(r.display_name);
     else if (r.role === 'opl') opls.push(r.display_name);
+    else if (r.role === 'online') onlines.push(r.display_name);
   }
 
   const pickerExcludedRecruiters: string[] = [];
   const pickerExcludedScreeners: string[] = [];
   const pickerExcludedOpls: string[] = [];
+  const pickerExcludedOnlines: string[] = [];
   for (const e of exRows) {
     if (e.role === 'recruiter') pickerExcludedRecruiters.push(e.name_norm);
     else if (e.role === 'screener') pickerExcludedScreeners.push(e.name_norm);
     else if (e.role === 'opl') pickerExcludedOpls.push(e.name_norm);
+    else if (e.role === 'online') pickerExcludedOnlines.push(e.name_norm);
   }
 
   return {
     recruiters: dedupe(recruiters),
     screeners: dedupe(screeners),
     opls: dedupe(opls),
+    onlines: dedupe(onlines),
     pickerExcludedRecruiters: dedupe(pickerExcludedRecruiters),
     pickerExcludedScreeners: dedupe(pickerExcludedScreeners),
     pickerExcludedOpls: dedupe(pickerExcludedOpls),
+    pickerExcludedOnlines: dedupe(pickerExcludedOnlines),
     bu: scope.mode === 'code' ? scope.code : null,
     buMode: scope.mode,
   };
@@ -119,6 +127,7 @@ async function fetchManageEntries(scope: DepartmentScope) {
     recruiters: [] as RosterEntry[],
     screeners: [] as RosterEntry[],
     opls: [] as RosterEntry[],
+    onlines: [] as RosterEntry[],
   };
   if (scope.mode === 'none') return out;
   const w = scopeWhere(scope);
@@ -132,6 +141,7 @@ async function fetchManageEntries(scope: DepartmentScope) {
     if (r.role === 'recruiter') out.recruiters.push(entry);
     else if (r.role === 'screener') out.screeners.push(entry);
     else if (r.role === 'opl') out.opls.push(entry);
+    else if (r.role === 'online') out.onlines.push(entry);
   }
   return out;
 }

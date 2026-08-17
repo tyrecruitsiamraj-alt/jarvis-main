@@ -192,6 +192,8 @@ export interface JobRequest {
   screener_name?: string;
   /** เจ้าหน้าที่ OPL (แยกจากสรรหา/คัดสรร) */
   opl_name?: string;
+  /** ทีม online ที่รับผิดชอบใบขอ (097) — คนละช่องกับสรรหา/คัดสรร/OPL */
+  online_name?: string;
   age_range_min?: number;
   age_range_max?: number;
   vehicle_required?: string;

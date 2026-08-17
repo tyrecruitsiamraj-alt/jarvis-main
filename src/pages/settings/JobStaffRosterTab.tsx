@@ -8,7 +8,7 @@ import {
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 import { cn } from '@/lib/utils';
 
-type RosterKind = 'recruiter' | 'screener' | 'opl';
+type RosterKind = 'recruiter' | 'screener' | 'opl' | 'online';
 
 const NO_BU = ''; // ไม่ระบุ — visible in every BU
 
@@ -244,6 +244,8 @@ const JobStaffRosterTab: React.FC = () => {
     { kind: 'recruiter', title: 'เจ้าหน้าที่สรรหา', entries: state?.recruiters ?? [] },
     { kind: 'screener', title: 'เจ้าหน้าที่คัดสรร', entries: state?.screeners ?? [] },
     { kind: 'opl', title: 'เจ้าหน้าที่ OPL', entries: state?.opls ?? [] },
+    // ทีม online (097 · เจ้าของสั่ง 17 ส.ค. 2569) — บทบาทที่ 4 โครงเดียวกับสามอันบน
+    { kind: 'online', title: 'ทีม Online', entries: state?.onlines ?? [] },
   ];
 
   return (

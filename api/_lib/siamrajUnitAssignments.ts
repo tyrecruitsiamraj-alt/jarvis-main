@@ -8,6 +8,8 @@ export type UnitAssignment = {
   recruiter_name: string | null;
   screener_name: string | null;
   opl_name: string | null;
+  /** ทีม online (097) — คนละช่องกับสรรหา/คัดสรร/OPL */
+  online_name: string | null;
   updated_at: string | null;
   updated_by_user_id?: string | null;
   updated_by_name?: string | null;
@@ -18,6 +20,8 @@ type Row = {
   recruiter_name: string | null;
   screener_name: string | null;
   opl_name: string | null;
+  /** ทีม online (097) — คนละช่องกับสรรหา/คัดสรร/OPL */
+  online_name: string | null;
   updated_at: string | Date | null;
   updated_by_user_id?: string | null;
   updated_by_name?: string | null;
@@ -30,6 +34,7 @@ const selectCols = `
   a.recruiter_name,
   a.screener_name,
   a.opl_name,
+  a.online_name,
   a.updated_at,
   a.updated_by_user_id,
   coalesce(nullif(trim(u.full_name), ''), u.email) as updated_by_name
@@ -54,6 +59,7 @@ function mapRow(r: Row): UnitAssignment {
     recruiter_name: r.recruiter_name,
     screener_name: r.screener_name,
     opl_name: r.opl_name,
+    online_name: r.online_name ?? null,
     updated_at: toIso(r.updated_at),
     updated_by_user_id: r.updated_by_user_id ?? null,
     updated_by_name: r.updated_by_name ?? null,
@@ -103,6 +109,7 @@ export async function upsertUnitAssignment(input: {
   recruiterName?: unknown;
   screenerName?: unknown;
   oplName?: unknown;
+  onlineName?: unknown;
   userId?: string | null;
 }): Promise<UnitAssignment> {
   const key = input.requestNo.trim();
@@ -111,10 +118,12 @@ export async function upsertUnitAssignment(input: {
   const hasRecruiter = input.recruiterName !== undefined;
   const hasScreener = input.screenerName !== undefined;
   const hasOpl = input.oplName !== undefined;
+  const hasOnline = input.onlineName !== undefined;
 
   const recruiter = hasRecruiter ? clean(input.recruiterName) : null;
   const screener = hasScreener ? clean(input.screenerName) : null;
   const opl = hasOpl ? clean(input.oplName) : null;
+  const online = hasOnline ? clean(input.onlineName) : null;
 
   const { rows: existing } = await dbQuery<Row>(
     `
@@ -129,14 +138,16 @@ export async function upsertUnitAssignment(input: {
   if (!existing[0]) {
     await dbQuery(
       `
-      insert into ${table} (request_no, recruiter_name, screener_name, opl_name, updated_by_user_id, updated_at)
-      values ($1, $2, $3, $4, $5, now())
+      insert into ${table}
+        (request_no, recruiter_name, screener_name, opl_name, online_name, updated_by_user_id, updated_at)
+      values ($1, $2, $3, $4, $5, $6, now())
       `,
       [
         key,
         hasRecruiter ? recruiter : null,
         hasScreener ? screener : null,
         hasOpl ? opl : null,
+        hasOnline ? online : null,
         input.userId ?? null,
       ],
     );
@@ -147,6 +158,8 @@ export async function upsertUnitAssignment(input: {
   const nextRecruiter = hasRecruiter ? recruiter : cur.recruiter_name;
   const nextScreener = hasScreener ? screener : cur.screener_name;
   const nextOpl = hasOpl ? opl : cur.opl_name;
+  // ไม่ส่งช่องไหนมา = คงค่าเดิม (แก้ทีละช่องได้ ไม่ล้างของคนอื่นทิ้ง)
+  const nextOnline = hasOnline ? online : cur.online_name;
 
   await dbQuery(
     `
@@ -154,11 +167,12 @@ export async function upsertUnitAssignment(input: {
     set recruiter_name = $2,
         screener_name = $3,
         opl_name = $4,
-        updated_by_user_id = $5,
+        online_name = $5,
+        updated_by_user_id = $6,
         updated_at = now()
     where request_no = $1
     `,
-    [key, nextRecruiter, nextScreener, nextOpl, input.userId ?? null],
+    [key, nextRecruiter, nextScreener, nextOpl, nextOnline, input.userId ?? null],
   );
   return (await getUnitAssignment(key))!;
 }

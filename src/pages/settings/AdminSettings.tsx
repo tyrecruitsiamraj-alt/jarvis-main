@@ -42,7 +42,7 @@ const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminO
   { id: 'navMenu', label: 'จัดเมนู', icon: ListChecks, adminOnly: true },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
-  { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
+  { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL / Online', icon: UserCog, adminOnly: true },
   { id: 'workStatus', label: 'สถานะทำงาน', icon: ListChecks, adminOnly: true },
   { id: 'matchWeights', label: 'น้ำหนักเรียงผู้สมัคร', icon: SlidersHorizontal, adminOnly: true },
   { id: 'lumosMode', label: 'โหมดส่งงานให้ Lumos', icon: PhoneForwarded, adminOnly: true },

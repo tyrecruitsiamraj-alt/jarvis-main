@@ -32,6 +32,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           recruiter_name: null,
           screener_name: null,
           opl_name: null,
+          online_name: null,
           updated_at: null,
         },
       );
@@ -60,6 +61,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         recruiterName: body.recruiter_name,
         screenerName: body.screener_name,
         oplName: body.opl_name,
+        onlineName: body.online_name,
         userId: req.user.sub,
       });
 
@@ -72,12 +74,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
               recruiter_name: before.recruiter_name,
               screener_name: before.screener_name,
               opl_name: before.opl_name,
+              online_name: before.online_name,
             }
           : null,
         after: {
           recruiter_name: item.recruiter_name,
           screener_name: item.screener_name,
           opl_name: item.opl_name,
+          online_name: item.online_name,
         },
       });
 

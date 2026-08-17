@@ -41,6 +41,20 @@ export function buildScreenerNameOptions(extraJobs?: JobRequest[]): string[] {
   return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
 }
 
+/**
+ * ชื่อทีม online (097 · เจ้าของสั่ง 17 ส.ค. 2569 — "ผู้รับผิดชอบจะต้องเป็นทีม online")
+ * โครงเดียวกับสรรหา/คัดสรร/OPL ทุกอย่าง: รายชื่อจาก roster + ชื่อที่โผล่บนใบขอจริง
+ */
+export function buildOnlineNameOptions(extraJobs?: JobRequest[]): string[] {
+  const fromJobs = (extraJobs ?? [])
+    .map((j) => j.online_name)
+    .filter((n): n is string => Boolean(n?.trim()));
+  const api = getJobStaffApiCache();
+  const roster = api?.onlines ?? [];
+  const ex = new Set((api?.pickerExcludedOnlines ?? []).map((s) => s.toLowerCase()));
+  return uniqueSorted([...roster, ...fromJobs]).filter((n) => !ex.has(n.trim().toLowerCase()));
+}
+
 export function buildOplNameOptions(extraJobs?: JobRequest[]): string[] {
   const fromJobs = (extraJobs ?? [])
     .map((j) => j.opl_name)

@@ -8,9 +8,12 @@ export type JobStaffApiState = {
   recruiters: string[];
   screeners: string[];
   opls: string[];
+  /** ทีม online (097) */
+  onlines: string[];
   pickerExcludedRecruiters: string[];
   pickerExcludedScreeners: string[];
   pickerExcludedOpls: string[];
+  pickerExcludedOnlines: string[];
   /** BU (department) the roster is locked to, or null when 'all'/'none' */
   bu: string | null;
   /** how the roster is scoped for the current user */
@@ -44,9 +47,11 @@ function parseState(data: unknown): JobStaffApiState | null {
     recruiters: o.recruiters,
     screeners: o.screeners,
     opls: isStringArray(o.opls) ? o.opls : [],
+    onlines: isStringArray(o.onlines) ? o.onlines : [],
     pickerExcludedRecruiters: o.pickerExcludedRecruiters,
     pickerExcludedScreeners: o.pickerExcludedScreeners,
     pickerExcludedOpls: isStringArray(o.pickerExcludedOpls) ? o.pickerExcludedOpls : [],
+    pickerExcludedOnlines: isStringArray(o.pickerExcludedOnlines) ? o.pickerExcludedOnlines : [],
     bu: typeof o.bu === 'string' ? o.bu : null,
     buMode,
   };
@@ -86,6 +91,7 @@ export type JobStaffManageState = {
   recruiters: RosterEntry[];
   screeners: RosterEntry[];
   opls: RosterEntry[];
+  onlines: RosterEntry[];
   /** admin may assign any BU; other roles only their own department */
   canManageAllBu: boolean;
 };
@@ -114,6 +120,7 @@ export async function fetchJobStaffManage(): Promise<JobStaffManageState | null>
       recruiters: toEntries(data.recruiters),
       screeners: toEntries(data.screeners),
       opls: toEntries(data.opls),
+      onlines: toEntries(data.onlines),
       canManageAllBu: data.canManageAllBu === true,
     };
   } catch {

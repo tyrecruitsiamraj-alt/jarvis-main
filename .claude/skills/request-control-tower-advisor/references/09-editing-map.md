@@ -2073,3 +2073,25 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
   และใบขอปกติของ รพ.เปาโล · คีย์ด้วยเลขเปล่าคือมีโอกาสเอาอัตราของอีกบริษัทมาโชว์
 * หน่วยของค่าแรงหลักต้องอ่านจาก `fee_unit_code_1` — วัดจริง `CRM6907001` ใส่
   "เงินเดือน 15,000" แต่หน่วยเป็น **D (รายวัน)** = ข้อมูลขัดกันเองในใบซ้อม (ปิดไปแล้ว)
+
+### รอบ 17 ส.ค. 2569 (เย็น ต่อ) — ทีม online เป็นผู้รับผิดชอบบทบาทที่ 4
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `migrations/097_online_assignee.sql` | **ใหม่** — ผ่อน CHECK role + `online_name` บน `siamraj_unit_assignments` |
+| `api/_handlers/job-staff.ts` | roster รับ role `online` (รายชื่อ + picker excluded) |
+| `api/_lib/siamrajUnitAssignments.ts` · `api/_handlers/siamraj-unit-assignments.ts` | อ่าน/เขียน `online_name` |
+| `src/lib/jobStaffRemote.ts` · `src/lib/jobStaffNames.ts` | `onlines` + `buildOnlineNameOptions` |
+| `src/pages/settings/JobStaffRosterTab.tsx` · `AdminSettings.tsx` | กลุ่ม "ทีม Online" + เปลี่ยนป้ายแท็บ |
+
+**🔴 กับดักซ้ำรอบที่สาม: CHECK constraint ของ `role`**
+`job_staff_roster.role` / `job_staff_picker_excluded.role` มี CHECK ระบุค่าตายตัว
+เพิ่มบทบาทใหม่โดยไม่ drop+สร้าง CHECK ใหม่ = insert ตกเงียบ/500 โดยหน้าจอไม่บอกอะไร
+(migration 035 เคยเจอตอนเพิ่ม OPL · 097 เจอซ้ำตอนเพิ่ม online)
+
+⚠️ ตอนตรวจเจอ constraint **ชื่อเดียวกันสองชุด** — ของเก่าอยู่ schema `car_stamp`
+(คนละแอปที่ใช้ฐานร่วมกัน) ไม่ใช่ของ `jarvis_rm` · เวลาเช็ค constraint ต้องกรอง schema เสมอ
+ไม่งั้นอ่านผิดตัวแล้วไปแก้ของแอปอื่น
+
+**กติกา:** ไม่ส่งช่องไหนมาใน upsert = **คงค่าเดิม** — ยืนยันกับของจริงแล้วว่าอัปเดต
+`online_name` อย่างเดียวไม่ล้างสรรหา/คัดสรร/OPL ที่มีอยู่ (หมิว/น้ำหวาน/สมปอง อยู่ครบ)
