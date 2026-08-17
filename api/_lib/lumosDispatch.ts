@@ -1534,6 +1534,12 @@ export async function applyLumosResult(
   clientId: string,
   status: 'completed' | 'failed' | 'cancelled',
   result: unknown,
+  /**
+   * คำผลที่ใช้ "ตามงานต่อ" — ไม่ส่ง = อ่านจาก `result.outcome` ตามเดิม
+   * ช่องสัมภาษณ์ส่งคำที่แปลแล้วเข้ามา (`completed` → `confirmed`) เพราะสองช่อง
+   * ใช้ศัพท์คนละชุด · **ผลดิบใน `result` ยังเป็นคำเดิมของ Lumos ไม่ถูกทับ**
+   */
+  outcomeForFollowup?: string | null,
 ): Promise<boolean> {
   const idField = channel === 'reminder' ? 'client_contact_id' : 'client_candidate_id';
   // ⚠️ stamp `first_result_at` **ใน UPDATE เดียวกับผล** (migration 088) — เวลานี้คือ
@@ -1565,7 +1571,7 @@ export async function applyLumosResult(
 
   // ได้ผลแล้วต้องมีคนทำอะไรต่อ — ไม่รับสายก็โทรซ้ำ ขอเลื่อนก็นัดใหม่ ครบเพดานก็ส่งให้คนตาม
   // เดิมจบแค่บันทึกผล งานเลยตายคาที่ · error ที่นี่ห้ามทำให้ ingest ล้ม (Lumos จะยิงซ้ำ)
-  const outcome = readOutcome(result);
+  const outcome = outcomeForFollowup ?? readOutcome(result);
   if (outcome) {
     try {
       await applyCallFollowupToQueueRow({ queueId: rows[0].id, outcome, result });
