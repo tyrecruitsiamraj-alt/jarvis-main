@@ -120,7 +120,13 @@ function CopyIdButton({ id }: { id: string }) {
   );
 }
 
-const JobPostingsPage: React.FC = () => {
+/**
+ * `embedded` = ถูกวางเป็น **เนื้อของแท็บบนบอร์ดรับสมัคร** (เจ้าของสั่ง 17 ส.ค. 2569
+ * ให้ย้ายมารวมที่บอร์ด) — ซ่อนหัวหน้าและปุ่มย้อนกลับ เพราะบอร์ดมีหัวของตัวเองแล้ว
+ * สองหัวซ้อนกันคือสิ่งที่ทำให้แท็บอื่นดูไม่เหมือนกัน
+ * route เดิม `/matching/job-postings` ยังอยู่เป็นทางถอย (เปิดตรงได้เหมือนเดิม)
+ */
+const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [items, setItems] = useState<JobPostingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | JobPostingStatus>('all');
@@ -160,11 +166,13 @@ const JobPostingsPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader
-        title="คำขอโพสหางานใหม่"
-        subtitle="ใบขอที่หาคนของเราไม่ได้ — ทีมคอนเทนต์/สรรหารับ ID ไปโพสหาคนต่อ"
-        backPath="/matching"
-      />
+      {embedded ? null : (
+        <PageHeader
+          title="คำขอโพสหางานใหม่"
+          subtitle="ใบขอที่หาคนของเราไม่ได้ — ทีมคอนเทนต์/สรรหารับ ID ไปโพสหาคนต่อ"
+          backPath="/matching"
+        />
+      )}
       <div className="px-4 md:px-6 space-y-4 pb-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground">

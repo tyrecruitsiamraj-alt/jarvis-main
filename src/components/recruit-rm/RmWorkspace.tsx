@@ -31,6 +31,7 @@ import {
 } from '@/lib/recruitRm';
 import {
   fetchAllJobApplications,
+  markApplicationDialed,
   recordAppointmentAttendance,
   setJobApplicationLead,
   type PublicApplication,
@@ -329,6 +330,34 @@ const RmWorkspace: React.FC<{
       if (!canHoldApplication(row).ok || holdByRef[row.id]) return;
       setNotice(null);
       void acquireTargets([toHoldTarget(row)]);
+      return;
+    }
+    /**
+     * "กดโทร" — จดเวลาที่ยกหูโทรออก (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 5)
+     * อัปเดตแถวในหน้าเลยไม่ต้อง reload ทั้งลิสต์ (คนกดรัว ๆ ทีละหลายคน)
+     * ⚠️ ล้มแล้วต้องบอก — ถ้าเงียบ คนจะคิดว่าจดแล้วทั้งที่ไม่ได้จด
+     */
+    if (action === 'dial') {
+      setNotice(null);
+      void markApplicationDialed(row.id)
+        .then((r) => {
+          setRows((prev) =>
+            prev.map((x) =>
+              x.id === row.id
+                ? {
+                    ...x,
+                    dialed_first_at: r.dialed_first_at ?? undefined,
+                    dialed_last_at: r.dialed_last_at ?? undefined,
+                    dial_count: r.dial_count,
+                  }
+                : x,
+            ),
+          );
+          setNotice(`จดเวลาโทรของ ${row.full_name} แล้ว`);
+        })
+        .catch((e: unknown) => {
+          setNotice(e instanceof Error ? e.message : 'จดเวลาโทรไม่สำเร็จ');
+        });
       return;
     }
     // ดูรายละเอียด/บันทึกผล → dialog ติดต่อสำเร็จ-ไม่สำเร็จ (ลิสต์ข้อ 7 · 14 ส.ค. 2569)

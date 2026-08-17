@@ -90,7 +90,7 @@ export type JobBoardViewProps = {
 };
 
 /** แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace */
-export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments';
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'postings';
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -141,6 +141,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [originCounts, setOriginCounts] = useState<
     Record<string, Partial<Record<ApplicationOrigin, number>>>
   >({});
+  /** ยอด Lead แยกต่างหาก — ใบที่ปัดเข้าคลังไม่ถูกนับใน applicantCounts (17 ส.ค. 2569) */
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
 
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
@@ -276,6 +278,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         if (cancelled) return;
         setApplicantCounts(b.counts);
         setOriginCounts(b.byOrigin);
+        setLeadCounts(b.leadCounts);
       })
       .catch(() => {
         /* badge is optional — ignore */
@@ -386,6 +389,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 { id: 'list', label: 'รายชื่อผู้สมัคร' },
                 { id: 'contact', label: 'การโทรของฉัน' },
                 { id: 'appointments', label: 'ติดตามนัดหมาย' },
+                // ย้ายมาจากเมนู Matching (เจ้าของสั่ง 17 ส.ค. 2569) — ใบขอที่หาคนของเรา
+                // ไม่ได้ ต้องให้ทีมคอนเทนต์รับไปโพสต่อ เป็นงานที่เกิดต่อจากกล่องงานโดยตรง
+                { id: 'postings', label: 'คำขอโพสต์งานใหม่' },
               ] as const
             ).map((v) => {
               const active = view === v.id;
@@ -623,6 +629,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
                         <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                         ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
+                        {/* Lead = ใบที่ถูกปัดเข้าคลัง ไม่ถูกนับในยอดซ้าย — โชว์เป็นเลขที่สอง
+                            แทนที่จะยุบรวม (ยุบรวมแล้วเลขบนการ์ดจะไม่ตรงกับที่กดเข้าไปเห็น
+                            ซึ่งเป็นเหตุผลที่ตัวนับกรอง Lead ออกตั้งแต่แรก) */}
+                        {(leadCounts[job.id] ?? 0) > 0 ? (
+                          <span className="font-normal text-muted-foreground">
+                            · Lead {leadCounts[job.id]}
+                          </span>
+                        ) : null}
                         {/* แยกที่มาให้เห็นบนใบขอเลย — ไม่รู้ที่มา = ไม่ขึ้นบรรทัดนี้ */}
                         {applicantOriginSummary(originCounts[job.id]) ? (
                           <span className="font-normal text-muted-foreground">
@@ -631,28 +645,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ) : null}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {/* ค้นหาคนที่ยังไม่สมัคร — พาไปหน้า Matching ของใบนั้นแล้วค้นให้เลยด้วย `?ir=1`
-                            ⚠️ ที่นี่ทำได้แค่ navigate เป็นสตริง **ห้าม import อะไรจาก
-                            pages/matching เข้าไฟล์นี้** เพราะไฟล์นี้ใช้ร่วมกับหน้าสมัคร
-                            สาธารณะ /apply (bundle ฝั่ง public จะบวมและลากโค้ดหลังบ้านไปด้วย) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/matching/match?jobId=${encodeURIComponent(job.id)}&ir=1`);
-                          }}
-                          title="เปิดใบขอนี้ในหน้า Matching แล้วค้นหาคนในฐานที่ยังไม่ได้สมัครงานนี้"
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.info.outline,
-                          )}
-                        >
-                          <Search className="h-3.5 w-3.5" />
-                          ค้นหาคนที่ยังไม่สมัคร
-                        </button>
-                        {/* เลนสรรหา (R2b · 16 ส.ค. 2569): ค้น 3 แหล่งรวด (Checklist +
-                            ฐานใหม่ + iRecruit) แล้วส่ง AI โทรทันที ไม่ต้องอนุมัติ
-                            — ต่างจากปุ่มซ้ายที่พาไปหน้า Matching ให้ดูก่อน (เลนคัดสรร) */}
+                        {/* เจ้าของเคาะ 17 ส.ค. 2569: *"ถ้าไม่ต่างเหลือแค่ปุ่มเดียวพอ"* →
+                            ยุบสองปุ่มเป็นปุ่มเดียว **เก็บตัวที่ทำงานครบกว่า** (ค้น 3 แหล่ง:
+                            Checklist + ฐานใหม่ + iRecruit แล้วส่ง AI โทรทันที) แล้วเปลี่ยน
+                            คำเป็น "หาผู้สมัครเพิ่ม" · ปุ่มเดิมที่พาไปหน้า Matching ค้นแต่
+                            iRecruit ให้ดูเฉย ๆ ถูกถอดออก (ของใหม่ครอบอยู่แล้ว) */}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -666,7 +663,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           )}
                         >
                           <Send className="h-3.5 w-3.5" />
-                          หาคนเพิ่ม + ส่ง AI โทร
+                          หาผู้สมัครเพิ่ม
                         </button>
                         <button
                           type="button"

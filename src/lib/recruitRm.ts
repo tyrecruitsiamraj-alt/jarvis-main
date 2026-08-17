@@ -226,17 +226,24 @@ export const RM_TOOLBAR_LABEL: Record<RmToolbarKey, string> = {
 };
 
 /** ปุ่ม action ต่อแถว — จุดเดียวที่ระบบเดิมให้แต่ละแท็บต่างกัน */
-export type RmRowAction = 'bookmark' | 'call' | 'view' | 'rule' | 'remove';
+export type RmRowAction = 'bookmark' | 'call' | 'dial' | 'view' | 'rule' | 'remove';
 
+/**
+ * ⚠️ `call` กับ `dial` เป็นคนละเรื่อง — สับสนเมื่อไหร่ตัวเลขเวลารอโทรเพี้ยนทันที
+ *   call = **ดึงเข้าถังโทรของตัวเอง** (จับล็อกที่เบอร์ กันคนอื่นโทรทับ)
+ *   dial = **จดว่าเพิ่งยกหูโทร** (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 5 ของงานสรรหา)
+ * ปุ่ม dial โผล่เฉพาะแท็บ "การโทรของฉัน" เพราะเป็นขั้นหลังเก็บชื่อไปแล้ว
+ */
 export const RM_ROW_ACTIONS: Record<RmTab, RmRowAction[]> = {
   candidates: ['bookmark', 'call', 'view'],
-  contact: ['bookmark', 'call', 'view'],
+  contact: ['bookmark', 'call', 'dial', 'view'],
   appointments: ['call', 'rule', 'remove'],
 };
 
 export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
   bookmark: 'เก็บเข้า Lead',
-  call: 'โทร',
+  call: 'ดึงเข้าถังโทร',
+  dial: 'กดโทร (จดเวลา)',
   view: 'ดูรายละเอียด',
   rule: 'บันทึกผลนัดหมาย',
   remove: 'เอาออกจากรายการ',

@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import type { FollowOutcome } from '@/lib/followOutcome';
 
 export type FollowCallStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 
@@ -15,6 +16,14 @@ export type FollowEntry = {
   created_by_name: string | null;
   created_at: string | null;
   cancelled: boolean;
+  /**
+   * ปิดงานแล้ว (095) — **คนละเรื่องกับ `cancelled`**
+   * ยกเลิก = ไม่ต้องตามแล้ว ตัดสายทิ้งก่อนถึงวัน · ปิดงาน = ตามจนจบแล้ว จบแบบไหน
+   */
+  completed_at?: string | null;
+  outcome_code?: string | null;
+  outcome_note?: string | null;
+  completed_by_name?: string | null;
   call_status: FollowCallStatus;
   call_outcome: string | null;
   call_summary: string | null;
@@ -55,6 +64,23 @@ export async function createFollowEntry(input: NewFollowEntry): Promise<FollowEn
 export async function cancelFollowEntry(id: string): Promise<void> {
   const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!r.ok) throw new Error(await readError(r));
+}
+
+/**
+ * ปิดงานติดตาม (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 7 ของงานคัดสรร)
+ * `outcome_note` บังคับเฉพาะ 'other' — server เป็นด่านตัดสินอีกชั้น
+ */
+export async function completeFollowEntry(
+  id: string,
+  outcome: FollowOutcome,
+  note?: string,
+): Promise<FollowEntry> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ outcome_code: outcome, outcome_note: note?.trim() || undefined }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowEntry;
 }
 
 export const FOLLOW_STATUS_LABEL: Record<FollowCallStatus, string> = {

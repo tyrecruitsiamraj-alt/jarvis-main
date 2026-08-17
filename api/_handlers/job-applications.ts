@@ -91,6 +91,10 @@ type Row = {
   origin?: string | null;
   /** ขั้นในกระบวนการจ้าง + เช็คลิสต์เตรียมเข้างาน (migration 094) */
   selection_status?: string | null;
+  /** เวลาที่กดโทร (095) — ฐานที่ยังไม่รัน migration จะไม่มีสามฟิลด์นี้ */
+  dialed_first_at?: string | Date | null;
+  dialed_last_at?: string | Date | null;
+  dial_count?: number | null;
   prep_checklist?: unknown;
 };
 
@@ -172,6 +176,14 @@ function toApplication(r: Row, viewerId?: string) {
      */
     selection_status: isSelectionStatus(r.selection_status) ? r.selection_status : undefined,
     prep_checklist: normalizePrepChecklist(r.prep_checklist),
+    /**
+     * เวลาที่ **เจ้าหน้าที่กดโทร** (095) — คนละอันกับ `last_call_at` ที่ handler แนบ
+     * ทีหลัง (ผลโทรล่าสุดของเบอร์ จากคิว AI + ถังคนโทร) · อันนั้นมีค่าต่อเมื่อมีผลแล้ว
+     * อันนี้มีตั้งแต่ยกหูครั้งแรก แม้จะไม่ติด
+     */
+    dialed_first_at: r.dialed_first_at ? toIso(r.dialed_first_at) : undefined,
+    dialed_last_at: r.dialed_last_at ? toIso(r.dialed_last_at) : undefined,
+    dial_count: Number(r.dial_count) || 0,
     created_at: toIso(r.created_at),
   };
 }
@@ -196,6 +208,7 @@ const LIST_COLUMNS = `
   claimed_by, claimed_by_name, claimed_at,
   is_lead, lead_by_name, lead_at,
   selection_status, prep_checklist,
+  dialed_first_at, dialed_last_at, dial_count,
   ${applicationOriginColumn('a')}
 `;
 
@@ -751,6 +764,70 @@ async function patchPhone(req: AuthedReq, res: ApiRes, id: string, rawPhone: str
   return res.status(200).json({ item: toApplication(rows[0], req.user.sub) });
 }
 
+/**
+ * "กดโทร" — จดเวลาที่เจ้าหน้าที่หยิบสายโทรออก (migration 095 · เจ้าของสั่ง 17 ส.ค. 2569
+ * ข้อ 5 ของงานสรรหา: *"ต้องกดรูปโทรศัพท์เพื่อ stamp เวลาว่าโทรกี่โมง และโทรวันไหน"*)
+ *
+ * ⚠️ **คนละเวลากับที่มีอยู่แล้ว 2 อัน** — `claimed_at` คือตอนเก็บเข้าถัง · เวลาใน
+ * `application_contact_logs` คือตอนบันทึกผล · คนที่โทรแล้วไม่ติดจึงไม่เคยมีร่องรอย
+ * ว่าเคยโทร และวัด "เวลารอโทร" ไม่ได้จริง
+ *
+ * ⚠️ `dialed_first_at` เขียนครั้งเดียวด้วย coalesce — ห้ามมี reset ที่ไหนล้าง
+ * (กติกาเดียวกับ stamps 088) กดซ้ำได้ ครั้งหลังขยับแค่ `dialed_last_at` + นับเพิ่ม
+ * ฐานที่ยังไม่รัน 095 → 42703 ตอบ 503 บอกให้รัน migration (ของเดิมไม่พัง)
+ */
+async function patchDial(req: AuthedReq, res: ApiRes, id: string) {
+  const { rows: beforeRows } = await dbQuery<{
+    job_id: string | null;
+    department_code: string | null;
+  }>(`select job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found');
+  if (!(await isApplicationInWriteScope(req.user, before))) {
+    return sendError(res, 403, 'Forbidden', 'ใบสมัครนี้อยู่นอกแผนกของคุณ');
+  }
+
+  try {
+    const { rows } = await dbQuery<{
+      id: string;
+      dialed_first_at: string | null;
+      dialed_last_at: string | null;
+      dial_count: number;
+    }>(
+      `update ${tbl}
+          set dialed_first_at = coalesce(dialed_first_at, now()),
+              dialed_last_at  = now(),
+              dial_count      = coalesce(dial_count, 0) + 1,
+              updated_at      = now()
+        where id = $1
+        returning id, dialed_first_at, dialed_last_at, dial_count`,
+      [id],
+    );
+    const row = rows[0];
+    if (!row) return sendError(res, 404, 'Not found');
+
+    await auditFromAuthed(req, {
+      action: 'application.dial',
+      entityType: 'public_job_application',
+      entityId: id,
+      after: { dialed_last_at: row.dialed_last_at, dial_count: row.dial_count },
+    });
+
+    return res.status(200).json({
+      id: row.id,
+      dialed_first_at: row.dialed_first_at,
+      dialed_last_at: row.dialed_last_at,
+      dial_count: Number(row.dial_count) || 0,
+    });
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+    return sendError(
+      res, 503, 'Service unavailable',
+      'ยังไม่ได้รัน migration 095 — สั่ง node scripts/migrate.mjs ก่อน',
+    );
+  }
+}
+
 async function patchStatus(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
   if (typeof raw !== 'object' || raw === null) {
@@ -770,6 +847,8 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
   if (b.selection_status !== undefined || b.prep_checklist !== undefined) {
     return patchSelectionProgress(req, res, id, b);
   }
+  // "กดโทร" — จดเวลาที่หยิบสายโทรออก (095)
+  if (b.dial === true) return patchDial(req, res, id);
 
   const hasStatus = b.status !== undefined;
   const hasNote = b.admin_note !== undefined;
@@ -902,7 +981,36 @@ async function handler(req: AuthedReq, res: ApiRes) {
         countsByOrigin = undefined;
       }
 
-      return res.status(200).json({ counts, ...(countsByOrigin ? { countsByOrigin } : {}) });
+      /**
+       * ยอด **Lead** แยกอีกก้อน (เจ้าของเคาะ 17 ส.ค. 2569: *"แยกเป็นเลขที่สอง"*)
+       *
+       * ที่มา: ใบที่ถูกกด "เก็บ Lead" หายจากยอดบนการ์ดทั้งก้อน (ตัวนับข้างบนกรอง
+       * `not is_lead` ให้ตรงกับ dialog) — การ์ดเลยขึ้น "ผู้สมัคร 0 คน" ทั้งที่มีคนจริง
+       * แก้ด้วยการโชว์สองเลขข้างกัน ไม่ใช่ยุบรวม (ยุบรวม = เลขบนการ์ดไม่ตรงกับที่กด
+       * เข้าไปเห็นอีกแบบ ซึ่งเป็นเหตุผลที่ตัวนับกรอง Lead ออกตั้งแต่แรก)
+       * ⚠️ schema เก่าไม่มี `is_lead` → ไม่ส่งคีย์นี้เลย (คนละเรื่องกับ "ไม่มี Lead")
+       */
+      let leadCounts: Record<string, number> | undefined;
+      try {
+        const { rows: leadRows } = await dbQuery<{ job_id: string; n: string }>(
+          `select job_id, count(*)::text as n from ${tbl}
+            where job_id is not null and is_lead group by job_id`,
+        );
+        leadCounts = {};
+        for (const r of leadRows) {
+          if (scopedJobIds && !scopedJobIds.has(r.job_id)) continue;
+          leadCounts[r.job_id] = Number(r.n);
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
+        leadCounts = undefined;
+      }
+
+      return res.status(200).json({
+        counts,
+        ...(countsByOrigin ? { countsByOrigin } : {}),
+        ...(leadCounts ? { leadCounts } : {}),
+      });
     }
 
     const jobId = getString(req.query?.job_id);

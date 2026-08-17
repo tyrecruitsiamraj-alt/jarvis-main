@@ -433,7 +433,7 @@ const HomePage: React.FC = () => {
                 value={flow.postings.content ?? 0}
                 sub={postingStagesSub(flow.postings.content_stages) ?? 'ใบขอที่รอทีมคอนเทนต์ทำโพส'}
                 tone="orange"
-                onClick={() => navigate('/matching/job-postings')}
+                onClick={() => navigate('/jobs/board?view=postings')}
               />
               {/* Content กับ Scraping เป็น "ปลายทางคู่ขนาน" ของถังเดียวกัน ไม่ใช่ขั้นต่อกัน
                   จึงคั่นด้วยจุด ไม่ใช่ลูกศร — แต่ต้องกว้าง w-4 เท่าไอคอนลูกศร ไม่งั้นช่องไฟเพี้ยน */}
@@ -450,7 +450,7 @@ const HomePage: React.FC = () => {
                 value={flow.postings.scraping ?? 0}
                 sub={postingStagesSub(flow.postings.scraping_stages) ?? 'ใบขอที่รอไปดูดประกาศหาคน'}
                 tone="violet"
-                onClick={() => navigate('/matching/job-postings')}
+                onClick={() => navigate('/jobs/board?view=postings')}
               />
               {/* grid เหลือ 7 คอลัมน์ (4 การ์ด + 3 ช่องคั่น) — แถวนี้เต็มทุกช่องพอดี
                   ช่อง auto (2·4·6) มีลูกครบทั้งสองแถว จึงไม่มีช่องยุบให้ความกว้างเพี้ยน

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookmarkPlus, Phone, Eye, ClipboardCheck, UserMinus, FileText } from 'lucide-react';
+import { BookmarkPlus, Phone, PhoneCall, Eye, ClipboardCheck, UserMinus, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // ⚠️ DASH = token พื้นผิว dashboard · ขีดกลางคือ EM_DASH คนละตัว อย่าสับสน
 import { DASH, TONE } from '@/lib/designTokens';
@@ -51,6 +51,7 @@ import type { CallHold } from '@/lib/callHoldsApi';
 const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   bookmark: BookmarkPlus,
   call: Phone,
+  dial: PhoneCall,
   view: Eye,
   rule: ClipboardCheck,
   remove: UserMinus,
@@ -238,12 +239,27 @@ const RmTable: React.FC<{
                   ) : null}
                   {tab === 'contact' ? (
                     <td className={cn('px-3 py-2 whitespace-nowrap text-[11px]', DASH.cellMuted)}>
-                      {/* ถืออยู่ (เพิ่งกดโทร) = heldAt · มีผลแล้ว = last_call_at · ไม่เคยโทร = ขีด */}
-                      {holdByRef[r.id]
-                        ? `📞 ${formatDateTimeTh(holdByRef[r.id].heldAt)}`
-                        : r.last_call_at
-                          ? formatDateTimeTh(r.last_call_at)
-                          : EM_DASH}
+                      {/**
+                        * ลำดับความจริง: เวลาที่ **กดโทรจริง** (095) > เวลาที่ถือไว้ >
+                        * เวลาที่ได้ผลโทร · อันแรกคือสิ่งที่เจ้าหน้าที่ทำเองกับมือ
+                        * จึงตรงกับคำถาม "โทรกี่โมง โทรวันไหน" มากที่สุด
+                        */}
+                      {r.dialed_last_at ? (
+                        <span className="inline-flex flex-col leading-tight">
+                          <span>📞 {formatDateTimeTh(r.dialed_last_at)}</span>
+                          {(r.dial_count ?? 0) > 1 ? (
+                            <span className="text-[11px] text-muted-foreground">
+                              โทรไปแล้ว {r.dial_count} ครั้ง
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : holdByRef[r.id] ? (
+                        `ถือไว้ ${formatDateTimeTh(holdByRef[r.id].heldAt)}`
+                      ) : r.last_call_at ? (
+                        formatDateTimeTh(r.last_call_at)
+                      ) : (
+                        EM_DASH
+                      )}
                     </td>
                   ) : null}
                   <td className="px-3 py-2">

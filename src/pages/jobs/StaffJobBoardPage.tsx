@@ -2,6 +2,7 @@ import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
+import JobPostingsPage from '@/pages/matching/JobPostingsPage';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 
 /**
@@ -19,6 +20,9 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 
+/** แท็บที่ไม่ใช่ RmWorkspace — ย้ายมาจากเมนูอื่น (17 ส.ค. 2569) */
+const EXTRA_VIEWS = ['postings'] as const;
+
 /** view ระดับบอร์ด → แท็บของ RmWorkspace (นิยามแท็บอยู่ที่ lib/recruitRm เหมือนเดิม) */
 const VIEW_TO_RM_TAB = {
   list: 'candidates',
@@ -30,9 +34,11 @@ const StaffJobBoardPage: React.FC = () => {
   const { jobs, loading, refreshing, loadError, refetch } = useUnitRequestsFeed();
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('view');
-  const view: BoardViewId = (RM_VIEWS as readonly string[]).includes(raw ?? '')
-    ? (raw as BoardViewId)
-    : 'board';
+  const view: BoardViewId =
+    (RM_VIEWS as readonly string[]).includes(raw ?? '') ||
+    (EXTRA_VIEWS as readonly string[]).includes(raw ?? '')
+      ? (raw as BoardViewId)
+      : 'board';
 
   const setView = (next: BoardViewId) => {
     const params = new URLSearchParams(searchParams);
@@ -59,7 +65,13 @@ const StaffJobBoardPage: React.FC = () => {
         view={view}
         onViewChange={setView}
         listContent={
-          view === 'board' ? null : <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} />
+          view === 'board' ? null : view === 'postings' ? (
+            /* หน้าเดิมทั้งหน้า ยกมาวางเป็นเนื้อของแท็บ — ไม่ได้ก๊อปโค้ด ใช้ตัวเดียวกัน
+               กับที่ /matching/job-postings เคยเรียก (route เดิมยังอยู่เป็นทางถอย) */
+            <JobPostingsPage embedded />
+          ) : (
+            <RmWorkspace tab={VIEW_TO_RM_TAB[view as (typeof RM_VIEWS)[number]]} />
+          )
         }
       />
     </div>

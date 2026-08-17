@@ -24,6 +24,11 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import { enqueueFollowReminder, cancelFollowReminder } from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { toE164Thai } from '../_lib/lumosDispatch.js';
+import {
+  FOLLOW_OUTCOMES,
+  isFollowOutcome,
+  requiresNote,
+} from '../../src/lib/followOutcome.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -39,6 +44,11 @@ type FollowRow = {
   scheduled_at: string | Date;
   created_by_name: string | null;
   cancelled_at: string | Date | null;
+  /** ปิดงานแล้วเมื่อไหร่ + จบแบบไหน (migration 095) */
+  completed_at: string | Date | null;
+  outcome_code: string | null;
+  outcome_note: string | null;
+  completed_by_name: string | null;
   created_at: string | Date;
   call_status: string | null;
   call_outcome: string | null;
@@ -61,6 +71,11 @@ function toResponse(r: FollowRow) {
     created_by_name: r.created_by_name,
     created_at: iso(r.created_at),
     cancelled: r.cancelled_at != null,
+    // ปิดงาน (095) — คนละช่องกับ cancelled โดยตั้งใจ (ตามจนจบ ≠ ตัดทิ้งก่อนถึงวัน)
+    completed_at: iso(r.completed_at ?? null),
+    outcome_code: r.outcome_code ?? null,
+    outcome_note: r.outcome_note ?? null,
+    completed_by_name: r.completed_by_name ?? null,
     /** สถานะจากคิว Lumos: pending=รอโทร, delivered=Lumos รับไปแล้ว, completed/failed/cancelled */
     call_status: r.cancelled_at != null ? 'cancelled' : (r.call_status ?? 'pending'),
     call_outcome: r.call_outcome,
@@ -254,13 +269,65 @@ async function cancelFollow(req: AuthedReq, res: ApiRes) {
   return res.status(200).json({ ...toResponse(cancelled), removedFromQueue });
 }
 
+/**
+ * ปิดงานติดตาม (migration 095 · เจ้าของสั่ง 17 ส.ค. 2569) — PATCH /api/follow?id=<uuid>
+ *
+ * ⚠️ **คนละเรื่องกับ DELETE (ยกเลิก)** — ยกเลิก = ไม่ต้องตามแล้ว ตัดสายทิ้งก่อนถึงวัน ·
+ * ปิดงาน = ตามจนจบแล้ว บันทึกว่าจบแบบไหน · สองอย่างเก็บคนละช่องและนับคนละกอง
+ *
+ * ⚠️ ไม่แตะคิวโทร — รายการที่ปิดแล้วแต่ยังมีรอบค้างในตาราง ให้กดยกเลิกแยก
+ * (ปิดงานแล้วลบสายที่นัดไว้อัตโนมัติ = เดาแทนคน · เจ้าของยังไม่ได้สั่ง)
+ */
+async function completeFollow(req: AuthedReq, res: ApiRes) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+
+  const body = (await readJsonBody(req)) as Record<string, unknown> | null;
+  const outcome = getString(body?.outcome_code) ?? '';
+  const note = getString(body?.outcome_note) || null;
+
+  if (!isFollowOutcome(outcome)) {
+    return sendError(
+      res, 400, 'Bad request',
+      `ผลปิดงานต้องเป็นค่าใดค่าหนึ่ง: ${FOLLOW_OUTCOMES.join(', ')}`,
+    );
+  }
+  // 'อื่น ๆ' ที่ไม่มีคำอธิบาย = เก็บไปก็ตอบอะไรไม่ได้ (กติกาเดียวกับ requiresNote ฝั่งหน้าเว็บ)
+  if (requiresNote(outcome) && !note) {
+    return sendError(res, 400, 'Bad request', 'เลือก "อื่น ๆ" ต้องใส่หมายเหตุด้วย');
+  }
+
+  const { rows } = await dbQuery<FollowRow>(
+    `update ${followTable}
+        set completed_at = now(), outcome_code = $2, outcome_note = $3,
+            completed_by = $4, completed_by_name = $5
+      where id = $1 and completed_at is null and cancelled_at is null
+      returning *`,
+    [id, outcome, note, req.user.sub, req.user.email ?? null],
+  );
+  const done = rows[0];
+  if (!done) {
+    return sendError(res, 404, 'Not found', 'ไม่พบรายการ หรือปิด/ยกเลิกไปแล้ว');
+  }
+
+  await auditFromAuthed(req, {
+    action: 'follow.complete',
+    entityType: 'follow_entry',
+    entityId: id,
+    after: { outcome_code: outcome, outcome_note: note },
+  });
+
+  return res.status(200).json(toResponse(done));
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
     if (method === 'GET') return await listFollow(req, res);
     if (method === 'POST') return await createFollow(req, res);
+    if (method === 'PATCH') return await completeFollow(req, res);
     if (method === 'DELETE') return await cancelFollow(req, res);
-    return sendError(res, 405, 'Method not allowed', 'Use GET, POST or DELETE');
+    return sendError(res, 405, 'Method not allowed', 'Use GET, POST, PATCH or DELETE');
   } catch (e) {
     return handleApiError(res, e, `follow ${method}`, { userId: req.user.sub });
   }

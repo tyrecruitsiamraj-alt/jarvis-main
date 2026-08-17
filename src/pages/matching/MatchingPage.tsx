@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
+import SelectionRecallButton from '@/components/matching/SelectionRecallButton';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
@@ -2602,7 +2603,7 @@ const MatchingPage: React.FC = () => {
                       "AI กำลังคิดที่หลังบ้าน…") ถ้าปล่อยให้กว้างตามข้อความ มันจะไปบีบ
                       กล่องซ้ายคนละขนาด แล้วเลขในแถบ 6 ช่องของแต่ละใบไม่ตรงคอลัมน์กัน
                       (วัดเจอจริง: แถบกว้าง 544.9–549.1px ต่างกันข้ามใบ) */}
-                  <div className="flex w-[168px] shrink-0 items-center justify-end">
+                  <div className="flex w-[168px] shrink-0 flex-col items-end justify-start gap-1.5">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -2622,6 +2623,9 @@ const MatchingPage: React.FC = () => {
                               : 'หาคนของเรา'}
                       </span>
                     </button>
+                    {/* ข้อ 4 ของงานคัดสรร (17 ส.ค. 2569): หมดรายชื่อแล้วกดหาคนจาก
+                        กองคนที่เคยตอบไม่สนใจงานอื่น — เดิมมีแต่หลังบ้าน ไม่มีปุ่ม */}
+                    <SelectionRecallButton jobId={j.id} />
                   </div>
                 </div>
               </div>

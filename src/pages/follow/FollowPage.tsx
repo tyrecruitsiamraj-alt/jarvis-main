@@ -4,10 +4,13 @@ import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users } from 'lucide-react';
+import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
+import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
 import {
   listFollowEntries,
   createFollowEntry,
   cancelFollowEntry,
+  completeFollowEntry,
   FOLLOW_STATUS_LABEL,
   FOLLOW_STATUS_CLASS,
   FOLLOW_STATUS_BAR,
@@ -290,6 +293,24 @@ const FollowPage: React.FC = () => {
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * ปิดงาน (095) — บันทึกว่าจบแบบไหน แล้วโหลดใหม่ให้ป้ายบนแถวขึ้นทันที
+   * ⚠️ ไม่แตะคิวโทร: รายการที่ปิดแล้วแต่ยังมีรอบค้างในตาราง ต้องกดยกเลิกแยก
+   * (ปิดแล้วลบสายที่นัดไว้เอง = เดาแทนคน เจ้าของยังไม่ได้สั่ง)
+   */
+  const doComplete = async (id: string, outcome: FollowOutcome, note?: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await completeFollowEntry(id, outcome, note);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ปิดงานไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -697,6 +718,20 @@ const FollowPage: React.FC = () => {
                       <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
                         {FOLLOW_STATUS_LABEL[it.call_status]}
                       </span>
+                      {/* ปิดงานแล้ว (095) — ป้ายแยกจากสถานะการโทร เพราะคนละเรื่อง:
+                          สถานะโทร = AI ไปถึงไหน · ป้ายนี้ = เจ้าหน้าที่สรุปว่าจบแบบไหน */}
+                      {it.completed_at && it.outcome_code ? (
+                        <span
+                          title={it.outcome_note || undefined}
+                          className={cn(
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                            TONE.success.chip,
+                          )}
+                        >
+                          ปิดงาน:{' '}
+                          {FOLLOW_OUTCOME_LABEL[it.outcome_code as FollowOutcome] ?? it.outcome_code}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-sm text-foreground">{it.topic}</p>
                     {it.note ? <p className="text-xs text-muted-foreground">{it.note}</p> : null}
@@ -723,7 +758,16 @@ const FollowPage: React.FC = () => {
                       <Phone className="h-3 w-3" aria-hidden />
                       {it.recipient_phone}
                     </a>
-                    {!it.cancelled && it.call_status === 'pending' ? (
+                    {/* ปิดงาน (095) — โผล่เมื่อยังไม่ปิดและยังไม่ถูกยกเลิก
+                        ⚠️ ไม่ผูกกับ call_status: ตามจนจบด้วยตัวเองโดยที่ AI ยังไม่ได้โทร
+                        ก็ต้องปิดได้ (ปุ่มยกเลิกข้างล่างผูกกับ pending เพราะมันไปแตะคิว) */}
+                    {!it.cancelled && !it.completed_at ? (
+                      <FollowCompleteControls
+                        busy={busyId === it.id}
+                        onComplete={(outcome, note) => doComplete(it.id, outcome, note)}
+                      />
+                    ) : null}
+                    {!it.cancelled && it.call_status === 'pending' && !it.completed_at ? (
                       cancellingId === it.id ? (
                         <>
                           <button

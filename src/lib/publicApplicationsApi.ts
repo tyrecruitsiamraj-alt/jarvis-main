@@ -12,6 +12,14 @@ export type PublicApplication = {
   last_call_outcome?: string | null;
   last_call_at?: string | null;
   /**
+   * เวลาที่ **เจ้าหน้าที่กดโทร** (095) — คนละอันกับ `last_call_at` ข้างบน
+   * (อันนั้นคือเวลาที่ได้ **ผล** โทร จากคิว AI หรือถังคนโทร)
+   * อันนี้มีตั้งแต่ยกหูครั้งแรก แม้โทรไม่ติดก็ยังมีร่องรอย
+   */
+  dialed_first_at?: string | null;
+  dialed_last_at?: string | null;
+  dial_count?: number;
+  /**
    * วันนัดสัมภาษณ์ที่ตกลงได้ตอนโทร (ISO) — server แนบมาให้จากแถวผลโทร (migration 085)
    * ไม่มีค่า = ยังไม่มีนัด (ยังไม่โทร · โทรแล้วแต่ยังนัดไม่ได้ · หรือผลอื่น)
    */
@@ -302,16 +310,26 @@ export type JobApplicantBreakdown = {
   counts: Record<string, number>;
   /** ไม่มีคีย์ของใบไหน = server ยังบอกที่มาไม่ได้ (ห้ามตีความว่าเป็นศูนย์) */
   byOrigin: Record<string, Partial<Record<ApplicationOrigin, number>>>;
+  /**
+   * ยอด Lead ต่อใบขอ — ใบที่ถูกปัดเข้าคลัง ไม่ถูกนับใน `counts`
+   * โชว์เป็นเลขที่สองข้างยอดผู้สมัคร (เจ้าของเคาะ 17 ส.ค. 2569)
+   */
+  leadCounts: Record<string, number>;
 };
 
 export async function fetchJobApplicantBreakdown(): Promise<JobApplicantBreakdown> {
   const r = await apiFetch('/api/job-applications?counts=1');
-  if (!r.ok) return { counts: {}, byOrigin: {} };
+  if (!r.ok) return { counts: {}, byOrigin: {}, leadCounts: {} };
   const body = (await r.json()) as {
     counts?: Record<string, number>;
     countsByOrigin?: Record<string, Partial<Record<ApplicationOrigin, number>>>;
+    leadCounts?: Record<string, number>;
   };
-  return { counts: body.counts ?? {}, byOrigin: body.countsByOrigin ?? {} };
+  return {
+    counts: body.counts ?? {},
+    byOrigin: body.countsByOrigin ?? {},
+    leadCounts: body.leadCounts ?? {},
+  };
 }
 
 /**
@@ -410,6 +428,31 @@ export async function claimJobApplication(id: string, claim: boolean): Promise<P
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;
+}
+
+/**
+ * "กดโทร" — จดเวลาที่ยกหูโทรออก (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 5 ของงานสรรหา)
+ * กดซ้ำได้: ครั้งแรกเขียน `dialed_first_at` ครั้งเดียวถาวร ครั้งหลังขยับแค่ครั้งล่าสุด
+ * 503 = ยังไม่รัน migration 095
+ */
+export async function markApplicationDialed(id: string): Promise<{
+  dialed_first_at: string | null;
+  dialed_last_at: string | null;
+  dial_count: number;
+}> {
+  const r = await apiFetch('/api/job-applications', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, dial: true }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'จดเวลาโทรไม่สำเร็จ');
+  }
+  return (await r.json()) as {
+    dialed_first_at: string | null;
+    dialed_last_at: string | null;
+    dial_count: number;
+  };
 }
 
 /**

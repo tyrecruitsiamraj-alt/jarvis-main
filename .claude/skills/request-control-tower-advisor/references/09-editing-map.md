@@ -1818,3 +1818,27 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
 
 ⚠️ **บทใหม่มีผลเฉพาะสายที่เข้าคิวหลังแก้** — payload ถูกประกอบตอนเข้าคิวแล้วเก็บใน
 `lumos_dispatch_queue.payload` แถวที่รออยู่ยังใช้บทเดิม (ยกเว้นประโยครายได้ซึ่งเติมตอนเสิร์ฟ)
+
+### รอบ 17 ส.ค. 2569 — เติมของที่ขาดของสองเลน (migration 095)
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `api/_lib/lumosInterviewOutcome.ts` | **pure · ใหม่** — แปลศัพท์ผลช่องสัมภาษณ์ (`completed`→`confirmed`) |
+| `src/lib/followOutcome.ts` | **pure · ใหม่** — ผลปิดงาน Follow 5 ค่า (parity กับ CHECK ใน 095) |
+| `src/components/follow/FollowCompleteControls.tsx` | ปุ่มเสร็จสิ้น + เหตุอื่น (ยกเลิกงาน/ไม่ไปเริ่มงาน/ลา/อื่น ๆ) |
+| `src/components/matching/SelectionRecallButton.tsx` | ปุ่ม "หาคนจากกองไม่สนใจ" — ทางเข้าจากหน้าจอของ `/api/matching/selection-recall` |
+| `migrations/095_call_stamp_and_follow_outcome.sql` | `dialed_first_at/last_at/dial_count` บนใบสมัคร + `completed_at/outcome_code/outcome_note` บน follow |
+
+**จุดที่ต้องระวังรอบนี้**
+
+* 🔴 **`dialed_last_at` ≠ `last_call_at`** — อันแรกคือ "เจ้าหน้าที่กดโทร" (095 คอลัมน์จริง)
+  อันหลังคือ "ผลโทรล่าสุดของเบอร์" ที่ handler แนบทีหลังจากคิว AI + ถังคนโทร
+  ตั้งชื่อชนกันเมื่อไหร่ = ตัวเลขสองความหมายปนกันทั้งหน้า (เกือบพลาดตอนตั้งชื่อคอลัมน์)
+* 🔴 **`completed_at` ≠ `cancelled_at`** บน follow — ยกเลิก = ตัดสายทิ้งก่อนถึงวัน ·
+  ปิดงาน = ตามจนจบแล้วสรุปว่าจบแบบไหน · ยุบรวม = สถิติต้นเหตุแยกไม่ออก
+* `dialed_first_at` เขียนครั้งเดียวด้วย coalesce — **ห้ามมี reset ที่ไหนล้าง** (กติกาเดียวกับ 088)
+* คอลัมน์ dial เพิ่มใน `LIST_COLUMNS` ชุดเดียว (ชุด fallback ไม่มี) — แพตเทิร์นเดียวกับ 094
+* แท็บ "คำขอโพสต์งานใหม่" บนบอร์ด = `JobPostingsPage embedded` ตัวเดิม ไม่ได้ก๊อปโค้ด ·
+  route `/matching/job-postings` ยังอยู่เป็นทางถอย · ถอดออกจากเมนูแล้ว (กติกา "ย้ายแล้วต้องหาย")
+* ปุ่มบนการ์ดกล่องงานเหลือปุ่มเดียว **"หาผู้สมัครเพิ่ม"** (ค้น 3 แหล่ง + ส่ง AI ทันที) —
+  ปุ่มเดิมที่พาไปหน้า Matching ค้นแต่ iRecruit ถูกถอด (ของใหม่ครอบอยู่แล้ว)
