@@ -84,6 +84,12 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     gender_requirement: r.gender_requirement || undefined,
     vehicle_required: r.vehicle_required || undefined,
     work_schedule: r.work_schedule || undefined,
+    /**
+     * สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
+     * ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ค่าที่เป็นขีด/ว่างถูกล้างเป็น undefined ตั้งแต่
+     * `cleanErpText` แล้ว — ไม่มีข้อมูล = **ไม่ขึ้นบรรทัดนี้** ห้ามขึ้นว่า "ไม่ระบุ"
+     */
+    boss_nationality: (r as Record<string, unknown>).boss_nationality as string | undefined,
     /** ที่อยู่ที่เจ้าหน้าที่แก้เอง — หน้าประกาศใช้ค่านี้ก่อนค่าที่เดาจากที่อยู่ดิบ */
     override_province: (r as Record<string, unknown>).override_province as string | undefined,
     override_district: (r as Record<string, unknown>).override_district as string | undefined,

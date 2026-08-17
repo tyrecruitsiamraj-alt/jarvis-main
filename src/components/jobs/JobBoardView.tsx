@@ -48,7 +48,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -520,25 +520,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           {visibleJobs.map((job) => (
             <Card
               key={job.id}
-              onClick={isStaff ? () => setApplicantsJob(job) : undefined}
-              role={isStaff ? 'button' : undefined}
-              tabIndex={isStaff ? 0 : undefined}
-              onKeyDown={
-                isStaff
-                  ? (e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setApplicantsJob(job);
-                      }
-                    }
-                  : undefined
-              }
+              /* กดที่กล่อง = เปิดรายละเอียดใบงานเลย (เจ้าของสั่ง 17 ส.ค. 2569)
+                 เดิมกดกล่องแล้วได้รายชื่อผู้สมัคร ส่วนรายละเอียดต้องไปหาปุ่มเล็ก ๆ ใน footer
+                 ตอนนี้สลับกัน: กล่อง = รายละเอียด · รายชื่อเป็นปุ่มที่กดตรง ๆ */
+              onClick={() => setSelected(job)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelected(job);
+                }
+              }}
               className={cn(
                 // flex-col + h-full: grid ยืดกล่องสูงเท่ากันอยู่แล้ว แต่ลูกเรียงชิดบน
                 // พื้นที่เหลือจึงกองใต้ footer → แถบ "ผู้สมัคร N คน" ของแต่ละใบลอยคนละระดับ
                 // (⚠️ ใส่ที่จุดเรียกใช้เท่านั้น ห้ามแก้ ui/card.tsx ซึ่งทั้งแอปใช้ร่วมกัน)
                 'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
-                isStaff && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
               )}
             >
               <CardHeader className="space-y-3 pb-2">
@@ -615,6 +614,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <Calendar className="h-3.5 w-3.5" />
                     ต้องการ {formatYmdDmyBe(job.required_date)}
                   </span>
+                  {/* สัญชาติเจ้านาย (เจ้าของสั่ง 17 ส.ค. 2569 — เอาขึ้นทั้งกล่องงานและหน้าสาธารณะ)
+                      ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ไม่มีข้อมูล = ไม่ขึ้นบรรทัดนี้
+                      ห้ามขึ้นว่า "ไม่ระบุ" — การ์ดนี้โผล่บนหน้าสมัครสาธารณะด้วย */}
+                  {job.boss_nationality?.trim() ? (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Flag className="h-3.5 w-3.5" />
+                      นายสัญชาติ {job.boss_nationality.trim()}
+                    </span>
+                  ) : null}
                 </div>
                 {/* สวัสดิการ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
                     ⚠️ ตัวเลขทั้งหมดเป็น **อัตราจ่าย** ที่พนักงานได้จริง ไม่ใช่อัตราเบิก
@@ -736,27 +744,23 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             แก้ไข
                           </button>
                         ) : null}
-                        {/* ดูรายละเอียดใบขอ (17 ส.ค. 2569 — เจ้าของ: "กดแล้วทำไมดูรายละเอียด
-                            ใบขอไม่ได้") · เดิมมีปุ่มนี้เฉพาะฝั่งสาธารณะ ฝั่งเจ้าหน้าที่กดการ์ด
-                            แล้วได้รายชื่อผู้สมัครอย่างเดียว ไม่มีทางเปิดรายละเอียดเลย
-                            ⚠️ stopPropagation — ไม่งั้นโดนคลิกของการ์ด (เปิดรายชื่อ) ทับ */}
+                        {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
+                            รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
+                            ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelected(job);
+                            setApplicantsJob(job);
                           }}
                           className={cn(
                             'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.neutral.outline,
+                            TONE.info.outline,
                           )}
                         >
-                          <FileText className="h-3.5 w-3.5" />
-                          รายละเอียด
+                          <Users className="h-3.5 w-3.5" />
+                          ดูรายชื่อ
                         </button>
-                        <span className="text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
-                          ดูรายชื่อ →
-                        </span>
                       </div>
                     </div>
                   </>
@@ -764,14 +768,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <div className="flex w-full gap-2">
                     <button
                       type="button"
-                      onClick={() => setSelected(job)}
-                      className="flex-1 rounded-lg border border-border bg-background py-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
-                    >
-                      รายละเอียด
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openApply(job)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openApply(job);
+                      }}
                       className="jarvis-pill-btn flex-1 py-2.5 text-xs font-semibold"
                     >
                       สมัครงาน

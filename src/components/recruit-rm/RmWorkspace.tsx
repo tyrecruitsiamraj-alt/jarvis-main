@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
-import RmFilterSidebar from '@/components/recruit-rm/RmFilterSidebar';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
@@ -23,9 +22,7 @@ import {
   RM_LIST_VIEWS,
   RM_LIST_VIEW_LABEL,
   type RmListView,
-  provincesFromApplications,
   rmTabHasLeadTools,
-  type RmFilters,
   type RmRowAction,
   type RmTab,
 } from '@/lib/recruitRm';
@@ -100,7 +97,6 @@ const RmWorkspace: React.FC<{
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<RmFilters>(EMPTY_RM_FILTERS);
   const [keyword, setKeyword] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -203,8 +199,6 @@ const RmWorkspace: React.FC<{
       .catch((e) => setNotice(e instanceof Error ? e.message : 'บันทึกผลนัดไม่สำเร็จ'));
   };
 
-  const provinces = useMemo(() => provincesFromApplications(rows), [rows]);
-
   /** จำนวนต่อแท็บ — นิยามเดียวกับตัวกรอง (isInRmTab) เลขบนแท็บจึงตรงกับที่เห็นเสมอ */
   const tabCounts = useMemo(() => {
     const out = {} as Record<RmTab, number>;
@@ -216,19 +210,19 @@ const RmWorkspace: React.FC<{
     // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
     // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
     if (bucket) return rows;
-    const base = filterApplications(rows, tab, filters, keyword);
+    const base = filterApplications(rows, tab, EMPTY_RM_FILTERS, keyword);
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
-  }, [rows, tab, filters, keyword, listView, bucket]);
+  }, [rows, tab, keyword, listView, bucket]);
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
-    const base = filterApplications(rows, 'candidates', filters, keyword);
+    const base = filterApplications(rows, 'candidates', EMPTY_RM_FILTERS, keyword);
     const out = {} as Record<RmListView, number>;
     for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
     return out;
-  }, [rows, filters, keyword]);
+  }, [rows, keyword]);
 
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);
@@ -471,9 +465,10 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-4 lg:flex-row">
-        <RmFilterSidebar filters={filters} onChange={setFilters} provinces={provinces} />
-
+      {/* แผงตัวกรองด้านข้าง (ช่องทางสมัคร/จังหวัด/สถานะใบสมัคร) ถูกถอดออกทั้งหมด
+          (เจ้าของสั่ง 17 ส.ค. 2569: "เอาออกจากทุกหน้าไปเลย") — คัดรายชื่อใช้
+          แท็บ + มุมมองย่อย + ช่องค้นหาที่มีอยู่แล้ว */}
+      <div className="mt-4">
         <div className="min-w-0 flex-1 space-y-3">
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
               "กล่องช่องทาง ฯลฯ มีแค่หน้ากล่องงาน") — เครื่องมือพวกนี้เหลือที่ RecruitBoardTools

@@ -13,19 +13,18 @@ import {
 } from '@/lib/appointmentAttendance';
 import { formatDateTimeTh, formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
-  APPLICATION_ORIGIN_CLASS,
-  APPLICATION_ORIGIN_HINT,
-  APPLICATION_ORIGIN_LABEL,
-  APPLICATION_STATUS_CLASS,
-  APPLICATION_STATUS_LABEL,
+  GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import {
   RM_ROW_ACTIONS,
   RM_ROW_ACTION_LABEL,
+  applicationAddressLabel,
   applicationJobLabel,
+  applicationUnitLabel,
   canHoldApplication,
+  daysSinceApplied,
   splitApplicantName,
   type RmRowAction,
   type RmTab,
@@ -35,8 +34,8 @@ import type { CallHold } from '@/lib/callHoldsApi';
 /**
  * ตารางใบสมัครของหน้างานสรรหา (RM) — แถวคือ **ใบสมัครจริงจากหน้า /apply**
  *
- * คอลัมน์ "สมัครงาน" คือหัวใจของหน้านี้ (เจ้าของย้ำ: ต้องรู้ว่าใครสมัครมางานไหน)
- * — มาจาก `job_title` + `unit_name` ที่ตารางใบสมัครเก็บไว้แล้วต่อใบ
+ * คอลัมน์ "หน่วยงาน" คือหัวใจของหน้านี้ (เจ้าของย้ำ: ต้องรู้ว่าใครสมัครมาที่ไหน)
+ * — มาจาก `unit_name` ที่ตารางใบสมัครเก็บไว้แล้วต่อใบ (ถอยไป `job_title` เมื่อไม่มี)
  *
  * ⚠️ **ปุ่ม action ต่อแถวต่างกันตามแท็บ** (จุดเดียวที่ระบบเดิมให้ต่างกัน):
  *   ข้อมูลผู้สมัคร / การติดต่อ → bookmark_add · call · visibility
@@ -44,7 +43,7 @@ import type { CallHold } from '@/lib/callHoldsApi';
  * ไอคอน Material เดิมจับคู่กับ lucide ที่ใช้ทั้งแอป — ไม่ลากชุดฟอนต์ใหม่เข้ามา
  *
  * ⚠️ คอลัมน์ "จำนวน" ของระบบเดิมไม่มีข้อมูลฝั่งเรา (ไม่รู้ว่าเขานับอะไร) —
- * **ตัดออกดีกว่าโชว์ 0 ปลอมทุกแถว** · สีสถานะใช้ APPLICATION_STATUS_CLASS
+ * **ตัดออกดีกว่าโชว์ 0 ปลอมทุกแถว**
  * ที่ประกาศใน lib อยู่แล้ว (กติกา: ห้ามทำ map สีในไฟล์หน้า)
  */
 
@@ -70,12 +69,14 @@ const RmTable: React.FC<{
   onAttendance?: (row: PublicApplication, result: AttendanceResult) => void;
 }> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance }) => {
   const actions = RM_ROW_ACTIONS[tab];
+  /** จับเวลาครั้งเดียวต่อการ render — ทุกแถวจึงนับ "ผ่านมาแล้วกี่วัน" จากหมุดเดียวกัน */
+  const now = new Date();
   const allChecked = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
 
   if (rows.length === 0) {
     return (
       <p className={cn('rounded-xl border px-3 py-6 text-center text-sm', DASH.card, DASH.muted)}>
-        ไม่พบใบสมัครตามเงื่อนไขที่เลือก — ลองล้างตัวกรองด้านซ้าย
+        ไม่พบใบสมัครตามเงื่อนไขที่เลือก — ลองล้างคำค้นหรือเปลี่ยนแท็บ
       </p>
     );
   }
@@ -99,12 +100,18 @@ const RmTable: React.FC<{
               <th className="px-3 py-2 font-semibold">ชื่อ</th>
               <th className="px-3 py-2 font-semibold">นามสกุล</th>
               <th className="px-3 py-2 font-semibold">เบอร์โทร</th>
-              {/* กว้างคงที่ — ค่า "ตำแหน่ง — หน่วยงาน" ยาวมาก ถ้าปล่อยให้ auto-layout
-                  จัดเอง แถวนั้นจะสูง 2–3 บรรทัดขณะที่แถวข้าง ๆ สูงบรรทัดเดียว */}
-              <th className="w-[20rem] px-3 py-2 font-semibold">สมัครงาน</th>
-              <th className="px-3 py-2 font-semibold">จังหวัด</th>
+              {/* ชุดคอลัมน์ที่เจ้าของสั่งไว้ 17 ส.ค. 2569:
+                  ชื่อ · นามสกุล · เบอร์โทร · อายุ · เพศ · ที่อยู่ · หน่วยงาน · ช่องทาง ·
+                  วันที่สมัคร · ผ่านมาแล้วกี่วัน (คอลัมน์ "สถานะ" ถูกถอดออกตามลิสต์) */}
+              <th className="px-3 py-2 text-right font-semibold">อายุ</th>
+              <th className="px-3 py-2 font-semibold">เพศ</th>
+              <th className="px-3 py-2 font-semibold">ที่อยู่</th>
+              {/* กว้างคงที่ — ชื่อหน่วยงานยาวมาก ถ้าปล่อยให้ auto-layout จัดเอง
+                  แถวนั้นจะสูง 2–3 บรรทัดขณะที่แถวข้าง ๆ สูงบรรทัดเดียว */}
+              <th className="w-[20rem] px-3 py-2 font-semibold">หน่วยงาน</th>
               <th className="px-3 py-2 font-semibold">ช่องทาง</th>
               <th className="px-3 py-2 font-semibold">วันที่สมัคร</th>
+              <th className="px-3 py-2 text-right font-semibold">ผ่านมาแล้ว</th>
               {/* วันนัดโผล่เฉพาะแท็บติดตามนัดหมาย — แท็บอื่นไม่มีใครถามคำถามนี้
                   (คอลัมน์ที่ว่างทั้งแถวทุกแท็บทำให้ตารางกว้างขึ้นโดยไม่ได้อะไร) */}
               {tab === 'appointments' ? (
@@ -122,7 +129,6 @@ const RmTable: React.FC<{
               {tab === 'contact' ? (
                 <th className="px-3 py-2 font-semibold">โทรล่าสุด</th>
               ) : null}
-              <th className="px-3 py-2 font-semibold">สถานะ</th>
               <th className="px-3 py-2 text-right font-semibold">ตัวเลือก</th>
             </tr>
           </thead>
@@ -160,11 +166,23 @@ const RmTable: React.FC<{
                       ) : null}
                     </span>
                   </td>
+                  {/* อายุ/เพศ — ไม่ได้กรอกมา = ขีด (ห้ามเดาหรือใส่ 0) */}
+                  <td className={cn('px-3 py-2 text-right tabular-nums whitespace-nowrap', DASH.cell)}>
+                    {typeof r.age === 'number' ? r.age : EM_DASH}
+                  </td>
+                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
+                    {r.gender ? (GENDER_LABEL[r.gender] ?? EM_DASH) : EM_DASH}
+                  </td>
+                  <td className={cn('px-3 py-2', DASH.cell)} title={applicationAddressLabel(r) || undefined}>
+                    <span className="block max-w-[14rem] truncate">
+                      {dashIfEmpty(applicationAddressLabel(r))}
+                    </span>
+                  </td>
                   {/* ⚠️ truncate ต้องการกล่องที่มีความกว้างแน่นอน — inline-flex เดิมใช้ไม่ได้
                       ใส่ title ไว้ให้อ่านเต็มตอน hover ข้อมูลจึงไม่หายไปกับการตัด */}
                   <td className={cn('px-3 py-2', DASH.cell)} title={applicationJobLabel(r)}>
                     <span className="flex max-w-[20rem] items-center gap-1.5">
-                      <span className="truncate">{dashIfEmpty(applicationJobLabel(r))}</span>
+                      <span className="truncate">{dashIfEmpty(applicationUnitLabel(r))}</span>
                       {r.has_document ? (
                         <FileText
                           className={cn('h-3.5 w-3.5 shrink-0', DASH.muted)}
@@ -173,7 +191,6 @@ const RmTable: React.FC<{
                       ) : null}
                     </span>
                   </td>
-                  <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>{dashIfEmpty(r.province)}</td>
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellMuted)}>
                     {r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH}
                   </td>
@@ -182,6 +199,15 @@ const RmTable: React.FC<{
                       ไทยจะถอยไป 1 วัน — ต้องตัดตามปฏิทินกรุงเทพ (แบบเดียวกับคอลัมน์วันนัด) */}
                   <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
                     {r.created_at ? formatYmdDmyBe(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
+                  </td>
+                  {/* ผ่านมาแล้วกี่วัน — นับตามปฏิทินกรุงเทพ ใบเมื่อวานตอนสามทุ่มต้องอ่านว่า
+                      "1 วัน" ตั้งแต่เช้าวันนี้ ไม่ใช่รอครบ 24 ชม. */}
+                  <td className={cn('px-3 py-2 text-right tabular-nums whitespace-nowrap', DASH.cell)}>
+                    {(() => {
+                      const d = daysSinceApplied(r.created_at, now);
+                      if (d === null) return EM_DASH;
+                      return d === 0 ? 'วันนี้' : `${d.toLocaleString('th-TH')} วัน`;
+                    })()}
                   </td>
                   {tab === 'appointments' ? (
                     <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cell)}>
@@ -262,30 +288,9 @@ const RmTable: React.FC<{
                       )}
                     </td>
                   ) : null}
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                          APPLICATION_STATUS_CLASS[r.status],
-                        )}
-                      >
-                        {APPLICATION_STATUS_LABEL[r.status]}
-                      </span>
-                      {/* ที่มา (16 ส.ค.) — ไม่รู้ที่มา = ไม่ขึ้นชิป ห้ามเดา */}
-                      {r.origin ? (
-                        <span
-                          title={APPLICATION_ORIGIN_HINT[r.origin]}
-                          className={cn(
-                            'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                            APPLICATION_ORIGIN_CLASS[r.origin],
-                          )}
-                        >
-                          {APPLICATION_ORIGIN_LABEL[r.origin]}
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
+                  {/* คอลัมน์ "สถานะ" (ชิปสถานะใบ + ชิปที่มา) ถูกถอดออกตามชุดคอลัมน์ที่
+                      เจ้าของสั่ง 17 ส.ค. 2569 — ⚠️ ถอด <th> แล้วต้องถอด <td> ด้วยเสมอ
+                      ไม่งั้นทุกแถวเลื่อนไปหนึ่งช่อง (ข้อมูลไปโผล่ใต้หัวคอลัมน์ผิด) */}
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-1">
                       {actions.map((a) => {

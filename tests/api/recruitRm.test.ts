@@ -10,8 +10,11 @@ import {
   canHoldApplication,
   RM_TABS,
   RM_TAB_STATUSES,
+  applicationAddressLabel,
   applicationJobLabel,
+  applicationUnitLabel,
   countActiveRmFilters,
+  daysSinceApplied,
   EMPTY_RM_FILTERS,
   filterApplications,
   isInRmListView,
@@ -277,5 +280,80 @@ describe('ดึงไปโทร (call hold) จากแถวรายชื
       expect(r.ok, String(job_id)).toBe(false);
       if (!r.ok) expect(r.reason).toContain('ใบขอ');
     }
+  });
+});
+
+/**
+ * ชุดคอลัมน์ที่เจ้าของสั่ง 17 ส.ค. 2569:
+ * ชื่อ · นามสกุล · เบอร์โทร · อายุ · เพศ · ที่อยู่ · หน่วยงาน · ช่องทาง · วันที่สมัคร · ผ่านมาแล้วกี่วัน
+ */
+describe('คอลัมน์ใหม่ของตารางรายชื่อ', () => {
+  const base = { id: 'a1', full_name: 'ก ข', phone: '0800000000' } as PublicApplication;
+
+  describe('หน่วยงาน', () => {
+    it('เอาชื่อหน่วยงานล้วน ไม่ใช่ "ตำแหน่ง — หน่วยงาน"', () => {
+      const r = { ...base, job_title: 'ธุรการ', unit_name: 'บริษัท ก. จำกัด' };
+      expect(applicationUnitLabel(r)).toBe('บริษัท ก. จำกัด');
+      // ตัวเดิมยังต่อสองท่อนเหมือนเดิม (ยังมีที่ใช้อยู่) — ตัวใหม่ต้องไม่เหมือนกัน
+      expect(applicationJobLabel(r)).toBe('ธุรการ — บริษัท ก. จำกัด');
+    });
+
+    it('🔴 ของจริงมีใบที่ชื่องานกับหน่วยงานเป็นค่าเดียวกัน — ต้องไม่โชว์ซ้ำสองรอบ', () => {
+      const dup = 'บริษัท กรุงเทพดุสิตเวชการ จำกัด (มหาชน)';
+      const r = { ...base, job_title: dup, unit_name: dup };
+      expect(applicationUnitLabel(r)).toBe(dup);
+      expect(applicationUnitLabel(r)).not.toContain('—');
+    });
+
+    it('ไม่มีหน่วยงาน ถอยไปใช้ชื่องานที่สมัคร แล้วค่อยเป็นค่าว่าง', () => {
+      expect(applicationUnitLabel({ ...base, job_title: 'ขับรถ' })).toBe('ขับรถ');
+      expect(applicationUnitLabel({ ...base, position_interest: 'แม่บ้าน' })).toBe('แม่บ้าน');
+      expect(applicationUnitLabel(base)).toBe('');
+    });
+  });
+
+  describe('ที่อยู่', () => {
+    it('ต่อ ตำบล · อำเภอ · จังหวัด', () => {
+      expect(
+        applicationAddressLabel({ ...base, subdistrict: 'คลองตัน', district: 'คลองเตย', province: 'กรุงเทพมหานคร' }),
+      ).toBe('คลองตัน · คลองเตย · กรุงเทพมหานคร');
+    });
+
+    it('กรอกไม่ครบ = ต่อเท่าที่มี ห้ามมีตัวคั่นค้าง', () => {
+      expect(applicationAddressLabel({ ...base, province: 'ชลบุรี' })).toBe('ชลบุรี');
+      expect(applicationAddressLabel({ ...base, district: 'ศรีราชา', province: 'ชลบุรี' })).toBe('ศรีราชา · ชลบุรี');
+      expect(applicationAddressLabel(base)).toBe('');
+      expect(applicationAddressLabel({ ...base, province: '  ' })).toBe('');
+    });
+  });
+
+  describe('ผ่านมาแล้วกี่วัน', () => {
+    const now = new Date('2026-08-17T03:00:00.000Z'); // 17 ส.ค. 10:00 น. ไทย
+
+    it('วันเดียวกัน = 0', () => {
+      expect(daysSinceApplied('2026-08-17T01:00:00.000Z', now)).toBe(0);
+    });
+
+    it('🔴 ใบเมื่อวานตอนสามทุ่มไทย ต้องเป็น 1 วันตั้งแต่เช้านี้ (ไม่ใช่รอครบ 24 ชม.)', () => {
+      // 16 ส.ค. 21:00 น. ไทย = 14:00Z · ห่างจาก now จริง ๆ แค่ 13 ชม.
+      expect(daysSinceApplied('2026-08-16T14:00:00.000Z', now)).toBe(1);
+    });
+
+    it('🔴 ใบที่กรอกตี 2 ไทย ต้องไม่ถอยไปนับเป็นเมื่อวาน (กับดักเขตเวลา UTC)', () => {
+      // 17 ส.ค. 02:00 น. ไทย = 16 ส.ค. 19:00Z — ถ้าตัดวันฝั่ง UTC จะกลายเป็น 1 วัน
+      expect(daysSinceApplied('2026-08-16T19:00:00.000Z', now)).toBe(0);
+    });
+
+    it('นับเป็นวันเต็ม', () => {
+      expect(daysSinceApplied('2026-08-07T04:00:00.000Z', now)).toBe(10);
+    });
+
+    it('ไม่มีวันที่/วันที่เสีย = null (คนละความหมายกับ 0 = วันนี้)', () => {
+      expect(daysSinceApplied(null, now)).toBeNull();
+      expect(daysSinceApplied(undefined, now)).toBeNull();
+      expect(daysSinceApplied('', now)).toBeNull();
+      expect(daysSinceApplied('ไม่ใช่วันที่', now)).toBeNull();
+      expect(daysSinceApplied('2026-08-17T01:00:00.000Z', now)).not.toBeNull();
+    });
   });
 });

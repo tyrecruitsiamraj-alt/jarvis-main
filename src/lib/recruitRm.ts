@@ -1,3 +1,4 @@
+import { toYmdBangkok } from '@/lib/dateTh';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
  *
@@ -176,6 +177,49 @@ export function applicationJobLabel(r: PublicApplication): string {
   const unit = (r.unit_name || '').trim();
   if (job && unit) return `${job} — ${unit}`;
   return job || unit || 'สมัครทั่วไป (ไม่ระบุงาน)';
+}
+
+/**
+ * ป้าย "หน่วยงาน" ของแถวรายชื่อ (เจ้าของสั่ง 17 ส.ค. 2569 — คอลัมน์นี้เอาชื่อหน่วยงานล้วน)
+ *
+ * ⚠️ ของจริงมีใบที่ `job_title` กับ `unit_name` เป็นค่าเดียวกันเป๊ะ ทำให้คอลัมน์เดิม
+ * โชว์ซ้ำสองรอบคั่นด้วยขีด ("บริษัท ก. — บริษัท ก.") — ตัวนี้เอาชื่อหน่วยงานอย่างเดียว
+ * ไม่มีหน่วยงานค่อยถอยไปใช้ชื่องานที่สมัคร
+ */
+export function applicationUnitLabel(r: PublicApplication): string {
+  const unit = (r.unit_name || '').trim();
+  if (unit) return unit;
+  return (r.job_title || '').trim() || (r.position_interest || '').trim() || '';
+}
+
+/**
+ * ที่อยู่ย่อของผู้สมัคร — ตำบล/อำเภอ/จังหวัด เท่าที่กรอกมา (เจ้าของสั่ง 17 ส.ค. 2569)
+ * เดิมโชว์แค่จังหวัด ซึ่งกว้างเกินกว่าจะบอกได้ว่าคนนี้ไปไซต์ไหนไหว
+ * ⚠️ กรอกไม่ครบ = ต่อเท่าที่มี ห้ามเติมคำว่า "ไม่ระบุ" คั่นกลางให้อ่านยาก
+ */
+export function applicationAddressLabel(r: PublicApplication): string {
+  return [r.subdistrict, r.district, r.province]
+    .map((v) => (v || '').trim())
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/**
+ * ใบนี้ยื่นมาแล้วกี่วัน (เจ้าของสั่ง 17 ส.ค. 2569 — "ผ่านมาแล้วกี่วัน")
+ *
+ * นับตาม **ปฏิทินกรุงเทพ** ไม่ใช่ผลต่างมิลลิวินาที — ใบที่กรอกเมื่อวานตอนสามทุ่ม
+ * ต้องอ่านว่า "1 วัน" ตั้งแต่เช้าวันนี้ ไม่ใช่รอครบ 24 ชม.
+ * คืน null เมื่อไม่มีวันที่/วันที่เสีย (คนละความหมายกับ 0 = วันนี้)
+ */
+export function daysSinceApplied(createdAt: string | null | undefined, now: Date): number | null {
+  const raw = (createdAt || '').trim();
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  const start = Date.parse(`${toYmdBangkok(d)}T00:00:00Z`);
+  const today = Date.parse(`${toYmdBangkok(now)}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(today)) return null;
+  return Math.round((today - start) / 86400000);
 }
 
 /**

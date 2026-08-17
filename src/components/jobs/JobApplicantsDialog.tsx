@@ -7,9 +7,6 @@ import {
   APPLICATION_ORIGIN_CLASS,
   APPLICATION_ORIGIN_HINT,
   APPLICATION_ORIGIN_LABEL,
-  countApplicationsByOrigin,
-  filterApplicationsByOrigin,
-  type ApplicationOrigin,
   APPLICATION_STATUS_CLASS,
   APPLICATION_STATUS_LABEL,
   fetchApplicationDocument,
@@ -50,7 +47,6 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
    * กรองตาม "ที่มา" (เจ้าของสั่ง 16 ส.ค.: *"แยกให้หน่อยว่าอันไหนมาจากการสมัครใหม่
    * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองคอลัมน์จึงตรงกันเสมอ
    */
-  const [originFilter, setOriginFilter] = useState<ApplicationOrigin | 'all'>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -176,8 +172,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   // กติกา "ใครนับว่าสนใจ" อยู่ที่ lib ที่เดียว (ไฟล์หน้าไม่ตัดสินเอง)
   // ⚠️ นับที่มาจาก `items` (ก้อนเต็ม) ไม่ใช่ก้อนที่กรองแล้ว — ไม่งั้นกดกรองแล้วเลขบนชิป
   // เปลี่ยนตามจนกดกลับไม่ได้
-  const originCounts = countApplicationsByOrigin(items);
-  const shownItems = filterApplicationsByOrigin(items, originFilter);
+  // ไม่มีตัวกรองที่มาแล้ว — "รายชื่อทั้งหมด" คือทั้งหมดจริง ๆ
+  const shownItems = items;
   const { interested } = splitInterested(shownItems);
   const visible = tab === 'interested' ? interested : shownItems;
 
@@ -337,41 +333,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             {sendNotice ? <span className="text-[11px] text-muted-foreground">{sendNotice}</span> : null}
           </div>
 
-          {/* ที่มาของคน (16 ส.ค.) — "ใบขอเข้ามาก็ยังหาคนให้เอง แต่แยกให้เห็นว่าใครมาจากไหน"
-              เห็นทุกช่องเสมอแม้ยอด 0 · ช่อง "ไม่รู้ที่มา" โผล่เฉพาะเมื่อมีจริง */}
-          <div className="mt-3 flex flex-wrap items-center gap-1">
-            {(
-              [
-                ['all', 'ทั้งหมด', items.length],
-                ['self_apply', APPLICATION_ORIGIN_LABEL.self_apply, originCounts.self_apply],
-                ['ai_found', APPLICATION_ORIGIN_LABEL.ai_found, originCounts.ai_found],
-                ['staff_added', APPLICATION_ORIGIN_LABEL.staff_added, originCounts.staff_added],
-              ] as Array<[ApplicationOrigin | 'all', string, number]>
-            ).map(([id, label, n]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setOriginFilter(id)}
-                title={id === 'all' ? 'ดูทุกที่มา' : APPLICATION_ORIGIN_HINT[id]}
-                className={cn(
-                  'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
-                  originFilter === id
-                    ? 'bg-foreground text-background'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
-                )}
-              >
-                {label} <span className="tabular-nums">({n})</span>
-              </button>
-            ))}
-            {originCounts.unknown > 0 ? (
-              <span
-                title="ยังบอกที่มาไม่ได้ (ใบเก่า/server ยังไม่อัปเดต) — ไม่ได้แปลว่าสมัครเอง"
-                className="rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground"
-              >
-                ไม่รู้ที่มา <span className="tabular-nums">({originCounts.unknown})</span>
-              </span>
-            ) : null}
-          </div>
+          {/* แถวชิป "ที่มาของคน" (ทั้งหมด/สมัครใหม่/AI หาให้/เจ้าหน้าที่คีย์) ถูกถอดออก
+              (เจ้าของสั่ง 17 ส.ค. 2569: "รายชื่อภายในกล่องมีแค่ รายชื่อทั้งหมด กับ คนที่สนใจ")
+              ⚠️ ป้ายบอกที่มายังอยู่บนการ์ดของแต่ละคนเหมือนเดิม — ที่เอาออกคือตัวกรอง */}
 
           {/* แท็บ — เฉพาะจอเล็ก (จอ ≥lg แสดง 2 คอลัมน์คู่กันแทน · เจ้าของเคาะ 15 ส.ค.)
               ⚠️ "ที่สนใจ" = คนที่ตอบสนใจ **ตอนโทร** ไม่ใช่สถานะใบสมัคร
@@ -379,8 +343,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
           <div className="mt-3 flex items-center gap-1 lg:hidden">
             {(
               [
-                ['all', 'รายชื่อผู้สมัครทั้งหมด', shownItems.length],
-                ['interested', 'รายชื่อที่สนใจ', interested.length],
+                ['all', 'รายชื่อทั้งหมด', shownItems.length],
+                ['interested', 'คนที่สนใจ', interested.length],
               ] as Array<[ApplicantTab, string, number]>
             ).map(([id, label, n]) => (
               <button
@@ -437,13 +401,13 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               <div className="hidden gap-4 lg:grid lg:grid-cols-2">
                 <section className="min-w-0">
                   <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
-                    รายชื่อผู้สมัครทั้งหมด <span className="tabular-nums">({shownItems.length})</span>
+                    รายชื่อทั้งหมด <span className="tabular-nums">({shownItems.length})</span>
                   </h3>
                   <ul className="space-y-2.5">{shownItems.map((a) => renderCard(a, false))}</ul>
                 </section>
                 <section className="min-w-0 rounded-2xl bg-emerald-50/40 p-2 dark:bg-emerald-950/20">
                   <h3 className="mb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                    รายชื่อที่สนใจ <span className="tabular-nums">({interested.length})</span>
+                    คนที่สนใจ <span className="tabular-nums">({interested.length})</span>
                   </h3>
                   {interested.length === 0 ? (
                     <p className="px-1 py-6 text-center text-xs text-muted-foreground">
