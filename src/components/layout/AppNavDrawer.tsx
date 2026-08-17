@@ -41,20 +41,6 @@ const AppNavDrawer: React.FC<Props> = ({
    */
   const [boardOpen, setBoardOpen] = useState(() => location.pathname.startsWith('/jobs/board'));
 
-  /**
-   * "Matching" ใช้แพตเทิร์นเดียวกับบอร์ด (เจ้าของสั่ง 11 ส.ค. 2569) — หัวข้อเดียวกดกาง
-   * เห็นทางเข้าทั้งสามของโมดูล แทนที่จะต้องเข้าหน้ารวม /matching แล้วกดต่ออีกที
-   *
-   * ⚠️ หัวข้อ**กางอย่างเดียว ไม่พาไปไหน** (เหมือนบอร์ด) ทางเข้าหน้า Matching จริงจึงต้อง
-   * อยู่ในลูกด้วย ไม่งั้นกดเมนูแล้วไปหน้าจับคู่ไม่ได้เลย
-   * ไม่ได้ตัดหน้ารวม /matching ทิ้ง — RoleHubPage กับลิงก์เก่ายังชี้ไปที่นั่นได้เหมือนเดิม
-   */
-  const [matchingOpen, setMatchingOpen] = useState(
-    () =>
-      location.pathname.startsWith('/recruit/rm') ||
-      (location.pathname.startsWith('/matching') && !location.pathname.startsWith('/matching/candidates')),
-  );
-
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -128,53 +114,6 @@ const AppNavDrawer: React.FC<Props> = ({
         <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="เมนูหลัก">
           {items.map((item) => {
             const Icon = item.icon;
-
-            // "Matching" เป็นหัวข้อกดกาง ไม่ใช่ปุ่มพาไปหน้า — ทางเข้าทั้งสามอยู่ในลูก
-            if (item.path === '/matching') {
-              const inMatching = isDockPathActive('/matching', location.pathname);
-              const child = (path: string, label: string) => (
-                <button
-                  key={path}
-                  type="button"
-                  onClick={() => go(path)}
-                  className={cn(rowClass(location.pathname.startsWith(path)), 'pl-10')}
-                >
-                  <span className="truncate">{label}</span>
-                </button>
-              );
-              return [
-                <button
-                  key="matching-group"
-                  type="button"
-                  onClick={() => setMatchingOpen((v) => !v)}
-                  aria-expanded={matchingOpen}
-                  className={rowClass(inMatching)}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                  <ChevronDown
-                    className={cn(
-                      'ml-auto h-4 w-4 shrink-0 transition-transform',
-                      matchingOpen && 'rotate-180',
-                    )}
-                    aria-hidden
-                  />
-                </button>,
-                ...(matchingOpen
-                  ? [
-                      // ถอดออกจากเมนู 16 ส.ค. 2569 เย็น (เจ้าของ: "ย้ายแล้วอันนั้นก็หายไป"):
-                      //  · "จับคู่กับงาน"      → แท็บในหน้าหน่วยงาน
-                      //  · "การติดต่อ (คัดสรร)" → แท็บในใบขอ
-                      //  · "Pre-Check"        → ปุ่มแถบตัวกรองในกล่องงาน
-                      //  · "คำขอโพสต์งานใหม่" → แท็บบนบอร์ดรับสมัคร (17 ส.ค. 2569)
-                      // route เดิมยังอยู่ครบ — ลิงก์เก่าที่คนแชร์ไว้ยังเปิดได้
-                      // "งานสรรหา (RM)" ยุบเข้าบอร์ดรับสมัครแล้ว (11 ส.ค. 2569 รอบหก)
-                      // — ทางเข้าอยู่กลุ่ม "บอร์ดรับสมัคร" ข้างล่าง
-                      // "โทรของฉัน" ย้ายเป็น section บนหน้าหลักแล้ว (13 ส.ค. 2569)
-                    ]
-                  : []),
-              ];
-            }
 
             const rows = [
               <button

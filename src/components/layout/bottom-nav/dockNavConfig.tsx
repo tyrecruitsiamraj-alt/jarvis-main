@@ -31,10 +31,11 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
   { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
-  // "จับคู่กับงาน" ถูกถอดจากเมนู 16 ส.ค. 2569 — ไปเป็นแท็บในหน้าหน่วยงานแล้ว
-  // (เจ้าของ: "คำว่าจับคู่กับงานก็หายไปด้วย ไม่งั้นงงตาย") · หัวข้อนี้เหลือไว้เพราะ
-  // ยังมีลูกอื่น (คำขอโพสหางานใหม่) และ RoleHubPage ยังชี้มาที่ /matching
-  { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
+  // หัวข้อ "Matching" ถูกถอดจากเมนู 17 ส.ค. 2569 (เจ้าของ: "อันนี้ก็เอาออกได้เลย") —
+  // ลูกย้ายออกไปอยู่กับงานจริงหมดแล้ว เหลือหัวข้อที่กดกางแล้วไม่มีอะไรข้างใน:
+  //   จับคู่กับงาน → แท็บในหน้าหน่วยงาน · การติดต่อ (คัดสรร) → แท็บในใบขอ
+  //   Pre-Check → ปุ่มแถบตัวกรองในกล่องงาน · คำขอโพสต์งานใหม่ → แท็บบนบอร์ดรับสมัคร
+  // route `/matching` ยังอยู่ (RoleHubPage + ลิงก์เก่ายังเปิดได้) แค่ไม่มีทางเข้าจากเมนู
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },
 ];
 
