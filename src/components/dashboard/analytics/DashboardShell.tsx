@@ -49,7 +49,12 @@ type Props = {
   onRefresh?: () => void;
   onExport?: () => void;
   onViewItem: (item: DashboardWorkItem) => void;
-  onKpiClick?: (kpiId: string, label: string) => void;
+  /**
+   * กดการ์ด KPI · ส่ง `expectedRequests` (ยอด "ใบขอ" ที่การ์ดโชว์) ไปด้วย เพื่อให้
+   * ตัวเปิดลิสต์บอกได้ว่ารายการที่ดึงมาได้ครบตามเลขบนการ์ดหรือไม่ — ยอดบางตัวนับจาก
+   * ยอดรวมฝั่ง ERP ซึ่ง**รวมใบที่อยู่นอก feed ของกล่องงาน** ลิสต์จึงน้อยกว่าได้เป็นปกติ
+   */
+  onKpiClick?: (kpiId: string, label: string, expectedRequests?: number | null) => void;
   onCohortClick?: (rowId: string, label: string) => void;
   onFilledBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
@@ -230,7 +235,7 @@ const DashboardShell: React.FC<Props> = ({
                         key={kpi.id}
                         kpi={kpi}
                         progressPercent={kpiProgress(kpi)}
-                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                       />
                     ))}
                   </div>
@@ -254,7 +259,7 @@ const DashboardShell: React.FC<Props> = ({
                           kpi={kpi}
                           progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
                           progressBaseLabel="ของทุกสถานะ"
-                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
                       ));
                     })()}

@@ -26,19 +26,46 @@ type BoxDef = {
   sub?: string | null;
   tone: ToneKey;
   title?: string;
+  /** ขั้นในเส้นทางของคน — ใช้จัดกลุ่มบนจอ (เข้ามา → โทร → ติดต่อ → เก็บใบ → นัด) */
+  group: StageKey;
 };
+
+/**
+ * เส้นทางของคนหนึ่งคนในงานสรรหา — เรียงซ้ายไปขวาตามลำดับที่เกิดจริง
+ * เดิมเป็นกล่อง 13 ใบเรียงติดกันรวดเดียว อ่านแล้วไม่รู้ว่าอันไหนมาก่อนมาหลัง
+ * (เจ้าของสั่ง 17 ส.ค. 2569: *"ศูนย์คุมงานสรรหา ทำให้มันสวยกว่านี้หน่อย"*)
+ */
+const STAGES = [
+  { key: 'intake', label: 'เข้ามา' },
+  { key: 'call', label: 'โทร' },
+  { key: 'contact', label: 'ติดต่อ' },
+  { key: 'collect', label: 'เก็บใบสมัคร' },
+  { key: 'appointment', label: 'นัด → มาไหม' },
+] as const;
+
+type StageKey = (typeof STAGES)[number]['key'];
 
 function StatBox({
   box,
   active,
   onClick,
+  total,
 }: {
   box: BoxDef;
   active: boolean;
   onClick: (bucket: string | null) => void;
+  /** ยอด "กรอกมาทั้งหมด" — ใช้วาดแถบสัดส่วน · null/0 = ไม่วาด */
+  total: number | null;
 }) {
   const tone = TONE[box.tone];
   const clickable = box.bucket !== null && box.value !== null;
+  /**
+   * แถบสัดส่วนเทียบยอดเข้ามา — ตัวที่ทำให้กวาดตาแล้วเห็น "คนหายไปตรงไหน"
+   * โดยไม่ต้องเอาเลข 13 ช่องมาหารในหัวเอง (แพตเทิร์นเดียวกับการ์ด KPI บน Dashboard)
+   * ⚠️ ไม่มีตัวหาร/ค่าอ่านไม่ได้ = ไม่วาดแถบ ห้ามวาดเป็น 0% (คนละความหมายกับ "ไม่รู้")
+   */
+  const percent =
+    total && total > 0 && box.value !== null ? Math.min(100, (box.value / total) * 100) : null;
   return (
     <button
       type="button"
@@ -46,16 +73,31 @@ function StatBox({
       onClick={() => onClick(box.bucket)}
       title={box.title || (clickable ? 'กดเพื่อดูรายชื่อในกล่องนี้' : undefined)}
       className={cn(
-        'flex min-w-0 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left',
+        'flex min-w-0 flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors',
         tone.soft,
         clickable ? tone.softHover : 'cursor-default',
         active ? 'ring-2 ring-ring' : '',
       )}
     >
       <span className={cn('w-full truncate text-[11px] font-semibold', DASH.muted)}>{box.label}</span>
-      <span className={cn('text-xl font-bold leading-none', tone.num)}>
-        {box.value === null ? '—' : box.value.toLocaleString('th-TH')}
+      <span className="flex w-full items-baseline gap-1.5">
+        <span className={cn('text-2xl font-bold leading-none tabular-nums', tone.num)}>
+          {box.value === null ? '—' : box.value.toLocaleString('th-TH')}
+        </span>
+        {percent !== null && box.bucket !== null ? (
+          <span className={cn('text-[10px] font-medium tabular-nums', DASH.muted)}>
+            {Math.round(percent)}%
+          </span>
+        ) : null}
       </span>
+      {percent !== null ? (
+        <span className="block h-[5px] w-full overflow-hidden rounded-full bg-slate-900/10 dark:bg-white/10">
+          <span
+            className={cn('block h-full rounded-full', tone.dot ?? 'bg-slate-400')}
+            style={{ width: `${percent}%` }}
+          />
+        </span>
+      ) : null}
       {box.sub ? (
         <span className={cn('w-full truncate text-[10px]', DASH.muted)} title={box.sub}>
           {box.sub}
@@ -134,6 +176,7 @@ export default function RecruitControlPanel() {
       sub: `เบอร์ไม่ซ้ำ ${intake.distinctPhones} · Lead ${intake.leads}`,
       tone: 'primary',
       title: 'ใบสมัครทั้งหมดใน scope ของคุณ (นับเป็นใบ — คนเดียวหลายใบนับหลายใบ)',
+      group: 'intake',
     },
     {
       bucket: 'bad_phone',
@@ -141,6 +184,7 @@ export default function RecruitControlPanel() {
       value: intake.invalidPhone,
       sub: 'ส่ง AI โทรไม่ได้ — กดเพื่อไปแก้เบอร์',
       tone: 'danger',
+      group: 'intake',
     },
     {
       bucket: 'untouched',
@@ -148,6 +192,7 @@ export default function RecruitControlPanel() {
       value: calling.untouched,
       sub: `ในคิว AI ${calling.inQueueAwaitingAi} · มีคนถือ/เก็บ ${calling.heldOrClaimed}`,
       tone: 'warn',
+      group: 'call',
     },
     {
       bucket: 'called',
@@ -155,6 +200,7 @@ export default function RecruitControlPanel() {
       value: calling.called,
       sub: calling.calledViaOtherChannel > 0 ? `ในนั้นจากช่องทางอื่น ${calling.calledViaOtherChannel}` : null,
       tone: 'primary',
+      group: 'call',
     },
     {
       bucket: 'contact_success',
@@ -162,8 +208,9 @@ export default function RecruitControlPanel() {
       value: contact.success,
       sub: 'รวมคนที่คุยแล้วปฏิเสธ (= ติดต่อถึงตัว)',
       tone: 'success',
+      group: 'contact',
     },
-    { bucket: 'contact_failed', label: 'ติดต่อไม่สำเร็จ', value: contact.failed, tone: 'danger' },
+    { bucket: 'contact_failed', label: 'ติดต่อไม่สำเร็จ', value: contact.failed, tone: 'danger', group: 'contact' },
     // เส้นแบ่งสรรหา→คัดสรร (16 ส.ค.) — สนใจแล้วแต่ยังไม่มาสมัคร vs มาสมัครแล้ว (ขึ้นบอร์ด)
     {
       bucket: null,
@@ -172,6 +219,7 @@ export default function RecruitControlPanel() {
       sub: 'สนใจแล้วแต่ยังไม่มาสมัคร (งานสรรหา) — ดูรายชื่อที่ชิป "รอเก็บใบสมัคร"',
       tone: 'warn',
       title: 'คนตอบสนใจตอนโทร แต่ชื่อยังไม่ขึ้นบอร์ด (ยังไม่ได้มาสมัคร)',
+      group: 'collect',
     },
     {
       bucket: null,
@@ -180,13 +228,15 @@ export default function RecruitControlPanel() {
       sub: 'ชื่อขึ้นบอร์ดแล้ว (เป็นงานคัดสรรต่อ)',
       tone: 'success',
       title: 'จับคู่ด้วยเบอร์กับรายชื่อบนบอร์ด ERP',
+      group: 'collect',
     },
-    { bucket: 'scheduled', label: 'สำเร็จ · นัดได้', value: appointment.scheduled, tone: 'success' },
+    { bucket: 'scheduled', label: 'สำเร็จ · นัดได้', value: appointment.scheduled, tone: 'success', group: 'appointment' },
     {
       bucket: 'success_unscheduled',
       label: 'สำเร็จ · ยังนัดไม่ได้',
       value: appointment.successNoAppointment,
       tone: 'warn',
+      group: 'appointment',
     },
     {
       bucket: null,
@@ -199,6 +249,7 @@ export default function RecruitControlPanel() {
         : 'เริ่มบันทึกได้เมื่อรัน migration 089',
       tone: 'success',
       title: 'บันทึกผลที่แท็บติดตามนัดหมาย (ปุ่ม ✓มาแล้ว/✗ไม่มา โผล่ตั้งแต่วันนัด)',
+      group: 'appointment',
     },
     {
       bucket: null,
@@ -206,8 +257,12 @@ export default function RecruitControlPanel() {
       value: attendance ? attendance.noShow : null,
       tone: 'danger',
       title: 'บันทึกผลที่แท็บติดตามนัดหมาย',
+      group: 'appointment',
     },
   ];
+
+  /** ตัวหารของแถบสัดส่วนทุกกล่อง — ยอดใบที่กรอกเข้ามาทั้งหมด */
+  const intakeTotal = intake.total;
 
   const agingTotal = stale.agingUncalled.d0_3 + stale.agingUncalled.d4_7 + stale.agingUncalled.over7;
 
@@ -225,11 +280,45 @@ export default function RecruitControlPanel() {
         ) : null}
       </div>
 
-      {/* แถว 1 — สถานะงานเรียงตามเส้นทางของคน: เข้ามา → โทร → ติดต่อ → นัด → มา */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {row1.map((b) => (
-          <StatBox key={b.label} box={b} active={activeBucket === b.bucket && b.bucket !== null} onClick={setBucket} />
-        ))}
+      {/* เส้นทางของคน แบ่งเป็นขั้น ๆ พร้อมแถบสัดส่วนเทียบ "กรอกมาทั้งหมด"
+          เดิมเป็นกล่อง 12 ใบเรียงติดกันรวดเดียว กวาดตาแล้วไม่รู้ว่าอันไหนมาก่อนมาหลัง
+          และไม่รู้ว่าคนหายไปตรงขั้นไหน (เจ้าของสั่ง 17 ส.ค. 2569 ให้ทำให้อ่านง่ายกว่านี้) */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+        {STAGES.map((stage, i) => {
+          const boxes = row1.filter((b) => b.group === stage.key);
+          if (boxes.length === 0) return null;
+          return (
+            <div key={stage.key} className="min-w-0 flex-1">
+              <p className={cn('mb-1.5 flex items-center gap-1.5', DASH.eyebrow)}>
+                <span
+                  className={cn(
+                    'inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold',
+                    'bg-foreground/10 text-foreground/70',
+                  )}
+                >
+                  {i + 1}
+                </span>
+                {stage.label}
+              </p>
+              <div
+                className={cn(
+                  'grid gap-2',
+                  boxes.length >= 4 ? 'grid-cols-2' : boxes.length === 2 ? 'grid-cols-2' : 'grid-cols-1',
+                )}
+              >
+                {boxes.map((b) => (
+                  <StatBox
+                    key={b.label}
+                    box={b}
+                    total={intakeTotal}
+                    active={activeBucket === b.bucket && b.bucket !== null}
+                    onClick={setBucket}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* แถว 2 — เวลา + ความเสี่ยงค้าง (ตัวจี้งาน) */}

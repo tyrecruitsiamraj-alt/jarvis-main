@@ -74,6 +74,8 @@ const SupervisorDashboard: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [detailDialogTitle, setDetailDialogTitle] = useState('');
   const [detailDialogItems, setDetailDialogItems] = useState<ReturnType<typeof jobToDashboardDetailItem>[]>([]);
+  /** กล่องรายละเอียดกำลังรอข้อมูลอยู่ไหม — ใช้กับ "ปิดแล้ว" ที่ต้องยิง ERP ตอนกด */
+  const [detailDialogLoading, setDetailDialogLoading] = useState(false);
 
   const [throughputRecords, setThroughputRecords] = useState<ThroughputRecord[]>([]);
   const [closedJobs, setClosedJobs] = useState<JobRequest[]>([]);
@@ -388,8 +390,83 @@ const SupervisorDashboard: React.FC = () => {
     [jobById, openJobList],
   );
 
+  /**
+   * 🔴 กล่อง "ปิดแล้ว" กดแล้วต้องเห็น**ใบที่ปิดไปแล้วจริง ๆ** (เจ้าของสั่ง 17 ส.ค. 2569:
+   * *"พอกดเข้าไปไม่เห็นเลยว่าใบไหนที่ปิดไปแล้ว"*)
+   *
+   * ของเดิมกรองจาก `stockJobs` ซึ่งเป็น**กองใบที่ยังเปิดอยู่** — ใบที่ปิดสนิทแล้ว
+   * ไม่เคยอยู่ในกองนั้นตั้งแต่แรก (feed กล่องงานถามหาเฉพาะใบที่ยังต้องหาคน)
+   * ที่โผล่ขึ้นมาจึงมีแต่ใบที่ยังเปิดและหาได้บางส่วน — วัดจริงได้ 23 ใบ ขณะที่ตัวเลข
+   * บนกล่องบอก 3,697 ใบ **ไม่ตรงกันคนละโลก**
+   *
+   * ตัวนี้ดึงจากชุดเดียวกับแท็บ "ปิดแล้ว" ของบอร์ด (`siamrajSqlServerClosed`)
+   * ซึ่งเป็นนิยามเดียวกับที่ KPI ใช้นับ เลขกับรายการจึงมาจากที่เดียวกัน
+   *
+   * ⚠️ ต้องยิง ERP ตอนกด (ชุดใบปิดไม่ได้โหลดไว้ล่วงหน้าในโหมด "ทั้งหมด" เพราะ
+   * ช่วงเต็มมี 2,700+ ใบ ~20 วิ) → เปิดกล่องพร้อมสถานะกำลังโหลดก่อน
+   */
+  const openClosedJobList = useCallback(
+    async (label: string, expectedRequests?: number | null) => {
+      if (DEMO_MODE) return;
+      const cached = period ? closedJobs : closedAllJobs;
+      const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
+      /**
+       * "มีการหาได้" = หาได้อย่างน้อย 1 อัตรา — ครอบทั้ง**ใบที่ปิดไปแล้ว**และ
+       * **ใบที่ยังเปิดอยู่แต่หาได้บางส่วน** · ใบสองกองนี้มาคนละเส้น (กองเปิดอยู่ใน
+       * feed กล่องงาน · กองปิดต้องยิง ERP แยก) ต้องรวมแล้วตัดซ้ำด้วย id
+       */
+      const openWithFill = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range).filter(
+        (j) => (j.filled_positions ?? 0) > 0,
+      );
+      const merge = (closedList: JobRequest[]) => {
+        const seen = new Set(openWithFill.map((j) => j.id));
+        return [
+          ...openWithFill,
+          ...closedList.filter((j) => (j.filled_positions ?? 0) > 0 && !seen.has(j.id)),
+        ];
+      };
+      /**
+       * 🔴 **ห้ามเงียบเมื่อลิสต์ได้ไม่ครบ** — เลขบนการ์ดมาจากยอดรวมรายเดือนฝั่ง ERP
+       * (`sumCohortStockByRequestDate`) ซึ่งนับ**ใบที่อยู่นอก feed ของกล่องงาน**ด้วย
+       * ส่วนรายการที่เราลิสต์ได้มีแค่ใบที่อยู่ในสองเส้นที่ดึงได้จริง
+       * วัด 17 ส.ค.: การ์ดบอก 3,698 ใบ · ลิสต์ได้ 1,571 ใบ
+       * ปล่อยให้ต่างกันเฉย ๆ = คนอ่านนึกว่ารายการหาย ต้องบอกบนหัวกล่องไปเลย
+       */
+      const openWithNote = (list: JobRequest[]) => {
+        openJobList(label, list);
+        if (typeof expectedRequests === 'number' && list.length < expectedRequests) {
+          setDetailDialogTitle(
+            (prev) =>
+              `${prev} — เลขบนการ์ดคือ ${expectedRequests.toLocaleString('th-TH')} ใบ ส่วนที่เกินเป็นใบนอกกล่องงาน ยังดึงรายชื่อไม่ได้`,
+          );
+        }
+      };
+      if (cached && cached.length > 0) {
+        openWithNote(merge(cached));
+        return;
+      }
+      setDetailDialogTitle(label);
+      setDetailDialogItems([]);
+      setDetailDialogLoading(true);
+      setDetailDialogOpen(true);
+      try {
+        const rows = await fetchSiamrajClosedRequests(
+          period ? period.from : throughputFrom,
+          period ? period.to : throughputTo,
+        );
+        openWithNote(merge(rows));
+      } catch {
+        // เปิดกล่องค้างไว้พร้อมข้อความว่าง ดีกว่าปิดหน้าต่างหายไปเฉย ๆ โดยไม่บอกอะไร
+        setDetailDialogTitle(`${label} — โหลดรายการไม่สำเร็จ`);
+      } finally {
+        setDetailDialogLoading(false);
+      }
+    },
+    [period, dateRange, closedJobs, closedAllJobs, openJobList, jobsWithoutAgeFilter, throughputFrom, throughputTo],
+  );
+
   const handleKpiClick = useCallback(
-    (kpiId: string, label: string) => {
+    (kpiId: string, label: string, expectedRequests?: number | null) => {
       const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
       const stockJobs = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range);
 
@@ -411,10 +488,7 @@ const SupervisorDashboard: React.FC = () => {
       }
 
       if (kpiId === 'closed') {
-        openJobList(
-          label,
-          stockJobs.filter((j) => (j.filled_positions ?? 0) > 0),
-        );
+        void openClosedJobList(label, expectedRequests);
         return;
       }
 
@@ -466,7 +540,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, openControlList, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
+    [openJobList, openClosedJobList, openControlList, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
   );
 
   const handleCohortClick = useCallback(
@@ -602,7 +676,9 @@ const SupervisorDashboard: React.FC = () => {
       onOpenChange={setDetailDialogOpen}
       title={detailDialogTitle}
       items={detailDialogItems}
-      emptyMessage="ไม่มีใบขอในกลุ่มนี้"
+      emptyMessage={
+        detailDialogLoading ? 'กำลังโหลดรายการใบขอที่ปิดแล้ว…' : 'ไม่มีใบขอในกลุ่มนี้'
+      }
     />
   </>
   );

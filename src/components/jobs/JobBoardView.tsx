@@ -843,7 +843,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       }
                     }}
                     className={cn(
-                      'group jarvis-interactive-card cursor-pointer overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                      // ทรงเดียวกับการ์ด "ประกาศจากใบขอ" เป๊ะ (เจ้าของสั่ง 17 ส.ค. 2569
+                      // — "กล่องลอยทำให้เหมือนกับประกาศจากใบขอ") · flex-col + h-full
+                      // คือตัวที่ทำให้กล่องสูงเท่ากันทั้งแถวและ footer ปักอยู่ล่างสุด
+                      // เดิมกล่องลอยไม่มีสองคลาสนี้ แถวจึงสูงไม่เท่ากันและแถบล่างลอยคนละระดับ
+                      'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                      'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                       s.postings === 0 && 'opacity-60',
                     )}
                   >
@@ -853,7 +858,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           <h2 className="line-clamp-2 text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-blue-600">
                             {k.label}
                           </h2>
-                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                          <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
                             {s.titles.length > 0 ? s.titles.join(' • ') : 'ยังไม่มีประกาศของประเภทนี้'}
                           </p>
                         </div>
@@ -875,21 +880,30 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ))}
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-2 pb-4">
-                      <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
+                    <CardContent className="flex-1 space-y-2 pb-4">
+                      <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
                         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
                         {s.provinces.length > 0 ? s.provinces.join(' · ') : 'ไม่ได้ระบุจังหวัด'}
                       </p>
                     </CardContent>
-                    <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
-                      <div className="flex w-full items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                          <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                    <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
+                      {/* แถวล่างจัดแบบเดียวกับการ์ดใบขอ: "ผู้สมัคร N คน" ซ้าย · ปุ่มขวา
+                          ⚠️ ไม่มีปุ่ม "ดูรายชื่อ" เพราะใบสมัครผูกกับ `job_id` ไม่ได้ผูกกับ
+                          ประกาศ — กรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ยังทำไม่ได้จริง
+                          ใส่ไปก็เป็นปุ่มหลอก */}
+                      <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                        <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
+                          <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                           ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.violet.outline,
+                          )}
+                        >
                           <Link2 className="h-3.5 w-3.5" />
-                          สร้างลิงก์ →
+                          Gen link
                         </span>
                       </div>
                     </CardFooter>
