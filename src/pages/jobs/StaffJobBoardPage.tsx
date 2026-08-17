@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { type BoardViewId } from '@/components/jobs/JobBoardView';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import JobPostingsPage from '@/pages/matching/JobPostingsPage';
+import ClosedRequestsPanel from '@/components/jobs/ClosedRequestsPanel';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 
 /**
@@ -21,7 +22,7 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 
 /** แท็บที่ไม่ใช่ RmWorkspace — ย้ายมาจากเมนูอื่น (17 ส.ค. 2569) */
-const EXTRA_VIEWS = ['postings'] as const;
+const EXTRA_VIEWS = ['postings', 'closed'] as const;
 
 /** view ระดับบอร์ด → แท็บของ RmWorkspace (นิยามแท็บอยู่ที่ lib/recruitRm เหมือนเดิม) */
 const VIEW_TO_RM_TAB = {
@@ -65,7 +66,9 @@ const StaffJobBoardPage: React.FC = () => {
         view={view}
         onViewChange={setView}
         listContent={
-          view === 'board' ? null : view === 'postings' ? (
+          view === 'board' ? null : view === 'closed' ? (
+            <ClosedRequestsPanel />
+          ) : view === 'postings' ? (
             /* หน้าเดิมทั้งหน้า ยกมาวางเป็นเนื้อของแท็บ — ไม่ได้ก๊อปโค้ด ใช้ตัวเดียวกัน
                กับที่ /matching/job-postings เคยเรียก (route เดิมยังอยู่เป็นทางถอย) */
             <JobPostingsPage embedded />

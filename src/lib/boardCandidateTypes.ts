@@ -28,3 +28,29 @@ export type BoardCandidateMatch = {
 
 /** ระดับความตรงของสกิล: เขียว=ตรง · เหลือง=ใกล้เคียง · แดง=คนละสาย */
 export type MatchTier = BoardCandidateMatch['tier'];
+
+/** ผลแมท "คนของเรา" ต่อใบขอ — ตัวเดียวกับที่หน้าจับคู่งานใช้ */
+export type BoardMatchResult = {
+  jobId: string;
+  job_family_code: string;
+  job_family_label: string;
+  pool_size: number;
+  matches: BoardCandidateMatch[];
+  /** เป้า = อัตราที่ขอ × 3 — ต่ำกว่านี้ระบบค้นถัง "ไม่มีงาน" เพิ่มให้แล้ว */
+  recommended_target?: number;
+  fallback_used?: boolean;
+  fallback_pool_size?: number;
+};
+
+/**
+ * ผลจาก API — **AI คิดที่ worker หลังบ้านเท่านั้น** หน้าเว็บได้แค่ผลสำเร็จหรือสถานะรอ
+ * (ห้ามมีหน้าไหนสั่งให้ AI คิดสด — เคยทำให้คำขอค้างเป็นนาทีต่อคนที่เปิดหน้า)
+ */
+export type BoardMatchResponse = BoardMatchResult & {
+  computed_at?: string;
+  /** ยังไม่มีผลของใบนี้ — ส่งเข้าคิวหลังบ้านให้แล้ว */
+  pending?: boolean;
+  /** สั่งค้นหาใหม่แล้ว — ผลที่เห็นคือของเดิม รอผลใหม่มาแทน */
+  refresh_queued?: boolean;
+  worker_active?: boolean;
+};

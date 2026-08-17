@@ -6,6 +6,8 @@ import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { fetchJobApplications, type PublicApplication } from '@/lib/publicApplicationsApi';
 import { fetchRecruitLaneCandidates, tierChipClass, type RecruitLaneMatch } from '@/lib/recruitLaneApi';
+import { fetchBoardMatchForJob } from '@/lib/boardMatchApi';
+import type { BoardMatchResponse } from '@/lib/boardCandidateTypes';
 import {
   groupApplicationsByOrigin,
   summarizeUnitMatches,
@@ -53,6 +55,15 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
 
+  /**
+   * ผลแมท "คนของเรา" ของใบนี้ — **แหล่งเดียวกับหน้าจับคู่งาน** (เจ้าของสั่ง 17 ส.ค. 2569)
+   * ต่างกันแค่ขอบเขต: หน้าจับคู่งานโชว์ทุกใบ · แท็บนี้โชว์เฉพาะใบนี้
+   * โหลดเองทันทีที่เปิดแท็บ ไม่ต้องกดปุ่ม (ของเดิมต้องกด "ให้ AI ค้นหา" ก่อนถึงจะเห็นอะไร)
+   */
+  const [board, setBoard] = useState<BoardMatchResponse | null>(null);
+  const [boardError, setBoardError] = useState<string | null>(null);
+  const [boardWaiting, setBoardWaiting] = useState(false);
+
   const reload = useCallback(async () => {
     setError(null);
     try {
@@ -70,6 +81,52 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
   useEffect(() => {
     if (id) void reload();
   }, [id, reload]);
+
+  /**
+   * 🔴 **ต้องใช้ `job.id` ไม่ใช่ `id` จาก URL** — id บน route คือเลขที่ใบขอเปล่า ๆ
+   * (`OPL6908052`) แต่หน้าจับคู่งานส่ง id เต็ม (`siamraj-sql:OPL6908052`)
+   * ผลแมทถูกเก็บโดยคีย์ตามสตริงที่ส่งไป ส่งคนละรูป = **คนละช่องเก็บ** สองหน้าจะเห็น
+   * คนละผลทั้งที่เป็นใบเดียวกัน (เจอจริงตอนตรวจ 17 ส.ค. — มีแถว `OPL6908052`
+   * โผล่มาข้างแถว `siamraj-sql:OPL6908052`) · เจ้าของสั่งให้เป็น "ค่าเดียวกัน"
+   */
+  const loadBoardMatch = useCallback(
+    async (refresh = false) => {
+      const jobKey = job?.id;
+      if (!jobKey) return;
+      setBoardError(null);
+      try {
+        const data = await fetchBoardMatchForJob(jobKey, { refresh });
+        if (data.pending) {
+          // worker หลังบ้านปิดอยู่ = รอไปก็ไม่มีผล ต้องบอกให้ไปเปิด ไม่ใช่หมุนค้าง
+          if (data.worker_active === false) {
+            setBoardWaiting(false);
+            setBoardError('ระบบค้นหาหลังบ้านปิดอยู่ — ต้องเปิด MATCH_PRECOMPUTE_ENABLED บนเซิร์ฟเวอร์ก่อน');
+            return;
+          }
+          setBoardWaiting(true);
+          return;
+        }
+        setBoard(data);
+        setBoardWaiting(Boolean(data.refresh_queued));
+      } catch (e) {
+        setBoardWaiting(false);
+        setBoardError(e instanceof Error ? e.message : 'โหลดผลแมทไม่สำเร็จ');
+      }
+    },
+    [job?.id],
+  );
+
+  // เปิดแท็บ AI Match = โหลดเลย (ไม่ต้องกดปุ่ม) · รอ job โหลดก่อนเพราะต้องใช้ id เต็ม
+  useEffect(() => {
+    if (tab === 'ai-match' && job?.id) void loadBoardMatch(false);
+  }, [tab, job?.id, loadBoardMatch]);
+
+  // ระหว่างรอ worker คิด — เช็คซ้ำทุก 15 วิ แล้วผลโผล่เอง (แพตเทิร์นเดียวกับหน้าจับคู่งาน)
+  useEffect(() => {
+    if (!boardWaiting || tab !== 'ai-match') return;
+    const timer = setInterval(() => void loadBoardMatch(false), 15_000);
+    return () => clearInterval(timer);
+  }, [boardWaiting, tab, loadBoardMatch]);
 
   const summary = useMemo(() => summarizeUnitMatches(items ?? []), [items]);
   const groups = useMemo(() => groupApplicationsByOrigin(items ?? []), [items]);
@@ -206,9 +263,92 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
         {tab === 'ai-match' ? (
           <>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <span className="font-semibold">คนที่ AI แนะนำสำหรับใบขอนี้</span>
+              <span className="font-semibold">
+                คนของเราที่ AI แนะนำ {board ? `${board.matches.length} คน` : ''}
+              </span>
               <span className="text-xs text-muted-foreground">
-                · ยังไม่ใช่ใบสมัคร — ต้องโทรถามก่อน
+                {board
+                  ? `· จากกอง ${board.pool_size.toLocaleString('th-TH')} คน (To do · ไม่มีงาน)`
+                  : '· ยังไม่ใช่ใบสมัคร — ต้องโทรถามก่อน'}
+              </span>
+              <button
+                type="button"
+                disabled={boardWaiting}
+                onClick={() => void loadBoardMatch(true)}
+                title="สั่งให้หลังบ้านคิดใหม่ — ผลเดิมยังแสดงอยู่ระหว่างรอ"
+                className={cn(
+                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
+                  TONE.info.outline,
+                )}
+              >
+                {boardWaiting ? (
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                คิดใหม่
+              </button>
+            </div>
+
+            {boardError ? (
+              <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+                {boardError}
+              </p>
+            ) : null}
+
+            {!board && boardWaiting ? (
+              <p className="rounded-xl bg-primary/10 px-3 py-2 text-sm text-primary">
+                AI กำลังคิดที่หลังบ้าน — ผลจะขึ้นเองเมื่อเสร็จ
+              </p>
+            ) : null}
+
+            {board && board.matches.length > 0 ? (
+              <ul className="space-y-1.5">
+                {board.matches.map((m) => (
+                  <li
+                    key={m.card_id}
+                    className="grid gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[1.3fr_1.3fr_auto] sm:items-center"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-foreground">
+                        {m.full_name}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {[m.job1_name, m.province_name, m.column_label].filter(Boolean).join(' · ') ||
+                          EM_DASH}
+                      </span>
+                    </span>
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">{m.reason}</span>
+                    <span
+                      className={cn(
+                        'justify-self-start rounded-full px-2.5 py-0.5 text-xs font-semibold sm:justify-self-end',
+                        m.tier === 'green'
+                          ? TONE.success.chip
+                          : m.tier === 'yellow'
+                            ? TONE.warn.chip
+                            : TONE.neutral.chip,
+                      )}
+                    >
+                      {m.tier === 'green' ? 'ตรงสาย' : m.tier === 'yellow' ? 'ใกล้เคียง' : 'คนละสาย'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : board ? (
+              <div className="rounded-xl border border-border/70 bg-card px-4 py-8 text-center">
+                <p className="text-sm font-medium text-foreground">ยังไม่มีคนของเราที่เข้าข่ายใบนี้</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ลองกด “หาผู้สมัครเพิ่ม” ข้างล่างเพื่อค้นจากฐานคนที่ยังไม่สมัคร
+                </p>
+              </div>
+            ) : null}
+
+            {/* ── หาผู้สมัครเพิ่ม (เลนสรรหา · คนที่ยังไม่สมัคร) ─────────────── */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
+              <span className="font-semibold">หาผู้สมัครเพิ่ม</span>
+              <span className="text-xs text-muted-foreground">
+                · ค้นจากฐานคนที่ยังไม่สมัคร (Checklist · ฐานใหม่ · iRecruit) — หน้านี้ดูอย่างเดียว
+                ไม่ส่งเข้าคิวโทร
               </span>
               <button
                 type="button"
@@ -216,7 +356,7 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
                 onClick={() => void runAiMatch()}
                 className={cn(
                   'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
-                  TONE.info.outline,
+                  TONE.neutral.outline,
                 )}
               >
                 {aiBusy ? (
@@ -224,22 +364,12 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
                 ) : (
                   <Search className="h-3.5 w-3.5" />
                 )}
-                {aiMatches ? 'ค้นใหม่' : 'ให้ AI ค้นหา'}
+                {aiMatches ? 'ค้นใหม่' : 'หาผู้สมัครเพิ่ม'}
               </button>
             </div>
 
             {aiNotice ? (
               <p className="rounded-xl bg-primary/10 px-3 py-2 text-sm text-primary">{aiNotice}</p>
-            ) : null}
-
-            {!aiMatches && !aiBusy && !aiNotice ? (
-              <div className="rounded-xl border border-border/70 bg-card px-4 py-10 text-center">
-                <p className="text-sm font-medium text-foreground">ยังไม่ได้ค้น</p>
-                <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
-                  กด “ให้ AI ค้นหา” เพื่อดูรายชื่อที่เข้าข่าย · หน้านี้ดูอย่างเดียว
-                  การส่งเข้าคิวโทรอยู่ที่ปุ่มบนการ์ดในกล่องงาน
-                </p>
-              </div>
             ) : null}
 
             {aiMatches && aiMatches.length > 0 ? (

@@ -90,7 +90,7 @@ export type JobBoardViewProps = {
 };
 
 /** แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace */
-export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'postings';
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'postings' | 'closed';
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -392,6 +392,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 // ย้ายมาจากเมนู Matching (เจ้าของสั่ง 17 ส.ค. 2569) — ใบขอที่หาคนของเรา
                 // ไม่ได้ ต้องให้ทีมคอนเทนต์รับไปโพสต่อ เป็นงานที่เกิดต่อจากกล่องงานโดยตรง
                 { id: 'postings', label: 'คำขอโพสต์งานใหม่' },
+                // ใบขอที่ปิดแล้วหลุดจากกล่องงานเองอยู่แล้ว (กล่องงานถามหาเฉพาะใบที่ยังเปิด)
+                // แท็บนี้คือที่ที่ใบพวกนั้นไปโผล่ (เจ้าของสั่ง 17 ส.ค. 2569)
+                { id: 'closed', label: 'ปิดแล้ว' },
               ] as const
             ).map((v) => {
               const active = view === v.id;
