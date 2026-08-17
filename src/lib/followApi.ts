@@ -14,8 +14,15 @@ export type FollowEntry = {
   /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI บอกผู้สมัครไว้โทรกลับ */
   staff_phone?: string | null;
   scheduled_at: string | null;
+  /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — null = ไม่ได้ระบุ */
+  unit_name?: string | null;
+  site_code?: string | null;
+  /** 🔴 เจ้าของข้อมูล = **คนที่กรอกครั้งแรก** ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
   created_by_name: string | null;
   created_at: string | null;
+  /** คนแก้ล่าสุด — คนละคนกับเจ้าของข้อมูลได้ */
+  updated_at?: string | null;
+  updated_by_name?: string | null;
   cancelled: boolean;
   /**
    * ปิดงานแล้ว (095) — **คนละเรื่องกับ `cancelled`**
@@ -27,6 +34,8 @@ export type FollowEntry = {
   completed_by_name?: string | null;
   call_status: FollowCallStatus;
   call_outcome: string | null;
+  /** รอบที่โทรล่าสุด — null = ยังไม่มีแถวคิว (ยังไม่ได้ส่งให้ AI) */
+  call_attempt?: number | null;
   call_summary: string | null;
   next_action: LumosNextAction | null;
   called_at: string | null;
@@ -43,6 +52,21 @@ export type NewFollowEntry = {
   group_id?: string;
   /** รอบเวลาของวันนั้น (HH:MM) — หลายรอบในวันเดียว (Lumos หยุดที่เหลือเมื่อยืนยัน) */
   call_times?: string[];
+  /** หน่วยงาน + รหัสไซต์ (096) — เลือกจากใบขอแล้วเติมให้ทั้งคู่ */
+  unit_name?: string;
+  site_code?: string;
+};
+
+/** ฟิลด์ที่แก้ไขได้ (096) — ไม่รวมเจ้าของข้อมูลและตารางโทร (ดูเหตุผลที่ฝั่ง API) */
+export type EditFollowEntry = {
+  recipient_name: string;
+  recipient_phone: string;
+  topic: string;
+  note?: string;
+  staff_phone?: string;
+  scheduled_at?: string;
+  unit_name?: string;
+  site_code?: string;
 };
 
 async function readError(r: Response): Promise<string> {
@@ -61,6 +85,25 @@ export async function createFollowEntry(input: NewFollowEntry): Promise<FollowEn
   const r = await apiFetch('/api/follow', { method: 'POST', body: JSON.stringify(input) });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as FollowEntry;
+}
+
+/**
+ * แก้ไขรายการติดตาม (096 · เจ้าของสั่ง 17 ส.ค. 2569: *"เพิ่มให้แก้ไขได้"*)
+ *
+ * ⚠️ `action: 'update'` คือตัวแยกจาก PATCH เดิมที่แปลว่า "ปิดงาน" — ห้ามตัดออก
+ * คืน `queue_refreshed` = จำนวนสายในคิวที่แก้บทพูดตามได้ทัน · **0 = Lumos ดึงไปแล้ว
+ * สายที่ออกไปใช้ข้อมูลเดิม** ต้องบอกคนใช้ ไม่ใช่เงียบ
+ */
+export async function updateFollowEntry(
+  id: string,
+  input: EditFollowEntry,
+): Promise<FollowEntry & { queue_refreshed?: number }> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ...input, action: 'update' }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowEntry & { queue_refreshed?: number };
 }
 
 export async function cancelFollowEntry(id: string): Promise<void> {

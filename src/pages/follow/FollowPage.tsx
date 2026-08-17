@@ -3,7 +3,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users } from 'lucide-react';
+import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2 } from 'lucide-react';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
 import {
@@ -16,12 +16,17 @@ import {
   FOLLOW_STATUS_BAR,
   type FollowEntry,
   type FollowCallStatus,
+  updateFollowEntry,
 } from '@/lib/followApi';
 import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { useSearchParams } from 'react-router-dom';
 import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
+import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import type { JobRequest } from '@/types';
+import FollowEditDialog from '@/components/follow/FollowEditDialog';
 
 const FILTERS: Array<{ id: 'all' | FollowCallStatus; label: string }> = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -82,6 +87,24 @@ const FollowPage: React.FC = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [roundTimes, setRoundTimes] = useState<string[]>(() => ['07:00']);
+  /**
+   * วันที่ **จะส่งให้ Lumos จริง** (เจ้าของสั่ง 17 ส.ค. 2569: *"ลงหน้า Follow ตั้งแต่ 1-7 วัน
+   * แต่เลือกได้ว่าจะส่งให้ lumos วันไหนบ้าง"*)
+   *
+   * เดิมช่วงวันคือ "ส่งทุกวันในช่วง" ไม่มีทางข้ามวัน — เสาร์อาทิตย์/วันหยุดก็ยิงหมด
+   * ตอนนี้ช่วงวันเป็นแค่ **ตัวกางปฏิทิน** ส่วนวันที่ติ๊กไว้เท่านั้นที่กลายเป็นสายจริง
+   * ⚠️ ติ๊กไม่ครบ = ไม่ใช่ error — ตั้งใจข้ามวันได้
+   */
+  const [skippedDays, setSkippedDays] = useState<Set<string>>(() => new Set());
+  /**
+   * หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — เลือกจากใบขอแล้วเติมให้ทั้งคู่
+   * (เจ้าของสั่ง: *"เพิ่มชื่อหน่วยงาน โดยเลือกจากใบงานได้เลย · Code site ถ้าเลือกหน่วยงานก็ให้ขึ้นมาเลย"*)
+   */
+  const [unitName, setUnitName] = useState('');
+  const [siteCode, setSiteCode] = useState('');
+  const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
+  /** รายการที่กำลังแก้ไข (096) — null = ไม่ได้เปิดกล่องแก้ */
+  const [editing, setEditing] = useState<FollowEntry | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -95,6 +118,21 @@ const FollowPage: React.FC = () => {
    */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+
+  /** ใบขอที่ยังเปิด — ใช้เป็นตัวเลือกหน่วยงาน · โหลดไม่ได้ = พิมพ์ชื่อเองได้เหมือนเดิม */
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSiamrajUnitRequests(500)
+      .then((v) => {
+        if (!cancelled) setOpenJobs(v);
+      })
+      .catch(() => {
+        if (!cancelled) setOpenJobs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /**
    * ค่าที่ส่งมาจากปุ่ม "ลงแผนแจ้งเข้า" ในหน้าคัดสรร (ข้อ 7) — กรอกชื่อ/เบอร์/เรื่องให้เลย
@@ -157,6 +195,9 @@ const FollowPage: React.FC = () => {
     setDateFrom('');
     setDateTo('');
     setRoundTimes(['07:00']);
+    setSkippedDays(new Set());
+    setUnitName('');
+    setSiteCode('');
     setFormError(null);
   };
 
@@ -200,9 +241,15 @@ const FollowPage: React.FC = () => {
     // โหมดตาราง: ช่วงวัน × รอบเวลา/วัน → 1 แถว/วัน ผูก group เดียว (Lumos หยุดรอบที่เหลือ
     // ของวันเมื่อยืนยัน · declined ยกเลิกทั้งชุด — server จัดการ)
     if (scheduleMode) {
-      const days = daysInRange(dateFrom, dateTo);
-      if (days.length === 0) {
+      const allDays = daysInRange(dateFrom, dateTo);
+      if (allDays.length === 0) {
         setFormError('เลือกช่วงวันให้ถูกต้อง (ไม่เกิน 31 วัน · วันเริ่มต้องไม่หลังวันจบ)');
+        return;
+      }
+      // ส่งเฉพาะวันที่ติ๊กไว้ — ช่วงวันเป็นแค่ตัวกางปฏิทิน ไม่ใช่คำสั่งส่งทุกวัน
+      const days = allDays.filter((d) => !skippedDays.has(d));
+      if (days.length === 0) {
+        setFormError('ยังไม่ได้เลือกวันที่จะส่งให้ AI โทรสักวัน — ติ๊กอย่างน้อย 1 วัน');
         return;
       }
       const rounds = [...new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t)))].sort();
@@ -224,6 +271,8 @@ const FollowPage: React.FC = () => {
             scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
             group_id: groupId,
             call_times: rounds,
+            unit_name: unitName.trim() || undefined,
+            site_code: siteCode.trim() || undefined,
           });
           done += 1;
         }
@@ -260,6 +309,8 @@ const FollowPage: React.FC = () => {
           note: note || undefined,
           staff_phone: staffPhone || undefined,
           scheduled_at: new Date(t).toISOString(),
+          unit_name: unitName.trim() || undefined,
+          site_code: siteCode.trim() || undefined,
         });
         done += 1;
       }
@@ -478,6 +529,64 @@ const FollowPage: React.FC = () => {
                 className="jarvis-soft-field min-h-[46px]"
               />
             </div>
+            {/* หน่วยงาน (096 · เจ้าของสั่ง 17 ส.ค. 2569) — เลือกจากใบขอแล้วรหัสไซต์ขึ้นเอง
+                ⚠️ เก็บเป็น **ข้อความ ไม่ใช่ FK ไปใบขอ** — ใบขออยู่คนละฐาน (ERP) และเลขที่ใบ
+                ยังซ้ำกันได้ (ใบขอปกติ vs ใบขอล่วงหน้า 23 ใบ · เลขท้ายชนข้าม BU อีก 234 ใบ)
+                สิ่งที่งาน Follow ต้องการคือ "ตอนนั้นตามเรื่องของหน่วยงานไหน" = snapshot */}
+            <div className="space-y-1.5">
+              <label htmlFor="followUnit" className="ml-1 text-xs font-medium text-muted-foreground">
+                หน่วยงาน (ถ้ามี)
+              </label>
+              <select
+                id="followUnit"
+                value={siteCode || (unitName ? '__manual__' : '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) {
+                    setUnitName('');
+                    setSiteCode('');
+                    return;
+                  }
+                  const job = openJobs.find((j) => (j.site_code || '') === v);
+                  if (job) {
+                    setUnitName(job.unit_name || '');
+                    setSiteCode(job.site_code || '');
+                  }
+                }}
+                className="jarvis-soft-field min-h-[46px] w-full"
+              >
+                <option value="">— ไม่ระบุหน่วยงาน —</option>
+                {unitName && !siteCode ? <option value="__manual__">{unitName} (พิมพ์เอง)</option> : null}
+                {/* ใบขอที่ยังเปิด — ชื่อเดียวกับที่เห็นบนกล่องงาน จะได้ไม่ต้องเดา */}
+                {openJobs
+                  .filter((j) => (j.site_code || '').trim())
+                  .map((j) => (
+                    <option key={j.id} value={j.site_code || ''}>
+                      {jobBoardCardTitle(j)}{j.request_no ? ` · ${j.request_no}` : ''}
+                    </option>
+                  ))}
+              </select>
+              {siteCode ? (
+                <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Building2 className="h-3 w-3" aria-hidden />
+                  รหัสไซต์ <span className="font-mono font-semibold text-foreground">{siteCode}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnitName('');
+                      setSiteCode('');
+                    }}
+                    className="ml-1 underline hover:text-foreground"
+                  >
+                    ล้าง
+                  </button>
+                </p>
+              ) : (
+                <p className="ml-1 text-[10px] text-muted-foreground">
+                  เลือกจากใบขอแล้วรหัสไซต์จะขึ้นเอง · โหลดใบขอไม่ได้ก็ข้ามช่องนี้ได้
+                </p>
+              )}
+            </div>
             {/* เจ้าของสั่ง 13 ส.ค. 2569: เปลี่ยนช่อง "รายละเอียดเพิ่มเติม" เป็นเบอร์เจ้าหน้าที่
                 — ผู้สมัครที่รับสายจาก AI ต้องมีเบอร์คนจริงให้โทรกลับ
                 ⚠️ เก็บเป็นคอลัมน์ใหม่ (staff_phone) ไม่ทับ note เดิมซึ่งคนละความหมาย */}
@@ -561,15 +670,81 @@ const FollowPage: React.FC = () => {
                     </button>
                   ) : null}
                 </div>
+                {/* เลือกได้ว่าจะส่งให้ Lumos วันไหนบ้าง (เจ้าของสั่ง 17 ส.ค. 2569)
+                    ช่วงวันข้างบนเป็นแค่ตัวกางปฏิทิน · ติ๊กวันไหน วันนั้นถึงกลายเป็นสายจริง
+                    เดิมส่งทุกวันในช่วง ข้ามเสาร์อาทิตย์/วันหยุดไม่ได้เลย */}
                 {(() => {
-                  const days = daysInRange(dateFrom, dateTo).length;
+                  const all = daysInRange(dateFrom, dateTo);
+                  if (all.length === 0) return null;
+                  const dayLabel = (ymd: string) => {
+                    const d = new Date(`${ymd}T00:00:00+07:00`);
+                    return d.toLocaleDateString('th-TH', {
+                      timeZone: 'Asia/Bangkok',
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                    });
+                  };
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="ml-1 text-xs font-medium text-muted-foreground">
+                          ส่งให้ AI โทรวันไหนบ้าง
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSkippedDays((prev) =>
+                              prev.size > 0 ? new Set() : new Set(all),
+                            )
+                          }
+                          className="text-[11px] font-medium text-primary underline"
+                        >
+                          {skippedDays.size > 0 ? 'เลือกทุกวัน' : 'ไม่เลือกสักวัน'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {all.map((d) => {
+                          const on = !skippedDays.has(d);
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() =>
+                                setSkippedDays((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(d)) next.delete(d);
+                                  else next.add(d);
+                                  return next;
+                                })
+                              }
+                              className={cn(
+                                'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                on
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-background text-muted-foreground hover:bg-secondary',
+                              )}
+                            >
+                              {dayLabel(d)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const days = daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)).length;
                   const rounds = new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size;
                   return days > 0 && rounds > 0 ? (
                     <p className="ml-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
                       รวม {days} วัน × {rounds} รอบ = {days * rounds} สาย · รับสายยืนยันแล้ววันนั้นหยุด พรุ่งนี้โทรต่อ
                     </p>
                   ) : (
-                    <p className="ml-1 text-[11px] text-muted-foreground">เลือกช่วงวัน + รอบเวลา แล้วระบบจะสรุปจำนวนสายให้</p>
+                    <p className="ml-1 text-[11px] text-muted-foreground">
+                      เลือกช่วงวัน + ติ๊กวันที่จะส่ง + รอบเวลา แล้วระบบจะสรุปจำนวนสายให้
+                    </p>
                   );
                 })()}
               </div>
@@ -743,9 +918,22 @@ const FollowPage: React.FC = () => {
                     </div>
                     <p className="mt-1 text-sm text-foreground">{it.topic}</p>
                     {it.note ? <p className="text-xs text-muted-foreground">{it.note}</p> : null}
+                    {/* หน่วยงาน + รหัสไซต์ (096) — ไม่ได้ระบุ = ไม่ขึ้นบรรทัดนี้ ห้ามขึ้นว่า "ไม่ระบุ" */}
+                    {it.unit_name || it.site_code ? (
+                      <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Building2 className="h-3 w-3 shrink-0" aria-hidden />
+                        <span className="font-medium text-foreground">{it.unit_name || '—'}</span>
+                        {it.site_code ? (
+                          <span className="font-mono">({it.site_code})</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       ให้โทร {formatWhen(it.scheduled_at)}
-                      {it.created_by_name ? ` · ลงโดย ${it.created_by_name}` : ''}
+                      {/* เจ้าของข้อมูล = คนที่กรอกครั้งแรก (เจ้าของสั่ง 17 ส.ค. 2569)
+                          คนแก้ทีหลังโชว์แยก ไม่ทับกัน */}
+                      {it.created_by_name ? ` · เจ้าของข้อมูล ${it.created_by_name}` : ''}
+                      {it.updated_by_name ? ` · แก้ล่าสุดโดย ${it.updated_by_name}` : ''}
                       {/* เบอร์ที่ AI บอกให้ผู้สมัครโทรกลับ — ต้องเห็นได้ในรายการ
                           ไม่งั้นเจ้าหน้าที่ตอบไม่ได้ว่าสายที่โทรเข้ามาบอกเบอร์ใครไป */}
                       {it.staff_phone ? ` · โทรกลับ ${it.staff_phone}` : ''}
@@ -775,6 +963,21 @@ const FollowPage: React.FC = () => {
                     {/* ปิดงาน (095) — โผล่เมื่อยังไม่ปิดและยังไม่ถูกยกเลิก
                         ⚠️ ไม่ผูกกับ call_status: ตามจนจบด้วยตัวเองโดยที่ AI ยังไม่ได้โทร
                         ก็ต้องปิดได้ (ปุ่มยกเลิกข้างล่างผูกกับ pending เพราะมันไปแตะคิว) */}
+                    {/* แก้ไข (096) — เฉพาะรายการที่ยังไม่ปิด/ยกเลิก (server กันอีกชั้น) */}
+                    {!it.cancelled && !it.completed_at ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(it)}
+                        title="แก้ไขรายการนี้"
+                        className={cn(
+                          'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
+                          TONE.neutral.outline,
+                        )}
+                      >
+                        <Pencil className="h-3 w-3" aria-hidden />
+                        แก้ไข
+                      </button>
+                    ) : null}
                     {!it.cancelled && !it.completed_at ? (
                       <FollowCompleteControls
                         busy={busyId === it.id}
@@ -826,6 +1029,17 @@ const FollowPage: React.FC = () => {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={pickPerson}
+      />
+
+      <FollowEditDialog
+        entry={editing}
+        openJobs={openJobs}
+        onClose={() => setEditing(null)}
+        onSaved={(msg) => {
+          setOkMessage(msg);
+          window.setTimeout(() => setOkMessage(null), 7000);
+          void reload();
+        }}
       />
     </div>
   );

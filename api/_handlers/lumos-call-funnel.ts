@@ -14,6 +14,10 @@ import {
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
+import {
+  CONNECTED_CALL_OUTCOMES,
+  UNREACHED_CALL_OUTCOMES,
+} from '../../src/lib/callOutcomeBuckets.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
@@ -21,9 +25,9 @@ import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
 /** ผลโทรที่ถือว่า "คุยติด" — ได้คุยกับคนจริง */
-const CONNECTED_OUTCOMES = ['confirmed', 'acknowledged', 'declined', 'reschedule_requested'];
+const CONNECTED_OUTCOMES: readonly string[] = CONNECTED_CALL_OUTCOMES;
 /** ผลโทรที่ถือว่า "ไม่ติด" */
-const UNREACHED_OUTCOMES = ['no_answer', 'busy', 'unresponsive', 'failed'];
+const UNREACHED_OUTCOMES: readonly string[] = UNREACHED_CALL_OUTCOMES;
 
 export type CallFunnel = {
   /** ส่งเข้าคิวทั้งหมด (ยังไม่นับซ้ำการโทรซ้ำ) — **รวมแถวที่ยกเลิก** */

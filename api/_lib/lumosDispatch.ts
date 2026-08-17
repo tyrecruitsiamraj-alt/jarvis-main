@@ -1308,6 +1308,31 @@ export async function cancelFollowReminder(followId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+/**
+ * 🔴 **แก้รายการ Follow แล้วต้องแก้บทพูดในคิวด้วย** (เจ้าของสั่ง 17 ส.ค. 2569 — "เพิ่มให้แก้ไขได้")
+ *
+ * payload ถูกสร้างตอน **เข้าคิว** ไม่ใช่ตอนเสิร์ฟ — แก้แถวในฐานเฉย ๆ แล้วไม่แตะคิว
+ * = AI ยังโทรไปพูดชื่อ/เรื่อง/เบอร์ติดต่อกลับ**ชุดเก่า** โดยที่หน้าจอโชว์ชุดใหม่
+ * (พังเงียบสนิท ไม่มีอะไรเตือน)
+ *
+ * ⚠️ ได้ผลเฉพาะแถวที่ **Lumos ยังไม่ดึงไป** (`status='pending'`) — ดึงไปแล้วเรียกคืนไม่ได้
+ * คืนจำนวนแถวที่แก้ได้จริง เพื่อให้ฝั่ง API บอกคนใช้ได้ว่า "สายที่ออกไปแล้วใช้ข้อมูลเดิม"
+ */
+export async function refreshFollowReminderPayload(entry: FollowEntryInput): Promise<number> {
+  const payload = buildFollowReminderPayload(entry);
+  const scheduledFor = payload.steps[0]?.scheduled_at ?? entry.scheduled_at.toISOString();
+  const { rows } = await dbQuery<{ id: number }>(
+    `update ${queueTable}
+        set payload = $2, next_attempt_at = $3, updated_at = now()
+      where channel = 'reminder' and job_ref = 'follow'
+        and person_ref = $1 and status = 'pending'
+      returning id`,
+    [`follow-${entry.id}`, JSON.stringify(payload), scheduledFor],
+  );
+  logInfo('lumos.dispatch.follow.refresh', { followId: entry.id, updated: rows.length });
+  return rows.length;
+}
+
 // ─── Serve + result (เรียกจาก lumos endpoints) ───────────────────────────────
 
 /**

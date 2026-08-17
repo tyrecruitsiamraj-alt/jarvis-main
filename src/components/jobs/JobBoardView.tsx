@@ -569,11 +569,37 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       </p>
                     ) : null}
                   </div>
-                  {job.urgency === 'urgent' && (
-                    <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
-                      ด่วน
-                    </span>
-                  )}
+                  {/* มุมขวาบน = ป้ายสถานะ + ปุ่มแก้ข้อมูลประกาศ (เจ้าของสั่ง 17 ส.ค. 2569
+                      ให้ย้ายปุ่มมาไว้ตรงนี้) · วางเป็นคอลัมน์ให้ป้ายอยู่บน ปุ่มอยู่ล่าง
+                      จะได้ไม่แย่งบรรทัดกับหัวข้อที่ยาว 2 บรรทัด
+                      ⚠️ ปุ่มอยู่ในกล่องที่คลิกได้ทั้งใบ → ต้อง stopPropagation
+                      ไม่งั้นกดปุ่มแล้วเด้งไปเปิดรายละเอียดแทน */}
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    {job.urgency === 'urgent' && (
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                        ด่วน
+                      </span>
+                    )}
+                    {isStaff ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditPublicJob({ ...job, ...(publicPatchById[job.id] || {}) });
+                        }}
+                        title="แก้จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ ที่จะขึ้นบนประกาศสาธารณะ"
+                        aria-label="แก้ข้อมูลประกาศ"
+                        className={cn(
+                          'inline-flex h-7 w-7 items-center justify-center rounded-full border transition-colors',
+                          TONE.info.outline,
+                          // จาง ๆ ไว้ก่อน ชัดขึ้นตอนชี้ที่การ์ด — หัวการ์ดจะได้ไม่รก
+                          'opacity-60 group-hover:opacity-100 focus-visible:opacity-100',
+                        )}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
@@ -701,21 +727,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         </button>
                         {/* แก้ข้อมูลที่จะขึ้นประกาศ (17 ส.ค. 2569) — จังหวัด/อำเภอ/ตำบล ·
                             รายได้รวม · สวัสดิการติ๊กเพิ่ม · เก็บเป็น override ฝั่งเรา ไม่แตะ ERP */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditPublicJob({ ...job, ...(publicPatchById[job.id] || {}) });
-                          }}
-                          title="แก้จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ ที่จะขึ้นบนประกาศสาธารณะ"
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.info.outline,
-                          )}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          แก้ข้อมูลประกาศ
-                        </button>
                         <button
                           type="button"
                           onClick={(e) => {

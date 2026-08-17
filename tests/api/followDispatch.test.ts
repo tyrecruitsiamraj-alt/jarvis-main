@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildFollowReminderPayload } from '../../api/_lib/lumosDispatch';
-import { parseFollowInput } from '../../api/_handlers/follow';
+import { parseFollowInput, parseFollowEditInput } from '../../api/_handlers/follow';
 import { checkApiAccess } from '../../api/_lib/rbac';
 import { APP_FUNCTIONS, primaryFunctionForPath, OPL_READ_FUNCTIONS } from '../../src/lib/roleFunctions';
 
@@ -216,5 +216,103 @@ describe('follow RBAC', () => {
     expect(ids).toContain('follow_manage');
     expect(ids.some((id) => id.startsWith('driver_care'))).toBe(false);
     expect(primaryFunctionForPath('/driver-care')).toBeNull();
+  });
+});
+
+/**
+ * หน่วยงาน + รหัสไซต์ บนรายการ Follow (096 · เจ้าของสั่ง 17 ส.ค. 2569)
+ * *"เพิ่มชื่อหน่วยงาน โดยเลือกจากใบงานได้เลย · Code site ถ้าเลือกหน่วยงานก็ให้ขึ้นมาเลย"*
+ */
+describe('หน่วยงาน/รหัสไซต์ ของรายการติดตาม', () => {
+  const NOW = new Date('2026-08-17T20:00:00+07:00');
+  const base = { recipient_name: 'สมชาย ใจดี', recipient_phone: '0812345678', topic: 'ตามเอกสาร' };
+
+  it('รับหน่วยงาน + รหัสไซต์ที่ส่งมาคู่กัน', () => {
+    const r = parseFollowInput(
+      { ...base, unit_name: 'บริษัท แคททาเลอร์ (ประเทศไทย) จำกัด', site_code: '69LBDL0218' },
+      NOW,
+    );
+    expect(r.error).toBeNull();
+    expect(r.value!.unitName).toBe('บริษัท แคททาเลอร์ (ประเทศไทย) จำกัด');
+    expect(r.value!.siteCode).toBe('69LBDL0218');
+  });
+
+  it('ไม่ส่งมาก็ต้องผ่าน — Follow หลายเคสไม่ได้ผูกกับใบขอใด', () => {
+    const r = parseFollowInput(base, NOW);
+    expect(r.error).toBeNull();
+    expect(r.value!.unitName).toBeNull();
+    expect(r.value!.siteCode).toBeNull();
+  });
+
+  it('ค่าว่าง/ช่องว่างล้วน = ไม่ได้ระบุ (ไม่ใช่ข้อความว่าง)', () => {
+    const r = parseFollowInput({ ...base, unit_name: '   ', site_code: '' }, NOW);
+    expect(r.error).toBeNull();
+    expect(r.value!.unitName).toBeNull();
+    expect(r.value!.siteCode).toBeNull();
+  });
+});
+
+/**
+ * แก้ไขรายการติดตาม (096) — *"เพิ่มให้แก้ไขได้"*
+ *
+ * 🔴 กติกาที่ห้ามหลุด: กติกาความถูกต้องของตอนแก้ต้อง**เหมือนตอนสร้างเป๊ะ**
+ * ไม่งั้นแก้ทีหลังจะใส่ค่าที่ตอนสร้างห้ามใส่ได้ (เช่นเบอร์ที่โทรไม่ได้จริง)
+ */
+describe('parseFollowEditInput', () => {
+  const NOW = new Date('2026-08-17T20:00:00+07:00');
+  const ok = { recipient_name: 'สมชาย ใจดี', recipient_phone: '0812345678', topic: 'ตามเอกสาร' };
+
+  it('แก้ครบทุกช่องที่แก้ได้', () => {
+    const r = parseFollowEditInput(
+      {
+        ...ok,
+        recipient_name: 'สมหญิง ใจงาม',
+        note: 'ย้ำเรื่องเอกสาร',
+        staff_phone: '021234567',
+        unit_name: 'บริษัท ทาทา สตีล',
+        site_code: '69LBAL0007',
+        scheduled_at: '2026-08-18T09:00:00+07:00',
+      },
+      NOW,
+    );
+    expect(r.error).toBeNull();
+    expect(r.value!.name).toBe('สมหญิง ใจงาม');
+    expect(r.value!.unitName).toBe('บริษัท ทาทา สตีล');
+    expect(r.value!.siteCode).toBe('69LBAL0007');
+    expect(r.value!.when.toISOString()).toBe('2026-08-18T02:00:00.000Z');
+  });
+
+  it('🔴 ตรวจเบอร์เข้มเท่าตอนสร้าง — เบอร์ที่โทรไม่ได้ต้องไม่ผ่าน', () => {
+    const r = parseFollowEditInput({ ...ok, recipient_phone: '123' }, NOW);
+    expect(r.error).not.toBeNull();
+    expect(r.value).toBeNull();
+  });
+
+  it('🔴 ชื่อ/เรื่อง ว่างไม่ได้ (เหมือนตอนสร้าง)', () => {
+    expect(parseFollowEditInput({ ...ok, recipient_name: '' }, NOW).error).not.toBeNull();
+    expect(parseFollowEditInput({ ...ok, topic: '  ' }, NOW).error).not.toBeNull();
+  });
+
+  it('🔴 เจ้าของข้อมูลแก้ไม่ได้ — ส่ง created_by_name มาก็ต้องไม่มีผล', () => {
+    const r = parseFollowEditInput({ ...ok, created_by_name: 'คนอื่น' }, NOW);
+    expect(r.error).toBeNull();
+    expect(Object.keys(r.value!)).not.toContain('created_by_name');
+    expect(JSON.stringify(r.value)).not.toContain('คนอื่น');
+  });
+
+  it('🔴 ตารางโทร (group_id/call_times) แก้ทางนี้ไม่ได้ — ไม่หลุดเข้าไปในค่าที่คืน', () => {
+    const r = parseFollowEditInput(
+      { ...ok, group_id: '11111111-2222-3333-4444-555555555555', call_times: ['07:00', '08:00'] },
+      NOW,
+    );
+    expect(r.error).toBeNull();
+    expect(Object.keys(r.value!)).not.toContain('groupId');
+    expect(Object.keys(r.value!)).not.toContain('callTimes');
+  });
+
+  it('ไม่ส่งเวลา = ใช้เวลาปัจจุบัน (ไม่ล้มทั้งคำขอ)', () => {
+    const r = parseFollowEditInput(ok, NOW);
+    expect(r.error).toBeNull();
+    expect(r.value!.when.getTime()).toBe(NOW.getTime());
   });
 });

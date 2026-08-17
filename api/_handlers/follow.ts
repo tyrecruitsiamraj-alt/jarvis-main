@@ -20,8 +20,13 @@ import {
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { logWarn } from '../_lib/logger.js';
 import { auditFromAuthed } from '../_lib/audit.js';
-import { enqueueFollowReminder, cancelFollowReminder } from '../_lib/lumosDispatch.js';
+import {
+  enqueueFollowReminder,
+  cancelFollowReminder,
+  refreshFollowReminderPayload,
+} from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { toE164Thai } from '../_lib/lumosDispatch.js';
 import {
@@ -49,7 +54,15 @@ type FollowRow = {
   /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI บอกผู้สมัครไว้โทรกลับ (migration 081) */
   staff_phone: string | null;
   scheduled_at: string | Date;
+  /** รอบเวลาของวันนั้น (092) — ต้องพกไปด้วยตอนสร้าง payload ใหม่ ไม่งั้นตารางหลายรอบหาย */
+  call_times: string[] | null;
+  /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
+  unit_name: string | null;
+  site_code: string | null;
   created_by_name: string | null;
+  /** คนแก้ล่าสุด — คนละคนกับเจ้าของข้อมูล (created_by_name) ได้ */
+  updated_at: string | Date | null;
+  updated_by_name: string | null;
   cancelled_at: string | Date | null;
   /** ปิดงานแล้วเมื่อไหร่ + จบแบบไหน (migration 095) */
   completed_at: string | Date | null;
@@ -59,6 +72,8 @@ type FollowRow = {
   created_at: string | Date;
   call_status: string | null;
   call_outcome: string | null;
+  /** รอบที่โทรล่าสุดของแถวคิว — ใช้จัดกลุ่ม "ใครอยู่รอบไหน" บนแผงหน้าหลัก */
+  call_attempt: number | null;
   call_summary: string | null;
   call_next_action: LumosNextAction | null;
   called_at: string | Date | null;
@@ -76,7 +91,12 @@ function toResponse(r: FollowRow) {
     note: r.note,
     staff_phone: r.staff_phone ?? null,
     scheduled_at: iso(r.scheduled_at),
+    unit_name: r.unit_name ?? null,
+    site_code: r.site_code ?? null,
+    /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
     created_by_name: r.created_by_name,
+    updated_at: iso(r.updated_at ?? null),
+    updated_by_name: r.updated_by_name ?? null,
     created_at: iso(r.created_at),
     cancelled: r.cancelled_at != null,
     // ปิดงาน (095) — คนละช่องกับ cancelled โดยตั้งใจ (ตามจนจบ ≠ ตัดทิ้งก่อนถึงวัน)
@@ -87,6 +107,7 @@ function toResponse(r: FollowRow) {
     /** สถานะจากคิว Lumos: pending=รอโทร, delivered=Lumos รับไปแล้ว, completed/failed/cancelled */
     call_status: r.cancelled_at != null ? 'cancelled' : (r.call_status ?? 'pending'),
     call_outcome: r.call_outcome,
+    call_attempt: r.call_attempt == null ? null : Number(r.call_attempt),
     call_summary: r.call_summary,
     next_action: r.call_next_action ?? null,
     called_at: iso(r.called_at),
@@ -108,6 +129,7 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
     `select f.*,
             q.status                                       as call_status,
             coalesce(q.last_outcome, q.result->>'outcome') as call_outcome,
+            q.attempt_count                                as call_attempt,
             q.result->>'summary'                           as call_summary,
             q.result->'next_action'                        as call_next_action,
             q.updated_at                                   as called_at
@@ -135,6 +157,10 @@ export type ParsedFollowInput = {
   groupId: string | null;
   /** รอบเวลาของวันนั้น (HH:MM) — payload สร้าง steps ตามนี้ · ว่าง = 1 รอบที่ when */
   callTimes: string[] | null;
+  /** หน่วยงานที่ตามเรื่องให้ (096) — เลือกจากใบขอหรือพิมพ์เอง · null = ไม่ได้ระบุ */
+  unitName: string | null;
+  /** รหัสไซต์ของหน่วยงานนั้น — เติมเองเมื่อเลือกจากใบขอ */
+  siteCode: string | null;
 };
 
 const HHMM_RE = /^\d{1,2}:\d{2}$/;
@@ -201,7 +227,14 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
     callTimes = uniq;
   }
 
-  return { error: null, value: { name, phone, topic, note, staffPhone, when, groupId, callTimes } };
+  // หน่วยงาน/รหัสไซต์ (096) — ไม่บังคับ · Follow หลายเคสไม่ได้ผูกกับใบขอใด
+  const unitName = getString(body.unit_name) || null;
+  const siteCode = getString(body.site_code) || null;
+
+  return {
+    error: null,
+    value: { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode },
+  };
 }
 
 async function createFollow(req: AuthedReq, res: ApiRes) {
@@ -209,7 +242,8 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   if (parsed.error || !parsed.value) {
     return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
   }
-  const { name, phone, topic, note, staffPhone, when, groupId, callTimes } = parsed.value;
+  const { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode } =
+    parsed.value;
 
   // ฐานที่รัน 092 แล้วเก็บ group_id/call_times · ยังไม่รัน → ถอยไป insert ชุดเดิม (42703)
   let created: FollowRow | undefined;
@@ -217,10 +251,11 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
     const { rows } = await dbQuery<FollowRow>(
       `insert into ${followTable}
          (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
-          group_id, call_times, created_by, created_by_name)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          group_id, call_times, unit_name, site_code, created_by, created_by_name)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        returning *`,
-      [name, phone, topic, note, staffPhone, when.toISOString(), groupId, callTimes, req.user.sub, req.user.email],
+      [name, phone, topic, note, staffPhone, when.toISOString(), groupId, callTimes,
+       unitName, siteCode, req.user.sub, req.user.email],
     );
     created = rows[0];
   } catch (e) {
@@ -295,11 +330,10 @@ async function cancelFollow(req: AuthedReq, res: ApiRes) {
  * ⚠️ ไม่แตะคิวโทร — รายการที่ปิดแล้วแต่ยังมีรอบค้างในตาราง ให้กดยกเลิกแยก
  * (ปิดงานแล้วลบสายที่นัดไว้อัตโนมัติ = เดาแทนคน · เจ้าของยังไม่ได้สั่ง)
  */
-async function completeFollow(req: AuthedReq, res: ApiRes) {
+async function completeFollow(req: AuthedReq, res: ApiRes, body: Record<string, unknown> | null) {
   const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
   if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
 
-  const body = (await readJsonBody(req)) as Record<string, unknown> | null;
   const outcome = getString(body?.outcome_code) ?? '';
   const note = getString(body?.outcome_note) || null;
 
@@ -337,12 +371,136 @@ async function completeFollow(req: AuthedReq, res: ApiRes) {
   return res.status(200).json(toResponse(done));
 }
 
+/**
+ * ฟิลด์ที่แก้ได้ของรายการติดตาม (096 · เจ้าของสั่ง 17 ส.ค. 2569: *"เพิ่มให้แก้ไขได้"*)
+ *
+ * ⚠️ **เจ้าของข้อมูลแก้ไม่ได้** — `created_by` / `created_by_name` คือคนที่กรอกครั้งแรก
+ * ทับเมื่อไหร่ = ประวัติว่าใครลงงานนี้หายเงียบ ๆ · คนแก้ทีหลังลงที่ `updated_by_name` แทน
+ *
+ * ⚠️ **`group_id` / `call_times` แก้ไม่ได้ทางนี้** — สองอันนั้นกำหนดรูปตารางโทรทั้งชุด
+ * แก้ทีละแถวคือชุดเพี้ยน (บางวันรอบไม่เท่ากัน) · จะเปลี่ยนตารางให้ยกเลิกชุดแล้วตั้งใหม่
+ */
+export type ParsedFollowEdit = {
+  name: string;
+  phone: string;
+  topic: string;
+  note: string | null;
+  staffPhone: string | null;
+  when: Date;
+  unitName: string | null;
+  siteCode: string | null;
+};
+
+export function parseFollowEditInput(
+  raw: unknown,
+  now = new Date(),
+): { error: string | null; value: ParsedFollowEdit | null } {
+  // ใช้ตัวตรวจชุดเดียวกับตอนสร้าง — กติกาความถูกต้องต้องเหมือนกันเป๊ะ
+  // ไม่งั้นแก้ทีหลังจะใส่ค่าที่ตอนสร้างห้ามใส่ได้ (เช่นเบอร์ที่โทรไม่ได้)
+  const parsed = parseFollowInput(raw, now);
+  if (parsed.error || !parsed.value) return { error: parsed.error, value: null };
+  const v = parsed.value;
+  return {
+    error: null,
+    value: {
+      name: v.name,
+      phone: v.phone,
+      topic: v.topic,
+      note: v.note,
+      staffPhone: v.staffPhone,
+      when: v.when,
+      unitName: v.unitName,
+      siteCode: v.siteCode,
+    },
+  };
+}
+
+/**
+ * แก้ไขรายการติดตาม — PATCH /api/follow?id=<uuid> body มี `action: 'update'`
+ *
+ * ⚠️ PATCH เดิม (ไม่มี action) = **ปิดงาน** ยังทำงานเหมือนเดิมทุกอย่าง
+ * แยกด้วย action เพราะของเก่ามีคนใช้อยู่ เปลี่ยนความหมายกลางทางคือพังเงียบ
+ */
+async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, unknown>) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+
+  const parsed = parseFollowEditInput(body);
+  if (parsed.error || !parsed.value) {
+    return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
+  }
+  const v = parsed.value;
+
+  const { rows: beforeRows } = await dbQuery<FollowRow>(
+    `select * from ${followTable} where id = $1`,
+    [id],
+  );
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found', 'ไม่พบรายการติดตาม');
+  // ปิด/ยกเลิกไปแล้ว = จบเรื่องแล้ว แก้ย้อนหลังคือแก้ประวัติ
+  if (before.cancelled_at != null) {
+    return sendError(res, 409, 'Conflict', 'รายการนี้ยกเลิกไปแล้ว แก้ไขไม่ได้');
+  }
+  if (before.completed_at != null) {
+    return sendError(res, 409, 'Conflict', 'รายการนี้ปิดงานไปแล้ว แก้ไขไม่ได้');
+  }
+
+  const { rows } = await dbQuery<FollowRow>(
+    `update ${followTable}
+        set recipient_name = $2, recipient_phone = $3, topic = $4, note = $5,
+            staff_phone = $6, scheduled_at = $7, unit_name = $8, site_code = $9,
+            updated_at = now(), updated_by = $10, updated_by_name = $11
+      where id = $1 and cancelled_at is null and completed_at is null
+      returning *`,
+    [id, v.name, v.phone, v.topic, v.note, v.staffPhone, v.when.toISOString(),
+     v.unitName, v.siteCode, req.user.sub, req.user.email ?? null],
+  );
+  const updated = rows[0];
+  if (!updated) return sendError(res, 404, 'Not found', 'ไม่พบรายการ หรือปิด/ยกเลิกไปแล้ว');
+
+  /**
+   * 🔴 แก้แถวแล้วต้องแก้บทพูดในคิวด้วย — payload ถูกสร้างตอนเข้าคิว ไม่ใช่ตอนเสิร์ฟ
+   * ไม่แก้ = AI ไปพูดชุดเก่าโดยที่หน้าจอโชว์ชุดใหม่
+   * ได้ผลเฉพาะสายที่ Lumos ยังไม่ดึงไป — ดึงไปแล้วบอกคนใช้ตรง ๆ
+   */
+  let queueRefreshed = 0;
+  try {
+    queueRefreshed = await refreshFollowReminderPayload({
+      id: updated.id,
+      recipient_name: v.name,
+      recipient_phone: v.phone,
+      topic: v.topic,
+      note: v.note,
+      staffPhone: v.staffPhone,
+      scheduled_at: v.when,
+      callTimes: updated.call_times ?? null,
+    });
+  } catch (e) {
+    logWarn('follow.update.queueRefreshFailed', { followId: id, error: String(e) });
+  }
+
+  await auditFromAuthed(req, {
+    action: 'follow.update',
+    entityType: 'follow_entry',
+    entityId: id,
+    before: toResponse(before),
+    after: { ...toResponse(updated), queueRefreshed },
+  });
+
+  return res.status(200).json({ ...toResponse(updated), queue_refreshed: queueRefreshed });
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
     if (method === 'GET') return await listFollow(req, res);
     if (method === 'POST') return await createFollow(req, res);
-    if (method === 'PATCH') return await completeFollow(req, res);
+    if (method === 'PATCH') {
+      // action='update' = แก้ไข · ไม่ใส่ = ปิดงาน (พฤติกรรมเดิม ห้ามเปลี่ยน)
+      const body = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>;
+      if (getString(body.action) === 'update') return await updateFollow(req, res, body);
+      return await completeFollow(req, res, body);
+    }
     if (method === 'DELETE') return await cancelFollow(req, res);
     return sendError(res, 405, 'Method not allowed', 'Use GET, POST, PATCH or DELETE');
   } catch (e) {
