@@ -24,6 +24,20 @@ export type UnitFieldOverrides = {
   age_max?: number | null;
   gender?: string | null;
   branches?: UnitBranchOverride[] | null;
+  /**
+   * ที่อยู่ที่เจ้าหน้าที่แก้เอง (17 ส.ค. 2569) — ที่อยู่จาก ERP เป็นข้อความก้อนเดียว
+   * ตัวถอดจังหวัด/อำเภอเดาผิดได้ ประกาศจึงขึ้นพื้นที่ผิดแล้วคนในพื้นที่หาไม่เจอ
+   */
+  province?: string | null;
+  district?: string | null;
+  subdistrict?: string | null;
+  /**
+   * รายได้รวมที่เจ้าหน้าที่แก้เอง — ทับเลขที่โชว์บนประกาศเท่านั้น
+   * ⚠️ **ไม่แตะอัตราจ่ายใน ERP** และไม่ใช่ตัวที่ AI ใช้คิดค่าแรง
+   */
+  total_income?: number | null;
+  /** สวัสดิการเพิ่มเติมที่ติ๊กเอง (คีย์จาก `src/lib/extraBenefits.ts`) */
+  benefits?: string[] | null;
 };
 
 export type UnitNote = {
@@ -106,6 +120,28 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
   if ('age_min' in o) out.age_min = numOrNull(o.age_min);
   if ('age_max' in o) out.age_max = numOrNull(o.age_max);
   if ('gender' in o) out.gender = typeof o.gender === 'string' && o.gender.trim() ? o.gender.trim() : null;
+
+  // ที่อยู่ที่แก้เอง — ตัดความยาวกันคนวางข้อความทั้งย่อหน้ามา
+  const textOrNull = (x: unknown, max = 120) =>
+    typeof x === 'string' && x.trim() ? x.trim().slice(0, max) : null;
+  if ('province' in o) out.province = textOrNull(o.province);
+  if ('district' in o) out.district = textOrNull(o.district);
+  if ('subdistrict' in o) out.subdistrict = textOrNull(o.subdistrict);
+
+  // รายได้รวม — ติดลบไม่ได้ · 0 แปลว่า "ตั้งใจให้เป็นศูนย์" ต่างจาก null ที่แปลว่าใช้ค่า ERP
+  if ('total_income' in o) {
+    const n = numOrNull(o.total_income);
+    out.total_income = n === null ? null : Math.max(0, Math.trunc(n));
+  }
+
+  // สวัสดิการที่ติ๊ก — เก็บเฉพาะคีย์ที่ระบบรู้จัก (กันค่าแปลกจาก client)
+  if ('benefits' in o) {
+    out.benefits = Array.isArray(o.benefits)
+      ? [...new Set(o.benefits.filter((b): b is string => typeof b === 'string' && b.trim() !== ''))]
+          .map((b) => b.trim().slice(0, 60))
+          .slice(0, 40)
+      : null;
+  }
 
   if ('branches' in o) {
     if (!Array.isArray(o.branches)) {

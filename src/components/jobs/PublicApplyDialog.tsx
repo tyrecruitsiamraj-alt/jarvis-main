@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle2, ClipboardList, Loader2, MapPin, Paperclip, Send, UserRound, X } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Loader2, MapPin, Paperclip, PhoneCall, Send, UserRound, X } from 'lucide-react';
 
 const MAX_DOC_MB = 3;
 const DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png';
@@ -249,6 +249,21 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
               ขอบคุณที่สนใจร่วมงานกับเรา เราได้รับข้อมูลของคุณเรียบร้อยแล้ว
             </p>
+            {/**
+              * บอกล่วงหน้าว่าจะมี AI โทรหา (เจ้าของสั่ง 17 ส.ค. 2569) — คนไม่รู้ตัวว่า
+              * เป็นระบบอัตโนมัติมักไม่รับสายเบอร์แปลก หรือรับแล้ววางเพราะนึกว่ามิจฉาชีพ
+              * ⚠️ พูดให้ตรงกับที่ระบบทำจริง: AI โทรก่อน แล้วเจ้าหน้าที่ตามทีหลัง
+              */}
+            <div className="w-full max-w-xs rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-left dark:border-sky-800 dark:bg-sky-950/40">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-sky-800 dark:text-sky-200">
+                <PhoneCall className="h-4 w-4 shrink-0" aria-hidden />
+                เตรียมรับสายจากเรานะครับ
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-sky-900/80 dark:text-sky-100/80">
+                สยามราชธานีใช้ระบบ AI โทรสอบถามความสนใจก่อนเป็นด่านแรก
+                หากสนใจงาน เจ้าหน้าที่จะโทรกลับไปนัดหมายอีกครั้ง
+              </p>
+            </div>
             <button
               type="button"
               onClick={onClose}

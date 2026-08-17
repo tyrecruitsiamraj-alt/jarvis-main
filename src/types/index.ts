@@ -223,6 +223,16 @@ export interface JobRequest {
   send_replacement?: boolean | null;
   /** ข้อความ ERP ที่ override เพื่อใช้แตกสาขาแบบถาวร */
   parser_override_text?: string | null;
+  /**
+   * ค่าที่เจ้าหน้าที่แก้เองจากกล่องงาน เพื่อให้ประกาศสาธารณะถูกต้อง (17 ส.ค. 2569)
+   * ⚠️ ที่อยู่จาก ERP เป็นข้อความก้อนเดียว ตัวถอดจังหวัด/อำเภอเดาผิดได้
+   * ค่าพวกนี้จึงมาก่อนค่าที่เดาจากที่อยู่ดิบเสมอ
+   */
+  override_province?: string | null;
+  override_district?: string | null;
+  override_subdistrict?: string | null;
+  /** สวัสดิการที่ติ๊กเพิ่มเอง (คีย์จาก `src/lib/extraBenefits.ts`) — คนละชุดกับ `benefits` จาก ERP */
+  extra_benefits?: string[] | null;
   work_status?: UnitRequestWorkStatus | null;
   work_person_first_name?: string | null;
   work_person_last_name?: string | null;

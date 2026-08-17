@@ -8,6 +8,7 @@ import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
+import { extraBenefitLabels } from '@/lib/extraBenefits';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
@@ -21,6 +22,10 @@ import EditPostingDialog from '@/components/jobs/EditPostingDialog';
  * กล่องผลค้น (+ ตัวเรียก API หลังบ้าน) ต้องไม่ถูกลากเข้า bundle ฝั่ง public
  */
 const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
+/** แก้ข้อมูลประกาศ — lazy ด้วยเหตุผลเดียวกัน (ลากตัวบันทึก override เข้า bundle public ไม่ได้) */
+const EditPublicJobFieldsDialog = React.lazy(
+  () => import('@/components/jobs/EditPublicJobFieldsDialog'),
+);
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
@@ -143,6 +148,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   >({});
   /** ยอด Lead แยกต่างหาก — ใบที่ปัดเข้าคลังไม่ถูกนับใน applicantCounts (17 ส.ค. 2569) */
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
+  /** ใบที่กำลังแก้ข้อมูลประกาศ (จังหวัด/รายได้/สวัสดิการ) — 17 ส.ค. 2569 */
+  const [editPublicJob, setEditPublicJob] = useState<JobRequest | null>(null);
+  /** ค่าที่เพิ่งแก้ — ทับบนการ์ดทันทีโดยไม่ต้องรีเฟรชทั้งบอร์ด */
+  const [publicPatchById, setPublicPatchById] = useState<Record<string, Partial<JobRequest>>>({});
 
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
@@ -598,9 +607,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 {/* สวัสดิการ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
                     ⚠️ ตัวเลขทั้งหมดเป็น **อัตราจ่าย** ที่พนักงานได้จริง ไม่ใช่อัตราเบิก
                     ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
-                {job.benefits && job.benefits.length > 0 ? (
+                {/* ชิปสวัสดิการ = ของจาก ERP (อัตราจริง) + ของที่เจ้าหน้าที่ติ๊กเพิ่มเอง
+                    เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
+                {[...(job.benefits ?? []), ...extraBenefitLabels(job.extra_benefits)].length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1">
-                    {job.benefits.map((b) => (
+                    {[...(job.benefits ?? []), ...extraBenefitLabels(job.extra_benefits)].map((b) => (
                       <span key={b} className={TONE.success.chip}>
                         {b}
                       </span>
@@ -667,6 +678,23 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         >
                           <Send className="h-3.5 w-3.5" />
                           หาผู้สมัครเพิ่ม
+                        </button>
+                        {/* แก้ข้อมูลที่จะขึ้นประกาศ (17 ส.ค. 2569) — จังหวัด/อำเภอ/ตำบล ·
+                            รายได้รวม · สวัสดิการติ๊กเพิ่ม · เก็บเป็น override ฝั่งเรา ไม่แตะ ERP */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditPublicJob({ ...job, ...(publicPatchById[job.id] || {}) });
+                          }}
+                          title="แก้จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ ที่จะขึ้นบนประกาศสาธารณะ"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.info.outline,
+                          )}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          แก้ข้อมูลประกาศ
                         </button>
                         <button
                           type="button"
@@ -910,19 +938,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">ตำบล / แขวง</dt>
                   <dd className="mt-0.5 font-medium text-foreground break-words">
-                    {inferSubdistrictFromAddress(selected.location_address || '') ?? '—'}
+                    {selected.override_subdistrict ||
+                      (inferSubdistrictFromAddress(selected.location_address || '') ?? '—')}
                   </dd>
                 </div>
                 <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">อำเภอ / เขต</dt>
                   <dd className="mt-0.5 font-medium text-foreground break-words">
-                    {displayDistrictLine(selected.location_address || '') ?? '—'}
+                    {selected.override_district ||
+                      (displayDistrictLine(selected.location_address || '') ?? '—')}
                   </dd>
                 </div>
                 <div className="border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">จังหวัด</dt>
                   <dd className="mt-0.5 font-medium text-foreground break-words">
-                    {inferProvinceFromAddress(selected.location_address || '') ?? '—'}
+                    {selected.override_province ||
+                      (inferProvinceFromAddress(selected.location_address || '') ?? '—')}
                   </dd>
                 </div>
                 {extractJobSubtypeLabel(selected) !== 'ไม่ระบุ' ? (
@@ -1079,6 +1110,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         onClose={() => setEditPosting(null)}
         onSaved={() => setPostingsRev((n) => n + 1)}
       />
+
+      {/* แก้ข้อมูลที่จะขึ้นประกาศสาธารณะ — lazy เหมือนเลนสรรหา (ไฟล์นี้ใช้ร่วมกับ /apply) */}
+      {editPublicJob ? (
+        <React.Suspense fallback={null}>
+          <EditPublicJobFieldsDialog
+            job={editPublicJob}
+            onClose={() => setEditPublicJob(null)}
+            onSaved={(patch) =>
+              setPublicPatchById((prev) => ({
+                ...prev,
+                [editPublicJob.id]: { ...(prev[editPublicJob.id] || {}), ...patch },
+              }))
+            }
+          />
+        </React.Suspense>
+      ) : null}
 
       {/* เลนสรรหา (R2b) — โหลดเมื่อกดเท่านั้น ไม่ให้ติดไปกับ bundle ของ /apply */}
       {laneJob ? (

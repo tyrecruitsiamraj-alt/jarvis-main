@@ -89,7 +89,12 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const [positionName, setPositionName] = useState('');
   const [province, setProvince] = useState('');
   const [responsible, setResponsible] = useState('');
-  const [specificType, setSpecificType] = useState('');
+  /**
+   * "ข้อมูลเจาะจง" ถูกถอดออกจากฟอร์ม 17 ส.ค. 2569 (เจ้าของสั่ง) — ไม่มีใครกรอกจริง
+   * ⚠️ **ไม่ได้ลบฟิลด์ฝั่งหลังบ้าน** ประกาศเก่าที่เคยกรอกไว้ยังอ่านได้เหมือนเดิม
+   * ส่งเป็น null ตลอดจากหน้านี้แทน (ลบคอลัมน์ = ข้อมูลเก่าหาย ซึ่งไม่ได้สั่ง)
+   */
+  const specificType = '';
   const [formType, setFormType] = useState<string>('rm');
   const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
@@ -119,7 +124,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     // จังหวัดไม่มีเป็นฟิลด์เดี่ยวในใบขอ — ถอดจากที่อยู่ด้วยตัวถอดเดิมที่ตัวกรองบอร์ดใช้
     setProvince(job ? (inferProvinceFromAddress(job.location_address || '') ?? '') : '');
     setResponsible('');
-    setSpecificType('');
     setFormType('rm');
     setShortLinks({});
     setPicked([]);
@@ -327,21 +331,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     {staff.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">ข้อมูลเจาะจง</label>
-                  <select
-                    className={fieldCls}
-                    value={specificType}
-                    onChange={(e) => setSpecificType(e.target.value)}
-                  >
-                    <option value="">ไม่ระบุ</option>
-                    {RM_SPECIFIC_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
                       </option>
                     ))}
                   </select>

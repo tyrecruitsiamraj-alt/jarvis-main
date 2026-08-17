@@ -11,6 +11,8 @@ import {
   fetchMonthlyIncomes,
   type MonthlyIncomeItem,
 } from '../../_lib/siamrajJobBenefits.js';
+import { attachNotes, attachWorkStatus } from '../siamraj-unit-requests.js';
+import { isPublicVisibleByWorkStatus } from '../../../src/lib/publicJobVisibility.js';
 
 type JobRow = {
   id: string;
@@ -78,6 +80,20 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     gender_requirement: r.gender_requirement || undefined,
     vehicle_required: r.vehicle_required || undefined,
     work_schedule: r.work_schedule || undefined,
+    /** ที่อยู่ที่เจ้าหน้าที่แก้เอง — หน้าประกาศใช้ค่านี้ก่อนค่าที่เดาจากที่อยู่ดิบ */
+    override_province: (r as Record<string, unknown>).override_province as string | undefined,
+    override_district: (r as Record<string, unknown>).override_district as string | undefined,
+    override_subdistrict: (r as Record<string, unknown>).override_subdistrict as string | undefined,
+    /** สวัสดิการที่ติ๊กเพิ่มเอง (คีย์) — คนละชุดกับ `benefits` ที่มาจากอัตราจริงใน ERP */
+    extra_benefits: (r as Record<string, unknown>).extra_benefits as string[] | undefined,
+    /**
+     * ⚠️ ฟิลด์ส่งต่อภายใน — `withBenefits()` ใช้แล้ว**ลบทิ้งก่อนตอบ**
+     * ต้องพกมาทางนี้เพราะ `withBenefits` ทำงานบนก้อนที่ map แล้ว ซึ่งไม่มี
+     * `field_overrides` ติดมาด้วย (toPublicJob หยิบเฉพาะฟิลด์ที่ระบุชื่อ)
+     */
+    manual_income: ((r as Record<string, unknown>).field_overrides as
+      | { total_income?: number | null }
+      | undefined)?.total_income ?? undefined,
     status: r.status,
     source: r.source || undefined,
     created_at: toIsoString(r.created_at),
@@ -103,31 +119,72 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
  * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChips` — ERP ล่ม = ประกาศงานยังขึ้นครบ
  * แค่ไม่มีชิป (หน้านี้เป็นเส้นสาธารณะที่คนจริงกำลังจะสมัคร ห้ามล่มเพราะข้อมูลเสริม)
  */
-async function withBenefits(jobs: PublicJob[]): Promise<PublicJob[]> {
+type PublicJobOut = Omit<PublicJob, 'manual_income'>;
+
+async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
   const nos = jobs.map((j) => (j.request_no ? String(j.request_no) : '')).filter(Boolean);
-  if (nos.length === 0) return jobs;
+  // ⚠️ ต้องเดินต่อแม้ไม่มีเลขที่ใบขอ/ไม่มีข้อมูล ERP — ยังต้องตัด manual_income ออกจากผลลัพธ์
+  // (เดิม early-return คืนก้อนเดิม ซึ่งตอนนี้มีฟิลด์ภายในติดไปด้วย)
   const [chips, incomes] = await Promise.all([fetchJobBenefitChips(nos), fetchMonthlyIncomes(nos)]);
-  if (chips.size === 0 && incomes.size === 0) return jobs;
   return jobs.map((j) => {
     const no = j.request_no ? String(j.request_no) : '';
     const found = no ? chips.get(no) : undefined;
     const income = no ? incomes.get(no) : undefined;
+    /**
+     * 🔴 **รายได้ที่เจ้าหน้าที่แก้เองต้องชนะเลขจาก ERP** — การ์ดประกาศโชว์
+     * `monthly_income` เป็นหลัก (ถอยไป `total_income` เมื่อคิดไม่ได้) ถ้าทับแค่
+     * `total_income` เลขที่แก้จะไม่ขึ้นบนหน้าจอเลยในใบส่วนใหญ่ = แก้แล้วเหมือนไม่ได้แก้
+     * `overridden` มาจาก attachNotes (ทับ `total_income` ไว้แล้วตอนแนบ override)
+     */
+    const manualIncome = typeof j.manual_income === 'number' ? j.manual_income : null;
+    const { manual_income: _drop, ...rest } = j;
     return {
-      ...j,
+      ...rest,
       ...(found && found.length > 0 ? { benefits: found } : {}),
       ...(income
         ? {
-            monthly_income: income.total,
+            monthly_income: manualIncome ?? income.total,
             monthly_income_base: income.base,
             monthly_income_items: income.items,
           }
-        : {}),
+        : manualIncome != null
+          ? { monthly_income: manualIncome }
+          : {}),
     };
   });
 }
 
 function isPublicVisible(job: { status?: string }) {
   return job.status === 'open' || job.status === 'in_progress';
+}
+
+/**
+ * ซ่อนใบที่ **ได้ตัวคนแล้ว** (เจ้าของเคาะ 17 ส.ค. 2569: รอเริ่มงาน + รอแจ้งเข้า)
+ * สถานะงานเก็บฝั่ง Jarvis (PG) ไม่ใช่ ERP — ต้องแนบก่อนกรอง
+ * ⚠️ แนบไม่ได้ (ตารางล่ม) = **ไม่กรอง** ดีกว่าให้ประกาศหายทั้งหน้า
+ */
+async function withoutFilledJobs<T extends Record<string, unknown>>(jobs: T[]): Promise<T[]> {
+  try {
+    await attachWorkStatus(jobs);
+  } catch {
+    return jobs;
+  }
+  return jobs.filter((j) => isPublicVisibleByWorkStatus(j));
+}
+
+/**
+ * ทับค่าที่เจ้าหน้าที่แก้เองจากกล่องงาน (จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการติ๊กเพิ่ม)
+ * ⚠️ `attachNotes` แนบ **โน้ตภายใน** มาด้วย (`list_note`) — ปลอดภัยเพราะ `toPublicJob`
+ * หยิบเฉพาะฟิลด์ที่ระบุชื่อไว้ ไม่ได้ spread ทั้งก้อน · ห้ามเปลี่ยนเป็น spread เด็ดขาด
+ * ⚠️ อ่านไม่ได้ = ใช้ค่า ERP ตามเดิม (ประกาศต้องขึ้นเสมอ)
+ */
+async function withStaffOverrides<T extends Record<string, unknown>>(jobs: T[]): Promise<T[]> {
+  try {
+    await attachNotes(jobs);
+  } catch {
+    /* ข้อมูลเสริม */
+  }
+  return jobs;
 }
 
 const parseIntOrNull = (v: unknown): number | null => {
@@ -137,13 +194,20 @@ const parseIntOrNull = (v: unknown): number | null => {
 
 async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
   const items = await listSiamrajUnitRequests({ limit, mode: 'all' });
-  return items.filter(isPublicVisible).map((j) => toPublicJob(j as unknown as JobRow));
+  const open = items.filter(isPublicVisible) as unknown as Array<Record<string, unknown>>;
+  const stillHiring = await withStaffOverrides(await withoutFilledJobs(open));
+  return stillHiring.map((j) => toPublicJob(j as unknown as JobRow));
 }
 
 async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
   const item = await getSiamrajUnitRequestById(id);
   if (!item || !isPublicVisible(item)) return null;
-  return toPublicJob(item as unknown as JobRow);
+  // เปิดตรงด้วยลิงก์ก็ต้องซ่อนเหมือนกัน — ไม่งั้นลิงก์เก่าที่คนแชร์ไว้ยังพาไปสมัครใบที่ได้คนแล้ว
+  const visible = await withStaffOverrides(
+    await withoutFilledJobs([item as unknown as Record<string, unknown>]),
+  );
+  if (visible.length === 0) return null;
+  return toPublicJob(visible[0] as unknown as JobRow);
 }
 
 export default async function handler(req: ApiReq, res: ApiRes) {

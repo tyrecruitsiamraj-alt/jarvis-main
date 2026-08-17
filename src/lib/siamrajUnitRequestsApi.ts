@@ -105,6 +105,16 @@ export type UnitFieldOverrides = {
   age_max?: number | null;
   gender?: string | null;
   branches?: UnitBranchOverride[] | null;
+  /**
+   * ค่าที่เจ้าหน้าที่แก้เองเพื่อให้ประกาศสาธารณะถูกต้อง (17 ส.ค. 2569)
+   * null = กลับไปใช้ค่าจาก ERP · ต้องตรงกับ `UnitFieldOverrides` ฝั่ง API
+   * (`api/_lib/siamrajUnitNotes.ts`) ไม่งั้น sanitizer ตัดทิ้งเงียบ
+   */
+  province?: string | null;
+  district?: string | null;
+  subdistrict?: string | null;
+  total_income?: number | null;
+  benefits?: string[] | null;
 };
 
 export async function saveUnitRequestMeta(

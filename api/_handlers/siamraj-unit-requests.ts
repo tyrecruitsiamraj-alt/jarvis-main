@@ -75,6 +75,16 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         if (fo.age_max !== undefined) it.age_range_max = fo.age_max;
         if (fo.gender !== undefined && fo.gender !== null) it.gender_requirement = fo.gender;
         if (fo.branches !== undefined) it.branch_override = fo.branches;
+        /**
+         * ที่อยู่/รายได้/สวัสดิการที่เจ้าหน้าที่แก้เองจากกล่องงาน (17 ส.ค. 2569)
+         * ⚠️ ทับเฉพาะเมื่อ**ตั้งค่าไว้จริง** (ไม่ใช่ null) — null แปลว่า "ใช้ค่า ERP"
+         * ต่างจาก age/gender ข้างบนที่ null = ล้างค่าโดยตั้งใจ (พฤติกรรมเดิม ห้ามเปลี่ยน)
+         */
+        if (fo.province) it.override_province = fo.province;
+        if (fo.district) it.override_district = fo.district;
+        if (fo.subdistrict) it.override_subdistrict = fo.subdistrict;
+        if (fo.total_income != null) it.total_income = fo.total_income;
+        if (fo.benefits && fo.benefits.length > 0) it.extra_benefits = fo.benefits;
         it.field_overrides = fo;
       }
     }
