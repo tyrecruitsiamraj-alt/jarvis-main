@@ -3,6 +3,13 @@ import { apiFetch } from '@/lib/apiFetch';
 export type LumosQueueStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 export type LumosChannel = 'reminder' | 'interview';
 
+export type LumosNextAction = {
+  type: string;
+  urgency: 'urgent' | 'normal' | 'not urgent';
+  due_at: string;
+  reason: string;
+};
+
 export type LumosCallStatus = {
   channel: LumosChannel;
   /** 'card-<id>' = คนของเรา · 'ir-<id>' = ผู้สมัคร iRecruit */
@@ -11,6 +18,8 @@ export type LumosCallStatus = {
   /** ผลจาก Lumos เช่น confirmed / declined / no_answer / acknowledged / cancelled */
   outcome: string | null;
   summary: string | null;
+  /** การกระทำถัดไปที่ Lumos แนะนำ — urgency=urgent หมายถึงพนักงานต้องโทรกลับด่วน */
+  next_action: LumosNextAction | null;
   delivery_count: number;
   sent_at: string;
   updated_at: string;
@@ -91,6 +100,7 @@ export async function dispatchLumosCalls(input: {
   jobId: string;
   boardCardIds: number[];
   irecruitIds: number[];
+  priority?: 'high' | 'medium' | 'low';
 }): Promise<LumosDispatchResult> {
   const r = await apiFetch('/api/lumos/dispatch', { method: 'POST', body: JSON.stringify(input) });
   if (!r.ok) throw new Error(await readError(r));

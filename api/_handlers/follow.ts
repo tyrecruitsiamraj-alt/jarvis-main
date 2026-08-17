@@ -33,6 +33,13 @@ import {
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
+type LumosNextAction = {
+  type: string;
+  urgency: 'urgent' | 'normal' | 'not urgent';
+  due_at: string;
+  reason: string;
+};
+
 type FollowRow = {
   id: string;
   recipient_name: string;
@@ -53,6 +60,7 @@ type FollowRow = {
   call_status: string | null;
   call_outcome: string | null;
   call_summary: string | null;
+  call_next_action: LumosNextAction | null;
   called_at: string | Date | null;
 };
 
@@ -80,6 +88,7 @@ function toResponse(r: FollowRow) {
     call_status: r.cancelled_at != null ? 'cancelled' : (r.call_status ?? 'pending'),
     call_outcome: r.call_outcome,
     call_summary: r.call_summary,
+    next_action: r.call_next_action ?? null,
     called_at: iso(r.called_at),
   };
 }
@@ -90,6 +99,11 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
 
   const { rows } = await dbQuery<FollowRow>(
     `select f.*,
+            q.status                     as call_status,
+            q.result->>'outcome'         as call_outcome,
+            q.result->>'summary'         as call_summary,
+            q.result->'next_action'      as call_next_action,
+            q.updated_at                 as called_at
             q.status                                       as call_status,
             coalesce(q.last_outcome, q.result->>'outcome') as call_outcome,
             q.result->>'summary'                           as call_summary,

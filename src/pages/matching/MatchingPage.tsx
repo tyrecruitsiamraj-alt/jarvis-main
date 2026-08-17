@@ -143,6 +143,7 @@ import {
   type LumosCallStatus,
   type LumosPoolCandidate,
   type LumosJobCallSummaryRow,
+  type LumosNextAction,
 } from '@/lib/lumosDispatchApi';
 
 /**
@@ -421,6 +422,296 @@ function suggestedProposalReason(status: ProposalStatus, aiReason?: string | nul
  * ป้าย tier ของคนบนบอร์ด — ตั้งชื่อโทนไว้ที่เดียวแบบเดียวกับ CHECK_META
  * ความหมายเดียวกับ TIER_CRITERIA (เขียว=success · เหลือง=warn · แดง=danger) จุดเรียกใช้เลือก variant เอง
  */
+function boardCandidatePriority(
+  job: JobRequest,
+  m: BoardCandidateMatch,
+  config: PriorityConfig,
+): CandidatePriorityScore {
+  return scoreCandidatePriority(
+    {
+      age: ageVerdict(job, m.age) as PriorityVerdict,
+      area: areaVerdict(job, [m.amphur_name, m.province_name]) as PriorityVerdict,
+      experience: m.tier === 'green' ? 'pass' : m.tier === 'yellow' ? 'warn' : 'fail',
+      salary: salaryVerdict(job, m.required_salary) as PriorityVerdict,
+    },
+    config,
+  );
+}
+
+/** ผลเช็คคุณสมบัติรายข้อ — โทนกลาง: ผ่าน=เขียว · ต้องดู=เหลือง · ไม่ผ่าน=แดง · ไม่รู้=เทา */
+const CHECK_META: Record<CheckVerdict, { icon: string; tone: ToneKey }> = {
+  pass: { icon: '✓', tone: 'success' },
+  warn: { icon: '!', tone: 'warn' },
+  fail: { icon: '×', tone: 'danger' },
+  unknown: { icon: '?', tone: 'neutral' },
+};
+
+function CheckChip({ label, verdict }: { label: string; verdict: CheckVerdict }) {
+  const meta = CHECK_META[verdict];
+  return (
+    <span className={TONE[meta.tone].chip}>
+      {label} {meta.icon}
+    </span>
+  );
+}
+
+function CandidateChecklist({
+  job,
+  tier,
+  sex,
+  age,
+  areaParts,
+  salary,
+  licenses,
+}: {
+  job: JobRequest;
+  tier: MatchTier;
+  sex?: string | null;
+  age?: number | null;
+  areaParts: Array<string | null | undefined>;
+  salary?: number | null;
+  licenses?: string[];
+}) {
+  const position: CheckVerdict = tier === 'green' ? 'pass' : tier === 'yellow' ? 'warn' : 'fail';
+  const requiresLicense = Boolean(job.vehicle_required && normText(job.vehicle_required) !== 'ไม่ระบุ');
+  const license: CheckVerdict = requiresLicense
+    ? licenses == null
+      ? 'unknown'
+      : licenses.length > 0
+        ? 'pass'
+        : 'warn'
+    : 'unknown';
+  // ลำดับชิปไล่ตามลำดับความสำคัญที่เจ้าของกำหนด: อายุ → ที่อยู่ → ประสบการณ์ (ตำแหน่ง) → รายได้
+  // เพศ/ใบขับขี่เป็นเกณฑ์ของใบขอ อยู่ท้ายรายการ
+  return (
+    <div className="flex flex-wrap gap-1" aria-label="ผลตรวจคุณสมบัติเบื้องต้น">
+      <CheckChip label="อายุ" verdict={ageVerdict(job, age)} />
+      <CheckChip label="ที่อยู่" verdict={areaVerdict(job, areaParts)} />
+      <CheckChip label="ประสบการณ์" verdict={position} />
+      {salary !== undefined ? <CheckChip label="รายได้" verdict={salaryVerdict(job, salary)} /> : null}
+      <CheckChip label="เพศ" verdict={genderVerdict(job.gender_requirement, sex)} />
+      {requiresLicense ? <CheckChip label="ใบขับขี่" verdict={license} /> : null}
+    </div>
+  );
+}
+
+function formatCallWhen(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** ป้ายแดง "โทรกลับด่วน" — แสดงเมื่อ next_action.urgency === 'urgent' */
+function LumosUrgentBadge({ nextAction }: { nextAction: LumosNextAction | null | undefined }) {
+  if (nextAction?.urgency !== 'urgent') return null;
+  return (
+    <span
+      title={nextAction.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
+      className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
+    >
+      📞 โทรกลับด่วน
+    </span>
+  );
+}
+
+/**
+ * ป้ายผลการโทร Lumos ต่อคน (ระดับ 1) — รอโทร → Lumos รับไปแล้ว → สนใจ/ปฏิเสธ/ไม่รับสาย
+ * กดขยายเห็นสรุปบทสนทนา + ยกเลิกได้ถ้า Lumos ยังไม่ส่งผลกลับ
+ */
+function LumosCallBadgeRow({
+  row,
+  expanded,
+  onToggle,
+  onCancel,
+  cancelling,
+}: {
+  row: LumosCallStatus;
+  expanded: boolean;
+  onToggle: () => void;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
+  const badge = lumosCallBadge(row);
+  const hasDetail = Boolean(row.summary) || canCancelLumosCall(row);
+  return (
+    <div className="mt-1.5 border-t border-white/70 pt-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={!hasDetail}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+            badge.cls,
+            hasDetail ? 'hover:brightness-95' : 'cursor-default',
+          )}
+        >
+          {badge.label}
+          {hasDetail ? <span aria-hidden>{expanded ? '▴' : '▾'}</span> : null}
+        </button>
+        <span className="text-[10px] text-muted-foreground">ส่งเมื่อ {formatCallWhen(row.sent_at)}</span>
+        {row.delivery_count > 1 ? (
+          <span className="text-[10px] text-muted-foreground">· ส่งซ้ำ {row.delivery_count} ครั้ง</span>
+        ) : null}
+      </div>
+      {expanded ? (
+        <div className="mt-1.5 space-y-1.5 rounded-lg border border-slate-200 bg-white/85 px-2.5 py-1.5">
+          {row.summary ? (
+            <p className="text-[10px] leading-relaxed text-slate-700">
+              <span className="font-semibold">สรุปบทสนทนา:</span> {row.summary}
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground">ยังไม่มีสรุปบทสนทนาจาก AI</p>
+          )}
+          {row.next_action?.urgency === 'urgent' ? (
+            <p className="text-[10px] text-red-700 dark:text-red-300">
+              <span className="font-semibold">AI แนะนำ:</span> {row.next_action.reason || 'โทรกลับหาคนนี้ด่วน'}
+              {row.next_action.due_at ? ` (ภายใน ${formatCallWhen(row.next_action.due_at)})` : ''}
+            </p>
+          ) : null}
+          <p className="text-[10px] text-muted-foreground">อัปเดตล่าสุด {formatCallWhen(row.updated_at)}</p>
+          {canCancelLumosCall(row) ? (
+            <button
+              type="button"
+              disabled={cancelling}
+              onClick={onCancel}
+              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/50"
+            >
+              <X className="h-2.5 w-2.5" /> {cancelling ? 'กำลังยกเลิก…' : 'ยกเลิกการส่ง'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * กล่องสรุปผลโทรของใบขอ 1 ใบ — ตัวเลข 6 ช่องอ่านปราดเดียวรู้:
+ * ส่ง / โทรแล้ว / เหลือ (ยังไม่ได้โทร) / โอเค / ไม่ไป / ไม่รับ
+ * โทรแล้ว = มีผลกลับจริง (ไม่นับสายที่ระบบยกเลิกเอง)
+ */
+function LumosJobSummaryStats({
+  s,
+  className,
+  variant = 'pill',
+}: {
+  s: LumosJobCallSummaryRow;
+  className?: string;
+  /** pill = ก้อนลอยพื้นจาง (ในใบขอ/หน้ารายละเอียด) · column = เต็มความกว้างคอลัมน์ขวาของการ์ด */
+  variant?: 'pill' | 'column';
+}) {
+  if (s.sent === 0) return null;
+  const waiting = Math.max(0, s.sent - s.called);
+  const cells = [
+    { label: 'ส่ง', value: s.sent, cls: 'text-slate-800 dark:text-slate-200', title: 'ส่งเข้าคิว AI โทรแล้ว (ไม่นับที่ยกเลิก)' },
+    { label: 'โทรแล้ว', value: s.called, cls: 'text-blue-600 dark:text-blue-300', title: 'มีผลโทรกลับมาจริง' },
+    { label: 'เหลือ', value: waiting, cls: 'text-amber-600 dark:text-amber-300', title: 'รอ AI โทร (ส่งแล้วยังไม่มีผลกลับ)' },
+    { label: 'โอเค', value: s.confirmed, cls: 'text-emerald-600 dark:text-emerald-300', title: 'สนใจงาน' },
+    { label: 'ไม่ไป', value: s.declined, cls: 'text-rose-600 dark:text-rose-300', title: 'ไม่สนใจ/ปฏิเสธ' },
+    { label: 'ไม่รับ', value: s.no_answer, cls: 'text-amber-700 dark:text-amber-300', title: 'ไม่รับสาย — ควรโทรซ้ำ' },
+  ];
+  // สไตล์เรียบแบบ Apple: พื้นจางชิ้นเดียว ไม่มีเส้นแบ่ง เลขน้ำหนักกลางตัวใหญ่ขึ้นเล็กน้อย
+  // ป้ายตัวจิ๋วโทนเทา ค่า 0 จางลงทั้งช่องให้ตาไหลผ่านไปหาช่องที่มีค่า
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-0.5',
+        variant === 'pill'
+          ? 'shrink-0 rounded-2xl bg-slate-900/[0.04] px-2 py-1.5 dark:bg-white/[0.07]'
+          : 'mt-0.5 w-full justify-between',
+        className,
+      )}
+    >
+      {cells.map((c) => (
+        <div
+          key={c.label}
+          title={c.title}
+          className={cn(
+            'px-1 text-center',
+            variant === 'pill' ? 'min-w-[42px]' : 'min-w-0 flex-1',
+            c.value === 0 && 'opacity-35',
+          )}
+        >
+          <div
+            className={cn(
+              'text-[15px] font-semibold leading-tight tabular-nums tracking-tight',
+              c.value === 0 ? 'text-slate-500 dark:text-slate-400' : c.cls,
+            )}
+          >
+            {c.value}
+          </div>
+          <div className="text-[9px] font-medium leading-tight tracking-wide text-slate-500 dark:text-slate-400">
+            {c.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ชิป "ทำต่อเลย" บนการ์ดใบขอ — มองปุ๊บรู้ว่าก้าวถัดไปคืออะไร โดยไม่ต้องเปิดใบ
+ * เรียงตามความสำคัญ: มีคนสนใจ (ปิดงานได้) > ไม่รับสาย (โทรซ้ำ) > มีคนพร้อมส่งโทร >
+ * รอผลโทร > ไม่มีคนแนะนำ (ส่งต่อทีมอื่น) · ใบที่ AI ยังไม่ประเมิน = ไม่เดา ไม่ขึ้นชิป
+ */
+function cardNextAction(
+  matchCount: number | undefined,
+  s: LumosJobCallSummaryRow | undefined,
+): { text: string; cls: string } | null {
+  const confirmed = s?.confirmed ?? 0;
+  const noAnswer = s?.no_answer ?? 0;
+  const sent = s?.sent ?? 0;
+  const waiting = s ? Math.max(0, s.sent - s.called) : 0;
+  if (confirmed > 0)
+    return { text: `มีคนสนใจ ${confirmed} — กดจองตัวเลย`, cls: 'jarvis-chip-success' };
+  if (noAnswer > 0) return { text: `ไม่รับสาย ${noAnswer} — ควรโทรซ้ำ`, cls: 'jarvis-chip-warn' };
+  if ((matchCount ?? 0) > 0 && sent === 0)
+    return { text: `AI แนะนำ ${matchCount} — เลือกคนส่ง AI โทร`, cls: 'jarvis-chip-info' };
+  if (waiting > 0) return { text: `รอผลโทร ${waiting} สาย`, cls: 'jarvis-chip-neutral' };
+  if (matchCount === 0)
+    return { text: 'ไม่มีคนแนะนำ — ส่งคิด Content / Scraping', cls: 'jarvis-chip-danger' };
+  return null;
+}
+
+/** แถบ "ส่งให้ Lumos โทร" — โผล่เมื่อติ๊กเลือกอย่างน้อย 1 คน (ใช้ทั้งฝั่งคนของเราและ iRecruit) */
+function LumosSendBar({
+  count,
+  onSend,
+  onClear,
+  busy,
+}: {
+  count: number;
+  onSend: () => void;
+  onClear: () => void;
+  busy: boolean;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-300 bg-sky-50/80 px-3 py-2 dark:border-sky-700 dark:bg-sky-950/50">
+      <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">ติ๊กเลือกไว้ {count} คน</p>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onClear}
+          className="jarvis-btn-ghost"
+        >
+          ล้างที่เลือก
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSend}
+          className="jarvis-btn-primary"
+        >
+          <PhoneCall className="h-3 w-3" /> ส่ง AI โทร ({count} คน)
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function boardTierMeta(tier: BoardCandidateMatch['tier']): { icon: string; label: string; tone: ToneKey } {
   if (tier === 'green') return { icon: '🟢', label: 'ลงได้ทันที', tone: 'success' };
   if (tier === 'red') return { icon: '🔴', label: 'ห่างไกล', tone: 'danger' };
@@ -829,6 +1120,7 @@ const MatchingPage: React.FC = () => {
   const [lumosPool, setLumosPool] = useState<LumosPoolCandidate[]>([]);
   const [lumosPoolLoading, setLumosPoolLoading] = useState(false);
   const [lumosPoolSearch, setLumosPoolSearch] = useState('');
+  const [lumosInterviewPriority, setLumosInterviewPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   const lumosSelectedCount = lumosSelectedBoard.length + lumosSelectedIrecruit.length;
 
@@ -1115,6 +1407,7 @@ const MatchingPage: React.FC = () => {
         jobId: jobDetail.id,
         boardCardIds: lumosSelectedBoard,
         irecruitIds: lumosSelectedIrecruit,
+        ...(lumosSelectedIrecruit.length > 0 ? { priority: lumosInterviewPriority } : {}),
       });
       // ส่งไป "งานอื่น" ที่เลือกไว้ใน popup — ยิงทีละใบ (API รับทีละ jobId)
       // ใบไหนล้มไม่ดึงทั้งก้อนลง: รวมผลแล้วรายงานตรง ๆ ว่าใบไหนไม่สำเร็จ
@@ -3139,7 +3432,8 @@ const MatchingPage: React.FC = () => {
                                 </span>
                               </TierCriteriaTooltip>{' '}
                               {m.full_name}
-                              {m.nick_name ? ` (${m.nick_name})` : ''}
+                              {m.nick_name ? ` (${m.nick_name})` : ''}{' '}
+                              <LumosUrgentBadge nextAction={lumosRow?.next_action} />
                             </span>
                             <div className="flex shrink-0 items-center gap-1">
                               {/* ป้าย "แมทอยู่ N งาน" — เฉพาะคนที่แมทเกิน 1 ใบ (เจ้าของสั่ง 12 ส.ค. 2569)
@@ -3443,7 +3737,8 @@ const MatchingPage: React.FC = () => {
                                         {matchTierEmoji(m.tier)}
                                       </span>
                                     </TierCriteriaTooltip>{' '}
-                                    {m.full_name}
+                                    {m.full_name}{' '}
+                                    <LumosUrgentBadge nextAction={lumosRow?.next_action} />
                                   </span>
                                   <div className="flex shrink-0 items-center gap-1">
                                     {proposed ? (
@@ -4465,6 +4760,36 @@ const MatchingPage: React.FC = () => {
                 </div>
               );
             })()}
+            {lumosSelectedIrecruit.length > 0 ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 py-2 dark:border-blue-800 dark:bg-blue-950/40">
+                <p className="mb-1.5 text-[11px] font-semibold text-blue-800 dark:text-blue-200">
+                  ระดับความสำคัญ AI สัมภาษณ์
+                </p>
+                <div className="flex gap-2">
+                  {(
+                    [
+                      { value: 'high', label: 'สูง', cls: 'border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300' },
+                      { value: 'medium', label: 'ปกติ', cls: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+                      { value: 'low', label: 'ต่ำ', cls: 'border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-400' },
+                    ] as const
+                  ).map(({ value, label, cls }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setLumosInterviewPriority(value)}
+                      className={cn(
+                        'rounded-full border px-3 py-0.5 text-[11px] font-semibold transition-all',
+                        lumosInterviewPriority === value
+                          ? cn(cls, 'ring-2 ring-offset-1')
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"

@@ -135,6 +135,7 @@ export type LumosInterviewPayload = {
   language: string;
   tone: string;
   skills?: string[];
+  priority?: 'high' | 'medium' | 'low';
 };
 
 export function buildInterviewPayload(
@@ -142,6 +143,7 @@ export function buildInterviewPayload(
   result: Pick<IrecruitMatchResult, 'jobId' | 'request_no'> & { job_family_label: string | null },
   match: { id: number; full_name: string; phone_number: string | null; job_name_th: string | null; position_name: string | null },
   now = new Date(),
+  priority?: 'high' | 'medium' | 'low',
 ): LumosInterviewPayload | null {
   const phone = toE164Thai(match.phone_number);
   if (!phone || !match.full_name) return null;
@@ -179,6 +181,7 @@ export function buildInterviewPayload(
     language: 'th',
     tone: 'professional',
     ...(skills.length ? { skills } : {}),
+    ...(priority ? { priority } : {}),
   };
 }
 
@@ -590,11 +593,12 @@ export async function enqueueLumosInterviewForSelected(
     position_name: string | null;
     tier?: string | null;
   }>,
+  priority?: 'high' | 'medium' | 'low',
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number }> = [];
   for (const m of selected) {
-    const payload = buildInterviewPayload(job, result, m);
+    const payload = buildInterviewPayload(job, result, m, new Date(), priority);
     if (!payload) {
       skipped.push({ ref: `ir-${m.id}`, name: m.full_name, reason: NO_PHONE_REASON });
       continue;
@@ -997,6 +1001,13 @@ export async function enqueueLumosInterviewForRecall(
 
 // ─── สถานะการโทรต่อคน (ระดับ 1: badge ในการ์ด Matching) ──────────────────────
 
+export type LumosNextAction = {
+  type: string;
+  urgency: 'urgent' | 'normal' | 'not urgent';
+  due_at: string;
+  reason: string;
+};
+
 export type LumosCallStatusRow = {
   channel: 'reminder' | 'interview';
   /** 'card-<id>' สำหรับคนของเรา · 'ir-<id>' สำหรับผู้สมัคร iRecruit */
@@ -1004,6 +1015,7 @@ export type LumosCallStatusRow = {
   status: 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
   outcome: string | null;
   summary: string | null;
+  next_action: LumosNextAction | null;
   delivery_count: number;
   sent_at: string;
   updated_at: string;
@@ -1015,6 +1027,7 @@ type QueueStatusSqlRow = {
   status: string;
   outcome: string | null;
   summary: string | null;
+  next_action_raw: LumosNextAction | null;
   delivery_count: number;
   created_at: string | Date;
   updated_at: string | Date;
@@ -1035,6 +1048,9 @@ const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() :
 export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCallStatusRow[]> {
   const { rows } = await dbQuery<QueueStatusSqlRow>(
     `select channel, person_ref, status, delivery_count, created_at, updated_at,
+            result->>'outcome' as outcome,
+            result->>'summary' as summary,
+            result->'next_action' as next_action_raw
             coalesce(last_outcome, result->>'outcome') as outcome,
             result->>'summary' as summary
        from ${queueTable}
@@ -1052,6 +1068,7 @@ export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCal
       : 'pending',
     outcome: r.outcome,
     summary: r.summary,
+    next_action: r.next_action_raw ?? null,
     delivery_count: Number(r.delivery_count) || 0,
     sent_at: iso(r.created_at),
     updated_at: iso(r.updated_at),
