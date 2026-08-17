@@ -239,6 +239,10 @@ export async function fetchJobBenefitLines(
  * รายได้ต่อเดือนของหลายใบขอ (คีย์ = เลขที่ใบขอ) — **error-safe** เหมือนชิป
  * ใบที่คิดไม่ได้ (ไม่มีแถวค่าแรงหลัก) จะไม่มีคีย์ ผู้เรียกต้องถอยไปใช้เลขเดิม
  */
+/**
+ * @deprecated คีย์ด้วย**เลขที่ใบเปล่า** — ใช้กับใบขอล่วงหน้าไม่ได้ (เลขซ้ำกันจริง 23 ใบ)
+ * ของใหม่คือ `fetchMonthlyIncomesById` ที่คีย์ด้วย id เต็ม
+ */
 export async function fetchMonthlyIncomes(
   requestNos: string[],
 ): Promise<Map<string, MonthlyIncome>> {
@@ -258,6 +262,9 @@ export async function fetchMonthlyIncomes(
  * ชิปสำหรับ **หน้าสมัครสาธารณะ** — กติกาเดียวกับประโยคที่ AI พูด
  * ⚠️ **error-safe**: ERP ล่ม/ยังไม่ตั้งค่า → คืน map ว่าง ไม่ throw
  * (หน้าประกาศงานสาธารณะห้ามล่มเพราะข้อมูลเสริม — คนจริงกำลังจะสมัคร)
+ */
+/**
+ * @deprecated คีย์ด้วย**เลขที่ใบเปล่า** — ใช้ `fetchJobBenefitChipsById` แทน
  */
 export async function fetchJobBenefitChips(
   requestNos: string[],
@@ -280,4 +287,133 @@ export function requestNoFromJobRef(jobRef: string): string | null {
   if (!s.startsWith('siamraj-sql:')) return null;
   const no = s.slice('siamraj-sql:'.length).trim();
   return no || null;
+}
+
+/**
+ * แยก job id/job_ref เป็น "เลขที่ใบ + มาจากตารางไหน" (17 ส.ค. 2569)
+ *
+ * 🔴 ใบขอจริงกับใบขอล่วงหน้า **เก็บอัตราคนละตาราง** (`st_request_p3_rate` vs
+ * `st_prequest_p3_rate`) และเลขที่ใบ**ซ้ำกันได้** — ถามผิดตารางคือได้เลขของอีกใบ
+ * มาโชว์โดยไม่มีใครรู้ จึงต้องพก prefix ไปด้วยเสมอ ห้ามส่งแค่เลขที่ใบเปล่า ๆ
+ */
+export function parseJobRef(jobRef: string): { no: string; prequest: boolean } | null {
+  const s = (jobRef || '').trim();
+  for (const [prefix, prequest] of [
+    ['siamraj-sql:', false],
+    ['siamraj-pre:', true],
+  ] as const) {
+    if (s.startsWith(prefix)) {
+      const no = s.slice(prefix.length).trim();
+      return no ? { no, prequest } : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * อัตราของ **ใบขอล่วงหน้า** — โครงเดียวกับ `fetchJobBenefitRates` ทุกอย่าง
+ * (whitelist · หน่วย · ตัดฝั่งหัก `what_side='2'` · ใช้อัตราจ่ายเท่านั้น)
+ * ⚠️ คอลัมน์อัตราของตารางนี้ชื่อ `fee_rate` ไม่ใช่ `payment_rate` (ตาราง prequest
+ * ไม่มีคอลัมน์ `payment_rate` เลย) · `draw_rate` มีอยู่แต่ **ห้าม select** เหมือนกัน
+ */
+export async function fetchPrequestBenefitRates(
+  prequestNos: string[],
+): Promise<Map<string, JobBenefitRate[]>> {
+  const byNo = new Map<string, JobBenefitRate[]>();
+  const nos = [...new Set(prequestNos.map((s) => (s || '').trim()).filter(Boolean))];
+  if (nos.length === 0) return byNo;
+  const placeholders = nos.map((_, i) => `@q${i}`).join(', ');
+  const params = Object.fromEntries(nos.map((v, i) => [`q${i}`, v]));
+  const rows = await siamrajSqlQuery<{
+    prequest_no: string;
+    fee_name: string;
+    fee_rate: number;
+    unit: string | null;
+    is_wage: string | null;
+  }>(
+    `SELECT RTRIM(C.prequest_no) as prequest_no, RTRIM(F.fee_name) as fee_name, C.fee_rate as fee_rate,
+            RTRIM(ISNULL(F.fee_unit_code_1, '')) as unit, RTRIM(C.is_wage) as is_wage
+       FROM st_prequest_p3_rate C
+       LEFT JOIN wg2_ms_fee F
+         ON F.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)
+      WHERE C.prequest_no IN (${placeholders})
+        AND RTRIM(ISNULL(F.what_side, '')) <> '2'`,
+    params,
+  );
+  for (const r of rows) {
+    if (!r.fee_name) continue;
+    const list = byNo.get(r.prequest_no) ?? [];
+    list.push({
+      fee_name: r.fee_name,
+      fee_rate: Number(r.fee_rate),
+      unit: r.unit || null,
+      is_wage: (r.is_wage || '').trim().toUpperCase() === 'Y',
+    });
+    byNo.set(r.prequest_no, list);
+  }
+  return byNo;
+}
+
+/**
+ * ดึงอัตราของทั้งใบจริงและใบล่วงหน้าในรอบเดียว — คีย์ผลลัพธ์เป็น **id เต็ม**
+ * (`siamraj-sql:X` / `siamraj-pre:X`) ไม่ใช่เลขที่ใบเปล่า เพราะเลขซ้ำกันได้
+ * ⚠️ error-safe: ฝั่งไหนล้มก็คืนเท่าที่ได้ (ข้อมูลเสริม ห้ามทำให้หน้าหลักพัง)
+ */
+export async function fetchBenefitRatesByJobId(
+  jobIds: string[],
+): Promise<Map<string, JobBenefitRate[]>> {
+  const out = new Map<string, JobBenefitRate[]>();
+  const real: string[] = [];
+  const pre: string[] = [];
+  const refs = new Map<string, { no: string; prequest: boolean }>();
+  for (const id of jobIds) {
+    const parsed = parseJobRef(id);
+    if (!parsed) continue;
+    refs.set(id, parsed);
+    (parsed.prequest ? pre : real).push(parsed.no);
+  }
+  const [realRates, preRates] = await Promise.all([
+    real.length > 0 ? fetchJobBenefitRates(real).catch(() => new Map()) : new Map(),
+    pre.length > 0 ? fetchPrequestBenefitRates(pre).catch(() => new Map()) : new Map(),
+  ]);
+  for (const [id, { no, prequest }] of refs) {
+    const hit = (prequest ? preRates : realRates).get(no);
+    if (hit && hit.length > 0) out.set(id, hit);
+  }
+  return out;
+}
+
+/**
+ * ชิปสวัสดิการ + รายได้ต่อเดือน แบบคีย์ด้วย **id เต็ม** (17 ส.ค. 2569)
+ *
+ * 🔴 ตัวเดิมคีย์ด้วย**เลขที่ใบเปล่า** ซึ่งใช้กับใบขอล่วงหน้าไม่ได้ — เลขที่ใบของสองระบบ
+ * ซ้ำกันจริง 23 ใบ (เช่น `LBM6907002` เป็นทั้งใบล่วงหน้าของแคททาเลอร์ และใบขอปกติ
+ * ของ รพ.เปาโล) ถามด้วยเลขเปล่าคือมีโอกาสได้อัตราของอีกบริษัทมาโชว์บนประกาศ
+ *
+ * ⚠️ error-safe เหมือนตัวเดิมทุกอย่าง — ERP ล่ม = คืน map ว่าง ประกาศยังขึ้นครบ
+ */
+export async function fetchJobBenefitChipsById(jobIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  try {
+    for (const [id, list] of await fetchBenefitRatesByJobId(jobIds)) {
+      const chips = speakableBenefitChips(list);
+      if (chips.length > 0) out.set(id, chips);
+    }
+  } catch {
+    return out;
+  }
+  return out;
+}
+
+export async function fetchMonthlyIncomesById(jobIds: string[]): Promise<Map<string, MonthlyIncome>> {
+  const out = new Map<string, MonthlyIncome>();
+  try {
+    for (const [id, list] of await fetchBenefitRatesByJobId(jobIds)) {
+      const income = monthlyGuaranteedIncome(list);
+      if (income.total > 0) out.set(id, income);
+    }
+  } catch {
+    return out;
+  }
+  return out;
 }

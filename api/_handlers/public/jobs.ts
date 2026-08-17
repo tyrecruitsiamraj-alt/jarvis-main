@@ -7,8 +7,8 @@ import { dbQuery } from '../../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { getString } from '../../_lib/body.js';
 import {
-  fetchJobBenefitChips,
-  fetchMonthlyIncomes,
+  fetchJobBenefitChipsById,
+  fetchMonthlyIncomesById,
   type MonthlyIncomeItem,
 } from '../../_lib/siamrajJobBenefits.js';
 import { attachNotes, attachWorkStatus } from '../siamraj-unit-requests.js';
@@ -126,20 +126,28 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
 
 /**
  * เติมชิปสวัสดิการให้ประกาศงาน — คิวรีเดียวทั้งชุด (วัดจริง 200 ใบ = 236 ms)
- * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChips` — ERP ล่ม = ประกาศงานยังขึ้นครบ
+ * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChipsById` — ERP ล่ม = ประกาศงานยังขึ้นครบ
  * แค่ไม่มีชิป (หน้านี้เป็นเส้นสาธารณะที่คนจริงกำลังจะสมัคร ห้ามล่มเพราะข้อมูลเสริม)
  */
 type PublicJobOut = Omit<PublicJob, 'manual_income'>;
 
 async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
-  const nos = jobs.map((j) => (j.request_no ? String(j.request_no) : '')).filter(Boolean);
-  // ⚠️ ต้องเดินต่อแม้ไม่มีเลขที่ใบขอ/ไม่มีข้อมูล ERP — ยังต้องตัด manual_income ออกจากผลลัพธ์
+  /**
+   * 🔴 คีย์ด้วย **id เต็ม** (`siamraj-sql:` / `siamraj-pre:`) ไม่ใช่เลขที่ใบเปล่า
+   * เลขที่ใบของใบขอปกติกับใบขอล่วงหน้า**ซ้ำกันจริง 23 ใบ** — คีย์ด้วยเลขเปล่าคือ
+   * มีโอกาสเอาอัตราของอีกบริษัทมาโชว์บนประกาศโดยไม่มีใครรู้
+   */
+  const ids = jobs.map((j) => String(j.id || '')).filter(Boolean);
+  // ⚠️ ต้องเดินต่อแม้ไม่มีข้อมูล ERP — ยังต้องตัด manual_income ออกจากผลลัพธ์
   // (เดิม early-return คืนก้อนเดิม ซึ่งตอนนี้มีฟิลด์ภายในติดไปด้วย)
-  const [chips, incomes] = await Promise.all([fetchJobBenefitChips(nos), fetchMonthlyIncomes(nos)]);
+  const [chips, incomes] = await Promise.all([
+    fetchJobBenefitChipsById(ids),
+    fetchMonthlyIncomesById(ids),
+  ]);
   return jobs.map((j) => {
-    const no = j.request_no ? String(j.request_no) : '';
-    const found = no ? chips.get(no) : undefined;
-    const income = no ? incomes.get(no) : undefined;
+    const key = String(j.id || '');
+    const found = key ? chips.get(key) : undefined;
+    const income = key ? incomes.get(key) : undefined;
     /**
      * 🔴 **รายได้ที่เจ้าหน้าที่แก้เองต้องชนะเลขจาก ERP** — การ์ดประกาศโชว์
      * `monthly_income` เป็นหลัก (ถอยไป `total_income` เมื่อคิดไม่ได้) ถ้าทับแค่

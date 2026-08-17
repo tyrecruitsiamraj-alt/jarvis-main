@@ -48,7 +48,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
+import {
+  isUnitRequestWorkStatus,
+  UNIT_REQUEST_WORK_STATUS_LABELS,
+} from '@/lib/unitRequestWorkStatus';
+import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -605,6 +610,33 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
                     {publicJobPositionLabel(job)}
                   </span>
+                  {/* สถานะงาน + บอกด้วยเมื่อสถานะนั้นทำให้ประกาศไม่ขึ้นหน้าสาธารณะ
+                      (เจ้าของสั่ง 17 ส.ค. 2569: *"ถ้าบอกมีคนรอเริ่มงานแล้วไม่ขึ้น
+                      งั้นต่อไปหน้ากล่องงานช่วยบอกสถานะด้วยจะได้รู้"*)
+                      เคสจริงที่ทำให้สั่ง: LBM6908002 แคททาเลอร์ ถูกตั้ง "รอแจ้งเข้า"
+                      แล้วหายจากหน้าประกาศ โดยที่กล่องงานไม่ได้บอกอะไรเลย
+                      ⚠️ ฝั่งสาธารณะไม่ต้องเห็น — เป็นข้อมูลการทำงานภายใน */}
+                  {isStaff && isUnitRequestWorkStatus(job.work_status) ? (
+                    <span
+                      title={
+                        isHiddenFromPublicByWorkStatus(job.work_status)
+                          ? 'สถานะนี้แปลว่าได้ตัวคนแล้ว — ประกาศจึงไม่ขึ้นหน้าสาธารณะ (เปลี่ยนสถานะแล้วประกาศกลับมาเอง)'
+                          : 'สถานะงานที่เจ้าหน้าที่ตั้งไว้'
+                      }
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium',
+                        isHiddenFromPublicByWorkStatus(job.work_status)
+                          ? TONE.warn.chip
+                          : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {isHiddenFromPublicByWorkStatus(job.work_status) ? (
+                        <EyeOff className="h-3 w-3" aria-hidden />
+                      ) : null}
+                      {UNIT_REQUEST_WORK_STATUS_LABELS[job.work_status]}
+                      {isHiddenFromPublicByWorkStatus(job.work_status) ? ' · ไม่ขึ้นประกาศ' : ''}
+                    </span>
+                  ) : null}
                   {job.job_description_code_1 && job.job_type ? (
                     <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                       {JOB_TYPE_LABELS[job.job_type]}

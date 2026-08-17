@@ -53,23 +53,29 @@ describe('สถานะที่ต้องซ่อนจากหน้า�
 });
 
 /**
- * 🔴 ใบขอล่วงหน้าห้ามออกหน้าสาธารณะ (17 ส.ค. 2569)
+ * ใบขอล่วงหน้าออกหน้าสาธารณะได้ (เจ้าของเคาะเย็น 17 ส.ค. 2569)
  *
- * ทำไมต้องมีเทสต์: ของจริงหลุดไปแล้ว **18 ใบ** — ในนั้นเป็นใบที่คนซ้อมใช้ระบบใน ERP
- * วันที่ 24 ก.ค. ชื่อหน่วยงานเป็น `ช่วยหนูด้วย` / `อะ 10 20 30 40` / `so test`
- * และมีใบที่เอาชื่อลูกค้าจริง (`SCB ไทยพาณิชย์`) ไปใส่ในใบซ้อม
- * ถ้าด่านนี้หลุดอีกรอบ **คนนอกเห็นทันทีโดยไม่มีสัญญาณเตือน**
+ * ทำไมยังต้องมีเทสต์ทั้งที่เปิดแล้ว: ตัวสวิตช์ยังอยู่ (ปิดฉุกเฉินได้) และ**การแยกใบ
+ * ล่วงหน้าออกจากใบขอปกติยังสำคัญเท่าเดิม** เพราะเลขที่ใบซ้ำกันจริง 23 ใบ —
+ * `isPrequestJob` ผิดเมื่อไหร่ = ปิด/เปิดผิดใบ และอัตราค่าจ้างไปดึงผิดบริษัท
  */
-describe('ใบขอล่วงหน้าห้ามออกหน้าสาธารณะ', () => {
+describe('ใบขอล่วงหน้าออกหน้าสาธารณะ (เจ้าของสั่งเปิด 17 ส.ค. เย็น)', () => {
   it('รู้จักใบล่วงหน้าจาก id `siamraj-pre:`', () => {
     expect(isPrequestJob({ id: 'siamraj-pre:OPL6907002' })).toBe(true);
     expect(isPrequestJob({ id: 'siamraj-sql:OPL6907002' })).toBe(false);
   });
 
   it('🔴 เลขที่ใบเปล่า ๆ ไม่พอ — ใบล่วงหน้ากับใบขอปกติเลขที่ซ้ำกันได้ (จริง 23 ใบ)', () => {
-    // เลขเดียวกันเป๊ะ แต่ id คนละตัว → ใบปกติต้องโชว์ ใบล่วงหน้าต้องซ่อน
+    // เลขเดียวกันเป๊ะ แต่ id คนละตัว → ตอนสั่งปิด ต้องปิดเฉพาะฝั่งล่วงหน้า
     expect(isPublicVisibleByPrequest({ id: 'siamraj-sql:OPL6907002' }, false)).toBe(true);
     expect(isPublicVisibleByPrequest({ id: 'siamraj-pre:OPL6907002' }, false)).toBe(false);
+  });
+
+  it('🔴 ค่าเริ่มต้น = เปิด (เจ้าของสั่ง "เอาขึ้นไปเลย") — ไม่ตั้ง env ก็ต้องขึ้น', () => {
+    for (const v of [undefined, '', '  ']) {
+      expect(isPublicPrequestEnabled(v)).toBe(true);
+      expect(isPublicVisibleByPrequest({ id: 'siamraj-pre:X' }, isPublicPrequestEnabled(v))).toBe(true);
+    }
   });
 
   it('ธง is_prequest ก็จับได้ (บางเส้นส่ง id มาไม่ครบ)', () => {
@@ -83,8 +89,8 @@ describe('ใบขอล่วงหน้าห้ามออกหน้า�
     expect(isPublicVisibleByPrequest({}, false)).toBe(true);
   });
 
-  it('🔴 ค่าเริ่มต้นของ env ต้องเป็น "ปิด" — ตั้งไม่ครบ/สะกดผิด ห้ามแปลว่าเปิด', () => {
-    for (const v of [undefined, '', ' ', 'false', '0', 'no', 'off', 'ture', 'enabled', 'y']) {
+  it('🔴 ปิดฉุกเฉินต้องเขียนคำว่าปิดชัด ๆ — false/0/no/off เท่านั้น', () => {
+    for (const v of ['false', 'FALSE', ' false ', '0', 'no', 'off']) {
       expect(isPublicPrequestEnabled(v)).toBe(false);
       expect(isPublicVisibleByPrequest({ id: 'siamraj-pre:X' }, isPublicPrequestEnabled(v))).toBe(
         false,
@@ -92,12 +98,9 @@ describe('ใบขอล่วงหน้าห้ามออกหน้า�
     }
   });
 
-  it('เปิดกลับได้ด้วย env — ค่าที่ยอมรับคือ true/1/yes/on', () => {
-    for (const v of ['true', 'TRUE', ' true ', '1', 'yes', 'on']) {
+  it('คำที่สะกดเพี้ยนไม่ทำให้ประกาศหายทั้งกอง (ตีความว่าเปิดตามค่าเริ่มต้น)', () => {
+    for (const v of ['ture', 'flase', 'disabled', 'ปิด', 'y']) {
       expect(isPublicPrequestEnabled(v)).toBe(true);
-      expect(isPublicVisibleByPrequest({ id: 'siamraj-pre:X' }, isPublicPrequestEnabled(v))).toBe(
-        true,
-      );
     }
   });
 });
