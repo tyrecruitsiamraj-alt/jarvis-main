@@ -544,6 +544,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <CardHeader className="space-y-3 pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
+                    {/* ป้ายใบขอล่วงหน้า (17 ส.ค. 2569) — ต้องรู้ตั้งแต่แรกเห็นว่ายังไม่ใช่
+                        ใบจริง เพราะยังไม่การันตีว่าจะเปิดงาน (หาคนล่วงหน้าได้ แต่อย่าไปสัญญา) */}
+                    {job.is_prequest ? (
+                      <span
+                        className={cn(
+                          'mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold',
+                          TONE.violet.chip,
+                        )}
+                      >
+                        ใบขอล่วงหน้า
+                      </span>
+                    ) : null}
                     <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                       {jobBoardCardTitle(job)}
                     </h2>

@@ -12,6 +12,11 @@ import {
   type ResignationUnitRank,
 } from './siamrajSqlServerThroughput.js';
 import { listSiamrajSqlServerClosedRequests } from './siamrajSqlServerClosed.js';
+import {
+  getSiamrajSqlServerPrequestById,
+  isPrequestId,
+  listSiamrajSqlServerPrequests,
+} from './siamrajSqlServerPrequests.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
 import { jobAllowedByDepartmentScope, loadUserDepartmentScope } from './departmentScope.js';
@@ -219,7 +224,21 @@ export async function listSiamrajUnitRequests(options: {
   if (!source) return [];
 
   if (source === 'sqlserver') {
-    return listSiamrajSqlServerUnitRequests(options);
+    /**
+     * ใบขอจริง + **ใบขอล่วงหน้า** รวมกองเดียวกัน (เจ้าของสั่ง 17 ส.ค. 2569:
+     * *"ทำเหมือนใบขอใบนึงเลย"*) — ทั้งบอร์ด ตัวกรอง AI แมท ใช้ของเดิมได้หมด
+     * เพราะรูปข้อมูลเหมือนกัน · แยกกันด้วยธง `is_prequest` กับ id ที่ขึ้นต้นต่างกัน
+     *
+     * ⚠️ ใบล่วงหน้าล้มต้อง **ไม่ลากใบจริงล้มไปด้วย** — ใบจริงคืองานที่ต้องส่งคนวันนี้
+     */
+    const [real, pre] = await Promise.all([
+      listSiamrajSqlServerUnitRequests(options),
+      listSiamrajSqlServerPrequests({
+        limit: options.limit,
+        departmentScope: options.departmentScope,
+      }).catch(() => []),
+    ]);
+    return [...real, ...pre] as typeof real;
   }
 
   const schema = getSiamrajSchema();
@@ -256,7 +275,10 @@ export async function getSiamrajUnitRequestById(
     | ReturnType<typeof mapSiamrajRow>
     | null =
     source === 'sqlserver'
-      ? await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id))
+      ? // ใบขอล่วงหน้ามี id คนละ prefix — ต้องแยกไปอ่านคนละตาราง ไม่งั้นเปิดใบไม่เจอ
+        isPrequestId(id)
+        ? ((await getSiamrajSqlServerPrequestById(id)) as never)
+        : await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id))
       : null;
 
   if (source !== 'sqlserver') {

@@ -233,6 +233,15 @@ export interface JobRequest {
   override_subdistrict?: string | null;
   /** สวัสดิการที่ติ๊กเพิ่มเอง (คีย์จาก `src/lib/extraBenefits.ts`) — คนละชุดกับ `benefits` จาก ERP */
   extra_benefits?: string[] | null;
+  /**
+   * ใบขอ**ล่วงหน้า** (`st_prequest_*` · 17 ส.ค. 2569) — ลูกค้าแจ้งไว้ก่อน
+   * ยังไม่ถูกแปลงเป็นใบขอจริง · ทำงานเหมือนใบขอทุกอย่าง แค่ติดป้ายให้รู้
+   */
+  is_prequest?: boolean;
+  /** วันสิ้นสุดที่ลูกค้าอยากได้ — มีเฉพาะใบขอล่วงหน้า */
+  wanted_until_date?: string;
+  /** หน่วยของอัตราค่าแรง: M ต่อเดือน · D ต่อวัน · H ต่อชั่วโมง */
+  rate_unit?: string;
   work_status?: UnitRequestWorkStatus | null;
   work_person_first_name?: string | null;
   work_person_last_name?: string | null;

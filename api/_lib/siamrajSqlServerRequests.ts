@@ -82,8 +82,12 @@ function toYmd(v: Date | string | null | undefined): string {
   return toBangkokYmd(v);
 }
 
-/** เว้นวรรคหน้าคำนำหน้าที่อยู่ — ให้ filter จังหวัด/อำเภอ/ตำบลจับได้ */
-function normalizeSiamrajWorkAddress(raw: string | null | undefined): string {
+/**
+ * เว้นวรรคหน้าคำนำหน้าที่อยู่ — ให้ filter จังหวัด/อำเภอ/ตำบลจับได้
+ * ⚠️ export เพื่อให้ใบขอล่วงหน้าใช้สูตรเดียวกัน — ก๊อปสูตรไปอีกที่ = ตัวกรองพื้นที่
+ * ของสองกองจับไม่เท่ากัน แล้วไม่มีใครรู้จนกว่าจะมีคนบ่นว่าค้นไม่เจอ
+ */
+export function normalizeSiamrajWorkAddress(raw: string | null | undefined): string {
   const s = (raw || '').toString().normalize('NFC').replace(/\u00a0/g, ' ').trim();
   if (!s) return '';
   return s

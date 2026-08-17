@@ -172,12 +172,19 @@ export function unitRequestNoteKey(job: JobRequest): string {
 }
 
 export function isSiamrajJob(job: JobRequest): boolean {
-  return job.source === 'siamraj' || job.id.startsWith('siamraj:') || job.id.startsWith('siamraj-sql:');
+  return (
+    job.source === 'siamraj' ||
+    job.id.startsWith('siamraj:') ||
+    job.id.startsWith('siamraj-sql:') ||
+    // ใบขอล่วงหน้า (17 ส.ค. 2569) — ไม่รู้จัก prefix นี้ = ลิงก์เปิดใบพาไป /jobs/<id> ซึ่งไม่มีหน้า
+    job.id.startsWith('siamraj-pre:')
+  );
 }
 
 export function siamrajExternalId(job: JobRequest): string | null {
   if (job.externalId) return job.externalId;
   if (job.id.startsWith('siamraj-sql:')) return job.id.slice('siamraj-sql:'.length);
+  if (job.id.startsWith('siamraj-pre:')) return job.id.slice('siamraj-pre:'.length);
   if (job.id.startsWith('siamraj:')) return job.id.slice('siamraj:'.length);
   return null;
 }
