@@ -724,6 +724,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             แก้ไข
                           </button>
                         ) : null}
+                        {/* ดูรายละเอียดใบขอ (17 ส.ค. 2569 — เจ้าของ: "กดแล้วทำไมดูรายละเอียด
+                            ใบขอไม่ได้") · เดิมมีปุ่มนี้เฉพาะฝั่งสาธารณะ ฝั่งเจ้าหน้าที่กดการ์ด
+                            แล้วได้รายชื่อผู้สมัครอย่างเดียว ไม่มีทางเปิดรายละเอียดเลย
+                            ⚠️ stopPropagation — ไม่งั้นโดนคลิกของการ์ด (เปิดรายชื่อ) ทับ */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(job);
+                          }}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.neutral.outline,
+                          )}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          รายละเอียด
+                        </button>
                         <span className="text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
                           ดูรายชื่อ →
                         </span>
