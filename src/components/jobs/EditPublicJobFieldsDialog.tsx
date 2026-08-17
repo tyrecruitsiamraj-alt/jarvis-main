@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { JobRequest } from '@/types';
 import {
   Dialog,
@@ -13,6 +13,11 @@ import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { EXTRA_BENEFITS } from '@/lib/extraBenefits';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import {
+  getDistrictOptions,
+  getProvinceOptions,
+  getSubdistrictOptions,
+} from '@/lib/thaiAddressCascade';
 
 /**
  * แก้ข้อมูลที่จะไปโผล่บน **หน้าประกาศสาธารณะ** — เปิดจากการ์ดในกล่องงาน
@@ -50,6 +55,20 @@ const EditPublicJobFieldsDialog: React.FC<{
     setIncome(job.total_income != null ? String(job.total_income) : '');
     setBenefits(job.extra_benefits ?? []);
   }, [job]);
+
+  /**
+   * ตัวเลือกที่อยู่แบบไล่ระดับ (เจ้าของสั่ง 17 ส.ค. 2569: *"จังหวัด อำเภอ ตำบล ทำเป็น Dropdown"*)
+   *
+   * เดิมเป็นช่องพิมพ์เอง — พิมพ์ผิด/สะกดคนละแบบ ("บางรัก" vs "เขตบางรัก") ทำให้ประกาศ
+   * ขึ้นพื้นที่ที่คนหาไม่เจอ และตัวกรองจังหวัดบนบอร์ดก็จับไม่ตรง
+   * ใช้ชุดข้อมูลเดียวกับหน้าเพิ่มงาน/หน้าสมัคร (`thaiAddressCascade`) ทั้งระบบจึงสะกดเหมือนกัน
+   */
+  const provinceOptions = useMemo(() => getProvinceOptions(), []);
+  const districtOptions = useMemo(() => getDistrictOptions(province), [province]);
+  const subdistrictOptions = useMemo(
+    () => getSubdistrictOptions(province, district),
+    [province, district],
+  );
 
   if (!job) return null;
 
@@ -114,35 +133,91 @@ const EditPublicJobFieldsDialog: React.FC<{
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="space-y-1">
                 <span className="text-xs text-muted-foreground">จังหวัด</span>
-                <input
+                <select
                   className={fieldCls}
                   value={province}
-                  placeholder={guessedProvince}
-                  onChange={(e) => setProvince(e.target.value)}
-                />
+                  onChange={(e) => {
+                    // เปลี่ยนจังหวัด = อำเภอ/ตำบลเดิมใช้ไม่ได้แล้ว ต้องล้างทิ้ง
+                    // ไม่ล้าง = ได้คู่ที่ไม่มีอยู่จริง (เช่น กรุงเทพฯ + อ.ศรีราชา)
+                    setProvince(e.target.value);
+                    setDistrict('');
+                    setSubdistrict('');
+                  }}
+                >
+                  <option value="">— ใช้ค่าที่ระบบเดา ({guessedProvince}) —</option>
+                  {provinceOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="space-y-1">
                 <span className="text-xs text-muted-foreground">อำเภอ/เขต</span>
-                <input
+                <select
                   className={fieldCls}
                   value={district}
-                  placeholder={guessedDistrict}
-                  onChange={(e) => setDistrict(e.target.value)}
-                />
+                  disabled={!province}
+                  onChange={(e) => {
+                    setDistrict(e.target.value);
+                    setSubdistrict('');
+                  }}
+                >
+                  <option value="">
+                    {province ? `— ใช้ค่าที่ระบบเดา (${guessedDistrict}) —` : '— เลือกจังหวัดก่อน —'}
+                  </option>
+                  {districtOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="space-y-1">
                 <span className="text-xs text-muted-foreground">ตำบล/แขวง</span>
-                <input
+                <select
                   className={fieldCls}
                   value={subdistrict}
-                  placeholder={guessedSubdistrict}
+                  disabled={!district}
                   onChange={(e) => setSubdistrict(e.target.value)}
-                />
+                >
+                  <option value="">
+                    {district ? `— ใช้ค่าที่ระบบเดา (${guessedSubdistrict}) —` : '— เลือกอำเภอก่อน —'}
+                  </option>
+                  {subdistrictOptions.map((sd) => (
+                    <option key={sd} value={sd}>
+                      {sd}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              ปล่อยว่าง = ใช้ค่าที่ระบบเดาจากที่อยู่ (ตัวสีจางในช่อง)
+              ไม่เลือก = ใช้ค่าที่ระบบเดาจากที่อยู่ ERP · เลือกจังหวัดใหม่แล้วอำเภอ/ตำบลจะถูกล้าง
             </p>
+            {/* ค่าเดิมที่เคยพิมพ์เองอาจไม่มีในรายการ (ก่อนเปลี่ยนเป็น dropdown)
+                ต้องบอกให้รู้ ไม่ใช่ปล่อยให้ช่องว่างเปล่าแล้วเข้าใจว่าไม่เคยตั้ง */}
+            {[
+              province && !provinceOptions.includes(province) ? `จังหวัด "${province}"` : '',
+              district && province && !districtOptions.includes(district) ? `อำเภอ "${district}"` : '',
+              subdistrict && district && !subdistrictOptions.includes(subdistrict)
+                ? `ตำบล "${subdistrict}"`
+                : '',
+            ].filter(Boolean).length > 0 ? (
+              <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
+                ค่าเดิมที่เคยพิมพ์ไว้ไม่ตรงกับรายการมาตรฐาน (
+                {[
+                  province && !provinceOptions.includes(province) ? `จังหวัด "${province}"` : '',
+                  district && province && !districtOptions.includes(district) ? `อำเภอ "${district}"` : '',
+                  subdistrict && district && !subdistrictOptions.includes(subdistrict)
+                    ? `ตำบล "${subdistrict}"`
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                ) — เลือกใหม่จากรายการเพื่อให้ตัวกรองจับได้
+              </p>
+            ) : null}
           </section>
 
           <section className="space-y-2">

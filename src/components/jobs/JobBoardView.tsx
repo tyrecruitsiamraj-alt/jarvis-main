@@ -563,6 +563,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                       {jobBoardCardTitle(job)}
                     </h2>
+                    {/* ตำแหน่งงานอยู่ใต้ชื่อไซต์ทันที + ไฮไลต์สี (เจ้าของสั่ง 17 ส.ค. 2569:
+                        *"ตำแหน่งงานอยู่ใต้ Site งาน และขอไฮไลสีด้วย"*)
+                        เดิมตำแหน่งเป็นชิปเทา ๆ ปนอยู่แถวล่างกับประเภทงาน กวาดตาหาไม่เจอ
+                        ทั้งที่เป็นคำที่คนใช้ตัดสินใจมากที่สุดบนการ์ด */}
+                    <p className="mt-1 line-clamp-2 text-sm font-bold leading-snug text-blue-700 dark:text-blue-300">
+                      {publicJobPositionLabel(job)}
+                    </p>
                     <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
                       {unitRequestCardSubtitle(job) || EM_DASH}
                     </p>
@@ -607,9 +614,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                    {publicJobPositionLabel(job)}
-                  </span>
+                  {/* ⚠️ ชิป "ตำแหน่ง" เดิมถูกถอดออกจากแถวนี้ — ขึ้นเป็นบรรทัดไฮไลต์
+                      ใต้ชื่อไซต์แล้ว ปล่อยไว้ทั้งสองที่ = อ่านซ้ำสองรอบบนการ์ดเดียว */}
                   {/* สถานะงาน + บอกด้วยเมื่อสถานะนั้นทำให้ประกาศไม่ขึ้นหน้าสาธารณะ
                       (เจ้าของสั่ง 17 ส.ค. 2569: *"ถ้าบอกมีคนรอเริ่มงานแล้วไม่ขึ้น
                       งั้นต่อไปหน้ากล่องงานช่วยบอกสถานะด้วยจะได้รู้"*)
