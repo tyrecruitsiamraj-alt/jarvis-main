@@ -12,7 +12,11 @@ import {
   type MonthlyIncomeItem,
 } from '../../_lib/siamrajJobBenefits.js';
 import { attachNotes, attachWorkStatus } from '../siamraj-unit-requests.js';
-import { isPublicVisibleByWorkStatus } from '../../../src/lib/publicJobVisibility.js';
+import {
+  isPublicPrequestEnabled,
+  isPublicVisibleByPrequest,
+  isPublicVisibleByWorkStatus,
+} from '../../../src/lib/publicJobVisibility.js';
 
 type JobRow = {
   id: string;
@@ -192,14 +196,28 @@ const parseIntOrNull = (v: unknown): number | null => {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
 
+/**
+ * ใบขอล่วงหน้าออกหน้าสาธารณะได้ไหม — อ่าน env ทุกครั้ง (ไม่ cache) เพื่อให้เปลี่ยนค่าแล้ว
+ * มีผลทันทีโดยไม่ต้อง restart · ค่าเริ่มต้น = **ปิด** ดูเหตุผลที่ `publicJobVisibility.ts`
+ */
+function prequestPublicEnabled(): boolean {
+  return isPublicPrequestEnabled(process.env.PUBLIC_PREQUEST_JOBS_ENABLED);
+}
+
 async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
   const items = await listSiamrajUnitRequests({ limit, mode: 'all' });
-  const open = items.filter(isPublicVisible) as unknown as Array<Record<string, unknown>>;
+  const prequestOk = prequestPublicEnabled();
+  const open = items.filter(
+    (j) => isPublicVisible(j) && isPublicVisibleByPrequest(j, prequestOk),
+  ) as unknown as Array<Record<string, unknown>>;
   const stillHiring = await withStaffOverrides(await withoutFilledJobs(open));
   return stillHiring.map((j) => toPublicJob(j as unknown as JobRow));
 }
 
 async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
+  // ด่านใบล่วงหน้าต้องอยู่ก่อนยิง ERP — ลิงก์เก่าที่คนแชร์ไว้ต้องตาย 404 ด้วย
+  // ไม่งั้นปิดหน้ารวมแล้วยังเปิดใบซ้อมตรง ๆ ได้อยู่ดี
+  if (!isPublicVisibleByPrequest({ id }, prequestPublicEnabled())) return null;
   const item = await getSiamrajUnitRequestById(id);
   if (!item || !isPublicVisible(item)) return null;
   // เปิดตรงด้วยลิงก์ก็ต้องซ่อนเหมือนกัน — ไม่งั้นลิงก์เก่าที่คนแชร์ไว้ยังพาไปสมัครใบที่ได้คนแล้ว
