@@ -16,6 +16,7 @@ import {
   excludeInternalReplacementRoleWhereSql,
 } from './siamrajBoardRequestTypes.js';
 import {
+  digitsOnlyRowMatchesLookup,
   extractRequestNoDigitSuffix,
   normalizeSiamrajRequestNoForDisplay,
   pickBestRequestNoCandidate,
@@ -413,10 +414,16 @@ export async function getSiamrajSqlServerUnitRequestById(requestNo: string) {
   const digits = extractRequestNoDigitSuffix(trimmed);
   if (!digits || digits === trimmed) return null;
 
-  const suffixMatches = await fetchSqlServerUnitRequestRows(
-    `AND UPPER(RTRIM(A.request_no)) LIKE '%' + @digits`,
+  // 🔴 ต้องเป็น `=` ห้ามเป็น `LIKE '%' + @digits` — LIKE กวาดใบของแผนกอื่นที่เลขท้ายซ้ำ
+  // มาด้วย (เลข 6907002 มี 9 ใบ ข้าม 4 BU) แล้วเลือกผิดใบเงียบ ๆ
+  // ดูเหตุผลเต็มที่ `digitsOnlyRowMatchesLookup`
+  const digitsOnlyRows = await fetchSqlServerUnitRequestRows(
+    `AND RTRIM(A.request_no) = @digits`,
     { digits },
   );
-  const best = pickBestRequestNoCandidate(suffixMatches, trimmed);
+  // ด่านที่สอง: prefix ที่เราเติมให้ตอนแสดงผลต้องตรงกับที่ผู้ใช้กด
+  // (เลขล้วนใบเดียวกันคนละไซต์ = คนละ prefix = คนละใบ)
+  const sameRequest = digitsOnlyRows.filter((r) => digitsOnlyRowMatchesLookup(trimmed, r));
+  const best = pickBestRequestNoCandidate(sameRequest, trimmed);
   return best ? mapSqlServerRow(best) : null;
 }

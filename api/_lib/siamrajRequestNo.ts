@@ -32,6 +32,40 @@ export function normalizeSiamrajRequestNoForDisplay(
   return t;
 }
 
+/**
+ * 🔴 **ด่านกันเปิดผิดใบข้ามบริษัท** (17 ส.ค. 2569)
+ *
+ * ทางสำรอง "หาด้วยเลขท้าย" มีไว้เพื่อเคสเดียวเท่านั้น: ERP บางแถวเก็บ `request_no`
+ * เป็น**ตัวเลขล้วน** (`6907001`) แล้วเราเติม prefix ให้ตอนแสดงผลจาก `site_code`
+ * พอผู้ใช้กดเลขที่เห็นบนจอ (`LBD6907001`) หาแบบตรงตัวจึงไม่เจอ
+ *
+ * แต่เดิมทางสำรองยิง `LIKE '%<เลขท้าย>'` ซึ่ง**กวาดใบของแผนกอื่นมาด้วย** — วัดจากฐานจริง
+ * เลข `6907002` มีถึง **9 ใบ ข้าม 4 BU** และ `prefixSimilarity` ให้ `OPL` เทียบ `LAO`
+ * ได้ 1 แต้ม (ตัว `o` พ้องกัน) มากกว่า `SQ` ที่ได้ 0 → กด **OPL6907002 (ฮอนด้า/LBD)**
+ * แล้วได้ **LAO6907002 (ทาทา สตีล/LBA)** แบบเงียบ ๆ · ทั้งระบบมี **234 ใบ** ที่เด้งข้าม BU
+ *
+ * เลขนำหน้าใบขอ = **รหัสแผนกที่ยื่นขอ** (ตรวจแล้วตรง 1,517/1,517 ใบ) แต่ละแผนกเดินเลข
+ * รันของตัวเอง เลขท้ายจึงชนกันเป็นปกติ → **ตัดเลขนำหน้าทิ้งเมื่อไหร่ = ถามผิดใบทันที**
+ *
+ * ด่านนี้บังคับว่า แถวที่ได้จากทางสำรองต้องเป็น**เลขล้วนจริง ๆ** และ prefix ที่เรา
+ * เติมให้ตอนแสดงผลต้อง**ตรงกับที่ผู้ใช้กดเป๊ะ** ไม่งั้นถือว่าไม่ใช่ใบเดียวกัน
+ */
+export function digitsOnlyRowMatchesLookup(
+  query: string,
+  row: { request_no?: string | null; site_code?: string | null; department_code?: string | null },
+): boolean {
+  const q = query.trim().toUpperCase();
+  const raw = (row.request_no || '').trim();
+  // แถวที่มี prefix อยู่แล้วห้ามเข้าทางสำรองเด็ดขาด — นั่นคือใบของแผนกอื่น
+  // (เลขที่ว่างก็ตกด่านนี้ เพราะ regex ต้องการเลขอย่างน้อย 5 ตัว · คำค้นว่างก็เทียบไม่ติดอยู่ดี)
+  if (!DIGITS_ONLY_REQUEST_NO.test(raw)) return false;
+  const display = normalizeSiamrajRequestNoForDisplay(raw, {
+    siteCode: row.site_code,
+    departmentCode: row.department_code,
+  });
+  return display.trim().toUpperCase() === q;
+}
+
 export function requestNoMatchesLookup(query: string, requestNo: string): boolean {
   const q = query.trim().toLowerCase();
   const no = requestNo.trim().toLowerCase();
