@@ -18,6 +18,8 @@ function row(over: Partial<LumosCallStatus> = {}): LumosCallStatus {
     status: 'pending',
     outcome: null,
     summary: null,
+    // ⚠️ ฟิลด์บังคับของ LumosCallStatus (เพิ่ม 17 ส.ค. 2569) — ไม่ใส่ = tsc ไม่ผ่าน
+    next_action: null,
     delivery_count: 0,
     sent_at: '2026-08-03T01:00:00.000Z',
     updated_at: '2026-08-03T01:00:00.000Z',

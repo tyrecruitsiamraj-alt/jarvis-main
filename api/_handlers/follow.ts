@@ -98,15 +98,18 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 200;
 
   const { rows } = await dbQuery<FollowRow>(
+    /**
+     * ⚠️ รวมสองสายที่ทำขนานกัน 17 ส.ค. 2569 — merge ต่อบรรทัดให้ดื้อ ๆ จน SQL พัง
+     * (ไม่มี conflict marker เพราะเป็นการเพิ่มบรรทัดติดกัน) เก็บของทั้งสองฝั่ง:
+     *   · `next_action` ของอีกสาย
+     *   · `coalesce(last_outcome, result->>'outcome')` ของสายนี้ — ผลที่คนบันทึกเขียนแค่
+     *     `last_outcome` ส่วนแถวก่อน migration 070 มีแต่ `result` อ่านทางเดียวจะหายเงียบ
+     */
     `select f.*,
-            q.status                     as call_status,
-            q.result->>'outcome'         as call_outcome,
-            q.result->>'summary'         as call_summary,
-            q.result->'next_action'      as call_next_action,
-            q.updated_at                 as called_at
             q.status                                       as call_status,
             coalesce(q.last_outcome, q.result->>'outcome') as call_outcome,
             q.result->>'summary'                           as call_summary,
+            q.result->'next_action'                        as call_next_action,
             q.updated_at                                   as called_at
        from ${followTable} f
        left join ${queueTable} q

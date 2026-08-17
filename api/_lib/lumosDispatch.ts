@@ -1047,12 +1047,16 @@ const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() :
  */
 export async function listLumosCallStatusForJob(jobId: string): Promise<LumosCallStatusRow[]> {
   const { rows } = await dbQuery<QueueStatusSqlRow>(
+    /**
+     * ⚠️ รวมสองสายที่ทำขนานกัน 17 ส.ค. 2569 — merge ต่อบรรทัดจน SQL พัง (ไม่มี conflict
+     * marker เพราะเป็นการเพิ่มบรรทัดติดกัน) · เก็บ `next_action` ของอีกสาย และคง
+     * `coalesce(last_outcome, ...)` ของสายนี้ไว้ตามกติกา (เทสต์ outcomeReadGuard คุมอยู่):
+     * ผลที่คนบันทึกเขียนแค่ `last_outcome` อ่าน `result` ทางเดียว = ผลของคนหายเงียบ
+     */
     `select channel, person_ref, status, delivery_count, created_at, updated_at,
-            result->>'outcome' as outcome,
+            coalesce(last_outcome, result->>'outcome') as outcome,
             result->>'summary' as summary,
             result->'next_action' as next_action_raw
-            coalesce(last_outcome, result->>'outcome') as outcome,
-            result->>'summary' as summary
        from ${queueTable}
       where job_ref = $1 and status <> 'cancelled'
       order by created_at asc`,
