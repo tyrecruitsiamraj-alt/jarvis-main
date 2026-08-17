@@ -1,20 +1,21 @@
-# Business Context
+# บริบททางธุรกิจ
 
-This project is for a Request Control Tower dashboard for staffing/workforce requests.
+โปรเจกต์นี้คือแดชบอร์ด "ศูนย์ควบคุมใบขอ" (Request Control Tower) สำหรับใบขอกำลังคน
 
-The dashboard must help executives and operations answer:
+แดชบอร์ดต้องช่วยผู้บริหารและฝ่ายปฏิบัติการตอบคำถามเหล่านี้:
 
-* How much demand came in this period?
-* How much backlog was carried over?
-* How many positions were fulfilled/informed?
-* How many requests were fully fulfilled?
-* How many positions were cancelled?
-* How many requests are resolved?
-* How many positions remain?
-* Did backlog increase or decrease?
-* Which lifecycle type is driving demand?
-* Which requests are SLA risk or SLA breached?
-* Which site/unit/customer/owner causes recurring demand or backlog?
+* งวดนี้มีความต้องการเข้ามาเท่าไหร่
+* ยกยอดงานค้างมาจากงวดก่อนเท่าไหร่
+* หาคนได้/แจ้งเข้าไปแล้วกี่อัตรา
+* มีใบขอที่ปิดครบแล้วกี่ใบ
+* ถูกยกเลิกไปกี่อัตรา
+* มีใบขอที่จบงานแล้วกี่ใบ
+* เหลือต้องหาอีกกี่อัตรา
+* งานค้างเพิ่มขึ้นหรือลดลง
+* ความต้องการมาจากวงจรชีวิตใบขอแบบไหนมากที่สุด
+* ใบขอไหนเสี่ยงเกิน SLA หรือเกินไปแล้ว
+* ไซต์/หน่วยงาน/ลูกค้า/ผู้รับผิดชอบรายไหนเป็นต้นเหตุของความต้องการซ้ำหรืองานค้าง
 
-Business-first objective:
-The dashboard must support decision-making, reduce manual reporting, improve productivity, identify SLA risk, and expose root causes such as resignation-heavy sites or repeated replacement requests.
+**เป้าหมายเชิงธุรกิจมาก่อน:**
+แดชบอร์ดต้องช่วยให้ตัดสินใจได้ ลดงานทำรายงานด้วยมือ เพิ่มผลิตภาพ ชี้ความเสี่ยง SLA
+และเปิดให้เห็นต้นเหตุ เช่น ไซต์ที่คนลาออกบ่อย หรือใบขอแทนคนที่วนซ้ำ

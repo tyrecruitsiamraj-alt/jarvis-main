@@ -133,6 +133,24 @@ export interface JobRequest {
   filled_positions?: number;
   /** จำนวนที่ยกเลิก / ปิดค้าง */
   cancelled_positions?: number;
+  /** วันที่แจ้งเข้า (YMD) — ยังไม่มี adapter ไหนส่งมา ledger จึง fallback เป็น closed_date */
+  inform_date?: string;
+  /** วันที่ยกเลิก (YMD) — ใบขอที่ปิดแล้วจาก SQL Server ส่งค่านี้มา */
+  cancel_date?: string;
+  /**
+   * เหตุการณ์หาได้/ยกเลิกรายครั้งพร้อมวันที่ — ถ้ามีค่านี้ ledger จะใช้แทน snapshot
+   * (`filled_positions`/`cancelled_positions`) ทำให้ยอดรายงวดแม่นขึ้นและเลิกเป็น snapshot_fallback
+   * ยังไม่มี adapter ไหนส่งมา — โครงรอไว้ให้ตรงกับ `FulfillmentLedgerEvent`
+   */
+  fulfillment_events?: Array<{
+    eventDate: string | null;
+    eventType: 'informed' | 'cancelled';
+    positionQty: number;
+    sourceTable?: string;
+    sourceId?: string;
+    isDateReliable?: boolean;
+    reliabilityNote?: string;
+  }>;
   lastWorkingDay?: string;
   contact_phone?: string;
   contact_name?: string;
@@ -156,6 +174,14 @@ export interface JobRequest {
   urgency: JobUrgency;
   total_income: number;
   location_address: string;
+  /**
+   * สถานที่ปฏิบัติงาน — ชื่อสถานที่/บริษัทที่ไปประจำ (ERP `st_request_p2.work_place1`)
+   * ต่างจาก `location_address` ที่รวม work_place1-3 (มีที่อยู่/ผู้ใช้บริการปนมา) และเป็นตัวที่
+   * ตัวกรองจังหวัด-อำเภอใช้ — ช่องนี้ไว้อ่านอย่างเดียว ไม่เอาไปกรอง
+   */
+  work_place?: string;
+  /** สัญชาติเจ้านาย (ERP `st_request_p2.boss_nationality`) — เป็นข้อความอิสระ ~40% ของใบขอเท่านั้นที่กรอก */
+  boss_nationality?: string;
   lat?: number;
   lng?: number;
   job_type: JobType;
@@ -170,6 +196,21 @@ export interface JobRequest {
   age_range_max?: number;
   vehicle_required?: string;
   work_schedule?: string;
+  /**
+   * สวัสดิการที่โชว์บนประกาศได้ เช่น ["โอที ~75 บาท/ชม.", "เบี้ยขยัน", "ค่าเดินทาง"]
+   * (เจ้าของเคาะ 16 ส.ค. 2569 — กติกาเดียวกับที่ AI พูดตอนโทร)
+   * ⚠️ ทุกตัวเลขเป็น **อัตราจ่าย** ไม่ใช่อัตราเบิก · undefined = ใบนี้ไม่มีข้อมูล/ERP อ่านไม่ได้
+   */
+  benefits?: string[];
+  /**
+   * รายได้ต่อเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของนิยาม 16 ส.ค. 2569)
+   * ⚠️ **ต่างจาก `total_income`** ซึ่งเป็นอัตราค่าแรงหลักดิบจาก ERP (บางใบเป็น**ต่อวัน**
+   * เช่น 410 = ค่าแรงรายวัน วัดเจอ 20 จาก 200 ใบ) — ฟิลด์นี้แปลงเป็นต่อเดือนแล้วเสมอ
+   * undefined = คิดไม่ได้/ERP อ่านไม่ได้ → ให้ถอยไปแสดง total_income เหมือนเดิม
+   */
+  monthly_income?: number;
+  monthly_income_base?: number;
+  monthly_income_items?: Array<{ label: string; monthly: number }>;
   penalty_per_day: number;
   days_without_worker: number;
   total_penalty: number;

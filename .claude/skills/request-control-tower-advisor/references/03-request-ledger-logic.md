@@ -1,92 +1,83 @@
-# Request Ledger Logic
+# ตรรกะบัญชีใบขอ (Request Ledger)
 
-The dashboard must use ledger/event-based logic where possible.
+แดชบอร์ดต้องคิดแบบ "บัญชี/เหตุการณ์" ให้มากที่สุดเท่าที่ข้อมูลจะเอื้อ
 
-Required conceptual ledgers:
+## บัญชีที่ต้องมีในเชิงแนวคิด
 
-1. Request Ledger
-   Each request should include:
+### 1. บัญชีใบขอ (Request Ledger)
 
-* requestNo
-* submittedDate
-* requiredDate
-* effectiveRequestDate
-* requestKind
-* lifecycleKind
-* requestActionName
-* requestPositions
-* unit/site/customer/owner fields
-* SLA fields
+แต่ละใบขอควรมี:
 
-2. Fulfillment Event Ledger
-   Each event should include:
+* `requestNo` — เลขที่ใบขอ
+* `submittedDate` — วันที่ยื่นใบขอ
+* `requiredDate` — วันที่ต้องการคน
+* `effectiveRequestDate` — วันที่ใช้จริงในการคิดงวด
+* `requestKind` — ประเภทความเร่ง (ย้อนหลัง/ฉุกเฉิน/ล่วงหน้า)
+* `lifecycleKind` — วงจรชีวิตใบขอ (ลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์)
+* `requestActionName` — ชื่อประเภทใบขอจาก ERP
+* `requestPositions` — จำนวนอัตราที่ขอ
+* ฟิลด์หน่วยงาน/ไซต์/ลูกค้า/ผู้รับผิดชอบ
+* ฟิลด์ SLA
 
-* requestNo
-* eventDate
-* eventType: informed or cancelled
-* positionQty
-* sourceTable
-* isDateReliable
-* reliabilityNote
+### 2. บัญชีเหตุการณ์การหาได้ (Fulfillment Event Ledger)
 
-Core calculation:
-requestPositions = requested quantity
-fulfilledPositions = informed/started/sent-to-start quantity
-cancelledPositions = cancelled quantity
-remainingPositions = max(requestPositions - fulfilledPositions - cancelledPositions, 0)
+แต่ละเหตุการณ์ควรมี:
 
-Status rules:
+* `requestNo` — เลขที่ใบขอ
+* `eventDate` — วันที่เกิดเหตุการณ์
+* `eventType` — `informed` (แจ้งเข้า) หรือ `cancelled` (ยกเลิก)
+* `positionQty` — จำนวนอัตรา
+* `sourceTable` — มาจากตารางไหน
+* `isDateReliable` — วันที่เชื่อถือได้ไหม
+* `reliabilityNote` — หมายเหตุความน่าเชื่อถือ
 
-1. fulfilled 3 of 5, cancelled 0:
+## การคำนวณหลัก
 
-* หาได้แล้ว = 3
-* เหลือหา = 2
-* status = partial
-* fully fulfilled = no
-* resolved = no
+```
+requestPositions   = จำนวนอัตราที่ขอ
+fulfilledPositions = จำนวนที่แจ้งเข้า/เริ่มงาน/ส่งไปเริ่มงาน
+cancelledPositions = จำนวนที่ยกเลิก
+remainingPositions = max(requestPositions − fulfilledPositions − cancelledPositions, 0)
+```
 
-2. fulfilled 5 of 5:
+## กติกาสถานะ — 4 กรณีตัวอย่าง
 
-* หาได้แล้ว = 5
-* เหลือหา = 0
-* status = fully_fulfilled
-* fully fulfilled = yes
-* resolved = yes
+**1. ขอ 5 หาได้ 3 ยกเลิก 0**
+หาได้แล้ว = 3 · เหลือหา = 2 · สถานะ = `partial`
+ปิดครบใบขอ = ไม่ · จบงานแล้ว = ไม่
 
-3. fulfilled 2 of 5, cancelled 3:
+**2. ขอ 5 หาได้ 5**
+หาได้แล้ว = 5 · เหลือหา = 0 · สถานะ = `fully_fulfilled`
+ปิดครบใบขอ = ใช่ · จบงานแล้ว = ใช่
 
-* หาได้แล้ว = 2
-* ยกเลิก = 3
-* เหลือหา = 0
-* status = partially_fulfilled_cancelled_remaining
-* fully fulfilled = no
-* resolved = yes
+**3. ขอ 5 หาได้ 2 ยกเลิก 3**
+หาได้แล้ว = 2 · ยกเลิก = 3 · เหลือหา = 0
+สถานะ = `partially_fulfilled_cancelled_remaining`
+ปิดครบใบขอ = **ไม่** · จบงานแล้ว = ใช่
 
-4. fulfilled 0 of 5, cancelled 5:
+**4. ขอ 5 หาได้ 0 ยกเลิก 5**
+หาได้แล้ว = 0 · ยกเลิก = 5 · เหลือหา = 0 · สถานะ = `cancelled_full`
+ปิดครบใบขอ = **ไม่** · จบงานแล้ว = ใช่
 
-* หาได้แล้ว = 0
-* ยกเลิก = 5
-* เหลือหา = 0
-* status = cancelled_full
-* fully fulfilled = no
-* resolved = yes
+> กรณี 3 กับ 4 คือหัวใจของกติกา "ยกเลิกไม่ใช่หาได้แล้ว" —
+> จบงานแล้วแต่ไม่ได้แปลว่าปิดครบใบขอ
 
-Effective request date:
+## วันที่ใช้จริงในการคิดงวด (effective request date)
 
-* retroactive / ฉุกเฉินย้อนหลัง: use submitted/request date
-* urgent / ฉุกเฉิน: use required/want date
-* advance / ล่วงหน้า: use required/want date
+* **ฉุกเฉินย้อนหลัง** (retroactive) → ใช้วันที่ยื่นใบขอ
+* **ฉุกเฉิน** (urgent) → ใช้วันที่ต้องการคน
+* **ล่วงหน้า** (advance) → ใช้วันที่ต้องการคน
 
-Request kind classification:
+## การจัดประเภทความเร่ง (request kind)
 
-* retroactive = required date < submitted date
-* urgent = required date >= submitted date AND lead days < 7
-* advance = lead days >= 7
+* `retroactive` — วันที่ต้องการ < วันที่ยื่น
+* `urgent` — วันที่ต้องการ ≥ วันที่ยื่น และเหลือเวลา < 7 วัน
+* `advance` — เหลือเวลา ≥ 7 วัน
 
-Lifecycle mapping:
+## การจับคู่วงจรชีวิตใบขอ (lifecycle)
 
-* resignation = request_action_name contains “ลาออก”
-* replacement = request_action_name contains “เปลี่ยนตัว”
-* increase_headcount = request_action_name contains “เพิ่มอัตรา”
-* new_site = request_action_name contains “เปิดไซต์”
-* other = anything else
+* `resignation` — ชื่อประเภทใบขอมีคำว่า "ลาออก"
+* `replacement` — มีคำว่า "เปลี่ยนตัว"
+* `increase_headcount` — มีคำว่า "เพิ่มอัตรา"
+* `new_site` — มีคำว่า "เปิดไซต์"
+* `other` — นอกเหนือจากนี้

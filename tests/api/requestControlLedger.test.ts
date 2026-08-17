@@ -212,4 +212,59 @@ describe('requestControlLedger acceptance', () => {
     expect(resolveResolutionStatus(5, 2, 3)).toBe('partially_fulfilled_cancelled_remaining');
     expect(resolveResolutionStatus(5, 0, 5)).toBe('cancelled_full');
   });
+
+  it('makeTestLedger: วันที่ที่ใช้คำนวณ SLA ต้องลงไปอยู่ใน record ด้วย', () => {
+    // เคยพลาด: default ของ submitted/required ถูกใช้คำนวณ SLA แต่ ...partial ทับให้หายไป
+    // ผลคือ record มี slaDueDate แต่ submittedDate เป็น undefined — เทียบวันไม่ได้
+    const ledger = makeTestLedger({ requestNo: 'D' });
+    expect(ledger.submittedDate).toBe('2026-07-01');
+    expect(ledger.requiredDate).toBe('2026-07-20');
+    expect(ledger.slaStartDate).toBe(
+      resolveSlaDates(ledger.requestKind, ledger.submittedDate, ledger.requiredDate).slaStartDate,
+    );
+
+    const explicit = makeTestLedger({
+      requestNo: 'E',
+      submittedDate: '2026-06-01',
+      requiredDate: '2026-06-10',
+    });
+    expect(explicit.submittedDate).toBe('2026-06-01');
+    expect(explicit.requiredDate).toBe('2026-06-10');
+  });
+
+  it('buildFulfillmentEventsFromJob: ใช้ fulfillment_events ที่มีวันที่จริงแทน snapshot', () => {
+    const j = job({
+      unit_name: 'U',
+      request_positions: 5,
+      filled_positions: 3,
+      fulfillment_events: [
+        { eventDate: '2026-07-09', eventType: 'informed', positionQty: 2 },
+        { eventDate: '2026-07-19', eventType: 'informed', positionQty: 1 },
+      ],
+    });
+    const events = buildFulfillmentEventsFromJob(j);
+    expect(events).toHaveLength(2);
+    expect(events.every((e) => e.isDateReliable)).toBe(true);
+
+    const ledger = makeTestLedger({ requestNo: 'F', effectiveRequestDate: '2026-07-01', requestPositions: 5 });
+    const state = computeRequestStateForPeriod(ledger, events, JULY.from, JULY.to)!;
+    expect(state.fulfilledPositionsTotal).toBe(3);
+    // มีวันที่จริง → ต้องนับเข้างวดได้ และเลิกเป็น snapshot_fallback
+    expect(state.fulfilledPositionsThisPeriod).toBe(3);
+    expect(state.dataQuality).toBe('event_based');
+  });
+
+  it('buildFulfillmentEventsFromJob: cancel_date ใช้เป็นวันยกเลิกได้', () => {
+    const j = job({
+      unit_name: 'U',
+      status: 'cancelled',
+      request_positions: 2,
+      cancelled_positions: 2,
+      cancel_date: '2026-07-14',
+    });
+    const events = buildFulfillmentEventsFromJob(j);
+    const cancelled = events.find((e) => e.eventType === 'cancelled');
+    expect(cancelled?.eventDate).toBe('2026-07-14');
+    expect(cancelled?.isDateReliable).toBe(true);
+  });
 });

@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
+import { ChevronDown, ExternalLink, KeyRound, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import {
@@ -34,6 +34,13 @@ const AppNavDrawer: React.FC<Props> = ({
   const navigate = useNavigate();
   const location = useLocation();
 
+  /**
+   * "บอร์ดรับสมัคร" กับ "หน้าสมัครสาธารณะ" เคยเป็นสองแถวเรียงกันในเมนู ซึ่งอ่านแล้วดูเหมือน
+   * เมนูซ้ำกันสองอัน (เจ้าของทัก 10 ส.ค. 2569) — ยุบเป็นหัวข้อเดียวที่กดกางเห็นทั้งสอง
+   * เปิดค้างไว้ให้เองเมื่ออยู่ในบอร์ดอยู่แล้ว จะได้ไม่ต้องกดหาทุกครั้ง
+   */
+  const [boardOpen, setBoardOpen] = useState(() => location.pathname.startsWith('/jobs/board'));
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -52,8 +59,8 @@ const AppNavDrawer: React.FC<Props> = ({
     cn(
       'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors touch-manipulation',
       active
-        ? 'bg-blue-500/12 text-blue-700'
-        : 'text-foreground/80 hover:bg-white/60 hover:text-foreground',
+        ? 'bg-blue-500/12 text-blue-700 dark:bg-sky-400/15 dark:text-sky-200'
+        : 'text-foreground/80 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10',
     );
 
   return (
@@ -74,11 +81,11 @@ const AppNavDrawer: React.FC<Props> = ({
         aria-label="เมนูหลัก"
         aria-modal={open}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full w-[17rem] max-w-[85vw] flex-col border-r border-white/60 bg-white/85 shadow-2xl backdrop-blur-xl transition-transform duration-250 ease-out safe-area-pt',
+          'fixed inset-y-0 left-0 z-50 flex h-full w-[17rem] max-w-[85vw] flex-col border-r border-white/60 bg-white/85 shadow-2xl dark:border-slate-700/70 dark:bg-slate-900/90 backdrop-blur-xl transition-transform duration-250 ease-out safe-area-pt',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-white/60 px-4 py-3">
+        <div className="flex items-center justify-between gap-2 border-b border-white/60 px-4 py-3 dark:border-slate-700/70">
           <button type="button" onClick={() => go('/')} className="flex min-w-0 items-center gap-2">
             <BrandMark size="sm" />
             <BrandTitle className="truncate text-base font-bold text-foreground" />
@@ -87,14 +94,14 @@ const AppNavDrawer: React.FC<Props> = ({
             type="button"
             onClick={onClose}
             aria-label="ปิดเมนู"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/70 hover:text-foreground"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {userName ? (
-          <div className="flex items-center gap-2 border-b border-white/50 px-4 py-2.5">
+          <div className="flex items-center gap-2 border-b border-white/50 px-4 py-2.5 dark:border-slate-700/70">
             <span className="truncate text-sm font-medium text-foreground">{userName}</span>
             {userRole ? (
               <span className="ml-auto rounded-full bg-[#141210] px-2 py-0.5 text-[10px] font-medium uppercase text-white">
@@ -107,6 +114,7 @@ const AppNavDrawer: React.FC<Props> = ({
         <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="เมนูหลัก">
           {items.map((item) => {
             const Icon = item.icon;
+
             const rows = [
               <button
                 key={item.path}
@@ -118,37 +126,60 @@ const AppNavDrawer: React.FC<Props> = ({
                 <span className="truncate">{item.label}</span>
               </button>,
             ];
-            // แทรก "บอร์ดรับสมัคร" ต่อจาก "หน่วยงาน"
+            // แทรกกลุ่ม "บอร์ดรับสมัคร" ต่อจาก "หน่วยงาน" — หัวข้อเดียว กดแล้วกางเห็น 2 ทางเข้า
             if (item.path === '/jobs/list' && showJobBoard) {
+              const inBoard = location.pathname.startsWith('/jobs/board');
               rows.push(
                 <button
-                  key="/jobs/board"
+                  key="board-group"
                   type="button"
-                  onClick={() => go('/jobs/board')}
-                  className={rowClass(location.pathname.startsWith('/jobs/board'))}
+                  onClick={() => setBoardOpen((v) => !v)}
+                  aria-expanded={boardOpen}
+                  className={rowClass(inBoard)}
                 >
                   <LayoutGrid className="h-4 w-4 shrink-0" />
                   <span className="truncate">บอร์ดรับสมัคร</span>
-                </button>,
-                <button
-                  key="apply-public"
-                  type="button"
-                  onClick={() => {
-                    window.open('/apply', '_blank', 'noopener,noreferrer');
-                    onClose();
-                  }}
-                  className={cn(rowClass(false), 'text-muted-foreground')}
-                >
-                  <ExternalLink className="h-4 w-4 shrink-0" />
-                  <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
+                  <ChevronDown
+                    className={cn(
+                      'ml-auto h-4 w-4 shrink-0 transition-transform',
+                      boardOpen && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
                 </button>,
               );
+              if (boardOpen) {
+                rows.push(
+                  <button
+                    key="/jobs/board"
+                    type="button"
+                    onClick={() => go('/jobs/board')}
+                    className={cn(rowClass(inBoard), 'pl-10')}
+                  >
+                    <span className="truncate">กล่องงาน (เปิดบอร์ด)</span>
+                  </button>,
+                  // ⚠️ ลิงก์ "รายชื่อผู้สมัคร (RM)" เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก
+                  // 13 ส.ค. 2569 ("มันอยู่หน้าบอร์ดรับสมัครแล้ว") · ทางเข้า = แท็บบนบอร์ด
+                  <button
+                    key="apply-public"
+                    type="button"
+                    onClick={() => {
+                      window.open('/apply', '_blank', 'noopener,noreferrer');
+                      onClose();
+                    }}
+                    className={cn(rowClass(false), 'pl-10 text-muted-foreground')}
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                    <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
+                  </button>,
+                );
+              }
             }
             return rows;
           })}
         </nav>
 
-        <div className="space-y-1 border-t border-white/60 p-3">
+        <div className="space-y-1 border-t border-white/60 p-3 dark:border-slate-700/70">
           {showSettings ? (
             <button
               type="button"
@@ -159,6 +190,15 @@ const AppNavDrawer: React.FC<Props> = ({
               <span className="truncate">ตั้งค่า</span>
             </button>
           ) : null}
+          {/* ย้ายมาจากหัวเว็บ — จอมือถือใส่ปุ่มพวกนี้ไว้บนหัวไม่พอ ปุ่มจะเบียดทับกัน */}
+          <button
+            type="button"
+            onClick={() => go('/account/change-password')}
+            className={rowClass(location.pathname.startsWith('/account/change-password'))}
+          >
+            <KeyRound className="h-4 w-4 shrink-0" />
+            <span className="truncate">เปลี่ยนรหัสผ่าน</span>
+          </button>
           <button
             type="button"
             onClick={() => {

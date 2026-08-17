@@ -1,29 +1,39 @@
-# Cursor Prompt Patterns
+# แบบ prompt สำหรับสั่งงาน Cursor
 
-Use this prompt pattern for implementation:
+ใช้แบบนี้เวลาสั่งให้ลงมือ implement:
 
-Read CLAUDE.md and all files in .claude/skills/request-control-tower-advisor before making changes.
+---
 
-Implement Request Control Tower using:
+อ่าน `CLAUDE.md` และไฟล์ทั้งหมดใน `.claude/skills/request-control-tower-advisor`
+ให้ครบก่อนแก้อะไร
 
-* parallel calculation layer
+สร้าง Request Control Tower โดยใช้:
+
+* ชั้นคำนวณคู่ขนาน
 * feature flag
 * adapter
-* read-only API
-* backward-compatible types
-* unit tests
-* reconciliation
+* API แบบอ่านอย่างเดียว
+* ชนิดข้อมูลที่เข้ากันได้กับของเดิม
+* unit test
+* การกระทบยอด
 
-Do not delete old dashboard code.
-Do not rename existing DashboardData fields.
-Do not change SQL write behavior.
-Do not silently use snapshot inform_qty as exact monthly fulfillment.
-If event date is unavailable, use snapshot_fallback and show a data quality warning.
+**ข้อห้าม:**
 
-Always keep these concepts separate:
+* ห้ามลบโค้ดแดชบอร์ดเดิม
+* ห้ามเปลี่ยนชื่อฟิลด์เดิมของ DashboardData
+* ห้ามเปลี่ยนพฤติกรรมการเขียนข้อมูลลง SQL
+* ห้ามเอา snapshot `inform_qty` มาใช้เป็นยอดหาได้รายเดือนที่แม่นยำแบบเงียบ ๆ
+* ถ้าไม่มีวันที่ของเหตุการณ์ ให้ใช้ `snapshot_fallback` และขึ้นคำเตือนคุณภาพข้อมูล
+
+**ต้องแยกความหมาย 5 คำนี้ออกจากกันเสมอ:**
 
 * หาได้แล้ว
 * ปิดครบใบขอ
 * ยกเลิก
 * จบงานแล้ว
 * เหลือหา
+
+---
+
+> หมายเหตุ: แบบ prompt นี้ใช้กับผู้ช่วยเขียนโค้ดตัวไหนก็ได้ (Cursor / Claude Code)
+> หัวใจคือบังคับให้อ่าน skill ก่อน แล้วย้ำข้อห้ามที่เคยพลาดมาแล้ว

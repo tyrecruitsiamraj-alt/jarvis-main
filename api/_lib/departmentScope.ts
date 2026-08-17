@@ -82,6 +82,28 @@ export async function loadRosterBuScope(user: {
   return { mode: 'none' };
 }
 
+/**
+ * ขอบเขต BU ของ **หน้า Matching ทั้งหมด** (เจ้าของสั่ง 10 ส.ค. 2569:
+ * "หน้า matching ทุกคนจะเห็นแต่งานตัวเอง")
+ *
+ * ต่างจาก `loadUserDepartmentScope` ตรงที่ **ล็อก BU ของตัวเองแม้เป็น admin**
+ * (ตัวเดิม admin เห็นทุก BU) — ใช้ตรรกะเดียวกับหน้าโรสเตอร์ที่ล็อกอยู่แล้ว
+ *
+ * ⚠️ ต้องใช้ให้ครบทุก endpoint ของเส้น matching ไม่ใช่แค่ตัวลิสต์ — ไม่งั้น admin
+ * ยังเปิดใบขอนอก BU ได้ด้วยการยิง `?jobId=` ตรง ๆ (ลิสต์กรองแล้วแต่หน้ารายละเอียดไม่กรอง)
+ * ตอนนี้ใช้ที่: matching-list · matching-board-candidates · matching-irecruit-candidates ·
+ * matching-candidate-spec · matching-parse-branch-demand-job · matching-flow-summary
+ *
+ * ⚠️ admin ที่ยังไม่ถูกกำหนด department ตกไปที่ 'all' (พฤติกรรมเดียวกับโรสเตอร์)
+ * — ถ้าอยากให้เข้มกว่านี้ต้องบังคับตั้ง department ให้ admin ทุกคนก่อน
+ */
+export async function loadMatchingBuScope(user: {
+  sub: string;
+  role: UserRole;
+}): Promise<DepartmentScope> {
+  return loadRosterBuScope(user);
+}
+
 export function jobAllowedByDepartmentScope(
   job: { department_code?: string | null },
   scope: DepartmentScope,

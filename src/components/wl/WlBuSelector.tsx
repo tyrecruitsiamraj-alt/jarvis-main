@@ -1,4 +1,5 @@
 import React from 'react';
+import { TONE } from '@/lib/designTokens';
 import { motion } from 'framer-motion';
 import { Building2, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -52,7 +53,7 @@ const WlBuSelector: React.FC<WlBuSelectorProps> = ({
                     ? 'bg-amber-500 text-white'
                     : 'bg-primary text-primary-foreground'
                   : unassigned
-                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    ? cn(TONE.warn.soft, TONE.warn.value, TONE.warn.softHover)
                     : 'bg-secondary text-muted-foreground hover:text-foreground',
               )}
             >

@@ -14,6 +14,8 @@ import {
   createRecruitPosting,
   createPostingLink,
   setPostingStatus,
+  updateRecruitPosting,
+  type UpdatePostingPatch,
 } from '../_lib/recruitPostings.js';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -103,6 +105,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         salaryText: typeof body.salaryText === 'string' ? body.salaryText : null,
         contactName: typeof body.contactName === 'string' ? body.contactName : null,
         contactPhone: typeof body.contactPhone === 'string' ? body.contactPhone : null,
+        positionName: typeof body.positionName === 'string' ? body.positionName : null,
+        province: typeof body.province === 'string' ? body.province : null,
+        responsibleName: typeof body.responsibleName === 'string' ? body.responsibleName : null,
+        responsibleUserId: typeof body.responsibleUserId === 'string' ? body.responsibleUserId : null,
+        // ค่าที่ไม่อยู่ใน master ถูกทิ้งเป็น null ที่ชั้น store — ไม่ต้องตรวจซ้ำที่นี่
+        specificType: typeof body.specificType === 'string' ? body.specificType : null,
+        formType: typeof body.formType === 'string' ? body.formType : null,
         channels: Array.isArray(body.channels)
           ? body.channels.filter(isPlainObject).map((c) => ({
               channelId: typeof c.channelId === 'string' ? c.channelId : null,
@@ -126,9 +135,33 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!(await canAccessPosting(posting.jobId, posting.departmentCode, req, scope))) {
         return sendError(res, 404, 'Not found', 'ไม่พบประกาศนี้');
       }
-      const status = body.status === 'closed' ? 'closed' : 'open';
-      await setPostingStatus(id, status);
-      return res.status(200).json({ ...posting, status });
+      // แก้เนื้อหาประกาศ — ส่งฟิลด์ไหนมาแก้เฉพาะฟิลด์นั้น (mockup rev.3 ข้อ 04)
+      // BU/ใบขอของประกาศแก้ที่นี่ไม่ได้ตามกติกาใน updateRecruitPosting
+      const patch: UpdatePostingPatch = {};
+      if (typeof body.title === 'string') patch.title = body.title;
+      if ('detail' in body) patch.detail = typeof body.detail === 'string' ? body.detail : null;
+      if ('locationText' in body) {
+        patch.locationText = typeof body.locationText === 'string' ? body.locationText : null;
+      }
+      if ('salaryText' in body) {
+        patch.salaryText = typeof body.salaryText === 'string' ? body.salaryText : null;
+      }
+      if ('contactName' in body) {
+        patch.contactName = typeof body.contactName === 'string' ? body.contactName : null;
+      }
+      if ('contactPhone' in body) {
+        patch.contactPhone = typeof body.contactPhone === 'string' ? body.contactPhone : null;
+      }
+
+      const updated = Object.keys(patch).length > 0 ? await updateRecruitPosting(id, patch) : null;
+
+      // status ส่งมาก็เปลี่ยนด้วย — ไม่ส่งมาให้คงค่าเดิม (เดิมไม่ส่ง = เปิด ทำให้แก้เนื้อหาแล้วประกาศที่ปิดกลับมาเปิดเอง)
+      if (typeof body.status === 'string') {
+        const status = body.status === 'closed' ? 'closed' : 'open';
+        await setPostingStatus(id, status);
+        return res.status(200).json({ ...(updated ?? posting), status });
+      }
+      return res.status(200).json(updated ?? posting);
     }
 
     return sendError(res, 405, 'Method not allowed');

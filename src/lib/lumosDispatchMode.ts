@@ -1,0 +1,103 @@
+/**
+ * โหมดส่งงานให้ Lumos — นิยามกลางที่ทั้งหน้าเว็บและ API ใช้ร่วมกัน
+ * (แพตเทิร์นเดียวกับ candidatePriority.ts / recruitPostings.ts ที่ถูก import จากสองฝั่ง)
+ *
+ * ดู migrations/069_lumos_dispatch_mode.sql ว่าทำไมต้องมีตารางนี้
+ */
+
+/**
+ * จุดที่ทำให้เกิดการส่งเข้าคิว Lumos
+ * `selection_recall` เพิ่ม 16 ส.ค. 2569 — เลนคัดสรรวิ่งขนาน: ใบขอเข้ามาแล้วไปหาคน
+ * จากกองที่เคยตอบไม่สนใจงานอื่นให้เอง (เจ้าของสั่ง "อันที่ AI หามาก็โทรไปเลย")
+ * ⚠️ ค่าเริ่มต้นยังเป็น `manual` — เปิดเมื่อสาย Lumos พร้อมจริง
+ */
+export const LUMOS_DISPATCH_TRIGGERS = [
+  'board_match',
+  'irecruit_search',
+  'follow_entry',
+  'selection_recall',
+] as const;
+export type LumosDispatchTrigger = (typeof LUMOS_DISPATCH_TRIGGERS)[number];
+
+/**
+ * manual = คนติ๊กเลือกแล้วกดส่งเอง
+ * auto   = ส่งเองทันทีเมื่อถึงจุดนั้น
+ *
+ * ⚠️ เคยมีโหมด `assist` (ระบบจัดชุดให้ คนกดอนุมัติทีเดียว) — **ถอดออก 11 ส.ค. 2569**
+ * เพราะเจ้าของสั่งเลิกลูปอนุมัติทั้งชุด (แผงอนุมัติถูกเอาออกจากทุกหน้าไปแล้ว)
+ * assist ที่ไม่มีคนอนุมัติ = ชุดค้างถาวรแบบเงียบสนิท ซึ่งเกิดมาแล้วจริงบนฐาน
+ * ค่าเก่าที่อาจค้างในตารางจะถูก normalize เป็น `manual` เอง (ทางที่ปลอดภัยกว่า)
+ */
+export const LUMOS_DISPATCH_MODES = ['manual', 'auto'] as const;
+export type LumosDispatchMode = (typeof LUMOS_DISPATCH_MODES)[number];
+
+export type LumosDispatchModeConfig = Record<LumosDispatchTrigger, LumosDispatchMode>;
+
+/**
+ * ค่าเริ่มต้น = manual ทุกจุด (พฤติกรรมเดียวกับ production หลัง commit eb8c386)
+ * **fail-safe ที่ตั้งใจ**: อ่านค่าไม่ได้ / ตารางยังไม่ migrate / ค่าเพี้ยน → manual
+ * เพราะเดาผิดทาง auto = โทรหาผู้สมัครจริงโดยไม่มีใครสั่ง ซึ่งกู้คืนไม่ได้
+ */
+export const DEFAULT_LUMOS_DISPATCH_MODE: LumosDispatchModeConfig = {
+  board_match: 'manual',
+  irecruit_search: 'manual',
+  follow_entry: 'manual',
+  selection_recall: 'manual',
+};
+
+export function isLumosDispatchTrigger(v: unknown): v is LumosDispatchTrigger {
+  return typeof v === 'string' && (LUMOS_DISPATCH_TRIGGERS as readonly string[]).includes(v);
+}
+
+export function isLumosDispatchMode(v: unknown): v is LumosDispatchMode {
+  return typeof v === 'string' && (LUMOS_DISPATCH_MODES as readonly string[]).includes(v);
+}
+
+/**
+ * กันค่าจาก DB/ผู้ใช้เพี้ยน — คีย์ที่ไม่รู้จักถูกทิ้ง ค่าที่ไม่รู้จักกลับเป็น manual
+ * ⚠️ รวมถึงค่า `assist` ที่อาจค้างในตารางจากก่อน 11 ส.ค. 2569 — ตกเป็น manual
+ * ไม่ใช่ auto (เดาผิดทาง auto = โทรหาผู้สมัครจริงโดยไม่มีใครสั่ง กู้คืนไม่ได้)
+ */
+export function normalizeLumosDispatchMode(raw: unknown): LumosDispatchModeConfig {
+  const out: LumosDispatchModeConfig = { ...DEFAULT_LUMOS_DISPATCH_MODE };
+  if (typeof raw !== 'object' || raw === null) return out;
+  const src = raw as Record<string, unknown>;
+  for (const trigger of LUMOS_DISPATCH_TRIGGERS) {
+    const v = src[trigger];
+    if (!isLumosDispatchMode(v)) continue;
+    out[trigger] = v;
+  }
+  return out;
+}
+
+/** ป้ายภาษาไทยของแต่ละจุด — ใช้ที่หน้าตั้งค่า */
+export const LUMOS_TRIGGER_LABEL: Record<LumosDispatchTrigger, string> = {
+  board_match: 'AI แมท "คนของเรา" เสร็จ',
+  irecruit_search: 'กดค้นหาผู้สมัครจาก iRecruit',
+  follow_entry: 'สร้างรายการติดตามในหน้า Follow',
+  selection_recall: 'ใบขอเข้ามา → ชวนคนที่เคยตอบไม่สนใจกลับมา',
+};
+
+export const LUMOS_TRIGGER_DETAIL: Record<LumosDispatchTrigger, string> = {
+  board_match:
+    'ส่งคนที่ AI แนะนำ (เขียว/เหลือง) เข้าคิวให้ Lumos โทรทันทีที่แมทเสร็จ · ปิดอยู่ = ต้องติ๊กเลือกแล้วกดส่งเองที่หน้า Matching',
+  irecruit_search:
+    'ส่งผู้สมัครที่ค้นเจอเข้าคิวให้ Lumos โทรสัมภาษณ์ทันทีที่ค้นเสร็จ · ปิดอยู่ = ติ๊กเลือกแล้วกดส่งเอง',
+  follow_entry:
+    'พอกรอกรายชื่อในหน้า Follow แล้วส่งให้ Lumos โทรตามทันที · ปิดอยู่ = รายการถูกบันทึกไว้แต่ยังไม่มีใครโทร',
+  selection_recall:
+    'ใบขอใหม่เข้ามาแล้วไปหาคนจากกอง "เคยตอบไม่สนใจงานอื่น" ให้เอง แล้วส่ง Lumos โทรทันที (วิ่งขนานกับใบสมัครใหม่) · ปิดอยู่ = ต้องกดปุ่มที่การ์ดใบขอเอง',
+};
+
+export const LUMOS_MODE_LABEL: Record<LumosDispatchMode, string> = {
+  manual: 'คนกดส่งเอง',
+  auto: 'ส่งอัตโนมัติ',
+};
+
+/**
+ * ทุกจุดมีตัวเลือกเท่ากันแล้ว — เหลือฟังก์ชันไว้เพราะหน้าตั้งค่าเรียกอยู่
+ * และถ้าวันไหนมีโหมดที่ใช้ได้เฉพาะบางจุดอีก จะได้เติมที่นี่ที่เดียวเหมือนเดิม
+ */
+export function modesForTrigger(_trigger: LumosDispatchTrigger): LumosDispatchMode[] {
+  return ['manual', 'auto'];
+}

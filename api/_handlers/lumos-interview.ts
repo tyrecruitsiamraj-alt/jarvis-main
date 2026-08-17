@@ -11,6 +11,7 @@ import { readJsonBody } from '../_lib/body.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { logInfo } from '../_lib/logger.js';
 import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
+import { normalizeInterviewOutcome } from '../_lib/lumosInterviewOutcome.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -366,21 +367,42 @@ async function postInterviewResults(req: ApiReq, res: ApiRes): Promise<void> {
     );
     const failed = settled.filter((s) => s.status === 'rejected').length;
 
-    // ผลของคนจากคิว iRecruit (id รูปแบบ jobId::ir-N — ไม่ใช่ UUID) → ผูกกลับเข้าคิว dispatch
+    /**
+     * ผูกผลกลับเข้าคิว dispatch — **ทุกแหล่ง** (`ir-` iRecruit · `app-` ใบสมัคร
+     * หน้าสาธารณะ · `card-` คนบนบอร์ด)
+     *
+     * 🔴 เดิมกรองไว้ `includes('::ir-')` ตั้งแต่ตอนที่ช่องนี้มีแต่ iRecruit — พอเพิ่ม
+     * ใบสมัครหน้าสาธารณะ (090) กับเลนสรรหา (R2b) เข้าช่องเดียวกันแล้วไม่ได้แก้ตาม
+     * ผลของสองกลุ่มหลัง**ถูกทิ้งทั้งหมดโดยยังตอบว่าบันทึกแล้ว** Lumos จึงไม่ส่งซ้ำ
+     * และแถวยังค้างเป็น "รอผล" ให้เสิร์ฟโทรซ้ำจนครบเพดาน
+     * (วัดจริง 17 ส.ค. 2569: คิว 15 แถวเป็น `card-` ทั้งหมด · ผลกลับมา 0)
+     *
+     * ⚠️ ศัพท์ผลของช่องนี้ไม่ตรงกับช่องแจ้งเตือน → แปลก่อนส่งให้ตัวตามงาน
+     * (ดู `normalizeInterviewOutcome`) ไม่งั้น "สนใจ" จะไม่เด้งแจ้งเตือนและไม่บังใบอื่น
+     */
+    let matched = 0;
     for (const r of results as InterviewResult[]) {
-      if (!r.client_candidate_id.includes('::ir-')) continue;
       const queueStatus =
         r.outcome === 'completed' ? 'completed' : r.status === 'ยกเลิก' ? 'cancelled' : 'failed';
-      await applyLumosResult('interview', r.client_candidate_id, queueStatus, r).catch(() => {});
+      const ok = await applyLumosResult(
+        'interview',
+        r.client_candidate_id,
+        queueStatus,
+        r,
+        normalizeInterviewOutcome(r.outcome),
+      ).catch(() => false);
+      if (ok) matched += 1;
     }
 
     return res.status(200).json({
       ok: true,
       received: results.length,
+      // ⚠️ ตัวเลขต้องบอกความจริง — เดิมตอบ persisted = จำนวนที่รับมา ทั้งที่ไม่ได้เขียนอะไร
+      matched,
       persisted: results.length - failed,
       failed,
       message: failed === 0
-        ? 'Interview results accepted and saved'
+        ? `Interview results accepted — matched ${matched}/${results.length} queue rows`
         : `Accepted ${results.length - failed}/${results.length} — ${failed} failed to save`,
     });
   } catch (e) {

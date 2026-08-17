@@ -312,7 +312,6 @@ export async function listRecruitRegistrations(options?: {
     ? RECRUIT_REGISTER_LIST_SQL.replace(
         'SELECT',
         'SELECT TOP (@limit)',
-        1,
       )
     : RECRUIT_REGISTER_LIST_SQL;
 

@@ -7,6 +7,8 @@ import {
   proposalStatusChip,
   type ProposalStatus,
 } from '@/lib/candidateProposalsApi';
+import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
+import { CALL_OUTCOMES } from '@/lib/callFollowupPolicy';
 import {
   JOB_POSTING_STATUS_TONE,
   jobPostingStatusChip,
@@ -96,6 +98,55 @@ describe('ไม่มีตารางสีสถานะซ้ำในห�
     for (const f of files) {
       const src = readFileSync(path.resolve(process.cwd(), f), 'utf8');
       expect(src.includes('const STATUS_CLASS'), `${f} ยังมีตารางสีของตัวเอง`).toBe(false);
+    }
+  });
+});
+
+/**
+ * โทนของ "ผลโทร" ต้องมาจาก src/lib/callOutcomeTone.ts ที่เดียว
+ *
+ * เดิมแต่ละหน้าประกาศ map เอง 4 ที่ แล้วเพี้ยนกันจริง: "ไม่รับสาย" เป็นเทาใน
+ * funnel/หน้างานโทร แต่เป็นเหลืองบนหน้าหลัก/การ์ด Matching — เจ้าของกวาดเจอเอง
+ */
+describe('โทนผลโทร — แหล่งเดียว ห้ามแตกไปประกาศซ้ำในไฟล์หน้า', () => {
+  const FILES = [
+    'src/components/follow/CallFunnelPanel.tsx',
+    'src/components/matching/CallHoldPanel.tsx',
+    // หน้า "โทรของฉัน" เปิดกลับมา 11 ส.ค. 2569 รอบหก — กลับเข้าลิสต์คุมโทนตามเดิม
+    'src/pages/matching/MyCallsPage.tsx',
+    // CallTeamBoardPage ลบทิ้ง 14 ส.ค. 2569 (ตัดบอร์ดทีมออก — เจ้าของสั่ง)
+  ];
+
+  it('ไม่มีไฟล์หน้าไหนประกาศตารางโทนผลโทรของตัวเอง', () => {
+    for (const f of FILES) {
+      const src = readFileSync(path.resolve(process.cwd(), f), 'utf8');
+      expect(src, f).not.toMatch(/const\s+(OUTCOME_TONE|CALL_RESULT_TONE)\s*:/);
+      expect(src, f).toMatch(/from '@\/lib\/callOutcomeTone'/);
+    }
+  });
+
+  it('ครบทุก outcome ที่ Lumos ส่งกลับได้ — เพิ่มค่าใหม่แล้วลืมใส่สีจะพัง', () => {
+    for (const o of CALL_OUTCOMES) {
+      expect(CALL_OUTCOME_TONE[o], o).toBeTruthy();
+    }
+    expect(Object.keys(CALL_OUTCOME_TONE).sort()).toEqual([...CALL_OUTCOMES].sort());
+  });
+
+  it('ทิศทางความหมายตรงกันทั้งชุด: จบดี=เขียว · จบไม่ดี=แดง · รอโทรซ้ำ=เหลือง · ต้องคนตาม=ส้ม', () => {
+    expect(CALL_OUTCOME_TONE.confirmed).toBe('success');
+    expect(CALL_OUTCOME_TONE.acknowledged).toBe('success');
+    expect(CALL_OUTCOME_TONE.declined).toBe('danger');
+    for (const o of ['no_answer', 'busy', 'unresponsive', 'failed', 'reschedule_requested'] as const) {
+      expect(CALL_OUTCOME_TONE[o], o).toBe('warn');
+    }
+    expect(CALL_OUTCOME_TONE.wrong_person).toBe('orange');
+    // สายที่คนกดยกเลิกไม่ใช่ผลการโทร — ต้องไม่ถูกระบายสีว่าดีหรือแย่
+    expect(CALL_OUTCOME_TONE.cancelled).toBe('neutral');
+  });
+
+  it('ทุกโทนที่ใช้มีจริงใน TONE', () => {
+    for (const key of Object.values(CALL_OUTCOME_TONE)) {
+      expect(TONE[key], key).toBeTruthy();
     }
   });
 });

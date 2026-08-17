@@ -1,52 +1,71 @@
-# Project Overview
+# ภาพรวมโปรเจกต์
 
-Jarvis is a workforce management web app for staffing operations. It is a React/Vite TypeScript SPA with shadcn/Radix UI components, Tailwind styling, Vercel-style API handlers, local API emulation, PostgreSQL migrations, and selected MSSQL/Siamraj/Lumos integrations.
+Jarvis คือเว็บแอปบริหารกำลังคนสำหรับงาน staffing — เป็น SPA แบบ React/Vite TypeScript
+ใช้คอมโพเนนต์ shadcn/Radix UI จัดสไตล์ด้วย Tailwind มี API handler สไตล์ Vercel
+พร้อมตัวจำลอง API ในเครื่อง migration ของ PostgreSQL และการเชื่อมต่อ
+MSSQL/Siamraj/Lumos บางส่วน
 
-## Runtime And Commands
+## Runtime และคำสั่ง
 
-- App stack: React 18, Vite 5, TypeScript, TanStack Query, React Router, shadcn/Radix UI, lucide-react, Recharts.
-- API stack: single Vercel catch-all function in `api/[[...path]].ts`; private route handlers under `api/_handlers/`; shared API utilities under `api/_lib/`.
-- Local full stack: `npm run dev` starts `npm run api:local` and Vite. Vite defaults to `http://localhost:8080` and proxies `/api` to `http://127.0.0.1:3000`.
-- Frontend-only: `npm run dev:vite`.
-- Local API only: `npm run api:local` via `tsx watch server/local-api.ts`.
-- Build: `npm run build`.
-- Tests: `npm test` or targeted `npx vitest run <test-file>`.
-- Readiness tests: `npm run test:readiness`.
-- Database: `npm run db:migrate`, `npm run db:migrate:status`, `npm run db:seed`, `npm run db:ping`, `npm run db:ping:mssql`.
+- ฝั่งแอป: React 18, Vite 5, TypeScript, TanStack Query, React Router,
+  shadcn/Radix UI, lucide-react, Recharts
+- ฝั่ง API: ฟังก์ชัน Vercel แบบ catch-all ตัวเดียวใน `api/[[...path]].ts` ·
+  handler รายเส้นทางอยู่ใต้ `api/_handlers/` · ยูทิลิตี้ที่ใช้ร่วมอยู่ใต้ `api/_lib/`
+- รันครบทั้งชุดในเครื่อง: `npm run dev` (สตาร์ต `npm run api:local` กับ Vite พร้อมกัน)
+  Vite เปิดที่ `http://localhost:8080` และ proxy `/api` ไป `http://127.0.0.1:3000`
+- หน้าเว็บอย่างเดียว: `npm run dev:vite`
+- API ในเครื่องอย่างเดียว: `npm run api:local` (ผ่าน `tsx watch server/local-api.ts`)
+- Build: `npm run build`
+- เทสต์: `npm test` หรือเจาะไฟล์เดียว `npx vitest run <ไฟล์เทสต์>`
+- เทสต์ความพร้อม: `npm run test:readiness`
+- ฐานข้อมูล: `npm run db:migrate` · `npm run db:migrate:status` · `npm run db:seed`
+  · `npm run db:ping` · `npm run db:ping:mssql`
 
-## App Surface
+## หน้าจอของแอป
 
-Primary routes are declared in `src/App.tsx`:
+route หลักประกาศใน `src/App.tsx`:
 
-- Public: `/apply`, `/s/:code`, `/careers`, `/mapwork`, `/auth/magic-link`, `/reset-password`.
-- Protected role hubs: `/`, `/opl`, `/staff`, `/supervisor`, `/admin`.
-- Workforce/labor: `/wl`, `/wl/monthly-planner`, `/wl/daily-assignment`, `/wl/global-calendar`, `/wl/employees`.
-- Matching: `/matching`, `/matching/candidates`, `/matching/match`, `/matching/pre-check`, `/matching/job-postings`, `/matching/reservations`.
-- Jobs: `/jobs/list`, `/jobs/board`, `/jobs/overview`, `/jobs/siamraj/:id`, `/jobs/:id`.
-- Dashboard: `/dashboard`.
-- Settings/account: `/settings`, `/account/change-password`.
+- สาธารณะ: `/apply`, `/s/:code`, `/careers`, `/mapwork`, `/auth/magic-link`,
+  `/reset-password`
+- role hub (ต้องล็อกอิน): `/`, `/opl`, `/staff`, `/supervisor`, `/admin`
+- กำลังคน/แรงงาน: `/wl`, `/wl/monthly-planner`, `/wl/daily-assignment`,
+  `/wl/global-calendar`, `/wl/employees`
+- Matching: `/matching`, `/matching/candidates`, `/matching/match`,
+  `/matching/pre-check`, `/matching/job-postings`, `/matching/reservations`
+- ใบขอ: `/jobs/list`, `/jobs/board`, `/jobs/overview`, `/jobs/siamraj/:id`, `/jobs/:id`
+- แดชบอร์ด: `/dashboard`
+- ตั้งค่า/บัญชี: `/settings`, `/account/change-password`
 
-## API Shape
+## รูปร่างของ API
 
-`api/_handlers/registry.ts` is the route table shared by local and Vercel runtime. It includes auth, jobs, candidates, employees, work calendar, Siamraj unit requests, matching, Lumos, public apply/jobs, short links, branding, follow, request-control demand forecast, RBAC, audit, and diagnostics routes.
+`api/_handlers/registry.ts` คือตาราง route ที่ใช้ร่วมกันทั้ง runtime ในเครื่องและ
+Vercel — ครอบคลุม auth, ใบขอ, ผู้สมัคร, พนักงาน, ปฏิทินงาน, ใบขอหน่วยงาน Siamraj,
+matching, Lumos, รับสมัคร/ประกาศงานสาธารณะ, ลิงก์สั้น, branding, follow,
+พยากรณ์ความต้องการของ request-control, RBAC, audit และ diagnostics
 
-Important patterns:
+แพตเทิร์นสำคัญ:
 
-- API handlers use `ApiReq`/`ApiRes` from `api/_lib/http.ts`.
-- Vercel runtime expects relative API imports with `.js` suffixes.
-- Source imports can use `@/` according to existing tests/build setup.
-- Keep dashboard APIs read-only unless a write flow is explicitly requested and approved.
+- handler ของ API ใช้ `ApiReq`/`ApiRes` จาก `api/_lib/http.ts`
+- runtime ของ Vercel ต้องการ import แบบ relative ที่ลงท้าย `.js`
+- โค้ดฝั่ง `src/` import ด้วย `@/` ได้ตามที่เทสต์/build ตั้งไว้
+- API ของแดชบอร์ดต้องเป็นอ่านอย่างเดียว เว้นแต่มีการขอ flow เขียนและอนุมัติชัดเจน
 
-## Data Sources
+## แหล่งข้อมูล
 
-- PostgreSQL migrations live in `migrations/`.
-- Siamraj/MSSQL adapters and probes live under `api/_lib/siamraj*`, `api/_lib/irecruit*`, and `scripts/probe-*.mjs`.
-- Public applications use `migrations/048_public_job_applications.sql`, `migrations/049_public_job_applications_structured.sql`, `api/_lib/publicApplications.ts`, `api/_handlers/public/apply.ts`, and `src/components/jobs/PublicApplyDialog.tsx`.
-- Matching data uses candidate/job APIs, board match storage, proposals, request-type tracking, and server-side list filtering.
+- migration ของ PostgreSQL อยู่ใน `migrations/`
+- adapter และ probe ของ Siamraj/MSSQL อยู่ใต้ `api/_lib/siamraj*`,
+  `api/_lib/irecruit*` และ `scripts/probe-*.mjs`
+- ใบสมัครสาธารณะใช้ `migrations/048_public_job_applications.sql`,
+  `migrations/049_public_job_applications_structured.sql`,
+  `api/_lib/publicApplications.ts`, `api/_handlers/public/apply.ts` และ
+  `src/components/jobs/PublicApplyDialog.tsx`
+- ข้อมูล matching ใช้ API ผู้สมัคร/ใบขอ, ที่เก็บผลแมทของบอร์ด, การเสนอ (proposals),
+  การติดตามประเภทคำขอ และการกรองลิสต์ฝั่ง server
 
-## Documentation Source Of Truth
+## แหล่งความจริงของเอกสาร
 
-- Request Control Tower domain rules: `.claude/skills/request-control-tower-advisor/`.
-- Human project handbook: `docs/request-control-tower/HANDBOOK.md`.
-- Cursor rule mirror: `.cursor/rules/request-control-tower.mdc`.
-- This `.codex` skill is a project adapter. If rules disagree, stop and reconcile with `.claude/skills/request-control-tower-advisor/` first.
+- กติกาโดเมนศูนย์ควบคุมใบขอ: `.claude/skills/request-control-tower-advisor/`
+- คู่มือโปรเจกต์สำหรับคน: `docs/request-control-tower/HANDBOOK.md`
+- กติกาฝั่ง Cursor (mirror): `.cursor/rules/request-control-tower.mdc`
+- skill ฝั่ง `.codex` นี้เป็นแค่ตัวเชื่อมของโปรเจกต์ — ถ้ากติกาขัดกัน ให้หยุดแล้ว
+  กลับไปเทียบกับ `.claude/skills/request-control-tower-advisor/` ก่อน

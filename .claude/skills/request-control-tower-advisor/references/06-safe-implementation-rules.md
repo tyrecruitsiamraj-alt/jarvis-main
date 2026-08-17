@@ -1,49 +1,56 @@
-# Safe Implementation Rules
+# กติกาการลงมืออย่างปลอดภัย
 
-Do not rewrite the existing dashboard directly.
+## ห้ามเขียนทับแดชบอร์ดเดิมตรง ๆ
 
-Use safe architecture:
+ใช้สถาปัตยกรรมแบบปลอดภัย 8 ขั้น:
 
-1. Parallel calculation layer
-2. Feature flag
-3. Adapter
-4. Read-only API
-5. Backward-compatible types
-6. Preview route
-7. Unit tests
-8. Reconciliation
+1. ชั้นคำนวณคู่ขนาน (parallel calculation layer)
+2. feature flag
+3. adapter
+4. API แบบอ่านอย่างเดียว
+5. ชนิดข้อมูลที่เข้ากันได้กับของเดิม
+6. เส้นทางพรีวิว
+7. unit test
+8. การกระทบยอด (reconciliation)
 
-Recommended future code folder:
-src/lib/dashboard/request-control/
+## โครงโฟลเดอร์ที่แนะนำ
 
-* types.ts
-* adapters.ts
-* requestLedger.ts
-* fulfillmentLedger.ts
-* calculations.ts
-* sla.ts
-* lifecycle.ts
-* reconciliation.ts
-* mock.ts
-* index.ts
+`src/lib/dashboard/request-control/`
 
-Do not delete or rename existing DashboardData fields.
+* `types.ts` — ชนิดข้อมูล
+* `adapters.ts` — ตัวแปลงข้อมูล
+* `requestLedger.ts` — บัญชีใบขอ
+* `fulfillmentLedger.ts` — บัญชีเหตุการณ์การหาได้
+* `calculations.ts` — การคำนวณ
+* `sla.ts` — กติกา SLA
+* `lifecycle.ts` — วงจรชีวิตใบขอ
+* `reconciliation.ts` — การกระทบยอด
+* `mock.ts` — ข้อมูลจำลอง
+* `index.ts`
 
-If needed, extend safely:
+## ห้ามลบหรือเปลี่ยนชื่อฟิลด์เดิมของ DashboardData
+
+ถ้าจำเป็นต้องเพิ่ม ให้ต่อยอดแบบปลอดภัย:
+
+```ts
 type EnhancedDashboardData = DashboardData & {
-requestControl?: RequestControlDashboardData;
+  requestControl?: RequestControlDashboardData;
 };
+```
 
-Feature flag:
-VITE_REQUEST_CONTROL_TOWER_ENABLED=true
+## Feature flag
 
-When enabled:
-show Request Control Tower UI.
+`VITE_REQUEST_CONTROL_TOWER_ENABLED=true`
 
-When disabled:
-show existing Analytics Dashboard exactly as before.
+* **เปิด** → แสดงหน้า Request Control Tower
+* **ปิด** → แสดง Analytics Dashboard เดิมทุกอย่างเหมือนเดิมเป๊ะ
 
-Data quality rule:
-Monthly “หาได้แล้ว” should use fulfillment event date when available.
-If only current inform_qty snapshot is available, mark as snapshot_fallback and show:
-“ประมาณการจากสถานะล่าสุด”
+## กติกาคุณภาพข้อมูล
+
+ยอด **"หาได้แล้ว" รายเดือน** ควรใช้วันที่ของเหตุการณ์การหาได้ (fulfillment event date)
+เมื่อมีข้อมูล
+
+ถ้ามีแต่ snapshot `inform_qty` ล่าสุด **ต้องติดธง `snapshot_fallback`** แล้วแสดงข้อความว่า
+"ประมาณการจากสถานะล่าสุด"
+
+> ⚠️ ห้ามเอา snapshot `inform_qty` มาใช้เป็นยอดรายเดือนที่แม่นยำโดยไม่ติดธง

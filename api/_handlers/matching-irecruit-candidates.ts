@@ -6,10 +6,13 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
 import { getOllamaConfig } from '../_lib/ollamaClient.js';
 import { matchIrecruitCandidatesForJob } from '../_lib/irecruitCandidateMatcher.js';
+import { enqueueLumosInterviewForIrecruit } from '../_lib/lumosDispatch.js';
+import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
+import { logError } from '../_lib/logger.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -39,7 +42,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     // จำกัดตามแผนก — ห้ามอ้าง jobId ข้ามแผนกเพื่อดึงผู้สมัคร iRecruit ของใบขออื่น
-    const job = await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user));
+    const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
     }
@@ -52,8 +55,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
       refresh,
     });
 
+    // ค้นเสร็จ → ส่งเข้าคิว Lumos เส้น interview (เขียว+เหลือง · กัน 30 วัน · error-safe)
+    // - `send=1` = เลนคัดสรรกด "หาคนเพิ่ม" → ส่งทันทีไม่ต้องอนุมัติ (เจ้าของเคาะ 16 ส.ค.)
+    // - หรือโหมด auto เดิม (`irecruit_search`) ก็ยังส่ง
+    // OT/สวัสดิการติดไปเองตอนเสิร์ฟคิว (siamrajJobBenefits)
+    const forceSend = getQuery(req, 'send') === '1';
+    let dispatch: (Awaited<ReturnType<typeof enqueueLumosInterviewForIrecruit>>) | null = null;
+    if (forceSend || (await isAutoDispatchEnabled('irecruit_search'))) {
+      dispatch = await enqueueLumosInterviewForIrecruit(job as Record<string, unknown>, result);
+    }
+
     res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json(result);
+    return res.status(200).json({ ...result, dispatch });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (

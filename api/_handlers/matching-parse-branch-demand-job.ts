@@ -6,7 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { buildErpBranchDemandInput, parseErpBranchDemand } from '../_lib/erpBranchDemandParser.js';
 import { buildBranchMatchingSuggestions } from '../_lib/matchingEngine.js';
 
@@ -31,7 +31,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     // จำกัดตาม BU — staff อ้าง jobId ข้าม BU เพื่ออ่านใบขอ/ผลแมทระดับสาขาไม่ได้
-    const job = await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user));
+    const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบงาน ERP');
     }
@@ -40,7 +40,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const parsed = parseErpBranchDemand(parserInput);
 
     const includeMatches = getQuery(req, 'matches') === '1';
-    let branch_matches: Awaited<ReturnType<typeof buildBranchMatchingSuggestions>>['branches'] = [];
+    let branch_matches: NonNullable<Awaited<ReturnType<typeof buildBranchMatchingSuggestions>>>['branches'] = [];
     if (includeMatches) {
       const poolRaw = getQuery(req, 'poolSize');
       const poolSize = poolRaw ? Number(poolRaw) : 200;

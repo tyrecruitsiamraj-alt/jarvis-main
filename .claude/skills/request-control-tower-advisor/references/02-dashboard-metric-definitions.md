@@ -1,28 +1,31 @@
-# Dashboard Metric Definitions
+# นิยามตัวชี้วัดบนแดชบอร์ด
 
-Use these Thai labels consistently:
+ใช้คำไทยเหล่านี้ให้ตรงกันทั้งระบบ:
 
-| Thai label        | Meaning                      |
-| ----------------- | ---------------------------- |
-| ขอมา              | requested positions          |
-| หาได้แล้ว         | fulfilled/informed positions |
-| ปิดครบใบขอ        | fully fulfilled requests     |
-| ยกเลิก            | cancelled positions          |
-| จบงานแล้ว         | resolved requests            |
-| เหลือหา           | remaining positions          |
-| งานค้าง / ยอดยกมา | backlog                      |
-| หาได้บางส่วน      | partial fulfillment          |
+| คำที่ใช้บนหน้าจอ | ความหมาย | ชื่อในโค้ด |
+| --- | --- | --- |
+| ขอมา | อัตราที่หน่วยงานขอมา | requested positions |
+| หาได้แล้ว | อัตราที่หาคนได้/แจ้งเข้าแล้ว | fulfilled/informed positions |
+| ปิดครบใบขอ | ใบขอที่หาได้ครบตามที่ขอ | fully fulfilled requests |
+| ยกเลิก | อัตราที่ถูกยกเลิก | cancelled positions |
+| จบงานแล้ว | ใบขอที่ไม่เหลืออัตราต้องหาแล้ว | resolved requests |
+| เหลือหา | อัตราที่ยังต้องหาต่อ | remaining positions |
+| งานค้าง / ยอดยกมา | ยอดค้างสะสม | backlog |
+| หาได้บางส่วน | หาได้แล้วแต่ยังไม่ครบ | partial fulfillment |
 
-Do not use “ปิดได้” as the primary KPI label because it can be confused with “ปิดครบใบขอ”.
+## กติกาการใช้คำ
 
-Use “หาได้แล้ว” for fulfilled/informed positions.
+**ห้ามใช้ "ปิดได้" เป็นชื่อ KPI หลัก** เพราะสับสนกับ "ปิดครบใบขอ"
 
-Use “ปิดครบใบขอ” only when fulfilledPositions >= requestPositions.
+* ใช้ **"หาได้แล้ว"** กับอัตราที่หาคนได้/แจ้งเข้าแล้ว
+* ใช้ **"ปิดครบใบขอ"** เฉพาะเมื่อ อัตราที่หาได้ ≥ อัตราที่ขอมา เท่านั้น
+* ใช้ **"จบงานแล้ว"** เมื่อไม่เหลืออัตราต้องหา ไม่ว่าจะเพราะหาได้ครบหรือถูกยกเลิก
 
-Use “จบงานแล้ว” when remainingPositions = 0, whether due to full fulfillment or cancellation.
+## สมการหลัก
 
-Core equation:
-startingBacklogPositions + newRequestPositions - fulfilledPositionsThisPeriod - cancelledPositionsThisPeriod = endingBacklogPositions
+**ภาษาคน:**
+ยอดค้างต้นงวด + ขอใหม่ − หาได้แล้ว − ยกเลิก = เหลือหา
 
-Thai:
-ยอดค้างต้นงวด + ขอใหม่ - หาได้แล้ว - ยกเลิก = เหลือหา
+**ชื่อตัวแปรในโค้ด:**
+startingBacklogPositions + newRequestPositions − fulfilledPositionsThisPeriod
+− cancelledPositionsThisPeriod = endingBacklogPositions

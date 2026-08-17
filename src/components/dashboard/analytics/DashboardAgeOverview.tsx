@@ -78,7 +78,7 @@ const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTo
               >
                 {item.count.toLocaleString('th-TH')}
               </p>
-              <p className={cn('mt-1 text-[11px]', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+              <p className={cn('mt-1 text-[11px]', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}>
                 {item.label} · ตำแหน่ง
               </p>
             </button>

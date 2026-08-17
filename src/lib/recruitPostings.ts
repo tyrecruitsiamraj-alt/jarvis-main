@@ -37,7 +37,26 @@ export type RecruitChannel = {
   isActive: boolean;
   /** ช่องทางรองของช่องทางนี้ (เติมเฉพาะตอนดึงเป็นทรี) */
   children?: RecruitChannel[];
+  /** จำนวนช่องทางรอง (เติมเฉพาะตอนดึงแบบ roots — ทรีไม่ใช้ นับจาก children เอาเอง) */
+  childCount?: number;
 };
+
+/**
+ * ผลค้นหาช่องทาง — แบนพร้อมชื่อพ่อ เพราะช่องทางรองชื่อซ้ำกันข้ามพ่อได้
+ * (ข้อมูลจริงจาก iRecruit: ช่องย่อย 4,347 ตัวอยู่ใต้พ่อ 43 ตัว)
+ */
+export type RecruitChannelMatch = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  parentName: string | null;
+  isActive: boolean;
+};
+
+/** ป้ายที่คนอ่าน — "พ่อ · ลูก" หรือชื่อเดี่ยวถ้าเป็นช่องทางหลัก */
+export function recruitChannelLabel(m: RecruitChannelMatch): string {
+  return m.parentName ? `${m.parentName} · ${m.name}` : m.name;
+}
 
 export type RecruitPostingLink = {
   id: string;
@@ -62,6 +81,13 @@ export type RecruitPosting = {
   salaryText: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  /** ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) */
+  positionName: string | null;
+  province: string | null;
+  responsibleName: string | null;
+  specificType: string | null;
+  /** 'rm' = ฟอร์มทั่วไป · 'global' = ฟอร์มที่แนบเอกสารได้ */
+  formType: string;
   status: RecruitPostingStatus;
   createdByName: string | null;
   createdAt: string;

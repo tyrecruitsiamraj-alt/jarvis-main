@@ -1,39 +1,38 @@
-# SLA Rules
+# กติกา SLA
 
-SLA rules:
+## จำนวนวัน SLA ตามประเภทความเร่ง
 
-* retroactive / ฉุกเฉินย้อนหลัง: 7 days from submitted/request date
-* urgent / ฉุกเฉิน: 15 days from required/want date
-* advance / ล่วงหน้า: 15 days from required/want date
+* **ฉุกเฉินย้อนหลัง** (retroactive) — 7 วัน นับจากวันที่ยื่นใบขอ
+* **ฉุกเฉิน** (urgent) — 15 วัน นับจากวันที่ต้องการคน
+* **ล่วงหน้า** (advance) — 15 วัน นับจากวันที่ต้องการคน
 
-SLA types:
+## SLA มี 3 แบบ
 
-1. Fulfillment SLA
-   Measures how many positions were fulfilled within SLA.
+**1. SLA การหาได้ (Fulfillment SLA)**
+วัดว่าหาคนได้กี่อัตราภายในกำหนด
 
-2. Full Closure SLA
-   Measures whether the whole request was fully fulfilled within SLA.
-   This is the main executive SLA.
+**2. SLA การปิดครบใบขอ (Full Closure SLA)** ← **ตัวหลักที่ผู้บริหารดู**
+วัดว่าทั้งใบขอหาได้ครบภายในกำหนดหรือไม่
 
-3. Resolution SLA
-   Measures whether the request no longer has remaining positions due to fulfillment or cancellation.
+**3. SLA การจบงาน (Resolution SLA)**
+วัดว่าใบขอไม่เหลืออัตราต้องหาแล้วหรือยัง ไม่ว่าจะเพราะหาได้ครบหรือถูกยกเลิก
 
-Important:
-Cancelled positions must not be counted as fully fulfilled.
+> ⚠️ **สำคัญ: อัตราที่ถูกยกเลิก ห้ามนับเป็นปิดครบใบขอ**
 
-SLA status:
+## สถานะ SLA
 
-* on_track
-* at_risk
-* breached
-* fulfilled_on_time
-* fully_closed_on_time
-* resolved_on_time
-* closed_late
-* resolved_late
+* `on_track` — ทันกำหนด
+* `at_risk` — เสี่ยงเกิน
+* `breached` — เกินแล้ว
+* `fulfilled_on_time` — หาได้ทันกำหนด
+* `fully_closed_on_time` — ปิดครบทันกำหนด
+* `resolved_on_time` — จบงานทันกำหนด
+* `closed_late` — ปิดช้ากว่ากำหนด
+* `resolved_late` — จบงานช้ากว่ากำหนด
 
-At risk:
-Not breached and 0–3 days remaining.
+## เกณฑ์ตัดสิน
 
-Breached:
-Today is later than slaDueDate and the request is not fully fulfilled/resolved depending on SLA type.
+**เสี่ยงเกิน (at_risk):** ยังไม่เกินกำหนด และเหลือเวลา 0–3 วัน
+
+**เกินแล้ว (breached):** วันนี้เลยวันครบกำหนดแล้ว และใบขอยังไม่ปิดครบ/ยังไม่จบงาน
+(ขึ้นกับว่าวัด SLA แบบไหน)

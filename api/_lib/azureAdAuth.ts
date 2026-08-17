@@ -50,10 +50,27 @@ export function azureAdScopes(): string {
   );
 }
 
-/** อนุญาตเฉพาะ path ภายในแอป (ป้องกัน open redirect) */
+/**
+ * อนุญาตเฉพาะ path ภายในแอป (ป้องกัน open redirect)
+ *
+ * ค่านี้จบที่ header `Location` ตอน login เสร็จ ถ้าหลุดออกนอกเว็บได้
+ * = พาผู้ใช้ที่เพิ่งล็อกอินไปหน้าปลอมได้ทันที จึงต้องแน่นเป็นพิเศษ
+ *
+ * ⚠️ **เบราว์เซอร์ normalize URL ก่อนใช้** — สองอย่างนี้ผ่านด่าน "ขึ้นต้นด้วย / และไม่ใช่ //"
+ * ได้ทั้งคู่แต่กลายเป็น protocol-relative ตอนเบราว์เซอร์อ่าน:
+ *   · `\` ถูกแปลงเป็น `/` → `/\evil.com` กลายเป็น `//evil.com`
+ *   · อักขระควบคุม (tab/newline/CR) ถูกตัดทิ้ง → `/<tab>/evil.com` กลายเป็น `//evil.com`
+ * ตอนนี้ยังกันได้อีกชั้นเพราะ `azureAuthSuccessRedirect()` เติม origin ของแอปไว้ข้างหน้า
+ * **แต่พึ่งไม่ได้** — `getAppPublicUrl()` คืนสตริงว่างเมื่อไม่ได้ตั้ง `APP_PUBLIC_URL`
+ * และ `isAzureAdConfigured()` ไม่ได้บังคับให้ตั้งค่านั้น (เช็คแค่ client id/secret/tenant)
+ * เจอสภาพนั้นเมื่อไหร่ base เป็นค่าว่าง แล้ว `/\evil.com` ก็ออกนอกเว็บได้จริง
+ */
 export function sanitizeReturnPath(raw: string | null | undefined): string {
   const v = (raw || '/').trim();
   if (!v.startsWith('/') || v.startsWith('//')) return '/';
+  if (v.includes('\\')) return '/';
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001F\u007F]/.test(v)) return '/';
   if (v.startsWith('/api/')) return '/';
   return v;
 }

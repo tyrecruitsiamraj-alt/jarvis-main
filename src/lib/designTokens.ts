@@ -54,6 +54,14 @@ export type ToneClasses = {
   soft: string;
   /** hover ของกล่อง soft ที่กดได้ — ใส่คู่กับ soft เท่านั้น */
   softHover: string;
+  /**
+   * ปุ่ม/ลิงก์แบบเส้นขอบบนพื้นขาว (ธีมสว่าง) — เส้นขอบ + ตัวหนังสือสีโทน + hover จาง
+   *
+   * มีไว้เพราะเวลาเขียนมือมักลืมคู่มืดของ `bg-white` → ปุ่มเป็นสี่เหลี่ยมขาวโพลน
+   * บนพื้นเข้มในโหมดมืด (เจอมาแล้วที่ปุ่มแบ่งหน้าของ MatchingPage)
+   * ต่างจาก `soft` ตรงที่ soft เป็นกล่องพื้นพาสเทล ส่วน outline พื้นขาว/เข้มตามธีม
+   */
+  outline: string;
   /** บล็อกสีอิ่ม ตัวหนังสือขาว — เฉพาะตัวเลขที่ต้องลงมือวันนี้ */
   solid: string;
   /** จุดสีเล็กหน้าป้าย */
@@ -69,128 +77,171 @@ export type ToneClasses = {
   hex: string;
 };
 
+/**
+ * จานสีของทั้งระบบ — **แบบ B "กรมท่า + ทองเก่า"** (เจ้าของเลือก 10 ส.ค. 2569)
+ *
+ * ก่อนหน้านี้เจ้าของติงว่า "ไม่มีความ luxury เลย สีแจ๋นแหลนมาก" — ต้นเหตุไม่ใช่ตัวสี
+ * แต่เป็น **การเอาสีอิ่มตัวไปทำพื้น** ทุกการ์ดจึงมีพื้นสีของตัวเองแล้วแข่งกันหมด
+ * ตาไม่รู้จะไปหยุดตรงไหน
+ *
+ * หลักที่ใช้ตอนนี้ — "หมึกกับกระดาษ":
+ * 1. **พื้นเป็นกลางเสมอ** (`tile` / `soft` ใช้ตระกูล slate ทุกโทน) — กระดาษไม่มีสี
+ * 2. **สีอยู่ที่หมึก** — ขีดบนการ์ด (`bar`) · ตัวเลข (`num`/`value`) · จุด (`dot`) · เส้นขอบ
+ * 3. **เข้มขึ้นหนึ่งขั้น** จากเดิม (600→700, 400→600) — สีเข้มอ่านเป็น "สุขุม" สีสดอ่านเป็น "ตะโกน"
+ * 4. `primary` = **กรมท่า** (blue-800/900) เป็นสีหลักของแบรนด์ในหน้าจอ
+ *    `warn` = **ทองด้าน** (amber-700/800) เป็นสีเน้นจุดเดียวที่อุ่น
+ * 5. **เก็บ violet/teal/orange ไว้ครบ** ไม่ยุบรวมกับ warn — สามสีนี้เป็นภาษาที่ทีมใช้แยกงานจริง
+ *    (Scraping vs Content · In process vs To do · ต้องคนตาม) ยุบแล้วข้อมูลหาย
+ *    แต่หรี่ลงให้ไม่แย่งสายตากับสถานะหลัก
+ *
+ * ⚠️ `outline` ต้องมี `bg-white` ในธีมสว่างเสมอ (มีเทสต์บังคับ) — เป็นปุ่มพื้นขาว ไม่ใช่กล่องพาสเทล
+ * ⚠️ `dot` / `solid` ใช้สีเดียวทั้งสองธีมโดยตั้งใจ — เป็นสีอิ่มบนพื้นที่เล็กมาก
+ */
 export const TONE: Record<ToneKey, ToneClasses> = {
   neutral: {
     bar: '!border-t-slate-400 dark:!border-t-slate-500',
     tile: 'bg-slate-100/80 hover:bg-slate-200/60 dark:bg-slate-800/70 dark:hover:bg-slate-800',
-    num: 'text-slate-700 dark:text-slate-300',
-    value: 'text-slate-800 dark:text-slate-200',
+    num: 'text-slate-800 dark:text-slate-200',
+    value: 'text-slate-700 dark:text-slate-300',
     soft: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50',
-    softHover: 'hover:bg-slate-100/70 dark:hover:bg-slate-800',
-    solid: 'bg-slate-600 text-white hover:bg-slate-500',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-slate-700 text-white hover:bg-slate-600',
     dot: 'bg-slate-400',
-    onDark: 'text-slate-200',
+    onDark: 'text-slate-300',
     chip: 'jarvis-chip jarvis-chip-neutral',
-    hex: '#94a3b8',
+    hex: '#64748b',
   },
   info: {
-    bar: '!border-t-sky-400 dark:!border-t-sky-500',
-    tile: 'bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/60 dark:hover:bg-sky-950',
-    num: 'text-sky-900 dark:text-sky-200',
-    value: 'text-sky-700 dark:text-sky-300',
-    soft: 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/50',
-    softHover: 'hover:bg-sky-100/70 dark:hover:bg-sky-950',
-    solid: 'bg-sky-600 text-white hover:bg-sky-500',
-    dot: 'bg-sky-400',
+    bar: '!border-t-sky-600 dark:!border-t-sky-500',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
+    num: 'text-sky-800 dark:text-sky-200',
+    value: 'text-sky-800 dark:text-sky-300',
+    soft: 'border-sky-300/70 bg-slate-50 dark:border-sky-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-sky-300 bg-white text-sky-800 hover:bg-slate-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-sky-700 text-white hover:bg-sky-600',
+    dot: 'bg-sky-600',
     onDark: 'text-sky-300',
     chip: 'jarvis-chip jarvis-chip-info',
-    hex: '#0ea5e9',
+    hex: '#0369a1',
   },
   primary: {
-    bar: '!border-t-blue-500 dark:!border-t-blue-400',
-    tile: 'bg-blue-50 hover:bg-blue-100/70 dark:bg-blue-950/60 dark:hover:bg-blue-950',
+    // กรมท่า — สีหลักของหน้าจอตามแบบ B
+    bar: '!border-t-blue-800 dark:!border-t-blue-500',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
     num: 'text-blue-900 dark:text-blue-200',
-    value: 'text-blue-700 dark:text-blue-300',
-    soft: 'border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50',
-    softHover: 'hover:bg-blue-100/70 dark:hover:bg-blue-950',
-    solid: 'bg-blue-600 text-white hover:bg-blue-500',
-    dot: 'bg-blue-500',
-    onDark: 'text-blue-400',
+    value: 'text-blue-800 dark:text-blue-300',
+    soft: 'border-blue-300/70 bg-slate-50 dark:border-blue-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-blue-300 bg-white text-blue-800 hover:bg-slate-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-blue-800 text-white hover:bg-blue-700',
+    dot: 'bg-blue-800',
+    onDark: 'text-blue-300',
     chip: 'jarvis-chip jarvis-chip-primary',
-    hex: '#3b82f6',
+    hex: '#1e40af',
   },
   success: {
-    bar: '!border-t-emerald-500 dark:!border-t-emerald-400',
-    tile: 'bg-emerald-50 hover:bg-emerald-100/70 dark:bg-emerald-950/60 dark:hover:bg-emerald-950',
-    num: 'text-emerald-900 dark:text-emerald-200',
-    value: 'text-emerald-700 dark:text-emerald-300',
-    soft: 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/50',
-    softHover: 'hover:bg-emerald-100/70 dark:hover:bg-emerald-950',
-    solid: 'bg-emerald-600 text-white hover:bg-emerald-500',
-    dot: 'bg-emerald-400',
+    // ⚠️ ต้องอยู่คนละตระกูลกับโทน `teal` — เทสต์บังคับว่า hex ของทุกโทนห้ามซ้ำ
+    // (ซ้ำเมื่อไหร่ = สองเส้นบนกราฟกลายเป็นสีเดียว แยกไม่ออก) · จับได้ตอนเปลี่ยนจานสีรอบนี้
+    bar: '!border-t-emerald-700 dark:!border-t-emerald-500',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
+    num: 'text-emerald-800 dark:text-emerald-200',
+    value: 'text-emerald-800 dark:text-emerald-300',
+    soft: 'border-emerald-300/70 bg-slate-50 dark:border-emerald-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-emerald-300 bg-white text-emerald-800 hover:bg-slate-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-emerald-700 text-white hover:bg-emerald-600',
+    dot: 'bg-emerald-700',
     onDark: 'text-emerald-300',
     chip: 'jarvis-chip jarvis-chip-success',
-    hex: '#22c55e',
+    hex: '#047857',
   },
   warn: {
-    bar: '!border-t-amber-400 dark:!border-t-amber-500',
-    tile: 'bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/60 dark:hover:bg-amber-950',
-    num: 'text-amber-900 dark:text-amber-200',
-    value: 'text-amber-700 dark:text-amber-300',
-    soft: 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50',
-    softHover: 'hover:bg-amber-100/70 dark:hover:bg-amber-950',
-    solid: 'bg-amber-500 text-white hover:bg-amber-400',
-    dot: 'bg-amber-400',
+    // ทองด้าน — สีเน้นที่อุ่นเพียงสีเดียวของระบบ
+    bar: '!border-t-amber-700 dark:!border-t-amber-500',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
+    num: 'text-amber-800 dark:text-amber-200',
+    value: 'text-amber-800 dark:text-amber-300',
+    soft: 'border-amber-300/70 bg-slate-50 dark:border-amber-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-amber-300 bg-white text-amber-800 hover:bg-slate-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-amber-700 text-white hover:bg-amber-600',
+    dot: 'bg-amber-700',
     onDark: 'text-amber-300',
     chip: 'jarvis-chip jarvis-chip-warn',
-    hex: '#f59e0b',
+    hex: '#b45309',
   },
   danger: {
-    bar: '!border-t-red-500 dark:!border-t-red-400',
-    tile: 'bg-red-50 hover:bg-red-100/70 dark:bg-red-950/60 dark:hover:bg-red-950',
-    num: 'text-red-900 dark:text-red-200',
-    value: 'text-red-700 dark:text-red-300',
-    soft: 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/50',
-    softHover: 'hover:bg-red-100/70 dark:hover:bg-red-950',
-    solid: 'bg-red-600 text-white hover:bg-red-500',
-    dot: 'bg-red-500',
+    bar: '!border-t-rose-800 dark:!border-t-red-500',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
+    num: 'text-rose-900 dark:text-red-200',
+    value: 'text-rose-800 dark:text-red-300',
+    soft: 'border-rose-300/70 bg-slate-50 dark:border-red-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-rose-300 bg-white text-rose-800 hover:bg-slate-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-rose-800 text-white hover:bg-rose-700',
+    dot: 'bg-rose-800',
     onDark: 'text-red-400',
     chip: 'jarvis-chip jarvis-chip-danger',
-    hex: '#ef4444',
+    hex: '#9f1239',
   },
   violet: {
-    bar: '!border-t-violet-500 dark:!border-t-violet-400',
-    tile: 'bg-violet-50 hover:bg-violet-100/70 dark:bg-violet-950/60 dark:hover:bg-violet-950',
+    // สีที่ 4 — Scraping / คนเก่า Re Use · หรี่ลงให้ไม่แย่งสถานะหลัก
+    bar: '!border-t-violet-700 dark:!border-t-violet-500',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
     num: 'text-violet-900 dark:text-violet-200',
-    value: 'text-violet-700 dark:text-violet-300',
-    soft: 'border-violet-200 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/50',
-    softHover: 'hover:bg-violet-100/70 dark:hover:bg-violet-950',
-    solid: 'bg-violet-600 text-white hover:bg-violet-500',
-    dot: 'bg-violet-400',
+    value: 'text-violet-800 dark:text-violet-300',
+    soft: 'border-violet-300/70 bg-slate-50 dark:border-violet-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-violet-300 bg-white text-violet-800 hover:bg-slate-50 dark:border-violet-800 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-violet-700 text-white hover:bg-violet-600',
+    dot: 'bg-violet-700',
     onDark: 'text-violet-300',
     chip: 'jarvis-chip jarvis-chip-violet',
-    hex: '#8b5cf6',
+    hex: '#6d28d9',
   },
   orange: {
-    bar: '!border-t-orange-400 dark:!border-t-orange-400',
-    tile: 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/60 dark:hover:bg-orange-950',
+    // สีที่ 5 — "ต้องคนตาม" / ส่งทีมคอนเทนต์ · เป็นสีเดียวที่ยังสดได้เพราะแปลว่า "ต้องลงมือ"
+    bar: '!border-t-orange-600 dark:!border-t-orange-400',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
     num: 'text-orange-900 dark:text-orange-200',
-    value: 'text-orange-700 dark:text-orange-300',
-    soft: 'border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/50',
-    softHover: 'hover:bg-orange-100/70 dark:hover:bg-orange-950',
-    solid: 'bg-orange-500 text-white hover:bg-orange-400',
-    dot: 'bg-orange-400',
+    value: 'text-orange-800 dark:text-orange-300',
+    soft: 'border-orange-300/70 bg-slate-50 dark:border-orange-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-orange-300 bg-white text-orange-800 hover:bg-slate-50 dark:border-orange-800 dark:bg-slate-900 dark:text-orange-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-orange-600 text-white hover:bg-orange-500',
+    dot: 'bg-orange-600',
     onDark: 'text-orange-300',
     chip: 'jarvis-chip jarvis-chip-orange',
-    hex: '#f97316',
+    hex: '#c2410c',
   },
   teal: {
-    bar: '!border-t-teal-400 dark:!border-t-teal-400',
-    tile: 'bg-teal-50 hover:bg-teal-100/70 dark:bg-teal-950/60 dark:hover:bg-teal-950',
+    bar: '!border-t-teal-700 dark:!border-t-teal-400',
+    tile: 'bg-slate-100/70 hover:bg-slate-200/60 dark:bg-slate-800/60 dark:hover:bg-slate-800',
     num: 'text-teal-900 dark:text-teal-200',
-    value: 'text-teal-700 dark:text-teal-300',
-    soft: 'border-teal-200 bg-teal-50 dark:border-teal-900 dark:bg-teal-950/50',
-    softHover: 'hover:bg-teal-100/70 dark:hover:bg-teal-950',
-    solid: 'bg-teal-600 text-white hover:bg-teal-500',
-    dot: 'bg-teal-400',
+    value: 'text-teal-800 dark:text-teal-300',
+    soft: 'border-teal-300/70 bg-slate-50 dark:border-teal-800/70 dark:bg-slate-800/50',
+    softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    outline: 'border-teal-300 bg-white text-teal-800 hover:bg-slate-50 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-300 dark:hover:bg-slate-950/50',
+    solid: 'bg-teal-700 text-white hover:bg-teal-600',
+    dot: 'bg-teal-700',
     onDark: 'text-teal-300',
     chip: 'jarvis-chip jarvis-chip-teal',
-    hex: '#14b8a6',
+    hex: '#0f766e',
   },
 };
 
 /** variant ที่ต้องมีคู่ `dark:` เสมอ — dot/solid ใช้สีอิ่มตัวเดียวกันทั้งสองธีมโดยตั้งใจ */
-export const TONE_DARK_REQUIRED_VARIANTS = ['bar', 'tile', 'num', 'value', 'soft', 'softHover'] as const;
+export const TONE_DARK_REQUIRED_VARIANTS = [
+  'bar',
+  'tile',
+  'num',
+  'value',
+  'soft',
+  'softHover',
+  'outline',
+] as const;
 
 /**
  * พื้นผิวของหน้า /dashboard (Request Control Tower)
@@ -210,12 +261,12 @@ export const DASH = {
   /** ป้ายทอง (brass) บน hero เข้ม — สีเดียวทั้งสองธีมเพราะพื้นเข้มตลอด */
   heroLabel: 'text-[10px] font-bold uppercase tracking-[0.14em] text-[#c9b184]',
   /** ป้ายหัวข้อกลุ่ม (brass) บนพื้นสว่างของหน้า — ภาษาเดียวกับ eyebrow ใน mockup */
-  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]',
+  eyebrow: 'text-[11px] font-bold uppercase tracking-[0.14em] text-[#8a6c33] dark:text-[#cfae72]',
   title: 'text-sm font-semibold text-slate-900 dark:text-slate-100',
   label: 'text-xs font-medium text-slate-600 dark:text-slate-300',
   sub: 'text-xs text-slate-500 dark:text-slate-400',
   /** เหมือน sub แต่ไม่กำหนดขนาด — ใช้เมื่อจุดเรียกใช้กำหนดขนาดเอง (twMerge จะทับขนาดถ้าใช้ sub) */
-  muted: 'text-slate-500 dark:text-slate-400',
+  muted: 'text-slate-600 dark:text-slate-400',
   divider: 'border-slate-100 dark:border-slate-800',
   tableHead: 'bg-slate-50/80 text-slate-500 dark:bg-slate-800/60 dark:text-slate-400',
   tableRow: 'border-slate-50 hover:bg-slate-50/50 dark:border-slate-800 dark:hover:bg-slate-800/40',

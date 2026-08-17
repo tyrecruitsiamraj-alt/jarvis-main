@@ -57,6 +57,8 @@ type SqlServerRequestRow = {
   resign_date: Date | string | null;
   reason_main_name: string | null;
   work_addr: string | null;
+  work_place: string | null;
+  boss_nationality: string | null;
   work_date: string | null;
   work_time: string | null;
   age: string | null;
@@ -89,6 +91,19 @@ function normalizeSiamrajWorkAddress(raw: string | null | undefined): string {
     .replace(/\s*([:：])\s*/gu, '$1 ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
+
+/**
+ * ค่าที่คนกรอก ERP ใส่ขีดทิ้งไว้ ("-", "--", ".") = ยังไม่ได้กรอกจริง
+ * ปล่อยผ่านจะได้ช่อง "สัญชาติเจ้านาย: -" ซึ่งอ่านแล้วสับสนกว่า "—" ของหน้าเว็บ
+ * (ข้อมูลจริง: boss_nationality เป็น "-" อยู่ 408 ใบใน 2 ปีล่าสุด)
+ * ⚠ "ไม่ระบุ" ไม่ตัดทิ้ง — นั่นคือคนตอบมาแล้วว่าไม่ระบุ ต่างจากช่องที่ไม่ได้กรอก
+ */
+function cleanErpText(v: string | null | undefined): string | undefined {
+  const s = (v ?? '').toString().normalize('NFC').replace(/\u00a0/g, ' ').trim();
+  if (!s) return undefined;
+  if (/^[-–—.\s]+$/.test(s)) return undefined;
+  return s;
 }
 
 function getSqlFilters() {
@@ -158,6 +173,10 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     contract_type_code: r.contract_type_code?.trim() || undefined,
     contract_type_name: r.contract_type_name?.trim() || undefined,
     location_address: normalizeSiamrajWorkAddress(r.work_addr) || r.site_name || r.site_code || '',
+    // work_place1 เดี่ยว ๆ = ชื่อสถานที่ที่ไปประจำ · location_address รวม work_place1-3 เข้าด้วยกัน
+    // (ตัวหลังมีที่อยู่/ผู้ใช้บริการปนมาด้วย และเป็นตัวที่ตัวกรองจังหวัด-อำเภอใช้ ห้ามเปลี่ยนรูป)
+    work_place: cleanErpText(r.work_place),
+    boss_nationality: cleanErpText(r.boss_nationality),
     request_action_code: r.request_action_code || undefined,
     request_action_name: r.request_action_name || undefined,
     resigned_employee_name: r.staff_fullname?.trim() || undefined,
@@ -228,6 +247,8 @@ const BASE_SQL = `
       END +
       ISNULL(NULLIF(LTRIM(RTRIM(B.work_place3)), N''), N'')
     )) AS work_addr,
+    LTRIM(RTRIM(B.work_place1)) AS work_place,
+    LTRIM(RTRIM(B.boss_nationality)) AS boss_nationality,
     A.staff_title_code,
     A.job_description_code_1,
     A.job_description_code_2,
@@ -278,7 +299,7 @@ const SELECT_COLUMNS = `
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
   request_qty, inform_qty, is_inform_all, effective_inform_qty,
-  reason_main_name, work_addr, work_date, work_time, age, sex,
+  reason_main_name, work_addr, work_place, boss_nationality, work_date, work_time, age, sex,
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
 `;
 
@@ -291,6 +312,20 @@ function boardRequestTypeExtraWhere(alias = 'A'): string {
 
 /** จำนวนสูงสุดต่อครั้งเมื่อดึง feed ใบขอหน่วยงาน */
 export const SIAMRAJ_UNIT_REQUESTS_MAX_LIMIT = 2000;
+
+/**
+ * ดึงใบขอเปิดเฉพาะที่ยื่นตั้งแต่วันนี้เป็นต้นไป (เจ้าของเคาะ 14 ส.ค. 2569: **1 ม.ค. 2567**)
+ *
+ * เหตุ: ERP ยังมีใบเปิดค้างข้ามปี — วัดจริง 14 ส.ค. เจอใบเปิด 298 ใบ ในนั้น 5 ใบ
+ * เก่ากว่าปี 2566 (เก่าสุด 18 ธ.ค. 2015 ค้างมา 10 ปี) · เปิดใช้ AI โทรโดยไม่กรอง =
+ * โทรหาคนเรื่องงานที่ค้างมาหลายปี · ยังพลอยลากช่วงกราฟ Dashboard ย้อนไปปีเก่าด้วย
+ *
+ * ⚠️ **กรองที่ CTE `recent` (ตัวคัดว่าจะแสดงใบไหน) จุดเดียว** — `getSiamrajSqlServerUnitRequestById`
+ * ไม่ผ่าน `recent` เลย (มี base CTE ตรง) จึงเปิดใบเก่ารายใบ/ค้นด้วยเลขที่ใบยังได้เสมอ
+ * ⚠️ env ว่าง = default (ห้ามให้ว่างกลายเป็น "ไม่กรอง")
+ */
+const OPEN_REQUEST_MIN_DATE =
+  (process.env.SIAMRAJ_OPEN_REQUEST_MIN_DATE || '').trim() || '2024-01-01';
 
 function clampUnitRequestLimit(limit?: number): number {
   const n = limit ?? 200;
@@ -316,6 +351,7 @@ export async function listSiamrajSqlServerUnitRequests(options: {
       FROM st_request_head A
       INNER JOIN ms_site SS ON A.site_code = SS.site_code
       WHERE ${openStaffingRequestWhere()}
+        AND A.request_date >= CONVERT(datetime, @minRequestDate, 120)
         AND SS.department_code BETWEEN @deptFrom AND @deptTo
         AND A.site_code BETWEEN @siteFrom AND @siteTo
         ${clsExclude}
@@ -333,7 +369,7 @@ export async function listSiamrajSqlServerUnitRequests(options: {
     WHERE rn = 1
     ORDER BY act_saleco_datetime DESC
   `,
-    { limit, ...filters, ...deptScope.params },
+    { limit, minRequestDate: OPEN_REQUEST_MIN_DATE, ...filters, ...deptScope.params },
   );
 
   return rows.map(mapSqlServerRow);

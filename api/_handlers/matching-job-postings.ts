@@ -9,7 +9,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   listJobPostingRequests,
-  getActiveJobPostingForJob,
+  listActiveJobPostingsForJob,
   getJobPostingRequestById,
   createJobPostingRequest,
   updateJobPostingRequest,
@@ -50,8 +50,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (!(await isSiamrajRequestInScope(req.user, jobId))) {
           return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
         }
-        const item = await getActiveJobPostingForJob(jobId);
-        return res.status(200).json({ item });
+        // `active` = คำขอ active ทุกประเภทของใบนี้ (ตั้งแต่ 080 มีได้ทั้ง Content และ Scraping)
+        // — คง `item` ไว้ด้วยเพื่อไม่ให้ client เดิมพัง (อ่านตัวล่าสุดเหมือนเคย)
+        const active = await listActiveJobPostingsForJob(jobId);
+        return res.status(200).json({ item: active[0] ?? null, active });
       }
       const status = normalizeJobPostingStatus(getQuery(req, 'status'));
       const scoped = await loadScopedRequestNoSet(req.user);

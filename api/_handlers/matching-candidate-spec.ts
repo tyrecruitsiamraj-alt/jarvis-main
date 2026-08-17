@@ -6,7 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { analyzeCandidateSpecForJob } from '../_lib/candidateSpecAnalyzer.js';
 import { getOllamaConfig, checkOllamaReachable } from '../_lib/ollamaClient.js';
 
@@ -50,7 +50,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const refresh = getQuery(req, 'refresh') === '1';
     // จำกัดตามแผนก — ห้ามวิเคราะห์สเปคใบขอข้ามแผนก
-    const job = await getSiamrajUnitRequestById(jobId, await loadUserDepartmentScope(req.user));
+    const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
     }

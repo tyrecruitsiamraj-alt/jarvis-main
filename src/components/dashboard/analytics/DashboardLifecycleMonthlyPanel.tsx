@@ -133,7 +133,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">ยังไม่มีข้อมูลในช่วง {scopeLabel}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">ยังไม่มีข้อมูลในช่วง {scopeLabel}</p>
       </div>
     );
   }
@@ -144,7 +144,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           ประเภทใบขอรายเดือน — เข้ามา / ปิดแล้ว / คงเหลือ
         </h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
           คอลัมน์ลาออก–อื่นๆ = แตกยอด「เข้ามา」ของเดือนนั้น · คงเหลือแยกต่างหาก · สรุปตาม {scopeLabel}
         </p>
         <ul className="text-xs text-slate-700 dark:text-slate-300 mt-2 space-y-0.5 list-disc list-inside">
@@ -157,7 +157,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
       <div className="overflow-x-auto -mx-1">
         <table className="w-full min-w-[48rem] text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+            <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
               <th className="text-left font-medium px-2 py-2 whitespace-nowrap">เดือน</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">เข้ามา</th>
               <th className="text-right font-medium px-2 py-2 whitespace-nowrap">ปิดแล้ว</th>
@@ -228,7 +228,7 @@ const DashboardLifecycleMonthlyPanel: React.FC<Props> = ({ data, scopeLabel }) =
             </tr>
           </tbody>
         </table>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 px-1">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 px-1">
           คอลัมน์「รวมประเภท」ต้องเท่า「เข้ามา」ทุกเดือน · คงเหลือไม่ใช่ผลรวมของคอลัมน์ประเภท
         </p>
       </div>

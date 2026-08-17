@@ -5,7 +5,7 @@ const table = tableInAppSchema('candidate_proposals');
 const MAX_TEXT = 400;
 const MAX_REASON = 2000;
 
-export type ProposalSource = 'board' | 'irecruit';
+export type ProposalSource = 'board' | 'irecruit' | 'application';
 export type ProposalTier = 'green' | 'yellow' | 'red';
 export type ProposalStatus =
   | 'proposed'
@@ -15,7 +15,7 @@ export type ProposalStatus =
   | 'rejected'
   | 'cancelled';
 
-const SOURCES: ProposalSource[] = ['board', 'irecruit'];
+const SOURCES: ProposalSource[] = ['board', 'irecruit', 'application'];
 const TIERS: ProposalTier[] = ['green', 'yellow', 'red'];
 const STATUSES: ProposalStatus[] = [
   'proposed',
@@ -244,7 +244,7 @@ export async function upsertProposal(input: UpsertProposalInput): Promise<Candid
   const candidateRef = String(input.candidateRef ?? '').trim();
   if (!jobId) throw new Error('job_id is required');
   if (!candidateRef) throw new Error('candidate_ref is required');
-  if (!normalizeSource(input.source)) throw new Error('source must be board or irecruit');
+  if (!normalizeSource(input.source)) throw new Error('source must be board, irecruit or application');
 
   const status = normalizeStatus(input.status) ?? 'reserved';
   const userId =

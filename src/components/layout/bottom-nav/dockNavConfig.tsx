@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -13,14 +13,29 @@ export type DockNavItem = {
   functionId?: AppFunctionId;
 };
 
-/** 8 เมนูหลัก — ลำดับต้องตรงกับ UI bottom dock */
+/**
+ * เมนูหลัก — ลำดับต้องตรงกับ UI bottom dock
+ *
+ * ลำดับตามที่เจ้าของสั่ง 16 ส.ค. 2569 เย็น: *"หน้าหลัก หน่วยงาน บอร์ดรับสมัคร Follow
+ * แล้วก็ตามด้วยที่เหลือ"* — กลุ่ม "บอร์ดรับสมัคร" ไม่ได้อยู่ในลิสต์นี้ แต่ถูกแทรก
+ * ต่อจาก "หน่วยงาน" ที่ `AppNavDrawer` (ดูตรงนั้น) จึงได้ลำดับตามสั่งพอดี
+ *
+ * ⚠️ นี่คือ **ลำดับตั้งต้น** — แอดมินย้าย/เปลี่ยนชื่อ/ซ่อนทับได้ที่หน้าตั้งค่า
+ * (`applyNavPreferences` ใน src/lib/navPreferences.ts) · แก้ตรงนี้ = เปลี่ยนค่าตั้งต้น
+ * ของคนที่ยังไม่เคยตั้งเอง ไม่ทับค่าที่แอดมินตั้งไว้แล้ว
+ */
 export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/', label: 'หน้าหลัก', icon: Home },
-  { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
-  { path: '/matching', label: 'Matching', icon: Search, functionId: 'candidates_read' },
-  { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
-  { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
+  // ← กลุ่ม "บอร์ดรับสมัคร" ถูกแทรกตรงนี้โดย AppNavDrawer
+  { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
+  { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
+  { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
+  // หัวข้อ "Matching" ถูกถอดจากเมนู 17 ส.ค. 2569 (เจ้าของ: "อันนี้ก็เอาออกได้เลย") —
+  // ลูกย้ายออกไปอยู่กับงานจริงหมดแล้ว เหลือหัวข้อที่กดกางแล้วไม่มีอะไรข้างใน:
+  //   จับคู่กับงาน → แท็บในหน้าหน่วยงาน · การติดต่อ (คัดสรร) → แท็บในใบขอ
+  //   Pre-Check → ปุ่มแถบตัวกรองในกล่องงาน · คำขอโพสต์งานใหม่ → แท็บบนบอร์ดรับสมัคร
+  // route `/matching` ยังอยู่ (RoleHubPage + ลิงก์เก่ายังเปิดได้) แค่ไม่มีทางเข้าจากเมนู
   { path: '/dashboard', label: 'Dashboard', icon: BarChart3, functionId: 'dashboard' },
 ];
 

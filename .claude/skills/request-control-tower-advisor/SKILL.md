@@ -1,68 +1,66 @@
 ---
 name: request-control-tower-advisor
-description: use when working on request control tower, staffing request dashboards, demand, fulfillment, full closure, cancellation, resolution, backlog, sla, lifecycle trend, root cause ranking, cursor implementation prompts, safe architecture, redteam, swot, or pre-mortem for this project.
+description: use when working on request control tower, staffing request dashboards, demand, fulfillment, full closure, cancellation, resolution, backlog, sla, lifecycle trend, root cause ranking, cursor implementation prompts, safe architecture, redteam, swot, or pre-mortem for this project. ใช้เมื่อทำงานเกี่ยวกับ ศูนย์ควบคุมใบขอ แดชบอร์ดใบขอกำลังคน ความต้องการ การหาได้ ปิดครบใบขอ ยกเลิก จบงาน งานค้าง SLA แนวโน้มวงจรชีวิตใบขอ อันดับต้นเหตุ
 ---
 
-# Request Control Tower Advisor
+# ที่ปรึกษาศูนย์ควบคุมใบขอ (Request Control Tower)
 
-Use this skill for all work related to the Request Control Tower project.
+ใช้ skill นี้กับงานทุกอย่างที่เกี่ยวกับโปรเจกต์ศูนย์ควบคุมใบขอ
 
-The goal is to build a production-ready executive and operational dashboard for staffing/workforce requests.
+เป้าหมาย: สร้างแดชบอร์ดระดับผู้บริหารและระดับปฏิบัติการที่ใช้งานจริงได้
+สำหรับใบขอกำลังคน
 
-The dashboard must explain:
+แดชบอร์ดต้องตอบให้ได้ 9 เรื่อง:
 
-1. Demand: how many positions/requests came in.
-2. Fulfillment: how many positions were found/informed.
-3. Full Closure: how many requests were fully fulfilled.
-4. Cancellation: how many positions/requests were cancelled.
-5. Resolution: which requests no longer have remaining positions.
-6. Backlog: how many positions remain to be filled.
-7. SLA: which requests are on track, at risk, or breached.
-8. Lifecycle: whether demand comes from resignation, replacement, increase headcount, new site, or other.
-9. Root Cause: which site/unit/customer/owner causes recurring demand, resignation, backlog, or SLA breach.
+1. **ความต้องการ** — มีใบขอ/อัตราเข้ามากี่รายการ
+2. **หาได้แล้ว** — หาคนได้/แจ้งเข้าไปแล้วกี่อัตรา
+3. **ปิดครบใบขอ** — ใบไหนหาได้ครบตามที่ขอแล้วบ้าง
+4. **ยกเลิก** — ถูกยกเลิกไปกี่อัตรา/กี่ใบ
+5. **จบงานแล้ว** — ใบไหนไม่เหลืออัตราต้องหาแล้ว
+6. **งานค้าง** — เหลือต้องหาอีกกี่อัตรา
+7. **SLA** — ใบไหนทันกำหนด เสี่ยง หรือเกินแล้ว
+8. **วงจรชีวิตใบขอ** — ความต้องการมาจากลาออก แทนคน เพิ่มอัตรา เปิดไซต์ใหม่ หรืออื่น ๆ
+9. **ต้นเหตุ** — ไซต์/หน่วยงาน/ลูกค้า/ผู้รับผิดชอบรายไหนเป็นต้นเหตุของความต้องการซ้ำ
+   การลาออก งานค้าง หรือการเกิน SLA
 
-## Non-negotiable logic
+## ตรรกะที่ห้ามผิดเด็ดขาด
 
-Never mix these concepts:
+ห้ามเอาสามคู่นี้มาปนกัน:
 
-* หาได้แล้ว is not the same as ปิดครบใบขอ.
-* ยกเลิก is not the same as หาได้แล้ว.
-* จบงานแล้ว is not always the same as ปิดครบใบขอ.
+* **หาได้แล้ว ≠ ปิดครบใบขอ**
+* **ยกเลิก ≠ หาได้แล้ว**
+* **จบงานแล้ว ไม่ได้แปลว่า ปิดครบใบขอ เสมอไป**
 
-Core equation:
-ยอดค้างต้นงวด + ขอใหม่ - หาได้แล้ว - ยกเลิก = เหลือหา
+สมการหลัก:
+ยอดค้างต้นงวด + ขอใหม่ − หาได้แล้ว − ยกเลิก = เหลือหา
 
-## Before changing code
+## ก่อนแตะโค้ด ต้องอ่านก่อนเสมอ
 
-Always read:
+* references/02-dashboard-metric-definitions.md — นิยามตัวชี้วัด
+* references/03-request-ledger-logic.md — ตรรกะบัญชีใบขอ
+* references/04-sla-rules.md — กติกา SLA
+* references/06-safe-implementation-rules.md — กติกาการลงมืออย่างปลอดภัย
+* references/09-editing-map.md — แผนที่ไฟล์ + กับดักทุกข้อ (สำคัญที่สุด)
 
-* references/02-dashboard-metric-definitions.md
-* references/03-request-ledger-logic.md
-* references/04-sla-rules.md
-* references/06-safe-implementation-rules.md
-* references/09-editing-map.md
+## กติกาการลงมืออย่างปลอดภัย
 
-## Safe implementation rule
+**ห้ามเขียนทับแดชบอร์ดเดิมตรง ๆ**
 
-Do not rewrite the existing dashboard directly.
+ให้ใช้แนวทางนี้แทน:
 
-Use:
+1. ชั้นคำนวณคู่ขนาน (parallel layer)
+2. feature flag
+3. adapter
+4. API แบบอ่านอย่างเดียว
+5. ชนิดข้อมูลที่เข้ากันได้กับของเดิม
+6. เส้นทางพรีวิว
+7. unit test
+8. การกระทบยอด (reconciliation)
 
-1. Parallel calculation layer
-2. Feature flag
-3. Adapter
-4. Read-only API
-5. Backward-compatible types
-6. Preview route
-7. Unit tests
-8. Reconciliation
+## รูปแบบการตอบเจ้าของโปรเจกต์
 
-## Output style
-
-When responding to the project owner:
-
-1. Start with executive summary.
-2. Give one clear recommendation.
-3. Explain business impact.
-4. Provide implementation steps.
-5. Include Cursor-ready prompts when useful.
+1. เริ่มด้วยบทสรุปสำหรับผู้บริหาร
+2. ให้คำแนะนำที่ชัดเจนหนึ่งข้อ
+3. อธิบายผลกระทบทางธุรกิจ
+4. บอกขั้นตอนการลงมือ
+5. แนบ prompt ที่พร้อมใช้กับ Cursor เมื่อเป็นประโยชน์

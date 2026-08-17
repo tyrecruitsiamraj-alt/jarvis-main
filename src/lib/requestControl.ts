@@ -16,6 +16,20 @@ export type PositionBreakdown = {
   filledPositions: number;
   cancelledPositions: number;
   remainingPositions: number;
+  /**
+   * `true` = ตัวเลขชุดนี้ **เดาจาก status + position_units** ไม่ได้มาจาก ERP
+   * (ไม่มี `request_positions` / `filled_positions` / `cancelled_positions` ส่งมา)
+   *
+   * ไม่มีค่า = มาจาก ERP ตรง ๆ เชื่อถือได้
+   *
+   * ทำไมต้องมีธงนี้: กติกาข้อ 1 ของโปรเจกต์คือ **ห้ามเอา "ปิดครบใบขอ" มาเป็น "หาได้แล้ว"**
+   * แต่ทางหนีทีไล่ด้านล่างทำแบบนั้นพอดี (`status === 'closed'` → `filledPositions = ทุกอัตรา`)
+   * ถ้าไม่ติดธง ตัวเลขที่เดาจะไหลเข้าแดชบอร์ดปนกับตัวเลขจริงโดยไม่มีใครแยกออก
+   * เทียบได้กับ `snapshot_fallback` ใน `dashboard/requestControlLedger.ts` ซึ่งทำถูกอยู่แล้ว
+   *
+   * เป็น optional โดยตั้งใจ — จุดเรียกใช้ 12 จุดไม่ต้องแก้ และตัวเลขไม่เปลี่ยนแม้แต่ตัวเดียว
+   */
+  isDerived?: true;
 };
 
 export type RequestControlRecord = {
@@ -74,6 +88,21 @@ export function positionBreakdownFromJob(job: JobRequest): PositionBreakdown {
     return { requestPositions, filledPositions, cancelledPositions, remainingPositions };
   }
 
+  // ── ทางหนีทีไล่: ไม่มีตัวเลข staffing จาก ERP จึงต้องเดาจาก status ──────────────
+  //
+  // วัดกับข้อมูลจริงแล้ว (7 ส.ค. 2569): **ไม่มีใบขอจาก ERP เส้นไหนตกมาถึงตรงนี้เลย**
+  //   · ใบขอเปิดอยู่ 325 ใบ → ใช้เลขจาก ERP ครบ 325 (100%)
+  //   · ใบขอที่ปิดแล้ว 2,734 ใบ → ใช้เลขจาก ERP ครบ 2,734 (100%)
+  // เพราะ `requestPositionTotal()` คืนค่าต่ำสุด 1 เสมอ (ไม่มีทางเป็น 0) และ mapper
+  // ทั้งสองเส้น (siamrajSqlServerRequests / siamrajSqlServerClosed) เซ็ตครบทั้ง 3 ฟิลด์
+  //
+  // ⚠️ แต่ยังลบทิ้งไม่ได้ — จะทำงานทันทีเมื่อ **feed Siamraj ถูกปิด/ ERP ล่ม**
+  // แล้ว `useUnitRequestsFeed` ถอยไปใช้ `/api/jobs` (ใบขอฝั่ง PostgreSQL ซึ่ง
+  // **ไม่มีฟิลด์ staffing เลย**) — วัดแล้วมี 18 ใบ ในนั้น 7 ใบ status = 'closed'
+  // ซึ่งจะถูกเดาว่า "หาได้ครบทุกอัตรา" ทั้งที่ไม่มีข้อมูลยืนยันสักตัว
+  //
+  // นั่นคือจังหวะที่ตัวเลขสำคัญที่สุดและไม่มีใครสงสัยมันเลย จึง **ติดธง `isDerived`**
+  // ไว้ทุกทางที่เดา ตัวเลขเท่าเดิมทุกตัว แต่ปลายทางแยก "เลขจริง" กับ "เลขเดา" ได้
   const units = jobPositionUnits(job);
   if (job.status === 'cancelled') {
     return {
@@ -81,23 +110,28 @@ export function positionBreakdownFromJob(job: JobRequest): PositionBreakdown {
       filledPositions: 0,
       cancelledPositions: units,
       remainingPositions: 0,
+      isDerived: true,
     };
   }
   if (job.status === 'closed') {
+    // ⚠️ จุดที่ขัดกติกาข้อ 1 ตรง ๆ ถ้าไม่มีธง: เอา "ปิดครบใบขอ" มาเป็น "หาได้แล้ว"
+    // ปิดใบขอไม่ได้แปลว่าหาคนได้ครบ — ยกเลิกกลางคันก็ปิดเหมือนกัน
     return {
       requestPositions: units,
       filledPositions: units,
       cancelledPositions: 0,
       remainingPositions: 0,
+      isDerived: true,
     };
   }
 
-  // TODO: ถ้าไม่มี request_qty/inform_qty จาก SQL ให้ถือว่า position_units = คงเหลือ
+  // ยังไม่ปิด ไม่ยกเลิก = ถือว่ายังหาไม่ได้สักอัตรา (ไม่เดาว่าหาได้ — ปลอดภัยกว่า)
   return {
     requestPositions: units,
     filledPositions: 0,
     cancelledPositions: 0,
     remainingPositions: units,
+    isDerived: true,
   };
 }
 

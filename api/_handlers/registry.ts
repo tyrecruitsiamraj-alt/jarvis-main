@@ -1,4 +1,7 @@
 import type { ApiReq, ApiRes } from '../_lib/http.js';
+// import เพื่อ side-effect: ลงทะเบียนตัวปล่อยชุดส่งงานเข้าคิว (setCallBatchDispatcher)
+// วางที่ registry เพราะถูก import ทั้ง server ท้องถิ่นและ Vercel catch-all
+import '../_lib/callBatchDispatcher.js';
 import candidatesHandler from './candidates.js';
 import employeesHandler from './employees.js';
 import geocodeHandler from './geocode.js';
@@ -12,6 +15,7 @@ import candidateInterviewsHandler from './candidate-interviews.js';
 import candidateWorkHistoryHandler from './candidate-work-history.js';
 import trainingRecordsHandler from './training-records.js';
 import appUsersHandler from './app-users.js';
+import appNavPreferencesHandler from './app-nav-preferences.js';
 import rolePermissionsHandler from './role-permissions.js';
 import auditLogsHandler from './audit-logs.js';
 import loginHandler from './auth/login.js';
@@ -32,7 +36,14 @@ import publicApplyHandler from './public/apply.js';
 import publicApplyLinkHandler from './public/apply-link.js';
 import recruitChannelsHandler from './recruit-channels.js';
 import recruitPostingsHandler from './recruit-postings.js';
+import recruitReasonsHandler from './recruit-reasons.js';
+import recruitJobTitlesHandler from './recruit-job-titles.js';
+import recruitFunnelHandler from './recruit-funnel.js';
 import jobApplicationsHandler from './job-applications.js';
+import applicationContactsHandler from './application-contacts.js';
+import applicationAttendanceHandler from './application-attendance.js';
+import recruitRmOverviewHandler from './recruit-rm-overview.js';
+import applicationDispatchHandler from './application-dispatch.js';
 import jobApplicationDocumentHandler from './job-application-document.js';
 import shortLinksHandler from './short-links.js';
 import shortLinksResolveHandler from './short-links-resolve.js';
@@ -63,8 +74,18 @@ import lumosPositionsHandler from './lumos-positions.js';
 import lumosDispatchHandler from './lumos-dispatch.js';
 import matchingCandidateSpecHandler from './matching-candidate-spec.js';
 import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js';
+import matchingRecruitLaneHandler from './matching-recruit-lane.js';
+import matchingSelectionRecallHandler from './matching-selection-recall.js';
 import matchingBoardCandidatesHandler from './matching-board-candidates.js';
 import matchingProposalsHandler from './matching-proposals.js';
+import matchingCandidateScreeningHandler from './matching-candidate-screening.js';
+import lumosDispatchModeHandler from './lumos-dispatch-mode.js';
+import lumosCallFunnelHandler from './lumos-call-funnel.js';
+import lumosCallBatchesHandler from './lumos-call-batches.js';
+import matchingCallHoldsHandler from './matching-call-holds.js';
+import matchingCandidateJobMatchesHandler from './matching-candidate-job-matches.js';
+import matchingContactHistoryHandler from './matching-contact-history.js';
+import notificationsHandler from './notifications.js';
 import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
 import matchingWorkerStatusHandler from './matching-worker-status.js';
@@ -84,6 +105,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/candidate-work-history': candidateWorkHistoryHandler as ApiHandler,
   '/api/training-records': trainingRecordsHandler as ApiHandler,
   '/api/app-users': appUsersHandler as ApiHandler,
+  // เมนูที่แอดมินจัดเอง (093) — GET ทุกคน · PUT เฉพาะ admin
+  '/api/app-nav-preferences': appNavPreferencesHandler as ApiHandler,
   '/api/role-permissions': rolePermissionsHandler as ApiHandler,
   '/api/audit-logs': auditLogsHandler as ApiHandler,
   '/api/employees': employeesHandler as ApiHandler,
@@ -110,8 +133,20 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/lumos/reminder/results': lumosReminderResultsHandler as ApiHandler,
   '/api/matching/candidate-spec': matchingCandidateSpecHandler as ApiHandler,
   '/api/matching/irecruit-candidates': matchingIrecruitCandidatesHandler as ApiHandler,
+  // เลนสรรหา — ค้นคนที่ยังไม่สมัครจาก 3 แหล่ง แล้วส่ง AI โทรทันที (R2b)
+  '/api/matching/recruit-lane': matchingRecruitLaneHandler as ApiHandler,
+  // เลนคัดสรร — ชวนคนที่เคยปฏิเสธงานอื่นกลับมา แล้วส่ง AI โทรทันที
+  '/api/matching/selection-recall': matchingSelectionRecallHandler as ApiHandler,
   '/api/matching/board-candidates': matchingBoardCandidatesHandler as ApiHandler,
   '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
+  '/api/matching/candidate-screening': matchingCandidateScreeningHandler as ApiHandler,
+  '/api/lumos/dispatch-mode': lumosDispatchModeHandler as ApiHandler,
+  '/api/lumos/call-funnel': lumosCallFunnelHandler as ApiHandler,
+  '/api/lumos/call-batches': lumosCallBatchesHandler as ApiHandler,
+  '/api/matching/call-holds': matchingCallHoldsHandler as ApiHandler,
+  '/api/matching/candidate-job-matches': matchingCandidateJobMatchesHandler as ApiHandler,
+  '/api/matching/contact-history': matchingContactHistoryHandler as ApiHandler,
+  '/api/notifications': notificationsHandler as ApiHandler,
   '/api/matching/flow-summary': matchingFlowSummaryHandler as ApiHandler,
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
@@ -123,7 +158,14 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
   '/api/recruit/channels': recruitChannelsHandler as ApiHandler,
   '/api/recruit/postings': recruitPostingsHandler as ApiHandler,
+  '/api/recruit/reasons': recruitReasonsHandler as ApiHandler,
+  '/api/recruit/job-titles': recruitJobTitlesHandler as ApiHandler,
+  '/api/recruit/funnel': recruitFunnelHandler as ApiHandler,
   '/api/job-applications': jobApplicationsHandler as ApiHandler,
+  '/api/application-contacts': applicationContactsHandler as ApiHandler,
+  '/api/application-attendance': applicationAttendanceHandler as ApiHandler,
+  '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
+  '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,
   '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,

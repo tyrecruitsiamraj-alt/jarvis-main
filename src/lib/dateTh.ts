@@ -22,14 +22,17 @@ export function toYmdLocal(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** สร้างครั้งเดียว — `new Intl.DateTimeFormat()` แพงมาก อย่าสร้างในลูป (ดู api/_lib/businessDate.ts) */
+const bangkokYmdFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 /** YYYY-MM-DD ตามปฏิทินกรุงเทพ (ใช้กับคำนวณวันธุรกิจ) */
 export function toYmdBangkok(d: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(d);
+  return bangkokYmdFormat.format(d);
 }
 
 export function parseYmd(ymd: string | undefined | null): { y: number; m: number; d: number } | null {
@@ -92,4 +95,46 @@ export function buildDateRangeYmd(from: string, to: string | null): string[] {
     cur.setDate(cur.getDate() + 1);
   }
   return out;
+}
+
+/**
+ * นับถอยหลังเป็น ช:นน:ss — ใช้กับล็อกโทรที่มีอายุจำกัด
+ * (ย้ายมาจาก MatchingPage.tsx ตอนแตกไฟล์)
+ */
+export function formatCountdown(msLeft: number): string {
+  if (msLeft <= 0) return 'หมดเวลาแล้ว';
+  const total = Math.floor(msLeft / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * ตัวจัดรูปสองตัวนี้ **สร้างครั้งเดียวระดับโมดูล** ตามกติกาเดียวกับ `bangkokYmdFormat`
+ * ข้างบนและ `api/_lib/businessDate.ts` — `toLocaleString()` / `toLocaleTimeString()`
+ * สร้าง Intl formatter ใหม่ทุกครั้งที่เรียก ซึ่งแพง (~0.16ms) และสองฟังก์ชันนี้ถูกเรียก
+ * **ต่อแถว** (ป้ายผลโทรทุกใบในหน้า Matching · ทุกแถวในแผงล็อกโทร)
+ */
+const thDateTimeFormat = new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+const thShortTimeFormat = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+/** เวลาสั้น ชั่วโมง:นาที แบบไทย — ค่าที่อ่านไม่ออกคืน "—" ไม่ throw */
+export function shortTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return thShortTimeFormat.format(d);
+}
+
+/**
+ * วันที่+เวลาแบบไทยอ่านง่าย (เช่น "3 ส.ค. 2569 18:08") — ใช้กับป้ายผลโทรของ Lumos
+ *
+ * ไม่มีค่า = "—" · ค่าที่อ่านไม่ออก **คืนสตริงเดิม** ไม่ใช่ "—"
+ * (ตั้งใจ: ถ้า ERP/คิวส่งอะไรแปลก ๆ มา อยากให้เห็นของจริงเพื่อไล่ต้นเหตุได้)
+ */
+export function formatDateTimeTh(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return thDateTimeFormat.format(d);
 }

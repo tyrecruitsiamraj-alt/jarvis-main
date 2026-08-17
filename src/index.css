@@ -22,7 +22,7 @@
     --secondary-foreground: 240 5% 26%;
 
     --muted: 240 12% 95%;
-    --muted-foreground: 240 4% 46%;
+    --muted-foreground: 240 5% 42%;
 
     --accent: 211 100% 50%;
     --accent-foreground: 0 0% 100%;
@@ -140,6 +140,17 @@
 }
 
 @layer base {
+  /**
+   * ขนาดฐานของทั้งแอป — เจ้าของบอกทุกหน้าดูเล็ก (7 ส.ค. 2569) เลยขยายจาก 16px
+   * ปรับที่นี่ที่เดียว: ทุกอย่างที่เป็น rem (ตัวหนังสือ text-* / ระยะห่าง p-* gap-*)
+   * โตตามสัดส่วนพร้อมกัน โครงหน้าจึงไม่เพี้ยนเป็นจุด ๆ
+   * ⚠️ ขนาด px ตายตัว (text-[11px] ฯลฯ) ไม่โตตาม — ตั้งใจ เพราะเป็นป้ายจิ๋วในชิป
+   * ที่ถ้าโตแล้วจะดันบรรทัดตก
+   */
+  html {
+    font-size: 112.5%; /* 18px */
+  }
+
   * {
     @apply border-border;
   }
@@ -335,34 +346,40 @@
   .jarvis-chip-sm {
     @apply px-1.5 text-[10px];
   }
+  /* ชิปตามจานสีแบบ B ("กรมท่า + ทองเก่า" เจ้าของเลือก 10 ส.ค. 2569)
+     หลักเดียวกับ TONE ใน designTokens.ts: **พื้นเป็นกลาง สีอยู่ที่เส้นขอบกับตัวหนังสือ**
+     เดิมชิปทุกอันเป็นพื้นพาสเทลของตัวเอง พอมีหลายชิปในแถวเดียว (การ์ดใบขอมีถึง 5-6 อัน)
+     จะกลายเป็นแถบสีรุ้งที่ตาไม่รู้จะอ่านอันไหนก่อน
+     ⚠️ ต้องแก้คู่กับ TONE เสมอ — เทสต์ designTokens บังคับว่า chip ต้องมี class จริงที่นี่
+     และต้องมีคู่ `.dark` ครบทุกโทน */
   .jarvis-chip-neutral {
-    @apply border-slate-200 bg-slate-50 text-slate-700;
+    @apply border-slate-300 bg-slate-50 text-slate-700;
   }
   .jarvis-chip-info {
-    @apply border-sky-200 bg-sky-50 text-sky-700;
+    @apply border-sky-300 bg-slate-50 text-sky-800;
   }
   .jarvis-chip-success {
-    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+    @apply border-emerald-300 bg-slate-50 text-emerald-800;
   }
   .jarvis-chip-warn {
-    @apply border-amber-200 bg-amber-50 text-amber-800;
+    @apply border-amber-300 bg-slate-50 text-amber-800;
   }
   .jarvis-chip-danger {
-    @apply border-red-200 bg-red-50 text-red-700;
+    @apply border-rose-300 bg-slate-50 text-rose-800;
   }
   .jarvis-chip-violet {
-    @apply border-violet-200 bg-violet-50 text-violet-700;
+    @apply border-violet-300 bg-slate-50 text-violet-800;
   }
   /* 3 โทนล่างเพิ่มตอนทำ token กลาง (src/lib/designTokens.ts) — ให้ครบ 9 โทนเท่าที่ TONE ประกาศ
-     น้ำเงิน=กำลังดำเนินการ · ส้ม=ส่งทีมคอนเทนต์/ปิดช้า · เขียวน้ำทะเล=ส่ง Scraping */
+     กรมท่า=กำลังดำเนินการ · ส้ม=ส่งทีมคอนเทนต์/ต้องคนตาม · เขียวน้ำทะเล=ส่ง Scraping */
   .jarvis-chip-primary {
-    @apply border-blue-200 bg-blue-50 text-blue-700;
+    @apply border-blue-400 bg-slate-50 text-blue-900;
   }
   .jarvis-chip-orange {
-    @apply border-orange-200 bg-orange-50 text-orange-700;
+    @apply border-orange-300 bg-slate-50 text-orange-800;
   }
   .jarvis-chip-teal {
-    @apply border-teal-200 bg-teal-50 text-teal-700;
+    @apply border-teal-300 bg-slate-50 text-teal-800;
   }
 
   /* ปุ่มมาตรฐาน 4 ระดับ — ทุกปุ่มในระบบควรเป็นหนึ่งในนี้ */
@@ -486,33 +503,34 @@
     @apply border-sky-700/60 bg-sky-950/40;
   }
 
-  /* chips — โทนเดียวกับ light แต่บนพื้นมืด: พื้นทึบจาง ตัวหนังสือโทนอ่อน */
+  /* chips โหมดมืด — หลักเดียวกับ light: **พื้นเป็นกลาง** (slate) สีอยู่ที่เส้นขอบกับตัวหนังสือ
+     เดิมพื้นเป็นสีของตัวเอง (`bg-sky-950` ฯลฯ) ซึ่งบนพื้นดำกลายเป็นก้อนสีเรืองแสงเรียงกัน */
   .dark .jarvis-chip-neutral {
     @apply border-slate-700 bg-slate-800/70 text-slate-300;
   }
   .dark .jarvis-chip-info {
-    @apply border-sky-800 bg-sky-950/70 text-sky-300;
+    @apply border-sky-800 bg-slate-800/70 text-sky-300;
   }
   .dark .jarvis-chip-success {
-    @apply border-emerald-800 bg-emerald-950/70 text-emerald-300;
+    @apply border-emerald-800 bg-slate-800/70 text-emerald-300;
   }
   .dark .jarvis-chip-warn {
-    @apply border-amber-800 bg-amber-950/70 text-amber-300;
+    @apply border-amber-800 bg-slate-800/70 text-amber-300;
   }
   .dark .jarvis-chip-danger {
-    @apply border-red-800 bg-red-950/70 text-red-300;
+    @apply border-red-800 bg-slate-800/70 text-red-300;
   }
   .dark .jarvis-chip-violet {
-    @apply border-violet-800 bg-violet-950/70 text-violet-300;
+    @apply border-violet-800 bg-slate-800/70 text-violet-300;
   }
   .dark .jarvis-chip-primary {
-    @apply border-blue-800 bg-blue-950/70 text-blue-300;
+    @apply border-blue-700 bg-slate-800/70 text-blue-300;
   }
   .dark .jarvis-chip-orange {
-    @apply border-orange-800 bg-orange-950/70 text-orange-300;
+    @apply border-orange-800 bg-slate-800/70 text-orange-300;
   }
   .dark .jarvis-chip-teal {
-    @apply border-teal-800 bg-teal-950/70 text-teal-300;
+    @apply border-teal-800 bg-slate-800/70 text-teal-300;
   }
 
   /* ปุ่มมาตรฐาน — primary ใช้ตัวแปรอยู่แล้ว ไม่ต้องแตะ */
@@ -547,5 +565,32 @@
   }
   .dark .btn-primary:hover:not(:disabled) {
     @apply bg-slate-800;
+  }
+}
+
+/* ═══ พิมพ์ตารางนัดหมายเป็น PDF (ลิสต์ข้อ 9 · 14 ส.ค. 2569) ═══
+   เจ้าของเคาะ: โหลด PDF ฝั่งเบราว์เซอร์ (window.print — ไม่เพิ่ม lib)
+   หน้าที่มี .rm-print-area (เฉพาะแท็บติดตามนัดหมาย) พิมพ์เฉพาะก้อนนั้น
+   ⚠️ ใช้ :has() — เบราว์เซอร์เก่าที่ไม่รองรับจะพิมพ์ทั้งหน้า (ยังใช้งานได้ แค่ไม่สวย) */
+@media print {
+  body:has(.rm-print-area) > *:not(#root),
+  body:has(.rm-print-area) #root > *:not(:has(.rm-print-area)) {
+    display: none !important;
+  }
+  body:has(.rm-print-area) .rm-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+  }
+  /* ซ่อนทุกอย่างแล้วโชว์เฉพาะตารางนัด — ตัวหนังสือดำบนขาวเสมอ (หมึกจริง) */
+  body:has(.rm-print-area) * {
+    visibility: hidden;
+  }
+  body:has(.rm-print-area) .rm-print-area,
+  body:has(.rm-print-area) .rm-print-area * {
+    visibility: visible;
+  }
+  body:has(.rm-print-area) .rm-print-area table {
+    color: #000;
   }
 }

@@ -33,6 +33,7 @@ export type ApiResource =
   | 'follow'
   | 'job-staff'
   | 'app-users'
+  | 'app-nav-preferences'
   | 'audit-logs'
   | 'branding'
   | 'siamraj-unit-requests'
@@ -41,10 +42,13 @@ export type ApiResource =
   | 'siamraj-unit-work-status'
   | 'siamraj-opl-import'
   | 'recruit-registrations'
+  | 'recruit-funnel'
   | 'matching-suggestions'
   | 'matching-parse-branch-demand'
   | 'matching-candidate-spec'
   | 'matching-irecruit-candidates'
+  | 'matching-recruit-lane'
+  | 'matching-selection-recall'
   | 'matching-board-candidates'
   | 'matching-proposals'
   | 'matching-job-postings'
@@ -53,6 +57,8 @@ export type ApiResource =
   | 'job-applications'
   | 'work-status-master'
   | 'recruit-channels'
+  | 'recruit-reasons'
+  | 'recruit-job-titles'
   | 'recruit-postings';
 
 /**
@@ -116,10 +122,27 @@ export function minimumRoleFor(
     case 'branding':
       return 'admin';
 
+    case 'app-nav-preferences':
+      // อ่านได้ทุกคน (ทุกหน้าต้องใช้ตอน render เมนู) · เขียนเฉพาะ admin
+      if (isRead) return 'staff';
+      return 'admin';
+
     case 'recruit-channels':
       // อ่านได้ทุกคน (ฟอร์มสร้างลิงก์ใช้) — เพิ่ม/แก้/ลบ เฉพาะหัวหน้างานขึ้นไป
       if (isRead) return 'staff';
       return 'supervisor';
+
+    case 'recruit-reasons':
+      // อ่านได้ทุกคน (ตอนบันทึกผลติดต่อต้องเลือกเหตุผล) — แก้ master เฉพาะหัวหน้างานขึ้นไป
+      if (isRead) return 'staff';
+      return 'supervisor';
+
+    case 'recruit-job-titles':
+      // อ่านได้ทุกคน (ช่องตำแหน่งงานในฟอร์มเพิ่มผู้สมัคร/สร้างลิงก์ใช้)
+      // ⚠️ ยังไม่มีทางเขียน — handler ตอบ 405 อยู่แล้ว แต่ตั้ง admin ไว้เป็นชั้นที่สอง
+      // เผื่อวันหน้ามีคนเพิ่ม POST เข้าไปโดยไม่ได้กลับมาดูตารางสิทธิ์นี้
+      if (isRead) return 'staff';
+      return 'admin';
 
     case 'recruit-postings':
       return 'staff';
@@ -145,11 +168,16 @@ export function minimumRoleFor(
     case 'siamraj-opl-import':
       return 'admin';
 
+    // `matching-recruit-lane` = เลนสรรหา — ระดับเดียวกับเลนคัดสรร (staff)
+    // A4 จะมาแยกทีมสรรหา/คัดสรรด้วย function grant ไม่ใช่ที่ระดับ role ตรงนี้
+    case 'recruit-funnel':
     case 'recruit-registrations':
     case 'matching-suggestions':
     case 'matching-parse-branch-demand':
     case 'matching-candidate-spec':
     case 'matching-irecruit-candidates':
+    case 'matching-recruit-lane':
+    case 'matching-selection-recall':
     case 'matching-board-candidates':
     case 'matching-proposals':
     case 'matching-job-postings':

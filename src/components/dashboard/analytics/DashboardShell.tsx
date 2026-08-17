@@ -12,7 +12,6 @@ import DashboardHeroStrip from './DashboardHeroStrip';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
-import DashboardPriorityQueue from './DashboardPriorityQueue';
 import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
 import DashboardFlowViewCard from './DashboardFlowView';
 import DashboardCohortSummaryCard from './DashboardCohortSummary';
@@ -36,6 +35,9 @@ type Props = {
   filters: DashboardFilters;
   onFiltersChange: (patch: Partial<DashboardFilters>) => void;
   dateRange: DateRangeYmd | null;
+  /** กดแท่ง "เข้ามารายเดือน" → กรองทั้งหน้าเป็นเดือนนั้น */
+  onMonthClick?: (monthStartYmd: string, label: string) => void;
+  selectedMonth?: string | null;
   onDateRangeChange: (range: DateRangeYmd | null) => void;
   unitFilters: UnitRequestFilterState;
   onUnitFiltersChange: (patch: Partial<UnitRequestFilterState>) => void;
@@ -66,6 +68,8 @@ const DashboardShell: React.FC<Props> = ({
   filters,
   onFiltersChange,
   dateRange,
+  onMonthClick,
+  selectedMonth,
   onDateRangeChange,
   unitFilters,
   onUnitFiltersChange,
@@ -115,7 +119,6 @@ const DashboardShell: React.FC<Props> = ({
     return null;
   };
 
-  const hasPriority = data.priorityWorkQueue.length > 0;
 
   return (
     <div className="min-h-full bg-slate-100/60 dark:bg-transparent pb-24">
@@ -165,7 +168,7 @@ const DashboardShell: React.FC<Props> = ({
 
       <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-5">
         {loading ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
             <DashboardFilterBar
@@ -191,12 +194,14 @@ const DashboardShell: React.FC<Props> = ({
                 trend={data.activityTrend}
                 trendLabel={data.activityTrendLabel || data.periodLabel}
                 onBucketClick={onAgeBucketClick}
+                onMonthClick={onMonthClick}
+                selectedMonth={selectedMonth}
               />
 
               <div className="space-y-3">
                 <div>
                   <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
                     {dateRange == null ? (
                       <>
                         <span className="font-medium text-slate-600 dark:text-slate-400">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>
@@ -234,32 +239,35 @@ const DashboardShell: React.FC<Props> = ({
                   <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา) — กดเพื่อกรอง</p>
                   {/* ใช้การ์ดทรงเดียวกับ "สรุปอัตราในช่วงที่เลือก" ตามที่เจ้าของสั่ง — กวาดตาอ่านง่ายกว่าชิป
                       ครบทุกสถานะเท่าเดิม (ตัวเลข 0 ก็ยังอยู่ ไม่ซ่อน) · กดแล้วเปิดลิสต์ใบขอสถานะนั้นเหมือนเดิม */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-                    {(data.workStatusKpis ?? []).map((kpi) => (
-                      <DashboardKpiCard
-                        key={kpi.id}
-                        kpi={kpi}
-                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
-                      />
-                    ))}
+                  {/* เจ้าของสั่ง 10 ส.ค. 2569: "แถวละ 5 จะได้พอดีกัน" และ "ไม่เป็น visual control เลย"
+                      → ใส่แถบสัดส่วนเทียบยอดรวมของทุกสถานะ ทำให้กวาดตาแล้วเห็นทันทีว่าอัตรา
+                      ไปกองอยู่สถานะไหน ไม่ต้องอ่านเลขทีละใบแล้วเทียบในหัวเอง
+                      (การ์ดตัวเดียวกับ KPI ด้านบนอยู่แล้ว — มันรองรับ `progressPercent` มาแต่แรก
+                      แค่ไม่เคยถูกส่งค่าให้) */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                    {(() => {
+                      const list = data.workStatusKpis ?? [];
+                      const total = list.reduce((sum, k) => sum + (k.value || 0), 0);
+                      return list.map((kpi) => (
+                        <DashboardKpiCard
+                          key={kpi.id}
+                          kpi={kpi}
+                          progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
+                          progressBaseLabel="ของทุกสถานะ"
+                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label) : undefined}
+                        />
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>
 
-              {/* mockup rev.3: "ต้องแก้วันนี้" คู่กับสมการงานค้างในแถวเดียว — สองการ์ดที่ต้องเห็นก่อนเพื่อน */}
-              {hasPriority || data.flowView ? (
-                <div
-                  className={cn(
-                    'grid gap-3',
-                    hasPriority && data.flowView && 'xl:grid-cols-[1.6fr_1fr]',
-                  )}
-                >
-                  {hasPriority ? (
-                    <DashboardPriorityQueue items={data.priorityWorkQueue} onView={onViewItem} />
-                  ) : null}
-                  {data.flowView ? (
-                    <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
-                  ) : null}
+              {/* ⚠️ การ์ด "ต้องแก้วันนี้" (DashboardPriorityQueue) ถูกเอาออก 10 ส.ค. 2569 ตามที่เจ้าของสั่ง
+                  — ตัวคำนวณ `priorityWorkQueue` ยังอยู่ใน buildDashboardData และยังมีเทสต์คุม
+                  เผื่อเอากลับมา · เหลือ "สมการงานค้าง" เต็มความกว้าง */}
+              {data.flowView ? (
+                <div className="grid gap-3">
+                  <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
                 </div>
               ) : null}
 

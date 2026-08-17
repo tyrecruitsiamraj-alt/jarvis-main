@@ -1,0 +1,194 @@
+import React, { useEffect, useState } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
+
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
+import {
+  EMPTY_RECRUIT_FUNNEL,
+  RECRUIT_FUNNEL_STEP_LABEL,
+  RECRUIT_FUNNEL_STEP_PRIMARY,
+  RECRUIT_FUNNEL_TILES,
+  funnelPercent,
+  type RecruitFunnelCounts,
+  type RecruitFunnelTile,
+} from '@/lib/recruitFunnel';
+import { fetchRecruitFunnel } from '@/lib/recruitFunnelApi';
+
+/** ความหมายสีของแต่ละช่อง — เขียว=จบดี · แดง=จบไม่ดี · เหลือง=ยังไม่จบ (ทิศเดียวกับ callOutcomeTone) */
+const TILE_TONE: Record<RecruitFunnelTile['key'], ToneKey> = {
+  registered: 'primary',
+  called: 'info',
+  contactSuccess: 'success',
+  noAnswer: 'warn',
+  unreachable: 'danger',
+  contactFailedOther: 'neutral',
+  appointmentSuccess: 'success',
+  appointmentFailed: 'danger',
+  showedUp: 'success',
+  noShow: 'danger',
+  followPending: 'warn',
+};
+
+const STEPS: RecruitFunnelTile['step'][] = ['intake', 'contact', 'appointment', 'follow'];
+
+function tileLabel(key: RecruitFunnelTile['key']): string {
+  return RECRUIT_FUNNEL_TILES.find((t) => t.key === key)?.label ?? key;
+}
+
+/**
+ * แผงคุมงานสรรหา — 9 ตัวเลขที่เจ้าของขอ 11 ส.ค. 2569
+ *
+ * โครงตามที่เจ้าของติง (11 ส.ค. รอบห้า): 11 ช่องพร้อมกัน "ดูรก" →
+ * เหลือ **ปุ่มขั้นตอน 4 ปุ่ม** (แต่ละปุ่มมีตัวเลขหน้าปกของขั้นนั้น) กดปุ่มไหน
+ * ค่อยกางช่องรายละเอียดของขั้นนั้นข้างล่าง — ภาพรวมยังเห็นครบโดยไม่ต้องกาง
+ *
+ * ⚠️ **ตัวเลขมาจากฐานเราเท่านั้น** (เจ้าของสั่ง 12 ส.ค. 2569 — เดิมอ่าน iRecruit
+ * แล้วขึ้นเป็นแสน ทั้งที่เจ้าของจะเริ่มเก็บรายชื่อใหม่) · ช่องที่ยังไม่เก็บ = 0
+ * ⚠️ อ่านไม่ได้ = ขึ้นข้อความว่าอ่านไม่ได้ **ไม่โชว์ 0** — "0 คนกรอกมา" กับ
+ * "ต่อฐานไม่ติด" คนละเรื่องกันคนละขั้ว (กติกาข้อ 9 ของโปรเจกต์)
+ */
+const RecruitFunnelPanel: React.FC = () => {
+  const [data, setData] = useState<(RecruitFunnelCounts & { leads: number }) | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<RecruitFunnelTile['step']>('intake');
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    fetchRecruitFunnel()
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch((e: unknown) => {
+        setData(null);
+        setError(e instanceof Error ? e.message : 'โหลดยอดสรุปไม่สำเร็จ');
+        setLoading(false);
+      });
+  };
+
+  useEffect(load, []);
+
+  const counts = data ?? EMPTY_RECRUIT_FUNNEL;
+  const detailTiles = RECRUIT_FUNNEL_TILES.filter((t) => t.step === step);
+
+  return (
+    <section className="rounded-[1.5rem] border border-border/70 bg-card p-4">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          {/* หัวเป็นป้ายทองแบบเดียวกับ section อื่นบนบอร์ด — ภาษาเดียวกันทั้งหน้า */}
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+            ภาพรวมงานสรรหา
+          </h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            ยอดจากฐานของเรา (เริ่มเก็บใหม่) · นัดหมาย/ติดตามนัดจะขึ้นเมื่อเริ่มบันทึกผลติดต่อ · กดขั้นตอนเพื่อดูรายละเอียด
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+          รีเฟรช
+        </button>
+      </div>
+
+      {loading && !data ? (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> กำลังอ่านยอดจากระบบเดิม…
+        </p>
+      ) : error ? (
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          อ่านยอดจากระบบเดิมไม่ได้ — {error}
+          <br />
+          <span className="text-[11px]">
+            ยังไม่แสดงตัวเลข เพราะ &ldquo;อ่านไม่ได้&rdquo; กับ &ldquo;ไม่มีเลย&rdquo; ไม่ใช่เรื่องเดียวกัน
+          </span>
+        </p>
+      ) : (
+        <div className="space-y-2.5">
+          {/* ปุ่มขั้นตอน 4 ปุ่ม — ตัวเลขหน้าปกของแต่ละขั้นเห็นครบโดยไม่ต้องกด */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {STEPS.map((s) => {
+              const primaryKey = RECRUIT_FUNNEL_STEP_PRIMARY[s];
+              const tone = TONE[TILE_TONE[primaryKey]];
+              const active = s === step;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStep(s)}
+                  aria-pressed={active}
+                  className={cn(
+                    'rounded-2xl px-3 py-2.5 text-left transition-colors',
+                    tone.tile,
+                    active && 'ring-2 ring-sky-400/80',
+                  )}
+                >
+                  <p className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    {RECRUIT_FUNNEL_STEP_LABEL[s]}
+                  </p>
+                  <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
+                    {counts[primaryKey].toLocaleString('th-TH')}
+                  </p>
+                  <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
+                    {tileLabel(primaryKey)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* รายละเอียดของขั้นตอนที่เลือก */}
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-2.5">
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+              {detailTiles.map((t) => {
+                const tone = TONE[TILE_TONE[t.key]];
+                const value = counts[t.key];
+                const pct = t.ofKey ? funnelPercent(value, counts[t.ofKey]) : null;
+                return (
+                  <div key={t.key} className={cn('rounded-2xl px-3 py-2.5', tone.tile)}>
+                    <p className="truncate text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      {t.label}
+                    </p>
+                    <p className={cn('mt-0.5 text-xl font-bold tabular-nums', tone.num)}>
+                      {value.toLocaleString('th-TH')}
+                    </p>
+                    {/* แถบสัดส่วน — ไม่มีตัวหารก็ไม่ขึ้นแถบ ไม่ใช่แถบศูนย์ */}
+                    {pct != null ? (
+                      <>
+                        {/* เนื้อแถบใช้ `tone.dot` ตามแพตเทิร์นเดียวกับ DashboardKpiCard —
+                            `tone.bar` เป็นเส้นขอบบน (border-t) เอามาทำเนื้อแถบไม่ได้ */}
+                        <div
+                          className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-slate-900/10 dark:bg-white/10"
+                          aria-hidden
+                        >
+                          <span
+                            className={cn('block h-full rounded-full', tone.dot)}
+                            style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                          {pct.toLocaleString('th-TH')}% ของ {tileLabel(t.ofKey!)}
+                        </p>
+                      </>
+                    ) : data ? (
+                      <p className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        ในนั้นเป็น Lead {data.leads.toLocaleString('th-TH')} ราย
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+export default RecruitFunnelPanel;

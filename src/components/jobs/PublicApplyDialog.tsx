@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { apiFetch } from '@/lib/apiFetch';
@@ -524,7 +526,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
               </section>
 
               {error ? (
-                <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600">
+                <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
                   {error}
                 </p>
               ) : null}

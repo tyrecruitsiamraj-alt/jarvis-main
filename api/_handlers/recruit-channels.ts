@@ -8,6 +8,9 @@ import {
 import { readJsonBody } from '../_lib/body.js';
 import {
   listRecruitChannels,
+  listRecruitChannelRoots,
+  listRecruitChannelChildren,
+  searchRecruitChannels,
   createRecruitChannel,
   updateRecruitChannel,
   deleteRecruitChannel,
@@ -34,6 +37,34 @@ async function handler(req: AuthedReq, res: ApiRes) {
   try {
     if (method === 'GET') {
       const includeInactive = getQuery(req, 'all') === '1';
+      const limit = Number(getQuery(req, 'limit')) || undefined;
+
+      // ค้นหา — หน้าเว็บใช้ท่านี้เป็นหลัก (ทรีเต็มมี 4,390 แถวหลังยกของจากระบบเดิม)
+      const q = getQuery(req, 'q');
+      if (q) {
+        return res
+          .status(200)
+          .json(await searchRecruitChannels(q, { includeInactive, limit }));
+      }
+
+      // ช่องทางรองของพ่อหนึ่งตัว แบ่งหน้า
+      const parent = getQuery(req, 'parent');
+      if (parent) {
+        return res.status(200).json(
+          await listRecruitChannelChildren(parent, {
+            includeInactive,
+            limit,
+            offset: Number(getQuery(req, 'offset')) || 0,
+            q: getQuery(req, 'childQ'),
+          }),
+        );
+      }
+
+      // ช่องทางหลักอย่างเดียว + จำนวนลูก
+      if (getQuery(req, 'roots') === '1') {
+        return res.status(200).json(await listRecruitChannelRoots(includeInactive));
+      }
+
       return res.status(200).json(await listRecruitChannels(includeInactive));
     }
 

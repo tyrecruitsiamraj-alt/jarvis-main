@@ -134,18 +134,69 @@ function isDateYmd(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
+type ClosedRequest = ReturnType<typeof mapClosedRow>;
+
+/**
+ * cache ใบขอที่ปิดแล้ว — เก็บเฉพาะข้อมูลจาก SQL Server ซึ่งเป็นประวัติที่ไม่ขยับแล้ว
+ *
+ * ชื่อผู้รับผิดชอบ (recruiter/screener/opl) **ไม่ได้อยู่ในนี้** — มาจาก PostgreSQL
+ * ผ่าน attachAssignments ทีหลังทุกครั้ง เพราะ admin แก้ได้ตลอด ถ้า cache ไปด้วย
+ * การถอนคนออกจากใบขอจะไม่แสดงผลจนกว่า cache หมดอายุ
+ *
+ * คืนค่าเป็นสำเนาเสมอ — attachAssignments เขียนทับ object ที่ได้รับ ถ้าคืนตัวจริงจาก cache
+ * ชื่อของรอบก่อนจะค้างอยู่ในแถวที่รอบใหม่ไม่มีข้อมูล (ลบผู้รับผิดชอบแล้วชื่อไม่หาย)
+ */
+const closedCache = new Map<string, { rows: ClosedRequest[]; expiresAt: number }>();
+const CLOSED_TTL_MS = 10 * 60 * 1000;
+/** กันบวมเมื่อมีการเลือกช่วงวันที่หลากหลาย — เกินนี้ทิ้งรายการที่เก่าสุดก่อน */
+const CLOSED_CACHE_MAX_ENTRIES = 32;
+
+function closedScopeKey(scope: DepartmentScope): string {
+  return scope.mode === 'code' ? `code:${scope.code}` : scope.mode;
+}
+
+function readClosedCache(key: string): ClosedRequest[] | null {
+  const hit = closedCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    closedCache.delete(key);
+    return null;
+  }
+  return hit.rows.map((r) => ({ ...r }));
+}
+
+function writeClosedCache(key: string, rows: ClosedRequest[]): void {
+  if (closedCache.size >= CLOSED_CACHE_MAX_ENTRIES) {
+    const oldest = closedCache.keys().next();
+    if (!oldest.done) closedCache.delete(oldest.value);
+  }
+  closedCache.set(key, {
+    rows: rows.map((r) => ({ ...r })),
+    expiresAt: Date.now() + CLOSED_TTL_MS,
+  });
+}
+
+/** ล้าง cache — ใช้ในเทสต์ให้แต่ละเคสเริ่มจากศูนย์ */
+export function clearSiamrajClosedCache(): void {
+  closedCache.clear();
+}
+
 export async function listSiamrajSqlServerClosedRequests(options: {
   from: string;
   to: string;
   limit?: number;
   departmentScope?: DepartmentScope;
-}): Promise<ReturnType<typeof mapClosedRow>[]> {
+}): Promise<ClosedRequest[]> {
   const { from, to } = options;
   if (!isDateYmd(from) || !isDateYmd(to)) throw new Error('from/to must be YYYY-MM-DD');
   const limit = Math.min(Math.max(options.limit ?? 3000, 1), 5000);
+  const scope = options.departmentScope ?? { mode: 'all' };
+  const cacheKey = `${closedScopeKey(scope)}|${from}|${to}|${limit}`;
+  const cached = readClosedCache(cacheKey);
+  if (cached) return cached;
   const filters = getSqlFilters();
   const clsExclude = excludeClsContractTypeWhere('SS');
-  const deptScope = sqlServerDepartmentScopeClause(options.departmentScope ?? { mode: 'all' });
+  const deptScope = sqlServerDepartmentScopeClause(scope);
 
   const rows = await siamrajSqlQuery<ClosedRow>(
     `
@@ -188,5 +239,7 @@ export async function listSiamrajSqlServerClosedRequests(options: {
   );
 
   // เก็บเฉพาะใบที่มีตำแหน่งปิดจริง (ตรงนิยาม throughput)
-  return rows.map(mapClosedRow).filter((r) => r.position_units > 0);
+  const mapped = rows.map(mapClosedRow).filter((r) => r.position_units > 0);
+  writeClosedCache(cacheKey, mapped);
+  return mapped;
 }

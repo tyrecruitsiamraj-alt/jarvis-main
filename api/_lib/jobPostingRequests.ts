@@ -118,18 +118,45 @@ export function normalizeJobPostingRequestType(v: unknown): JobPostingRequestTyp
     : null;
 }
 
-/** คำขอที่ยัง active อยู่ของใบขอนี้ (ถ้ามี) */
-export async function getActiveJobPostingForJob(jobId: string): Promise<JobPostingRequest | null> {
+/**
+ * คำขอที่ยัง active อยู่ของใบขอนี้ (ถ้ามี)
+ * ระบุ `requestType` = ดูเฉพาะประเภทนั้น (Content กับ Scraping มีพร้อมกันได้ตั้งแต่ 080)
+ */
+export async function getActiveJobPostingForJob(
+  jobId: string,
+  requestType?: JobPostingRequestType,
+): Promise<JobPostingRequest | null> {
   const key = jobId.trim();
   if (!key) return null;
   try {
-    const rows = await selectPostings(
-      `where job_id = $1 and status = ANY($2::text[]) order by created_at desc limit 1`,
-      [key, ACTIVE_STATUSES],
-    );
+    const rows = requestType
+      ? await selectPostings(
+          `where job_id = $1 and status = ANY($2::text[]) and request_type = $3
+             order by created_at desc limit 1`,
+          [key, ACTIVE_STATUSES, requestType],
+        )
+      : await selectPostings(
+          `where job_id = $1 and status = ANY($2::text[]) order by created_at desc limit 1`,
+          [key, ACTIVE_STATUSES],
+        );
     return rows[0] ?? null;
   } catch (e) {
     if (isMissingTable(e)) return null;
+    throw e;
+  }
+}
+
+/** คำขอ active ทุกประเภทของใบขอนี้ — หน้าเว็บใช้ตัดสินว่าปุ่มไหนควรซ่อน */
+export async function listActiveJobPostingsForJob(jobId: string): Promise<JobPostingRequest[]> {
+  const key = jobId.trim();
+  if (!key) return [];
+  try {
+    return await selectPostings(
+      `where job_id = $1 and status = ANY($2::text[]) order by created_at desc`,
+      [key, ACTIVE_STATUSES],
+    );
+  } catch (e) {
+    if (isMissingTable(e)) return [];
     throw e;
   }
 }
@@ -161,14 +188,18 @@ export type CreateJobPostingInput = {
 };
 
 /**
- * สร้างคำขอโพสหางานใหม่ — ถ้ามีคำขอ active ของใบขอนี้อยู่แล้ว คืนอันเดิม (ไม่สร้างซ้ำ)
+ * สร้างคำขอโพสหางานใหม่ — ถ้ามีคำขอ active **ประเภทเดียวกัน** อยู่แล้ว คืนอันเดิม (ไม่สร้างซ้ำ)
  * กันซ้ำสองชั้น: เช็คก่อน insert + partial unique index กันแข่งกันเขียนพร้อมกัน
+ *
+ * ⚠️ ตั้งแต่ migration 080 กันซ้ำระดับ **(ใบขอ, ประเภท)** ไม่ใช่ระดับใบขอ —
+ * ใบเดียวส่งได้ทั้ง Content และ Scraping (เจ้าของสั่ง 13 ส.ค. 2569) · ของเดิมกด
+ * ประเภทที่สองแล้วได้คำขอเดิมกลับมาเงียบ ๆ = ปุ่มที่กดแล้วไม่เกิดอะไร
  */
 export async function createJobPostingRequest(input: CreateJobPostingInput): Promise<JobPostingRequest> {
   const jobId = input.jobId.trim();
   if (!jobId) throw new Error('job_id is required');
 
-  const existing = await getActiveJobPostingForJob(jobId);
+  const existing = await getActiveJobPostingForJob(jobId, input.requestType ?? 'content');
   if (existing) return existing;
 
   const userId = input.userId && uuidRe.test(input.userId) ? input.userId : null;
@@ -209,7 +240,10 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
     return mapRow(rows[0]);
   } catch (e) {
     if (isPgUniqueViolation(e)) {
-      const race = await getActiveJobPostingForJob(jobId);
+      // unique index ระดับ (job_id, request_type) ตั้งแต่ migration 080 — ต้องกู้ด้วย
+      // requestType เดิม ไม่งั้นคืนคำขอ active "ประเภทไหนก็ได้" (ล่าสุด) กลับไป → กด Scraping
+      // แต่ได้ id ของคำขอ Content คนละใบ (เหมือนตอนเช็คก่อน insert ที่ :203)
+      const race = await getActiveJobPostingForJob(jobId, input.requestType ?? 'content');
       if (race) return race;
     }
     throw e;

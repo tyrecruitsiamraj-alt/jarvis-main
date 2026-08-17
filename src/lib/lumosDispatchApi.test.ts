@@ -107,12 +107,42 @@ describe('summarizeLumosCallStatus — เลขสรุปข้างกา�
       row({ person_ref: 'card-8', status: 'completed', outcome: 'cancelled' }),
       // เรายกเลิกก่อนส่ง — ไม่นับอะไรเลย
       row({ person_ref: 'card-9', status: 'cancelled' }),
+      // ขอให้โทรกลับ — นับเป็นโทรแล้ว และมีช่องของตัวเอง
+      row({ person_ref: 'card-10', status: 'completed', outcome: 'reschedule_requested' }),
     ]);
-    expect(s).toEqual({ sent: 8, called: 5, confirmed: 1, declined: 1, no_answer: 2 });
+    expect(s).toEqual({
+      pendingApproval: 0,
+      sent: 9,
+      called: 6,
+      confirmed: 1,
+      declined: 1,
+      no_answer: 2,
+      reschedule: 1,
+      needsHuman: 0,
+    });
   });
 
   it('ใบที่ไม่เคยส่งเลย → ทุกช่องเป็น 0', () => {
-    expect(summarizeLumosCallStatus([])).toEqual({ sent: 0, called: 0, confirmed: 0, declined: 0, no_answer: 0 });
+    expect(summarizeLumosCallStatus([])).toEqual({
+      pendingApproval: 0,
+      sent: 0,
+      called: 0,
+      confirmed: 0,
+      declined: 0,
+      no_answer: 0,
+      reschedule: 0,
+      needsHuman: 0,
+    });
+  });
+
+  it('รออนุมัติ/ต้องคนตาม คิดจากสถานะรายคนไม่ได้ — ต้องเป็น 0 เสมอ ไม่ใช่เดาเอา', () => {
+    // สองช่องนี้อยู่คนละตาราง (ชุดส่ง) และคนละคอลัมน์ (followup_state)
+    // endpoint รายคนไม่ได้ส่งมา ถ้าวันไหนมีคนไปเดาค่าจากตรงนี้ ตัวเลขบนการ์ดจะขัดกับของจริง
+    const s = summarizeLumosCallStatus([
+      row({ person_ref: 'card-1', status: 'completed', outcome: 'no_answer' }),
+    ]);
+    expect(s.pendingApproval).toBe(0);
+    expect(s.needsHuman).toBe(0);
   });
 });
 

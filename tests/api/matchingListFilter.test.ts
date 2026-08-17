@@ -116,6 +116,9 @@ describe('filterAndSortMatchingJobs', () => {
     expect(run('green')).toEqual(['g']);
     expect(run('yellow')).toEqual(['y']); // มี green แล้วไม่นับ yellow
     expect(run('none')).toEqual(['n']); // วิเคราะห์แล้วแต่ไม่มีแนะนำ — ใบที่ยังไม่วิเคราะห์ไม่โผล่
+    // recommended = เขียว**หรือ**เหลือง — ลิงก์ "AI แนะนำคนแล้ว" จากหน้าแรกใช้
+    // ต้องนับตรงกับ with_recommend ของ flow-summary (green ∪ yellow ไม่ใช่ green อย่างเดียว)
+    expect(run('recommended')).toEqual(['g', 'y']);
   });
 
   it('sorts breached SLA first, then urgent, then earliest required date', () => {
@@ -160,6 +163,35 @@ describe('การเรียงลิสต์ (sort)', () => {
     expect(
       filterAndSortMatchingJobs(withRec, { ...baseQuery, sort: 'no_recommend' }, ctx).map((j) => j.id),
     ).toEqual(['none', 'has']);
+  });
+
+  it('green_desc = ใบที่มีคนเขียวมากสุดขึ้นก่อน (เจ้าของสั่ง 14 ส.ค. 2569)', () => {
+    const g = (id: string, greens: number, yellows = 0) =>
+      Array.from({ length: greens }, () => ({ tier: 'green' as const })).concat(
+        Array.from({ length: yellows }, () => ({ tier: 'yellow' as const })),
+      );
+    const byId: Record<string, ReturnType<typeof g>> = {
+      three: g('three', 3),
+      one: g('one', 1, 5), // เหลืองเยอะแต่เขียวน้อย → ต้องอยู่หลัง three
+      zero: g('zero', 0, 2), // ไม่มีเขียวเลย → ท้ายสุด
+    };
+    const rows = [job({ id: 'one' }), job({ id: 'zero' }), job({ id: 'three' })];
+    const ctx = { ...noCtx, today, matchesFor: (id: string) => byId[id] };
+    expect(
+      filterAndSortMatchingJobs(rows, { ...baseQuery, sort: 'green_desc' }, ctx).map((j) => j.id),
+    ).toEqual(['three', 'one', 'zero']);
+  });
+
+  it('green_desc — ใบที่ AI ยังไม่ประเมิน (undefined) นับเป็น 0 เขียว ไปท้าย', () => {
+    const rows = [job({ id: 'unanalyzed' }), job({ id: 'hasgreen' })];
+    const ctx = {
+      ...noCtx,
+      today,
+      matchesFor: (id: string) => (id === 'hasgreen' ? [{ tier: 'green' as const }] : undefined),
+    };
+    expect(
+      filterAndSortMatchingJobs(rows, { ...baseQuery, sort: 'green_desc' }, ctx).map((j) => j.id),
+    ).toEqual(['hasgreen', 'unanalyzed']);
   });
 
   it('ไม่ส่ง sort = พฤติกรรมเดิม (SLA เกินขึ้นก่อน) ต้องไม่เปลี่ยน', () => {

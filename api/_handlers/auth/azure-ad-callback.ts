@@ -125,7 +125,7 @@ export default async function azureAdCallbackHandler(req: ApiReq, res: ApiRes) {
 
     const { rows } = await dbQuery<AzureUserRow>(FIND_USER_SQL, [profile.oid, profile.email]);
 
-    let row = rows[0];
+    let row: AzureUserRow | undefined = rows[0];
     if (!row) {
       // อีเมลนี้ยังไม่มีในระบบ → เปิด account ใหม่ให้เลย (role staff) แล้ว login ต่อทันที
       const created = await provisionAzureUser(profile);

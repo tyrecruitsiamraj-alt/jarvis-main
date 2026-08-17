@@ -4,19 +4,21 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, SlidersHorizontal } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, SlidersHorizontal, PhoneForwarded } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
+import LumosDispatchModeTab from '@/pages/settings/LumosDispatchModeTab';
+import NavMenuTab from '@/pages/settings/NavMenuTab';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 
-type SettingsTab = 'appearance' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'matchWeights' | 'reference' | 'audit';
+type SettingsTab = 'appearance' | 'navMenu' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'matchWeights' | 'lumosMode' | 'reference' | 'audit';
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -37,11 +39,13 @@ const DEFAULT_REF_DATA: Record<ReferenceCategory, string[]> = {
 
 const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminOnly: boolean }[] = [
   { id: 'appearance', label: 'ธีม / โลโก้', icon: Palette, adminOnly: false },
+  { id: 'navMenu', label: 'จัดเมนู', icon: ListChecks, adminOnly: true },
   { id: 'users', label: 'Users', icon: Users, adminOnly: true },
   { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
   { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL', icon: UserCog, adminOnly: true },
   { id: 'workStatus', label: 'สถานะทำงาน', icon: ListChecks, adminOnly: true },
   { id: 'matchWeights', label: 'น้ำหนักเรียงผู้สมัคร', icon: SlidersHorizontal, adminOnly: true },
+  { id: 'lumosMode', label: 'โหมดส่งงานให้ Lumos', icon: PhoneForwarded, adminOnly: true },
   { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
   { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
 ];
@@ -58,6 +62,7 @@ const AdminSettings: React.FC = () => {
     tabFromUrl === 'jobStaff' ||
     tabFromUrl === 'workStatus' ||
     tabFromUrl === 'matchWeights' ||
+    tabFromUrl === 'lumosMode' ||
     tabFromUrl === 'reference' ||
     tabFromUrl === 'audit'
       ? tabFromUrl
@@ -265,6 +270,8 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'appearance' && <BrandingAppearanceTab />}
 
+        {activeTab === 'navMenu' && <NavMenuTab />}
+
         {activeTab === 'users' &&
           (usersLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลดรายชื่อผู้ใช้…</p>
@@ -383,6 +390,7 @@ const AdminSettings: React.FC = () => {
 
         {activeTab === 'workStatus' && <WorkStatusMasterTab />}
         {activeTab === 'matchWeights' && <MatchPriorityWeightsTab />}
+        {activeTab === 'lumosMode' && <LumosDispatchModeTab />}
 
         {activeTab === 'reference' && (
           <div className="space-y-3">

@@ -17,6 +17,8 @@ import {
   upsertGrant,
 } from '../_lib/roleFunctionGrants.js';
 
+const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
@@ -48,12 +50,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const gate = canToggleGrant(role as UserRole, functionId, enabled);
       if (!gate.ok) return sendError(res, 400, 'Bad request', gate.message);
 
-      await upsertGrant(role as UserRole, functionId, enabled, req.user?.id ?? null);
+      // updated_by เป็น uuid FK — token ฝั่ง dev ใช้ sub ที่ไม่ใช่ uuid ได้ ต้องกรองก่อน
+      const updatedBy = uuidRe.test(req.user.sub) ? req.user.sub : null;
+      await upsertGrant(role as UserRole, functionId, enabled, updatedBy);
       await auditFromAuthed(req, {
         action: 'role_permission.update',
-        entity_type: 'role_function_grant',
-        entity_id: `${role}:${functionId}`,
-        metadata: { role, functionId, enabled },
+        entityType: 'role_function_grant',
+        entityId: `${role}:${functionId}`,
+        after: { role, functionId, enabled },
       });
 
       const overrides = await loadGrantOverrides();

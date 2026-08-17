@@ -5,7 +5,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { listProposalsForJobs } from '../_lib/candidateProposals.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
 import { loadLumosJobCallSummaryMap, type LumosJobCallSummary } from '../_lib/lumosDispatch.js';
@@ -25,6 +25,7 @@ import {
   type MatchingWorkflowFilter,
 } from '@/lib/matchingListFilter';
 import { recommendedCandidateCount } from '@/lib/matchingProgress';
+import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import type { JobRequest } from '@/types';
 import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
 
@@ -35,7 +36,15 @@ function getQuery(req: AuthedReq, key: string): string {
   return '';
 }
 
-const WORKFLOWS: MatchingWorkflowFilter[] = ['all', 'sla', 'green', 'yellow', 'none', 'reserved'];
+const WORKFLOWS: MatchingWorkflowFilter[] = [
+  'all',
+  'sla',
+  'green',
+  'yellow',
+  'recommended',
+  'none',
+  'reserved',
+];
 
 function normalizeWorkflow(v: string): MatchingWorkflowFilter {
   return (WORKFLOWS as string[]).includes(v) ? (v as MatchingWorkflowFilter) : 'all';
@@ -53,7 +62,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   try {
-    const departmentScope = await loadUserDepartmentScope(req.user);
+    const departmentScope = await loadMatchingBuScope(req.user);
 
     // ท่อเดียวกับ feed หลักของหน้า Matching เดิม: ใบขอเปิด + ผู้รับผิดชอบ/หมายเหตุ/สถานะทำงาน + urgency
     const raw = (await listSiamrajUnitRequests({ limit: 500, departmentScope })) as unknown[];
@@ -69,7 +78,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       listProposalsForJobs(jobs.map((j) => j.id)),
       loadBoardMatchTierMap(),
       loadBoardAvailabilityContext(),
-      loadLumosJobCallSummaryMap().catch(() => new Map<string, LumosJobCallSummary>()),
+      // ⚠️ ห้ามครอบ .catch(() => empty) — loadLumosJobCallSummaryMap กลืน 42P01 (ตารางยังไม่
+      // migrate) ให้ข้างในแล้ว · ที่เหลือคือ DB ล้มจริง ถ้ากลืนที่นี่การ์ดจะเขียน "รออนุมัติ 0"
+      // ทั้งหน้าแทนที่จะขึ้น error ให้รู้ว่าอ่านไม่ได้ (โกหกในทางที่อันตราย — ดู lumosDispatch.ts:622)
+      loadLumosJobCallSummaryMap(),
     ]);
 
     // กรองผลที่เก็บไว้ให้เหลือเฉพาะ "คนที่ยังพร้อม" ก่อนนับป้าย/summary/workflow filter
@@ -123,37 +135,68 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // "เหลือง" = มีเหลืองแต่ไม่มีเขียว (นิยามเดียวกับตัวกรอง workflow=yellow ไม่ให้นับซ้อนกับเขียว)
     const hasYellowOnly = (id: string) =>
       !hasGreen(id) && tiersOf(id).some((t) => t.tier === 'yellow');
+    /**
+     * แบ่งใบขอเป็น 3 ถังที่ **ครอบคลุมทุกใบและไม่ซ้อนกัน** — เขียว + เหลือง + ยังไม่มีคน = ทั้งหมดเสมอ
+     *
+     * เดิม "ยังไม่มีคน" นับเฉพาะใบที่ AI ประเมินแล้วไม่พบ (ต้องมีใน tierMap)
+     * ใบที่ AI ยังไม่ได้ประเมินจึงตกนอกทั้ง 3 ถัง → สามตัวรวมกันไม่เท่ายอดรวม
+     * (ตอนนี้บังเอิญเท่าเพราะทุกใบถูกประเมินหมดพอดี — พังทันทีที่มีใบใหม่เข้ามา)
+     * เจ้าของสั่ง 10 ส.ค. 2569: "แบ่งไปเป็นอะไรก็ได้ แต่รวมกันต้องได้ยอดรวม"
+     * จึงให้ถังที่ 3 = "ที่เหลือทั้งหมด" แล้วแยกรายละเอียดในบรรทัดย่อยแทน
+     */
+    const isGreen = (j: (typeof scopedJobs)[number]) => hasGreen(j.id);
+    const isYellow = (j: (typeof scopedJobs)[number]) => hasYellowOnly(j.id);
+    const noneJobs = scopedJobs.filter((j) => !isGreen(j) && !isYellow(j));
+    const greenJobs = scopedJobs.filter(isGreen);
+    const yellowJobs = scopedJobs.filter(isYellow);
+    /** ในถัง "ยังไม่มีคน" — แยกว่า AI ดูแล้วไม่เจอ vs ยังไม่ได้ดู (คนละงานที่ต้องทำต่อ) */
+    const analyzedNoneJobs = noneJobs.filter((j) => tierMap.has(j.id));
+
+    /** อัตราคงเหลือของชุดใบขอ — หน่วยที่เจ้าของใช้คิดงาน (1 ใบขออาจหลายอัตรา) */
+    const posOf = (list: typeof scopedJobs) => list.reduce((sum, j) => sum + jobPositionUnits(j), 0);
+
     const summary = {
       urgentTotal: urgentJobs.length,
       urgentAnalyzed: urgentJobs.filter((j) => tierMap.has(j.id)).length,
       urgentWithGreen: urgentJobs.filter((j) => hasGreen(j.id)).length,
-      // ยอดทั้งชุด (ตาม BU) สำหรับกล่องสรุปที่กดเพื่อกรองได้
+      // ยอดทั้งชุด (ตาม BU) สำหรับกล่องสรุปที่กดเพื่อกรองได้ — นับเป็น "ใบขอ"
       scopedTotal: scopedJobs.length,
-      withGreen: scopedJobs.filter((j) => hasGreen(j.id)).length,
-      withYellow: scopedJobs.filter((j) => hasYellowOnly(j.id)).length,
-      // ประเมินแล้วแต่ไม่มีใครแนะนำ — ตรงกับตัวกรอง "AI ไม่พบคน"
-      noRecommend: scopedJobs.filter(
-        (j) => tierMap.has(j.id) && recommendedCandidateCount(tiersOf(j.id)) === 0,
-      ).length,
+      withGreen: greenJobs.length,
+      withYellow: yellowJobs.length,
+      noRecommend: noneJobs.length,
+      /** ในถังยังไม่มีคน: AI ประเมินแล้วไม่พบ vs ยังไม่ได้ประเมิน */
+      noneAnalyzed: analyzedNoneJobs.length,
+      noneUnanalyzed: noneJobs.length - analyzedNoneJobs.length,
+      // ยอดเดียวกันในหน่วย "อัตรา" — การ์ดสรุปโชว์อัตราเป็นเลขหลัก
+      positionsTotal: posOf(scopedJobs),
+      positionsUrgent: posOf(urgentJobs),
+      positionsGreen: posOf(greenJobs),
+      positionsYellow: posOf(yellowJobs),
+      positionsNone: posOf(noneJobs),
     };
 
     // ป้าย "AI แนะนำ N" บนการ์ด: ผลที่เก็บไว้ของใบในหน้านี้
-    const storedMatches: Record<string, { recommended: number; computedAt: string }> = {};
+    // `green` แยกออกมาด้วย (14 ส.ค. 2569) — คู่กับ sort green_desc และเผื่อโชว์บนการ์ด
+    const storedMatches: Record<string, { recommended: number; green: number; computedAt: string }> = {};
     for (const j of items) {
       const entry = tierMap.get(j.id);
       if (entry) {
         storedMatches[j.id] = {
           recommended: recommendedCandidateCount(entry.tiers),
+          green: entry.tiers.filter((t) => t.tier === 'green').length,
           computedAt: entry.computedAt,
         };
       }
     }
 
-    // สรุปผลโทร Lumos ต่อใบในหน้านี้: ส่งโทร/โทรแล้ว/สนใจ/ไม่สนใจ/ไม่รับสาย
+    // สรุปผลโทร Lumos ต่อใบในหน้านี้: รออนุมัติ/ส่งโทร/โทรแล้ว/สนใจ/ไม่สนใจ/ไม่รับสาย/ขอเลื่อน/ต้องคนตาม
+    // ⚠️ เงื่อนไขต้องรวม `pendingApproval` ด้วย ไม่ใช่ `sent > 0` อย่างเดียว —
+    // ใบที่เพิ่งตั้งชุดรออนุมัติยังไม่เคยเข้าคิว `sent` เป็น 0 ถ้ากรองด้วย sent อย่างเดียว
+    // แถบตัวเลขจะไม่ขึ้นเลยทั้งที่มีคนรอให้กดอนุมัติอยู่ (เจอตอนตรวจกับฐานจริง 10 ส.ค. 2569)
     const lumosSummary: Record<string, LumosJobCallSummary> = {};
     for (const j of items) {
       const entry = lumosMap.get(j.id);
-      if (entry && entry.sent > 0) lumosSummary[j.id] = entry;
+      if (entry && (entry.sent > 0 || entry.pendingApproval > 0)) lumosSummary[j.id] = entry;
     }
 
     res.setHeader?.('Cache-Control', 'no-store');

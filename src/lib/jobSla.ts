@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest } from '@/types';
 import { computeJobUrgency, effectiveRequestDateYmd, type RequestStatusKind } from '@/lib/jobUrgency';
+import { toYmdBangkok } from '@/lib/dateTh';
 import type { RequestControlStatus } from '@/lib/requestControl';
 
 export type SlaStatus =
@@ -42,10 +43,18 @@ function slaDaysForKind(kind: RequestStatusKind | 'unknown'): number {
   }
 }
 
+/**
+ * บวกวันปฏิทินบน YYYY-MM-DD โดยคิดเป็นเวลาท้องถิ่นล้วน
+ *
+ * ⚠️ **ห้ามใช้ `parseISO(ymd).toISOString().slice(0,10)`** — parseISO คืนเที่ยงคืน
+ * เวลาท้องถิ่น พอ toISOString (UTC) ในเขต UTC+7 จะถอยไปวันก่อนหน้า → SLA พลาด 1 วันทุกใบ
+ * (นิยามที่ถูกอยู่ที่ requestControlLedger.ts:164 มีเทสต์ล็อกค่าไว้ — ตัวนี้ต้องตรงกัน)
+ */
 function addCalendarDays(ymd: string, days: number): string {
-  const d = parseISO(ymd);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
 /** SLA เริ่มนับและครบกำหนดตามประเภทใบขอ */
@@ -62,7 +71,8 @@ export function computeJobSla(
     kind === 'retroactive' ? submittedYmd(job) : safeYmd(job.required_date) || submittedYmd(job);
   const slaDueDate = slaStartDate ? addCalendarDays(slaStartDate, slaDays) : null;
 
-  const todayYmd = today.toISOString().slice(0, 10);
+  // วันนี้ตามปฏิทินกรุงเทพ — ห้าม toISOZ (ช่วงเที่ยงคืน–07:00 น. ไทยจะกลายเป็นเมื่อวาน)
+  const todayYmd = toYmdBangkok(today);
   const closedYmd = safeYmd(job.closed_date);
 
   if (controlStatus === 'fully_closed' && closedYmd && slaDueDate) {

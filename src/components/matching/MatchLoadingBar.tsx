@@ -11,7 +11,7 @@ export default function MatchLoadingBar({ label, className }: Props) {
     <div className={cn('space-y-1.5', className)}>
       <p className="text-xs text-blue-700">{label}</p>
       <div
-        className="relative h-1.5 w-full overflow-hidden rounded-full bg-blue-100"
+        className="relative h-1.5 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950"
         role="progressbar"
         aria-label={label}
       >

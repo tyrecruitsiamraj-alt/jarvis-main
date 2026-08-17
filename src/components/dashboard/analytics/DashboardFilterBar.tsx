@@ -188,7 +188,7 @@ const DashboardFilterBar: React.FC<Props> = ({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
-            <label htmlFor="dashboard-month-select" className="text-[11px] text-slate-500 dark:text-slate-400">
+            <label htmlFor="dashboard-month-select" className="text-[11px] text-slate-600 dark:text-slate-400">
               เดือน
             </label>
             <select
@@ -212,7 +212,7 @@ const DashboardFilterBar: React.FC<Props> = ({
             </select>
           </div>
           <div className="space-y-1">
-            <label htmlFor="dashboard-year-select" className="text-[11px] text-slate-500 dark:text-slate-400">
+            <label htmlFor="dashboard-year-select" className="text-[11px] text-slate-600 dark:text-slate-400">
               ปี (พ.ศ.)
             </label>
             <select
@@ -236,7 +236,7 @@ const DashboardFilterBar: React.FC<Props> = ({
               })}
             </select>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 col-span-2">
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 col-span-2">
             เลือกเฉพาะปี = ดูทั้งปี · เลือกเดือน+ปี = เฉพาะเดือนนั้น
           </p>
         </div>

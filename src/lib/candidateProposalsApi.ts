@@ -2,7 +2,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 
 /** การเสนอ/จองตัว/ลงงานผู้สมัคร (board/iRecruit) ต่อใบขอ — client helper */
-export type ProposalSource = 'board' | 'irecruit';
+export type ProposalSource = 'board' | 'irecruit' | 'application';
 export type ProposalTier = 'green' | 'yellow' | 'red';
 export type ProposalStatus =
   | 'proposed'
@@ -166,6 +166,57 @@ export async function listActiveProposals(): Promise<CandidateProposal[]> {
   if (!r.ok) return [];
   const d = (await r.json().catch(() => ({}))) as { items?: CandidateProposal[] };
   return d.items ?? [];
+}
+
+/**
+ * ธง "เพิ่งมีผลโทรว่าไม่สนใจ" ต่อเบอร์ E.164 — server แนบมากับลิสต์จอง
+ * ใช้เตือนบนหน้าจองตัวให้คนตัดสินใจกดโยนกลับเอง (ผลโทร **ไม่** เด้งสถานะจองอัตโนมัติ
+ * โดยตั้งใจ — เบอร์ผิด/คนละคนก็มี auto-ยกเลิกเสี่ยงเกิน)
+ */
+export type ProposalCallWarning = {
+  outcome: 'declined';
+  /** job = ไม่เอางานนี้ · all = ไม่หางานแล้ว (แรงกว่า) · null = ฝั่ง AI ไม่มี scope */
+  scope: 'job' | 'all' | null;
+  at: string;
+  byName: string | null;
+};
+
+/** ลิสต์จอง + ธงเตือนผลโทร — หน้าจองตัวใช้ตัวนี้ (ตัวบนคงไว้ให้ผู้เรียกเดิม) */
+export async function listActiveProposalsWithWarnings(): Promise<{
+  items: CandidateProposal[];
+  callWarnings: Record<string, ProposalCallWarning>;
+}> {
+  const r = await apiFetch('/api/matching/proposals?active=1');
+  if (!r.ok) return { items: [], callWarnings: {} };
+  const d = (await r.json().catch(() => ({}))) as {
+    items?: CandidateProposal[];
+    callWarnings?: Record<string, ProposalCallWarning>;
+  };
+  return { items: d.items ?? [], callWarnings: d.callWarnings ?? {} };
+}
+
+/**
+ * "โทรแล้วไม่สนใจ" จากหน้าจองตัว — โยนคนออกจากการจอง (status = rejected)
+ * ให้เขากลับไปว่างพอที่จะถูกจองกับใบขออื่นได้ · ท่อเดียวกับปุ่ม "ไม่ผ่าน" ในหน้า Matching
+ * (logic เดิมทั้งหมด แค่กดได้จากหน้าจองตัวโดยไม่ต้องย้อนกลับไปเปิดใบขอ)
+ */
+export async function declineProposalAfterCall(
+  id: string,
+  input?: { operatorName?: string | null },
+): Promise<CandidateProposal> {
+  const r = await apiFetch(`/api/matching/proposals?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: 'rejected',
+      reason: 'โทรแล้วไม่สนใจงานนี้ — เอาออกจากการจองเพื่อให้เสนอใบอื่นได้',
+      proposed_by_name: input?.operatorName,
+    }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message || 'บันทึกไม่สำเร็จ');
+  }
+  return (await r.json()) as CandidateProposal;
 }
 
 export async function cancelProposal(

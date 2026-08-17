@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { KeyRound, LogOut, Menu, Moon, Settings, Sun, UserCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,9 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
+import { applyNavPreferences, type NavPreferences } from '@/lib/navPreferences';
+import { fetchNavPreferences } from '@/lib/navPreferencesApi';
+import { NAV_PREFERENCES_CHANGED_EVENT } from '@/lib/navPreferencesEvent';
 import { Switch } from '@/components/ui/switch';
 import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -22,7 +25,28 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const shellBg = getAppShellBackgroundStyle(config);
-  const navItems = filterByMinimumRole(DOCK_NAV_ITEMS, user?.role);
+  /**
+   * เมนูที่แอดมินจัดเอง (093) — ทับลำดับ/ชื่อ/ซ่อน ของลิสต์ตั้งต้น
+   * ⚠️ โหลดไม่ได้ = ใช้ตั้งต้น (fetchNavPreferences ไม่ throw) — เมนูต้องขึ้นเสมอ
+   */
+  const [navPrefs, setNavPrefs] = useState<NavPreferences>({});
+  useEffect(() => {
+    let cancelled = false;
+    void fetchNavPreferences().then((p) => {
+      if (!cancelled) setNavPrefs(p);
+    });
+    // ฟังสัญญาณจากหน้าตั้งค่า — บันทึกแล้วเมนูเปลี่ยนทันที ไม่ต้องรีเฟรช
+    const onChanged = () => void fetchNavPreferences().then((p) => setNavPrefs(p));
+    window.addEventListener(NAV_PREFERENCES_CHANGED_EVENT, onChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NAV_PREFERENCES_CHANGED_EVENT, onChanged);
+    };
+  }, []);
+  const navItems = applyNavPreferences(
+    filterByMinimumRole(DOCK_NAV_ITEMS, user?.role),
+    navPrefs,
+  );
   const showJobBoardMenu = isFunctionEnabled('unit_requests_read');
   const showSettings = isFunctionEnabled('settings_access');
   const [navOpen, setNavOpen] = useState(false);
@@ -55,6 +79,27 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         className={cn('h-4 w-4 transition-colors', theme === 'dark' ? 'text-sky-300' : 'text-muted-foreground/40')}
       />
     </div>
+  );
+
+  /**
+   * สลับธีมแบบปุ่มเดียว — ใช้เฉพาะหัวเว็บจอเล็ก
+   * ตัวเต็ม (Sun + Switch + Moon) กว้าง 108px ซึ่งกินที่จนปุ่มอื่นเบียดทับกันบนมือถือ
+   * ตัวนี้กว้าง 44px เท่าเกณฑ์นิ้วโป้ง · ไอคอนบอก "กดแล้วจะไปโหมดไหน"
+   */
+  const themeSwitchCompact = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
+      title={theme === 'dark' ? 'ตอนนี้โหมดมืด — กดเพื่อไปโหมดสว่าง' : 'ตอนนี้โหมดสว่าง — กดเพื่อไปโหมดมืด'}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/60 dark:hover:bg-white/10 hover:text-foreground touch-manipulation"
+    >
+      {theme === 'dark' ? (
+        <Sun className="h-4 w-4 text-amber-500" />
+      ) : (
+        <Moon className="h-4 w-4 text-sky-600" />
+      )}
+    </button>
   );
 
   const hamburger = (
@@ -153,28 +198,22 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <BrandTitle className="text-base font-bold text-foreground truncate" />
           </button>
         </div>
+        {/*
+          จอเล็กใส่ได้เท่าที่พอจริง ๆ — เดิมยัด 5 ชิ้น (กระดิ่ง + ป้าย role + สลับธีมตัวเต็ม
+          + กุญแจ + ออกจากระบบ) รวม 306px ในกลุ่มที่ `shrink-0` มันจึงไปบีบกลุ่มซ้าย
+          (burger + โลโก้) ให้เหลือ 24px ทั้งที่ปุ่ม burger เองกว้าง 50px
+          ผลคือ burger ทะลุออกไปซ้อนกับกระดิ่ง 17px และชื่อแอปหายทั้งอัน
+          เกณฑ์เดิมต้องการจอกว้าง ~438px ขึ้นไปถึงจะไม่เบียด = มือถือทุกรุ่นพัง
+
+          "เปลี่ยนรหัสผ่าน" กับ "ออกจากระบบ" **ย้ายเข้าเมนูข้าง ไม่ได้ตัดทิ้ง**
+          (ออกจากระบบมีอยู่ในเมนูอยู่แล้ว · เปลี่ยนรหัสผ่านเพิ่มเข้าไปคู่กัน)
+        */}
         <div className="flex items-center gap-1 shrink-0">
           <NotificationPanel />
           <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
             {user?.role}
           </span>
-          {themeSwitch}
-          <button
-            type="button"
-            onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/12 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="เปลี่ยนรหัสผ่าน"
-          >
-            <KeyRound className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="p-2.5 rounded-lg text-muted-foreground hover:text-destructive touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="ออกจากระบบ"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          {themeSwitchCompact}
         </div>
       </header>
 

@@ -524,6 +524,34 @@ const SupervisorDashboard: React.FC = () => {
     [openJobList, scopedJobs],
   );
 
+  /**
+   * กดแท่ง "เข้ามารายเดือน" → กรองทั้งแดชบอร์ดเป็นเดือนนั้น
+   * (เจ้าของสั่ง 10 ส.ค. 2569: "กดแล้วข้อมูลเปลี่ยนตามเหมือนเป็น calendar ตัวนึงเลย")
+   *
+   * ⚠️ คิดวันสิ้นเดือนด้วย `new Date(y, m, 0)` = วันที่ 0 ของเดือนถัดไป = วันสุดท้ายของเดือนนี้
+   * ครอบคลุมทั้ง 28/29/30/31 โดยไม่ต้องมีตารางวัน · กดแท่งเดิมซ้ำ = กลับไปช่วงเริ่มต้น
+   */
+  const handleMonthClick = useCallback(
+    (monthStartYmd: string) => {
+      const ym = monthStartYmd.slice(0, 7);
+      if (dateRange && dateRange.from.slice(0, 7) === ym && dateRange.to.slice(0, 7) === ym) {
+        setDateRange(defaultDashboardDateRange());
+        return;
+      }
+      const [y, m] = ym.split('-').map(Number);
+      if (!Number.isFinite(y) || !Number.isFinite(m)) return;
+      const lastDay = new Date(y, m, 0).getDate();
+      setDateRange({ from: `${ym}-01`, to: `${ym}-${String(lastDay).padStart(2, '0')}` });
+    },
+    [dateRange],
+  );
+
+  /** เดือนที่กำลังกรองอยู่ — มีค่าเมื่อช่วงที่เลือกอยู่ในเดือนเดียวกันทั้งต้นและท้าย */
+  const selectedMonth =
+    dateRange && dateRange.from.slice(0, 7) === dateRange.to.slice(0, 7)
+      ? dateRange.from.slice(0, 7)
+      : null;
+
   const handleExport = useCallback(() => {
     exportWorkQueueCsv(data.workQueue, `work-queue-${period?.from ?? 'all'}-${period?.to ?? 'all'}.csv`);
   }, [data.workQueue, period]);
@@ -536,6 +564,8 @@ const SupervisorDashboard: React.FC = () => {
       onFiltersChange={patchFilters}
       dateRange={dateRange}
       onDateRangeChange={setDateRange}
+      onMonthClick={handleMonthClick}
+      selectedMonth={selectedMonth}
       unitFilters={unitFilters}
       onUnitFiltersChange={patchUnitFilters}
       siamrajPrimary={siamrajPrimary}

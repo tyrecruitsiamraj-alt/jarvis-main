@@ -1,19 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
-import { Phone, ExternalLink, X } from 'lucide-react';
+import { DASH, TONE } from '@/lib/designTokens';
+import { PhoneOff, Phone, ExternalLink, X } from 'lucide-react';
 import {
-  listActiveProposals,
+  listActiveProposalsWithWarnings,
   cancelProposal,
+  declineProposalAfterCall,
   proposalStatusLabel,
   proposalStatusChip,
   type CandidateProposal,
+  type ProposalCallWarning,
   type ProposalSource,
 } from '@/lib/candidateProposalsApi';
 
+/**
+ * แหล่งที่มาของผู้สมัคร (ไม่ใช่ "สถานะ" — สีสถานะยังมาจาก candidateProposalsApi เท่านั้น)
+ * คนของเรา = info (ฟ้า) · iRecruit = primary (น้ำเงิน) ตามความหมายที่ล็อกไว้ใน designTokens.ts
+ */
 const SOURCE_META: Record<ProposalSource, { label: string; cls: string }> = {
-  board: { label: 'คนของเรา', cls: 'bg-sky-500/15 text-sky-700' },
-  irecruit: { label: 'iRecruit', cls: 'bg-blue-500/15 text-blue-700' },
+  board: { label: 'คนของเรา', cls: TONE.info.chip },
+  irecruit: { label: 'iRecruit', cls: TONE.primary.chip },
+  // ใบสมัครจากบอร์ดรับสมัคร (S9) — จองจากใบที่โทรแล้วสนใจ
+  application: { label: 'ใบสมัคร', cls: TONE.success.chip },
 };
 
 function formatWhen(iso: string): string {
@@ -24,6 +33,8 @@ function formatWhen(iso: string): string {
 
 const ReservationsPage: React.FC = () => {
   const [items, setItems] = useState<CandidateProposal[]>([]);
+  /** ธง "เพิ่งมีผลโทรว่าไม่สนใจ" ต่อ id การจอง — server แนบมากับลิสต์ */
+  const [callWarnings, setCallWarnings] = useState<Record<string, ProposalCallWarning>>({});
   const [loading, setLoading] = useState(true);
   const [sourceFilter, setSourceFilter] = useState<'all' | ProposalSource>('all');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -33,8 +44,9 @@ const ReservationsPage: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listActiveProposals();
-      setItems(data);
+      const data = await listActiveProposalsWithWarnings();
+      setItems(data.items);
+      setCallWarnings(data.callWarnings);
     } catch {
       setError('โหลดรายการไม่สำเร็จ');
     } finally {
@@ -60,6 +72,21 @@ const ReservationsPage: React.FC = () => {
       setConfirmingId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /** โทรแล้วเขาไม่สนใจ — โยนออกจากการจอง (rejected) ให้เสนอใบอื่นได้ ไม่ต้องย้อนไปเปิดใบขอ */
+  const declineAfterCall = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await declineProposalAfterCall(id);
+      setItems((prev) => prev.filter((it) => it.id !== id));
+      setConfirmingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -103,9 +130,7 @@ const ReservationsPage: React.FC = () => {
               return (
                 <li key={it.id} className="glass-card rounded-2xl border border-white/70 p-4 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', src.cls)}>
-                      {src.label}
-                    </span>
+                    <span className={src.cls}>{src.label}</span>
                     <span
                       className={proposalStatusChip(it.status)}
                     >
@@ -113,14 +138,19 @@ const ReservationsPage: React.FC = () => {
                     </span>
                     <span className="text-[11px] text-muted-foreground ml-auto">{formatWhen(it.updated_at)}</span>
                   </div>
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
                     {it.candidate_name || `#${it.candidate_ref}`}
                   </h3>
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     {it.candidate_position ? <span>{it.candidate_position}</span> : null}
-                    {it.branch_name ? <span className="font-medium text-blue-700">สาขา: {it.branch_name}</span> : null}
+                    {it.branch_name ? (
+                      <span className={cn('font-medium', TONE.primary.value)}>สาขา: {it.branch_name}</span>
+                    ) : null}
                     {it.candidate_phone ? (
-                      <a href={`tel:${it.candidate_phone}`} className="inline-flex items-center gap-1 text-sky-700 hover:underline">
+                      <a
+                        href={`tel:${it.candidate_phone}`}
+                        className={cn('inline-flex items-center gap-1 hover:underline', TONE.info.value)}
+                      >
                         <Phone className="h-3 w-3" /> {it.candidate_phone}
                       </a>
                     ) : null}
@@ -128,11 +158,37 @@ const ReservationsPage: React.FC = () => {
                   {it.reason ? (
                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">— {it.reason}</p>
                   ) : null}
+                  {(() => {
+                    const w = callWarnings[it.id];
+                    if (!w) return null;
+                    // ผลที่เก่ากว่าการจองล่าสุดไม่ใช่สัญญาณ (คนจองอาจรู้อยู่แล้วตอนกด)
+                    if (new Date(w.at).getTime() <= new Date(it.updated_at).getTime()) return null;
+                    const strong = w.scope === 'all';
+                    return (
+                      <p
+                        className={cn(
+                          'flex flex-wrap items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium',
+                          strong ? TONE.danger.soft : TONE.warn.soft,
+                          strong ? TONE.danger.value : TONE.warn.value,
+                        )}
+                      >
+                        <PhoneOff className="h-3 w-3 shrink-0" />
+                        {strong
+                          ? 'ผลโทรล่าสุด: ไม่หางานแล้ว'
+                          : 'ผลโทรล่าสุด: ไม่สนใจงานนี้'}{' '}
+                        · {formatWhen(w.at)}
+                        {w.byName ? ` · โดย ${w.byName}` : ' · จาก AI'}
+                        <span className="basis-full text-[10px] font-normal opacity-80">
+                          ระบบไม่ถอนจองให้เอง (เบอร์ผิด/คนละคนก็มี) — ถ้าจริงกดปุ่ม "โยนกลับ" ด้านล่าง
+                        </span>
+                      </p>
+                    );
+                  })()}
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     <span>จองไว้กับใบขอ: {it.request_no || it.job_id}</span>
                     <a
                       href={`/matching/match?jobId=${encodeURIComponent(it.job_id)}`}
-                      className="inline-flex items-center gap-0.5 text-blue-700 hover:underline"
+                      className={cn('inline-flex items-center gap-0.5 hover:underline', TONE.primary.value)}
                     >
                       เปิดใบขอ <ExternalLink className="h-2.5 w-2.5" />
                     </a>
@@ -145,26 +201,59 @@ const ReservationsPage: React.FC = () => {
                           type="button"
                           disabled={busy}
                           onClick={() => void cancel(it.id)}
-                          className="rounded-full border border-red-300 bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                          className={cn(
+                            'rounded-full border border-transparent px-3 py-1 text-[11px] font-semibold disabled:opacity-60',
+                            TONE.danger.solid,
+                          )}
                         >
                           {busy ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setConfirmingId(null)}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-600 hover:bg-slate-50"
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-[11px]',
+                            TONE.neutral.soft,
+                            TONE.neutral.value,
+                            TONE.neutral.softHover,
+                          )}
                         >
                           ไม่ยกเลิก
                         </button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingId(it.id)}
-                        className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
-                      >
-                        <X className="h-3 w-3" /> ยกเลิกจอง
-                      </button>
+                      <>
+                        {/* ผลโทรบอกว่าไม่สนใจ → โยนกลับจากหน้านี้ได้เลย (logic เดียวกับ
+                            ปุ่ม "ไม่ผ่าน" ในหน้า Matching แค่ย้ายมาให้กดถึง) · ลงงานแล้วไม่โชว์ */}
+                        {it.status !== 'placed' ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void declineAfterCall(it.id)}
+                            title="เอาออกจากการจอง (ไม่ผ่าน) — เขาจะถูกเสนอกับใบขออื่นได้"
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-60',
+                              TONE.warn.soft,
+                              TONE.warn.value,
+                              TONE.warn.softHover,
+                            )}
+                          >
+                            <PhoneOff className="h-3 w-3" /> {busy ? 'กำลังบันทึก…' : 'โทรแล้วไม่สนใจ — โยนกลับ'}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingId(it.id)}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
+                            TONE.danger.soft,
+                            TONE.danger.value,
+                            TONE.danger.softHover,
+                          )}
+                        >
+                          <X className="h-3 w-3" /> ยกเลิกจอง
+                        </button>
+                      </>
                     )}
                   </div>
                 </li>

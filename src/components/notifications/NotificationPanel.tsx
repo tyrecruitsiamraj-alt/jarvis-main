@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Briefcase, CheckCircle2, CheckCheck } from 'lucide-react';
+import { Bell, Briefcase, CheckCircle2, CheckCheck, PhoneCall, Flag, ClipboardCheck } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { NotificationType } from '@/types/notification';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -8,10 +8,16 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
 
-const typeConfig: Record<NotificationType, { icon: React.ElementType; color: string }> = {
-  new_job: { icon: Briefcase, color: 'text-blue-600 bg-blue-500/10' },
+/** ชนิดใหม่จาก server ที่ยังไม่มีในตารางนี้ → ตกไปใช้ไอคอนกระดิ่งกลาง ไม่พัง */
+const typeConfig: Partial<Record<NotificationType, { icon: React.ElementType; color: string }>> = {
+  new_job: { icon: Briefcase, color: 'text-blue-600 bg-blue-500/10 dark:text-blue-300' },
   job_closed: { icon: CheckCircle2, color: 'text-success bg-success/10' },
+  call_confirmed: { icon: PhoneCall, color: 'text-success bg-success/10' },
+  needs_human: { icon: Flag, color: 'text-destructive bg-destructive/10' },
+  batch_pending: { icon: ClipboardCheck, color: 'text-amber-600 bg-amber-500/10 dark:text-amber-300' },
 };
+
+const fallbackType = { icon: Bell, color: 'text-muted-foreground bg-secondary' };
 
 const NotificationPanel: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
@@ -58,7 +64,7 @@ const NotificationPanel: React.FC = () => {
             </div>
           ) : (
             notifications.map((n) => {
-              const config = typeConfig[n.type];
+              const config = typeConfig[n.type] ?? fallbackType;
               const Icon = config.icon;
               return (
                 <button

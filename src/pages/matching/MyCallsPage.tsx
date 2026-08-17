@@ -1,0 +1,644 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
+import {
+  CONFIRMED_SCOPE_HINT,
+  CONFIRMED_SCOPE_LABEL,
+  CONFIRMED_SCOPES,
+  resolveAppointment,
+} from '@/lib/callAppointment';
+import { cn } from '@/lib/utils';
+import { CALL_LANE_HINT, CALL_LANE_LABEL, filterHoldsByLane, type CallLane } from '@/lib/callLane';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import NameAvatar from '@/components/shared/NameAvatar';
+import {
+  CALL_HOLD_SOURCE_LABEL,
+  fetchMyCallQueue,
+  recordCallResult,
+  releaseCallHold,
+  CALL_RESULT_DESTINATION,
+  CALL_RESULT_LABEL,
+  EMPTY_TALLY,
+  type CallHold,
+  type CallResultOutcome,
+  type CallResultScope,
+  type CallResultTally,
+} from '@/lib/callHoldsApi';
+import { bookingActionFor, bookingTargetFromHold } from '@/lib/callResultBooking';
+import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
+import { Phone, RefreshCw, ArrowRight } from 'lucide-react';
+
+/**
+ * หน้า "โทรของฉัน" — ถังงานโทรของเจ้าหน้าที่คนเดียว
+ *
+ * ทำไมต้องมีหน้าแยกจาก Matching: การ์ดในหน้า Matching ไว้รับ+โทรทันทีตอนกำลังดูใบขอนั้น
+ * แต่พอรับสะสมจากหลายใบขอ ต้องมีถังรวมที่ **เรียงให้เสร็จว่าโทรใครก่อน** ไม่ต้องเปิดไล่ทีละใบ
+ *
+ * ผลโทรใช้ศัพท์ชุดเดียวกับ Lumos (ดู callHoldsApi) → funnel นับรวมกับผลของ AI ได้
+ */
+
+
+const OUTCOME_ORDER: CallResultOutcome[] = [
+  'confirmed',
+  'declined',
+  'reschedule_requested',
+  'no_answer',
+  'wrong_person',
+];
+
+function msLeftOf(hold: CallHold, now: number): number {
+  return new Date(hold.expiresAt).getTime() - now;
+}
+
+function countdown(ms: number): string {
+  if (ms <= 0) return 'หมดเวลา';
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h > 0) return `${h} ชม. ${m} นาที`;
+  return `${m} นาที`;
+}
+
+/** ใกล้คายภายใน 2 ชม. = ต้องรีบโทร (ไฮไลต์แถว) */
+const DUE_SOON_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * "โทรของฉัน" — **เป็น section บนหน้าหลักแล้ว** (เจ้าของสั่ง 13 ส.ค. 2569:
+ * "หน้าโทรของฉันก็ย้ายไปรวมกับหน้าหลัก แต่จัดวางให้ดูสวยๆ ไม่รก")
+ * `/matching/my-calls` เหลือเป็น redirect เข้าหน้าหลัก · เมนูเดิมถูกถอด
+ * ทุกอย่างข้างในเหมือนหน้าเดิม: ถังของตัวเอง + บันทึกผล + บอร์ดทีมของหัวหน้า
+ */
+/**
+ * แยกเลน (เจ้าของสั่ง 16 ส.ค. 2569: "งานคัดสรรก็ให้มีหน้าการติดต่อของเขาเอง ไม่ปนกัน")
+ * `lane` = โชว์เฉพาะงานโทรของเลนนั้น (สรรหา = คนยังไม่สมัคร · คัดสรร = คนสมัครแล้ว)
+ * ไม่ส่ง = ทั้งหมด (พฤติกรรมเดิม — หน้า redirect เก่ายังใช้)
+ * ⚠️ ยอด "วันนี้" ในแผนผังปลายทางเป็นยอดรวมของคนคนนั้น ไม่แยกเลน (เป็นสถิติส่วนตัว
+ * ไม่ใช่ของเลน) — แยกเมื่อไหร่ต้องแยกที่ server เพราะ tally นับจากผลที่บันทึกแล้ว
+ */
+export const MyCallsSection: React.FC<{ lane?: CallLane }> = ({ lane }) => {
+  /**
+   * เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: **ทุกคนเห็นถังของตัวเอง** (ของใครของมัน)
+   * ⚠️ "ภาระงานโทรของทีม" (บอร์ดหัวหน้า) ถูกเอาออก 14 ส.ค. 2569 (เจ้าของสั่ง) —
+   * API `?team=1` / โอน / เทกอง ยังอยู่ แค่ไม่มี UI เข้าถึง (ดู docs ถ้าจะเอากลับ)
+   */
+  const [holds, setHolds] = useState<CallHold[]>([]);
+  const [tally, setTally] = useState<CallResultTally>(EMPTY_TALLY);
+  const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
+
+  /** แถวที่กำลังกรอกผล + ค่าที่กรอก */
+  const [openRef, setOpenRef] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<CallResultOutcome | null>(null);
+  const [scope, setScope] = useState<CallResultScope | null>(null);
+  const [note, setNote] = useState('');
+  /** วันนัดสัมภาษณ์ (`YYYY-MM-DD` จากช่อง date) — ใช้เมื่อเลือก "สนใจ + นัดได้เลย" */
+  const [appointmentAt, setAppointmentAt] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /**
+   * ผลที่เพิ่งบันทึก — โชว์ปลายทางค้างไว้ให้เห็นว่างานวิ่งไปไหน
+   * เก็บตัวล็อกไว้ด้วย (ไม่ใช่แค่ผล) เพราะแถวที่ตอบ "สนใจ" ต้องมีปุ่มจองตัวต่อท้าย
+   * ซึ่งต้องใช้ jobId/source/candidateRef ของคนนั้น — ดู src/lib/callResultBooking.ts
+   */
+  const [justDone, setJustDone] = useState<Record<string, { hold: CallHold; outcome: CallResultOutcome }>>({});
+  /** ปุ่มจองตัวหลังผล "สนใจ" — คีย์กันกดซ้ำใช้ id ของล็อก (ผูกคน+ใบขออยู่แล้ว) */
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [bookedIds, setBookedIds] = useState<Record<string, true>>({});
+  const [bookingError, setBookingError] = useState<Record<string, string>>({});
+
+  const load = useCallback(() => {
+    setLoading(true);
+    void fetchMyCallQueue().then((data) => {
+      // กรองที่จุดโหลดจุดเดียว — ทุกยอด/ทุกกลุ่มข้างล่างจะเป็นของเลนนี้โดยอัตโนมัติ
+      setHolds(filterHoldsByLane(data.holds, lane));
+      setTally(data.tally);
+      setLoading(false);
+    });
+  }, [lane]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // เดินนาฬิกาเฉพาะเมื่อมีงานค้าง — ไม่ให้หน้าว่างเปลืองรอบ
+  useEffect(() => {
+    if (holds.length === 0) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [holds.length]);
+
+  /**
+   * คิวเรียงเอง: ใกล้คายก่อน (ถือมานานสุด = ค้างสุด) → แล้วเรียงตามใบขอให้โทรจบเป็นเรื่อง ๆ
+   * server เรียง expires_at asc มาแล้ว หน้านี้แค่จัดกลุ่มใบขอโดยคงลำดับความด่วนของใบแรกไว้
+   */
+  const grouped = useMemo(() => {
+    const byJob = new Map<string, CallHold[]>();
+    for (const h of holds) {
+      const list = byJob.get(h.jobId) ?? [];
+      list.push(h);
+      byJob.set(h.jobId, list);
+    }
+    return [...byJob.entries()].map(([jobId, list]) => ({
+      jobId,
+      requestNo: list[0].requestNo,
+      items: list,
+    }));
+  }, [holds]);
+
+  const dueSoonCount = useMemo(
+    () => holds.filter((h) => msLeftOf(h, now) <= DUE_SOON_MS).length,
+    [holds, now],
+  );
+
+  const openForm = (hold: CallHold) => {
+    setOpenRef(hold.id);
+    setOutcome(null);
+    setScope(null);
+    setNote('');
+    setAppointmentAt('');
+    setError(null);
+  };
+
+  const submit = async (hold: CallHold) => {
+    if (!outcome || busyId) return;
+    if (outcome === 'declined' && !scope) {
+      setError('เลือกก่อนว่า “ไม่สนใจงานนี้” หรือ “ไม่หางานแล้ว”');
+      return;
+    }
+    if (outcome === 'confirmed' && !scope) {
+      setError('เลือกก่อนว่า “นัดได้เลย” หรือ “สนใจ แต่ยังนัดไม่ได้”');
+      return;
+    }
+    /**
+     * ตรวจด้วยตัวตัดสินตัวเดียวกับฝั่ง server — ผิดตรงไหนบอกตรงนั้นตั้งแต่ยังไม่ยิง
+     * (ถ้าปล่อยไปให้ server ตอบ 400 ผู้ใช้จะเห็นข้อความเดียวกันแต่ช้ากว่าหนึ่งรอบ)
+     */
+    const decided = resolveAppointment({
+      outcome,
+      scope,
+      appointmentAt,
+      now: new Date().toISOString(),
+    });
+    if (!decided.ok) {
+      setError(decided.reason);
+      return;
+    }
+    setBusyId(hold.id);
+    setError(null);
+    try {
+      await recordCallResult({
+        holdId: hold.id,
+        outcome,
+        // ส่งค่าที่ resolveAppointment ตัดสินแล้ว ไม่ใช่ค่า state ดิบ — กันชุด scope/วันนัด
+        // ผิดฝั่งหลุดไป (เช่น confirmed แต่ scope ยังเป็น 'all' ที่ค้างจาก declined)
+        scope: decided.scope ?? undefined,
+        appointmentAt: decided.appointmentAt,
+        note: note.trim() || null,
+      });
+      setJustDone((prev) => ({ ...prev, [hold.id]: { hold, outcome } }));
+      setHolds((prev) => prev.filter((h) => h.id !== hold.id));
+      setOpenRef(null);
+      void fetchMyCallQueue().then((d) => setTally(d.tally));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกผลโทรไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * "โทรแล้วสนใจ → จองตัวเลย" — ใช้เส้นเดียวกับปุ่มจองในหน้า Matching (`saveProposal`)
+   * จึงติดกติกาเดิมครบ: 1 คนจองได้ใบเดียว (backend ตอบ 409 พร้อมบอกว่าติดใบไหน)
+   *
+   * ⚠️ ล็อกโทรที่ API ส่งกลับ **ไม่มีเบอร์** (กันเบอร์ของแผนกอื่นรั่ว) แถวจองจึงไม่มีเบอร์
+   * ซึ่งถูกกว่าการเดา — หน้าจองมีทางเปิดดูรายละเอียดคนอยู่แล้ว
+   */
+  const bookFromResult = async (hold: CallHold) => {
+    const target = bookingTargetFromHold(hold.source, hold.candidateRef);
+    if (!target || bookingId) return;
+    setBookingId(hold.id);
+    setBookingError((prev) => {
+      const next = { ...prev };
+      delete next[hold.id];
+      return next;
+    });
+    try {
+      await saveProposal({
+        jobId: hold.jobId,
+        requestNo: hold.requestNo,
+        source: target.source,
+        candidateRef: target.candidateRef,
+        candidateName: hold.candidateName,
+        operatorName: hold.heldByName,
+        status: 'reserved',
+      });
+      setBookedIds((prev) => ({ ...prev, [hold.id]: true }));
+    } catch (e) {
+      const msg =
+        e instanceof ProposalConflictError
+          ? `จองไม่ได้ — ติดจองอยู่กับใบขอ ${e.conflict.request_no || e.conflict.job_id} อยู่แล้ว`
+          : e instanceof Error
+            ? e.message
+            : 'จองตัวไม่สำเร็จ';
+      setBookingError((prev) => ({ ...prev, [hold.id]: msg }));
+    } finally {
+      setBookingId(null);
+    }
+  };
+
+  const giveBack = async (hold: CallHold, reason: 'manual' | 'to_ai') => {
+    if (busyId) return;
+    setBusyId(hold.id);
+    setError(null);
+    try {
+      await releaseCallHold(hold.id, reason);
+      setHolds((prev) => prev.filter((h) => h.id !== hold.id));
+      setOpenRef(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'คืนงานไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // ไม่มีงานค้างและไม่มียอดวันนี้ = ไม่กินที่บนหน้าหลักเลย (เจ้าของสั่งว่าห้ามรก)
+  // มีของค่อยโผล่ทั้งแผง · หัวหน้าเห็นบอร์ดทีมเสมอ (งานของลูกทีมไม่ใช่ของตัวเอง)
+  // ไม่มีงานค้างและไม่มียอดวันนี้ = ซ่อนตัวเอง ไม่กินที่ (ทุก role เท่ากันหลังตัดบอร์ดทีม)
+  if (!loading && holds.length === 0 && tally.total === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      {/* PageHeader เดิมถูกถอด — ตอนนี้เป็น section บนหน้าหลัก ใช้หัวเรื่องบรรทัดเดียว */}
+      <div className="border-b border-slate-200 pb-1 dark:border-slate-800">
+        <h2 className={cn('text-base font-semibold', DASH.cellStrong)}>
+          📞 {lane ? CALL_LANE_LABEL[lane] : 'โทรของฉัน'}
+        </h2>
+        <p className={cn('text-xs', DASH.muted)}>
+          {lane ? CALL_LANE_HINT[lane] : 'งานที่เก็บมาโทรเอง'} — เรียงให้แล้วว่าโทรใครก่อน ·
+          โทรเสร็จบันทึกผลที่นี่
+        </p>
+      </div>
+
+      {/* แผนผังปลายทาง — กดผลแล้วงานวิ่งไปไหนต่อ */}
+      <div className={cn('rounded-2xl border p-4', DASH.card)}>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div>
+            <p className={DASH.eyebrow}>รอโทร</p>
+            <p className={cn('font-mono text-3xl font-extrabold tabular-nums', DASH.cellStrong)}>
+              {holds.length.toLocaleString('th-TH')}
+            </p>
+            <p className={cn('text-xs', DASH.muted)}>
+              {dueSoonCount > 0
+                ? `ใกล้คาย ${dueSoonCount.toLocaleString('th-TH')} คน — รีบโทรก่อน`
+                : 'ล็อกอยู่ได้ 1 วันต่อคน'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            className={cn(
+              'ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold',
+              TONE.neutral.soft,
+              TONE.neutral.value,
+              TONE.neutral.softHover,
+            )}
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> รีเฟรช
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-1.5">
+          {OUTCOME_ORDER.map((key) => {
+            const tone = TONE[CALL_OUTCOME_TONE[key]];
+            const count =
+              key === 'declined'
+                ? tally.declinedByScope.job
+                : (tally.byOutcome[key] ?? 0);
+            const extra = key === 'declined' ? tally.declinedByScope.all : null;
+            return (
+              <div
+                key={key}
+                className={cn(
+                  'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2 text-xs font-semibold',
+                  tone.soft,
+                  tone.value,
+                )}
+              >
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                <span>{CALL_RESULT_LABEL[key]}</span>
+                <span className={cn('font-normal', DASH.muted)}>
+                  → {CALL_RESULT_DESTINATION[key]}
+                </span>
+                <span className="ml-auto font-mono tabular-nums">
+                  วันนี้ {count.toLocaleString('th-TH')}
+                  {extra != null && extra > 0
+                    ? ` · ไม่หางานแล้ว ${extra.toLocaleString('th-TH')}`
+                    : ''}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {error ? <p className={cn('px-1 text-xs', TONE.danger.value)}>{error}</p> : null}
+
+      {loading && holds.length === 0 ? (
+        <p className={cn('px-1 text-sm', DASH.muted)}>กำลังโหลดงานโทร…</p>
+      ) : holds.length === 0 ? (
+        <div className={cn('rounded-2xl border p-6 text-center', DASH.card)}>
+          <p className={cn('text-sm font-semibold', DASH.cellStrong)}>ยังไม่มีงานโทรที่ถืออยู่</p>
+          <p className={cn('mt-1 text-xs', DASH.muted)}>
+            ไปที่{' '}
+            <Link to="/matching/match" className={cn('font-semibold underline', TONE.primary.value)}>
+              หน้า Matching
+            </Link>{' '}
+            แล้วกด “รับไปโทรเอง” บนการ์ดผู้สมัคร
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {grouped.map((group) => (
+            <div key={group.jobId} className={cn('overflow-hidden rounded-2xl border', DASH.card)}>
+              <div
+                className={cn(
+                  'flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5',
+                  DASH.divider,
+                  DASH.tableHead,
+                )}
+              >
+                <span className="font-mono text-xs font-bold">
+                  {group.requestNo || group.jobId}
+                </span>
+                <span className="text-[11px]">
+                  {group.items.length.toLocaleString('th-TH')} คนต้องโทร
+                </span>
+              </div>
+
+              {group.items.map((hold) => {
+                const left = msLeftOf(hold, now);
+                const dueSoon = left <= DUE_SOON_MS;
+                const isOpen = openRef === hold.id;
+                const busy = busyId === hold.id;
+                return (
+                  <div
+                    key={hold.id}
+                    className={cn('border-b px-4 py-3 last:border-b-0', DASH.divider, dueSoon && TONE.warn.soft)}
+                  >
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <NameAvatar name={hold.candidateName || hold.candidateRef} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className={cn('text-sm font-semibold', DASH.cellStrong)}>
+                          {hold.candidateName || `ผู้สมัคร #${hold.candidateRef}`}
+                        </p>
+                        <p className={cn('text-[11px]', DASH.muted)}>
+                          {CALL_HOLD_SOURCE_LABEL[hold.source]} · คายอีก{' '}
+                          <span className={cn('font-semibold', dueSoon ? TONE.warn.value : '')}>
+                            {countdown(left)}
+                          </span>
+                        </p>
+                      </div>
+                      {!isOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => openForm(hold)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold',
+                            TONE.primary.solid,
+                          )}
+                        >
+                          <Phone className="h-3.5 w-3.5" /> กดผลโทร
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {isOpen ? (
+                      <div className={cn('mt-2.5 space-y-2 rounded-xl border px-3 py-2.5', TONE.primary.soft)}>
+                        <div className="flex flex-wrap gap-1.5">
+                          {OUTCOME_ORDER.map((key) => {
+                            const tone = TONE[CALL_OUTCOME_TONE[key]];
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => {
+                                  // สลับผลโทรต้องล้าง scope เสมอ — scope ของ "สนใจ"
+                                  // (scheduled/unscheduled) กับ "ไม่สนใจ" (job/all) เป็นคนละชุด
+                                  // ถ้าไม่ล้างตอนสลับ confirmed↔declined ค่าชุดผิดจะติดไป
+                                  // แล้ว guard `!scope` ผ่าน → ด่านบังคับเลือกถูกข้ามเงียบ ๆ
+                                  if (key !== outcome) setScope(null);
+                                  setOutcome(key);
+                                  if (key !== 'confirmed') setAppointmentAt('');
+                                  setError(null);
+                                }}
+                                className={cn(
+                                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                                  tone.soft,
+                                  tone.value,
+                                  outcome === key ? 'ring-2 ring-ring' : tone.softHover,
+                                )}
+                              >
+                                {CALL_RESULT_LABEL[key]}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {outcome ? (
+                          <p className={cn('text-[11px]', DASH.muted)}>
+                            ผลนี้จะไปต่อที่: {CALL_RESULT_DESTINATION[outcome]}
+                          </p>
+                        ) : null}
+
+                        {outcome === 'confirmed' ? (
+                          <div className="space-y-1 text-[11px]">
+                            {CONFIRMED_SCOPES.map((value) => (
+                              <label key={value} className="flex cursor-pointer items-start gap-2">
+                                <input
+                                  type="radio"
+                                  name={`confirm-${hold.id}`}
+                                  checked={scope === value}
+                                  onChange={() => {
+                                    setScope(value);
+                                    if (value === 'unscheduled') setAppointmentAt('');
+                                    setError(null);
+                                  }}
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
+                                />
+                                <span>
+                                  <span className={cn('font-semibold', DASH.cellStrong)}>
+                                    {CONFIRMED_SCOPE_LABEL[value]}
+                                  </span>
+                                  <span className={cn('ml-1', DASH.muted)}>
+                                    — {CONFIRMED_SCOPE_HINT[value]}
+                                  </span>
+                                </span>
+                              </label>
+                            ))}
+                            {scope === 'scheduled' ? (
+                              <label className="flex flex-wrap items-center gap-2 pt-1">
+                                <span className={cn('font-semibold', DASH.cellStrong)}>
+                                  วันนัดสัมภาษณ์
+                                </span>
+                                <input
+                                  type="date"
+                                  value={appointmentAt}
+                                  onChange={(e) => {
+                                    setAppointmentAt(e.target.value);
+                                    setError(null);
+                                  }}
+                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                />
+                              </label>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {outcome === 'declined' ? (
+                          <div className="space-y-1 text-[11px]">
+                            {(
+                              [
+                                ['job', 'ไม่สนใจงานนี้', 'AI ยังเสนองานอื่นให้เขาได้'],
+                                ['all', 'ไม่หางานแล้ว', 'พักเบอร์นี้ ไม่โทรอีก — ดับทุกใบที่เขาแมท'],
+                              ] as Array<[CallResultScope, string, string]>
+                            ).map(([value, label, hint]) => (
+                              <label key={value} className="flex cursor-pointer items-start gap-2">
+                                <input
+                                  type="radio"
+                                  name={`scope-${hold.id}`}
+                                  checked={scope === value}
+                                  onChange={() => setScope(value)}
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-sky-600"
+                                />
+                                <span>
+                                  <span className={cn('font-semibold', DASH.cellStrong)}>{label}</span>
+                                  <span className={cn('ml-1', DASH.muted)}>— {hint}</span>
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <textarea
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="โน้ตเพิ่มเติม (ถ้ามี)"
+                          className="min-h-[44px] w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        />
+
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => void submit(hold)}
+                            disabled={busy || !outcome}
+                            className={cn(
+                              'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+                              TONE.primary.solid,
+                            )}
+                          >
+                            {busy ? 'กำลังบันทึก…' : 'บันทึกผล'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void giveBack(hold, 'to_ai')}
+                            disabled={busy}
+                            className={cn(
+                              'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+                              TONE.info.soft,
+                              TONE.info.value,
+                              TONE.info.softHover,
+                            )}
+                          >
+                            คืนให้ AI โทรต่อ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void giveBack(hold, 'manual')}
+                            disabled={busy}
+                            className={cn(
+                              'rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+                              TONE.neutral.soft,
+                              TONE.neutral.value,
+                              TONE.neutral.softHover,
+                            )}
+                          >
+                            คืนเข้าถังกลาง
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOpenRef(null)}
+                            className={cn('px-2 py-1 text-[11px] font-semibold', DASH.muted)}
+                          >
+                            ปิด
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ผลที่เพิ่งบันทึกในรอบนี้ — ให้เห็นว่างานวิ่งไปไหนต่อ ไม่ใช่หายไปเฉย ๆ */}
+      {Object.keys(justDone).length > 0 ? (
+        <div className={cn('rounded-2xl border p-4', DASH.card)}>
+          <p className={DASH.eyebrow}>เพิ่งบันทึกรอบนี้</p>
+          <div className="mt-2 grid gap-1.5">
+            {Object.entries(justDone).map(([id, { hold, outcome: key }]) => {
+              // ผล "สนใจ" คือผลเดียวที่มีงานให้ทำต่อทันที — ปลายทางที่ CALL_RESULT_DESTINATION
+              // สัญญาไว้ว่า "เข้าเส้นจองตัว" · ก่อนหน้านี้ไม่มีปุ่มรออยู่จริง
+              const target = key === 'confirmed' ? bookingTargetFromHold(hold.source, hold.candidateRef) : null;
+              const action = bookingActionFor({
+                target,
+                jobId: hold.jobId,
+                holdSource: hold.source,
+                alreadyBooked: bookedIds[id] === true,
+                busy: bookingId === id,
+              });
+              return (
+                <div key={id} className="space-y-1">
+                  <p className={cn('text-xs', TONE[CALL_OUTCOME_TONE[key]].value)}>
+                    <span className={cn('font-semibold', DASH.cellStrong)}>
+                      {hold.candidateName || `ผู้สมัคร #${hold.candidateRef}`}
+                    </span>{' '}
+                    · {CALL_RESULT_LABEL[key]} → {CALL_RESULT_DESTINATION[key]}
+                  </p>
+                  {key === 'confirmed' ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void bookFromResult(hold)}
+                        disabled={action.disabled}
+                        className={cn(
+                          'rounded-full px-3 py-1 text-[11px] font-bold disabled:opacity-50',
+                          TONE.violet.solid,
+                        )}
+                      >
+                        {bookedIds[id] ? 'จองตัวแล้ว ✓' : 'จองตัวเลย'}
+                      </button>
+                      {action.reason ? (
+                        <span className={cn('text-[10px]', DASH.muted)}>{action.reason}</span>
+                      ) : null}
+                      {bookingError[id] ? (
+                        <span className={cn('text-[10px] font-medium', TONE.danger.value)}>
+                          {bookingError[id]}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+    </div>
+  );
+};
+
+// ⚠️ ไม่มี default export แล้ว — เนื้อทั้งหมดเป็น `MyCallsSection` บนหน้าหลัก
+// `/matching/my-calls` เป็น redirect ใน App.tsx (กัน bookmark เก่าพัง)

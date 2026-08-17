@@ -32,8 +32,10 @@ const MatchingDashboard = lazy(() => import("@/pages/matching/MatchingDashboard"
 const CandidateProfile = lazy(() => import("@/pages/matching/CandidateProfile"));
 const AddCandidatePage = lazy(() => import("@/pages/matching/AddCandidatePage"));
 const MatchingPage = lazy(() => import("@/pages/matching/MatchingPage"));
+const SelectionContactPage = lazy(() => import("@/pages/matching/SelectionContactPage"));
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
+const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
 const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
 const OurPeoplePage = lazy(() => import("@/pages/matching/OurPeoplePage"));
 const JobDashboard = lazy(() => import("@/pages/jobs/JobDashboard"));
@@ -41,6 +43,8 @@ const JobListPage = lazy(() => import("@/pages/jobs/JobListPage"));
 const StaffJobBoardPage = lazy(() => import("@/pages/jobs/StaffJobBoardPage"));
 const JobDetailPage = lazy(() => import("@/pages/jobs/JobDetailPage"));
 const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
+// แท็บย่อยของใบขอ (16 ส.ค. 2569 เย็น) — ผู้สมัคร / AI Match / การติดต่อ
+const UnitRequestTabPage = lazy(() => import("@/pages/jobs/UnitRequestTabPage"));
 const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
@@ -100,7 +104,16 @@ const ProtectedRoutes = () => {
             <Route path="/matching/match" element={<MatchingPage />} />
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
             <Route path="/matching/job-postings" element={<JobPostingsPage />} />
+            {/* งานสรรหา (RM) — หน้าเดียว 3 แท็บ · แท็บอยู่ใน ?tab= เพื่อให้แชร์ลิงก์ได้ */}
+            <Route path="/recruit/rm" element={<RecruitRmPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
+            {/* "โทรของฉัน" ย้ายเป็น section บนหน้าหลักแล้ว (เจ้าของสั่ง 13 ส.ค. 2569:
+                14 ส.ค. ย้ายไปหน้า Matching) — สอง path เดิม redirect เข้าหน้า Matching
+                กัน bookmark เก่าพัง · call-team ไม่มีบอร์ดทีมแล้ว (เอาออก 14 ส.ค.) */}
+            <Route path="/matching/my-calls" element={<Navigate to="/matching/match" replace />} />
+            {/* การติดต่อของเลนคัดสรร (16 ส.ค. 2569) — เลนสรรหาอยู่บนบอร์ดรับสมัคร ไม่ปนกัน */}
+            <Route path="/matching/contact" element={<SelectionContactPage />} />
+            <Route path="/matching/call-team" element={<Navigate to="/matching/match" replace />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
@@ -109,6 +122,9 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/board" element={<StaffJobBoardPage />} />
             <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
+            <Route path="/jobs/siamraj/:id/applicants" element={<UnitRequestTabPage tab="applicants" />} />
+            <Route path="/jobs/siamraj/:id/ai-match" element={<UnitRequestTabPage tab="ai-match" />} />
+            <Route path="/jobs/siamraj/:id/contact" element={<UnitRequestTabPage tab="contact" />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />
             <Route path="/settings" element={<AdminSettings />} />

@@ -1,0 +1,328 @@
+// @vitest-environment node
+/**
+ * "เสนอทีละงาน" — คิวต้องไม่เสิร์ฟคนเดียวกันหลายใบขอพร้อมกัน
+ *
+ * โจทย์จากเจ้าของ: คนเดียวแมทได้หลายใบ → เสนอทีละใบ ไม่ใช่โทรถล่มคนเดียวกัน
+ * ข้อมูลจริง: card 1805 อยู่ในผลแมท 113 ใบขอ · ช่อง reminder มีแถวถึงคิว 2,816 แถว
+ * แต่เป็นคนแค่ 126 คน (เฉลี่ยคนละ ~22 ใบ)
+ *
+ * ⚠️ **เกณฑ์ที่เลือกเทสต์: "พังแล้วเงียบสนิท"** — ถ้าตัวกันหลุด ระบบยังตอบ 200
+ * Lumos ยังได้งานไปโทร ทุกอย่างดูปกติทุกหน้าจอ ต่างกันแค่ผู้สมัครถูกโทร 20 สายในวันเดียว
+ * ซึ่งไม่มีใครในบริษัทเห็นจนกว่าจะมีคนโทรมาด่า · เทสต์นี้จึงอ่านโครงสร้าง SQL ตรง ๆ
+ */
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+
+vi.mock('../../api/_lib/postgres.js', () => ({
+  dbQuery: vi.fn(async () => ({ rows: [{ id: 1 }] })),
+  isPgUndefinedTable: () => false,
+}));
+vi.mock('../../api/_lib/schema.js', () => ({ tableInAppSchema: (n: string) => n }));
+vi.mock('../../api/_lib/logger.js', () => ({ logInfo: vi.fn(), logError: vi.fn() }));
+vi.mock('../../api/_lib/candidateCallHolds.js', () => ({ listHeldPhones: vi.fn(async () => new Set()) }));
+vi.mock('../../api/_lib/callFollowup.js', () => ({
+  listSuppressedPhones: vi.fn(async () => new Set()),
+  applyCallFollowupToQueueRow: vi.fn(),
+}));
+vi.mock('../../api/_lib/callBatchStore.js', () => ({
+  countPendingApprovalByJob: vi.fn(async () => new Map()),
+  releaseDueCallBatches: vi.fn(async () => 0),
+}));
+vi.mock('../../api/_lib/callFollowupPolicyStore.js', () => ({
+  getCallFollowupPolicy: vi.fn(async () => ({
+    maxAttempts: 3,
+    retryGapHours: 24,
+    rescheduleDefaultHours: 4,
+    quietFromHour: 20,
+    quietToHour: 8,
+    suppressDays: 30,
+  })),
+}));
+
+const { CONFIRMED_FOCUS_DAYS } = await import('../../src/lib/callFollowupPolicy.js');
+const { dbQuery } = await import('../../api/_lib/postgres.js');
+const { listHeldPhones } = await import('../../api/_lib/candidateCallHolds.js');
+const { listSuppressedPhones } = await import('../../api/_lib/callFollowup.js');
+const {
+  TAKE_PENDING_SQL,
+  TAKE_PENDING_SQL_NO_RANK,
+  buildInterviewPayload,
+  buildReminderPayload,
+  enqueueLumosInterviewForSelected,
+} = await import('../../api/_lib/lumosDispatch.js');
+
+/** ตัดเอาเฉพาะเนื้อใน not exists ก้อนที่ n (นับจาก 0) */
+function notExistsBlock(sql: string, n: number): string {
+  const parts = sql.split(/not exists\s*\(/i).slice(1);
+  const body = parts[n] ?? '';
+  // ตัดที่วงเล็บปิดที่สมดุล — ในก้อนมีวงเล็บซ้อน (เงื่อนไข status)
+  let depth = 1;
+  for (let i = 0; i < body.length; i += 1) {
+    if (body[i] === '(') depth += 1;
+    else if (body[i] === ')') {
+      depth -= 1;
+      if (depth === 0) return body.slice(0, i);
+    }
+  }
+  return body;
+}
+
+const inFlight = notExistsBlock(TAKE_PENDING_SQL, 0);
+const earliestFirst = notExistsBlock(TAKE_PENDING_SQL, 1);
+const confirmedFocus = notExistsBlock(TAKE_PENDING_SQL, 2);
+
+describe('เบอร์เดียวกันต้องมีสายเดียวที่กำลังเดิน', () => {
+  it('มีตัวกันครบสามชั้น', () => {
+    expect(TAKE_PENDING_SQL.match(/not exists/gi)?.length).toBe(3);
+  });
+
+  it('ชั้นที่ 1 — เบอร์ที่ส่งไปแล้วยังไม่มีผลกลับ ต้องบังใบอื่นไว้', () => {
+    expect(inFlight).toMatch(/f\.result is null/);
+    expect(inFlight).toMatch(/f\.status = 'delivered'/);
+    // ต้องมีเพดานเวลา ไม่งั้นแถวที่ Lumos ทิ้งหายจะบังใบอื่นค้างถาวร
+    expect(inFlight).toMatch(/f\.delivered_at >= now\(\) - interval/);
+  });
+
+  it('ชั้นที่ 2 — เสิร์ฟใบเดียว: คะแนน AI ก่อน แล้วค่อยใบที่มาก่อน (14 ส.ค. 2569)', () => {
+    // เทียบเป็น row comparison — เทียบ created_at อย่างเดียวจะเสมอกันได้เมื่อเข้าคิวพร้อมกัน
+    // (เข้าคิวทีเดียวหลายใบเป็นเรื่องปกติของหน้านี้) แล้วจะไม่มีใครถูกเสิร์ฟเลย หรือถูกเสิร์ฟทั้งคู่
+    // ⚠️ คะแนนต้องอยู่ **หน้าสุด** ของ tuple ไม่งั้น tier ไม่มีผลกับลำดับจริง
+    expect(earliestFirst).toMatch(
+      /\(coalesce\(e\.match_rank, \d+\), e\.created_at, e\.id\) < \(coalesce\(c\.match_rank, \d+\), c\.created_at, c\.id\)/,
+    );
+  });
+
+  it('⚠️ match_rank ต้องผ่าน coalesce ทุกจุด — NULL ใน row comparison ทำตัวกันหลุด', () => {
+    // match_rank เป็น null ได้ (คิวเก่า · งาน Follow) · row comparison ที่มี NULL
+    // ให้ผลเป็น NULL ไม่ใช่ true → แถวคู่แข่งไม่ถูกตัด แล้วคนเดียวโดนหลายสายพร้อมกัน
+    const bare = TAKE_PENDING_SQL.match(/(?<!coalesce\()\b[cef]\.match_rank/g) ?? [];
+    expect(bare).toEqual([]);
+    expect(TAKE_PENDING_SQL).toMatch(/coalesce\(c\.match_rank, \d+\) asc, c\.created_at asc/);
+  });
+
+  it('ฐานที่ยังไม่รัน 084 ต้องได้พฤติกรรมเดิมเป๊ะ (ไม่อ้าง match_rank เลย)', () => {
+    // คิวหยุดเดินแย่กว่าเรียงผิด — takePendingLumosItems ถอยมาใช้ตัวนี้เมื่อเจอ 42703
+    expect(TAKE_PENDING_SQL_NO_RANK).not.toMatch(/match_rank/);
+    expect(TAKE_PENDING_SQL_NO_RANK.match(/not exists/gi)?.length).toBe(3);
+    // ค่าคงที่เท่ากันสองฝั่ง = เงื่อนไขยุบเหลือการเทียบ (created_at, id) แบบเดิม
+    expect(TAKE_PENDING_SQL_NO_RANK).toMatch(
+      /\(\d+, e\.created_at, e\.id\) < \(\d+, c\.created_at, c\.id\)/,
+    );
+  });
+
+  it('ชั้นที่ 2 ต้องนับเฉพาะแถวที่ "ถึงคิว" ด้วยเกณฑ์เดียวกับแถวที่กำลังพิจารณา', () => {
+    // ถ้านับแถวที่ยังไม่ถึงเวลานัด/ครบเพดานส่งแล้วด้วย แถวเหล่านั้นจะบังใบอื่นค้างถาวร
+    for (const cond of [
+      /e\.result is null/,
+      /e\.delivery_count < \d+/,
+      /e\.next_attempt_at is null or e\.next_attempt_at <= now\(\)/,
+      /e\.status = 'pending'/,
+    ]) {
+      expect(earliestFirst).toMatch(cond);
+    }
+  });
+
+  it('ทุกชั้นต้องเทียบเบอร์ ไม่ใช่เทียบ person_ref', () => {
+    // คนเดียวมีหลายรหัส (card-<id> ของบอร์ด · ir-<id> ของ iRecruit) แต่เบอร์ที่ดังมีเบอร์เดียว
+    // เทียบด้วย ref จะกันไม่อยู่จริง — กติกาเดียวกับล็อก "รับไปโทรเอง"
+    for (const block of [inFlight, earliestFirst, confirmedFocus]) {
+      expect(block).toMatch(/payload->>'recipient_phone'/);
+      expect(block).toMatch(/payload->>'phone'/);
+      expect(block).not.toMatch(/person_ref/);
+    }
+  });
+
+  it('ทุกชั้นต้องข้ามช่อง — ห้ามกรอง channel ในตัวกัน', () => {
+    // คนเดียวอยู่ได้ทั้งคิว reminder และ interview · กันเฉพาะช่องตัวเอง
+    // = โดนโทรสองสายพร้อมกันจากคนละช่อง ซึ่งเป็นอาการเดิมเป๊ะ
+    for (const block of [inFlight, earliestFirst, confirmedFocus]) {
+      expect(block).not.toMatch(/channel/);
+    }
+    // แต่ตัวเลือกหลักยังต้องกรองช่องของตัวเอง (endpoint แยกกันคนละช่อง)
+    expect(TAKE_PENDING_SQL).toMatch(/c\.channel = \$1/);
+  });
+
+  it('สองชั้นแรกต้องไม่บังตัวเอง', () => {
+    expect(inFlight).toMatch(/f\.id <> c\.id/);
+    expect(earliestFirst).toMatch(/e\.id <> c\.id/);
+  });
+});
+
+/**
+ * "รู้แล้วว่าสนใจใบ A → บังใบอื่นจนกว่าใบ A จะจบ" (เจ้าของเคาะไว้)
+ *
+ * ข้อมูลจริง 11 ส.ค. 2569: คนที่ตอบว่าสนใจไว้ 2 คน มีใบขออื่นค้างในคิว
+ * **73 และ 84 ใบ** ต่อคน — ไม่บังก็คือโทรไล่เสนอใบอื่นทั้ง 84 ใบทั้งที่ดีลใบแรกยังไม่จบ
+ */
+describe('สนใจใบไหนแล้ว บังใบอื่นของคนคนนั้น', () => {
+  it('บังเฉพาะ "ใบอื่น" — ใบที่เขาสนใจต้องเดินต่อได้', () => {
+    expect(confirmedFocus).toMatch(/k\.job_ref <> c\.job_ref/);
+  });
+
+  it('อ่านผลด้วย coalesce(last_outcome, result->>\'outcome\')', () => {
+    // ผลที่ "คน" บันทึกเขียนแค่ last_outcome · แถวก่อน migration 070 มีแต่ result
+    // อ่านทางเดียวจะนับหายเงียบ ๆ แล้วบังไม่ติด (กับดักเดิมของ funnel และแถบต่อใบขอ)
+    expect(confirmedFocus).toMatch(/coalesce\(k\.last_outcome, k\.result->>'outcome'\) = 'confirmed'/);
+  });
+
+  it('ต้องมีเพดานเวลาเสมอ — ไม่งั้นดีลที่เงียบหายทำให้คนหายจากระบบถาวร', () => {
+    // ระบบไม่มีสัญญาณ "ใบ A จบแล้ว" ที่เชื่อถือได้ (การจองอยู่คนละตาราง
+    // และใบที่เงียบหายก็ไม่มีใครมาปิด) — บังแบบไม่มีเพดานคือลบคนออกจากระบบเงียบ ๆ
+    expect(confirmedFocus).toMatch(/k\.updated_at >= now\(\) - interval '\d+ days'/);
+    expect(confirmedFocus).toContain(`interval '${CONFIRMED_FOCUS_DAYS} days'`);
+  });
+
+  it('เพดานต้องอยู่ในช่วงที่สมเหตุสมผล — ยาวไปคนหาย สั้นไปบังไม่ทันดีล', () => {
+    expect(CONFIRMED_FOCUS_DAYS).toBeGreaterThanOrEqual(1);
+    expect(CONFIRMED_FOCUS_DAYS).toBeLessThanOrEqual(30);
+  });
+
+  it('ยังต้อง claim แบบ skip locked — สอง request พร้อมกันห้ามได้แถวเดียวกัน', () => {
+    expect(TAKE_PENDING_SQL).toMatch(/for update skip locked/);
+  });
+});
+
+describe('เบอร์ใน payload — ต้องอ่านได้ทั้งสองช่อง', () => {
+  const JOB = { unit_name: 'หน่วยงาน ก', job_description_code_1: 'ขับรถ' };
+  const RESULT = { jobId: 'siamraj-sql:J1', request_no: 'J1', job_family_label: 'งานขับรถ' };
+
+  it('reminder ใช้คีย์ recipient_phone · interview ใช้คีย์ phone', () => {
+    // ⚠️ นี่คือต้นเหตุของบั๊กที่แก้ไปพร้อมกัน: payloadPhone() เดิมอ่านแค่ recipient_phone
+    // ฝั่ง interview จึงได้ null ทุกแถว → ล็อก "รับไปโทรเอง" กับการพักเบอร์ไม่เคยมีผลกับ iRecruit
+    const rem = buildReminderPayload(JOB, RESULT, { card_id: 1, full_name: 'ก', mobile: '0812345678' });
+    const itv = buildInterviewPayload(JOB, RESULT, {
+      id: 2,
+      full_name: 'ข',
+      phone_number: '0812345678',
+      job_name_th: null,
+      position_name: null,
+    });
+    expect(rem!.recipient_phone).toBe('+66812345678');
+    expect(itv!.phone).toBe('+66812345678');
+    expect(itv as unknown as Record<string, unknown>).not.toHaveProperty('recipient_phone');
+
+    // SQL ต้องอ่านครบทั้งสองคีย์ ไม่งั้นเทียบเบอร์ข้ามช่องไม่เจอกัน
+    for (const key of Object.keys({ recipient_phone: 1, phone: 1 })) {
+      expect(TAKE_PENDING_SQL).toContain(`payload->>'${key}'`);
+    }
+  });
+});
+
+/**
+ * ฝั่ง JS ของบั๊กเดียวกัน — `insertQueueItems()` คือคอขวดเดียวของการเข้าคิวทุกเส้น
+ * ถ้ามันอ่านเบอร์ของ payload ฝั่ง iRecruit ไม่ออก ตัวกรองทั้งสองอย่าง (ล็อก + พักเบอร์)
+ * จะถูก **ข้ามไปเงียบ ๆ** เพราะโค้ดเช็คเฉพาะเมื่อมีเบอร์
+ */
+describe('ล็อก "รับไปโทรเอง" + พักเบอร์ ต้องมีผลกับช่อง interview ด้วย', () => {
+  const JOB = { unit_name: 'หน่วยงาน ก', job_description_code_1: 'ขับรถ' };
+  const RESULT = { jobId: 'siamraj-sql:J1', request_no: 'J1', job_family_label: 'งานขับรถ' };
+  const PERSON = {
+    id: 7,
+    full_name: 'สมชาย',
+    phone_number: '0812345678',
+    job_name_th: null,
+    position_name: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(dbQuery).mockClear();
+    vi.mocked(listHeldPhones).mockResolvedValue(new Set());
+    vi.mocked(listSuppressedPhones).mockResolvedValue(new Set());
+  });
+
+  const insertCalls = () =>
+    vi.mocked(dbQuery).mock.calls.filter((c) => /insert into\s+lumos_dispatch_queue/i.test(String(c[0])));
+
+  it('เบอร์ที่เจ้าหน้าที่ถือไว้ → ไม่เข้าคิว และรายงานว่าถูกถือ', async () => {
+    vi.mocked(listHeldPhones).mockResolvedValue(new Set(['+66812345678']));
+    const out = await enqueueLumosInterviewForSelected(JOB, RESULT, [PERSON]);
+    expect(insertCalls()).toHaveLength(0);
+    expect(out.queued).toBe(0);
+    expect(out.skipped[0].reason).toContain('รับไปโทรเอง');
+  });
+
+  it('เบอร์ที่ถูกพัก (ไม่หางานแล้ว) → ไม่เข้าคิว และรายงานว่าถูกพัก', async () => {
+    vi.mocked(listSuppressedPhones).mockResolvedValue(new Set(['+66812345678']));
+    const out = await enqueueLumosInterviewForSelected(JOB, RESULT, [PERSON]);
+    expect(insertCalls()).toHaveLength(0);
+    expect(out.queued).toBe(0);
+    expect(out.skipped[0].reason).toContain('พัก');
+  });
+
+  it('อ่านรายการพักเบอร์ไม่ได้ → ไม่ส่ง (เผลอโทรคนที่เลิกหางานแล้วเสียหายกว่า)', async () => {
+    vi.mocked(listSuppressedPhones).mockRejectedValue(new Error('db down'));
+    const out = await enqueueLumosInterviewForSelected(JOB, RESULT, [PERSON]);
+    expect(insertCalls()).toHaveLength(0);
+    expect(out.queued).toBe(0);
+  });
+
+  it('ไม่ติดอะไรเลย → เข้าคิวตามปกติ', async () => {
+    const out = await enqueueLumosInterviewForSelected(JOB, RESULT, [PERSON]);
+    expect(insertCalls()).toHaveLength(1);
+    expect(out.queued).toBe(1);
+  });
+});
+
+/**
+ * แถวที่ถูกยกเลิก (`status='cancelled'`) ต้องส่งซ้ำได้ — unique เต็มตารางทำให้ `do nothing`
+ * เดิมเงียบ ๆ ได้ 0 แถว (เจอตอนล้างคิว 4,849 แถวก่อนเปิดใช้ 18 ส.ค.)
+ */
+describe('ชุบชีวิตแถวที่ยกเลิก (on conflict do update)', () => {
+  beforeEach(() => {
+    vi.mocked(dbQuery).mockClear();
+    vi.mocked(listHeldPhones).mockResolvedValue(new Set());
+    vi.mocked(listSuppressedPhones).mockResolvedValue(new Set());
+  });
+
+  const insertSql = () => {
+    const call = vi
+      .mocked(dbQuery)
+      .mock.calls.find((c) => /insert into\s+lumos_dispatch_queue/i.test(String(c[0])));
+    return String(call?.[0] ?? '');
+  };
+
+  it('insert ต้อง revive เฉพาะแถวที่ยกเลิก ไม่ใช่ do nothing', async () => {
+    await enqueueLumosInterviewForSelected(
+      { unit_name: 'ก' },
+      { jobId: 'siamraj-sql:J1', request_no: 'J1', job_family_label: 'x' },
+      [{ id: 7, full_name: 'ก', phone_number: '0812345678', job_name_th: null, position_name: null }],
+    );
+    const sql = insertSql();
+    expect(sql).toMatch(/on conflict \(channel, job_ref, person_ref\) do update/i);
+    // ⚠️ ต้องบังคับเฉพาะแถวยกเลิก — ไม่งั้น revive แถว active ที่มีผลกลับไปแล้ว
+    expect(sql).toMatch(/where\s+lumos_dispatch_queue\.status = 'cancelled'/i);
+    // ⚠️ ต้อง reset result + delivery_count ไม่งั้น takePending ไม่หยิบแถวที่ revive
+    expect(sql).toMatch(/result = null/i);
+    expect(sql).toMatch(/delivery_count = 0/i);
+    expect(sql).toMatch(/status = 'pending'/i);
+    // ต้องไม่เหลือ do nothing (บั๊กเดิม)
+    expect(sql).not.toMatch(/do nothing/i);
+  });
+
+  it('เส้น fallback (ยังไม่รัน 084) ก็ต้อง revive เหมือนกัน — ไม่ปล่อยให้เงียบ', async () => {
+    // insert แรกโยน 42703 (ไม่มี match_rank) → ถอยไปคิวรีที่สอง
+    const undefinedColumn = Object.assign(new Error('no column'), { code: '42703' });
+    let insertCount = 0;
+    vi.mocked(dbQuery).mockImplementation(async (sql: string) => {
+      if (/insert into\s+lumos_dispatch_queue/i.test(sql)) {
+        insertCount += 1;
+        if (insertCount === 1 && /match_rank/i.test(sql)) throw undefinedColumn;
+        return { rows: [{ id: 1 }] };
+      }
+      return { rows: [] };
+    });
+    await enqueueLumosInterviewForSelected(
+      { unit_name: 'ก' },
+      { jobId: 'siamraj-sql:J1', request_no: 'J1', job_family_label: 'x' },
+      [{ id: 7, full_name: 'ก', phone_number: '0812345678', job_name_th: null, position_name: null }],
+    );
+    const fallback = vi
+      .mocked(dbQuery)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((s) => /insert into\s+lumos_dispatch_queue/i.test(s))
+      .find((s) => !/match_rank/i.test(s));
+    expect(fallback).toBeTruthy();
+    expect(fallback).toMatch(/do update/i);
+    expect(fallback).toMatch(/where\s+lumos_dispatch_queue\.status = 'cancelled'/i);
+    expect(fallback).not.toMatch(/do nothing/i);
+  });
+});

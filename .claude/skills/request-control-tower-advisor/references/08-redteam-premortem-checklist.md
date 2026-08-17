@@ -1,26 +1,26 @@
-# Redteam and Pre-mortem Checklist
+# เช็กลิสต์ก่อนปล่อยของ (Redteam / Pre-mortem)
 
-Before shipping, check:
+## ตรวจให้ครบ 13 ข้อก่อนปล่อย
 
-1. Are หาได้แล้ว and ปิดครบใบขอ clearly separated?
-2. Are cancelled positions excluded from fulfilled positions?
-3. Does monthly หาได้แล้ว use event dates?
-4. If event dates are missing, is snapshot_fallback shown?
-5. Does backlog equation reconcile?
-6. Can every KPI drill down to real requests?
-7. Does SLA use correct start date by request kind?
-8. Does lifecycle mapping preserve raw request action name?
-9. Is the old dashboard still available behind feature flag?
-10. Are unit tests included for core cases?
-11. Does UI avoid overcrowding?
-12. Does the first screen show what needs action today?
-13. Can the dashboard be rolled back instantly?
+1. แยก **หาได้แล้ว** กับ **ปิดครบใบขอ** ออกจากกันชัดเจนหรือยัง
+2. อัตราที่ **ยกเลิก** ถูกกันออกจากอัตราที่ **หาได้แล้ว** หรือยัง
+3. ยอด "หาได้แล้ว" รายเดือน ใช้วันที่ของเหตุการณ์จริงหรือเปล่า
+4. ถ้าไม่มีวันที่ของเหตุการณ์ ได้ขึ้นธง `snapshot_fallback` ไหม
+5. สมการงานค้างกระทบยอดตรงไหม
+6. ทุก KPI กดลงไปดูใบขอจริงได้ไหม
+7. SLA ใช้วันเริ่มนับถูกตามประเภทความเร่งไหม
+8. การจับคู่วงจรชีวิตใบขอ ยังเก็บชื่อประเภทใบขอดิบไว้ไหม
+9. แดชบอร์ดเดิมยังเปิดใช้ได้ผ่าน feature flag ไหม
+10. มี unit test ครอบเคสหลักไหม
+11. หน้าจอแน่นเกินไปหรือเปล่า
+12. หน้าจอแรกบอกไหมว่าวันนี้ต้องลงมือทำอะไร
+13. ถอยกลับ (rollback) ได้ทันทีไหม
 
-Failure scenarios:
+## ฉากที่จะพัง — ระวังให้ดี
 
-* Dashboard numbers do not match old Excel/report.
-* Users confuse หาได้แล้ว with ปิดครบใบขอ.
-* Snapshot inform_qty is treated as exact monthly fulfillment.
-* Cancellation is counted as successful fulfillment.
-* UI is too busy and users stop using it.
-* Cursor rewrites existing dashboard and breaks production.
+* ตัวเลขบนแดชบอร์ดไม่ตรงกับ Excel/รายงานเดิม
+* ผู้ใช้สับสนระหว่าง "หาได้แล้ว" กับ "ปิดครบใบขอ"
+* เอา snapshot `inform_qty` มาใช้เป็นยอดหาได้รายเดือนแบบแม่นยำ
+* นับ "ยกเลิก" เป็นความสำเร็จ
+* หน้าจอรกจนคนเลิกใช้
+* ผู้ช่วยเขียนโค้ดไปเขียนทับแดชบอร์ดเดิมจน production พัง

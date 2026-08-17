@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
+import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import SearchField from '@/components/shared/SearchField';
@@ -21,7 +22,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   UNIT_REQUEST_WORK_STATUS_OPTIONS,
 } from '@/lib/unitRequestWorkStatus';
-import { formatYmdDmyBe } from '@/lib/dateTh';
+import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import { DASH } from '@/lib/designTokens';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
@@ -71,7 +72,9 @@ import { saveJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState'
 function formatSubmittedDate(job: JobRequest): string {
   const d = getJobRequestSubmittedDate(job);
   if (!d) return '—';
-  return formatYmdDmyBe(d.toISOString().slice(0, 10));
+  // ตัดวันตามปฏิทินกรุงเทพ (เหมือน jobUrgency.submittedDateYmd) — toISOString (UTC) เลื่อน
+  // ย้อน 1 วันทุกแถว ไม่ตรงกับหน้ารายละเอียดที่ใช้ formatYmdDmyBe(job.request_date) ตรง ๆ
+  return formatYmdDmyBe(toYmdBangkok(d));
 }
 
 function ageDaysLabel(job: JobRequest): string {
@@ -376,8 +379,9 @@ const JobListPage: React.FC = () => {
         backPath="/"
         actions={
           // ช่องค้นหาอยู่คู่ปุ่มรีเฟรชบนหัวหน้า — ของที่ใช้บ่อยสุดอยู่ใกล้มือ ไม่ต้องเลื่อนหาในกล่องตัวกรอง
-          <div className="flex items-center gap-2">
-            <div className="w-[200px] sm:w-[280px]">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* จอเล็กหดได้ ไม่ล็อกความกว้างตายตัว (จอ 320px เคยล้นออกไป) · จอใหญ่เท่าเดิม */}
+            <div className="w-full min-w-0 max-w-[200px] sm:max-w-[280px]">
               <label htmlFor="job-list-search" className="sr-only">
                 ค้นหา
               </label>
@@ -402,6 +406,10 @@ const JobListPage: React.FC = () => {
           </div>
         }
       />
+
+      <div className="px-4 md:px-6">
+        <UnitSectionTabs active="units" />
+      </div>
 
       <div className="px-4 md:px-6 space-y-4">
         {loadError && (
@@ -810,9 +818,10 @@ const JobListPage: React.FC = () => {
                         {ageDaysLabel(j)}
                       </span>
                     </td>
-                    {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) ไม่ใช้ text-foreground
-                        เพราะ branding เขียน --foreground ทับ inline บน <html> ทำให้ค่านั้นไม่สลับตามธีม
-                        แล้วจะได้ตัวหนังสือเข้มบนการ์ดเข้มในโหมดมืด */}
+                    {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) เพื่อคุมคอนทราสต์
+                        ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline
+                        บน <html> จนไม่สลับตามธีมนั้น แก้แล้วที่ brandingStorage.applyBrandSurfaceVars()
+                        และมีเทสต์คุมที่ tests/api/brandingSurfaceTheme.test.ts */}
                     <td className={cn('px-3 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
                     <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
                     <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>

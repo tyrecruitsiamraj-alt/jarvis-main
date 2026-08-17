@@ -14,6 +14,7 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useSiamrajUnitRequestFilters } from '@/hooks/useSiamrajUnitRequestFilters';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { cn } from '@/lib/utils';
+import { DASH, TONE } from '@/lib/designTokens';
 import { loadJobDashboardFilters, saveJobDashboardFilters } from '@/lib/jobDashboardPageState';
 import { jobListReturnTo } from '@/lib/jobListPageState';
 import { loadJobListLastUrl, saveUnitLastPath } from '@/lib/jobUnitSessionState';
@@ -206,8 +207,8 @@ const JobDashboard: React.FC = () => {
             onClick={() => navigate(loadJobListLastUrl() || '/jobs/list')}
             className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-blue-300/50 text-center"
           >
-            <Briefcase className="w-6 h-6 text-blue-600 mx-auto mb-1" />
-            <div className="text-sm font-semibold text-foreground">รายการงานทั้งหมด</div>
+            <Briefcase className={cn('w-6 h-6 mx-auto mb-1', TONE.primary.value)} />
+            <div className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>รายการงานทั้งหมด</div>
           </button>
         </div>
 
@@ -229,14 +230,13 @@ const JobDashboard: React.FC = () => {
                   className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-foreground text-sm">
+                    <span className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
                       {j.request_no ? `${j.unit_name} · ${j.request_no}` : j.unit_name}
                     </span>
                     <div className="flex items-center gap-2">
+                      {/* ชื่อ action ของใบขอ = "กำลังดำเนินการ" → primary ตาม token กลาง */}
                       {j.request_action_name ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/12 text-blue-700">
-                          {j.request_action_name}
-                        </span>
+                        <span className={TONE.primary.chip}>{j.request_action_name}</span>
                       ) : (
                         <JobUrgencyBadge job={j} className="px-2 py-0.5 rounded-full bg-secondary" compact />
                       )}

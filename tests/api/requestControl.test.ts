@@ -88,3 +88,63 @@ describe('requestControl', () => {
     expect(resolveRequestControlStatus(positionBreakdownFromJob(cancelled))).toBe('cancelled_full');
   });
 });
+
+/**
+ * ทางหนีทีไล่ตอนไม่มีตัวเลข staffing จาก ERP — ต้องติดธง `isDerived` เสมอ
+ *
+ * วัดกับข้อมูลจริงแล้วว่าใบขอจาก ERP ไม่ตกมาทางนี้เลย (325 + 2,734 ใบ ใช้เลขจริง 100%)
+ * แต่จะทำงานทันทีเมื่อ feed Siamraj ถูกปิด แล้วระบบถอยไปใช้ใบขอฝั่ง PostgreSQL
+ * ซึ่งไม่มีฟิลด์ staffing — ตอนนั้น "ปิดใบขอ" จะกลายเป็น "หาได้ครบ" เงียบ ๆ ถ้าไม่มีธง
+ */
+describe('requestControl — ทางที่เดาจาก status ต้องติดธงว่าเป็นเลขเดา', () => {
+  it('เลขจาก ERP ต้องไม่ติดธง (ไม่งั้นเลขจริงจะถูกนับเป็นเลขเดา)', () => {
+    const fromErp = job({
+      unit_name: 'U',
+      status: 'closed',
+      request_positions: 5,
+      filled_positions: 5,
+      cancelled_positions: 0,
+    });
+    expect(positionBreakdownFromJob(fromErp).isDerived).toBeUndefined();
+  });
+
+  it('ไม่มีเลข staffing + ปิดใบขอ = เดาว่าหาได้ครบ จึงต้องติดธง', () => {
+    const closedNoErp = job({ unit_name: 'U', status: 'closed', position_units: 4 });
+    const b = positionBreakdownFromJob(closedNoErp);
+    // ตัวเลขต้องเท่าเดิม (คอมมิตนี้ตั้งใจไม่เปลี่ยนพฤติกรรม) แต่ต้องบอกได้ว่าเป็นเลขเดา
+    expect(b).toEqual({
+      requestPositions: 4,
+      filledPositions: 4,
+      cancelledPositions: 0,
+      remainingPositions: 0,
+      isDerived: true,
+    });
+    // นี่คือจุดที่ขัดกติกา "ห้ามเอาปิดครบใบขอมาเป็นหาได้แล้ว" ถ้าธงหาย
+    expect(b.isDerived).toBe(true);
+  });
+
+  it('ไม่มีเลข staffing + ยกเลิก = เดาว่ายกเลิกทั้งใบ จึงต้องติดธง', () => {
+    const b = positionBreakdownFromJob(job({ unit_name: 'U', status: 'cancelled', position_units: 3 }));
+    expect(b).toEqual({
+      requestPositions: 3,
+      filledPositions: 0,
+      cancelledPositions: 3,
+      remainingPositions: 0,
+      isDerived: true,
+    });
+  });
+
+  it('ไม่มีเลข staffing + ยังเปิดอยู่ = ต้องไม่เดาว่าหาได้ และติดธง', () => {
+    const b = positionBreakdownFromJob(job({ unit_name: 'U', status: 'open', position_units: 2 }));
+    expect(b.filledPositions).toBe(0);
+    expect(b.remainingPositions).toBe(2);
+    expect(b.isDerived).toBe(true);
+  });
+
+  it('มี request_positions แต่ไม่มีทั้ง filled และ cancelled = ยังถือว่าเลขไม่ครบ ต้องติดธง', () => {
+    const b = positionBreakdownFromJob(
+      job({ unit_name: 'U', status: 'open', request_positions: 9, position_units: 9 }),
+    );
+    expect(b.isDerived).toBe(true);
+  });
+});

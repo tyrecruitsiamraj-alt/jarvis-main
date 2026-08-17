@@ -114,7 +114,9 @@ function sortByPriority(
  * cards get their AI results first.
  */
 export function enqueuePrecomputeJobs(
-  jobs: Array<Record<string, unknown> & { id: string }>,
+  // รับแค่ { id } — interface อย่าง JobRequest ไม่มี index signature จึง assign เข้า
+  // Record<string, unknown> ตรง ๆ ไม่ได้ · ฟิลด์อื่นถูกอ่านแบบ dynamic ผ่าน PrecomputeJob อยู่แล้ว
+  jobs: Array<{ id: string }>,
   opts: { refresh?: boolean; front?: boolean } = {},
 ): void {
   if (!workerStarted) return;
@@ -198,8 +200,13 @@ type WorkerConfig = {
   startupDelayMs: number;
 };
 
-function parseIntEnv(raw: string | undefined, def: number, min: number): number {
-  const n = Number(String(raw ?? '').trim());
+export function parseIntEnv(raw: string | undefined, def: number, min: number): number {
+  const s = String(raw ?? '').trim();
+  // ⚠️ ว่าง = ไม่ได้ตั้ง → ใช้ default — ห้ามปล่อยไป Number('') ซึ่งได้ 0 (finite!)
+  // บั๊กเดิม: env ที่ไม่ได้ตั้งทุกตัวตกไปที่ค่า min แทน default → scan ได้แค่ 1 ใบ/แผนก
+  // ทุก 10 วิ แทน 2,000 ใบทุก 5 นาที (เจอตอนเปิด precompute ครั้งแรก 12 ส.ค. 2569)
+  if (!s) return def;
+  const n = Number(s);
   if (!Number.isFinite(n)) return def;
   return Math.max(min, Math.floor(n));
 }
@@ -373,6 +380,11 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
         // matchBoardCandidatesForJob succeeded but DB write was silently dropped
         logWarn('match-precompute.job.not-stored', { jobId: id, queueRemaining: queue.size });
       }
+
+      // เลนคัดสรรวิ่งขนาน (16 ส.ค. 2569) — ใบขอเข้ามาแล้วไปหาคนจากกอง "เคยตอบไม่สนใจ"
+      // ให้เองด้วย แล้วส่ง AI โทรทันที · ปิดไว้เป็นค่าเริ่มต้น (trigger selection_recall)
+      // ⚠️ กลืน error เสมอ — เส้นนี้เป็นของแถม ห้ามทำให้ precompute ของบอร์ดล้ม
+      await runSelectionRecall(id, entry.job);
     } catch (e) {
       workerStats.totalProcessed++;
       workerStats.totalFailed++;
@@ -388,6 +400,33 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
   }
 
   logInfo('match-precompute.consumer.stop', workerStats);
+}
+
+/**
+ * เส้น "ชวนกลับ" ของเลนคัดสรร — เรียกหลังคิดผลบอร์ดของใบขอนั้นเสร็จ
+ * import แบบ dynamic เพื่อไม่ให้ worker ลาก matcher + ollama เข้ามาตอน boot
+ */
+async function runSelectionRecall(jobId: string, job: Record<string, unknown>): Promise<void> {
+  try {
+    const { isAutoDispatchEnabled } = await import('./lumosDispatchMode.js');
+    if (!(await isAutoDispatchEnabled('selection_recall'))) return;
+    const { matchDeclinedApplicantsForJob } = await import('./selectionRecallMatcher.js');
+    const { enqueueLumosInterviewForRecall } = await import('./lumosDispatch.js');
+    const result = await matchDeclinedApplicantsForJob(jobId, job);
+    if (result.matches.length === 0) return;
+    const outcome = await enqueueLumosInterviewForRecall(job, result);
+    logInfo('match-precompute.recall.done', {
+      jobId,
+      matched: result.matches.length,
+      queued: outcome.queued,
+      cooldownSkipped: outcome.cooldownSkipped,
+    });
+  } catch (e) {
+    logError('match-precompute.recall.fail', {
+      jobId,
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
 }
 
 // ─── Module-level stats (readable via getWorkerStatus) ───────────────────────

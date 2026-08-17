@@ -6,20 +6,33 @@ import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } fr
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
+import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
+import SearchField from '@/components/shared/SearchField';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
+import EditPostingDialog from '@/components/jobs/EditPostingDialog';
+/**
+ * เลนสรรหา — lazy ตั้งใจ: ไฟล์นี้ใช้ร่วมกับหน้าสมัครสาธารณะ /apply
+ * กล่องผลค้น (+ ตัวเรียก API หลังบ้าน) ต้องไม่ถูกลากเข้า bundle ฝั่ง public
+ */
+const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
+import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
-import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
+import {
+  applicantOriginSummary,
+  fetchJobApplicantBreakdown,
+  type ApplicationOrigin,
+} from '@/lib/publicApplicationsApi';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
-import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
+import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import {
@@ -30,7 +43,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2 } from 'lucide-react';
+import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -41,6 +54,9 @@ function staffAssigneeLine(j: JobRequest): string | null {
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
+
+/** BU ตั้งต้นของกล่องลอยที่ยังไม่มีประกาศ — ผู้ใช้แก้ได้ในฟอร์ม (ชุดเดียวกับ RecruitBoardTools) */
+const BOARD_DEFAULT_BU = 'LBD';
 
 /** สีกล่องลอยต่อประเภท (mockup rev.3 ข้อ 04) — ม่วง/ม่วง/ฟ้า/ส้ม/เขียว ตามลำดับใน STANDALONE_POSTING_KINDS */
 const STANDALONE_KIND_TONE: Record<string, ToneKey> = {
@@ -60,7 +76,21 @@ export type JobBoardViewProps = {
   onRefresh?: () => void;
   refreshing?: boolean;
   detailReturnTo?: string;
+  /**
+   * มุมมองของบอร์ดฝั่งเจ้าหน้าที่ (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด
+   * · 13 ส.ค. 2569: ยก "การติดต่อ"/"ติดตามนัดหมาย" ขึ้นเป็นแท็บระดับบอร์ด)
+   * 'board' = กล่องงาน · ที่เหลือ = เนื้อ RM คนละแท็บ (ส่งมาทาง listContent —
+   * StaffJobBoardPage เป็นคนเลือกแท็บให้ RmWorkspace ตาม view)
+   * ⚠️ ตัวเนื้อ list ถูก import ที่ StaffJobBoardPage ไม่ใช่ที่นี่ — ไฟล์นี้ใช้ร่วมกับ
+   * หน้าสมัครสาธารณะ ห้ามลากโค้ด RM เข้ามาใน bundle
+   */
+  view?: BoardViewId;
+  onViewChange?: (view: BoardViewId) => void;
+  listContent?: React.ReactNode;
 };
+
+/** แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace */
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'postings' | 'closed';
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -71,6 +101,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onRefresh,
   refreshing,
   detailReturnTo = '/jobs/board',
+  view = 'board',
+  onViewChange,
+  listContent,
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -86,13 +119,45 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   });
   const isStaff = variant === 'staff';
 
+  /**
+   * ตัวกรอง "ประเภทงาน" + "เจ้าหน้าที่สรรหา" (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569)
+   * ⚠️ **ส่งเฉพาะฝั่งเจ้าหน้าที่** — ชื่อเจ้าหน้าที่สรรหาเป็นข้อมูลภายใน
+   * ห้ามหลุดออกหน้าสมัครสาธารณะ ซึ่งใช้ component ตัวเดียวกันนี้
+   */
+  const staffOnlyFilterProps = isStaff
+    ? {
+        recruiterFilter: filters.recruiterFilter,
+        onRecruiterFilterChange: filters.setRecruiterFilter,
+        recruiterOptions: filters.recruiterOptions,
+        contractTypeFilter: filters.contractTypeFilter,
+        onContractTypeFilterChange: filters.setContractTypeFilter,
+        contractTypeOptions: filters.contractTypeOptions,
+      }
+    : {};
+
+  // จำนวนผู้สมัครต่อใบ (เจ้าหน้าที่) — ประกาศตรงนี้เพราะการเรียงการ์ดข้างล่างต้องใช้
+  const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
+  /** แยกยอดตามที่มาต่อใบขอ — "AI หามากี่คน สมัครใหม่กี่คน" (เจ้าของสั่ง 16 ส.ค. 2569) */
+  const [originCounts, setOriginCounts] = useState<
+    Record<string, Partial<Record<ApplicationOrigin, number>>>
+  >({});
+  /** ยอด Lead แยกต่างหาก — ใบที่ปัดเข้าคลังไม่ถูกนับใน applicantCounts (17 ส.ค. 2569) */
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
+
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
   const totalPages = getTotalPages(filters.filtered.length, pageSize);
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleJobs = filters.filtered.slice(pageStart, pageStart + pageSize);
+  // ใบที่มีคนกรอกใบสมัครเข้ามาแล้วขึ้นก่อน (เจ้าของสั่ง 13 ส.ค. 2569:
+  // "เรียงใบที่มีคนกรอกเข้ามาไว้บนๆ") — sort เป็น stable ลำดับเดิมในแต่ละกลุ่มไม่เปลี่ยน
+  // ฝั่งสาธารณะไม่มี applicantCounts (โหลดเฉพาะเจ้าหน้าที่) = ไม่เรียงใหม่ พฤติกรรมเดิม
+  const orderedJobs = useMemo(() => {
+    const rank = (id: string) => ((applicantCounts[id] ?? 0) > 0 ? 0 : 1);
+    return [...filters.filtered].sort((a, b) => rank(a.id) - rank(b.id));
+  }, [filters.filtered, applicantCounts]);
+  const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
   // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
   useEffect(() => {
@@ -107,11 +172,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     setApplyOpen(true);
   };
 
-  // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น + จำนวนผู้สมัครต่อใบ
+  // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น
+  // (state จำนวนผู้สมัครต่อใบย้ายไปประกาศไว้ข้างบน — การเรียงการ์ดต้องใช้ก่อนถึงตรงนี้)
   const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
-  const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
+  /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
+  const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
+  /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
+  const [genStandalone, setGenStandalone] = useState<
+    { kind: string; kindLabel: string; departmentCode: string } | null
+  >(null);
+  // เจ้าหน้าที่: แก้เนื้อหาประกาศที่สร้างไว้แล้ว (mockup rev.3 ข้อ 04)
+  const [editPosting, setEditPosting] = useState<RecruitPosting | null>(null);
   // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
@@ -121,6 +194,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ล้มเหลวก็ปล่อยเงียบเหมือน applicantCounts — เป็นข้อมูลเสริม ไม่ใช่ตัวหลักของหน้า
    */
   const [postings, setPostings] = useState<Awaited<ReturnType<typeof fetchRecruitPostings>>>([]);
+  /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
+  const [postingsRev, setPostingsRev] = useState(0);
 
   useEffect(() => {
     if (!isStaff) return;
@@ -135,18 +210,48 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isStaff]);
+  }, [isStaff, postingsRev]);
 
-  /** ประเภทกล่องลอย → จำนวนประกาศ/ผู้สมัคร (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น) */
+  /**
+   * ประเภทกล่องลอย → สรุปของจริงต่อประเภท (นับจากประกาศที่ไม่ผูกใบขอเท่านั้น)
+   * เก็บชื่อประกาศ/จังหวัด/BU มาด้วย เพราะการ์ดกล่องลอยใช้โครงเดียวกับการ์ดใบขอ
+   * ซึ่งมีบรรทัดคำบรรยายกับบรรทัดสถานที่ — **ทุกค่ามาจากประกาศจริง ไม่มีค่าตกแต่ง**
+   */
   const standaloneSummary = useMemo(() => {
-    const acc: Record<string, { postings: number; applicants: number }> = {};
-    for (const k of STANDALONE_POSTING_KINDS) acc[k.code] = { postings: 0, applicants: 0 };
+    const acc: Record<
+      string,
+      { postings: number; applicants: number; titles: string[]; provinces: string[]; bus: string[] }
+    > = {};
+    for (const k of STANDALONE_POSTING_KINDS) {
+      acc[k.code] = { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
+    }
     for (const p of postings) {
       if (!p.standaloneKind || !acc[p.standaloneKind]) continue;
-      acc[p.standaloneKind].postings += 1;
-      acc[p.standaloneKind].applicants += p.applicationCount ?? 0;
+      const a = acc[p.standaloneKind];
+      a.postings += 1;
+      a.applicants += p.applicationCount ?? 0;
+      const title = p.title?.trim();
+      if (title && !a.titles.includes(title)) a.titles.push(title);
+      const province = p.province?.trim();
+      if (province && !a.provinces.includes(province)) a.provinces.push(province);
+      const bu = p.departmentCode?.trim();
+      if (bu && !a.bus.includes(bu)) a.bus.push(bu);
     }
     return acc;
+  }, [postings]);
+
+  /**
+   * ใบขอ → ประกาศล่าสุดของใบนั้น — ใช้กับปุ่ม "แก้ไข" บนการ์ด (mockup rev.3 ข้อ 04)
+   * ใบเดียวมีได้หลายประกาศ เลือกใบล่าสุดเพราะเป็นตัวที่กำลังใช้รับสมัครอยู่
+   * (API เรียงมาแบบ created_at DESC แล้ว จึงเอาตัวแรกที่เจอ)
+   */
+  const latestPostingByJob = useMemo(() => {
+    const map = new Map<string, RecruitPosting>();
+    for (const p of postings) {
+      if (!p.jobId || map.has(p.jobId)) continue;
+      map.set(p.jobId, p);
+    }
+    return map;
   }, [postings]);
 
   /** ใบขอ → ช่องทางที่ปล่อยลิงก์ไว้ (รวมยอดคลิกของช่องทางเดียวกันเข้าด้วยกัน) */
@@ -168,9 +273,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   useEffect(() => {
     if (!isStaff) return;
     let cancelled = false;
-    fetchJobApplicationCounts()
-      .then((c) => {
-        if (!cancelled) setApplicantCounts(c);
+    fetchJobApplicantBreakdown()
+      .then((b) => {
+        if (cancelled) return;
+        setApplicantCounts(b.counts);
+        setOriginCounts(b.byOrigin);
+        setLeadCounts(b.leadCounts);
       })
       .catch(() => {
         /* badge is optional — ignore */
@@ -201,9 +309,28 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             meta={loading ? undefined : `· ${filters.visibleCount.toLocaleString('th-TH')} ตำแหน่ง`}
             actions={
               <>
-                {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย */}
-                <RecruitBoardTools variant="onDark" />
-                {onRefresh ? (
+                {/* ค้นหาอยู่ในแถบหัวเดียวกับชื่อหน้า+ปุ่ม แบบหน้า Dashboard
+                    (เจ้าของสั่ง 13 ส.ค. 2569: "ย้ายไปด้านบนแบบของหน้า Dashboard")
+                    — เดิมอยู่ใต้แผงตัวเลข 9 ช่อง ต้องกวาดตาลงไปหา
+                    ⚠️ เฉพาะมุมมอง "กล่องงาน" — แท็บอื่น (รายชื่อ/ติดต่อ/นัดหมาย) มีช่องค้นหา
+                    ของตัวเองใน RmWorkspace ถ้าโชว์ตัวนี้ด้วยจะมีสองช่องที่ค้นคนละเรื่อง */}
+                {view === 'board' ? (
+                  <SearchField
+                    compact
+                    placeholder={searchPlaceholder}
+                    value={filters.search}
+                    onChange={(e) => filters.setSearch(e.target.value)}
+                    wrapperClassName="w-full min-w-0 sm:w-72 lg:w-80"
+                  />
+                ) : null}
+                {/* งานระดับตั้งค่าของบอร์ด — จัดการช่องทาง + สร้างประกาศลอย + เหตุผล
+                    ⚠️ **เฉพาะมุมมอง "กล่องงาน"** (เจ้าของสั่ง 13 ส.ค. 2569:
+                    "นอกจากหน้ากล่องงาน หน้าอื่นไม่ต้องมี") — ทั้งสามปุ่มทำงานกับ
+                    ประกาศ/ช่องทางรับสมัคร ซึ่งเป็นเรื่องของฝั่งใบขอ ไม่ใช่ของรายชื่อคน */}
+                {view === 'board' ? <RecruitBoardTools variant="onDark" /> : null}
+                {/* ปุ่มรีเฟรชนี้โหลด feed **ใบขอ** ใหม่ — แท็บอื่นแสดงรายชื่อคนคนละชุด
+                    และมีปุ่มรีเฟรชของตัวเองใน RmWorkspace อยู่แล้ว */}
+                {onRefresh && view === 'board' ? (
                   <button
                     type="button"
                     onClick={() => void onRefresh()}
@@ -235,36 +362,79 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        {/* กล่องลอย (ไม่ผูกใบขอ) — โชว์เฉพาะเมื่อมีประกาศลอยจริง ไม่งั้นเป็นแถวศูนย์เปล่า ๆ */}
-        {isStaff && postings.some((p) => p.standaloneKind) ? (
-          <div className="mt-4">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
-              กล่องลอย (ไม่ผูกใบขอ)
-            </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-              {STANDALONE_POSTING_KINDS.map((k) => {
-                const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
-                const s = standaloneSummary[k.code] ?? { postings: 0, applicants: 0 };
-                return (
-                  <div
-                    key={k.code}
-                    className={cn('rounded-2xl px-3 py-2.5', tone.tile, s.postings === 0 && 'opacity-60')}
-                    title={`${k.label} · ประกาศ ${s.postings} ใบ · ผู้สมัคร ${s.applicants} คน`}
-                  >
-                    <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{k.label}</p>
-                    <p className={cn('mt-0.5 text-lg font-bold tabular-nums', tone.num)}>
-                      {s.applicants.toLocaleString('th-TH')}
-                      <span className="ml-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                        ผู้สมัคร · {s.postings.toLocaleString('th-TH')} ประกาศ
-                      </span>
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+        {/*
+          แผงคุม 9 ตัวเลขของงานสรรหา — ตัวเดียวกับที่อยู่หน้า /recruit/rm
+          ⚠️ เจ้าหน้าที่เท่านั้น — บอร์ดตัวนี้ใช้เป็นหน้าสาธารณะด้วย ยอดภายในห้ามหลุดออกไป
+          ⚠️ **เฉพาะมุมมอง "รายชื่อผู้สมัคร"** (เจ้าของสั่ง 13 ส.ค. 2569:
+          "ภาพรวมงานสรรหา อยู่แค่หน้ารายชื่อผู้สมัครก็พอ หน้าอื่นๆในนี้ไม่ต้องมี")
+          — ตัวเลขในแผงเป็นเรื่องของ **คน** (กรอกมา/ติดต่อ/นัดหมาย) ไม่ใช่เรื่องของ
+          ใบขอ จึงไม่เข้ากับมุมมองกล่องงาน และดันเนื้อหาจริงตกจอไปเปล่า ๆ
+        */}
+        {/* ⚠️ ช่องค้นหาของเจ้าหน้าที่เคยอยู่ตรงนี้ (ใต้แผงตัวเลข 9 ช่อง) — ย้ายขึ้นไปอยู่ใน
+            แถบหัวข้าง ๆ ปุ่มแล้ว แบบหน้า Dashboard (เจ้าของสั่ง 13 ส.ค. 2569)
+            หน้าสาธารณะช่องค้นหายังอยู่ที่เดิมในแถบตัวกรอง — คนนอกไม่มีแถบหัวเข้ม */}
+
+        {/* แท็บสลับมุมมอง (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: รวมหน้า RM เข้าบอร์ด)
+            เจ้าของสั่งเพิ่ม 13 ส.ค. 2569: ยก "การติดต่อ" กับ "ติดตามนัดหมาย" จากแท็บย่อย
+            ของ RM ขึ้นมาอยู่ระดับเดียวกับกล่องงาน/รายชื่อผู้สมัคร (แท็บย่อยใน RmWorkspace
+            ถูกซ่อนเมื่อคุมจากข้างนอก) · โผล่เฉพาะเจ้าหน้าที่ — หน้าสาธารณะไม่มีทางเห็น
+            ⚠️ **ต้องอยู่ position เดียวกันทุกแท็บ** (เจ้าของสั่ง 14 ส.ค. 2569: "Position
+            เดียวกันกับหน้ากล่องงาน") — จึงอยู่ **เหนือ** ภาพรวมงานสรรหา · เดิม funnel
+            แทรกก่อน tab bar ทำให้แท็บเลื่อนลงเฉพาะหน้ารายชื่อผู้สมัคร */}
+        {isStaff && onViewChange ? (
+          <div className="mt-6 flex flex-wrap items-center gap-1 border-b border-border/60">
+            {(
+              [
+                { id: 'board', label: 'กล่องงาน' },
+                { id: 'list', label: 'รายชื่อผู้สมัคร' },
+                { id: 'contact', label: 'การโทรของฉัน' },
+                { id: 'appointments', label: 'ติดตามนัดหมาย' },
+                // ย้ายมาจากเมนู Matching (เจ้าของสั่ง 17 ส.ค. 2569) — ใบขอที่หาคนของเรา
+                // ไม่ได้ ต้องให้ทีมคอนเทนต์รับไปโพสต่อ เป็นงานที่เกิดต่อจากกล่องงานโดยตรง
+                { id: 'postings', label: 'คำขอโพสต์งานใหม่' },
+                // ใบขอที่ปิดแล้วหลุดจากกล่องงานเองอยู่แล้ว (กล่องงานถามหาเฉพาะใบที่ยังเปิด)
+                // แท็บนี้คือที่ที่ใบพวกนั้นไปโผล่ (เจ้าของสั่ง 17 ส.ค. 2569)
+                { id: 'closed', label: 'ปิดแล้ว' },
+              ] as const
+            ).map((v) => {
+              const active = view === v.id;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onViewChange(v.id)}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'px-4 py-2.5 text-sm font-semibold transition-colors',
+                    active
+                      ? cn(TONE.primary.value, 'border-b-2 border-current')
+                      : 'border-b-2 border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
           </div>
         ) : null}
 
+        {/* ภาพรวมงานสรรหา — เฉพาะแท็บรายชื่อผู้สมัคร · อยู่ **ใต้** tab bar (เจ้าของสั่ง
+            14 ส.ค. 2569) เพื่อให้ tab bar อยู่ position เดียวกับหน้ากล่องงาน
+            "ภาพรวมงานสรรหา อยู่แค่หน้ารายชื่อผู้สมัครก็พอ" (13 ส.ค.) — คงเงื่อนไข view==='list' */}
+        {isStaff && view === 'list' ? (
+          <div className="mt-4">
+            {/* Dashboard ศูนย์คุมงานสรรหา (S6 · 15 ส.ค. 2569) — แทนแผงภาพรวมเดิม
+                แผงเดิมยังเป็นทางถอยข้างใน (?panel=classic หรือ endpoint พัง) */}
+            <RecruitControlPanel />
+          </div>
+        ) : null}
+
+        {/* มุมมองฝั่ง RM (รายชื่อผู้สมัคร/การติดต่อ/ติดตามนัดหมาย) — แทนที่ก้อน
+            กล่องลอย+ตัวกรอง+การ์ดทั้งหมด · hero + แผงภาพรวมข้างบนคงอยู่ทุกมุมมอง */}
+        {isStaff && view !== 'board' && listContent ? (
+          <div className="mt-4 pb-10">{listContent}</div>
+        ) : (
+          <>
         <JobBoardTopFilters
           search={filters.search}
           onSearchChange={filters.setSearch}
@@ -283,11 +453,34 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           districtOptions={filters.districtOptions}
           positionOptions={filters.positionOptions}
           subtypeOptions={filters.subtypeOptions}
+          {...staffOnlyFilterProps}
           loading={loading}
           searchPlaceholder={searchPlaceholder}
+          hideSearch={isStaff}
           resultCount={loading ? undefined : filters.filtered.length}
           totalCount={loading ? undefined : filters.visibleCount}
         />
+
+        {/* Pre-Check ย้ายมาอยู่ท้ายแถบตัวกรอง (เจ้าของสั่ง 16 ส.ค. 2569 เย็น:
+            "หน้า Pre-check ก็ย้ายไปไว้ในหน้ากล่องงาน เอาไว้ตรง Filter")
+            — เมนูเดิมถูกถอดออกแล้ว · route /matching/pre-check ยังอยู่ ลิงก์เก่าไม่พัง
+            ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
+        {isStaff && view === 'board' ? (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => navigate('/matching/pre-check')}
+              title="ตรวจใบขอก่อนเริ่มหาคน — เปิดหน้า Pre-Check"
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold',
+                TONE.neutral.outline,
+              )}
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Pre-Check
+            </button>
+          </div>
+        ) : null}
 
         {loadError ? <p className="mt-4 text-sm text-destructive">{loadError}</p> : null}
 
@@ -309,7 +502,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {isStaff ? (
+          <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+            ประกาศจากใบขอ
+          </p>
+        ) : null}
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleJobs.map((job) => (
             <Card
               key={job.id}
@@ -327,7 +525,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   : undefined
               }
               className={cn(
-                'group jarvis-interactive-card overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                // flex-col + h-full: grid ยืดกล่องสูงเท่ากันอยู่แล้ว แต่ลูกเรียงชิดบน
+                // พื้นที่เหลือจึงกองใต้ footer → แถบ "ผู้สมัคร N คน" ของแต่ละใบลอยคนละระดับ
+                // (⚠️ ใส่ที่จุดเรียกใช้เท่านั้น ห้ามแก้ ui/card.tsx ซึ่งทั้งแอปใช้ร่วมกัน)
+                'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
                 isStaff && 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
               )}
             >
@@ -337,11 +538,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                       {jobBoardCardTitle(job)}
                     </h2>
-                    {unitRequestCardSubtitle(job) ? (
-                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{unitRequestCardSubtitle(job)}</p>
-                    ) : null}
-                    {isStaff && job.request_no?.trim() ? (
-                      <p className="mt-0.5 text-[11px] text-muted-foreground/80 font-mono">{job.request_no.trim()}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                      {unitRequestCardSubtitle(job) || EM_DASH}
+                    </p>
+                    {/* เลขที่ใบขอโชว์เฉพาะเจ้าหน้าที่ (หน้าสมัครสาธารณะไม่ต้องเห็น จึงไม่จองที่)
+                        แต่ในฝั่งเจ้าหน้าที่ต้องมีที่ยืนทุกใบ ไม่งั้นแถวล่างเลื่อนไม่ตรงกัน */}
+                    {isStaff ? (
+                      <p className="mt-0.5 font-mono text-[11px] leading-4 text-muted-foreground/80">
+                        {dashIfEmpty(job.request_no)}
+                      </p>
                     ) : null}
                   </div>
                   {job.urgency === 'urgent' && (
@@ -365,23 +570,45 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 pb-4">
-                <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
+              {/* flex-1: ดูดพื้นที่เหลือของกล่องไว้ที่นี่ ให้ footer ถูกตรึงก้นการ์ด
+                  ความแปรผันของเนื้อด้านบน (ชิปช่องทางที่หายทั้งบล็อกในบางใบ ฯลฯ)
+                  จึงไม่ทำให้แถบ "ผู้สมัคร N คน" ของแต่ละใบอยู่คนละระดับอีก */}
+              <CardContent className="flex-1 space-y-2 pb-4">
+                <p className="flex items-start gap-2 text-xs leading-4 text-muted-foreground line-clamp-2">
                   <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
-                  {job.location_address}
+                  {/* ข้อความสำรองแบบเดียวกับการ์ดกล่องลอย ('ไม่ได้ระบุจังหวัด') —
+                      คำที่ผู้สมัครทั่วไปอ่านรู้เรื่อง เพราะโผล่บนหน้าสมัครสาธารณะด้วย */}
+                  {job.location_address?.trim() || 'ไม่ได้ระบุสถานที่'}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs">
+                  {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
+                      ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
+                      (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
                   <span className="inline-flex items-center gap-1 text-foreground font-semibold">
                     <Banknote className="h-3.5 w-3.5 text-success" />
-                    ฿{job.total_income.toLocaleString()}
+                    {job.monthly_income
+                      ? `฿${job.monthly_income.toLocaleString('th-TH')} / เดือน`
+                      : `฿${job.total_income.toLocaleString('th-TH')}`}
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
                     ต้องการ {formatYmdDmyBe(job.required_date)}
                   </span>
                 </div>
+                {/* สวัสดิการ (เจ้าของเคาะ 16 ส.ค. 2569 — "เอาเหมือนที่ AI พูด")
+                    ⚠️ ตัวเลขทั้งหมดเป็น **อัตราจ่าย** ที่พนักงานได้จริง ไม่ใช่อัตราเบิก
+                    ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
+                {job.benefits && job.benefits.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1">
+                    {job.benefits.map((b) => (
+                      <span key={b} className={TONE.success.chip}>
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
-              <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
+              <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (
                   <>
                     {/* ชิปช่องทางที่ปล่อยลิงก์ไว้ + ยอดคลิก (mockup rev.3 ข้อ 04) */}
@@ -398,24 +625,78 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ))}
                       </div>
                     ) : null}
-                    <div className="flex w-full items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                    {/* เจ้าของสั่ง 14 ส.ค. 2569: จัดเรียงให้สวย · "สร้างลิงก์" → "Gen link"
+                        · 2 ปุ่มคนละสี (ค้นหา = ฟ้า · Gen link = ม่วง) — สีมาจาก TONE ที่เดียว
+                        แถวเดียว wrap ได้ · "ผู้สมัคร N คน" ซ้าย · ปุ่ม+ดูรายชื่อ ขวา */}
+                    <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                      <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
+                        <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                         ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
+                        {/* Lead = ใบที่ถูกปัดเข้าคลัง ไม่ถูกนับในยอดซ้าย — โชว์เป็นเลขที่สอง
+                            แทนที่จะยุบรวม (ยุบรวมแล้วเลขบนการ์ดจะไม่ตรงกับที่กดเข้าไปเห็น
+                            ซึ่งเป็นเหตุผลที่ตัวนับกรอง Lead ออกตั้งแต่แรก) */}
+                        {(leadCounts[job.id] ?? 0) > 0 ? (
+                          <span className="font-normal text-muted-foreground">
+                            · Lead {leadCounts[job.id]}
+                          </span>
+                        ) : null}
+                        {/* แยกที่มาให้เห็นบนใบขอเลย — ไม่รู้ที่มา = ไม่ขึ้นบรรทัดนี้ */}
+                        {applicantOriginSummary(originCounts[job.id]) ? (
+                          <span className="font-normal text-muted-foreground">
+                            ({applicantOriginSummary(originCounts[job.id])})
+                          </span>
+                        ) : null}
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* เจ้าของเคาะ 17 ส.ค. 2569: *"ถ้าไม่ต่างเหลือแค่ปุ่มเดียวพอ"* →
+                            ยุบสองปุ่มเป็นปุ่มเดียว **เก็บตัวที่ทำงานครบกว่า** (ค้น 3 แหล่ง:
+                            Checklist + ฐานใหม่ + iRecruit แล้วส่ง AI โทรทันที) แล้วเปลี่ยน
+                            คำเป็น "หาผู้สมัครเพิ่ม" · ปุ่มเดิมที่พาไปหน้า Matching ค้นแต่
+                            iRecruit ให้ดูเฉย ๆ ถูกถอดออก (ของใหม่ครอบอยู่แล้ว) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLaneJob(job);
+                          }}
+                          title="ค้นคนที่ยังไม่สมัครจาก Checklist + ฐานใหม่ + iRecruit แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos โทรทันที"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.success.outline,
+                          )}
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          หาผู้สมัครเพิ่ม
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setGenLinkJob(job);
                           }}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.violet.outline,
+                          )}
                         >
                           <Link2 className="h-3.5 w-3.5" />
-                          สร้างลิงก์
+                          Gen link
                         </button>
-                        <span className="text-[11px] font-medium text-blue-600 group-hover:underline">
+                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
+                        {latestPostingByJob.has(job.id) ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditPosting(latestPostingByJob.get(job.id) ?? null);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            แก้ไข
+                          </button>
+                        ) : null}
+                        <span className="text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
                           ดูรายชื่อ →
                         </span>
                       </div>
@@ -462,7 +743,106 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               }}
             />
           </div>
+
         ) : null}
+
+        {/*
+          กล่องลอย (ไม่ผูกใบขอ) — เจ้าของสั่ง 13 ส.ค. 2569 ให้ "เอาลงมารวม" ท้ายลิสต์
+          (เดิมอยู่เหนือตัวกรอง ดันใบขอจริงตกจอ) · ทรงการ์ดเดียวกับการ์ดใบขอ (11 ส.ค. 2569)
+          (`jarvis-interactive-card` · หัวข้อ → ชิป → เนื้อ → แถบล่าง) แทนกล่องเล็กแบน ๆ เดิม
+
+          ⚠️ ไม่มีลิงก์ "ดูรายชื่อ →" เหมือนการ์ดใบขอ — ใบสมัครฝั่งเราผูกกับ `job_id`
+          ไม่ได้ผูกกับประกาศ จึงยังกรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ไม่ได้จริง
+          ใส่ปุ่มไปก็เป็นปุ่มหลอก · การกดการ์ด = สร้างลิงก์ของประเภทนั้น ซึ่งทำได้จริง
+        */}
+        {isStaff && postings.some((p) => p.standaloneKind) ? (
+          <div className="mt-6">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+              กล่องลอย (ไม่ผูกใบขอ)
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {STANDALONE_POSTING_KINDS.map((k) => {
+                const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
+                const s =
+                  standaloneSummary[k.code] ??
+                  { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
+                const openGen = () =>
+                  setGenStandalone({
+                    kind: k.code,
+                    kindLabel: k.label,
+                    departmentCode: s.bus[0] ?? BOARD_DEFAULT_BU,
+                  });
+                return (
+                  <Card
+                    key={k.code}
+                    onClick={openGen}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openGen();
+                      }
+                    }}
+                    className={cn(
+                      'group jarvis-interactive-card cursor-pointer overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                      s.postings === 0 && 'opacity-60',
+                    )}
+                  >
+                    <CardHeader className="space-y-3 pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h2 className="line-clamp-2 text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-blue-600">
+                            {k.label}
+                          </h2>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {s.titles.length > 0 ? s.titles.join(' • ') : 'ยังไม่มีประกาศของประเภทนี้'}
+                          </p>
+                        </div>
+                        <span className={cn('shrink-0', tone.chip)}>
+                          {s.postings.toLocaleString('th-TH')} ประกาศ
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                          กล่องลอย
+                        </span>
+                        {s.bus.map((bu) => (
+                          <span
+                            key={bu}
+                            className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                          >
+                            {bu}
+                          </span>
+                        ))}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2 pb-4">
+                      <p className="flex items-start gap-2 text-xs text-muted-foreground line-clamp-2">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600/70" />
+                        {s.provinces.length > 0 ? s.provinces.join(' · ') : 'ไม่ได้ระบุจังหวัด'}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <Users className="h-3.5 w-3.5 text-blue-600/80" />
+                          ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-300 group-hover:underline">
+                          <Link2 className="h-3.5 w-3.5" />
+                          สร้างลิงก์ →
+                        </span>
+                      </div>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+          </>
+        )}
 
         {!isStaff ? (
           <div className="mx-auto max-w-md pb-14 pt-2 text-center">
@@ -554,9 +934,47 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">ฐานเงินเดือน</dt>
-                  <dd className="text-success font-semibold">฿{selected.total_income.toLocaleString()}</dd>
+                  {/**
+                   * ⚠️ **ค่านี้ไม่ใช่ยอดรวม** — วัดจาก ERP 16 ส.ค. 2569:
+                   * `total_income` = `payment_rate` ของแถว `is_wage='Y'` **แถวเดียว**
+                   * (ดู siamrajSqlServerRequests.ts — ROW_NUMBER เลือกแถวค่าแรงหลัก)
+                   * ใบ LAO6908007 มี 12 แถว: ค่าแรงหลัก 16,000 + อีก 11 แถวที่เป็น
+                   * **คนละหน่วย** (โอทีต่อชั่วโมง · เบี้ยเลี้ยงต่อวัน) และมี **รายการหัก**
+                   * ปนอยู่ด้วย (ค่าปรับขาดงาน) → บวกกันตรง ๆ ได้เลขที่ไม่มีความหมาย
+                   * จึงห้ามเรียกว่า "รายได้รวม" · ของแถมที่เหลือโชว์เป็นชิปสวัสดิการแทน
+                   * (ต่างจาก JobDetailPage/AddJobPage ที่เป็นใบขอฝั่งเราซึ่งคนกรอกยอดรวมเอง)
+                   */}
+                  <dt className="text-muted-foreground">
+                    {selected.monthly_income ? 'รายได้ต่อเดือน' : 'ค่าแรง (อัตราจาก ERP)'}
+                  </dt>
+                  <dd className="text-success font-semibold">
+                    ฿{(selected.monthly_income ?? selected.total_income).toLocaleString('th-TH')}
+                  </dd>
                 </div>
+                {/* แจกแจงที่มาของยอด — ผู้สมัครต้องเห็นว่าเลขมาจากไหน ไม่ใช่เชื่อยอดรวมลอย ๆ
+                    ⚠️ ไม่รวมโอที/เบี้ยเลี้ยง/เบี้ยขยัน เพราะไม่การันตี (โชว์เป็นชิปแยก) */}
+                {selected.monthly_income ? (
+                  <div className="border-b border-border/60 py-2.5">
+                    <dt className="text-muted-foreground">คิดจาก</dt>
+                    <dd className="mt-0.5 space-y-0.5 text-xs">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">ค่าแรงหลัก</span>
+                        <span className="font-medium">
+                          ฿{(selected.monthly_income_base ?? 0).toLocaleString('th-TH')}
+                        </span>
+                      </div>
+                      {(selected.monthly_income_items ?? []).map((it) => (
+                        <div key={it.label} className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">+ {it.label}</span>
+                          <span className="font-medium">฿{it.monthly.toLocaleString('th-TH')}</span>
+                        </div>
+                      ))}
+                      <p className="pt-1 text-[11px] text-muted-foreground">
+                        ยังไม่รวมโอที เบี้ยขยัน และเบี้ยเลี้ยง ซึ่งได้เพิ่มตามงานจริง
+                      </p>
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
                   <dt className="text-muted-foreground">วันที่ต้องการคน</dt>
                   <dd>{formatYmdDmyBe(selected.required_date)}</dd>
@@ -645,7 +1063,29 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         open={!!genLinkJob}
         job={genLinkJob}
         onClose={() => setGenLinkJob(null)}
+        onCreated={() => setPostingsRev((n) => n + 1)}
       />
+
+      <GenApplyLinkDialog
+        open={!!genStandalone}
+        job={null}
+        standalone={genStandalone}
+        onClose={() => setGenStandalone(null)}
+        onCreated={() => setPostingsRev((n) => n + 1)}
+      />
+
+      <EditPostingDialog
+        posting={editPosting}
+        onClose={() => setEditPosting(null)}
+        onSaved={() => setPostingsRev((n) => n + 1)}
+      />
+
+      {/* เลนสรรหา (R2b) — โหลดเมื่อกดเท่านั้น ไม่ให้ติดไปกับ bundle ของ /apply */}
+      {laneJob ? (
+        <React.Suspense fallback={null}>
+          <RecruitLaneDialog open job={laneJob} onClose={() => setLaneJob(null)} />
+        </React.Suspense>
+      ) : null}
     </div>
   );
 };

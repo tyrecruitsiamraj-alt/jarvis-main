@@ -44,6 +44,7 @@ describe('designTokens — TONE', () => {
       'value',
       'soft',
       'softHover',
+      'outline',
       'solid',
       'dot',
       'onDark',
@@ -70,6 +71,16 @@ describe('designTokens — TONE', () => {
       const [light, dark] = TONE[key].bar.split(' ');
       expect(light, `${key}.bar (light)`).toMatch(/^!border-t-/);
       expect(dark, `${key}.bar (dark)`).toMatch(/^dark:!border-t-/);
+    }
+  });
+
+  it('outline พื้นขาวต้องมีคู่พื้นมืด — กันปุ่มขาวโพลนบนพื้นเข้ม', () => {
+    for (const key of TONE_KEYS) {
+      const outline = TONE[key].outline;
+      expect(outline, `${key}.outline ต้องเป็นพื้นขาวในธีมสว่าง`).toContain('bg-white');
+      // นี่คือบั๊กที่ทำให้ต้องมี variant นี้: เขียนมือแล้วลืม dark:bg-*
+      expect(outline, `${key}.outline: bg-white ขาดคู่ dark:bg-*`).toMatch(/dark:bg-[a-z]+-\d/);
+      expect(outline, `${key}.outline ต้องมีสีตัวหนังสือคู่มืด`).toMatch(/dark:text-[a-z]+-\d/);
     }
   });
 

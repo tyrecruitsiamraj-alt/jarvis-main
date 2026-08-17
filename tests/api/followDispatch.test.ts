@@ -32,6 +32,49 @@ describe('parseFollowInput', () => {
     }
   });
 
+  it('ตารางโทร (092): group_id uuid + call_times กรอง HH:MM + dedupe + เพดาน 5 รอบ', () => {
+    const gid = 'a506aa87-7502-4886-8607-ccbb799b215c';
+    const r = parseFollowInput(
+      {
+        recipient_name: 'ก',
+        recipient_phone: '0800000000',
+        topic: 'ข',
+        group_id: gid,
+        call_times: ['07:00', '08:00', '07:00', 'บ่าย', ''],
+      },
+      NOW,
+    );
+    expect(r.error).toBeNull();
+    expect(r.value!.groupId).toBe(gid);
+    expect(r.value!.callTimes).toEqual(['07:00', '08:00']); // dedupe + กรองรูปผิด
+  });
+
+  it('ตารางโทร: group_id ผิดรูป → error · call_times เกิน 5 → error', () => {
+    expect(
+      parseFollowInput(
+        { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', group_id: 'not-uuid' },
+        NOW,
+      ).error,
+    ).toBeTruthy();
+    expect(
+      parseFollowInput(
+        {
+          recipient_name: 'ก',
+          recipient_phone: '0800000000',
+          topic: 'ข',
+          call_times: ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00'],
+        },
+        NOW,
+      ).error,
+    ).toBeTruthy();
+  });
+
+  it('ไม่ส่ง group_id/call_times → null ทั้งคู่ (รอบเดี่ยวแบบเดิม)', () => {
+    const r = parseFollowInput({ recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข' }, NOW);
+    expect(r.value!.groupId).toBeNull();
+    expect(r.value!.callTimes).toBeNull();
+  });
+
   it('เก็บ note ที่กรอกมาและ trim ให้', () => {
     const r = parseFollowInput(
       { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', note: '  ถามวันสะดวก  ' },
@@ -51,6 +94,26 @@ describe('parseFollowInput', () => {
       ).error,
     ).toContain('วันเวลา');
     expect(parseFollowInput(null, NOW).error).toBe('Invalid JSON body');
+  });
+
+  it('เบอร์เจ้าหน้าที่: ไม่กรอกก็ผ่าน · กรอกแล้วเก็บตามที่พิมพ์ (เบอร์ต่อภายในใช้ได้)', () => {
+    // เจ้าของสั่ง 13 ส.ค. 2569 — ช่องนี้แทน "รายละเอียดเพิ่มเติม" เดิม
+    // ⚠️ ไม่บังคับ E.164 เพราะเป็นเบอร์ที่ AI **พูดให้ฟัง** ไม่ใช่เบอร์ที่ระบบโทรออก
+    const base = { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข' };
+    expect(parseFollowInput(base, NOW).value!.staffPhone).toBeNull();
+    expect(parseFollowInput({ ...base, staff_phone: '021234567 ต่อ 101' }, NOW).value!.staffPhone).toBe(
+      '021234567 ต่อ 101',
+    );
+    expect(parseFollowInput({ ...base, staff_phone: '' }, NOW).value!.staffPhone).toBeNull();
+  });
+
+  it('เบอร์เจ้าหน้าที่ที่ไม่มีตัวเลขพอ ต้องไม่ผ่าน — ผู้สมัครจะโทรกลับไม่ได้', () => {
+    const r = parseFollowInput(
+      { recipient_name: 'ก', recipient_phone: '0800000000', topic: 'ข', staff_phone: 'ถามพี่แดง' },
+      NOW,
+    );
+    expect(r.error).toContain('เบอร์เจ้าหน้าที่');
+    expect(r.value).toBeNull();
   });
 
   it('ใช้ scheduled_at ที่ส่งมาเมื่อเป็นวันเวลาที่ถูกต้อง', () => {
@@ -77,7 +140,13 @@ describe('buildFollowReminderPayload', () => {
     expect(p.title).toBe('ยืนยันวันเริ่มงาน 15 ส.ค.');
     expect(p.steps).toHaveLength(1);
     expect(p.steps[0].type).toBe('follow_up');
-    expect(p.steps[0].message).toBe('ยืนยันวันเริ่มงาน 15 ส.ค. — ถ้ายังไม่พร้อมให้ถามวันที่สะดวก');
+    // บทใหม่ 16 ส.ค. 2569 (lumosCallScript.buildFollowMessage) — แนะนำตัว + เรียกชื่อ +
+    // บอกให้ยืนยันกลับ · เดิมต่อสามท่อนด้วย "—" เฉย ๆ ฟังแล้วห้วนไม่มีหัวไม่มีท้าย
+    expect(p.steps[0].message).toContain('สยามราชธานี');
+    expect(p.steps[0].message).toContain('คุณสมชาย ใจดี');
+    expect(p.steps[0].message).toContain('ยืนยันวันเริ่มงาน 15 ส.ค.');
+    expect(p.steps[0].message).toContain('ถ้ายังไม่พร้อมให้ถามวันที่สะดวก');
+    expect(p.steps[0].message).toContain('ยืนยันกลับ');
     expect(p.steps[0].scheduled_at).toBe(WHEN.toISOString());
   });
 
@@ -90,7 +159,40 @@ describe('buildFollowReminderPayload', () => {
       note: null,
       scheduled_at: WHEN,
     });
-    expect(p.steps[0].message).toBe('ตามเอกสาร');
+    expect(p.steps[0].message).toContain('ตามเอกสาร');
+    // ไม่มีเบอร์เจ้าหน้าที่ = ไม่พูดท่อนติดต่อกลับ (ไม่ใช่พูดว่า "โทร ว่าง")
+    expect(p.steps[0].message).not.toContain('โทร');
+  });
+
+  it('มีเบอร์เจ้าหน้าที่ → ต่อท้ายบทพูดให้ผู้สมัครโทรกลับได้', () => {
+    // ⚠️ schema ของ Lumos ไม่มีช่องใส่เบอร์ติดต่อกลับ — ช่องเดียวที่ถึงหูผู้สมัคร
+    // คือ steps[].message · ถ้าเทสต์นี้ล้มแปลว่าเบอร์หายจากบท ผู้สมัครโทรกลับไม่ได้
+    const p = buildFollowReminderPayload({
+      id: 'abc',
+      recipient_name: 'ก',
+      recipient_phone: '+66800000000',
+      topic: 'ตามเอกสาร',
+      note: null,
+      staffPhone: '021234567',
+      scheduled_at: WHEN,
+    });
+    // เบอร์อ่านเป็นกลุ่มตัวเลข — 021234567 ติดกันเสี่ยงถูก TTS อ่านเป็นจำนวนเต็มก้อนเดียว
+    expect(p.steps[0].message).toContain('02 123 4567');
+  });
+
+  it('มีทั้งหมายเหตุและเบอร์ → พูดครบทั้งสามท่อน เรียงหัวเรื่อง → หมายเหตุ → เบอร์', () => {
+    const p = buildFollowReminderPayload({
+      id: 'abc',
+      recipient_name: 'ก',
+      recipient_phone: '+66800000000',
+      topic: 'ตามเอกสาร',
+      note: 'ถามวันสะดวก',
+      staffPhone: '021234567',
+      scheduled_at: WHEN,
+    });
+    const msg = p.steps[0].message;
+    expect(msg.indexOf('ตามเอกสาร')).toBeLessThan(msg.indexOf('ถามวันสะดวก'));
+    expect(msg.indexOf('ถามวันสะดวก')).toBeLessThan(msg.indexOf('02 123 4567'));
   });
 });
 

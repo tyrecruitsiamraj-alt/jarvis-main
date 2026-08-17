@@ -40,7 +40,7 @@ const ACTION_RESULTS = new Set([
 
 const MAX_NOTE_LENGTH = 2000;
 
-function requireUuid(value: string | undefined, field: string): string {
+function requireUuid(value: string | null | undefined, field: string): string {
   const v = value?.trim();
   if (!v || !UUID_RE.test(v)) {
     throw new DomainError(400, 'Bad request', `${field} must be a valid UUID`);
@@ -48,7 +48,7 @@ function requireUuid(value: string | undefined, field: string): string {
   return v;
 }
 
-function requireEnum(value: string | undefined, field: string, allowed: Set<string>): string {
+function requireEnum(value: string | null | undefined, field: string, allowed: Set<string>): string {
   const v = value?.trim();
   if (!v || !allowed.has(v)) {
     throw new DomainError(400, 'Bad request', `${field} is invalid`);
@@ -56,7 +56,7 @@ function requireEnum(value: string | undefined, field: string, allowed: Set<stri
   return v;
 }
 
-function requireNote(value: string | undefined, field: string): string {
+function requireNote(value: string | null | undefined, field: string): string {
   const v = value?.trim();
   if (!v) {
     throw new DomainError(400, 'Bad request', `${field} is required`);

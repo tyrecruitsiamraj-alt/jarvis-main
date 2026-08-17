@@ -27,6 +27,16 @@ type Props = {
   lockPosition?: boolean;
   subtypeFilter: string;
   onSubtypeFilterChange: (v: string) => void;
+  /**
+   * ตัวกรองฝั่งเจ้าหน้าที่ (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569) — ไม่ส่ง = ไม่แสดงช่อง
+   * ⚠️ **หน้าสาธารณะห้ามส่ง** ชื่อเจ้าหน้าที่สรรหาเป็นข้อมูลภายใน
+   */
+  recruiterFilter?: string;
+  onRecruiterFilterChange?: (v: string) => void;
+  recruiterOptions?: readonly string[];
+  contractTypeFilter?: string;
+  onContractTypeFilterChange?: (v: string) => void;
+  contractTypeOptions?: readonly string[];
   provinceOptions: readonly string[];
   districtOptions: readonly string[];
   positionOptions: readonly string[];
@@ -35,15 +45,16 @@ type Props = {
   searchPlaceholder?: string;
   resultCount?: number;
   totalCount?: number;
+  /**
+   * ซ่อนช่องค้นหาในแถบนี้ — ใช้ตอนหน้าแม่ยกช่องค้นหาขึ้นไปไว้บนสุดเอง
+   * (เจ้าของสั่ง 13 ส.ค. 2569: บอร์ดเจ้าหน้าที่ให้ค้นหาอยู่ด้านบนแบบหน้า Dashboard
+   * · หน้าสาธารณะไม่ส่ง prop นี้ = ช่องค้นหาอยู่ที่เดิม)
+   */
+  hideSearch?: boolean;
 };
 
-function countActiveFilters(
-  province: string,
-  district: string,
-  position: string,
-  subtype: string,
-): number {
-  return [province, district, position, subtype].filter(Boolean).length;
+function countActiveFilters(...values: string[]): number {
+  return values.filter(Boolean).length;
 }
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
@@ -81,6 +92,12 @@ const JobBoardTopFilters: React.FC<Props> = ({
   lockPosition = false,
   subtypeFilter,
   onSubtypeFilterChange,
+  recruiterFilter = '',
+  onRecruiterFilterChange,
+  recruiterOptions,
+  contractTypeFilter = '',
+  onContractTypeFilterChange,
+  contractTypeOptions,
   provinceOptions,
   districtOptions,
   positionOptions,
@@ -89,11 +106,20 @@ const JobBoardTopFilters: React.FC<Props> = ({
   searchPlaceholder = 'ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน...',
   resultCount,
   totalCount,
+  hideSearch = false,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = useMemo(
-    () => countActiveFilters(provinceFilter, districtFilter, positionFilter, subtypeFilter),
-    [provinceFilter, districtFilter, positionFilter, subtypeFilter],
+    () =>
+      countActiveFilters(
+        provinceFilter,
+        districtFilter,
+        positionFilter,
+        subtypeFilter,
+        recruiterFilter,
+        contractTypeFilter,
+      ),
+    [provinceFilter, districtFilter, positionFilter, subtypeFilter, recruiterFilter, contractTypeFilter],
   );
 
   const clearAllFilters = () => {
@@ -101,10 +127,18 @@ const JobBoardTopFilters: React.FC<Props> = ({
     onDistrictFilterChange('');
     if (!lockPosition) onPositionFilterChange('');
     onSubtypeFilterChange('');
+    onRecruiterFilterChange?.('');
+    onContractTypeFilterChange?.('');
   };
 
+  /**
+   * ทุกช่องอยู่ **แถวเดียวกัน** (เจ้าของสั่ง 13 ส.ค. 2569: "ทำให้อยู่บรรทัดเดียวกันได้ไหม")
+   * — เดิมเป็น grid 2 คอลัมน์ ทำให้ตัวกรอง 4 ช่องกินความสูง 2 แถวเต็ม ๆ
+   * ⚠️ ใช้ flex-wrap ไม่ใช่แถวตายตัว — จอแคบต้องตกบรรทัดเอง ไม่ใช่ทะลุขอบ
+   * (กับดักเดิมของโปรเจกต์: shrink-0 คู่กับแถวที่ไม่ wrap = ทะลุ)
+   */
   const filterFields = (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="flex flex-wrap items-end gap-3">
       <LocationFilterSelect
         label="จังหวัด"
         placeholder="เลือกจังหวัด"
@@ -137,6 +171,27 @@ const JobBoardTopFilters: React.FC<Props> = ({
         options={subtypeOptions}
         disabled={loading || subtypeOptions.length === 0}
       />
+      {/* สองช่องล่างมีเฉพาะฝั่งเจ้าหน้าที่ — ไม่ส่ง prop มา = ไม่แสดง (หน้าสาธารณะ) */}
+      {onContractTypeFilterChange ? (
+        <LocationFilterSelect
+          label="ประเภทงาน"
+          placeholder="เลือกประเภทงาน"
+          value={contractTypeFilter}
+          onChange={onContractTypeFilterChange}
+          options={contractTypeOptions ?? []}
+          disabled={loading || (contractTypeOptions?.length ?? 0) === 0}
+        />
+      ) : null}
+      {onRecruiterFilterChange ? (
+        <LocationFilterSelect
+          label="เจ้าหน้าที่สรรหา"
+          placeholder="เลือกเจ้าหน้าที่"
+          value={recruiterFilter}
+          onChange={onRecruiterFilterChange}
+          options={recruiterOptions ?? []}
+          disabled={loading || (recruiterOptions?.length ?? 0) === 0}
+        />
+      ) : null}
     </div>
   );
 
@@ -166,18 +221,20 @@ const JobBoardTopFilters: React.FC<Props> = ({
 
   return (
     <>
-      <div className="mt-8">
+      <div className="mt-6">
         <div className="jarvis-frost rounded-2xl border border-white/70 p-4 shadow-sm md:rounded-[1.25rem] md:p-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <SearchField
-                wrapperClassName="flex-1 min-w-0"
-                placeholder={searchPlaceholder}
-                value={search}
-                onChange={(e) => onSearchChange(e.target.value)}
-              />
+              {hideSearch ? null : (
+                <SearchField
+                  wrapperClassName="flex-1 min-w-0"
+                  placeholder={searchPlaceholder}
+                  value={search}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                />
+              )}
 
-              <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+              <div className={cn('flex flex-wrap items-center gap-2 lg:shrink-0', hideSearch && 'flex-1')}>
                 <div
                   className="inline-flex rounded-xl border border-white/80 bg-white/55 p-1 shadow-sm"
                   role="group"
@@ -191,7 +248,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                       className={cn(
                         'rounded-lg px-4 py-2 text-xs font-semibold transition-all touch-manipulation min-w-[4.5rem]',
                         chip === f.id
-                          ? 'bg-white text-blue-700 shadow-sm'
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
@@ -206,7 +263,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                   className={cn(
                     'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all touch-manipulation lg:hidden',
                     activeFilterCount > 0
-                      ? 'border-blue-300/70 bg-blue-50 text-blue-800 shadow-sm'
+                      ? 'border-blue-300/70 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-700/70 dark:bg-blue-950/60 dark:text-blue-200'
                       : 'border-white/80 bg-white/60 text-foreground hover:bg-white',
                   )}
                 >

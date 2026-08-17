@@ -13,8 +13,13 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, backPath, acti
   const navigate = useNavigate();
 
   return (
-    <div className="flex items-center justify-between px-4 md:px-6 py-4 md:py-5">
-      <div className="flex items-center gap-3 min-w-0">
+    /*
+      จอเล็ก: ให้แถวตกบรรทัดได้ ไม่งั้นช่อง actions (ซึ่งเดิมเป็น `shrink-0`)
+      จะดันตัวเองออกนอกจอ — เจอที่ /jobs/list บนจอ 320px ล้นออกไป 16px
+      กระทบทุกหน้าที่ส่ง actions มา ไม่ใช่หน้าเดียว จึงแก้ที่ตัวกลางนี้
+    */
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 md:px-6 py-4 md:py-5">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         {backPath && (
           <button
             type="button"
@@ -29,7 +34,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, backPath, acti
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 };

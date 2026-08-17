@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
-import { applyLinkPath, type RecruitChannel } from '@/lib/recruitPostings';
 import {
-  fetchRecruitChannels,
-  createRecruitPosting,
-  type CreatePostingBody,
-} from '@/lib/recruitPostingsApi';
+  applyLinkPath,
+  recruitChannelLabel,
+  type RecruitChannelMatch,
+} from '@/lib/recruitPostings';
+import { createRecruitPosting, type CreatePostingBody } from '@/lib/recruitPostingsApi';
+import ChannelPicker from '@/components/shared/ChannelPicker';
+import JobTitleField from '@/components/shared/JobTitleField';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +17,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/apiFetch';
+import { parseAppUserList } from '@/lib/userApi';
+import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
+import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
+import { createShortLink } from '@/lib/shortLinksApi';
 
 export type GenApplyLinkDialogProps = {
   open: boolean;
@@ -70,17 +78,26 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   standalone = null,
   onCreated,
 }) => {
-  const [channels, setChannels] = useState<RecruitChannel[]>([]);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [locationText, setLocationText] = useState('');
   const [salaryText, setSalaryText] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  // ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
+  const [positionName, setPositionName] = useState('');
+  const [province, setProvince] = useState('');
+  const [responsible, setResponsible] = useState('');
+  const [specificType, setSpecificType] = useState('');
+  const [formType, setFormType] = useState<string>('rm');
+  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<Array<{ code: string; label: string | null }>>([]);
+  /** code เดิม → path สั้น · ระบบเดิมมี checkbox "ตัด URL ให้สั้นลง" */
+  const [shortLinks, setShortLinks] = useState<Record<string, string>>({});
+  const [shortening, setShortening] = useState(false);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -89,7 +106,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setError(null);
     setLinks([]);
     setSaving(false);
-    setPicked(new Set());
     // เติมค่าจากใบขอให้อัตโนมัติ — ไม่ต้องพิมพ์ซ้ำสิ่งที่ ERP มีอยู่แล้ว
     setTitle(job ? jobBoardCardTitle(job) : standalone ? standalone.kindLabel : '');
     setDetail('');
@@ -97,28 +113,50 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setSalaryText('');
     setContactName(job?.contact_name ?? '');
     setContactPhone(job?.contact_phone ?? '');
-    void fetchRecruitChannels()
-      .then(setChannels)
-      .catch(() => setChannels([]));
+    // ตำแหน่ง/จังหวัด: ใบขอมีอยู่แล้ว ไม่ต้องให้พิมพ์ซ้ำ (staff_title_name = ตำแหน่งที่ขอ)
+    // ประกาศลอยไม่มีใบขอ ใช้ชื่อกล่องเป็นตำแหน่งตั้งต้นแล้วแก้ได้
+    setPositionName(job?.staff_title_name ?? standalone?.kindLabel ?? '');
+    // จังหวัดไม่มีเป็นฟิลด์เดี่ยวในใบขอ — ถอดจากที่อยู่ด้วยตัวถอดเดิมที่ตัวกรองบอร์ดใช้
+    setProvince(job ? (inferProvinceFromAddress(job.location_address || '') ?? '') : '');
+    setResponsible('');
+    setSpecificType('');
+    setFormType('rm');
+    setShortLinks({});
+    setPicked([]);
+    // ผู้รับผิดชอบ = ผู้ใช้ในระบบ (ไม่ใช่ master แยกอีกชุด) — พลาดก็ปล่อยว่างได้ ไม่บังคับ
+    void apiFetch('/api/app-users')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) =>
+        setStaff(
+          parseAppUserList(data)
+            .filter((u) => u.is_active)
+            .map((u) => ({ id: u.id, name: u.full_name || u.email })),
+        ),
+      )
+      .catch(() => setStaff([]));
   }, [open, job, standalone]);
 
-  const flatChannels = useMemo(() => {
-    const out: Array<{ id: string; label: string }> = [];
-    for (const parent of channels) {
-      const kids = parent.children ?? [];
-      if (kids.length === 0) out.push({ id: parent.id, label: parent.name });
-      for (const kid of kids) out.push({ id: kid.id, label: `${parent.name} · ${kid.name}` });
+  /**
+   * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
+   * (ผู้ใช้จะคัดลอกลิงก์ยาวไปโดยคิดว่าสั้นแล้ว)
+   */
+  const toggleShort = async (want: boolean) => {
+    if (!want) {
+      setShortLinks({});
+      return;
     }
-    return out;
-  }, [channels]);
-
-  const toggle = (id: string) => {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setShortening(true);
+    try {
+      const pairs = await Promise.all(
+        links.map(async (l) => [l.code, (await createShortLink(applyLinkPath(l.code))).path] as const),
+      );
+      setShortLinks(Object.fromEntries(pairs));
+    } catch (e) {
+      setShortLinks({});
+      setError(e instanceof Error ? e.message : 'ตัดลิงก์ให้สั้นไม่สำเร็จ');
+    } finally {
+      setShortening(false);
+    }
   };
 
   const submit = async () => {
@@ -136,9 +174,13 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         salaryText: salaryText || null,
         contactName: contactName || null,
         contactPhone: contactPhone || null,
-        channels: flatChannels
-          .filter((c) => picked.has(c.id))
-          .map((c) => ({ channelId: c.id, label: c.label })),
+        channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) })),
+        positionName: positionName.trim() || null,
+        province: province || null,
+        responsibleName: staff.find((u) => u.id === responsible)?.name ?? null,
+        responsibleUserId: responsible || null,
+        specificType: specificType || null,
+        formType,
       };
       const created = await createRecruitPosting(body);
       setLinks(created.links.map((l) => ({ code: l.code, label: l.channelLabel })));
@@ -180,10 +222,23 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {links.map((l) => (
                 <LinkRow
                   key={l.code}
-                  url={`${origin}${applyLinkPath(l.code)}`}
+                  url={`${origin}${shortLinks[l.code] ?? applyLinkPath(l.code)}`}
                   label={l.label ?? 'ไม่ระบุช่องทาง'}
                 />
               ))}
+              {/* ระบบเดิมมี checkbox "ตัด URL ให้สั้นลง" — ฝั่งเรามี /api/short-links อยู่แล้ว
+                  ติ๊กแล้วแปลงทุกลิงก์พร้อมกัน (ยิงซ้ำได้ ได้ code เดิม ไม่สร้างซ้ำ) */}
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                  checked={Object.keys(shortLinks).length > 0}
+                  disabled={shortening}
+                  onChange={(e) => void toggleShort(e.target.checked)}
+                />
+                ตัด URL ให้สั้นลง
+                {shortening ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              </label>
             </div>
           ) : (
             <>
@@ -238,32 +293,89 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 </div>
               </div>
 
+              {/* ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
+                  ตำแหน่ง/จังหวัดเติมจากใบขอให้แล้ว · ไม่บังคับกรอกเพื่อไม่ให้ประกาศลอย
+                  ที่รีบส่งออกติดฟอร์ม แต่กรอกไว้แล้วรายงานย้อนหลังตอบได้ว่าลิงก์ไหนของงานไหน */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* ตำแหน่งของประกาศ — ลิสต์กรองตาม BU ของใบขอ/กล่องงานที่กำลังสร้างลิงก์ */}
+                <JobTitleField
+                  value={positionName}
+                  onChange={setPositionName}
+                  departmentCode={job?.department_code ?? standalone?.departmentCode ?? null}
+                  inputClassName={fieldCls}
+                  labelClassName="text-xs font-medium text-muted-foreground"
+                />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">จังหวัด</label>
+                  <select className={fieldCls} value={province} onChange={(e) => setProvince(e.target.value)}>
+                    <option value="">ไม่ระบุ</option>
+                    {THAI_PROVINCE_NAMES_SORTED.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
+                  <select
+                    className={fieldCls}
+                    value={responsible}
+                    onChange={(e) => setResponsible(e.target.value)}
+                  >
+                    <option value="">ไม่ระบุ</option>
+                    {staff.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">ข้อมูลเจาะจง</label>
+                  <select
+                    className={fieldCls}
+                    value={specificType}
+                    onChange={(e) => setSpecificType(e.target.value)}
+                  >
+                    <option value="">ไม่ระบุ</option>
+                    {RM_SPECIFIC_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">ประเภทฟอร์มการสมัคร</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {RM_FORM_TYPES.map((f) => (
+                    <button
+                      key={f.code}
+                      type="button"
+                      onClick={() => setFormType(f.code)}
+                      className={
+                        formType === f.code
+                          ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-semibold text-primary'
+                          : 'rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-secondary'
+                      }
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
                   ช่องทางที่จะส่ง (เลือกได้หลายช่อง — ได้ลิงก์แยกช่องละอัน)
                 </label>
-                {flatChannels.length === 0 ? (
-                  <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                    ยังไม่มีช่องทาง — เพิ่มได้ที่ปุ่ม "จัดการช่องทาง" หน้าบอร์ด · ถ้าไม่เลือกจะได้ลิงก์กลาง 1 อัน
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {flatChannels.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggle(c.id)}
-                        className={
-                          picked.has(c.id)
-                            ? 'rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary'
-                            : 'rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary'
-                        }
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <ChannelPicker value={picked} onChange={setPicked} multiple reloadKey={open} />
+                <p className="text-[11px] text-muted-foreground">
+                  ไม่เลือกช่องทางจะได้ลิงก์กลาง 1 อัน
+                </p>
               </div>
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}

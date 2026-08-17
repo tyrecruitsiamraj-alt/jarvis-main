@@ -750,6 +750,8 @@ export function makeTestLedger(partial: Partial<RequestLedgerRecord> & { request
     requestPositions: 1,
     unitName: 'Test Unit',
     ...partial,
+    submittedDate: submitted,
+    requiredDate: required,
     requestKind,
     effectiveRequestDate,
     slaStartDate: partial.slaStartDate ?? sla.slaStartDate,

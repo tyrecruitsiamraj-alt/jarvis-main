@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 import { Users, RefreshCw, Phone, MessageCircle, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -68,10 +70,10 @@ function CandidateDetailDialog({
         {match ? (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="outline" className="border-slate-200 bg-white text-slate-700">
+              <Badge variant="outline" className={TONE.neutral.outline}>
                 {matchTierEmoji(match.tier)} {matchTierLabel(match.tier)}
               </Badge>
-              <Badge variant="outline" className="border-slate-200 bg-white text-slate-700">
+              <Badge variant="outline" className={TONE.neutral.outline}>
                 สถานะ: {match.process_status_name}
               </Badge>
             </div>
@@ -100,13 +102,13 @@ function CandidateDetailDialog({
               {match.phone_number ? (
                 <a
                   href={`tel:${match.phone_number}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-sky-50"
+                  className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium', TONE.info.outline)}
                 >
                   <Phone className="h-4 w-4" /> {match.phone_number}
                 </a>
               ) : null}
               {match.line_id ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700">
+                <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium', TONE.success.outline)}>
                   <MessageCircle className="h-4 w-4" /> LINE: {match.line_id}
                 </span>
               ) : null}
@@ -117,7 +119,7 @@ function CandidateDetailDialog({
                     onPrefill(match);
                     onClose();
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
+                  className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium', TONE.violet.soft, TONE.violet.value, TONE.violet.softHover)}
                 >
                   เปิดฟอร์มเพิ่มผู้สมัคร
                 </button>
@@ -155,7 +157,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
           <button
             type="button"
             onClick={onMatch}
-            className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50"
+            className={cn('rounded-full border px-3 py-1 text-xs font-medium', TONE.info.outline)}
           >
             ลองใหม่
           </button>
@@ -176,7 +178,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
             <button
               type="button"
               onClick={onMatch}
-              className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50"
+              className={cn('rounded-full border px-3 py-1 text-xs font-medium', TONE.info.outline)}
             >
               ค้นหา
             </button>
@@ -206,7 +208,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
           <button
             type="button"
             onClick={onRefresh}
-            className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50"
+            className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium', TONE.info.outline)}
           >
             <RefreshCw className="h-3 w-3" />
             ค้นหาใหม่
@@ -232,7 +234,7 @@ export default function IrecruitMatchPanel({ loading, error, result, onMatch, on
                   {matchTierEmoji(m.tier)} {m.full_name}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Badge variant="outline" className="border-slate-200 bg-white text-[10px] text-slate-600">
+                  <Badge variant="outline" className={cn('text-[10px]', TONE.neutral.outline)}>
                     {matchTierLabel(m.tier)}
                   </Badge>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
