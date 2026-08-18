@@ -214,3 +214,46 @@ export async function bulkUpsertOplNames(
 
   return { inserted, updated };
 }
+
+/**
+ * ผู้รับผิดชอบ **ทุกใบ** — สำหรับ Dashboard กรองกราฟ/การ์ดตามเจ้าหน้าที่
+ * (เจ้าของสั่ง 18 ส.ค. 2569: เลือกชื่อเจ้าหน้าที่แล้วยอดต้องเป็นของคนนั้น)
+ *
+ * 🔴 **ต้องอ่านทั้งตาราง ไม่ใช่เฉพาะใบใน feed** — feed กล่องงานมีแต่**ใบที่ยังเปิด**
+ * ถ้ากรองจากใบเปิดอย่างเดียว ใบที่ปิดไปแล้วของคนนั้นจะหายทั้งกอง
+ * (วัดจริง 18 ส.ค.: "คิว" ดูแล 116 ใบ แต่เปิดอยู่แค่ 51 → ขาดไป 65 ใบ)
+ *
+ * ตารางนี้เก็บเฉพาะใบที่ **เคยถูกมอบหมาย** จึงเล็กกว่าจำนวนใบขอทั้งหมดมาก
+ * คืนเป็น array เพื่อให้ฝั่ง client ทำ map เอง (กันส่ง object ใหญ่ซ้อนโดยไม่จำเป็น)
+ */
+export async function listAllUnitAssignees(): Promise<
+  Array<{
+    request_no: string;
+    recruiter_name: string | null;
+    screener_name: string | null;
+    opl_name: string | null;
+    online_name: string | null;
+  }>
+> {
+  const { rows } = await dbQuery<{
+    request_no: string;
+    recruiter_name: string | null;
+    screener_name: string | null;
+    opl_name: string | null;
+    online_name: string | null;
+  }>(
+    `select a.request_no, a.recruiter_name, a.screener_name, a.opl_name, a.online_name
+       from ${table} a
+      where a.recruiter_name is not null
+         or a.screener_name is not null
+         or a.opl_name is not null
+         or a.online_name is not null`,
+  );
+  return rows.map((r) => ({
+    request_no: String(r.request_no || '').trim(),
+    recruiter_name: r.recruiter_name ?? null,
+    screener_name: r.screener_name ?? null,
+    opl_name: r.opl_name ?? null,
+    online_name: r.online_name ?? null,
+  }));
+}

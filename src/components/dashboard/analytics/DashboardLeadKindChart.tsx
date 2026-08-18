@@ -106,11 +106,18 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
         })}
       </ul>
 
-      {/* 🔴 ห้ามเงียบเมื่อเลขไม่ตรง — เจ้าของสั่งให้เช็คว่าข้อมูลถูกไหม */}
+      {/* 🔴 ห้ามเงียบเมื่อเลขไม่ตรง — เจ้าของสั่งให้เช็คว่าข้อมูลถูกไหม
+          แต่ "ถูกกรองแล้ว" ไม่ใช่ความผิดพลาด → ขึ้นเป็นหมายเหตุเฉย ๆ ไม่ใช่คำเตือน */}
       {mismatchNote ? (
-        <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
-          ⚠️ ตัวเลขไม่ตรงกัน: {mismatchNote}
-        </p>
+        mismatchNote.startsWith('กรองตามตัวกรอง') ? (
+          <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-[11px]', TONE.info.soft, TONE.info.value)}>
+            {mismatchNote}
+          </p>
+        ) : (
+          <p className={cn('mt-2 rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
+            ⚠️ ตัวเลขไม่ตรงกัน: {mismatchNote}
+          </p>
+        )
       ) : (
         <p className={cn('mt-2 text-[10px]', DASH.muted)}>
           ผลรวมสามถัง = ยอด「เข้ามา」ของช่วงเดียวกันเป๊ะ · ล่วงหน้า = ให้เวลาหา 7 วันขึ้นไป

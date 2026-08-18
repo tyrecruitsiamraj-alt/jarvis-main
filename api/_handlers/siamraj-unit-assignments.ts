@@ -9,6 +9,7 @@ import { readJsonBody, getString } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   getUnitAssignment,
+  listAllUnitAssignees,
   upsertUnitAssignment,
 } from '../_lib/siamrajUnitAssignments.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
@@ -20,6 +21,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   if (method === 'GET') {
     try {
+      /**
+       * `?all=1` — ผู้รับผิดชอบทุกใบ (read-only) สำหรับ Dashboard กรองตามเจ้าหน้าที่
+       * ไม่ผูก scope รายใบเพราะข้อมูลคือ "ใบเลขนี้ใครดูแล" เท่านั้น ไม่มีข้อมูลบุคคล
+       * และหน้า Dashboard ถูกล็อก BU ของผู้ใช้อยู่แล้วอีกชั้น
+       */
+      if (getString(req.query?.all) === '1') {
+        res.setHeader?.('Cache-Control', 'no-store');
+        return res.status(200).json({ items: await listAllUnitAssignees() });
+      }
       const requestNo = getString(req.query?.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no query is required');
       if (!(await isSiamrajRequestInScope(req.user, requestNo))) {

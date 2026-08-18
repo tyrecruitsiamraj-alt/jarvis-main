@@ -197,3 +197,19 @@ export function siamrajExternalId(job: JobRequest): string | null {
   if (job.id.startsWith('siamraj:')) return job.id.slice('siamraj:'.length);
   return null;
 }
+
+/** ผู้รับผิดชอบของ **ทุกใบ** — Dashboard ใช้กรองกราฟ/การ์ดตามเจ้าหน้าที่ (18 ส.ค. 2569) */
+export async function fetchAllUnitAssignees(): Promise<
+  Array<{
+    request_no: string;
+    recruiter_name: string | null;
+    screener_name: string | null;
+    opl_name: string | null;
+    online_name: string | null;
+  }>
+> {
+  const r = await apiFetch('/api/siamraj/unit-assignments?all=1', { cache: 'no-store' });
+  if (!r.ok) return [];
+  const data = await readJsonSafe<{ items?: Array<{ request_no: string; recruiter_name: string | null; screener_name: string | null; opl_name: string | null; online_name: string | null }> }>(r);
+  return Array.isArray(data.items) ? data.items : [];
+}

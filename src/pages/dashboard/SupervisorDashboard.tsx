@@ -29,6 +29,14 @@ import {
   buildLeadKindBreakdown,
   leadKindMismatchNote,
 } from '@/lib/dashboard/leadKindBreakdown';
+import {
+  assigneeRequestKeys,
+  buildRequestKeySet,
+  needsRequestScopeFilter,
+  scopeDropNote,
+  scopeThroughputByRequestKeys,
+  type UnitAssignee,
+} from '@/lib/dashboard/throughputScope';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import {
   filterJobsClosedInPeriod,
@@ -57,7 +65,11 @@ import {
   loadSupervisorDashboardFilters,
   saveSupervisorDashboardFilters,
 } from '@/lib/supervisorDashboardPageState';
-import { fetchSiamrajThroughput, fetchSiamrajClosedRequests } from '@/lib/siamrajUnitRequestsApi';
+import {
+  fetchAllUnitAssignees,
+  fetchSiamrajThroughput,
+  fetchSiamrajClosedRequests,
+} from '@/lib/siamrajUnitRequestsApi';
 import {
   filterJobsForThroughput,
   filterThroughputByDepartment,
@@ -93,9 +105,26 @@ const SupervisorDashboard: React.FC = () => {
    * จะดึงก็ต่อเมื่อคนกดกางแผง "ภาระงานตามผู้รับผิดชอบ" ซึ่งเป็นที่เดียวที่ใช้ยอดปิดรายคน
    */
   const [closedAllJobs, setClosedAllJobs] = useState<JobRequest[] | null>(null);
+  /** ผู้รับผิดชอบทุกใบ (รวมใบที่ปิดแล้ว) — โหลดครั้งเดียว ใช้กรองตามเจ้าหน้าที่ */
+  const [assignees, setAssignees] = useState<UnitAssignee[]>([]);
   const [closedAllLoading, setClosedAllLoading] = useState(false);
 
   const RETURN_TO = '/dashboard';
+
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let cancelled = false;
+    void fetchAllUnitAssignees()
+      .then((rows) => {
+        if (!cancelled) setAssignees(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setAssignees([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const { jobs, loading, refreshing, refetch, siamrajPrimary, dbSource } = useUnitRequestsFeed();
 
@@ -335,6 +364,52 @@ const SupervisorDashboard: React.FC = () => {
     [navigate],
   );
 
+  /**
+   * ชุด throughput ที่ **กรอง BU แล้ว** + ช่วงที่การ์ดใช้ — แหล่งเดียวของทั้ง
+   * การ์ด KPI · กราฟ ล่วงหน้า/ฉุกเฉิน · drill-down รายใบ
+   * แยกออกมาเป็น memo เพื่อกันสามที่คำนวณช่วง/ตัวกรองไม่ตรงกันแล้วเลขหลุดจากกัน
+   */
+  const cohortScope = useMemo(() => {
+    const from = period?.from ?? trendMeta.from;
+    const to = period?.to ?? trendMeta.to;
+    const byDept = filterThroughputByDepartment(throughputRecords, unitFilters.departmentFilter);
+    /**
+     * 🔴 **กราฟต้องขยับตามตัวกรองทุกตัว ไม่ใช่แค่ BU** (เจ้าของสั่ง 18 ส.ค. 2569 —
+     * เลือกเจ้าหน้าที่สรรหาชื่อหนึ่งแล้วยอด เข้ามา/ฉุกเฉิน/ล่วงหน้า ต้องเป็นของคนนั้น)
+     *
+     * ผู้รับผิดชอบ/โน้ต/สถานะ **ไม่มีใน throughput** (มาจาก ERP) — ต้องกรองด้วย
+     * รายการเลขที่ใบที่ผ่าน `filterUnitRequests` มาแล้ว ทั้งใบเปิดและใบปิดของช่วงนั้น
+     * ⚠️ ใบที่อยู่นอกชุดถูกตัดออกจริง และยอดที่ตัดถูกรายงานขึ้นจอ (ห้ามหายเงียบ)
+     */
+    if (!needsRequestScopeFilter(unitFilters)) {
+      return { from, to, records: byDept, dropNote: null as string | null };
+    }
+    /**
+     * 🔴 **เลือกเจ้าหน้าที่ → ใช้ตารางมอบหมายทั้งตาราง ไม่ใช่ใบใน feed**
+     * feed มีแต่ใบที่ยังเปิด — ใบที่ปิดไปแล้วของคนนั้นจะหายทั้งกอง
+     * (วัดจริง 18 ส.ค.: "คิว" ดูแล 116 ใบ แต่เปิดอยู่แค่ 51 → ขาด 65 ใบ)
+     * ตัวกรองอื่น (หน่วยงาน/ประเภท/โน้ต/สถานะ/อายุ) ยังต้องใช้ข้อมูลใบ จึงใช้ชุดจาก jobs
+     */
+    const byAssignee = assigneeRequestKeys(assignees, unitFilters);
+    const byJob = buildRequestKeySet([...jobsWithoutAgeFilter, ...scopedClosedJobs]);
+    const needsJobLevel =
+      unitFilters.unitFilter !== 'all' ||
+      unitFilters.jobSubtypeFilter !== 'all' ||
+      unitFilters.urgencyFilter !== 'all' ||
+      unitFilters.noteFilter !== 'all' ||
+      unitFilters.ageDaysFilter !== 'all' ||
+      unitFilters.statusFilter !== 'all';
+
+    let allowed: Set<string>;
+    if (byAssignee && !needsJobLevel) allowed = byAssignee;
+    else if (byAssignee) allowed = new Set([...byAssignee].filter((k) => byJob.has(k)));
+    else allowed = byJob;
+
+    const scoped = scopeThroughputByRequestKeys(byDept, allowed);
+    return { from, to, records: scoped.records, dropNote: scopeDropNote(scoped.droppedPositions) };
+  }, [period, trendMeta, throughputRecords, unitFilters, jobsWithoutAgeFilter, scopedClosedJobs, assignees]);
+
+
   const data = useMemo(() => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
 
@@ -357,12 +432,14 @@ const SupervisorDashboard: React.FC = () => {
         from: trendRange.from,
         to: trendRange.to,
         label: trendRange.label,
-        // throughput มาจาก SQL เป็นยอดรวม ไม่ผ่าน filterUnitRequests เหมือน jobs
-        // ต้องกรอง BU ที่นี่ ไม่งั้น KPI เข้ามา/ปิด/ยกเลิก ค้างที่ยอดทั้งบริษัท
-        throughputRecords: filterThroughputByDepartment(
-          throughputRecords,
-          unitFilters.departmentFilter,
-        ),
+        /**
+         * 🔴 **การ์ด KPI ต้องใช้ชุดเดียวกับกราฟความเร่งด่วนเป๊ะ ๆ** (`cohortScope`)
+         * throughput มาจาก SQL เป็นยอดรวม ไม่ผ่าน `filterUnitRequests` เหมือน jobs
+         * — ถ้ากรองแค่ BU ที่นี่ พอเลือก "เจ้าหน้าที่สรรหา = คิว" กราฟจะเป็นของคิว
+         * แต่การ์ด「เข้ามา」ยังค้างที่ยอดทั้งบริษัท (วัดจริง 18 ส.ค.: กราฟ 54 · การ์ด 7,552)
+         * สองเลขบนจอเดียวกันขัดกันเองแบบนั้นอ่านไม่ออกว่าอันไหนจริง
+         */
+        throughputRecords: cohortScope.records,
       },
       scopedClosedJobs,
       jobsWithoutAgeFilter,
@@ -373,7 +450,7 @@ const SupervisorDashboard: React.FC = () => {
       // โหมดทั้งหมด: ทับด้วยชุดที่รวมใบปิดที่โหลด on-demand แล้ว (ถ้ายังไม่โหลดก็ใช้ของเดิม)
       recruiterOverview: recruiterOverviewAllMode ?? built.recruiterOverview,
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, throughputRecords, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, cohortScope, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {
@@ -487,21 +564,6 @@ const SupervisorDashboard: React.FC = () => {
    * เลขกับรายการจึงเท่ากันทุกโหมด · ใบที่รู้ id เต็มกดเปิดได้ · อัตราที่ระบุใบไม่ได้
    * ขึ้นบอกบนหัวกล่อง ไม่หายเงียบ
    */
-  /**
-   * ชุด throughput ที่ **กรอง BU แล้ว** + ช่วงที่การ์ดใช้ — แหล่งเดียวของทั้ง
-   * การ์ด KPI · กราฟ ล่วงหน้า/ฉุกเฉิน · drill-down รายใบ
-   * แยกออกมาเป็น memo เพื่อกันสามที่คำนวณช่วง/ตัวกรองไม่ตรงกันแล้วเลขหลุดจากกัน
-   */
-  const cohortScope = useMemo(() => {
-    const from = period?.from ?? trendMeta.from;
-    const to = period?.to ?? trendMeta.to;
-    return {
-      from,
-      to,
-      records: filterThroughputByDepartment(throughputRecords, unitFilters.departmentFilter),
-    };
-  }, [period, trendMeta, throughputRecords, unitFilters.departmentFilter]);
-
   /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — null เมื่อยังไม่มี records (ไม่โชว์กราฟเปล่า) */
   const leadKindBreakdown = useMemo(() => {
     if (DEMO_MODE || cohortScope.records.length === 0) return null;
@@ -513,8 +575,19 @@ const SupervisorDashboard: React.FC = () => {
     if (!leadKindBreakdown) return null;
     const intake = data.kpis.find((k) => k.id === 'total_requests');
     if (!intake) return null;
-    return leadKindMismatchNote(leadKindBreakdown, intake.value, intake.secondaryCount ?? 0);
-  }, [leadKindBreakdown, data.kpis]);
+    const mismatch = leadKindMismatchNote(
+      leadKindBreakdown,
+      intake.value,
+      intake.secondaryCount ?? 0,
+    );
+    /**
+     * การ์ดกับกราฟใช้ `cohortScope` ชุดเดียวกันแล้ว → ปกติต้องตรงกันเสมอ
+     * ถ้าไม่ตรงคือของพังจริง ให้ขึ้นคำเตือนตามเดิม
+     * ส่วน `dropNote` เป็น**หมายเหตุประกอบ** บอกว่ากรองแล้วเหลือเท่าไหร่จากทั้งหมด
+     */
+    if (mismatch) return mismatch;
+    return cohortScope.dropNote;
+  }, [leadKindBreakdown, data.kpis, cohortScope.dropNote]);
 
   const openCohortDrillList = useCallback(
     (kpi: CohortDrillKpi, label: string, leadKind?: RequestLeadKind) => {
