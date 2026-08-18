@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
-import CallFunnelPanel from '@/components/follow/CallFunnelPanel';
+import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2 } from 'lucide-react';
@@ -28,13 +28,6 @@ import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
 
-const FILTERS: Array<{ id: 'all' | FollowCallStatus; label: string }> = [
-  { id: 'all', label: 'ทั้งหมด' },
-  { id: 'pending', label: 'รอโทร' },
-  { id: 'delivered', label: 'กำลังโทร' },
-  { id: 'completed', label: 'โทรสำเร็จ' },
-  { id: 'failed', label: 'ไม่สำเร็จ' },
-];
 
 function formatWhen(iso: string | null): string {
   if (!iso) return '—';
@@ -390,7 +383,10 @@ const FollowPage: React.FC = () => {
         {/* funnel การโทร "ของหน้านี้เท่านั้น" + ถัง "ต้องคนตาม"
             เจ้าของสั่ง 10 ส.ค. 2569: หน้านี้เอาแค่ของ Follow พอ ("ตอนนี้มีแค่ 1 พอ")
             ตัวที่กดสลับดูต้นทางอื่นได้ ย้ายไปอยู่หน้าการไหลของงานแล้ว */}
-        <CallFunnelPanel defaultSource="follow" lockSource showAttempts />
+        {/* แผงการโทรแบบ 3 รอบ + ปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 — แทน funnel 4 ช่องเดิม)
+            CallFunnelPanel ใช้ที่หน้านี้ที่เดียว การเปลี่ยนจึงไม่กระทบหน้า Matching
+            (หน้านั้นใช้ AiCallFlowPanel คนละตัว) */}
+        <FollowCallRoundsPanel />
 
 
         {/* สรุป + ปุ่มเพิ่ม */}
@@ -832,24 +828,13 @@ const FollowPage: React.FC = () => {
           </form>
         ) : null}
 
-        {/* ตัวกรอง */}
-        <div className="flex flex-wrap gap-1.5">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={cn(
-                'min-h-[36px] rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
-                filter === f.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'border border-white/70 bg-white/60 text-slate-600 hover:text-foreground dark:border-white/15 dark:bg-white/10 dark:text-slate-300',
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {/* ⚠️ ชิปกรอง "ทั้งหมด / รอโทร / กำลังโทร / โทรสำเร็จ / ไม่สำเร็จ" ถูกถอดออก
+            (เจ้าของสั่ง 18 ส.ค. 2569 ให้เอาไปแทนด้วยแผง 3 รอบด้านบน)
+            แผงใหม่ให้ข้อมูลมากกว่าเดิม: แยกตามรอบโทร + กดแล้วเห็นชื่อพร้อมรายละเอียด
+            ทั้งที่ชิปเดิมบอกได้แค่ยอดรวมข้ามรอบ
+
+            ⚠️ state `filter` ยังอยู่และยังกรองรายการข้างล่างตามเดิม — ตอนนี้ค้างที่
+            'all' เสมอ · จะเอาชิปกลับมาก็แค่คืน block นี้ ไม่ต้องรื้ออย่างอื่น */}
 
         {error ? (
           <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
