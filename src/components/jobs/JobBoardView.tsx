@@ -48,7 +48,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Sparkles, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
 import {
   isUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
@@ -361,14 +361,28 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         ) : (
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 mb-3">
-                <Sparkles className="h-3.5 w-3.5" />
-                บอร์ดประกาศรับสมัคร
-              </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-                ค้นหางานที่เหมาะกับคุณ
-              </h1>
-              <p className="mt-2.5 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
+              {/* หัวหน้าสาธารณะเป็น **โลโก้** แทนข้อความ (เจ้าของสั่ง 17 ส.ค. 2569:
+                  *"บอร์ดประกาศรับสมัคร / ค้นหางานที่เหมาะกับคุณ เปลี่ยนเอาโลโก้นี้ไปแทน"*)
+
+                  ⚠️ ยังต้องมี <h1> ไว้ให้ screen reader และ SEO — หน้านี้เป็นหน้าสาธารณะ
+                  ที่คนค้นเจอจาก Google · ตัดหัวข้อทิ้งทั้งหมด = หน้าไม่มีชื่อเรื่อง
+                  จึงใช้ sr-only แทนการลบ
+
+                  ⚠️ `onError` ถอยไปโลโก้เดิม — ถ้าไฟล์ `/so-logo.png` ยังไม่ถูกวาง
+                  จะได้ไม่เป็นรูปแตกบนหน้าที่คนนอกเห็น */}
+              <h1 className="sr-only">บอร์ดประกาศรับสมัคร — ค้นหางานที่เหมาะกับคุณ</h1>
+              <img
+                src="/so-logo.png"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.fallback === '1') return;
+                  img.dataset.fallback = '1';
+                  img.src = '/so-work-logo.png';
+                }}
+                alt="SO"
+                className="h-16 w-auto sm:h-20 md:h-24"
+              />
+              <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
                 เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
                 <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
               </p>

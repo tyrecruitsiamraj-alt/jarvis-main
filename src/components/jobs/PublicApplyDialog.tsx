@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { apiFetch } from '@/lib/apiFetch';
 import { TITLE_PREFIX_OPTIONS } from '@/lib/titlePrefixOptions';
 import {
@@ -115,7 +115,9 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
     if (!open) return;
     setSubmitted(false);
     setError(null);
-    setPositionInterest(job ? jobBoardCardTitle(job) : '');
+    // เติมช่อง "ตำแหน่งที่สนใจ" ด้วย **ตำแหน่ง** ไม่ใช่ชื่อหน่วยงาน
+    // (เดิมเติมชื่อบริษัท ผู้สมัครส่วนใหญ่ไม่แก้ → ช่องตำแหน่งเก็บชื่อบริษัททั้งระบบ)
+    setPositionInterest(job ? publicJobPositionLabel(job) : '');
   }, [open, job]);
 
   const resetForm = () => {
@@ -196,7 +198,15 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           referral_source: referralSource || null,
           document,
           job_id: job?.id ?? posting?.jobId ?? null,
-          job_title: job ? jobBoardCardTitle(job) : posting?.title ?? null,
+          /**
+           * 🔴 `job_title` ต้องเป็น **ตำแหน่งงาน** ไม่ใช่ชื่อหน่วยงาน
+           * เดิมใส่ `jobBoardCardTitle(job)` ซึ่งคืน **ชื่อหน่วยงาน** → ใบสมัครทุกใบ
+           * เก็บชื่อบริษัทไว้ในช่องตำแหน่ง ผลคือ:
+           *   · คอลัมน์ "ตำแหน่ง — หน่วยงาน" โชว์ชื่อบริษัทซ้ำสองรอบ
+           *   · ตัวย้ายอัตโนมัติ (098) เทียบ "ตำแหน่งเดียวกัน" ไม่เจอสักใบ
+           * ชื่อหน่วยงานมีช่องของตัวเองอยู่แล้วที่ `unit_name` บรรทัดถัดไป
+           */
+          job_title: job ? publicJobPositionLabel(job) : posting?.title ?? null,
           unit_name: job?.unit_name ?? null,
           posting_id: posting?.postingId ?? null,
           link_id: posting?.linkId ?? null,

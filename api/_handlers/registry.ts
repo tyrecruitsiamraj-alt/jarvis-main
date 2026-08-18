@@ -44,6 +44,7 @@ import applicationContactsHandler from './application-contacts.js';
 import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
 import applicationDispatchHandler from './application-dispatch.js';
+import applicationAutoMoveHandler from './application-auto-move.js';
 import jobApplicationDocumentHandler from './job-application-document.js';
 import shortLinksHandler from './short-links.js';
 import shortLinksResolveHandler from './short-links-resolve.js';
@@ -166,6 +167,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/application-attendance': applicationAttendanceHandler as ApiHandler,
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
   '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
+  '/api/application-auto-move': applicationAutoMoveHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,
   '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,
