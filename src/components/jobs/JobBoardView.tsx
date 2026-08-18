@@ -118,6 +118,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selected, setSelected] = useState<JobRequest | null>(null);
+  /**
+   * ไฟล์โลโก้ใหม่ `/so-logo.png` ยังไม่ถูกวางไหม
+   * ถอยไป **หัวข้อข้อความเดิม** ไม่ใช่โลโก้ตัวอื่น — เอาโลโก้ผิดตัวขึ้นแทนคือให้ข้อมูลผิด
+   * บนหน้าที่คนนอกเห็น (เจ้าของทัก 18 ส.ค. 2569 ว่าที่ขึ้นอยู่คนละรูป)
+   */
+  const [boardLogoMissing, setBoardLogoMissing] = useState(false);
   const positionPreset = useMemo(
     () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
     [variant, searchParams],
@@ -313,6 +319,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
   return (
     <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
+      {/* ลายน้ำโลโก้บนหน้าสาธารณะ (เจ้าของสั่ง 18 ส.ค. 2569: *"เอารูปไปทำพื้นหลังเลย
+          ได้ไหมแต่แบบบางๆหน่อย"*)
+
+          ⚠️ ฝั่งเจ้าหน้าที่ไม่ใส่ — หน้านั้นแน่นด้วยตัวเลข ลายน้ำทำให้อ่านยากขึ้นเปล่า ๆ
+          ⚠️ ใช้ CSS background ไม่ใช่ <img> → ไฟล์ยังไม่ถูกวางก็แค่ไม่ขึ้น ไม่มีรูปแตก
+          ⚠️ `pointer-events-none` + `aria-hidden` — เป็นของตกแต่งล้วน ห้ามบังการกดและ
+             ห้ามให้ screen reader อ่าน
+          ⚠️ จางคนละระดับใน light/dark — พื้นเข้มต้องจางกว่า ไม่งั้นโลโก้เด้งข่มเนื้อหา */}
+      {!isStaff ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden select-none"
+        >
+          <div
+            className="absolute -right-16 top-4 h-[26rem] w-[26rem] bg-contain bg-no-repeat bg-center opacity-[0.05] dark:opacity-[0.03] md:h-[34rem] md:w-[34rem]"
+            style={{ backgroundImage: 'url(/so-logo.png)' }}
+          />
+        </div>
+      ) : null}
 
       <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
         {/* ฝั่งเจ้าหน้าที่ = hero เข้มตาม mockup rev.3 ข้อ 04 · ฝั่งคนนอกคงหัวสว่างเดิมไว้ (หน้าแบรนด์) */}
@@ -370,18 +395,21 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
                   ⚠️ `onError` ถอยไปโลโก้เดิม — ถ้าไฟล์ `/so-logo.png` ยังไม่ถูกวาง
                   จะได้ไม่เป็นรูปแตกบนหน้าที่คนนอกเห็น */}
-              <h1 className="sr-only">บอร์ดประกาศรับสมัคร — ค้นหางานที่เหมาะกับคุณ</h1>
-              <img
-                src="/so-logo.png"
-                onError={(e) => {
-                  const img = e.currentTarget;
-                  if (img.dataset.fallback === '1') return;
-                  img.dataset.fallback = '1';
-                  img.src = '/so-work-logo.png';
-                }}
-                alt="SO"
-                className="h-16 w-auto sm:h-20 md:h-24"
-              />
+              {boardLogoMissing ? (
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
+                  ค้นหางานที่เหมาะกับคุณ
+                </h1>
+              ) : (
+                <>
+                  <h1 className="sr-only">บอร์ดประกาศรับสมัคร — ค้นหางานที่เหมาะกับคุณ</h1>
+                  <img
+                    src="/so-logo.png"
+                    onError={() => setBoardLogoMissing(true)}
+                    alt="SO"
+                    className="h-16 w-auto sm:h-20 md:h-24"
+                  />
+                </>
+              )}
               <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
                 เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
                 <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
