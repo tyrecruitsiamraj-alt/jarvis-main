@@ -140,3 +140,31 @@ describe('buildCohortDrillDown', () => {
     expect(r.requestCount).toBe(0);
   });
 });
+
+describe('ป้ายล่วงหน้า/ฉุกเฉินบน drill-down (เจ้าของสั่ง 18 ส.ค. 2569)', () => {
+  it('ติดป้ายตามที่ API ส่งมา และพา requiredDate มาด้วย', () => {
+    const records: ThroughputRecord[] = [
+      rec({ requestNo: 'U1', requestDate: '2026-08-01', positionUnits: 1, kind: 'filled', leadKind: 'urgent', requiredDate: '2026-08-03' }),
+      rec({ requestNo: 'A1', requestDate: '2026-08-02', positionUnits: 1, kind: 'filled', leadKind: 'advance', requiredDate: '2026-09-01' }),
+      rec({ requestNo: 'R1', requestDate: '2026-08-03', positionUnits: 1, kind: 'filled', leadKind: 'retroactive', requiredDate: '2026-07-20' }),
+    ];
+    const r = buildCohortDrillDown(records, '2026-08-01', '2026-08-31', 'closed');
+    expect(r.rows.map((x) => [x.requestNo, x.leadKind])).toEqual([
+      ['U1', 'urgent'],
+      ['A1', 'advance'],
+      ['R1', 'retroactive'],
+    ]);
+    expect(r.rows[0].requiredDate).toBe('2026-08-03');
+  });
+
+  it('🔴 แถวเก่าที่ไม่มี leadKind ต้องไม่พัง และไม่เดาเป็นฉุกเฉิน', () => {
+    const r = buildCohortDrillDown(
+      [rec({ requestNo: 'OLD', requestDate: '2026-08-05', positionUnits: 2, kind: 'filled', leadKind: undefined, requiredDate: undefined })],
+      '2026-08-01',
+      '2026-08-31',
+      'closed',
+    );
+    expect(r.rows[0].leadKind).toBe('advance');
+    expect(r.rows[0].requiredDate).toBeNull();
+  });
+});

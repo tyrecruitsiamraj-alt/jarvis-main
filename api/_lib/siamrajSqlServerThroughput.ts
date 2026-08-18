@@ -1,5 +1,6 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
+import { requestLeadKindFromYmd, type RequestLeadKind } from '../../src/lib/requestLeadKind.js';
 import { toBangkokYmd } from './businessDate.js';
 import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 import {
@@ -30,6 +31,10 @@ export type SiamrajThroughputRecord = {
   /** ชื่อหน่วยงาน/ลูกค้า — มีไว้ให้ drill-down อ่านออกโดยไม่ต้องยิงเส้นอื่น */
   unitName?: string;
   siteCode?: string;
+  /** วันที่ต้องการคน (want_date_from) — ใช้คิดว่าเป็นล่วงหน้าหรือฉุกเฉิน */
+  requiredDate?: string | null;
+  /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง — กฎเดียวกับหน้าเว็บ (`requestLeadKind.ts`) */
+  leadKind?: RequestLeadKind;
   /** รหัส BU ของไซต์ (ms_site.department_code) — ให้ dashboard กรองตาม BU ที่เลือกได้ */
   departmentCode?: string;
   requestDate: string;
@@ -109,6 +114,12 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
     : undefined;
   const unitName =
     (row.customer_name || '').trim() || (row.site_name || '').trim() || siteCode || undefined;
+  /**
+   * ล่วงหน้า/ฉุกเฉิน คิดจาก **วันที่กรอกใบ → วันที่ต้องการคน** ตัวเดียวกับหน้ารายการใบขอ
+   * ⚠️ `requestDate` ที่ใช้ตรงนี้คือวันที่กรอกจริง (`request_date`) ไม่ใช่ effective date
+   */
+  const requiredDate = toYmd(row.want_date_from);
+  const leadKind = requestLeadKindFromYmd(toYmd(row.request_date), requiredDate);
   const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
   const requestActionCode = (row.request_action_code || '').trim() || undefined;
@@ -119,6 +130,8 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
     requestNoDisplay,
     unitName,
     siteCode,
+    requiredDate,
+    leadKind,
     departmentCode,
     requestActionName,
     requestActionCode,

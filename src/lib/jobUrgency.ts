@@ -2,8 +2,9 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest, JobUrgency } from '@/types';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { toYmdBangkok } from '@/lib/dateTh';
+import { requestLeadKindFromDays, URGENCY_LEAD_DAYS } from '@/lib/requestLeadKind';
 
-export const URGENCY_LEAD_DAYS = 7;
+export { URGENCY_LEAD_DAYS };
 
 /** สถานะใบขอ — คำนวณจากวันที่กรอก vs วันที่ต้องการ */
 export type RequestStatusKind = 'retroactive' | 'urgent' | 'advance';
@@ -196,15 +197,16 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
   const daysPastRequired = differenceInCalendarDays(today0, required);
   const wasAdvanceAtSubmit = leadDays >= URGENCY_LEAD_DAYS;
 
-  if (leadDays < 0) {
-    return { kind: 'retroactive', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: false };
-  }
-
-  if (leadDays < URGENCY_LEAD_DAYS) {
-    return { kind: 'urgent', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: false };
-  }
-
-  return { kind: 'advance', leadDays, daysUntilRequired, daysPastRequired, wasAdvanceAtSubmit: true };
+  // เส้นแบ่ง ล่วงหน้า/ฉุกเฉิน/ย้อนหลัง อยู่ที่ `requestLeadKind.ts` ที่เดียว
+  // (ฝั่ง API ของ throughput ใช้ตัวเดียวกัน — เขียนซ้ำเมื่อไหร่คือรอวันเพี้ยน)
+  const kind = requestLeadKindFromDays(leadDays);
+  return {
+    kind,
+    leadDays,
+    daysUntilRequired,
+    daysPastRequired,
+    wasAdvanceAtSubmit: kind === 'advance',
+  };
 }
 
 /**

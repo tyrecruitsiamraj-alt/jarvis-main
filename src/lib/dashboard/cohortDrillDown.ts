@@ -1,4 +1,5 @@
 import type { ThroughputRecord } from '@/lib/dashboard/throughput';
+import { requestLeadKindFromDays, type RequestLeadKind } from '@/lib/requestLeadKind';
 
 /**
  * drill-down ของการ์ด **เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ** บน Request Control Tower
@@ -33,6 +34,10 @@ export type CohortDrillRow = {
   siteCode: string | null;
   departmentCode: string | null;
   requestDate: string;
+  /** วันที่ต้องการคน · null = ERP ไม่ได้กรอก */
+  requiredDate: string | null;
+  /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง — เจ้าของสั่งให้บอกบน drill-down 18 ส.ค. 2569 */
+  leadKind: RequestLeadKind;
   requestActionName: string | null;
   /** อัตราของถังที่กด (เข้ามา = ทั้งใบ · ปิด/ยกเลิก/คงเหลือ = เฉพาะส่วนนั้น) */
   positions: number;
@@ -101,6 +106,9 @@ export function buildCohortDrillDown(
         siteCode: (r.siteCode || '').trim() || null,
         departmentCode: (r.departmentCode || '').trim().toUpperCase() || null,
         requestDate: r.requestDate,
+        requiredDate: r.requiredDate ?? null,
+        // แถวเก่าที่ยังไม่มี leadKind (deploy ก่อนหน้า) ให้ถอยไปคิดจากวันเอง
+        leadKind: r.leadKind ?? requestLeadKindFromDays(null),
         requestActionName: (r.requestActionName || '').trim() || null,
         positions: 0,
         requestPositions: 0,

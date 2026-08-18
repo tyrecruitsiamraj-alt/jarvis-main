@@ -2,6 +2,8 @@ import type { JobRequest } from '@/types';
 import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
 import { positionBreakdownFromJob } from '@/lib/requestControl';
 import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/types';
+import { computeJobUrgency } from '@/lib/jobUrgency';
+import type { RequestLeadKind } from '@/lib/requestLeadKind';
 
 export type ThroughputRecord = {
   /** เลขที่ใบขอ**ดิบ** — คีย์จัดกลุ่มของ drill-down · ห้ามตัดนำหน้าทิ้ง (เลขท้ายซ้ำข้าม BU) */
@@ -12,6 +14,10 @@ export type ThroughputRecord = {
   requestNoDisplay?: string;
   unitName?: string;
   siteCode?: string;
+  /** วันที่ต้องการคน */
+  requiredDate?: string | null;
+  /** ล่วงหน้า / ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง */
+  leadKind?: RequestLeadKind;
   /** รหัส BU ของไซต์ — throughput เป็นยอดรวมจาก SQL ที่ไม่ผ่านตัวกรองฝั่ง client
    *  ถ้าไม่มีมิตินี้ KPI เข้ามา/ปิด/ยกเลิก จะไม่ขยับตาม BU ที่เลือก */
   departmentCode?: string;
@@ -81,6 +87,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     const requestNoDisplay = (j.request_no || '').trim() || requestNo;
     const unitName = (j.unit_name || '').trim() || undefined;
     const siteCode = j.site_code?.trim() || undefined;
+    const requiredDate = safeYmd(j.required_date);
+    const leadKind = computeJobUrgency(j, today).kind;
     const b = positionBreakdownFromJob(j);
     const closureDate =
       b.remainingPositions === 0
@@ -96,6 +104,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         requestNoDisplay,
         unitName,
         siteCode,
+        requiredDate,
+        leadKind,
         departmentCode,
         requestDate,
         closureDate: closedYmd,
@@ -121,6 +131,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         requestNoDisplay,
         unitName,
         siteCode,
+        requiredDate,
+        leadKind,
         departmentCode,
         requestDate,
         closureDate: closedYmd,
@@ -146,6 +158,8 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
         requestNoDisplay,
         unitName,
         siteCode,
+        requiredDate,
+        leadKind,
         departmentCode,
         requestDate,
         closureDate: null,

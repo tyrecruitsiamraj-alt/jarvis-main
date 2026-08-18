@@ -6,6 +6,7 @@ import type { RequestControlRecord } from '@/lib/requestControl';
 import { lifecycleKindLabel } from '@/lib/dashboard/lifecycle';
 import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
 import type { CohortDrillKpi, CohortDrillRow } from '@/lib/dashboard/cohortDrillDown';
+import { REQUEST_LEAD_KIND_LABEL } from '@/lib/requestLeadKind';
 
 export type DashboardDetailDialogItem = {
   id: string;
@@ -111,11 +112,18 @@ export function cohortRowToDashboardDetailItem(
     `ยกเลิก ${row.cancelledPositions.toLocaleString('th-TH')}`,
     `เหลือ ${row.remainingPositions.toLocaleString('th-TH')}`,
   ].join(' · ');
+  /**
+   * เจ้าของสั่ง 18 ส.ค. 2569: *"กดดูแล้วโชว์หน่วยงาน บอกหน่อยว่าเป็นงานล่วงหน้าหรือฉุกเฉิน"*
+   * — ขึ้นเป็นคำแรกของบรรทัดรอง พร้อมวันที่ต้องการคน จะได้เห็นว่าทำไมถึงเร่ง
+   */
+  const leadLabel = REQUEST_LEAD_KIND_LABEL[row.leadKind];
   return {
     id: row.jobId ?? row.requestNo,
     title: `${row.unitName ?? '—'} (${row.requestNoDisplay})`,
     subtitle: [
+      leadLabel,
       `เข้ามา ${formatYmdDmyBe(row.requestDate)}`,
+      row.requiredDate ? `ต้องการ ${formatYmdDmyBe(row.requiredDate)}` : null,
       row.requestActionName,
       buckets,
       row.siteCode ? `ไซต์ ${row.siteCode}` : null,

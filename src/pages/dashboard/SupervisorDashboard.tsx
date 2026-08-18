@@ -26,6 +26,11 @@ import {
 } from '@/lib/dashboard/dashboardDetailDialog';
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import {
+  buildLeadKindBreakdown,
+  leadKindMismatchNote,
+} from '@/lib/dashboard/leadKindBreakdown';
+import type { RequestLeadKind } from '@/lib/requestLeadKind';
+import {
   filterJobsClosedInPeriod,
   filterJobsForAgeBucket,
   filterJobsForDashboardKpi,
@@ -482,21 +487,53 @@ const SupervisorDashboard: React.FC = () => {
    * เลขกับรายการจึงเท่ากันทุกโหมด · ใบที่รู้ id เต็มกดเปิดได้ · อัตราที่ระบุใบไม่ได้
    * ขึ้นบอกบนหัวกล่อง ไม่หายเงียบ
    */
+  /**
+   * ชุด throughput ที่ **กรอง BU แล้ว** + ช่วงที่การ์ดใช้ — แหล่งเดียวของทั้ง
+   * การ์ด KPI · กราฟ ล่วงหน้า/ฉุกเฉิน · drill-down รายใบ
+   * แยกออกมาเป็น memo เพื่อกันสามที่คำนวณช่วง/ตัวกรองไม่ตรงกันแล้วเลขหลุดจากกัน
+   */
+  const cohortScope = useMemo(() => {
+    const from = period?.from ?? trendMeta.from;
+    const to = period?.to ?? trendMeta.to;
+    return {
+      from,
+      to,
+      records: filterThroughputByDepartment(throughputRecords, unitFilters.departmentFilter),
+    };
+  }, [period, trendMeta, throughputRecords, unitFilters.departmentFilter]);
+
+  /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — null เมื่อยังไม่มี records (ไม่โชว์กราฟเปล่า) */
+  const leadKindBreakdown = useMemo(() => {
+    if (DEMO_MODE || cohortScope.records.length === 0) return null;
+    return buildLeadKindBreakdown(cohortScope.records, cohortScope.from, cohortScope.to);
+  }, [cohortScope]);
+
+  /** เทียบกราฟกับการ์ด「เข้ามา」ทุกครั้ง — ไม่ตรงเมื่อไหร่ให้หน้าจอบอกเอง */
+  const leadKindMismatch = useMemo(() => {
+    if (!leadKindBreakdown) return null;
+    const intake = data.kpis.find((k) => k.id === 'total_requests');
+    if (!intake) return null;
+    return leadKindMismatchNote(leadKindBreakdown, intake.value, intake.secondaryCount ?? 0);
+  }, [leadKindBreakdown, data.kpis]);
+
   const openCohortDrillList = useCallback(
-    (kpi: CohortDrillKpi, label: string) => {
-      const from = period?.from ?? trendMeta.from;
-      const to = period?.to ?? trendMeta.to;
-      const records = filterThroughputByDepartment(throughputRecords, unitFilters.departmentFilter);
+    (kpi: CohortDrillKpi, label: string, leadKind?: RequestLeadKind) => {
+      const { from, to, records } = cohortScope;
       const drill = buildCohortDrillDown(records, from, to, kpi);
+      // กดแท่งกราฟ = ดูเฉพาะใบของถังนั้น (ยอดหัวกล่องคิดใหม่จากแถวที่เหลือ)
+      const rows = leadKind ? drill.rows.filter((r) => r.leadKind === leadKind) : drill.rows;
+      const positions = leadKind
+        ? rows.reduce((sum, r) => sum + r.positions, 0)
+        : drill.positions;
       const noteMissing =
-        drill.positionsWithoutRequestNo > 0
+        !leadKind && drill.positionsWithoutRequestNo > 0
           ? ` · อีก ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตราไม่มีเลขที่ใบ ลิสต์ไม่ได้`
           : '';
       setDetailDialogTitle(
-        `${label} (${drill.positions.toLocaleString('th-TH')} อัตรา · ${drill.requestCount.toLocaleString('th-TH')} ใบขอ)${noteMissing}`,
+        `${label} (${positions.toLocaleString('th-TH')} อัตรา · ${rows.length.toLocaleString('th-TH')} ใบขอ)${noteMissing}`,
       );
       setDetailDialogItems(
-        drill.rows.map((row) => {
+        rows.map((row) => {
           // ใบเปิดใน feed มีข้อมูลเต็ม — ใช้ตัวจริงนำทาง · ใบปิด/นอก feed รู้แค่ id เต็มก็เปิดหน้าใบได้
           const feedJob = (row.jobId ? jobById.get(row.jobId) : undefined) ?? jobById.get(row.requestNo);
           const navJob =
@@ -518,7 +555,15 @@ const SupervisorDashboard: React.FC = () => {
       );
       setDetailDialogOpen(true);
     },
-    [period, trendMeta, throughputRecords, unitFilters.departmentFilter, jobById, navigate],
+    [cohortScope, jobById, navigate],
+  );
+
+  /** กดแท่งกราฟ ล่วงหน้า/ฉุกเฉิน → ลิสต์ใบขอของถังนั้น (ฐานเดียวกับการ์ด「เข้ามา」) */
+  const handleLeadKindClick = useCallback(
+    (kind: RequestLeadKind, label: string) => {
+      openCohortDrillList('total_requests', `เข้ามา · ${label}`, kind);
+    },
+    [openCohortDrillList],
   );
 
   const handleKpiClick = useCallback(
@@ -732,6 +777,9 @@ const SupervisorDashboard: React.FC = () => {
       onExport={handleExport}
       onViewItem={handleView}
       onKpiClick={DEMO_MODE ? undefined : handleKpiClick}
+      leadKindBreakdown={leadKindBreakdown}
+      leadKindMismatch={leadKindMismatch}
+      onLeadKindClick={DEMO_MODE ? undefined : handleLeadKindClick}
       onCohortClick={DEMO_MODE ? undefined : handleCohortClick}
       onFilledBreakdownClick={DEMO_MODE ? undefined : handleFilledBreakdownClick}
       onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}

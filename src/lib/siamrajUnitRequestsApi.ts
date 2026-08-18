@@ -40,6 +40,8 @@ export type SiamrajThroughputRecord = {
   requestNoDisplay?: string;
   unitName?: string;
   siteCode?: string;
+  requiredDate?: string | null;
+  leadKind?: 'retroactive' | 'urgent' | 'advance';
   /** รหัส BU ของไซต์ — ใช้กรอง KPI เข้ามา/ปิด/ยกเลิก ตาม BU ที่เลือก */
   departmentCode?: string;
   requestDate: string;

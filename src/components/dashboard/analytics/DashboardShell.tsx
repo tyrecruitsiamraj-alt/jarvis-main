@@ -9,6 +9,7 @@ import DashboardFilterBar from './DashboardFilterBar';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardHeroStrip from './DashboardHeroStrip';
+import DashboardLeadKindChart from './DashboardLeadKindChart';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
@@ -17,6 +18,8 @@ import DashboardFlowViewCard from './DashboardFlowView';
 import DashboardCohortSummaryCard from './DashboardCohortSummary';
 import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
+import type { LeadKindBreakdown } from '@/lib/dashboard/leadKindBreakdown';
+import type { RequestLeadKind } from '@/lib/requestLeadKind';
 
 type FilterOptions = {
   departmentOptions: { value: string; label: string }[];
@@ -55,6 +58,10 @@ type Props = {
    * ยอดรวมฝั่ง ERP ซึ่ง**รวมใบที่อยู่นอก feed ของกล่องงาน** ลิสต์จึงน้อยกว่าได้เป็นปกติ
    */
   onKpiClick?: (kpiId: string, label: string, expectedRequests?: number | null) => void;
+  /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า (18 ส.ค. 2569) — ไม่ส่ง = ไม่แสดงกราฟ (เช่นโหมด demo) */
+  leadKindBreakdown?: LeadKindBreakdown | null;
+  leadKindMismatch?: string | null;
+  onLeadKindClick?: (kind: RequestLeadKind, label: string) => void;
   onCohortClick?: (rowId: string, label: string) => void;
   onFilledBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
@@ -87,6 +94,9 @@ const DashboardShell: React.FC<Props> = ({
   onExport,
   onViewItem,
   onKpiClick,
+  leadKindBreakdown,
+  leadKindMismatch,
+  onLeadKindClick,
   onCohortClick,
   onFilledBreakdownClick,
   onFullyClosedBreakdownClick,
@@ -267,6 +277,17 @@ const DashboardShell: React.FC<Props> = ({
                 </div>
               </div>
 
+              {/* กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — วางใต้การ์ด KPI ให้เห็นทันทีโดยไม่ต้องกางแผง
+                  (เจ้าของสั่ง 18 ส.ค. 2569) · เลขชุดเดียวกับการ์ด「เข้ามา」 เปลี่ยนตามตัวกรองเอง */}
+              {leadKindBreakdown ? (
+                <DashboardLeadKindChart
+                  breakdown={leadKindBreakdown}
+                  scopeLabel={data.activityTrendLabel || data.periodLabel}
+                  mismatchNote={leadKindMismatch ?? null}
+                  onSliceClick={onLeadKindClick}
+                />
+              ) : null}
+
               {/* ⚠️ การ์ด "ต้องแก้วันนี้" (DashboardPriorityQueue) ถูกเอาออก 10 ส.ค. 2569 ตามที่เจ้าของสั่ง
                   — ตัวคำนวณ `priorityWorkQueue` ยังอยู่ใน buildDashboardData และยังมีเทสต์คุม
                   เผื่อเอากลับมา · เหลือ "สมการงานค้าง" เต็มความกว้าง */}
@@ -358,8 +379,8 @@ const DashboardShell: React.FC<Props> = ({
                 />
               </DashboardExpandablePanel>
               <DashboardExpandablePanel
-                title="แนวโน้มรายเดือน & Life Cycle"
-                subtitle="เข้ามา/ปิดแล้ว/ยกเลิก/คงเหลือ · ลาออก/เปลี่ยนตัว/เพิ่มอัตรา/เปิดไซต์ — กดเพื่อดู"
+                title="แนวโน้มรายเดือน"
+                subtitle="เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ — กดเพื่อดู"
                 open={showLifecycle}
                 onOpenChange={setShowLifecycle}
               >
