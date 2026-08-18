@@ -32,7 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw, X } from 'lucide-react';
 
 /**
  * แผงการโทรของหน้า Follow — **3 รอบ + ปฏิทิน** (เจ้าของสั่ง 18 ส.ค. 2569)
@@ -109,6 +109,11 @@ export default function FollowCallRoundsPanel() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
   const [activeRound, setActiveRound] = useState(1);
+  /**
+   * วันที่เลือกบนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569: *"เลือกวันที่แล้วให้รายละเอียดเปลี่ยนตาม"*)
+   * — เลือกแล้วทั้งแท็บ/กล่อง/รายชื่อกรองเป็นของวันนั้น · กดวันเดิมซ้ำ = ยกเลิกเลือก
+   */
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -123,19 +128,27 @@ export default function FollowCallRoundsPanel() {
    * คนในแต่ละรอบ — นับจาก **ชุดเดียวกับที่แสดงชื่อ** ยอดกับรายชื่อจึงตรงกันเสมอ
    * (เดิมยอดมาจาก funnel ที่นับแถวคิว ทำให้มีเคสยอดไม่ตรงกับชื่อที่กางออกมา)
    */
+  /** ชุดที่แผงทั้งแผงใช้ — เลือกวันบนปฏิทินแล้วเหลือเฉพาะของวันนั้น (ตั้งไว้หรือมีผลกลับ) */
+  const scopedEntries = useMemo(() => {
+    if (!selectedDay) return entries;
+    return entries.filter(
+      (e) => callDayKey(e.scheduled_at) === selectedDay || callDayKey(e.called_at) === selectedDay,
+    );
+  }, [entries, selectedDay]);
+
   const roundRows = useMemo(() => {
     const map = new Map<number, FollowEntry[]>([
       [1, []],
       [2, []],
       [3, []],
     ]);
-    for (const e of entries) {
+    for (const e of scopedEntries) {
       // ยังไม่เคยเข้าคิวและยังไม่มีผล = ยังไม่อยู่รอบไหน
       if (e.call_attempt == null && e.call_status === 'pending' && !e.call_outcome) continue;
       map.get(callAttemptSlot(e.call_attempt))?.push(e);
     }
     return map;
-  }, [entries]);
+  }, [scopedEntries]);
 
   const countsByRound = useMemo(() => {
     const map = new Map<number, ReturnType<typeof countFollowRoundBuckets>>();
@@ -153,17 +166,6 @@ export default function FollowCallRoundsPanel() {
       title: `${roundTabLabel(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
       hint: FOLLOW_ROUND_BUCKET_HINT[b],
       people: list,
-    });
-  };
-
-  const openDayDialog = (ymd: string) => {
-    const people = entries.filter(
-      (e) => callDayKey(e.scheduled_at) === ymd || callDayKey(e.called_at) === ymd,
-    );
-    setPeopleDialog({
-      title: `${formatYmdDmyBe(ymd)} · ${people.length.toLocaleString('th-TH')} คน`,
-      hint: 'คนที่ตั้งไว้ว่าจะโทร หรือมีผลโทรกลับมาในวันนี้',
-      people,
     });
   };
 
@@ -189,6 +191,21 @@ export default function FollowCallRoundsPanel() {
         </div>
         {/* มุมขวาบน: ปฏิทิน (popover) + รีเฟรช */}
         <div className="flex shrink-0 items-center gap-2">
+          {selectedDay ? (
+            <button
+              type="button"
+              onClick={() => setSelectedDay(null)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold',
+                TONE.info.soft,
+                TONE.info.value,
+              )}
+              title="กดเพื่อกลับไปดูทุกวัน"
+            >
+              เฉพาะวันที่ {formatYmdDmyBe(selectedDay)}
+              <X className="h-3 w-3" aria-hidden />
+            </button>
+          ) : null}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
               <button type="button" className="jarvis-btn-ghost shrink-0">
@@ -232,7 +249,10 @@ export default function FollowCallRoundsPanel() {
                       key={ymd}
                       type="button"
                       disabled={!has}
-                      onClick={() => openDayDialog(ymd)}
+                      onClick={() => {
+                        setSelectedDay((cur) => (cur === ymd ? null : ymd));
+                        setCalendarOpen(false);
+                      }}
                       title={has ? `ตั้งไว้ ${planned} · โทรแล้ว ${called}` : undefined}
                       className={cn(
                         'rounded-md border px-1 py-1 transition-colors',

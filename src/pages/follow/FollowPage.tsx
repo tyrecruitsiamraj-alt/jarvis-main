@@ -23,6 +23,7 @@ import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
+import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import {
   firstIncompleteStep,
   followStepError,
@@ -134,6 +135,16 @@ const FollowPage: React.FC = () => {
    * มาเรนเดอร์แถวเดียวกันทันที คลิกที่สองของคนกดเร็วตกลงบนบันทึกพอดี (โดนจริง 18 ส.ค.)
    */
   const step3EnteredAtRef = useRef(0);
+  /**
+   * popup เตือนลงซ้ำ (เจ้าของสั่ง 18 ส.ค. 2569) — เก็บทั้งกองซ้ำและกองที่ไม่ซ้ำ
+   * `null` = ไม่มีเตือนค้าง · ตรรกะเทียบอยู่ที่ `followDuplicateGuard.ts` (pure + เทสต์)
+   */
+  const [dupWarning, setDupWarning] = useState<{
+    duplicates: DuplicateRound[];
+    freshIso: string[];
+    /** โหมดตาราง: ยิงตามชุดวันเดิม · โหมดเวลา: ยิงตาม freshIso */
+    proceed: () => Promise<void>;
+  } | null>(null);
 
   /** ใบขอที่ยังเปิด — ใช้เป็นตัวเลือกหน่วยงาน · โหลดไม่ได้ = พิมพ์ชื่อเองได้เหมือนเดิม */
   useEffect(() => {
@@ -353,36 +364,54 @@ const FollowPage: React.FC = () => {
         return;
       }
       const groupId = crypto.randomUUID();
-      setSubmitting(true);
-      let done = 0;
-      try {
-        for (const day of days) {
-          await createFollowEntry({
-            recipient_name: recipientName,
-            recipient_phone: phone,
-            topic,
-            note: note || undefined,
-            staff_phone: staffPhone || undefined,
-            scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
-            group_id: groupId,
-            call_times: rounds,
-            unit_name: unitName.trim() || undefined,
-            site_code: siteCode.trim() || undefined,
-          });
-          done += 1;
+      const dayIsos = days.map((day) => new Date(`${day}T${rounds[0]}:00+07:00`).toISOString());
+      const dupCheck = findScheduleDuplicates(phone, dayIsos, items);
+      const runSchedule = async (sendDays: string[]) => {
+        setSubmitting(true);
+        let done = 0;
+        try {
+          for (const day of sendDays) {
+            await createFollowEntry({
+              recipient_name: recipientName,
+              recipient_phone: phone,
+              topic,
+              note: note || undefined,
+              staff_phone: staffPhone || undefined,
+              scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
+              group_id: groupId,
+              call_times: rounds,
+              unit_name: unitName.trim() || undefined,
+              site_code: siteCode.trim() || undefined,
+            });
+            done += 1;
+          }
+          resetForm();
+          setFormOpen(false);
+          setOkMessage(
+            `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย)`,
+          );
+          window.setTimeout(() => setOkMessage(null), 6000);
+          await reload();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
+          setFormError(done > 0 ? `${msg} — ตั้งไปแล้ว ${done} จาก ${sendDays.length} วัน อย่ากดซ้ำทั้งชุด` : msg);
+          if (done > 0) await reload();
+        } finally {
+          setSubmitting(false);
         }
-        resetForm();
-        setFormOpen(false);
-        setOkMessage(`ตั้งตารางโทรแล้ว — ${days.length} วัน วันละ ${rounds.length} รอบ (รวม ${days.length * rounds.length} สาย)`);
-        window.setTimeout(() => setOkMessage(null), 6000);
-        await reload();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
-        setFormError(done > 0 ? `${msg} — ตั้งไปแล้ว ${done} จาก ${days.length} วัน อย่ากดซ้ำทั้งชุด` : msg);
-        if (done > 0) await reload();
-      } finally {
-        setSubmitting(false);
+      };
+      if (dupCheck.duplicates.length > 0) {
+        // วันที่ไม่ซ้ำ = วันที่รอบแรกของวันนั้นอยู่ในกอง fresh
+        const freshSet = new Set(dupCheck.freshIso);
+        const freshDays = days.filter((day, i) => freshSet.has(dupCheck.freshIso.find((x) => x === dayIsos[i]) ?? ''));
+        setDupWarning({
+          duplicates: dupCheck.duplicates,
+          freshIso: dupCheck.freshIso,
+          proceed: () => runSchedule(freshDays),
+        });
+        return;
       }
+      await runSchedule(days);
       return;
     }
 
@@ -393,42 +422,57 @@ const FollowPage: React.FC = () => {
       return;
     }
 
-    setSubmitting(true);
-    let done = 0;
-    try {
-      for (const t of times) {
-        await createFollowEntry({
-          recipient_name: recipientName,
-          recipient_phone: phone,
-          topic,
-          note: note || undefined,
-          staff_phone: staffPhone || undefined,
-          scheduled_at: new Date(t).toISOString(),
-          unit_name: unitName.trim() || undefined,
-          site_code: siteCode.trim() || undefined,
-        });
-        done += 1;
+    /**
+     * 🔴 เตือนลงซ้ำก่อนยิง (เจ้าของสั่ง 18 ส.ค. 2569: *"นายคนนี้ลงวันเวลาเดิม
+     * ก็เด้งเตือนเลยว่าซ้ำ"*) — เบอร์เดิม+เวลาเดิม (ระดับนาที) กับรายการที่ยังไม่ยกเลิก
+     */
+    const isoTimes = times.map((t) => new Date(t).toISOString());
+    const dupCheck = findScheduleDuplicates(phone, isoTimes, items);
+    const runTimes = async (sendIso: string[]) => {
+      setSubmitting(true);
+      let done = 0;
+      try {
+        for (const t of sendIso) {
+          await createFollowEntry({
+            recipient_name: recipientName,
+            recipient_phone: phone,
+            topic,
+            note: note || undefined,
+            staff_phone: staffPhone || undefined,
+            scheduled_at: t,
+            unit_name: unitName.trim() || undefined,
+            site_code: siteCode.trim() || undefined,
+          });
+          done += 1;
+        }
+        resetForm();
+        setFormOpen(false);
+        setOkMessage(
+          sendIso.length > 1 ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${sendIso.length} รอบ` : 'เพิ่มรายชื่อแล้ว',
+        );
+        window.setTimeout(() => setOkMessage(null), 5000);
+        await reload();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
+        setFormError(
+          done > 0
+            ? `${msg} — แต่บันทึกไปแล้ว ${done} จาก ${sendIso.length} รอบ กรุณาเพิ่มเฉพาะรอบที่ยังขาด อย่ากดซ้ำทั้งชุด`
+            : msg,
+        );
+        if (done > 0) await reload();
+      } finally {
+        setSubmitting(false);
       }
-      resetForm();
-      setFormOpen(false);
-      setOkMessage(
-        times.length > 1
-          ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${times.length} รอบ`
-          : 'เพิ่มรายชื่อแล้ว',
-      );
-      window.setTimeout(() => setOkMessage(null), 5000);
-      await reload();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
-      setFormError(
-        done > 0
-          ? `${msg} — แต่บันทึกไปแล้ว ${done} จาก ${times.length} รอบ กรุณาเพิ่มเฉพาะรอบที่ยังขาด อย่ากดซ้ำทั้งชุด`
-          : msg,
-      );
-      if (done > 0) await reload();
-    } finally {
-      setSubmitting(false);
+    };
+    if (dupCheck.duplicates.length > 0) {
+      setDupWarning({
+        duplicates: dupCheck.duplicates,
+        freshIso: dupCheck.freshIso,
+        proceed: () => runTimes(dupCheck.freshIso),
+      });
+      return;
     }
+    await runTimes(isoTimes);
   };
 
   const doCancel = async (id: string) => {
@@ -1229,6 +1273,59 @@ const FollowPage: React.FC = () => {
         jobs={openJobs}
         onPick={pickUnit}
       />
+
+      {/* popup เตือนลงซ้ำ (เจ้าของสั่ง 18 ส.ค. 2569) — บอกชนกับใคร เวลาไหน
+          เลือกได้: บันทึกเฉพาะรอบที่ไม่ซ้ำ หรือกลับไปแก้ · ไม่มีปุ่ม "บันทึกซ้ำทั้งหมด"
+          (ตั้งซ้อนเวลาเดิม = AI โทรหาคนเดิมสองสายพร้อมกัน ไม่มีเคสที่ตั้งใจทำแบบนั้น) */}
+      {dupWarning ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="เตือนรายการซ้ำ"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5 shadow-xl">
+            <h2 className="text-base font-semibold text-foreground">⚠️ ลงซ้ำกับรายการที่มีอยู่แล้ว</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              เบอร์นี้มีคิวโทรเวลาเดียวกันอยู่แล้ว — ตั้งซ้ำ = AI โทรซ้อนหาคนเดิม
+            </p>
+            <ul className="mt-3 space-y-1.5">
+              {dupWarning.duplicates.map((d) => (
+                <li
+                  key={d.iso}
+                  className={cn('rounded-lg border px-3 py-2 text-xs', TONE.warn.soft, TONE.warn.value)}
+                >
+                  <span className="font-semibold">{d.existingName}</span>
+                  {' · '}
+                  {new Date(d.iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDupWarning(null)}
+                className={cn('inline-flex min-h-[40px] items-center rounded-full border px-4 text-xs font-medium', TONE.neutral.outline)}
+              >
+                กลับไปแก้เวลา
+              </button>
+              {dupWarning.freshIso.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const go = dupWarning.proceed;
+                    setDupWarning(null);
+                    void go();
+                  }}
+                  className="jarvis-pill-btn inline-flex min-h-[40px] items-center px-5 text-xs font-semibold"
+                >
+                  บันทึกเฉพาะที่ไม่ซ้ำ ({dupWarning.freshIso.length.toLocaleString('th-TH')} รอบ)
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <FollowEditDialog
         entry={editing}
