@@ -312,11 +312,43 @@ export type ScopeUser = { sub: string; role: UserRole };
  * กัน IDOR: staff แผนกหนึ่งอ้าง request_no/jobId ของอีกแผนกไม่ได้
  */
 export async function isSiamrajRequestInScope(user: ScopeUser, requestNoOrId: string): Promise<boolean> {
+  return (await checkSiamrajRequestScope(user, requestNoOrId)).ok;
+}
+
+/**
+ * เหมือน `isSiamrajRequestInScope` แต่**บอกเหตุผล** — ให้ API ขึ้นข้อความที่ถูกต้อง
+ *
+ * 🔴 **ต้องส่ง `includeClosed`** (เจ้าของเจอจริง 18 ส.ค. 2569) — ของเดิมไม่ส่ง ทำให้
+ * **ใบที่ปิด/ยกเลิกแล้วหาไม่เจอ** แล้วถูกตีความว่า "เป็นใบของแผนกอื่น"
+ * เคสจริง: `samtipap` supervisor **LBD** เปิดใบ `OPL6901006` ที่ไซต์ก็ **LBD**
+ * (ตรงกันเป๊ะ) แต่ใบเปิดมาตั้งแต่ ม.ค. และปิดไปแล้ว → เด้ง 403 บอกผิดสาเหตุ
+ *
+ * 🔴 **อ่านใบโดยไม่ผูก scope ก่อน** แล้วค่อยเทียบ BU เอง — ต้องรู้ให้ได้ว่า
+ * "ไม่มีใบนี้" กับ "มีแต่คนละ BU" ต่างกัน ถ้าอ่านแบบผูก scope จะได้ `null` เหมือนกันทั้งคู่
+ */
+export async function checkSiamrajRequestScope(
+  user: ScopeUser,
+  requestNoOrId: string,
+): Promise<
+  | { ok: true }
+  | { ok: false; reason: 'not_found' }
+  | { ok: false; reason: 'no_department' }
+  | { ok: false; reason: 'other_bu'; requestBu: string | null; userBu: string | null }
+> {
   const scope = await loadUserDepartmentScope(user);
-  if (scope.mode === 'all') return true;
-  if (scope.mode === 'none') return false;
-  const item = await getSiamrajUnitRequestById(requestNoOrId, scope);
-  return item !== null;
+  if (scope.mode === 'all') return { ok: true };
+  if (scope.mode === 'none') return { ok: false, reason: 'no_department' };
+
+  // ไม่ผูก scope + เปิดใบที่ปิดแล้วได้ → แยก "ไม่มีใบ" ออกจาก "คนละ BU" ได้จริง
+  const item = (await getSiamrajUnitRequestById(requestNoOrId, undefined, {
+    includeClosed: true,
+  })) as { department_code?: string | null } | null;
+  if (!item) return { ok: false, reason: 'not_found' };
+
+  const requestBu = (item.department_code || '').trim().toUpperCase() || null;
+  const userBu = scope.code.trim().toUpperCase();
+  if (requestBu && requestBu === userBu) return { ok: true };
+  return { ok: false, reason: 'other_bu', requestBu, userBu };
 }
 
 /**

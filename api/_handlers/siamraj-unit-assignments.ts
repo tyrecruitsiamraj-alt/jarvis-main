@@ -12,9 +12,9 @@ import {
   listAllUnitAssignees,
   upsertUnitAssignment,
 } from '../_lib/siamrajUnitAssignments.js';
-import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
+import { checkSiamrajRequestScope } from '../_lib/siamrajUnitRequests.js';
+import { requestScopeDenyMessage } from '../../src/lib/requestScopeMessage.js';
 
-const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
@@ -32,8 +32,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       const requestNo = getString(req.query?.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no query is required');
-      if (!(await isSiamrajRequestInScope(req.user, requestNo))) {
-        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      const scope = await checkSiamrajRequestScope(req.user, requestNo);
+      if (!scope.ok) {
+        // บอกเหตุผลจริง — "ไม่พบใบ" กับ "คนละ BU" คนละเรื่องกัน
+        return sendError(
+          res,
+          scope.reason === 'not_found' ? 404 : 403,
+          scope.reason === 'not_found' ? 'Not found' : 'Forbidden',
+          requestScopeDenyMessage({ ...scope, requestNo }),
+        );
       }
       const item = await getUnitAssignment(requestNo);
       return res.status(200).json(
@@ -60,8 +67,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const body = raw as Record<string, unknown>;
       const requestNo = getString(body.request_no);
       if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no is required');
-      if (!(await isSiamrajRequestInScope(req.user, requestNo))) {
-        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      const scope = await checkSiamrajRequestScope(req.user, requestNo);
+      if (!scope.ok) {
+        // บอกเหตุผลจริง — "ไม่พบใบ" กับ "คนละ BU" คนละเรื่องกัน
+        return sendError(
+          res,
+          scope.reason === 'not_found' ? 404 : 403,
+          scope.reason === 'not_found' ? 'Not found' : 'Forbidden',
+          requestScopeDenyMessage({ ...scope, requestNo }),
+        );
       }
 
       const before = await getUnitAssignment(requestNo);
