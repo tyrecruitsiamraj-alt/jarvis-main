@@ -18,19 +18,23 @@ const baseEntry = {
 };
 
 describe('buildFollowReminderPayload — หลายรอบต่อวัน', () => {
-  it('ไม่มี callTimes → 1 step ที่ scheduled_at (แบบเดิม)', () => {
+  it('ไม่มี callTimes → 1 step ที่ scheduled_at (แบบเดิม) — เขียนเป็นเวลาไทย +07:00', () => {
     const p = buildFollowReminderPayload(baseEntry);
     expect(p.steps.length).toBe(1);
-    expect(p.steps[0].scheduled_at).toBe(baseEntry.scheduled_at.toISOString());
-    expect(p.client_contact_id).toBe('follow::f1');
+    // instant เดียวกับ scheduled_at แต่รูปเวลาไทย (18 ส.ค. 2569 — Lumos ไม่ขึ้นรายการ
+    // ข้อสงสัยหนึ่งคือเวลารูป UTC ถูกฝั่งเขาปัดทิ้ง)
+    expect(p.steps[0].scheduled_at).toBe('2026-08-20T00:00:00+07:00');
+    // 🔴 ห้ามมี `::` ในรหัสอ้างอิง — ใช้ follow-<id> ให้ตรงกับ person_ref
+    // (ตัวรับผลจับคู่ด้วยค่าใน payload ของแถวนั้นเอง แถวเก่ารูป follow:: ยังจับคู่ได้)
+    expect(p.client_contact_id).toBe('follow-f1');
+    expect(p.client_contact_id).not.toContain('::');
   });
 
   it('2 รอบ 07:00/08:00 → 2 step วันเดียวกัน คนละเวลา (เวลาไทย)', () => {
     const p = buildFollowReminderPayload({ ...baseEntry, callTimes: ['07:00', '08:00'] });
     expect(p.steps.length).toBe(2);
-    // 07:00 เวลาไทย = 00:00Z · 08:00 = 01:00Z ของวันที่ 20
-    expect(p.steps[0].scheduled_at).toBe('2026-08-20T00:00:00.000Z');
-    expect(p.steps[1].scheduled_at).toBe('2026-08-20T01:00:00.000Z');
+    expect(p.steps[0].scheduled_at).toBe('2026-08-20T07:00:00+07:00');
+    expect(p.steps[1].scheduled_at).toBe('2026-08-20T08:00:00+07:00');
     // ทุก step พูดบทเดียวกัน (topic + เบอร์ติดต่อกลับ)
     expect(p.steps[0].message).toContain('ติดตามนัดสัมภาษณ์');
     // เบอร์ถูกอ่านเป็นกลุ่มตัวเลข (16 ส.ค. 2569 — ดู lumosCallScript.speakablePhoneTh)
@@ -41,7 +45,7 @@ describe('buildFollowReminderPayload — หลายรอบต่อวัน
   it('รอบเวล่ารูปแบบผิด (ไม่ใช่ HH:MM) ถูกกรองทิ้ง — เหลือแต่รอบที่ถูก', () => {
     const p = buildFollowReminderPayload({ ...baseEntry, callTimes: ['07:00', 'บ่าย', ''] });
     expect(p.steps.length).toBe(1);
-    expect(p.steps[0].scheduled_at).toBe('2026-08-20T00:00:00.000Z');
+    expect(p.steps[0].scheduled_at).toBe('2026-08-20T07:00:00+07:00');
   });
 
   it('callTimes ว่าง → ถอยเป็น 1 step ที่ scheduled_at', () => {

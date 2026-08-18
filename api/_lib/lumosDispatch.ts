@@ -1248,13 +1248,28 @@ export type FollowEntryInput = {
   callTimes?: string[] | null;
 };
 
-/** ประกอบ ISO ของ "วันเดียวกับ scheduled_at + เวลา HH:MM (เวลาไทย)" */
+/**
+ * ISO เวลาไทย `YYYY-MM-DDTHH:mm:ss+07:00` — instant เดียวกับ `toISOString()` แต่เขียน
+ * ด้วย offset ไทยแทน `Z` (18 ส.ค. 2569: Lumos ดึงรายการไปแล้วแต่ไม่ขึ้นหน้าแจ้งเตือน
+ * — หนึ่งในสามข้อสงสัยคือฝั่งเขาอ่านเวลารูป UTC แล้วปัดทิ้งเงียบ ๆ จึงส่งเป็นเวลาไทยให้ชัด)
+ * ตั้งใจไม่ใช้ `Intl` — กติกาโปรเจกต์ห้าม `new Intl.*` นอกระดับโมดูล (เคยทำ API ช้า 4.7 วิ)
+ */
+export function bangkokIso(d: Date): string {
+  const t = new Date(d.getTime() + 7 * 3_600_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}` +
+    `T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())}+07:00`
+  );
+}
+
+/** ประกอบ ISO (เวลาไทย +07:00) ของ "วันเดียวกับ scheduled_at + เวลา HH:MM" */
 function dayAtTime(day: Date, hhmm: string): string {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
   const ymd = day.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-  if (!m) return day.toISOString();
+  if (!m) return bangkokIso(day);
   const hh = String(Math.min(23, Number(m[1]))).padStart(2, '0');
-  return new Date(`${ymd}T${hh}:${m[2]}:00+07:00`).toISOString();
+  return `${ymd}T${hh}:${m[2]}:00+07:00`;
 }
 
 export function buildFollowReminderPayload(entry: FollowEntryInput): LumosReminderPayload {
@@ -1272,9 +1287,18 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
   const steps =
     times.length > 0
       ? times.map((t) => ({ type: 'follow_up' as const, message, scheduled_at: dayAtTime(entry.scheduled_at, t) }))
-      : [{ type: 'follow_up' as const, message, scheduled_at: entry.scheduled_at.toISOString() }];
+      : [{ type: 'follow_up' as const, message, scheduled_at: bangkokIso(entry.scheduled_at) }];
   return {
-    client_contact_id: `follow::${entry.id}`,
+    /**
+     * 🔴 **ห้ามมี `::` ในรหัสอ้างอิง** (18 ส.ค. 2569: Lumos ดึงไปแล้วแต่ไม่ขึ้น
+     * หน้าแจ้งเตือน — ข้อสงสัยหนึ่งคือฝั่งเขาใช้ `::` เป็นตัวคั่นภายในแล้วรายการพังเงียบ)
+     * ใช้ `follow-<id>` ให้ตรงกับ person_ref ไปเลย
+     *
+     * ตัวรับผล (`applyLumosResult`) จับคู่ด้วยค่าใน payload ของแถวนั้นเอง
+     * (`payload->>'client_contact_id' = <ค่าที่ Lumos ส่งกลับ>`) — แถวเก่าที่ค้างคิว
+     * ด้วยรูป `follow::<id>` จึงยังจับคู่ได้เหมือนเดิม รองรับสองรูปแบบโดยไม่ต้องแปลง
+     */
+    client_contact_id: `follow-${entry.id}`,
     recipient_name: entry.recipient_name,
     recipient_phone: entry.recipient_phone,
     title: entry.topic,
@@ -1337,17 +1361,22 @@ export async function refreshFollowReminderPayload(entry: FollowEntryInput): Pro
 
 /**
  * Lumos spec บังคับ scheduled_at ต้องเป็น "now or future" — ถ้าเวลาที่เก็บไว้เลยมาแล้ว
- * (เช่น เข้าคิวก่อน Lumos มาดึงหลายนาที) ให้ขยับไปอนาคตเล็กน้อย ณ ตอนเสิร์ฟ
+ * (เช่น เข้าคิวก่อน Lumos มาดึงหลายนาที) ให้ขยับไปอนาคต ณ ตอนเสิร์ฟ
  * มิฉะนั้นฝั่ง Lumos จะปัดรายการทิ้งตอน ingest แบบเงียบ ๆ
+ *
+ * 18 ส.ค. 2569 (เคส follow ไม่ขึ้นหน้าแจ้งเตือนทั้งที่ดึงไปแล้ว) ปรับสองอย่าง:
+ * - เผื่อล่วงหน้า **10 นาที** (เดิม 2) — เผื่อรอบ ingest/ตั้งสายฝั่งเขาช้ากว่าที่คิด
+ * - เวลาที่เสิร์ฟออกทุกค่า **เขียนเป็นเวลาไทย +07:00** (instant เดิม ไม่เลื่อนเวลา)
+ *   ครอบทุก payload ณ จุดเสิร์ฟที่เดียว — แถวเก่าในคิวที่เก็บรูป UTC ก็ถูกแปลงตอนออก
  */
 export function bumpScheduledAtForward(payload: unknown, now = new Date()): unknown {
   if (typeof payload !== 'object' || payload === null) return payload;
   const p = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
-  const floor = new Date(now.getTime() + 2 * 60_000).toISOString();
+  const floor = bangkokIso(new Date(now.getTime() + 10 * 60_000));
   const bump = (v: unknown): string | unknown => {
     if (typeof v !== 'string' || !v) return floor;
     const t = new Date(v);
-    return Number.isNaN(t.getTime()) || t.getTime() < now.getTime() ? floor : v;
+    return Number.isNaN(t.getTime()) || t.getTime() < now.getTime() ? floor : bangkokIso(t);
   };
   if ('scheduled_at' in p) p.scheduled_at = bump(p.scheduled_at);
   if (Array.isArray(p.steps)) {

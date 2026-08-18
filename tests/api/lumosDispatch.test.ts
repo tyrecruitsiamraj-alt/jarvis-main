@@ -66,9 +66,11 @@ describe('buildReminderPayload', () => {
 
 describe('bumpScheduledAtForward — Lumos บังคับ scheduled_at เป็น now or future', () => {
   const SERVE = new Date('2026-07-30T16:17:00+07:00');
-  const FLOOR = new Date(SERVE.getTime() + 2 * 60_000).toISOString();
+  // 18 ส.ค. 2569: เผื่อล่วงหน้า 10 นาที (เดิม 2) + เขียนเป็นเวลาไทย +07:00
+  // (เคส follow ที่ Lumos ดึงไปแล้วแต่ไม่ขึ้นหน้าแจ้งเตือน)
+  const FLOOR = '2026-07-30T16:27:00+07:00';
 
-  it('เวลาที่เลยมาแล้ว (เข้าคิวก่อนถูกดึง) ถูกขยับเป็นอนาคต — ทั้งระดับบนและใน steps', () => {
+  it('เวลาที่เลยมาแล้ว (เข้าคิวก่อนถูกดึง) ถูกขยับเป็นอนาคต 10 นาที — ทั้งระดับบนและใน steps', () => {
     const past = '2026-07-30T16:10:00+07:00';
     const out = bumpScheduledAtForward(
       { scheduled_at: past, steps: [{ type: 'remind', message: 'ม', scheduled_at: past }] },
@@ -78,7 +80,7 @@ describe('bumpScheduledAtForward — Lumos บังคับ scheduled_at เ�
     expect(out.steps[0].scheduled_at).toBe(FLOOR);
   });
 
-  it('เวลาอนาคต (เช่น Follow ที่นัดล่วงหน้า) ต้องไม่ถูกแตะ', () => {
+  it('เวลาอนาคต (เช่น Follow ที่นัดล่วงหน้า) instant ต้องไม่เลื่อน', () => {
     const future = '2026-08-15T09:30:00+07:00';
     const out = bumpScheduledAtForward({ scheduled_at: future, steps: [{ scheduled_at: future }] }, SERVE) as {
       scheduled_at: string;
@@ -86,6 +88,14 @@ describe('bumpScheduledAtForward — Lumos บังคับ scheduled_at เ�
     };
     expect(out.scheduled_at).toBe(future);
     expect(out.steps[0].scheduled_at).toBe(future);
+  });
+
+  it('แถวเก่าในคิวที่เก็บรูป UTC ถูกแปลงเป็น +07:00 ตอนเสิร์ฟ (instant เดิม)', () => {
+    // 02:30Z = 09:30 เวลาไทย — Lumos ได้เห็นแต่รูปเวลาไทยเสมอ ไม่ว่าแถวเข้าคิวเมื่อไหร่
+    const out = bumpScheduledAtForward({ scheduled_at: '2026-08-15T02:30:00.000Z' }, SERVE) as {
+      scheduled_at: string;
+    };
+    expect(out.scheduled_at).toBe('2026-08-15T09:30:00+07:00');
   });
 
   it('ไม่พังกับ payload แปลก ๆ และไม่แก้ object เดิม', () => {

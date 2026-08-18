@@ -135,7 +135,8 @@ describe('buildFollowReminderPayload', () => {
       note: 'ถ้ายังไม่พร้อมให้ถามวันที่สะดวก',
       scheduled_at: WHEN,
     });
-    expect(p.client_contact_id).toBe('follow::e6c1f0aa-1111-4222-8333-444455556666');
+    // 🔴 ไม่มี `::` ในรหัสอ้างอิง (18 ส.ค. 2569 — Lumos ไม่ขึ้นรายการ) · ตรงกับ person_ref
+    expect(p.client_contact_id).toBe('follow-e6c1f0aa-1111-4222-8333-444455556666');
     expect(p.recipient_phone).toBe('+66812345678');
     expect(p.title).toBe('ยืนยันวันเริ่มงาน 15 ส.ค.');
     expect(p.steps).toHaveLength(1);
@@ -147,7 +148,8 @@ describe('buildFollowReminderPayload', () => {
     expect(p.steps[0].message).toContain('ยืนยันวันเริ่มงาน 15 ส.ค.');
     expect(p.steps[0].message).toContain('ถ้ายังไม่พร้อมให้ถามวันที่สะดวก');
     expect(p.steps[0].message).toContain('ยืนยันกลับ');
-    expect(p.steps[0].scheduled_at).toBe(WHEN.toISOString());
+    // เวลาไทย +07:00 (instant เดิม) — ไม่ใช่รูป UTC `Z` แล้ว (18 ส.ค. 2569)
+    expect(p.steps[0].scheduled_at).toBe('2026-08-15T09:30:00+07:00');
   });
 
   it('ไม่มีหมายเหตุ → ใช้เฉพาะหัวเรื่อง', () => {
