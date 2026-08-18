@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import { EMPTY_FUNNEL, fetchCallFunnel, type CallFunnel } from '@/lib/callFunnelApi';
 import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
+import { callAttemptSlot } from '@/lib/callOutcomeBuckets';
 import {
-  bucketOfCall,
-  callAttemptSlot,
-  CALL_BUCKET_LABEL,
-  type CallBucket,
-} from '@/lib/callOutcomeBuckets';
+  countFollowRoundBuckets,
+  FOLLOW_ROUND_BUCKETS,
+  FOLLOW_ROUND_BUCKET_HINT,
+  FOLLOW_ROUND_BUCKET_LABEL,
+  inFollowRoundBucket,
+  type FollowRoundBucket,
+} from '@/lib/followRoundBuckets';
 import {
   buildCallCalendar,
   callDayKey,
@@ -16,7 +18,7 @@ import {
   shiftMonth,
 } from '@/lib/followCallCalendar';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
-import { ChevronLeft, ChevronRight, Phone, RefreshCw } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw, X } from 'lucide-react';
 
 /**
  * แผงการโทรของหน้า Follow — **3 รอบ + ปฏิทิน** (เจ้าของสั่ง 18 ส.ค. 2569)
@@ -32,13 +34,15 @@ import { ChevronLeft, ChevronRight, Phone, RefreshCw } from 'lucide-react';
  * เงื่อนไขแบ่งถังอยู่ที่ `callOutcomeBuckets.ts` ที่เดียว ทั้ง SQL และหน้าเว็บใช้ตัวเดียวกัน
  */
 
-const BUCKET_ORDER: CallBucket[] = ['connected', 'unreached', 'pending', 'cancelled'];
-
-const BUCKET_STYLE: Record<CallBucket, { text: string; bar: string }> = {
-  connected: { text: TONE.success.value, bar: TONE.success.dot },
-  unreached: { text: TONE.warn.value, bar: TONE.warn.dot },
-  pending: { text: TONE.primary.value, bar: TONE.primary.dot },
-  cancelled: { text: DASH.muted, bar: 'bg-slate-400' },
+/** สีของแต่ละช่อง — ความหมายเดียวกับที่ใช้ทั้งระบบ (เขียว=ดี · เหลือง=ติดขัด · แดง=หลุด) */
+const BUCKET_TEXT: Record<FollowRoundBucket, string> = {
+  all: DASH.cellStrong,
+  waiting: DASH.muted,
+  calling: TONE.primary.value,
+  connected: TONE.success.value,
+  unreached: TONE.warn.value,
+  went: TONE.success.value,
+  not_went: TONE.danger.value,
 };
 
 /** รายละเอียดของคนหนึ่งคนในกล่อง — เจ้าของขอ "ชื่อพร้อมรายละเอียดของแต่ละคน" */
@@ -82,42 +86,47 @@ function PersonRow({ p }: { p: FollowEntry }) {
 }
 
 export default function FollowCallRoundsPanel() {
-  const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [entries, setEntries] = useState<FollowEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  /** กล่องที่กางอยู่ — "รอบ:ถัง" · null = ยังไม่กด */
+  /** ช่องที่กางอยู่ — "รอบ:ช่อง" · null = ยังไม่กด */
   const [openBox, setOpenBox] = useState<string | null>(null);
   const [month, setMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
   const [openDay, setOpenDay] = useState<string | null>(null);
+  /** ปฏิทินย่อไว้ก่อน กดถึงกาง (เจ้าของสั่ง 18 ส.ค. 2569: "ทำเป็นแบบอันเล็ก") */
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
-    void fetchCallFunnel(undefined, 'follow')
-      .then((d) => setFunnel(d.funnel))
-      .finally(() => setLoading(false));
     void listFollowEntries()
       .then(setEntries)
-      .catch(() => setEntries([]));
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
   };
   useEffect(load, []);
 
-  const rounds = funnel.byAttempt ?? [];
-
-  /** รายชื่อแยกตามรอบ + ถัง — กติกาเดียวกับที่ฝั่งฐานนับ */
-  const peopleByRound = useMemo(() => {
-    const map = new Map<number, Record<CallBucket, FollowEntry[]>>();
-    for (const slot of [1, 2, 3]) {
-      map.set(slot, { connected: [], unreached: [], cancelled: [], pending: [] });
-    }
+  /**
+   * คนในแต่ละรอบ — นับจาก **ชุดเดียวกับที่แสดงชื่อ** ยอดกับรายชื่อจึงตรงกันเสมอ
+   * (เดิมยอดมาจาก funnel ที่นับแถวคิว ทำให้มีเคสยอดไม่ตรงกับชื่อที่กางออกมา)
+   */
+  const roundRows = useMemo(() => {
+    const map = new Map<number, FollowEntry[]>([
+      [1, []],
+      [2, []],
+      [3, []],
+    ]);
     for (const e of entries) {
-      // ยังไม่เคยเข้าคิว = ยังไม่อยู่รอบไหน
+      // ยังไม่เคยเข้าคิวและยังไม่มีผล = ยังไม่อยู่รอบไหน
       if (e.call_attempt == null && e.call_status === 'pending' && !e.call_outcome) continue;
-      const slot = callAttemptSlot(e.call_attempt);
-      const bucket = bucketOfCall(e.cancelled ? 'cancelled' : e.call_status, e.call_outcome);
-      map.get(slot)?.[bucket].push(e);
+      map.get(callAttemptSlot(e.call_attempt))?.push(e);
     }
     return map;
   }, [entries]);
+
+  const countsByRound = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof countFollowRoundBuckets>>();
+    for (const [slot, rows] of roundRows) map.set(slot, countFollowRoundBuckets(rows));
+    return map;
+  }, [roundRows]);
 
   const calendar = useMemo(() => buildCallCalendar(entries), [entries]);
   const grid = useMemo(() => monthGridDays(month), [month]);
@@ -160,27 +169,23 @@ export default function FollowCallRoundsPanel() {
 
       {/* 3 แถว = 3 รอบ · แต่ละแถวมี 4 กล่องถัง กดได้ */}
       <div className="space-y-2">
-        {rounds.map((r) => {
-          const people = peopleByRound.get(r.attempt);
-          const counts: Record<CallBucket, number> = {
-            connected: r.connected,
-            unreached: r.unreached,
-            pending: r.pending,
-            cancelled: r.cancelled,
-          };
+        {[1, 2, 3].map((slot) => {
+          const rows = roundRows.get(slot) ?? [];
+          const counts = countsByRound.get(slot);
+          if (!counts) return null;
           return (
-            <div key={r.attempt} className={cn('rounded-xl border p-2.5', TONE.neutral.soft)}>
+            <div key={slot} className={cn('rounded-xl border p-2.5', TONE.neutral.soft)}>
               <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className={cn('text-xs font-bold', DASH.cellStrong)}>รอบ {r.attempt}</span>
+                <span className={cn('text-xs font-bold', DASH.cellStrong)}>รอบ {slot}</span>
                 <span className={cn('text-[11px]', DASH.muted)}>
-                  ส่ง{' '}
-                  <b className="tabular-nums text-foreground">{r.total.toLocaleString('th-TH')}</b>{' '}
-                  คน
+                  {rows.length.toLocaleString('th-TH')} คน
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                {BUCKET_ORDER.map((b) => {
-                  const key = `${r.attempt}:${b}`;
+              {/* 7 ช่องเท่ากันทุกรอบ (เจ้าของสั่ง 18 ส.ค. 2569) — ช่อง 0 ก็ยังโชว์
+                  เพื่อให้สามรอบอ่านเทียบกันได้ตรงคอลัมน์ */}
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+                {FOLLOW_ROUND_BUCKETS.map((b) => {
+                  const key = `${slot}:${b}`;
                   const n = counts[b];
                   const open = openBox === key;
                   return (
@@ -188,6 +193,7 @@ export default function FollowCallRoundsPanel() {
                       key={b}
                       type="button"
                       disabled={n === 0}
+                      title={FOLLOW_ROUND_BUCKET_HINT[b]}
                       onClick={() => setOpenBox(open ? null : key)}
                       className={cn(
                         'rounded-lg border px-2 py-1.5 text-left transition-colors',
@@ -195,10 +201,10 @@ export default function FollowCallRoundsPanel() {
                         n === 0 ? 'cursor-default opacity-60' : 'hover:bg-secondary',
                       )}
                     >
-                      <span className={cn('block text-[10px] font-semibold', DASH.muted)}>
-                        {CALL_BUCKET_LABEL[b]}
+                      <span className={cn('block truncate text-[10px] font-semibold', DASH.muted)}>
+                        {FOLLOW_ROUND_BUCKET_LABEL[b]}
                       </span>
-                      <span className={cn('block text-lg font-bold tabular-nums', BUCKET_STYLE[b].text)}>
+                      <span className={cn('block text-lg font-bold tabular-nums', BUCKET_TEXT[b])}>
                         {n.toLocaleString('th-TH')}
                       </span>
                     </button>
@@ -206,35 +212,24 @@ export default function FollowCallRoundsPanel() {
                 })}
               </div>
 
-              {/* รายชื่อของกล่องที่กด */}
-              {openBox?.startsWith(`${r.attempt}:`) && people ? (
+              {openBox?.startsWith(`${slot}:`) ? (
                 (() => {
-                  const b = openBox.split(':')[1] as CallBucket;
-                  const list = people[b];
-                  const expected = counts[b];
+                  const b = openBox.split(':')[1] as FollowRoundBucket;
+                  const list = rows.filter((r) => inFollowRoundBucket(r, b));
                   return (
                     <div className="mt-2 border-t border-border/60 pt-2">
-                      <p className={cn('mb-1.5 text-[11px] font-bold', BUCKET_STYLE[b].text)}>
-                        รอบ {r.attempt} · {CALL_BUCKET_LABEL[b]} ({list.length.toLocaleString('th-TH')})
+                      <p className={cn('mb-1.5 text-[11px] font-bold', BUCKET_TEXT[b])}>
+                        รอบ {slot} · {FOLLOW_ROUND_BUCKET_LABEL[b]} (
+                        {list.length.toLocaleString('th-TH')})
+                        <span className={cn('ml-1.5 font-normal', DASH.muted)}>
+                          {FOLLOW_ROUND_BUCKET_HINT[b]}
+                        </span>
                       </p>
-                      {/* 🔴 ยอดกับรายชื่อคนละเส้น — ไม่เท่ากันต้องบอก ไม่ใช่ให้คนนับเอง */}
-                      {list.length < expected ? (
-                        <p className={cn('mb-1.5 rounded px-2 py-1 text-[10px]', TONE.warn.soft, TONE.warn.value)}>
-                          แสดงชื่อได้ {list.length} จาก {expected} คน — ที่เหลือเป็นสายที่ไม่มี
-                          รายการติดตามคู่กันแล้ว
-                        </p>
-                      ) : null}
-                      {list.length === 0 ? (
-                        <p className={cn('py-3 text-center text-[11px]', DASH.muted)}>
-                          ดึงรายชื่อไม่ได้ — ลองกดรีเฟรช
-                        </p>
-                      ) : (
-                        <ul className="space-y-1.5">
-                          {list.map((p) => (
-                            <PersonRow key={p.id} p={p} />
-                          ))}
-                        </ul>
-                      )}
+                      <ul className="space-y-1.5">
+                        {list.map((p) => (
+                          <PersonRow key={p.id} p={p} />
+                        ))}
+                      </ul>
                     </div>
                   );
                 })()
@@ -242,14 +237,39 @@ export default function FollowCallRoundsPanel() {
             </div>
           );
         })}
-        {rounds.every((r) => r.total === 0) ? (
+        {entries.length === 0 ? (
           <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.neutral.soft, DASH.muted)}>
-            ยังไม่มีงาน Follow ที่ส่งให้ AI โทร — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
+            ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
           </p>
         ) : null}
       </div>
+      {/* ⚠️ ช่องพวกนี้ **ซ้อนกันได้** — "โทรติด" กับ "ไป" คนละแกน (สถานะสาย vs ผลปิดงาน)
+          บวกทุกช่องแล้วมากกว่า "ทั้งหมด" เป็นเรื่องปกติ ไม่ใช่บั๊ก */}
+      <p className={cn('text-[10px]', DASH.muted)}>
+        รอโทร/กำลังโทร/โทรติด/โทรไม่ติด = สถานะของสาย · ไป/ไม่ไป = ผลปิดงานติดตาม —
+        คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
+      </p>
 
-      {/* ปฏิทิน — แต่ละวันโทรกี่คน */}
+      {/* ปฏิทินแบบย่อ — กดถึงกาง (เจ้าของสั่ง 18 ส.ค. 2569: *"ทำเป็นแบบอันเล็กได้ไหม
+          ที่กดไปแล้วค่อยขึ้นวันที่ให้เลือก"*) · ย่อไว้เพราะแผงนี้ยาวอยู่แล้ว */}
+      <button
+        type="button"
+        onClick={() => setCalendarOpen((v) => !v)}
+        className={cn(
+          'flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left',
+          TONE.neutral.soft,
+          TONE.neutral.softHover,
+        )}
+      >
+        <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', DASH.cellStrong)}>
+          <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+          ปฏิทินการโทร
+          <span className={cn('font-normal', DASH.muted)}>— แต่ละวันโทรกี่คน</span>
+        </span>
+        <span className={cn('text-[11px]', DASH.muted)}>{calendarOpen ? 'ซ่อน' : 'เปิดดู'}</span>
+      </button>
+
+      {calendarOpen ? (
       <div className="rounded-xl border border-border/60 p-2.5">
         <div className="mb-2 flex items-center justify-between gap-2">
           <button
@@ -327,6 +347,7 @@ export default function FollowCallRoundsPanel() {
           </div>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

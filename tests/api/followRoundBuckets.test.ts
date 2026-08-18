@@ -1,0 +1,103 @@
+// @vitest-environment node
+/**
+ * ช่องของแต่ละรอบโทรหน้า Follow (เจ้าของสั่ง 18 ส.ค. 2569)
+ *
+ * ทำไมต้องคุม: แถวเดียวมี **สองแกน** ปนกัน (สถานะสาย vs ผลปิดงาน) คนอ่านง่ายมาก
+ * ที่จะเข้าใจว่าทุกช่องบวกกันได้ "ทั้งหมด" ซึ่งไม่จริง · และ 'ลา'/'อื่น ๆ' ต้องไม่ถูก
+ * เหมาเป็น "ไม่ไป" เพราะยังไม่รู้ผลจริง
+ */
+import { describe, expect, it } from 'vitest';
+import {
+  countFollowRoundBuckets,
+  FOLLOW_ROUND_BUCKETS,
+  inFollowRoundBucket,
+  type FollowRoundRow,
+} from '../../src/lib/followRoundBuckets';
+
+const row = (o: Partial<FollowRoundRow> = {}): FollowRoundRow => ({ call_status: 'pending', ...o });
+
+describe('ช่องทั้ง 7', () => {
+  it('เรียงตามที่เจ้าของสั่ง', () => {
+    expect([...FOLLOW_ROUND_BUCKETS]).toEqual([
+      'all', 'waiting', 'calling', 'connected', 'unreached', 'went', 'not_went',
+    ]);
+  });
+
+  it('"ทั้งหมด" รับทุกคน', () => {
+    expect(inFollowRoundBucket(row(), 'all')).toBe(true);
+    expect(inFollowRoundBucket(row({ cancelled: true }), 'all')).toBe(true);
+  });
+});
+
+describe('แกนสถานะสาย', () => {
+  it('🔴 รอโทร = ยังไม่ถูกดึง · กำลังโทร = ดึงไปแล้วยังไม่มีผล (ห้ามปนกัน)', () => {
+    expect(inFollowRoundBucket(row({ call_status: 'pending' }), 'waiting')).toBe(true);
+    expect(inFollowRoundBucket(row({ call_status: 'pending' }), 'calling')).toBe(false);
+    expect(inFollowRoundBucket(row({ call_status: 'delivered' }), 'calling')).toBe(true);
+    expect(inFollowRoundBucket(row({ call_status: 'delivered' }), 'waiting')).toBe(false);
+  });
+
+  it('มีผลแล้วไม่อยู่ทั้งรอโทรและกำลังโทร', () => {
+    const r = row({ call_status: 'completed', call_outcome: 'confirmed' });
+    expect(inFollowRoundBucket(r, 'waiting')).toBe(false);
+    expect(inFollowRoundBucket(r, 'calling')).toBe(false);
+    expect(inFollowRoundBucket(r, 'connected')).toBe(true);
+  });
+
+  it('โทรติด/โทรไม่ติด ใช้กติกาเดียวกับที่อื่นทั้งระบบ', () => {
+    expect(inFollowRoundBucket(row({ call_outcome: 'declined' }), 'connected')).toBe(true);
+    expect(inFollowRoundBucket(row({ call_outcome: 'no_answer' }), 'unreached')).toBe(true);
+  });
+
+  it('🔴 ยกเลิกแล้วไม่ตกไปอยู่ "รอโทร"', () => {
+    const r = row({ cancelled: true, call_status: 'pending' });
+    expect(inFollowRoundBucket(r, 'waiting')).toBe(false);
+    expect(inFollowRoundBucket(r, 'calling')).toBe(false);
+  });
+});
+
+describe('แกนผลปิดงาน', () => {
+  it('เสร็จสิ้น = ไป', () => {
+    expect(inFollowRoundBucket(row({ outcome_code: 'done' }), 'went')).toBe(true);
+    expect(inFollowRoundBucket(row({ outcome_code: 'done' }), 'not_went')).toBe(false);
+  });
+
+  it('ไม่ไปเริ่มงาน / ยกเลิกงาน = ไม่ไป', () => {
+    for (const c of ['no_show_start', 'job_cancelled']) {
+      expect(inFollowRoundBucket(row({ outcome_code: c }), 'not_went')).toBe(true);
+      expect(inFollowRoundBucket(row({ outcome_code: c }), 'went')).toBe(false);
+    }
+  });
+
+  it('🔴 "ลา" กับ "อื่น ๆ" ไม่เข้าทั้งสองช่อง — ยังไม่รู้ผลจริง ห้ามเหมา', () => {
+    for (const c of ['leave', 'other']) {
+      expect(inFollowRoundBucket(row({ outcome_code: c }), 'went')).toBe(false);
+      expect(inFollowRoundBucket(row({ outcome_code: c }), 'not_went')).toBe(false);
+    }
+  });
+
+  it('ยังไม่ปิดงาน = ไม่เข้าทั้งสองช่อง', () => {
+    expect(inFollowRoundBucket(row({ outcome_code: null }), 'went')).toBe(false);
+    expect(inFollowRoundBucket(row({ outcome_code: 'อะไรไม่รู้' }), 'not_went')).toBe(false);
+  });
+});
+
+describe('นับทั้งรอบ', () => {
+  it('คืนครบทุกช่องเสมอ แม้เป็น 0 (ช่อง 0 ก็ต้องโชว์)', () => {
+    const c = countFollowRoundBuckets([]);
+    expect(Object.keys(c).sort()).toEqual([...FOLLOW_ROUND_BUCKETS].sort());
+    expect(Object.values(c).every((v) => v === 0)).toBe(true);
+  });
+
+  it('🔴 ช่องต่าง ๆ ซ้อนกันได้ — บวกกันแล้วไม่เท่า "ทั้งหมด"', () => {
+    // คนเดียว: โทรติด + ปิดงานว่าไป → อยู่ทั้งสองช่อง
+    const c = countFollowRoundBuckets([
+      row({ call_status: 'completed', call_outcome: 'confirmed', outcome_code: 'done' }),
+    ]);
+    expect(c.all).toBe(1);
+    expect(c.connected).toBe(1);
+    expect(c.went).toBe(1);
+    const sum = c.waiting + c.calling + c.connected + c.unreached + c.went + c.not_went;
+    expect(sum).toBeGreaterThan(c.all);
+  });
+});

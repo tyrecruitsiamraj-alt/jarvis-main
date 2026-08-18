@@ -119,12 +119,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selected, setSelected] = useState<JobRequest | null>(null);
-  /**
-   * ไฟล์โลโก้ใหม่ `/so-logo.png` ยังไม่ถูกวางไหม
-   * ถอยไป **หัวข้อข้อความเดิม** ไม่ใช่โลโก้ตัวอื่น — เอาโลโก้ผิดตัวขึ้นแทนคือให้ข้อมูลผิด
-   * บนหน้าที่คนนอกเห็น (เจ้าของทัก 18 ส.ค. 2569 ว่าที่ขึ้นอยู่คนละรูป)
-   */
-  const [boardLogoMissing, setBoardLogoMissing] = useState(false);
   const positionPreset = useMemo(
     () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
     [variant, searchParams],
@@ -337,25 +331,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
   return (
     <div className="relative bg-gradient-to-b from-blue-100/35 via-blue-50/10 to-transparent">
-      {/* ลายน้ำโลโก้บนหน้าสาธารณะ (เจ้าของสั่ง 18 ส.ค. 2569: *"เอารูปไปทำพื้นหลังเลย
-          ได้ไหมแต่แบบบางๆหน่อย"*)
-
-          ⚠️ ฝั่งเจ้าหน้าที่ไม่ใส่ — หน้านั้นแน่นด้วยตัวเลข ลายน้ำทำให้อ่านยากขึ้นเปล่า ๆ
-          ⚠️ ใช้ CSS background ไม่ใช่ <img> → ไฟล์ยังไม่ถูกวางก็แค่ไม่ขึ้น ไม่มีรูปแตก
-          ⚠️ `pointer-events-none` + `aria-hidden` — เป็นของตกแต่งล้วน ห้ามบังการกดและ
-             ห้ามให้ screen reader อ่าน
-          ⚠️ จางคนละระดับใน light/dark — พื้นเข้มต้องจางกว่า ไม่งั้นโลโก้เด้งข่มเนื้อหา */}
-      {!isStaff ? (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden select-none"
-        >
-          <div
-            className="absolute -right-16 top-4 h-[26rem] w-[26rem] bg-contain bg-no-repeat bg-center opacity-[0.05] dark:opacity-[0.03] md:h-[34rem] md:w-[34rem]"
-            style={{ backgroundImage: 'url(/so-logo.png)' }}
-          />
-        </div>
-      ) : null}
 
       <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-8 pb-6 md:pt-12 md:pb-10">
         {/* ฝั่งเจ้าหน้าที่ = hero เข้มตาม mockup rev.3 ข้อ 04 · ฝั่งคนนอกคงหัวสว่างเดิมไว้ (หน้าแบรนด์) */}
@@ -404,30 +379,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         ) : (
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl min-w-0">
-              {/* หัวหน้าสาธารณะเป็น **โลโก้** แทนข้อความ (เจ้าของสั่ง 17 ส.ค. 2569:
-                  *"บอร์ดประกาศรับสมัคร / ค้นหางานที่เหมาะกับคุณ เปลี่ยนเอาโลโก้นี้ไปแทน"*)
-
-                  ⚠️ ยังต้องมี <h1> ไว้ให้ screen reader และ SEO — หน้านี้เป็นหน้าสาธารณะ
-                  ที่คนค้นเจอจาก Google · ตัดหัวข้อทิ้งทั้งหมด = หน้าไม่มีชื่อเรื่อง
-                  จึงใช้ sr-only แทนการลบ
-
-                  ⚠️ `onError` ถอยไปโลโก้เดิม — ถ้าไฟล์ `/so-logo.png` ยังไม่ถูกวาง
-                  จะได้ไม่เป็นรูปแตกบนหน้าที่คนนอกเห็น */}
-              {boardLogoMissing ? (
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-                  ค้นหางานที่เหมาะกับคุณ
-                </h1>
-              ) : (
-                <>
-                  <h1 className="sr-only">บอร์ดประกาศรับสมัคร — ค้นหางานที่เหมาะกับคุณ</h1>
-                  <img
-                    src="/so-logo.png"
-                    onError={() => setBoardLogoMissing(true)}
-                    alt="SO"
-                    className="h-16 w-auto sm:h-20 md:h-24"
-                  />
-                </>
-              )}
+              {/* เจ้าของเคาะ 18 ส.ค. 2569: **ยังไม่เอาโลโก้** — กลับมาใช้หัวข้อข้อความล้วน
+                  (เคยลองเปลี่ยนเป็นโลโก้ + ลายน้ำ แต่ไฟล์โลโก้ตัวจริงยังไม่มีในโปรเจกต์
+                  ถ้าจะเอากลับ ดู docs/LOGO-SO.md) */}
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
+                ค้นหางานที่เหมาะกับคุณ
+              </h1>
               <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
                 เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
                 <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
