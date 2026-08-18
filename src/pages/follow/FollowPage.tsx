@@ -1233,6 +1233,19 @@ const FollowPage: React.FC = () => {
       <FollowEditDialog
         entry={editing}
         openJobs={openJobs}
+        /**
+         * รอบอื่นของ "คนเดียวกัน" — จับคู่ด้วย **เบอร์ + เรื่อง** (ไม่มี group ผูกให้ทุกเคส
+         * · เบอร์อย่างเดียวไม่พอ คนเดียวอาจถูกตามหลายเรื่องพร้อมกัน)
+         */
+        siblings={
+          editing
+            ? items.filter(
+                (x) =>
+                  x.recipient_phone === editing.recipient_phone &&
+                  x.topic === editing.topic,
+              )
+            : []
+        }
         onClose={() => setEditing(null)}
         onSaved={(msg) => {
           setOkMessage(msg);

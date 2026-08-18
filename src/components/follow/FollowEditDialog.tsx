@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Building2, LoaderCircle, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { updateFollowEntry, type FollowEntry } from '@/lib/followApi';
+import { createFollowEntry, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
+import { buildExtraRounds, extraRoundsNote } from '@/lib/followExtraRounds';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
 
@@ -17,16 +18,24 @@ import type { JobRequest } from '@/types';
  *
  * 🔴 หลังบันทึก server จะรีเฟรชบทพูดในคิว Lumos ให้ด้วย **เฉพาะสายที่ยังไม่ถูกดึงไป**
  * ถ้า `queue_refreshed = 0` แปลว่าสายที่ออกไปแล้วใช้ข้อมูลเดิม — ต้องบอกคนใช้ ไม่ใช่เงียบ
+ *
+ * **เพิ่มรอบโทรได้** (เจ้าของสั่ง 18 ส.ค. 2569: *"เผื่อบางทีต้องโทร 2 รอบ
+ * แต่ดันเผลอตั้งไปรอบเดียว"*) — หนึ่งรอบ = **หนึ่งรายการใหม่** ที่ลอกคน/เรื่อง/หน่วยงาน
+ * มาจากรายการนี้ (คิวโทรผูกกับรายการ 1:1 · ยัดหลายเวลาลงรายการเดียวไม่ได้)
+ * ตรรกะกันเวลาซ้ำ/เตือนเวลาที่ผ่านมาแล้วอยู่ที่ `followExtraRounds.ts`
  */
 export default function FollowEditDialog({
   entry,
   openJobs,
+  siblings = [],
   onClose,
   onSaved,
 }: {
   entry: FollowEntry | null;
   /** ใบขอที่ยังเปิด — ตัวเลือกหน่วยงาน (โหลดไว้แล้วจากหน้าแม่) */
   openJobs: JobRequest[];
+  /** รอบอื่นของ "คนเดียวกัน" ที่ยังไม่ถูกยกเลิก — ใช้โชว์รอบที่มีอยู่ + กันตั้งเวลาซ้ำ */
+  siblings?: FollowEntry[];
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -40,6 +49,8 @@ export default function FollowEditDialog({
   const [siteCode, setSiteCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** ช่องเวลาของ "รอบที่จะเพิ่ม" — ว่างอยู่ = ยังไม่เพิ่ม */
+  const [extraWhen, setExtraWhen] = useState<string[]>([]);
 
   useEffect(() => {
     if (!entry) return;
@@ -61,9 +72,32 @@ export default function FollowEditDialog({
       }
     }
     setError(null);
+    setExtraWhen([]);
   }, [entry]);
 
+  /**
+   * เวลาที่ "มีอยู่แล้ว" ของคนนี้ = รอบที่กำลังแก้ (ค่าในช่อง) + รอบพี่น้องที่ยังไม่ยกเลิก
+   * ใช้กันตั้งซ้ำ — ซ้ำเมื่อไหร่คือโทรซ้อนหาคนเดิม
+   */
+  const existingIso = useMemo(() => {
+    const out: string[] = [];
+    if (when) {
+      const d = new Date(when);
+      if (!Number.isNaN(d.getTime())) out.push(d.toISOString());
+    }
+    for (const s of siblings) {
+      if (s.id === entry?.id || s.cancelled || !s.scheduled_at) continue;
+      out.push(s.scheduled_at);
+    }
+    return out;
+  }, [when, siblings, entry?.id]);
+
+  const rounds = useMemo(() => buildExtraRounds(extraWhen, existingIso), [extraWhen, existingIso]);
+  const roundsNote = extraRoundsNote(rounds);
+
   if (!entry) return null;
+
+  const otherRounds = siblings.filter((s) => s.id !== entry.id && !s.cancelled);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +114,31 @@ export default function FollowEditDialog({
         unit_name: unitName.trim() || undefined,
         site_code: siteCode.trim() || undefined,
       });
+      /**
+       * รอบใหม่สร้างหลังแก้สำเร็จเท่านั้น — แก้ล้มแล้วยังเพิ่มรอบต่อ = ได้รอบที่ใช้ข้อมูลเก่า
+       * ⚠️ ยิงทีละรอบ ล้มกลางทางต้องบอกว่าสำเร็จไปกี่รอบ ไม่งั้นคนกดซ้ำแล้วได้รอบซ้อน
+       */
+      let added = 0;
+      for (const iso of rounds.isoTimes) {
+        await createFollowEntry({
+          recipient_name: name,
+          recipient_phone: phone,
+          topic,
+          note: note || undefined,
+          staff_phone: staffPhone || undefined,
+          scheduled_at: iso,
+          unit_name: unitName.trim() || undefined,
+          site_code: siteCode.trim() || undefined,
+        });
+        added += 1;
+      }
+
       // บอกตรง ๆ ว่าสายที่ออกไปแล้วใช้ข้อมูลเดิม — เงียบไว้คือเข้าใจผิดว่าแก้ทันทุกสาย
-      onSaved(
+      const queueMsg =
         (saved.queue_refreshed ?? 0) > 0
           ? `แก้ไขแล้ว — อัปเดตบทพูดในคิว ${saved.queue_refreshed} สายด้วย`
-          : 'แก้ไขแล้ว — แต่สายที่ AI รับไปแล้วยังใช้ข้อมูลเดิม (เรียกคืนไม่ได้)',
-      );
+          : 'แก้ไขแล้ว — แต่สายที่ AI รับไปแล้วยังใช้ข้อมูลเดิม (เรียกคืนไม่ได้)';
+      onSaved(added > 0 ? `${queueMsg} · เพิ่มอีก ${added} รอบ` : queueMsg);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'แก้ไขไม่สำเร็จ');
@@ -238,6 +291,97 @@ export default function FollowEditDialog({
               </p>
             ) : null}
           </div>
+          {/* เพิ่มรอบโทร (เจ้าของสั่ง 18 ส.ค. 2569) — รอบใหม่ = รายการใหม่ที่ลอกข้อมูลนี้ไป
+              โชว์รอบที่มีอยู่แล้วให้เห็นก่อน จะได้ไม่ตั้งซ้อนกันเอง */}
+          <div className={cn('space-y-2 rounded-xl border p-3', TONE.neutral.soft)}>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold text-foreground">รอบโทรของคนนี้</span>
+              <span className="text-[11px] text-muted-foreground">
+                มีอยู่ {(otherRounds.length + 1).toLocaleString('th-TH')} รอบ
+                {rounds.isoTimes.length > 0
+                  ? ` · กำลังเพิ่มอีก ${rounds.isoTimes.length.toLocaleString('th-TH')}`
+                  : ''}
+              </span>
+            </div>
+
+            {otherRounds.length > 0 ? (
+              <ul className="space-y-1">
+                {otherRounds.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-background/60 px-2 py-1 text-[11px]"
+                  >
+                    <span className="text-muted-foreground">
+                      {s.scheduled_at
+                        ? new Date(s.scheduled_at).toLocaleString('th-TH', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })
+                        : '—'}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {s.call_status === 'pending' ? 'รอโทร' : 'ส่ง AI แล้ว'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {extraWhen.map((v, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="datetime-local"
+                  value={v}
+                  aria-label={`รอบที่จะเพิ่ม ${i + 1}`}
+                  onChange={(e) =>
+                    setExtraWhen((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))
+                  }
+                  className="jarvis-soft-field min-h-[44px] flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => setExtraWhen((prev) => prev.filter((_, idx) => idx !== i))}
+                  aria-label={`เอารอบที่จะเพิ่ม ${i + 1} ออก`}
+                  className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setExtraWhen((prev) => (prev.length >= 5 ? prev : [...prev, when || '']))
+              }
+              disabled={extraWhen.length >= 5}
+              className={cn(
+                'inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-4 text-xs font-medium disabled:opacity-40',
+                TONE.info.outline,
+              )}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden /> เพิ่มรอบโทร
+            </button>
+
+            {/* 🔴 ห้ามเงียบเมื่อมีของถูกตัด/ของเสี่ยง — คนต้องรู้ก่อนกดบันทึก */}
+            {roundsNote ? (
+              <p
+                className={cn(
+                  'rounded-lg px-2 py-1 text-[11px]',
+                  rounds.pastCount > 0 || rounds.invalidCount > 0
+                    ? cn(TONE.warn.soft, TONE.warn.value)
+                    : 'text-muted-foreground',
+                )}
+              >
+                {roundsNote}
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                กดเพิ่มรอบแล้วตั้งวัน-เวลา · เวลาซ้ำกับรอบเดิมจะถูกตัดให้อัตโนมัติ
+              </p>
+            )}
+          </div>
+
           <div className="space-y-1.5">
             <label htmlFor="feNote" className="ml-1 text-xs font-medium text-muted-foreground">
               ข้อความที่อยากให้ AI พูดเพิ่ม
@@ -275,7 +419,9 @@ export default function FollowEditDialog({
             className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-            บันทึกการแก้ไข
+            {rounds.isoTimes.length > 0
+              ? `บันทึก + เพิ่ม ${rounds.isoTimes.length} รอบ`
+              : 'บันทึกการแก้ไข'}
           </button>
         </div>
       </form>

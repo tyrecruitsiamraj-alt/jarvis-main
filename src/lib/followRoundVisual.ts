@@ -18,20 +18,30 @@ import {
  * 🔴 **สีบอก "ควรทำอะไร" ไม่ใช่ "มากหรือน้อย"** — ช่องที่ต้องลงมือ (โทรไม่ติด/ไม่ไป)
  * ต้องเด่นแม้เลขน้อย และช่องที่ดีแล้วต้องไม่แย่งสายตาแม้เลขเยอะ
  *
- * 🔴 **เลข 0 ต้องไม่ติดสีร้อน** — กล่องว่างที่ยังแดงอยู่ทำให้คนไล่ดูของที่ไม่มีจริง
- * ทุกช่องที่นับได้ 0 ตกไปเป็นโทนเทาเสมอ ไม่ว่าจะเป็นช่องอะไร
+ * 🔴 **ช่องต้องคงสีประจำตัวไว้เสมอ แม้เป็น 0** (เจ้าของสั่งซ้ำ 18 ส.ค. 2569:
+ * *"ตรง ทั้งหมด รอโทร กำลังโทร ฯลฯ ทำเป็น Visual แบบแบ่งสีให้หน่อย"*)
+ * เดิมทำ "0 = เทา" แล้วเจอว่าเวลาข้อมูลน้อย ทั้งแถบเทาหมดจนแยกไม่ออกว่าช่องไหนคืออะไร
+ *
+ * แต่ยังต้องกันของเดิมด้วย: **กล่องว่างห้ามเด่นเท่ากล่องที่มีของ** ไม่งั้นคนไล่ดูของที่ไม่มีจริง
+ * → ทางออกคือ `muted` — สีเดิมแต่จาง ๆ (ป้ายจาง พื้นไม่ติดสี ไม่ขึ้นกรอบหนา)
+ * ส่วน `actionable` ยังผูกกับ "มีของจริง" เท่านั้น เหมือนเดิมทุกอย่าง
  */
 
 export type BucketVisual = {
+  /** สีประจำช่อง — **คงที่เสมอ** ไม่ขึ้นกับจำนวน (ใช้เป็นตัวระบุว่าช่องไหนคืออะไร) */
   tone: ToneKey;
-  /** true = ช่องที่ต้องลงมือทำ (ใช้เน้นกรอบ + ขึ้นในคำแนะนำ) */
+  /** true = ช่องที่ต้องลงมือทำ (ใช้เน้นกรอบ + ขึ้นในคำแนะนำ) · เป็นจริงเมื่อมีของจริงเท่านั้น */
   actionable: boolean;
+  /** true = ช่องว่าง (0 คน) — ให้ลงสีแบบจาง ไม่ใช่เต็มสี */
+  muted: boolean;
 };
 
-/** โทนประจำช่องเมื่อ **มีคนอยู่ในช่อง** — 0 คนถูกลดเป็นเทาที่ `bucketVisual()` */
-const BUCKET_BASE: Record<FollowRoundBucket, BucketVisual> = {
-  all: { tone: 'neutral', actionable: false },
-  waiting: { tone: 'neutral', actionable: false },
+/** โทนประจำช่อง — คงที่เสมอ · ส่วน actionable/muted คิดจากจำนวนที่ `bucketVisual()` */
+const BUCKET_BASE: Record<FollowRoundBucket, Omit<BucketVisual, 'muted'>> = {
+  // เจ้าของสั่ง 18 ส.ค. 2569: *"ตรง ทั้งหมด รอโทร กำลังโทร ฯลฯ ทำเป็น Visual แบ่งสีให้หน่อย"*
+  // — เดิม ทั้งหมด/รอโทร เป็นเทาทั้งคู่ กวาดตาแล้วแยกไม่ออกว่าช่องไหนคืออะไร
+  all: { tone: 'info', actionable: false },
+  waiting: { tone: 'teal', actionable: false },
   calling: { tone: 'primary', actionable: false },
   connected: { tone: 'success', actionable: false },
   unreached: { tone: 'warn', actionable: true },
@@ -39,10 +49,11 @@ const BUCKET_BASE: Record<FollowRoundBucket, BucketVisual> = {
   not_went: { tone: 'danger', actionable: true },
 };
 
-/** สีของช่องตามจำนวนคนในช่อง */
+/** สีของช่อง — สีคงที่ · ช่องว่างได้ `muted` และไม่นับเป็นของที่ต้องลงมือ */
 export function bucketVisual(bucket: FollowRoundBucket, count: number): BucketVisual {
-  if (!(count > 0)) return { tone: 'neutral', actionable: false };
-  return BUCKET_BASE[bucket];
+  const base = BUCKET_BASE[bucket];
+  const has = count > 0;
+  return { tone: base.tone, actionable: has && base.actionable, muted: !has };
 }
 
 export type RoundCounts = Record<FollowRoundBucket, number>;
@@ -61,7 +72,9 @@ export type RoundSignal = {
  */
 export function roundSignal(counts: RoundCounts): RoundSignal {
   if (!(counts.all > 0)) {
-    return { level: 'empty', tone: 'neutral', text: 'ยังไม่มีใครอยู่รอบนี้' };
+    // เจ้าของสั่ง 18 ส.ค. 2569: *"ยังไม่มีใครอยู่รอบนี้ เอาออก"* —
+    // รอบว่างไม่ต้องมีข้อความ (เลข 0 บนกล่องบอกอยู่แล้ว) · text ว่าง = UI ไม่เรนเดอร์แถบ
+    return { level: 'empty', tone: 'neutral', text: '' };
   }
   if (counts.not_went > 0) {
     return {

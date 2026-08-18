@@ -304,7 +304,7 @@ export default function FollowCallRoundsPanel() {
                 <span className={cn('ml-1 text-[10px] font-normal', DASH.muted)}>คน</span>
               </span>
               <span className={cn('block truncate text-[10px]', DASH.muted)}>
-                {actionableSummary(counts) ?? (rows.length > 0 ? 'ไม่มีของค้าง' : 'ยังไม่มีใคร')}
+                {actionableSummary(counts) ?? (rows.length > 0 ? 'ไม่มีของค้าง' : '—')}
               </span>
             </button>
           );
@@ -321,15 +321,13 @@ export default function FollowCallRoundsPanel() {
         const signalTone = TONE[signal.tone];
         return (
           <div className="space-y-2">
-            <div
-              className={cn(
-                'flex items-center gap-2 rounded-xl border px-3 py-2',
-                signal.level === 'empty' ? TONE.neutral.soft : signalTone.soft,
-              )}
-            >
-              <span className={cn('h-2 w-2 shrink-0 rounded-full', signalTone.dot)} aria-hidden />
-              <p className={cn('text-[11px] font-semibold', signalTone.value)}>{signal.text}</p>
-            </div>
+            {/* รอบว่าง = ไม่มีข้อความ ไม่ต้องเรนเดอร์แถบ (เจ้าของสั่ง 18 ส.ค. 2569) */}
+            {signal.text ? (
+              <div className={cn('flex items-center gap-2 rounded-xl border px-3 py-2', signalTone.soft)}>
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', signalTone.dot)} aria-hidden />
+                <p className={cn('text-[11px] font-semibold', signalTone.value)}>{signal.text}</p>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
               {FOLLOW_ROUND_BUCKETS.map((b) => {
@@ -345,16 +343,34 @@ export default function FollowCallRoundsPanel() {
                     onClick={() => openBucketDialog(activeRound, b)}
                     className={cn(
                       'rounded-lg border px-2 py-1.5 text-left transition-colors',
-                      tone.soft,
-                      n === 0 ? 'cursor-default opacity-60' : cn(tone.softHover, 'hover:brightness-105'),
+                      // ช่องว่าง: สีประจำตัวยังอยู่ (จุด+ป้าย) แต่พื้นไม่ติดสี ไม่แย่งสายตา
+                      vis.muted
+                        ? cn('cursor-default border-border/60 bg-background/40 opacity-75')
+                        : cn(tone.soft, tone.softHover, 'hover:brightness-105'),
                       // ช่องที่ต้องลงมือ = กรอบหนา กวาดตาเจอก่อนเพื่อน แม้เลขน้อย
                       vis.actionable ? 'border-2 font-bold shadow-sm' : '',
                     )}
                   >
-                    <span className={cn('block truncate text-[10px] font-semibold', DASH.muted)}>
-                      {FOLLOW_ROUND_BUCKET_LABEL[b]}
+                    {/* จุดสี + ป้ายสีโทน — เดิมป้ายเป็นเทาทุกช่อง เห็นสีแค่ตัวเลข
+                        กวาดตาแล้วยังแยกไม่ออกว่าช่องไหนคืออะไร (เจ้าของสั่งแบ่งสีให้ชัด) */}
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={cn('h-1.5 w-1.5 shrink-0 rounded-full', tone.dot, vis.muted && 'opacity-50')}
+                        aria-hidden
+                      />
+                      <span
+                        className={cn(
+                          'truncate text-[10px] font-semibold',
+                          tone.value,
+                          vis.muted && 'opacity-60',
+                        )}
+                      >
+                        {FOLLOW_ROUND_BUCKET_LABEL[b]}
+                      </span>
                     </span>
-                    <span className={cn('block text-lg font-bold tabular-nums', tone.num)}>
+                    <span
+                      className={cn('block text-lg font-bold tabular-nums', tone.num, vis.muted && 'opacity-45')}
+                    >
                       {n.toLocaleString('th-TH')}
                     </span>
                   </button>

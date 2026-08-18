@@ -22,35 +22,54 @@ const counts = (over: Partial<RoundCounts> = {}): RoundCounts => ({
 
 describe('bucketVisual — สีบอกว่าควรทำอะไร', () => {
   it('ช่องที่ต้องลงมือ = เหลือง/แดง และติดธง actionable', () => {
-    expect(bucketVisual('unreached', 3)).toEqual({ tone: 'warn', actionable: true });
-    expect(bucketVisual('not_went', 1)).toEqual({ tone: 'danger', actionable: true });
+    expect(bucketVisual('unreached', 3)).toEqual({ tone: 'warn', actionable: true, muted: false });
+    expect(bucketVisual('not_went', 1)).toEqual({ tone: 'danger', actionable: true, muted: false });
   });
 
   it('ช่องที่ดีแล้ว/กำลังเดิน ไม่ต้องลงมือ', () => {
-    expect(bucketVisual('connected', 9)).toEqual({ tone: 'success', actionable: false });
-    expect(bucketVisual('went', 9)).toEqual({ tone: 'success', actionable: false });
-    expect(bucketVisual('calling', 2)).toEqual({ tone: 'primary', actionable: false });
-    expect(bucketVisual('waiting', 5)).toEqual({ tone: 'neutral', actionable: false });
-    expect(bucketVisual('all', 5)).toEqual({ tone: 'neutral', actionable: false });
+    expect(bucketVisual('connected', 9)).toEqual({ tone: 'success', actionable: false, muted: false });
+    expect(bucketVisual('went', 9)).toEqual({ tone: 'success', actionable: false, muted: false });
+    expect(bucketVisual('calling', 2)).toEqual({ tone: 'primary', actionable: false, muted: false });
   });
 
-  it('🔴 เลข 0 ต้องเป็นเทาเสมอ ไม่ว่าช่องไหน — กล่องว่างห้ามติดสีร้อน', () => {
+  it('🔴 ทุกช่องที่มีคนต้องมีสีของตัวเอง ห้ามซ้ำกันจนแยกไม่ออก', () => {
+    const tones = FOLLOW_ROUND_BUCKETS.map((b) => bucketVisual(b, 3).tone);
+    // ไป/โทรติด เป็นเขียวได้ทั้งคู่ (ความหมายเดียวกัน = ดีแล้ว) ที่เหลือต้องไม่ซ้ำ
+    expect(new Set(tones).size).toBeGreaterThanOrEqual(5);
+    // ทั้งหมด กับ รอโทร ต้องไม่ใช่สีเดียวกัน (เคยเป็นเทาทั้งคู่ กวาดตาแยกไม่ออก)
+    expect(bucketVisual('all', 3).tone).not.toBe(bucketVisual('waiting', 3).tone);
+    // และห้ามเป็นเทาล้วน — เทาไม่สื่ออะไรเลย
+    expect(bucketVisual('all', 3).tone).not.toBe('neutral');
+    expect(bucketVisual('waiting', 3).tone).not.toBe('neutral');
+  });
+
+  it('🔴 ทั้ง 7 ช่องต้องแยกสีได้แม้ตอนว่างทั้งแถบ (เคสที่เจ้าของเจอ)', () => {
+    const tones = FOLLOW_ROUND_BUCKETS.map((b) => bucketVisual(b, 0).tone);
+    expect(new Set(tones).size).toBeGreaterThanOrEqual(5);
+    expect(tones.every((t) => t === 'neutral')).toBe(false);
+  });
+
+  it('🔴 ช่องว่าง (0) คงสีประจำตัวไว้ แต่ต้อง muted และไม่ใช่ของที่ต้องลงมือ', () => {
     for (const b of FOLLOW_ROUND_BUCKETS) {
-      expect(bucketVisual(b, 0)).toEqual({ tone: 'neutral', actionable: false });
+      const v = bucketVisual(b, 0);
+      expect(v.muted).toBe(true);
+      expect(v.actionable).toBe(false);
+      // สีต้องเท่ากับตอนมีของ — ช่องเดิมต้องเป็นสีเดิมเสมอ กวาดตาจำตำแหน่งได้
+      expect(v.tone).toBe(bucketVisual(b, 5).tone);
     }
-    expect(bucketVisual('not_went', 0).actionable).toBe(false);
   });
 
-  it('ค่าเพี้ยน (ติดลบ/NaN) ตกเป็นเทา ไม่ใช่ติดสีร้อน', () => {
-    expect(bucketVisual('not_went', -1).tone).toBe('neutral');
-    expect(bucketVisual('unreached', Number.NaN).tone).toBe('neutral');
+  it('ค่าเพี้ยน (ติดลบ/NaN) ถือเป็นช่องว่าง — สีเดิมแต่ muted', () => {
+    expect(bucketVisual('not_went', -1)).toEqual({ tone: 'danger', actionable: false, muted: true });
+    expect(bucketVisual('unreached', Number.NaN).muted).toBe(true);
   });
 });
 
 describe('roundSignal — เรียงความเร่งด่วน', () => {
-  it('ไม่มีใครในรอบ = empty', () => {
+  it('🔴 ไม่มีใครในรอบ = empty และ **ไม่มีข้อความ** (เจ้าของสั่งเอาออก)', () => {
     expect(roundSignal(counts()).level).toBe('empty');
     expect(roundSignal(counts()).tone).toBe('neutral');
+    expect(roundSignal(counts()).text).toBe('');
   });
 
   it('🔴 แดงชนะเหลือง ชนะน้ำเงิน ชนะเทา', () => {
