@@ -155,7 +155,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const id = getQuery(req, 'id');
     if (id) {
-      const item = await getSiamrajUnitRequestById(id, departmentScope);
+      // หน้ารายละเอียดต้องเปิดใบที่ปิด/ยกเลิกแล้วได้ (drill-down บน Dashboard ชี้มาที่ใบพวกนี้)
+      const item = await getSiamrajUnitRequestById(id, departmentScope, { includeClosed: true });
       if (!item) return sendError(res, 404, 'Not found', 'ไม่พบใบขอ');
       await attachAssignments([item]);
       await attachNotes([item]);

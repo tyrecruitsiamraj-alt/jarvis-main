@@ -18,7 +18,15 @@ import {
   shiftMonth,
 } from '@/lib/followCallCalendar';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
-import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw } from 'lucide-react';
 
 /**
  * แผงการโทรของหน้า Follow — **3 รอบ + ปฏิทิน** (เจ้าของสั่ง 18 ส.ค. 2569)
@@ -27,11 +35,15 @@ import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw, X } from 'lu
  * > เพื่อให้รู้ว่าโทร 3 รอบ แต่ละกล่องกดแล้วต้องแสดงชื่อขึ้นมาพร้อมรายละเอียดของแต่ละคน
  * > มี calendar ให้หน่อยเพื่อจะได้รู้ว่าแต่ละวันโทรกี่คน"*
  *
+ * ปรับรอบสอง (18 ส.ค. บ่าย): *"ตัว calendar ย้ายไปมุมขวาบน และกล่องที่ให้กดอะ
+ * กดแล้วต้องมี Popup ขึ้นมา"* — ปฏิทินเป็น Popover ที่มุมขวาบนของแผง ·
+ * กดกล่องถัง/กดวันบนปฏิทินแล้วรายชื่อขึ้นเป็น Dialog ไม่ใช่กางต่อท้ายแผง
+ *
  * แทน `CallFunnelPanel` (funnel 4 ช่อง) ซึ่งใช้ที่หน้า Follow ที่เดียว
  *
- * 🔴 **ยอดกับรายชื่อมาคนละเส้น** — ยอดมาจาก funnel (นับในฐาน) · รายชื่อมาจากตาราง
- * รายการติดตาม · นับได้ไม่เท่ากันต้อง**ขึ้นข้อความบอก** ห้ามเงียบ
- * เงื่อนไขแบ่งถังอยู่ที่ `callOutcomeBuckets.ts` ที่เดียว ทั้ง SQL และหน้าเว็บใช้ตัวเดียวกัน
+ * 🔴 **ยอดกับรายชื่อต้องมาจากชุดเดียวกัน** — ทั้งเลขบนกล่องและชื่อใน popup นับจาก
+ * `entries` ชุดเดียว (เคยแยกเส้นแล้วเลขไม่ตรงกับชื่อ) ·
+ * เงื่อนไขแบ่งถังอยู่ที่ `callOutcomeBuckets.ts` / `followRoundBuckets.ts` ที่เดียว
  */
 
 /** สีของแต่ละช่อง — ความหมายเดียวกับที่ใช้ทั้งระบบ (เขียว=ดี · เหลือง=ติดขัด · แดง=หลุด) */
@@ -45,7 +57,7 @@ const BUCKET_TEXT: Record<FollowRoundBucket, string> = {
   not_went: TONE.danger.value,
 };
 
-/** รายละเอียดของคนหนึ่งคนในกล่อง — เจ้าของขอ "ชื่อพร้อมรายละเอียดของแต่ละคน" */
+/** รายละเอียดของคนหนึ่งคนใน popup — เจ้าของขอ "ชื่อพร้อมรายละเอียดของแต่ละคน" */
 function PersonRow({ p }: { p: FollowEntry }) {
   return (
     <li className={cn('rounded-lg border px-2.5 py-2', TONE.neutral.soft)}>
@@ -85,14 +97,20 @@ function PersonRow({ p }: { p: FollowEntry }) {
   );
 }
 
+/** ของที่ popup รายชื่อต้องรู้ — หัวเรื่อง + คำอธิบาย + คนในกล่องที่กด */
+type PeopleDialogState = {
+  title: string;
+  hint: string;
+  people: FollowEntry[];
+};
+
 export default function FollowCallRoundsPanel() {
   const [entries, setEntries] = useState<FollowEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  /** ช่องที่กางอยู่ — "รอบ:ช่อง" · null = ยังไม่กด */
-  const [openBox, setOpenBox] = useState<string | null>(null);
+  /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
+  const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
   const [month, setMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
-  const [openDay, setOpenDay] = useState<string | null>(null);
-  /** ปฏิทินย่อไว้ก่อน กดถึงกาง (เจ้าของสั่ง 18 ส.ค. 2569: "ทำเป็นแบบอันเล็ก") */
+  /** ปฏิทินเป็น popover มุมขวาบน (เจ้าของสั่ง 18 ส.ค. 2569 บ่าย) */
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const load = () => {
@@ -130,12 +148,27 @@ export default function FollowCallRoundsPanel() {
 
   const calendar = useMemo(() => buildCallCalendar(entries), [entries]);
   const grid = useMemo(() => monthGridDays(month), [month]);
-  const dayPeople = useMemo(() => {
-    if (!openDay) return [];
-    return entries.filter(
-      (e) => callDayKey(e.scheduled_at) === openDay || callDayKey(e.called_at) === openDay,
+
+  const openBucketDialog = (slot: number, b: FollowRoundBucket) => {
+    const rows = roundRows.get(slot) ?? [];
+    const list = rows.filter((r) => inFollowRoundBucket(r, b));
+    setPeopleDialog({
+      title: `รอบ ${slot} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
+      hint: FOLLOW_ROUND_BUCKET_HINT[b],
+      people: list,
+    });
+  };
+
+  const openDayDialog = (ymd: string) => {
+    const people = entries.filter(
+      (e) => callDayKey(e.scheduled_at) === ymd || callDayKey(e.called_at) === ymd,
     );
-  }, [entries, openDay]);
+    setPeopleDialog({
+      title: `${formatYmdDmyBe(ymd)} · ${people.length.toLocaleString('th-TH')} คน`,
+      hint: 'คนที่ตั้งไว้ว่าจะโทร หรือมีผลโทรกลับมาในวันนี้',
+      people,
+    });
+  };
 
   const monthLabel = (() => {
     const [y, m] = month.split('-').map(Number);
@@ -149,7 +182,7 @@ export default function FollowCallRoundsPanel() {
 
   return (
     <div className={cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card)}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className={cn('text-sm font-bold', DASH.cellStrong)}>การโทรของงาน Follow</h2>
           <p className={cn('text-[11px]', DASH.muted)}>
@@ -157,17 +190,91 @@ export default function FollowCallRoundsPanel() {
             ไม่ใช่ยอดสะสมทุกครั้งที่โทร
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="jarvis-btn-ghost shrink-0 disabled:opacity-50"
-        >
-          <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
-        </button>
+        {/* มุมขวาบน: ปฏิทิน (popover) + รีเฟรช */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" className="jarvis-btn-ghost shrink-0">
+                <CalendarDays className="h-3 w-3" aria-hidden /> ปฏิทินการโทร
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[320px] p-2.5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMonth((m) => shiftMonth(m, -1))}
+                  aria-label="เดือนก่อนหน้า"
+                  className="rounded-full border border-border p-1 hover:bg-secondary"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                </button>
+                <span className={cn('text-xs font-bold', DASH.cellStrong)}>{monthLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => setMonth((m) => shiftMonth(m, 1))}
+                  aria-label="เดือนถัดไป"
+                  className="rounded-full border border-border p-1 hover:bg-secondary"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
+              <div className={cn('grid grid-cols-7 gap-1 text-center text-[10px]', DASH.muted)}>
+                {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((d) => (
+                  <span key={d} className="py-0.5 font-semibold">
+                    {d}
+                  </span>
+                ))}
+                {grid.map((ymd, i) => {
+                  if (!ymd) return <span key={`x${i}`} />;
+                  const day = calendar.get(ymd);
+                  const planned = day?.planned ?? 0;
+                  const called = day?.called ?? 0;
+                  const has = planned > 0 || called > 0;
+                  return (
+                    <button
+                      key={ymd}
+                      type="button"
+                      disabled={!has}
+                      onClick={() => openDayDialog(ymd)}
+                      title={has ? `ตั้งไว้ ${planned} · โทรแล้ว ${called}` : undefined}
+                      className={cn(
+                        'rounded-md border px-1 py-1 transition-colors',
+                        has ? 'border-border hover:bg-secondary' : 'border-transparent opacity-45',
+                      )}
+                    >
+                      <span className="block tabular-nums text-foreground">
+                        {Number(ymd.slice(-2))}
+                      </span>
+                      {has ? (
+                        <span className="mt-0.5 block leading-none">
+                          <b className={cn('tabular-nums', TONE.primary.value)}>{planned}</b>
+                          {called > 0 ? (
+                            <b className={cn('ml-1 tabular-nums', TONE.success.value)}>✓{called}</b>
+                          ) : null}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className={cn('mt-1.5 text-[10px]', DASH.muted)}>
+                เลขน้ำเงิน = ตั้งไว้ว่าจะโทรวันนั้น · <b className={TONE.success.value}>✓</b>{' '}
+                เขียว = มีผลโทรกลับมาแล้ว · สายที่ยกเลิกไม่ถูกนับ · กดวันเพื่อดูรายชื่อ
+              </p>
+            </PopoverContent>
+          </Popover>
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="jarvis-btn-ghost shrink-0 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
+          </button>
+        </div>
       </div>
 
-      {/* 3 แถว = 3 รอบ · แต่ละแถวมี 4 กล่องถัง กดได้ */}
+      {/* 3 แถว = 3 รอบ · แต่ละแถวมี 7 กล่องถัง กดแล้วรายชื่อขึ้นเป็น popup */}
       <div className="space-y-2">
         {[1, 2, 3].map((slot) => {
           const rows = roundRows.get(slot) ?? [];
@@ -185,19 +292,16 @@ export default function FollowCallRoundsPanel() {
                   เพื่อให้สามรอบอ่านเทียบกันได้ตรงคอลัมน์ */}
               <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
                 {FOLLOW_ROUND_BUCKETS.map((b) => {
-                  const key = `${slot}:${b}`;
                   const n = counts[b];
-                  const open = openBox === key;
                   return (
                     <button
                       key={b}
                       type="button"
                       disabled={n === 0}
                       title={FOLLOW_ROUND_BUCKET_HINT[b]}
-                      onClick={() => setOpenBox(open ? null : key)}
+                      onClick={() => openBucketDialog(slot, b)}
                       className={cn(
                         'rounded-lg border px-2 py-1.5 text-left transition-colors',
-                        open ? 'ring-2 ring-ring' : '',
                         n === 0 ? 'cursor-default opacity-60' : 'hover:bg-secondary',
                       )}
                     >
@@ -211,29 +315,6 @@ export default function FollowCallRoundsPanel() {
                   );
                 })}
               </div>
-
-              {openBox?.startsWith(`${slot}:`) ? (
-                (() => {
-                  const b = openBox.split(':')[1] as FollowRoundBucket;
-                  const list = rows.filter((r) => inFollowRoundBucket(r, b));
-                  return (
-                    <div className="mt-2 border-t border-border/60 pt-2">
-                      <p className={cn('mb-1.5 text-[11px] font-bold', BUCKET_TEXT[b])}>
-                        รอบ {slot} · {FOLLOW_ROUND_BUCKET_LABEL[b]} (
-                        {list.length.toLocaleString('th-TH')})
-                        <span className={cn('ml-1.5 font-normal', DASH.muted)}>
-                          {FOLLOW_ROUND_BUCKET_HINT[b]}
-                        </span>
-                      </p>
-                      <ul className="space-y-1.5">
-                        {list.map((p) => (
-                          <PersonRow key={p.id} p={p} />
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })()
-              ) : null}
             </div>
           );
         })}
@@ -250,104 +331,30 @@ export default function FollowCallRoundsPanel() {
         คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
       </p>
 
-      {/* ปฏิทินแบบย่อ — กดถึงกาง (เจ้าของสั่ง 18 ส.ค. 2569: *"ทำเป็นแบบอันเล็กได้ไหม
-          ที่กดไปแล้วค่อยขึ้นวันที่ให้เลือก"*) · ย่อไว้เพราะแผงนี้ยาวอยู่แล้ว */}
-      <button
-        type="button"
-        onClick={() => setCalendarOpen((v) => !v)}
-        className={cn(
-          'flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left',
-          TONE.neutral.soft,
-          TONE.neutral.softHover,
-        )}
-      >
-        <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold', DASH.cellStrong)}>
-          <CalendarDays className="h-3.5 w-3.5" aria-hidden />
-          ปฏิทินการโทร
-          <span className={cn('font-normal', DASH.muted)}>— แต่ละวันโทรกี่คน</span>
-        </span>
-        <span className={cn('text-[11px]', DASH.muted)}>{calendarOpen ? 'ซ่อน' : 'เปิดดู'}</span>
-      </button>
-
-      {calendarOpen ? (
-      <div className="rounded-xl border border-border/60 p-2.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => setMonth((m) => shiftMonth(m, -1))}
-            aria-label="เดือนก่อนหน้า"
-            className="rounded-full border border-border p-1 hover:bg-secondary"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          <span className={cn('text-xs font-bold', DASH.cellStrong)}>{monthLabel}</span>
-          <button
-            type="button"
-            onClick={() => setMonth((m) => shiftMonth(m, 1))}
-            aria-label="เดือนถัดไป"
-            className="rounded-full border border-border p-1 hover:bg-secondary"
-          >
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-          </button>
-        </div>
-        <div className={cn('grid grid-cols-7 gap-1 text-center text-[10px]', DASH.muted)}>
-          {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((d) => (
-            <span key={d} className="py-0.5 font-semibold">
-              {d}
-            </span>
-          ))}
-          {grid.map((ymd, i) => {
-            if (!ymd) return <span key={`x${i}`} />;
-            const day = calendar.get(ymd);
-            const planned = day?.planned ?? 0;
-            const called = day?.called ?? 0;
-            const has = planned > 0 || called > 0;
-            const isOpen = openDay === ymd;
-            return (
-              <button
-                key={ymd}
-                type="button"
-                disabled={!has}
-                onClick={() => setOpenDay(isOpen ? null : ymd)}
-                title={has ? `ตั้งไว้ ${planned} · โทรแล้ว ${called}` : undefined}
-                className={cn(
-                  'rounded-md border px-1 py-1 transition-colors',
-                  has ? 'border-border hover:bg-secondary' : 'border-transparent opacity-45',
-                  isOpen ? 'ring-2 ring-ring' : '',
-                )}
-              >
-                <span className="block tabular-nums text-foreground">{Number(ymd.slice(-2))}</span>
-                {has ? (
-                  <span className="mt-0.5 block leading-none">
-                    <b className={cn('tabular-nums', TONE.primary.value)}>{planned}</b>
-                    {called > 0 ? (
-                      <b className={cn('ml-1 tabular-nums', TONE.success.value)}>✓{called}</b>
-                    ) : null}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-        <p className={cn('mt-1.5 text-[10px]', DASH.muted)}>
-          เลขน้ำเงิน = ตั้งไว้ว่าจะโทรวันนั้น · <b className={TONE.success.value}>✓</b> เขียว =
-          มีผลโทรกลับมาแล้ว · สายที่ยกเลิกไม่ถูกนับ
-        </p>
-
-        {openDay ? (
-          <div className="mt-2 border-t border-border/60 pt-2">
-            <p className={cn('mb-1.5 text-[11px] font-bold', DASH.cellStrong)}>
-              {formatYmdDmyBe(openDay)} · {dayPeople.length.toLocaleString('th-TH')} คน
-            </p>
-            <ul className="space-y-1.5">
-              {dayPeople.map((p) => (
-                <PersonRow key={p.id} p={p} />
-              ))}
-            </ul>
+      {/* popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน */}
+      <Dialog open={peopleDialog != null} onOpenChange={(open) => !open && setPeopleDialog(null)}>
+        <DialogContent className="flex max-h-[min(88dvh,720px)] w-[min(calc(100vw-1.25rem),34rem)] max-w-none flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border/50 px-4 pb-3 pt-4 text-left">
+            <DialogTitle className="pr-8 text-sm font-bold leading-snug">
+              {peopleDialog?.title ?? ''}
+            </DialogTitle>
+            <DialogDescription className={cn('text-[11px]', DASH.muted)}>
+              {peopleDialog?.hint ?? ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+            {peopleDialog && peopleDialog.people.length > 0 ? (
+              <ul className="space-y-1.5">
+                {peopleDialog.people.map((p) => (
+                  <PersonRow key={p.id} p={p} />
+                ))}
+              </ul>
+            ) : (
+              <p className={cn('py-4 text-center text-xs', DASH.muted)}>ไม่มีรายชื่อในกล่องนี้</p>
+            )}
           </div>
-        ) : null}
-      </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

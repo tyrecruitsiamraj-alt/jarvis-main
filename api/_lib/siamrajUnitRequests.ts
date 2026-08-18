@@ -266,6 +266,10 @@ export async function listSiamrajUnitRequests(options: {
 export async function getSiamrajUnitRequestById(
   id: string,
   departmentScope?: DepartmentScope,
+  options?: {
+    /** true = เปิดใบที่ปิด/ยกเลิกแล้วได้ (หน้ารายละเอียดเท่านั้น) — เส้น AI/บอร์ดห้ามส่ง */
+    includeClosed?: boolean;
+  },
 ) {
   const source = getSiamrajDbSource();
   if (!source) return null;
@@ -278,7 +282,7 @@ export async function getSiamrajUnitRequestById(
       ? // ใบขอล่วงหน้ามี id คนละ prefix — ต้องแยกไปอ่านคนละตาราง ไม่งั้นเปิดใบไม่เจอ
         isPrequestId(id)
         ? ((await getSiamrajSqlServerPrequestById(id)) as never)
-        : await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id))
+        : await getSiamrajSqlServerUnitRequestById(normalizeLookupId(id), options)
       : null;
 
   if (source !== 'sqlserver') {

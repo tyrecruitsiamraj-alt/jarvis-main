@@ -2215,3 +2215,24 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
 * อัตราที่ไม่มีเลขที่ใบยังนับบนการ์ด — drill คืน `positionsWithoutRequestNo`
   แล้วหัวกล่องเขียนบอก ห้ามหายเงียบ
 * throughput ยังโหลดไม่มา (`records.length === 0`) = ถอยไปเส้นเดิม ไม่เปิดกล่องว่าง
+
+### รอบ 18 ส.ค. 2569 (บ่าย-2) — เปิดหน้ารายละเอียดใบที่ปิดแล้วได้ + Follow ปฏิทินขวาบน/popup
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `api/_lib/siamrajSqlServerRequests.ts` | `getSiamrajSqlServerUnitRequestById` รับ `includeClosed` — ไม่เจอในกองใบเปิดค่อยหาแบบไม่กรอง (`BASE_SQL_BY_ID_ANY`) · `mapSqlServerRow` ตีสถานะจากแถวจริงด้วย `isOpenStaffingRow` แทน hardcode `'open'` |
+| `api/_lib/siamrajUnitRequests.ts` | ส่งต่อ `options.includeClosed` |
+| `api/_handlers/siamraj-unit-requests.ts` | เส้น `?id=` (หน้ารายละเอียด) ส่ง `includeClosed: true` |
+| `src/components/follow/FollowCallRoundsPanel.tsx` | ปฏิทินเป็น **Popover มุมขวาบน** ข้างปุ่มรีเฟรช · กดกล่องถัง/กดวันแล้วรายชื่อขึ้นเป็น **Dialog popup** (เลิกกางใต้แผง) — state `openBox`/`openDay`/`calendarOpen` แบบกางแถวถูกแทนด้วย `peopleDialog` ก้อนเดียว |
+
+**ทำไม includeClosed** — drill-down 4 การ์ดลิสต์ใบที่ปิด/ยกเลิกแล้วด้วย แต่การค้นรายใบ
+เดิมผ่าน CTE ที่กรอง `openStaffingRequestWhere` → กดใบปิดจาก popup แล้ว **404**
+(วัดจริง: `LMO6901001`) · แก้แล้วใบเปิดยังตอบ `open` เหมือนเดิม ใบปิดตอบ `closed`
+
+**กับดัก**
+
+* 🔴 `includeClosed` ใช้ได้เฉพาะหน้ารายละเอียด — **เส้น AI โทร (`callBatchDispatcher`)
+  กับ matching พึ่ง "null = ใบไม่เปิดแล้ว" เป็นด่านกันโทรผิดใบ** ห้ามส่ง option นี้
+* 🔴 `mapSqlServerRow` เลิก hardcode `status: 'open'` แล้ว — ใครเพิ่มคอลัมน์ SELECT
+  ที่กระทบ `isOpenStaffingRow` (status/is_stop/stop_no/is_inform_all/inform) ต้องเช็คทั้งสองทาง
+* popup รายชื่อของ Follow ใช้ `entries` ชุดเดียวทั้งเลขและชื่อ — กติกาเดิม ห้ามแยกเส้น

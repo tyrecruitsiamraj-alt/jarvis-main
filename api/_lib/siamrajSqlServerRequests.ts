@@ -2,6 +2,7 @@ import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import {
   openStaffingRequestWhereSql,
   effectiveInformQtySql,
+  isOpenStaffingRow,
   staffingPositionBreakdown,
 } from './siamrajStaffingOpen.js';
 import {
@@ -189,7 +190,24 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     contact_name: r.contact_name || undefined,
     contact_phone: r.mobile_phone?.trim() || undefined,
     work_schedule: workSchedule || undefined,
-    status: 'open' as const,
+    /**
+     * เดิม hardcode 'open' เพราะ feed ผ่าน open WHERE เสมอ — พอหน้ารายละเอียด
+     * เปิดใบปิดได้ (includeClosed) ต้องตีจากแถวจริง ไม่งั้นใบปิดโชว์เป็นใบเปิด
+     */
+    status: (isOpenStaffingRow({
+      status: r.status,
+      is_stop: r.is_stop ?? 'N',
+      stop_no: r.stop_no ?? null,
+      is_inform_all: r.is_inform_all,
+      request_qty: r.request_qty,
+      inform_qty: r.inform_qty,
+      effective_inform_qty: r.effective_inform_qty,
+      has_inform:
+        r.has_inform ??
+        ((r.effective_inform_qty ?? r.inform_qty ?? 0) > 0 ? 1 : 0),
+    })
+      ? 'open'
+      : 'closed') as 'open' | 'closed',
     siamraj_status: r.status || undefined,
     staff_title_code: r.staff_title_code || undefined,
     staff_title_name: r.staff_title_name || undefined,
@@ -297,6 +315,15 @@ const BASE_SQL_BY_ID = `${BASE_SQL}
   WHERE ${openStaffingRequestWhere()}
 `;
 
+/**
+ * ค้นรายใบแบบ**ไม่กรองใบเปิด** — ใช้เฉพาะหน้ารายละเอียดใบขอ (อ่านอย่างเดียว)
+ * เพื่อให้ drill-down/ลิงก์ที่ชี้ใบที่ปิด/ยกเลิกแล้วยังเปิดดูได้ ไม่เจอ 404
+ * ⚠️ เส้น AI/บอร์ดห้ามใช้ตัวนี้ — พวกนั้นพึ่ง "null = ใบไม่เปิดแล้ว" เป็นด่านกันโทรผิดใบ
+ */
+const BASE_SQL_BY_ID_ANY = `${BASE_SQL}
+  WHERE 1 = 1
+`;
+
 const SELECT_COLUMNS = `
   external_id, request_no, act_saleco_datetime, want_date_from, resign_date,
   site_code, site_name, department_code, department_name, contract_type_code, contract_type_name,
@@ -383,11 +410,12 @@ export async function listSiamrajSqlServerUnitRequests(options: {
 async function fetchSqlServerUnitRequestRows(
   extraWhere: string,
   params: Record<string, unknown>,
+  baseSql: string = BASE_SQL_BY_ID,
 ): Promise<Array<SqlServerRequestRow & { rn: number }>> {
   return siamrajSqlQuery<SqlServerRequestRow & { rn: number }>(
     `
     WITH base AS (
-      ${BASE_SQL_BY_ID}
+      ${baseSql}
       ${extraWhere}
     )
     SELECT
@@ -399,31 +427,49 @@ async function fetchSqlServerUnitRequestRows(
   );
 }
 
-export async function getSiamrajSqlServerUnitRequestById(requestNo: string) {
+export async function getSiamrajSqlServerUnitRequestById(
+  requestNo: string,
+  options?: {
+    /**
+     * true = หาใบที่ปิด/ยกเลิกแล้วด้วย (หน้ารายละเอียดใบขอเท่านั้น)
+     * ค่าเริ่มต้น false — เส้น AI โทร/บอร์ดพึ่ง "null = ใบไม่เปิดแล้ว" เป็นด่านกันโทรผิดใบ
+     */
+    includeClosed?: boolean;
+  },
+) {
   const trimmed = requestNo.trim();
   if (!trimmed) return null;
 
-  const exact = await fetchSqlServerUnitRequestRows(
-    `AND UPPER(RTRIM(A.request_no)) = UPPER(RTRIM(@requestNo))`,
-    { requestNo: trimmed },
-  );
-  if (exact.length > 0) {
-    return mapSqlServerRow(exact[0]);
-  }
+  const lookupWith = async (baseSql: string) => {
+    const exact = await fetchSqlServerUnitRequestRows(
+      `AND UPPER(RTRIM(A.request_no)) = UPPER(RTRIM(@requestNo))`,
+      { requestNo: trimmed },
+      baseSql,
+    );
+    if (exact.length > 0) {
+      return mapSqlServerRow(exact[0]);
+    }
 
-  const digits = extractRequestNoDigitSuffix(trimmed);
-  if (!digits || digits === trimmed) return null;
+    const digits = extractRequestNoDigitSuffix(trimmed);
+    if (!digits || digits === trimmed) return null;
 
-  // 🔴 ต้องเป็น `=` ห้ามเป็น `LIKE '%' + @digits` — LIKE กวาดใบของแผนกอื่นที่เลขท้ายซ้ำ
-  // มาด้วย (เลข 6907002 มี 9 ใบ ข้าม 4 BU) แล้วเลือกผิดใบเงียบ ๆ
-  // ดูเหตุผลเต็มที่ `digitsOnlyRowMatchesLookup`
-  const digitsOnlyRows = await fetchSqlServerUnitRequestRows(
-    `AND RTRIM(A.request_no) = @digits`,
-    { digits },
-  );
-  // ด่านที่สอง: prefix ที่เราเติมให้ตอนแสดงผลต้องตรงกับที่ผู้ใช้กด
-  // (เลขล้วนใบเดียวกันคนละไซต์ = คนละ prefix = คนละใบ)
-  const sameRequest = digitsOnlyRows.filter((r) => digitsOnlyRowMatchesLookup(trimmed, r));
-  const best = pickBestRequestNoCandidate(sameRequest, trimmed);
-  return best ? mapSqlServerRow(best) : null;
+    // 🔴 ต้องเป็น `=` ห้ามเป็น `LIKE '%' + @digits` — LIKE กวาดใบของแผนกอื่นที่เลขท้ายซ้ำ
+    // มาด้วย (เลข 6907002 มี 9 ใบ ข้าม 4 BU) แล้วเลือกผิดใบเงียบ ๆ
+    // ดูเหตุผลเต็มที่ `digitsOnlyRowMatchesLookup`
+    const digitsOnlyRows = await fetchSqlServerUnitRequestRows(
+      `AND RTRIM(A.request_no) = @digits`,
+      { digits },
+      baseSql,
+    );
+    // ด่านที่สอง: prefix ที่เราเติมให้ตอนแสดงผลต้องตรงกับที่ผู้ใช้กด
+    // (เลขล้วนใบเดียวกันคนละไซต์ = คนละ prefix = คนละใบ)
+    const sameRequest = digitsOnlyRows.filter((r) => digitsOnlyRowMatchesLookup(trimmed, r));
+    const best = pickBestRequestNoCandidate(sameRequest, trimmed);
+    return best ? mapSqlServerRow(best) : null;
+  };
+
+  const open = await lookupWith(BASE_SQL_BY_ID);
+  if (open || !options?.includeClosed) return open;
+  // ไม่เจอในกองใบเปิด → หาแบบไม่กรอง (ใบปิด/ยกเลิกเปิดดูได้ · mapSqlServerRow ตีสถานะจากแถวจริง)
+  return lookupWith(BASE_SQL_BY_ID_ANY);
 }
