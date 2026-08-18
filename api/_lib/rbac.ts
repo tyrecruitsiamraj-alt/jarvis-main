@@ -40,6 +40,7 @@ export type ApiResource =
   | 'siamraj-unit-requests'
   | 'siamraj-unit-assignments'
   | 'siamraj-unit-notes'
+  | 'siamraj-unit-history'
   | 'siamraj-unit-work-status'
   | 'siamraj-opl-import'
   | 'recruit-registrations'
@@ -168,6 +169,12 @@ export function minimumRoleFor(
 
     case 'siamraj-unit-notes':
       return 'staff';
+
+    case 'siamraj-unit-history':
+      // ประวัติ "ใครแก้อะไร" ของใบขอ — อ่านอย่างเดียว (handler ตอบ 405 ที่เหลือ)
+      // ตั้ง admin เป็นชั้นสองไว้เผื่อวันหน้ามีคนเพิ่ม POST โดยไม่กลับมาดูตารางนี้
+      if (isRead) return 'staff';
+      return 'admin';
 
     case 'siamraj-unit-work-status':
       return 'staff';

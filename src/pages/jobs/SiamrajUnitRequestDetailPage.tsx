@@ -8,7 +8,8 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
-import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
+import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment, fetchUnitEditLog } from '@/lib/siamrajUnitRequestsApi';
+import { describeUnitEdit, UNIT_EDIT_TITLE } from '@/lib/unitEditLog';
 import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
@@ -22,7 +23,7 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList, History } from 'lucide-react';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
@@ -54,6 +55,17 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     queryKey: ['siamraj', 'unit-request', id],
     queryFn: () => fetchSiamrajUnitRequest(id),
     enabled: !!id,
+  });
+
+  /**
+   * ประวัติ "ใครแก้อะไรไป" (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ) — คีย์เดียวกับที่ audit เก็บ
+   * คือ requestKey (externalId || request_no) · ล้มเหลว = โชว์ข้อความ ไม่พาหน้าล้ม
+   */
+  const historyKey = (data?.externalId || data?.request_no)?.trim();
+  const editLog = useQuery({
+    queryKey: ['siamraj', 'unit-history', historyKey],
+    queryFn: () => fetchUnitEditLog(historyKey!),
+    enabled: !!historyKey,
   });
 
   const [recruiter, setRecruiter] = useState('');
@@ -121,6 +133,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
           : old,
       );
       await queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-request', id] });
+      // ประวัติการแก้ไขต้องเห็นรอบที่เพิ่งบันทึกทันที ไม่ต้องรีเฟรชหน้า
+      await queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-history', historyKey] });
       setSaveMsg('บันทึกผู้รับผิดชอบแล้ว');
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -213,7 +227,10 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <Field label="คงเหลือ (ต้องหา)" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
                 <Field label="ทำงานวันสุดท้าย" value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined} />
                 <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
-                <Field label="รหัสไซต์" value={data.site_code || data.unit_name} />
+                {/* ⚠️ ห้าม fallback ไปชื่อหน่วยงาน — ใบขอล่วงหน้าไม่มีรหัสไซต์
+                    แล้วช่อง "รหัสไซต์" ขึ้นชื่อบริษัท คนอ่านเข้าใจว่านั่นคือรหัส (เจอ 18 ส.ค. 2569)
+                    ไม่มีก็บอกว่าไม่มี — Field แสดง "—" ให้เองเมื่อค่าว่าง */}
+                <Field label="รหัสไซต์" value={data.site_code} />
                 <Field label="สถานที่ปฏิบัติงาน" value={data.work_place} />
                 <Field label="สถานที่ทำงาน (ที่อยู่เต็ม)" value={data.location_address} />
                 <Field label="ลักษณะงาน" value={data.job_description_code_1} />
@@ -356,6 +373,58 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 />
               ) : (
                 <p className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกสถานะไม่ได้</p>
+              )}
+            </section>
+
+            {/* ประวัติการแก้ไข (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: *"เพิ่ม log การแก้ไข
+                ไว้ด้วยนะหน้ากล่องงาน ว่าใครแก้อะไรไป"*) — อ่านจาก audit_logs ที่ระบบ
+                บันทึกอยู่แล้วทุกการแก้ (ผู้รับผิดชอบ/สถานะทำงาน/หมายเหตุ) ผ่านเส้น scoped
+                · การแปลงเป็นข้อความอยู่ที่ unitEditLog.ts (pure + เทสต์) */}
+            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <History className={cn('w-4 h-4', TONE.primary.value)} />
+                ประวัติการแก้ไข — ใครแก้อะไรไป
+              </h3>
+              {editLog.isLoading ? (
+                <p className="text-xs text-muted-foreground">กำลังโหลดประวัติ…</p>
+              ) : editLog.error ? (
+                <p className="text-xs text-muted-foreground">
+                  โหลดประวัติไม่ได้ตอนนี้ — ข้อมูลใบขอด้านบนยังใช้ได้ปกติ
+                </p>
+              ) : (editLog.data?.length ?? 0) === 0 ? (
+                <p className="text-xs text-muted-foreground">ยังไม่มีการแก้ไขใบนี้ในระบบ Jarvis</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {editLog.data!.map((it) => {
+                    const lines = describeUnitEdit(it);
+                    return (
+                      <li key={it.id} className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
+                        <p className="text-[11px] text-muted-foreground">
+                          <span className="font-semibold text-foreground">{it.user_name || 'ไม่ทราบชื่อ'}</span>
+                          {' · '}
+                          {UNIT_EDIT_TITLE[it.entity_type] ?? it.entity_type}
+                          {' · '}
+                          {new Date(it.created_at).toLocaleString('th-TH', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </p>
+                        {lines.length > 0 ? (
+                          <ul className="mt-0.5 space-y-0.5">
+                            {lines.map((line, i) => (
+                              <li key={i} className="text-xs text-foreground">
+                                {line}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          // diff อ่านไม่ออก/ไม่มีช่องที่เปลี่ยน — บอกแค่ว่ามีการบันทึก ดีกว่าเดา
+                          <p className="mt-0.5 text-xs text-muted-foreground">บันทึกโดยไม่มีช่องที่เปลี่ยน</p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </section>
 

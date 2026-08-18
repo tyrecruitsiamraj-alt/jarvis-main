@@ -213,3 +213,19 @@ export async function fetchAllUnitAssignees(): Promise<
   const data = await readJsonSafe<{ items?: Array<{ request_no: string; recruiter_name: string | null; screener_name: string | null; opl_name: string | null; online_name: string | null }> }>(r);
   return Array.isArray(data.items) ? data.items : [];
 }
+
+/**
+ * ประวัติ "ใครแก้อะไรไป" ของใบขอ (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ)
+ * อ่านจาก audit_logs ผ่านเส้น scoped — โหลดพัง = คืน [] (ประวัติล้มห้ามพาหน้าหลักล้ม)
+ */
+export async function fetchUnitEditLog(
+  requestNo: string,
+): Promise<import('@/lib/unitEditLog').UnitEditLogItem[]> {
+  const r = await apiFetch(
+    `/api/siamraj/unit-history?request_no=${encodeURIComponent(requestNo)}`,
+    { cache: 'no-store' },
+  );
+  if (!r.ok) throw new Error(`โหลดประวัติไม่สำเร็จ (HTTP ${r.status})`);
+  const data = await readJsonSafe<{ items?: import('@/lib/unitEditLog').UnitEditLogItem[] }>(r);
+  return Array.isArray(data.items) ? data.items : [];
+}

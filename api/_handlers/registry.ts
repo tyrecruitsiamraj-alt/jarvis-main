@@ -58,6 +58,7 @@ import followStaffContactsHandler from './follow-staff-contacts.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
+import siamrajUnitHistoryHandler from './siamraj-unit-history.js';
 import siamrajUnitWorkStatusHandler from './siamraj-unit-work-status.js';
 import siamrajOplImportHandler from './siamraj-opl-import.js';
 import recruitRegistrationsHandler from './recruit-registrations.js';
@@ -116,6 +117,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/follow': followHandler as ApiHandler,
   '/api/follow-staff-contacts': followStaffContactsHandler as ApiHandler,
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
+  '/api/siamraj/unit-history': siamrajUnitHistoryHandler as ApiHandler,
   '/api/siamraj/unit-assignments': siamrajUnitAssignmentsHandler as ApiHandler,
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
   '/api/siamraj/unit-work-status': siamrajUnitWorkStatusHandler as ApiHandler,
