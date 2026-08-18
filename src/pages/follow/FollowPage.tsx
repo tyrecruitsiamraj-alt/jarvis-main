@@ -3,7 +3,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome, type FollowOutcomeAny } from '@/lib/followOutcome';
 import {
@@ -15,7 +15,6 @@ import {
   FOLLOW_STATUS_CLASS,
   FOLLOW_STATUS_BAR,
   type FollowEntry,
-  type FollowCallStatus,
   updateFollowEntry,
 } from '@/lib/followApi';
 import NameAvatar from '@/components/shared/NameAvatar';
@@ -25,6 +24,16 @@ import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { groupFollowEntries } from '@/lib/followGrouping';
+import {
+  filterFollowEntries,
+  countFollowTabs,
+  listFollowOwners,
+  FOLLOW_TABS,
+  FOLLOW_TAB_LABEL,
+  TIME_BAND_LABEL,
+  type FollowTab,
+  type TimeBand,
+} from '@/lib/followListFilter';
 import {
   firstIncompleteStep,
   followStepError,
@@ -82,7 +91,15 @@ const FollowPage: React.FC = () => {
   const [items, setItems] = useState<FollowEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | FollowCallStatus>('all');
+  /**
+   * แท็บสถานะ (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6: แยกหน้า กำลังตาม/สำเร็จ/สิ้นสุด/ยกเลิก)
+   * + filter ประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) · ตรรกะที่ followListFilter.ts
+   */
+  const [tab, setTab] = useState<FollowTab>('active');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fDate, setFDate] = useState('');
+  const [fBand, setFBand] = useState<TimeBand>('');
+  const [fOwner, setFOwner] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [prefix, setPrefix] = useState('');
@@ -602,9 +619,12 @@ const FollowPage: React.FC = () => {
   );
 
   const filtered = useMemo(
-    () => (filter === 'all' ? items : items.filter((it) => it.call_status === filter)),
-    [items, filter],
+    () => filterFollowEntries(items, { tab, date: fDate, band: fBand, owner: fOwner }),
+    [items, tab, fDate, fBand, fOwner],
   );
+  const tabCounts = useMemo(() => countFollowTabs(items), [items]);
+  const owners = useMemo(() => listFollowOwners(items), [items]);
+  const hasActiveFilter = Boolean(fDate || fBand || fOwner);
 
   /**
    * การ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: คนเดียวหลายรอบแตกหลายแถว "งงตาย")
@@ -720,6 +740,113 @@ const FollowPage: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* แท็บสถานะ + ปุ่ม Filter (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6) — แยกหน้าตามสถานะ
+            เพื่อดูง่าย · ปุ่ม Filter เช็คสถานะประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-border p-0.5 text-xs">
+            {FOLLOW_TABS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                aria-pressed={tab === t}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium transition-colors',
+                  tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary',
+                )}
+              >
+                {FOLLOW_TAB_LABEL[t]}
+                <span
+                  className={cn(
+                    'tabular-nums',
+                    tab === t ? 'text-primary-foreground/80' : 'text-muted-foreground/70',
+                  )}
+                >
+                  {tabCounts[t].toLocaleString('th-TH')}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setFilterOpen((v) => !v)}
+            aria-expanded={filterOpen}
+            className={cn(
+              'inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
+              hasActiveFilter ? cn(TONE.info.soft, TONE.info.value, 'border-transparent') : TONE.neutral.outline,
+            )}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            ตัวกรอง
+            {hasActiveFilter ? <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden /> : null}
+          </button>
+          {hasActiveFilter ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFDate('');
+                setFBand('');
+                setFOwner('');
+              }}
+              className="text-[11px] font-medium text-primary underline"
+            >
+              ล้างตัวกรอง
+            </button>
+          ) : null}
+        </div>
+
+        {/* แผงตัวกรองประจำวัน — วันที่ / ช่วงเวลา / เจ้าของงาน (พับได้) */}
+        {filterOpen ? (
+          <div className={cn('grid gap-3 rounded-xl border p-3 sm:grid-cols-3', TONE.neutral.soft)}>
+            <div className="space-y-1">
+              <label htmlFor="fDate" className="ml-1 text-[11px] font-medium text-muted-foreground">
+                วันที่
+              </label>
+              <input
+                id="fDate"
+                type="date"
+                value={fDate}
+                onChange={(e) => setFDate(e.target.value)}
+                className="jarvis-soft-field min-h-[40px] w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="fBand" className="ml-1 text-[11px] font-medium text-muted-foreground">
+                ช่วงเวลา
+              </label>
+              <select
+                id="fBand"
+                value={fBand}
+                onChange={(e) => setFBand(e.target.value as TimeBand)}
+                className="jarvis-soft-field min-h-[40px] w-full"
+              >
+                <option value="">ทุกช่วง</option>
+                <option value="morning">{TIME_BAND_LABEL.morning}</option>
+                <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
+                <option value="evening">{TIME_BAND_LABEL.evening}</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="fOwner" className="ml-1 text-[11px] font-medium text-muted-foreground">
+                เจ้าของงาน (คนคีย์)
+              </label>
+              <select
+                id="fOwner"
+                value={fOwner}
+                onChange={(e) => setFOwner(e.target.value)}
+                className="jarvis-soft-field min-h-[40px] w-full"
+              >
+                <option value="">ทุกคน</option>
+                {owners.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : null}
 
         {okMessage ? (
           <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.success.soft, TONE.success.value)}>
@@ -1272,10 +1399,26 @@ const FollowPage: React.FC = () => {
           <div className="glass-card rounded-2xl border border-white/70 p-8 text-center text-muted-foreground">
             <PhoneForwarded className="mx-auto mb-2 h-8 w-8 text-blue-400/60" aria-hidden />
             <p className="text-sm font-medium text-foreground">
-              {items.length === 0 ? 'ยังไม่มีรายชื่อที่ต้องติดตาม' : 'ไม่มีรายการตามตัวกรองนี้'}
+              {items.length === 0
+                ? 'ยังไม่มีรายชื่อที่ต้องติดตาม'
+                : hasActiveFilter
+                  ? `ไม่มีรายการในแท็บ "${FOLLOW_TAB_LABEL[tab]}" ตามตัวกรองนี้`
+                  : `ยังไม่มีรายการในแท็บ "${FOLLOW_TAB_LABEL[tab]}"`}
             </p>
             {items.length === 0 ? (
               <p className="mt-1 text-xs">กด “เพิ่มรายชื่อที่ต้องติดตาม” เพื่อให้ AI โทรตามให้</p>
+            ) : hasActiveFilter ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFDate('');
+                  setFBand('');
+                  setFOwner('');
+                }}
+                className="mt-1 text-xs font-medium text-primary underline"
+              >
+                ล้างตัวกรอง
+              </button>
             ) : null}
           </div>
         ) : view === 'grid' ? (
