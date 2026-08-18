@@ -31,6 +31,7 @@ export default function FollowEditDialog({
   unitOptions,
   siblings = [],
   topicsRev,
+  contactsRev,
   onClose,
   onSaved,
 }: {
@@ -39,8 +40,9 @@ export default function FollowEditDialog({
   unitOptions: BoardUnitOption[];
   /** รอบอื่นของ "คนเดียวกัน" ที่ยังไม่ถูกยกเลิก — ใช้โชว์รอบที่มีอยู่ + กันตั้งเวลาซ้ำ */
   siblings?: FollowEntry[];
-  /** bump เมื่อกล่องจัดการเรื่องเพิ่มเรื่องใหม่ — dropdown เรื่องโหลดลิสต์ใหม่ */
+  /** bump เมื่อ dialog จัดการ (ข้างปฏิทิน) เพิ่มค่าใหม่ — dropdown โหลดลิสต์ใหม่ */
   topicsRev?: number;
+  contactsRev?: number;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -271,7 +273,12 @@ export default function FollowEditDialog({
           {/* dropdown ชื่อ+เบอร์จากรายชื่อกลาง (099 · เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ)
               ⚠️ select ในฟอร์มนี้กด Enter แล้วฟอร์มยิง save ได้ — ยอมรับได้เพราะ
               ฟอร์มแก้ไข Enter = บันทึกการแก้ อยู่แล้วทุกช่อง (ไม่ใช่ฟอร์มเพิ่มที่เคยพัง) */}
-          <StaffContactField id="feStaffPhone" value={staffPhone} onChange={setStaffPhone} />
+          <StaffContactField
+            id="feStaffPhone"
+            value={staffPhone}
+            onChange={setStaffPhone}
+            reloadSignal={contactsRev}
+          />
           <div className="space-y-1.5">
             <label htmlFor="feWhen" className="ml-1 text-xs font-medium text-muted-foreground">
               ให้โทรเมื่อไหร่

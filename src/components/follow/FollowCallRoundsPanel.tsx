@@ -99,7 +99,16 @@ type PeopleDialogState = {
   people: FollowEntry[];
 };
 
-export default function FollowCallRoundsPanel() {
+export default function FollowCallRoundsPanel({
+  headerExtras,
+}: {
+  /**
+   * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
+   * "เพิ่มเจ้าหน้าที่" ย้ายมาไว้ตรงนี้ · supervisor+ เท่านั้น — หน้าแม่เป็นคนคุมสิทธิ์
+   * และถือ dialog เอง แผงนี้แค่ให้ที่วาง)
+   */
+  headerExtras?: React.ReactNode;
+} = {}) {
   const [entries, setEntries] = useState<FollowEntry[]>([]);
   const [loading, setLoading] = useState(false);
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
@@ -189,8 +198,9 @@ export default function FollowCallRoundsPanel() {
             แต่ละครั้งคือ "ตอนนี้ใครอยู่รอบนั้น" ไม่ใช่ยอดสะสมทุกครั้งที่โทร
           </p>
         </div>
-        {/* มุมขวาบน: ปฏิทิน (popover) + รีเฟรช */}
-        <div className="flex shrink-0 items-center gap-2">
+        {/* มุมขวาบน: ปุ่มเสริมจากหน้าแม่ (เพิ่มเรื่อง/เพิ่มเจ้าหน้าที่) + ปฏิทิน (popover) + รีเฟรช */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {headerExtras}
           {selectedDay ? (
             <button
               type="button"

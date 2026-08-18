@@ -42,7 +42,15 @@ import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
 import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
-import TopicManager from '@/components/follow/TopicManager';
+import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
+import FollowMonthGrid from '@/components/follow/FollowMonthGrid';
+import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
+import {
+  listStaffContacts,
+  createStaffContact,
+  type FollowStaffContact,
+} from '@/lib/followStaffContactsApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 function formatWhen(iso: string | null): string {
@@ -125,8 +133,23 @@ const FollowPage: React.FC = () => {
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   /** รายการที่กำลังแก้ไข (096) — null = ไม่ได้เปิดกล่องแก้ */
   const [editing, setEditing] = useState<FollowEntry | null>(null);
-  /** bump เมื่อกล่องจัดการเรื่องเพิ่มเรื่องใหม่ — dropdown เรื่องในฟอร์ม/กล่องแก้ไขโหลดลิสต์ใหม่ */
+  /**
+   * bump เมื่อ dialog จัดการ (ข้างไอคอนปฏิทิน) เพิ่มค่าใหม่ — dropdown ที่ mount อยู่
+   * โหลดลิสต์ใหม่ทันที ไม่ต้องรีเฟรชหน้า (เรื่อง กับ เจ้าหน้าที่ แยกตัวนับกัน)
+   */
   const [topicsRev, setTopicsRev] = useState(0);
+  const [contactsRev, setContactsRev] = useState(0);
+  /** dialog จัดการเรื่อง / เจ้าหน้าที่ — เปิดจากปุ่มข้างปฏิทิน (supervisor+ เท่านั้น) */
+  const [topicManagerOpen, setTopicManagerOpen] = useState(false);
+  const [staffManagerOpen, setStaffManagerOpen] = useState(false);
+  const { user } = useAuth();
+  /** เพิ่มเรื่อง/เจ้าหน้าที่ได้เฉพาะ supervisor ขึ้นไป (เจ้าของสั่ง ค่ำ-5) */
+  const canManageMasters = user?.role === 'supervisor' || user?.role === 'admin';
+  /**
+   * มุมมองลิสต์ (เจ้าของสั่ง ค่ำ-5: อยากได้ตารางสรุปแบบ คน × วันของเดือน)
+   * — 'cards' = การ์ดต่อคนแบบเดิม · 'grid' = ตารางเดือน (FollowMonthGrid)
+   */
+  const [view, setView] = useState<'cards' | 'grid'>('cards');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -610,11 +633,37 @@ const FollowPage: React.FC = () => {
         {/* แผงการโทรแบบ 3 รอบ + ปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 — แทน funnel 4 ช่องเดิม)
             CallFunnelPanel ใช้ที่หน้านี้ที่เดียว การเปลี่ยนจึงไม่กระทบหน้า Matching
             (หน้านั้นใช้ AiCallFlowPanel คนละตัว) */}
-        <FollowCallRoundsPanel />
-
-        {/* กล่องจัดการ "เรื่องที่จะให้โทรติดตาม" บนหน้า Follow (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-4)
-            เพิ่มเรื่องที่นี่แล้ว dropdown ในฟอร์มโหลดลิสต์ใหม่ผ่าน topicsRev */}
-        <TopicManager onChanged={() => setTopicsRev((r) => r + 1)} />
+        {/* ปุ่ม "เพิ่มเรื่อง / เพิ่มเจ้าหน้าที่" อยู่ข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค.
+            2569 ค่ำ-5 — แทนกล่อง TopicManager ของค่ำ-4 ที่ถูกถอดออก) · โผล่เฉพาะ
+            supervisor+ เท่านั้น server กันอีกชั้นที่ rbac ไม่ใช่แค่ซ่อนปุ่ม */}
+        <FollowCallRoundsPanel
+          headerExtras={
+            canManageMasters ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setTopicManagerOpen(true)}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
+                    TONE.info.outline,
+                  )}
+                >
+                  <Plus className="h-3 w-3" aria-hidden /> เพิ่มเรื่อง
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStaffManagerOpen(true)}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
+                    TONE.info.outline,
+                  )}
+                >
+                  <Plus className="h-3 w-3" aria-hidden /> เพิ่มเจ้าหน้าที่
+                </button>
+              </>
+            ) : null
+          }
+        />
 
         {/* สรุป + ปุ่มเพิ่ม */}
         <div className="flex flex-wrap items-center gap-2.5">
@@ -648,6 +697,28 @@ const FollowPage: React.FC = () => {
             <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">{counts.pending}</span> · สำเร็จ{' '}
             <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{counts.done}</span>
           </p>
+          {/* สลับมุมมอง: การ์ดต่อคน / ตารางเดือน (คน × วัน) — เจ้าของสั่ง ค่ำ-5 */}
+          <div className="ml-auto flex items-center gap-1 rounded-full border border-border p-0.5 text-[11px]">
+            {(
+              [
+                ['cards', 'การ์ด'],
+                ['grid', 'ตารางเดือน'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                aria-pressed={view === v}
+                className={cn(
+                  'rounded-full px-3 py-1 font-medium transition-colors',
+                  view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {okMessage ? (
@@ -1026,6 +1097,7 @@ const FollowPage: React.FC = () => {
                                   onChange={(next) =>
                                     setStaffPhoneByDay((prev) => ({ ...prev, [d]: next }))
                                   }
+                                  reloadSignal={contactsRev}
                                 />
                               </div>
                             ))}
@@ -1091,6 +1163,7 @@ const FollowPage: React.FC = () => {
                       label={`เจ้าหน้าที่ที่ติดตามรอบที่ ${i + 1}`}
                       value={staffPhones[i] ?? ''}
                       onChange={(next) => setStaffPhoneAt(i, next)}
+                      reloadSignal={contactsRev}
                     />
                   </div>
                 ))}
@@ -1205,6 +1278,9 @@ const FollowPage: React.FC = () => {
               <p className="mt-1 text-xs">กด “เพิ่มรายชื่อที่ต้องติดตาม” เพื่อให้ AI โทรตามให้</p>
             ) : null}
           </div>
+        ) : view === 'grid' ? (
+          /* ตารางเดือน คน × วัน (เจ้าของสั่ง ค่ำ-5) — ใช้ชุดข้อมูลเดียวกับการ์ดเป๊ะ ๆ */
+          <FollowMonthGrid entries={filtered} />
         ) : (
           /* การ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: *"งงตาย"* กับคนเดียวหลายแถว)
              หัวการ์ด = สรุป (รอบถัดไป · วันนี้ครั้งที่เท่าไหร่ · หน่วยงาน · ใครคีย์)
@@ -1453,10 +1529,38 @@ const FollowPage: React.FC = () => {
         </div>
       ) : null}
 
+      {/* dialog จัดการเรื่อง / เจ้าหน้าที่ (เปิดจากปุ่มข้างปฏิทิน · supervisor+) */}
+      <FollowMasterManagerDialog<FollowTopic>
+        open={topicManagerOpen}
+        onClose={() => setTopicManagerOpen(false)}
+        title="เรื่องที่จะให้โทรติดตาม"
+        description="ตัวเลือกใน dropdown ตอนเพิ่มรายชื่อ — เพิ่มแล้วใช้ได้ทันทีทุกฟอร์ม"
+        fields={[{ key: 'name', placeholder: 'เพิ่มเรื่องใหม่ เช่น ติดตามเบิกเบี้ยเลี้ยง' }]}
+        load={listFollowTopics}
+        create={(f) => createFollowTopic(f.name ?? '')}
+        toChip={(t) => t.name}
+        onChanged={() => setTopicsRev((r) => r + 1)}
+      />
+      <FollowMasterManagerDialog<FollowStaffContact>
+        open={staffManagerOpen}
+        onClose={() => setStaffManagerOpen(false)}
+        title="ชื่อ-เบอร์โทรเจ้าหน้าที่ที่ติดตาม"
+        description="ตัวเลือกใน dropdown เจ้าหน้าที่ (หน้าตั้งวันเวลา) — AI บอกเบอร์นี้ให้ผู้สมัครโทรกลับ"
+        fields={[
+          { key: 'name', placeholder: 'ชื่อเจ้าหน้าที่ เช่น คุณคิว ทีมสรรหา' },
+          { key: 'phone', placeholder: 'เบอร์โทร เช่น 021234567 ต่อ 101', inputMode: 'tel' },
+        ]}
+        load={listStaffContacts}
+        create={(f) => createStaffContact(f.name ?? '', f.phone ?? '')}
+        toChip={(c) => `${c.name} — ${c.phone}`}
+        onChanged={() => setContactsRev((r) => r + 1)}
+      />
+
       <FollowEditDialog
         entry={editing}
         unitOptions={unitOptions}
         topicsRev={topicsRev}
+        contactsRev={contactsRev}
         /**
          * รอบอื่นของ "คนเดียวกัน" — จับคู่ด้วย **เบอร์ + เรื่อง** (ไม่มี group ผูกให้ทุกเคส
          * · เบอร์อย่างเดียวไม่พอ คนเดียวอาจถูกตามหลายเรื่องพร้อมกัน)
