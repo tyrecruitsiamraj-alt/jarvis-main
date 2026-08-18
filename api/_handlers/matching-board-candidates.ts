@@ -124,6 +124,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
             first_name: c.first_name,
             last_name: c.last_name,
             nick_name: c.nick_name,
+            // เพศ — บอร์ด iRecruit ไม่เก็บคำนำหน้า (เจอติดใน fname แค่ 17/49,524 คน)
+            // ฟอร์ม Follow ใช้เดาคำนำหน้า: M→นาย · F→นางสาว (คนแก้เป็น นาง เองได้)
+            sex_code: c.sex_code,
             mobile: c.mobile,
             skills: [c.job1_name, c.job2_name].filter(Boolean).join(' / ') || null,
             area: [c.amphur_name, c.province_name].filter(Boolean).join(' ') || null,

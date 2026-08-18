@@ -19,6 +19,7 @@ const person = (over: Partial<BoardPickerPerson> = {}): BoardPickerPerson => ({
   first_name: 'สมชาย',
   last_name: 'ใจดี',
   nick_name: 'ชาย',
+  sex_code: null,
   mobile: '0812345678',
   skills: 'ขับรถ / ส่งของ',
   area: 'บางรัก กรุงเทพมหานคร',
@@ -104,5 +105,37 @@ describe('pickerSearchBlob', () => {
     expect(blob).toContain('สมชาย');
     expect(blob).toContain('0812345678');
     expect(blob).toContain('to do');
+  });
+});
+
+describe('คำนำหน้าจากเพศ — iRecruit ไม่เก็บคำนำหน้าเป็นคอลัมน์', () => {
+  it('M → นาย · F → นางสาว · ไม่รู้เพศ = เว้นว่าง', () => {
+    expect(splitPickerName(person({ sex_code: 'M' })).prefix).toBe('นาย');
+    expect(splitPickerName(person({ sex_code: 'F' })).prefix).toBe('นางสาว');
+    expect(splitPickerName(person({ sex_code: null })).prefix).toBe('');
+    expect(splitPickerName(person({ sex_code: '  ' })).prefix).toBe('');
+  });
+
+  it('รับค่าตัวพิมพ์เล็ก/มีช่องว่างจาก ERP ได้', () => {
+    expect(splitPickerName(person({ sex_code: ' m ' })).prefix).toBe('นาย');
+    expect(splitPickerName(person({ sex_code: 'f' })).prefix).toBe('นางสาว');
+  });
+
+  it('🔴 คำนำหน้าที่ติดมากับชื่อชนะเพศเสมอ (ห้ามให้เพศทับของจริง)', () => {
+    expect(splitPickerName(person({ first_name: 'นางมาลี', sex_code: 'F' }))).toEqual({
+      prefix: 'นาง',
+      first: 'มาลี',
+      last: 'ใจดี',
+    });
+    // ข้อมูลขัดกัน: ชื่อบอกนาย แต่เพศบอก F → เชื่อชื่อ
+    expect(splitPickerName(person({ first_name: 'นายสมชาย', sex_code: 'F' })).prefix).toBe('นาย');
+  });
+
+  it('🔴 ลิสต์ picker ต้องโชว์คำนำหน้าเดียวกับที่เติมลงฟอร์ม', () => {
+    expect(pickerDisplayName(person({ sex_code: 'M' }))).toBe('นายสมชาย ใจดี');
+    expect(pickerDisplayName(person({ sex_code: 'F' }))).toBe('นางสาวสมชาย ใจดี');
+    expect(pickerDisplayName(person({ first_name: 'นางมาลี', sex_code: 'F' }))).toBe('นางมาลี ใจดี');
+    // ไม่รู้เพศ = เหมือนเดิม ไม่มีคำนำหน้ามั่ว
+    expect(pickerDisplayName(person())).toBe('สมชาย ใจดี');
   });
 });

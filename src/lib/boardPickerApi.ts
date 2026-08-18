@@ -11,6 +11,8 @@ export type BoardPickerPerson = {
   first_name: string | null;
   last_name: string | null;
   nick_name: string | null;
+  /** เพศจากใบสมัคร (M/F) — ใช้เดาคำนำหน้า เพราะบอร์ดไม่เก็บคำนำหน้าแยก */
+  sex_code: string | null;
   mobile: string | null;
   skills: string | null;
   area: string | null;
@@ -28,9 +30,14 @@ export async function listBoardPickerPeople(): Promise<BoardPickerPerson[]> {
   return data.people ?? [];
 }
 
-/** ชื่อเต็มที่ใช้แสดง — ไม่มีชื่อจริงใช้ชื่อเล่น ไม่มีเลยใช้เลขการ์ด (ห้ามเป็นช่องว่าง) */
+/**
+ * ชื่อเต็มที่ใช้แสดง — ไม่มีชื่อจริงใช้ชื่อเล่น ไม่มีเลยใช้เลขการ์ด (ห้ามเป็นช่องว่าง)
+ * มี**คำนำหน้า**นำเสมอ (เจ้าของทัก 18 ส.ค. 2569: *"เลือกจากบอร์ด มันไม่มีคำนำหน้าหรอ"*)
+ * — ใช้ตัวเดียวกับที่เติมลงฟอร์ม (`splitPickerName`) ลิสต์กับฟอร์มจึงตรงกันเสมอ
+ */
 export function pickerDisplayName(p: BoardPickerPerson): string {
-  const full = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
+  const { prefix, first, last } = splitPickerName(p);
+  const full = [prefix + first, last].filter(Boolean).join(' ').trim();
   return full || (p.nick_name || '').trim() || `การ์ด #${p.card_id}`;
 }
 
@@ -73,6 +80,10 @@ export function filterPickerPeople(
 /**
  * แยกชื่อที่บอร์ดเก็บไว้ออกเป็น คำนำหน้า/ชื่อ/นามสกุล ให้ฟอร์ม Follow
  * บอร์ดเก็บคำนำหน้าติดมากับ `fname` บ้าง ("นายสมชาย") — ต้องถอดออกไม่งั้นได้ "นายนายสมชาย"
+ *
+ * 🔴 **iRecruit ไม่เก็บคำนำหน้าเป็นคอลัมน์** (วัดจริง 18 ส.ค. 2569: เจอติดใน fname
+ * แค่ 17/49,524 คน) — ชื่อที่ไม่มีคำนำหน้าติดมาให้**เดาจากเพศ**: M→นาย · F→นางสาว
+ * ผู้หญิงอาจเป็น "นาง" — ฟอร์มแก้ได้ ห้ามล็อก · ไม่รู้เพศ = เว้นว่างเหมือนเดิม
  */
 export function splitPickerName(p: BoardPickerPerson): {
   prefix: string;
@@ -88,6 +99,11 @@ export function splitPickerName(p: BoardPickerPerson): {
       first = first.slice(pre.length).trim();
       break;
     }
+  }
+  if (!prefix) {
+    const sex = (p.sex_code || '').trim().toUpperCase();
+    if (sex === 'M') prefix = 'นาย';
+    else if (sex === 'F') prefix = 'นางสาว';
   }
   return { prefix, first, last: (p.last_name || '').trim() };
 }

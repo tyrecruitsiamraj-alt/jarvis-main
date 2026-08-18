@@ -3,7 +3,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2 } from 'lucide-react';
+import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
 import {
@@ -20,7 +20,18 @@ import {
 } from '@/lib/followApi';
 import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
+import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
+import type { BoardUnitOption } from '@/lib/boardUnitPicker';
+import {
+  firstIncompleteStep,
+  followStepError,
+  followStepSummary,
+  FOLLOW_WIZARD_STEPS,
+  nextFollowStep,
+  prevFollowStep,
+  type FollowWizardStep,
+} from '@/lib/followWizard';
 import { useSearchParams } from 'react-router-dom';
 import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
 import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
@@ -111,6 +122,13 @@ const FollowPage: React.FC = () => {
    */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+  /** ตัวเลือกหน่วยงานจากบอร์ด (18 ส.ค. 2569) — คู่แฝดของ picker ชื่อคน */
+  const [unitPickerOpen, setUnitPickerOpen] = useState(false);
+  /**
+   * ฟอร์มเพิ่มเป็น 3 ขั้น (เจ้าของสั่ง 18 ส.ค. 2569) — คน → หน่วยงาน → เวลา
+   * ด่านตรวจอยู่ที่ `followWizard.ts` ที่เดียว ทั้งปุ่มถัดไปและตอนกดบันทึก
+   */
+  const [step, setStep] = useState<FollowWizardStep>(1);
 
   /** ใบขอที่ยังเปิด — ใช้เป็นตัวเลือกหน่วยงาน · โหลดไม่ได้ = พิมพ์ชื่อเองได้เหมือนเดิม */
   useEffect(() => {
@@ -159,6 +177,14 @@ const FollowPage: React.FC = () => {
     setFormError(null);
   };
 
+  /** เลือกหน่วยงานจากบอร์ด — เติมทั้งชื่อและรหัสไซต์ (เหมือน dropdown เดิมทุกอย่าง) */
+  const pickUnit = (u: BoardUnitOption) => {
+    setUnitName(u.unitName);
+    setSiteCode(u.siteCode);
+    setUnitPickerOpen(false);
+    setFormError(null);
+  };
+
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -192,6 +218,7 @@ const FollowPage: React.FC = () => {
     setUnitName('');
     setSiteCode('');
     setFormError(null);
+    setStep(1);
   };
 
   const setScheduledAtAt = (i: number, v: string) =>
@@ -226,9 +253,45 @@ const FollowPage: React.FC = () => {
    * ⚠️ ยิงหลายรอบแล้วรอบท้าย ๆ ล้มได้ — ต้องบอกผู้ใช้ว่า **อะไรสำเร็จไปแล้ว**
    * ไม่งั้นเขากดซ้ำทั้งชุดแล้วได้รายการซ้อน (บทเรียนเดียวกับตอนสร้างชุดส่งจากหน้า Matching)
    */
+  /** ค่าที่ตัวตรวจของ wizard ใช้ — ประกอบที่เดียว ปุ่มถัดไปกับตอนบันทึกจึงตรวจชุดเดียวกัน */
+  const wizardValues = useMemo(
+    () => ({
+      firstName,
+      phone,
+      topic,
+      scheduleMode,
+      scheduledAts,
+      scheduleDays: daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)),
+      roundTimes,
+    }),
+    [firstName, phone, topic, scheduleMode, scheduledAts, dateFrom, dateTo, skippedDays, roundTimes],
+  );
+
+  const stepError = followStepError(step, wizardValues);
+
+  /** กดถัดไป — ไม่ผ่านด่านของขั้นนี้ก็ไม่ให้ไป และบอกว่าติดตรงไหน */
+  const goNext = () => {
+    if (stepError) {
+      setFormError(stepError);
+      return;
+    }
+    setFormError(null);
+    setStep((cur) => nextFollowStep(cur));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    /**
+     * 🔴 กันข้ามขั้น — ต่อให้กด Enter จากขั้นไหนก็ต้องผ่านทุกขั้นก่อนถึงจะยิงจริง
+     * ไม่ผ่านตรงไหนให้เด้งกลับไป**ขั้นนั้น** ไม่ใช่ขึ้น error ลอย ๆ ที่คนหาไม่เจอ
+     */
+    const incomplete = firstIncompleteStep(wizardValues);
+    if (incomplete) {
+      setStep(incomplete);
+      setFormError(followStepError(incomplete, wizardValues));
+      return;
+    }
     const recipientName = composeRecipientName(prefix, firstName, lastName);
 
     // โหมดตาราง: ช่วงวัน × รอบเวลา/วัน → 1 แถว/วัน ผูก group เดียว (Lumos หยุดรอบที่เหลือ
@@ -432,6 +495,46 @@ const FollowPage: React.FC = () => {
         {/* ฟอร์มเพิ่ม */}
         {formOpen ? (
           <form onSubmit={submit} className="jarvis-frost space-y-3 p-4 sm:p-5">
+            {/* แถบขั้น 1→2→3 (เจ้าของสั่ง 18 ส.ค. 2569) — กดย้อนกลับขั้นที่ทำแล้วได้
+                ขั้นที่ยังไม่ถึงกดไม่ได้ ต้องผ่านด่านของขั้นก่อนหน้าเอง */}
+            <ol className="flex items-stretch gap-1.5">
+              {FOLLOW_WIZARD_STEPS.map((s) => {
+                const done = s.step < step;
+                const current = s.step === step;
+                return (
+                  <li key={s.step} className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      disabled={s.step > step}
+                      onClick={() => setStep(s.step)}
+                      className={cn(
+                        'flex w-full flex-col gap-0.5 rounded-xl border px-2.5 py-2 text-left transition-colors',
+                        current
+                          ? 'border-primary bg-primary/10'
+                          : done
+                            ? cn(TONE.success.soft, 'hover:bg-secondary')
+                            : 'border-border bg-background opacity-60',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'text-[10px] font-bold',
+                          current ? 'text-primary' : done ? TONE.success.value : 'text-muted-foreground',
+                        )}
+                      >
+                        {done ? '✓' : s.step} · {s.title}
+                      </span>
+                      <span className="truncate text-[10px] text-muted-foreground">
+                        {followStepSummary(s.step, { ...wizardValues, recipientName: composeRecipientName(prefix, firstName, lastName), unitName, siteCode }) ?? s.hint}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+
+            {step === 1 ? (
+            <>
             {/* เลือกจากบอร์ด (F5b) — คีย์ชื่อเองก็ยังได้เหมือนเดิม ปุ่มนี้เป็นทางลัดกันพิมพ์ผิด */}
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -525,6 +628,34 @@ const FollowPage: React.FC = () => {
                 className="jarvis-soft-field min-h-[46px]"
               />
             </div>
+            </>
+            ) : null}
+
+            {step === 2 ? (
+            <>
+            {/* ปุ่มเลือกหน่วยงานจากบอร์ด (18 ส.ค. 2569) — คู่แฝดของปุ่มเลือกชื่อ
+                dropdown เดิมยังอยู่ข้างล่าง สำหรับคนที่ชินกับของเก่า */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setUnitPickerOpen(true)}
+                className={cn(
+                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold',
+                  TONE.info.outline,
+                )}
+              >
+                <Building2 className="h-3.5 w-3.5" aria-hidden />
+                เลือกหน่วยงานจากบอร์ด
+              </button>
+              {unitName ? (
+                <span className="jarvis-chip jarvis-chip-info">{unitName}</span>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">
+                  ข้ามได้ถ้าไม่ผูกหน่วยงาน
+                </span>
+              )}
+            </div>
+
             {/* หน่วยงาน (096 · เจ้าของสั่ง 17 ส.ค. 2569) — เลือกจากใบขอแล้วรหัสไซต์ขึ้นเอง
                 ⚠️ เก็บเป็น **ข้อความ ไม่ใช่ FK ไปใบขอ** — ใบขออยู่คนละฐาน (ERP) และเลขที่ใบ
                 ยังซ้ำกันได้ (ใบขอปกติ vs ใบขอล่วงหน้า 23 ใบ · เลขท้ายชนข้าม BU อีก 234 ใบ)
@@ -603,6 +734,11 @@ const FollowPage: React.FC = () => {
               </p>
             </div>
 
+            </>
+            ) : null}
+
+            {step === 3 ? (
+            <>
             {/* สลับโหมด: รอบเดี่ยว/หลายรอบ (เวลาเจาะจง) vs ตารางหลายวัน (ช่วงวัน × รอบ/วัน) */}
             <div className="flex items-center gap-2 rounded-full border border-white/70 bg-white/40 p-1 text-xs dark:border-white/15 dark:bg-white/5">
               <button
@@ -791,6 +927,8 @@ const FollowPage: React.FC = () => {
               </p>
             </div>
             )}
+            </>
+            ) : null}
 
             {formError ? (
               <p className="text-xs font-medium text-destructive" role="alert">
@@ -798,19 +936,46 @@ const FollowPage: React.FC = () => {
               </p>
             ) : null}
 
+            {/* ปุ่มเดินขั้น — ปุ่มบันทึกโผล่เฉพาะขั้นสุดท้าย กันกดส่งตั้งแต่ยังไม่ตั้งเวลา */}
             <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="jarvis-pill-btn inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm disabled:opacity-50"
-              >
-                {submitting ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <PhoneForwarded className="h-4 w-4" aria-hidden />
-                )}
-                {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่ง AI โทร'}
-              </button>
+              {step > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormError(null);
+                    setStep((cur) => prevFollowStep(cur));
+                  }}
+                  className={cn(
+                    'inline-flex min-h-[46px] items-center gap-1.5 rounded-full border px-5 py-2.5 text-sm font-medium',
+                    TONE.neutral.outline,
+                  )}
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden /> ย้อนกลับ
+                </button>
+              ) : null}
+
+              {step < 3 ? (
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="jarvis-pill-btn inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm"
+                >
+                  ถัดไป <ChevronRight className="h-4 w-4" aria-hidden />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="jarvis-pill-btn inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <PhoneForwarded className="h-4 w-4" aria-hidden />
+                  )}
+                  {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่ง AI โทร'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1014,6 +1179,13 @@ const FollowPage: React.FC = () => {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={pickPerson}
+      />
+
+      <BoardUnitPicker
+        open={unitPickerOpen}
+        onClose={() => setUnitPickerOpen(false)}
+        jobs={openJobs}
+        onPick={pickUnit}
       />
 
       <FollowEditDialog

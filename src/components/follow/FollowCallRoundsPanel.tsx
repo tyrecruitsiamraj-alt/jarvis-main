@@ -17,6 +17,12 @@ import {
   monthGridDays,
   shiftMonth,
 } from '@/lib/followCallCalendar';
+import {
+  actionableSummary,
+  bucketVisual,
+  roundSignal,
+  roundTabLabel,
+} from '@/lib/followRoundVisual';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import {
   Dialog,
@@ -45,17 +51,6 @@ import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw } from 'lucid
  * `entries` ชุดเดียว (เคยแยกเส้นแล้วเลขไม่ตรงกับชื่อ) ·
  * เงื่อนไขแบ่งถังอยู่ที่ `callOutcomeBuckets.ts` / `followRoundBuckets.ts` ที่เดียว
  */
-
-/** สีของแต่ละช่อง — ความหมายเดียวกับที่ใช้ทั้งระบบ (เขียว=ดี · เหลือง=ติดขัด · แดง=หลุด) */
-const BUCKET_TEXT: Record<FollowRoundBucket, string> = {
-  all: DASH.cellStrong,
-  waiting: DASH.muted,
-  calling: TONE.primary.value,
-  connected: TONE.success.value,
-  unreached: TONE.warn.value,
-  went: TONE.success.value,
-  not_went: TONE.danger.value,
-};
 
 /** รายละเอียดของคนหนึ่งคนใน popup — เจ้าของขอ "ชื่อพร้อมรายละเอียดของแต่ละคน" */
 function PersonRow({ p }: { p: FollowEntry }) {
@@ -112,6 +107,8 @@ export default function FollowCallRoundsPanel() {
   const [month, setMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
   /** ปฏิทินเป็น popover มุมขวาบน (เจ้าของสั่ง 18 ส.ค. 2569 บ่าย) */
   const [calendarOpen, setCalendarOpen] = useState(false);
+  /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
+  const [activeRound, setActiveRound] = useState(1);
 
   const load = () => {
     setLoading(true);
@@ -153,7 +150,7 @@ export default function FollowCallRoundsPanel() {
     const rows = roundRows.get(slot) ?? [];
     const list = rows.filter((r) => inFollowRoundBucket(r, b));
     setPeopleDialog({
-      title: `รอบ ${slot} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
+      title: `${roundTabLabel(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
       hint: FOLLOW_ROUND_BUCKET_HINT[b],
       people: list,
     });
@@ -186,8 +183,8 @@ export default function FollowCallRoundsPanel() {
         <div>
           <h2 className={cn('text-sm font-bold', DASH.cellStrong)}>การโทรของงาน Follow</h2>
           <p className={cn('text-[11px]', DASH.muted)}>
-            แยกตามรอบโทร · กดกล่องเพื่อดูรายชื่อ · แต่ละรอบคือ "ตอนนี้ใครอยู่รอบนั้น"
-            ไม่ใช่ยอดสะสมทุกครั้งที่โทร
+            กดเลือกครั้งที่โทร แล้วกดกล่องเพื่อดูรายชื่อ · สีบอกว่าควรทำอะไรต่อ ·
+            แต่ละครั้งคือ "ตอนนี้ใครอยู่รอบนั้น" ไม่ใช่ยอดสะสมทุกครั้งที่โทร
           </p>
         </div>
         {/* มุมขวาบน: ปฏิทิน (popover) + รีเฟรช */}
@@ -274,56 +271,105 @@ export default function FollowCallRoundsPanel() {
         </div>
       </div>
 
-      {/* 3 แถว = 3 รอบ · แต่ละแถวมี 7 กล่องถัง กดแล้วรายชื่อขึ้นเป็น popup */}
-      <div className="space-y-2">
+      {/* แท็บ "การโทรครั้งที่ 1/2/3" (เจ้าของสั่ง 18 ส.ค. 2569 บ่าย) —
+          กดแล้ว visual เปลี่ยนตามรอบ · สีบนแท็บ = สถานะของรอบนั้น ไม่ใช่แค่ที่เลือกอยู่
+          จะได้กวาดตาเห็นตั้งแต่ยังไม่กดว่ารอบไหนมีของค้าง */}
+      <div className="grid grid-cols-3 gap-1.5">
         {[1, 2, 3].map((slot) => {
-          const rows = roundRows.get(slot) ?? [];
           const counts = countsByRound.get(slot);
+          const rows = roundRows.get(slot) ?? [];
           if (!counts) return null;
+          const signal = roundSignal(counts);
+          const active = slot === activeRound;
+          const tone = TONE[signal.tone];
           return (
-            <div key={slot} className={cn('rounded-xl border p-2.5', TONE.neutral.soft)}>
-              <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className={cn('text-xs font-bold', DASH.cellStrong)}>รอบ {slot}</span>
-                <span className={cn('text-[11px]', DASH.muted)}>
-                  {rows.length.toLocaleString('th-TH')} คน
+            <button
+              key={slot}
+              type="button"
+              onClick={() => setActiveRound(slot)}
+              aria-pressed={active}
+              className={cn(
+                'rounded-xl border px-2.5 py-2 text-left transition-colors',
+                active ? cn(tone.soft, 'ring-2 ring-ring') : cn(TONE.neutral.soft, TONE.neutral.softHover),
+              )}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                <span className={cn('truncate text-[11px] font-bold', active ? tone.value : DASH.cellStrong)}>
+                  {roundTabLabel(slot)}
                 </span>
-              </div>
-              {/* 7 ช่องเท่ากันทุกรอบ (เจ้าของสั่ง 18 ส.ค. 2569) — ช่อง 0 ก็ยังโชว์
-                  เพื่อให้สามรอบอ่านเทียบกันได้ตรงคอลัมน์ */}
-              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
-                {FOLLOW_ROUND_BUCKETS.map((b) => {
-                  const n = counts[b];
-                  return (
-                    <button
-                      key={b}
-                      type="button"
-                      disabled={n === 0}
-                      title={FOLLOW_ROUND_BUCKET_HINT[b]}
-                      onClick={() => openBucketDialog(slot, b)}
-                      className={cn(
-                        'rounded-lg border px-2 py-1.5 text-left transition-colors',
-                        n === 0 ? 'cursor-default opacity-60' : 'hover:bg-secondary',
-                      )}
-                    >
-                      <span className={cn('block truncate text-[10px] font-semibold', DASH.muted)}>
-                        {FOLLOW_ROUND_BUCKET_LABEL[b]}
-                      </span>
-                      <span className={cn('block text-lg font-bold tabular-nums', BUCKET_TEXT[b])}>
-                        {n.toLocaleString('th-TH')}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+              </span>
+              <span className={cn('mt-0.5 block text-lg font-bold tabular-nums', active ? tone.num : DASH.cellStrong)}>
+                {rows.length.toLocaleString('th-TH')}
+                <span className={cn('ml-1 text-[10px] font-normal', DASH.muted)}>คน</span>
+              </span>
+              <span className={cn('block truncate text-[10px]', DASH.muted)}>
+                {actionableSummary(counts) ?? (rows.length > 0 ? 'ไม่มีของค้าง' : 'ยังไม่มีใคร')}
+              </span>
+            </button>
           );
         })}
-        {entries.length === 0 ? (
-          <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.neutral.soft, DASH.muted)}>
-            ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
-          </p>
-        ) : null}
       </div>
+
+      {/* ช่องของรอบที่เลือก — 7 ช่องเท่าเดิมทุกรอบ (ช่อง 0 ก็ยังโชว์ให้เทียบกันได้)
+          สีพื้นบอกว่าควรทำอะไร: เขียว=ดีแล้ว · เหลือง=ต้องตามต่อ · แดง=หลุด ต้องตัดสินใจ ·
+          น้ำเงิน=กำลังเดิน · เทา=ยังไม่ถึงคิว หรือไม่มีใครในช่อง */}
+      {(() => {
+        const counts = countsByRound.get(activeRound);
+        if (!counts) return null;
+        const signal = roundSignal(counts);
+        const signalTone = TONE[signal.tone];
+        return (
+          <div className="space-y-2">
+            <div
+              className={cn(
+                'flex items-center gap-2 rounded-xl border px-3 py-2',
+                signal.level === 'empty' ? TONE.neutral.soft : signalTone.soft,
+              )}
+            >
+              <span className={cn('h-2 w-2 shrink-0 rounded-full', signalTone.dot)} aria-hidden />
+              <p className={cn('text-[11px] font-semibold', signalTone.value)}>{signal.text}</p>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+              {FOLLOW_ROUND_BUCKETS.map((b) => {
+                const n = counts[b];
+                const vis = bucketVisual(b, n);
+                const tone = TONE[vis.tone];
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    disabled={n === 0}
+                    title={FOLLOW_ROUND_BUCKET_HINT[b]}
+                    onClick={() => openBucketDialog(activeRound, b)}
+                    className={cn(
+                      'rounded-lg border px-2 py-1.5 text-left transition-colors',
+                      tone.soft,
+                      n === 0 ? 'cursor-default opacity-60' : cn(tone.softHover, 'hover:brightness-105'),
+                      // ช่องที่ต้องลงมือ = กรอบหนา กวาดตาเจอก่อนเพื่อน แม้เลขน้อย
+                      vis.actionable ? 'border-2 font-bold shadow-sm' : '',
+                    )}
+                  >
+                    <span className={cn('block truncate text-[10px] font-semibold', DASH.muted)}>
+                      {FOLLOW_ROUND_BUCKET_LABEL[b]}
+                    </span>
+                    <span className={cn('block text-lg font-bold tabular-nums', tone.num)}>
+                      {n.toLocaleString('th-TH')}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {entries.length === 0 ? (
+        <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.neutral.soft, DASH.muted)}>
+          ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
+        </p>
+      ) : null}
       {/* ⚠️ ช่องพวกนี้ **ซ้อนกันได้** — "โทรติด" กับ "ไป" คนละแกน (สถานะสาย vs ผลปิดงาน)
           บวกทุกช่องแล้วมากกว่า "ทั้งหมด" เป็นเรื่องปกติ ไม่ใช่บั๊ก */}
       <p className={cn('text-[10px]', DASH.muted)}>
