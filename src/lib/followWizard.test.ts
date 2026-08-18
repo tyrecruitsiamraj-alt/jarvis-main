@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   firstIncompleteStep,
+  FOLLOW_SUBMIT_GUARD_MS,
+  isSubmitTooSoonAfterStep3,
   followStepError,
   followStepSummary,
   nextFollowStep,
@@ -116,5 +118,19 @@ describe('followStepSummary', () => {
   it('ยังไม่มีชื่อ = ไม่ต้องสรุป', () => {
     expect(followStepSummary(1, { ...full, recipientName: '  ' })).toBeNull();
     expect(followStepSummary(3, full)).toBeNull();
+  });
+});
+
+describe('isSubmitTooSoonAfterStep3 — กันคลิกเร็วซ้อนตอนปุ่มบันทึกมาแทนที่ปุ่มถัดไป', () => {
+  it('ภายในช่วงกัน = ห้ามบันทึก · พ้นช่วงแล้ว = บันทึกได้', () => {
+    const t0 = 1_000_000;
+    expect(isSubmitTooSoonAfterStep3(t0, t0)).toBe(true);
+    expect(isSubmitTooSoonAfterStep3(t0, t0 + FOLLOW_SUBMIT_GUARD_MS - 1)).toBe(true);
+    expect(isSubmitTooSoonAfterStep3(t0, t0 + FOLLOW_SUBMIT_GUARD_MS)).toBe(false);
+    expect(isSubmitTooSoonAfterStep3(t0, t0 + 10_000)).toBe(false);
+  });
+
+  it('ช่วงกันต้องยาวพอสำหรับดับเบิลคลิกจริง (>= 500ms)', () => {
+    expect(FOLLOW_SUBMIT_GUARD_MS).toBeGreaterThanOrEqual(500);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ import {
   followStepError,
   followStepSummary,
   FOLLOW_WIZARD_STEPS,
+  isSubmitTooSoonAfterStep3,
   nextFollowStep,
   prevFollowStep,
   type FollowWizardStep,
@@ -128,6 +129,11 @@ const FollowPage: React.FC = () => {
    * ด่านตรวจอยู่ที่ `followWizard.ts` ที่เดียว ทั้งปุ่มถัดไปและตอนกดบันทึก
    */
   const [step, setStep] = useState<FollowWizardStep>(1);
+  /**
+   * เวลาที่เพิ่งเข้าขั้นตั้งเวลา — กันคลิกเร็วซ้อน: กด "ถัดไป" แล้วปุ่ม "บันทึก"
+   * มาเรนเดอร์แถวเดียวกันทันที คลิกที่สองของคนกดเร็วตกลงบนบันทึกพอดี (โดนจริง 18 ส.ค.)
+   */
+  const step3EnteredAtRef = useRef(0);
 
   /** ใบขอที่ยังเปิด — ใช้เป็นตัวเลือกหน่วยงาน · โหลดไม่ได้ = พิมพ์ชื่อเองได้เหมือนเดิม */
   useEffect(() => {
@@ -268,6 +274,20 @@ const FollowPage: React.FC = () => {
 
   const stepError = followStepError(step, wizardValues);
 
+  /**
+   * เปลี่ยนขั้นผ่านตัวนี้เสมอ — จับเวลาเข้าขั้น 3 **ตอนคลิก ไม่ใช่หลัง render**
+   * (useEffect ตั้งหลัง paint — คลิกซ้อนที่เร็วกว่าเฟรมแรกจะเห็น ref เป็นค่าเก่าแล้วหลุดด่าน)
+   */
+  const goToStep = (target: FollowWizardStep) => {
+    if (target === 3 && step !== 3) step3EnteredAtRef.current = Date.now();
+    setStep(target);
+  };
+
+  // backstop เผื่อมีทางเปลี่ยนขั้นที่ไม่ผ่าน goToStep
+  useEffect(() => {
+    if (step === 3 && step3EnteredAtRef.current === 0) step3EnteredAtRef.current = Date.now();
+  }, [step]);
+
   /** กดถัดไป — ไม่ผ่านด่านของขั้นนี้ก็ไม่ให้ไป และบอกว่าติดตรงไหน */
   const goNext = () => {
     if (stepError) {
@@ -275,11 +295,11 @@ const FollowPage: React.FC = () => {
       return;
     }
     setFormError(null);
-    setStep((cur) => nextFollowStep(cur));
+    goToStep(nextFollowStep(step));
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: React.SyntheticEvent) => {
+    e?.preventDefault();
     setFormError(null);
     /**
      * 🔴 **ยังไม่ถึงขั้นตั้งเวลา = ห้ามบันทึกเด็ดขาด** (เจ้าของแจ้ง 18 ส.ค. 2569:
@@ -293,9 +313,14 @@ const FollowPage: React.FC = () => {
     if (step !== 3) {
       const err = followStepError(step, wizardValues);
       if (err) setFormError(err);
-      else setStep((cur) => nextFollowStep(cur));
+      else goToStep(nextFollowStep(step));
       return;
     }
+    /**
+     * 🔴 เพิ่งเข้าขั้นตั้งเวลามาไม่ถึงช่วงกัน = คลิกซ้อนจากปุ่มถัดไป ไม่ใช่เจตนาบันทึก
+     * กลืนเงียบ ๆ (เหมือนกดไม่ติด) — คนที่ตั้งใจจริงจะกดอีกครั้งหลังอ่านหน้าจอ
+     */
+    if (isSubmitTooSoonAfterStep3(step3EnteredAtRef.current, Date.now())) return;
     /**
      * 🔴 กันข้ามขั้น — ต่อให้กด Enter จากขั้นไหนก็ต้องผ่านทุกขั้นก่อนถึงจะยิงจริง
      * ไม่ผ่านตรงไหนให้เด้งกลับไป**ขั้นนั้น** ไม่ใช่ขึ้น error ลอย ๆ ที่คนหาไม่เจอ
@@ -509,14 +534,13 @@ const FollowPage: React.FC = () => {
         {/* ฟอร์มเพิ่ม */}
         {formOpen ? (
           <form
-            onSubmit={submit}
             /**
-             * 🔴 **บันทึกเกิดเฉพาะตอนกดปุ่ม "บันทึก" เท่านั้น** (เจ้าของสั่ง 18 ส.ค. 2569:
-             * ขั้นตอนข้อ 6 = "กดบันทึก") — กด Enter ในช่องใด ๆ ต้องไม่ยิง submit
-             * (ฟอร์ม HTML ยิง submit เองเมื่อกด Enter · ทำให้บันทึกก่อนถึงเวลา)
-             * ปุ่ม "ถัดไป" เป็น type=button มี onClick ของตัวเอง จึงไม่โดนกระทบ
-             * ยกเว้น textarea ที่ Enter = ขึ้นบรรทัดใหม่อยู่แล้ว ไม่ต้องกัน
+             * 🔴 **ฟอร์มนี้ไม่รับ submit เลย** (เจ้าของโดนบันทึกเองซ้ำ 18 ส.ค. 2569) —
+             * ทุกเส้นทาง submit ของเบราว์เซอร์ (Enter · implicit submit · ปุ่มที่ลืมใส่ type)
+             * ถูกตัดทิ้งที่นี่ การบันทึกผูกกับ onClick ของปุ่ม "บันทึก + ส่ง AI โทร"
+             * **ที่เดียวเท่านั้น** — โครงสร้างนี้ทำให้ "บันทึกเอง" เป็นไปไม่ได้ ไม่ใช่แค่กันไว้
              */
+            onSubmit={(e) => e.preventDefault()}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
                 e.preventDefault();
@@ -535,7 +559,7 @@ const FollowPage: React.FC = () => {
                     <button
                       type="button"
                       disabled={s.step > step}
-                      onClick={() => setStep(s.step)}
+                      onClick={() => goToStep(s.step)}
                       className={cn(
                         'flex w-full flex-col gap-0.5 rounded-xl border px-2.5 py-2 text-left transition-colors',
                         current
@@ -960,7 +984,7 @@ const FollowPage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setFormError(null);
-                    setStep((cur) => prevFollowStep(cur));
+                    goToStep(prevFollowStep(step));
                   }}
                   className={cn(
                     'inline-flex min-h-[46px] items-center gap-1.5 rounded-full border px-5 py-2.5 text-sm font-medium',
@@ -981,7 +1005,8 @@ const FollowPage: React.FC = () => {
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => void submit()}
                   disabled={submitting}
                   className="jarvis-pill-btn inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm disabled:opacity-50"
                 >
