@@ -508,7 +508,22 @@ const FollowPage: React.FC = () => {
 
         {/* ฟอร์มเพิ่ม */}
         {formOpen ? (
-          <form onSubmit={submit} className="jarvis-frost space-y-3 p-4 sm:p-5">
+          <form
+            onSubmit={submit}
+            /**
+             * 🔴 **บันทึกเกิดเฉพาะตอนกดปุ่ม "บันทึก" เท่านั้น** (เจ้าของสั่ง 18 ส.ค. 2569:
+             * ขั้นตอนข้อ 6 = "กดบันทึก") — กด Enter ในช่องใด ๆ ต้องไม่ยิง submit
+             * (ฟอร์ม HTML ยิง submit เองเมื่อกด Enter · ทำให้บันทึกก่อนถึงเวลา)
+             * ปุ่ม "ถัดไป" เป็น type=button มี onClick ของตัวเอง จึงไม่โดนกระทบ
+             * ยกเว้น textarea ที่ Enter = ขึ้นบรรทัดใหม่อยู่แล้ว ไม่ต้องกัน
+             */
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                e.preventDefault();
+              }
+            }}
+            className="jarvis-frost space-y-3 p-4 sm:p-5"
+          >
             {/* แถบขั้น 1→2→3 (เจ้าของสั่ง 18 ส.ค. 2569) — กดย้อนกลับขั้นที่ทำแล้วได้
                 ขั้นที่ยังไม่ถึงกดไม่ได้ ต้องผ่านด่านของขั้นก่อนหน้าเอง */}
             <ol className="flex items-stretch gap-1.5">
