@@ -35,7 +35,6 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
 import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
 
@@ -282,6 +281,21 @@ const FollowPage: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    /**
+     * 🔴 **ยังไม่ถึงขั้นตั้งเวลา = ห้ามบันทึกเด็ดขาด** (เจ้าของแจ้ง 18 ส.ค. 2569:
+     * *"พอเลือกหน่วยงานแล้วจะกดไปตั้งเวลามันบันทึกเองเลย"*)
+     *
+     * เหตุ: ฟอร์ม HTML ยิง submit เองเมื่อกด Enter ในช่องใด ๆ (รวมตอนเลือก dropdown
+     * ด้วยคีย์บอร์ด) — และขั้น 3 **ผ่านด่านตั้งแต่ยังไม่แตะ** เพราะเวลาเริ่มต้นเป็น "ตอนนี้"
+     * ด่าน `firstIncompleteStep` จึงไม่ช่วยเลย บันทึกทันทีตั้งแต่ยืนอยู่ขั้น 2
+     * → ต้องกันด้วย "อยู่ขั้นไหน" ไม่ใช่ "ข้อมูลครบหรือยัง" · Enter กลายเป็นปุ่มถัดไปแทน
+     */
+    if (step !== 3) {
+      const err = followStepError(step, wizardValues);
+      if (err) setFormError(err);
+      else setStep((cur) => nextFollowStep(cur));
+      return;
+    }
     /**
      * 🔴 กันข้ามขั้น — ต่อให้กด Enter จากขั้นไหนก็ต้องผ่านทุกขั้นก่อนถึงจะยิงจริง
      * ไม่ผ่านตรงไหนให้เด้งกลับไป**ขั้นนั้น** ไม่ใช่ขึ้น error ลอย ๆ ที่คนหาไม่เจอ
@@ -664,35 +678,22 @@ const FollowPage: React.FC = () => {
               <label htmlFor="followUnit" className="ml-1 text-xs font-medium text-muted-foreground">
                 หน่วยงาน (ถ้ามี)
               </label>
-              <select
+              {/* 🔴 **ไม่มี dropdown แล้ว** (เจ้าของสั่ง 18 ส.ค. 2569: *"พอเลือกหน่วยงานแล้ว
+                  ให้ชื่อมาอยู่ในช่องหน่วยงาน เอา Dropdown ออก"*)
+                  เหตุผลเสริม: การเลือก dropdown ด้วยคีย์บอร์ดกด Enter = ฟอร์มยิง submit เอง
+                  ซึ่งทำให้บันทึกทั้งที่ยังไม่ได้ตั้งเวลา · ช่องข้อความไม่มีปัญหานั้น
+                  พิมพ์เองได้สำหรับหน่วยงานที่ไม่มีใบขอเปิดบนบอร์ด */}
+              <input
                 id="followUnit"
-                value={siteCode || (unitName ? '__manual__' : '')}
+                value={unitName}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) {
-                    setUnitName('');
-                    setSiteCode('');
-                    return;
-                  }
-                  const job = openJobs.find((j) => (j.site_code || '') === v);
-                  if (job) {
-                    setUnitName(job.unit_name || '');
-                    setSiteCode(job.site_code || '');
-                  }
+                  setUnitName(e.target.value);
+                  // พิมพ์เองแล้วรหัสไซต์เดิมใช้ไม่ได้ — รหัสไซต์มาจากการ "เลือกจากบอร์ด" เท่านั้น
+                  if (siteCode) setSiteCode('');
                 }}
+                placeholder="กดปุ่มด้านบนเพื่อเลือก หรือพิมพ์ชื่อหน่วยงานเอง"
                 className="jarvis-soft-field min-h-[46px] w-full"
-              >
-                <option value="">— ไม่ระบุหน่วยงาน —</option>
-                {unitName && !siteCode ? <option value="__manual__">{unitName} (พิมพ์เอง)</option> : null}
-                {/* ใบขอที่ยังเปิด — ชื่อเดียวกับที่เห็นบนกล่องงาน จะได้ไม่ต้องเดา */}
-                {openJobs
-                  .filter((j) => (j.site_code || '').trim())
-                  .map((j) => (
-                    <option key={j.id} value={j.site_code || ''}>
-                      {jobBoardCardTitle(j)}{j.request_no ? ` · ${j.request_no}` : ''}
-                    </option>
-                  ))}
-              </select>
+              />
               {siteCode ? (
                 <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Building2 className="h-3 w-3" aria-hidden />
@@ -710,10 +711,11 @@ const FollowPage: React.FC = () => {
                 </p>
               ) : (
                 <p className="ml-1 text-[10px] text-muted-foreground">
-                  เลือกจากใบขอแล้วรหัสไซต์จะขึ้นเอง · โหลดใบขอไม่ได้ก็ข้ามช่องนี้ได้
+                  เลือกจากบอร์ดแล้วรหัสไซต์จะขึ้นเอง · พิมพ์เองได้แต่จะไม่มีรหัสไซต์
                 </p>
               )}
             </div>
+
             {/* เจ้าของสั่ง 13 ส.ค. 2569: เปลี่ยนช่อง "รายละเอียดเพิ่มเติม" เป็นเบอร์เจ้าหน้าที่
                 — ผู้สมัครที่รับสายจาก AI ต้องมีเบอร์คนจริงให้โทรกลับ
                 ⚠️ เก็บเป็นคอลัมน์ใหม่ (staff_phone) ไม่ทับ note เดิมซึ่งคนละความหมาย */}
