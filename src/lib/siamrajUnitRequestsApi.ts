@@ -32,7 +32,14 @@ export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
 }
 
 export type SiamrajThroughputRecord = {
+  /** เลขที่ใบขอ**ดิบ** — คีย์จัดกลุ่ม ห้ามตัดนำหน้าทิ้ง */
   requestNo?: string;
+  /** id เต็มของใบขอ (`siamraj-sql:<เลขดิบ>`) — ใช้เปิดใบจาก drill-down */
+  jobId?: string;
+  /** เลขที่ใบขอแบบที่โชว์บนจอ */
+  requestNoDisplay?: string;
+  unitName?: string;
+  siteCode?: string;
   /** รหัส BU ของไซต์ — ใช้กรอง KPI เข้ามา/ปิด/ยกเลิก ตาม BU ที่เลือก */
   departmentCode?: string;
   requestDate: string;

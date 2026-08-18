@@ -2180,3 +2180,38 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
 
 **บอร์ดเรียงใหม่** — `compareJobsByAgeDaysDesc` (ตัวเดียวกับหน้ารายการใบขอ) เป็นคีย์หลัก
 "ใบที่มีคนกรอกขึ้นก่อน" (คำสั่ง 13 ส.ค.) ลดเป็นตัวตัดสินรองเมื่ออายุเท่ากัน
+
+### รอบ 18 ส.ค. 2569 (บ่าย) — การ์ด เข้ามา/ปิดได้/ยกเลิก/คงเหลือ กดแล้วเห็นรายใบเสมอ
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/dashboard/cohortDrillDown.ts` | **pure · ใหม่** — แตก `throughputRecords` เป็นรายใบตามถังที่กด (เทสต์ 10 ข้อ · mutation 7/7) |
+| `src/lib/dashboard/dashboardDetailDialog.ts` | เพิ่ม `cohortRowToDashboardDetailItem` — แถว drill-down ของ 4 การ์ด |
+| `src/lib/dashboard/throughput.ts` | `ThroughputRecord` เพิ่ม `jobId` / `requestNoDisplay` / `unitName` / `siteCode` (fallback ฝั่ง jobs เติมให้ด้วย) |
+| `api/_lib/siamrajSqlServerThroughput.ts` | SQL เพิ่ม `site_code` / `site_name` / `customer_name` + ส่ง id เต็ม `siamraj-sql:` กับเลขที่แบบโชว์ |
+| `src/lib/siamrajUnitRequestsApi.ts` | type ฝั่ง client ตามให้ตรง |
+| `src/pages/dashboard/SupervisorDashboard.tsx` | `openCohortDrillList` — 4 การ์ดเปิดลิสต์จากชุดเดียวกับเลขบนการ์ด |
+
+**เจ้าของสั่ง 18 ส.ค.**
+> *"หน้า Dashboard ตรง เข้ามา ปิดได้ ยกเลิก คงเหลือ กดเข้าไปต้องมีใบขอบอกด้วยสิ่
+> ต่อให้ดูเป็นรายเดือน ทั้งปี ก็ต้องขึ้น"*
+
+**ทำไมต้องมีตัวใหม่** — เลขบนการ์ดนับจาก `throughputRecords` (ERP ทุกใบที่กรอกในช่วง
+รวมใบที่ปิด/ยกเลิกแล้ว) แต่ลิสต์เดิมกรองจาก**กองใบเปิดในกล่องงาน** คนละกอง
+วัดจริง: 「เข้ามา」การ์ด 7,548·5,602 กดได้ 340·289 · 「ยกเลิก」1,686 ใบ กดแล้ว**ว่างเปล่า**
+· 「ปิดแล้ว」เคยต้องยิง ERP แยกแล้วขึ้นหมายเหตุ "ลิสต์ได้ไม่ครบ" (3,699 vs 1,571)
+ตอนนี้ทั้งเลขและรายการมาจาก records ชุดเดียวกัน → เท่ากันเป๊ะทุกโหมด (วัดแล้ว:
+ทั้งหมด 7,548·5,602=5,602 แถว · เดือนนี้ 105·96 · ทั้งปี 2569 1,743·1,518)
+
+**กับดัก**
+
+* 🔴 **คีย์จัดกลุ่มคือเลขที่ใบดิบเต็ม ๆ** ห้าม slice/ตัดนำหน้า (เลขท้ายซ้ำข้าม BU 9 ใบ/เลข)
+  · เปิดใบใช้ `jobId` (`siamraj-sql:<เลขดิบ>`) — แถวที่ไม่รู้ id เต็มไม่ผูก onClick เลย
+* 🔴 **ช่วงของ drill ต้องเท่าช่วงของการ์ด**: `period ?? trendMeta` (ตัวเดียวกับ
+  `periodFrom/periodTo` ใน buildDashboardData) และ records ต้องผ่าน
+  `filterThroughputByDepartment` เหมือนกัน ไม่งั้นเลขกับรายการหลุดจากกันอีก
+* 🔴 **คงเหลือโหมด "ทั้งหมด" ไม่ใช่ cohort** — การ์ดนับจากใบเปิดจริง จึงยังใช้เส้นเดิม
+  (`filterJobsForRemainingKpi`) · cohort drill ใช้กับคงเหลือเฉพาะโหมดมีงวด
+* อัตราที่ไม่มีเลขที่ใบยังนับบนการ์ด — drill คืน `positionsWithoutRequestNo`
+  แล้วหัวกล่องเขียนบอก ห้ามหายเงียบ
+* throughput ยังโหลดไม่มา (`records.length === 0`) = ถอยไปเส้นเดิม ไม่เปิดกล่องว่าง

@@ -1,4 +1,5 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
 import { toBangkokYmd } from './businessDate.js';
 import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 import {
@@ -20,7 +21,15 @@ export {
 } from './siamrajStaffingOpen.js';
 
 export type SiamrajThroughputRecord = {
+  /** เลขที่ใบขอ**ดิบ**จาก ERP — ใช้เป็นคีย์จัดกลุ่ม ห้ามตัดนำหน้าทิ้ง (เลขท้ายซ้ำข้าม BU) */
   requestNo?: string;
+  /** id เต็มของใบขอ (`siamraj-sql:<เลขดิบ>`) — ใช้เปิดใบจาก drill-down */
+  jobId?: string;
+  /** เลขที่ใบขอแบบที่โชว์บนจอ (เติมนำหน้าจาก site_code ให้แถวที่ ERP เก็บเป็นเลขล้วน) */
+  requestNoDisplay?: string;
+  /** ชื่อหน่วยงาน/ลูกค้า — มีไว้ให้ drill-down อ่านออกโดยไม่ต้องยิงเส้นอื่น */
+  unitName?: string;
+  siteCode?: string;
   /** รหัส BU ของไซต์ (ms_site.department_code) — ให้ dashboard กรองตาม BU ที่เลือกได้ */
   departmentCode?: string;
   requestDate: string;
@@ -36,6 +45,9 @@ export type SiamrajThroughputRecord = {
 type SqlThroughputRow = {
   request_no: string | null;
   department_code: string | null;
+  site_code: string | null;
+  site_name: string | null;
+  customer_name: string | null;
   request_date: Date | string | null;
   want_date_from: Date | string | null;
   request_qty: number | null;
@@ -87,14 +99,31 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
   const requestDate = requestOpenDateYmdFromRow(row);
   if (!requestDate) return [];
 
-  const requestNo = (row.request_no || '').trim() || undefined;
+  const rawRequestNo = (row.request_no || '').trim();
+  const requestNo = rawRequestNo || undefined;
   const departmentCode = (row.department_code || '').trim().toUpperCase() || undefined;
+  const siteCode = (row.site_code || '').trim() || undefined;
+  const jobId = rawRequestNo ? `siamraj-sql:${rawRequestNo}` : undefined;
+  const requestNoDisplay = rawRequestNo
+    ? normalizeSiamrajRequestNoForDisplay(rawRequestNo, { siteCode, departmentCode })
+    : undefined;
+  const unitName =
+    (row.customer_name || '').trim() || (row.site_name || '').trim() || siteCode || undefined;
   const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
   const requestActionCode = (row.request_action_code || '').trim() || undefined;
   const requestActionName = (row.request_action_name || '').trim() || undefined;
   const lifecycleKind = classifyActionToLifecycle(requestActionName, requestActionCode);
-  const meta = { departmentCode, requestActionName, requestActionCode, lifecycleKind };
+  const meta = {
+    jobId,
+    requestNoDisplay,
+    unitName,
+    siteCode,
+    departmentCode,
+    requestActionName,
+    requestActionCode,
+    lifecycleKind,
+  };
   const out: SiamrajThroughputRecord[] = [];
 
   if (breakdown.filledPositions > 0) {
@@ -196,6 +225,9 @@ export async function listSiamrajSqlServerThroughput(options: {
     SELECT
       A.request_no,
       RTRIM(SS.department_code) AS department_code,
+      A.site_code,
+      SS.site_name,
+      (SELECT TOP 1 z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no) AS customer_name,
       A.request_date,
       A.want_date_from,
       A.request_qty,

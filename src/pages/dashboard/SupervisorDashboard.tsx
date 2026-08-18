@@ -20,7 +20,11 @@ import { loadDashboardFilters, saveDashboardFilters } from '@/lib/dashboard/dash
 import { exportWorkQueueCsv } from '@/lib/dashboard/exportWorkQueue';
 import { MOCK_DASHBOARD_DATA } from '@/lib/dashboard/mockDashboardData';
 import type { DashboardFilters, DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
-import { jobToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
+import {
+  cohortRowToDashboardDetailItem,
+  jobToDashboardDetailItem,
+} from '@/lib/dashboard/dashboardDetailDialog';
+import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import {
   filterJobsClosedInPeriod,
   filterJobsForAgeBucket,
@@ -465,10 +469,77 @@ const SupervisorDashboard: React.FC = () => {
     [period, dateRange, closedJobs, closedAllJobs, openJobList, jobsWithoutAgeFilter, throughputFrom, throughputTo],
   );
 
+  /**
+   * 🔴 การ์ด **เข้ามา / ปิดได้ / ยกเลิก / คงเหลือ** กดแล้วต้องมีรายการใบขอเสมอ
+   * (เจ้าของสั่ง 18 ส.ค. 2569: *"กดเข้าไปต้องมีใบขอบอกด้วยสิ ต่อให้ดูเป็นรายเดือน
+   * ทั้งปี ก็ต้องขึ้น"*)
+   *
+   * ของเดิมรายการมากรองจาก**กองใบเปิดในกล่องงาน** แต่เลขบนการ์ดนับจาก
+   * `throughputRecords` (ERP รวมใบที่ปิด/ยกเลิกแล้ว) — คนละกอง วัดจริง:
+   * การ์ด「เข้ามา」7,548·5,602 กดแล้วได้ 340·289 · การ์ด「ยกเลิก」กดแล้ว**ว่าง**
+   *
+   * ตัวนี้แตกรายการจาก records **ชุดเดียวกับที่การ์ดนับ** (กรอง BU + ช่วงเดียวกัน)
+   * เลขกับรายการจึงเท่ากันทุกโหมด · ใบที่รู้ id เต็มกดเปิดได้ · อัตราที่ระบุใบไม่ได้
+   * ขึ้นบอกบนหัวกล่อง ไม่หายเงียบ
+   */
+  const openCohortDrillList = useCallback(
+    (kpi: CohortDrillKpi, label: string) => {
+      const from = period?.from ?? trendMeta.from;
+      const to = period?.to ?? trendMeta.to;
+      const records = filterThroughputByDepartment(throughputRecords, unitFilters.departmentFilter);
+      const drill = buildCohortDrillDown(records, from, to, kpi);
+      const noteMissing =
+        drill.positionsWithoutRequestNo > 0
+          ? ` · อีก ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตราไม่มีเลขที่ใบ ลิสต์ไม่ได้`
+          : '';
+      setDetailDialogTitle(
+        `${label} (${drill.positions.toLocaleString('th-TH')} อัตรา · ${drill.requestCount.toLocaleString('th-TH')} ใบขอ)${noteMissing}`,
+      );
+      setDetailDialogItems(
+        drill.rows.map((row) => {
+          // ใบเปิดใน feed มีข้อมูลเต็ม — ใช้ตัวจริงนำทาง · ใบปิด/นอก feed รู้แค่ id เต็มก็เปิดหน้าใบได้
+          const feedJob = (row.jobId ? jobById.get(row.jobId) : undefined) ?? jobById.get(row.requestNo);
+          const navJob =
+            feedJob ??
+            (row.jobId
+              ? ({ id: row.jobId, externalId: row.requestNo, source: 'siamraj' } as JobRequest)
+              : null);
+          return cohortRowToDashboardDetailItem(
+            row,
+            kpi,
+            navJob
+              ? () => {
+                  setDetailDialogOpen(false);
+                  navigateToUnitRequest(navJob, navigate, { returnTo: RETURN_TO });
+                }
+              : undefined,
+          );
+        }),
+      );
+      setDetailDialogOpen(true);
+    },
+    [period, trendMeta, throughputRecords, unitFilters.departmentFilter, jobById, navigate],
+  );
+
   const handleKpiClick = useCallback(
     (kpiId: string, label: string, expectedRequests?: number | null) => {
       const range = period ?? (dateRange ? resolvePeriodRange('custom', dateRange) : null);
       const stockJobs = filterJobsForRemainingKpi(jobsWithoutAgeFilter, range);
+
+      /**
+       * เข้ามา/ปิดได้/ยกเลิก = cohort เสมอ · คงเหลือ = cohort เฉพาะโหมดมีงวด
+       * (โหมด "ทั้งหมด" การ์ดคงเหลือนับจากใบเปิดจริง ไม่ใช่ cohort — ดู buildDashboardData)
+       * ไม่มี throughput records (โหลดไม่ทัน/ล้มเหลว) ให้ถอยไปทางเดิม ไม่เปิดกล่องว่างเปล่า
+       */
+      const cohortReady = throughputRecords.length > 0;
+      if (cohortReady && (kpiId === 'total_requests' || kpiId === 'closed' || kpiId === 'cancelled')) {
+        openCohortDrillList(kpiId, label);
+        return;
+      }
+      if (cohortReady && kpiId === 'remaining' && period) {
+        openCohortDrillList('remaining', label);
+        return;
+      }
 
       if (kpiId === 'remaining' || kpiId === 'total_requests') {
         openJobList(
@@ -540,7 +611,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, openClosedJobList, openControlList, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
+    [openJobList, openClosedJobList, openControlList, openCohortDrillList, throughputRecords, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
   );
 
   const handleCohortClick = useCallback(

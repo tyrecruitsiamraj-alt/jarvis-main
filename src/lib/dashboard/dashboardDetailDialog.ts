@@ -5,6 +5,7 @@ import { REQUEST_CONTROL_STATUS_LABELS } from '@/lib/requestControl';
 import type { RequestControlRecord } from '@/lib/requestControl';
 import { lifecycleKindLabel } from '@/lib/dashboard/lifecycle';
 import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
+import type { CohortDrillKpi, CohortDrillRow } from '@/lib/dashboard/cohortDrillDown';
 
 export type DashboardDetailDialogItem = {
   id: string;
@@ -82,5 +83,47 @@ export function jobToDashboardDetailItem(
     badge: DASHBOARD_STATUS_LABELS[status],
     badgeVariant: statusBadgeVariant(status),
     onClick: () => onOpen(job),
+  };
+}
+
+const COHORT_KPI_BADGE: Record<CohortDrillKpi, { label: string; variant: DashboardDetailDialogItem['badgeVariant'] }> = {
+  total_requests: { label: 'เข้ามา', variant: 'info' },
+  closed: { label: 'ปิดได้', variant: 'success' },
+  cancelled: { label: 'ยกเลิก', variant: 'default' },
+  remaining: { label: 'คงเหลือ', variant: 'warning' },
+};
+
+/**
+ * รายการ drill-down ของการ์ด เข้ามา/ปิดได้/ยกเลิก/คงเหลือ — สร้างจาก `CohortDrillRow`
+ * (ชุดเดียวกับที่เลขบนการ์ดนับ) ไม่ใช่จากกองใบเปิดในกล่องงาน
+ *
+ * `onOpen` ไม่มี = ใบนั้นเปิดหน้าไม่ได้ (ไม่รู้ id เต็ม) — โชว์ข้อมูลเฉย ๆ ไม่หลอกว่ากดได้
+ */
+export function cohortRowToDashboardDetailItem(
+  row: CohortDrillRow,
+  kpi: CohortDrillKpi,
+  onOpen?: () => void,
+): DashboardDetailDialogItem {
+  const badge = COHORT_KPI_BADGE[kpi];
+  const buckets = [
+    `ขอ ${row.requestPositions.toLocaleString('th-TH')}`,
+    `ปิดได้ ${row.filledPositions.toLocaleString('th-TH')}`,
+    `ยกเลิก ${row.cancelledPositions.toLocaleString('th-TH')}`,
+    `เหลือ ${row.remainingPositions.toLocaleString('th-TH')}`,
+  ].join(' · ');
+  return {
+    id: row.jobId ?? row.requestNo,
+    title: `${row.unitName ?? '—'} (${row.requestNoDisplay})`,
+    subtitle: [
+      `เข้ามา ${formatYmdDmyBe(row.requestDate)}`,
+      row.requestActionName,
+      buckets,
+      row.siteCode ? `ไซต์ ${row.siteCode}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    badge: `${badge.label} ${row.positions.toLocaleString('th-TH')}`,
+    badgeVariant: badge.variant,
+    onClick: onOpen,
   };
 }

@@ -4,7 +4,14 @@ import { positionBreakdownFromJob } from '@/lib/requestControl';
 import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/types';
 
 export type ThroughputRecord = {
+  /** เลขที่ใบขอ**ดิบ** — คีย์จัดกลุ่มของ drill-down · ห้ามตัดนำหน้าทิ้ง (เลขท้ายซ้ำข้าม BU) */
   requestNo?: string;
+  /** id เต็มของใบขอ (`siamraj-sql:<เลขดิบ>` / id ฝั่ง Jarvis) — ใช้เปิดใบจาก drill-down */
+  jobId?: string;
+  /** เลขที่ใบขอแบบที่โชว์บนจอ (ไม่มี = ใช้ requestNo) */
+  requestNoDisplay?: string;
+  unitName?: string;
+  siteCode?: string;
   /** รหัส BU ของไซต์ — throughput เป็นยอดรวมจาก SQL ที่ไม่ผ่านตัวกรองฝั่ง client
    *  ถ้าไม่มีมิตินี้ KPI เข้ามา/ปิด/ยกเลิก จะไม่ขยับตาม BU ที่เลือก */
   departmentCode?: string;
@@ -70,6 +77,10 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (!requestDate) continue;
     const requestNo = (j.request_no || j.externalId || j.id || '').trim() || undefined;
     const departmentCode = j.department_code?.trim().toUpperCase() || undefined;
+    const jobId = (j.id || '').trim() || undefined;
+    const requestNoDisplay = (j.request_no || '').trim() || requestNo;
+    const unitName = (j.unit_name || '').trim() || undefined;
+    const siteCode = j.site_code?.trim() || undefined;
     const b = positionBreakdownFromJob(j);
     const closureDate =
       b.remainingPositions === 0
@@ -81,6 +92,10 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (b.filledPositions > 0) {
       out.push({
         requestNo,
+        jobId,
+        requestNoDisplay,
+        unitName,
+        siteCode,
         departmentCode,
         requestDate,
         closureDate: closedYmd,
@@ -102,6 +117,10 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (b.cancelledPositions > 0) {
       out.push({
         requestNo,
+        jobId,
+        requestNoDisplay,
+        unitName,
+        siteCode,
         departmentCode,
         requestDate,
         closureDate: closedYmd,
@@ -123,6 +142,10 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
     if (b.remainingPositions > 0) {
       out.push({
         requestNo,
+        jobId,
+        requestNoDisplay,
+        unitName,
+        siteCode,
         departmentCode,
         requestDate,
         closureDate: null,
