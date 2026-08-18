@@ -26,6 +26,12 @@ export type BoardUnitOption = {
   sampleRequestNo: string | null;
   /** ตำแหน่งที่หน่วยงานนี้กำลังหา (ไม่เกิน 3 ชื่อ) */
   roles: string[];
+  /**
+   * ใบขอทั้งหมดตั้งแต่ปี 2567 / วันที่ใบขอล่าสุด — มีเฉพาะแถวที่มาจากชุดหน่วยงานทั้งชุด
+   * (`?units=1`) ส่วนแถวที่ยุบจากใบขอเปิดเป็น undefined
+   */
+  totalRequests?: number;
+  lastRequestDate?: string | null;
 };
 
 function cleanText(v?: string | null): string {
@@ -69,6 +75,52 @@ export function buildBoardUnitOptions(jobs: JobRequest[]): BoardUnitOption[] {
         ? a.unitName.localeCompare(b.unitName, 'th')
         : b.remainingPositions - a.remainingPositions,
     );
+}
+
+/**
+ * **รวมสองชุดเข้าด้วยกัน** (เจ้าของแจ้ง 18 ส.ค. 2569: *"เลือกหน่วยงานได้ แต่ขึ้นไม่ครบ"*)
+ *
+ * - `fromOpenJobs` = ยุบจากใบขอที่ยังเปิด · ข้อมูลละเอียด (ตำแหน่งที่หา · อัตราที่ยังต้องหา)
+ * - `fromAllUnits` = หน่วยงานทั้งชุดตั้งแต่ปี 2567 (~1,054) · ข้อมูลบาง แต่ครบ
+ *
+ * หน่วยงานที่มีในทั้งสองชุด **ใช้ตัวละเอียดเป็นหลัก** แล้วเติมวันที่ใบขอล่าสุด/ยอดรวมจากชุดครบ
+ * → หน่วยงานที่ยังมีใบขอเปิดยังโชว์รายละเอียดเหมือนเดิม ที่เหลือโชว์ชื่อ+รหัส+ใบขอล่าสุด
+ *
+ * 🔴 คีย์คือ `siteCode` — ห้ามจับคู่ด้วยชื่อ (ชื่อลูกค้าซ้ำกันได้หลายไซต์ เช่น สาขาต่างกัน)
+ *
+ * เรียง: หน่วยงานที่ยังมีใบขอเปิดขึ้นก่อน (คนใช้ส่วนใหญ่ตามเรื่องของใบที่ยังเปิด)
+ * แล้วค่อยเรียงตามใบขอล่าสุดใหม่→เก่า · ไม่มีวันที่ไปท้ายสุด
+ */
+export function mergeBoardUnitOptions(
+  fromOpenJobs: BoardUnitOption[],
+  fromAllUnits: BoardUnitOption[],
+): BoardUnitOption[] {
+  const byCode = new Map<string, BoardUnitOption>();
+  for (const u of fromAllUnits) {
+    if (u.siteCode) byCode.set(u.siteCode, u);
+  }
+  for (const u of fromOpenJobs) {
+    if (!u.siteCode) continue;
+    const thin = byCode.get(u.siteCode);
+    byCode.set(u.siteCode, {
+      ...u,
+      totalRequests: thin?.totalRequests,
+      lastRequestDate: thin?.lastRequestDate,
+    });
+  }
+
+  return Array.from(byCode.values()).sort((a, b) => {
+    const aOpen = a.openRequests > 0 ? 1 : 0;
+    const bOpen = b.openRequests > 0 ? 1 : 0;
+    if (aOpen !== bOpen) return bOpen - aOpen;
+    if (aOpen === 1 && a.remainingPositions !== b.remainingPositions) {
+      return b.remainingPositions - a.remainingPositions;
+    }
+    const ad = a.lastRequestDate || '';
+    const bd = b.lastRequestDate || '';
+    if (ad !== bd) return bd.localeCompare(ad);
+    return a.unitName.localeCompare(b.unitName, 'th');
+  });
 }
 
 /** ข้อความที่ใช้ค้นฝั่ง client — ชื่อหน่วยงาน / รหัสไซต์ / เลขที่ใบ / ตำแหน่ง */

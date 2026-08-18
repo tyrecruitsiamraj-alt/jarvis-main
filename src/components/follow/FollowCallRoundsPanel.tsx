@@ -208,8 +208,21 @@ export default function FollowCallRoundsPanel() {
           ) : null}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
-              <button type="button" className="jarvis-btn-ghost shrink-0">
-                <CalendarDays className="h-3 w-3" aria-hidden /> ปฏิทินการโทร
+              {/* เจ้าของสั่ง 18 ส.ค. 2569 (ค่ำ-4): ปฏิทินเหลือแค่ไอคอน เหมือนตัวกรองวันที่
+                  — กดแล้วเลือกวัน ข้อมูลในแผงกรองเฉพาะวันนั้น · ไอคอนติดสีเมื่อกำลังกรองอยู่
+                  เพื่อบอกว่าตอนนี้ดูเฉพาะวันเดียว (คู่กับชิป "เฉพาะวันที่ X" ด้านซ้าย) */}
+              <button
+                type="button"
+                aria-label="ปฏิทินการโทร — กดเลือกวันเพื่อดูเฉพาะวันนั้น"
+                title="ปฏิทินการโทร — กดเลือกวันเพื่อดูเฉพาะวันนั้น"
+                className={cn(
+                  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors',
+                  selectedDay
+                    ? cn(TONE.info.soft, TONE.info.value, 'border-transparent')
+                    : 'border-border hover:bg-secondary',
+                )}
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden />
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[320px] p-2.5">
@@ -280,13 +293,16 @@ export default function FollowCallRoundsPanel() {
               </p>
             </PopoverContent>
           </Popover>
+          {/* รีเฟรชเหลือไอคอนให้เข้าชุดกับปุ่มปฏิทินที่อยู่ติดกัน */}
           <button
             type="button"
             onClick={load}
             disabled={loading}
-            className="jarvis-btn-ghost shrink-0 disabled:opacity-50"
+            aria-label="รีเฟรช"
+            title="รีเฟรช"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-secondary disabled:opacity-50"
           >
-            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
           </button>
         </div>
       </div>

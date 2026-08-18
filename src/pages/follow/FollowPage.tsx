@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
-import { FOLLOW_OUTCOME_LABEL, type FollowOutcome } from '@/lib/followOutcome';
+import { FOLLOW_OUTCOME_LABEL, type FollowOutcome, type FollowOutcomeAny } from '@/lib/followOutcome';
 import {
   listFollowEntries,
   createFollowEntry,
@@ -22,7 +22,7 @@ import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
-import type { BoardUnitOption } from '@/lib/boardUnitPicker';
+import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import {
@@ -37,10 +37,12 @@ import {
 } from '@/lib/followWizard';
 import { useSearchParams } from 'react-router-dom';
 import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/followPrefill';
-import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
+import { fetchSiamrajUnitRequests, fetchAllUnitOptions } from '@/lib/siamrajUnitRequestsApi';
 import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
 import StaffContactField from '@/components/follow/StaffContactField';
+import TopicField from '@/components/follow/TopicField';
+import TopicManager from '@/components/follow/TopicManager';
 
 
 function formatWhen(iso: string | null): string {
@@ -81,8 +83,19 @@ const FollowPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [topic, setTopic] = useState('');
   const [note, setNote] = useState('');
-  /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI พูดให้ผู้สมัครโทรกลับ (เจ้าของสั่ง 13 ส.ค. 2569) */
-  const [staffPhone, setStaffPhone] = useState('');
+  /**
+   * เบอร์เจ้าหน้าที่ผู้ติดตาม — AI พูดให้ผู้สมัครโทรกลับ (เจ้าของสั่ง 13 ส.ค. 2569)
+   *
+   * 18 ส.ค. 2569 (ค่ำ-2) เจ้าของสั่งให้ **ระบุได้ทีละวัน**:
+   * *"ต้องอยู่หน้ากรอกวันที่เวลา เพื่อจะได้ระบุเจ้าของแผนแต่ละวันได้"*
+   * → เก็บแยกตามรอบ/ตามวัน ไม่ใช่ค่าเดียวทั้งชุด
+   *   · โหมดเวลาเอง: `staffPhones[i]` คู่กับ `scheduledAts[i]`
+   *   · โหมดตาราง: `staffPhoneByDay['YYYY-MM-DD']`
+   * ⚠️ ไม่ต้องแตะ schema — แถวจริงเป็น **1 แถว/วัน (หรือ 1 แถว/รอบ)** อยู่แล้ว
+   *   แต่ละแถวจึงถือ `staff_phone` ของตัวเองได้เลย
+   */
+  const [staffPhones, setStaffPhones] = useState<string[]>(() => ['']);
+  const [staffPhoneByDay, setStaffPhoneByDay] = useState<Record<string, string>>({});
   /** ให้โทรเมื่อไหร่ — หลายรอบได้ เพราะบางเคสต้องโทรมากกว่า 1 ครั้ง (เจ้าของสั่ง 10 ส.ค. 2569) */
   const [scheduledAts, setScheduledAts] = useState<string[]>(() => [nowForInput()]);
   /**
@@ -112,6 +125,8 @@ const FollowPage: React.FC = () => {
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   /** รายการที่กำลังแก้ไข (096) — null = ไม่ได้เปิดกล่องแก้ */
   const [editing, setEditing] = useState<FollowEntry | null>(null);
+  /** bump เมื่อกล่องจัดการเรื่องเพิ่มเรื่องใหม่ — dropdown เรื่องในฟอร์ม/กล่องแก้ไขโหลดลิสต์ใหม่ */
+  const [topicsRev, setTopicsRev] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -147,6 +162,26 @@ const FollowPage: React.FC = () => {
     /** โหมดตาราง: ยิงตามชุดวันเดิม · โหมดเวลา: ยิงตาม freshIso */
     proceed: () => Promise<void>;
   } | null>(null);
+
+  /**
+   * หน่วยงานทั้งชุดตั้งแต่ปี 2567 (~1,054) — เจ้าของแจ้ง 18 ส.ค. 2569 ว่ากล่องเลือก
+   * "ขึ้นไม่ครบ" เพราะเดิมยุบจากใบขอที่ยังเปิดเท่านั้น (152)
+   * โหลดพัง = [] แล้ว merge จะเหลือชุดใบขอเปิดเหมือนเดิม (ห้ามบล็อกงาน)
+   */
+  const [allUnits, setAllUnits] = useState<BoardUnitOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAllUnitOptions()
+      .then((v) => {
+        if (!cancelled) setAllUnits(v);
+      })
+      .catch(() => {
+        if (!cancelled) setAllUnits([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /** ใบขอที่ยังเปิด — ใช้เป็นตัวเลือกหน่วยงาน · โหลดไม่ได้ = พิมพ์ชื่อเองได้เหมือนเดิม */
   useEffect(() => {
@@ -226,7 +261,8 @@ const FollowPage: React.FC = () => {
     setPhone('');
     setTopic('');
     setNote('');
-    setStaffPhone('');
+    setStaffPhones(['']);
+    setStaffPhoneByDay({});
     setPickedFrom(null);
     setScheduledAts([nowForInput()]);
     setDateFrom('');
@@ -241,9 +277,25 @@ const FollowPage: React.FC = () => {
 
   const setScheduledAtAt = (i: number, v: string) =>
     setScheduledAts((prev) => prev.map((x, idx) => (idx === i ? v : x)));
-  const addScheduledAt = () => setScheduledAts((prev) => [...prev, nowForInput()]);
-  const removeScheduledAt = (i: number) =>
+  /**
+   * เพิ่ม/ลบรอบต้องขยับ **อาร์เรย์เบอร์ให้คู่กันเสมอ** — หลุดคู่เมื่อไหร่ เบอร์เลื่อนไปอยู่ผิดรอบ
+   * (รอบที่ 2 ได้เบอร์ของรอบที่ 3) ซึ่งไม่มีอะไรบนจอบอก จนกว่าสายจะออกไปแล้ว
+   * รอบใหม่ลอกเบอร์ของรอบสุดท้ายมาเป็นค่าตั้งต้น — ปกติทั้งชุดเป็นเจ้าของคนเดียวกัน
+   */
+  const addScheduledAt = () => {
+    setScheduledAts((prev) => [...prev, nowForInput()]);
+    setStaffPhones((prev) => [...prev, prev[prev.length - 1] ?? '']);
+  };
+  const removeScheduledAt = (i: number) => {
     setScheduledAts((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+    setStaffPhones((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+  };
+  const setStaffPhoneAt = (i: number, v: string) =>
+    setStaffPhones((prev) => {
+      const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array(i + 1 - prev.length).fill('')];
+      next[i] = v;
+      return next;
+    });
 
   const setRoundAt = (i: number, v: string) =>
     setRoundTimes((prev) => prev.map((x, idx) => (idx === i ? v : x)));
@@ -378,7 +430,8 @@ const FollowPage: React.FC = () => {
               recipient_phone: phone,
               topic,
               note: note || undefined,
-              staff_phone: staffPhone || undefined,
+              // เบอร์ของ **วันนั้น** — เจ้าของแผนคนละคนกันได้ในชุดเดียว
+              staff_phone: (staffPhoneByDay[day] || '').trim() || undefined,
               scheduled_at: new Date(`${day}T${rounds[0]}:00+07:00`).toISOString(),
               group_id: groupId,
               call_times: rounds,
@@ -429,6 +482,17 @@ const FollowPage: React.FC = () => {
      * ก็เด้งเตือนเลยว่าซ้ำ"*) — เบอร์เดิม+เวลาเดิม (ระดับนาที) กับรายการที่ยังไม่ยกเลิก
      */
     const isoTimes = times.map((t) => new Date(t).toISOString());
+    /**
+     * 🔴 แมป **เวลา → เบอร์** ก่อนใช้ — `times` ถูก dedup + sort แล้ว index จึง**ไม่ตรง**
+     * กับ `scheduledAts`/`staffPhones` อีก ใช้ index ตรง ๆ = เบอร์ไปโผล่ผิดรอบเงียบ ๆ
+     * เวลาซ้ำกันเก็บเบอร์ของช่องแรกที่เจอ (ช่องที่ซ้ำถูกตัดทิ้งอยู่แล้ว)
+     */
+    const phoneByLocal = new Map<string, string>();
+    scheduledAts.forEach((v, i) => {
+      if (v && !phoneByLocal.has(v)) phoneByLocal.set(v, (staffPhones[i] || '').trim());
+    });
+    const phoneByIso = new Map<string, string>();
+    times.forEach((t, i) => phoneByIso.set(isoTimes[i], phoneByLocal.get(t) ?? ''));
     const dupCheck = findScheduleDuplicates(phone, isoTimes, items);
     const runTimes = async (sendIso: string[]) => {
       setSubmitting(true);
@@ -440,7 +504,7 @@ const FollowPage: React.FC = () => {
             recipient_phone: phone,
             topic,
             note: note || undefined,
-            staff_phone: staffPhone || undefined,
+            staff_phone: phoneByIso.get(t) || undefined,
             scheduled_at: t,
             unit_name: unitName.trim() || undefined,
             site_code: siteCode.trim() || undefined,
@@ -508,6 +572,12 @@ const FollowPage: React.FC = () => {
     }
   };
 
+  /** ตัวเลือกหน่วยงานที่กล่อง picker ใช้ — ละเอียดจากใบขอเปิด + ครบจากชุดทั้งหมด */
+  const unitOptions = useMemo(
+    () => mergeBoardUnitOptions(buildBoardUnitOptions(openJobs), allUnits),
+    [openJobs, allUnits],
+  );
+
   const filtered = useMemo(
     () => (filter === 'all' ? items : items.filter((it) => it.call_status === filter)),
     [items, filter],
@@ -542,6 +612,9 @@ const FollowPage: React.FC = () => {
             (หน้านั้นใช้ AiCallFlowPanel คนละตัว) */}
         <FollowCallRoundsPanel />
 
+        {/* กล่องจัดการ "เรื่องที่จะให้โทรติดตาม" บนหน้า Follow (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-4)
+            เพิ่มเรื่องที่นี่แล้ว dropdown ในฟอร์มโหลดลิสต์ใหม่ผ่าน topicsRev */}
+        <TopicManager onChanged={() => setTopicsRev((r) => r + 1)} />
 
         {/* สรุป + ปุ่มเพิ่ม */}
         <div className="flex flex-wrap items-center gap-2.5">
@@ -720,19 +793,9 @@ const FollowPage: React.FC = () => {
                 className="jarvis-soft-field min-h-[46px]"
               />
             </div>
-            <div className="space-y-1.5">
-              <label htmlFor="followTopic" className="ml-1 text-xs font-medium text-muted-foreground">
-                เรื่องที่จะให้โทรติดตาม
-              </label>
-              <input
-                id="followTopic"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                required
-                placeholder="เช่น ยืนยันวันเริ่มงาน 15 ส.ค."
-                className="jarvis-soft-field min-h-[46px]"
-              />
-            </div>
+            {/* เรื่องที่จะให้โทรติดตาม (100 · เจ้าของสั่ง 18 ส.ค. 2569) — dropdown จากลิสต์กลาง
+                ที่ supervisor เพิ่มเองได้ · ยังพิมพ์เรื่องใหม่เองได้ถ้าไม่มีในลิสต์ */}
+            <TopicField id="followTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />
             </>
             ) : null}
 
@@ -807,12 +870,9 @@ const FollowPage: React.FC = () => {
               )}
             </div>
 
-            {/* เจ้าของสั่ง 13 ส.ค. 2569: เปลี่ยนช่อง "รายละเอียดเพิ่มเติม" เป็นเบอร์เจ้าหน้าที่
-                — ผู้สมัครที่รับสายจาก AI ต้องมีเบอร์คนจริงให้โทรกลับ
-                ⚠️ เก็บเป็นคอลัมน์ใหม่ (staff_phone) ไม่ทับ note เดิมซึ่งคนละความหมาย
-                18 ส.ค. 2569 (ค่ำ): เปลี่ยนเป็น dropdown ชื่อ+เบอร์จากรายชื่อกลาง (099)
-                — ค่าที่เก็บยังเป็นเบอร์อย่างเดียวเหมือนเดิม ไม่แตะ schema ของ follow_entries */}
-            <StaffContactField id="followStaffPhone" value={staffPhone} onChange={setStaffPhone} />
+            {/* 🔴 ช่องเบอร์เจ้าหน้าที่ **ย้ายไปขั้น 3 (หน้าตั้งวันเวลา)** แล้ว
+                เจ้าของสั่ง 18 ส.ค. 2569 (ค่ำ-2): *"เบอร์โทร จนท ที่ติดตาม ต้องอยู่หน้ากรอก
+                วันที่เวลา เพื่อจะได้ระบุเจ้าของแผนแต่ละวันได้"* — หนึ่งวันมีเจ้าของคนละคนได้ */}
 
             </>
             ) : null}
@@ -943,6 +1003,34 @@ const FollowPage: React.FC = () => {
                           );
                         })}
                       </div>
+
+                      {/* เบอร์เจ้าหน้าที่ **ใต้วันที่ที่ติดตาม** (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-2)
+                          โชว์เฉพาะวันที่ติ๊กไว้ — วันที่ไม่ส่งไม่มีเจ้าของแผน จะโชว์ก็รกเปล่า ๆ
+                          ⚠️ ช่องนี้แชร์ลิสต์กันผ่านแคชระดับโมดูล (ไม่ยิงเส้นตัวละครั้ง) */}
+                      {all.filter((d) => !skippedDays.has(d)).length > 0 ? (
+                        <div className="mt-1.5 space-y-2">
+                          <span className="ml-1 text-[11px] font-medium text-muted-foreground">
+                            เจ้าของแผนแต่ละวัน
+                          </span>
+                          {all
+                            .filter((d) => !skippedDays.has(d))
+                            .map((d) => (
+                              <div
+                                key={d}
+                                className="rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5"
+                              >
+                                <StaffContactField
+                                  id={`followStaffPhoneDay${d}`}
+                                  label={`เจ้าหน้าที่ที่ติดตาม · ${dayLabel(d)}`}
+                                  value={staffPhoneByDay[d] ?? ''}
+                                  onChange={(next) =>
+                                    setStaffPhoneByDay((prev) => ({ ...prev, [d]: next }))
+                                  }
+                                />
+                              </div>
+                            ))}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })()}
@@ -966,31 +1054,44 @@ const FollowPage: React.FC = () => {
               <label htmlFor="followWhen0" className="ml-1 text-xs font-medium text-muted-foreground">
                 ให้โทรเมื่อไหร่
               </label>
-              <div className="space-y-2">
+              {/* หนึ่งรอบ = วันเวลา + **เบอร์เจ้าหน้าที่ของรอบนั้น** (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-2)
+                  เบอร์อยู่ใต้วันที่เลย เพื่อระบุเจ้าของแผนของรอบนั้นได้ */}
+              <div className="space-y-2.5">
                 {scheduledAts.map((v, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      id={`followWhen${i}`}
-                      type="datetime-local"
-                      value={v}
-                      onChange={(e) => setScheduledAtAt(i, e.target.value)}
-                      className="jarvis-soft-field min-h-[46px] flex-1"
+                  <div
+                    key={i}
+                    className="space-y-1.5 rounded-xl border border-white/70 bg-white/40 p-2.5 dark:border-white/15 dark:bg-white/5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`followWhen${i}`}
+                        type="datetime-local"
+                        value={v}
+                        onChange={(e) => setScheduledAtAt(i, e.target.value)}
+                        className="jarvis-soft-field min-h-[46px] flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeScheduledAt(i)}
+                        disabled={scheduledAts.length <= 1}
+                        title={scheduledAts.length <= 1 ? 'ต้องมีอย่างน้อย 1 รอบ' : 'เอารอบนี้ออก'}
+                        aria-label={`เอารอบที่ ${i + 1} ออก`}
+                        className={cn(
+                          'inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border',
+                          'border-white/70 bg-white/60 text-slate-600 hover:text-foreground',
+                          'dark:border-white/15 dark:bg-white/10 dark:text-slate-300',
+                          'disabled:cursor-not-allowed disabled:opacity-40',
+                        )}
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                    <StaffContactField
+                      id={`followStaffPhone${i}`}
+                      label={`เจ้าหน้าที่ที่ติดตามรอบที่ ${i + 1}`}
+                      value={staffPhones[i] ?? ''}
+                      onChange={(next) => setStaffPhoneAt(i, next)}
                     />
-                    <button
-                      type="button"
-                      onClick={() => removeScheduledAt(i)}
-                      disabled={scheduledAts.length <= 1}
-                      title={scheduledAts.length <= 1 ? 'ต้องมีอย่างน้อย 1 รอบ' : 'เอารอบนี้ออก'}
-                      aria-label={`เอารอบที่ ${i + 1} ออก`}
-                      className={cn(
-                        'inline-flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border',
-                        'border-white/70 bg-white/60 text-slate-600 hover:text-foreground',
-                        'dark:border-white/15 dark:bg-white/10 dark:text-slate-300',
-                        'disabled:cursor-not-allowed disabled:opacity-40',
-                      )}
-                    >
-                      <X className="h-4 w-4" aria-hidden />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -1200,7 +1301,7 @@ const FollowPage: React.FC = () => {
                                 title={it.outcome_note || undefined}
                                 className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.success.chip)}
                               >
-                                ปิดงาน: {FOLLOW_OUTCOME_LABEL[it.outcome_code as FollowOutcome] ?? it.outcome_code}
+                                ปิดงาน: {FOLLOW_OUTCOME_LABEL[it.outcome_code as FollowOutcomeAny] ?? it.outcome_code}
                               </span>
                             ) : null}
                             {it.staff_phone ? (
@@ -1295,7 +1396,7 @@ const FollowPage: React.FC = () => {
       <BoardUnitPicker
         open={unitPickerOpen}
         onClose={() => setUnitPickerOpen(false)}
-        jobs={openJobs}
+        units={unitOptions}
         onPick={pickUnit}
       />
 
@@ -1354,7 +1455,8 @@ const FollowPage: React.FC = () => {
 
       <FollowEditDialog
         entry={editing}
-        openJobs={openJobs}
+        unitOptions={unitOptions}
+        topicsRev={topicsRev}
         /**
          * รอบอื่นของ "คนเดียวกัน" — จับคู่ด้วย **เบอร์ + เรื่อง** (ไม่มี group ผูกให้ทุกเคส
          * · เบอร์อย่างเดียวไม่พอ คนเดียวอาจถูกตามหลายเรื่องพร้อมกัน)

@@ -28,6 +28,12 @@ export type BoardReadyCandidate = {
   priority_code: string | null;
   last_activity_at: string | null;
   remarks: string | null;
+  /**
+   * แจ้งเข้าแล้วหรือยัง (`hr_recruitment.is_inform`) — true = ได้งานแล้ว
+   * ⚠️ ต้องส่งออกมาเสมอ ไม่ใช่แค่ตอนกรอง: กล่องเลือกคนของหน้า Follow เอาคนกลุ่มนี้
+   * มาด้วย (เจ้าของสั่ง 18 ส.ค. 2569) แล้วต้องติดป้ายให้เห็นว่าเขาได้งานแล้ว
+   */
+  is_informed: boolean;
 };
 
 type Row = {
@@ -54,6 +60,7 @@ type Row = {
   priority_code: string | null;
   last_activity_at: Date | string | null;
   remarks: string | null;
+  is_inform: string | null;
 };
 
 const LIST_SQL = `
@@ -87,7 +94,8 @@ SELECT TOP (@limit)
     )))                    AS full_address,
     c.priority_code,
     c.last_activity_at,
-    c.remarks
+    c.remarks,
+    r.is_inform
 FROM dbo.ir_board_card AS c
 INNER JOIN dbo.ir_board_head   AS bh ON bh.board_id  = c.board_id
 INNER JOIN dbo.ir_board_column AS bc ON bc.column_id = c.column_id
@@ -248,5 +256,6 @@ export async function listBoardReadyCandidates(options?: {
     priority_code: clean(r.priority_code),
     last_activity_at: toIso(r.last_activity_at),
     remarks: clean(r.remarks),
+    is_informed: (r.is_inform || '').trim().toUpperCase() === 'Y',
   }));
 }

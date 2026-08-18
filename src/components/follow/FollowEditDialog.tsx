@@ -6,8 +6,8 @@ import { createFollowEntry, updateFollowEntry, type FollowEntry } from '@/lib/fo
 import { buildExtraRounds, extraRoundsNote } from '@/lib/followExtraRounds';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import StaffContactField from '@/components/follow/StaffContactField';
+import TopicField from '@/components/follow/TopicField';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
-import type { JobRequest } from '@/types';
 
 /**
  * แก้ไขรายการติดตาม (096 · เจ้าของสั่ง 17 ส.ค. 2569: *"เพิ่มให้แก้ไขได้"*)
@@ -28,16 +28,19 @@ import type { JobRequest } from '@/types';
  */
 export default function FollowEditDialog({
   entry,
-  openJobs,
+  unitOptions,
   siblings = [],
+  topicsRev,
   onClose,
   onSaved,
 }: {
   entry: FollowEntry | null;
-  /** ใบขอที่ยังเปิด — ตัวเลือกหน่วยงาน (โหลดไว้แล้วจากหน้าแม่) */
-  openJobs: JobRequest[];
+  /** ตัวเลือกหน่วยงานที่ merge แล้ว (โหลดไว้แล้วจากหน้าแม่ — ไม่ยิงเส้นซ้ำ) */
+  unitOptions: BoardUnitOption[];
   /** รอบอื่นของ "คนเดียวกัน" ที่ยังไม่ถูกยกเลิก — ใช้โชว์รอบที่มีอยู่ + กันตั้งเวลาซ้ำ */
   siblings?: FollowEntry[];
+  /** bump เมื่อกล่องจัดการเรื่องเพิ่มเรื่องใหม่ — dropdown เรื่องโหลดลิสต์ใหม่ */
+  topicsRev?: number;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -209,18 +212,10 @@ export default function FollowEditDialog({
               className="jarvis-soft-field min-h-[46px] w-full"
             />
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="feTopic" className="ml-1 text-xs font-medium text-muted-foreground">
-              เรื่องที่จะให้โทรติดตาม
-            </label>
-            <input
-              id="feTopic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              required
-              className="jarvis-soft-field min-h-[46px] w-full"
-            />
-          </div>
+          {/* dropdown เรื่องจากลิสต์กลาง (100) — ตัวเดียวกับฟอร์มเพิ่ม
+              ⚠️ แก้เรื่องแล้วกลุ่มการ์ดบนลิสต์เปลี่ยนตาม (จับกลุ่มด้วยเบอร์+เรื่อง)
+              และ `siblings` ของกล่องนี้ก็ผูกเรื่องเดิม — เปลี่ยนเรื่องคือแยกออกจากกลุ่มเดิม */}
+          <TopicField id="feTopic" value={topic} onChange={setTopic} reloadSignal={topicsRev} />
           <div className="space-y-1.5">
             <label htmlFor="feUnit" className="ml-1 text-xs font-medium text-muted-foreground">
               หน่วยงาน
@@ -434,7 +429,7 @@ export default function FollowEditDialog({
       <BoardUnitPicker
         open={unitPickerOpen}
         onClose={() => setUnitPickerOpen(false)}
-        jobs={openJobs}
+        units={unitOptions}
         onPick={(u: BoardUnitOption) => {
           setUnitName(u.unitName);
           setSiteCode(u.siteCode);

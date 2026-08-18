@@ -24,12 +24,33 @@ export async function listStaffContacts(): Promise<FollowStaffContact[]> {
   return data.items ?? [];
 }
 
+/**
+ * โหลดครั้งเดียวแล้วแชร์กัน — หน้าตั้งวันเวลามีช่องเบอร์ **ตัวละวัน** (ได้ถึง 31 ตัว)
+ * ถ้าแต่ละตัวยิงเอง = 31 request ต่อการเปิดฟอร์มครั้งเดียว
+ * ⚠️ ล้มเหลวต้องล้างแคช ไม่งั้นพลาดครั้งเดียวแล้วค้างพังตลอดอายุหน้า
+ */
+let cached: Promise<FollowStaffContact[]> | null = null;
+
+export function listStaffContactsCached(): Promise<FollowStaffContact[]> {
+  cached ??= listStaffContacts().catch((e) => {
+    cached = null;
+    throw e;
+  });
+  return cached;
+}
+
+/** เพิ่มชื่อใหม่แล้วแคชเก่าใช้ไม่ได้ — ช่องที่ mount ทีหลังต้องเห็นของใหม่ */
+export function invalidateStaffContactsCache(): void {
+  cached = null;
+}
+
 export async function createStaffContact(name: string, phone: string): Promise<FollowStaffContact> {
   const r = await apiFetch('/api/follow-staff-contacts', {
     method: 'POST',
     body: JSON.stringify({ name, phone }),
   });
   if (!r.ok) throw new Error(await readError(r));
+  invalidateStaffContactsCache();
   return (await r.json()) as FollowStaffContact;
 }
 

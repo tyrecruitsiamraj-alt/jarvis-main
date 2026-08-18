@@ -6,78 +6,56 @@ import {
   FOLLOW_OUTCOMES,
   FOLLOW_OUTCOME_HINT,
   FOLLOW_OUTCOME_LABEL,
-  requiresNote,
   type FollowOutcome,
 } from '@/lib/followOutcome';
 
 /**
- * ปิดงานติดตาม (migration 095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 7 ของงานคัดสรร:
- * *"เมื่อวันนั้น ๆ ไม่มีอะไรแล้วก็กดเสร็จสิ้น แต่ถ้าไม่ไปหรืออะไรให้กดว่า ยกเลิกงาน
- * ไม่ไปเริ่มงาน ลา อะไรต่าง ๆ ได้"*)
+ * ปิดงานติดตาม (migration 095 · ชุดคำใหม่ 101)
  *
- * ⚠️ **แยกจากปุ่ม "ยกเลิก" ที่มีอยู่เดิมโดยตั้งใจ** — ยกเลิก = ตัดสายทิ้งก่อนถึงวัน
- * (ไม่ต้องตามแล้ว) · ปิดงาน = ตามจนจบแล้ว บันทึกว่าจบแบบไหน · ยุบรวมเมื่อไหร่
- * สถิติต้นเหตุจะแยกไม่ออกว่า "ไม่ได้ตาม" กับ "ตามแล้วเขาไม่ไป" ต่างกันยังไง
+ * เจ้าของสั่ง 18 ส.ค. 2569: *"เหลือไว้แค่ปุ่ม เสร็จสิ้น แก้ไข ยกเลิก ปุ่มเสร็จสิ้น
+ * เมื่อกดแล้วมีให้เลือกว่าเสร็จสิ้นเพราะไปแล้ว ถึงแล้ว หรือ ยกเลิก ลา เลื่อน"*
  *
- * กดปุ่มเดียวจบสำหรับเคสปกติ (เสร็จสิ้น) · เคสอื่นค่อยกางตัวเลือก — คนส่วนใหญ่
- * กดเสร็จสิ้น ไม่ควรต้องเลือกจากลิสต์ทุกครั้ง
+ * → **ปุ่มเดียว** ("เสร็จสิ้น") แล้วกางให้เลือก 5 คำ · ปุ่ม "เหตุอื่น…" ถูกถอดออก
+ * ⚠️ เดิมกด "เสร็จสิ้น" = ปิดงานทันทีด้วยค่า `done` โดยไม่ถามอะไร — ตอนนี้ **ไม่ปิดทันที**
+ * อีกแล้ว ต้องเลือกคำก่อนเสมอ (เจ้าของต้องการรู้ว่า "ไปแล้ว" กับ "ถึงแล้ว" ต่างกัน)
+ *
+ * ⚠️ **แยกจากปุ่ม "ยกเลิก" ที่อยู่ข้าง ๆ โดยตั้งใจ** — ปุ่มยกเลิก = ตัดสายทิ้งก่อนถึงวัน
+ * (ไม่ต้องตามแล้ว · ไปแตะคิว Lumos) · คำ "ยกเลิก" ในนี้ = ตามจนจบแล้วและงานถูกยกเลิก
+ * ยุบรวมเมื่อไหร่ สถิติต้นเหตุจะแยกไม่ออกว่า "ไม่ได้ตาม" กับ "ตามแล้วเขาไม่ไป" ต่างกันยังไง
  */
 const FollowCompleteControls: React.FC<{
   busy?: boolean;
   onComplete: (outcome: FollowOutcome, note?: string) => void | Promise<void>;
 }> = ({ busy = false, onComplete }) => {
   const [open, setOpen] = useState(false);
-  const [picked, setPicked] = useState<FollowOutcome | null>(null);
   const [note, setNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const submit = async (outcome: FollowOutcome) => {
-    if (requiresNote(outcome) && !note.trim()) {
-      setPicked(outcome);
-      setError('เลือก "อื่น ๆ" ต้องใส่หมายเหตุด้วย');
-      return;
-    }
-    setError(null);
     await onComplete(outcome, note.trim() || undefined);
     setOpen(false);
-    setPicked(null);
     setNote('');
   };
 
   if (!open) {
     return (
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void submit('done')}
-          className={cn(
-            'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
-            TONE.success.outline,
-          )}
-        >
-          <CheckCircle2 className="h-3 w-3" aria-hidden />
-          {busy ? 'กำลังบันทึก…' : 'เสร็จสิ้น'}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setOpen(true)}
-          title="จบด้วยเหตุอื่น — ยกเลิกงาน / ไม่ไปเริ่มงาน / ลา"
-          className={cn(
-            'inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-50',
-            TONE.neutral.outline,
-          )}
-        >
-          เหตุอื่น…
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => setOpen(true)}
+        className={cn(
+          'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
+          TONE.success.outline,
+        )}
+      >
+        <CheckCircle2 className="h-3 w-3" aria-hidden />
+        {busy ? 'กำลังบันทึก…' : 'เสร็จสิ้น'}
+      </button>
     );
   }
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-xl border border-border/70 bg-muted/30 p-2.5">
-      <p className="text-[11px] font-semibold text-foreground">ปิดงานนี้แบบไหน</p>
+      <p className="text-[11px] font-semibold text-foreground">ปิดงานนี้เพราะอะไร</p>
       <div className="flex flex-wrap gap-1.5">
         {FOLLOW_OUTCOMES.map((o) => (
           <button
@@ -85,54 +63,38 @@ const FollowCompleteControls: React.FC<{
             type="button"
             disabled={busy}
             title={FOLLOW_OUTCOME_HINT[o]}
-            onClick={() => (requiresNote(o) ? setPicked(o) : void submit(o))}
+            onClick={() => void submit(o)}
             className={cn(
               'inline-flex min-h-[32px] items-center rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-50',
-              picked === o ? TONE.info.solid : TONE.neutral.outline,
+              TONE.neutral.outline,
             )}
           >
             {FOLLOW_OUTCOME_LABEL[o]}
           </button>
         ))}
       </div>
+      {/* หมายเหตุไม่บังคับแล้ว (ชุดใหม่ไม่มี "อื่น ๆ") — พิมพ์ก่อนกดคำ เดี๋ยวเก็บไปด้วย */}
       <input
         type="text"
         value={note}
         maxLength={300}
         onChange={(e) => setNote(e.target.value)}
-        placeholder="หมายเหตุ (บังคับเมื่อเลือก “อื่น ๆ”)"
+        placeholder="หมายเหตุ (ถ้ามี) — พิมพ์ก่อนกดคำด้านบน"
         className="min-h-[36px] rounded-lg border border-border bg-background px-2.5 text-[12px]"
       />
-      {error ? <p className="text-[11px] font-medium text-red-600 dark:text-red-400">{error}</p> : null}
-      <div className="flex gap-1.5">
-        {picked ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void submit(picked)}
-            className={cn(
-              'inline-flex min-h-[32px] items-center rounded-full px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
-              TONE.success.solid,
-            )}
-          >
-            {busy ? 'กำลังบันทึก…' : `ยืนยัน: ${FOLLOW_OUTCOME_LABEL[picked]}`}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setPicked(null);
-            setError(null);
-          }}
-          className={cn(
-            'inline-flex min-h-[32px] items-center rounded-full border px-3 py-1 text-[11px] font-medium',
-            TONE.neutral.outline,
-          )}
-        >
-          ปิด
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(false);
+          setNote('');
+        }}
+        className={cn(
+          'inline-flex min-h-[32px] w-fit items-center rounded-full border px-3 py-1 text-[11px] font-medium',
+          TONE.neutral.outline,
+        )}
+      >
+        ปิด
+      </button>
     </div>
   );
 };

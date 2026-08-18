@@ -30,7 +30,7 @@ import {
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { toE164Thai } from '../_lib/lumosDispatch.js';
 import {
-  FOLLOW_OUTCOMES,
+  FOLLOW_OUTCOME_ALL,
   isFollowOutcome,
   requiresNote,
 } from '../../src/lib/followOutcome.js';
@@ -340,7 +340,7 @@ async function completeFollow(req: AuthedReq, res: ApiRes, body: Record<string, 
   if (!isFollowOutcome(outcome)) {
     return sendError(
       res, 400, 'Bad request',
-      `ผลปิดงานต้องเป็นค่าใดค่าหนึ่ง: ${FOLLOW_OUTCOMES.join(', ')}`,
+      `ผลปิดงานต้องเป็นค่าใดค่าหนึ่ง: ${FOLLOW_OUTCOME_ALL.join(', ')}`,
     );
   }
   // 'อื่น ๆ' ที่ไม่มีคำอธิบาย = เก็บไปก็ตอบอะไรไม่ได้ (กติกาเดียวกับ requiresNote ฝั่งหน้าเว็บ)

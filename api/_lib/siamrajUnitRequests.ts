@@ -19,6 +19,7 @@ import {
 } from './siamrajSqlServerPrequests.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
+import { listSiamrajSqlServerUnits } from './siamrajSqlServerUnits.js';
 import { jobAllowedByDepartmentScope, loadUserDepartmentScope } from './departmentScope.js';
 import type { DepartmentScope } from './departmentScope.js';
 import type { UserRole } from './auth.js';
@@ -418,6 +419,21 @@ export async function listSiamrajResignationUnitRanking(options: {
   const source = getSiamrajDbSource();
   if (source === 'sqlserver') {
     return listResignationUnitRanking(options);
+  }
+  return [];
+}
+
+/**
+ * รายชื่อ **หน่วยงานทั้งชุด** สำหรับกล่องเลือกหน่วยงานของหน้า Follow (18 ส.ค. 2569)
+ * — [] เมื่อไม่ได้ต่อ SQL Server (กล่องจะถอยไปใช้ชุดจากใบขอเปิดเหมือนเดิม)
+ */
+export async function listSiamrajUnits(options: {
+  sinceYear?: number;
+  departmentScope?: DepartmentScope;
+}) {
+  const source = getSiamrajDbSource();
+  if (source === 'sqlserver') {
+    return listSiamrajSqlServerUnits(options);
   }
   return [];
 }

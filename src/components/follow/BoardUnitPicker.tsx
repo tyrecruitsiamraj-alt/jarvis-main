@@ -1,9 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  buildBoardUnitOptions,
-  filterBoardUnits,
-  type BoardUnitOption,
-} from '@/lib/boardUnitPicker';
+import { filterBoardUnits, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import {
   Dialog,
   DialogContent,
@@ -13,26 +9,26 @@ import {
 } from '@/components/ui/dialog';
 import SearchField from '@/components/shared/SearchField';
 import { Building2 } from 'lucide-react';
-import type { JobRequest } from '@/types';
 
 /**
  * เลือก **หน่วยงานจากบอร์ด** — คู่แฝดของ `BoardPersonPicker`
  * (เจ้าของสั่ง 18 ส.ค. 2569: *"หน่วยงานก็ทำเหมือนปุ่มเลือกชื่อจากบอร์ด"*)
  *
- * ใช้ใบขอเปิดชุดเดียวกับที่ฟอร์มโหลดไว้อยู่แล้ว — ไม่ยิงเส้นใหม่
- * ตรรกะยุบ/ค้นอยู่ที่ `boardUnitPicker.ts` (pure + เทสต์) ที่เดียว
+ * 18 ส.ค. 2569 (ค่ำ-2): เจ้าของแจ้งว่า *"ขึ้นไม่ครบทุกหน่วยงาน"* — เดิมยุบจากใบขอ
+ * ที่ยังเปิดเท่านั้น (152 หน่วยงาน) · ตอนนี้หน้าแม่ **รวมกับหน่วยงานทั้งชุดตั้งแต่ปี 2567**
+ * (~1,054) มาให้แล้ว component นี้จึงรับ `units` ที่ merge เสร็จตรง ๆ
+ * ตรรกะยุบ/รวม/ค้นอยู่ที่ `boardUnitPicker.ts` (pure + เทสต์) ที่เดียว
  */
 export type BoardUnitPickerProps = {
   open: boolean;
   onClose: () => void;
-  /** ใบขอที่ยังเปิด (ชุดเดียวกับ dropdown เดิม) */
-  jobs: JobRequest[];
+  /** หน่วยงานที่ merge เสร็จแล้วจากหน้าแม่ (ใบขอเปิด + หน่วยงานทั้งชุด) */
+  units: BoardUnitOption[];
   onPick: (unit: BoardUnitOption) => void;
 };
 
-const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, jobs, onPick }) => {
+const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, units, onPick }) => {
   const [query, setQuery] = useState('');
-  const units = useMemo(() => buildBoardUnitOptions(jobs), [jobs]);
   const shown = useMemo(() => filterBoardUnits(units, query), [units, query]);
 
   return (
@@ -43,7 +39,8 @@ const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, jobs, 
             <Building2 className="h-4 w-4" /> เลือกหน่วยงานจากบอร์ด
           </DialogTitle>
           <DialogDescription>
-            หน่วยงานที่ยังมีใบขอเปิดอยู่ — กดเพื่อเติมชื่อหน่วยงานและรหัสไซต์ลงฟอร์ม
+            ทุกหน่วยงานที่มีใบขอตั้งแต่ปี 2567 — กดเพื่อเติมชื่อหน่วยงานและรหัสไซต์ลงฟอร์ม
+            (หน่วยงานที่ยังมีใบขอเปิดอยู่ขึ้นก่อน)
           </DialogDescription>
         </DialogHeader>
 
@@ -56,7 +53,7 @@ const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, jobs, 
 
         {units.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            ยังโหลดใบขอไม่ได้ — ปิดหน้าต่างนี้แล้วพิมพ์ชื่อหน่วยงานเองได้
+            ยังโหลดหน่วยงานไม่ได้ — ปิดหน้าต่างนี้แล้วพิมพ์ชื่อหน่วยงานเองได้
           </p>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -75,16 +72,25 @@ const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, jobs, 
                     >
                       <span className="font-semibold text-foreground">{u.unitName}</span>
                       <span className="font-mono text-muted-foreground">{u.siteCode}</span>
-                      <span className="jarvis-chip jarvis-chip-info">
-                        ใบขอเปิด {u.openRequests.toLocaleString('th-TH')}
-                      </span>
+                      {u.openRequests > 0 ? (
+                        <span className="jarvis-chip jarvis-chip-info">
+                          ใบขอเปิด {u.openRequests.toLocaleString('th-TH')}
+                        </span>
+                      ) : (
+                        // ไม่มีใบขอเปิด = หน่วยงานที่ปิดใบไปแล้ว (ยังต้องตามคนที่ลงงานไป)
+                        <span className="jarvis-chip jarvis-chip-neutral">ไม่มีใบขอเปิด</span>
+                      )}
                       {u.remainingPositions > 0 ? (
                         <span className="jarvis-chip jarvis-chip-warn">
                           ยังต้องหา {u.remainingPositions.toLocaleString('th-TH')}
                         </span>
                       ) : null}
                       <span className="w-full text-[11px] text-muted-foreground">
-                        {[u.roles.join(' · '), u.sampleRequestNo ? `เช่น ${u.sampleRequestNo}` : null]
+                        {[
+                          u.roles.length > 0 ? u.roles.join(' · ') : null,
+                          u.sampleRequestNo ? `เช่น ${u.sampleRequestNo}` : null,
+                          u.lastRequestDate ? `ใบขอล่าสุด ${u.lastRequestDate}` : null,
+                        ]
                           .filter(Boolean)
                           .join(' — ') || 'ไม่ระบุตำแหน่ง'}
                       </span>

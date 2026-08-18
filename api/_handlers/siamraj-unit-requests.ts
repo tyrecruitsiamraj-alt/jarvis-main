@@ -10,6 +10,7 @@ import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
   listSiamrajThroughput,
+  listSiamrajUnits,
   listSiamrajClosedRequests,
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
@@ -162,6 +163,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
       await attachNotes([item]);
       await attachWorkStatus([item]);
       return res.status(200).json(item);
+    }
+
+    /**
+     * `?units=1` — รายชื่อหน่วยงานทั้งชุด (read-only) สำหรับกล่องเลือกหน่วยงานหน้า Follow
+     * เจ้าของแจ้ง 18 ส.ค. 2569 ว่ากล่องเดิม "ขึ้นไม่ครบ" เพราะยุบมาจากใบขอที่ยังเปิด
+     * เท่านั้น (152 หน่วยงาน) · ชุดนี้เอาทุกหน่วยงานที่มีใบขอตั้งแต่ปี 2567 (~1,054)
+     * ⚠️ ผูก department scope เหมือนเส้นใบขอ — ห้ามให้คน BU หนึ่งเห็นชื่อลูกค้าของ BU อื่น
+     * ⚠️ ไม่เพิ่ม route ใหม่ (โหมดบนเส้นเดิม) — แพตเทิร์นเดียวกับ ?throughput=1 / ?closed=1
+     */
+    if (getQuery(req, 'units') === '1') {
+      const sinceYear = Number(getQuery(req, 'since') || '2024');
+      const units = await listSiamrajUnits({
+        sinceYear: Number.isFinite(sinceYear) ? sinceYear : 2024,
+        departmentScope,
+      });
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ items: units, total: units.length });
     }
 
     if (getQuery(req, 'throughput') === '1') {

@@ -32,6 +32,7 @@ export type ApiResource =
   | 'training-records'
   | 'follow'
   | 'follow-staff-contacts'
+  | 'follow-topics'
   | 'job-staff'
   | 'app-users'
   | 'app-nav-preferences'
@@ -116,8 +117,9 @@ export function minimumRoleFor(
       return 'staff';
 
     case 'follow-staff-contacts':
-      // อ่านได้ทุกคน (dropdown เบอร์เจ้าหน้าที่บนหน้า Follow ใช้)
-      // เพิ่มชื่อ/เบอร์ใหม่เฉพาะหัวหน้างานขึ้นไป (เจ้าของสั่ง 18 ส.ค. 2569)
+    case 'follow-topics':
+      // อ่านได้ทุกคน (dropdown เบอร์เจ้าหน้าที่ / เรื่องที่จะให้โทรติดตาม บนหน้า Follow ใช้)
+      // เพิ่มค่าใหม่เฉพาะหัวหน้างานขึ้นไป (เจ้าของสั่ง 18 ส.ค. 2569)
       if (isRead) return 'staff';
       return 'supervisor';
 

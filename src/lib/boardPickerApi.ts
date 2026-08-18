@@ -4,7 +4,10 @@ import { apiFetch } from '@/lib/apiFetch';
  * รายชื่อจากบอร์ด ERP สำหรับ **ตั้งตารางโทรตาม** ในหน้า Follow (F5b · 16 ส.ค. 2569)
  *
  * ขอบเขตที่เจ้าของกำหนด: ทุกถัง **ยกเว้น Checklist** (คนยังสมัครไม่เสร็จ = งานเลนสรรหา)
- * และตัดคนที่ **แจ้งเข้าแล้ว** (`is_inform='Y'` — ได้งานแล้ว ไม่ต้องตามอีก) · server กรองให้
+ *
+ * 🔴 18 ส.ค. 2569 (ค่ำ-2): **เอาคนที่แจ้งเข้าแล้วกลับเข้ากล่อง** (เจ้าของสั่ง) —
+ * เดิม server ตัดทิ้งทำให้ถัง Done เหลือ 51 จาก 235 คน ซึ่งคนกลุ่มนั้นคือกลุ่มที่ต้องตาม
+ * เรื่องเริ่มงาน/เรียนงาน/เบิกเบี้ยเลี้ยงพอดี · ตอนนี้มาครบแล้วและติดป้าย `is_informed`
  */
 export type BoardPickerPerson = {
   card_id: number;
@@ -18,6 +21,8 @@ export type BoardPickerPerson = {
   area: string | null;
   column_label: string | null;
   last_activity_at: string | null;
+  /** แจ้งเข้าแล้ว = ได้งานแล้ว — ป้ายเตือนบนลิสต์ ไม่ใช่เงื่อนไขกรองออกอีกแล้ว */
+  is_informed?: boolean;
 };
 
 export async function listBoardPickerPeople(): Promise<BoardPickerPerson[]> {
@@ -51,6 +56,7 @@ export function pickerSearchBlob(p: BoardPickerPerson): string {
     p.area,
     p.mobile,
     p.column_label,
+    p.is_informed ? 'แจ้งเข้าแล้ว' : null,
   ]
     .filter(Boolean)
     .join(' ')

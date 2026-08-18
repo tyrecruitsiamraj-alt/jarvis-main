@@ -229,3 +229,34 @@ export async function fetchUnitEditLog(
   const data = await readJsonSafe<{ items?: import('@/lib/unitEditLog').UnitEditLogItem[] }>(r);
   return Array.isArray(data.items) ? data.items : [];
 }
+
+/**
+ * รายชื่อ **หน่วยงานทั้งชุด** (ตั้งแต่ปี 2567) — กล่องเลือกหน่วยงานของหน้า Follow
+ * เจ้าของแจ้ง 18 ส.ค. 2569 ว่ากล่องเดิมขึ้นไม่ครบเพราะยุบมาจากใบขอที่ยังเปิดเท่านั้น
+ * โหลดพัง = คืน [] แล้วกล่องถอยไปใช้ชุดจากใบขอเปิดเหมือนเดิม (ห้ามบล็อกงาน)
+ */
+export async function fetchAllUnitOptions(): Promise<import('@/lib/boardUnitPicker').BoardUnitOption[]> {
+  const r = await apiFetch('/api/siamraj/unit-requests?units=1', { cache: 'no-store' });
+  if (!r.ok) return [];
+  const data = await readJsonSafe<{
+    items?: Array<{
+      siteCode: string;
+      unitName: string;
+      openRequests: number;
+      totalRequests: number;
+      lastRequestDate: string | null;
+      sampleRequestNo: string | null;
+    }>;
+  }>(r);
+  return (data.items ?? []).map((u) => ({
+    siteCode: u.siteCode,
+    unitName: u.unitName,
+    openRequests: Number(u.openRequests) || 0,
+    // ชุดนี้ไม่มีรายละเอียดอัตรา/ตำแหน่ง — ตัวที่มีใบขอเปิดจะถูกทับด้วยชุดละเอียดตอน merge
+    remainingPositions: 0,
+    sampleRequestNo: u.sampleRequestNo,
+    roles: [],
+    totalRequests: Number(u.totalRequests) || 0,
+    lastRequestDate: u.lastRequestDate,
+  }));
+}
