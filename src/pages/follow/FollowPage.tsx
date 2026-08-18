@@ -24,6 +24,7 @@ import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
+import { groupFollowEntries } from '@/lib/followGrouping';
 import {
   firstIncompleteStep,
   followStepError,
@@ -39,6 +40,7 @@ import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/fol
 import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
+import StaffContactField from '@/components/follow/StaffContactField';
 
 
 function formatWhen(iso: string | null): string {
@@ -511,6 +513,12 @@ const FollowPage: React.FC = () => {
     [items, filter],
   );
 
+  /**
+   * การ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: คนเดียวหลายรอบแตกหลายแถว "งงตาย")
+   * จับกลุ่มเบอร์+เรื่อง — ตรรกะอยู่ที่ `followGrouping.ts` (pure + เทสต์) ที่เดียว
+   */
+  const groups = useMemo(() => groupFollowEntries(filtered), [filtered]);
+
   const counts = useMemo(() => {
     const pending = items.filter((i) => i.call_status === 'pending').length;
     const done = items.filter((i) => i.call_status === 'completed').length;
@@ -801,23 +809,10 @@ const FollowPage: React.FC = () => {
 
             {/* เจ้าของสั่ง 13 ส.ค. 2569: เปลี่ยนช่อง "รายละเอียดเพิ่มเติม" เป็นเบอร์เจ้าหน้าที่
                 — ผู้สมัครที่รับสายจาก AI ต้องมีเบอร์คนจริงให้โทรกลับ
-                ⚠️ เก็บเป็นคอลัมน์ใหม่ (staff_phone) ไม่ทับ note เดิมซึ่งคนละความหมาย */}
-            <div className="space-y-1.5">
-              <label htmlFor="followStaffPhone" className="ml-1 text-xs font-medium text-muted-foreground">
-                เบอร์โทรเจ้าหน้าที่ที่ติดตาม (ถ้ามี)
-              </label>
-              <input
-                id="followStaffPhone"
-                value={staffPhone}
-                onChange={(e) => setStaffPhone(e.target.value)}
-                inputMode="tel"
-                placeholder="เบอร์ที่ให้ผู้สมัครโทรกลับ เช่น 021234567 ต่อ 101"
-                className="jarvis-soft-field min-h-[46px]"
-              />
-              <p className="ml-1 text-[10px] text-muted-foreground">
-                AI จะบอกเบอร์นี้ตอนท้ายสาย — ไม่ใช่เบอร์ที่ระบบใช้โทรออก
-              </p>
-            </div>
+                ⚠️ เก็บเป็นคอลัมน์ใหม่ (staff_phone) ไม่ทับ note เดิมซึ่งคนละความหมาย
+                18 ส.ค. 2569 (ค่ำ): เปลี่ยนเป็น dropdown ชื่อ+เบอร์จากรายชื่อกลาง (099)
+                — ค่าที่เก็บยังเป็นเบอร์อย่างเดียวเหมือนเดิม ไม่แตะ schema ของ follow_entries */}
+            <StaffContactField id="followStaffPhone" value={staffPhone} onChange={setStaffPhone} />
 
             </>
             ) : null}
@@ -1110,153 +1105,183 @@ const FollowPage: React.FC = () => {
             ) : null}
           </div>
         ) : (
+          /* การ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: *"งงตาย"* กับคนเดียวหลายแถว)
+             หัวการ์ด = สรุป (รอบถัดไป · วันนี้ครั้งที่เท่าไหร่ · หน่วยงาน · ใครคีย์)
+             ข้างใน = ทุกรอบพร้อมสถานะ + ปุ่มของแต่ละรอบ (แก้ไข/ปิดงาน/ยกเลิก ตามเงื่อนไขเดิม)
+             ⚠️ "เริ่มงานวันไหน" ไม่มีฟิลด์เก็บ — ตั้งใจไม่โชว์ (รอเจ้าของเคาะว่าจะเพิ่มฟิลด์ไหม) */
           <div className="space-y-2.5">
-            {filtered.map((it) => (
-              // แถบสีซ้าย 4px บอกสถานะทันทีแบบการ์ด Matching (mockup rev.3 ข้อ 08)
-              <div
-                key={it.id}
-                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 pl-4 pr-3.5 py-3 dark:border-slate-700/70"
-              >
-                <span
-                  aria-hidden
-                  className={cn('absolute left-0 top-0 bottom-0 w-1', FOLLOW_STATUS_BAR[it.call_status])}
-                />
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <NameAvatar name={it.recipient_name} />
-                      <span className="font-bold text-foreground">{it.recipient_name}</span>
-                      {it.next_action?.urgency === 'urgent' ? (
-                        <span
-                          title={it.next_action.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
-                        >
-                          📞 โทรกลับด่วน
-                        </span>
+            {groups.map((g) => {
+              const barStatus =
+                g.nextRound?.call_status ??
+                g.rounds.find((r) => !r.cancelled)?.call_status ??
+                g.rounds[0]?.call_status ??
+                'pending';
+              const urgent = g.rounds.find((r) => r.next_action?.urgency === 'urgent');
+              return (
+                <div
+                  key={g.key}
+                  className="glass-card relative overflow-hidden rounded-2xl border border-white/70 pl-4 pr-3.5 py-3 dark:border-slate-700/70"
+                >
+                  <span
+                    aria-hidden
+                    className={cn('absolute left-0 top-0 bottom-0 w-1', FOLLOW_STATUS_BAR[barStatus])}
+                  />
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <NameAvatar name={g.name} />
+                        <span className="font-bold text-foreground">{g.name}</span>
+                        {urgent ? (
+                          <span
+                            title={urgent.next_action?.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
+                            className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
+                          >
+                            📞 โทรกลับด่วน
+                          </span>
+                        ) : null}
+                        {g.todayOrdinal != null ? (
+                          <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
+                            วันนี้เป็นการติดตามครั้งที่ {g.todayOrdinal}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm text-foreground">{g.topic}</p>
+                      {/* สรุปที่เจ้าของขอ: โทรวันไหนกี่โมง (รอบถัดไป) · หน่วยงาน · ใครคีย์ */}
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {g.nextRound
+                          ? `รอบถัดไป โทร ${formatWhen(g.nextRound.scheduled_at)}`
+                          : 'ไม่มีนัดโทรข้างหน้าแล้ว'}
+                        {` · ติดตาม ${g.activeCount.toLocaleString('th-TH')} รอบ`}
+                        {g.createdByName ? ` · คนคีย์ ${g.createdByName}` : ''}
+                      </p>
+                      {g.unitName || g.siteCode ? (
+                        <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <Building2 className="h-3 w-3 shrink-0" aria-hidden />
+                          <span className="font-medium text-foreground">{g.unitName || '—'}</span>
+                          {g.siteCode ? <span className="font-mono">({g.siteCode})</span> : null}
+                        </p>
                       ) : null}
-                      <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
-                        {FOLLOW_STATUS_LABEL[it.call_status]}
-                      </span>
-                      {/* ปิดงานแล้ว (095) — ป้ายแยกจากสถานะการโทร เพราะคนละเรื่อง:
-                          สถานะโทร = AI ไปถึงไหน · ป้ายนี้ = เจ้าหน้าที่สรุปว่าจบแบบไหน */}
-                      {it.completed_at && it.outcome_code ? (
-                        <span
-                          title={it.outcome_note || undefined}
-                          className={cn(
-                            'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                            TONE.success.chip,
-                          )}
-                        >
-                          ปิดงาน:{' '}
-                          {FOLLOW_OUTCOME_LABEL[it.outcome_code as FollowOutcome] ?? it.outcome_code}
-                        </span>
+                      {urgent?.next_action?.reason ? (
+                        <p className="mt-1 rounded-lg border border-red-200 bg-red-50/70 px-2.5 py-1 text-[11px] font-medium text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300">
+                          AI แนะนำ: {urgent.next_action.reason}
+                          {urgent.next_action.due_at ? ` · ภายใน ${formatWhen(urgent.next_action.due_at)}` : ''}
+                        </p>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm text-foreground">{it.topic}</p>
-                    {it.note ? <p className="text-xs text-muted-foreground">{it.note}</p> : null}
-                    {/* หน่วยงาน + รหัสไซต์ (096) — ไม่ได้ระบุ = ไม่ขึ้นบรรทัดนี้ ห้ามขึ้นว่า "ไม่ระบุ" */}
-                    {it.unit_name || it.site_code ? (
-                      <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <Building2 className="h-3 w-3 shrink-0" aria-hidden />
-                        <span className="font-medium text-foreground">{it.unit_name || '—'}</span>
-                        {it.site_code ? (
-                          <span className="font-mono">({it.site_code})</span>
-                        ) : null}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      ให้โทร {formatWhen(it.scheduled_at)}
-                      {/* เจ้าของข้อมูล = คนที่กรอกครั้งแรก (เจ้าของสั่ง 17 ส.ค. 2569)
-                          คนแก้ทีหลังโชว์แยก ไม่ทับกัน */}
-                      {it.created_by_name ? ` · เจ้าของข้อมูล ${it.created_by_name}` : ''}
-                      {it.updated_by_name ? ` · แก้ล่าสุดโดย ${it.updated_by_name}` : ''}
-                      {/* เบอร์ที่ AI บอกให้ผู้สมัครโทรกลับ — ต้องเห็นได้ในรายการ
-                          ไม่งั้นเจ้าหน้าที่ตอบไม่ได้ว่าสายที่โทรเข้ามาบอกเบอร์ใครไป */}
-                      {it.staff_phone ? ` · โทรกลับ ${it.staff_phone}` : ''}
-                    </p>
-                    {it.call_outcome || it.call_summary ? (
-                      <p className="mt-1.5 rounded-lg bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700">
-                        ผลการโทร{it.call_outcome ? ` (${it.call_outcome})` : ''}
-                        {it.call_summary ? `: ${it.call_summary}` : ''}
-                        {it.called_at ? ` · ${formatWhen(it.called_at)}` : ''}
-                      </p>
-                    ) : null}
-                    {it.next_action?.urgency === 'urgent' && it.next_action.reason ? (
-                      <p className="mt-1 rounded-lg border border-red-200 bg-red-50/70 px-2.5 py-1 text-[11px] font-medium text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300">
-                        AI แนะนำ: {it.next_action.reason}
-                        {it.next_action.due_at ? ` · ภายใน ${formatWhen(it.next_action.due_at)}` : ''}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
                     <a
-                      href={`tel:${it.recipient_phone}`}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-950"
+                      href={`tel:${g.phone}`}
+                      className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-950"
                     >
                       <Phone className="h-3 w-3" aria-hidden />
-                      {it.recipient_phone}
+                      {g.phone}
                     </a>
-                    {/* ปิดงาน (095) — โผล่เมื่อยังไม่ปิดและยังไม่ถูกยกเลิก
-                        ⚠️ ไม่ผูกกับ call_status: ตามจนจบด้วยตัวเองโดยที่ AI ยังไม่ได้โทร
-                        ก็ต้องปิดได้ (ปุ่มยกเลิกข้างล่างผูกกับ pending เพราะมันไปแตะคิว) */}
-                    {/* แก้ไข (096) — เฉพาะรายการที่ยังไม่ปิด/ยกเลิก (server กันอีกชั้น) */}
-                    {!it.cancelled && !it.completed_at ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(it)}
-                        title="แก้ไขรายการนี้"
+                  </div>
+
+                  {/* ติดตามวันไหนบ้าง — ทุกรอบ+สถานะ · ปุ่มของแต่ละรอบเงื่อนไขเดิมทุกอย่าง */}
+                  <ul className="mt-2 space-y-1.5">
+                    {g.rounds.map((it) => (
+                      <li
+                        key={it.id}
                         className={cn(
-                          'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
-                          TONE.neutral.outline,
+                          'rounded-xl bg-white/60 px-2.5 py-2 dark:bg-white/5',
+                          it.cancelled && 'opacity-60',
                         )}
                       >
-                        <Pencil className="h-3 w-3" aria-hidden />
-                        แก้ไข
-                      </button>
-                    ) : null}
-                    {!it.cancelled && !it.completed_at ? (
-                      <FollowCompleteControls
-                        busy={busyId === it.id}
-                        onComplete={(outcome, note) => doComplete(it.id, outcome, note)}
-                      />
-                    ) : null}
-                    {!it.cancelled && it.call_status === 'pending' && !it.completed_at ? (
-                      cancellingId === it.id ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={busyId === it.id}
-                            onClick={() => void doCancel(it.id)}
-                            className="inline-flex min-h-[36px] items-center rounded-full bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                          >
-                            {busyId === it.id ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCancellingId(null)}
-                            className={cn(
-                              'inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium',
-                              TONE.neutral.outline,
-                            )}
-                          >
-                            ไม่
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setCancellingId(it.id)}
-                          className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
-                        >
-                          <X className="h-3 w-3" aria-hidden />
-                          ยกเลิก
-                        </button>
-                      )
-                    ) : null}
-                  </div>
+                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
+                            <span className="font-medium text-foreground">{formatWhen(it.scheduled_at)}</span>
+                            <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
+                              {FOLLOW_STATUS_LABEL[it.call_status]}
+                            </span>
+                            {/* ปิดงานแล้ว (095) — ป้ายแยกจากสถานะโทร: สถานะโทร = AI ไปถึงไหน
+                                · ป้ายนี้ = เจ้าหน้าที่สรุปว่าจบแบบไหน */}
+                            {it.completed_at && it.outcome_code ? (
+                              <span
+                                title={it.outcome_note || undefined}
+                                className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.success.chip)}
+                              >
+                                ปิดงาน: {FOLLOW_OUTCOME_LABEL[it.outcome_code as FollowOutcome] ?? it.outcome_code}
+                              </span>
+                            ) : null}
+                            {it.staff_phone ? (
+                              <span className="text-muted-foreground">โทรกลับ {it.staff_phone}</span>
+                            ) : null}
+                            {it.updated_by_name ? (
+                              <span className="text-muted-foreground">แก้ล่าสุดโดย {it.updated_by_name}</span>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {/* แก้ไข (096) — เฉพาะรอบที่ยังไม่ปิด/ยกเลิก (server กันอีกชั้น) */}
+                            {!it.cancelled && !it.completed_at ? (
+                              <button
+                                type="button"
+                                onClick={() => setEditing(it)}
+                                title="แก้ไขรอบนี้"
+                                className={cn(
+                                  'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
+                                  TONE.neutral.outline,
+                                )}
+                              >
+                                <Pencil className="h-3 w-3" aria-hidden />
+                                แก้ไข
+                              </button>
+                            ) : null}
+                            {/* ปิดงาน (095) — ไม่ผูกกับ call_status: ตามจนจบเองโดย AI ยังไม่โทรก็ปิดได้ */}
+                            {!it.cancelled && !it.completed_at ? (
+                              <FollowCompleteControls
+                                busy={busyId === it.id}
+                                onComplete={(outcome, note) => doComplete(it.id, outcome, note)}
+                              />
+                            ) : null}
+                            {!it.cancelled && it.call_status === 'pending' && !it.completed_at ? (
+                              cancellingId === it.id ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={busyId === it.id}
+                                    onClick={() => void doCancel(it.id)}
+                                    className="inline-flex min-h-[36px] items-center rounded-full bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                  >
+                                    {busyId === it.id ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCancellingId(null)}
+                                    className={cn(
+                                      'inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium',
+                                      TONE.neutral.outline,
+                                    )}
+                                  >
+                                    ไม่
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancellingId(it.id)}
+                                  className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
+                                >
+                                  <X className="h-3 w-3" aria-hidden />
+                                  ยกเลิก
+                                </button>
+                              )
+                            ) : null}
+                          </div>
+                        </div>
+                        {it.note ? <p className="mt-1 text-[11px] text-muted-foreground">{it.note}</p> : null}
+                        {it.call_outcome || it.call_summary ? (
+                          <p className="mt-1 rounded-lg bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                            ผลการโทร{it.call_outcome ? ` (${it.call_outcome})` : ''}
+                            {it.call_summary ? `: ${it.call_summary}` : ''}
+                            {it.called_at ? ` · ${formatWhen(it.called_at)}` : ''}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

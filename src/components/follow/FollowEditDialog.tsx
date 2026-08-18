@@ -4,7 +4,9 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { createFollowEntry, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
 import { buildExtraRounds, extraRoundsNote } from '@/lib/followExtraRounds';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
+import StaffContactField from '@/components/follow/StaffContactField';
+import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 import type { JobRequest } from '@/types';
 
 /**
@@ -51,6 +53,8 @@ export default function FollowEditDialog({
   const [error, setError] = useState<string | null>(null);
   /** ช่องเวลาของ "รอบที่จะเพิ่ม" — ว่างอยู่ = ยังไม่เพิ่ม */
   const [extraWhen, setExtraWhen] = useState<string[]>([]);
+  /** ตัวเลือกหน่วยงานจากบอร์ด — ชุดเดียวกับฟอร์มเพิ่ม (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ) */
+  const [unitPickerOpen, setUnitPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!entry) return;
@@ -221,59 +225,58 @@ export default function FollowEditDialog({
             <label htmlFor="feUnit" className="ml-1 text-xs font-medium text-muted-foreground">
               หน่วยงาน
             </label>
-            <select
+            {/* ปุ่มเลือกจากบอร์ด + ช่องข้อความ — แบบเดียวกับฟอร์มเพิ่ม (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ)
+                dropdown เดิมมีปัญหาเดียวกับที่ฟอร์มเพิ่มเคยเจอ: เลือกด้วยคีย์บอร์ดกด Enter
+                = ฟอร์มยิง submit เอง · ช่องข้อความ + ปุ่มเปิด picker ไม่มีทางนั้น */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setUnitPickerOpen(true)}
+                className={cn(
+                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold',
+                  TONE.info.outline,
+                )}
+              >
+                <Building2 className="h-3.5 w-3.5" aria-hidden />
+                เลือกหน่วยงานจากบอร์ด
+              </button>
+            </div>
+            <input
               id="feUnit"
-              value={siteCode || (unitName ? '__manual__' : '')}
+              value={unitName}
               onChange={(e) => {
-                const v = e.target.value;
-                if (!v) {
-                  setUnitName('');
-                  setSiteCode('');
-                  return;
-                }
-                if (v === '__manual__') return;
-                const job = openJobs.find((j) => (j.site_code || '') === v);
-                if (job) {
-                  setUnitName(job.unit_name || '');
-                  setSiteCode(job.site_code || '');
-                }
+                setUnitName(e.target.value);
+                // พิมพ์เองแล้วรหัสไซต์เดิมใช้ไม่ได้ — รหัสไซต์มาจากการ "เลือกจากบอร์ด" เท่านั้น
+                if (siteCode) setSiteCode('');
               }}
+              placeholder="กดปุ่มด้านบนเพื่อเลือก หรือพิมพ์ชื่อหน่วยงานเอง"
               className="jarvis-soft-field min-h-[46px] w-full"
-            >
-              <option value="">— ไม่ระบุหน่วยงาน —</option>
-              {unitName && !openJobs.some((j) => (j.site_code || '') === siteCode) ? (
-                <option value="__manual__">
-                  {unitName}
-                  {siteCode ? ` (${siteCode})` : ''}
-                </option>
-              ) : null}
-              {openJobs
-                .filter((j) => (j.site_code || '').trim())
-                .map((j) => (
-                  <option key={j.id} value={j.site_code || ''}>
-                    {jobBoardCardTitle(j)}{j.request_no ? ` · ${j.request_no}` : ''}
-                  </option>
-                ))}
-            </select>
+            />
             {siteCode ? (
               <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Building2 className="h-3 w-3" aria-hidden />
                 รหัสไซต์ <span className="font-mono font-semibold text-foreground">{siteCode}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUnitName('');
+                    setSiteCode('');
+                  }}
+                  className="ml-1 underline hover:text-foreground"
+                >
+                  ล้าง
+                </button>
               </p>
-            ) : null}
+            ) : (
+              <p className="ml-1 text-[10px] text-muted-foreground">
+                เลือกจากบอร์ดแล้วรหัสไซต์จะขึ้นเอง · พิมพ์เองได้แต่จะไม่มีรหัสไซต์
+              </p>
+            )}
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="feStaffPhone" className="ml-1 text-xs font-medium text-muted-foreground">
-              เบอร์โทรเจ้าหน้าที่ที่ติดตาม
-            </label>
-            <input
-              id="feStaffPhone"
-              value={staffPhone}
-              onChange={(e) => setStaffPhone(e.target.value)}
-              inputMode="tel"
-              className="jarvis-soft-field min-h-[46px] w-full"
-            />
-          </div>
+          {/* dropdown ชื่อ+เบอร์จากรายชื่อกลาง (099 · เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ)
+              ⚠️ select ในฟอร์มนี้กด Enter แล้วฟอร์มยิง save ได้ — ยอมรับได้เพราะ
+              ฟอร์มแก้ไข Enter = บันทึกการแก้ อยู่แล้วทุกช่อง (ไม่ใช่ฟอร์มเพิ่มที่เคยพัง) */}
+          <StaffContactField id="feStaffPhone" value={staffPhone} onChange={setStaffPhone} />
           <div className="space-y-1.5">
             <label htmlFor="feWhen" className="ml-1 text-xs font-medium text-muted-foreground">
               ให้โทรเมื่อไหร่
@@ -425,6 +428,19 @@ export default function FollowEditDialog({
           </button>
         </div>
       </form>
+
+      {/* picker เป็น Radix Dialog ที่ portal ไป body — เปิดซ้อนกล่องแก้ไข (fixed z-50) ได้
+          เพราะ portal ถูกต่อท้าย DOM ทีหลังจึงอยู่บนสุดเสมอ */}
+      <BoardUnitPicker
+        open={unitPickerOpen}
+        onClose={() => setUnitPickerOpen(false)}
+        jobs={openJobs}
+        onPick={(u: BoardUnitOption) => {
+          setUnitName(u.unitName);
+          setSiteCode(u.siteCode);
+          setUnitPickerOpen(false);
+        }}
+      />
     </div>
   );
 }

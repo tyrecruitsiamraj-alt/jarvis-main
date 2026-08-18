@@ -31,6 +31,7 @@ export type ApiResource =
   | 'candidate-work-history'
   | 'training-records'
   | 'follow'
+  | 'follow-staff-contacts'
   | 'job-staff'
   | 'app-users'
   | 'app-nav-preferences'
@@ -112,6 +113,12 @@ export function minimumRoleFor(
     case 'follow':
       // staff: ดู + เพิ่ม/ยกเลิกรายชื่อที่ต้องติดตามเอง
       return 'staff';
+
+    case 'follow-staff-contacts':
+      // อ่านได้ทุกคน (dropdown เบอร์เจ้าหน้าที่บนหน้า Follow ใช้)
+      // เพิ่มชื่อ/เบอร์ใหม่เฉพาะหัวหน้างานขึ้นไป (เจ้าของสั่ง 18 ส.ค. 2569)
+      if (isRead) return 'staff';
+      return 'supervisor';
 
     case 'job-staff':
       if (isRead) return 'staff';

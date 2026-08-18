@@ -54,6 +54,7 @@ import brandingHandler from './branding.js';
 import matchPriorityWeightsHandler from './match-priority-weights.js';
 import workStatusMasterHandler from './work-status-master.js';
 import followHandler from './follow.js';
+import followStaffContactsHandler from './follow-staff-contacts.js';
 import siamrajUnitRequestsHandler from './siamraj-unit-requests.js';
 import siamrajUnitAssignmentsHandler from './siamraj-unit-assignments.js';
 import siamrajUnitNotesHandler from './siamraj-unit-notes.js';
@@ -113,6 +114,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/employees': employeesHandler as ApiHandler,
   '/api/geocode': geocodeHandler as ApiHandler,
   '/api/follow': followHandler as ApiHandler,
+  '/api/follow-staff-contacts': followStaffContactsHandler as ApiHandler,
   '/api/siamraj/unit-requests': siamrajUnitRequestsHandler as ApiHandler,
   '/api/siamraj/unit-assignments': siamrajUnitAssignmentsHandler as ApiHandler,
   '/api/siamraj/unit-notes': siamrajUnitNotesHandler as ApiHandler,
