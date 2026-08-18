@@ -40,6 +40,7 @@ import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
+import { compareJobsByAgeDaysDesc } from '@/lib/jobUrgency';
 import {
   Dialog,
   DialogContent,
@@ -170,12 +171,29 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const totalPages = getTotalPages(filters.filtered.length, pageSize);
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
-  // ใบที่มีคนกรอกใบสมัครเข้ามาแล้วขึ้นก่อน (เจ้าของสั่ง 13 ส.ค. 2569:
-  // "เรียงใบที่มีคนกรอกเข้ามาไว้บนๆ") — sort เป็น stable ลำดับเดิมในแต่ละกลุ่มไม่เปลี่ยน
-  // ฝั่งสาธารณะไม่มี applicantCounts (โหลดเฉพาะเจ้าหน้าที่) = ไม่เรียงใหม่ พฤติกรรมเดิม
+  /**
+   * ลำดับการ์ดบนบอร์ด — **ทั้งกล่องงานและหน้าสาธารณะ**
+   *
+   * 1. **ผ่านมานานสุดขึ้นก่อน** (เจ้าของสั่ง 18 ส.ค. 2569: *"เรียงงานที่ผ่านมานานๆ
+   *    แล้วขึ้นก่อนเลย"*) — ใบที่ค้างนานคือใบที่กำลังจะเสียลูกค้า ต้องเห็นก่อนเสมอ
+   *    ใช้ `compareJobsByAgeDaysDesc` ตัวเดียวกับหน้ารายการใบขอ นิยาม "ผ่านมา"
+   *    จึงตรงกันทุกหน้า (ล่วงหน้านับจากวันที่กรอก · เลยกำหนดนับจากวันที่ต้องการ)
+   *
+   * 2. อายุเท่ากัน → ใบที่มีคนกรอกใบสมัครเข้ามาแล้วขึ้นก่อน
+   *    (เจ้าของสั่ง 13 ส.ค. 2569 — ยังอยู่ แต่ลดเป็นตัวตัดสินรอง เพราะคำสั่งใหม่
+   *    บอกให้อายุมาก่อน "เลย")
+   *
+   * ⚠️ ฝั่งสาธารณะไม่มี `applicantCounts` (โหลดเฉพาะเจ้าหน้าที่) → ข้อ 2 ไม่มีผล
+   * แต่ข้อ 1 ทำงานทั้งสองฝั่ง ซึ่งเป็นสิ่งที่สั่งมา
+   */
   const orderedJobs = useMemo(() => {
-    const rank = (id: string) => ((applicantCounts[id] ?? 0) > 0 ? 0 : 1);
-    return [...filters.filtered].sort((a, b) => rank(a.id) - rank(b.id));
+    const today = new Date();
+    const hasApplicants = (id: string) => ((applicantCounts[id] ?? 0) > 0 ? 0 : 1);
+    return [...filters.filtered].sort((a, b) => {
+      const byAge = compareJobsByAgeDaysDesc(a, b, today);
+      if (byAge !== 0) return byAge;
+      return hasApplicants(a.id) - hasApplicants(b.id);
+    });
   }, [filters.filtered, applicantCounts]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
