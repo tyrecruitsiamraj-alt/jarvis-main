@@ -45,7 +45,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   const [tab, setTab] = useState<ApplicantTab>('all');
   /**
    * กรองตาม "ที่มา" (เจ้าของสั่ง 16 ส.ค.: *"แยกให้หน่อยว่าอันไหนมาจากการสมัครใหม่
-   * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองคอลัมน์จึงตรงกันเสมอ
+   * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองแท็บจึงตรงกันเสมอ
    */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +177,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   const { interested } = splitInterested(shownItems);
   const visible = tab === 'interested' ? interested : shownItems;
 
-  /** การ์ดผู้สมัคร 1 ใบ — แยกออกมาเพื่อ reuse ทั้งมุมมองแท็บ (มือถือ) และ 2 คอลัมน์ (จอใหญ่) */
+  /** การ์ดผู้สมัคร 1 ใบ — ใช้ทั้งสองแท็บ (19 ส.ค. 2569: เลิกมุมมอง 2 คอลัมน์ของจอใหญ่) */
   const renderCard = (a: PublicApplication, inInterestedColumn: boolean) => (
     <li key={a.id} className="rounded-2xl border border-border/70 bg-background/60 p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -337,10 +337,11 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               (เจ้าของสั่ง 17 ส.ค. 2569: "รายชื่อภายในกล่องมีแค่ รายชื่อทั้งหมด กับ คนที่สนใจ")
               ⚠️ ป้ายบอกที่มายังอยู่บนการ์ดของแต่ละคนเหมือนเดิม — ที่เอาออกคือตัวกรอง */}
 
-          {/* แท็บ — เฉพาะจอเล็ก (จอ ≥lg แสดง 2 คอลัมน์คู่กันแทน · เจ้าของเคาะ 15 ส.ค.)
+          {/* แท็บ — **ทุกขนาดจอ** (เจ้าของเคาะ 19 ส.ค. 2569: *"เป็น 2 แท็บทุกขนาดจอ"*)
+              เดิมจอ ≥lg กางเป็น 2 คอลัมน์คู่กัน ทำให้หน้าเดียวมีสองหน้าตาแล้วคนละที่กัน
               ⚠️ "ที่สนใจ" = คนที่ตอบสนใจ **ตอนโทร** ไม่ใช่สถานะใบสมัคร
               · เห็นทั้งสองแท็บเสมอแม้ยอด 0 — เลข 0 คือคำตอบ ไม่ใช่ช่องว่าง */}
-          <div className="mt-3 flex items-center gap-1 lg:hidden">
+          <div className="mt-3 flex items-center gap-1">
             {(
               [
                 ['all', 'รายชื่อทั้งหมด', shownItems.length],
@@ -384,8 +385,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             </div>
           ) : (
             <>
-              {/* จอเล็ก: มุมมองแท็บเดียว (2 คอลัมน์แคบเกินไปบนมือถือ) */}
-              <div className="lg:hidden">
+              {/* มุมมองแท็บเดียวทุกขนาดจอ (19 ส.ค. 2569) */}
+              <div>
                 {visible.length === 0 ? (
                   <p className="py-12 text-center text-xs text-muted-foreground">
                     {tab === 'interested'
@@ -397,27 +398,6 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                 )}
               </div>
 
-              {/* จอใหญ่: 2 กล่องคู่กัน (เจ้าของเคาะ 15 ส.ค. — "คนสนใจโชว์กล่องข้าง ๆ") */}
-              <div className="hidden gap-4 lg:grid lg:grid-cols-2">
-                <section className="min-w-0">
-                  <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
-                    รายชื่อทั้งหมด <span className="tabular-nums">({shownItems.length})</span>
-                  </h3>
-                  <ul className="space-y-2.5">{shownItems.map((a) => renderCard(a, false))}</ul>
-                </section>
-                <section className="min-w-0 rounded-2xl bg-emerald-50/40 p-2 dark:bg-emerald-950/20">
-                  <h3 className="mb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                    คนที่สนใจ <span className="tabular-nums">({interested.length})</span>
-                  </h3>
-                  {interested.length === 0 ? (
-                    <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-                      ยังไม่มีใครตอบว่าสนใจ — เมื่อโทรแล้วได้ผล “สนใจ” ชื่อจะมาที่นี่ + ไปหน้ารายชื่อผู้สมัคร
-                    </p>
-                  ) : (
-                    <ul className="space-y-2.5">{interested.map((a) => renderCard(a, true))}</ul>
-                  )}
-                </section>
-              </div>
             </>
           )}
         </div>
