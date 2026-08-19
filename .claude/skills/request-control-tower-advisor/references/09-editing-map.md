@@ -2792,3 +2792,15 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
   · เกือบสรุปผิดว่าความจำพัง (เห็น prefill เป็น false positive เพราะเบอร์แค่ไม่ถูกล้าง)
 * ตรวจจริง: dropdown โชว์ 9 ชื่อคัดสรร + "พิมพ์เบอร์เองไม่ผูกชื่อ" · เลือกครีม+พิมพ์เบอร์+blur
   → จำลงฐาน `ครีม=0866660002` · ล้างเบอร์ เลือกครีมใหม่ → prefill กลับมาเอง · ลบ test row แล้ว
+
+### รอบ 18 ส.ค. 2569 (ค่ำ-10) — เอาปุ่มปฏิทินการโทรออก
+
+`src/components/follow/FollowCallRoundsPanel.tsx` — เจ้าของสั่งเอาปุ่มปฏิทินการโทร (ไอคอน
+มุมขวาบน) ออก · **เอาออกให้สุด**: ถอด Popover + ปฏิทินทั้งกริด + ชิป "เฉพาะวันที่ X" +
+state (`calendarOpen`/`selectedDay`/`month`) + derived (`calendar`/`grid`/`monthLabel`) +
+`scopedEntries` (roundRows อ่านจาก `entries` ตรง ๆ) + import ที่เลิกใช้
+(`buildCallCalendar`/`callDayKey`/`monthGridDays`/`shiftMonth`/`Popover*`/`CalendarDays`/
+`ChevronLeft/Right`/`X`) · เหลือแค่แผง 3 รอบ + ปุ่มรีเฟรช
+
+* การกรองรายวันมีที่ **"ตัวกรอง" ของลิสต์** (ค่ำ-6: วันที่/ช่วงเวลา/เจ้าของงาน) อยู่แล้ว
+  ปฏิทินบนแผงจึงซ้ำซ้อน · ตรวจจริง: ปุ่มปฏิทิน/ชิปหาย · แผง 3 รอบ+รีเฟรชอยู่ครบ · console สะอาด

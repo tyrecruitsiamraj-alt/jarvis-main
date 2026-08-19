@@ -12,12 +12,6 @@ import {
   type FollowRoundBucket,
 } from '@/lib/followRoundBuckets';
 import {
-  buildCallCalendar,
-  callDayKey,
-  monthGridDays,
-  shiftMonth,
-} from '@/lib/followCallCalendar';
-import {
   actionableSummary,
   bucketVisual,
   roundSignal,
@@ -31,19 +25,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarDays, ChevronLeft, ChevronRight, Phone, RefreshCw, X } from 'lucide-react';
+import { Phone, RefreshCw } from 'lucide-react';
 
 /**
- * แผงการโทรของหน้า Follow — **3 รอบ + ปฏิทิน** (เจ้าของสั่ง 18 ส.ค. 2569)
+ * แผงการโทรของหน้า Follow — **3 รอบ** (เจ้าของสั่ง 18 ส.ค. 2569)
  *
  * > *"เปลี่ยนเอา ทั้งหมด รอโทร กำลังโทร โทรสำเร็จ ไม่สำเร็จ ไปใส่แทนแบ่งเป็น 3 แถว
- * > เพื่อให้รู้ว่าโทร 3 รอบ แต่ละกล่องกดแล้วต้องแสดงชื่อขึ้นมาพร้อมรายละเอียดของแต่ละคน
- * > มี calendar ให้หน่อยเพื่อจะได้รู้ว่าแต่ละวันโทรกี่คน"*
+ * > เพื่อให้รู้ว่าโทร 3 รอบ แต่ละกล่องกดแล้วต้องแสดงชื่อขึ้นมาพร้อมรายละเอียดของแต่ละคน"*
  *
- * ปรับรอบสอง (18 ส.ค. บ่าย): *"ตัว calendar ย้ายไปมุมขวาบน และกล่องที่ให้กดอะ
- * กดแล้วต้องมี Popup ขึ้นมา"* — ปฏิทินเป็น Popover ที่มุมขวาบนของแผง ·
- * กดกล่องถัง/กดวันบนปฏิทินแล้วรายชื่อขึ้นเป็น Dialog ไม่ใช่กางต่อท้ายแผง
+ * กดกล่องถังแล้วรายชื่อขึ้นเป็น Dialog ไม่ใช่กางต่อท้ายแผง
+ *
+ * ⚠️ ปฏิทินการโทร (popover ที่มุมขวาบน) ถูกเอาออกแล้ว (ค่ำ-10) — การกรองรายวันไปอยู่ที่
+ * "ตัวกรอง" ของลิสต์ด้านล่างแทน (วันที่/ช่วงเวลา/เจ้าของงาน)
  *
  * แทน `CallFunnelPanel` (funnel 4 ช่อง) ซึ่งใช้ที่หน้า Follow ที่เดียว
  *
@@ -113,16 +106,8 @@ export default function FollowCallRoundsPanel({
   const [loading, setLoading] = useState(false);
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
   const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
-  const [month, setMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
-  /** ปฏิทินเป็น popover มุมขวาบน (เจ้าของสั่ง 18 ส.ค. 2569 บ่าย) */
-  const [calendarOpen, setCalendarOpen] = useState(false);
   /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
   const [activeRound, setActiveRound] = useState(1);
-  /**
-   * วันที่เลือกบนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569: *"เลือกวันที่แล้วให้รายละเอียดเปลี่ยนตาม"*)
-   * — เลือกแล้วทั้งแท็บ/กล่อง/รายชื่อกรองเป็นของวันนั้น · กดวันเดิมซ้ำ = ยกเลิกเลือก
-   */
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -137,36 +122,25 @@ export default function FollowCallRoundsPanel({
    * คนในแต่ละรอบ — นับจาก **ชุดเดียวกับที่แสดงชื่อ** ยอดกับรายชื่อจึงตรงกันเสมอ
    * (เดิมยอดมาจาก funnel ที่นับแถวคิว ทำให้มีเคสยอดไม่ตรงกับชื่อที่กางออกมา)
    */
-  /** ชุดที่แผงทั้งแผงใช้ — เลือกวันบนปฏิทินแล้วเหลือเฉพาะของวันนั้น (ตั้งไว้หรือมีผลกลับ) */
-  const scopedEntries = useMemo(() => {
-    if (!selectedDay) return entries;
-    return entries.filter(
-      (e) => callDayKey(e.scheduled_at) === selectedDay || callDayKey(e.called_at) === selectedDay,
-    );
-  }, [entries, selectedDay]);
-
   const roundRows = useMemo(() => {
     const map = new Map<number, FollowEntry[]>([
       [1, []],
       [2, []],
       [3, []],
     ]);
-    for (const e of scopedEntries) {
+    for (const e of entries) {
       // ยังไม่เคยเข้าคิวและยังไม่มีผล = ยังไม่อยู่รอบไหน
       if (e.call_attempt == null && e.call_status === 'pending' && !e.call_outcome) continue;
       map.get(callAttemptSlot(e.call_attempt))?.push(e);
     }
     return map;
-  }, [scopedEntries]);
+  }, [entries]);
 
   const countsByRound = useMemo(() => {
     const map = new Map<number, ReturnType<typeof countFollowRoundBuckets>>();
     for (const [slot, rows] of roundRows) map.set(slot, countFollowRoundBuckets(rows));
     return map;
   }, [roundRows]);
-
-  const calendar = useMemo(() => buildCallCalendar(entries), [entries]);
-  const grid = useMemo(() => monthGridDays(month), [month]);
 
   const openBucketDialog = (slot: number, b: FollowRoundBucket) => {
     const rows = roundRows.get(slot) ?? [];
@@ -178,16 +152,6 @@ export default function FollowCallRoundsPanel({
     });
   };
 
-  const monthLabel = (() => {
-    const [y, m] = month.split('-').map(Number);
-    if (!y || !m) return month;
-    return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('th-TH', {
-      timeZone: 'UTC',
-      month: 'long',
-      year: 'numeric',
-    });
-  })();
-
   return (
     <div className={cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card)}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -198,112 +162,11 @@ export default function FollowCallRoundsPanel({
             แต่ละครั้งคือ "ตอนนี้ใครอยู่รอบนั้น" ไม่ใช่ยอดสะสมทุกครั้งที่โทร
           </p>
         </div>
-        {/* มุมขวาบน: ปุ่มเสริมจากหน้าแม่ (เพิ่มเรื่อง/เพิ่มเจ้าหน้าที่) + ปฏิทิน (popover) + รีเฟรช */}
+        {/* มุมขวาบน: ปุ่มเสริมจากหน้าแม่ (เพิ่มเรื่อง/เพิ่มเจ้าหน้าที่) + รีเฟรช
+            ⚠️ ปุ่มปฏิทินการโทรถูกเอาออกทั้งชุด (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-10) —
+            การกรองรายวันย้ายไปที่ "ตัวกรอง" ของลิสต์ด้านล่างแล้ว (วันที่/ช่วงเวลา/เจ้าของงาน) */}
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {headerExtras}
-          {selectedDay ? (
-            <button
-              type="button"
-              onClick={() => setSelectedDay(null)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold',
-                TONE.info.soft,
-                TONE.info.value,
-              )}
-              title="กดเพื่อกลับไปดูทุกวัน"
-            >
-              เฉพาะวันที่ {formatYmdDmyBe(selectedDay)}
-              <X className="h-3 w-3" aria-hidden />
-            </button>
-          ) : null}
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              {/* เจ้าของสั่ง 18 ส.ค. 2569 (ค่ำ-4): ปฏิทินเหลือแค่ไอคอน เหมือนตัวกรองวันที่
-                  — กดแล้วเลือกวัน ข้อมูลในแผงกรองเฉพาะวันนั้น · ไอคอนติดสีเมื่อกำลังกรองอยู่
-                  เพื่อบอกว่าตอนนี้ดูเฉพาะวันเดียว (คู่กับชิป "เฉพาะวันที่ X" ด้านซ้าย) */}
-              <button
-                type="button"
-                aria-label="ปฏิทินการโทร — กดเลือกวันเพื่อดูเฉพาะวันนั้น"
-                title="ปฏิทินการโทร — กดเลือกวันเพื่อดูเฉพาะวันนั้น"
-                className={cn(
-                  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors',
-                  selectedDay
-                    ? cn(TONE.info.soft, TONE.info.value, 'border-transparent')
-                    : 'border-border hover:bg-secondary',
-                )}
-              >
-                <CalendarDays className="h-4 w-4" aria-hidden />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-[320px] p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMonth((m) => shiftMonth(m, -1))}
-                  aria-label="เดือนก่อนหน้า"
-                  className="rounded-full border border-border p-1 hover:bg-secondary"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                </button>
-                <span className={cn('text-xs font-bold', DASH.cellStrong)}>{monthLabel}</span>
-                <button
-                  type="button"
-                  onClick={() => setMonth((m) => shiftMonth(m, 1))}
-                  aria-label="เดือนถัดไป"
-                  className="rounded-full border border-border p-1 hover:bg-secondary"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-                </button>
-              </div>
-              <div className={cn('grid grid-cols-7 gap-1 text-center text-[10px]', DASH.muted)}>
-                {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((d) => (
-                  <span key={d} className="py-0.5 font-semibold">
-                    {d}
-                  </span>
-                ))}
-                {grid.map((ymd, i) => {
-                  if (!ymd) return <span key={`x${i}`} />;
-                  const day = calendar.get(ymd);
-                  const planned = day?.planned ?? 0;
-                  const called = day?.called ?? 0;
-                  const has = planned > 0 || called > 0;
-                  return (
-                    <button
-                      key={ymd}
-                      type="button"
-                      disabled={!has}
-                      onClick={() => {
-                        setSelectedDay((cur) => (cur === ymd ? null : ymd));
-                        setCalendarOpen(false);
-                      }}
-                      title={has ? `ตั้งไว้ ${planned} · โทรแล้ว ${called}` : undefined}
-                      className={cn(
-                        'rounded-md border px-1 py-1 transition-colors',
-                        has ? 'border-border hover:bg-secondary' : 'border-transparent opacity-45',
-                      )}
-                    >
-                      <span className="block tabular-nums text-foreground">
-                        {Number(ymd.slice(-2))}
-                      </span>
-                      {has ? (
-                        <span className="mt-0.5 block leading-none">
-                          <b className={cn('tabular-nums', TONE.primary.value)}>{planned}</b>
-                          {called > 0 ? (
-                            <b className={cn('ml-1 tabular-nums', TONE.success.value)}>✓{called}</b>
-                          ) : null}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className={cn('mt-1.5 text-[10px]', DASH.muted)}>
-                เลขน้ำเงิน = ตั้งไว้ว่าจะโทรวันนั้น · <b className={TONE.success.value}>✓</b>{' '}
-                เขียว = มีผลโทรกลับมาแล้ว · สายที่ยกเลิกไม่ถูกนับ · กดวันเพื่อดูรายชื่อ
-              </p>
-            </PopoverContent>
-          </Popover>
-          {/* รีเฟรชเหลือไอคอนให้เข้าชุดกับปุ่มปฏิทินที่อยู่ติดกัน */}
           <button
             type="button"
             onClick={load}
