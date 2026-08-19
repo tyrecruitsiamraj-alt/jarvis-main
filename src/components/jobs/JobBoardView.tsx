@@ -1079,38 +1079,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           <Send className="h-3.5 w-3.5" />
                           หาผู้สมัครเพิ่ม
                         </button>
-                        {/* แก้ข้อมูลที่จะขึ้นประกาศ (17 ส.ค. 2569) — จังหวัด/อำเภอ/ตำบล ·
-                            รายได้รวม · สวัสดิการติ๊กเพิ่ม · เก็บเป็น override ฝั่งเรา ไม่แตะ ERP */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setGenLinkJob(job);
-                          }}
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.violet.outline,
-                          )}
-                        >
-                          <Link2 className="h-3.5 w-3.5" />
-                          Gen link
-                        </button>
-                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
-                        {latestPostingByJob.has(job.id) ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditPosting(latestPostingByJob.get(job.id) ?? null);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            แก้ไข
-                          </button>
-                        ) : null}
                           </>
                         )}
+                        {/* 🔴 Gen link กับ แก้ไข **ย้ายไปอยู่ในป๊อปอัปที่กดการ์ด** แล้ว
+                            (เจ้าของเคาะ 19 ส.ค. 2569: การ์ดเหลือแค่ "ดูรายชื่อ" กับ
+                            "หาผู้สมัครเพิ่ม") — ห้ามใส่ปุ่มกลับมาบนการ์ดโดยไม่ถามก่อน */}
                         {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
                             รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
@@ -1475,6 +1448,37 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     สมัครตำแหน่งนี้
                     <Send className="h-4 w-4" />
                   </button>
+                ) : null}
+
+                {/* 🔴 Gen link + แก้ไข อยู่ที่นี่ที่เดียว (เจ้าของเคาะ 19 ส.ค. 2569:
+                    *"ย้ายไปอยู่ในป๊อปอัปที่กดการ์ด"* · การ์ดเหลือ "ดูรายชื่อ" กับ
+                    "หาผู้สมัครเพิ่ม") — ถอดตรงนี้ = สองฟีเจอร์นี้ไม่มีทางเข้าเหลือเลย
+                    ⚠️ ใบที่ปิด/ยกเลิกแล้วไม่ต้องมี — งานจบไปแล้ว ไม่ต้องปล่อยลิงก์รับสมัครอีก */}
+                {isStaff && !closedBox ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGenLinkJob(selected)}
+                      className={cn(
+                        'inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-semibold',
+                        TONE.violet.outline,
+                      )}
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Gen link
+                    </button>
+                    {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
+                    {latestPostingByJob.has(selected.id) ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditPosting(latestPostingByJob.get(selected.id) ?? null)}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        แก้ไขประกาศ
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </>
