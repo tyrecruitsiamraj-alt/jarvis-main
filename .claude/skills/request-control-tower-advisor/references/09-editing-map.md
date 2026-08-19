@@ -2718,3 +2718,27 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
   กรองช่วงเช้าเหลือเฉพาะรอบเช้า · dropdown เจ้าของงานลิสต์คนคีย์จริง
 * 🔴 **`filter`/`FollowCallStatus` state เดิมถูกถอดออกหมด** (เอาออกให้สุด) — ชิปกรอง
   call_status เดิมไม่มีแล้ว แท็บ lifecycle แทน
+
+### รอบ 18 ส.ค. 2569 (ค่ำ-7) — แยกกล่องรายชื่อทีมเป็น drill-down ราย BU + pagination
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/rosterBuGroups.ts` | **ใหม่ · pure** — จัดกลุ่มราย BU (SN/DS/LM/LBA/LBD/none) + นับต่อบทบาท + `paginate` (เทสต์ 9) |
+| `src/pages/settings/JobStaffRosterTab.tsx` | เขียนใหม่: หน้ารวม = กล่อง BU กดเข้า → 4 กล่องบทบาท (สรรหา/คัดสรร/OPL/Online) แบ่งหน้า **หน้าละ 10** |
+
+**เจ้าของสั่ง 18 ส.ค. (ค่ำ-7)** — แท็บ "สรรหา / คัดสรร / OPL / Online" ใน Settings (`AdminSettings` → `JobStaffRosterTab`)
+> *"แยกกล่องเป็นกล่องแต่ละ BU แล้วพอกดแต่ละ BU แยกกล่องของเจ้าหน้าที่สรรหา/คัดสรร/OPL/ทีมออนไลน์ · pagination หน้าละ 10"*
+
+เดิม = filter BU แนวนอน + 4 กล่องโชว์หมดทุกที ไม่แบ่งหน้า → เปลี่ยนเป็น drill-down
+
+**กับดัก / ตรวจจริง**
+* 🔴 **"ไม่ระบุ" (bu=null) เป็นกล่องแยก จับคู่ BU แบบ exact** — null ไม่โผล่ในกล่อง BU จริง
+  (ในหน้าจัดการ) · คนละเรื่องกับ picker มอบหมายงานที่ null = เห็นทุก BU · อย่าปน
+* 🔴 **`paginate` บีบ page ให้อยู่ในช่วงเสมอ** — ลบคนจนหน้าท้ายว่างต้องไม่เห็นหน้าเปล่า
+  (มี useEffect sync state page ตามที่ถูกบีบ)
+* `JobStaffManageState` มี field `canManageAllBu` — fallback ตอน state=null ต้องใส่ครบ ไม่งั้น tsc ตก
+* ⚠️ dev server session นี้ต้อง `preview_start` ทั้ง **vite (8080) และ api (3100)** — api ไม่รันเอง
+  · ลืมสตาร์ท api = manage เส้นตอบ 500 (ไม่ใช่โค้ดพัง)
+* ตรวจจริง (ข้อมูลจริง 41 คน): กล่อง BU ครบ 6 (SN/DS/LM 0 คน · LBA 6 · LBD 32 · ไม่ระบุ 3) ·
+  กด LBD → 4 กล่องบทบาท · OPL 16 คน = **หน้า 1/2 (10 แถว) → หน้า 2/2 (6 แถว)** ปุ่มถัดไป
+  disable หน้าสุดท้าย · back "ทุก BU" กลับได้ · console สะอาด

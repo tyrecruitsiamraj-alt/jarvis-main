@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import {
   fetchJobStaffManage,
   rosterMutate,
@@ -6,11 +7,26 @@ import {
   type RosterEntry,
 } from '@/lib/jobStaffRemote';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
+import {
+  ROSTER_BU_KEYS,
+  ROSTER_KINDS,
+  rosterBuLabel,
+  entriesOfKind,
+  entriesForBu,
+  countRosterByBu,
+  paginate,
+  type RosterBuKey,
+  type RosterKind,
+} from '@/lib/rosterBuGroups';
 import { cn } from '@/lib/utils';
 
-type RosterKind = 'recruiter' | 'screener' | 'opl' | 'online';
+/** BU ที่กำหนดกับรายชื่อ — ค่าใน select ตอน add/แก้ · '' = ไม่ระบุ (เห็นทุก BU ตอนมอบหมาย) */
+const NO_BU = '';
 
-const NO_BU = ''; // ไม่ระบุ — visible in every BU
+/** แปลงคีย์กล่อง BU (มี 'none') → ค่า bu ที่เก็บจริง ('' สำหรับ none) */
+function buKeyToValue(key: RosterBuKey): string {
+  return key === 'none' ? NO_BU : key;
+}
 
 function BuSelect({
   value,
@@ -45,6 +61,8 @@ function BuSelect({
   );
 }
 
+const PAGE_SIZE = 10; // เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-7: หน้าละ 10 รายการ
+
 function RosterSection({
   kind,
   title,
@@ -54,19 +72,23 @@ function RosterSection({
 }: {
   kind: RosterKind;
   title: string;
+  /** รายชื่อของบทบาทนี้ **ที่กรอง BU มาแล้ว** จากหน้าแม่ */
   entries: RosterEntry[];
   defaultBu: string;
   onChanged: () => void;
 }) {
   const [draft, setDraft] = useState('');
-  const [draftBu, setDraftBu] = useState<string>(defaultBu);
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(1);
 
+  // จำนวนคนเปลี่ยน (เพิ่ม/ลบ) แล้วหน้าอาจเกินช่วง — paginate บีบให้เอง
+  const paged = useMemo(() => paginate(entries, page, PAGE_SIZE), [entries, page]);
+  // ให้ state page ตามที่ถูกบีบ (กันปุ่มโชว์หน้าเกินจริง)
   useEffect(() => {
-    setDraftBu(defaultBu);
-  }, [defaultBu]);
+    if (paged.page !== page) setPage(paged.page);
+  }, [paged.page, page]);
 
   const run = async (body: Record<string, unknown>) => {
     if (busy) return false;
@@ -84,9 +106,9 @@ function RosterSection({
   const add = async () => {
     const t = draft.trim();
     if (!t) return;
-    if (await run({ op: 'add', name: t, bu: draftBu })) {
+    // เพิ่มในกล่อง BU ที่กำลังดูอยู่ — คนคาดหวังว่าชื่อใหม่จะอยู่ BU นี้เลย
+    if (await run({ op: 'add', name: t, bu: defaultBu })) {
       setDraft('');
-      setDraftBu(NO_BU);
     }
   };
 
@@ -116,12 +138,17 @@ function RosterSection({
 
   return (
     <div className="glass-card rounded-xl border border-border p-4 space-y-3">
-      <h3 className="font-semibold text-foreground text-sm">{title}</h3>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="font-semibold text-foreground text-sm">{title}</h3>
+        <span className="text-xs text-muted-foreground">
+          {paged.total.toLocaleString('th-TH')} คน
+        </span>
+      </div>
       <ul className="space-y-2">
-        {entries.length === 0 && (
-          <li className="text-sm text-muted-foreground italic">ยังไม่มีชื่อในรายการ — เพิ่มด้านล่าง</li>
+        {paged.total === 0 && (
+          <li className="text-sm text-muted-foreground italic">ยังไม่มีชื่อในกล่องนี้ — เพิ่มด้านล่าง</li>
         )}
-        {entries.map((entry) => (
+        {paged.items.map((entry) => (
           <li
             key={`${entry.name}::${entry.bu ?? ''}`}
             className="flex flex-wrap items-center gap-2 py-1.5 border-b border-border/40 last:border-0"
@@ -182,6 +209,34 @@ function RosterSection({
           </li>
         ))}
       </ul>
+
+      {/* แบ่งหน้า — โผล่เมื่อมีมากกว่า 1 หน้า (เจ้าของขอหน้าละ 10) */}
+      {paged.pageCount > 1 ? (
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={paged.page <= 1}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border disabled:opacity-40 hover:bg-secondary"
+            aria-label="หน้าก่อนหน้า"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+          </button>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            หน้า {paged.page.toLocaleString('th-TH')}/{paged.pageCount.toLocaleString('th-TH')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={paged.page >= paged.pageCount}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border disabled:opacity-40 hover:bg-secondary"
+            aria-label="หน้าถัดไป"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50">
         <input
           value={draft}
@@ -190,7 +245,6 @@ function RosterSection({
           className="flex-1 min-w-[150px] jarvis-soft-field"
           onKeyDown={(e) => e.key === 'Enter' && void add()}
         />
-        <BuSelect value={draftBu} disabled={busy} onChange={setDraftBu} />
         <button
           type="button"
           disabled={busy}
@@ -207,18 +261,11 @@ function RosterSection({
   );
 }
 
-type BuFilter = 'all' | 'none' | (typeof APP_DEPARTMENT_CODES)[number];
-
-function matchesFilter(entry: RosterEntry, filter: BuFilter): boolean {
-  if (filter === 'all') return true;
-  if (filter === 'none') return entry.bu === null;
-  return entry.bu === filter;
-}
-
 const JobStaffRosterTab: React.FC = () => {
   const [state, setState] = useState<JobStaffManageState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<BuFilter>('all');
+  /** BU ที่กด drill เข้าไป — null = หน้ารวมกล่อง BU (เจ้าของสั่ง ค่ำ-7) */
+  const [openBu, setOpenBu] = useState<RosterBuKey | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -231,66 +278,88 @@ const JobStaffRosterTab: React.FC = () => {
     void reload();
   }, [reload]);
 
-  // adding while filtered to a BU should default the new name to that BU
-  const defaultBu = filter === 'all' || filter === 'none' ? NO_BU : filter;
+  const buCounts = useMemo(() => (state ? countRosterByBu(state) : []), [state]);
 
-  const filterTabs: { key: BuFilter; label: string }[] = [
-    { key: 'all', label: 'ทั้งหมด' },
-    ...APP_DEPARTMENT_CODES.map((code) => ({ key: code as BuFilter, label: APP_DEPARTMENT_LABELS[code] })),
-    { key: 'none', label: 'ไม่ระบุ' },
-  ];
+  if (loading && !state) {
+    return (
+      <p className="text-sm text-muted-foreground animate-pulse py-6 text-center">กำลังโหลดรายชื่อ…</p>
+    );
+  }
 
-  const sections: { kind: RosterKind; title: string; entries: RosterEntry[] }[] = [
-    { kind: 'recruiter', title: 'เจ้าหน้าที่สรรหา', entries: state?.recruiters ?? [] },
-    { kind: 'screener', title: 'เจ้าหน้าที่คัดสรร', entries: state?.screeners ?? [] },
-    { kind: 'opl', title: 'เจ้าหน้าที่ OPL', entries: state?.opls ?? [] },
-    // ทีม online (097 · เจ้าของสั่ง 17 ส.ค. 2569) — บทบาทที่ 4 โครงเดียวกับสามอันบน
-    { kind: 'online', title: 'ทีม Online', entries: state?.onlines ?? [] },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="jarvis-menu-card rounded-[1.5rem] border border-white/70 border-info/30 bg-info/5 p-3 space-y-2.5">
-        <p className="text-sm text-muted-foreground">
-          รายชื่อสรรหา/คัดสรร/OPL — เลือก BU ข้างชื่อได้ (&quot;ไม่ระบุ&quot; = ทุก BU)
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {filterTabs.map((t) => {
-            const active = filter === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setFilter(t.key)}
-                className={cn(
-                  'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {t.label}
-              </button>
-            );
-          })}
+  // ── หน้ารวม: กล่องแต่ละ BU (กดเข้าไปดู 4 บทบาท) ──────────────────────────
+  if (openBu === null) {
+    return (
+      <div className="space-y-4">
+        <div className="jarvis-menu-card rounded-[1.5rem] border border-white/70 border-info/30 bg-info/5 p-3">
+          <p className="text-sm text-muted-foreground">
+            เลือก BU เพื่อดูรายชื่อเจ้าหน้าที่สรรหา / คัดสรร / OPL / ทีมออนไลน์ ของ BU นั้น
+          </p>
         </div>
-      </div>
-      {loading && !state ? (
-        <p className="text-sm text-muted-foreground animate-pulse py-6 text-center">กำลังโหลดรายชื่อ…</p>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sections.map((s) => (
-            <RosterSection
-              key={s.kind}
-              kind={s.kind}
-              title={s.title}
-              entries={s.entries.filter((e) => matchesFilter(e, filter))}
-              defaultBu={defaultBu}
-              onChanged={reload}
-            />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {buCounts.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setOpenBu(b.key)}
+              className="glass-card rounded-xl border border-border p-4 text-left transition-colors hover:border-primary/50 hover:bg-secondary/30"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2 font-semibold text-foreground">
+                  <Users className="h-4 w-4 text-primary" aria-hidden />
+                  {rosterBuLabel(b.key)}
+                </span>
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  {b.total.toLocaleString('th-TH')} คน
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>สรรหา {b.recruiter.toLocaleString('th-TH')}</span>
+                <span>คัดสรร {b.screener.toLocaleString('th-TH')}</span>
+                <span>OPL {b.opl.toLocaleString('th-TH')}</span>
+                <span>Online {b.online.toLocaleString('th-TH')}</span>
+              </div>
+            </button>
           ))}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // ── หน้า BU เดียว: 4 กล่องบทบาท + แบ่งหน้าอิสระ ──────────────────────────
+  const activeState: JobStaffManageState = state ?? {
+    recruiters: [],
+    screeners: [],
+    opls: [],
+    onlines: [],
+    canManageAllBu: false,
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpenBu(null)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:bg-secondary"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden /> ทุก BU
+        </button>
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Users className="h-4 w-4 text-primary" aria-hidden />
+          {rosterBuLabel(openBu)}
+        </span>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {ROSTER_KINDS.map((s) => (
+          <RosterSection
+            key={s.kind}
+            kind={s.kind}
+            title={s.title}
+            entries={entriesForBu(entriesOfKind(activeState, s.kind), openBu)}
+            defaultBu={buKeyToValue(openBu)}
+            onChanged={reload}
+          />
+        ))}
+      </div>
     </div>
   );
 };
