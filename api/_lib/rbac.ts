@@ -37,6 +37,8 @@ export type ApiResource =
   | 'app-users'
   | 'app-nav-preferences'
   | 'audit-logs'
+  /** สถานะระบบ (ยามเฝ้า) — ตกไป default = admin เท่านั้น */
+  | 'system-health'
   | 'branding'
   | 'siamraj-unit-requests'
   | 'siamraj-unit-assignments'

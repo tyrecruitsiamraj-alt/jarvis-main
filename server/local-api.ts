@@ -15,6 +15,7 @@ import { applyCorsHeaders } from '../api/_lib/cors.ts';
 import { isProductionRuntime } from '../api/_lib/runtime.ts';
 import { startMatchPrecomputeWorker } from '../api/_lib/matchPrecomputeWorker.ts';
 import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveWorker.ts';
+import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
 type VercelLikeRes = {
@@ -182,4 +183,6 @@ server.listen(port, '127.0.0.1', () => {
   startMatchPrecomputeWorker();
   // ตัวย้ายใบสมัครอัตโนมัติ — ปิดโดยดีฟอลต์ · เปิดแล้วยังเป็นโหมดลองดูจนกว่าจะสั่ง APPLY
   startApplicationAutoMoveWorker();
+  // ยามเฝ้าระบบ — เปิดโดยดีฟอลต์ (อ่านอย่างเดียว + เด้งแจ้งเตือนตอนผิดปกติ)
+  startSystemHealthWorker();
 });

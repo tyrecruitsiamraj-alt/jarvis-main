@@ -60,6 +60,9 @@ jobs:
                       # ตัวย้ายใบสมัครอัตโนมัติ (19 ส.ค. 2569) — เจ้าของเคาะว่า "เปิดโหมดลองดูก่อน"
                       # ENABLED=true เดินรอบทุก 15 นาทีแล้วบันทึกว่า "รอบนี้จะย้ายใครไปไหน"
                       # APPLY=false คือยังไม่เขียนจริง · ดูผลที่ ตั้งค่า → ย้ายใบสมัครอัตโนมัติ
+                      # ยามเฝ้าระบบ — เปิดเฉพาะเครื่องจริง (ฐาน dev = prod ถ้าเปิดบน dev
+                      # จะเด้งแจ้งเตือนผิด ๆ ไปหาแอดมินบน production)
+                      ./scripts/sync-env.sh .env SYSTEM_HEALTH_WATCH_ENABLED "true"
                       ./scripts/sync-env.sh .env APPLICATION_AUTO_MOVE_ENABLED "true"
                       ./scripts/sync-env.sh .env APPLICATION_AUTO_MOVE_APPLY "false"
                       ./scripts/sync-env.sh .env MATCH_PRECOMPUTE_ENABLED "true"

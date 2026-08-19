@@ -94,6 +94,7 @@ import notificationsHandler from './notifications.js';
 import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
 import matchingWorkerStatusHandler from './matching-worker-status.js';
+import systemHealthHandler from './system-health.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
 
@@ -177,6 +178,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/application-auto-move': applicationAutoMoveHandler as ApiHandler,
   // สถานะ/ผลรอบล่าสุดของตัวตั้งเวลา — อ่านอย่างเดียว ไม่ย้ายจริง
   '/api/application-auto-move-status': applicationAutoMoveStatusHandler as ApiHandler,
+  // สถานะระบบ (ยามเฝ้า) — ไฟ 4 ดวง + สวิตช์ + ของค้าง · admin เท่านั้น
+  '/api/system-health': systemHealthHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,
   '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,
