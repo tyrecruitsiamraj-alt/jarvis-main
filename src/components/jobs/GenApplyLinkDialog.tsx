@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { buildOnlineNameOptions } from '@/lib/jobStaffNames';
+import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import {
   applyLinkPath,
   recruitChannelLabel,
@@ -18,7 +20,6 @@ import {
 } from '@/components/ui/dialog';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch';
-import { parseAppUserList } from '@/lib/userApi';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
@@ -96,7 +97,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
    */
   const specificType = '';
   const [formType, setFormType] = useState<string>('rm');
-  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
+  /** ชื่อทีม Online — ที่มาของช่อง "ผู้รับผิดชอบ" (เจ้าของสั่ง 19 ส.ค. 2569) */
+  const [onlineNames, setOnlineNames] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<Array<{ code: string; label: string | null }>>([]);
@@ -127,17 +129,15 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setFormType('rm');
     setShortLinks({});
     setPicked([]);
-    // ผู้รับผิดชอบ = ผู้ใช้ในระบบ (ไม่ใช่ master แยกอีกชุด) — พลาดก็ปล่อยว่างได้ ไม่บังคับ
-    void apiFetch('/api/app-users')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) =>
-        setStaff(
-          parseAppUserList(data)
-            .filter((u) => u.is_active)
-            .map((u) => ({ id: u.id, name: u.full_name || u.email })),
-        ),
-      )
-      .catch(() => setStaff([]));
+    /**
+     * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
+     * เดิมดึงผู้ใช้ทั้งระบบมาให้เลือก ซึ่งได้ชื่อคนที่ไม่เกี่ยวกับงานประกาศเลย
+     * ⚠️ roster เก็บเป็น **ชื่อ** ไม่ใช่ user id — ประกาศจึงบันทึกที่ `responsibleName`
+     * (`responsibleUserId` เป็น null ตั้งใจ · ฟิลด์นั้นมีไว้ตอนผูกกับ user จริงเท่านั้น)
+     */
+    void refreshJobStaffFromApi()
+      .then(() => setOnlineNames(buildOnlineNameOptions()))
+      .catch(() => setOnlineNames(buildOnlineNameOptions()));
   }, [open, job, standalone]);
 
   /**
@@ -181,8 +181,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) })),
         positionName: positionName.trim() || null,
         province: province || null,
-        responsibleName: staff.find((u) => u.id === responsible)?.name ?? null,
-        responsibleUserId: responsible || null,
+        responsibleName: responsible || null,
+        responsibleUserId: null,
         specificType: specificType || null,
         formType,
       };
@@ -328,12 +328,15 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     onChange={(e) => setResponsible(e.target.value)}
                   >
                     <option value="">ไม่ระบุ</option>
-                    {staff.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
+                    {onlineNames.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
                       </option>
                     ))}
                   </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    ชื่อมาจากทีม Online (ตั้งค่า → สรรหา / คัดสรร / OPL / Online)
+                  </p>
                 </div>
               </div>
 

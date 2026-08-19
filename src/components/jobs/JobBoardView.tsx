@@ -4,7 +4,6 @@ import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
-import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
@@ -17,13 +16,10 @@ import SearchField from '@/components/shared/SearchField';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
-import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 /**
  * เลนสรรหา — lazy ตั้งใจ: ไฟล์นี้ใช้ร่วมกับหน้าสมัครสาธารณะ /apply
  * กล่องผลค้น (+ ตัวเรียก API หลังบ้าน) ต้องไม่ถูกลากเข้า bundle ฝั่ง public
  */
-const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
-/** แก้ข้อมูลประกาศ — lazy ด้วยเหตุผลเดียวกัน (ลากตัวบันทึก override เข้า bundle public ไม่ได้) */
 const EditPublicJobFieldsDialog = React.lazy(
   () => import('@/components/jobs/EditPublicJobFieldsDialog'),
 );
@@ -50,7 +46,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, FileText, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
 import {
   isUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
@@ -211,15 +207,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   // (state จำนวนผู้สมัครต่อใบย้ายไปประกาศไว้ข้างบน — การเรียงการ์ดต้องใช้ก่อนถึงตรงนี้)
   const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
-  const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
   /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
-  const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
   /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
   const [genStandalone, setGenStandalone] = useState<
     { kind: string; kindLabel: string; departmentCode: string } | null
   >(null);
   // เจ้าหน้าที่: แก้เนื้อหาประกาศที่สร้างไว้แล้ว (mockup rev.3 ข้อ 04)
-  const [editPosting, setEditPosting] = useState<RecruitPosting | null>(null);
   // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
@@ -754,56 +747,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ) : null}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {/* เจ้าของเคาะ 17 ส.ค. 2569: *"ถ้าไม่ต่างเหลือแค่ปุ่มเดียวพอ"* →
-                            ยุบสองปุ่มเป็นปุ่มเดียว **เก็บตัวที่ทำงานครบกว่า** (ค้น 3 แหล่ง:
-                            Checklist + ฐานใหม่ + iRecruit แล้วส่ง AI โทรทันที) แล้วเปลี่ยน
-                            คำเป็น "หาผู้สมัครเพิ่ม" · ปุ่มเดิมที่พาไปหน้า Matching ค้นแต่
-                            iRecruit ให้ดูเฉย ๆ ถูกถอดออก (ของใหม่ครอบอยู่แล้ว) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLaneJob(job);
-                          }}
-                          title="ค้นคนที่ยังไม่สมัครจาก Checklist + ฐานใหม่ + iRecruit แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos โทรทันที"
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.success.outline,
-                          )}
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                          หาผู้สมัครเพิ่ม
-                        </button>
-                        {/* แก้ข้อมูลที่จะขึ้นประกาศ (17 ส.ค. 2569) — จังหวัด/อำเภอ/ตำบล ·
-                            รายได้รวม · สวัสดิการติ๊กเพิ่ม · เก็บเป็น override ฝั่งเรา ไม่แตะ ERP */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setGenLinkJob(job);
-                          }}
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.violet.outline,
-                          )}
-                        >
-                          <Link2 className="h-3.5 w-3.5" />
-                          Gen link
-                        </button>
-                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
-                        {latestPostingByJob.has(job.id) ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditPosting(latestPostingByJob.get(job.id) ?? null);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            แก้ไข
-                          </button>
-                        ) : null}
+                        {/* 🔴 19 ส.ค. 2569 เจ้าของสั่ง: *"ปุ่มจะเหลือแค่ดูชื่อ"* —
+                            "หาผู้สมัครเพิ่ม" · "Gen link" · "แก้ไข" ย้ายไปเป็นแท็บบนหน้ารายละเอียด
+                            ใบขอ (`/jobs/siamraj/:id/find|gen-link|edit`) กดการ์ดเข้าไปแล้วเลือกได้เลย */}
                         {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
                             รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
@@ -1151,31 +1097,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               </dl>
               </div>
               <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 px-5 py-4">
-                {isStaff ? (
+                {/* 19 ส.ค. 2569 เจ้าของสั่งเอาปุ่ม "เปิดใบขอในระบบ" ออก —
+                    กดที่กล่องบนบอร์ดก็เข้าหน้ารายละเอียดอยู่แล้ว ปุ่มนี้ซ้ำซ้อน */}
+                {/* 🔴 "สมัครตำแหน่งนี้" มีเฉพาะหน้าสาธารณะ (เจ้าของสั่ง 19 ส.ค. 2569) —
+                    กล่องงานเป็นหน้าเจ้าหน้าที่ ไม่ใช่หน้าที่คนสมัครเอง */}
+                {!isStaff ? (
                   <button
                     type="button"
                     onClick={() => {
+                      const job = selected;
                       setSelected(null);
-                      navigateToUnitRequest(selected, navigate, { returnTo: detailReturnTo });
+                      openApply(job);
                     }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background py-3 text-sm font-semibold text-foreground hover:bg-secondary"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
                   >
-                    <FileText className="h-4 w-4" />
-                    เปิดใบขอในระบบ
+                    สมัครตำแหน่งนี้
+                    <Send className="h-4 w-4" />
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const job = selected;
-                    setSelected(null);
-                    openApply(job);
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
-                >
-                  สมัครตำแหน่งนี้
-                  <Send className="h-4 w-4" />
-                </button>
               </div>
             </>
           )}
@@ -1195,24 +1134,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       />
 
       <GenApplyLinkDialog
-        open={!!genLinkJob}
-        job={genLinkJob}
-        onClose={() => setGenLinkJob(null)}
-        onCreated={() => setPostingsRev((n) => n + 1)}
-      />
-
-      <GenApplyLinkDialog
         open={!!genStandalone}
         job={null}
         standalone={genStandalone}
         onClose={() => setGenStandalone(null)}
         onCreated={() => setPostingsRev((n) => n + 1)}
-      />
-
-      <EditPostingDialog
-        posting={editPosting}
-        onClose={() => setEditPosting(null)}
-        onSaved={() => setPostingsRev((n) => n + 1)}
       />
 
       {/* แก้ข้อมูลที่จะขึ้นประกาศสาธารณะ — lazy เหมือนเลนสรรหา (ไฟล์นี้ใช้ร่วมกับ /apply) */}
@@ -1231,12 +1157,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         </React.Suspense>
       ) : null}
 
-      {/* เลนสรรหา (R2b) — โหลดเมื่อกดเท่านั้น ไม่ให้ติดไปกับ bundle ของ /apply */}
-      {laneJob ? (
-        <React.Suspense fallback={null}>
-          <RecruitLaneDialog open job={laneJob} onClose={() => setLaneJob(null)} />
-        </React.Suspense>
-      ) : null}
     </div>
   );
 };
