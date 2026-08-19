@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, LoaderCircle, RefreshCw } from 'lucide-react';
 import type { JobRequest } from '@/types';
 import { fetchSiamrajClosedRequests } from '@/lib/siamrajUnitRequestsApi';
+import { filterByClosedBox, JOB_BOX_LABEL, type ClosedBoxKey } from '@/lib/jobBoxGroups';
 import { jobBoardCardTitle, unitRequestCardSubtitle } from '@/lib/unitRequestDisplay';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -36,7 +37,11 @@ const RANGES = [
   { days: 365, label: '1 ปี' },
 ] as const;
 
-const ClosedRequestsPanel: React.FC = () => {
+/**
+ * `mode` (19 ส.ค. 2569) — เจ้าของสั่งแยก "ยกเลิก" ออกจาก "ปิดแล้ว"
+ * ⚠️ ทั้งสองมาจาก feed เดียวกัน แยกด้วย `cancel_date` เท่านั้น (`closedJobBoxOf`)
+ */
+const ClosedRequestsPanel: React.FC<{ mode?: ClosedBoxKey }> = ({ mode = 'closed' }) => {
   const navigate = useNavigate();
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<JobRequest[] | null>(null);
@@ -64,8 +69,10 @@ const ClosedRequestsPanel: React.FC = () => {
     void load();
   }, [load]);
 
+  const scoped = useMemo(() => filterByClosedBox(rows ?? [], mode), [rows, mode]);
+
   const filtered = useMemo(() => {
-    const list = rows ?? [];
+    const list = scoped;
     const needle = q.trim().toLowerCase();
     if (!needle) return list;
     // ค้นหลายคำ = ต้องเจอทุกคำ (แพตเทิร์นเดียวกับตัวกรองบอร์ด)
@@ -77,7 +84,7 @@ const ClosedRequestsPanel: React.FC = () => {
         .toLowerCase();
       return words.every((w) => hay.includes(w));
     });
-  }, [rows, q]);
+  }, [scoped, q]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -97,7 +104,7 @@ const ClosedRequestsPanel: React.FC = () => {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
         <span className="inline-flex items-center gap-1.5 font-semibold">
           <CheckCircle2 className={cn('h-4 w-4', TONE.success.value)} />
-          ปิดแล้ว {filtered.length.toLocaleString('th-TH')} ใบ
+          {JOB_BOX_LABEL[mode]} {filtered.length.toLocaleString('th-TH')} ใบ
         </span>
         <span className="text-xs text-muted-foreground">
           · รวม {closedPositions.toLocaleString('th-TH')} อัตรา

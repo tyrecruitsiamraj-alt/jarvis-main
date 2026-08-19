@@ -35,6 +35,15 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
+import {
+  CLOSED_BOX_KEYS,
+  JOB_BOX_HINT,
+  JOB_BOX_LABEL,
+  OPEN_BOX_KEYS,
+  countOpenBoxes,
+  filterByOpenBox,
+  type OpenBoxKey,
+} from '@/lib/jobBoxGroups';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import { compareJobsByAgeDaysDesc } from '@/lib/jobUrgency';
@@ -100,7 +109,15 @@ export type JobBoardViewProps = {
 };
 
 /** แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace */
-export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'postings' | 'closed';
+/** 'cancelled' เพิ่ม 19 ส.ค. 2569 — เจ้าของสั่งแยกใบยกเลิกออกจากกล่อง "ปิดแล้ว" */
+export type BoardViewId =
+  | 'board'
+  | 'list'
+  | 'contact'
+  | 'appointments'
+  | 'postings'
+  | 'closed'
+  | 'cancelled';
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -161,7 +178,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
-  const totalPages = getTotalPages(filters.filtered.length, pageSize);
+  /**
+   * กล่องสถานะที่เลือกอยู่ (เจ้าของสั่ง 19 ส.ค. 2569) — null = ทั้งหมด
+   * ⚠️ กรอง**หลัง**ตัวกรองปกติ (จังหวัด/ตำแหน่ง/ฯลฯ) — เลขบนกล่องจึงเป็น
+   * "ในผลที่กรองอยู่ตอนนี้" ไม่ใช่ยอดทั้งระบบ ซึ่งตรงกับที่คนกำลังมองบนจอ
+   */
+  const [openBox, setOpenBox] = useState<OpenBoxKey | null>(null);
+  const boxCounts = useMemo(() => countOpenBoxes(filters.filtered), [filters.filtered]);
+  const boxedJobs = useMemo(
+    () => filterByOpenBox(filters.filtered, openBox),
+    [filters.filtered, openBox],
+  );
+  const totalPages = getTotalPages(boxedJobs.length, pageSize);
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
   /**
@@ -182,13 +210,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const orderedJobs = useMemo(() => {
     const today = new Date();
     const hasApplicants = (id: string) => ((applicantCounts[id] ?? 0) > 0 ? 0 : 1);
-    return [...filters.filtered].sort((a, b) => {
+    return [...boxedJobs].sort((a, b) => {
       const byAge = compareJobsByAgeDaysDesc(a, b, today);
       if (byAge !== 0) return byAge;
       return hasApplicants(a.id) - hasApplicants(b.id);
     });
-  }, [filters.filtered, applicantCounts]);
+  }, [boxedJobs, applicantCounts]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
+
+  // เปลี่ยนกล่อง = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของกล่องเดิม)
+  useEffect(() => {
+    setPage(1);
+  }, [openBox]);
 
   // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
   useEffect(() => {
@@ -422,6 +455,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 // ใบขอที่ปิดแล้วหลุดจากกล่องงานเองอยู่แล้ว (กล่องงานถามหาเฉพาะใบที่ยังเปิด)
                 // แท็บนี้คือที่ที่ใบพวกนั้นไปโผล่ (เจ้าของสั่ง 17 ส.ค. 2569)
                 { id: 'closed', label: 'ปิดแล้ว' },
+                // แยกออกจาก "ปิดแล้ว" (เจ้าของสั่ง 19 ส.ค. 2569) — ยกเลิกกับปิดคนละเรื่อง
+                { id: 'cancelled', label: 'ยกเลิก' },
               ] as const
             ).map((v) => {
               const active = view === v.id;
@@ -484,9 +519,76 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           loading={loading}
           searchPlaceholder={searchPlaceholder}
           hideSearch={isStaff}
-          resultCount={loading ? undefined : filters.filtered.length}
+          resultCount={loading ? undefined : boxedJobs.length}
           totalCount={loading ? undefined : filters.visibleCount}
         />
+
+        {/* กล่องสถานะ (เจ้าของสั่ง 19 ส.ค. 2569: *"มีกล่องเพื่อดูข้อมูลได้หมดอะ กำลังสรรหา
+            ยกเลิก รอแจ้งเข้า รอเริ่มงานไรงี้"*) — 4 กล่องแรกกรองการ์ดในหน้านี้เลย
+            ส่วน "ปิดแล้ว/ยกเลิก" มาจากคนละ feed จึงพาไปมุมมองของมัน
+            ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
+        {isStaff && view === 'board' ? (
+          <div className="mt-3 overflow-x-auto pb-1">
+            <div className="inline-flex w-max gap-2">
+              <button
+                type="button"
+                onClick={() => setOpenBox(null)}
+                className={cn(
+                  'rounded-xl border px-3 py-2 text-left transition-colors',
+                  openBox === null
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-background hover:bg-secondary',
+                )}
+              >
+                <span className="block whitespace-nowrap text-xs font-semibold text-foreground">
+                  ทั้งหมด
+                </span>
+                <span className="block text-sm font-bold tabular-nums text-foreground">
+                  {filters.filtered.length.toLocaleString('th-TH')}
+                </span>
+              </button>
+
+              {OPEN_BOX_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
+                  title={JOB_BOX_HINT[key]}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-left transition-colors',
+                    openBox === key
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-background hover:bg-secondary',
+                  )}
+                >
+                  <span className="block whitespace-nowrap text-xs font-semibold text-foreground">
+                    {JOB_BOX_LABEL[key]}
+                  </span>
+                  <span className="block text-sm font-bold tabular-nums text-foreground">
+                    {boxCounts[key].toLocaleString('th-TH')}
+                  </span>
+                </button>
+              ))}
+
+              {CLOSED_BOX_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onViewChange(key)}
+                  title={JOB_BOX_HINT[key]}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-left hover:bg-secondary"
+                >
+                  <span className="block whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                    {JOB_BOX_LABEL[key]}
+                  </span>
+                  <span className="block whitespace-nowrap text-[11px] text-muted-foreground">
+                    เปิดดู →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Pre-Check ย้ายมาอยู่ท้ายแถบตัวกรอง (เจ้าของสั่ง 16 ส.ค. 2569 เย็น:
             "หน้า Pre-check ก็ย้ายไปไว้ในหน้ากล่องงาน เอาไว้ตรง Filter")
@@ -521,7 +623,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </p>
         )}
 
-        {!loading && filters.filtered.length === 0 && (
+        {!loading && boxedJobs.length === 0 && (
           <div className="mt-10 jarvis-frost rounded-[1.5rem] border border-dashed border-white/70 p-10 text-center">
             <Briefcase className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
             <p className="font-medium text-foreground">ยังไม่มีตำแหน่งที่ตรงกับตัวกรอง</p>
@@ -791,12 +893,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         </div>
 
         {/* แถบเลขหน้า — ตัวเดียวกับหน้าหน่วยงาน/ผู้สมัคร เลือกจำนวนต่อหน้าได้ (20/40/60/100) */}
-        {filters.filtered.length > 0 ? (
+        {boxedJobs.length > 0 ? (
           <div className="pb-10 pt-4">
             <ListPaginationBar
               page={currentPage}
               pageSize={pageSize}
-              totalItems={filters.filtered.length}
+              totalItems={boxedJobs.length}
               totalPages={totalPages}
               pageFrom={pageStart + 1}
               pageTo={pageStart + visibleJobs.length}

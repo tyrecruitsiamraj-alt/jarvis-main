@@ -22,7 +22,7 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 
 /** แท็บที่ไม่ใช่ RmWorkspace — ย้ายมาจากเมนูอื่น (17 ส.ค. 2569) */
-const EXTRA_VIEWS = ['postings', 'closed'] as const;
+const EXTRA_VIEWS = ['postings', 'closed', 'cancelled'] as const;
 
 /** view ระดับบอร์ด → แท็บของ RmWorkspace (นิยามแท็บอยู่ที่ lib/recruitRm เหมือนเดิม) */
 const VIEW_TO_RM_TAB = {
@@ -66,8 +66,9 @@ const StaffJobBoardPage: React.FC = () => {
         view={view}
         onViewChange={setView}
         listContent={
-          view === 'board' ? null : view === 'closed' ? (
-            <ClosedRequestsPanel />
+          view === 'board' ? null : view === 'closed' || view === 'cancelled' ? (
+            /* กล่องเดียวกัน คนละมุม — 'cancelled' = ใบที่มี cancel_date (เจ้าของสั่ง 19 ส.ค. 2569) */
+            <ClosedRequestsPanel mode={view === 'cancelled' ? 'cancelled' : 'closed'} />
           ) : view === 'postings' ? (
             /* หน้าเดิมทั้งหน้า ยกมาวางเป็นเนื้อของแท็บ — ไม่ได้ก๊อปโค้ด ใช้ตัวเดียวกัน
                กับที่ /matching/job-postings เคยเรียก (route เดิมยังอยู่เป็นทางถอย) */
