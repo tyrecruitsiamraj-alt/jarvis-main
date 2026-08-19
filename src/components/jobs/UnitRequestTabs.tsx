@@ -8,36 +8,17 @@ import { cn } from '@/lib/utils';
  *
  * แยก 4 แท็บเพราะตอบคนละคำถาม:
  *   รายละเอียด — งานนี้คืออะไร
- *   แก้ไข      — แก้ข้อมูลที่จะขึ้นประกาศ
- *   Gen link   — สร้างลิงก์รับสมัครของใบนี้
- *   หาผู้สมัครเพิ่ม — ค้น 3 แหล่งแล้วส่งเข้าคิว AI โทร
  *   ผู้สมัคร    — ใครสมัครเข้ามาบ้าง (ของจริงที่มีใบสมัครแล้ว)
  *   AI Match   — AI แนะนำใครบ้าง (ยังไม่ใช่ใบสมัคร)
  *   การติดต่อ   — ใครถูกโทรไปแล้ว ผลเป็นยังไง
  *
  * ⚠️ navigate จริง ไม่ใช่ซ่อน/โชว์ — คนต้องส่งลิงก์แท็บที่ตัวเองดูอยู่ให้กันได้
  */
-/**
- * 19 ส.ค. 2569 เจ้าของสั่งเพิ่ม 3 เส้นงาน: *"พอกดไปเห็นรายละเอียด ก็มีปุ่มให้เลือกแบบเป็น
- * เส้นงาน คือ รายละเอียด แก้ไข genlink กดอันไหนก็ทำหน้านั้นได้เลย ไม่ต้องทำปุ่มแยกแล้ว"*
- * → ปุ่มบนการ์ดบอร์ดถูกถอดออก เหลือแค่ "ดูรายชื่อ"
- */
-export const UNIT_TAB_IDS = [
-  'detail',
-  'edit',
-  'gen-link',
-  'find',
-  'applicants',
-  'ai-match',
-  'contact',
-] as const;
+export const UNIT_TAB_IDS = ['detail', 'applicants', 'ai-match', 'contact'] as const;
 export type UnitRequestTabId = (typeof UNIT_TAB_IDS)[number];
 
 const TAB_LABEL: Record<UnitRequestTabId, string> = {
   detail: 'รายละเอียดงาน',
-  edit: 'แก้ไข',
-  'gen-link': 'Gen link',
-  find: 'หาผู้สมัครเพิ่ม',
   applicants: 'ผู้สมัคร',
   'ai-match': 'AI Match',
   contact: 'การติดต่อ',

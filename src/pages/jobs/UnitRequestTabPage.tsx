@@ -32,10 +32,7 @@ const STATUS_CLASS: Record<string, string> = {
   neutral: 'jarvis-chip jarvis-chip-neutral',
 };
 
-/** แท็บที่หน้านี้รับผิดชอบ — เส้นงาน (แก้ไข/Gen link/หาผู้สมัครเพิ่ม) อยู่ที่ UnitRequestActionTabPage */
-type ListTabId = Extract<UnitRequestTabId, 'applicants' | 'ai-match' | 'contact'>;
-
-const TAB_TITLE: Record<ListTabId, string> = {
+const TAB_TITLE: Record<Exclude<UnitRequestTabId, 'detail'>, string> = {
   applicants: 'ผู้สมัคร',
   'ai-match': 'AI Match',
   contact: 'การติดต่อ',
@@ -48,7 +45,7 @@ const TAB_TITLE: Record<ListTabId, string> = {
  * ⚠️ **ผู้สมัคร ≠ AI Match** — ผู้สมัครคือคนที่มีใบสมัครจริงกับใบขอนี้ ส่วน AI Match
  * คือคนที่ AI แนะนำ ซึ่งยังไม่ใช่ใบสมัคร · เอาปนกันแล้วยอด "ผู้สมัคร" จะเฟ้อทันที
  */
-const UnitRequestTabPage: React.FC<{ tab: ListTabId }> = ({ tab }) => {
+const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }> = ({ tab }) => {
   const { id = '' } = useParams();
   const [job, setJob] = useState<JobRequest | null>(null);
   const [items, setItems] = useState<PublicApplication[] | null>(null);

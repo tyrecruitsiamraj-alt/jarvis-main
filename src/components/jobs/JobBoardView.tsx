@@ -56,6 +56,8 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
+import EditPostingDialog from '@/components/jobs/EditPostingDialog';
+const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
@@ -239,6 +241,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น
   // (state จำนวนผู้สมัครต่อใบย้ายไปประกาศไว้ข้างบน — การเรียงการ์ดต้องใช้ก่อนถึงตรงนี้)
   const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
+  const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
+  const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
+  const [editPosting, setEditPosting] = useState<RecruitPosting | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
   /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
@@ -849,9 +854,56 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ) : null}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {/* 🔴 19 ส.ค. 2569 เจ้าของสั่ง: *"ปุ่มจะเหลือแค่ดูชื่อ"* —
-                            "หาผู้สมัครเพิ่ม" · "Gen link" · "แก้ไข" ย้ายไปเป็นแท็บบนหน้ารายละเอียด
-                            ใบขอ (`/jobs/siamraj/:id/find|gen-link|edit`) กดการ์ดเข้าไปแล้วเลือกได้เลย */}
+                        {/* เจ้าของเคาะ 17 ส.ค. 2569: *"ถ้าไม่ต่างเหลือแค่ปุ่มเดียวพอ"* →
+                            ยุบสองปุ่มเป็นปุ่มเดียว **เก็บตัวที่ทำงานครบกว่า** (ค้น 3 แหล่ง:
+                            Checklist + ฐานใหม่ + iRecruit แล้วส่ง AI โทรทันที) แล้วเปลี่ยน
+                            คำเป็น "หาผู้สมัครเพิ่ม" · ปุ่มเดิมที่พาไปหน้า Matching ค้นแต่
+                            iRecruit ให้ดูเฉย ๆ ถูกถอดออก (ของใหม่ครอบอยู่แล้ว) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLaneJob(job);
+                          }}
+                          title="ค้นคนที่ยังไม่สมัครจาก Checklist + ฐานใหม่ + iRecruit แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos โทรทันที"
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.success.outline,
+                          )}
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          หาผู้สมัครเพิ่ม
+                        </button>
+                        {/* แก้ข้อมูลที่จะขึ้นประกาศ (17 ส.ค. 2569) — จังหวัด/อำเภอ/ตำบล ·
+                            รายได้รวม · สวัสดิการติ๊กเพิ่ม · เก็บเป็น override ฝั่งเรา ไม่แตะ ERP */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGenLinkJob(job);
+                          }}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                            TONE.violet.outline,
+                          )}
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          Gen link
+                        </button>
+                        {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
+                        {latestPostingByJob.has(job.id) ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditPosting(latestPostingByJob.get(job.id) ?? null);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-secondary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            แก้ไข
+                          </button>
+                        ) : null}
                         {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
                             รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
@@ -1236,6 +1288,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       />
 
       <GenApplyLinkDialog
+        open={!!genLinkJob}
+        job={genLinkJob}
+        onClose={() => setGenLinkJob(null)}
+        onCreated={() => setPostingsRev((n) => n + 1)}
+      />
+
+      <EditPostingDialog
+        posting={editPosting}
+        onClose={() => setEditPosting(null)}
+        onSaved={() => setPostingsRev((n) => n + 1)}
+      />
+
+      <GenApplyLinkDialog
         open={!!genStandalone}
         job={null}
         standalone={genStandalone}
@@ -1259,6 +1324,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         </React.Suspense>
       ) : null}
 
+      {/* เลนสรรหา (R2b) — โหลดเมื่อกดเท่านั้น ไม่ให้ติดไปกับ bundle ของ /apply */}
+      {laneJob ? (
+        <React.Suspense fallback={null}>
+          <RecruitLaneDialog open job={laneJob} onClose={() => setLaneJob(null)} />
+        </React.Suspense>
+      ) : null}
     </div>
   );
 };
