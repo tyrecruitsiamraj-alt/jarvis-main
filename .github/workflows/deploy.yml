@@ -51,6 +51,12 @@ jobs:
                       ./scripts/sync-env.sh .env IRECRUIT_DB_PASSWORD "${{ secrets.IRECRUIT_DB_PASSWORD }}"
                       ./scripts/sync-env.sh .env IRECRUIT_DB_NAME "${{ secrets.IRECRUIT_DB_NAME }}"
                       ./scripts/sync-env.sh .env RECRUIT_REGISTER_OWNER "${{ secrets.RECRUIT_REGISTER_OWNER }}"
+                      # ส่งใบสมัครจากหน้าสาธารณะเข้าคิว AI โทรอัตโนมัติ
+                      # เจ้าของสั่งไว้ตั้งแต่ 15 ส.ค. 2569 (migration 090) แต่สวิตช์นี้ไม่เคยถูกใส่
+                      # ใน deploy จึงปิดอยู่บนเครื่องจริงมาตลอด — ใบสมัคร 17 ส.ค. เลยไม่เข้าคิวสักใบ
+                      # (ยืนยัน 19 ส.ค.: คิวมี card-/ir-/follow- แต่ไม่มี app- เลยสักแถว)
+                      ./scripts/sync-env.sh .env APPLICATION_AUTO_DISPATCH_ENABLED "true"
+
                       # ตัวย้ายใบสมัครอัตโนมัติ (19 ส.ค. 2569) — เจ้าของเคาะว่า "เปิดโหมดลองดูก่อน"
                       # ENABLED=true เดินรอบทุก 15 นาทีแล้วบันทึกว่า "รอบนี้จะย้ายใครไปไหน"
                       # APPLY=false คือยังไม่เขียนจริง · ดูผลที่ ตั้งค่า → ย้ายใบสมัครอัตโนมัติ
