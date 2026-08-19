@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
+import PrequestBadge from '@/components/jobs/PrequestBadge';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
@@ -163,10 +164,14 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
         subtitle={data?.request_no || 'อ่านจาก Siamraj'}
         backPath={backPath}
         actions={
-          <span className={cn('inline-flex items-center gap-1', TONE.primary.chip)}>
-            <Database className="w-3.5 h-3.5" />
-            Siamraj · อ่านอย่างเดียว
-          </span>
+          <>
+            {/* ป้ายใบขอชั่วคราว — หน้ารายละเอียดคือที่ที่คนตัดสินใจว่าจะสัญญาอะไรกับผู้สมัคร */}
+            <PrequestBadge job={data ?? { id }} />
+            <span className={cn('inline-flex items-center gap-1', TONE.primary.chip)}>
+              <Database className="w-3.5 h-3.5" />
+              Siamraj · อ่านอย่างเดียว
+            </span>
+          </>
         }
       />
 

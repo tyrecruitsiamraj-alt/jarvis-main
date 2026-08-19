@@ -5,6 +5,8 @@
  * ค่าเริ่มต้นทุกตัวจึงเอียงไปทาง "ไม่ทำอะไร": ปิดอยู่ และถึงเปิดก็เป็นโหมดลองดูก่อน
  */
 
+import { PREQUEST_LABEL } from './publicJobVisibility';
+
 /** ผลรายคนของรอบหนึ่ง — ตรงกับ `AutoMoveResult.details` ฝั่งเซิร์ฟเวอร์ */
 export type AutoMoveDetail = {
   applicationId: string;
@@ -89,7 +91,7 @@ export function readAutoMoveWorkerConfig(env: Record<string, string | undefined>
 /**
  * เลขที่ใบขอจากคีย์เต็ม — `siamraj-sql:OPL6901006` → `OPL6901006`
  * ⚠️ คีย์ที่ระบบใช้ต้องเป็น id เต็มเสมอ ตัวนี้ใช้ **แสดงผลอย่างเดียว**
- * (เลขที่ใบซ้ำกันได้ระหว่างใบปกติกับใบล่วงหน้า จึงติดป้าย "ล่วงหน้า" กำกับให้ด้วย)
+ * (เลขที่ใบซ้ำกันได้ระหว่างใบปกติกับใบล่วงหน้า จึงติดป้ายกำกับให้ด้วย — คำเดียวกับป้ายบนจอ)
  */
 export function autoMoveJobLabel(jobId: string): string {
   const s = String(jobId ?? '').trim();
@@ -98,7 +100,7 @@ export function autoMoveJobLabel(jobId: string): string {
   if (i < 0) return s;
   const prefix = s.slice(0, i);
   const no = s.slice(i + 1) || s;
-  return prefix === 'siamraj-pre' ? `${no} (ล่วงหน้า)` : no;
+  return prefix === 'siamraj-pre' ? `${no} (${PREQUEST_LABEL})` : no;
 }
 
 /** บรรทัดเดียวต่อคน — "สมชาย ใจดี · OPL6901006 → LBM6908002" */

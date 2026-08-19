@@ -62,7 +62,7 @@ describe('autoMoveJobLabel', () => {
     expect(autoMoveJobLabel('siamraj-sql:OPL6901006')).toBe('OPL6901006');
   });
   it('🔴 ใบล่วงหน้าต้องติดป้ายกำกับ — เลขที่ใบซ้ำกับใบปกติได้จริง', () => {
-    expect(autoMoveJobLabel('siamraj-pre:LBM6908001')).toBe('LBM6908001 (ล่วงหน้า)');
+    expect(autoMoveJobLabel('siamraj-pre:LBM6908001')).toBe('LBM6908001 (ใบขอชั่วคราว)');
   });
   it('คีย์ที่ไม่มี prefix / ว่าง', () => {
     expect(autoMoveJobLabel('OPL1')).toBe('OPL1');

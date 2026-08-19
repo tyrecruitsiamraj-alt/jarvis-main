@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { DASH } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import type { DashboardSortDir, DashboardSortKey, DashboardWorkItem } from '@/lib/dashboard/types';
@@ -93,7 +94,12 @@ const DashboardWorkQueueTable: React.FC<Props> = ({
                   onClick={() => onView(item)}
                 >
                   <td className="px-3 py-3 align-top">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">{item.requestNo}</p>
+                    <p className="flex flex-wrap items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100">
+                      {item.requestNo}
+                      {/* ⚠️ แดชบอร์ดส่งมาแต่ `id` ที่ขึ้นต้น siamraj-pre: ไม่มีธง is_prequest
+                          — PrequestBadge เช็คทั้งสองทางอยู่แล้ว */}
+                      <PrequestBadge job={item} compact />
+                    </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{item.unitName}</p>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{item.lifecycleKind}</p>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500">{item.requestAction || item.requestKind}</p>

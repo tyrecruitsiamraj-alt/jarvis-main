@@ -57,6 +57,16 @@ export function isPublicPrequestEnabled(raw: string | undefined): boolean {
   return !(v === 'false' || v === '0' || v === 'no' || v === 'off');
 }
 
+/**
+ * คำที่ใช้เรียกใบขอล่วงหน้า **บนหน้าจอ** (เจ้าของสั่ง 19 ส.ค. 2569: *"ใบขอไหนมาจากใบพรี
+ * ก็ใส่ป้ายแท็กไว้ว่าเป็นใบขอชั่วคราว"*)
+ *
+ * 🔴 ที่เดียวในระบบ — ใบพรีโผล่หลายหน้า (บอร์ด · รายการ · รายละเอียด · แดชบอร์ด ·
+ * รายงานตัวย้ายใบสมัคร) ถ้าแต่ละที่พิมพ์คำเอง จะกลายเป็นของสิ่งเดียวกันแต่เรียกคนละชื่อ
+ * ⚠️ นี่คือ **คำบนจอ** เท่านั้น — ฝั่งข้อมูลยังเรียก prequest/`siamraj-pre:` เหมือนเดิม
+ */
+export const PREQUEST_LABEL = 'ใบขอชั่วคราว';
+
 /** ใบล่วงหน้าดูจาก id (`siamraj-pre:`) หรือธง `is_prequest` — เช็คสองทางเพราะบางเส้นส่งมาไม่ครบ */
 export function isPrequestJob(job: { id?: unknown; is_prequest?: unknown }): boolean {
   if (job.is_prequest === true) return true;

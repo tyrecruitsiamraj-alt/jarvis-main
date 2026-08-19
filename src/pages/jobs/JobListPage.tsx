@@ -15,6 +15,7 @@ import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNav
 import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
+import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
 import {
@@ -669,8 +670,9 @@ const JobListPage: React.FC = () => {
                   className="w-full text-left"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="font-semibold text-foreground text-sm">
+                    <span className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground text-sm">
                       {j.request_no || j.unit_name}
+                      <PrequestBadge job={j} compact />
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span
@@ -747,6 +749,7 @@ const JobListPage: React.FC = () => {
 
                   <div className="flex items-center justify-end mt-2 text-xs gap-2">
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <PrequestBadge job={j} compact />
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
                       <UnitRequestWorkStatusBadge
                         status={j.work_status}
@@ -804,7 +807,12 @@ const JobListPage: React.FC = () => {
                     }}
                     className={cn('cursor-pointer border-b', DASH.tableRow)}
                   >
-                    <td className={cn('px-3 py-3 whitespace-nowrap', DASH.cellStrong)}>{j.request_no || '—'}</td>
+                    <td className={cn('px-3 py-3 whitespace-nowrap', DASH.cellStrong)}>
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {j.request_no || '—'}
+                        <PrequestBadge job={j} compact />
+                      </span>
+                    </td>
                     {/* ชิปอายุใบขอ 4 ระดับ (mockup rev.3 ข้อ 05) — ภาษาสีเดียวกับหน้า Matching
                         เดิมเป็นชิปเทาเท่ากันหมด มองไม่ออกว่าใบไหนค้างนาน · เกณฑ์ถังไม่เปลี่ยน */}
                     <td className="px-3 py-3 text-xs whitespace-nowrap">
@@ -853,6 +861,7 @@ const JobListPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">
+                      <PrequestBadge job={j} compact />
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
                     </td>
                     <td className="px-3 py-3 text-center">
