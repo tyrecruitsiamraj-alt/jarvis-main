@@ -26,6 +26,16 @@ function trimTo(value: unknown, max: number): string | null {
   return s.slice(0, max);
 }
 
+/**
+ * ทำคำค้นให้ปลอดภัยสำหรับ ILIKE
+ * ⚠️ `_` และ `%` เป็นไวลด์การ์ดของ SQL — ปล่อยดิบ ๆ แล้วคนพิมพ์ `__test__`
+ * จะได้แถวที่มีแค่คำว่า "test" ติดมาด้วย (เจอจริงตอนตรวจหน้าจัดช่องทาง 19 ส.ค. 2569)
+ * ใส่ `\` นำหน้าแล้วประกาศ ESCAPE ที่คิวรีทุกจุดที่ใช้
+ */
+function likeContains(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+}
+
 /** โค้ดลิงก์ — ตัวอักษรที่อ่าน/พิมพ์ตามไม่สับสน (ตัด 0/O/1/I/l ออก) */
 const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 
@@ -92,6 +102,47 @@ export async function listRecruitChannelRoots(includeInactive = false): Promise<
   return rows.map((r) => ({ ...mapChannel(r), childCount: Number(r.child_count) || 0 }));
 }
 
+/**
+ * ช่องทางหลักแบบแบ่งหน้า + ค้นหา — ใช้ในหน้าจัดช่องทาง (มุมมอง "ช่องทางหลัก")
+ * แยกจาก `listRecruitChannelRoots` ที่คืนทั้งชุดโดยตั้งใจ — ตัวนั้น ChannelPicker ใช้อยู่
+ * และหน้าจัดการต้องเห็นของที่ปิดใช้งานด้วย
+ */
+export async function listRecruitChannelRootsPage(
+  options: { includeInactive?: boolean; limit?: number; offset?: number; q?: string } = {},
+): Promise<{ items: RecruitChannel[]; total: number }> {
+  const includeInactive = !!options.includeInactive;
+  const limit = clampLimit(options.limit, 50);
+  const offset = Math.max(0, Math.trunc(Number(options.offset) || 0));
+  const q = trimTo(options.q, MAX_TEXT);
+  const params: unknown[] = [];
+  let where = 'c.parent_id IS NULL';
+  if (!includeInactive) where += ' AND c.is_active = true';
+  if (q) {
+    params.push(likeContains(q));
+    where += ` AND c.name ILIKE $${params.length} ESCAPE '\\'`;
+  }
+  const totalRes = await dbQuery<{ n: string }>(
+    `SELECT count(*) AS n FROM ${channelsTable} c WHERE ${where}`,
+    params,
+  );
+  // ⚠️ อย่า push ทับ params ตัวเดิม — คิวรีนับใช้อยู่ (บทเรียนเดียวกับ listRecruitChannelChildren)
+  const pageParams = [...params, limit, offset];
+  const { rows } = await dbQuery<ChannelRow & { child_count: string }>(
+    `SELECT c.id, c.parent_id, c.name, c.sort_order, c.is_active,
+            (SELECT count(*) FROM ${channelsTable} k
+              WHERE k.parent_id = c.id ${includeInactive ? '' : 'AND k.is_active = true'}) AS child_count
+       FROM ${channelsTable} c
+      WHERE ${where}
+      ORDER BY c.sort_order, lower(c.name)
+      LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
+    pageParams,
+  );
+  return {
+    items: rows.map((r) => ({ ...mapChannel(r), childCount: Number(r.child_count) || 0 })),
+    total: Number(totalRes.rows[0]?.n) || 0,
+  };
+}
+
 /** เพดานผลลัพธ์ต่อครั้ง — พ่อบางตัวมีลูก 4,187 ตัว ส่งหมดไม่ไหว */
 export const RECRUIT_CHANNEL_PAGE_MAX = 200;
 
@@ -101,40 +152,62 @@ function clampLimit(value: unknown, fallback: number): number {
   return Math.min(Math.trunc(n), RECRUIT_CHANNEL_PAGE_MAX);
 }
 
-/** ช่องทางรองของพ่อหนึ่งตัว แบ่งหน้า — คืน total ด้วยเพื่อให้หน้าเว็บบอกได้ว่าเหลืออีกกี่ตัว */
+type MatchRow = ChannelRow & { parent_name: string | null };
+
+/**
+ * ช่องทางรอง แบ่งหน้า — คืน total ด้วยเพื่อให้หน้าเว็บบอกได้ว่าเหลืออีกกี่ตัว
+ *
+ * `parentId` = ไอดีพ่อ → เฉพาะลูกของพ่อตัวนั้น (ท่าเดิมที่ ChannelPicker/ป๊อปอัปเก่าใช้)
+ * `parentId` = null   → **ช่องทางรองทุกพ่อ** (มุมมอง "ช่องทางรอง" ของหน้าจัดช่องทาง)
+ *
+ * ⚠️ ตอนดูข้ามพ่อ คำค้นต้องแมตช์ชื่อพ่อด้วย — คนพิมพ์ "Facebook" แล้วคาดว่าจะเห็นกลุ่มทั้งหมด
+ * แต่ตอนเจาะพ่อตัวเดียวห้ามแมตช์ชื่อพ่อ ไม่งั้นพิมพ์อะไรก็ได้ทั้งกอง
+ */
 export async function listRecruitChannelChildren(
-  parentId: string,
+  parentId: string | null,
   options: { includeInactive?: boolean; limit?: number; offset?: number; q?: string } = {},
 ): Promise<{ items: RecruitChannel[]; total: number }> {
   const includeInactive = !!options.includeInactive;
   const limit = clampLimit(options.limit, 50);
   const offset = Math.max(0, Math.trunc(Number(options.offset) || 0));
   const q = trimTo(options.q, MAX_TEXT);
-  const params: unknown[] = [parentId];
-  let where = 'parent_id = $1';
-  if (!includeInactive) where += ' AND is_active = true';
+  const scopedParent = trimTo(parentId, 64);
+  const params: unknown[] = [];
+  let where = 'c.parent_id IS NOT NULL';
+  if (scopedParent) {
+    params.push(scopedParent);
+    where += ` AND c.parent_id = $${params.length}`;
+  }
+  if (!includeInactive) where += ' AND c.is_active = true';
   if (q) {
-    params.push(`%${q}%`);
-    where += ` AND name ILIKE $${params.length}`;
+    params.push(likeContains(q));
+    where += scopedParent
+      ? ` AND c.name ILIKE $${params.length} ESCAPE '\\'`
+      : ` AND (c.name ILIKE $${params.length} ESCAPE '\\' OR p.name ILIKE $${params.length} ESCAPE '\\')`;
   }
   const totalRes = await dbQuery<{ n: string }>(
-    `SELECT count(*) AS n FROM ${channelsTable} WHERE ${where}`,
+    `SELECT count(*) AS n
+       FROM ${channelsTable} c
+       LEFT JOIN ${channelsTable} p ON p.id = c.parent_id
+      WHERE ${where}`,
     params,
   );
   // ⚠️ อย่า push ทับ params ตัวเดิม — คิวรีนับใช้อยู่ ต่อท้ายแล้วจะอ่านย้อนหลังไม่ตรง
   const pageParams = [...params, limit, offset];
-  const { rows } = await dbQuery<ChannelRow>(
-    `SELECT id, parent_id, name, sort_order, is_active
-       FROM ${channelsTable}
+  const { rows } = await dbQuery<MatchRow>(
+    `SELECT c.id, c.parent_id, c.name, c.sort_order, c.is_active, p.name AS parent_name
+       FROM ${channelsTable} c
+       LEFT JOIN ${channelsTable} p ON p.id = c.parent_id
       WHERE ${where}
-      ORDER BY sort_order, lower(name)
+      ORDER BY lower(coalesce(p.name, '')), c.sort_order, lower(c.name)
       LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`,
     pageParams,
   );
-  return { items: rows.map(mapChannel), total: Number(totalRes.rows[0]?.n) || 0 };
+  return {
+    items: rows.map((r) => ({ ...mapChannel(r), parentName: r.parent_name })),
+    total: Number(totalRes.rows[0]?.n) || 0,
+  };
 }
-
-type MatchRow = ChannelRow & { parent_name: string | null };
 
 /**
  * ค้นหาช่องทางด้วยข้อความ — ค้นทั้งชื่อลูกและชื่อพ่อ
@@ -153,10 +226,10 @@ export async function searchRecruitChannels(
     `SELECT c.id, c.parent_id, c.name, c.sort_order, c.is_active, p.name AS parent_name
        FROM ${channelsTable} c
        LEFT JOIN ${channelsTable} p ON p.id = c.parent_id
-      WHERE (c.name ILIKE $1 OR p.name ILIKE $1) ${activeFilter}
-      ORDER BY (c.name ILIKE $1) DESC, lower(coalesce(p.name, '')), c.sort_order, lower(c.name)
+      WHERE (c.name ILIKE $1 ESCAPE '\\' OR p.name ILIKE $1 ESCAPE '\\') ${activeFilter}
+      ORDER BY (c.name ILIKE $1 ESCAPE '\\') DESC, lower(coalesce(p.name, '')), c.sort_order, lower(c.name)
       LIMIT $2`,
-    [`%${term}%`, limit],
+    [likeContains(term), limit],
   );
   return rows.map((r) => ({
     id: r.id,

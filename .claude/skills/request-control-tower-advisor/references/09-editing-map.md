@@ -2804,3 +2804,38 @@ state (`calendarOpen`/`selectedDay`/`month`) + derived (`calendar`/`grid`/`month
 
 * การกรองรายวันมีที่ **"ตัวกรอง" ของลิสต์** (ค่ำ-6: วันที่/ช่วงเวลา/เจ้าของงาน) อยู่แล้ว
   ปฏิทินบนแผงจึงซ้ำซ้อน · ตรวจจริง: ปุ่มปฏิทิน/ชิปหาย · แผง 3 รอบ+รีเฟรชอยู่ครบ · console สะอาด
+
+### รอบ 19 ส.ค. 2569 (รอบยี่สิบสี่ · งาน-1) — หน้าจัดช่องทางรับสมัครเต็มจอ (แทนป๊อปอัปเดิม)
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/recruitChannelAdmin.ts` | **ใหม่ · pure** — เลขหน้า (`channelPageCount`/`clampChannelPage`/`channelPageOffset`/`channelRangeLabel`) + ตรวจชื่อ + ข้อความเตือนก่อนลบ (เทสต์ 16) |
+| `src/pages/recruit/RecruitChannelsPage.tsx` | **ใหม่** — หน้า `/recruit/channels` · สลับมุมมองหลัก/รอง · ค้นหา+แบ่งหน้าฝั่งเซิร์ฟเวอร์ · เพิ่ม/แก้ชื่อ/เปิด-ปิด/ลบ · dropdown เลือกพ่อที่ค้นได้ |
+| `src/App.tsx` | ลงทะเบียน route `/recruit/channels` (lazy chunk แยก) |
+| `src/components/jobs/RecruitBoardTools.tsx` | 🔴 **ถอด `ChannelManagerDialog` ทั้งก้อน** — ปุ่ม "ช่องทาง" `navigate('/recruit/channels')` แทน |
+| `api/_lib/recruitPostings.ts` | `listRecruitChannelRootsPage()` **ใหม่** · `listRecruitChannelChildren()` รับ `parentId = null` (ทุกพ่อ) + คืน `parentName` · `likeContains()` escape ไวลด์การ์ด |
+| `api/_handlers/recruit-channels.ts` | สาขา `?view=roots` / `?view=children` คืน `{ items, total }` (ท่าเดิม `roots=1`/`parent=`/`q=` ยังอยู่ครบ) |
+| `src/lib/recruitPostingsApi.ts` | `fetchRecruitChannelRootsPage()` · `fetchRecruitChannelSecondary()` |
+| `src/lib/recruitPostings.ts` | `RecruitChannel.parentName?` |
+| `tests/api/recruitChannelAdmin.test.ts` · `tests/api/recruitChannelSearch.test.ts` | เทสต์ใหม่ 16 + อัปเดตคำยืนยัน SQL + เคส escape 2 อัน |
+
+**เจ้าของเคาะ 19 ส.ค. 2569:** *"หน้าใหม่เต็มจอ + ถอดป๊อปอัปเดิม"*
+
+**กับดัก / ตรวจจริง**
+* 🔴 **`_` และ `%` ในคำค้นเป็นไวลด์การ์ดของ SQL** — ของเดิมส่ง `%${q}%` ดิบ ๆ พิมพ์ `__test__`
+  แล้วได้แถวที่มีแค่คำว่า "test" ติดมา 6 แถว (เจอตอนไล่หาข้อมูลทดสอบที่ค้าง — เกือบสรุปผิดว่าลบไม่หมด)
+  → `likeContains()` + `ESCAPE '\'` ทุกจุด · **`ESCAPE '\\'` (สองตัว) = `invalid escape string` ฐานตีกลับ**
+  ยืนยันกับฐานจริงแล้วว่าตัวเดียวเท่านั้นที่ผ่าน
+* 🔴 **FK `parent_id` เป็น `on delete cascade`** (migration 063) — ลบช่องทางหลัก = ลูกหายทั้งกอง
+  ข้อความยืนยันต้องบอกจำนวนลูกเสมอ (`channelDeleteWarning`) · ตรวจจริง: กดลบ "Facebook Ads"
+  ขึ้น "ช่องทางรองใต้ช่องทางนี้ 6 ช่องจะถูกลบไปด้วย" · กดยกเลิกแล้วยอดยัง 43/4,345 ครบ
+* 🔴 **เลขบนแท็บต้องมาจากยอดที่ไม่ถูกกรอง** — ถ้าเขียนทับด้วย total ของผลค้น แท็บจะกลายเป็น
+  "ช่องทางรอง 860" ตอนพิมพ์ค้น · แยก `counts` ออกจาก `total` ของตาราง
+* `MatchRow` ต้องประกาศ**ก่อน** `listRecruitChannelChildren` (ไฟล์เดียวกัน ใช้ก่อนประกาศ = tsc ตก)
+* dropdown เลือกพ่อโหลดพ่อ 43 ตัวครั้งเดียวแล้วกรองในเครื่อง — **ไม่ขัดกฎ "ห้ามโหลดหมด"**
+  ที่ห้ามคือลูก 4,345 ตัว (ท่าเดียวกับ ChannelPicker เดิม)
+* ตรวจจริงบนเบราว์เซอร์ (ยิงเส้นเขียนจริงแล้วคืนค่าเดิมครบ): แท็บ 43 / 4,345 ·
+  รอง "1–25 จาก 4,345" หน้า 1/174 · กดถัดไปได้ "26–50" · ค้น "ขับรถ" เหลือ 860 (35 หน้า) ·
+  กรองพ่อ Facebook Ads เหลือ 6 · เพิ่ม `__test__` เป็น 7 → แก้ชื่อ → ปิดใช้งาน → ลบ กลับเป็น 6 ·
+  เพิ่มช่องทางหลักซ้ำชื่อ = "มีช่องทางชื่อนี้อยู่แล้ว" (400 ตามคาด) · ลบทิ้งกลับเป็น 43 ·
+  ปุ่ม "ช่องทาง" บนบอร์ดพาไป `/recruit/channels` จริง · โหมดมืดการ์ด slate-900 ตัวหนังสือสว่าง · console สะอาด

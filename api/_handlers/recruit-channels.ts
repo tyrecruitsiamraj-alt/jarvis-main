@@ -9,6 +9,7 @@ import { readJsonBody } from '../_lib/body.js';
 import {
   listRecruitChannels,
   listRecruitChannelRoots,
+  listRecruitChannelRootsPage,
   listRecruitChannelChildren,
   searchRecruitChannels,
   createRecruitChannel,
@@ -39,22 +40,45 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const includeInactive = getQuery(req, 'all') === '1';
       const limit = Number(getQuery(req, 'limit')) || undefined;
 
-      // ค้นหา — หน้าเว็บใช้ท่านี้เป็นหลัก (ทรีเต็มมี 4,390 แถวหลังยกของจากระบบเดิม)
       const q = getQuery(req, 'q');
+      const offset = Number(getQuery(req, 'offset')) || 0;
+
+      /**
+       * หน้าจัดช่องทาง — สองมุมมองแบ่งหน้าฝั่งเซิร์ฟเวอร์ คืน { items, total }
+       * ⚠️ ต้องเช็คก่อนสาขา `q` ข้างล่าง ไม่งั้นพิมพ์ค้นหาแล้วตกไปที่ผลค้นแบบเก่า (ไม่มี total)
+       */
+      const view = getQuery(req, 'view');
+      if (view === 'roots') {
+        return res
+          .status(200)
+          .json(await listRecruitChannelRootsPage({ includeInactive, limit, offset, q }));
+      }
+      if (view === 'children') {
+        return res.status(200).json(
+          await listRecruitChannelChildren(getQuery(req, 'parent') || null, {
+            includeInactive,
+            limit,
+            offset,
+            q,
+          }),
+        );
+      }
+
+      // ค้นหา — ตัวเลือกช่องทาง (ChannelPicker) ใช้ท่านี้ (ทรีเต็มมี 4,390 แถว)
       if (q) {
         return res
           .status(200)
           .json(await searchRecruitChannels(q, { includeInactive, limit }));
       }
 
-      // ช่องทางรองของพ่อหนึ่งตัว แบ่งหน้า
+      // ช่องทางรองของพ่อหนึ่งตัว แบ่งหน้า (ท่าเดิม — คำค้นอยู่ที่ childQ)
       const parent = getQuery(req, 'parent');
       if (parent) {
         return res.status(200).json(
           await listRecruitChannelChildren(parent, {
             includeInactive,
             limit,
-            offset: Number(getQuery(req, 'offset')) || 0,
+            offset,
             q: getQuery(req, 'childQ'),
           }),
         );

@@ -40,8 +40,20 @@ describe('ค้นหาช่องทาง', () => {
   it('ค้นทั้งชื่อช่องย่อยและชื่อช่องหลัก — พิมพ์ "Facebook" ต้องเจอกลุ่มที่อยู่ใต้ Facebook Group', async () => {
     vi.mocked(dbQuery).mockResolvedValue({ rows: [] });
     await searchRecruitChannels('Facebook');
-    expect(sqlOf(0)).toContain('c.name ILIKE $1 OR p.name ILIKE $1');
+    expect(sqlOf(0)).toContain(String.raw`c.name ILIKE $1 ESCAPE '\' OR p.name ILIKE $1 ESCAPE '\'`);
     expect(paramsOf(0)[0]).toBe('%Facebook%');
+  });
+
+  it("🔴 `_` กับ `%` ในคำค้นต้องถูก escape — ไม่งั้นพิมพ์ `__test__` ได้แถวที่มีแค่ 'test' ติดมา", async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] });
+    await searchRecruitChannels('__test__');
+    expect(paramsOf(0)[0]).toBe('%\\_\\_test\\_\\_%');
+    expect(sqlOf(0)).toContain(String.raw`ESCAPE '\'`);
+
+    vi.mocked(dbQuery).mockReset();
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] });
+    await searchRecruitChannels('50%');
+    expect(paramsOf(0)[0]).toBe('%50\\%%');
   });
 
   it('ไม่รวมช่องที่ปิดอยู่ตามค่าเริ่มต้น · ขอ all=1 ถึงจะรวม', async () => {

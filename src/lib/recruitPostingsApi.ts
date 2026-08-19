@@ -53,6 +53,46 @@ export async function fetchRecruitChannelChildren(
 }
 
 
+/** มุมมอง "ช่องทางหลัก" ของหน้าจัดช่องทาง — แบ่งหน้า + ค้นหาฝั่งเซิร์ฟเวอร์ */
+export async function fetchRecruitChannelRootsPage(
+  options: { includeInactive?: boolean; limit?: number; offset?: number; q?: string } = {},
+): Promise<{ items: RecruitChannel[]; total: number }> {
+  const params = new URLSearchParams({ view: 'roots' });
+  if (options.includeInactive) params.set('all', '1');
+  if (options.limit) params.set('limit', String(options.limit));
+  if (options.offset) params.set('offset', String(options.offset));
+  if (options.q) params.set('q', options.q);
+  const r = await apiFetch(`/api/recruit/channels?${params.toString()}`);
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดช่องทางหลักไม่สำเร็จ'));
+  const data = await readJsonSafe<{ items: RecruitChannel[]; total: number }>(r);
+  return { items: Array.isArray(data?.items) ? data.items : [], total: Number(data?.total) || 0 };
+}
+
+/**
+ * มุมมอง "ช่องทางรอง" ของหน้าจัดช่องทาง — ข้ามพ่อได้ (parentId ว่าง = ทุกพ่อ)
+ * ⚠️ ของจริง 4,345 แถว ห้ามโหลดหมด — ต้องส่ง limit/offset ทุกครั้ง
+ */
+export async function fetchRecruitChannelSecondary(
+  options: {
+    parentId?: string | null;
+    includeInactive?: boolean;
+    limit?: number;
+    offset?: number;
+    q?: string;
+  } = {},
+): Promise<{ items: RecruitChannel[]; total: number }> {
+  const params = new URLSearchParams({ view: 'children' });
+  if (options.parentId) params.set('parent', options.parentId);
+  if (options.includeInactive) params.set('all', '1');
+  if (options.limit) params.set('limit', String(options.limit));
+  if (options.offset) params.set('offset', String(options.offset));
+  if (options.q) params.set('q', options.q);
+  const r = await apiFetch(`/api/recruit/channels?${params.toString()}`);
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดช่องทางรองไม่สำเร็จ'));
+  const data = await readJsonSafe<{ items: RecruitChannel[]; total: number }>(r);
+  return { items: Array.isArray(data?.items) ? data.items : [], total: Number(data?.total) || 0 };
+}
+
 export async function createRecruitChannel(input: {
   parentId?: string | null;
   name: string;

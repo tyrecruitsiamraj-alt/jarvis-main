@@ -36,6 +36,7 @@ const SelectionContactPage = lazy(() => import("@/pages/matching/SelectionContac
 const PreCheckPage = lazy(() => import("@/pages/matching/PreCheckPage"));
 const JobPostingsPage = lazy(() => import("@/pages/matching/JobPostingsPage"));
 const RecruitRmPage = lazy(() => import("@/pages/recruit/RecruitRmPage"));
+const RecruitChannelsPage = lazy(() => import("@/pages/recruit/RecruitChannelsPage"));
 const ReservationsPage = lazy(() => import("@/pages/matching/ReservationsPage"));
 const OurPeoplePage = lazy(() => import("@/pages/matching/OurPeoplePage"));
 const JobDashboard = lazy(() => import("@/pages/jobs/JobDashboard"));
@@ -106,6 +107,7 @@ const ProtectedRoutes = () => {
             <Route path="/matching/job-postings" element={<JobPostingsPage />} />
             {/* งานสรรหา (RM) — หน้าเดียว 3 แท็บ · แท็บอยู่ใน ?tab= เพื่อให้แชร์ลิงก์ได้ */}
             <Route path="/recruit/rm" element={<RecruitRmPage />} />
+            <Route path="/recruit/channels" element={<RecruitChannelsPage />} />
             <Route path="/matching/reservations" element={<ReservationsPage />} />
             {/* "โทรของฉัน" ย้ายเป็น section บนหน้าหลักแล้ว (เจ้าของสั่ง 13 ส.ค. 2569:
                 14 ส.ค. ย้ายไปหน้า Matching) — สอง path เดิม redirect เข้าหน้า Matching
