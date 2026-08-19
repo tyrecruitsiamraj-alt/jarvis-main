@@ -29,9 +29,8 @@ import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
   AGE_DAYS_MULTI_OPTIONS,
   compareJobsForListSort,
-  getJobAgeUrgencyLevel,
-  getJobRequestAgeLabel,
-  JOB_AGE_URGENCY_META,
+  getJobAgeChipInfo,
+  JOB_AGE_CHIP_META,
   getJobRequestSubmittedDate,
   JOB_LIST_SORT_OPTIONS,
   matchesAnyAgeDaysFilter,
@@ -78,9 +77,27 @@ function formatSubmittedDate(job: JobRequest): string {
   return formatYmdDmyBe(toYmdBangkok(d));
 }
 
-function ageDaysLabel(job: JobRequest): string {
-  return getJobRequestAgeLabel(job);
-}
+/**
+ * ชิป「ผ่านมา」— ข้อความ + สี + tooltip มาจาก `getJobAgeChipInfo` **ที่เดียว**
+ *
+ * 🔴 **ห้ามแยกข้อความกับสีไปอ่านคนละฟังก์ชัน** (บั๊กเดิมที่เจ้าของทัก 19 ส.ค. 2569:
+ * ข้อความว่า "ล่วงหน้า" แต่สีมาจากอายุที่นับวันจากวันที่กรอก → ใบล่วงหน้าได้สี "ด่วน"
+ * ส้ม และ tooltip ขึ้นคำว่า "ด่วน" · *"ล่วงหน้าสีอะไรก็สีนั้น … มาทำล่วงหน้าหลาย ๆ สี
+ * ให้งงทำไม"*) — ตอนนี้ใบล่วงหน้าเป็น**เขียวชุดเดียวเสมอ** ไม่ว่ากรอกไว้นานแค่ไหน
+ *
+ * `withPrefix` = การ์ดบนมือถือ (ไม่มีหัวคอลัมน์บอก) · ตารางไม่ต้องเพราะหัวคอลัมน์เขียนว่า "ผ่านมา"
+ */
+const JobAgeChip: React.FC<{ job: JobRequest; withPrefix?: boolean }> = ({ job, withPrefix }) => {
+  const info = getJobAgeChipInfo(job);
+  return (
+    <span
+      className={cn('jarvis-chip whitespace-nowrap', JOB_AGE_CHIP_META[info.level].chipCls)}
+      title={info.title}
+    >
+      {withPrefix ? info.cardText : info.text}
+    </span>
+  );
+};
 
 const SIAMRAJ_REQUEST_NO_RE = /^[a-z]{2,4}\d{4,}$/i;
 
@@ -675,15 +692,7 @@ const JobListPage: React.FC = () => {
                       <PrequestBadge job={j} compact />
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span
-                        className={cn(
-                          'jarvis-chip whitespace-nowrap',
-                          JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].chipCls,
-                        )}
-                        title={JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].label}
-                      >
-                        ผ่านมา {ageDaysLabel(j)}
-                      </span>
+                      <JobAgeChip job={j} withPrefix />
                     </div>
                   </div>
 
@@ -813,18 +822,11 @@ const JobListPage: React.FC = () => {
                         <PrequestBadge job={j} compact />
                       </span>
                     </td>
-                    {/* ชิปอายุใบขอ 4 ระดับ (mockup rev.3 ข้อ 05) — ภาษาสีเดียวกับหน้า Matching
-                        เดิมเป็นชิปเทาเท่ากันหมด มองไม่ออกว่าใบไหนค้างนาน · เกณฑ์ถังไม่เปลี่ยน */}
+                    {/* ชิปอายุใบขอ (mockup rev.3 ข้อ 05) — 4 ระดับตามวันที่ค้าง
+                        \+ "ล่วงหน้า" อีกระดับที่เป็นเขียวชุดเดียวเสมอ (19 ส.ค. 2569)
+                        เกณฑ์ถังไม่เปลี่ยน · ดู JobAgeChip ข้างบน */}
                     <td className="px-3 py-3 text-xs whitespace-nowrap">
-                      <span
-                        className={cn(
-                          'jarvis-chip',
-                          JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].chipCls,
-                        )}
-                        title={JOB_AGE_URGENCY_META[getJobAgeUrgencyLevel(j)].label}
-                      >
-                        {ageDaysLabel(j)}
-                      </span>
+                      <JobAgeChip job={j} />
                     </td>
                     {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) เพื่อคุมคอนทราสต์
                         ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline

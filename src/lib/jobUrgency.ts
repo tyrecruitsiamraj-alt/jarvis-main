@@ -485,6 +485,77 @@ export function ageUrgencyLevelFromDays(ageDays: number | null): JobAgeUrgencyLe
   return 'critical';
 }
 
-export function getJobAgeUrgencyLevel(job: JobRequest, today = new Date()): JobAgeUrgencyLevel {
-  return ageUrgencyLevelFromDays(getJobRequestAgeDays(job, today));
+/**
+ * ⚠️ **ไม่มี `getJobAgeUrgencyLevel(job)` แล้ว** (ถอด 19 ส.ค. 2569) — ตัวนั้นให้ระดับสี
+ * จากจำนวนวันเพียว ๆ โดยไม่รู้ว่าใบยังไม่ถึงวันที่ต้องการ จึงเป็นต้นเหตุที่ใบล่วงหน้า
+ * ได้สี "ด่วน" · ชิปทุกที่ต้องใช้ `getJobAgeChipInfo()` ที่ตัดสินข้อความกับสีพร้อมกัน
+ */
+
+/**
+ * ระดับของชิปคอลัมน์「ผ่านมา」บนหน้ารายการใบขอ — เพิ่ม `'advance'` เข้ามาอีกระดับ
+ *
+ * 🔴 **ใบล่วงหน้าใช้สีเดียวเสมอ** (เจ้าของสั่ง 19 ส.ค. 2569: *"ล่วงหน้าสีอะไรก็สีนั้น
+ * เพราะถ้ายังไม่ถึงวันที่ต้องการก็เป็นล่วงหน้า ก็สีนั้น ๆ ไปเลย มาทำล่วงหน้าหลาย ๆ สี
+ * ให้งงทำไม"*)
+ *
+ * ของเดิมขัดกันเอง: **ข้อความ**มาจาก `getJobRequestAgeLabel` (พิมพ์ว่า "ล่วงหน้า")
+ * แต่**สี**มาจาก `getJobAgeUrgencyLevel` ที่นับวันจากวันที่กรอก — ใบล่วงหน้าที่กรอกไว้
+ * 45 วันก่อนจึงได้สี "ด่วน" (ส้ม) และ tooltip ขึ้นคำว่า "ด่วน" ทั้งที่ยังไม่ถึงวันที่ต้องการ
+ * → ป้ายบอกล่วงหน้า สีบอกด่วน อ่านแล้วงงว่าต้องรีบหรือไม่ต้องรีบ
+ */
+export type JobAgeChipLevel = JobAgeUrgencyLevel | 'advance';
+
+/**
+ * สีของชิป「ผ่านมา」
+ * `advance` ใช้ **เขียว** ชุดเดียวกับ "ล่วงหน้า" บนกราฟ Dashboard (`KIND_TONE.advance = success`)
+ * — คำเดียวกันต้องสีเดียวกันทุกหน้า และเขียวสื่อว่า "ยังไม่ต้องรีบ" ตรงกับความหมาย
+ */
+export const JOB_AGE_CHIP_META: Record<
+  JobAgeChipLevel,
+  { label: string; chipCls: string; barCls: string; dotCls: string }
+> = {
+  ...JOB_AGE_URGENCY_META,
+  advance: {
+    label: 'ล่วงหน้า — ยังไม่ถึงวันที่ต้องการ',
+    chipCls:
+      'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300',
+    barCls: 'bg-emerald-400',
+    dotCls: 'bg-emerald-500',
+  },
+};
+
+export type JobAgeChipInfo = {
+  level: JobAgeChipLevel;
+  /** ข้อความสั้น (ใช้ในตารางที่หัวคอลัมน์บอก "ผ่านมา" อยู่แล้ว) */
+  text: string;
+  /** ข้อความบนการ์ด — ใบล่วงหน้า**ไม่มี**คำว่า "ผ่านมา" นำหน้า (เดิมอ่านว่า "ผ่านมา ล่วงหน้า") */
+  cardText: string;
+  /** ข้อความ tooltip — ต้องพูดเรื่องเดียวกับสี ห้ามขึ้นคำว่า "ด่วน" บนใบล่วงหน้า */
+  title: string;
+};
+
+/** ชิป「ผ่านมา」ของใบขอหนึ่งใบ — ข้อความ + สี + tooltip มาจากที่นี่ที่เดียว */
+export function getJobAgeChipInfo(job: JobRequest, today = new Date()): JobAgeChipInfo {
+  // ข้อความมาจาก `getJobRequestAgeLabel` ที่เดียวเหมือนเดิม (เทสต์เดิมยังคุมนิยามวันอยู่)
+  // ที่เพิ่มคือ**ระดับสีต้องตัดสินพร้อมข้อความ** ไม่ใช่ไปคำนวณแยกกันอีกฟังก์ชัน
+  const text = getJobRequestAgeLabel(job, today);
+  if (isBeforeRequiredForAge(job, today)) {
+    return {
+      level: 'advance',
+      text,
+      cardText: text,
+      title: 'ยังไม่ถึงวันที่ต้องการ — ใบล่วงหน้าใช้สีเดียวเสมอ',
+    };
+  }
+  const days = getJobRequestAgeDays(job, today);
+  if (days == null) {
+    return { level: 'unknown', text, cardText: text, title: JOB_AGE_CHIP_META.unknown.label };
+  }
+  const level = ageUrgencyLevelFromDays(days);
+  return {
+    level,
+    text,
+    cardText: `ผ่านมา ${text}`,
+    title: `${JOB_AGE_CHIP_META[level].label} · ผ่านมา ${text}`,
+  };
 }
