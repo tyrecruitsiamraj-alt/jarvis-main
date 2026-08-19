@@ -51,6 +51,11 @@ jobs:
                       ./scripts/sync-env.sh .env IRECRUIT_DB_PASSWORD "${{ secrets.IRECRUIT_DB_PASSWORD }}"
                       ./scripts/sync-env.sh .env IRECRUIT_DB_NAME "${{ secrets.IRECRUIT_DB_NAME }}"
                       ./scripts/sync-env.sh .env RECRUIT_REGISTER_OWNER "${{ secrets.RECRUIT_REGISTER_OWNER }}"
+                      # ตัวย้ายใบสมัครอัตโนมัติ (19 ส.ค. 2569) — เจ้าของเคาะว่า "เปิดโหมดลองดูก่อน"
+                      # ENABLED=true เดินรอบทุก 15 นาทีแล้วบันทึกว่า "รอบนี้จะย้ายใครไปไหน"
+                      # APPLY=false คือยังไม่เขียนจริง · ดูผลที่ ตั้งค่า → ย้ายใบสมัครอัตโนมัติ
+                      ./scripts/sync-env.sh .env APPLICATION_AUTO_MOVE_ENABLED "true"
+                      ./scripts/sync-env.sh .env APPLICATION_AUTO_MOVE_APPLY "false"
                       ./scripts/sync-env.sh .env MATCH_PRECOMPUTE_ENABLED "true"
                       docker compose up -d --build
                       docker compose exec -T app npm run db:migrate

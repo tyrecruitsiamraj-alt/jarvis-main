@@ -45,6 +45,7 @@ import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
 import applicationDispatchHandler from './application-dispatch.js';
 import applicationAutoMoveHandler from './application-auto-move.js';
+import applicationAutoMoveStatusHandler from './application-auto-move-status.js';
 import jobApplicationDocumentHandler from './job-application-document.js';
 import shortLinksHandler from './short-links.js';
 import shortLinksResolveHandler from './short-links-resolve.js';
@@ -174,6 +175,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
   '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
   '/api/application-auto-move': applicationAutoMoveHandler as ApiHandler,
+  // สถานะ/ผลรอบล่าสุดของตัวตั้งเวลา — อ่านอย่างเดียว ไม่ย้ายจริง
+  '/api/application-auto-move-status': applicationAutoMoveStatusHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,
   '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,

@@ -2839,3 +2839,35 @@ state (`calendarOpen`/`selectedDay`/`month`) + derived (`calendar`/`grid`/`month
   กรองพ่อ Facebook Ads เหลือ 6 · เพิ่ม `__test__` เป็น 7 → แก้ชื่อ → ปิดใช้งาน → ลบ กลับเป็น 6 ·
   เพิ่มช่องทางหลักซ้ำชื่อ = "มีช่องทางชื่อนี้อยู่แล้ว" (400 ตามคาด) · ลบทิ้งกลับเป็น 43 ·
   ปุ่ม "ช่องทาง" บนบอร์ดพาไป `/recruit/channels` จริง · โหมดมืดการ์ด slate-900 ตัวหนังสือสว่าง · console สะอาด
+
+### รอบ 19 ส.ค. 2569 (รอบยี่สิบสี่ · งาน-2) — ตัวตั้งเวลาย้ายใบสมัคร + หน้าที่บอกว่า "ย้ายใครไปไหน"
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/applicationAutoMoveReport.ts` | **ใหม่ · pure** — อ่านค่า env (`readAutoMoveWorkerConfig`) + ประกอบข้อความ (`autoMoveRunSummary`/`autoMoveDetailLine`/`autoMoveJobLabel`/`autoMoveModeLabel`/`autoMoveTopReasons`) (เทสต์ 19) |
+| `api/_lib/applicationAutoMoveWorker.ts` | **ใหม่** — วนรอบใน process API (แพตเทิร์นเดียวกับ `matchPrecomputeWorker`) · เก็บผลรอบล่าสุดในหน่วยความจำ · `runAutoMoveOnce()` ใช้ซ้ำได้ (เทสต์ 7) |
+| `api/_handlers/application-auto-move-status.ts` | **ใหม่ · route 89** — `GET` อ่านค่าตั้ง+รอบล่าสุด · `POST` สั่งลองดูหนึ่งรอบ (**ลองดูเสมอ ย้ายจริงไม่ได้**) |
+| `api/_lib/applicationAutoMoveRunner.ts` | `details[]` มี `applicant` เพิ่ม (select `a.full_name`) — เดิมมีแต่ UUID คนอ่านไม่รู้ว่าใคร |
+| `server/local-api.ts` | เรียก `startApplicationAutoMoveWorker()` ตอนบูต (ต่อจาก match precompute) |
+| `src/lib/applicationAutoMoveApi.ts` · `src/pages/settings/ApplicationAutoMoveTab.tsx` | **ใหม่** — แท็บ "ย้ายใบสมัครอัตโนมัติ" ใน Settings: โหมด · รอบล่าสุด · ตาราง "ย้ายใครไปไหน" · เหตุผลที่ไม่ย้าย · ปุ่มลองดูตอนนี้ |
+| `src/pages/settings/AdminSettings.tsx` | เพิ่มแท็บ `autoMove` (admin เท่านั้น · รองรับ `?tab=autoMove`) |
+| `.github/workflows/deploy.yml` | `APPLICATION_AUTO_MOVE_ENABLED=true` · `APPLICATION_AUTO_MOVE_APPLY=false` |
+
+**เจ้าของเคาะ 19 ส.ค. 2569:** worker ในเซิร์ฟเวอร์ (ไม่ใช่ GitHub cron) ·
+*"แบบ 1 ก็ดี แต่ทำให้มันมีบอกหน่อยว่าย้ายใครไปไหน"* → เปิดโหมดลองดูก่อน + มีหน้าให้ดูผล
+
+**กับดัก / ตรวจจริง**
+* 🔴 **สองสวิตช์ ไม่ใช่สวิตช์เดียว** — `ENABLED` เปิด worker · `APPLY` ถึงจะเขียนจริง
+  เปิดตัวแรกอย่างเดียว = เดินรอบแล้วบันทึกว่า "จะย้ายใคร" เฉย ๆ · มีเทสต์คุมทั้งสองทาง
+* 🔴 **`POST /api/application-auto-move-status` สั่งย้ายจริงไม่ได้โดยตั้งใจ** — ปุ่มบนหน้าตั้งค่า
+  ต้องไม่กลายเป็นปุ่มย้ายคนจริง · ย้ายจริงมีทางเดียวคือ `POST /api/application-auto-move` หรือ worker ที่เปิด APPLY
+* 🔴 **รอบที่ล้มต้องบันทึกว่าล้ม** — ถ้าปล่อยผลรอบเก่าค้าง หน้าเว็บจะบอกว่ายังดีอยู่ทั้งที่อ่าน ERP ไม่ได้
+* ⚠️ ผลรอบล่าสุดอยู่ในหน่วยความจำ process (ตั้งใจ ไม่เพิ่มตาราง) — รีสตาร์ตแล้วว่างจนกว่าจะเดินรอบใหม่
+  · บน Vercel (serverless) จะว่างเสมอ ของจริงรันเป็น process เดียวบน on-prem ผ่าน supervisord (`docker/supervisord.conf`)
+* ⚠️ `toTargetJob` ซ้ำกับใน `api/_handlers/application-auto-move.ts` — แก้ที่ไหนต้องแก้อีกที่ด้วย
+  (import จาก handler ไม่ได้ เพราะมันพันกับ req/res)
+* ⚠️ เทสต์: `vi.mock` ถูกยกไปบนสุด — ประกาศ `vi.fn()` ไว้นอกโรงงานแล้วอ้างในโรงงาน = *Cannot access before initialization*
+  ต้องสร้างในโรงงานแล้วดึงกลับด้วย `vi.mocked(...)`
+* ตรวจจริงบนเบราว์เซอร์ (ข้อมูลจริง · ไม่เขียนอะไรเลยเพราะเป็น dry run): กด "ลองดูตอนนี้"
+  → **"รอบล่าสุด จะย้าย 1 ใบ (จากที่ค้างอยู่ 1 ใบ) · ใบขอที่ยังเปิด 290 ใบ"** และรายการ
+  **"นายtest test · LAM6908004 → LAO6908007 · เหตุผล: closed_request:same_province"**

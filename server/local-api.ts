@@ -14,6 +14,7 @@ import { logError, logInfo, logWarn } from '../api/_lib/logger.ts';
 import { applyCorsHeaders } from '../api/_lib/cors.ts';
 import { isProductionRuntime } from '../api/_lib/runtime.ts';
 import { startMatchPrecomputeWorker } from '../api/_lib/matchPrecomputeWorker.ts';
+import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveWorker.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
 type VercelLikeRes = {
@@ -179,4 +180,6 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`[jarvis] เปิด Vite ด้วย npm run dev — proxy /api → พอร์ต ${port}`);
   // Background precompute (on-prem process เท่านั้น) — ปิดโดยดีฟอลต์ เปิดด้วย MATCH_PRECOMPUTE_ENABLED
   startMatchPrecomputeWorker();
+  // ตัวย้ายใบสมัครอัตโนมัติ — ปิดโดยดีฟอลต์ · เปิดแล้วยังเป็นโหมดลองดูจนกว่าจะสั่ง APPLY
+  startApplicationAutoMoveWorker();
 });

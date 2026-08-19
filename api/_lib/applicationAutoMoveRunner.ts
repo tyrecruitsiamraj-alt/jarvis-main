@@ -30,7 +30,14 @@ export type AutoMoveResult = {
   skipped: number;
   /** เหตุผลที่ไม่ย้าย นับรวม — ไว้ตอบว่า "ทำไมไม่ย้ายสักคน" */
   reasons: Record<string, number>;
-  details: Array<{ applicationId: string; from: string; to: string; reason: string }>;
+  /** ⚠️ `applicant` มีไว้ให้คนอ่านว่า "ย้ายใครไปไหน" — ระบบยังตัดสินด้วย id เท่านั้น */
+  details: Array<{
+    applicationId: string;
+    applicant: string | null;
+    from: string;
+    to: string;
+    reason: string;
+  }>;
 };
 
 type AppRow = AutoMoveApplication & { job_id: string };
@@ -75,9 +82,9 @@ export async function runApplicationAutoMove(
   const openIds = new Set(openJobs.map((j) => j.id));
   const result: AutoMoveResult = { scanned: 0, moved: 0, skipped: 0, reasons: {}, details: [] };
 
-  const { rows } = await dbQuery<AppRow & { phone_e164: string | null }>(
+  const { rows } = await dbQuery<AppRow & { phone_e164: string | null; full_name: string | null }>(
     `select a.id, a.job_id, a.province, a.district, a.position_interest, a.job_title,
-            a.status, a.moved_at, a.phone_e164
+            a.status, a.moved_at, a.phone_e164, a.full_name
        from ${APPS} a
       where a.job_id is not null and trim(a.job_id) <> ''
         and a.moved_at is null
@@ -135,6 +142,7 @@ export async function runApplicationAutoMove(
       result.moved += 1;
       result.details.push({
         applicationId: row.id,
+        applicant: row.full_name ?? null,
         from: row.job_id,
         to: decision.job.id,
         reason: decision.reason,
@@ -163,6 +171,7 @@ export async function runApplicationAutoMove(
       result.moved += 1;
       result.details.push({
         applicationId: row.id,
+        applicant: row.full_name ?? null,
         from: row.job_id,
         to: decision.job.id,
         reason: decision.reason,
