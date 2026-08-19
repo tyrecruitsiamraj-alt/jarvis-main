@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   fetchJobStaffManage,
   rosterMutate,
@@ -261,11 +261,57 @@ function RosterSection({
   );
 }
 
+/** แถบแท็บ pill รางเดียว — สไตล์เดียวกับแท็บ Settings (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-8) */
+function PillTabs<T extends string>({
+  tabs,
+  active,
+  onSelect,
+}: {
+  tabs: { key: T; label: string; count: number }[];
+  active: T;
+  onSelect: (key: T) => void;
+}) {
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className="inline-flex w-max gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800/70">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => onSelect(t.key)}
+            className={cn(
+              'flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors',
+              active === t.key
+                ? 'bg-white font-semibold text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                : 'font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+            )}
+          >
+            {t.label}
+            <span
+              className={cn(
+                'rounded-full px-1.5 text-xs tabular-nums',
+                active === t.key ? 'bg-primary/10 text-primary' : 'bg-slate-200/70 dark:bg-slate-700/70',
+              )}
+            >
+              {t.count.toLocaleString('th-TH')}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const JobStaffRosterTab: React.FC = () => {
   const [state, setState] = useState<JobStaffManageState | null>(null);
   const [loading, setLoading] = useState(false);
-  /** BU ที่กด drill เข้าไป — null = หน้ารวมกล่อง BU (เจ้าของสั่ง ค่ำ-7) */
-  const [openBu, setOpenBu] = useState<RosterBuKey | null>(null);
+  /**
+   * สองชั้นแท็บ (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-8: *"กด BU แล้วมีให้เลือกดูอีกเป็น
+   * สรรหา/คัดสรร ฯลฯ ไม่ได้ให้เอามารวมกันมันงง"*) — เลือก BU แล้วเลือกบทบาท เห็นกล่องเดียว
+   * `activeBu = null` = ยังไม่เลือกเอง → ใช้ค่าเริ่มต้น (BU แรกที่มีคน)
+   */
+  const [activeBu, setActiveBu] = useState<RosterBuKey | null>(null);
+  const [activeKind, setActiveKind] = useState<RosterKind>('recruiter');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -286,46 +332,6 @@ const JobStaffRosterTab: React.FC = () => {
     );
   }
 
-  // ── หน้ารวม: กล่องแต่ละ BU (กดเข้าไปดู 4 บทบาท) ──────────────────────────
-  if (openBu === null) {
-    return (
-      <div className="space-y-4">
-        <div className="jarvis-menu-card rounded-[1.5rem] border border-white/70 border-info/30 bg-info/5 p-3">
-          <p className="text-sm text-muted-foreground">
-            เลือก BU เพื่อดูรายชื่อเจ้าหน้าที่สรรหา / คัดสรร / OPL / ทีมออนไลน์ ของ BU นั้น
-          </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {buCounts.map((b) => (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => setOpenBu(b.key)}
-              className="glass-card rounded-xl border border-border p-4 text-left transition-colors hover:border-primary/50 hover:bg-secondary/30"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-2 font-semibold text-foreground">
-                  <Users className="h-4 w-4 text-primary" aria-hidden />
-                  {rosterBuLabel(b.key)}
-                </span>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                  {b.total.toLocaleString('th-TH')} คน
-                </span>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span>สรรหา {b.recruiter.toLocaleString('th-TH')}</span>
-                <span>คัดสรร {b.screener.toLocaleString('th-TH')}</span>
-                <span>OPL {b.opl.toLocaleString('th-TH')}</span>
-                <span>Online {b.online.toLocaleString('th-TH')}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── หน้า BU เดียว: 4 กล่องบทบาท + แบ่งหน้าอิสระ ──────────────────────────
   const activeState: JobStaffManageState = state ?? {
     recruiters: [],
     screeners: [],
@@ -333,33 +339,41 @@ const JobStaffRosterTab: React.FC = () => {
     onlines: [],
     canManageAllBu: false,
   };
+
+  // BU ที่ใช้จริง — ค่าเริ่มต้น = BU แรกที่มีคน (ไม่งั้นเปิดมาเจอกล่องว่างของ SN)
+  const firstWithPeople = buCounts.find((b) => b.total > 0)?.key;
+  const effectiveBu: RosterBuKey = activeBu ?? firstWithPeople ?? ROSTER_BU_KEYS[0];
+
+  const buTabs = buCounts.map((b) => ({ key: b.key, label: rosterBuLabel(b.key), count: b.total }));
+  const activeBuCount = buCounts.find((b) => b.key === effectiveBu);
+  const kindTabs = ROSTER_KINDS.map((k) => ({
+    key: k.kind,
+    label: k.title.replace('เจ้าหน้าที่', '').replace('ทีม ', '').trim(),
+    count: activeBuCount ? activeBuCount[k.kind] : 0,
+  }));
+  const activeKindMeta = ROSTER_KINDS.find((k) => k.kind === activeKind) ?? ROSTER_KINDS[0];
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setOpenBu(null)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:bg-secondary"
-        >
-          <ChevronLeft className="h-4 w-4" aria-hidden /> ทุก BU
-        </button>
-        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Users className="h-4 w-4 text-primary" aria-hidden />
-          {rosterBuLabel(openBu)}
-        </span>
+      {/* ชั้น 1: เลือก BU */}
+      <div className="space-y-1.5">
+        <p className="ml-1 text-xs font-medium text-muted-foreground">เลือก BU</p>
+        <PillTabs<RosterBuKey> tabs={buTabs} active={effectiveBu} onSelect={(k) => setActiveBu(k)} />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {ROSTER_KINDS.map((s) => (
-          <RosterSection
-            key={s.kind}
-            kind={s.kind}
-            title={s.title}
-            entries={entriesForBu(entriesOfKind(activeState, s.kind), openBu)}
-            defaultBu={buKeyToValue(openBu)}
-            onChanged={reload}
-          />
-        ))}
+      {/* ชั้น 2: เลือกบทบาทของ BU นั้น */}
+      <div className="space-y-1.5">
+        <p className="ml-1 text-xs font-medium text-muted-foreground">เลือกทีม</p>
+        <PillTabs<RosterKind> tabs={kindTabs} active={activeKind} onSelect={(k) => setActiveKind(k)} />
       </div>
+      {/* กล่องเดียวของบทบาทที่เลือก + แบ่งหน้า */}
+      <RosterSection
+        key={`${effectiveBu}:${activeKind}`}
+        kind={activeKind}
+        title={`${activeKindMeta.title} · ${rosterBuLabel(effectiveBu)}`}
+        entries={entriesForBu(entriesOfKind(activeState, activeKind), effectiveBu)}
+        defaultBu={buKeyToValue(effectiveBu)}
+        onChanged={reload}
+      />
     </div>
   );
 };

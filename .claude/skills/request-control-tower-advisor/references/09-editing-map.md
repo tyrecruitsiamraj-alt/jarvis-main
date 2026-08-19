@@ -2742,3 +2742,20 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
 * ตรวจจริง (ข้อมูลจริง 41 คน): กล่อง BU ครบ 6 (SN/DS/LM 0 คน · LBA 6 · LBD 32 · ไม่ระบุ 3) ·
   กด LBD → 4 กล่องบทบาท · OPL 16 คน = **หน้า 1/2 (10 แถว) → หน้า 2/2 (6 แถว)** ปุ่มถัดไป
   disable หน้าสุดท้าย · back "ทุก BU" กลับได้ · console สะอาด
+
+### รอบ 18 ส.ค. 2569 (ค่ำ-8) — รายชื่อทีม: สองชั้นแท็บ pill (BU → บทบาท) แทน drill-down การ์ด
+
+`src/pages/settings/JobStaffRosterTab.tsx` — ปรับต่อจากค่ำ-7 ตามที่เจ้าของสั่งเพิ่ม:
+> *"ทุก BU ทำเป็นแท็บแบบนี้ [pill รางเดียว]"* · *"พอกดแต่ละ BU ก็มีให้เลือกดูอีกเป็น
+> สรรหา คัดสรร ฯลฯ ไม่ได้ให้เอามารวมกันมันงง"*
+
+* เดิม (ค่ำ-7) = การ์ด BU กดเข้า → **4 กล่องบทบาทเรียงกัน** · เจ้าของบอกงง
+* ใหม่ = **สองชั้นแท็บ pill** (สไตล์เดียวกับแท็บ Settings · `AdminSettings` บรรทัด ~252):
+  ชั้น 1 เลือก BU (SN/DS/LM/LBA/LBD/ไม่ระบุ + count) → ชั้น 2 เลือกทีม
+  (สรรหา/คัดสรร/OPL/Online + count ของ BU นั้น) → **กล่องเดียว** ของบทบาทที่เลือก + แบ่งหน้า 10
+* `PillTabs<T>` component ในไฟล์ — generic ต้อง annotate `<RosterBuKey>` / `<RosterKind>`
+  ไม่งั้น TS infer เป็น string แล้ว setter ไม่ match (SetStateAction)
+* ค่าเริ่มต้น BU = **ตัวแรกที่มีคน** (`activeBu ?? firstWithPeople ?? keys[0]`) ไม่งั้น
+  เปิดมาเจอกล่องว่างของ SN · `key={bu:kind}` บน RosterSection = สลับแล้ว remount รีเซ็ตหน้า
+* ตรวจจริง: BU pills + kind pills ครบ · LBD→OPL = กล่องเดียว "เจ้าหน้าที่ OPL · LBD"
+  หน้า 1/2 (10 แถว) · count บน pill อัปเดตตาม BU (LBA OPL 2 / LBD OPL 16) · console สะอาด
