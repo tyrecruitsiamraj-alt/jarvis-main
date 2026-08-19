@@ -2759,3 +2759,36 @@ entry for table "a"` แล้ว **ทั้ง endpoint ตาย 500** ไม
   เปิดมาเจอกล่องว่างของ SN · `key={bu:kind}` บน RosterSection = สลับแล้ว remount รีเซ็ตหน้า
 * ตรวจจริง: BU pills + kind pills ครบ · LBD→OPL = กล่องเดียว "เจ้าหน้าที่ OPL · LBD"
   หน้า 1/2 (10 แถว) · count บน pill อัปเดตตาม BU (LBA OPL 2 / LBD OPL 16) · console สะอาด
+
+### รอบ 18 ส.ค. 2569 (ค่ำ-9) — สองงาน: ช่อง Online ผู้รับผิดชอบ + ช่องเจ้าหน้าที่ติดตามแบบจำ name→phone
+
+**งาน 1 — ผู้รับผิดชอบทีม Online บนหน้ากล่องงาน** (commit แยก `7d8b1d0`)
+> เจ้าของ: *"ผู้รับผิดชอบ ในหน้ากล่องงาน เอาชื่อมาจากทีม online"*
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/pages/jobs/SiamrajUnitRequestDetailPage.tsx` | เพิ่มช่อง `RosterBackedStaffSelect role=online` (ชื่อจาก `buildOnlineNameOptions`) บันทึก `online_name` |
+| `api/_handlers/siamraj-unit-requests.ts` | 🔴 **fix**: `attachAssignments` ไม่ map `online_name` — บันทึกได้แต่อ่านกลับ null เสมอตั้งแต่ 097 |
+| `src/components/jobs/JobBoardView.tsx` | `staffAssigneeLine` โชว์ Online ขึ้นก่อน |
+| `src/components/jobs/RosterBackedStaffSelect.tsx` · `src/lib/jobStaffRemote.ts` (MutateOp) · `src/lib/siamrajUnitRequestsApi.ts` | widen ให้รับ `online` |
+
+* 🔴 กับดัก: **backend รองรับ online_name ครบตั้งแต่ 097 แต่ read handler ลืม map** —
+  พังเงียบ 1 ปี เพิ่งเจอตอนต่อ UI · ยิงเขียนจริง OPL6908073 เลือก "ว่าน" → อ่านกลับได้
+  (ก่อน fix = null) · คืนค่า null เดิมแล้ว
+
+**งาน 2 — Follow ช่องเจ้าหน้าที่ติดตาม: ชื่อจากคัดสรร + เบอร์พิมพ์เอง + จำ name→phone**
+> เจ้าของ: *"เอาชื่อมาจากเจ้าหน้าที่คัดสรร เบอร์โทรให้เขาพิมพ์เอง แล้วมันจำไว้ว่าเคยเลือก
+> ชื่อใครแล้วเบอร์ไหน ให้มันขึ้นมาเอง"*
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/followStaffMemory.ts` | **ใหม่ · pure** — `rememberedPhoneForName` / `nameForPhone` / `staffNameOptions` (เทสต์ 6) |
+| `src/components/follow/StaffContactField.tsx` | เขียนใหม่: **select ชื่อ (คัดสรร) + input เบอร์พิมพ์เอง** · เลือกชื่อที่จำไว้ → เบอร์ prefill · blur แล้วจำคู่ (createStaffContact) |
+
+* `follow_staff_contacts` เปลี่ยนบทบาทเป็น **ความจำ name→phone** (ชื่อมาจาก screener roster
+  ไม่ใช่จากตารางนี้แล้ว) · ปุ่ม "เพิ่มเจ้าหน้าที่" (ค่ำ-5) ยังใช้ได้ = pre-seed ความจำ
+* 🔴 **remember ใช้ onBlur** — ทดสอบด้วย `dispatchEvent('blur')` เฉย ๆ **ไม่ทริกเกอร์** React
+  onBlur (React ฟัง focusout ที่ bubble) · ต้อง `FocusEvent('focusout',{bubbles:true})`
+  · เกือบสรุปผิดว่าความจำพัง (เห็น prefill เป็น false positive เพราะเบอร์แค่ไม่ถูกล้าง)
+* ตรวจจริง: dropdown โชว์ 9 ชื่อคัดสรร + "พิมพ์เบอร์เองไม่ผูกชื่อ" · เลือกครีม+พิมพ์เบอร์+blur
+  → จำลงฐาน `ครีม=0866660002` · ล้างเบอร์ เลือกครีมใหม่ → prefill กลับมาเอง · ลบ test row แล้ว
