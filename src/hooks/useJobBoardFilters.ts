@@ -7,17 +7,13 @@ import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { districtMatchesFilter } from '@/lib/districtMatch';
 import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
+import { isBoardVisibleJob } from '@/lib/jobBoardSearch';
+import { DRIVING_POSITION_LABEL, jobMatchesPositionFilter } from '@/lib/jobBoardPositionPreset';
 import {
-  boardSearchTokens,
-  isBoardVisibleJob,
-  jobBoardSearchBlob,
-  normBoardSearch,
-} from '@/lib/jobBoardSearch';
-import {
-  DRIVING_POSITION_LABEL,
-  jobMatchesPositionFilter,
-  jobMatchesStaffFilters,
-} from '@/lib/jobBoardPositionPreset';
+  filterJobBoardRows,
+  type JobBoardRowFilterOptions,
+  type JobBoardRowFilterState,
+} from '@/lib/jobBoardRowFilter';
 
 export type JobBoardUrgencyChip = 'all' | 'urgent';
 
@@ -126,58 +122,49 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     if (!subtypeOptions.includes(subtypeFilter)) setSubtypeFilter('');
   }, [subtypeFilter, subtypeOptions]);
 
-  const { filtered, usedRelatedFallback } = useMemo(() => {
-    const q = normBoardSearch(search);
-    const baseRows = visible
-      .filter((j) => {
-        if (chip === 'urgent') return j.urgency === 'urgent';
-        return true;
-      })
-      .filter((j) => {
-        const jobProv = inferProvinceFromAddress(j.location_address);
-        if (provinceFilter && jobProv !== provinceFilter) return false;
-        if (districtFilter && !districtMatchesFilter(j.location_address, districtFilter)) return false;
-        if (
-          !jobMatchesPositionFilter(j, positionFilter, {
-            isDrivingGroup: drivingPositionGroup || positionFilter === DRIVING_POSITION_LABEL,
-          })
-        ) {
-          return false;
-        }
-        if (subtypeFilter && extractJobSubtypeLabel(j) !== subtypeFilter) return false;
-        // กติกาของสองตัวกรองนี้อยู่ที่ lib ที่เดียว (เทสต์คุมที่นั่น)
-        if (!jobMatchesStaffFilters(j, { recruiter: recruiterFilter, contractType: contractTypeFilter })) {
-          return false;
-        }
-        return true;
-      });
-    if (!q) return { filtered: baseRows, usedRelatedFallback: false };
+  /**
+   * สถานะตัวกรองก้อนเดียว — ส่งต่อให้ตัวกรอง pure ได้ตรง ๆ
+   * (ใช้กับชุดใบปิด/ยกเลิกด้วย ผ่าน `filterRows` ข้างล่าง)
+   */
+  const rowFilterState = useMemo<JobBoardRowFilterState>(
+    () => ({
+      search,
+      chip,
+      provinceFilter,
+      districtFilter,
+      positionFilter,
+      subtypeFilter,
+      recruiterFilter,
+      contractTypeFilter,
+      drivingPositionGroup,
+    }),
+    [
+      search,
+      chip,
+      provinceFilter,
+      districtFilter,
+      positionFilter,
+      subtypeFilter,
+      recruiterFilter,
+      contractTypeFilter,
+      drivingPositionGroup,
+    ],
+  );
 
-    const exact = baseRows.filter((j) => jobBoardSearchBlob(j).includes(q));
-    if (exact.length > 0) return { filtered: exact, usedRelatedFallback: false };
+  const { filtered, usedRelatedFallback } = useMemo(
+    () => filterJobBoardRows(visible, rowFilterState),
+    [visible, rowFilterState],
+  );
 
-    const tokens = boardSearchTokens(search);
-    if (tokens.length === 0) return { filtered: baseRows, usedRelatedFallback: false };
-
-    const related = baseRows.filter((j) => {
-      const blob = jobBoardSearchBlob(j);
-      return tokens.some((t) => blob.includes(t) || t.includes(blob));
-    });
-    if (related.length > 0) return { filtered: related, usedRelatedFallback: true };
-
-    return { filtered: baseRows, usedRelatedFallback: true };
-  }, [
-    visible,
-    search,
-    chip,
-    provinceFilter,
-    districtFilter,
-    positionFilter,
-    subtypeFilter,
-    recruiterFilter,
-    contractTypeFilter,
-    drivingPositionGroup,
-  ]);
+  /**
+   * เอาตัวกรองชุดเดียวกันไปใช้กับ**อีกชุดข้อมูล** (ใบที่ปิดแล้ว/ยกเลิก ซึ่งมาจากอีก feed)
+   * 🔴 ต้องเป็นตัวเดียวกับที่กรองใบเปิด — เขียนกรองรอบสองเมื่อไหร่คือรอวันที่สองกล่องไม่ตรงกัน
+   */
+  const filterRows = useCallback(
+    (rows: readonly JobRequest[], options?: JobBoardRowFilterOptions) =>
+      filterJobBoardRows(rows, rowFilterState, options).filtered,
+    [rowFilterState],
+  );
 
   const onProvinceFilterChange = useCallback((next: string) => {
     setProvinceFilter(next);
@@ -217,6 +204,7 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     onProvinceFilterChange,
     filtered,
     usedRelatedFallback,
+    filterRows,
     visibleCount: visible.length,
     /** อัตรารวมของชุดที่มองเห็น (ก่อนกรอง) — หน่วยเดียวกับ Dashboard ที่นับ "อัตรา" */
     visiblePositions: sumJobPositionUnits(visible),

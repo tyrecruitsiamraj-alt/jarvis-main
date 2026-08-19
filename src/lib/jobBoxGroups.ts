@@ -148,7 +148,29 @@ export function filterByClosedBox<T extends { cancel_date?: unknown }>(
   return jobs.filter((j) => closedJobBoxOf(j) === box);
 }
 
-/** กล่องนี้อ่านจาก feed ใบปิดไหม (ต้องสลับมุมมอง ไม่ได้กรองการ์ดในหน้าเดียว) */
+/** กล่องนี้อ่านจาก feed ใบปิดไหม (คนละชุดกับกล่องงาน — ต้องโหลดชุดใบปิดมาก่อน) */
 export function isClosedBox(box: JobBoxKey): box is ClosedBoxKey {
   return box === 'closed' || box === 'cancelled';
+}
+
+/**
+ * เรียงใบปิด/ยกเลิก — **ปิดล่าสุดขึ้นก่อน**
+ * (ใบเปิดเรียงตามอายุที่ค้าง แต่ใบปิดไม่มี "ค้าง" แล้ว สิ่งที่คนอยากเห็นคือของที่เพิ่งปิด)
+ * 🔴 ไม่มีวันปิดให้ตกท้ายเสมอ — ห้ามให้ค่าว่างชนะใบที่มีวันจริง
+ */
+export function compareByClosedDateDesc(
+  a: { closed_date?: unknown; cancel_date?: unknown },
+  b: { closed_date?: unknown; cancel_date?: unknown },
+): number {
+  const key = (j: { closed_date?: unknown; cancel_date?: unknown }): string => {
+    const closed = typeof j.closed_date === 'string' ? j.closed_date.trim() : '';
+    if (closed) return closed;
+    return typeof j.cancel_date === 'string' ? j.cancel_date.trim() : '';
+  };
+  const ka = key(a);
+  const kb = key(b);
+  if (!ka && !kb) return 0;
+  if (!ka) return 1;
+  if (!kb) return -1;
+  return kb.localeCompare(ka);
 }

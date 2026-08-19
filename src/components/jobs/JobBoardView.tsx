@@ -41,11 +41,17 @@ import {
   JOB_BOX_LABEL,
   JOB_BOX_TONE,
   OPEN_BOX_KEYS,
+  compareByClosedDateDesc,
   countOpenBoxes,
   countOpenBoxPositions,
+  filterByClosedBox,
   filterByOpenBox,
+  isClosedBox,
+  type ClosedBoxKey,
+  type JobBoxKey,
   type OpenBoxKey,
 } from '@/lib/jobBoxGroups';
+import { CLOSED_RANGE_OPTIONS } from '@/hooks/useClosedRequestsFeed';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
@@ -58,7 +64,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff, LoaderCircle } from 'lucide-react';
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
@@ -111,18 +117,29 @@ export type JobBoardViewProps = {
   view?: BoardViewId;
   onViewChange?: (view: BoardViewId) => void;
   listContent?: React.ReactNode;
+  /**
+   * ชุดใบที่ปิดแล้ว/ยกเลิก (คนละ feed กับกล่องงาน) — ส่งมาจาก `StaffJobBoardPage`
+   * เจ้าของสั่ง 19 ส.ค. 2569: *"ปิดแล้วกับยกเลิกในหน้ากล่องงานมันต้องกดแล้วดูได้
+   * แบบกล่องอื่น ๆ สิ กดแล้วเด้งไปหน้าอื่นทำไม ทำไมไม่ทำให้มันเหมือนกัน"*
+   * → กล่องทั้ง 6 กดแล้วกรองการ์ดในหน้าเดิมเหมือนกันหมด ไม่สลับมุมมองอีก
+   */
+  closedJobs?: JobRequest[];
+  closedLoading?: boolean;
+  closedError?: string | null;
+  closedDays?: number;
+  onClosedDaysChange?: (days: number) => void;
+  onReloadClosed?: () => void;
+  /** กล่องที่ให้เลือกไว้ตั้งแต่เปิดหน้า — รองรับลิงก์เก่า `?view=closed` / `?view=cancelled` */
+  initialBox?: JobBoxKey | null;
 };
 
-/** แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace */
-/** 'cancelled' เพิ่ม 19 ส.ค. 2569 — เจ้าของสั่งแยกใบยกเลิกออกจากกล่อง "ปิดแล้ว" */
-export type BoardViewId =
-  | 'board'
-  | 'list'
-  | 'contact'
-  | 'appointments'
-  | 'postings'
-  | 'closed'
-  | 'cancelled';
+/**
+ * แท็บระดับบอร์ด — 'board' คือกล่องงาน ที่เหลือ mapped เข้าแท็บของ RmWorkspace
+ * 🔴 **ไม่มี 'closed' / 'cancelled' อีกแล้ว** (19 ส.ค. 2569) — ปิดแล้ว/ยกเลิกเป็น
+ * **กล่องบนหน้ากล่องงาน** ที่กดแล้วกรองในหน้าเดิม เหมือนกล่องอื่นทุกกล่อง
+ * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
+ */
+export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'postings';
 
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
@@ -136,6 +153,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   view = 'board',
   onViewChange,
   listContent,
+  closedJobs,
+  closedLoading = false,
+  closedError = null,
+  closedDays = 30,
+  onClosedDaysChange,
+  onReloadClosed,
+  initialBox = null,
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -188,8 +212,27 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⚠️ กรอง**หลัง**ตัวกรองปกติ (จังหวัด/ตำแหน่ง/ฯลฯ) — เลขบนกล่องจึงเป็น
    * "ในผลที่กรองอยู่ตอนนี้" ไม่ใช่ยอดทั้งระบบ ซึ่งตรงกับที่คนกำลังมองบนจอ
    */
-  const [openBox, setOpenBox] = useState<OpenBoxKey | null>(null);
+  const [openBox, setOpenBox] = useState<JobBoxKey | null>(initialBox);
+  /** กล่องปิดแล้ว/ยกเลิกที่เลือกอยู่ — null = กำลังดูชุดใบเปิด */
+  const closedBox: ClosedBoxKey | null = openBox && isClosedBox(openBox) ? openBox : null;
+  const openBoxKey: OpenBoxKey | null = openBox && !isClosedBox(openBox) ? openBox : null;
   const boxCounts = useMemo(() => countOpenBoxes(filters.filtered), [filters.filtered]);
+  /**
+   * ชุดใบปิด/ยกเลิกหลังผ่าน**ตัวกรองชุดเดียวกับใบเปิด** (จังหวัด/ตำแหน่ง/คำค้น/…)
+   * 🔴 ข้ามชิป "ด่วน" — ใบปิดไม่ได้ผ่าน `enrichJobsWithUrgency` ถ้าไม่ข้าม
+   * คนที่ค้างชิปด่วนไว้จะเปิดกล่องปิดแล้วเจอ 0 ใบทุกครั้ง ทั้งที่ของมีอยู่
+   */
+  const closedFiltered = useMemo(
+    () => (isStaff ? filters.filterRows(closedJobs ?? [], { skipUrgencyChip: true }) : []),
+    [isStaff, filters, closedJobs],
+  );
+  const closedBoxCounts = useMemo(
+    () => ({
+      closed: filterByClosedBox(closedFiltered, 'closed'),
+      cancelled: filterByClosedBox(closedFiltered, 'cancelled'),
+    }),
+    [closedFiltered],
+  );
   /**
    * 🔴 อัตราต่อกล่อง — **หน่วยเดียวกับ Dashboard** (เจ้าของทัก 19 ส.ค. 2569:
    * *"หน้า Dashboard มีงานทั้งหมด 339 แต่หน้ากล่องงานมีแค่ 291 เอง"*)
@@ -204,9 +247,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => sumJobPositionUnits(filters.filtered),
     [filters.filtered],
   );
+  /**
+   * การ์ดที่จะโชว์ — กล่องปิดแล้ว/ยกเลิกใช้ชุดใบปิด · กล่องอื่นใช้ชุดใบเปิด
+   * ⚠️ ทั้งสองเส้นผ่านตัวกรองเดียวกันมาแล้ว จึงกรอง "ในหน้าเดิม" ได้เหมือนกันหมด
+   */
   const boxedJobs = useMemo(
-    () => filterByOpenBox(filters.filtered, openBox),
-    [filters.filtered, openBox],
+    () => (closedBox ? closedBoxCounts[closedBox] : filterByOpenBox(filters.filtered, openBoxKey)),
+    [closedBox, closedBoxCounts, filters.filtered, openBoxKey],
   );
   const totalPages = getTotalPages(boxedJobs.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -227,6 +274,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * แต่ข้อ 1 ทำงานทั้งสองฝั่ง ซึ่งเป็นสิ่งที่สั่งมา
    */
   const orderedJobs = useMemo(() => {
+    // ใบปิด/ยกเลิกไม่มี "ค้างมานาน" แล้ว — เรียงตามวันที่ปิดล่าสุดขึ้นก่อน
+    if (closedBox) return [...boxedJobs].sort(compareByClosedDateDesc);
     const today = new Date();
     const hasApplicants = (id: string) => ((applicantCounts[id] ?? 0) > 0 ? 0 : 1);
     return [...boxedJobs].sort((a, b) => {
@@ -234,7 +283,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       if (byAge !== 0) return byAge;
       return hasApplicants(a.id) - hasApplicants(b.id);
     });
-  }, [boxedJobs, applicantCounts]);
+  }, [boxedJobs, applicantCounts, closedBox]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
   // เปลี่ยนกล่อง = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของกล่องเดิม)
@@ -481,8 +530,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 // ไม่ได้ ต้องให้ทีมคอนเทนต์รับไปโพสต่อ เป็นงานที่เกิดต่อจากกล่องงานโดยตรง
                 { id: 'postings', label: 'คำขอโพสต์งานใหม่' },
                 // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:
-                // *"มันมีด้านล่างแล้วไงตรงนี้อะ"*) — เข้าได้จากกล่องสถานะข้างล่างที่เดียว
-                // แต่ view ยังมีอยู่ (`?view=closed` / `?view=cancelled`) ลิงก์เก่าไม่พัง
+                // *"มันมีด้านล่างแล้วไงตรงนี้อะ"*) — เป็นกล่องสถานะข้างล่างที่กดแล้ว
+                // กรองในหน้าเดิม · ลิงก์เก่า ?view=closed/cancelled แปลงเป็นกล่องให้แล้ว
               ] as const
             ).map((v) => {
               const active = view === v.id;
@@ -546,13 +595,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           searchPlaceholder={searchPlaceholder}
           hideSearch={isStaff}
           resultCount={loading ? undefined : boxedJobs.length}
-          totalCount={loading ? undefined : filters.visibleCount}
+          totalCount={
+            loading
+              ? undefined
+              : closedBox
+                ? filterByClosedBox(closedJobs ?? [], closedBox).length
+                : filters.visibleCount
+          }
           /* เจ้าหน้าที่: เลขนี้คือจำนวน**ใบขอ** + บอกอัตราต่อท้ายให้เทียบกับ Dashboard ได้
              สาธารณะ: คงคำว่า "ตำแหน่ง" เดิม (คนนอกไม่ได้ดูหน่วยอัตราของ ERP) */
           countUnitLabel={isStaff ? 'ใบขอ' : undefined}
           positionsNote={
             isStaff && !loading
-              ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตราที่ยังต้องหา`
+              ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา${closedBox ? '' : 'ที่ยังต้องหา'}`
               : undefined
           }
         />
@@ -626,33 +681,48 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   );
                 })}
 
-                {/* เส้นคั่น — ของสองกล่องขวาไม่ได้อยู่ในชุดเดียวกับซ้าย (คนละ feed) */}
+                {/* เส้นคั่น — ของสองกล่องขวามาจากอีก feed (ใบที่หลุดจากกล่องงานไปแล้ว)
+                    แต่**กดแล้วกรองในหน้าเดิมเหมือนกล่องอื่นทุกกล่อง** (เจ้าของสั่ง 19 ส.ค. 2569:
+                    *"กดแล้วเด้งไปหน้าอื่นทำไม ทำไมไม่ทำให้มันเหมือนกัน"*) */}
                 <span className="mx-1 w-px shrink-0 self-stretch bg-border" aria-hidden />
 
                 {CLOSED_BOX_KEYS.map((key) => {
                   const tone = TONE[JOB_BOX_TONE[key]];
+                  const active = openBox === key;
+                  const rows = closedBoxCounts[key];
                   return (
                     <button
                       key={key}
                       type="button"
-                      onClick={() => onViewChange(key)}
+                      onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
+                      aria-pressed={active}
                       className={cn(
-                        'min-w-[7rem] rounded-xl border-2 border-transparent px-3 py-2 text-left transition-colors',
+                        'min-w-[9rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
                         tone.soft,
                         tone.softHover,
+                        active ? 'border-primary' : 'border-transparent',
                       )}
                     >
                       <span className="flex items-center gap-1.5">
                         <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                        <span className="whitespace-nowrap text-[11px] font-semibold text-foreground">
+                        <span className="truncate whitespace-nowrap text-[11px] font-semibold text-foreground">
                           {JOB_BOX_LABEL[key]}
                         </span>
                       </span>
-                      <span className={cn('block text-sm font-semibold leading-tight', tone.value)}>
-                        เปิดดู →
+                      <span className={cn('block text-2xl font-bold leading-tight tabular-nums', tone.num)}>
+                        {closedLoading && rows.length === 0 ? (
+                          <LoaderCircle className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            {rows.length.toLocaleString('th-TH')}
+                            <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
+                              ใบขอ · {sumJobPositionUnits(rows).toLocaleString('th-TH')} อัตรา
+                            </span>
+                          </>
+                        )}
                       </span>
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        {JOB_BOX_HINT[key]}
+                        {JOB_BOX_HINT[key]} · {closedDays} วันล่าสุด
                       </span>
                     </button>
                   );
@@ -665,6 +735,48 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 กรองอยู่: <span className="font-semibold text-foreground">{JOB_BOX_LABEL[openBox]}</span>{' '}
                 — {JOB_BOX_HINT[openBox]} · กดกล่องเดิมซ้ำเพื่อล้าง
               </p>
+            ) : null}
+
+            {/* ช่วงวันที่ของชุดใบปิด/ยกเลิก — โผล่เฉพาะตอนเลือกสองกล่องนั้น
+                ⚠️ **ต้องมีช่วงวันที่เสมอ** ใบปิดสะสมย้อนหลังหลายปี ดึงหมดคือรอเป็นนาที */}
+            {closedBox ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3 py-2 text-xs">
+                <span className="font-semibold text-foreground">ปิดภายใน</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {CLOSED_RANGE_OPTIONS.map((r) => (
+                    <button
+                      key={r.days}
+                      type="button"
+                      onClick={() => onClosedDaysChange?.(r.days)}
+                      className={cn(
+                        'rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                        closedDays === r.days ? TONE.info.solid : TONE.neutral.outline,
+                      )}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={closedLoading}
+                  onClick={() => onReloadClosed?.()}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
+                    TONE.neutral.outline,
+                  )}
+                >
+                  {closedLoading ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  รีเฟรช
+                </button>
+                {closedError ? (
+                  <span className="text-destructive">{closedError}</span>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -704,15 +816,30 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
         {!loading && boxedJobs.length === 0 && (
           <div className="mt-10 jarvis-frost rounded-[1.5rem] border border-dashed border-white/70 p-10 text-center">
-            <Briefcase className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-            <p className="font-medium text-foreground">ยังไม่มีตำแหน่งที่ตรงกับตัวกรอง</p>
-            <p className="mt-1 text-sm text-muted-foreground">ลองเปลี่ยนคำค้นหาหรือกด &quot;ทั้งหมด&quot;</p>
+            {closedBox && closedLoading ? (
+              <>
+                <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-muted-foreground/50" />
+                <p className="font-medium text-foreground">กำลังโหลดใบขอที่ปิดแล้ว…</p>
+              </>
+            ) : (
+              <>
+                <Briefcase className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+                <p className="font-medium text-foreground">
+                  {closedBox
+                    ? `ไม่มี${JOB_BOX_LABEL[closedBox]}ในช่วง ${closedDays} วันล่าสุด`
+                    : 'ยังไม่มีตำแหน่งที่ตรงกับตัวกรอง'}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {closedBox ? 'ลองขยายช่วงวันที่ดู' : 'ลองเปลี่ยนคำค้นหาหรือกด "ทั้งหมด"'}
+                </p>
+              </>
+            )}
           </div>
         )}
 
         {isStaff ? (
           <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
-            ประกาศจากใบขอ
+            {closedBox ? JOB_BOX_LABEL[closedBox] : 'ประกาศจากใบขอ'}
           </p>
         ) : null}
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -928,6 +1055,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ) : null}
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
+                        {/* 🔴 ใบที่ปิด/ยกเลิกแล้วไม่มีปุ่มลงมือ — หาคนเพิ่ม/ปล่อยลิงก์/แก้ประกาศ
+                            ของใบที่จบไปแล้วคือส่งคนไปงานที่ไม่มีอยู่ (ดูรายชื่อยังกดได้) */}
+                        {closedBox ? null : (
+                          <>
                         {/* เจ้าของเคาะ 17 ส.ค. 2569: *"ถ้าไม่ต่างเหลือแค่ปุ่มเดียวพอ"* →
                             ยุบสองปุ่มเป็นปุ่มเดียว **เก็บตัวที่ทำงานครบกว่า** (ค้น 3 แหล่ง:
                             Checklist + ฐานใหม่ + iRecruit แล้วส่ง AI โทรทันที) แล้วเปลี่ยน
@@ -978,6 +1109,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             แก้ไข
                           </button>
                         ) : null}
+                          </>
+                        )}
                         {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
                             รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
