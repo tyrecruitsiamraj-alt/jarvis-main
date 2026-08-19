@@ -9,6 +9,7 @@ import {
   filterByOpenBox,
   isClosedBox,
   openJobBoxOf,
+  JOB_BOX_TONE,
 } from '../../src/lib/jobBoxGroups';
 
 /** สถานะจริงทั้ง 9 ตัวใน work_status_master (วัดจากฐาน 19 ส.ค. 2569) */
@@ -132,6 +133,14 @@ describe('รายการกล่อง', () => {
     expect(JOB_BOX_KEYS).toHaveLength(6);
     for (const k of JOB_BOX_KEYS) expect(JOB_BOX_LABEL[k]).toBeTruthy();
   });
+  it('🔴 ทุกกล่องต้องมีสีกำกับ — สีมาจาก designTokens ที่เดียว ห้ามเขียนสีสดในหน้า', () => {
+    for (const k of JOB_BOX_KEYS) expect(JOB_BOX_TONE[k]).toBeTruthy();
+    // ยกเลิก = แดง · เริ่มงานแล้ว = เขียว · จบแล้ว = เทา (ความหมายสีต้องไม่สลับกัน)
+    expect(JOB_BOX_TONE.cancelled).toBe('danger');
+    expect(JOB_BOX_TONE.started).toBe('success');
+    expect(JOB_BOX_TONE.closed).toBe('neutral');
+  });
+
   it('แยกได้ว่ากล่องไหนต้องไปอ่าน feed ใบปิด', () => {
     expect(isClosedBox('closed')).toBe(true);
     expect(isClosedBox('cancelled')).toBe(true);

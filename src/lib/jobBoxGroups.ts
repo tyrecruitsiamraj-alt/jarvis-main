@@ -11,6 +11,8 @@
  */
 
 /** กล่องที่กรองจากใบขอที่ยังเปิด (feed กล่องงาน) */
+import type { ToneKey } from './designTokens';
+
 export const OPEN_BOX_KEYS = ['sourcing', 'selecting', 'waiting', 'started'] as const;
 export type OpenBoxKey = (typeof OPEN_BOX_KEYS)[number];
 
@@ -29,6 +31,20 @@ export const JOB_BOX_LABEL: Record<JobBoxKey, string> = {
   started: 'เริ่มงานแล้ว',
   closed: 'ปิดแล้ว',
   cancelled: 'ยกเลิก',
+};
+
+/**
+ * สีของแต่ละกล่อง — **ความหมายสีมาจาก `designTokens` ที่เดียว** (กติกาข้อ 4 ของโปรเจกต์)
+ * เรียงตามการเดินทางของงาน: ฟ้า = เพิ่งเริ่มหา → ม่วง = กำลังคัดคน → ส้ม = รอ →
+ * เขียว = ได้คนเริ่มงานแล้ว · เทา = จบแล้ว · แดง = ยกเลิก
+ */
+export const JOB_BOX_TONE: Record<JobBoxKey, ToneKey> = {
+  sourcing: 'info',
+  selecting: 'violet',
+  waiting: 'orange',
+  started: 'success',
+  closed: 'neutral',
+  cancelled: 'danger',
 };
 
 /** คำอธิบายใต้ชื่อกล่อง — บอกว่ากล่องนี้รวมสถานะอะไรบ้าง (คนจะได้ไม่ต้องเดา) */

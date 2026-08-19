@@ -39,6 +39,7 @@ import {
   CLOSED_BOX_KEYS,
   JOB_BOX_HINT,
   JOB_BOX_LABEL,
+  JOB_BOX_TONE,
   OPEN_BOX_KEYS,
   countOpenBoxes,
   filterByOpenBox,
@@ -457,11 +458,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 // ย้ายมาจากเมนู Matching (เจ้าของสั่ง 17 ส.ค. 2569) — ใบขอที่หาคนของเรา
                 // ไม่ได้ ต้องให้ทีมคอนเทนต์รับไปโพสต่อ เป็นงานที่เกิดต่อจากกล่องงานโดยตรง
                 { id: 'postings', label: 'คำขอโพสต์งานใหม่' },
-                // ใบขอที่ปิดแล้วหลุดจากกล่องงานเองอยู่แล้ว (กล่องงานถามหาเฉพาะใบที่ยังเปิด)
-                // แท็บนี้คือที่ที่ใบพวกนั้นไปโผล่ (เจ้าของสั่ง 17 ส.ค. 2569)
-                { id: 'closed', label: 'ปิดแล้ว' },
-                // แยกออกจาก "ปิดแล้ว" (เจ้าของสั่ง 19 ส.ค. 2569) — ยกเลิกกับปิดคนละเรื่อง
-                { id: 'cancelled', label: 'ยกเลิก' },
+                // ⚠️ **ไม่มี "ปิดแล้ว"/"ยกเลิก" บนแท็บแล้ว** (เจ้าของสั่ง 19 ส.ค. 2569:
+                // *"มันมีด้านล่างแล้วไงตรงนี้อะ"*) — เข้าได้จากกล่องสถานะข้างล่างที่เดียว
+                // แต่ view ยังมีอยู่ (`?view=closed` / `?view=cancelled`) ลิงก์เก่าไม่พัง
               ] as const
             ).map((v) => {
               const active = view === v.id;
@@ -528,70 +527,109 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           totalCount={loading ? undefined : filters.visibleCount}
         />
 
-        {/* กล่องสถานะ (เจ้าของสั่ง 19 ส.ค. 2569: *"มีกล่องเพื่อดูข้อมูลได้หมดอะ กำลังสรรหา
-            ยกเลิก รอแจ้งเข้า รอเริ่มงานไรงี้"*) — 4 กล่องแรกกรองการ์ดในหน้านี้เลย
-            ส่วน "ปิดแล้ว/ยกเลิก" มาจากคนละ feed จึงพาไปมุมมองของมัน
+        {/* กล่องสถานะ (เจ้าของสั่ง 19 ส.ค. 2569: *"มีกล่องเพื่อดูข้อมูลได้หมดอะ"* +
+            *"ทำเป็น visual ให้เห็นแบ่งสีแบ่งอะไรให้ชัดเจน"*)
+
+            สีเรียงตามการเดินทางของงาน: ฟ้า = เพิ่งเริ่มหา → ม่วง = กำลังคัดคน →
+            ส้ม = รอ → เขียว = ได้คนเริ่มงานแล้ว · เทา = จบแล้ว · แดง = ยกเลิก
+            ⚠️ สีมาจาก `JOB_BOX_TONE` → `designTokens` ที่เดียว ห้ามเขียน class สีสดตรงนี้
             ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
         {isStaff && view === 'board' ? (
-          <div className="mt-3 overflow-x-auto pb-1">
-            <div className="inline-flex w-max gap-2">
-              <button
-                type="button"
-                onClick={() => setOpenBox(null)}
-                className={cn(
-                  'rounded-xl border px-3 py-2 text-left transition-colors',
-                  openBox === null
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border bg-background hover:bg-secondary',
-                )}
-              >
-                <span className="block whitespace-nowrap text-xs font-semibold text-foreground">
-                  ทั้งหมด
-                </span>
-                <span className="block text-sm font-bold tabular-nums text-foreground">
-                  {filters.filtered.length.toLocaleString('th-TH')}
-                </span>
-              </button>
-
-              {OPEN_BOX_KEYS.map((key) => (
+          <div className="mt-3 space-y-2">
+            <div className="overflow-x-auto pb-1">
+              <div className="inline-flex w-max items-stretch gap-2">
+                {/* ทั้งหมด — ไม่มีสีประจำ ใช้เป็นตัวล้างตัวกรอง */}
                 <button
-                  key={key}
                   type="button"
-                  onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
-                  title={JOB_BOX_HINT[key]}
+                  onClick={() => setOpenBox(null)}
                   className={cn(
-                    'rounded-xl border px-3 py-2 text-left transition-colors',
-                    openBox === key
+                    'min-w-[7rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
+                    openBox === null
                       ? 'border-primary bg-primary/10'
-                      : 'border-border bg-background hover:bg-secondary',
+                      : 'border-transparent bg-secondary/60 hover:bg-secondary',
                   )}
                 >
-                  <span className="block whitespace-nowrap text-xs font-semibold text-foreground">
-                    {JOB_BOX_LABEL[key]}
+                  <span className="block whitespace-nowrap text-[11px] font-semibold text-muted-foreground">
+                    ทั้งหมด
                   </span>
-                  <span className="block text-sm font-bold tabular-nums text-foreground">
-                    {boxCounts[key].toLocaleString('th-TH')}
+                  <span className="block text-2xl font-bold leading-tight tabular-nums text-foreground">
+                    {filters.filtered.length.toLocaleString('th-TH')}
                   </span>
+                  <span className="block text-[10px] text-muted-foreground">ใบขอที่ยังเปิด</span>
                 </button>
-              ))}
 
-              {CLOSED_BOX_KEYS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onViewChange(key)}
-                  title={JOB_BOX_HINT[key]}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-left hover:bg-secondary"
-                >
-                  <span className="block whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                    {JOB_BOX_LABEL[key]}
-                  </span>
-                  <span className="block whitespace-nowrap text-[11px] text-muted-foreground">
-                    เปิดดู →
-                  </span>
-                </button>
-              ))}
+                {OPEN_BOX_KEYS.map((key) => {
+                  const tone = TONE[JOB_BOX_TONE[key]];
+                  const active = openBox === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
+                      aria-pressed={active}
+                      className={cn(
+                        'min-w-[9rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
+                        tone.soft,
+                        tone.softHover,
+                        active ? 'border-primary' : 'border-transparent',
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                        <span className="truncate whitespace-nowrap text-[11px] font-semibold text-foreground">
+                          {JOB_BOX_LABEL[key]}
+                        </span>
+                      </span>
+                      <span className={cn('block text-2xl font-bold leading-tight tabular-nums', tone.num)}>
+                        {boxCounts[key].toLocaleString('th-TH')}
+                      </span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {JOB_BOX_HINT[key]}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {/* เส้นคั่น — ของสองกล่องขวาไม่ได้อยู่ในชุดเดียวกับซ้าย (คนละ feed) */}
+                <span className="mx-1 w-px shrink-0 self-stretch bg-border" aria-hidden />
+
+                {CLOSED_BOX_KEYS.map((key) => {
+                  const tone = TONE[JOB_BOX_TONE[key]];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => onViewChange(key)}
+                      className={cn(
+                        'min-w-[7rem] rounded-xl border-2 border-transparent px-3 py-2 text-left transition-colors',
+                        tone.soft,
+                        tone.softHover,
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                        <span className="whitespace-nowrap text-[11px] font-semibold text-foreground">
+                          {JOB_BOX_LABEL[key]}
+                        </span>
+                      </span>
+                      <span className={cn('block text-sm font-semibold leading-tight', tone.value)}>
+                        เปิดดู →
+                      </span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {JOB_BOX_HINT[key]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {openBox ? (
+              <p className="text-[11px] text-muted-foreground">
+                กรองอยู่: <span className="font-semibold text-foreground">{JOB_BOX_LABEL[openBox]}</span>{' '}
+                — {JOB_BOX_HINT[openBox]} · กดกล่องเดิมซ้ำเพื่อล้าง
+              </p>
+            ) : null}
           </div>
         ) : null}
 
