@@ -1,6 +1,57 @@
-# ส่งต่อเซสชัน — jarvis / So Recruit (18 ส.ค. 2569 · ล่าสุดรอบยี่สิบสอง)
+# ส่งต่อเซสชัน — jarvis / So Recruit (18–19 ส.ค. 2569 · ล่าสุดรอบยี่สิบสาม)
 
 อ่านไฟล์นี้ก่อนไฟล์อื่น แล้วค่อยเจาะรายละเอียดตามลิงก์ข้างล่าง
+
+---
+
+## 🔴 0.0000-A รอบยี่สิบสาม (18–19 ส.ค. 2569) — อ่านก่อนสุด
+
+| | |
+|---|---|
+| commit ล่าสุด | `73d8074` · push แล้ว · deploy อัตโนมัติ (เช็ค `gh run list --limit 1`) |
+| test | **1,718 ผ่าน / 6 skip** |
+| tsc **3 config** | 0 ทั้งสาม (`tsconfig.app.json` + **`tsconfig.api.json`** + root) · eslint **0 error** / 1 warning |
+| registry | **88 route** (เพิ่ม follow-topics · follow-staff-contacts · siamraj/unit-history) |
+| migration ไฟล์+**บนฐาน** | ถึง **101** (099 follow_staff_contacts · 100 follow_topics · 101 follow_outcome ชุดใหม่ — รันบนฐานแล้ว) |
+| working tree | สะอาด |
+
+### 🔴 กติกาที่เปลี่ยนรอบนี้ — สำคัญสุด
+* **งานที่ตรวจครบ + ด่านเขียวหมด → commit แล้ว push เองเลย ไม่ต้องรอสั่ง** (เจ้าของสั่ง
+  18 ส.ค. *"ทำเลยสิ ปกติก็ทำเอง"*) · push แล้วเฝ้า deploy จนจบ + **ตรวจของบน production จริง**
+  (งัด bundle chunk มา grep marker · หน้าเป็น lazy chunk แยก grep `index-*.js` อย่างเดียวสรุปผิด)
+* งานที่ยังไม่ตรวจ/มีคำถามค้าง = ยังไม่ push · สงสัยขอบเขต → ทำเป็น Choice (AskUserQuestion)
+
+### 🔴 กับดักใหม่รอบนี้ (นอกจากที่ 09-editing-map มี)
+* **โปรเจกต์มี tsconfig 3 ตัว** — `app`(src) · **`api`(api/)** · root · รันครบสามเสมอ
+  (พลาด: ลืม import `listSiamrajUnits` หลุดถึง prod 500 เพราะรันแค่ 2)
+* **`.env.local` = ฐาน production จริง** — `node scripts/migrate.mjs` รันปุ๊บลง prod ทันที ·
+  ทดสอบที่เขียนข้อมูลต้อง insert ตรงในฐาน + ลบคืน (โหมด `follow_entry` = auto จะโทรออกจริง)
+* **dev-role cookie อายุ ~30 นาที** — ตรวจงานยาวแล้วหน้าเด้ง login เงียบ ๆ (element หาไม่เจอ
+  ทั้งที่โค้ดถูก) · เช็ค URL ก่อนสรุปว่าโค้ดพัง แล้วยิง `POST /api/auth/dev-role {"role":"admin"}` ใหม่
+* **ทดสอบ onBlur ต้องใช้ `FocusEvent('focusout',{bubbles:true})`** — dispatch `blur` เปล่า ๆ
+  ไม่ทริกเกอร์ React onBlur (React ฟัง focusout ที่ bubble)
+* dev server session นี้ต้อง `preview_start` **ทั้ง vite(8080) และ api(3100)** — api ไม่รันเอง
+
+### สิ่งที่ทำเสร็จรอบนี้ (commit เรียงเก่า→ใหม่)
+1. `e8036ba` Follow งานค้าง 4 ข้อ (dropdown จนท · การ์ดต่อคน · migration 099)
+2. `5b7b931` Lumos 3 จุด (รหัสอ้างอิงไม่มี `::` · เวลา +07:00 · เผื่อล่วงหน้า 10 นาที)
+3. `ef8cd01` log การแก้ไขบนหน้าใบขอ (siamraj/unit-history)
+4. `40ef7d8` fix กดใบขอล่วงหน้าเปิดผิดบริษัท (URL พก `siamraj-pre:`)
+5. `3c4b261` dropdown เรื่อง · หน่วยงานครบ 1,048 · คำปิดงานชุดใหม่ 5 คำ · ปฏิทินไอคอน (migration 100/101)
+6. `2295613` ปุ่มเพิ่มเรื่อง/จนท ข้างปฏิทิน (supervisor+) · ตารางสรุปรายเดือน คน×วัน
+7. `ff60de1` แท็บสถานะ 4 อัน (กำลังตาม/สำเร็จ/สิ้นสุด/ยกเลิก) · ปุ่ม Filter (วันที่/ช่วงเวลา/เจ้าของงาน)
+8. `80579ac`+`6231a1d` รายชื่อทีม Settings → สองชั้นแท็บ pill (เลือก BU → เลือกทีม) + pagination 10
+9. `7d8b1d0` ช่องผู้รับผิดชอบทีม Online บนหน้าใบขอ + **fix bug เก่า** attachAssignments ไม่ map online_name (บันทึกได้แต่อ่านกลับ null ตั้งแต่ 097)
+10. `9597a95` Follow ช่อง จนท: ชื่อจากคัดสรร + เบอร์พิมพ์เอง + จำ name→phone (follow_staff_contacts = ความจำ)
+11. `73d8074` เอาปุ่มปฏิทินการโทรออกจากแผง 3 รอบ
+
+### 🔴 ค้างอยู่เรื่องเดียว
+* **Lumos ไม่ขึ้นหน้าแจ้งเตือนฝั่งเขา** — ฝั่งเราแก้ครบ 3 จุดแล้ว (commit `5b7b931`)
+  รอ **สายจริง** พิสูจน์ · ถ้ายังไม่ขึ้นต้องให้ทีม Lumos เช็ค log ฝั่งเขา
+  (`client_contact_id` เปลี่ยนเป็น `follow-<id>` แล้ว · ตัวรับผลยังจับคู่แถวเก่ารูป `follow::` ได้)
+
+### รายละเอียดครบทุกกับดัก/ทุกไฟล์ที่แตะ (ค่ำ-1 ถึง ค่ำ-10)
+→ `.claude/skills/request-control-tower-advisor/references/09-editing-map.md` (ท้ายไฟล์)
 
 ---
 
