@@ -2,7 +2,12 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest, JobUrgency } from '@/types';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { toYmdBangkok } from '@/lib/dateTh';
-import { requestLeadKindFromDays, URGENCY_LEAD_DAYS } from '@/lib/requestLeadKind';
+import {
+  REQUEST_LEAD_KIND_TONE,
+  requestLeadKindFromDays,
+  URGENCY_LEAD_DAYS,
+} from '@/lib/requestLeadKind';
+import type { ToneKey } from '@/lib/designTokens';
 
 export { URGENCY_LEAD_DAYS };
 
@@ -84,6 +89,18 @@ export type JobUrgencyMeta = {
   /** วันนี้ − วันที่ต้องการ (≥ 1 = เลยกำหนดแล้ว) */
   daysPastRequired: number;
   wasAdvanceAtSubmit: boolean;
+};
+
+/**
+ * สีของ `urgency` ที่มาจาก ERP (มี 2 ค่า: ด่วน / ล่วงหน้า)
+ *
+ * 🔴 **"ล่วงหน้า" ต้องเขียวเท่ากับ `REQUEST_LEAD_KIND_TONE.advance` เสมอ** — คนละสเกล
+ * (ตัวนี้ 2 ค่า · อีกตัว 3 ค่า) แต่**คำบนจอคำเดียวกันต้องสีเดียวกัน** ไม่งั้น user งง
+ * ว่าเขียวกับฟ้าต่างกันยังไง (เจ้าของทัก 19 ส.ค. 2569)
+ */
+export const JOB_URGENCY_TONE: Record<JobUrgency, ToneKey> = {
+  urgent: 'danger',
+  advance: REQUEST_LEAD_KIND_TONE.advance,
 };
 
 /** แปลงค่าวันที่เป็น YYYY-MM-DD ตามปฏิทินท้องถิ่น (ไม่ใช้ UTC slice) */

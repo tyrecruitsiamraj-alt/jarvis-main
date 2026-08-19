@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
+import { getJobAgeChipInfo, JOB_AGE_CHIP_META, JOB_URGENCY_TONE } from '@/lib/jobUrgency';
+import { REQUEST_LEAD_KIND_TONE } from '@/lib/requestLeadKind';
+import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 
 /**
@@ -83,5 +85,31 @@ describe('getJobAgeChipInfo — ใบล่วงหน้าต้องเป
       // กติกาข้อ 4 ของโปรเจกต์: ทุกสีธีมสว่างต้องมีคู่ dark (bg ด้วย ไม่ใช่แค่ text/border)
       expect(meta.chipCls, `${lv} ต้องมี dark:bg`).toMatch(/dark:bg-/);
     }
+  });
+});
+
+/**
+ * 🔴 เจ้าของทัก 19 ส.ค. 2569: *"ล่วงหน้าตอนนี้เจอทั้งเขียว และ ส้ม … ล่วงหน้ามันต้องเขียวสิ"*
+ * และเคาะกติกาว่า *"ถ้าอันไหนมันคือ Logic เดียวกันก็ไปทางเดียวกัน ป้องกัน user งง"*
+ * → คำว่า "ล่วงหน้า" ต้องเป็นเขียว (success) ทุกสเกล ทุกหน้า · เทสต์นี้กันไม่ให้ใครแยกไปคนละสี
+ */
+describe('สีของ "ล่วงหน้า" ต้องเป็นชุดเดียวกันทั้งระบบ', () => {
+  it('lead kind (3 ค่า) — advance = success', () => {
+    expect(REQUEST_LEAD_KIND_TONE.advance).toBe('success');
+  });
+
+  it('urgency ของ ERP (2 ค่า) — advance ต้องเท่ากับ lead kind เป๊ะ', () => {
+    expect(JOB_URGENCY_TONE.advance).toBe(REQUEST_LEAD_KIND_TONE.advance);
+  });
+
+  it('ชิป「ผ่านมา」ระดับ advance ต้องอยู่ตระกูลสีเดียวกับ TONE.success', () => {
+    // TONE.success = emerald (hex #047857) — ชิปจึงต้องเป็น emerald ไม่ใช่ sky/orange
+    expect(TONE.success.value).toMatch(/emerald/);
+    expect(JOB_AGE_CHIP_META.advance.chipCls).toMatch(/emerald/);
+    expect(JOB_AGE_CHIP_META.advance.dotCls).toMatch(/emerald/);
+  });
+
+  it('ห้ามมีสีอื่นแฝงในระดับ advance (ฟ้า/ส้ม/แดง)', () => {
+    expect(JOB_AGE_CHIP_META.advance.chipCls).not.toMatch(/sky|info|orange|amber|red|rose/);
   });
 });

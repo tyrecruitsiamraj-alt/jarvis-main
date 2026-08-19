@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import type { LeadKindBreakdown } from '@/lib/dashboard/leadKindBreakdown';
-import type { RequestLeadKind } from '@/lib/requestLeadKind';
+import { REQUEST_LEAD_KIND_TONE, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { REQUEST_LEAD_KIND_HINT } from '@/lib/requestLeadKind';
 
 /**
@@ -16,11 +16,8 @@ import { REQUEST_LEAD_KIND_HINT } from '@/lib/requestLeadKind';
  * สีตามความเร่งด่วน: แดง = ขอย้อนหลัง · เหลือง = ฉุกเฉิน · เขียว = ล่วงหน้า (วางแผนทัน)
  */
 
-const KIND_TONE: Record<RequestLeadKind, ToneKey> = {
-  retroactive: 'danger',
-  urgent: 'warn',
-  advance: 'success',
-};
+/** ⚠️ สีย้ายไปอยู่ที่ `REQUEST_LEAD_KIND_TONE` (lib/requestLeadKind) แล้ว — ห้ามประกาศซ้ำที่นี่ */
+const KIND_TONE = REQUEST_LEAD_KIND_TONE;
 
 export type DashboardLeadKindChartProps = {
   breakdown: LeadKindBreakdown;

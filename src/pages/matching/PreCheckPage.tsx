@@ -6,6 +6,7 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import { MapPin, ClipboardCheck, Navigation, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
+import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { JobRequest, JOB_TYPE_LABELS, JOB_CATEGORY_LABELS, type ClientWorkplace } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
@@ -870,7 +871,9 @@ const PreCheckPage: React.FC = () => {
                   <span
                     className={cn(
                       'text-[10px] px-2 py-0.5 rounded-full',
-                      j.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info',
+                      // 🔴 สีของคำว่า "ล่วงหน้า" มาจาก JOB_URGENCY_TONE ที่เดียว (เดิมเป็นฟ้า)
+                      TONE[JOB_URGENCY_TONE[j.urgency]].soft,
+                      TONE[JOB_URGENCY_TONE[j.urgency]].value,
                     )}
                   >
                     {j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
@@ -1012,9 +1015,9 @@ const PreCheckPage: React.FC = () => {
                           <span
                             className={cn(
                               'rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                              jobDetail.urgency === 'urgent'
-                                ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300'
-                                : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
+                              // 🔴 สีเดียวกับชิปด้านบนและทุกหน้า — มาจาก JOB_URGENCY_TONE
+                              TONE[JOB_URGENCY_TONE[jobDetail.urgency]].soft,
+                              TONE[JOB_URGENCY_TONE[jobDetail.urgency]].value,
                             )}
                           >
                             {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}

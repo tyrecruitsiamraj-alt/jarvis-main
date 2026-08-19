@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { REQUEST_LEAD_KIND_TONE } from '@/lib/requestLeadKind';
 import type { DashboardAgeDaysBreakdown } from '@/lib/dashboard/types';
 
 type Props = {
@@ -17,7 +18,8 @@ type Props = {
  * ถัง 30+ เป็น "บล็อกสีอิ่ม" ตัวเดียวของหน้านี้ (ตามรูป reference: เลขที่ต้องลงมือวันนี้ต้องกระโดดออกมา)
  */
 const BUCKET_TONE: Record<DashboardAgeDaysBreakdown['bucket'], { urgency: string; tone: ToneKey; solid?: true }> = {
-  advance: { urgency: 'รอได้', tone: 'info' },
+  // 🔴 "ล่วงหน้า" = เขียวทุกหน้า (เจ้าของสั่ง 19 ส.ค. 2569) — เดิมเป็นฟ้าที่นี่ที่เดียว
+  advance: { urgency: 'รอได้', tone: REQUEST_LEAD_KIND_TONE.advance },
   '1-7': { urgency: 'ยังไม่ด่วน', tone: 'success' },
   '8-15': { urgency: 'เริ่มด่วน', tone: 'warn' },
   '16-30': { urgency: 'เริ่มด่วน', tone: 'orange' },

@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
+import { TONE } from '@/lib/designTokens';
 import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
@@ -418,10 +420,12 @@ const JobDetailPage: React.FC = () => {
             <span
               className={cn(
                 'text-xs px-2 py-0.5 rounded-full',
-                job.urgency === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-info/15 text-info',
+                // 🔴 สีของคำว่า "ล่วงหน้า" มาจาก JOB_URGENCY_TONE ที่เดียวทั้งระบบ (เดิมฟ้า)
+                TONE[JOB_URGENCY_TONE[job.urgency]].soft,
+                TONE[JOB_URGENCY_TONE[job.urgency]].value,
               )}
             >
-              {job.urgency === 'urgent' ? '🔴 ด่วน' : '🔵 ล่วงหน้า'}
+              {job.urgency === 'urgent' ? '🔴 ด่วน' : '🟢 ล่วงหน้า'}
             </span>
           </div>
 

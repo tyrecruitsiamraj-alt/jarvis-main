@@ -10,6 +10,8 @@
  * วันที่ (YYYY-MM-DD) ตามปฏิทินกรุงเทพมาแล้ว ไม่ใช่เอา timestamp มาลบกัน
  */
 
+import type { ToneKey } from './designTokens';
+
 export const URGENCY_LEAD_DAYS = 7;
 
 /** ล่วงหน้า = ขอไว้ล่วงหน้า ≥ 7 วัน · ฉุกเฉิน = ขอกระชั้น < 7 วัน · ย้อนหลัง = วันที่ต้องการอยู่ก่อนวันที่กรอก */
@@ -34,6 +36,19 @@ export const REQUEST_LEAD_KIND_HINT: Record<RequestLeadKind, string> = {
  * `computeJobUrgency` ที่ถือว่า "ไม่มีข้อมูล = ยังไม่เร่ง" · **ห้ามเดาเป็นฉุกเฉิน**
  * ไม่งั้นใบที่ ERP กรอกวันไม่ครบจะไปโป่งอยู่ในถังฉุกเฉินทั้งกอง
  */
+/**
+ * สีประจำชนิดใบขอตามระยะเวลา — **ที่เดียวทั้งระบบ**
+ *
+ * 🔴 เจ้าของสั่ง 19 ส.ค. 2569: *"ถ้าอันไหนมันคือ Logic เดียวกันก็ไปทางเดียวกัน
+ * ป้องกัน user งง"* (หลังเจอคำว่า "ล่วงหน้า" หลายสีในระบบเดียว)
+ * → **`advance` = `success` (เขียว) เสมอ** ห้ามหน้าไหนเขียนสีเองกับคำว่า "ล่วงหน้า"
+ */
+export const REQUEST_LEAD_KIND_TONE: Record<RequestLeadKind, ToneKey> = {
+  retroactive: 'danger',
+  urgent: 'warn',
+  advance: 'success',
+};
+
 export function requestLeadKindFromDays(leadDays: number | null | undefined): RequestLeadKind {
   if (leadDays == null || !Number.isFinite(leadDays)) return 'advance';
   if (leadDays < 0) return 'retroactive';
