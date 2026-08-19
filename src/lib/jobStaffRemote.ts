@@ -80,9 +80,9 @@ export function clearJobStaffApiCache(): void {
 }
 
 export type MutateOp =
-  | { op: 'add'; role: 'recruiter' | 'screener' | 'opl'; name: string }
-  | { op: 'remove'; role: 'recruiter' | 'screener' | 'opl'; name: string }
-  | { op: 'rename'; role: 'recruiter' | 'screener' | 'opl'; oldName: string; newName: string };
+  | { op: 'add'; role: 'recruiter' | 'screener' | 'opl' | 'online'; name: string }
+  | { op: 'remove'; role: 'recruiter' | 'screener' | 'opl' | 'online'; name: string }
+  | { op: 'rename'; role: 'recruiter' | 'screener' | 'opl' | 'online'; oldName: string; newName: string };
 
 /** A roster name with the BU it is assigned to (null = ไม่ระบุ, visible in every BU). */
 export type RosterEntry = { name: string; bu: string | null };

@@ -59,6 +59,8 @@ import { cn } from '@/lib/utils';
 
 function staffAssigneeLine(j: JobRequest): string | null {
   const parts = [
+    // ทีม online = ผู้รับผิดชอบ (เจ้าของสั่ง 18 ส.ค. 2569) — ขึ้นก่อนเพื่อน
+    j.online_name ? `Online ${j.online_name}` : null,
     j.opl_name ? `OPL ${j.opl_name}` : null,
     j.recruiter_name ? `สรรหา ${j.recruiter_name}` : null,
     j.screener_name ? `คัดสรร ${j.screener_name}` : null,

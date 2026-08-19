@@ -74,7 +74,12 @@ export async function fetchSiamrajClosedRequests(from: string, to: string): Prom
 /** บันทึกผู้รับผิดชอบ (สรรหา/คัดสรร) ของใบขอ Siamraj — เก็บใน PostgreSQL ฝั่ง Jarvis */
 export async function saveSiamrajUnitAssignment(
   requestNo: string,
-  payload: { recruiter_name?: string | null; screener_name?: string | null; opl_name?: string | null },
+  payload: {
+    recruiter_name?: string | null;
+    screener_name?: string | null;
+    opl_name?: string | null;
+    online_name?: string | null;
+  },
 ): Promise<void> {
   const r = await apiFetch('/api/siamraj/unit-assignments', {
     method: 'POST',

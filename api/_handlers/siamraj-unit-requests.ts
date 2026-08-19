@@ -48,6 +48,9 @@ export async function attachAssignments(items: unknown[]): Promise<void> {
       it.recruiter_name = a.recruiter_name;
       it.screener_name = a.screener_name;
       it.opl_name = a.opl_name;
+      // 🔴 ทีม online (097) เคยตกหล่นตรงนี้ — บันทึกลงฐานได้แต่อ่านกลับเป็น null เสมอ
+      // (เจอ 18 ส.ค. 2569 ตอนต่อช่องผู้รับผิดชอบทีม online บนหน้ากล่องงาน)
+      it.online_name = a.online_name;
     }
   } catch {
     /* ผู้รับผิดชอบเป็นข้อมูลเสริม — ไม่ทำให้ feed หลักล่ม */

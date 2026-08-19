@@ -10,7 +10,7 @@ import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment, fetchUnitEditLog } from '@/lib/siamrajUnitRequestsApi';
 import { describeUnitEdit, UNIT_EDIT_TITLE } from '@/lib/unitEditLog';
-import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, buildOnlineNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
@@ -71,6 +71,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   const [recruiter, setRecruiter] = useState('');
   const [screener, setScreener] = useState('');
   const [opl, setOpl] = useState('');
+  // ทีม online = ผู้รับผิดชอบ (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-9: "เอาชื่อมาจากทีม online")
+  const [online, setOnline] = useState('');
   const [rosterRev, setRosterRev] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -88,8 +90,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     setRecruiter(data?.recruiter_name ?? '');
     setScreener(data?.screener_name ?? '');
     setOpl(data?.opl_name ?? '');
+    setOnline(data?.online_name ?? '');
     setSaveMsg(null);
-  }, [data?.recruiter_name, data?.screener_name, data?.opl_name]);
+  }, [data?.recruiter_name, data?.screener_name, data?.opl_name, data?.online_name]);
 
   const recruiterOptions = useMemo(() => {
     void rosterRev;
@@ -103,13 +106,18 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     void rosterRev;
     return buildOplNameOptions();
   }, [rosterRev]);
+  const onlineOptions = useMemo(() => {
+    void rosterRev;
+    return buildOnlineNameOptions();
+  }, [rosterRev]);
 
   const requestNo = data?.request_no;
   const requestKey = (data?.externalId || data?.request_no)?.trim();
   const dirty =
     (recruiter.trim() || '') !== (data?.recruiter_name ?? '') ||
     (screener.trim() || '') !== (data?.screener_name ?? '') ||
-    (opl.trim() || '') !== (data?.opl_name ?? '');
+    (opl.trim() || '') !== (data?.opl_name ?? '') ||
+    (online.trim() || '') !== (data?.online_name ?? '');
 
   const saveAssignment = async () => {
     const key = requestKey;
@@ -121,6 +129,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
         recruiter_name: recruiter.trim() || null,
         screener_name: screener.trim() || null,
         opl_name: opl.trim() || null,
+        online_name: online.trim() || null,
       });
       queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
         old
@@ -129,6 +138,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               recruiter_name: recruiter.trim() || undefined,
               screener_name: screener.trim() || undefined,
               opl_name: opl.trim() || undefined,
+              online_name: online.trim() || undefined,
             }
           : old,
       );
@@ -287,6 +297,15 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       value={opl}
                       onChange={setOpl}
                       optionNames={oplOptions}
+                      canManageRoster={false}
+                      rosterRev={rosterRev}
+                    />
+                    <RosterBackedStaffSelect
+                      role="online"
+                      label="ทีม Online (ผู้รับผิดชอบ)"
+                      value={online}
+                      onChange={setOnline}
+                      optionNames={onlineOptions}
                       canManageRoster={false}
                       rosterRev={rosterRev}
                     />
