@@ -46,6 +46,14 @@ type Props = {
   resultCount?: number;
   totalCount?: number;
   /**
+   * หน่วยของ resultCount/totalCount — ค่าเริ่มต้น 'ตำแหน่ง' (หน้าสมัครสาธารณะพูดแบบนั้น)
+   * 🔴 ฝั่งเจ้าหน้าที่ส่ง 'ใบขอ' มา เพราะเลขนี้คือ**จำนวนใบ** ไม่ใช่จำนวนอัตรา
+   * (เจ้าของเทียบ "292 ตำแหน่ง" บนกล่องงานกับ 340 อัตราบน Dashboard แล้วคิดว่าใบขอหาย)
+   */
+  countUnitLabel?: string;
+  /** ข้อความหน่วยที่สอง เช่น "340 อัตรา" — ต่อท้ายบรรทัด "พบ …" ให้กระทบยอดกับ Dashboard ได้ */
+  positionsNote?: string;
+  /**
    * ซ่อนช่องค้นหาในแถบนี้ — ใช้ตอนหน้าแม่ยกช่องค้นหาขึ้นไปไว้บนสุดเอง
    * (เจ้าของสั่ง 13 ส.ค. 2569: บอร์ดเจ้าหน้าที่ให้ค้นหาอยู่ด้านบนแบบหน้า Dashboard
    * · หน้าสาธารณะไม่ส่ง prop นี้ = ช่องค้นหาอยู่ที่เดิม)
@@ -106,6 +114,8 @@ const JobBoardTopFilters: React.FC<Props> = ({
   searchPlaceholder = 'ค้นหาจากชื่อหน่วยงาน, ที่อยู่, ประเภทงาน...',
   resultCount,
   totalCount,
+  countUnitLabel = 'ตำแหน่ง',
+  positionsNote,
   hideSearch = false,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -303,11 +313,12 @@ const JobBoardTopFilters: React.FC<Props> = ({
                 {totalCount != null && totalCount !== resultCount ? (
                   <>
                     {' '}
-                    จาก {totalCount.toLocaleString('th-TH')} ตำแหน่ง
+                    จาก {totalCount.toLocaleString('th-TH')} {countUnitLabel}
                   </>
                 ) : (
-                  ' ตำแหน่ง'
+                  ` ${countUnitLabel}`
                 )}
+                {positionsNote ? <> · {positionsNote}</> : null}
               </p>
             ) : null}
           </div>

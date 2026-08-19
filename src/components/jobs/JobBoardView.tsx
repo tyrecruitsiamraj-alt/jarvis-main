@@ -42,9 +42,11 @@ import {
   JOB_BOX_TONE,
   OPEN_BOX_KEYS,
   countOpenBoxes,
+  countOpenBoxPositions,
   filterByOpenBox,
   type OpenBoxKey,
 } from '@/lib/jobBoxGroups';
+import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import { compareJobsByAgeDaysDesc } from '@/lib/jobUrgency';
@@ -188,6 +190,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const [openBox, setOpenBox] = useState<OpenBoxKey | null>(null);
   const boxCounts = useMemo(() => countOpenBoxes(filters.filtered), [filters.filtered]);
+  /**
+   * 🔴 อัตราต่อกล่อง — **หน่วยเดียวกับ Dashboard** (เจ้าของทัก 19 ส.ค. 2569:
+   * *"หน้า Dashboard มีงานทั้งหมด 339 แต่หน้ากล่องงานมีแค่ 291 เอง"*)
+   * ของจริงคือชุดเดียวกัน แต่กล่องงานนับ "ใบ" ส่วน Dashboard นับ "อัตรา"
+   * (วัดจริง 292 ใบ = 340 อัตรา = ขอมา 422 − หาได้แล้ว 82) → โชว์ทั้งสองหน่วยเสมอ
+   */
+  const boxPositions = useMemo(
+    () => countOpenBoxPositions(filters.filtered, jobPositionUnits),
+    [filters.filtered],
+  );
+  const filteredPositions = useMemo(
+    () => sumJobPositionUnits(filters.filtered),
+    [filters.filtered],
+  );
   const boxedJobs = useMemo(
     () => filterByOpenBox(filters.filtered, openBox),
     [filters.filtered, openBox],
@@ -373,7 +389,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           <PageHeroStrip
             eyebrow="บอร์ดงานเปิดรับ · เจ้าหน้าที่"
             title="งานสรรหา"
-            meta={loading ? undefined : `· ${filters.visibleCount.toLocaleString('th-TH')} ตำแหน่ง`}
+            /* 🔴 บอกหน่วยให้ครบทั้ง "ใบขอ" และ "อัตรา" — เดิมเขียน "292 ตำแหน่ง" ทั้งที่ 292
+               คือจำนวน**ใบ** ทำให้เอาไปเทียบกับ Dashboard (340 อัตรา) แล้วสรุปว่าใบขอหาย */
+            meta={
+              loading
+                ? undefined
+                : `· ${filters.visibleCount.toLocaleString('th-TH')} ใบขอ · ${filters.visiblePositions.toLocaleString('th-TH')} อัตรา`
+            }
             actions={
               <>
                 {/* ค้นหาอยู่ในแถบหัวเดียวกับชื่อหน้า+ปุ่ม แบบหน้า Dashboard
@@ -525,6 +547,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           hideSearch={isStaff}
           resultCount={loading ? undefined : boxedJobs.length}
           totalCount={loading ? undefined : filters.visibleCount}
+          /* เจ้าหน้าที่: เลขนี้คือจำนวน**ใบขอ** + บอกอัตราต่อท้ายให้เทียบกับ Dashboard ได้
+             สาธารณะ: คงคำว่า "ตำแหน่ง" เดิม (คนนอกไม่ได้ดูหน่วยอัตราของ ERP) */
+          countUnitLabel={isStaff ? 'ใบขอ' : undefined}
+          positionsNote={
+            isStaff && !loading
+              ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตราที่ยังต้องหา`
+              : undefined
+          }
         />
 
         {/* กล่องสถานะ (เจ้าของสั่ง 19 ส.ค. 2569: *"มีกล่องเพื่อดูข้อมูลได้หมดอะ"* +
@@ -554,8 +584,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </span>
                   <span className="block text-2xl font-bold leading-tight tabular-nums text-foreground">
                     {filters.filtered.length.toLocaleString('th-TH')}
+                    <span className="ml-1 text-[11px] font-semibold text-muted-foreground">ใบขอ</span>
                   </span>
-                  <span className="block text-[10px] text-muted-foreground">ใบขอที่ยังเปิด</span>
+                  <span className="block text-[10px] text-muted-foreground">
+                    {filteredPositions.toLocaleString('th-TH')} อัตราที่ยังต้องหา
+                  </span>
                 </button>
 
                 {OPEN_BOX_KEYS.map((key) => {
@@ -582,6 +615,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       </span>
                       <span className={cn('block text-2xl font-bold leading-tight tabular-nums', tone.num)}>
                         {boxCounts[key].toLocaleString('th-TH')}
+                        <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
+                          ใบขอ · {boxPositions[key].toLocaleString('th-TH')} อัตรา
+                        </span>
                       </span>
                       <span className="block truncate text-[10px] text-muted-foreground">
                         {JOB_BOX_HINT[key]}

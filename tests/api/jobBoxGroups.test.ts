@@ -5,6 +5,7 @@ import {
   OPEN_BOX_KEYS,
   closedJobBoxOf,
   countOpenBoxes,
+  countOpenBoxPositions,
   filterByClosedBox,
   filterByOpenBox,
   isClosedBox,
@@ -88,6 +89,49 @@ describe('countOpenBoxes', () => {
 
   it('ไม่มีใบเลย = ศูนย์ทุกกล่อง', () => {
     expect(countOpenBoxes([])).toEqual({ sourcing: 0, selecting: 0, waiting: 0, started: 0 });
+  });
+});
+
+describe('countOpenBoxPositions (อัตรา ไม่ใช่ใบ)', () => {
+  /**
+   * 🔴 เจ้าของทัก 19 ส.ค. 2569 ว่า Dashboard 339 แต่กล่องงาน 291 — คนละหน่วยกัน
+   * กล่องต้องบอกได้ทั้ง "ใบ" และ "อัตรา" เลขจึงกระทบยอดกับ Dashboard ได้
+   */
+  const units = (j: { position_units?: number }) => j.position_units ?? 1;
+
+  it('รวมอัตราต่อกล่อง — ไม่ใช่การนับใบ', () => {
+    const jobs = [
+      { position_units: 5 },
+      { work_status: 'in_progress', position_units: 2 },
+      { work_status: 'waiting_inform', position_units: 3 },
+      { work_status: 'daily_pay' },
+    ];
+    expect(countOpenBoxPositions(jobs, units)).toEqual({
+      sourcing: 7,
+      selecting: 0,
+      waiting: 3,
+      started: 1,
+    });
+  });
+
+  it('ผลรวมอัตราทุกกล่อง = อัตรารวมทั้งชุด (ห้ามมีอัตราตกหล่น)', () => {
+    const jobs = [
+      { position_units: 4 },
+      { work_status: 'evaluating', position_units: 2 },
+      { work_status: 'waiting_start', position_units: 1 },
+      { work_status: 'daily_work', position_units: 6 },
+    ];
+    const sum = Object.values(countOpenBoxPositions(jobs, units)).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(13);
+  });
+
+  it('ไม่มีใบเลย = ศูนย์ทุกกล่อง', () => {
+    expect(countOpenBoxPositions([], units)).toEqual({
+      sourcing: 0,
+      selecting: 0,
+      waiting: 0,
+      started: 0,
+    });
   });
 });
 

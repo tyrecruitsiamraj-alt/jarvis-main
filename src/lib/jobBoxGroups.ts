@@ -98,6 +98,30 @@ export function countOpenBoxes(
   return out;
 }
 
+/**
+ * นับ **อัตรา** ต่อกล่อง (ไม่ใช่จำนวนใบ)
+ *
+ * 🔴 เจ้าของทัก 19 ส.ค. 2569: *"หน้า Dashboard มีงานทั้งหมด 339 แต่หน้ากล่องงานมีแค่ 291 เอง"*
+ * — ชุดข้อมูลเดียวกันเป๊ะ แต่กล่องงานโชว์ "ใบขอ" ส่วน Dashboard โชว์ "อัตรา"
+ * (วัดจริงวันนั้น 292 ใบ = 340 อัตรา) → กล่องต้องบอก**ทั้งสองหน่วย** เลขจึงกระทบยอดกันได้
+ *
+ * `positionsOf` ส่งเข้ามาจากข้างนอก (`jobPositionUnits`) — ไฟล์นี้ไม่รู้จัก `JobRequest`
+ * และกติกา "ไม่มีค่า = 1 อัตรา" ต้องอยู่ที่เดียวเท่านั้น
+ */
+export function countOpenBoxPositions<T extends { work_status?: unknown }>(
+  jobs: readonly T[],
+  positionsOf: (job: T) => number,
+): Record<OpenBoxKey, number> {
+  const out: Record<OpenBoxKey, number> = {
+    sourcing: 0,
+    selecting: 0,
+    waiting: 0,
+    started: 0,
+  };
+  for (const j of jobs) out[openJobBoxOf(j)] += positionsOf(j);
+  return out;
+}
+
 /** กรองใบเปิดตามกล่องที่เลือก · ไม่เลือก (null) = ไม่กรอง */
 export function filterByOpenBox<T extends { work_status?: unknown }>(
   jobs: readonly T[],

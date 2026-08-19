@@ -83,6 +83,14 @@ export function filterUnitRequestsByDepartment(
   return jobs.filter((j) => extractDepartmentCode(j) === filter);
 }
 
+/**
+ * 🔴 **เลขในวงเล็บของตัวกรองนับ "อัตรา" ไม่ใช่ "ใบขอ"** (ต้องเขียนหน่วยกำกับเสมอ)
+ *
+ * เจ้าของทัก 19 ส.ค. 2569: *"หน้า Dashboard มีงานทั้งหมด 339 แต่หน้ากล่องงานมีแค่ 291 เอง"*
+ * — ของจริงคือ**ชุดเดียวกัน** แต่คนละหน่วย: วัดจริงวันนั้น **292 ใบขอ = 340 อัตรา**
+ * (ขอมา 422 − หาได้แล้ว 82 = เหลือหา 340 ซึ่งเท่ากับการ์ด「คงเหลือ」บน Dashboard เป๊ะ)
+ * เลขเปล่า ๆ ในวงเล็บทำให้อ่านเป็น "จำนวนงาน" แล้วสรุปว่าใบขอหายไป 48 ใบ
+ */
 export function departmentCounts(jobs: JobRequest[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const j of jobs) {
@@ -98,14 +106,14 @@ export function departmentFilterOptions(
   const counts = departmentCounts(jobs);
 
   const options: { value: SiamrajDepartmentFilter; label: string }[] = [
-    { value: 'all', label: `ทั้งหมด (${sumJobPositionUnits(jobs)})` },
+    { value: 'all', label: `ทั้งหมด (${sumJobPositionUnits(jobs)} อัตรา)` },
   ];
 
   for (const [code, count] of [...counts.entries()].sort(
     (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'),
   )) {
     const label = departmentLabelForCode(jobs, code);
-    options.push({ value: code, label: `${label} (${count})` });
+    options.push({ value: code, label: `${label} (${count} อัตรา)` });
   }
 
   return options;
@@ -153,7 +161,7 @@ export function jobSubtypeFilterOptions(
   const counts = jobSubtypeCounts(jobs);
 
   const options: { value: SiamrajJobSubtypeFilter; label: string }[] = [
-    { value: 'all', label: `ทั้งหมด (${sumJobPositionUnits(jobs)})` },
+    { value: 'all', label: `ทั้งหมด (${sumJobPositionUnits(jobs)} อัตรา)` },
   ];
 
   for (const [key, count] of [...counts.entries()].sort(
@@ -161,7 +169,7 @@ export function jobSubtypeFilterOptions(
   )) {
     options.push({
       value: key,
-      label: `${formatJobSubtypeLabel(key)} (${count})`,
+      label: `${formatJobSubtypeLabel(key)} (${count} อัตรา)`,
     });
   }
 

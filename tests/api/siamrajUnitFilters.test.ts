@@ -29,9 +29,11 @@ describe('siamrajUnitFilters counts', () => {
     ];
 
     const options = departmentFilterOptions(jobs);
-    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (7)');
-    expect(options.find((o) => o.value === 'LBD')?.label).toBe('LBD (6)');
-    expect(options.find((o) => o.value === 'LBA')?.label).toBe('LBA (1)');
+    // 🔴 ต้องมีหน่วย "อัตรา" ติดทุกป้าย — เลขเปล่าทำให้อ่านเป็นจำนวนใบขอ
+    // (เจ้าของเทียบ Dashboard 340 กับกล่องงาน 292 แล้วคิดว่าใบขอหาย 48 ใบ)
+    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (7 อัตรา)');
+    expect(options.find((o) => o.value === 'LBD')?.label).toBe('LBD (6 อัตรา)');
+    expect(options.find((o) => o.value === 'LBA')?.label).toBe('LBA (1 อัตรา)');
   });
 
   it('counts position units per job subtype', () => {
@@ -41,7 +43,7 @@ describe('siamrajUnitFilters counts', () => {
     ];
 
     const options = jobSubtypeFilterOptions(jobs);
-    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (4)');
-    expect(options.find((o) => o.value === 'พขร.')?.label).toBe('พขร. (4)');
+    expect(options.find((o) => o.value === 'all')?.label).toBe('ทั้งหมด (4 อัตรา)');
+    expect(options.find((o) => o.value === 'พขร.')?.label).toBe('พขร. (4 อัตรา)');
   });
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JobRequest } from '@/types';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { districtMatchesFilter } from '@/lib/districtMatch';
@@ -217,6 +218,8 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     filtered,
     usedRelatedFallback,
     visibleCount: visible.length,
+    /** อัตรารวมของชุดที่มองเห็น (ก่อนกรอง) — หน่วยเดียวกับ Dashboard ที่นับ "อัตรา" */
+    visiblePositions: sumJobPositionUnits(visible),
     lockPosition,
   };
 }
