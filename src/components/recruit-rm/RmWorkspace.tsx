@@ -34,6 +34,8 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
+import { buildAppointmentBoard } from '@/lib/appointmentBoard';
+import { formatYmdDmyBe } from '@/lib/dateTh';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import {
   LEAD_VIEW_HINT,
@@ -215,6 +217,9 @@ const RmWorkspace: React.FC<{
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
   }, [rows, tab, keyword, listView, bucket]);
+
+  /** บอร์ดสรุปนัดต่อวัน (ข้อ 12 · 20 ส.ค. 2569) — คิดจากชุดเดียวกับตาราง เลขจึงตรงกันเสมอ */
+  const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
@@ -507,18 +512,73 @@ const RmWorkspace: React.FC<{
           ) : null}
 
           {tab === 'appointments' ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rm-appointments-head">
-              {/* เจ้าของนิยาม 14 ส.ค. 2569: "ติดตามการนัดหมายเป็นแค่หน้าเอาไว้ดูว่านัดที่ไหน
-                  วันไหน และกี่คน โหลดเป็น PDF ได้" — สรุปหัว + ปุ่มพิมพ์ (window.print
-                  ฝั่งเบราว์เซอร์ — เจ้าของเคาะ ไม่เพิ่ม lib) · print CSS ซ่อนส่วนอื่นของหน้า */}
-              <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.info.soft, TONE.info.value)}>
-                นัดสัมภาษณ์ <b>{filtered.filter((r) => r.appointment_at).length.toLocaleString('th-TH')}</b> คน
-                จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
-                วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
-              </p>
-              <button type="button" onClick={() => window.print()} className="jarvis-btn-secondary shrink-0">
-                🖨 โหลดเป็น PDF
-              </button>
+            <div className="space-y-2 rm-appointments-head">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {/* เจ้าของนิยาม 14 ส.ค. 2569: "ติดตามการนัดหมายเป็นแค่หน้าเอาไว้ดูว่านัดที่ไหน
+                    วันไหน และกี่คน โหลดเป็น PDF ได้" — สรุปหัว + ปุ่มพิมพ์ (window.print
+                    ฝั่งเบราว์เซอร์ — เจ้าของเคาะ ไม่เพิ่ม lib) · print CSS ซ่อนส่วนอื่นของหน้า */}
+                <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.info.soft, TONE.info.value)}>
+                  นัดสัมภาษณ์ <b>{filtered.filter((r) => r.appointment_at).length.toLocaleString('th-TH')}</b> คน
+                  จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
+                  วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
+                </p>
+                <button type="button" onClick={() => window.print()} className="jarvis-btn-secondary shrink-0">
+                  🖨 โหลดเป็น PDF
+                </button>
+              </div>
+
+              {/* บอร์ดสรุปนัด (เจ้าของสั่ง 20 ส.ค. 2569 ข้อ 12: *"มีบอร์ดแสดงว่านัดทั้งหมด
+                  เท่าไหร่ มาเท่าไหร่ ไม่มาเท่าไหร่"* + รายวัน) — ตรรกะที่ appointmentBoard.ts
+                  · สีจาก TONE ที่เดียว · "รอผล" ต้องเห็นเป็นเลข ไม่ใช่หาย */}
+              {appointmentBoard.total.total > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(
+                      [
+                        ['นัดทั้งหมด', appointmentBoard.total.total, 'info'],
+                        ['มา', appointmentBoard.total.showed, 'success'],
+                        ['ไม่มา', appointmentBoard.total.noShow, 'danger'],
+                        ['รอผล / เลื่อนนัด', appointmentBoard.total.pending + appointmentBoard.total.rescheduled, 'warn'],
+                      ] as const
+                    ).map(([label, n, toneKey]) => (
+                      <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
+                        <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
+                        <p className={cn('text-xl font-bold tabular-nums', TONE[toneKey].num)}>
+                          {n.toLocaleString('th-TH')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border border-border/70">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className={cn('text-left', DASH.tableHead)}>
+                          <th className="px-3 py-2 font-medium">วันนัด</th>
+                          <th className="px-3 py-2 text-center font-medium">นัดทั้งหมด</th>
+                          <th className="px-3 py-2 text-center font-medium">มา</th>
+                          <th className="px-3 py-2 text-center font-medium">ไม่มา</th>
+                          <th className="px-3 py-2 text-center font-medium">เลื่อนนัด</th>
+                          <th className="px-3 py-2 text-center font-medium">รอผล</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appointmentBoard.days.map((d) => (
+                          <tr key={d.date} className={cn('border-t', DASH.tableRow)}>
+                            <td className={cn('px-3 py-2 whitespace-nowrap', DASH.cellStrong)}>
+                              {formatYmdDmyBe(d.date)}
+                            </td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cell)}>{d.total}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', TONE.success.value)}>{d.showed}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', TONE.danger.value)}>{d.noShow}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', TONE.warn.value)}>{d.rescheduled}</td>
+                            <td className={cn('px-3 py-2 text-center tabular-nums', DASH.cellMuted)}>{d.pending}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
