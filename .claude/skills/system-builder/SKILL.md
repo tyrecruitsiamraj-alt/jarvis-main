@@ -34,6 +34,25 @@ npx tsc --noEmit                        # ไม่ครอบ src/
 → โหมดมืดกล่องยังสว่าง ตัวหนังสือกลายเป็นสีจาง จมหายไปกับพื้นตัวเอง
 หาเจอด้วย: grep หา `bg-white` / `bg-<สี>-50` ในบรรทัดที่ไม่มี `dark:bg-`
 
+### 4.1 UI ต้องมาจาก shadcn/ui — ห้ามเขียน primitive เอง (เจ้าของสั่ง 20 ส.ค. 2569)
+
+โปรเจกต์นี้ติดตั้ง **shadcn Skill + MCP** แล้ว (`.mcp.json` → server `shadcn`) ·
+component 47 ตัวอยู่ที่ `src/components/ui/`
+
+* **ห้ามสร้าง Button ใหม่เอง** — `@/components/ui/button`
+* **ห้ามสร้าง Dialog ใหม่เอง** — `@/components/ui/dialog` (หรือ alert-dialog/sheet/drawer)
+  🔴 ห้ามซ้อน Dialog ใน Dialog → ใช้ prop `embedded` (ดู `GenApplyLinkDialog`)
+* **ห้ามกำหนด radius สุ่ม** — `rounded-lg/xl/2xl/full` เท่านั้น ห้าม `rounded-[13px]`
+* **ห้ามใช้สี hex ตรง ๆ** — สีมาจาก `designTokens.ts` (กฎข้อ 4 ข้างบน)
+* **ห้ามสร้าง spacing สุ่ม** — สเกล Tailwind (`gap-2` `p-4`) ห้าม `px-[13px]`
+
+อยากได้ component ใหม่: สั่งผ่าน MCP (เช่น *"Add form and input from shadcn"*) หรือ
+`npx shadcn@latest add <name>` · **ห้ามก๊อป markup มาทำ primitive ใหม่**
+
+⚠️ ของเดิมยังไม่ตรงกติกา (วัด 20 ส.ค. 2569): `rounded-[...]` 70 จุด · spacing สุ่ม 12 จุด ·
+hex ดิบ 24 บรรทัด/12 ไฟล์ (รวม `ui/button.tsx` ใช้ `bg-[#141210]`) —
+**กติกาบังคับกับของใหม่ทันที ของเดิมแก้เมื่อเจ้าของสั่ง**
+
 ### 5. ตรวจงานเองในเบราว์เซอร์เสมอ
 ห้ามให้เจ้าของไปกดเอง · dev server ใช้ `preview_start` (vite 8080 · api 3100)
 ห้ามรันด้วย Bash · auth ทดสอบ: `POST /api/auth/dev-role {"role":"admin"}` (cookie ~30 นาที)

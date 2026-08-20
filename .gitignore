@@ -36,3 +36,9 @@ dist-ssr
 # ไฟล์สำรองก่อนล้างคิวโทร (มี person_ref ของผู้สมัครจริง) — เก็บไว้บนเครื่อง ห้าม commit
 lumos-queue-cancel-backup-*.json
 wipe-backup-*.json
+
+# Skill ที่ลงจาก `npx skills add` — ไฟล์จริงอยู่ใน .agents/ (machine-local)
+# ส่วนใน .claude/skills เป็น **symlink** ชี้เข้าไป ถ้า commit จะได้ symlink เสีย
+# ลงใหม่บนเครื่องอื่นด้วย: npx skills add shadcn/ui   (เวอร์ชันล็อกที่ skills-lock.json)
+.claude/skills/shadcn
+.claude/skills/migrate-radix-to-base

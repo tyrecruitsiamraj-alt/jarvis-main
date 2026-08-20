@@ -42,6 +42,42 @@
 * งานค้าง / ยอดยกมา = backlog
 * หาได้บางส่วน = partial fulfillment
 
+
+## 🔴 กติกา UI — ห้ามละเมิด (เจ้าของสั่ง 20 ส.ค. 2569)
+
+โปรเจกต์นี้ใช้ **shadcn/ui** (มี `components.json` · component อยู่ที่ `src/components/ui/`
+47 ตัวติดตั้งแล้ว) และติดตั้ง **shadcn Skill + MCP** ไว้ให้ค้น/ดู/เพิ่ม component ได้เอง
+
+* **ห้ามสร้าง Button ใหม่เอง** — ใช้ `@/components/ui/button` เท่านั้น
+* **ห้ามสร้าง Dialog ใหม่เอง** — ใช้ `@/components/ui/dialog` (หรือ `alert-dialog` / `sheet` / `drawer`)
+  🔴 **ห้ามซ้อน Dialog ใน Dialog** — ต้องการฟอร์มในป๊อปเดิมให้ทำ prop `embedded`
+  (แพตเทิร์นเดียวกับ `GenApplyLinkDialog` · `EditPostingDialog`)
+* **ห้ามกำหนด radius สุ่ม** — ใช้ `rounded-lg` / `rounded-xl` / `rounded-2xl` / `rounded-full`
+  ตามสเกลของ Tailwind + token ของ shadcn (`--radius`) ห้ามเขียน `rounded-[13px]` เอง
+* **ห้ามใช้สี hex ตรง ๆ** — สีทุกสีมาจาก `src/lib/designTokens.ts` (`TONE` / `DASH`) หรือ
+  CSS variable ของธีม · มีเทสต์คุมที่ `tests/api/designTokens.test.ts`
+* **ห้ามสร้าง spacing สุ่ม** — ใช้สเกลของ Tailwind (`gap-2` `p-4` `space-y-3`)
+  ห้ามเขียน `px-[13px]` เอง
+
+**อยากได้ component ใหม่:** สั่ง Claude ตรง ๆ (เช่น *"Add form and input from shadcn"*)
+หรือ `npx shadcn@latest add <component>` — **ห้ามเขียน primitive ขึ้นมาใหม่**
+
+**ติดตั้งเครื่องมือบนเครื่องใหม่** (ตัว skill ไม่ได้ commit เพราะเป็น symlink เข้า `.agents/`
+ที่ machine-local · เวอร์ชันล็อกไว้ที่ `skills-lock.json`):
+
+```bash
+npx skills add shadcn/ui            # skill: shadcn + migrate-radix-to-base
+```
+
+MCP อยู่ที่ `.mcp.json` (commit แล้ว · server `shadcn` รันด้วย `npx shadcn@latest mcp`)
+— **ต้องรีสตาร์ต Claude Code หนึ่งครั้ง** แล้วเช็คด้วย `/mcp` ว่าขึ้น `shadcn: Connected`
+
+**ของเดิมที่ยังไม่ตรงกติกา (วัดจริง 20 ส.ค. 2569 — ยังไม่ได้แก้ รอเจ้าของสั่ง):**
+`rounded-[...]` **70 จุด** · spacing สุ่ม **12 จุด** · hex ดิบ **24 บรรทัดใน 12 ไฟล์**
+(ในนั้น `src/components/ui/button.tsx` ใช้ `bg-[#141210]` และโลโก้ Microsoft ที่
+`CompanyEmailLoginGate.tsx` ซึ่งเป็นสีแบรนด์ต้องเป๊ะ แก้ไม่ได้)
+🔴 **กติกานี้บังคับกับของใหม่ทันที** — ของเดิมแก้เมื่อเจ้าของสั่ง (แก้ทีเดียว 70 จุด = หน้าตาเปลี่ยนทั้งระบบ)
+
 ## คู่มือโปรเจกต์
 
 คู่มือฉบับอ่านง่ายสำหรับคน:
