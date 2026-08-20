@@ -26,6 +26,12 @@ import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 
 export type GenApplyLinkDialogProps = {
+  /**
+   * true = คืน**เนื้อฟอร์มเปล่า ๆ** ไม่ห่อ Dialog — ใช้ตอนฝังเป็นแท็บในป๊อปอัปของการ์ด
+   * (เจ้าของเคาะ 19 ส.ค. 2569: ป๊อปอัปเดียวมีแท็บไอคอน รายละเอียด → แก้ไข → Gen link)
+   * 🔴 ห้ามซ้อน Dialog ใน Dialog — ฝังต้องใช้โหมดนี้เท่านั้น
+   */
+  embedded?: boolean;
   open: boolean;
   job: JobRequest | null;
   onClose: () => void;
@@ -78,6 +84,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   onClose,
   standalone = null,
   onCreated,
+  embedded = false,
 }) => {
   const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
   const [title, setTitle] = useState('');
@@ -198,25 +205,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
 
   const heading = job ? jobBoardCardTitle(job) : standalone?.kindLabel ?? 'ประกาศรับสมัคร';
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[34rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] border-border/70 p-0">
-        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-              <Link2 className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
-                สร้างลิงก์รับสมัคร
-              </DialogTitle>
-              <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
-                {heading} — กรอกรายละเอียดที่ผู้สมัครจะเห็น แล้วเลือกช่องทางที่จะส่ง
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
+  const body = (
         <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4">
           {links.length > 0 ? (
             <div className="space-y-3">
@@ -384,6 +373,31 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
             </>
           )}
         </div>
+  );
+
+  /** ฝังเป็นแท็บ = คืนเนื้อฟอร์มเปล่า ๆ (ห้ามซ้อน Dialog ใน Dialog) */
+  if (embedded) return body;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[34rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] border-border/70 p-0">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <Link2 className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+                สร้างลิงก์รับสมัคร
+              </DialogTitle>
+              <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
+                {heading} — กรอกรายละเอียดที่ผู้สมัครจะเห็น แล้วเลือกช่องทางที่จะส่ง
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {body}
       </DialogContent>
     </Dialog>
   );

@@ -164,6 +164,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selected, setSelected] = useState<JobRequest | null>(null);
+  /**
+   * แท็บในป๊อปอัปที่กดการ์ด (เจ้าของเคาะ 19 ส.ค. 2569 — เลือกแบบ "แท็บมีไอคอน 3 อัน ชิดขวา"):
+   * **รายละเอียดงาน → แก้ไข → Gen link** · กดแล้ว**เนื้อกลางเปลี่ยนในป๊อปเดิม** ไม่เปลี่ยนหน้า
+   * 🔴 ฟอร์มแก้ไข/Gen link ใช้ component ตัวเดิมในโหมด `embedded` (ห้ามก๊อปฟอร์มมาทำใหม่
+   * และห้ามซ้อน Dialog ใน Dialog)
+   */
+  const [popupTab, setPopupTab] = useState<'detail' | 'edit' | 'genlink'>('detail');
   const positionPreset = useMemo(
     () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
     [variant, searchParams],
@@ -286,6 +293,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   }, [boxedJobs, applicantCounts, closedBox]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
+  // เปิดใบใหม่ = เริ่มที่แท็บรายละเอียดเสมอ ไม่ค้างแท็บของใบก่อน
+  useEffect(() => {
+    setPopupTab('detail');
+  }, [selected?.id]);
+
   // เปลี่ยนกล่อง = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของกล่องเดิม)
   useEffect(() => {
     setPage(1);
@@ -307,9 +319,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น
   // (state จำนวนผู้สมัครต่อใบย้ายไปประกาศไว้ข้างบน — การเรียงการ์ดต้องใช้ก่อนถึงตรงนี้)
   const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
-  const [genLinkJob, setGenLinkJob] = useState<JobRequest | null>(null);
   const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
-  const [editPosting, setEditPosting] = useState<RecruitPosting | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
   /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
@@ -1277,15 +1287,80 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="flex max-h-[min(92dvh,820px)] w-[min(calc(100vw-1.25rem),32rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
           <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
-            <DialogTitle className="pr-8 text-base font-semibold leading-snug sm:text-lg break-words">
-              {selected ? jobBoardCardTitle(selected) : ''}
-            </DialogTitle>
+            <div className="flex items-start justify-between gap-3 pr-8">
+              <DialogTitle className="text-base font-semibold leading-snug sm:text-lg break-words">
+                {selected ? jobBoardCardTitle(selected) : ''}
+              </DialogTitle>
+              {/* แท็บไอคอนชิดขวา (เจ้าของเคาะ 19 ส.ค. 2569) — รายละเอียดงาน → แก้ไข → Gen link
+                  ⚠️ เจ้าหน้าที่เท่านั้น · ใบที่ปิด/ยกเลิกแล้วเหลือแท็บรายละเอียดอันเดียว
+                  (งานจบแล้ว ไม่ต้องแก้ประกาศ/ปล่อยลิงก์รับสมัครอีก) */}
+              {isStaff && selected ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  {(
+                    [
+                      { id: 'detail' as const, label: 'รายละเอียดงาน', Icon: ClipboardCheck, show: true },
+                      {
+                        id: 'edit' as const,
+                        label: 'แก้ไขประกาศ',
+                        Icon: Pencil,
+                        // แก้ได้เฉพาะใบที่มีประกาศแล้ว — ใบที่ยังไม่มีต้องกด Gen link ก่อน
+                        show: !closedBox && latestPostingByJob.has(selected.id),
+                      },
+                      { id: 'genlink' as const, label: 'Gen link', Icon: Link2, show: !closedBox },
+                    ] as const
+                  )
+                    .filter((t) => t.show)
+                    .map((t) => {
+                      const active = popupTab === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setPopupTab(t.id)}
+                          title={t.label}
+                          aria-label={t.label}
+                          aria-pressed={active}
+                          className={cn(
+                            'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors',
+                            active
+                              ? cn(TONE.primary.solid, 'border-transparent')
+                              : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground',
+                          )}
+                        >
+                          <t.Icon className="h-4 w-4" />
+                        </button>
+                      );
+                    })}
+                </div>
+              ) : null}
+            </div>
             <DialogDescription className="sr-only">
               รายละเอียดตำแหน่งงาน
             </DialogDescription>
           </DialogHeader>
           {selected && (
             <>
+              {/* เนื้อกลางเปลี่ยนตามแท็บ — ฟอร์มแก้ไข/Gen link ใช้ component ตัวเดิม
+                  ในโหมด embedded (คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog) */}
+              {popupTab === 'edit' ? (
+                <EditPostingDialog
+                  embedded
+                  posting={latestPostingByJob.get(selected.id) ?? null}
+                  onClose={() => setPopupTab('detail')}
+                  onSaved={() => {
+                    setPostingsRev((n) => n + 1);
+                    setPopupTab('detail');
+                  }}
+                />
+              ) : popupTab === 'genlink' ? (
+                <GenApplyLinkDialog
+                  embedded
+                  open
+                  job={selected}
+                  onClose={() => setPopupTab('detail')}
+                  onCreated={() => setPostingsRev((n) => n + 1)}
+                />
+              ) : (
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 text-sm">
                 <div className="flex flex-wrap gap-2">
                 <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium">
@@ -1430,6 +1505,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 ) : null}
               </dl>
               </div>
+              )}
               <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 px-5 py-4">
                 {/* 19 ส.ค. 2569 เจ้าของสั่งเอาปุ่ม "เปิดใบขอในระบบ" ออก —
                     กดที่กล่องบนบอร์ดก็เข้าหน้ารายละเอียดอยู่แล้ว ปุ่มนี้ซ้ำซ้อน */}
@@ -1450,36 +1526,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </button>
                 ) : null}
 
-                {/* 🔴 Gen link + แก้ไข อยู่ที่นี่ที่เดียว (เจ้าของเคาะ 19 ส.ค. 2569:
-                    *"ย้ายไปอยู่ในป๊อปอัปที่กดการ์ด"* · การ์ดเหลือ "ดูรายชื่อ" กับ
-                    "หาผู้สมัครเพิ่ม") — ถอดตรงนี้ = สองฟีเจอร์นี้ไม่มีทางเข้าเหลือเลย
-                    ⚠️ ใบที่ปิด/ยกเลิกแล้วไม่ต้องมี — งานจบไปแล้ว ไม่ต้องปล่อยลิงก์รับสมัครอีก */}
-                {isStaff && !closedBox ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setGenLinkJob(selected)}
-                      className={cn(
-                        'inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-semibold',
-                        TONE.violet.outline,
-                      )}
-                    >
-                      <Link2 className="h-4 w-4" />
-                      Gen link
-                    </button>
-                    {/* แก้ไข — โชว์เฉพาะใบที่สร้างประกาศไว้แล้ว ใบที่ยังไม่มีให้กด "Gen link" ก่อน */}
-                    {latestPostingByJob.has(selected.id) ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditPosting(latestPostingByJob.get(selected.id) ?? null)}
-                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary"
-                      >
-                        <Pencil className="h-4 w-4" />
-                        แก้ไขประกาศ
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
+                {/* 🔴 Gen link + แก้ไขประกาศ = **แท็บไอคอนบนหัวป๊อปอัป** (เจ้าของเคาะ
+                    19 ส.ค. 2569: รายละเอียดงาน → แก้ไข → Gen link ในป๊อปเดียว)
+                    ห้ามเอาปุ่มกลับมาไว้ท้ายป๊อปหรือบนการ์ดโดยไม่ถามก่อน */}
               </div>
             </>
           )}
@@ -1498,19 +1547,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         onClose={() => setApplicantsJob(null)}
       />
 
-      <GenApplyLinkDialog
-        open={!!genLinkJob}
-        job={genLinkJob}
-        onClose={() => setGenLinkJob(null)}
-        onCreated={() => setPostingsRev((n) => n + 1)}
-      />
-
-      <EditPostingDialog
-        posting={editPosting}
-        onClose={() => setEditPosting(null)}
-        onSaved={() => setPostingsRev((n) => n + 1)}
-      />
-
+      {/* ⚠️ Gen link/แก้ไขประกาศ **ของใบขอ** ไม่ใช้ Dialog แยกอีกแล้ว — ฝังเป็นแท็บ
+          ในป๊อปอัปของการ์ด (19 ส.ค. 2569) · ที่เหลือข้างล่างเป็นของ**ประกาศลอย** คนละตัว */
+      }
       <GenApplyLinkDialog
         open={!!genStandalone}
         job={null}

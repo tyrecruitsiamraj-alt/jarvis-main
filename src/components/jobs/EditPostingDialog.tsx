@@ -15,6 +15,11 @@ const fieldCls =
   'w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30';
 
 export type EditPostingDialogProps = {
+  /**
+   * true = คืน**เนื้อฟอร์มเปล่า ๆ** ไม่ห่อ Dialog — ใช้ตอนฝังเป็นแท็บในป๊อปอัปของการ์ด
+   * (เจ้าของเคาะ 19 ส.ค. 2569) · 🔴 ห้ามซ้อน Dialog ใน Dialog
+   */
+  embedded?: boolean;
   /** ประกาศที่จะแก้ — null = ปิดกล่อง */
   posting: RecruitPosting | null;
   onClose: () => void;
@@ -29,7 +34,7 @@ export type EditPostingDialogProps = {
  * เพราะเป็นตัวกำหนดสิทธิ์การมองเห็น (กันย้ายประกาศข้าม BU) อยากย้ายให้ปิดแล้วสร้างใหม่
  * ช่องทาง/ลิงก์ก็ไม่แก้ที่นี่ — ลิงก์ที่ปล่อยออกไปแล้วต้องใช้ได้ต่อ เพิ่มช่องทางใหม่ทำที่ "สร้างลิงก์"
  */
-const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose, onSaved }) => {
+const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose, onSaved, embedded = false }) => {
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [locationText, setLocationText] = useState('');
@@ -76,25 +81,7 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
     }
   };
 
-  return (
-    <Dialog open={!!posting} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[34rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] border-border/70 p-0">
-        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-              <Pencil className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
-                แก้ไขประกาศ
-              </DialogTitle>
-              <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
-                แก้รายละเอียดที่ผู้สมัครเห็น · ลิงก์ที่ปล่อยไปแล้วยังใช้ได้ทุกอัน
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
+  const body = (
         <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">หัวข้อประกาศ *</label>
@@ -180,6 +167,31 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
             </button>
           </div>
         </div>
+  );
+
+  /** ฝังเป็นแท็บในป๊อปอัปของการ์ด = คืนเนื้อฟอร์มเปล่า ๆ (ห้ามซ้อน Dialog ใน Dialog) */
+  if (embedded) return body;
+
+  return (
+    <Dialog open={!!posting} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[34rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] border-border/70 p-0">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-border/50 bg-gradient-to-b from-primary/[0.07] to-transparent px-5 py-4 text-left">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <Pencil className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base font-semibold leading-tight sm:text-lg">
+                แก้ไขประกาศ
+              </DialogTitle>
+              <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
+                แก้รายละเอียดที่ผู้สมัครเห็น · ลิงก์ที่ปล่อยไปแล้วยังใช้ได้ทุกอัน
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {body}
       </DialogContent>
     </Dialog>
   );
