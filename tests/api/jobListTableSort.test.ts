@@ -161,4 +161,56 @@ describe('jobListTableSort', () => {
     expect(compareJobsByTableColumn(a, b, { column: 'remaining', dir: 'desc' })).toBeGreaterThan(0);
     expect(compareJobsByTableColumn(a, b, { column: 'remaining', dir: 'asc' })).toBeLessThan(0);
   });
+  /**
+   * 🔴 บั๊กที่เจ้าของเจอ 20 ส.ค. 2569: *"เรียงมั่วมาก เดี๋ยว 0 เดี๋ยว ล่วงหน้า"*
+   * ช่อง「ผ่านมา」โชว์คำว่า "ล่วงหน้า" สำหรับใบที่ยังไม่ถึงวันที่ต้องการ แต่เดิมเรียงด้วย
+   * จำนวนวันนับจากวันที่กรอก → ใบล่วงหน้าไปแทรกกลางระหว่างเลข
+   * กติกา: **เรียงตามสิ่งที่โชว์** · ใบล่วงหน้าต้องเกาะกลุ่มกันปลายเดียว
+   */
+  describe('คอลัมน์ "ผ่านมา" ต้องเรียงตามสิ่งที่โชว์', () => {
+    const TODAY = new Date('2026-08-20T03:00:00.000Z');
+    // ล่วงหน้า: กรอกไว้นาน (45 วัน) แต่ยังไม่ถึงวันที่ต้องการ → บนจอเขียน "ล่วงหน้า"
+    const advanceFar = job({
+      id: 'adv-far',
+      request_no: 'F1',
+      request_date: '2026-07-06',
+      required_date: '2026-12-01',
+    });
+    const advanceNear = job({
+      id: 'adv-near',
+      request_no: 'F2',
+      request_date: '2026-07-06',
+      required_date: '2026-08-25',
+    });
+    // ผ่านมาแล้ว: เลยวันที่ต้องการ
+    const past0 = job({ id: 'p0', request_no: 'F3', request_date: '2026-08-01', required_date: '2026-08-20' });
+    const past5 = job({ id: 'p5', request_no: 'F4', request_date: '2026-08-01', required_date: '2026-08-15' });
+
+    it('asc: ใบล่วงหน้าอยู่กลุ่มเดียวกันหน้าสุด แล้วค่อยไล่ 0 → มาก', () => {
+      const out = ids(
+        sortJobsByTableColumn([past5, advanceNear, past0, advanceFar], { column: 'age', dir: 'asc' }, TODAY),
+      );
+      // ล่วงหน้าสองใบต้องติดกัน (ไกลกำหนดก่อน ใกล้กำหนดทีหลัง) แล้วจึงเป็นเลขวัน
+      expect(out).toEqual(['adv-far', 'adv-near', 'p0', 'p5']);
+    });
+
+    it('desc: ผ่านมามากสุดก่อน · ใบล่วงหน้าไปอยู่ท้ายสุดเป็นกลุ่ม', () => {
+      const out = ids(
+        sortJobsByTableColumn([advanceNear, past0, advanceFar, past5], { column: 'age', dir: 'desc' }, TODAY),
+      );
+      expect(out).toEqual(['p5', 'p0', 'adv-near', 'adv-far']);
+    });
+
+    it('🔴 ห้ามมีใบล่วงหน้าแทรกกลางระหว่างเลขวัน', () => {
+      const out = sortJobsByTableColumn(
+        [past5, advanceNear, past0, advanceFar],
+        { column: 'age', dir: 'asc' },
+        TODAY,
+      );
+      const advanceFlags = out.map((j) => j.id.startsWith('adv'));
+      // true ทั้งหมดต้องอยู่ติดกันเป็นก้อนเดียว (ไม่สลับ true/false/true)
+      const blocks = advanceFlags.filter((v, i) => i === 0 || advanceFlags[i - 1] !== v).length;
+      expect(blocks).toBe(2);
+    });
+  });
 });

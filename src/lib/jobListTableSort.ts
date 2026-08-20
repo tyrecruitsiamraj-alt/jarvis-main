@@ -9,7 +9,12 @@
  * 🔴 **ค่าว่างตกท้ายเสมอ** ทั้งขาขึ้นและขาลง — ไม่ใช่ให้ช่องว่างชนะใบที่มีข้อมูลจริง
  */
 import type { JobRequest } from '@/types';
-import { getJobRequestAgeDays, getJobRequestSubmittedDate } from './jobUrgency';
+import {
+  computeJobUrgency,
+  getJobRequestAgeDays,
+  getJobRequestSubmittedDate,
+  isBeforeRequiredForAge,
+} from './jobUrgency';
 import { publicJobPositionLabel } from './unitRequestDisplay';
 import { extractJobSubtypeLabel } from './siamrajUnitFilters';
 import { positionBreakdownFromJob } from './requestControl';
@@ -118,6 +123,22 @@ export function tableSortValue(
     case 'request_no':
       return textVal(job.request_no);
     case 'age': {
+      /**
+       * 🔴 **ต้องเรียงตามสิ่งที่ช่องนั้นโชว์** ไม่ใช่ตัวเลขอายุดิบ
+       *
+       * บั๊กที่เจ้าของเจอ 20 ส.ค. 2569 (*"เรียงมั่วมาก เดี๋ยว 0 เดี๋ยว ล่วงหน้า"*):
+       * ใบที่ยังไม่ถึงวันที่ต้องการ ช่องนี้โชว์คำว่า **"ล่วงหน้า"** แต่ `getJobRequestAgeDays`
+       * คืน "จำนวนวันนับจากวันที่กรอก" (เช่น 45) → ใบล่วงหน้าไปแทรกกลางระหว่าง
+       * `0 วัน` กับ `3 วัน` ทั้งที่บนจอเขียนคำเดียวกันหมด อ่านแล้วเหมือนสุ่ม
+       *
+       * แก้ด้วยการทำให้เป็น **เส้นเวลาเดียวเทียบวันที่ต้องการ**:
+       * ล่วงหน้า = ค่าลบ (ยังไม่ถึงกำหนด · ยิ่งไกลยิ่งลบมาก) → `0` = ถึงกำหนดวันนี้ →
+       * บวก = ผ่านมาแล้วกี่วัน · ใบล่วงหน้าจึงเกาะกลุ่มกันปลายเดียวเสมอ
+       */
+      if (isBeforeRequiredForAge(job, today)) {
+        const until = computeJobUrgency(job, today).daysUntilRequired;
+        return { num: -1 - Math.max(0, until) };
+      }
       const days = getJobRequestAgeDays(job, today);
       return days == null ? {} : { num: days };
     }
