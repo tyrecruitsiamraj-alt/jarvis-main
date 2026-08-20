@@ -73,6 +73,7 @@ import {
 } from '@/lib/unitRequestWorkStatus';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 function staffAssigneeLine(j: JobRequest): string | null {
   const parts = [
@@ -480,7 +481,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     ⚠️ **เฉพาะมุมมอง "กล่องงาน"** (เจ้าของสั่ง 13 ส.ค. 2569:
                     "นอกจากหน้ากล่องงาน หน้าอื่นไม่ต้องมี") — ทั้งสามปุ่มทำงานกับ
                     ประกาศ/ช่องทางรับสมัคร ซึ่งเป็นเรื่องของฝั่งใบขอ ไม่ใช่ของรายชื่อคน */}
-                {view === 'board' ? <RecruitBoardTools variant="onDark" /> : null}
+                {view === 'board' ? (
+                  <RecruitBoardTools
+                    variant="onDark"
+                    /* Pre-Check ย้ายมาอยู่ในเมนูนี้ (20 ส.ค. 2569) — เดิมลอยเดี่ยวกลางหน้า */
+                    extraMenuItems={[
+                      {
+                        key: 'preCheck',
+                        label: 'Pre-Check (ตรวจใบขอก่อนหาคน)',
+                        icon: ClipboardCheck,
+                        onSelect: () => navigate('/matching/pre-check'),
+                      },
+                    ]}
+                  />
+                ) : null}
                 {/* ปุ่มรีเฟรชนี้โหลด feed **ใบขอ** ใหม่ — แท็บอื่นแสดงรายชื่อคนคนละชุด
                     และมีปุ่มรีเฟรชของตัวเองใน RmWorkspace อยู่แล้ว */}
                 {onRefresh && view === 'board' ? (
@@ -668,6 +682,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       type="button"
                       onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
                       aria-pressed={active}
+                      title={`${JOB_BOX_LABEL[key]} — ${JOB_BOX_HINT[key]}`}
                       className={cn(
                         'min-w-[9rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
                         tone.soft,
@@ -681,14 +696,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           {JOB_BOX_LABEL[key]}
                         </span>
                       </span>
+                      {/* 🔴 เหลือ 2 บรรทัด (เจ้าของสั่ง 20 ส.ค. 2569) — เดิม 4 บรรทัดต่อกล่อง
+                          ตัวหนังสือจิ๋วอ่านไม่ทัน · คำอธิบายย้ายไปอยู่ใน title (ชี้แล้วเห็น) */}
                       <span className={cn('block text-2xl font-bold leading-tight tabular-nums', tone.num)}>
                         {boxCounts[key].toLocaleString('th-TH')}
                         <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
                           ใบขอ · {boxPositions[key].toLocaleString('th-TH')} อัตรา
                         </span>
-                      </span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        {JOB_BOX_HINT[key]}
                       </span>
                     </button>
                   );
@@ -735,7 +749,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         )}
                       </span>
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        {JOB_BOX_HINT[key]} · {closedDays} วันล่าสุด
+                        {closedDays} วันล่าสุด
                       </span>
                     </button>
                   );
@@ -757,27 +771,28 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 <span className="font-semibold text-foreground">ปิดภายใน</span>
                 <div className="flex flex-wrap items-center gap-1">
                   {CLOSED_RANGE_OPTIONS.map((r) => (
-                    <button
+                    <Button
                       key={r.days}
                       type="button"
+                      size="sm"
+                      variant={closedDays === r.days ? 'default' : 'outline'}
                       onClick={() => onClosedDaysChange?.(r.days)}
                       className={cn(
-                        'rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                        'h-7 rounded-lg px-2.5 text-xs',
                         closedDays === r.days ? TONE.info.solid : TONE.neutral.outline,
                       )}
                     >
                       {r.label}
-                    </button>
+                    </Button>
                   ))}
                 </div>
-                <button
+                <Button
                   type="button"
+                  size="sm"
+                  variant="outline"
                   disabled={closedLoading}
                   onClick={() => onReloadClosed?.()}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
-                    TONE.neutral.outline,
-                  )}
+                  className={cn('h-7 rounded-lg px-2.5 text-xs', TONE.neutral.outline)}
                 >
                   {closedLoading ? (
                     <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -785,7 +800,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <RefreshCw className="h-3.5 w-3.5" />
                   )}
                   รีเฟรช
-                </button>
+                </Button>
                 {closedError ? (
                   <span className="text-destructive">{closedError}</span>
                 ) : null}
@@ -794,26 +809,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         ) : null}
 
-        {/* Pre-Check ย้ายมาอยู่ท้ายแถบตัวกรอง (เจ้าของสั่ง 16 ส.ค. 2569 เย็น:
-            "หน้า Pre-check ก็ย้ายไปไว้ในหน้ากล่องงาน เอาไว้ตรง Filter")
-            — เมนูเดิมถูกถอดออกแล้ว · route /matching/pre-check ยังอยู่ ลิงก์เก่าไม่พัง
-            ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
-        {isStaff && view === 'board' ? (
-          <div className="mt-2 flex justify-end">
-            <button
-              type="button"
-              onClick={() => navigate('/matching/pre-check')}
-              title="ตรวจใบขอก่อนเริ่มหาคน — เปิดหน้า Pre-Check"
-              className={cn(
-                'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-semibold',
-                TONE.neutral.outline,
-              )}
-            >
-              <ClipboardCheck className="h-3.5 w-3.5" />
-              Pre-Check
-            </button>
-          </div>
-        ) : null}
+        {/* 🔴 ปุ่ม Pre-Check ย้ายเข้าเมนู "ตั้งค่าบอร์ด" แล้ว (เจ้าของสั่ง 20 ส.ค. 2569) —
+            เดิมลอยเดี่ยวชิดขวาเป็นแถวของตัวเอง กินความสูงและไม่บอกว่าเกี่ยวกับอะไร
+            route /matching/pre-check ยังอยู่ ลิงก์เก่าไม่พัง */}
 
         {loadError ? <p className="mt-4 text-sm text-destructive">{loadError}</p> : null}
 
@@ -1062,21 +1060,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             Checklist + ฐานใหม่ + iRecruit แล้วส่ง AI โทรทันที) แล้วเปลี่ยน
                             คำเป็น "หาผู้สมัครเพิ่ม" · ปุ่มเดิมที่พาไปหน้า Matching ค้นแต่
                             iRecruit ให้ดูเฉย ๆ ถูกถอดออก (ของใหม่ครอบอยู่แล้ว) */}
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
                             setLaneJob(job);
                           }}
                           title="ค้นคนที่ยังไม่สมัครจาก Checklist + ฐานใหม่ + iRecruit แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos โทรทันที"
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.success.outline,
-                          )}
+                          /* 🔴 ui/button.tsx variant เป็นธีมสว่างล้วน (bg-white/50 ไม่มีคู่ dark)
+                             → ทับด้วย TONE.*.outline ที่มีคู่ dark ครบ (กติกาข้อ 4) */
+                          className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.success.outline)}
                         >
                           <Send className="h-3.5 w-3.5" />
                           หาผู้สมัครเพิ่ม
-                        </button>
+                        </Button>
                           </>
                         )}
                         {/* 🔴 Gen link กับ แก้ไข **ย้ายไปอยู่ในป๊อปอัปที่กดการ์ด** แล้ว
@@ -1085,20 +1084,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
                             รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
                             setApplicantsJob(job);
                           }}
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-                            TONE.info.outline,
-                          )}
+                          className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.info.outline)}
                         >
                           <Users className="h-3.5 w-3.5" />
                           ดูรายชื่อ
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </>
@@ -1541,32 +1539,32 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 {/* 🔴 "สมัครตำแหน่งนี้" มีเฉพาะหน้าสาธารณะ (เจ้าของสั่ง 19 ส.ค. 2569) —
                     กล่องงานเป็นหน้าเจ้าหน้าที่ ไม่ใช่หน้าที่คนสมัครเอง */}
                 {!isStaff ? (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       const job = selected;
                       setSelected(null);
                       openApply(job);
                     }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+                    className={cn('w-full rounded-xl py-3 text-sm', TONE.primary.solid)}
                   >
                     สมัครตำแหน่งนี้
                     <Send className="h-4 w-4" />
-                  </button>
+                  </Button>
                 ) : null}
 
                 {/* ปุ่ม "ถัดไป" ของ flow (เจ้าของสั่ง 20 ส.ค. 2569: *"เลือกกด next เพื่อไปแก้ไข
                     … แก้ไขเสร็จ กด next ไปหน้า gen link"*) — ขั้นสุดท้าย (Gen link) ไม่มีถัดไป
                     เพราะปุ่มลงมือคือ "สร้างประกาศ + ลิงก์" ในเนื้อขั้นนั้นเอง */}
                 {isStaff && !closedBox && popupTab !== 'genlink' ? (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setPopupTab(popupTab === 'detail' ? 'edit' : 'genlink')}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                    className={cn('w-full rounded-xl py-2.5 text-sm', TONE.primary.solid)}
                   >
                     ถัดไป — {popupTab === 'detail' ? 'แก้ไข' : 'Gen link'}
                     <Send className="h-4 w-4" />
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             </>

@@ -101,7 +101,14 @@ const StandalonePickerDialog: React.FC<{
  *
  * ทั้งแถบยังอยู่ใต้สิทธิ์ `recruit_postings` เหมือนเดิม (role ที่ไม่ได้เปิดจะไม่เห็นทั้งแถบ)
  */
-const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant = 'light' }) => {
+const RecruitBoardTools: React.FC<{
+  variant?: 'light' | 'onDark';
+  /**
+   * เมนูเสริมที่หน้าเรียกส่งเข้ามา — ต่อท้ายเมนู "ตั้งค่าบอร์ด"
+   * (20 ส.ค. 2569: ใช้เก็บปุ่ม Pre-Check ที่เดิมลอยเดี่ยวอยู่กลางหน้ากล่องงาน)
+   */
+  extraMenuItems?: { key: string; label: string; icon: React.ElementType; onSelect: () => void }[];
+}> = ({ variant = 'light', extraMenuItems = [] }) => {
   const { isFunctionEnabled } = useRolePermissions();
   const navigate = useNavigate();
   const [reasonsOpen, setReasonsOpen] = useState(false);
@@ -177,6 +184,11 @@ const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant
                   </DropdownMenuItem>
                 );
               })}
+              {extraMenuItems.map((item) => (
+                <DropdownMenuItem key={item.key} onClick={item.onSelect}>
+                  <item.icon className="h-3.5 w-3.5" aria-hidden /> {item.label}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

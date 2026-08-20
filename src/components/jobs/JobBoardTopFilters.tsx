@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import SearchField from '@/components/shared/SearchField';
 import LocationFilterSelect from '@/components/public/LocationFilterSelect';
 import {
@@ -10,6 +10,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { TONE } from '@/lib/designTokens';
 
 type Props = {
   search: string;
@@ -109,6 +111,13 @@ const JobBoardTopFilters: React.FC<Props> = ({
   hideSearch = false,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
+  /**
+   * แผงตัวกรองบนจอใหญ่ — **ปิดไว้ก่อน** (เจ้าของสั่ง 20 ส.ค. 2569: *"หน้า UI งงมาก"*)
+   * วัดของจริง: แผงนี้กางค้างกินความสูง **209px** ทั้งที่ทุกช่องขึ้น "ทั้งหมด (ไม่กรอง)"
+   * ดันการ์ดงานใบแรกไปอยู่ที่ Y=734px บนจอสูง 900px → เปิดหน้ามาไม่เห็นงาน
+   * 🔴 ถ้ามีตัวกรองเปิดอยู่ให้กางเอง — คนจะได้ไม่สงสัยว่าทำไมผลน้อย
+   */
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   const activeFilterCount = useMemo(
     () =>
       countActiveFilters(
@@ -222,8 +231,10 @@ const JobBoardTopFilters: React.FC<Props> = ({
   return (
     <>
       <div className="mt-6">
-        <div className="jarvis-frost rounded-2xl border border-white/70 p-4 shadow-sm md:p-5">
-          <div className="flex flex-col gap-4">
+        {/* ⚠️ padding เดิม p-4/md:p-5 + บรรทัด "พบ N" แยกแถว = การ์ดนี้สูง 209px
+            ตอนนี้ยุบเป็นแถวเดียว (ค้นหา · ปุ่มตัวกรอง · ผลลัพธ์) เหลือ ~80px */}
+        <div className="jarvis-frost rounded-2xl border border-white/70 p-3 shadow-sm md:p-4">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               {hideSearch ? null : (
                 <SearchField
@@ -237,28 +248,80 @@ const JobBoardTopFilters: React.FC<Props> = ({
               {/* แถบสลับ ทั้งหมด/ด่วน ถูกถอดทิ้งทั้งฟีเจอร์ (เจ้าของสั่ง 20 ส.ค. 2569:
                   "ไม่ต้องมีก็ได้") — ความด่วนยังเห็นจากป้าย "ด่วน" บนการ์ดเหมือนเดิม */}
               <div className={cn('flex flex-wrap items-center gap-2 lg:shrink-0', hideSearch && 'flex-1')}>
-                <button
+                {/* จอเล็ก: เปิดเป็นแผ่นเลื่อนขึ้น (Sheet) เหมือนเดิม */}
+                <Button
                   type="button"
+                  variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+                  size="sm"
                   onClick={() => setSheetOpen(true)}
+                  /* 🔴 variant ของ ui/button.tsx ไม่มีคู่ dark — ทับด้วย TONE (กติกาข้อ 4) */
                   className={cn(
-                    'inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all touch-manipulation lg:hidden',
-                    activeFilterCount > 0
-                      ? 'border-blue-300/70 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-700/70 dark:bg-blue-950/60 dark:text-blue-200'
-                      : 'border-white/80 bg-white/60 text-foreground hover:bg-white',
+                    'rounded-xl lg:hidden',
+                    activeFilterCount > 0 ? TONE.info.outline : TONE.neutral.outline,
                   )}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   ตัวกรอง
                   {activeFilterCount > 0 ? (
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
+                    <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-bold', TONE.primary.solid)}>
                       {activeFilterCount}
                     </span>
                   ) : null}
-                </button>
+                </Button>
+
+                {/* จอใหญ่: กด = กาง/พับแผงตัวกรองในหน้า (เดิมกางค้างกิน 209px) */}
+                <Button
+                  type="button"
+                  variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setFieldsOpen((v) => !v)}
+                  aria-expanded={fieldsOpen || activeFilterCount > 0}
+                  className={cn(
+                    'hidden rounded-xl lg:inline-flex',
+                    activeFilterCount > 0 ? TONE.info.outline : TONE.neutral.outline,
+                  )}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  ตัวกรอง
+                  {activeFilterCount > 0 ? (
+                    <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-bold', TONE.primary.solid)}>
+                      {activeFilterCount}
+                    </span>
+                  ) : null}
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 transition-transform',
+                      (fieldsOpen || activeFilterCount > 0) && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
+                </Button>
+
+                {/* ผลลัพธ์อยู่แถวเดียวกับปุ่ม — เดิมกินอีกหนึ่งบรรทัดพร้อมเส้นคั่น */}
+                {resultCount != null && !loading ? (
+                  <p className="text-xs text-muted-foreground">
+                    พบ{' '}
+                    <span className="font-semibold text-foreground">
+                      {resultCount.toLocaleString('th-TH')}
+                    </span>
+                    {totalCount != null && totalCount !== resultCount ? (
+                      <>
+                        {' '}
+                        จาก {totalCount.toLocaleString('th-TH')} {countUnitLabel}
+                      </>
+                    ) : (
+                      ` ${countUnitLabel}`
+                    )}
+                    {positionsNote ? <> · {positionsNote}</> : null}
+                  </p>
+                ) : null}
               </div>
             </div>
 
-            <div className="hidden lg:block border-t border-white/60 pt-4">{filterFields}</div>
+            {/* กางเมื่อกด หรือเมื่อมีตัวกรองเปิดอยู่ (จะได้เห็นว่ากรองอะไรไว้) */}
+            {fieldsOpen || activeFilterCount > 0 ? (
+              <div className="hidden border-t border-white/60 pt-4 lg:block">{filterFields}</div>
+            ) : null}
 
             {activeFilterCount > 0 ? (
               <div className="flex flex-wrap items-center gap-2 border-t border-white/50 pt-3">
@@ -266,31 +329,19 @@ const JobBoardTopFilters: React.FC<Props> = ({
                   กำลังกรอง
                 </span>
                 <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">{activeChips}</div>
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={clearAllFilters}
-                  className="shrink-0 text-xs font-medium text-blue-700 hover:underline underline-offset-2"
+                  className="h-auto shrink-0 p-0 text-xs"
                 >
                   ล้างทั้งหมด
-                </button>
+                </Button>
               </div>
             ) : null}
 
-            {resultCount != null && !loading ? (
-              <p className="text-xs text-muted-foreground border-t border-white/40 pt-3">
-                พบ{' '}
-                <span className="font-semibold text-foreground">{resultCount.toLocaleString('th-TH')}</span>
-                {totalCount != null && totalCount !== resultCount ? (
-                  <>
-                    {' '}
-                    จาก {totalCount.toLocaleString('th-TH')} {countUnitLabel}
-                  </>
-                ) : (
-                  ` ${countUnitLabel}`
-                )}
-                {positionsNote ? <> · {positionsNote}</> : null}
-              </p>
-            ) : null}
+
           </div>
         </div>
       </div>
