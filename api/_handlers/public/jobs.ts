@@ -248,7 +248,13 @@ export default async function handler(req: ApiReq, res: ApiRes) {
 
   try {
     const id = getString(req.query?.id);
-    const limit = Math.min(200, Math.max(1, parseIntOrNull(req.query?.limit) ?? 200));
+    /**
+     * 🔴 เพดานต้องครอบ**ใบเปิดทั้งหมด** — เดิม 200 แล้วใบเก่าตกขอบหายจากหน้าสาธารณะ
+     * (เจ้าของทัก 20 ส.ค. 2569: "ทำไมกันยงอีเลคทริกฉันไม่เจอ" — 5 ใบของกันยงอยู่อันดับ
+     * 201/216/283 จากใบเปิด 284 ใบ เพราะ feed เรียงจากวันที่กรอกใหม่สุด)
+     * 500 ครอบใบเปิดจริง (~284) มีที่เผื่อ · ตัวกรองที่ตั้งใจ (ซ่อนรอเริ่มงาน/รอแจ้งเข้า) ยังทำงานเหมือนเดิม
+     */
+    const limit = Math.min(500, Math.max(1, parseIntOrNull(req.query?.limit) ?? 500));
 
     if (isSiamrajUnitRequestsEnabled()) {
       if (id) {

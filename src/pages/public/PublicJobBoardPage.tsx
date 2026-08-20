@@ -11,7 +11,8 @@ const PublicJobBoardPage: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiFetch('/api/public/jobs?limit=200')
+    // 500 = ครอบใบเปิดทั้งหมด (เดิม 200 ใบเก่าตกขอบ — เคสกันยงอีเลคทริกหาย 20 ส.ค. 2569)
+    apiFetch('/api/public/jobs?limit=500')
       .then(async (r) => {
         if (!r.ok) throw new Error('fail');
         return r.json() as Promise<JobRequest[]>;
