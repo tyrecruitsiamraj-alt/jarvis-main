@@ -207,7 +207,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** ยอด Lead แยกต่างหาก — ใบที่ปัดเข้าคลังไม่ถูกนับใน applicantCounts (17 ส.ค. 2569) */
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
   /** ใบที่กำลังแก้ข้อมูลประกาศ (จังหวัด/รายได้/สวัสดิการ) — 17 ส.ค. 2569 */
-  const [editPublicJob, setEditPublicJob] = useState<JobRequest | null>(null);
   /** ค่าที่เพิ่งแก้ — ทับบนการ์ดทันทีโดยไม่ต้องรีเฟรชทั้งบอร์ด */
   const [publicPatchById, setPublicPatchById] = useState<Record<string, Partial<JobRequest>>>({});
 
@@ -914,25 +913,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ด่วน
                       </span>
                     )}
-                    {isStaff ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditPublicJob({ ...job, ...(publicPatchById[job.id] || {}) });
-                        }}
-                        title="แก้จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ ที่จะขึ้นบนประกาศสาธารณะ"
-                        aria-label="แก้ข้อมูลประกาศ"
-                        className={cn(
-                          'inline-flex h-7 w-7 items-center justify-center rounded-full border transition-colors',
-                          TONE.info.outline,
-                          // จาง ๆ ไว้ก่อน ชัดขึ้นตอนชี้ที่การ์ด — หัวการ์ดจะได้ไม่รก
-                          'opacity-60 group-hover:opacity-100 focus-visible:opacity-100',
-                        )}
-                      >
-                        <Pencil className="h-3.5 w-3.5" aria-hidden />
-                      </button>
-                    ) : null}
+                    {/* 🔴 ไอคอนดินสอ "แก้ข้อมูลประกาศ" ถูกถอดออกจากการ์ด (เจ้าของสั่ง
+                        20 ส.ค. 2569) — ฟอร์มย้ายไปรวมในแท็บ "แก้ไข" ของป๊อปอัปแล้ว
+                        ห้ามเอาไอคอนกลับมาบนการ์ดโดยไม่ถามก่อน */}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1348,38 +1331,64 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               {/* เนื้อกลางเปลี่ยนตามแท็บ — ฟอร์มแก้ไข/Gen link ใช้ component ตัวเดิม
                   ในโหมด embedded (คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog) */}
               {popupTab === 'edit' ? (
-                latestPostingByJob.has(selected.id) ? (
-                  <EditPostingDialog
-                    embedded
-                    posting={latestPostingByJob.get(selected.id) ?? null}
-                    onClose={() => setPopupTab('detail')}
-                    onSaved={() => {
-                      setPostingsRev((n) => n + 1);
-                      setPopupTab('detail');
-                    }}
-                  />
-                ) : (
-                  /* ใบที่ยังไม่มีประกาศ — บอกให้รู้ว่าต้องสร้างก่อน แล้วพาไปเลย
-                     (ปุ่ม "แก้ไข" ต้องมีทุกใบตามที่สั่ง แต่ต้องไม่กลายเป็นทางตัน) */
-                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-8 text-center">
-                    <Pencil className="mx-auto h-9 w-9 text-muted-foreground/40" />
-                    <p className="text-sm font-medium text-foreground">ใบนี้ยังไม่มีประกาศให้แก้</p>
-                    <p className="text-xs text-muted-foreground">
-                      กด Gen link สร้างประกาศ + ลิงก์รับสมัครก่อน แล้วกลับมาแก้ข้อความที่ผู้สมัครเห็นได้
+                /**
+                 * แท็บ "แก้ไข" = **สองส่วนในที่เดียว** (เจ้าของเคาะ 20 ส.ค. 2569 —
+                 * ถอดไอคอนดินสอบนการ์ดแล้วย้ายฟอร์มมารวมที่นี่)
+                 *   1. ข้อความประกาศ (มีเฉพาะใบที่สร้างประกาศแล้ว)
+                 *   2. ข้อมูลที่จะขึ้นประกาศ — จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ
+                 *      (แก้ได้ทุกใบ ไม่ต้องมีประกาศก่อน) → แท็บนี้จึงไม่เคยเป็นทางตัน
+                 */
+                <div className="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
+                  {latestPostingByJob.has(selected.id) ? (
+                    <EditPostingDialog
+                      embedded
+                      posting={latestPostingByJob.get(selected.id) ?? null}
+                      onClose={() => setPopupTab('detail')}
+                      onSaved={() => {
+                        setPostingsRev((n) => n + 1);
+                        setPopupTab('detail');
+                      }}
+                    />
+                  ) : (
+                    <div className="space-y-2 px-5 py-4 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        ใบนี้ยังไม่มีประกาศ — ข้อความที่ผู้สมัครเห็นต้องกด Gen link สร้างก่อน
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setPopupTab('genlink')}
+                        className={cn(
+                          'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold',
+                          TONE.violet.outline,
+                        )}
+                      >
+                        <Link2 className="h-3.5 w-3.5" />
+                        ไปหน้า Gen link
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 px-5 py-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      ข้อมูลที่จะขึ้นประกาศ
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setPopupTab('genlink')}
-                      className={cn(
-                        'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold',
-                        TONE.violet.outline,
-                      )}
+                    <React.Suspense
+                      fallback={<p className="text-xs text-muted-foreground">กำลังโหลดฟอร์ม…</p>}
                     >
-                      <Link2 className="h-4 w-4" />
-                      ไปหน้า Gen link
-                    </button>
+                      <EditPublicJobFieldsDialog
+                        embedded
+                        job={{ ...selected, ...(publicPatchById[selected.id] || {}) }}
+                        onClose={() => setPopupTab('detail')}
+                        onSaved={(patch) =>
+                          setPublicPatchById((prev) => ({
+                            ...prev,
+                            [selected.id]: { ...(prev[selected.id] || {}), ...patch },
+                          }))
+                        }
+                      />
+                    </React.Suspense>
                   </div>
-                )
+                </div>
               ) : popupTab === 'genlink' ? (
                 <GenApplyLinkDialog
                   embedded
@@ -1585,22 +1594,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         onClose={() => setGenStandalone(null)}
         onCreated={() => setPostingsRev((n) => n + 1)}
       />
-
-      {/* แก้ข้อมูลที่จะขึ้นประกาศสาธารณะ — lazy เหมือนเลนสรรหา (ไฟล์นี้ใช้ร่วมกับ /apply) */}
-      {editPublicJob ? (
-        <React.Suspense fallback={null}>
-          <EditPublicJobFieldsDialog
-            job={editPublicJob}
-            onClose={() => setEditPublicJob(null)}
-            onSaved={(patch) =>
-              setPublicPatchById((prev) => ({
-                ...prev,
-                [editPublicJob.id]: { ...(prev[editPublicJob.id] || {}), ...patch },
-              }))
-            }
-          />
-        </React.Suspense>
-      ) : null}
 
       {/* เลนสรรหา (R2b) — โหลดเมื่อกดเท่านั้น ไม่ให้ติดไปกับ bundle ของ /apply */}
       {laneJob ? (

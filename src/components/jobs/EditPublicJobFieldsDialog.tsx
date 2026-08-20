@@ -37,7 +37,9 @@ const EditPublicJobFieldsDialog: React.FC<{
   job: JobRequest | null;
   onClose: () => void;
   onSaved?: (patch: Partial<JobRequest>) => void;
-}> = ({ job, onClose, onSaved }) => {
+  /** true = คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog (ฝังในแท็บ "แก้ไข" ของป๊อปอัปการ์ด) */
+  embedded?: boolean;
+}> = ({ job, onClose, onSaved, embedded = false }) => {
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
@@ -116,17 +118,7 @@ const EditPublicJobFieldsDialog: React.FC<{
   const fieldCls =
     'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary';
 
-  return (
-    <Dialog open={Boolean(job)} onOpenChange={(o) => (!o ? onClose() : undefined)}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-base">แก้ข้อมูลที่จะขึ้นประกาศ</DialogTitle>
-          <DialogDescription className="text-xs">
-            {job.request_no ? `${job.request_no} · ` : ''}
-            {job.unit_name} — แก้แล้วมีผลเฉพาะหน้าประกาศสาธารณะ ไม่ได้แก้ข้อมูลใน ERP
-          </DialogDescription>
-        </DialogHeader>
-
+  const body = (
         <div className="space-y-4">
           <section className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground">พื้นที่ทำงาน</p>
@@ -298,6 +290,25 @@ const EditPublicJobFieldsDialog: React.FC<{
             </button>
           </div>
         </div>
+  );
+
+  /** ฝังเป็นส่วนหนึ่งของแท็บ "แก้ไข" ในป๊อปอัปการ์ด = คืนเนื้อฟอร์มเปล่า ๆ
+   *  (เจ้าของเคาะ 20 ส.ค. 2569 — ถอดไอคอนดินสอบนการ์ดแล้วย้ายฟอร์มมารวมที่นี่)
+   *  🔴 ห้ามซ้อน Dialog ใน Dialog */
+  if (embedded) return body;
+
+  return (
+    <Dialog open={Boolean(job)} onOpenChange={(o) => (!o ? onClose() : undefined)}>
+      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">แก้ข้อมูลที่จะขึ้นประกาศ</DialogTitle>
+          <DialogDescription className="text-xs">
+            {job.request_no ? `${job.request_no} · ` : ''}
+            {job.unit_name} — แก้แล้วมีผลเฉพาะหน้าประกาศสาธารณะ ไม่ได้แก้ข้อมูลใน ERP
+          </DialogDescription>
+        </DialogHeader>
+
+        {body}
       </DialogContent>
     </Dialog>
   );
