@@ -37,11 +37,17 @@ export default function ApplicantContactDialog({
   application,
   onClose,
   onSaved,
+  embedded = false,
 }: {
   application: PublicApplication | null;
   onClose: () => void;
   /** บันทึกสำเร็จ — ให้หน้าแม่ reload ลิสต์ (สถานะใบเปลี่ยน แถวอาจย้ายแท็บ) */
   onSaved: () => void;
+  /**
+   * true = คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog — ใช้ตอนฝังใน "ป๊อปดูรายชื่อ" ของกล่องงาน
+   * (เจ้าของสั่ง 20 ส.ค. 2569: ปุ่มประมวลผลที่คนสนใจ) · 🔴 ห้ามซ้อน Dialog ใน Dialog
+   */
+  embedded?: boolean;
 }) {
   /** โหมดที่เลือก: ยังไม่เลือก / สำเร็จ / ไม่สำเร็จ */
   const [mode, setMode] = useState<'idle' | 'ok' | 'fail'>('idle');
@@ -152,9 +158,9 @@ export default function ApplicantContactDialog({
   };
 
   const a = application;
-  return (
-    <Dialog open={!!a} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
+
+  const body = (
+    <>
         {a ? (
           <>
             <DialogHeader>
@@ -381,7 +387,15 @@ export default function ApplicantContactDialog({
             ) : null}
           </>
         ) : null}
-      </DialogContent>
+    </>
+  );
+
+  /** ฝังในป๊อปดูรายชื่อ = คืนเนื้อเปล่า ๆ (ห้ามซ้อน Dialog ใน Dialog) */
+  if (embedded) return a ? <div className="space-y-3">{body}</div> : null;
+
+  return (
+    <Dialog open={!!a} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">{body}</DialogContent>
     </Dialog>
   );
 }

@@ -14,6 +14,7 @@ import {
   GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
   claimJobApplication,
+  setJobApplicationLead,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import { cn } from '@/lib/utils';
@@ -29,8 +30,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Download, Loader2, MapPin, Phone, UserPlus, Users } from 'lucide-react';
+import { ClipboardCheck, Download, Loader2, MapPin, Phone, UserMinus, UserPlus, Users } from 'lucide-react';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
+import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 
 export type JobApplicantsDialogProps = {
@@ -56,6 +58,12 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
    * ใช้ฟอร์ม AddApplicantDialog ตัวเดิมโหมด embedded — ห้ามซ้อน Dialog ใน Dialog
    */
   const [adding, setAdding] = useState(false);
+  /**
+   * คนที่กำลัง "ประมวลผล" (ปุ่ม rule แบบ iRecruit — เจ้าของสั่ง 20 ส.ค. 2569):
+   * เปิดฟอร์มติดต่อ→นัดหมาย (ApplicantContactDialog โหมด embedded) ในป๊อปเดียวกัน
+   */
+  const [processing, setProcessing] = useState<PublicApplication | null>(null);
+  const [leadBusyId, setLeadBusyId] = useState<string | null>(null);
   /**
    * กรองตาม "ที่มา" (เจ้าของสั่ง 16 ส.ค.: *"แยกให้หน่อยว่าอันไหนมาจากการสมัครใหม่
    * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองแท็บจึงตรงกันเสมอ
@@ -135,6 +143,21 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     }
   };
 
+  /** ปัดเข้าคลังสำรอง (Lead) — ปุ่ม "เอาออกจากลิสต์" ของระบบเดิม (person_remove) */
+  const moveToLead = async (a: PublicApplication) => {
+    if (!window.confirm(`เอา "${a.full_name}" ออกจากลิสต์ (เก็บเข้าคลังสำรอง Lead)?`)) return;
+    setLeadBusyId(a.id);
+    setError(null);
+    try {
+      await setJobApplicationLead(a.id, true);
+      if (job) reload(job.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'เก็บ Lead ไม่สำเร็จ');
+    } finally {
+      setLeadBusyId(null);
+    }
+  };
+
   /** เก็บไปติดต่อ / คืน — ไม่ optimistic เพราะอาจชนกับเพื่อน (409) ให้ server ตัดสินก่อน */
   const toggleClaim = async (a: PublicApplication) => {
     setSavingId(a.id);
@@ -154,6 +177,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     let cancelled = false;
     setTab('all'); // เปิดใบใหม่เริ่มที่ "ทั้งหมด" เสมอ ไม่ค้างแท็บของใบก่อน
     setAdding(false);
+    setProcessing(null);
     setLoading(true);
     setError(null);
     fetchJobApplications(job.id)
@@ -284,9 +308,47 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
         </div>
       </div>
 
-      {/* "เก็บไปติดต่อ" เฉพาะฝั่ง "รายชื่อที่สนใจ" (เจ้าของสั่ง — เก็บหลังโทรแล้วสนใจ) */}
+      {/* แถวเครื่องมือของ "คนที่สนใจ" (เจ้าของสั่ง 20 ส.ค. 2569 ตามระบบเดิม iRecruit):
+          โทร (call) · ประมวลผล (rule → ติดต่อ/นัดหมาย) · เอาออกจากลิสต์ (person_remove → Lead)
+          + "เก็บไปติดต่อ" ของเดิม (ชื่อไปโผล่หน้า "การโทรของฉัน") */}
       {inInterestedColumn ? (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-border/50 pt-2.5">
+          <a
+            href={`tel:${a.phone}`}
+            title={`โทร ${a.phone}`}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+              TONE.success.outline,
+            )}
+          >
+            <Phone className="h-3 w-3" />
+            โทร
+          </a>
+          <button
+            type="button"
+            onClick={() => setProcessing(a)}
+            title="บันทึกผลติดต่อ / นัดหมาย"
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+              TONE.violet.outline,
+            )}
+          >
+            <ClipboardCheck className="h-3 w-3" />
+            ประมวลผล
+          </button>
+          <button
+            type="button"
+            disabled={leadBusyId === a.id}
+            onClick={() => void moveToLead(a)}
+            title="เอาออกจากลิสต์ — เก็บเข้าคลังสำรอง (Lead)"
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+              TONE.neutral.outline,
+            )}
+          >
+            <UserMinus className="h-3 w-3" />
+            เอาออก
+          </button>
           {a.claimed && !a.claimed_by_me ? (
             <span className="rounded-full border border-transparent bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
               🔒 เพื่อนเก็บไปติดต่อแล้ว
@@ -393,8 +455,27 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
           </div>
         </DialogHeader>
 
-        {/* มุมมองเพิ่มผู้สมัคร — ฟอร์มเดิมโหมด embedded ผูก job นี้ให้เลย */}
-        {adding && job ? (
+        {/* มุมมองประมวลผล (ติดต่อ→นัดหมาย) — ฟอร์ม RM ตัวเดิมโหมด embedded */}
+        {processing ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+            <button
+              type="button"
+              onClick={() => setProcessing(null)}
+              className="mb-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            >
+              ← กลับรายชื่อ
+            </button>
+            <ApplicantContactDialog
+              embedded
+              application={processing}
+              onClose={() => setProcessing(null)}
+              onSaved={() => {
+                setProcessing(null);
+                if (job) reload(job.id);
+              }}
+            />
+          </div>
+        ) : adding && job ? (
           <AddApplicantDialog
             embedded
             open={adding}
