@@ -24,7 +24,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_OPTIONS,
 } from '@/lib/unitRequestWorkStatus';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
-import { DASH, TONE } from '@/lib/designTokens';
+import { DASH } from '@/lib/designTokens';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
   AGE_DAYS_MULTI_OPTIONS,
@@ -610,22 +610,6 @@ const JobListPage: React.FC = () => {
               </option>
             ))}
           </FilterSelect>
-
-          {/* บอกให้เห็นว่าตอนนี้ dropdown ไม่มีผล เพราะกำลังเรียงจากหัวคอลัมน์ */}
-          {tableSort ? (
-            <button
-              type="button"
-              onClick={() => updateListState({ tableSort: null, page: 1 })}
-              title="กลับไปเรียงตาม dropdown"
-              className={cn(
-                'inline-flex items-center gap-1 self-end rounded-lg border px-2.5 py-1.5 text-xs font-semibold',
-                TONE.info.outline,
-              )}
-            >
-              เรียงจากคอลัมน์ {JOB_LIST_TABLE_COLUMN_LABEL[tableSort.column]}{' '}
-              {tableSort.dir === 'asc' ? '▲' : '▼'} · ล้าง
-            </button>
-          ) : null}
           </div>
         </div>
 
@@ -820,22 +804,24 @@ const JobListPage: React.FC = () => {
                 <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
                   {(
                     [
-                      ['request_no', 'เลขที่ใบขอ', 'left'],
-                      ['age', 'ผ่านมา', 'left'],
-                      ['unit', 'หน่วยงาน', 'left'],
-                      ['submitted', 'วันที่กรอก', 'left'],
-                      ['required', 'วันที่ต้องการ', 'left'],
-                      ['remaining', 'คงเหลือ', 'center'],
-                      ['request_type', 'ประเภทใบขอ', 'left'],
-                      ['position', 'ตำแหน่ง', 'left'],
-                      ['subtype', 'ลักษณะงานย่อย', 'left'],
-                      ['resigned', 'ผู้ลาออก', 'left'],
-                      ['assignee', 'ผู้รับผิดชอบ', 'left'],
-                      ['send_replacement', 'ส่งคนแทน', 'center'],
-                      ['work_status', 'สถานะทำงาน', 'center'],
-                      ['note', 'หมายเหตุ', 'left'],
-                    ] as Array<[JobListTableColumn, string, 'left' | 'center']>
-                  ).map(([col, label, align]) => {
+                      ['request_no', 'left'],
+                      ['age', 'left'],
+                      ['unit', 'left'],
+                      ['submitted', 'left'],
+                      ['required', 'left'],
+                      ['remaining', 'center'],
+                      ['request_type', 'left'],
+                      ['position', 'left'],
+                      ['subtype', 'left'],
+                      ['resigned', 'left'],
+                      ['assignee', 'left'],
+                      ['send_replacement', 'center'],
+                      ['work_status', 'center'],
+                      ['note', 'left'],
+                    ] as Array<[JobListTableColumn, 'left' | 'center']>
+                  ).map(([col, align]) => {
+                    // ป้ายชื่อคอลัมน์มาจาก JOB_LIST_TABLE_COLUMN_LABEL ที่เดียว (ไม่พิมพ์ซ้ำ)
+                    const label = JOB_LIST_TABLE_COLUMN_LABEL[col];
                     const active = tableSort?.column === col;
                     return (
                       <th
