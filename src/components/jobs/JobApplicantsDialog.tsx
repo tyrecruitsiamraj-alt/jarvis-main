@@ -39,8 +39,13 @@ export type JobApplicantsDialogProps = {
   onClose: () => void;
 };
 
-/** แท็บใน dialog — เจ้าของสั่ง 13 ส.ค. 2569: "กดเข้าไปอยากแยกหน้าแบบนี้" */
-type ApplicantTab = 'all' | 'interested';
+/**
+ * แท็บใน dialog — เจ้าของสั่ง 13 ส.ค. 2569: "กดเข้าไปอยากแยกหน้าแบบนี้"
+ * · 'not_interested' เพิ่ม 20 ส.ค. 2569: *"เมื่อ Lumos โทรแล้วให้เอาคนที่สนใจ ไม่สนใจ
+ *   ไปแยกตามกล่อง สนใจ ไม่สนใจ"* — ไม่สนใจ = declined/wrong_person เท่านั้น
+ *   (โทรไม่ติด/ไม่รับ ยังอยู่แค่ "ทั้งหมด" เพราะต้องตามต่อ)
+ */
+type ApplicantTab = 'all' | 'interested' | 'not_interested';
 
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, onClose }) => {
   const [items, setItems] = useState<PublicApplication[]>([]);
@@ -183,8 +188,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   // เปลี่ยนตามจนกดกลับไม่ได้
   // ไม่มีตัวกรองที่มาแล้ว — "รายชื่อทั้งหมด" คือทั้งหมดจริง ๆ
   const shownItems = items;
-  const { interested } = splitInterested(shownItems);
-  const visible = tab === 'interested' ? interested : shownItems;
+  const { interested, notInterested } = splitInterested(shownItems);
+  const visible =
+    tab === 'interested' ? interested : tab === 'not_interested' ? notInterested : shownItems;
 
   /** การ์ดผู้สมัคร 1 ใบ — ใช้ทั้งสองแท็บ (19 ส.ค. 2569: เลิกมุมมอง 2 คอลัมน์ของจอใหญ่) */
   const renderCard = (a: PublicApplication, inInterestedColumn: boolean) => (
@@ -367,6 +373,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               [
                 ['all', 'รายชื่อทั้งหมด', shownItems.length],
                 ['interested', 'คนที่สนใจ', interested.length],
+                ['not_interested', 'ไม่สนใจ', notInterested.length],
               ] as Array<[ApplicantTab, string, number]>
             ).map(([id, label, n]) => (
               <button
@@ -430,7 +437,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                   <p className="py-12 text-center text-xs text-muted-foreground">
                     {tab === 'interested'
                       ? 'ยังไม่มีใครตอบว่าสนใจ — เมื่อโทรแล้วได้ผล “สนใจ” ชื่อจะมาอยู่ที่นี่'
-                      : 'ยังไม่มีผู้สมัคร'}
+                      : tab === 'not_interested'
+                        ? 'ยังไม่มีใครปฏิเสธ — คนที่ตอบ “ไม่สนใจ” ตอนโทรจะมาอยู่ที่นี่'
+                        : 'ยังไม่มีผู้สมัคร'}
                   </p>
                 ) : (
                   <ul className="space-y-2.5">{visible.map((a) => renderCard(a, tab === 'interested'))}</ul>

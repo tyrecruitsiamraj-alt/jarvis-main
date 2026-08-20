@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isInterestedOutcome,
   isKnownOutcome,
+  isNotInterestedOutcome,
   splitInterested,
 } from '../../src/lib/applicantCallOutcome';
 
@@ -74,11 +75,40 @@ describe('splitInterested — แบ่งลิสต์ตามแท็บ',
   });
 
   it('ลิสต์ว่างไม่พัง', () => {
-    expect(splitInterested([])).toEqual({ all: [], interested: [] });
+    expect(splitInterested([])).toEqual({ all: [], interested: [], notInterested: [] });
   });
 
   it('ไม่มีใครสนใจ → ได้ลิสต์ว่าง ไม่ใช่ทั้งลิสต์', () => {
     const none = [{ id: 'a', last_call_outcome: 'no_answer' }];
     expect(splitInterested(none).interested).toEqual([]);
+  });
+});
+
+/**
+ * แท็บ "ไม่สนใจ" (เจ้าของสั่ง 20 ส.ค. 2569) — declined/wrong_person เท่านั้น
+ * 🔴 โทรไม่ติด/ไม่รับ (no_answer/busy/unresponsive) ห้ามนับเป็นไม่สนใจ — ต้องตามต่อ
+ */
+describe('splitInterested — ไม่สนใจ', () => {
+  it('declined กับ wrong_person เข้าไม่สนใจ · confirmed เข้าสนใจ · ที่เหลือแค่ทั้งหมด', () => {
+    const items = [
+      { id: 'yes', last_call_outcome: 'confirmed' },
+      { id: 'no1', last_call_outcome: 'declined' },
+      { id: 'no2', last_call_outcome: 'wrong_person' },
+      { id: 'wait', last_call_outcome: 'no_answer' },
+      { id: 'none', last_call_outcome: null },
+    ];
+    const { all, interested, notInterested } = splitInterested(items);
+    expect(all).toHaveLength(5);
+    expect(interested.map((x) => x.id)).toEqual(['yes']);
+    expect(notInterested.map((x) => x.id)).toEqual(['no1', 'no2']);
+  });
+
+  it('🔴 no_answer/busy/unresponsive ไม่นับเป็นไม่สนใจ', () => {
+    for (const o of ['no_answer', 'busy', 'unresponsive', 'failed', 'cancelled']) {
+      expect(isNotInterestedOutcome(o), o).toBe(false);
+    }
+    expect(isNotInterestedOutcome('declined')).toBe(true);
+    expect(isNotInterestedOutcome('wrong_person')).toBe(true);
+    expect(isNotInterestedOutcome(null)).toBe(false);
   });
 });
