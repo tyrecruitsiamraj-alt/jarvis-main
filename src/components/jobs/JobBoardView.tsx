@@ -85,6 +85,16 @@ function staffAssigneeLine(j: JobRequest): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/**
+ * ขั้นตอนในป๊อปอัปการ์ด (เจ้าของสั่ง 20 ส.ค. 2569 — flow ของงาน ไม่ใช่แท็บอิสระ):
+ * 1 รายละเอียดงาน → 2 แก้ไข → 3 Gen link · **ต้องเห็นครบ 3 ขั้นเสมอ** (คำสั่งเดิมยังอยู่)
+ */
+const POPUP_STEPS = [
+  { id: 'detail', label: 'รายละเอียดงาน' },
+  { id: 'edit', label: 'แก้ไข' },
+  { id: 'genlink', label: 'Gen link' },
+] as const;
+
 /** BU ตั้งต้นของกล่องลอยที่ยังไม่มีประกาศ — ผู้ใช้แก้ได้ในฟอร์ม (ชุดเดียวกับ RecruitBoardTools) */
 const BOARD_DEFAULT_BU = 'LBD';
 
@@ -1268,54 +1278,56 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <DialogTitle className="text-base font-semibold leading-snug sm:text-lg break-words">
                 {selected ? jobBoardCardTitle(selected) : ''}
               </DialogTitle>
-              {/* แท็บไอคอนชิดขวา (เจ้าของเคาะ 19 ส.ค. 2569) — รายละเอียดงาน → แก้ไข → Gen link
-                  ⚠️ เจ้าหน้าที่เท่านั้น · ใบที่ปิด/ยกเลิกแล้วเหลือแท็บรายละเอียดอันเดียว
-                  (งานจบแล้ว ไม่ต้องแก้ประกาศ/ปล่อยลิงก์รับสมัครอีก) */}
-              {isStaff && selected ? (
-                <div className="flex shrink-0 items-center gap-1">
-                  {(
-                    [
-                      { id: 'detail' as const, label: 'รายละเอียดงาน', Icon: ClipboardCheck, show: true },
-                      {
-                        id: 'edit' as const,
-                        label: 'แก้ไข',
-                        Icon: Pencil,
-                        /**
-                         * 🔴 **โชว์เสมอ** (เจ้าของสั่ง 20 ส.ค. 2569: *"เปิดมาต้องเจอ 3 ปุ่ม
-                         * 1.รายละเอียดงาน 2.แก้ไข 3.Gen link"*) — เดิมซ่อนเมื่อใบยังไม่มีประกาศ
-                         * ทำให้บางใบเห็น 2 ปุ่ม บางใบเห็น 3 ปุ่ม ไม่คงที่
-                         * ใบที่ยังไม่มีประกาศ กดแล้วเจอคำอธิบาย + ปุ่มพาไป Gen link (ไม่ใช่ทางตัน)
-                         */
-                        show: !closedBox,
-                      },
-                      { id: 'genlink' as const, label: 'Gen link', Icon: Link2, show: !closedBox },
-                    ] as const
-                  )
-                    .filter((t) => t.show)
-                    .map((t) => {
-                      const active = popupTab === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setPopupTab(t.id)}
-                          title={t.label}
-                          aria-label={t.label}
-                          aria-pressed={active}
-                          className={cn(
-                            'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors',
-                            active
-                              ? cn(TONE.primary.solid, 'border-transparent')
-                              : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground',
-                          )}
-                        >
-                          <t.Icon className="h-4 w-4" />
-                        </button>
-                      );
-                    })}
-                </div>
-              ) : null}
             </div>
+            {/* แถบขั้นตอนการไหลของงาน (เจ้าของสั่ง 20 ส.ค. 2569: *"ทำเป็นแบบการไหลของงาน …
+                ด้านบนก็จะมีบอกว่าตอนนี้เราอยู่ในหน้าไหน"*)
+                1 รายละเอียดงาน → 2 แก้ไข → 3 Gen link · กดขั้นไหนก็กระโดดได้ +
+                มีปุ่ม "ถัดไป" ท้ายเนื้อแต่ละขั้น
+                ⚠️ เจ้าหน้าที่เท่านั้น · ใบปิด/ยกเลิก = งานจบแล้ว ไม่มีขั้นแก้ไข/Gen link */}
+            {isStaff && selected && !closedBox ? (
+              <div className="mt-3 flex items-center gap-1.5" role="tablist" aria-label="ขั้นตอน">
+                {POPUP_STEPS.map((t, i) => {
+                  const active = popupTab === t.id;
+                  const passed = POPUP_STEPS.findIndex((x) => x.id === popupTab) > i;
+                  return (
+                    <React.Fragment key={t.id}>
+                      {i > 0 ? (
+                        <span
+                          className={cn('h-px w-4 shrink-0 sm:w-6', passed || active ? 'bg-primary' : 'bg-border')}
+                          aria-hidden
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        role="tab"
+                        onClick={() => setPopupTab(t.id)}
+                        aria-label={t.label}
+                        aria-selected={active}
+                        className={cn(
+                          'inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                          active
+                            ? cn(TONE.primary.solid, 'border-transparent')
+                            : passed
+                              ? cn(TONE.primary.value, 'border-primary/40 bg-background hover:bg-secondary')
+                              : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                            active ? 'bg-white/25' : 'bg-secondary',
+                          )}
+                          aria-hidden
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="truncate">{t.label}</span>
+                      </button>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            ) : null}
             <DialogDescription className="sr-only">
               รายละเอียดตำแหน่งงาน
             </DialogDescription>
@@ -1542,9 +1554,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </button>
                 ) : null}
 
-                {/* 🔴 Gen link + แก้ไขประกาศ = **แท็บไอคอนบนหัวป๊อปอัป** (เจ้าของเคาะ
-                    19 ส.ค. 2569: รายละเอียดงาน → แก้ไข → Gen link ในป๊อปเดียว)
-                    ห้ามเอาปุ่มกลับมาไว้ท้ายป๊อปหรือบนการ์ดโดยไม่ถามก่อน */}
+                {/* ปุ่ม "ถัดไป" ของ flow (เจ้าของสั่ง 20 ส.ค. 2569: *"เลือกกด next เพื่อไปแก้ไข
+                    … แก้ไขเสร็จ กด next ไปหน้า gen link"*) — ขั้นสุดท้าย (Gen link) ไม่มีถัดไป
+                    เพราะปุ่มลงมือคือ "สร้างประกาศ + ลิงก์" ในเนื้อขั้นนั้นเอง */}
+                {isStaff && !closedBox && popupTab !== 'genlink' ? (
+                  <button
+                    type="button"
+                    onClick={() => setPopupTab(popupTab === 'detail' ? 'edit' : 'genlink')}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                  >
+                    ถัดไป — {popupTab === 'detail' ? 'แก้ไข' : 'Gen link'}
+                    <Send className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
             </>
           )}
