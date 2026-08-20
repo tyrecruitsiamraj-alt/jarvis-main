@@ -19,8 +19,25 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { parseAppUser, parseAppUserList, isUserRole } from '@/lib/userApi';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
+import {
+  buildSettingsNav,
+  isSettingsTabId,
+  SETTINGS_TAB_IDS,
+  type SettingsTabId,
+} from '@/lib/settingsNav';
+import { TONE } from '@/lib/designTokens';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-type SettingsTab = 'appearance' | 'navMenu' | 'users' | 'roles' | 'jobStaff' | 'workStatus' | 'matchWeights' | 'lumosMode' | 'autoMove' | 'health' | 'reference' | 'audit';
+/** ⚠️ ชนิด + ป้ายชื่อ + การจัดกลุ่ม อยู่ที่ `src/lib/settingsNav.ts` ที่เดียว (มีเทสต์คุม) */
+type SettingsTab = SettingsTabId;
 type ReferenceCategory = 'สถานะพนักงาน' | 'ลักษณะงาน' | 'ประเภทงาน' | 'สาเหตุปัญหา' | 'ผลการขับรถ';
 
 const REF_DATA_STORAGE_KEY = 'jarvis_reference_data_v1';
@@ -39,41 +56,46 @@ const DEFAULT_REF_DATA: Record<ReferenceCategory, string[]> = {
   ผลการขับรถ: ['ผ่าน', 'ไม่ผ่าน', 'ยังไม่ทดสอบ'],
 };
 
-const allTabs: { id: SettingsTab; label: string; icon: React.ElementType; adminOnly: boolean }[] = [
-  { id: 'appearance', label: 'ธีม / โลโก้', icon: Palette, adminOnly: false },
-  { id: 'navMenu', label: 'จัดเมนู', icon: ListChecks, adminOnly: true },
-  { id: 'users', label: 'Users', icon: Users, adminOnly: true },
-  { id: 'roles', label: 'Roles', icon: Shield, adminOnly: true },
-  { id: 'jobStaff', label: 'สรรหา / คัดสรร / OPL / Online', icon: UserCog, adminOnly: true },
-  { id: 'workStatus', label: 'สถานะทำงาน', icon: ListChecks, adminOnly: true },
-  { id: 'matchWeights', label: 'น้ำหนักเรียงผู้สมัคร', icon: SlidersHorizontal, adminOnly: true },
-  { id: 'lumosMode', label: 'โหมดส่งงานให้ Lumos', icon: PhoneForwarded, adminOnly: true },
-  { id: 'autoMove', label: 'ย้ายใบสมัครอัตโนมัติ', icon: MoveRight, adminOnly: true },
-  { id: 'health', label: 'สถานะระบบ', icon: Activity, adminOnly: true },
-  { id: 'reference', label: 'Reference Data', icon: Database, adminOnly: true },
-  { id: 'audit', label: 'Audit Log', icon: FileText, adminOnly: true },
-];
+/**
+ * ไอคอนของแต่ละแท็บ — อยู่ที่ไฟล์หน้าเพราะเป็นเรื่องการแสดงผมล้วน ๆ
+ * (ป้ายชื่อ/คำอธิบาย/กลุ่ม อยู่ที่ `lib/settingsNav.ts`)
+ */
+const TAB_ICON: Record<SettingsTab, React.ElementType> = {
+  appearance: Palette,
+  navMenu: ListChecks,
+  users: Users,
+  roles: Shield,
+  jobStaff: UserCog,
+  workStatus: ListChecks,
+  matchWeights: SlidersHorizontal,
+  lumosMode: PhoneForwarded,
+  autoMove: MoveRight,
+  health: Activity,
+  reference: Database,
+  audit: FileText,
+};
+
+/** แท็บเดียวที่คนไม่ใช่ admin เข้าได้ (ของเดิม: adminOnly = false เฉพาะ appearance) */
+const NON_ADMIN_TABS: readonly SettingsTab[] = ['appearance'];
 
 const AdminSettings: React.FC = () => {
   const { hasPermission, user } = useAuth();
   const canAdmin = hasPermission('admin');
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
-  const initialTab: SettingsTab =
-    tabFromUrl === 'appearance' ||
-    tabFromUrl === 'users' ||
-    tabFromUrl === 'roles' ||
-    tabFromUrl === 'jobStaff' ||
-    tabFromUrl === 'workStatus' ||
-    tabFromUrl === 'matchWeights' ||
-    tabFromUrl === 'lumosMode' ||
-    tabFromUrl === 'autoMove' ||
-    tabFromUrl === 'health' ||
-    tabFromUrl === 'reference' ||
-    tabFromUrl === 'audit'
-      ? tabFromUrl
-      : 'users';
+  // ⚠️ ตัวคัดค่าอยู่ที่ `isSettingsTabId` แล้ว — เดิมไล่เทียบทีละชื่อ 11 บรรทัด
+  // แล้ว 'navMenu' หายไปจากรายการ (ลิงก์ ?tab=navMenu จึงเด้งกลับ users)
+  const initialTab: SettingsTab = isSettingsTabId(tabFromUrl) ? tabFromUrl : 'users';
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+
+  /**
+   * เมนูที่คนนี้เห็นได้ — จัดกลุ่มที่ `lib/settingsNav.ts` ที่เดียว
+   * (คนไม่ใช่ admin เข้าได้แค่ธีม/โลโก้ เหมือนเดิม)
+   */
+  const navGroups = React.useMemo(
+    () => buildSettingsNav(canAdmin ? SETTINGS_TAB_IDS : NON_ADMIN_TABS),
+    [canAdmin],
+  );
   const [apiUsers, setApiUsers] = useState<User[]>([]);
   const [apiAuditLogs, setApiAuditLogs] = useState<AuditLog[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -252,27 +274,81 @@ const AdminSettings: React.FC = () => {
     <div>
       <PageHeader title="Settings" subtitle="ตั้งค่าระบบ" />
       <div className="px-4 md:px-6 space-y-4">
-        {/* แท็บ pill รางเดียว (mockup rev.3 ข้อ 09) — รางเทาใบเดียว ตัวที่เปิดเป็นเม็ดขาวลอยขึ้นมา
-            หน้า admin ไม่ใส่ hero ตามกติกา mockup */}
-        <div className="overflow-x-auto pb-1">
-          <div className="inline-flex w-max gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800/70">
-            {allTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors',
-                  activeTab === tab.id
-                    ? 'bg-white font-semibold text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
-                    : 'font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
-                )}
-              >
-                <tab.icon className="w-4 h-4" /> {tab.label}
-              </button>
-            ))}
+        {/**
+         * เมนูซ้ายแบ่งกลุ่ม (เจ้าของเคาะ 20 ส.ค. 2569 — เดิมเป็นแท็บ 12 อันแถวเดียว
+         * เลื่อนซ้ายขวา เห็นพร้อมกันจริงแค่ ~8 อัน และไม่มีการจัดกลุ่มเลย)
+         * 🔴 จอเล็กใช้ดรอปดาวน์แทน **ห้ามกลับไปเป็นแถวเลื่อนซ้ายขวา** — นั่นคือปัญหาเดิม
+         */}
+        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+          {/* จอเล็ก: ดรอปดาวน์ (จัดกลุ่มด้วย SelectGroup เหมือนกัน) */}
+          <div className="lg:hidden">
+            <Select
+              value={activeTab}
+              onValueChange={(v) => {
+                if (isSettingsTabId(v)) setActiveTab(v);
+              }}
+            >
+              <SelectTrigger className="w-full rounded-xl">
+                <SelectValue placeholder="เลือกหัวข้อตั้งค่า" />
+              </SelectTrigger>
+              <SelectContent>
+                {navGroups.map((g) => (
+                  <SelectGroup key={g.id}>
+                    <SelectLabel>{g.label}</SelectLabel>
+                    {g.tabs.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
+
+          {/* จอใหญ่: เมนูซ้าย เห็นทั้ง 12 หัวข้อพร้อมกัน ไม่ต้องเลื่อน */}
+          <nav aria-label="หัวข้อตั้งค่า" className="hidden lg:block lg:sticky lg:top-4">
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-3">
+              {navGroups.map((g) => (
+                <div key={g.id} className="space-y-1">
+                  <p className="px-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {g.label}
+                  </p>
+                  {g.tabs.map((t) => {
+                    const Icon = TAB_ICON[t.id];
+                    const active = activeTab === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setActiveTab(t.id)}
+                        aria-current={active ? 'page' : undefined}
+                        title={t.hint}
+                        className={cn(
+                          'flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors',
+                          active
+                            ? cn(TONE.primary.soft, 'font-semibold')
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        )}
+                      >
+                        <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', active && TONE.primary.value)} />
+                        <span className="min-w-0">
+                          <span className={cn('block text-sm leading-snug', active && TONE.primary.value)}>
+                            {t.label}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                            {t.hint}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </nav>
+
+          <div className="min-w-0 space-y-4">
 
         {activeTab === 'appearance' && <BrandingAppearanceTab />}
 
@@ -522,6 +598,8 @@ const AdminSettings: React.FC = () => {
               />
             </div>
           ))}
+          </div>
+        </div>
       </div>
     </div>
   );
