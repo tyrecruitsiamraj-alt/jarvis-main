@@ -90,17 +90,27 @@ function toYmd(v: Date | string | null | undefined): string | null {
   return ymd || null;
 }
 
+/**
+ * วันอ้างอิงงวดของ cohort (เข้ามา/ปิด/ยกเลิก/คงเหลือ) = **วันที่ต้องการคน** (`want_date_from`)
+ *
+ * 🔴 เจ้าของเคาะ 20 ส.ค. 2569 (ถามยืนยันแล้วว่าเดิมนับจากวันที่กรอก):
+ * *"เปลี่ยนเป็นวันที่ต้องการ ทั้งชุด"* — เดือนของใบขอจึงหมายถึง "เดือนที่ลูกค้าต้องการคน"
+ * ไม่ใช่เดือนที่เปิดใบ · ใบที่กรอกเดือนนี้แต่ต้องการเดือนหน้าจะไปนับเดือนหน้า
+ *
+ * ⚠️ `COALESCE` กลับไปใช้ `request_date` เมื่อไม่มีวันที่ต้องการ — **ห้ามให้ใบหลุดจากทุกงวด**
+ * (ใบที่ไม่มี want_date_from จะหายจากทุกกล่องเงียบ ๆ ถ้าไม่มี fallback)
+ */
 function effectiveRequestDateSql(alias = 'A'): string {
-  /** วันที่เปิดใบสำหรับ cohort รายเดือน = วันที่กรอกใบ (request_date) */
-  return `CONVERT(date, ${alias}.request_date)`;
+  return `CONVERT(date, COALESCE(${alias}.want_date_from, ${alias}.request_date))`;
 }
 
+/** ต้องตรงกับ `effectiveRequestDateSql` เป๊ะ — วันที่ต้องการก่อน แล้วค่อย fallback วันที่กรอก */
 function requestOpenDateYmdFromRow(row: SqlThroughputRow): string | null {
-  return toYmd(row.request_date) || toYmd(row.want_date_from);
+  return toYmd(row.want_date_from) || toYmd(row.request_date);
 }
 
 function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
-  /** เดือนที่「เข้ามา」= วันที่เปิด/กรอกใบ ไม่ใช่ want_date_from */
+  /** เดือนที่「เข้ามา」= **วันที่ต้องการคน** (fallback วันที่กรอก) — เจ้าของเคาะ 20 ส.ค. 2569 */
   const requestDate = requestOpenDateYmdFromRow(row);
   if (!requestDate) return [];
 
@@ -116,7 +126,8 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
     (row.customer_name || '').trim() || (row.site_name || '').trim() || siteCode || undefined;
   /**
    * ล่วงหน้า/ฉุกเฉิน คิดจาก **วันที่กรอกใบ → วันที่ต้องการคน** ตัวเดียวกับหน้ารายการใบขอ
-   * ⚠️ `requestDate` ที่ใช้ตรงนี้คือวันที่กรอกจริง (`request_date`) ไม่ใช่ effective date
+   * ⚠️ ต้องอ่าน `row.request_date` ตรง ๆ **ห้ามใช้ `requestDate`** — ตัวนั้นเป็นวันอ้างอิงงวด
+   * (= วันที่ต้องการ) ถ้าเอามาคิด lead จะได้ 0 วันทุกใบแล้วกลายเป็น "ฉุกเฉิน" ทั้งระบบ
    */
   const requiredDate = toYmd(row.want_date_from);
   const leadKind = requestLeadKindFromYmd(toYmd(row.request_date), requiredDate);

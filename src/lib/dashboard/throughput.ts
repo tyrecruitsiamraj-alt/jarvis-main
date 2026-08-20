@@ -1,5 +1,5 @@
 import type { JobRequest } from '@/types';
-import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
+import { dashboardCohortYmd } from '@/lib/jobUrgency';
 import { positionBreakdownFromJob } from '@/lib/requestControl';
 import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/types';
 import { computeJobUrgency } from '@/lib/jobUrgency';
@@ -75,11 +75,9 @@ function resolveKind(r: ThroughputRecord): 'filled' | 'cancelled' | 'remaining' 
 export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()): ThroughputRecord[] {
   const out: ThroughputRecord[] = [];
   for (const j of jobs) {
-    // เดือนที่เข้ามา = วันที่กรอก/เปิดใบ ไม่ใช่ effective/want date
-    const requestDate =
-      safeYmd(j.request_date) ||
-      safeYmd(j.submittedAt) ||
-      effectiveRequestDateYmd(j, today);
+    // เดือนที่เข้ามา = **วันที่ต้องการคน** (fallback วันที่กรอก) — เจ้าของเคาะ 20 ส.ค. 2569
+    // ต้องตรงกับฝั่ง API (`effectiveRequestDateSql`) เพราะเส้นนี้เป็นทางถอยเมื่อไม่ใช่ sqlserver
+    const requestDate = dashboardCohortYmd(j) || safeYmd(j.request_date) || safeYmd(j.submittedAt);
     if (!requestDate) continue;
     const requestNo = (j.request_no || j.externalId || j.id || '').trim() || undefined;
     const departmentCode = j.department_code?.trim().toUpperCase() || undefined;
@@ -209,7 +207,7 @@ export function filterJobsForThroughput(
   today = new Date(),
 ): JobRequest[] {
   return jobs.filter((j) => {
-    const rd = effectiveRequestDateYmd(j, today);
+    const rd = dashboardCohortYmd(j);
     const cd =
       j.status === 'closed' || j.status === 'cancelled'
         ? safeYmd(j.closed_date) || rd
@@ -308,7 +306,7 @@ export function buildStockKpisFromCohort(
       value: summary.requestPositions,
       secondaryCount: summary.requestCount,
       secondaryLabel: 'ใบขอ',
-      description: `อัตราที่ขอในช่วง · ${posReq(summary.requestPositions, summary.requestCount)} · ไม่หายเมื่อปิด/ยกเลิก`,
+      description: `อัตราที่ต้องการคนในช่วง · ${posReq(summary.requestPositions, summary.requestCount)} · ไม่หายเมื่อปิด/ยกเลิก`,
       trendPercent: null,
     },
     {
@@ -501,7 +499,7 @@ export function applyOpenQueueRemainingToActivityTrend(
     if (j.status === 'closed' || j.status === 'cancelled') continue;
     const rem = positionBreakdownFromJob(j).remainingPositions;
     if (rem <= 0) continue;
-    const ymd = safeYmd(j.request_date) || safeYmd(j.submittedAt) || effectiveRequestDateYmd(j);
+    const ymd = dashboardCohortYmd(j) || safeYmd(j.request_date) || safeYmd(j.submittedAt);
     if (!ymd) continue;
     const month = ymd.slice(0, 7);
     remainingMap.set(month, (remainingMap.get(month) ?? 0) + rem);

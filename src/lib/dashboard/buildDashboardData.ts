@@ -23,7 +23,7 @@ import { pickUnitOrganizationDisplayName, NO_SITE_CODE_LABEL } from '@/lib/unitG
 import { buildPriorityWorkQueue } from '@/lib/dashboard/priorityWorkQueue';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
-import { effectiveRequestDateYmd } from '@/lib/jobUrgency';
+import { dashboardCohortYmd } from '@/lib/jobUrgency';
 import type {
   DashboardActivityTrendPoint,
   DashboardData,
@@ -416,7 +416,7 @@ export function resolveOpenStockTrendRange(
   const ytd = resolveYearToDateTrendRange(now);
   let earliest = ytd.from;
   for (const j of openJobs) {
-    const ymd = effectiveRequestDateYmd(j, now);
+    const ymd = dashboardCohortYmd(j);
     if (ymd && ymd < earliest) earliest = `${ymd.slice(0, 7)}-01`;
   }
   if (earliest >= ytd.from) return ytd;
@@ -436,10 +436,8 @@ function inYmdRange(ymd: string, from: string, to: string): boolean {
 export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: string, today = new Date()): JobRequest[] {
   void today;
   return jobs.filter((j) => {
-    const ymd =
-      safeYmd(j.request_date) ||
-      safeYmd(j.submittedAt) ||
-      effectiveRequestDateYmd(j, today);
+    // งวด = วันที่ต้องการคน (fallback วันที่กรอก) — เจ้าของเคาะ 20 ส.ค. 2569
+    const ymd = dashboardCohortYmd(j) || safeYmd(j.request_date) || safeYmd(j.submittedAt);
     return ymd ? inYmdRange(ymd, from, to) : false;
   });
 }
@@ -519,7 +517,7 @@ function buildAllOpenControlSummary(remaining: {
   };
 }
 
-/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบที่กรอกในช่วง (request_date) */
+/** เหลือหา: ทั้งหมด = ใบเปิดทุกใบ · มีงวด = เฉพาะใบที่**ต้องการคน**ในช่วง (want_date_from) */
 function resolveRemainingKpi(
   openJobs: JobRequest[],
   period: PeriodRange | null,
@@ -535,7 +533,7 @@ function resolveRemainingKpi(
   };
 }
 
-/** ใบเปิดในสต็อก KPI — ทั้งหมด หรือเฉพาะใบที่กรอกในช่วง (request_date) */
+/** ใบเปิดในสต็อก KPI — ทั้งหมด หรือเฉพาะใบที่**ต้องการคน**ในช่วง (want_date_from) */
 function resolveOpenJobsForStockKpi(
   openJobs: JobRequest[],
   period: PeriodRange | null,
@@ -1133,8 +1131,8 @@ export function buildDashboardData(
 
   const stockJobs = resolveOpenJobsForStockKpi(openJobSet, period, today);
   const stockScopeHint = period
-    ? `ใบขอที่กรอกในช่วงที่เลือก (รวมปิด/ยกเลิกแล้ว)`
-    : `ใบขอที่กรอกในช่วงแนวโน้ม (รวมปิด/ยกเลิกแล้ว)`;
+    ? `ใบขอที่ต้องการคนในช่วงที่เลือก (รวมปิด/ยกเลิกแล้ว)`
+    : `ใบขอที่ต้องการคนในช่วงแนวโน้ม (รวมปิด/ยกเลิกแล้ว)`;
   const cohortStock =
     throughputRecords.length > 0
       ? sumCohortStockByRequestDate(throughputRecords, periodFrom, periodTo)
@@ -1175,7 +1173,7 @@ export function buildDashboardData(
             : period && kpi.id === 'remaining'
               ? {
                   ...kpi,
-                  description: `อัตราที่ยังต้องหาจากใบขอที่กรอกในช่วง · ${cohortStock.remainingPositions.toLocaleString('th-TH')} อัตรา · ${cohortStock.remainingRequestCount.toLocaleString('th-TH')} ใบขอ`,
+                  description: `อัตราที่ยังต้องหาจากใบขอที่ต้องการคนในช่วง · ${cohortStock.remainingPositions.toLocaleString('th-TH')} อัตรา · ${cohortStock.remainingRequestCount.toLocaleString('th-TH')} ใบขอ`,
                 }
               : kpi,
         )

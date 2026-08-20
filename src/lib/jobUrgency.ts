@@ -133,6 +133,22 @@ function submittedDateYmd(job: JobRequest): string | null {
   return d ? toYmdBangkok(d) : null;
 }
 
+/**
+ * วันอ้างอิง**งวดของ Dashboard** (cohort เข้ามา/ปิด/ยกเลิก/คงเหลือ) = **วันที่ต้องการคน**
+ *
+ * 🔴 เจ้าของเคาะ 20 ส.ค. 2569: *"เปลี่ยนเป็นวันที่ต้องการ ทั้งชุด"* — เดือนของใบขอ
+ * หมายถึง "เดือนที่ลูกค้าต้องการคน" ไม่ใช่เดือนที่เปิดใบ
+ * ต้องตรงกับ `effectiveRequestDateSql()` ฝั่ง API เป๊ะ (SQL คือเส้นหลักที่ใช้จริง)
+ *
+ * ⚠️ ไม่มีวันที่ต้องการ → fallback วันที่กรอก **ห้ามคืน null ทิ้งใบ** ไม่งั้นใบนั้นหาย
+ * จากทุกงวดเงียบ ๆ
+ * ⚠️ **คนละตัวกับ `effectiveRequestDateYmd`** ซึ่งเป็นวันเริ่มนาฬิกา SLA/ledger
+ * (ย้อนหลังใช้วันที่กรอก) — อันนั้นไม่ได้เปลี่ยน ห้ามยุบรวมกัน
+ */
+export function dashboardCohortYmd(job: JobRequest): string | null {
+  return calendarYmdFromValue(job.required_date) ?? submittedDateYmd(job);
+}
+
 /** วันอ้างอิง「ขอมา」— ย้อนหลังใช้วันที่กรอก · ฉุกเฉิน/ล่วงหน้าใช้วันที่ต้องการ */
 export function effectiveRequestDateYmd(job: JobRequest, today = new Date()): string | null {
   const submitYmd = submittedDateYmd(job);

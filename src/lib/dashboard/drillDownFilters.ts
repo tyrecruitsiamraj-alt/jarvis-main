@@ -1,6 +1,6 @@
 import type { JobRequest } from '@/types';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
-import { effectiveRequestDateYmd, matchesDashboardAgeBucket } from '@/lib/jobUrgency';
+import { dashboardCohortYmd, effectiveRequestDateYmd, matchesDashboardAgeBucket } from '@/lib/jobUrgency';
 import {
   classifyRequestActivity,
   mapJobToTaskStatus,
@@ -162,7 +162,8 @@ export function filterJobsForRemainingKpi(
   let jobs = openJobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled');
   if (period) {
     jobs = jobs.filter((j) => {
-      const ymd = effectiveRequestDateYmd(j, today);
+      // ต้องใช้วันอ้างอิงงวดตัวเดียวกับ KPI ไม่งั้นกดการ์ดแล้วรายการไม่ตรงกับเลขบนการ์ด
+      const ymd = dashboardCohortYmd(j);
       return ymd ? inYmdRange(ymd, period.from, period.to) : false;
     });
   }

@@ -29,3 +29,32 @@
 **ชื่อตัวแปรในโค้ด:**
 startingBacklogPositions + newRequestPositions − fulfilledPositionsThisPeriod
 − cancelledPositionsThisPeriod = endingBacklogPositions
+
+---
+
+## 🔴 อัปเดต 20 ส.ค. 2569 — งวดของ cohort นับจาก "วันที่ต้องการคน"
+
+เจ้าของถามยืนยันว่าเดิมนับจากวันที่กรอกใช่ไหม แล้วเคาะว่า **"เปลี่ยนเป็นวันที่ต้องการ ทั้งชุด"**
+
+| | เดิม | ใหม่ |
+|---|---|---|
+| ฝั่ง API (เส้นหลัก) | `CONVERT(date, A.request_date)` | `CONVERT(date, COALESCE(A.want_date_from, A.request_date))` |
+| ฝั่งหน้า (ทางถอย) | ผสม (ย้อนหลังใช้วันกรอก · อื่นใช้วันต้องการ) | `dashboardCohortYmd()` = วันที่ต้องการ → fallback วันที่กรอก |
+
+**แปลว่า:** "เดือนของใบขอ" = **เดือนที่ลูกค้าต้องการคน** ไม่ใช่เดือนที่เปิดใบ ·
+ใบที่กรอกเดือนนี้แต่ต้องการเดือนหน้า จะไปนับอยู่เดือนหน้า
+
+**กระทบทั้งชุด (ตั้งใจให้ตรงกัน):** การ์ด KPI 4 ใบ · กราฟแนวโน้ม · drill-down รายใบ ·
+`filterJobsByRequestDate` · `filterJobsForThroughput` · `jobsToThroughputRecords`
+
+🔴 **ห้ามพลาด**
+* **fallback วันที่กรอกเสมอ** เมื่อไม่มี `want_date_from` — ไม่มี fallback = ใบหลุดจากทุกงวดเงียบ ๆ
+* **`effectiveRequestDateYmd` ไม่ได้เปลี่ยน** — ตัวนั้นคือวันเริ่มนาฬิกา SLA/ledger
+  (ย้อนหลังใช้วันที่กรอก) **คนละเรื่องกับงวด ห้ามยุบรวม**
+* `leadKind` (ล่วงหน้า/ฉุกเฉิน) ยังคิดจาก `request_date → want_date_from` เหมือนเดิม —
+  ห้ามเอา `requestDate` ของ record (ที่ตอนนี้ = วันต้องการ) ไปคิด lead ไม่งั้นได้ 0 วันทุกใบ
+* เทสต์คุมที่ `tests/api/dashboardCohortDate.test.ts` (8 เทสต์ · คุมทั้งฝั่งหน้าและสตริง SQL)
+
+**วัดจริง 20 ส.ค. 2569 (เดือนนี้):** เข้ามา 151 อัตรา/149 ใบ · ปิดแล้ว 43/42 ·
+ยกเลิก 21/21 · คงเหลือ 87/86 → 43+21+87 = 151 ตรงกับ「เข้ามา」เป๊ะ ·
+ทุกแถวของ throughput มี `requestDate === requiredDate` (149/149)
