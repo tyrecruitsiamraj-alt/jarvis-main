@@ -1334,7 +1334,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 /**
                  * แท็บ "แก้ไข" = **สองส่วนในที่เดียว** (เจ้าของเคาะ 20 ส.ค. 2569 —
                  * ถอดไอคอนดินสอบนการ์ดแล้วย้ายฟอร์มมารวมที่นี่)
-                 *   1. ข้อความประกาศ (มีเฉพาะใบที่สร้างประกาศแล้ว)
+                 *   1. ข้อความประกาศ (มีเฉพาะใบที่สร้างประกาศแล้ว — ใบที่ยังไม่มีก็ไม่ต้อง
+                 *      ขึ้นโน้ตชวนไป Gen link เพราะ Gen link เป็นแท็บข้าง ๆ อยู่แล้ว
+                 *      เจ้าของสั่งถอดโน้ตนั้นออก 20 ส.ค. 2569: *"มันอยู่อีกหน้าแล้ว"*)
                  *   2. ข้อมูลที่จะขึ้นประกาศ — จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ
                  *      (แก้ได้ทุกใบ ไม่ต้องมีประกาศก่อน) → แท็บนี้จึงไม่เคยเป็นทางตัน
                  */
@@ -1349,24 +1351,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         setPopupTab('detail');
                       }}
                     />
-                  ) : (
-                    <div className="space-y-2 px-5 py-4 text-center">
-                      <p className="text-xs text-muted-foreground">
-                        ใบนี้ยังไม่มีประกาศ — ข้อความที่ผู้สมัครเห็นต้องกด Gen link สร้างก่อน
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setPopupTab('genlink')}
-                        className={cn(
-                          'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold',
-                          TONE.violet.outline,
-                        )}
-                      >
-                        <Link2 className="h-3.5 w-3.5" />
-                        ไปหน้า Gen link
-                      </button>
-                    </div>
-                  )}
+                  ) : null}
 
                   <div className="space-y-3 px-5 py-4">
                     <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
