@@ -1301,10 +1301,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       { id: 'detail' as const, label: 'รายละเอียดงาน', Icon: ClipboardCheck, show: true },
                       {
                         id: 'edit' as const,
-                        label: 'แก้ไขประกาศ',
+                        label: 'แก้ไข',
                         Icon: Pencil,
-                        // แก้ได้เฉพาะใบที่มีประกาศแล้ว — ใบที่ยังไม่มีต้องกด Gen link ก่อน
-                        show: !closedBox && latestPostingByJob.has(selected.id),
+                        /**
+                         * 🔴 **โชว์เสมอ** (เจ้าของสั่ง 20 ส.ค. 2569: *"เปิดมาต้องเจอ 3 ปุ่ม
+                         * 1.รายละเอียดงาน 2.แก้ไข 3.Gen link"*) — เดิมซ่อนเมื่อใบยังไม่มีประกาศ
+                         * ทำให้บางใบเห็น 2 ปุ่ม บางใบเห็น 3 ปุ่ม ไม่คงที่
+                         * ใบที่ยังไม่มีประกาศ กดแล้วเจอคำอธิบาย + ปุ่มพาไป Gen link (ไม่ใช่ทางตัน)
+                         */
+                        show: !closedBox,
                       },
                       { id: 'genlink' as const, label: 'Gen link', Icon: Link2, show: !closedBox },
                     ] as const
@@ -1343,15 +1348,38 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               {/* เนื้อกลางเปลี่ยนตามแท็บ — ฟอร์มแก้ไข/Gen link ใช้ component ตัวเดิม
                   ในโหมด embedded (คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog) */}
               {popupTab === 'edit' ? (
-                <EditPostingDialog
-                  embedded
-                  posting={latestPostingByJob.get(selected.id) ?? null}
-                  onClose={() => setPopupTab('detail')}
-                  onSaved={() => {
-                    setPostingsRev((n) => n + 1);
-                    setPopupTab('detail');
-                  }}
-                />
+                latestPostingByJob.has(selected.id) ? (
+                  <EditPostingDialog
+                    embedded
+                    posting={latestPostingByJob.get(selected.id) ?? null}
+                    onClose={() => setPopupTab('detail')}
+                    onSaved={() => {
+                      setPostingsRev((n) => n + 1);
+                      setPopupTab('detail');
+                    }}
+                  />
+                ) : (
+                  /* ใบที่ยังไม่มีประกาศ — บอกให้รู้ว่าต้องสร้างก่อน แล้วพาไปเลย
+                     (ปุ่ม "แก้ไข" ต้องมีทุกใบตามที่สั่ง แต่ต้องไม่กลายเป็นทางตัน) */
+                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-8 text-center">
+                    <Pencil className="mx-auto h-9 w-9 text-muted-foreground/40" />
+                    <p className="text-sm font-medium text-foreground">ใบนี้ยังไม่มีประกาศให้แก้</p>
+                    <p className="text-xs text-muted-foreground">
+                      กด Gen link สร้างประกาศ + ลิงก์รับสมัครก่อน แล้วกลับมาแก้ข้อความที่ผู้สมัครเห็นได้
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPopupTab('genlink')}
+                      className={cn(
+                        'inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold',
+                        TONE.violet.outline,
+                      )}
+                    >
+                      <Link2 className="h-4 w-4" />
+                      ไปหน้า Gen link
+                    </button>
+                  </div>
+                )
               ) : popupTab === 'genlink' ? (
                 <GenApplyLinkDialog
                   embedded
