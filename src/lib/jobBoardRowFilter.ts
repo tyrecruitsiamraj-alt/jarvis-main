@@ -20,8 +20,6 @@ import {
 
 export type JobBoardRowFilterState = {
   search: string;
-  /** 'urgent' = ชิปด่วนบนแถบตัวกรอง */
-  chip: 'all' | 'urgent';
   provinceFilter: string;
   districtFilter: string;
   positionFilter: string;
@@ -31,15 +29,6 @@ export type JobBoardRowFilterState = {
   drivingPositionGroup: boolean;
 };
 
-export type JobBoardRowFilterOptions = {
-  /**
-   * ข้ามชิป "ด่วน" — ใช้กับชุดใบปิด/ยกเลิก
-   * 🔴 ใบปิดไม่ได้ผ่าน `enrichJobsWithUrgency` (มีแต่ feed ใบเปิด) ถ้าไม่ข้าม
-   * กดชิปด่วนค้างไว้แล้วเปิดกล่องปิดแล้วจะได้ 0 ใบทุกครั้ง ทั้งที่ของมีอยู่
-   */
-  skipUrgencyChip?: boolean;
-};
-
 /**
  * กรองแถวตามสถานะตัวกรองปัจจุบัน
  * `usedRelatedFallback` = ไม่เจอที่ตรงคำค้นเป๊ะ จึงคืนของใกล้เคียงให้ (พฤติกรรมเดิมของบอร์ด)
@@ -47,11 +36,9 @@ export type JobBoardRowFilterOptions = {
 export function filterJobBoardRows(
   rows: readonly JobRequest[],
   state: JobBoardRowFilterState,
-  options?: JobBoardRowFilterOptions,
 ): { filtered: JobRequest[]; usedRelatedFallback: boolean } {
   const {
     search,
-    chip,
     provinceFilter,
     districtFilter,
     positionFilter,
@@ -60,15 +47,11 @@ export function filterJobBoardRows(
     contractTypeFilter,
     drivingPositionGroup,
   } = state;
-  const skipUrgencyChip = options?.skipUrgencyChip ?? false;
   const q = normBoardSearch(search);
 
+  // ⚠️ ชิป "ด่วน" ถูกถอดทิ้งทั้งฟีเจอร์ (เจ้าของสั่ง 20 ส.ค. 2569: "ไม่ต้องมีก็ได้")
+  // — เดิมชิปนี้ยังเป็นเหตุให้ต้องมี skipUrgencyChip สำหรับชุดใบปิดด้วย ตอนนี้หมดทั้งคู่
   const baseRows = rows
-    .filter((j) => {
-      if (skipUrgencyChip) return true;
-      if (chip === 'urgent') return j.urgency === 'urgent';
-      return true;
-    })
     .filter((j) => {
       const jobProv = inferProvinceFromAddress(j.location_address);
       if (provinceFilter && jobProv !== provinceFilter) return false;

@@ -10,13 +10,10 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import type { JobBoardUrgencyChip } from '@/hooks/useJobBoardFilters';
 
 type Props = {
   search: string;
   onSearchChange: (v: string) => void;
-  chip: JobBoardUrgencyChip;
-  onChipChange: (v: JobBoardUrgencyChip) => void;
   provinceFilter: string;
   onProvinceFilterChange: (v: string) => void;
   districtFilter: string;
@@ -81,16 +78,9 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
-const URGENCY_CHIPS = [
-  { id: 'all' as const, label: 'ทั้งหมด' },
-  { id: 'urgent' as const, label: 'ด่วน' },
-] as const;
-
 const JobBoardTopFilters: React.FC<Props> = ({
   search,
   onSearchChange,
-  chip,
-  onChipChange,
   provinceFilter,
   onProvinceFilterChange,
   districtFilter,
@@ -244,29 +234,9 @@ const JobBoardTopFilters: React.FC<Props> = ({
                 />
               )}
 
+              {/* แถบสลับ ทั้งหมด/ด่วน ถูกถอดทิ้งทั้งฟีเจอร์ (เจ้าของสั่ง 20 ส.ค. 2569:
+                  "ไม่ต้องมีก็ได้") — ความด่วนยังเห็นจากป้าย "ด่วน" บนการ์ดเหมือนเดิม */}
               <div className={cn('flex flex-wrap items-center gap-2 lg:shrink-0', hideSearch && 'flex-1')}>
-                <div
-                  className="inline-flex rounded-xl border border-white/80 bg-white/55 p-1 shadow-sm"
-                  role="group"
-                  aria-label="ประเภทงาน"
-                >
-                  {URGENCY_CHIPS.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => onChipChange(f.id)}
-                      className={cn(
-                        'rounded-lg px-4 py-2 text-xs font-semibold transition-all touch-manipulation min-w-[4.5rem]',
-                        chip === f.id
-                          ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-blue-300'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
                 <button
                   type="button"
                   onClick={() => setSheetOpen(true)}

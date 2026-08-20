@@ -223,13 +223,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const closedBox: ClosedBoxKey | null = openBox && isClosedBox(openBox) ? openBox : null;
   const openBoxKey: OpenBoxKey | null = openBox && !isClosedBox(openBox) ? openBox : null;
   const boxCounts = useMemo(() => countOpenBoxes(filters.filtered), [filters.filtered]);
-  /**
-   * ชุดใบปิด/ยกเลิกหลังผ่าน**ตัวกรองชุดเดียวกับใบเปิด** (จังหวัด/ตำแหน่ง/คำค้น/…)
-   * 🔴 ข้ามชิป "ด่วน" — ใบปิดไม่ได้ผ่าน `enrichJobsWithUrgency` ถ้าไม่ข้าม
-   * คนที่ค้างชิปด่วนไว้จะเปิดกล่องปิดแล้วเจอ 0 ใบทุกครั้ง ทั้งที่ของมีอยู่
-   */
+  /** ชุดใบปิด/ยกเลิกหลังผ่าน**ตัวกรองชุดเดียวกับใบเปิด** (จังหวัด/ตำแหน่ง/คำค้น/…) */
   const closedFiltered = useMemo(
-    () => (isStaff ? filters.filterRows(closedJobs ?? [], { skipUrgencyChip: true }) : []),
+    () => (isStaff ? filters.filterRows(closedJobs ?? []) : []),
     [isStaff, filters, closedJobs],
   );
   const closedBoxCounts = useMemo(
@@ -584,8 +580,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         <JobBoardTopFilters
           search={filters.search}
           onSearchChange={filters.setSearch}
-          chip={filters.chip}
-          onChipChange={filters.setChip}
           provinceFilter={filters.provinceFilter}
           onProvinceFilterChange={filters.onProvinceFilterChange}
           districtFilter={filters.districtFilter}

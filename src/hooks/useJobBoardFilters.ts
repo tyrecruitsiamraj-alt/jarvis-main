@@ -9,13 +9,7 @@ import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import { isBoardVisibleJob } from '@/lib/jobBoardSearch';
 import { DRIVING_POSITION_LABEL, jobMatchesPositionFilter } from '@/lib/jobBoardPositionPreset';
-import {
-  filterJobBoardRows,
-  type JobBoardRowFilterOptions,
-  type JobBoardRowFilterState,
-} from '@/lib/jobBoardRowFilter';
-
-export type JobBoardUrgencyChip = 'all' | 'urgent';
+import { filterJobBoardRows, type JobBoardRowFilterState } from '@/lib/jobBoardRowFilter';
 
 export type JobBoardFilterOptions = {
   /** ค่าเริ่มต้นตำแหน่งจากลิงก์ เช่น งานขับรถ */
@@ -44,7 +38,6 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
    */
   const [recruiterFilter, setRecruiterFilter] = useState('');
   const [contractTypeFilter, setContractTypeFilter] = useState('');
-  const [chip, setChip] = useState<JobBoardUrgencyChip>('all');
 
   useEffect(() => {
     if (!initialPosition) return;
@@ -129,7 +122,6 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
   const rowFilterState = useMemo<JobBoardRowFilterState>(
     () => ({
       search,
-      chip,
       provinceFilter,
       districtFilter,
       positionFilter,
@@ -140,7 +132,6 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     }),
     [
       search,
-      chip,
       provinceFilter,
       districtFilter,
       positionFilter,
@@ -161,8 +152,7 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
    * 🔴 ต้องเป็นตัวเดียวกับที่กรองใบเปิด — เขียนกรองรอบสองเมื่อไหร่คือรอวันที่สองกล่องไม่ตรงกัน
    */
   const filterRows = useCallback(
-    (rows: readonly JobRequest[], options?: JobBoardRowFilterOptions) =>
-      filterJobBoardRows(rows, rowFilterState, options).filtered,
+    (rows: readonly JobRequest[]) => filterJobBoardRows(rows, rowFilterState).filtered,
     [rowFilterState],
   );
 
@@ -195,8 +185,6 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     setContractTypeFilter,
     recruiterOptions,
     contractTypeOptions,
-    chip,
-    setChip,
     provinceOptions,
     districtOptions,
     positionOptions,

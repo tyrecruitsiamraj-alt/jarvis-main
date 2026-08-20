@@ -25,7 +25,6 @@ function job(partial: Partial<JobRequest> & Pick<JobRequest, 'id'>): JobRequest 
 
 const EMPTY: JobBoardRowFilterState = {
   search: '',
-  chip: 'all',
   provinceFilter: '',
   districtFilter: '',
   positionFilter: '',
@@ -81,35 +80,13 @@ describe('filterJobBoardRows', () => {
     expect(out.usedRelatedFallback).toBe(false);
   });
 
-  it('ชิปด่วนเอาเฉพาะใบที่ ERP บอกว่าด่วน', () => {
-    const rows = [job({ id: 'a', urgency: 'urgent' }), job({ id: 'b', urgency: 'advance' })];
-    expect(filterJobBoardRows(rows, { ...EMPTY, chip: 'urgent' }).filtered.map((j) => j.id)).toEqual([
-      'a',
-    ]);
-  });
-
-  it('🔴 skipUrgencyChip: ชุดใบปิดไม่มีความด่วน — ค้างชิปด่วนไว้ต้องไม่ทำให้ผลเป็น 0', () => {
-    // ใบปิดไม่ได้ผ่าน enrichJobsWithUrgency (มีแต่ feed ใบเปิด) → urgency ไม่ใช่ 'urgent'
-    const closed = [
-      job({ id: 'c1', status: 'closed', urgency: 'advance' }),
-      job({ id: 'c2', status: 'closed', urgency: 'advance' }),
-    ];
-    expect(filterJobBoardRows(closed, { ...EMPTY, chip: 'urgent' }).filtered).toHaveLength(0);
-    expect(
-      filterJobBoardRows(closed, { ...EMPTY, chip: 'urgent' }, { skipUrgencyChip: true }).filtered,
-    ).toHaveLength(2);
-  });
-
+  // ⚠️ ชิป "ด่วน" (+ skipUrgencyChip) ถูกถอดทิ้งทั้งฟีเจอร์ 20 ส.ค. 2569 — เจ้าของสั่ง
   it('🔴 ตัวกรองใช้ได้กับใบที่ปิดแล้วเหมือนใบเปิด (กล่องปิดแล้ว/ยกเลิกกรองในหน้าเดิม)', () => {
     const closed = [
       job({ id: 'c1', status: 'closed', location_address: 'เขตบางนา กรุงเทพมหานคร' }),
       job({ id: 'c2', status: 'closed', location_address: 'อำเภอเมือง จังหวัดชลบุรี' }),
     ];
-    const out = filterJobBoardRows(
-      closed,
-      { ...EMPTY, provinceFilter: 'ชลบุรี' },
-      { skipUrgencyChip: true },
-    ).filtered;
+    const out = filterJobBoardRows(closed, { ...EMPTY, provinceFilter: 'ชลบุรี' }).filtered;
     expect(out.map((j) => j.id)).toEqual(['c2']);
   });
 });
