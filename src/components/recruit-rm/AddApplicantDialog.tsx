@@ -48,7 +48,14 @@ const AddApplicantDialog: React.FC<{
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-}> = ({ open, onClose, onSaved }) => {
+  /**
+   * ใบขอที่จะผูกใบสมัครให้เลย (20 ส.ค. 2569 — เจ้าของสั่ง: *"กรณีโทรมาไม่ได้กรอก
+   * ในกล่องงานสามารถเพิ่มผู้สมัครจากกล่องนั้น ๆ ได้"*) · ไม่ส่ง = สมัครทั่วไปแบบเดิม
+   */
+  job?: { id: string; title?: string | null; unitName?: string | null; positionLabel?: string | null } | null;
+  /** true = คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog (ฝังในป๊อป "ดูรายชื่อ" — ห้ามซ้อน Dialog) */
+  embedded?: boolean;
+}> = ({ open, onClose, onSaved, job = null, embedded = false }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [age, setAge] = useState('');
@@ -78,7 +85,7 @@ const AddApplicantDialog: React.FC<{
     setLineId('');
     setProvince('');
     setDistrict('');
-    setPositionInterest('');
+    setPositionInterest(job?.positionLabel ?? '');
     setSpecificType('');
     setEducation('');
     setResponsible('');
@@ -96,7 +103,8 @@ const AddApplicantDialog: React.FC<{
         ),
       )
       .catch(() => setStaff([]));
-  }, [open]);
+    // เปิดจากคนละใบ = ตำแหน่ง prefill คนละค่า
+  }, [open, job?.positionLabel]);
 
   const districts = province ? (DISTRICTS[province] ?? []) : [];
 
@@ -118,6 +126,10 @@ const AddApplicantDialog: React.FC<{
     setSaving(true);
     try {
       await createApplicationByStaff({
+        // ผูกใบขอเมื่อเปิดจากป๊อปของใบ (ดู prop `job` ข้างบน)
+        job_id: job?.id ?? null,
+        job_title: job?.title ?? null,
+        unit_name: job?.unitName ?? null,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         phone,
@@ -143,16 +155,8 @@ const AddApplicantDialog: React.FC<{
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] p-0">
-        <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
-          <DialogTitle className="text-base font-semibold">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
-          <DialogDescription className="text-xs">
-            สำหรับคนที่โทรเข้ามาสมัคร — ใบนี้จะไปอยู่รวมกับใบสมัครจากลิงก์ และมีชื่อผู้บันทึกติดไว้
-          </DialogDescription>
-        </DialogHeader>
-
+  const body = (
+    <>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -336,6 +340,23 @@ const AddApplicantDialog: React.FC<{
             {saving ? 'กำลังบันทึก…' : 'บันทึก'}
           </button>
         </div>
+    </>
+  );
+
+  /** ฝังในป๊อป "ดูรายชื่อ" = คืนเนื้อฟอร์มเปล่า ๆ (ห้ามซ้อน Dialog ใน Dialog) */
+  if (embedded) return open ? body : null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] p-0">
+        <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
+          <DialogTitle className="text-base font-semibold">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
+          <DialogDescription className="text-xs">
+            สำหรับคนที่โทรเข้ามาสมัคร — ใบนี้จะไปอยู่รวมกับใบสมัครจากลิงก์ และมีชื่อผู้บันทึกติดไว้
+          </DialogDescription>
+        </DialogHeader>
+
+        {body}
       </DialogContent>
     </Dialog>
   );

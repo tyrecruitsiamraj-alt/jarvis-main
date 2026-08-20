@@ -243,6 +243,10 @@ export async function fetchAllJobApplications(
  * ⚠️ ลงตารางเดียวกับใบสมัครจากลิงก์ — ดูเหตุผลที่ api/_handlers/job-applications.ts
  */
 export async function createApplicationByStaff(input: {
+  /** ผูกใบขอ (เปิดฟอร์มจากป๊อป "ดูรายชื่อ" ของใบ) · null = สมัครทั่วไป */
+  job_id?: string | null;
+  job_title?: string | null;
+  unit_name?: string | null;
   first_name: string;
   last_name: string;
   phone: string;

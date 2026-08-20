@@ -435,10 +435,13 @@ async function queryWithLegacyFallback(
  * ไม่งั้นหน้า RM/บอร์ดต้องนับสองที่แล้วยอดไม่ตรงกัน · `created_by_name` เป็นตัวบอกว่า
  * ใบนี้เจ้าหน้าที่คีย์ (มีค่า) หรือผู้สมัครกรอกเอง (null)
  *
- * ⚠️ ไม่ผูก `job_id` — ใบที่คีย์เองยังไม่รู้ว่าจะเข้างานไหน (ต่างจากใบที่มาทางลิงก์
- * ของประกาศ) จึงเป็น "สมัครทั่วไป" จนกว่าเจ้าหน้าที่จะจับคู่งานให้
- * ผลข้างเคียงที่ต้องรู้: ใบที่ job_id เป็น null คนที่ถูกล็อก BU จะไม่เห็น (กติกาเดิมของ GET)
- * → ให้เฉพาะ admin/ผู้ที่เห็นทุก BU คีย์ได้ ไม่ใช่คีย์แล้วหายไปเลย
+ * `job_id` (เพิ่ม 20 ส.ค. 2569 — เจ้าของสั่ง: *"กรณีโทรมาไม่ได้กรอก ในกล่องงานสามารถ
+ * เพิ่มผู้สมัครจากกล่องนั้น ๆ ได้"*):
+ * - **ส่งมา** = ใบสมัครผูกใบขอนั้นทันที โผล่ในป๊อป "ดูรายชื่อ" ของใบ · คนที่ถูกล็อก BU
+ *   คีย์ได้ถ้าใบขอนั้นอยู่ใน scope ตัวเอง (เช็คกับ scopedJobIds)
+ * - **ไม่ส่ง** = พฤติกรรมเดิม: "สมัครทั่วไป" ไม่ผูกงาน · เฉพาะคนเห็นทุก BU เท่านั้นที่คีย์ได้
+ *   (ใบ job_id null คนถูกล็อก BU มองไม่เห็น — คีย์แล้วจะหายไปเลย)
+ * ⚠️ **ไม่ enqueue AI โทร** — เคสนี้คือคนโทรเข้ามาเองแล้ว จะส่ง AI ใช้ปุ่มในกล่องเหมือนเดิม
  */
 async function createByStaff(req: AuthedReq, res: ApiRes) {
   const raw = await readJsonBody(req);
@@ -463,8 +466,13 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   const age = Number.isFinite(ageNum) && ageNum >= 15 && ageNum <= 80 ? Math.trunc(ageNum) : null;
   if (age === null) return sendError(res, 400, 'Bad request', 'อายุต้องอยู่ระหว่าง 15–80 ปี');
 
+  const text = (v: unknown, max = 200): string | null => {
+    const t = (getString(v) || '').trim();
+    return t ? t.slice(0, max) : null;
+  };
+  const jobId = text(b.job_id, 120);
   const scopedJobIds = await loadScopedJobIdSet(req.user);
-  if (scopedJobIds) {
+  if (scopedJobIds && !jobId) {
     return sendError(
       res,
       403,
@@ -472,11 +480,10 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
       'ใบที่คีย์เองยังไม่ผูกใบขอ ผู้ใช้ที่ถูกล็อก BU จะมองไม่เห็นใบของตัวเอง — ให้แอดมินคีย์แทน',
     );
   }
+  if (scopedJobIds && jobId && !scopedJobIds.has(jobId)) {
+    return sendError(res, 403, 'Forbidden', 'ใบขอนี้อยู่นอกแผนกของคุณ');
+  }
 
-  const text = (v: unknown, max = 200): string | null => {
-    const t = (getString(v) || '').trim();
-    return t ? t.slice(0, max) : null;
-  };
   const specificType = isRmSpecificType(getString(b.specific_type)) ? getString(b.specific_type) : null;
   const licenses = cleanRmLicenseTypes(b.license_types);
   const staffName = req.user.email || null;
@@ -484,12 +491,17 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
   let rows: Row[];
   try {
     ({ rows } = await dbQuery<Row>(
-      `insert into ${tbl}
+      // 🔴 ต้องมี alias `a` — LIST_COLUMNS มีคอลัมน์ derived (origin) ที่อ้าง a.*
+      // เดิมไม่มี alias → POST ตาย 500 'missing FROM-clause entry for table a'
+      // ตั้งแต่เพิ่มคอลัมน์ origin 16 ส.ค. (บั๊กตระกูลเดียวกับที่เคยหลุดใน PATCH)
+      `insert into ${tbl} as a
        (full_name, first_name, last_name, phone, age, gender,
         province, district, education, position_interest,
         line_id, specific_type, responsible_name, channel_id, channel_label,
-        license_types, created_by_name, status)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'new')
+        license_types, created_by_name, status,
+        job_id, job_title, unit_name)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'new',
+        $18,$19,$20)
      returning ${LIST_COLUMNS}`,
       [
       `${firstName} ${lastName}`.trim(),
@@ -509,6 +521,9 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
       text(b.channel_label),
         licenses.length > 0 ? licenses : null,
         staffName,
+        jobId,
+        text(b.job_title),
+        text(b.unit_name),
       ],
     ));
   } catch (e) {

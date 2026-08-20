@@ -29,7 +29,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Download, Loader2, MapPin, Phone, Users } from 'lucide-react';
+import { Download, Loader2, MapPin, Phone, UserPlus, Users } from 'lucide-react';
+import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
+import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 
 export type JobApplicantsDialogProps = {
   open: boolean;
@@ -43,6 +45,12 @@ type ApplicantTab = 'all' | 'interested';
 const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, onClose }) => {
   const [items, setItems] = useState<PublicApplication[]>([]);
   const [tab, setTab] = useState<ApplicantTab>('all');
+  /**
+   * มุมมอง "เพิ่มผู้สมัคร" ในป๊อปเดียวกัน (เจ้าของสั่ง 20 ส.ค. 2569: *"กรณีโทรมา
+   * ไม่ได้กรอก ในกล่องงานสามารถเพิ่มผู้สมัครจากกล่องนั้น ๆ ได้"*)
+   * ใช้ฟอร์ม AddApplicantDialog ตัวเดิมโหมด embedded — ห้ามซ้อน Dialog ใน Dialog
+   */
+  const [adding, setAdding] = useState(false);
   /**
    * กรองตาม "ที่มา" (เจ้าของสั่ง 16 ส.ค.: *"แยกให้หน่อยว่าอันไหนมาจากการสมัครใหม่
    * อันไหนมาจาก AI หาให้"*) — กรองที่ลิสต์ต้นทางก้อนเดียว ทั้งสองแท็บจึงตรงกันเสมอ
@@ -140,6 +148,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     if (!open || !job) return;
     let cancelled = false;
     setTab('all'); // เปิดใบใหม่เริ่มที่ "ทั้งหมด" เสมอ ไม่ค้างแท็บของใบก่อน
+    setAdding(false);
     setLoading(true);
     setError(null);
     fetchJobApplications(job.id)
@@ -330,6 +339,18 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
               {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🤖'} ส่งให้ AI โทร
               {sendableApprox > 0 ? ` (~${sendableApprox})` : ''}
             </button>
+            {/* คนโทรเข้ามาเอง ไม่ได้กรอกลิงก์ — คีย์เข้าใบนี้ได้เลย (20 ส.ค. 2569) */}
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold',
+                TONE.success.outline,
+              )}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              เพิ่มผู้สมัคร
+            </button>
             {sendNotice ? <span className="text-[11px] text-muted-foreground">{sendNotice}</span> : null}
           </div>
 
@@ -365,6 +386,24 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
           </div>
         </DialogHeader>
 
+        {/* มุมมองเพิ่มผู้สมัคร — ฟอร์มเดิมโหมด embedded ผูก job นี้ให้เลย */}
+        {adding && job ? (
+          <AddApplicantDialog
+            embedded
+            open={adding}
+            job={{
+              id: job.id,
+              title: publicJobPositionLabel(job),
+              unitName: job.unit_name,
+              positionLabel: publicJobPositionLabel(job),
+            }}
+            onClose={() => setAdding(false)}
+            onSaved={() => {
+              setAdding(false);
+              reload(job.id);
+            }}
+          />
+        ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
@@ -401,6 +440,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             </>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
