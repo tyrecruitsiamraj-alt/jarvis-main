@@ -1,6 +1,11 @@
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
 import type { AgeDaysFilter, JobListSort, NoteFilter, ReplacementFilter, UrgencyFilter } from '@/lib/jobUrgency';
 import {
+  parseTableSort,
+  serializeTableSort,
+  type JobListTableSort,
+} from '@/lib/jobListTableSort';
+import {
   isUnitRequestWorkStatus,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
@@ -28,6 +33,12 @@ export type JobListPageState = {
   replacementFilter: JobListReplacementFilter;
   ageDaysFilter: JobListAgeDaysFilter;
   sort: JobListSort;
+  /**
+   * เรียงจาก**การกดหัวคอลัมน์** — null = ใช้ `sort` (dropdown) ตามเดิม
+   * 🔴 มีค่าแล้ว **ทับ dropdown** เพื่อให้มีตัวเรียงที่ทำงานจริงทีละหนึ่งตัว
+   * (สองตัวเรียงพร้อมกัน = คนอ่านไม่รู้ว่าอันไหนมีผล)
+   */
+  tableSort: JobListTableSort | null;
   page: number;
   pageSize: PageSizeOption;
 };
@@ -47,6 +58,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   replacementFilter: [],
   ageDaysFilter: [],
   sort: 'assignee_age',
+  tableSort: null,
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 };
@@ -132,6 +144,8 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
       normalize: normalizeAgeToken,
     }) as JobListAgeDaysFilter,
     sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,
+    // `tsort=<column>:<dir>` — ค่าที่ parse ไม่ผ่านคืน null (กลับไปใช้ dropdown) ไม่ throw
+    tableSort: parseTableSort(params.get('tsort')),
     page,
     pageSize: parsePageSize(params.get('ps')),
   };
@@ -157,6 +171,8 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   setMulti('sr', state.replacementFilter);
   setMulti('ag', state.ageDaysFilter);
   if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
+  const tsort = serializeTableSort(state.tableSort);
+  if (tsort) params.set('tsort', tsort);
   if (state.page > 1) params.set('p', String(state.page));
   if (state.pageSize !== JOB_LIST_DEFAULTS.pageSize) params.set('ps', String(state.pageSize));
   return params;

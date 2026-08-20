@@ -24,7 +24,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_OPTIONS,
 } from '@/lib/unitRequestWorkStatus';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
-import { DASH } from '@/lib/designTokens';
+import { DASH, TONE } from '@/lib/designTokens';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import {
   AGE_DAYS_MULTI_OPTIONS,
@@ -40,6 +40,12 @@ import {
   REPLACEMENT_FILTER_OPTIONS,
   URGENCY_FILTER_OPTIONS,
 } from '@/lib/jobUrgency';
+import {
+  compareJobsByTableColumn,
+  JOB_LIST_TABLE_COLUMN_LABEL,
+  toggleTableSort,
+  type JobListTableColumn,
+} from '@/lib/jobListTableSort';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, countJobsByStaffName, countUnassignedRecruiters, countUnassignedScreeners, countUnassignedOpls, matchesAnyRecruiterFilter, matchesAnyScreenerFilter, matchesAnyOplFilter, STAFF_ASSIGNEE_UNASSIGNED, STAFF_ASSIGNEE_UNASSIGNED_LABEL } from '@/lib/jobStaffNames';
 import {
@@ -131,6 +137,7 @@ const JobListPage: React.FC = () => {
     replacementFilter,
     ageDaysFilter,
     sort,
+    tableSort,
     page,
     pageSize,
   } = listState;
@@ -345,8 +352,13 @@ const JobListPage: React.FC = () => {
           .toLowerCase()
           .includes(q);
       })
-      .sort((a, b) => compareJobsForListSort(a, b, sort));
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, unitScopeNames, lookupJob]);
+      // กดหัวคอลัมน์แล้วใช้อันนั้น (ทับ dropdown) — ไม่มีค่าก็ใช้ dropdown ตามเดิม
+      .sort((a, b) =>
+        tableSort
+          ? compareJobsByTableColumn(a, b, tableSort)
+          : compareJobsForListSort(a, b, sort),
+      );
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -584,11 +596,13 @@ const JobListPage: React.FC = () => {
             options={AGE_DAYS_MULTI_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           />
 
+          {/* dropdown กับการกดหัวคอลัมน์เป็นตัวเรียง**คนละตัว** — เลือก dropdown = ล้าง
+              การเรียงจากคอลัมน์ทิ้ง เพื่อให้มีตัวที่มีผลจริงทีละหนึ่งตัวเท่านั้น */}
           <FilterSelect
             id="job-list-sort"
             label="เรียงลำดับ"
             value={sort}
-            onChange={(v) => updateListState({ sort: v as typeof sort })}
+            onChange={(v) => updateListState({ sort: v as typeof sort, tableSort: null })}
           >
             {JOB_LIST_SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -596,6 +610,22 @@ const JobListPage: React.FC = () => {
               </option>
             ))}
           </FilterSelect>
+
+          {/* บอกให้เห็นว่าตอนนี้ dropdown ไม่มีผล เพราะกำลังเรียงจากหัวคอลัมน์ */}
+          {tableSort ? (
+            <button
+              type="button"
+              onClick={() => updateListState({ tableSort: null, page: 1 })}
+              title="กลับไปเรียงตาม dropdown"
+              className={cn(
+                'inline-flex items-center gap-1 self-end rounded-lg border px-2.5 py-1.5 text-xs font-semibold',
+                TONE.info.outline,
+              )}
+            >
+              เรียงจากคอลัมน์ {JOB_LIST_TABLE_COLUMN_LABEL[tableSort.column]}{' '}
+              {tableSort.dir === 'asc' ? '▲' : '▼'} · ล้าง
+            </button>
+          ) : null}
           </div>
         </div>
 
@@ -785,21 +815,64 @@ const JobListPage: React.FC = () => {
           <div className={cn(DASH.card, 'overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
             <table className="w-full text-sm min-w-[1000px]">
               <thead>
+                {/* 🔴 หัวคอลัมน์กดเรียงได้**ทุกอัน** (เจ้าของสั่ง 20 ส.ค. 2569) —
+                    กดซ้ำ = สลับขึ้น/ลง · ตรรกะอยู่ที่ lib/jobListTableSort (มีเทสต์) */}
                 <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                  <th className="px-3 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้ลาออก</th>
-                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                  <th className="px-3 py-3 text-center font-medium whitespace-nowrap">ส่งคนแทน</th>
-                  <th className="px-3 py-3 text-center font-medium whitespace-nowrap">สถานะทำงาน</th>
-                  <th className="px-3 py-3 text-left font-medium min-w-[180px]">หมายเหตุ</th>
+                  {(
+                    [
+                      ['request_no', 'เลขที่ใบขอ', 'left'],
+                      ['age', 'ผ่านมา', 'left'],
+                      ['unit', 'หน่วยงาน', 'left'],
+                      ['submitted', 'วันที่กรอก', 'left'],
+                      ['required', 'วันที่ต้องการ', 'left'],
+                      ['remaining', 'คงเหลือ', 'center'],
+                      ['request_type', 'ประเภทใบขอ', 'left'],
+                      ['position', 'ตำแหน่ง', 'left'],
+                      ['subtype', 'ลักษณะงานย่อย', 'left'],
+                      ['resigned', 'ผู้ลาออก', 'left'],
+                      ['assignee', 'ผู้รับผิดชอบ', 'left'],
+                      ['send_replacement', 'ส่งคนแทน', 'center'],
+                      ['work_status', 'สถานะทำงาน', 'center'],
+                      ['note', 'หมายเหตุ', 'left'],
+                    ] as Array<[JobListTableColumn, string, 'left' | 'center']>
+                  ).map(([col, label, align]) => {
+                    const active = tableSort?.column === col;
+                    return (
+                      <th
+                        key={col}
+                        aria-sort={active ? (tableSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        className={cn(
+                          'px-3 py-3 font-medium whitespace-nowrap',
+                          align === 'center' ? 'text-center' : 'text-left',
+                          col === 'note' && 'min-w-[180px]',
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateListState({ tableSort: toggleTableSort(tableSort, col), page: 1 })
+                          }
+                          title={`เรียงตาม ${label}`}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground',
+                            align === 'center' && 'justify-center',
+                            active ? 'font-bold text-foreground' : '',
+                          )}
+                        >
+                          {label}
+                          {active ? (
+                            <span aria-hidden className="text-[10px] leading-none">
+                              {tableSort.dir === 'asc' ? '▲' : '▼'}
+                            </span>
+                          ) : (
+                            <span aria-hidden className="text-[10px] leading-none opacity-25">
+                              ▲▼
+                            </span>
+                          )}
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
 
