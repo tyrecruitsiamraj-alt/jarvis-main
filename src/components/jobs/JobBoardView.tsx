@@ -828,7 +828,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         )}
 
         {!loading && boxedJobs.length === 0 && (
-          <div className="mt-10 jarvis-frost rounded-[1.5rem] border border-dashed border-white/70 p-10 text-center">
+          <div className="mt-10 jarvis-frost rounded-2xl border border-dashed border-white/70 p-10 text-center">
             {closedBox && closedLoading ? (
               <>
                 <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-muted-foreground/50" />
@@ -850,8 +850,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
+        {/* สีหัวข้อส่วนมาจาก TONE.warn (ทองด้าน) — เดิมเป็น hex ดิบ #b08d4f ขัดกติกา */}
         {isStaff ? (
-          <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+          <p className={cn('mt-6 text-[11px] font-bold uppercase tracking-[0.14em]', TONE.warn.value)}>
             {closedBox ? JOB_BOX_LABEL[closedBox] : 'ประกาศจากใบขอ'}
           </p>
         ) : null}
@@ -875,7 +876,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 // flex-col + h-full: grid ยืดกล่องสูงเท่ากันอยู่แล้ว แต่ลูกเรียงชิดบน
                 // พื้นที่เหลือจึงกองใต้ footer → แถบ "ผู้สมัคร N คน" ของแต่ละใบลอยคนละระดับ
                 // (⚠️ ใส่ที่จุดเรียกใช้เท่านั้น ห้ามแก้ ui/card.tsx ซึ่งทั้งแอปใช้ร่วมกัน)
-                'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-2xl border-white/70 transition-all duration-300 hover:border-blue-300/40',
                 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
               )}
             >
@@ -1152,7 +1153,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         */}
         {isStaff && postings.some((p) => p.standaloneKind) ? (
           <div className="mt-6">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+            <p className={cn('mb-2 text-[11px] font-bold uppercase tracking-[0.14em]', TONE.warn.value)}>
               กล่องลอย (ไม่ผูกใบขอ)
             </p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1184,7 +1185,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       // — "กล่องลอยทำให้เหมือนกับประกาศจากใบขอ") · flex-col + h-full
                       // คือตัวที่ทำให้กล่องสูงเท่ากันทั้งแถวและ footer ปักอยู่ล่างสุด
                       // เดิมกล่องลอยไม่มีสองคลาสนี้ แถวจึงสูงไม่เท่ากันและแถบล่างลอยคนละระดับ
-                      'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-[1.5rem] border-white/70 transition-all duration-300 hover:border-blue-300/40',
+                      'group jarvis-interactive-card flex h-full flex-col overflow-hidden rounded-2xl border-white/70 transition-all duration-300 hover:border-blue-300/40',
                       'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                       s.postings === 0 && 'opacity-60',
                     )}

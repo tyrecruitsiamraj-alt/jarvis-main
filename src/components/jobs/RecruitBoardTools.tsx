@@ -8,12 +8,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
 import { heroButton, heroButtonSolid } from '@/components/shared/PageHeroStrip';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
-import { RM_TOOLBAR_KEYS, RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
+import { RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
 
 const BU_OPTIONS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 
@@ -31,7 +37,7 @@ const StandalonePickerDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100%-1.5rem)] max-w-[26rem] rounded-[1.5rem] p-0">
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-[26rem] rounded-2xl p-0">
         <DialogHeader className="border-b border-border/50 px-5 py-4 text-left">
           <DialogTitle className="text-base font-semibold">ประกาศลอย (ไม่ผูกใบขอ)</DialogTitle>
           <DialogDescription className="text-xs">
@@ -142,24 +148,37 @@ const RecruitBoardTools: React.FC<{ variant?: 'light' | 'onDark' }> = ({ variant
       : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary';
   };
 
+  /** งานระดับตั้งค่า (ใช้ไม่บ่อย) — ยุบเข้าเมนูเดียว (เจ้าของสั่ง 20 ส.ค. 2569:
+   *  จัดระเบียบหน้าบอร์ด ไม่เพิ่มของใหม่) · "สร้างลิงก์" เป็นงานประจำ คงเป็นปุ่มเด่น */
+  const MENU_KEYS: RmToolbarKey[] = ['channels', 'reasons'];
+
   return (
     <>
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap gap-2">
-          {RM_TOOLBAR_KEYS.map((key) => {
-            const Icon = ICONS[key];
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onClickKey(key)}
-                title={key === 'link' ? 'สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ' : undefined}
-                className={btnCls(key)}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden /> {LABEL[key]}
-              </button>
-            );
-          })}
+          <button
+            type="button"
+            onClick={() => onClickKey('link')}
+            title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
+            className={btnCls('link')}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden /> {LABEL.link}
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className={btnCls('channels')}>
+              <Settings2 className="h-3.5 w-3.5" aria-hidden /> ตั้งค่าบอร์ด
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {MENU_KEYS.map((key) => {
+                const Icon = ICONS[key];
+                return (
+                  <DropdownMenuItem key={key} onClick={() => onClickKey(key)}>
+                    <Icon className="h-3.5 w-3.5" aria-hidden /> {RM_TOOLBAR_LABEL[key]}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         {notice ? (
           <p

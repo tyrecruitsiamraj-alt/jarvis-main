@@ -222,7 +222,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
   return (
     <>
       <div className="mt-6">
-        <div className="jarvis-frost rounded-2xl border border-white/70 p-4 shadow-sm md:rounded-[1.25rem] md:p-5">
+        <div className="jarvis-frost rounded-2xl border border-white/70 p-4 shadow-sm md:p-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               {hideSearch ? null : (
