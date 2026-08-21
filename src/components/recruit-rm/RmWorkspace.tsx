@@ -35,6 +35,7 @@ import {
 } from '@/lib/publicApplicationsApi';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
 import { buildAppointmentBoard } from '@/lib/appointmentBoard';
+import { fetchRecruitRmOverview, type RecruitRmOverview } from '@/lib/recruitRmOverviewApi';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import {
@@ -220,6 +221,29 @@ const RmWorkspace: React.FC<{
 
   /** บอร์ดสรุปนัดต่อวัน (ข้อ 12 · 20 ส.ค. 2569) — คิดจากชุดเดียวกับตาราง เลขจึงตรงกันเสมอ */
   const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
+
+  /**
+   * ก้อน "นัด → มาไหม" ที่ย้ายมาจากศูนย์คุมงานสรรหา (เจ้าของสั่ง 20 ส.ค. 2569 —
+   * เคาะ Choice: "แค่ย้ายก้อนนั้นไป อันอื่น ๆ เก็บไว้") · ยอด**ทั้งระบบ**จาก API เดิม
+   * ตัวเดียวกับศูนย์คุม (`/api/recruit-rm-overview`) — บอร์ดข้างล่างนับจากรายการ
+   * ในหน้านี้ (ผ่านตัวกรอง) สองชุดจึงใกล้กันแต่ไม่จำเป็นต้องเท่ากัน มีป้ายบอกแหล่งกำกับ
+   * · โหลดล้ม = ไม่แสดงแถว (ข้อมูลเสริม ห้ามทำหน้าหลักพัง)
+   */
+  const [rmOverview, setRmOverview] = useState<RecruitRmOverview | null>(null);
+  useEffect(() => {
+    if (tab !== 'appointments') return;
+    let cancelled = false;
+    fetchRecruitRmOverview()
+      .then((d) => {
+        if (!cancelled) setRmOverview(d);
+      })
+      .catch(() => {
+        if (!cancelled) setRmOverview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
@@ -526,6 +550,48 @@ const RmWorkspace: React.FC<{
                   🖨 โหลดเป็น PDF
                 </button>
               </div>
+
+              {/* ก้อน "นัด → มาไหม" ที่ย้ายมาจากศูนย์คุมงานสรรหา (20 ส.ค. 2569) —
+                  ยอดทั้งระบบจากฐานของเรา · ต่างจากบอร์ดข้างล่างที่นับจากรายการในหน้า */}
+              {rmOverview ? (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold text-muted-foreground">
+                    นัด → มาไหม (ยอดทั้งระบบ · ย้ายมาจากศูนย์คุมงานสรรหา)
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {(
+                      [
+                        ['สำเร็จ · นัดได้', rmOverview.appointment.scheduled, 'success', null],
+                        ['สำเร็จ · ยังนัดไม่ได้', rmOverview.appointment.successNoAppointment, 'warn', null],
+                        [
+                          'นัดแล้ว · มา',
+                          rmOverview.attendance ? rmOverview.attendance.showed : null,
+                          'success',
+                          rmOverview.attendance
+                            ? rmOverview.attendance.overdueNoResult > 0
+                              ? `เลยนัดยังไม่บันทึกผล ${rmOverview.attendance.overdueNoResult}`
+                              : `นัดข้างหน้า ${rmOverview.attendance.upcoming}`
+                            : null,
+                        ],
+                        [
+                          'นัดแล้ว · ไม่มา',
+                          rmOverview.attendance ? rmOverview.attendance.noShow : null,
+                          'danger',
+                          null,
+                        ],
+                      ] as const
+                    ).map(([label, n, toneKey, sub]) => (
+                      <div key={label} className={cn('rounded-xl border px-3 py-2', TONE[toneKey].soft)}>
+                        <p className="text-[10px] font-medium text-muted-foreground">{label}</p>
+                        <p className={cn('text-xl font-bold tabular-nums', TONE[toneKey].num)}>
+                          {n == null ? '—' : n.toLocaleString('th-TH')}
+                        </p>
+                        {sub ? <p className="text-[10px] text-muted-foreground">{sub}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {/* บอร์ดสรุปนัด (เจ้าของสั่ง 20 ส.ค. 2569 ข้อ 12: *"มีบอร์ดแสดงว่านัดทั้งหมด
                   เท่าไหร่ มาเท่าไหร่ ไม่มาเท่าไหร่"* + รายวัน) — ตรรกะที่ appointmentBoard.ts
