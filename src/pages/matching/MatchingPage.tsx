@@ -48,6 +48,7 @@ import {
   proposalStatusChip,
   ProposalConflictError,
   PROPOSAL_STATUS_TONE,
+  isSolidProposalAction,
   type ProposalStatus,
   type ProposalConflictInfo,
   type CandidateProposal,
@@ -373,9 +374,18 @@ const CANDIDATE_ACTION_BUTTON_CLASS =
  * ไม่ประกาศสีสถานะซ้ำในหน้านี้: ติดต่อ=น้ำเงิน · จอง=ม่วง · ลงงาน=เขียว · ไม่ผ่าน=แดง
  * "ลงงานแล้ว" เป็นการปิดงานจริงจึงใช้ solid (บล็อกสีอิ่ม) ตัวเดียวในกลุ่ม ที่เหลือเป็นปุ่มพื้นจาง
  */
-function proposalActionButtonClass(status: ProposalStatus): string {
+/**
+ * 🔴 solid = **สถานะปัจจุบันจริงเท่านั้น** — เดิมปุ่ม "ลงงานแล้ว" ถูกทำเขียว solid
+ * ตลอดเวลา (เจาะจง status === 'placed') คนที่ยังไม่ถูกกดอะไรเลยเปิดป๊อปมาก็เห็น
+ * ปุ่มเขียวเด่นเหมือนระบบบอกว่าลงงานแล้ว ทั้งที่ยังอยู่ถัง To do
+ * (เจ้าของทัก 21 ส.ค. 2569: *"คนนี้อยู่ใน Todo ทำ[ไม]บอกลงงานแล้ว"* — การ์ด #1808
+ * ตรวจฐานแล้วไม่มี proposal สักแถว สถานะไม่ได้เพี้ยน เพี้ยนที่สีปุ่ม)
+ */
+function proposalActionButtonClass(status: ProposalStatus, currentStatus?: ProposalStatus | null): string {
   const tone = TONE[PROPOSAL_STATUS_TONE[status]];
-  if (status === 'placed') return cn(CANDIDATE_ACTION_BUTTON_CLASS, 'border-transparent', tone.solid);
+  if (isSolidProposalAction(status, currentStatus)) {
+    return cn(CANDIDATE_ACTION_BUTTON_CLASS, 'border-transparent', tone.solid);
+  }
   return cn(CANDIDATE_ACTION_BUTTON_CLASS, tone.soft, tone.softHover, tone.value);
 }
 
@@ -4182,7 +4192,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'contacted')}
-                          className={proposalActionButtonClass('contacted')}
+                          className={proposalActionButtonClass('contacted', current?.status)}
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
@@ -4191,7 +4201,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'reserved')}
-                          className={proposalActionButtonClass('reserved')}
+                          className={proposalActionButtonClass('reserved', current?.status)}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
@@ -4200,7 +4210,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'placed')}
-                          className={proposalActionButtonClass('placed')}
+                          className={proposalActionButtonClass('placed', current?.status)}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
@@ -4209,7 +4219,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'rejected')}
-                          className={proposalActionButtonClass('rejected')}
+                          className={proposalActionButtonClass('rejected', current?.status)}
                         >
                           <UserX className="h-3.5 w-3.5" />
                           {current?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}

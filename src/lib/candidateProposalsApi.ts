@@ -85,6 +85,20 @@ export const PROPOSAL_STATUS_TONE: Record<ProposalStatus, ToneKey> = {
   cancelled: 'neutral',
 };
 
+/**
+ * ปุ่มลงมือของป๊อปผู้สมัคร (ติดต่อแล้ว · จองตัว · ลงงานแล้ว · ไม่ผ่าน) ควรเป็นแบบ **ทึบ** ไหม
+ *
+ * 🔴 **ทึบได้เฉพาะสถานะปัจจุบันจริงของคนนั้น** — เจ้าของทัก 21 ส.ค. 2569:
+ * *"คนนี้อยู่ใน Todo ทำ[ไม]บอกลงงานแล้ว"* (การ์ด #1808) · ตรวจฐานแล้ว **ไม่มี proposal
+ * สักแถว** สถานะไม่ได้เพี้ยน — เพี้ยนที่ปุ่ม "ลงงานแล้ว" ถูกทำเขียวทึบไว้ตลอดเวลา
+ * คนเปิดป๊อปมาจึงอ่านว่าระบบบอกว่าลงงานแล้ว
+ *
+ * `isCurrent` = สถานะที่บันทึกไว้จริงตรงกับปุ่มนี้ · ไม่มี proposal = ไม่มีปุ่มไหนทึบ
+ */
+export function isSolidProposalAction(status: ProposalStatus, currentStatus?: ProposalStatus | null): boolean {
+  return !!currentStatus && currentStatus === status;
+}
+
 /** ชิปสถานะพร้อมใช้ (class กลางใน index.css — มีคู่ dark ครบ) */
 export function proposalStatusChip(status: ProposalStatus): string {
   return TONE[PROPOSAL_STATUS_TONE[status]].chip;
