@@ -259,6 +259,7 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
           job_family_label: stored?.result.job_family_label ?? spec?.job_family_label ?? null,
         },
         selected.map((s) => ({ ...s, tier: tierByCard.get(s.card_id) ?? null })),
+        { autoPush: true },
       ),
     );
   }
@@ -290,6 +291,7 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
           position_name: c.position_name,
         })),
         priority,
+        { autoPush: true },
       ),
     );
   }
