@@ -57,3 +57,19 @@ export function extraBenefitLabels(keys: readonly string[] | null | undefined): 
   }
   return out;
 }
+
+/**
+ * แปลงค่าที่เก็บไว้ → คำที่คนอ่าน โดยรับ**ทั้งสองยุค**:
+ * ค่าเก่าเป็นคีย์ (เช่น `uniform`) → คืน label · ค่าใหม่เป็นข้อความอิสระ → คืนตรง ๆ
+ * (20 ส.ค. 2569 เจ้าของเคาะเปลี่ยนสวัสดิการเป็น freetext — ใบที่ติ๊กไว้เดิมห้ามหาย)
+ */
+export function benefitDisplayLabels(values: readonly string[] | null | undefined): string[] {
+  if (!values || values.length === 0) return [];
+  const out: string[] = [];
+  for (const v of values) {
+    if (typeof v !== 'string' || !v.trim()) continue;
+    const hit = BY_KEY.get(v);
+    out.push(hit ? hit.label : v.trim());
+  }
+  return out;
+}

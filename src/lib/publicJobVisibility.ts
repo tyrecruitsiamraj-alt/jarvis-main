@@ -18,10 +18,17 @@ import { isUnitRequestWorkStatus, type UnitRequestWorkStatus } from '@/lib/unitR
  * ไฟล์นี้ pure — ใช้ร่วมทั้งฝั่ง API และหน้าเว็บ · เทสต์ที่ `tests/api/publicJobVisibility.test.ts`
  */
 
-/** สถานะที่แปลว่าได้ตัวคนแล้ว — ไม่ต้องประกาศหาคนต่อ */
+/**
+ * สถานะที่แปลว่าได้ตัวคนแล้ว — ไม่ต้องประกาศหาคนต่อ
+ * เพิ่ม `daily_work` + `daily_pay` 20 ส.ค. 2569 — เจ้าของยืนยัน: *"หน้าสาธารณะจะไม่เห็น
+ * งานพวกรอแจ้งเข้า ปิดแล้ว หรือเริ่มงาน"* + ถามซ้ำแล้วเคาะ "ซ่อนด้วย"
+ * (เดิมสองสถานะนี้ยังโชว์อยู่ ทั้งที่งานเริ่มไปแล้ว — คนสมัครเข้ามาก็ไม่มีที่ลง)
+ */
 export const HIDDEN_FROM_PUBLIC_WORK_STATUSES: readonly UnitRequestWorkStatus[] = [
   'waiting_start',
   'waiting_inform',
+  'daily_work',
+  'daily_pay',
 ];
 
 export function isHiddenFromPublicByWorkStatus(status: unknown): boolean {

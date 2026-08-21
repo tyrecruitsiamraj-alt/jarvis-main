@@ -7,7 +7,7 @@ import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
-import { extraBenefitLabels } from '@/lib/extraBenefits';
+import { benefitDisplayLabels } from '@/lib/extraBenefits';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { resolveApplyPositionPreset } from '@/lib/jobBoardPositionPreset';
 import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
@@ -54,6 +54,7 @@ import {
 import { CLOSED_RANGE_OPTIONS } from '@/hooks/useClosedRequestsFeed';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { TONE, type ToneKey } from '@/lib/designTokens';
+import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import { compareJobsByAgeDaysDesc } from '@/lib/jobUrgency';
 import {
@@ -978,9 +979,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
                   <span className="inline-flex items-center gap-1 text-foreground font-semibold">
                     <Banknote className="h-3.5 w-3.5 text-success" />
-                    {job.monthly_income
-                      ? `฿${job.monthly_income.toLocaleString('th-TH')} / เดือน`
-                      : `฿${job.total_income.toLocaleString('th-TH')}`}
+                    {/* breakdown ที่เจ้าหน้าที่ตั้งเองมาก่อนเสมอ — บอกหน่วยตามที่ตั้ง (วัน/เดือน) */}
+                    {job.income_display
+                      ? `฿${job.income_display.total.toLocaleString('th-TH')} ${INCOME_PERIOD_LABEL[job.income_display.period]}`
+                      : job.monthly_income
+                        ? `฿${job.monthly_income.toLocaleString('th-TH')} / เดือน`
+                        : `฿${job.total_income.toLocaleString('th-TH')}`}
                   </span>
                   <span className="inline-flex items-center gap-1 text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
@@ -1001,9 +1005,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     ⚠️ ไม่มีข้อมูล = ไม่ขึ้นแถวนี้ (ห้ามขึ้นว่า "ไม่มีสวัสดิการ") */}
                 {/* ชิปสวัสดิการ = ของจาก ERP (อัตราจริง) + ของที่เจ้าหน้าที่ติ๊กเพิ่มเอง
                     เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
-                {[...(job.benefits ?? []), ...extraBenefitLabels(job.extra_benefits)].length > 0 ? (
+                {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1">
-                    {[...(job.benefits ?? []), ...extraBenefitLabels(job.extra_benefits)].map((b) => (
+                    {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].map((b) => (
                       <span key={b} className={TONE.success.chip}>
                         {b}
                       </span>
@@ -1462,15 +1466,48 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                    * (ต่างจาก JobDetailPage/AddJobPage ที่เป็นใบขอฝั่งเราซึ่งคนกรอกยอดรวมเอง)
                    */}
                   <dt className="text-muted-foreground">
-                    {selected.monthly_income ? 'รายได้ต่อเดือน' : 'ค่าแรง (อัตราจาก ERP)'}
+                    {selected.income_display
+                      ? `รายได้รวม${INCOME_PERIOD_LABEL[selected.income_display.period]}`
+                      : selected.monthly_income
+                        ? 'รายได้ต่อเดือน'
+                        : 'ค่าแรง (อัตราจาก ERP)'}
                   </dt>
                   <dd className="text-success font-semibold">
-                    ฿{(selected.monthly_income ?? selected.total_income).toLocaleString('th-TH')}
+                    ฿
+                    {(
+                      selected.income_display?.total ??
+                      selected.monthly_income ??
+                      selected.total_income
+                    ).toLocaleString('th-TH')}
                   </dd>
                 </div>
+                {/* รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — มาก่อน breakdown
+                    อัตโนมัติจาก ERP · เลข balance แล้วจาก buildIncomeDisplay (บรรทัด
+                    "อื่น ๆ" = ส่วนต่างของยอดรวมที่ใส่เอง) */}
+                {selected.income_display ? (
+                  <div className="border-b border-border/60 py-2.5">
+                    <dt className="text-muted-foreground">คิดจาก</dt>
+                    <dd className="mt-0.5 space-y-0.5 text-xs">
+                      {selected.income_display.lines.map((it, i) => (
+                        <div key={`${it.label}-${i}`} className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">
+                            {i === 0 ? it.label : `+ ${it.label}`}
+                          </span>
+                          <span className="font-medium">฿{it.amount.toLocaleString('th-TH')}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between gap-4 border-t border-border/50 pt-1">
+                        <span className="font-semibold text-foreground">รวม</span>
+                        <span className="font-semibold text-success">
+                          ฿{selected.income_display.total.toLocaleString('th-TH')}
+                        </span>
+                      </div>
+                    </dd>
+                  </div>
+                ) : null}
                 {/* แจกแจงที่มาของยอด — ผู้สมัครต้องเห็นว่าเลขมาจากไหน ไม่ใช่เชื่อยอดรวมลอย ๆ
                     ⚠️ ไม่รวมโอที/เบี้ยเลี้ยง/เบี้ยขยัน เพราะไม่การันตี (โชว์เป็นชิปแยก) */}
-                {selected.monthly_income ? (
+                {!selected.income_display && selected.monthly_income ? (
                   <div className="border-b border-border/60 py-2.5">
                     <dt className="text-muted-foreground">คิดจาก</dt>
                     <dd className="mt-0.5 space-y-0.5 text-xs">

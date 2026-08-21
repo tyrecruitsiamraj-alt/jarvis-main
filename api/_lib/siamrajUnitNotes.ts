@@ -36,8 +36,21 @@ export type UnitFieldOverrides = {
    * ⚠️ **ไม่แตะอัตราจ่ายใน ERP** และไม่ใช่ตัวที่ AI ใช้คิดค่าแรง
    */
   total_income?: number | null;
-  /** สวัสดิการเพิ่มเติมที่ติ๊กเอง (คีย์จาก `src/lib/extraBenefits.ts`) */
+  /**
+   * สวัสดิการเพิ่มเติม — ตั้งแต่ 20 ส.ค. 2569 เก็บเป็น**ข้อความอิสระ** (เจ้าของเคาะ
+   * "Freetext ล้วน จำกัดจำนวน") · ค่าเก่าที่เป็นคีย์จาก `extraBenefits.ts` ยังอ่านได้
+   * (ฝั่งแสดงแปลงคีย์เก่า → คำอ่านให้เอง)
+   */
   benefits?: string[] | null;
+  /**
+   * รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — ทับ breakdown อัตโนมัติ
+   * จาก ERP เฉพาะที่โชว์บนประกาศ · กติกา/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts`
+   */
+  income?: {
+    period: 'daily' | 'monthly';
+    lines: { label: string; amount: number }[];
+    total: number | null;
+  } | null;
 };
 
 export type UnitNote = {
@@ -134,13 +147,55 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
     out.total_income = n === null ? null : Math.max(0, Math.trunc(n));
   }
 
-  // สวัสดิการที่ติ๊ก — เก็บเฉพาะคีย์ที่ระบบรู้จัก (กันค่าแปลกจาก client)
+  // สวัสดิการ — freetext จำกัดจำนวน (เจ้าของเคาะ 20 ส.ค. 2569: 5 รายการ × 30 ตัวอักษร)
   if ('benefits' in o) {
-    out.benefits = Array.isArray(o.benefits)
-      ? [...new Set(o.benefits.filter((b): b is string => typeof b === 'string' && b.trim() !== ''))]
-          .map((b) => b.trim().slice(0, 60))
-          .slice(0, 40)
-      : null;
+    if (!Array.isArray(o.benefits)) {
+      out.benefits = null;
+    } else {
+      const seen = new Set<string>();
+      const lines: string[] = [];
+      for (const b of o.benefits) {
+        if (typeof b !== 'string') continue;
+        const t = b.trim().slice(0, 30);
+        if (!t || seen.has(t)) continue;
+        seen.add(t);
+        lines.push(t);
+        if (lines.length >= 5) break;
+      }
+      out.benefits = lines;
+    }
+  }
+
+  // รายได้แบบแยกส่วน — เพดานเดียวกับ src/lib/incomeBreakdown.ts (10 รายการ × 30 ตัวอักษร)
+  if ('income' in o) {
+    const inc = o.income;
+    if (!inc || typeof inc !== 'object') {
+      out.income = null;
+    } else {
+      const io = inc as Record<string, unknown>;
+      const lines: { label: string; amount: number }[] = [];
+      if (Array.isArray(io.lines)) {
+        for (const item of io.lines) {
+          if (!item || typeof item !== 'object') continue;
+          const r = item as Record<string, unknown>;
+          const label = typeof r.label === 'string' ? r.label.trim().slice(0, 30) : '';
+          const amount = Number(r.amount);
+          if (!label || !Number.isFinite(amount) || amount <= 0) continue;
+          lines.push({ label, amount: Math.trunc(amount) });
+          if (lines.length >= 10) break;
+        }
+      }
+      if (lines.length === 0) {
+        out.income = null;
+      } else {
+        const totalRaw = Number(io.total);
+        out.income = {
+          period: io.period === 'daily' ? 'daily' : 'monthly',
+          lines,
+          total: Number.isFinite(totalRaw) && totalRaw > 0 ? Math.trunc(totalRaw) : null,
+        };
+      }
+    }
   }
 
   if ('branches' in o) {

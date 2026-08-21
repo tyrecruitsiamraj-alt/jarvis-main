@@ -10,7 +10,20 @@ import {
 import { saveUnitRequestMeta, siamrajExternalId } from '@/lib/siamrajUnitRequestsApi';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
-import { EXTRA_BENEFITS } from '@/lib/extraBenefits';
+import { benefitDisplayLabels } from '@/lib/extraBenefits';
+import {
+  BENEFIT_LINE_MAX,
+  INCOME_LINE_MAX,
+  INCOME_OTHER_LABEL,
+  INCOME_PERIOD_LABEL,
+  INCOME_PERIODS,
+  SUGGESTED_INCOME_LABELS,
+  buildIncomeDisplay,
+  cleanBenefitLines,
+  sumIncomeLines,
+  type IncomeLine,
+  type IncomePeriod,
+} from '@/lib/incomeBreakdown';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import {
@@ -43,8 +56,16 @@ const EditPublicJobFieldsDialog: React.FC<{
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
-  const [income, setIncome] = useState('');
-  const [benefits, setBenefits] = useState<string[]>([]);
+  /**
+   * รายได้แบบแยกส่วน (เจ้าของสั่ง 20 ส.ค. 2569) — แต่ละแถว: ชื่อรายการ + จำนวนเงิน
+   * แถวที่ยังกรอกไม่ครบเก็บเป็น string ไว้ก่อน (แปลง/คัดตอนบันทึกด้วย lib กลาง)
+   */
+  const [incomePeriod, setIncomePeriod] = useState<IncomePeriod>('monthly');
+  const [incomeRows, setIncomeRows] = useState<{ label: string; amount: string }[]>([]);
+  /** ยอดรวมที่ใส่เอง — ว่าง = ใช้ผลบวกของรายการ */
+  const [incomeTotal, setIncomeTotal] = useState('');
+  /** สวัสดิการ freetext บรรทัดละรายการ (เจ้าของเคาะ: จำกัด 5 รายการ ไม่งั้นเยอะเกิน) */
+  const [benefitText, setBenefitText] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,8 +75,19 @@ const EditPublicJobFieldsDialog: React.FC<{
     setProvince(job.override_province ?? '');
     setDistrict(job.override_district ?? '');
     setSubdistrict(job.override_subdistrict ?? '');
-    setIncome(job.total_income != null ? String(job.total_income) : '');
-    setBenefits(job.extra_benefits ?? []);
+    const savedIncome = job.field_overrides?.income;
+    if (savedIncome && savedIncome.lines.length > 0) {
+      setIncomePeriod(savedIncome.period);
+      setIncomeRows(savedIncome.lines.map((l) => ({ label: l.label, amount: String(l.amount) })));
+      setIncomeTotal(savedIncome.total != null ? String(savedIncome.total) : '');
+    } else {
+      setIncomePeriod('monthly');
+      setIncomeRows([]);
+      // ยังไม่เคยตั้งรายการ → ช่องยอดรวมทำหน้าที่เดิม (ทับเลขเดี่ยวบนประกาศ)
+      setIncomeTotal(job.total_income != null ? String(job.total_income) : '');
+    }
+    // ค่าเก่าที่ติ๊กเป็นคีย์ → แปลงเป็นคำอ่านให้แก้ต่อได้ (ห้ามหายเงียบ)
+    setBenefitText(benefitDisplayLabels(job.extra_benefits).join('\n'));
   }, [job]);
 
   /**
@@ -79,8 +111,17 @@ const EditPublicJobFieldsDialog: React.FC<{
   const guessedDistrict = displayDistrictLine(job.location_address || '') || 'ไม่ทราบ';
   const guessedSubdistrict = inferSubdistrictFromAddress(job.location_address || '') || 'ไม่ทราบ';
 
-  const toggle = (key: string) =>
-    setBenefits((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  /** แปลงแถวในฟอร์ม → รายการที่ใช้ได้จริง (ตัดแถวที่กรอกไม่ครบ) */
+  const parsedLines: IncomeLine[] = incomeRows
+    .map((r) => ({ label: r.label.trim(), amount: Math.trunc(Number(r.amount)) }))
+    .filter((r) => r.label !== '' && Number.isFinite(r.amount) && r.amount > 0);
+  const linesSum = sumIncomeLines(parsedLines);
+  const totalNum = incomeTotal.trim() === '' ? null : Math.trunc(Number(incomeTotal) || 0);
+  /** ตัวอย่างที่ผู้สมัครจะเห็น — ใช้ตัวคำนวณเดียวกับหน้าสาธารณะเป๊ะ */
+  const preview = buildIncomeDisplay(
+    parsedLines.length > 0 ? { period: incomePeriod, lines: parsedLines, total: totalNum } : null,
+  );
+  const benefitLines = cleanBenefitLines(benefitText.split('\n'));
 
   const save = async () => {
     const requestNo = siamrajExternalId(job) || job.request_no;
@@ -91,13 +132,24 @@ const EditPublicJobFieldsDialog: React.FC<{
     setSaving(true);
     setError(null);
     try {
-      const trimmedIncome = income.trim();
+      /**
+       * มีรายการ = เก็บเป็น breakdown (income) · ไม่มีรายการ = ช่องยอดรวมทำหน้าที่
+       * เดิมของมัน (ทับเลขเดี่ยว total_income) — คนที่เคยตั้งเลขเดี่ยวไว้ไม่เสียค่า
+       */
+      const hasBreakdown = parsedLines.length > 0;
       const patch = {
         province: province.trim() || null,
         district: district.trim() || null,
         subdistrict: subdistrict.trim() || null,
-        total_income: trimmedIncome === '' ? null : Math.max(0, Math.trunc(Number(trimmedIncome) || 0)),
-        benefits: benefits.length > 0 ? benefits : null,
+        total_income: hasBreakdown
+          ? null
+          : incomeTotal.trim() === ''
+            ? null
+            : Math.max(0, Math.trunc(Number(incomeTotal) || 0)),
+        benefits: benefitLines.length > 0 ? benefitLines : null,
+        income: hasBreakdown
+          ? { period: incomePeriod, lines: parsedLines, total: totalNum }
+          : null,
       };
       await saveUnitRequestMeta(requestNo, { field_overrides: patch });
       onSaved?.({
@@ -105,6 +157,7 @@ const EditPublicJobFieldsDialog: React.FC<{
         override_district: patch.district,
         override_subdistrict: patch.subdistrict,
         ...(patch.total_income != null ? { total_income: patch.total_income } : {}),
+        ...(preview ? { income_display: preview } : { income_display: undefined }),
         extra_benefits: patch.benefits,
       });
       onClose();
@@ -213,58 +266,161 @@ const EditPublicJobFieldsDialog: React.FC<{
           </section>
 
           <section className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground">รายได้รวมที่จะโชว์</p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-muted-foreground">รายได้ที่จะโชว์บนประกาศ</p>
+              {/* หน่วยของทั้งชุด — ห้ามปนรายวันกับรายเดือนในรายการเดียว */}
+              <div className="flex items-center gap-1">
+                {INCOME_PERIODS.map((pd) => (
+                  <button
+                    key={pd}
+                    type="button"
+                    aria-pressed={incomePeriod === pd}
+                    onClick={() => setIncomePeriod(pd)}
+                    className={cn(
+                      'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                      incomePeriod === pd ? TONE.info.solid : TONE.neutral.outline,
+                    )}
+                  >
+                    {INCOME_PERIOD_LABEL[pd]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* รายการรายได้ — ชื่อพิมพ์เอง/เลือกจากชุดแนะนำ + จำนวนเงิน (เจ้าของสั่ง 20 ส.ค. 2569) */}
+            {incomeRows.length > 0 ? (
+              <div className="space-y-1.5">
+                {incomeRows.map((row, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input
+                      className={cn(fieldCls, 'flex-1')}
+                      list="income-label-suggestions"
+                      maxLength={30}
+                      placeholder="เช่น ฐานเงินเดือน"
+                      value={row.label}
+                      onChange={(e) =>
+                        setIncomeRows((prev) =>
+                          prev.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)),
+                        )
+                      }
+                    />
+                    <input
+                      className={cn(fieldCls, 'w-28 text-right font-semibold tabular-nums')}
+                      inputMode="numeric"
+                      placeholder="บาท"
+                      value={row.amount}
+                      onChange={(e) =>
+                        setIncomeRows((prev) =>
+                          prev.map((r, j) =>
+                            j === i ? { ...r, amount: e.target.value.replace(/[^\d]/g, '') } : r,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label={`ลบรายการ ${row.label || i + 1}`}
+                      onClick={() => setIncomeRows((prev) => prev.filter((_, j) => j !== i))}
+                      className={cn(
+                        'shrink-0 rounded-lg border px-2 py-1.5 text-xs font-semibold',
+                        TONE.danger.outline,
+                      )}
+                    >
+                      ลบ
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                ยังไม่มีรายการ — ประกาศจะโชว์รายได้แบบเดิม (เลขจาก ERP หรือยอดรวมที่ใส่ในช่องล่าง)
+              </p>
+            )}
+            <datalist id="income-label-suggestions">
+              {SUGGESTED_INCOME_LABELS.map((l) => (
+                <option key={l} value={l} />
+              ))}
+            </datalist>
+            {incomeRows.length < INCOME_LINE_MAX ? (
               <button
                 type="button"
-                onClick={() => setIncome(String(Math.max(0, (Number(income) || 0) - 500)))}
-                className={cn('rounded-lg border px-3 py-1.5 text-sm font-semibold', TONE.neutral.outline)}
+                onClick={() => setIncomeRows((prev) => [...prev, { label: '', amount: '' }])}
+                className={cn('rounded-lg border px-2.5 py-1 text-xs font-semibold', TONE.info.outline)}
               >
-                −500
+                + เพิ่มรายการรายได้
               </button>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">ครบ {INCOME_LINE_MAX} รายการแล้ว</p>
+            )}
+
+            <label className="flex items-center gap-2 pt-1">
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {parsedLines.length > 0 ? 'ยอดรวมที่จะโชว์ (ใส่เองได้)' : 'รายได้รวมที่จะโชว์'}
+              </span>
               <input
                 className={cn(fieldCls, 'text-center font-semibold tabular-nums')}
                 inputMode="numeric"
-                value={income}
-                placeholder="ใช้ค่าจาก ERP"
-                onChange={(e) => setIncome(e.target.value.replace(/[^\d]/g, ''))}
+                value={incomeTotal}
+                placeholder={parsedLines.length > 0 ? `ผลบวก ${linesSum.toLocaleString('th-TH')}` : 'ใช้ค่าจาก ERP'}
+                onChange={(e) => setIncomeTotal(e.target.value.replace(/[^\d]/g, ''))}
               />
-              <button
-                type="button"
-                onClick={() => setIncome(String((Number(income) || 0) + 500))}
-                className={cn('rounded-lg border px-3 py-1.5 text-sm font-semibold', TONE.neutral.outline)}
-              >
-                +500
-              </button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              ล้างช่องให้ว่าง = กลับไปใช้เลขจาก ERP · ตัวเลขนี้ทับเฉพาะที่โชว์บนประกาศ
-            </p>
+            </label>
+
+            {/* ตัวอย่างที่ผู้สมัครเห็น — คำนวณด้วยตัวเดียวกับหน้าสาธารณะ (เลข balance เสมอ:
+                ยอดรวม > ผลบวก → เติมบรรทัด "อื่น ๆ" · ยอดรวม < ผลบวก → ใช้ผลบวกแทน) */}
+            {preview ? (
+              <div className={cn('space-y-0.5 rounded-xl px-3 py-2 text-xs', TONE.success.soft)}>
+                <p className="text-[11px] font-semibold text-muted-foreground">
+                  ผู้สมัครจะเห็น ({INCOME_PERIOD_LABEL[preview.period]})
+                </p>
+                {preview.lines.map((l, i) => (
+                  <div key={`${l.label}-${i}`} className="flex justify-between gap-3">
+                    <span className={l.label === INCOME_OTHER_LABEL ? 'italic' : undefined}>
+                      {l.label}
+                    </span>
+                    <span className="font-medium tabular-nums">฿{l.amount.toLocaleString('th-TH')}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between gap-3 border-t border-border/50 pt-0.5 font-semibold">
+                  <span>รวม</span>
+                  <span className="tabular-nums">฿{preview.total.toLocaleString('th-TH')}</span>
+                </div>
+                {totalNum != null && totalNum < linesSum ? (
+                  <p className={cn('pt-0.5 text-[11px]', TONE.warn.value)}>
+                    ยอดรวมที่ใส่ ({totalNum.toLocaleString('th-TH')}) น้อยกว่าผลบวกของรายการ —
+                    ระบบใช้ผลบวกแทน (เลขบนประกาศห้ามน้อยกว่าของที่แจกแจง)
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                ล้างช่องให้ว่าง = กลับไปใช้เลขจาก ERP · ตัวเลขทั้งชุดทับเฉพาะที่โชว์บนประกาศ
+              </p>
+            )}
           </section>
 
           <section className="space-y-2">
+            {/* เจ้าของเคาะ 20 ส.ค. 2569: "Freetext ล้วน จำกัดจำนวน" — ถอดชิปติ๊กทิ้ง
+                ค่าเก่าที่เคยติ๊กไว้ถูกแปลงเป็นข้อความมาให้แก้ต่อแล้ว (ห้ามหายเงียบ) */}
             <p className="text-xs font-semibold text-muted-foreground">
-              สวัสดิการเพิ่มเติม {benefits.length > 0 ? `(ติ๊กไว้ ${benefits.length})` : ''}
+              สวัสดิการเพิ่มเติม ({benefitLines.length}/{BENEFIT_LINE_MAX} รายการ)
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {EXTRA_BENEFITS.map((b) => {
-                const on = benefits.includes(b.key);
-                return (
-                  <button
-                    key={b.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggle(b.key)}
-                    className={cn(
-                      'rounded-full border px-3 py-1 text-xs font-medium',
-                      on ? TONE.success.solid : TONE.neutral.outline,
-                    )}
-                  >
-                    {b.label}
-                  </button>
-                );
-              })}
-            </div>
+            <textarea
+              className={cn(fieldCls, 'min-h-[92px]')}
+              value={benefitText}
+              onChange={(e) => setBenefitText(e.target.value)}
+              placeholder={'บรรทัดละ 1 รายการ เช่น\nชุดฟอร์มฟรี\nรถรับส่งจากบีทีเอส'}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              บรรทัดละ 1 รายการ · เก็บสูงสุด {BENEFIT_LINE_MAX} รายการ รายการละไม่เกิน 30 ตัวอักษร
+              (เกินจากนั้นถูกตัดทิ้งตอนบันทึก)
+            </p>
+            {benefitText.split('\n').filter((l) => l.trim()).length > BENEFIT_LINE_MAX ? (
+              <p className={cn('rounded-lg px-2.5 py-1.5 text-[11px]', TONE.warn.soft, TONE.warn.value)}>
+                ใส่เกิน {BENEFIT_LINE_MAX} รายการ — จะเก็บเฉพาะ {BENEFIT_LINE_MAX} รายการแรก:{' '}
+                {benefitLines.join(' · ')}
+              </p>
+            ) : null}
           </section>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

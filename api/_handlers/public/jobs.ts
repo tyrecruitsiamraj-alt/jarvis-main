@@ -1,3 +1,4 @@
+import { buildIncomeDisplay, type IncomeDisplay } from '../../../src/lib/incomeBreakdown.js';
 import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
@@ -104,6 +105,15 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     manual_income: ((r as Record<string, unknown>).field_overrides as
       | { total_income?: number | null }
       | undefined)?.total_income ?? undefined,
+    /**
+     * รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — ผ่าน buildIncomeDisplay
+     * แล้ว = เลข balance เสมอ (เติมบรรทัด "อื่น ๆ" จากส่วนต่างให้แล้ว)
+     * มาก่อน breakdown อัตโนมัติจาก ERP — ดูการ merge ใน withBenefits()
+     */
+    income_display: (buildIncomeDisplay(
+      ((r as Record<string, unknown>).field_overrides as { income?: unknown } | undefined)
+        ?.income as never,
+    ) ?? undefined) as IncomeDisplay | undefined,
     status: r.status,
     source: r.source || undefined,
     created_at: toIsoString(r.created_at),
@@ -156,6 +166,21 @@ async function withBenefits(jobs: PublicJob[]): Promise<PublicJobOut[]> {
      */
     const manualIncome = typeof j.manual_income === 'number' ? j.manual_income : null;
     const { manual_income: _drop, ...rest } = j;
+    /**
+     * 🔴 breakdown ที่เจ้าหน้าที่ตั้งเอง (income_display) **ชนะของอัตโนมัติจาก ERP**
+     * — ถ้ามี ไม่ต้องส่ง monthly_income_base/items ของ ERP ไปสับสนซ้ำ
+     * และยอดหัวการ์ด (monthly_income) ใช้ total ของเจ้าหน้าที่เมื่อเป็นรายเดือน
+     * (รายวันไม่ยัดใส่ monthly_income — คนละหน่วย ห้ามโกหก)
+     */
+    if (rest.income_display) {
+      return {
+        ...rest,
+        ...(found && found.length > 0 ? { benefits: found } : {}),
+        ...(rest.income_display.period === 'monthly'
+          ? { monthly_income: rest.income_display.total }
+          : {}),
+      };
+    }
     return {
       ...rest,
       ...(found && found.length > 0 ? { benefits: found } : {}),

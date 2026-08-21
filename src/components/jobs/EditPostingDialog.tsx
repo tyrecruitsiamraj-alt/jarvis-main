@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import React, { useEffect, useState } from 'react';
 import type { RecruitPosting } from '@/lib/recruitPostings';
 import { updateRecruitPosting, type UpdatePostingBody } from '@/lib/recruitPostingsApi';
@@ -100,13 +101,16 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">สถานที่ทำงาน</label>
-              <input
-                className={fieldCls}
-                value={locationText}
-                onChange={(e) => setLocationText(e.target.value)}
-              />
-            </div>
+            <label className="text-xs font-medium text-muted-foreground">สถานที่ทำงาน</label>
+            {/* 🔴 อ่านอย่างเดียว (เจ้าของสั่ง 20 ส.ค. 2569: "ไม่ให้แก้ไข...สถานที่ทำงาน
+                เอา dropdown ไปใส่แทน") — ที่อยู่ก้อนนี้มาจาก ERP · พื้นที่บนประกาศแก้ที่
+                dropdown จังหวัด/อำเภอ/ตำบล ในส่วน "ข้อมูลที่จะขึ้นประกาศ" ข้างล่างที่เดียว
+                กันสองช่องขัดกันเอง */}
+            <input className={cn(fieldCls, 'opacity-70')} value={locationText} readOnly disabled />
+            <p className="text-[11px] text-muted-foreground">
+              จาก ERP · แก้พื้นที่บนประกาศได้ที่ &quot;พื้นที่ทำงาน&quot; ด้านล่าง
+            </p>
+          </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">ค่าตอบแทน</label>
               <input

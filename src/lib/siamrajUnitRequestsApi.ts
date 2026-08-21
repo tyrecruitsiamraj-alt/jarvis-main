@@ -128,7 +128,10 @@ export type UnitFieldOverrides = {
   district?: string | null;
   subdistrict?: string | null;
   total_income?: number | null;
+  /** ตั้งแต่ 20 ส.ค. 2569 เก็บเป็นข้อความอิสระ (freetext จำกัด 5 รายการ) · คีย์เก่ายังอ่านได้ */
   benefits?: string[] | null;
+  /** รายได้แบบแยกส่วน — โครง/เพดานอยู่ที่ `src/lib/incomeBreakdown.ts` */
+  income?: import('@/lib/incomeBreakdown').IncomeBreakdown | null;
 };
 
 export async function saveUnitRequestMeta(

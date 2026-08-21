@@ -18,8 +18,13 @@ import {
 import { UNIT_REQUEST_WORK_STATUS_OPTIONS } from '../../src/lib/unitRequestWorkStatus.js';
 
 describe('สถานะที่ต้องซ่อนจากหน้าสาธารณะ', () => {
-  it('🔴 ซ่อนเฉพาะ "รอเริ่มงาน" กับ "รอแจ้งเข้า" ตามที่เจ้าของเคาะ', () => {
-    expect([...HIDDEN_FROM_PUBLIC_WORK_STATUSES].sort()).toEqual(['waiting_inform', 'waiting_start']);
+  it('🔴 ซ่อน 4 สถานะ: รอเริ่มงาน · รอแจ้งเข้า · งานรายวัน · จ่ายรายวัน (เจ้าของเคาะ 20 ส.ค. 2569)', () => {
+    expect([...HIDDEN_FROM_PUBLIC_WORK_STATUSES].sort()).toEqual([
+      'daily_pay',
+      'daily_work',
+      'waiting_inform',
+      'waiting_start',
+    ]);
   });
 
   it('สถานะที่เหลือทั้งหมดยังโชว์ได้ (ยังหาคนอยู่)', () => {
@@ -30,8 +35,6 @@ describe('สถานะที่ต้องซ่อนจากหน้า�
       'evaluating',
       'waiting_interview',
       'waiting_result',
-      'daily_work',
-      'daily_pay',
     ]);
   });
 
@@ -46,9 +49,11 @@ describe('สถานะที่ต้องซ่อนจากหน้า�
     expect(isPublicVisibleByWorkStatus({ work_status: 42 })).toBe(true);
   });
 
-  it('ใบที่ได้คนแล้วต้องไม่โชว์', () => {
+  it('ใบที่ได้คนแล้ว/เริ่มงานแล้วต้องไม่โชว์', () => {
     expect(isPublicVisibleByWorkStatus({ work_status: 'waiting_start' })).toBe(false);
     expect(isPublicVisibleByWorkStatus({ work_status: 'waiting_inform' })).toBe(false);
+    expect(isPublicVisibleByWorkStatus({ work_status: 'daily_work' })).toBe(false);
+    expect(isPublicVisibleByWorkStatus({ work_status: 'daily_pay' })).toBe(false);
   });
 });
 

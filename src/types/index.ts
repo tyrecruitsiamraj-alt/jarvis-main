@@ -213,6 +213,16 @@ export interface JobRequest {
   monthly_income?: number;
   monthly_income_base?: number;
   monthly_income_items?: Array<{ label: string; monthly: number }>;
+  /**
+   * รายได้แบบแยกส่วนที่**เจ้าหน้าที่ตั้งเอง** (20 ส.ค. 2569) — มาก่อน breakdown
+   * อัตโนมัติจาก ERP เสมอ · ผ่าน `buildIncomeDisplay` มาแล้ว = เลข balance เสมอ
+   * (บรรทัด "อื่น ๆ" ถูกเติมให้แล้ว) · undefined = ไม่ได้ตั้ง ใช้การแสดงแบบเดิม
+   */
+  income_display?: {
+    period: 'daily' | 'monthly';
+    lines: Array<{ label: string; amount: number }>;
+    total: number;
+  };
   penalty_per_day: number;
   days_without_worker: number;
   total_penalty: number;
@@ -285,6 +295,16 @@ export interface JobRequest {
       lng?: number | null;
       geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
     }> | null;
+    /** รายได้รวมที่ตั้งเอง (ของเดิม) — ใช้เมื่อไม่ได้ตั้งรายได้แบบแยกส่วน */
+    total_income?: number | null;
+    /** สวัสดิการ (20 ส.ค. 2569 เป็น freetext · ค่าเก่าเป็นคีย์ยังอ่านได้) */
+    benefits?: string[] | null;
+    /** รายได้แบบแยกส่วนที่ตั้งเอง — โครงอยู่ที่ `src/lib/incomeBreakdown.ts` */
+    income?: {
+      period: 'daily' | 'monthly';
+      lines: Array<{ label: string; amount: number }>;
+      total: number | null;
+    } | null;
   } | null;
 }
 

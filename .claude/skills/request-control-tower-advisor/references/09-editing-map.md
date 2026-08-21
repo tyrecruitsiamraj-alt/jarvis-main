@@ -3395,3 +3395,39 @@ variant ในนั้นเขียน `bg-white/50` · `border-white/80` · 
 0→6 ช่อง การ์ดขยับ 561→668 กดปิดกลับมา 561 · กล่องสถานะ `innerText` เหลือ 2 บรรทัดทุกกล่อง ·
 ไม่มีปุ่ม Pre-Check ลอยแล้ว (นับได้ 0) · การ์ดเหลือ 2 ปุ่ม ·
 โหมดมืดปุ่มพื้น `rgb(15,23,42)` ตัวหนังสือ emerald-300/sky-300 · โหมดสว่างพื้นขาวตัวหนังสือเข้ม
+
+### รอบ 20 ส.ค. 2569 (รอบยี่สิบหก · งาน-6) — รายได้แบบแยกส่วน + สวัสดิการ freetext + ซ่อนใบเริ่มงาน
+
+เจ้าของสั่งชุดใหญ่เรื่องประกาศ (ถามเป็น Choice แล้วเคาะ 3 ข้อ):
+1. ยอดรวมใส่เอง > ผลบวก → **เติมบรรทัด "อื่น ๆ (เช่น OT)" ให้เลข balance**
+2. สวัสดิการ → **Freetext ล้วน จำกัดจำนวน** (5 รายการ × 30 ตัวอักษร)
+3. ใบสถานะ "เริ่มงานแล้ว" → **ซ่อนจากหน้าสาธารณะด้วย**
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/incomeBreakdown.ts` | **ใหม่ · pure** — `buildIncomeDisplay` (กติกา balance: override > ผลบวก → เติมอื่น ๆ · override < ผลบวก → ใช้ผลบวก "เลขห้ามโกหกลง") · `cleanIncomeBreakdown` · `cleanBenefitLines` · เพดาน 10 รายการ×30 ตัว / 5×30 (เทสต์ 10) |
+| `src/lib/publicJobVisibility.ts` | HIDDEN เพิ่ม `daily_work` + `daily_pay` (รวมเป็น 4 สถานะ) |
+| `src/lib/extraBenefits.ts` | `benefitDisplayLabels` — รับทั้งคีย์เก่า (แปลงเป็น label) และข้อความอิสระใหม่ (คืนตรง ๆ) **ใบที่ติ๊กไว้เดิมห้ามหายเงียบ** |
+| `api/_lib/siamrajUnitNotes.ts` | sanitizer: `benefits` freetext 5×30 · `income` ใหม่ (เพดานเดียวกับ lib) |
+| `api/_handlers/public/jobs.ts` | `income_display` ผ่าน `buildIncomeDisplay` · **ชนะ breakdown อัตโนมัติจาก ERP** (ไม่ส่ง base/items ของ ERP ซ้อน) · รายเดือน → `monthly_income = total` (รายวันไม่ยัด — คนละหน่วย) |
+| `api/_handlers/siamraj-unit-requests.ts` | แนบ `income_display` ให้ feed staff — ป๊อปกล่องงานเห็นเหมือนผู้สมัครเป๊ะ |
+| `src/components/jobs/EditPublicJobFieldsDialog.tsx` | ฟอร์มรายได้ใหม่: หน่วยวัน/เดือน · แถวรายการ (datalist ชื่อแนะนำ 10 ตัว) · ยอดรวมใส่เอง · **preview "ผู้สมัครจะเห็น" ใช้ตัวคำนวณเดียวกับหน้าจริง** · สวัสดิการเป็น textarea บรรทัดละรายการ + ตัวนับ/คำเตือนเกินโควตา |
+| `src/components/jobs/EditPostingDialog.tsx` | ช่อง "สถานที่ทำงาน" **read-only** (เจ้าของสั่ง) + ชี้ไปแก้ที่ dropdown พื้นที่ทำงาน — กันสองช่องขัดกันเอง |
+| `src/components/jobs/JobBoardView.tsx` | การ์ด: `฿20,000 ต่อเดือน` จาก income_display มาก่อน · ป๊อป: บล็อก "คิดจาก" ของ breakdown ที่ตั้งเอง (ไม่โชว์ซ้อนกับของ ERP) |
+| `src/types/index.ts` | `income_display` + `field_overrides.income/benefits/total_income` |
+
+**กับดัก**
+* 🔴 **override < ผลบวก = ใช้ผลบวก ไม่ใช่ค่าที่ใส่** — เลขบนประกาศห้ามน้อยกว่าของที่แจกแจง
+  (ฟอร์มขึ้นคำเตือนสีเหลืองบอกตรง ๆ)
+* 🔴 **breakdown รายวันห้ามยัดใส่ `monthly_income`** — คนละหน่วย การ์ดใช้ `income_display.total`
+  + ป้ายหน่วยของตัวเองแทน
+* 🔴 ไม่มีรายการ = ช่องยอดรวมทำหน้าที่เดิม (ทับ `total_income` เลขเดี่ยว) — คนที่เคยตั้ง
+  เลขเดี่ยวไว้ **ไม่เสียค่า** ตอนบันทึกรอบถัดไป
+* ⚠️ `benefits` ใน overrides ตอนนี้ปนสองยุค (คีย์เก่า + ข้อความใหม่) — ทุกจุดแสดงผลต้องผ่าน
+  `benefitDisplayLabels` ห้ามใช้ `extraBenefitLabels` ตรง ๆ (ตัวนั้นตัดข้อความอิสระทิ้ง)
+
+**ตรวจจริง (เดินครบวง + คืนค่าเดิมแล้ว):** ตั้ง breakdown เคสตัวอย่างของเจ้าของบนใบ LMM6704005
+(15,000+2,000+1,000 ใส่ยอด 20,000) → public API ตอบ 4 บรรทัด + อื่น ๆ 2,000 + monthly 20,000 ·
+การ์ดสาธารณะ `฿20,000 ต่อเดือน` · ป๊อป "คิดจาก" ครบ 4 บรรทัด + รวม · ชิปสวัสดิการ freetext
+ขึ้นบนการ์ด · ฟอร์มโหลดกลับครบ + preview ตรง · สถานที่ทำงาน readOnly+disabled ·
+คืนค่าเดิมแล้ว POST 200 + ป๊อปกลับสภาพเดิม + คีย์เก่า 5 ตัวแปลงเป็นคำอ่านในฟอร์มถูก
