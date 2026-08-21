@@ -9,9 +9,8 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
-import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment, fetchUnitEditLog } from '@/lib/siamrajUnitRequestsApi';
-import { describeUnitEdit, UNIT_EDIT_TITLE } from '@/lib/unitEditLog';
-import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions, buildOnlineNameOptions } from '@/lib/jobStaffNames';
+import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
+import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
@@ -24,7 +23,7 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList, History } from 'lucide-react';
+import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
@@ -58,22 +57,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     enabled: !!id,
   });
 
-  /**
-   * ประวัติ "ใครแก้อะไรไป" (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ) — คีย์เดียวกับที่ audit เก็บ
-   * คือ requestKey (externalId || request_no) · ล้มเหลว = โชว์ข้อความ ไม่พาหน้าล้ม
-   */
-  const historyKey = (data?.externalId || data?.request_no)?.trim();
-  const editLog = useQuery({
-    queryKey: ['siamraj', 'unit-history', historyKey],
-    queryFn: () => fetchUnitEditLog(historyKey!),
-    enabled: !!historyKey,
-  });
-
   const [recruiter, setRecruiter] = useState('');
   const [screener, setScreener] = useState('');
   const [opl, setOpl] = useState('');
-  // ทีม online = ผู้รับผิดชอบ (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-9: "เอาชื่อมาจากทีม online")
-  const [online, setOnline] = useState('');
   const [rosterRev, setRosterRev] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -91,9 +77,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     setRecruiter(data?.recruiter_name ?? '');
     setScreener(data?.screener_name ?? '');
     setOpl(data?.opl_name ?? '');
-    setOnline(data?.online_name ?? '');
     setSaveMsg(null);
-  }, [data?.recruiter_name, data?.screener_name, data?.opl_name, data?.online_name]);
+  }, [data?.recruiter_name, data?.screener_name, data?.opl_name]);
 
   const recruiterOptions = useMemo(() => {
     void rosterRev;
@@ -107,18 +92,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     void rosterRev;
     return buildOplNameOptions();
   }, [rosterRev]);
-  const onlineOptions = useMemo(() => {
-    void rosterRev;
-    return buildOnlineNameOptions();
-  }, [rosterRev]);
 
   const requestNo = data?.request_no;
   const requestKey = (data?.externalId || data?.request_no)?.trim();
   const dirty =
     (recruiter.trim() || '') !== (data?.recruiter_name ?? '') ||
     (screener.trim() || '') !== (data?.screener_name ?? '') ||
-    (opl.trim() || '') !== (data?.opl_name ?? '') ||
-    (online.trim() || '') !== (data?.online_name ?? '');
+    (opl.trim() || '') !== (data?.opl_name ?? '');
 
   const saveAssignment = async () => {
     const key = requestKey;
@@ -130,7 +110,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
         recruiter_name: recruiter.trim() || null,
         screener_name: screener.trim() || null,
         opl_name: opl.trim() || null,
-        online_name: online.trim() || null,
       });
       queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
         old
@@ -139,13 +118,10 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               recruiter_name: recruiter.trim() || undefined,
               screener_name: screener.trim() || undefined,
               opl_name: opl.trim() || undefined,
-              online_name: online.trim() || undefined,
             }
           : old,
       );
       await queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-request', id] });
-      // ประวัติการแก้ไขต้องเห็นรอบที่เพิ่งบันทึกทันที ไม่ต้องรีเฟรชหน้า
-      await queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-history', historyKey] });
       setSaveMsg('บันทึกผู้รับผิดชอบแล้ว');
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -305,15 +281,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       canManageRoster={false}
                       rosterRev={rosterRev}
                     />
-                    <RosterBackedStaffSelect
-                      role="online"
-                      label="ทีม Online (ผู้รับผิดชอบ)"
-                      value={online}
-                      onChange={setOnline}
-                      optionNames={onlineOptions}
-                      canManageRoster={false}
-                      rosterRev={rosterRev}
-                    />
+                    {/* ⚠️ ช่อง "ทีม Online (ผู้รับผิดชอบ)" ถูกถอดออก (เจ้าของสั่ง 21 ส.ค. 2569:
+                        *"ทีม Online (ผู้รับผิดชอบ) มีแค่กล่องงาน"*) — ตั้งค่าได้ที่ Gen link
+                        ในกล่องงานที่เดียว · ไม่ส่ง online_name = server คงค่าเดิม (partial update) */}
                   </div>
                   <div className="flex items-center gap-3">
                     <button
@@ -400,57 +370,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               )}
             </section>
 
-            {/* ประวัติการแก้ไข (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: *"เพิ่ม log การแก้ไข
-                ไว้ด้วยนะหน้ากล่องงาน ว่าใครแก้อะไรไป"*) — อ่านจาก audit_logs ที่ระบบ
-                บันทึกอยู่แล้วทุกการแก้ (ผู้รับผิดชอบ/สถานะทำงาน/หมายเหตุ) ผ่านเส้น scoped
-                · การแปลงเป็นข้อความอยู่ที่ unitEditLog.ts (pure + เทสต์) */}
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <History className={cn('w-4 h-4', TONE.primary.value)} />
-                ประวัติการแก้ไข — ใครแก้อะไรไป
-              </h3>
-              {editLog.isLoading ? (
-                <p className="text-xs text-muted-foreground">กำลังโหลดประวัติ…</p>
-              ) : editLog.error ? (
-                <p className="text-xs text-muted-foreground">
-                  โหลดประวัติไม่ได้ตอนนี้ — ข้อมูลใบขอด้านบนยังใช้ได้ปกติ
-                </p>
-              ) : (editLog.data?.length ?? 0) === 0 ? (
-                <p className="text-xs text-muted-foreground">ยังไม่มีการแก้ไขใบนี้ในระบบ Jarvis</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {editLog.data!.map((it) => {
-                    const lines = describeUnitEdit(it);
-                    return (
-                      <li key={it.id} className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
-                        <p className="text-[11px] text-muted-foreground">
-                          <span className="font-semibold text-foreground">{it.user_name || 'ไม่ทราบชื่อ'}</span>
-                          {' · '}
-                          {UNIT_EDIT_TITLE[it.entity_type] ?? it.entity_type}
-                          {' · '}
-                          {new Date(it.created_at).toLocaleString('th-TH', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
-                        </p>
-                        {lines.length > 0 ? (
-                          <ul className="mt-0.5 space-y-0.5">
-                            {lines.map((line, i) => (
-                              <li key={i} className="text-xs text-foreground">
-                                {line}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          // diff อ่านไม่ออก/ไม่มีช่องที่เปลี่ยน — บอกแค่ว่ามีการบันทึก ดีกว่าเดา
-                          <p className="mt-0.5 text-xs text-muted-foreground">บันทึกโดยไม่มีช่องที่เปลี่ยน</p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
+            {/* ⚠️ ส่วน "ประวัติการแก้ไข" ถูกย้ายไปป๊อปอัปการ์ดในกล่องงานแล้ว
+                (เจ้าของ clarify 21 ส.ค. 2569: *"ฉันหมายถึงหน้ากล่องงาน — ของหน้าใบงาน
+                ทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*) — ดูที่ JobBoardView แท็บรายละเอียดงาน */}
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
               <h3 className="text-sm font-semibold">ผู้ลาออก / ตำแหน่ง</h3>

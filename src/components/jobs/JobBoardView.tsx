@@ -34,6 +34,8 @@ import {
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import { fetchUnitEditLog, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
+import { describeUnitEdit, UNIT_EDIT_TITLE, type UnitEditLogItem } from '@/lib/unitEditLog';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   CLOSED_BOX_KEYS,
@@ -183,6 +185,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * และห้ามซ้อน Dialog ใน Dialog)
    */
   const [popupTab, setPopupTab] = useState<'detail' | 'edit' | 'genlink'>('detail');
+
   const positionPreset = useMemo(
     () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
     [variant, searchParams],
@@ -193,6 +196,35 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     drivingPositionGroup: positionPreset?.isDrivingGroup,
   });
   const isStaff = variant === 'staff';
+
+  /**
+   * ประวัติ "ใครแก้อะไรไป" ของใบที่เปิดอยู่ — **ย้ายมาจากหน้าใบงาน** (เจ้าของ clarify
+   * 21 ส.ค. 2569: *"ฉันหมายถึงหน้ากล่องงาน — ของหน้าใบงานทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*
+   * · คำสั่งเดิม 18 ส.ค.: "เพิ่ม log การแก้ไขไว้ด้วยนะหน้ากล่องงาน ว่าใครแก้อะไรไป")
+   * ⚠️ **staff เท่านั้น** — ชื่อคนแก้เป็นข้อมูลภายใน ห้ามหลุดหน้าสมัครสาธารณะ
+   * · คีย์เดียวกับที่ audit เก็บ (unitRequestNoteKey) · โหลดล้ม = โชว์ข้อความ ไม่พาป๊อปล้ม
+   */
+  const [editLog, setEditLog] = useState<UnitEditLogItem[] | null>(null);
+  const [editLogError, setEditLogError] = useState(false);
+  useEffect(() => {
+    if (!isStaff || !selected) {
+      setEditLog(null);
+      return;
+    }
+    let cancelled = false;
+    setEditLog(null);
+    setEditLogError(false);
+    fetchUnitEditLog(unitRequestNoteKey(selected))
+      .then((items) => {
+        if (!cancelled) setEditLog(items);
+      })
+      .catch(() => {
+        if (!cancelled) setEditLogError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStaff, selected]);
 
   /**
    * ตัวกรอง "ประเภทงาน" + "เจ้าหน้าที่สรรหา" (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569)
@@ -1568,6 +1600,46 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </div>
                 ) : null}
               </dl>
+
+              {/* ประวัติการแก้ไข — อยู่ที่ป๊อปกล่องงานที่เดียว (ย้ายมาจากหน้าใบงาน 21 ส.ค. 2569) */}
+              {isStaff ? (
+                <div className="space-y-1.5 border-t border-border/50 pt-3">
+                  <p className="text-xs font-semibold text-foreground">ประวัติการแก้ไข — ใครแก้อะไรไป</p>
+                  {editLogError ? (
+                    <p className="text-xs text-muted-foreground">โหลดประวัติไม่ได้ตอนนี้ — ข้อมูลใบขอด้านบนยังใช้ได้ปกติ</p>
+                  ) : editLog == null ? (
+                    <p className="text-xs text-muted-foreground">กำลังโหลดประวัติ…</p>
+                  ) : editLog.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">ยังไม่มีการแก้ไขใบนี้ในระบบ Jarvis</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {editLog.map((it) => {
+                        const lines = describeUnitEdit(it);
+                        return (
+                          <li key={it.id} className="rounded-xl border border-border/60 bg-secondary/30 px-3 py-2">
+                            <p className="text-[11px] text-muted-foreground">
+                              <span className="font-semibold text-foreground">{it.user_name || 'ไม่ทราบชื่อ'}</span>
+                              {' · '}
+                              {UNIT_EDIT_TITLE[it.entity_type] ?? it.entity_type}
+                              {' · '}
+                              {new Date(it.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </p>
+                            {lines.length > 0 ? (
+                              <ul className="mt-0.5 space-y-0.5">
+                                {lines.map((line, i) => (
+                                  <li key={i} className="text-xs text-foreground">{line}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-0.5 text-xs text-muted-foreground">บันทึกโดยไม่มีช่องที่เปลี่ยน</p>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
               </div>
               )}
               <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 px-5 py-4">
