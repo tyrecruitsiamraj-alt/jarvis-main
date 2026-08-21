@@ -112,7 +112,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
               unit_name: v.unitName,
               position_interest: v.positionInterest,
             },
-          ]);
+          ], { autoPush: true });
         }
       } catch (e) {
         logError('public/apply auto-dispatch failed (ใบสมัครถูกบันทึกแล้ว — ส่งซ้ำได้จากกล่องงาน)', e, {

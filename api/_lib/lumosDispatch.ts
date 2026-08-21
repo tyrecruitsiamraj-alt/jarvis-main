@@ -52,6 +52,8 @@ import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   shiftOutOfQuietHours,
 } from '../../src/lib/callFollowupPolicy.js';
+import { getLumosPushConfig, pushInterviews, pushReminders } from './lumosPushClient.js';
+import type { LumosPushInterviewRecord, LumosPushReminderRecord } from './lumosPushClient.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
@@ -292,6 +294,7 @@ export async function enqueueLumosInterviewForApplications(
     unit_name?: string | null;
     position_interest?: string | null;
   }>,
+  opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
@@ -328,6 +331,17 @@ export async function enqueueLumosInterviewForApplications(
     suppressed: suppressed.length,
     skipped: skipped.length,
   });
+  if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
+    const pushPayloads = items
+      .filter((i) => addedSet.has(i.personRef))
+      .map((i) => i.payload as unknown as LumosPushInterviewRecord);
+    try {
+      await pushInterviews(pushPayloads);
+      logInfo('lumos.push.application.ok', { jobId, pushed: pushPayloads.length });
+    } catch (e) {
+      logError('lumos.push.application failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { jobId });
+    }
+  }
   return { queued: added.length, duplicated, skipped };
 }
 
@@ -543,6 +557,7 @@ export async function enqueueLumosReminderForSelected(
     mobile: string | null;
     tier?: string | null;
   }>,
+  opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosReminderPayload; matchRank: number }> = [];
@@ -578,6 +593,17 @@ export async function enqueueLumosReminderForSelected(
     suppressed: suppressed.length,
     skipped: skipped.length,
   });
+  if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
+    const pushPayloads = items
+      .filter((i) => addedSet.has(i.personRef))
+      .map((i) => i.payload as unknown as LumosPushReminderRecord);
+    try {
+      await pushReminders(pushPayloads);
+      logInfo('lumos.push.reminder.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
+    } catch (e) {
+      logError('lumos.push.reminder.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { jobId: result.jobId });
+    }
+  }
   return { queued: added.length, duplicated, skipped };
 }
 
@@ -594,6 +620,7 @@ export async function enqueueLumosInterviewForSelected(
     tier?: string | null;
   }>,
   priority?: 'high' | 'medium' | 'low',
+  opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number }> = [];
@@ -629,6 +656,17 @@ export async function enqueueLumosInterviewForSelected(
     suppressed: suppressed.length,
     skipped: skipped.length,
   });
+  if (opts?.autoPush && added.length > 0 && getLumosPushConfig()) {
+    const pushPayloads = items
+      .filter((i) => addedSet.has(i.personRef))
+      .map((i) => i.payload as unknown as LumosPushInterviewRecord);
+    try {
+      await pushInterviews(pushPayloads);
+      logInfo('lumos.push.interview.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
+    } catch (e) {
+      logError('lumos.push.interview.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { jobId: result.jobId });
+    }
+  }
   return { queued: added.length, duplicated, skipped };
 }
 
