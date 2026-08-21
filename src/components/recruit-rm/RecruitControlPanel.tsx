@@ -35,12 +35,16 @@ type BoxDef = {
  * เดิมเป็นกล่อง 13 ใบเรียงติดกันรวดเดียว อ่านแล้วไม่รู้ว่าอันไหนมาก่อนมาหลัง
  * (เจ้าของสั่ง 17 ส.ค. 2569: *"ศูนย์คุมงานสรรหา ทำให้มันสวยกว่านี้หน่อย"*)
  */
+/**
+ * ⚠️ ขั้น "นัด → มาไหม" **ย้ายไปหน้าติดตามนัดหมายแล้ว** (เจ้าของสั่ง 20 ส.ค. 2569:
+ * *"นัด → มาไหม ย้ายไปหน้าติดตามการนัดหมาย เพื่อให้รู้ว่านัดทั้งหมด/มา/ไม่มาเท่าไหร่"*
+ * · เคาะ Choice: "แค่ย้ายก้อนนั้นไป อันอื่น ๆ เก็บไว้") — ดูที่ `RmWorkspace` แท็บ appointments
+ */
 const STAGES = [
   { key: 'intake', label: 'เข้ามา' },
   { key: 'call', label: 'โทร' },
   { key: 'contact', label: 'ติดต่อ' },
   { key: 'collect', label: 'เก็บใบสมัคร' },
-  { key: 'appointment', label: 'นัด → มาไหม' },
 ] as const;
 
 type StageKey = (typeof STAGES)[number]['key'];
@@ -166,7 +170,7 @@ export default function RecruitControlPanel() {
     setSearchParams(params, { replace: true });
   };
 
-  const { intake, calling, contact, appointment, attendance, waiting, stale, meta, recruit } = data;
+  const { intake, calling, contact, waiting, stale, meta, recruit } = data;
 
   const row1: BoxDef[] = [
     {
@@ -229,35 +233,6 @@ export default function RecruitControlPanel() {
       tone: 'success',
       title: 'จับคู่ด้วยเบอร์กับรายชื่อบนบอร์ด ERP',
       group: 'collect',
-    },
-    { bucket: 'scheduled', label: 'สำเร็จ · นัดได้', value: appointment.scheduled, tone: 'success', group: 'appointment' },
-    {
-      bucket: 'success_unscheduled',
-      label: 'สำเร็จ · ยังนัดไม่ได้',
-      value: appointment.successNoAppointment,
-      tone: 'warn',
-      group: 'appointment',
-    },
-    {
-      bucket: null,
-      label: 'นัดแล้ว · มา',
-      value: attendance ? attendance.showed : null,
-      sub: attendance
-        ? attendance.overdueNoResult > 0
-          ? `เลยนัดยังไม่บันทึกผล ${attendance.overdueNoResult}`
-          : `นัดข้างหน้า ${attendance.upcoming}`
-        : 'เริ่มบันทึกได้เมื่อรัน migration 089',
-      tone: 'success',
-      title: 'บันทึกผลที่แท็บติดตามนัดหมาย (ปุ่ม ✓มาแล้ว/✗ไม่มา โผล่ตั้งแต่วันนัด)',
-      group: 'appointment',
-    },
-    {
-      bucket: null,
-      label: 'นัดแล้ว · ไม่มา',
-      value: attendance ? attendance.noShow : null,
-      tone: 'danger',
-      title: 'บันทึกผลที่แท็บติดตามนัดหมาย',
-      group: 'appointment',
     },
   ];
 
