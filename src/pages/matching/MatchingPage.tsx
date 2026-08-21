@@ -4163,18 +4163,25 @@ const MatchingPage: React.FC = () => {
                   const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                   return (
                     <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 space-y-2 dark:border-violet-800 dark:bg-violet-950/50">
+                      {/* 🔴 บอก "สถานะตอนนี้" **เสมอ** (เจ้าของสั่ง 21 ส.ค. 2569: *"ให้คนไม่งง"*)
+                          เดิมไม่มี proposal = ไม่โชว์ชิปอะไรเลย → คนอ่านปุ่มข้างล่างเป็นสถานะแทน
+                          แล้วสรุปผิดว่า "ลงงานแล้ว" (เคสการ์ด #1808 ที่ยังอยู่ถัง To do) */}
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-violet-900 dark:text-violet-200">เสนอคนนี้ให้ใบขอ</p>
-                        {current ? (
-                          <span
-                            className={cn(
-                              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                              proposalStatusClass(current.status),
-                            )}
-                          >
-                            <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(current.status)}
-                          </span>
-                        ) : null}
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                            current ? proposalStatusClass(current.status) : TONE.neutral.chip,
+                          )}
+                        >
+                          {current ? (
+                            <>
+                              <CheckCircle2 className="h-3 w-3" /> สถานะตอนนี้: {proposalStatusLabel(current.status)}
+                            </>
+                          ) : (
+                            'สถานะตอนนี้: ยังไม่ได้เสนอ'
+                          )}
+                        </span>
                       </div>
                       {activeElsewhere ? (
                         <p className={cn('rounded-lg border px-2.5 py-2 text-[11px]', TONE.violet.soft, TONE.violet.num)}>
@@ -4238,6 +4245,11 @@ const MatchingPage: React.FC = () => {
                           </button>
                         ) : null}
                       </div>
+                      {/* บอกให้ชัดว่าแถวข้างบนคือ "ปุ่มกดเพื่อบันทึก" ไม่ใช่ป้ายสถานะ
+                          (เจ้าของสั่ง 21 ส.ค. 2569: *"ให้คนไม่งง"*) */}
+                      <p className="text-[11px] text-violet-900/80 dark:text-violet-200/80">
+                        แถวนี้คือ<b>ปุ่มกดเพื่อบันทึก</b> — ปุ่มที่ทึบคือสถานะตอนนี้ · กดปุ่มอื่นเพื่อเปลี่ยนสถานะ
+                      </p>
                       {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                     </div>
                   );
