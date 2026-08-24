@@ -48,6 +48,7 @@ import {
   proposalStatusChip,
   ProposalConflictError,
   PROPOSAL_STATUS_TONE,
+  isSolidProposalAction,
   type ProposalStatus,
   type ProposalConflictInfo,
   type CandidateProposal,
@@ -373,9 +374,18 @@ const CANDIDATE_ACTION_BUTTON_CLASS =
  * ไม่ประกาศสีสถานะซ้ำในหน้านี้: ติดต่อ=น้ำเงิน · จอง=ม่วง · ลงงาน=เขียว · ไม่ผ่าน=แดง
  * "ลงงานแล้ว" เป็นการปิดงานจริงจึงใช้ solid (บล็อกสีอิ่ม) ตัวเดียวในกลุ่ม ที่เหลือเป็นปุ่มพื้นจาง
  */
-function proposalActionButtonClass(status: ProposalStatus): string {
+/**
+ * 🔴 solid = **สถานะปัจจุบันจริงเท่านั้น** — เดิมปุ่ม "ลงงานแล้ว" ถูกทำเขียว solid
+ * ตลอดเวลา (เจาะจง status === 'placed') คนที่ยังไม่ถูกกดอะไรเลยเปิดป๊อปมาก็เห็น
+ * ปุ่มเขียวเด่นเหมือนระบบบอกว่าลงงานแล้ว ทั้งที่ยังอยู่ถัง To do
+ * (เจ้าของทัก 21 ส.ค. 2569: *"คนนี้อยู่ใน Todo ทำ[ไม]บอกลงงานแล้ว"* — การ์ด #1808
+ * ตรวจฐานแล้วไม่มี proposal สักแถว สถานะไม่ได้เพี้ยน เพี้ยนที่สีปุ่ม)
+ */
+function proposalActionButtonClass(status: ProposalStatus, currentStatus?: ProposalStatus | null): string {
   const tone = TONE[PROPOSAL_STATUS_TONE[status]];
-  if (status === 'placed') return cn(CANDIDATE_ACTION_BUTTON_CLASS, 'border-transparent', tone.solid);
+  if (isSolidProposalAction(status, currentStatus)) {
+    return cn(CANDIDATE_ACTION_BUTTON_CLASS, 'border-transparent', tone.solid);
+  }
   return cn(CANDIDATE_ACTION_BUTTON_CLASS, tone.soft, tone.softHover, tone.value);
 }
 
@@ -4153,18 +4163,25 @@ const MatchingPage: React.FC = () => {
                   const activeElsewhere = otherActive && otherActive.job_id !== jobDetail.id ? otherActive : null;
                   return (
                     <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2.5 space-y-2 dark:border-violet-800 dark:bg-violet-950/50">
+                      {/* 🔴 บอก "สถานะตอนนี้" **เสมอ** (เจ้าของสั่ง 21 ส.ค. 2569: *"ให้คนไม่งง"*)
+                          เดิมไม่มี proposal = ไม่โชว์ชิปอะไรเลย → คนอ่านปุ่มข้างล่างเป็นสถานะแทน
+                          แล้วสรุปผิดว่า "ลงงานแล้ว" (เคสการ์ด #1808 ที่ยังอยู่ถัง To do) */}
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-violet-900 dark:text-violet-200">เสนอคนนี้ให้ใบขอ</p>
-                        {current ? (
-                          <span
-                            className={cn(
-                              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                              proposalStatusClass(current.status),
-                            )}
-                          >
-                            <CheckCircle2 className="h-3 w-3" /> {proposalStatusLabel(current.status)}
-                          </span>
-                        ) : null}
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                            current ? proposalStatusClass(current.status) : TONE.neutral.chip,
+                          )}
+                        >
+                          {current ? (
+                            <>
+                              <CheckCircle2 className="h-3 w-3" /> สถานะตอนนี้: {proposalStatusLabel(current.status)}
+                            </>
+                          ) : (
+                            'สถานะตอนนี้: ยังไม่ได้เสนอ'
+                          )}
+                        </span>
                       </div>
                       {activeElsewhere ? (
                         <p className={cn('rounded-lg border px-2.5 py-2 text-[11px]', TONE.violet.soft, TONE.violet.num)}>
@@ -4182,7 +4199,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'contacted')}
-                          className={proposalActionButtonClass('contacted')}
+                          className={proposalActionButtonClass('contacted', current?.status)}
                         >
                           <PhoneCall className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว ✓' : 'ติดต่อแล้ว'}
@@ -4191,7 +4208,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'reserved')}
-                          className={proposalActionButtonClass('reserved')}
+                          className={proposalActionButtonClass('reserved', current?.status)}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว ✓' : 'จองตัว'}
@@ -4200,7 +4217,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'placed')}
-                          className={proposalActionButtonClass('placed')}
+                          className={proposalActionButtonClass('placed', current?.status)}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว ✓' : 'ลงงานแล้ว'}
@@ -4209,7 +4226,7 @@ const MatchingPage: React.FC = () => {
                           type="button"
                           disabled={busy}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'rejected')}
-                          className={proposalActionButtonClass('rejected')}
+                          className={proposalActionButtonClass('rejected', current?.status)}
                         >
                           <UserX className="h-3.5 w-3.5" />
                           {current?.status === 'rejected' ? 'ไม่ผ่าน ✓' : 'ไม่ผ่าน'}
@@ -4228,6 +4245,11 @@ const MatchingPage: React.FC = () => {
                           </button>
                         ) : null}
                       </div>
+                      {/* บอกให้ชัดว่าแถวข้างบนคือ "ปุ่มกดเพื่อบันทึก" ไม่ใช่ป้ายสถานะ
+                          (เจ้าของสั่ง 21 ส.ค. 2569: *"ให้คนไม่งง"*) */}
+                      <p className="text-[11px] text-violet-900/80 dark:text-violet-200/80">
+                        แถวนี้คือ<b>ปุ่มกดเพื่อบันทึก</b> — ปุ่มที่ทึบคือสถานะตอนนี้ · กดปุ่มอื่นเพื่อเปลี่ยนสถานะ
+                      </p>
                       {proposeError ? <p className="text-[11px] text-destructive">{proposeError}</p> : null}
                     </div>
                   );
