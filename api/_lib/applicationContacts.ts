@@ -139,6 +139,34 @@ export async function listContactLogs(applicationId: string): Promise<ContactLog
 }
 
 /**
+ * ผลติดต่อล่าสุดต่อใบ (สำเร็จ/ไม่สำเร็จ) — มุมมองรายชื่อใช้ตัดสิน "ไม่สนใจ" (Phase 5.11)
+ *
+ * ⚠️ ต้องคืน **เวลา** มาด้วย ไม่ใช่แค่ ok — ฝั่งหน้าเว็บเทียบกับเวลาผลโทรเพื่อดูว่าอันไหน
+ * ใหม่กว่า (ปฏิเสธเมื่อวานแล้ววันนี้โทรติดว่าเอางาน ต้องอ่านว่าสนใจ)
+ * ⚠️ ตารางยังไม่ migrate (086) → คืน map ว่าง ไม่โยน (รายชื่อต้องไม่หายเพราะของแถม)
+ */
+export async function loadLatestContactResults(
+  applicationIds: string[],
+): Promise<Map<string, { ok: boolean; at: string }>> {
+  const out = new Map<string, { ok: boolean; at: string }>();
+  if (applicationIds.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<{ application_id: string; ok: boolean; created_at: string }>(
+      `select distinct on (application_id) application_id, ok, created_at
+         from ${table}
+        where application_id = any($1::uuid[])
+        order by application_id, created_at desc`,
+      [applicationIds],
+    );
+    for (const r of rows) out.set(r.application_id, { ok: r.ok, at: r.created_at });
+    return out;
+  } catch (e) {
+    if (isPgUndefinedTable(e)) return out;
+    throw e;
+  }
+}
+
+/**
  * นัดล่าสุดต่อใบ (หลายใบในคิวรีเดียว) — แท็บติดตามนัดหมาย + หน้า PDF ใช้
  * DISTINCT ON เอานัดล่าสุดต่อใบ (เลื่อนนัด = บันทึกรอบใหม่ทับ)
  */

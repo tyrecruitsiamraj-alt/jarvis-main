@@ -50,9 +50,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
       refresh: getQuery(req, 'refresh') === '1',
     });
 
+    /**
+     * `refs=a,b,c` — ส่งเฉพาะคนที่ **ติ๊กเลือก** (Phase 5.12 · เจ้าของสั่งให้มี checkbox
+     * รายคน/ทั้งหมด) · ไม่ส่ง refs = ส่งทั้งชุดเหมือนเดิม (พฤติกรรมเดิมไม่เปลี่ยน)
+     * 🔴 กรองจาก `result.matches` ที่ AI คิดมาเท่านั้น — client ยัด ref อื่นเข้ามาไม่ได้
+     */
+    const wanted = new Set(
+      getQuery(req, 'refs')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    const toSend =
+      wanted.size > 0 ? { ...result, matches: result.matches.filter((m) => wanted.has(m.ref)) } : result;
+
     const dispatch =
       getQuery(req, 'send') === '1'
-        ? await enqueueLumosInterviewForRecall(job as Record<string, unknown>, result)
+        ? await enqueueLumosInterviewForRecall(job as Record<string, unknown>, toSend)
         : null;
 
     res.setHeader?.('Cache-Control', 'no-store');

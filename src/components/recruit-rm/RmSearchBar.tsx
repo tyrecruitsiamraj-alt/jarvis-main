@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive } from 'lucide-react';
+import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -26,9 +26,14 @@ const RmSearchBar: React.FC<{
   onSaveLead: () => void;
   onDeleteLead: () => void;
   onAddApplicant: () => void;
-  /** "ดึงเข้าถังโทร" ทีละหลายคน (เจ้าของเคาะ 11 ส.ค. 2569 รอบหก: ดึงเก็บไป = call hold) */
+  /**
+   * "เก็บไปโทรเอง" ทีละหลายคน — **ปุ่มรวม** ของเดิมสองปุ่ม (เจ้าของเคาะ 22 ส.ค. 2569)
+   * กดทีเดียว = จองใบ (claim) + ล็อกเบอร์กัน AI โทรทับ (call hold)
+   */
   onHoldSelected?: () => void;
   holdingSelected?: boolean;
+  /** "ส่ง AI โทร" ทีละหลายคน — 🔴 ยิงสายจริง ผู้เรียกต้องมี popup ยืนยันรายชื่อก่อนเสมอ */
+  onSendAiSelected?: () => void;
   /** กำลังยิงเก็บ/ลบ Lead อยู่ — ปิดปุ่มกันกดซ้อน (ยิงทีละใบหลายใบพร้อมกัน) */
   leadBusy?: boolean;
   /** อยู่ในมุมมอง "คลังสำรอง (Lead)" อยู่ไหม — สลับป้ายปุ่มและตัวที่เน้น */
@@ -45,6 +50,7 @@ const RmSearchBar: React.FC<{
   onAddApplicant,
   onHoldSelected,
   holdingSelected = false,
+  onSendAiSelected,
   leadBusy = false,
   leadView = false,
   onToggleLeadView,
@@ -78,12 +84,34 @@ const RmSearchBar: React.FC<{
         title={
           selectedCount === 0
             ? 'ติ๊กเลือกแถวก่อน'
-            : `ล็อก ${selectedCount} คนเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทร+บันทึกผลที่หน้าโทรของฉัน`
+            : `จอง ${selectedCount} ใบ + ล็อกเบอร์กัน AI โทรทับ — ไปโทร+บันทึกผลที่แท็บการโทรของฉัน`
         }
         className="jarvis-btn-primary shrink-0 disabled:opacity-50"
       >
         <PhoneCall className="h-3.5 w-3.5" aria-hidden />
-        {holdingSelected ? 'กำลังเก็บ…' : `ดึงเข้าถังโทร${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+        {holdingSelected ? 'กำลังเก็บ…' : `เก็บไปโทรเอง${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+      </button>
+    ) : null}
+
+    {/* ทางเลือกที่สองของงานเดียวกัน — วางคู่กันเพื่อให้เห็นว่าเลือกได้สองทาง
+        🔴 ยิงสายจริง → ผู้เรียกเปิด popup ยืนยันรายชื่อก่อนเสมอ (ปุ่มนี้แค่ถาม) */}
+    {onSendAiSelected ? (
+      <button
+        type="button"
+        onClick={onSendAiSelected}
+        disabled={selectedCount === 0 || holdingSelected}
+        title={
+          selectedCount === 0
+            ? 'ติ๊กเลือกแถวก่อน'
+            : `ส่ง ${selectedCount} คนให้ AI โทร — มีหน้ายืนยันรายชื่อก่อนโทรจริง`
+        }
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-50',
+          TONE.violet.outline,
+        )}
+      >
+        <Bot className="h-3.5 w-3.5" aria-hidden />
+        ส่ง AI โทร{selectedCount > 0 ? ` (${selectedCount})` : ''}
       </button>
     ) : null}
 

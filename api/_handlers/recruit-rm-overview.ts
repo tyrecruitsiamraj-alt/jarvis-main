@@ -19,6 +19,7 @@ import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import {
   bucketCondition,
   buildAttendanceSummarySql,
+  buildAwaitingChoiceSql,
   buildClaimedIdleSql,
   buildOverviewSql,
 } from '../_lib/applicantOverviewSql.js';
@@ -102,6 +103,27 @@ async function handler(req: AuthedReq, res: ApiRes) {
       };
     } catch (e) {
       if (!isPgUndefinedTable(e)) throw e;
+    }
+
+    // กอง "รอเลือกวิธีโทร" (104) — คอลัมน์ยังไม่ migrate = null (ไม่ใช่ 0) แล้วซ่อนกล่องไป
+    let awaitingCallChoice: { total: number; oldestUnclaimedAt: string | null } | null = null;
+    try {
+      const { rows: aw } = await dbQuery<{ n: number; oldest_unclaimed_at: string | null }>(
+        buildAwaitingChoiceSql(),
+        params,
+      );
+      awaitingCallChoice = {
+        total: Number(aw[0]?.n ?? 0),
+        oldestUnclaimedAt: aw[0]?.oldest_unclaimed_at ?? null,
+      };
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      if (code !== '42703' && !isPgUndefinedTable(e)) throw e;
+      flags.push({
+        metric: 'awaitingCallChoice',
+        flag: 'unavailable',
+        note: 'กอง "รอเลือกวิธีโทร" ใช้ได้เมื่อรัน migration 104',
+      });
     }
 
     // ผลติดตามนัด (089) — ตารางยังไม่ migrate = null + ธง (ไม่ใช่ 0)
@@ -188,6 +210,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         over5DaysUncalled: o.over5d_uncalled,
         agingUncalled: { d0_3: o.uncalled_age_0_3, d4_7: o.uncalled_age_4_7, over7: o.uncalled_age_over7 },
         claimedIdle,
+        awaitingCallChoice,
       },
       meta: { generatedAt: new Date().toISOString(), definitionsVersion: 1, flags },
     });

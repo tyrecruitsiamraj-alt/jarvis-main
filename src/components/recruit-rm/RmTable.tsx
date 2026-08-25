@@ -30,6 +30,7 @@ import {
   type RmTab,
 } from '@/lib/recruitRm';
 import type { CallHold } from '@/lib/callHoldsApi';
+import { choiceCountdown } from '@/lib/callChoiceGuard';
 
 /**
  * ตารางใบสมัครของหน้างานสรรหา (RM) — แถวคือ **ใบสมัครจริงจากหน้า /apply**
@@ -149,7 +150,32 @@ const RmTable: React.FC<{
                       className="h-3.5 w-3.5 cursor-pointer accent-sky-600"
                     />
                   </td>
-                  <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(firstName)}</td>
+                  <td className={cn('px-3 py-2', DASH.cellStrong)}>
+                    <span className="flex flex-col leading-tight">
+                      <span>{dashIfEmpty(firstName)}</span>
+                      {/* ป้ายนับถอยหลังของใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9)
+                          ⚠️ เวลาต้องคิดจาก choiceCountdown() ที่เดียว — ป้ายบนจอกับนาทีที่
+                          worker ลงมือต้องเป็นชุดเดียวกัน (ไม่งั้นอ่านว่าเหลือเวลาแต่ AI โทรไปแล้ว) */}
+                      {(() => {
+                        if (!r.unclaimed_at || r.call_choice || r.claimed) return null;
+                        const cd = choiceCountdown(r.unclaimed_at, now);
+                        if (!cd) return null;
+                        const tone = cd.overdue ? TONE.danger : TONE.warn;
+                        return (
+                          <span
+                            title={`ถูกถอดจาก ${r.unclaimed_from_name || 'คนที่เก็บไว้'} เพราะเก็บไว้เกิน 1 วันแล้วยังไม่โทร — ${cd.label}`}
+                            className={cn(
+                              'mt-0.5 w-fit rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
+                              tone.soft,
+                              tone.value,
+                            )}
+                          >
+                            {cd.overdue ? 'ครบกำหนด — AI จะรับไป' : `รอเลือกวิธีโทร · ${cd.hoursLeft} ชม.`}
+                          </span>
+                        );
+                      })()}
+                    </span>
+                  </td>
                   <td className={cn('px-3 py-2', DASH.cellStrong)}>{dashIfEmpty(lastName)}</td>
                   <td className={cn('px-3 py-2 font-mono text-[12px] whitespace-nowrap', DASH.cell)}>
                     <span className="inline-flex items-center gap-1.5">
@@ -309,7 +335,7 @@ const RmTable: React.FC<{
                             disabled = true;
                             label = can.reason;
                           } else {
-                            label = 'ดึงเข้าถังโทรของฉัน (AI จะไม่โทรทับ)';
+                            label = 'เก็บไปโทรเอง — จองใบ + ล็อกเบอร์กัน AI โทรทับ (กดเดียวได้ทั้งคู่)';
                           }
                         }
                         return (

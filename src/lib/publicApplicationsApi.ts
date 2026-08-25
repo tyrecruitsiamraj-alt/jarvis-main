@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 import type { PrepChecklist, SelectionStatus } from '@/lib/selectionProgress';
+import type { CallChoice } from '@/lib/callChoiceGuard';
 
 /** ใบสมัครที่ผู้สมัครกรอกผ่านฟอร์มหน้า /apply */
 export type PublicApplication = {
@@ -11,6 +12,14 @@ export type PublicApplication = {
    */
   last_call_outcome?: string | null;
   last_call_at?: string | null;
+  /**
+   * ผลติดต่อล่าสุดที่ **เจ้าหน้าที่บันทึกเอง** (086) — false = ติดต่อไม่สำเร็จ/ไม่เอางาน
+   * เจ้าของสั่ง 23 ส.ค. 2569: `ok=false` นับเป็น "ไม่สนใจ" ในมุมมองรายชื่อ
+   * ⚠️ ต้องอ่านคู่กับ `last_contact_at` เสมอ — เทียบเวลากับผลโทรว่าอันไหนใหม่กว่า
+   * (กติกาอยู่ที่ `applicantCallOutcome.ts` ที่เดียว ห้ามเทียบเองในไฟล์หน้า)
+   */
+  last_contact_ok?: boolean | null;
+  last_contact_at?: string | null;
   /**
    * เวลาที่ **เจ้าหน้าที่กดโทร** (095) — คนละอันกับ `last_call_at` ข้างบน
    * (อันนั้นคือเวลาที่ได้ **ผล** โทร จากคิว AI หรือถังคนโทร)
@@ -86,6 +95,13 @@ export type PublicApplication = {
   selection_status?: SelectionStatus;
   /** เช็คลิสต์เตรียมเข้างาน — คีย์ที่ไม่มี = ยังไม่ติ๊ก */
   prep_checklist?: PrepChecklist;
+  /**
+   * หน่วยงานที่กำลังพิจารณา (Phase 6.6 · ตารางกลาง 105)
+   * ⚠️ ชื่อฟิลด์เป็น `unit_name_progress` **ไม่ใช่ `unit_name`** เพราะ `unit_name` ของใบสมัคร
+   * คือ "สมัครมาที่หน่วยงานไหน" (คนละคำถาม) — ทับกันเมื่อไหร่คอลัมน์หน่วยงานบนตารางเพี้ยน
+   */
+  unit_site_code?: string;
+  unit_name_progress?: string;
   created_at: string;
   /** "เก็บไปติดต่อ" (13 ส.ค. 2569) — claimed = มีคนเก็บแล้ว · claimed_by_me = ของฉัน
    * ชื่อคนเก็บ server ส่งมาเฉพาะของตัวเอง (คนอื่นไม่เห็นชื่อ — เจ้าของสั่ง) */
@@ -100,6 +116,17 @@ export type PublicApplication = {
   is_lead?: boolean;
   lead_by_name?: string;
   lead_at?: string;
+  /**
+   * วงจร "กันชื่อดอง" (migration 104 · Phase 5.7-5.10)
+   * `unclaimed_at` = เวลาที่ worker ถอด claim เพราะดองเกิน 1 วัน (undefined = ไม่อยู่ในวงจร)
+   * `call_choice` = วิธีโทรที่ถูกเลือกแล้ว · undefined + มี unclaimed_at = **รอเลือกวิธีโทร**
+   * ⚠️ ป้ายนับถอยหลังบนแถวต้องคิดจาก `unclaimed_at` ผ่าน `choiceCountdown()` ที่เดียว
+   */
+  unclaimed_at?: string;
+  unclaimed_from_name?: string;
+  call_choice?: CallChoice;
+  call_choice_at?: string;
+  call_choice_by_name?: string;
 };
 
 export type ApplicationReferralSource = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
@@ -432,6 +459,37 @@ export async function claimJobApplication(id: string, claim: boolean): Promise<P
   }
   const body = (await r.json()) as { item: PublicApplication };
   return body.item;
+}
+
+/**
+ * เลือกวิธีโทร — เส้นเดียวของทั้งปุ่ม **"เก็บไปโทรเอง"** (`manual` = จองใบ + ล็อกเบอร์
+ * กัน AI ทับ · รวมสองปุ่มเดิมเข้าด้วยกันตามที่เจ้าของเคาะ 22 ส.ค. 2569) และปุ่ม
+ * **"ส่ง AI โทร"** (`ai`) ในกอง "เลือกวิธีโทร"
+ *
+ * ⚠️ `skipped` ต้องเอาไปโชว์เสมอ — บางใบเก็บได้แต่ล็อกเบอร์ไม่ได้ (ไม่มีเบอร์/ไม่ผูกใบขอ)
+ * ซึ่งแปลว่า AI ยังโทรทับได้ · กลืนทิ้ง = คนเข้าใจผิดว่าปลอดภัยแล้ว
+ */
+export type CallChoiceOutcome = {
+  choice: 'manual' | 'ai';
+  done: number;
+  skipped: Array<{ name: string; reason: string }>;
+};
+
+export async function chooseApplicationCall(
+  ids: string[],
+  choice: 'manual' | 'ai',
+): Promise<CallChoiceOutcome> {
+  const r = await apiFetch('/api/application-call-choice', {
+    method: 'POST',
+    body: JSON.stringify({ ids, choice }),
+  });
+  if (!r.ok) {
+    const body = (await r.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(
+      body?.message || (choice === 'manual' ? 'เก็บไปโทรเองไม่สำเร็จ' : 'ส่ง AI โทรไม่สำเร็จ'),
+    );
+  }
+  return (await r.json()) as CallChoiceOutcome;
 }
 
 /**

@@ -365,6 +365,27 @@ export default function RecruitControlPanel() {
               </button>
             ) : null}
           </div>
+          {/* กอง "รอเลือกวิธีโทร" (Phase 5.9) — ต่อท้ายกล่องเดียวกันเพราะเป็นขั้นถัดไปของ
+              เรื่องเดียวกัน (ดองเกิน 1 วัน → ถูกถอด → รอเลือก) · null = ยังไม่รัน 104 = ซ่อน
+              🔴 ห้ามเพิ่มกล่องใบใหม่ (เจ้าของ: "เยอะไปอะดูรก") */}
+          {stale.awaitingCallChoice && stale.awaitingCallChoice.total > 0 ? (
+            <button
+              type="button"
+              onClick={() => setBucket('awaiting_call_choice')}
+              title="กดเพื่อดูรายชื่อที่รอเลือกวิธีโทร — ไม่เลือกใน 1 วัน AI จะรับไปโทรเอง"
+              className={cn(
+                'mt-1 block w-full rounded-lg border px-2 py-1 text-left text-[11px]',
+                TONE.warn.soft,
+                TONE.warn.softHover,
+                activeBucket === 'awaiting_call_choice' ? 'ring-2 ring-ring' : '',
+              )}
+            >
+              <span className={cn('font-semibold', TONE.warn.value)}>
+                รอเลือกวิธีโทร {stale.awaitingCallChoice.total} ใบ
+              </span>
+              <span className={cn('ml-1', DASH.muted)}>— ไม่เลือกใน 1 วัน AI รับไปโทรเอง</span>
+            </button>
+          ) : null}
           {/* เจ้าของเคาะ 15 ส.ค.: โชว์ชื่อคนเก็บบน dashboard ให้ทุกคนเห็น (ยอดรวมต่อคน) */}
           {showIdleUsers ? (
             <ul className="mt-1 space-y-0.5 text-[11px]">

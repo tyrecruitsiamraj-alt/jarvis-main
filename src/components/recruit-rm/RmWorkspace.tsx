@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
+import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import RmSearchBar from '@/components/recruit-rm/RmSearchBar';
 import RmTable from '@/components/recruit-rm/RmTable';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
@@ -27,12 +28,16 @@ import {
   type RmTab,
 } from '@/lib/recruitRm';
 import {
+  chooseApplicationCall,
   fetchAllJobApplications,
   markApplicationDialed,
   recordAppointmentAttendance,
   setJobApplicationLead,
+  type CallChoiceOutcome,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import { summarizeCallChoice } from '@/lib/callChoiceSummary';
+import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
 import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttendance';
 import { buildAppointmentBoard } from '@/lib/appointmentBoard';
 import { fetchRecruitRmOverview, type RecruitRmOverview } from '@/lib/recruitRmOverviewApi';
@@ -43,17 +48,9 @@ import {
   summarizeLeadUpdate,
   type LeadUpdateResult,
 } from '@/lib/recruitLead';
-import {
-  acquireCallHold,
-  fetchCallHoldsByPhones,
-  type CallHold,
-} from '@/lib/callHoldsApi';
-import {
-  partitionHoldTargets,
-  summarizeAcquireResults,
-  type HoldTarget,
-} from '@/lib/callHoldsBulk';
+import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { canHoldApplication } from '@/lib/recruitRm';
+import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
@@ -74,6 +71,9 @@ import { useAuth } from '@/contexts/AuthContext';
  */
 
 const PAGE_SIZE_DEFAULT: PageSizeOption = 20;
+
+/** แถวที่โชว์ในแถบ "เลือกวิธีโทร" ก่อนยุบ — เกินนี้ใช้ปุ่มทั้งหมด/กล่องบนแดชบอร์ด */
+const AWAITING_ROWS_SHOWN = 5;
 
 function isRmTab(v: string | null): v is RmTab {
   return !!v && (RM_TABS as readonly string[]).includes(v);
@@ -202,6 +202,22 @@ const RmWorkspace: React.FC<{
       .catch((e) => setNotice(e instanceof Error ? e.message : 'บันทึกผลนัดไม่สำเร็จ'));
   };
 
+  /**
+   * ตัวกรองวันที่สมัคร (เจ้าของสั่ง 22 ส.ค. 2569: *"หน้าผู้สมัครขอเป็นแบบ filter แบบ
+   * calendar ที่กดแล้วข้อมูลเปลี่ยนตามวันที่เลือก"*)
+   *
+   * ⚠️ ไม่ผูกกับ URL — ต่างจากแท็บ/มุมมอง/bucket ที่คนแชร์ลิงก์กันจริง
+   * ช่วงวันเป็นของ "คนที่กำลังนั่งดู" ไม่ใช่ของลิงก์ (และ bucket drill-down
+   * มีความหมายของช่วงเวลาอยู่ในตัวแล้ว)
+   */
+  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(null);
+  /** เปลี่ยนช่วงวัน = กลับหน้า 1 + ล้างที่ติ๊กไว้ (ของที่ติ๊กอาจหลุดออกจากชุดที่เห็นแล้ว) */
+  const changeDateRange = (next: DateRangeYmd | null) => {
+    setDateRange(next);
+    setPage(1);
+    setSelectedIds([]);
+  };
+
   /** จำนวนต่อแท็บ — นิยามเดียวกับตัวกรอง (isInRmTab) เลขบนแท็บจึงตรงกับที่เห็นเสมอ */
   const tabCounts = useMemo(() => {
     const out = {} as Record<RmTab, number>;
@@ -209,18 +225,38 @@ const RmWorkspace: React.FC<{
     return out;
   }, [rows]);
 
+  /** ตัวกรองที่หน้านี้ใช้จริง — สามกลุ่มเดิมไม่มี UI แล้ว (ถอด 17 ส.ค. 2569) เหลือช่วงวันที่ */
+  const rmFilters = useMemo(
+    () => ({ ...EMPTY_RM_FILTERS, dateFrom: dateRange?.from ?? null, dateTo: dateRange?.to ?? null }),
+    [dateRange],
+  );
+
   const filtered = useMemo(() => {
     // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
     // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
     if (bucket) return rows;
-    const base = filterApplications(rows, tab, EMPTY_RM_FILTERS, keyword);
+    const base = filterApplications(rows, tab, rmFilters, keyword);
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
-  }, [rows, tab, keyword, listView, bucket]);
+  }, [rows, tab, keyword, listView, bucket, rmFilters]);
 
   /** บอร์ดสรุปนัดต่อวัน (ข้อ 12 · 20 ส.ค. 2569) — คิดจากชุดเดียวกับตาราง เลขจึงตรงกันเสมอ */
   const appointmentBoard = useMemo(() => buildAppointmentBoard(filtered), [filtered]);
+
+  /**
+   * ใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9) — คิดจาก **ชุดที่โหลดมาทั้งก้อน** ไม่ใช่
+   * `filtered` เพราะแถบนี้เป็น "งานที่ต้องลงมือ" ระดับหน้า ไม่ใช่ผลของตัวกรอง/คำค้น
+   * (กรองอยู่แล้วเห็นเลขน้อยลง = คนคิดว่างานหมดแล้ว)
+   * ⚠️ ต้องเช็ค `!r.claimed` ด้วย — มีคนกดเก็บใหม่ระหว่างรอ = ไม่ต้องเลือกอีก
+   */
+  const awaitingChoiceRows = useMemo(
+    () => rows.filter((r) => r.unclaimed_at && !r.call_choice && !r.claimed),
+    [rows],
+  );
+  /** หมุดเวลาเดียวต่อการ render — ทุกป้ายนับถอยหลังจึงนับจากจุดเดียวกัน
+   *  (แพตเทิร์นเดียวกับ RmTable ที่จับเวลาครั้งเดียวต่อ render ไม่ต้อง memo) */
+  const now = new Date();
 
   /**
    * ก้อน "นัด → มาไหม" ที่ย้ายมาจากศูนย์คุมงานสรรหา (เจ้าของสั่ง 20 ส.ค. 2569 —
@@ -247,11 +283,11 @@ const RmWorkspace: React.FC<{
 
   /** เลขบนปุ่มมุมมองย่อย — นับหลังตัวกรอง/คำค้นเดียวกัน เลขจึงตรงกับที่เห็นเสมอ */
   const listViewCounts = useMemo(() => {
-    const base = filterApplications(rows, 'candidates', EMPTY_RM_FILTERS, keyword);
+    const base = filterApplications(rows, 'candidates', rmFilters, keyword);
     const out = {} as Record<RmListView, number>;
     for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
     return out;
-  }, [rows, keyword]);
+  }, [rows, keyword, rmFilters]);
 
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);
@@ -311,48 +347,66 @@ const RmWorkspace: React.FC<{
   /** ปุ่มแถวที่ยังไม่ต่อของจริง — ขึ้นข้อความ ดีกว่ากดแล้วเงียบ */
   const todo = (what: string) => setNotice(`${what} — ยังไม่ได้ต่อกับระบบจริง`);
 
-  /** สร้าง HoldTarget จากใบสมัคร — source 'application' · ref = application id (แค่ display) */
-  const toHoldTarget = (row: PublicApplication): HoldTarget => ({
-    candidateRef: row.id,
-    candidateName: row.full_name,
-    phone: row.phone ?? null,
-    jobId: row.job_id ?? null,
-    requestNo: null,
-    source: 'application',
-  });
-
-  /** ยิงจับล็อกเป็นชุด (sequential — DB ตัดสินการชนที่เบอร์) แล้วสรุปเป็น notice เดียว */
-  const acquireTargets = async (targets: HoldTarget[]) => {
-    const { ready, noPhone, noJob } = partitionHoldTargets(targets);
-    const results: Array<{ target: HoldTarget; result: Awaited<ReturnType<typeof acquireCallHold>> }> = [];
-    for (const t of ready) {
-      const result = await acquireCallHold({
-        phone: t.phone!,
-        source: t.source,
-        candidateRef: t.candidateRef,
-        candidateName: t.candidateName,
-        jobId: t.jobId!,
-        requestNo: t.requestNo ?? null,
-      });
-      results.push({ target: t, result });
-      const hold = result.ok ? result.hold : result.heldBy;
-      if (hold) setHoldByRef((prev) => ({ ...prev, [t.candidateRef]: hold }));
+  /**
+   * "เก็บไปโทรเอง" — ปุ่มเดียวที่รวม claim + ล็อกเบอร์ (เจ้าของเคาะ 22 ส.ค. 2569)
+   *
+   * 🔴 ยิงเส้นเดียว `/api/application-call-choice` ให้ **server ทำทั้งสองอย่างในคำสั่งเดียว**
+   * ห้ามให้หน้าเว็บยิงสองเส้นเอง: เดิมทำแบบนั้นแล้วมีสภาพครึ่ง ๆ (จองใบได้แต่เบอร์ไม่ถูกล็อก
+   * = AI โทรทับ) โดยที่คนกดไม่รู้ · ตอนนี้ server รายงาน skipped กลับมาให้อ่านได้ทุกใบ
+   */
+  const keepForSelf = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setNotice(null);
+    try {
+      const outcome = await chooseApplicationCall(ids, 'manual');
+      setNotice(`${summarizeCallChoice(outcome)} — ไปโทร+บันทึกผลที่แท็บ "การโทรของฉัน"`);
+      load(); // ใบย้ายแท็บ (claimed_by_me) + ป้ายล็อกเปลี่ยน ต้องเห็นทันที
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
     }
-    const summary = summarizeAcquireResults({
-      results,
-      viewerName: user?.email ?? null,
-      skippedNoPhone: noPhone.length,
-      skippedNoJob: noJob.length,
-    });
-    setNotice(`${summary} — ไปโทร+บันทึกผลที่หน้า "โทรของฉัน"`);
   };
+
+  /**
+   * "ส่ง AI โทร" — ยิงสายจริง จึงต้องผ่าน popup ยืนยันรายชื่อทุกครั้ง (กติกาเจ้าของ)
+   * เก็บ id ที่รอยืนยันไว้ก่อน แล้วยิงตอนกดยืนยันในป๊อป
+   */
+  const [aiConfirmIds, setAiConfirmIds] = useState<string[] | null>(null);
+  const [aiSending, setAiSending] = useState(false);
+  const askSendAi = (ids: string[]) => {
+    if (ids.length === 0) return;
+    setNotice(null);
+    setAiConfirmIds(ids);
+  };
+  const confirmSendAi = async () => {
+    if (!aiConfirmIds || aiSending) return;
+    setAiSending(true);
+    try {
+      const outcome: CallChoiceOutcome = await chooseApplicationCall(aiConfirmIds, 'ai');
+      setNotice(summarizeCallChoice(outcome));
+      setAiConfirmIds(null);
+      setSelectedIds([]);
+      load();
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
+      setAiConfirmIds(null);
+    } finally {
+      setAiSending(false);
+    }
+  };
+  /** ชื่อของ id ที่รอยืนยัน — ป๊อปต้องโชว์ชื่อจริง ไม่ใช่แค่จำนวน */
+  const aiConfirmNames = useMemo(
+    () =>
+      (aiConfirmIds ?? [])
+        .map((id) => rows.find((r) => r.id === id)?.full_name)
+        .filter((n): n is string => Boolean(n)),
+    [aiConfirmIds, rows],
+  );
 
   const onRowAction = (action: RmRowAction, row: PublicApplication) => {
     if (action === 'call') {
       // ปุ่มถูก disable ไว้แล้วถ้าจับไม่ได้ — เช็คซ้ำกันหลุดจาก keyboard/สคริปต์
       if (!canHoldApplication(row).ok || holdByRef[row.id]) return;
-      setNotice(null);
-      void acquireTargets([toHoldTarget(row)]);
+      void keepForSelf([row.id]);
       return;
     }
     /**
@@ -391,17 +445,13 @@ const RmWorkspace: React.FC<{
     todo(`"${RM_ROW_ACTION_LABEL[action]}" ของ ${row.full_name}`);
   };
 
-  /** "ดึงเข้าถังโทร" จากแถวที่ติ๊ก — ทำงานได้ทุกแท็บ (นิยาม "ดึงเก็บไป" ที่เจ้าของเคาะ) */
-  const holdSelectedForSelf = async () => {
+  /** "เก็บไปโทรเอง" จากแถวที่ติ๊ก — ทำงานได้ทุกแท็บ (ปุ่มรวมของเจ้าของ 22 ส.ค. 2569) */
+  const keepSelectedForSelf = async () => {
     if (selectedIds.length === 0 || holdingSelected) return;
     setHoldingSelected(true);
-    setNotice(null);
     try {
-      const targets = pageRows.filter((r) => selectedIds.includes(r.id)).map(toHoldTarget);
-      await acquireTargets(targets);
+      await keepForSelf(pageRows.filter((r) => selectedIds.includes(r.id)).map((r) => r.id));
       setSelectedIds([]);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'ดึงเข้าถังโทรไม่สำเร็จ');
     } finally {
       setHoldingSelected(false);
     }
@@ -496,7 +546,23 @@ const RmWorkspace: React.FC<{
 
       {/* แผงตัวกรองด้านข้าง (ช่องทางสมัคร/จังหวัด/สถานะใบสมัคร) ถูกถอดออกทั้งหมด
           (เจ้าของสั่ง 17 ส.ค. 2569: "เอาออกจากทุกหน้าไปเลย") — คัดรายชื่อใช้
-          แท็บ + มุมมองย่อย + ช่องค้นหาที่มีอยู่แล้ว */}
+          แท็บ + มุมมองย่อย + ช่องค้นหาที่มีอยู่แล้ว
+          🔴 ห้ามเอาสามกลุ่มนั้นกลับมาโดยไม่ได้สั่งใหม่ */}
+
+      {/* ตัวกรองวันที่สมัคร (เจ้าของสั่ง 22 ส.ค. 2569) — ใช้ปฏิทินตัวเดียวกับหน้า Dashboard
+          ⚠️ ไม่โผล่ในโหมด drill-down (?bucket=) เพราะ server กรองมาแล้ว
+          ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
+      {!bucket ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className={cn('text-xs font-medium', DASH.label)}>วันที่สมัคร</span>
+          <DateRangeCalendarPicker value={dateRange} onChange={changeDateRange} />
+          {dateRange ? (
+            <span className={cn('text-xs', DASH.sub)}>
+              กรองแล้ว — เหลือ {filtered.length.toLocaleString('th-TH')} รายชื่อ
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-4">
         <div className="min-w-0 flex-1 space-y-3">
           {/* ⚠️ RmToolbar (ช่องทาง/สร้างลิงก์/เหตุผล) ถูกเอาออก (เจ้าของสั่ง 14 ส.ค. 2569:
@@ -517,8 +583,9 @@ const RmWorkspace: React.FC<{
               leadBusy={leadBusy}
               leadView={leadView}
               onAddApplicant={() => setAddOpen(true)}
-              onHoldSelected={() => void holdSelectedForSelf()}
+              onHoldSelected={() => void keepSelectedForSelf()}
               holdingSelected={holdingSelected}
+              onSendAiSelected={() => askSendAi(selectedIds)}
             />
           </div>
 
@@ -569,7 +636,7 @@ const RmWorkspace: React.FC<{
                           'success',
                           rmOverview.attendance
                             ? rmOverview.attendance.overdueNoResult > 0
-                              ? `เลยนัดยังไม่บันทึกผล ${rmOverview.attendance.overdueNoResult}`
+                              ? null // เลขนี้แยกไปเป็นกล่องกดได้ข้างล่าง (Phase 7.6)
                               : `นัดข้างหน้า ${rmOverview.attendance.upcoming}`
                             : null,
                         ],
@@ -590,6 +657,31 @@ const RmWorkspace: React.FC<{
                       </div>
                     ))}
                   </div>
+                  {/* Phase 7.6 — เลข "เลยนัดยังไม่บันทึกผล" เดิมเป็นข้อความเฉย ๆ กดไม่ได้
+                      ตอนนี้เป็นกล่องกดแล้วลงไปเห็นรายชื่อจริง (ถัง `overdue_no_result`
+                      นิยามเดียวกับตัวนับ — เทสต์ bucket-parity คุมอยู่) */}
+                  {rmOverview.attendance && rmOverview.attendance.overdueNoResult > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams);
+                        params.set('bucket', 'overdue_no_result');
+                        setSearchParams(params, { replace: true });
+                        setSelectedIds([]);
+                        setPage(1);
+                      }}
+                      className={cn(
+                        'w-full rounded-xl border px-3 py-2 text-left text-xs',
+                        TONE.danger.soft,
+                        TONE.danger.softHover,
+                      )}
+                    >
+                      <span className={cn('font-semibold', TONE.danger.value)}>
+                        เลยวันนัดแล้วยังไม่บันทึกผล {rmOverview.attendance.overdueNoResult} ใบ
+                      </span>
+                      <span className={cn('ml-1', DASH.muted)}>— กดเพื่อดูรายชื่อและบันทึก มา/ไม่มา</span>
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -696,6 +788,89 @@ const RmWorkspace: React.FC<{
                   </button>
                 </div>
               ) : null}
+              {/* กอง "เลือกวิธีโทร" (Phase 5.9) — ใบที่ worker ถอด claim เพราะดองเกิน 1 วัน
+                  🔴 ซ่อนตัวเองเมื่อไม่มีของ (แพตเทิร์นเดียวกับ MyCallsSection) — แถบที่ขึ้น
+                  ทุกวันด้วยเลข 0 คือขยะ (เจ้าของ: "ของน้อยคือสัญญาณ ของเยอะคือพื้นหลัง") */}
+              {awaitingChoiceRows.length > 0 ? (
+                <div className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.warn.soft)}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className={cn('text-xs font-semibold', TONE.warn.value)}>
+                      ต้องเลือกวิธีโทร {awaitingChoiceRows.length.toLocaleString('th-TH')} คน —
+                      ถูกถอดจากคนที่เก็บไว้แล้วไม่โทรเกิน 1 วัน
+                    </p>
+                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void keepForSelf(awaitingChoiceRows.map((r) => r.id))}
+                        className="jarvis-btn-secondary"
+                      >
+                        เก็บไปโทรเองทั้งหมด
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => askSendAi(awaitingChoiceRows.map((r) => r.id))}
+                        className="jarvis-btn-primary"
+                      >
+                        ส่ง AI โทรทั้งหมด
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="space-y-1">
+                    {awaitingChoiceRows.slice(0, AWAITING_ROWS_SHOWN).map((r) => {
+                      const cd = choiceCountdown(r.unclaimed_at, now);
+                      return (
+                        <li
+                          key={r.id}
+                          className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1 text-[11px] first:border-0 first:pt-0"
+                        >
+                          <span className="min-w-0">
+                            <b className={DASH.cellStrong}>{r.full_name}</b>
+                            {r.unclaimed_from_name ? (
+                              <span className={DASH.muted}> · เดิม {r.unclaimed_from_name} เก็บไว้</span>
+                            ) : null}
+                            {cd ? (
+                              <span className={cd.overdue ? TONE.danger.value : TONE.warn.value}>
+                                {' '}
+                                · {cd.label}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void keepForSelf([r.id])}
+                              className={cn(
+                                // min-h-9 = 36px กดโดนด้วยนิ้วบนมือถือ (เกณฑ์ของ panel เอกสาร)
+                                'inline-flex min-h-9 items-center rounded-full border px-3 font-semibold',
+                                TONE.primary.outline,
+                              )}
+                            >
+                              โทรเอง
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => askSendAi([r.id])}
+                              className={cn(
+                                'inline-flex min-h-9 items-center rounded-full border px-3 font-semibold',
+                                TONE.violet.outline,
+                              )}
+                            >
+                              ส่ง AI โทร
+                            </button>
+                          </span>
+                        </li>
+                      );
+                    })}
+                    {awaitingChoiceRows.length > AWAITING_ROWS_SHOWN ? (
+                      <li className={cn('pt-1 text-[11px]', DASH.muted)}>
+                        และอีก {awaitingChoiceRows.length - AWAITING_ROWS_SHOWN} คน — ใช้ปุ่ม
+                        "ทั้งหมด" ด้านบน หรือกดกล่อง "รอเลือกวิธีโทร" บนแดชบอร์ดเพื่อดูครบ
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
+              ) : null}
+
               {/* rm-print-area: ตอนกด "โหลดเป็น PDF" print CSS จะโชว์เฉพาะก้อนนี้
                   (เฉพาะแท็บนัดหมาย — แท็บอื่นพิมพ์ทั้งหน้าตามปกติ) */}
               <div className={tab === 'appointments' ? 'rm-print-area' : undefined}>
@@ -735,6 +910,15 @@ const RmWorkspace: React.FC<{
           setNotice('บันทึกผู้สมัครแล้ว');
           load(); // ใบใหม่ต้องโผล่ในตารางทันที ไม่ต้องให้กดรีเฟรชเอง
         }}
+      />
+
+      {/* ยืนยันก่อนให้ AI โทรจริง — โชว์รายชื่อ (Phase 5.9/5.12 · กติกา: ปุ่มที่ยิงสายต้องมีป๊อป) */}
+      <CallChoiceConfirmDialog
+        open={aiConfirmIds !== null}
+        names={aiConfirmNames}
+        busy={aiSending}
+        onCancel={() => setAiConfirmIds(null)}
+        onConfirm={() => void confirmSendAi()}
       />
 
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}

@@ -13,6 +13,7 @@ import {
   type MonthlyIncomeItem,
 } from '../../_lib/siamrajJobBenefits.js';
 import { attachNotes, attachWorkStatus } from '../siamraj-unit-requests.js';
+import { isReleased, loadReleasedJobKeys } from '../../_lib/jobPublicReleases.js';
 import {
   isPublicPrequestEnabled,
   isPublicVisibleByPrequest,
@@ -243,13 +244,30 @@ function prequestPublicEnabled(): boolean {
   return isPublicPrequestEnabled(process.env.PUBLIC_PREQUEST_JOBS_ENABLED);
 }
 
+/**
+ * ด่านที่ 4: **ปล่อยขึ้นหน้าสาธารณะแล้วหรือยัง** (เจ้าของเคาะ 22 ส.ค. 2569 — กลับด้านหมด)
+ *
+ * ก่อนมีด่านนี้ ใบขอที่เปิดอยู่ขึ้นหน้า `/apply` เองทุกใบ (วัดจริง 283 ใบ) ทีมไม่มีทางเลือก
+ * ว่าใบไหนให้คนนอกเห็น และไม่มีจังหวะแก้รายได้/สวัสดิการก่อนปล่อย
+ *
+ * 🔴 **อ่านทะเบียนไม่ได้ = ไม่ปล่อยอะไรเลย** (fail-closed)
+ * ต่างจากด่านอื่นในไฟล์นี้ที่ "อ่านไม่ได้ = ไม่กรอง" โดยตั้งใจ — เพราะสองอย่างนั้นคนละความเสี่ยง:
+ *   · ด่าน work_status พลาด = ประกาศที่ได้คนแล้วค้างอยู่ (น่ารำคาญ)
+ *   · ด่านนี้พลาด = **ใบที่ทีมยังไม่อยากให้คนนอกเห็น หลุดออกไปทั้งกอง** (กู้คืนไม่ได้)
+ */
+async function onlyReleasedJobs<T extends Record<string, unknown>>(jobs: T[]): Promise<T[]> {
+  const keys = await loadReleasedJobKeys();
+  return jobs.filter((j) => isReleased(keys, String(j.id ?? '')));
+}
+
 async function listPublicSiamrajJobs(limit: number): Promise<PublicJob[]> {
   const items = await listSiamrajUnitRequests({ limit, mode: 'all' });
   const prequestOk = prequestPublicEnabled();
   const open = items.filter(
     (j) => isPublicVisible(j) && isPublicVisibleByPrequest(j, prequestOk),
   ) as unknown as Array<Record<string, unknown>>;
-  const stillHiring = await withStaffOverrides(await withoutFilledJobs(open));
+  const released = await onlyReleasedJobs(open);
+  const stillHiring = await withStaffOverrides(await withoutFilledJobs(released));
   return stillHiring.map((j) => toPublicJob(j as unknown as JobRow));
 }
 
@@ -259,6 +277,11 @@ async function getPublicSiamrajJob(id: string): Promise<PublicJob | null> {
   if (!isPublicVisibleByPrequest({ id }, prequestPublicEnabled())) return null;
   const item = await getSiamrajUnitRequestById(id);
   if (!item || !isPublicVisible(item)) return null;
+  // ด่านปล่อยใบ — เปิดตรงด้วยลิงก์ก็ต้องผ่านด่านเดียวกับหน้ารวม
+  // (ไม่งั้นลิงก์ที่คนแชร์ไว้ยังพาไปสมัครใบที่ทีมยังไม่ปล่อย)
+  if ((await onlyReleasedJobs([item as unknown as Record<string, unknown>])).length === 0) {
+    return null;
+  }
   // เปิดตรงด้วยลิงก์ก็ต้องซ่อนเหมือนกัน — ไม่งั้นลิงก์เก่าที่คนแชร์ไว้ยังพาไปสมัครใบที่ได้คนแล้ว
   const visible = await withStaffOverrides(
     await withoutFilledJobs([item as unknown as Record<string, unknown>]),

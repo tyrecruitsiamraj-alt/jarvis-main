@@ -49,15 +49,66 @@ export function isKnownOutcome(outcome: string | null | undefined): outcome is C
 }
 
 /**
- * แยกใบสมัครเป็น "ทั้งหมด / สนใจ / ไม่สนใจ" ด้วยผลโทรที่แนบมากับแต่ละใบ
+ * สัญญาณที่ตัดสิน "สนใจ / ไม่สนใจ" ต่อใบ — มาได้ **สองทาง** ที่ต้องเทียบเวลากัน:
+ *   ① ผลโทร (AI ในคิว / คนบันทึกผลบนล็อก) → `last_call_outcome` + `last_call_at`
+ *   ② บันทึกผลติดต่อของเจ้าหน้าที่ (contact log 086) → `last_contact_ok` + `last_contact_at`
+ *
+ * 🔴 เจ้าของสั่ง 23 ส.ค. 2569 (Phase 5.11): **ผลติดต่อ `ok=false` นับเป็น "ไม่สนใจ"**
+ * เดิมมุมมองรายชื่ออ่านแค่ทาง ① → คนที่เจ้าหน้าที่กดว่า "ติดต่อไม่สำเร็จ" หล่นอยู่ใน
+ * "ทั้งหมด" เฉย ๆ ไม่เข้าถังไหน แล้วก็ถูกไล่โทรซ้ำวนไปเรื่อย
+ *
+ * ⚠️ **อันที่ใหม่กว่าชนะ** (แพตเทิร์นเดียวกับ `LATEST_CLASS_SQL` ฝั่ง dashboard) —
+ * ปฏิเสธเมื่อวานแล้ววันนี้โทรติดว่าเอางาน ต้องอ่านว่าสนใจ ไม่ใช่ค้างเป็นไม่สนใจตลอดไป
+ */
+export type ApplicantInterestSignals = {
+  last_call_outcome?: string | null;
+  last_call_at?: string | null;
+  /** ผลติดต่อล่าสุดที่เจ้าหน้าที่บันทึก (086) — false = ติดต่อไม่สำเร็จ/ไม่เอางาน */
+  last_contact_ok?: boolean | null;
+  last_contact_at?: string | null;
+};
+
+/** เวลาของสัญญาณ (ms) — อ่านไม่ได้/ไม่มี = -1 (แพ้ทุกอย่างที่มีเวลาจริง) */
+function stamp(iso: string | null | undefined): number {
+  if (!iso) return -1;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? -1 : t;
+}
+
+/** สัญญาณไหนใหม่กว่า — 'contact' | 'call' | null (ไม่มีทั้งคู่) */
+function newerSignal(a: ApplicantInterestSignals): 'contact' | 'call' | null {
+  const hasContact = typeof a.last_contact_ok === 'boolean';
+  const hasCall = Boolean(a.last_call_outcome);
+  if (!hasContact && !hasCall) return null;
+  if (hasContact && !hasCall) return 'contact';
+  if (!hasContact && hasCall) return 'call';
+  // มีทั้งคู่ — เทียบเวลา · เสมอ/ไม่มีเวลา ให้ contact log ชนะ (บันทึกเจาะจงใบนี้ตรง ๆ)
+  return stamp(a.last_call_at) > stamp(a.last_contact_at) ? 'call' : 'contact';
+}
+
+/** ใบนี้อ่านว่า "สนใจ" ไหม — สัญญาณล่าสุดต้องเป็นผลโทรที่ตอบว่าเอางาน */
+export function isInterestedApplicant(a: ApplicantInterestSignals): boolean {
+  return newerSignal(a) === 'call' && isInterestedOutcome(a.last_call_outcome);
+}
+
+/** ใบนี้อ่านว่า "ไม่สนใจ" ไหม — ปฏิเสธตอนโทร **หรือ** ผลติดต่อล่าสุด ok=false */
+export function isNotInterestedApplicant(a: ApplicantInterestSignals): boolean {
+  const s = newerSignal(a);
+  if (s === 'contact') return a.last_contact_ok === false;
+  if (s === 'call') return isNotInterestedOutcome(a.last_call_outcome);
+  return false;
+}
+
+/**
+ * แยกใบสมัครเป็น "ทั้งหมด / สนใจ / ไม่สนใจ" ด้วยสัญญาณที่แนบมากับแต่ละใบ
  * ⚠️ สนใจ+ไม่สนใจ ≠ ทั้งหมด — คนที่ยังไม่ถูกโทร/ยังติดต่อไม่ได้อยู่แค่ใน "ทั้งหมด"
  */
-export function splitInterested<T extends { last_call_outcome?: string | null }>(
+export function splitInterested<T extends ApplicantInterestSignals>(
   items: T[],
 ): { all: T[]; interested: T[]; notInterested: T[] } {
   return {
     all: items,
-    interested: items.filter((a) => isInterestedOutcome(a.last_call_outcome)),
-    notInterested: items.filter((a) => isNotInterestedOutcome(a.last_call_outcome)),
+    interested: items.filter(isInterestedApplicant),
+    notInterested: items.filter(isNotInterestedApplicant),
   };
 }

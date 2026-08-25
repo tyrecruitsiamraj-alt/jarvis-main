@@ -24,14 +24,17 @@ import {
 import {
   isSelectionStatus,
   normalizePrepChecklist,
+  type SelectionStatus,
 } from '../../src/lib/selectionProgress.js';
+import { isCallChoice } from '../../src/lib/callChoiceGuard.js';
+import { loadProgressByJob, saveProgress } from '../_lib/selectionProgressStore.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
   normalizeRmPhone,
 } from '../../src/lib/recruitRmMasters.js';
 import { loadAppointmentByPhone, loadLatestCallOutcomeByPhone } from '../_lib/applicantCallOutcomes.js';
-import { loadContactAppointments } from '../_lib/applicationContacts.js';
+import { loadContactAppointments, loadLatestContactResults } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
@@ -96,6 +99,12 @@ type Row = {
   dialed_last_at?: string | Date | null;
   dial_count?: number | null;
   prep_checklist?: unknown;
+  /** วงจรกันชื่อดอง (migration 104) — ฐานที่ยังไม่รันจะไม่มีห้าฟิลด์นี้ */
+  unclaimed_at?: string | Date | null;
+  unclaimed_from_name?: string | null;
+  call_choice?: string | null;
+  call_choice_at?: string | Date | null;
+  call_choice_by_name?: string | null;
 };
 
 function toNum(v: string | number | null): number | undefined {
@@ -184,6 +193,17 @@ function toApplication(r: Row, viewerId?: string) {
     dialed_first_at: r.dialed_first_at ? toIso(r.dialed_first_at) : undefined,
     dialed_last_at: r.dialed_last_at ? toIso(r.dialed_last_at) : undefined,
     dial_count: Number(r.dial_count) || 0,
+    /**
+     * วงจรกันชื่อดอง (104) — `unclaimed_at` มีค่า + ยังไม่เลือกวิธี = อยู่กอง "เลือกวิธีโทร"
+     * ⚠️ ชื่อคนที่โดนถอด (`unclaimed_from_name`) ส่งให้ทุกคนเห็นได้ ต่างจาก
+     * `claimed_by_name` ที่ซ่อนไว้ให้เจ้าตัว — เจ้าของสั่งให้การดองเป็นเรื่องที่หัวหน้าเห็น
+     * ค่า call_choice ที่ไม่รู้จักส่ง undefined (ห้ามเดา — ป้ายบนจอจะโกหก)
+     */
+    unclaimed_at: r.unclaimed_at ? toIso(r.unclaimed_at) : undefined,
+    unclaimed_from_name: r.unclaimed_from_name || undefined,
+    call_choice: isCallChoice(r.call_choice) ? r.call_choice : undefined,
+    call_choice_at: r.call_choice_at ? toIso(r.call_choice_at) : undefined,
+    call_choice_by_name: r.call_choice_by_name || undefined,
     created_at: toIso(r.created_at),
   };
 }
@@ -209,6 +229,31 @@ const LIST_COLUMNS = `
   is_lead, lead_by_name, lead_at,
   selection_status, prep_checklist,
   dialed_first_at, dialed_last_at, dial_count,
+  unclaimed_at, unclaimed_from_name, call_choice, call_choice_at, call_choice_by_name,
+  ${applicationOriginColumn('a')}
+`;
+
+/**
+ * ชุดคอลัมน์แบบยังไม่รัน **104** (วงจรกันชื่อดอง) แต่รุ่นก่อนครบแล้ว
+ *
+ * ⚠️ ต้องมีชั้นนี้แยก — ถอยข้ามไปชั้น `NO_LEAD` จะ null ฟิลด์ Lead/origin/094/095
+ * ที่ฐานมีข้อมูลจริงทิ้ง (กับดักเดิมข้อเดียวกับตอนเขียน 079/083)
+ */
+const LIST_COLUMNS_NO_CHOICE = `
+  id, full_name, title_prefix, first_name, last_name, phone, age, gender,
+  province, district, subdistrict, postal_code,
+  weight_kg, height_cm, education, referral_source,
+  document_filename, document_mime, (document_bytes is not null) as has_document,
+  job_id, job_title, unit_name, position_interest, note, status, admin_note,
+  line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
+  created_at,
+  claimed_by, claimed_by_name, claimed_at,
+  is_lead, lead_by_name, lead_at,
+  selection_status, prep_checklist,
+  dialed_first_at, dialed_last_at, dial_count,
+  null::timestamptz as unclaimed_at, null::text as unclaimed_from_name,
+  null::text as call_choice, null::timestamptz as call_choice_at,
+  null::text as call_choice_by_name,
   ${applicationOriginColumn('a')}
 `;
 
@@ -385,7 +430,7 @@ async function queryWithLegacyFallback(
   legacyClaimWhere = 'true',
   leadWhere = 'true',
 ): Promise<Row[]> {
-  // ไล่สี่ชั้นตามอายุ schema: 074+079+083 → 074+079 → 074 เท่านั้น → ก่อน 074
+  // ไล่ห้าชั้นตามอายุ schema: +104 → 074+079+083 → 074+079 → 074 เท่านั้น → ก่อน 074
   // (กลืนเฉพาะ 42703 คอลัมน์หาย — error อื่นโยนต่อ ตามกติกาข้อ 9)
   //
   // ⚠️ ชั้นที่ยังไม่มีคอลัมน์ Lead ใช้ `true` แทนเงื่อนไข — ยังไม่มีใครปัด Lead ได้
@@ -398,6 +443,12 @@ async function queryWithLegacyFallback(
       .replace(/\{\{leadWhere\}\}/g, lw);
   try {
     const { rows } = await dbQuery<Row>(fill(LIST_COLUMNS, claimWhere, leadWhere), params);
+    return rows;
+  } catch (e) {
+    if (!isUndefinedColumn(e)) throw e;
+  }
+  try {
+    const { rows } = await dbQuery<Row>(fill(LIST_COLUMNS_NO_CHOICE, claimWhere, leadWhere), params);
     return rows;
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
@@ -624,11 +675,16 @@ async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolea
 }
 
 /**
- * PATCH `{ id, selection_status?, prep_checklist? }` — ขั้นในกระบวนการจ้าง + เช็คลิสต์ (094)
+ * PATCH `{ id, selection_status?, prep_checklist?, unit_site_code?, unit_name? }`
+ * — ขั้นในกระบวนการจ้าง + เช็คลิสต์
  *
  * ⚠️ **ไม่แตะ `status` เดิม** — คนละความหมาย (ดู selectionProgress.ts) เอาไปทับกัน
  * เมื่อไหร่ตัวเลขทุกหน้าที่นับจาก status เพี้ยนพร้อมกัน
  * ⚠️ `selection_status: null` = ล้างขั้น (ยังไม่ถึงขั้นไหน) — ต่างจากไม่ส่งฟิลด์มาเลย
+ *
+ * 🔴 **Phase 6.2: เขียนผ่าน `selectionProgressStore` (dual-write)** — ตารางกลาง 105
+ * + คอลัมน์เดิม 094 · ตารางกลางคือแหล่งที่ระบบอ่านก่อน จึงทำให้คนจาก match
+ * (ไม่มีใบสมัคร) ใช้ชุดสถานะเดียวกับผู้สมัครได้ · ของเดิมยังอยู่ครบ = ถอยกลับได้
  */
 async function patchSelectionProgress(
   req: AuthedReq,
@@ -638,6 +694,7 @@ async function patchSelectionProgress(
 ) {
   const hasStatus = b.selection_status !== undefined;
   const hasChecklist = b.prep_checklist !== undefined;
+  const hasUnit = b.unit_site_code !== undefined || b.unit_name !== undefined;
   if (hasStatus && b.selection_status !== null && !isSelectionStatus(b.selection_status)) {
     return sendError(res, 400, 'Bad request', 'ขั้นไม่ถูกต้อง');
   }
@@ -648,20 +705,48 @@ async function patchSelectionProgress(
     return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
   }
 
-  const nextStatus = hasStatus ? (b.selection_status as string | null) : null;
-  const nextChecklist = hasChecklist ? normalizePrepChecklist(b.prep_checklist) : null;
+  const nextStatus = hasStatus ? (b.selection_status as SelectionStatus | null) : undefined;
+  const nextChecklist = hasChecklist ? normalizePrepChecklist(b.prep_checklist) : undefined;
 
-  const rows = await queryWithLegacyFallback(
-    `
-    update ${tbl} a
-    set selection_status = case when $2::boolean then $3 else selection_status end,
-        prep_checklist = case when $4::boolean then $5::jsonb else prep_checklist end,
-        updated_at = now()
-    where a.id = $1
-    returning {{cols}}
-    `,
-    [id, hasStatus, nextStatus, hasChecklist, nextChecklist ? JSON.stringify(nextChecklist) : null],
+  // ต้องรู้เบอร์+ใบขอเพื่อเขียนตารางกลาง (คีย์คือ job_id + phone_e164)
+  const { rows: keyRows } = await dbQuery<{ phone: string; job_id: string | null }>(
+    `select phone, job_id from ${tbl} where id = $1 limit 1`,
+    [id],
   );
+  const key = keyRows[0];
+  if (!key) return sendError(res, 404, 'Not found');
+
+  const saved = await saveProgress({
+    jobId: key.job_id ?? '',
+    phone: key.phone,
+    applicationId: id,
+    ...(hasStatus ? { selectionStatus: nextStatus } : {}),
+    ...(hasChecklist ? { prepChecklist: nextChecklist } : {}),
+    ...(hasUnit
+      ? {
+          unitSiteCode: getString(b.unit_site_code) ?? null,
+          unitName: getString(b.unit_name) ?? null,
+        }
+      : {}),
+    actor: { id: req.user.sub, name: req.user.email ?? null },
+  });
+
+  /**
+   * ใบที่ไม่ผูกใบขอ/ไม่มีเบอร์ใช้ตารางกลางไม่ได้ (คีย์ไม่ครบ) — ถอยไปเขียนคอลัมน์เดิม
+   * เพื่อให้ปุ่มยังทำงานเหมือนก่อน Phase 6 ไม่ใช่ตอบ error ใส่หน้าคนใช้
+   */
+  if (!saved.ok) {
+    await dbQuery(
+      `update ${tbl}
+          set selection_status = case when $2::boolean then $3 else selection_status end,
+              prep_checklist = case when $4::boolean then $5::jsonb else prep_checklist end,
+              updated_at = now()
+        where id = $1`,
+      [id, hasStatus, nextStatus ?? null, hasChecklist, nextChecklist ? JSON.stringify(nextChecklist) : null],
+    );
+  }
+
+  const rows = await queryWithLegacyFallback(`select {{cols}} from ${tbl} a where a.id = $1`, [id]);
   const row = rows[0];
   if (!row) return sendError(res, 404, 'Not found');
 
@@ -669,9 +754,21 @@ async function patchSelectionProgress(
     action: 'job_application.selection_progress',
     entityType: 'job_application',
     entityId: id,
-    after: { selection_status: nextStatus, prep_checklist: nextChecklist },
+    after: {
+      selection_status: nextStatus ?? null,
+      prep_checklist: nextChecklist ?? null,
+      central: saved.ok ? saved.centralWritten : false,
+    },
   });
-  return res.status(200).json({ item: toApplication(row, req.user.sub) });
+  const item = toApplication(row, req.user.sub) as Record<string, unknown>;
+  // ค่าจากตารางกลางชนะค่าบนใบ (เป็นแหล่งใหม่) — จอต้องเห็นสิ่งที่เพิ่งบันทึกจริง
+  if (saved.ok) {
+    item.selection_status = saved.row.selectionStatus ?? undefined;
+    item.prep_checklist = saved.row.prepChecklist;
+    item.unit_site_code = saved.row.unitSiteCode ?? undefined;
+    item.unit_name_progress = saved.row.unitName ?? undefined;
+  }
+  return res.status(200).json({ item });
 }
 
 /**
@@ -1085,6 +1182,42 @@ async function handler(req: AuthedReq, res: ApiRes) {
           (item as Record<string, unknown>).appointment_at = at;
           if (fromLog?.place) (item as Record<string, unknown>).appointment_place = fromLog.place;
           if (fromLog?.jobLabel) (item as Record<string, unknown>).appointment_job = fromLog.jobLabel;
+        }
+      }
+      /**
+       * ขั้นในกระบวนการจ้างจาก **ตารางกลาง** (105 · Phase 6.2) — ทับค่าบนใบสมัคร
+       * เพราะตารางกลางคือแหล่งใหม่ที่คนจาก match ใช้ร่วมกัน · ตารางยังไม่ migrate
+       * = Map ว่าง → ค่าบนใบสมัครยังทำงานเหมือนเดิม (ถอยกลับได้)
+       * ⚠️ ยิงต่อ **ใบขอ** เพราะคีย์คือ (job_id, phone) — จัดกลุ่มก่อนแล้วยิงทีละใบขอ
+       */
+      const byJob = new Map<string, typeof items>();
+      for (const it of items) {
+        if (!it.job_id) continue;
+        const list = byJob.get(it.job_id) ?? [];
+        list.push(it);
+        byJob.set(it.job_id, list);
+      }
+      for (const [jid, group] of byJob) {
+        const progress = await loadProgressByJob(jid, group.map((g) => g.phone));
+        if (progress.size === 0) continue;
+        for (const it of group) {
+          const hit = progress.get(toE164Thai(it.phone || '') || '');
+          if (!hit) continue;
+          const rec = it as Record<string, unknown>;
+          if (hit.selectionStatus) rec.selection_status = hit.selectionStatus;
+          if (Object.keys(hit.prepChecklist).length > 0) rec.prep_checklist = hit.prepChecklist;
+          if (hit.unitSiteCode) rec.unit_site_code = hit.unitSiteCode;
+          if (hit.unitName) rec.unit_name_progress = hit.unitName;
+        }
+      }
+      // ผลติดต่อล่าสุดที่เจ้าหน้าที่บันทึก (086) — Phase 5.11: `ok=false` = "ไม่สนใจ"
+      // ⚠️ ส่งเวลามาด้วย เพราะฝั่งหน้าเว็บเทียบกับเวลาผลโทรว่าอันไหนใหม่กว่า
+      const contactResults = await loadLatestContactResults(items.map((i) => i.id));
+      for (const item of items) {
+        const hit = contactResults.get(item.id);
+        if (hit) {
+          (item as Record<string, unknown>).last_contact_ok = hit.ok;
+          (item as Record<string, unknown>).last_contact_at = hit.at;
         }
       }
       // ผลติดตามนัดล่าสุด (มา/ไม่มา/เลื่อน — migration 089) — แท็บนัดหมายโชว์ชิป/ปุ่ม

@@ -1,4 +1,5 @@
 import { toYmdBangkok } from '@/lib/dateTh';
+import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
  *
@@ -109,11 +110,16 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
  * เพราะยังไม่มีใครรู้ว่าเขาสนใจไหม การเดาแทนคือการโกหกตัวเลข
  */
 export function isInRmListView(r: PublicApplication, view: RmListView): boolean {
-  if (view === 'interested') return r.last_call_outcome === 'confirmed';
-  if (view === 'declined') return r.last_call_outcome === 'declined';
+  /**
+   * 🔴 กติกา "สนใจ/ไม่สนใจ" อยู่ที่ `applicantCallOutcome.ts` **ที่เดียว**
+   * (เดิมไฟล์นี้เทียบ `=== 'confirmed'` / `=== 'declined'` เองตรง ๆ → พอเจ้าของสั่งให้
+   * ผลติดต่อ `ok=false` นับเป็นไม่สนใจด้วย (Phase 5.11) กล่องกับแท็บจะตอบไม่เหมือนกัน)
+   */
+  if (view === 'interested') return isInterestedApplicant(r);
+  if (view === 'declined') return isNotInterestedApplicant(r);
   // คิวสรรหา: ตอบสนใจตอนโทร แต่ยังไม่ขึ้นบอร์ด (ยังไม่มาสมัคร) — พอสรรหาเก็บใบสมัคร
   // (ชื่อขึ้นบอร์ด) on_board = true → หลุดจากคิวเอง
-  if (view === 'collect') return r.last_call_outcome === 'confirmed' && r.on_board !== true;
+  if (view === 'collect') return isInterestedApplicant(r) && r.on_board !== true;
   return true;
 }
 
@@ -129,22 +135,47 @@ export function rmTabHasLeadTools(tab: RmTab): boolean {
   return tab === 'candidates';
 }
 
-/** ตัวกรอง sidebar — ทุกกลุ่มมาจากฟิลด์ที่มีจริงในใบสมัคร ไม่มีกลุ่มที่กรองแล้วไม่มีผล */
+/**
+ * ตัวกรองของหน้ารายชื่อผู้สมัคร
+ *
+ * ⚠️ สามกลุ่มแรก (channels/provinces/statuses) **ไม่มี UI แล้ว** — เจ้าของสั่งถอด
+ * แผงตัวกรองด้านข้างออกจากทุกหน้า 17 ส.ค. 2569 (commit 9dbe94b ลบ RmFilterSidebar.tsx)
+ * ตรรกะยังอยู่เพราะ drill-down จาก Dashboard ใช้ผ่าน `?bucket=` และเทสต์คุมไว้
+ * 🔴 **ห้ามเอา UI สามกลุ่มนั้นกลับมาโดยไม่ได้สั่งใหม่**
+ *
+ * `dateFrom`/`dateTo` (YYYY-MM-DD) = ตัวกรองวันที่สมัคร — เจ้าของสั่ง 22 ส.ค. 2569
+ * *"หน้าผู้สมัครขอเป็นแบบ filter แบบ calendar ที่กดแล้วข้อมูลเปลี่ยนตามวันที่เลือก"*
+ */
 export type RmFilters = {
   channels: ApplicationReferralSource[];
   provinces: string[];
   statuses: ApplicationStatus[];
+  /** วันที่สมัคร ตั้งแต่ (YYYY-MM-DD) — ว่าง/ไม่ส่ง = ไม่กรอง */
+  dateFrom?: string | null;
+  /** วันที่สมัคร ถึง (YYYY-MM-DD) — ว่าง/ไม่ส่ง = ไม่กรอง */
+  dateTo?: string | null;
 };
 
 export const EMPTY_RM_FILTERS: RmFilters = {
   channels: [],
   provinces: [],
   statuses: [],
+  dateFrom: null,
+  dateTo: null,
 };
+
+/** วันที่สมัครในรูป YYYY-MM-DD (ตัดเวลาออก) — null = ไม่รู้วัน */
+export function applicationAppliedYmd(row: PublicApplication): string | null {
+  const raw = row.created_at;
+  if (!raw || typeof raw !== 'string') return null;
+  const ymd = raw.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+}
 
 /** ไม่ได้ติ๊กอะไรเลย = ไม่กรอง (ไม่ใช่ "กรองจนไม่เหลืออะไร") */
 export function countActiveRmFilters(f: RmFilters): number {
-  return f.channels.length + f.provinces.length + f.statuses.length;
+  const dateActive = f.dateFrom || f.dateTo ? 1 : 0;
+  return f.channels.length + f.provinces.length + f.statuses.length + dateActive;
 }
 
 /** ติ๊ก/เอาติ๊กออกในลิสต์เดียว — ใช้ร่วมทุกกลุ่มใน sidebar */
@@ -244,6 +275,14 @@ export function filterApplications(
     if (filters.provinces.length > 0 && !filters.provinces.includes((r.province || '').trim())) {
       return false;
     }
+    // ช่วงวันที่สมัคร — ใบที่ไม่รู้วันถือว่า "ไม่เข้าเงื่อนไข" เมื่อมีการกรองวัน
+    // (ดีกว่าปล่อยผ่านแล้วคนอ่านคิดว่าใบนั้นสมัครในช่วงที่เลือก)
+    if (filters.dateFrom || filters.dateTo) {
+      const ymd = applicationAppliedYmd(r);
+      if (!ymd) return false;
+      if (filters.dateFrom && ymd < filters.dateFrom) return false;
+      if (filters.dateTo && ymd > filters.dateTo) return false;
+    }
     if (kw) {
       const hay = `${r.full_name} ${r.first_name ?? ''} ${r.last_name ?? ''} ${r.phone} ${applicationJobLabel(r)}`.toLowerCase();
       if (!hay.includes(kw)) return false;
@@ -274,7 +313,7 @@ export type RmRowAction = 'bookmark' | 'call' | 'dial' | 'view' | 'rule' | 'remo
 
 /**
  * ⚠️ `call` กับ `dial` เป็นคนละเรื่อง — สับสนเมื่อไหร่ตัวเลขเวลารอโทรเพี้ยนทันที
- *   call = **ดึงเข้าถังโทรของตัวเอง** (จับล็อกที่เบอร์ กันคนอื่นโทรทับ)
+ *   call = **เก็บไปโทรเอง** (จองใบ + จับล็อกที่เบอร์ กัน AI/คนอื่นโทรทับ — สองอย่างในกดเดียว)
  *   dial = **จดว่าเพิ่งยกหูโทร** (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 5 ของงานสรรหา)
  * ปุ่ม dial โผล่เฉพาะแท็บ "การโทรของฉัน" เพราะเป็นขั้นหลังเก็บชื่อไปแล้ว
  */
@@ -286,7 +325,12 @@ export const RM_ROW_ACTIONS: Record<RmTab, RmRowAction[]> = {
 
 export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
   bookmark: 'เก็บเข้า Lead',
-  call: 'ดึงเข้าถังโทร',
+  /**
+   * 🔴 เดิมมีสองปุ่มที่คนงงว่าต่างกันตรงไหน — "เก็บไปติดต่อ" (claim บนใบ) กับ
+   * "ดึงเข้าถังโทร" (ล็อกเบอร์กัน AI ทับ) · เจ้าของเคาะ 22 ส.ค. 2569 ให้ **รวมเป็นปุ่มเดียว**
+   * กดทีเดียวได้ทั้งคู่ (เส้น /api/application-call-choice choice=manual)
+   */
+  call: 'เก็บไปโทรเอง',
   dial: 'กดโทร (จดเวลา)',
   view: 'ดูรายละเอียด',
   rule: 'บันทึกผลนัดหมาย',

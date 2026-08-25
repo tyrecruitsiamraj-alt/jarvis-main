@@ -16,6 +16,7 @@ import { isProductionRuntime } from '../api/_lib/runtime.ts';
 import { startMatchPrecomputeWorker } from '../api/_lib/matchPrecomputeWorker.ts';
 import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveWorker.ts';
 import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
+import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
 type VercelLikeRes = {
@@ -185,4 +186,7 @@ server.listen(port, '127.0.0.1', () => {
   startApplicationAutoMoveWorker();
   // ยามเฝ้าระบบ — เปิดโดยดีฟอลต์ (อ่านอย่างเดียว + เด้งแจ้งเตือนตอนผิดปกติ)
   startSystemHealthWorker();
+  // 🔴 worker กันชื่อดอง — **ปิดโดยดีฟอลต์** (ถอด claim ของคนจริง + ยิงสายจริง)
+  // เปิดที่ deploy ด้วย CLAIM_GUARD_ENABLED=true เท่านั้น (ฐาน dev = production)
+  startClaimGuardWorker();
 });

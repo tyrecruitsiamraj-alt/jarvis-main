@@ -28,6 +28,11 @@ export type RecruitRmOverview = {
       total: number;
       byUser: Array<{ name: string | null; count: number; oldestClaimedAt: string }>;
     };
+    /**
+     * กอง "รอเลือกวิธีโทร" (104 · Phase 5.9) — ใบที่ worker ถอด claim แล้วยังไม่มีใครเลือก
+     * `null` = ฐานยังไม่รัน migration (ไม่ใช่ 0 — 0 ที่แปลว่าเช็คไม่ได้อันตรายกว่า)
+     */
+    awaitingCallChoice: { total: number; oldestUnclaimedAt: string | null } | null;
   };
   meta: {
     generatedAt: string;
@@ -52,6 +57,8 @@ export const RM_BUCKET_LABEL: Record<string, string> = {
   success_unscheduled: 'ติดต่อสำเร็จ · ยังนัดไม่ได้',
   over5d: 'เกิน 5 วันยังไม่ถูกโทร',
   claimed_idle: 'เก็บไปแล้วยังไม่โทร (เกิน 1 วัน)',
+  awaiting_call_choice: 'รอเลือกวิธีโทร (ถูกถอดเพราะดองเกิน 1 วัน)',
+  overdue_no_result: 'เลยวันนัดแล้วยังไม่บันทึกผล มา/ไม่มา',
 };
 
 export function isRmBucket(v: string | null | undefined): v is string {
