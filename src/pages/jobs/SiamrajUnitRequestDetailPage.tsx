@@ -27,7 +27,7 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { ChevronDown, Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 import {
   amountText,
   formatMoney,
@@ -311,24 +311,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     แล้วช่อง "รหัสไซต์" ขึ้นชื่อบริษัท คนอ่านเข้าใจว่านั่นคือรหัส (เจอ 18 ส.ค. 2569)
                     ไม่มีก็บอกว่าไม่มี — Field แสดง "—" ให้เองเมื่อค่าว่าง */}
                 <Field label="รหัสไซต์" value={data.site_code} />
-                {/* ประเภทหน่วยงาน — เจ้าของสั่งย้ายมาเลือกที่ใบงาน 25 ส.ค. 2569
-                    🔴 คีย์ด้วย site_code ⇒ เลือกที่ใบนี้มีผลกับทุกใบขอของหน่วยงานเดียวกัน */}
-                <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
-                  <div className="text-[10px] text-muted-foreground">ราชการ / เอกชน</div>
-                  <div className="mt-1">
-                    <UnitSectorSelect
-                      siteCode={data.site_code}
-                      value={sector}
-                      onChange={(code, next) => void changeSector(code, next)}
-                      saving={savingSector}
-                    />
-                  </div>
-                  {data.site_code ? (
-                    <div className="mt-1 text-[10px] text-muted-foreground">
-                      มีผลกับทุกใบขอของหน่วยงานนี้
-                    </div>
-                  ) : null}
-                </div>
                 <Field label="สถานที่ปฏิบัติงาน" value={data.work_place} />
                 <Field label="สถานที่ทำงาน (ที่อยู่เต็ม)" value={data.location_address} />
                 <Field label="ลักษณะงาน" value={data.job_description_code_1} />
@@ -514,6 +496,33 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     กำหนดผู้รับผิดชอบได้เฉพาะ Supervisor ขึ้นไป
                   </p>
                 </div>
+              )}
+            </section>
+
+            {/* ประเภทหน่วยงาน ราชการ/เอกชน — เจ้าของสั่ง 25 ส.ค. 2569 (รอบสี่สิบห้า):
+                *"เอามาไว้ใต้ [ผู้รับผิดชอบ]"* · เดิมอยู่ในกริด "ข้อมูลใบขอ" ซึ่งหุบไว้เป็นค่าตั้งต้น
+                ⇒ คนที่ต้องกรอกต้องกางกล่องก่อนถึงจะเจอ · ย้ายออกมาแล้วเห็นทันทีที่เปิดใบ
+                🔴 คีย์ด้วย site_code ⇒ เลือกที่ใบนี้มีผลกับทุกใบขอของหน่วยงานเดียวกัน */}
+            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <Landmark className={cn("w-4 h-4", TONE.primary.value)} />
+                ราชการ / เอกชน
+              </h3>
+              <UnitSectorSelect
+                siteCode={data.site_code}
+                value={sector}
+                onChange={(code, next) => void changeSector(code, next)}
+                saving={savingSector}
+              />
+              {data.site_code ? (
+                <p className="text-xs text-muted-foreground">
+                  มีผลกับทุกใบขอของหน่วยงานนี้ ({data.site_code})
+                </p>
+              ) : (
+                // ใบขอล่วงหน้าไม่มีรหัสไซต์ ⇒ ไม่มีคีย์ให้บันทึก ต้องบอกตรง ๆ ว่าทำไมเลือกไม่ได้
+                <p className="text-xs text-muted-foreground">
+                  ใบขอนี้ยังไม่มีรหัสไซต์ จึงระบุประเภทหน่วยงานไม่ได้
+                </p>
               )}
             </section>
 
