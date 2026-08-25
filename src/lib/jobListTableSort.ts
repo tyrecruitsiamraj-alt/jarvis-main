@@ -19,14 +19,12 @@ import { publicJobPositionLabel } from './unitRequestDisplay';
 import { extractJobSubtypeLabel } from './siamrajUnitFilters';
 import { positionBreakdownFromJob } from './requestControl';
 import { UNIT_REQUEST_WORK_STATUS_LABELS, isUnitRequestWorkStatus } from './unitRequestWorkStatus';
-import { UNIT_SECTOR_LABEL, type UnitSector } from './unitSector';
 
 /** คอลัมน์ที่กดเรียงได้ — เรียงตามลำดับที่โผล่บนตารางจริง */
 export const JOB_LIST_TABLE_COLUMNS = [
   'request_no',
   'age',
   'unit',
-  'sector',
   'submitted',
   'required',
   'remaining',
@@ -47,7 +45,6 @@ export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   request_no: 'เลขที่ใบขอ',
   age: 'ผ่านมา',
   unit: 'หน่วยงาน',
-  sector: 'ราชการ / เอกชน',
   submitted: 'วันที่กรอก',
   required: 'วันที่ต้องการ',
   remaining: 'คงเหลือ',
@@ -117,32 +114,14 @@ function ymdVal(v: string | null | undefined): SortValue {
 }
 
 /** ค่าที่ใช้เทียบของแต่ละคอลัมน์ — ว่าง = `{}` (ตกท้ายเสมอ) */
-/**
- * ข้อมูลที่ไม่ได้อยู่ใน `JobRequest` แต่ต้องใช้ตอนเรียง
- * (ประเภทหน่วยงานเก็บแยกที่ตาราง `unit_sector` คีย์ site_code — เจ้าของสั่ง 25 ส.ค. 2569)
- */
-export type TableSortContext = {
-  sectors?: Readonly<Record<string, UnitSector>>;
-};
-
 export function tableSortValue(
   job: JobRequest,
   column: JobListTableColumn,
   today = new Date(),
-  ctx?: TableSortContext,
 ): SortValue {
   switch (column) {
     case 'request_no':
       return textVal(job.request_no);
-    case 'sector': {
-      /**
-       * 🔴 "ยังไม่ระบุ" ถือเป็น**ค่าว่าง** → ตกท้ายเสมอทั้งขาขึ้น/ขาลง (กติกาข้อ 2 หัวไฟล์)
-       * ถ้าคืนคำว่า "ยังไม่ระบุ" เป็นข้อความ มันจะไปแทรกกลางระหว่างราชการ/เอกชน
-       */
-      const code = String(job.site_code ?? '').trim();
-      const sector = code ? ctx?.sectors?.[code] : undefined;
-      return textVal(sector ? UNIT_SECTOR_LABEL[sector] : null);
-    }
     case 'age': {
       /**
        * 🔴 **ต้องเรียงตามสิ่งที่ช่องนั้นโชว์** ไม่ใช่ตัวเลขอายุดิบ
@@ -210,10 +189,9 @@ export function compareJobsByTableColumn(
   b: JobRequest,
   sort: JobListTableSort,
   today = new Date(),
-  ctx?: TableSortContext,
 ): number {
-  const va = tableSortValue(a, sort.column, today, ctx);
-  const vb = tableSortValue(b, sort.column, today, ctx);
+  const va = tableSortValue(a, sort.column, today);
+  const vb = tableSortValue(b, sort.column, today);
   const aEmpty = va.num == null && va.text == null;
   const bEmpty = vb.num == null && vb.text == null;
   if (aEmpty && bEmpty) return tieBreak(a, b);
@@ -238,7 +216,6 @@ export function sortJobsByTableColumn(
   jobs: readonly JobRequest[],
   sort: JobListTableSort,
   today = new Date(),
-  ctx?: TableSortContext,
 ): JobRequest[] {
-  return [...jobs].sort((a, b) => compareJobsByTableColumn(a, b, sort, today, ctx));
+  return [...jobs].sort((a, b) => compareJobsByTableColumn(a, b, sort, today));
 }

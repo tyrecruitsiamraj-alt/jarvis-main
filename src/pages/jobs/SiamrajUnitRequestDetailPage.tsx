@@ -3,6 +3,10 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
+import UnitSectorSelect from '@/components/jobs/UnitSectorSelect';
+import { fetchUnitSectors, saveUnitSector } from '@/lib/unitSectorApi';
+import { unitSectorLabel, type UnitSector } from '@/lib/unitSector';
+import { toast } from '@/hooks/use-toast';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -42,6 +46,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  /**
+   * ประเภทหน่วยงาน ราชการ/เอกชน — เจ้าของสั่งย้ายมาเลือกที่ใบงาน 25 ส.ค. 2569
+   * (เดิมอยู่เป็นคอลัมน์ในตารางหน้ารายการ)
+   * 🔴 ยังคีย์ด้วย site_code เหมือนเดิม — เลือกที่ใบนี้มีผลกับทุกใบขอของหน่วยงานเดียวกัน
+   */
+  const [sector, setSector] = React.useState<UnitSector | null>(null);
+  const [savingSector, setSavingSector] = React.useState(false);
   const backPath = resolveUnitDetailBackPath({
     stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
     search: location.search,
@@ -71,6 +82,52 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
     window.addEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, onRoster);
     return () => window.removeEventListener(JOB_STAFF_ROSTER_CHANGED_EVENT, onRoster);
   }, []);
+
+  /**
+   * โหลดประเภทหน่วยงานของไซต์นี้
+   * 🔴 ล้มแล้วถือว่า "ยังไม่ระบุ" — หน้าใบงานต้องไม่พังเพราะช่องนี้
+   */
+  useEffect(() => {
+    const code = String(data?.site_code ?? '').trim();
+    if (!code) {
+      setSector(null);
+      return;
+    }
+    let alive = true;
+    void fetchUnitSectors()
+      .then((m) => {
+        if (alive) setSector(m[code] ?? null);
+      })
+      .catch(() => {
+        if (alive) setSector(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [data?.site_code]);
+
+  /** บันทึกแบบมองโลกในแง่ดี — ล้มแล้วถอยกลับค่าเดิม (ไม่ปล่อยให้จอโกหก) */
+  const changeSector = async (code: string, next: UnitSector | null) => {
+    const prev = sector;
+    setSector(next);
+    setSavingSector(true);
+    try {
+      await saveUnitSector(code, next);
+      toast({
+        title: `หน่วยงานนี้ = ${unitSectorLabel(next)}`,
+        description: `มีผลกับทุกใบขอของรหัส ${code}`,
+      });
+    } catch (e) {
+      setSector(prev);
+      toast({
+        title: 'บันทึกไม่สำเร็จ',
+        description: e instanceof Error ? e.message : 'ลองใหม่อีกครั้ง',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingSector(false);
+    }
+  };
 
   // seed ค่าผู้รับผิดชอบจากข้อมูลที่โหลดมา
   useEffect(() => {
@@ -222,6 +279,24 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     แล้วช่อง "รหัสไซต์" ขึ้นชื่อบริษัท คนอ่านเข้าใจว่านั่นคือรหัส (เจอ 18 ส.ค. 2569)
                     ไม่มีก็บอกว่าไม่มี — Field แสดง "—" ให้เองเมื่อค่าว่าง */}
                 <Field label="รหัสไซต์" value={data.site_code} />
+                {/* ประเภทหน่วยงาน — เจ้าของสั่งย้ายมาเลือกที่ใบงาน 25 ส.ค. 2569
+                    🔴 คีย์ด้วย site_code ⇒ เลือกที่ใบนี้มีผลกับทุกใบขอของหน่วยงานเดียวกัน */}
+                <div className="rounded-xl border border-white/70 bg-white/40 px-3 py-2">
+                  <div className="text-[10px] text-muted-foreground">ราชการ / เอกชน</div>
+                  <div className="mt-1">
+                    <UnitSectorSelect
+                      siteCode={data.site_code}
+                      value={sector}
+                      onChange={(code, next) => void changeSector(code, next)}
+                      saving={savingSector}
+                    />
+                  </div>
+                  {data.site_code ? (
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      มีผลกับทุกใบขอของหน่วยงานนี้
+                    </div>
+                  ) : null}
+                </div>
                 <Field label="สถานที่ปฏิบัติงาน" value={data.work_place} />
                 <Field label="สถานที่ทำงาน (ที่อยู่เต็ม)" value={data.location_address} />
                 <Field label="ลักษณะงาน" value={data.job_description_code_1} />

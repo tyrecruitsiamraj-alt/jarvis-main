@@ -19,11 +19,8 @@ import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacemen
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
-import UnitSectorSelect from '@/components/jobs/UnitSectorSelect';
 import UnitRequestDetailPanel from '@/components/jobs/UnitRequestDetailPanel';
 import { detailSummary } from '@/lib/unitRequestDetail';
-import { fetchUnitSectors, saveUnitSector, type UnitSectorMap } from '@/lib/unitSectorApi';
-import { unitSectorLabel, type UnitSector } from '@/lib/unitSector';
 import {
   resolveUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
@@ -177,12 +174,9 @@ const JobListPage: React.FC = () => {
   );
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
-  /**
-   * ประเภทหน่วยงาน ราชการ/เอกชน ที่ทีมระบุเอง (เจ้าของสั่ง 25 ส.ค. 2569)
-   * 🔴 คีย์ด้วย site_code — เลือกที่ใบไหนก็มีผลทั้งหน่วยงาน
-   * 🔴 โหลดล้ม = ถือว่า "ยังไม่ระบุ" ทุกไซต์ · หน้าหน่วยงานต้องไม่พังเพราะช่องนี้
-   */
-  const [sectors, setSectors] = useState<UnitSectorMap>({});
+
+  const [lookupJob, setLookupJob] = useState<JobRequest | null>(null);
+  const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
   /**
    * แถวที่กางรายละเอียดอยู่ (เจ้าของสั่ง 25 ส.ค. 2569: *"กดลงมาค่อยเห็นข้อมูล"*)
    * เก็บเป็น Set ของ id — กางพร้อมกันหลายแถวได้ · ปิดหน้าแล้วลืม (ไม่ต้องจำข้ามหน้า)
@@ -196,60 +190,6 @@ const JobListPage: React.FC = () => {
       return next;
     });
   }, []);
-  const [savingSite, setSavingSite] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void fetchUnitSectors()
-      .then((m) => {
-        if (alive) setSectors(m);
-      })
-      .catch(() => {
-        if (alive) setSectors({});
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  /** บันทึกแบบมองโลกในแง่ดี — ล้มเมื่อไหร่ค่อยถอยกลับค่าเดิม (ไม่ปล่อยให้จอโกหก) */
-  const changeSector = useCallback(
-    async (siteCode: string, next: UnitSector | null) => {
-      const prev = sectors[siteCode] ?? null;
-      setSectors((m) => {
-        const copy = { ...m };
-        if (next) copy[siteCode] = next;
-        else delete copy[siteCode];
-        return copy;
-      });
-      setSavingSite(siteCode);
-      try {
-        await saveUnitSector(siteCode, next);
-        toast({
-          title: `หน่วยงานนี้ = ${unitSectorLabel(next)}`,
-          description: `มีผลกับทุกใบขอของรหัส ${siteCode}`,
-        });
-      } catch (e) {
-        setSectors((m) => {
-          const copy = { ...m };
-          if (prev) copy[siteCode] = prev;
-          else delete copy[siteCode];
-          return copy;
-        });
-        toast({
-          title: 'บันทึกไม่สำเร็จ',
-          description: e instanceof Error ? e.message : 'ลองใหม่อีกครั้ง',
-          variant: 'destructive',
-        });
-      } finally {
-        setSavingSite(null);
-      }
-    },
-    [sectors],
-  );
-
-  const [lookupJob, setLookupJob] = useState<JobRequest | null>(null);
-  const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
 
   useEffect(() => {
     saveUnitLastPath('/jobs/list');
@@ -432,10 +372,10 @@ const JobListPage: React.FC = () => {
       // กดหัวคอลัมน์แล้วใช้อันนั้น (ทับ dropdown) — ไม่มีค่าก็ใช้ dropdown ตามเดิม
       .sort((a, b) =>
         tableSort
-          ? compareJobsByTableColumn(a, b, tableSort, new Date(), { sectors })
+          ? compareJobsByTableColumn(a, b, tableSort)
           : compareJobsForListSort(a, b, sort),
       );
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, tableSort, unitScopeNames, lookupJob, sectors]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -723,7 +663,6 @@ const JobListPage: React.FC = () => {
                     <th className="px-3 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
                     <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
                     <th className="px-3 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ราชการ / เอกชน</th>
                     <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
                     <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
                     <th className="px-3 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
@@ -742,7 +681,6 @@ const JobListPage: React.FC = () => {
                     <tr key={i} className="border-b border-border/50">
                       <td className="px-3 py-3"><Skeleton className="h-4 w-24" /></td>
                       <td className="px-3 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-8 w-[104px] rounded-md" /></td>
                       <td className="px-3 py-3"><Skeleton className="h-3 w-36" /></td>
                       <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
                       <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
@@ -883,17 +821,6 @@ const JobListPage: React.FC = () => {
                 </button>
                 {expanded.has(j.id) ? <UnitRequestDetailPanel job={j} className="mt-1" /> : null}
 
-                {/* ประเภทหน่วยงาน — อยู่นอกปุ่มเปิดใบขอ ไม่งั้นกดเลือกแล้วเด้งออกจากหน้า */}
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/50 pt-3">
-                  <span className="text-[10px] text-muted-foreground">ราชการ / เอกชน</span>
-                  <UnitSectorSelect
-                    siteCode={j.site_code}
-                    value={sectors[String(j.site_code ?? '').trim()] ?? null}
-                    onChange={(code, next) => void changeSector(code, next)}
-                    saving={savingSite === String(j.site_code ?? '').trim()}
-                  />
-                </div>
-
                 {j.list_note?.trim() ? (
                   <div className="mt-3 pt-3 border-t border-border/50">
                     <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
@@ -915,7 +842,6 @@ const JobListPage: React.FC = () => {
                       ['request_no', 'left'],
                       ['age', 'left'],
                       ['unit', 'left'],
-                      ['sector', 'left'],
                       ['submitted', 'left'],
                       ['required', 'left'],
                       ['remaining', 'center'],
@@ -1025,15 +951,6 @@ const JobListPage: React.FC = () => {
                         บน <html> จนไม่สลับตามธีมนั้น แก้แล้วที่ brandingStorage.applyBrandSurfaceVars()
                         และมีเทสต์คุมที่ tests/api/brandingSurfaceTheme.test.ts */}
                     <td className={cn('px-3 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
-                    {/* ประเภทหน่วยงาน — เลือกที่ใบไหนก็มีผลกับทุกใบของ site_code เดียวกัน */}
-                    <td className="px-3 py-3">
-                      <UnitSectorSelect
-                        siteCode={j.site_code}
-                        value={sectors[String(j.site_code ?? '').trim()] ?? null}
-                        onChange={(code, next) => void changeSector(code, next)}
-                        saving={savingSite === String(j.site_code ?? '').trim()}
-                      />
-                    </td>
                     <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
                     <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
                     <td className={cn('px-3 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
@@ -1091,7 +1008,7 @@ const JobListPage: React.FC = () => {
                       ⚠️ ไม่ผูก onClick เปิดใบขอ ไม่งั้นกดอ่านรายละเอียดแล้วเด้งออก */}
                   {expanded.has(j.id) ? (
                     <tr className={cn('border-b', DASH.divider)}>
-                      <td colSpan={15} className="px-4 pb-3 pt-0">
+                      <td colSpan={14} className="px-4 pb-3 pt-0">
                         <UnitRequestDetailPanel job={j} />
                       </td>
                     </tr>
