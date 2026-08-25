@@ -128,13 +128,24 @@ export interface JobRequest {
   contract_type_code?: string;
   contract_type_name?: string;
   /**
-   * เงินล่าสุดของ **คนที่ลาออก** จากใบขอนี้ (เจ้าของสั่ง 25 ส.ค. 2569)
-   * `draw` = เงินที่จ่ายพนักงาน · `fee` = ค่าที่เก็บลูกค้า — **คนละความหมาย ห้ามรวมกัน**
-   * ⚠️ `undefined`/`null` = **ไม่รู้** (วัดจริงหาเจอ 76% ของใบขอ) ห้ามแสดงเป็น 0
+   * 🔴 **อัตราตามเงื่อนไข ไม่ใช่เงินที่ได้รับจริง** — มาจาก `hr_staff_changing`
+   * ซึ่งเป็นตารางเงื่อนไข/อัตรา (มี divide, begin/end date, สถานะพนักงาน · แถวรายวันค่าซ้ำกัน)
+   * เคสจริง: อัตรา 19,588 ทุกงวด แต่จ่ายจริง 20,345 / 21,220 / 20,927 — ไม่ตรงสักงวด
+   * `draw` = อัตราฝั่งพนักงาน · `fee` = อัตราที่เก็บลูกค้า — **คนละความหมาย ห้ามรวมกัน**
+   * ⚠️ `undefined`/`null` = **ไม่รู้** (236/298 ใบที่เปิดอยู่) ห้ามแสดงเป็น 0
    */
   resigned_wage_draw_rate?: number | null;
   resigned_wage_fee_rate?: number | null;
   resigned_wage_effective_date?: string | null;
+  /**
+   * **เงินที่ได้รับจริงงวดล่าสุด** (จาก `wg2_ppayment_*` เฉพาะงวดที่จ่ายแล้ว)
+   * 🔴 งวดสุดท้ายมักเป็น **งวดไม่เต็มเดือน** (คนออกกลางเดือน) ยอดจะต่ำกว่าปกติ
+   * ⇒ **ต้องโชว์ช่วงวันที่คู่กันเสมอ** ไม่งั้นคนอ่านว่า "เงินเดือนเขาแค่นี้เอง"
+   * ความครบ 238/298 ใบที่เปิดอยู่
+   */
+  resigned_paid_amount?: number | null;
+  resigned_paid_from?: string | null;
+  resigned_paid_to?: string | null;
   position_units?: number;
   /** จำนวนตำแหน่งที่ขอมา (Siamraj request_qty) */
   request_positions?: number;

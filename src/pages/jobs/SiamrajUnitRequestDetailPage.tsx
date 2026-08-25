@@ -28,7 +28,7 @@ import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { ChevronDown, Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
-import { moneyFieldText } from '@/lib/unitRequestDetail';
+import { moneyFieldText, paidPeriodText } from '@/lib/unitRequestDetail';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
@@ -342,21 +342,32 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <Field label="ชื่อผู้ติดต่อหน่วยงาน" value={data.contact_name} />
                 <Field label="เบอร์ติดต่อ" value={data.contact_phone} />
                 <Field label="ค่าปรับต่อวันถ้าไม่มีคน" value={moneyFieldText(data.penalty_per_day)} />
-                {/* เงินล่าสุดของคนที่ออก (เจ้าของเคาะ 25 ส.ค. 2569: โชว์ทั้งสองก้อนพร้อมป้ายกำกับ)
-                    🔴 สองตัวเลขคนละความหมาย ห้ามรวมกัน — draw = เงินที่จ่ายพนักงาน ·
-                    fee = ค่าที่เก็บลูกค้า · ความครบแค่ 76% ของใบขอ ⇒ ไม่รู้ขึ้น "—" ห้ามขึ้น 0
-                    แต่ 0 ที่มาจากฐานจริงต้องขึ้น "0 บาท" (แปลว่าไม่ได้เบิกส่วนนั้น) */}
+                {/* เงินของคนที่ออก — 🔴 **สองชุดคนละเรื่อง อย่าสลับกัน** (ตรวจฐาน ERP 25 ส.ค. 2569)
+                    ชุดที่ 1 = **อัตราตามเงื่อนไข** จาก hr_staff_changing (ตารางเรต ไม่ใช่ payroll)
+                    ชุดที่ 2 = **เงินที่ได้รับจริง** จากรอบจ่ายจริง wg2_ppayment
+                    เคสจริง: อัตรา 19,588 ทุกงวด แต่จ่ายจริง 20,345 / 21,220 / 20,927 ไม่ตรงสักงวด
+                    ⚠️ ไม่รู้ขึ้น "—" ห้ามขึ้น 0 · แต่ 0 ที่มาจากฐานจริงต้องขึ้น "0 บาท" */}
                 <Field
-                  label="คนเดิม — เงินที่พนักงานได้ (draw)"
+                  label="คนเดิม — อัตราตามเงื่อนไข ฝั่งพนักงาน (draw)"
                   value={moneyFieldText(data.resigned_wage_draw_rate)}
                 />
                 <Field
-                  label="คนเดิม — ค่าที่เก็บลูกค้า (fee)"
+                  label="คนเดิม — อัตราตามเงื่อนไข ที่เก็บลูกค้า (fee)"
                   value={moneyFieldText(data.resigned_wage_fee_rate)}
                 />
                 <Field
-                  label="คนเดิม — วันที่ของรายการล่าสุดใน ERP"
+                  label="คนเดิม — อัตรานี้มีผลตั้งแต่"
                   value={data.resigned_wage_effective_date}
+                />
+                {/* 🔴 งวดสุดท้ายมักเป็นงวด**ไม่เต็มเดือน** (ออกกลางเดือน) ยอดจึงต่ำกว่าปกติ
+                    ⇒ ต้องโชว์ช่วงวันที่ของงวดคู่กันเสมอ ไม่งั้นคนอ่านว่า "เงินเดือนเขาแค่นี้เอง" */}
+                <Field
+                  label="คนเดิม — เงินที่ได้รับจริง งวดล่าสุด"
+                  value={moneyFieldText(data.resigned_paid_amount)}
+                />
+                <Field
+                  label="คนเดิม — งวดที่จ่ายจริงนั้นคือช่วงไหน"
+                  value={paidPeriodText(data.resigned_paid_from, data.resigned_paid_to)}
                 />
               </div>
               ) : null}

@@ -64,6 +64,25 @@ export function moneyFieldText(v: number | null | undefined): string | undefined
   return typeof v === 'number' && Number.isFinite(v) ? formatMoney(v) : undefined;
 }
 
+/**
+ * ช่วงวันของงวดจ่ายจริง — "1 ก.ค. 2569 – 31 ก.ค. 2569"
+ *
+ * 🔴 มีไว้เพราะ **งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน** (ออกกลางเดือน) ยอดจึงต่ำกว่าปกติ
+ * วัดจริง 25 ส.ค. 2569: OPL6908107 อัตรา 16,093 แต่จ่ายจริงงวดสุดท้าย 6,823
+ * ⇒ โชว์ยอดโดยไม่บอกช่วงวัน = คนอ่านว่า "เงินเดือนเขาแค่ 6,823"
+ * ไม่รู้ช่วงวัน คืน `undefined` (จอขึ้น "—") ไม่ใช่เดาว่าเต็มเดือน
+ */
+export function paidPeriodText(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): string | undefined {
+  const a = String(from ?? '').slice(0, 10);
+  const b = String(to ?? '').slice(0, 10);
+  if (!a && !b) return undefined;
+  if (a && b) return `${a} ถึง ${b}`;
+  return a || b;
+}
+
 /** ข้อความของค่าหนึ่งช่อง (ที่เดียว — จอไม่ต้องเขียนเงื่อนไขเอง) */
 export function detailValueText(v: DetailValue): string {
   switch (v.kind) {
@@ -102,18 +121,18 @@ export function buildUnitRequestDetail(job: JobRequest): DetailGroup[] {
     },
     {
       key: 'resigned',
-      title: 'คนที่ออก — เงินล่าสุดที่เคยได้',
+      title: 'คนที่ออก — อัตราตามเงื่อนไข (ไม่ใช่ยอดที่ได้รับจริง)',
       items: [
         { key: 'name', label: 'ชื่อผู้ลาออก', value: text(job.resigned_employee_name) },
         {
           key: 'draw',
-          label: 'เงินที่พนักงานได้ (draw)',
+          label: 'อัตราตามเงื่อนไข ฝั่งพนักงาน (draw)',
           value: money(job.resigned_wage_draw_rate),
-          hint: 'ยอดที่จ่ายให้พนักงานคนเดิม',
+          hint: 'เรตที่ผูกไว้ ไม่ใช่ยอดที่โอนจริง',
         },
         {
           key: 'fee',
-          label: 'ค่าที่เก็บลูกค้า (fee)',
+          label: 'อัตราตามเงื่อนไข ที่เก็บลูกค้า (fee)',
           value: money(job.resigned_wage_fee_rate),
           hint: 'ยอดที่เรียกเก็บจากลูกค้าสำหรับตำแหน่งนี้',
         },

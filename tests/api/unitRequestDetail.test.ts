@@ -15,6 +15,7 @@ import {
   detailValueText,
   formatMoney,
   moneyFieldText,
+  paidPeriodText,
 } from '../../src/lib/unitRequestDetail.js';
 import type { JobRequest } from '../../src/types/index.js';
 
@@ -111,5 +112,30 @@ describe('moneyFieldText — ช่องเงินบนหน้าใบข
 
   it('เลขปกติใส่คั่นหลักพร้อมหน่วย', () => {
     expect(moneyFieldText(23861)).toBe('23,861 บาท');
+  });
+});
+
+/**
+ * 🔴 ช่วงวันของงวดจ่ายจริง — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
+ * โชว์ยอดโดยไม่บอกช่วงวัน คนจะอ่านว่า "เงินเดือนเขาแค่นี้"
+ */
+describe('paidPeriodText — งวดจ่ายจริง', () => {
+  it('รู้ทั้งสองวัน = บอกช่วง', () => {
+    expect(paidPeriodText('2026-07-01', '2026-07-31')).toBe('2026-07-01 ถึง 2026-07-31');
+  });
+
+  it('ไม่รู้เลย = undefined (จอขึ้น "—") ไม่ใช่เดาว่าเต็มเดือน', () => {
+    expect(paidPeriodText(null, null)).toBeUndefined();
+    expect(paidPeriodText(undefined, '')).toBeUndefined();
+  });
+
+  it('รู้ข้างเดียว = บอกเท่าที่รู้', () => {
+    expect(paidPeriodText('2026-07-01', null)).toBe('2026-07-01');
+  });
+
+  it('ตัดเวลาออกจาก timestamp', () => {
+    expect(paidPeriodText('2026-07-01T00:00:00.000Z', '2026-07-31T00:00:00.000Z')).toBe(
+      '2026-07-01 ถึง 2026-07-31',
+    );
   });
 });
