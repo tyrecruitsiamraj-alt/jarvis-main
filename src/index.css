@@ -594,3 +594,622 @@
     color: #000;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Jarvis HUD — แผงควบคุมล้ำ ๆ (เจ้าของสั่ง 22 ส.ค. 2569 "ให้ดูล้ำเหมือน Jarvis ใน Iron man")
+
+   นิยาม/กติกาอยู่ที่ HUD ใน src/lib/designTokens.ts — ที่นี่คือ "ตัวจริง" ของพื้นผิว
+   (แพตเทิร์นเดียวกับ .jarvis-chip-* และ .jarvis-hero-card ที่ประกาศสีจริงไว้ในไฟล์นี้)
+
+   🔴 เข้มเท่ากันทั้งสองธีมโดยตั้งใจ — ไม่มี .dark override
+      เพราะเส้นเรืองแสงบนพื้นสว่างจะกลายเป็นเส้นจางที่มองไม่เห็น (เทสต์ยกเว้นให้แล้ว)
+   สีเส้น = teal-300 (#5eead4) ชุดเดียวกับ TONE.teal.onDark ที่ระบบใช้บนพื้นเข้มอยู่แล้ว
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer utilities {
+  .jarvis-hud-panel {
+    --jarvis-hud-line: rgba(94, 234, 212, 0.32);
+    --jarvis-hud-line-soft: rgba(94, 234, 212, 0.14);
+    @apply relative overflow-hidden rounded-2xl text-white;
+    background: radial-gradient(900px 300px at 8% -35%, #12314a 0%, #0a1120 58%);
+    border: 1px solid var(--jarvis-hud-line-soft);
+    box-shadow:
+      0 12px 40px rgba(6, 12, 24, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* กริดจาง — บอกว่านี่คือ "จอ" ไม่ใช่การ์ดกระดาษ · จางมากพอที่ตัวหนังสือยังชนะ */
+  .jarvis-hud-panel::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0;
+    background-image:
+      linear-gradient(to right, var(--jarvis-hud-line-soft) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--jarvis-hud-line-soft) 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: 0.35;
+    mask-image: radial-gradient(120% 90% at 12% 0%, #000 0%, transparent 72%);
+  }
+
+  /* รางบนหัวแผง — เส้นเรืองที่ไล่จางไปทางขวา (ตัวบอกว่า "แผงนี้คือ HUD") */
+  .jarvis-hud-panel::after {
+    content: '';
+    @apply pointer-events-none absolute left-0 right-0 top-0 h-px;
+    background: linear-gradient(to right, var(--jarvis-hud-line) 0%, transparent 62%);
+  }
+
+  /* มุมวงเล็บ 4 มุม — component เรนเดอร์ 4 span พร้อม data-c (ไม่ใช้ pseudo เพราะชนกับกริด/ราง) */
+  .jarvis-hud-corner {
+    @apply pointer-events-none absolute h-3 w-3;
+    border-color: var(--jarvis-hud-line);
+    border-style: solid;
+    border-width: 0;
+  }
+  .jarvis-hud-corner[data-c='tl'] {
+    @apply left-2 top-2 rounded-tl-sm border-l border-t;
+  }
+  .jarvis-hud-corner[data-c='tr'] {
+    @apply right-2 top-2 rounded-tr-sm border-r border-t;
+  }
+  .jarvis-hud-corner[data-c='bl'] {
+    @apply bottom-2 left-2 rounded-bl-sm border-b border-l;
+  }
+  .jarvis-hud-corner[data-c='br'] {
+    @apply bottom-2 right-2 rounded-br-sm border-b border-r;
+  }
+
+  /* พื้นของ hover-card/popover ที่ลอยบนแผง HUD — ต้องทึบกว่าแผงเพื่อให้อ่านตัวหนังสือออก
+     เข้มเท่ากันทั้งสองธีมโดยตั้งใจ (มันลอยอยู่บน HUD ไม่ใช่บนหน้ากระดาษ) */
+  .jarvis-hud-popover {
+    background: #0b1220;
+  }
+
+  .jarvis-hud-inner {
+    @apply relative rounded-xl;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .jarvis-hud-inner-hover {
+    @apply transition-colors;
+  }
+  .jarvis-hud-inner-hover:hover {
+    background: rgba(94, 234, 212, 0.07);
+    border-color: var(--jarvis-hud-line);
+  }
+
+  /* เส้นสแกนวิ่ง — ของประดับชิ้นเดียวที่ยอมให้มี (1 เส้นต่อแผง) */
+  .jarvis-hud-scan {
+    @apply pointer-events-none absolute inset-x-0 top-0 h-16;
+    background: linear-gradient(to bottom, rgba(94, 234, 212, 0.10), transparent);
+    animation: jarvis-hud-sweep 5.5s ease-in-out infinite;
+  }
+
+  @keyframes jarvis-hud-sweep {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(520%);
+      opacity: 0;
+    }
+  }
+
+  /* คนที่ตั้งเครื่องว่าไม่เอาแอนิเมชัน = ไม่มีเส้นวิ่ง (สถานะยังอ่านครบเพราะเส้นนี้ไม่ถือข้อมูล) */
+  @media (prefers-reduced-motion: reduce) {
+    .jarvis-hud-scan {
+      animation: none;
+      opacity: 0;
+    }
+  }
+}
+
+/* ── ปุ่ม "หมึก" (variant default ของ src/components/ui/button.tsx) ──
+   เดิมเขียนเป็น hex ดิบในไฟล์ component (`bg-[#141210]`) ซึ่งผิดกติกาข้อ "ห้าม hex ตรง ๆ"
+   และ **ไม่มีคู่ธีมมืดเลย** — ค่า #141210 เกือบเท่าพื้นหลังธีมมืด (--background: 240 6% 8%)
+   ผลคือปุ่มหลักในโหมดมืด "จมหายไปกับพื้น" (บั๊กเดียวกับที่เจอบ่อยเรื่องลืม dark:bg)
+
+   ย้ายค่าสีมาไว้ที่ตัวแปรของธีมแทน → component อ้าง var ตัวเดียว สลับตามธีมเอง
+   ไม่ต้องมี dark: ในไฟล์ปุ่ม และ twMerge ยังทับได้ปกติเพราะยังเป็น utility `bg-[...]`
+   ค่าธีมสว่าง = ของเดิมเป๊ะทุกตัว (หน้าตาโหมดสว่างไม่เปลี่ยน) */
+@layer base {
+  :root {
+    --jarvis-ink: #141210;
+    --jarvis-ink-hover: #1f1c18;
+    --jarvis-ink-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  /* ธีมมืด: ยกพื้นปุ่มขึ้นจากพื้นหลัง + เส้นในโทน teal ให้เข้าภาษา HUD (ดู HUD ใน designTokens) */
+  .dark {
+    --jarvis-ink: #17262e;
+    --jarvis-ink-hover: #1e3540;
+    --jarvis-ink-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ═══ ฉาก "ห้องทำงาน" บนหน้าแรก (เจ้าของสั่ง 22 ส.ค. 2569) ═══
+   ตัวละครขยับตาม "งานจริง" ที่ src/lib/officeFloor.ts ตัดสินมาแล้ว
+   🔴 กติกา: ทุก keyframes ต้องหยุดเมื่อ (ก) ผู้ใช้ตั้งไม่เอาแอนิเมชัน
+   (ข) แท็บถูกซ่อน — component ถอด class .jarvis-office-live ออกให้ */
+@layer utilities {
+  /* ท่ายืน/เดิน — โต๊ะที่ว่าง ตัวละครเดินไปมา (ของว่างต้องดูว่าง ไม่ใช่โชว์เลข 0) */
+  .jarvis-office-live .jarvis-office-walk {
+    animation: jarvis-office-stroll 7s ease-in-out infinite;
+  }
+  @keyframes jarvis-office-stroll {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    25% {
+      transform: translate(-14px, -1.5px);
+    }
+    50% {
+      transform: translate(4px, 0);
+    }
+    75% {
+      transform: translate(-8px, -1.5px);
+    }
+  }
+
+  /* ท่านั่งพิมพ์ — ขยับแค่กลุ่มแขน ตัวไม่เด้ง (ตัวเด้งทั้งตัวอ่านเป็น "กระตุก") */
+  .jarvis-office-live .jarvis-office-type .jarvis-office-arms {
+    animation: jarvis-office-typing 0.85s ease-in-out infinite;
+    transform-origin: left center;
+  }
+  @keyframes jarvis-office-typing {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(2px) rotate(2.5deg);
+    }
+  }
+
+  /* ท่ายกหูโทร — วงคลื่นรอบหัว */
+  .jarvis-office-live .jarvis-office-ring {
+    animation: jarvis-office-wave 1.9s ease-out infinite;
+    transform-origin: center;
+  }
+  @keyframes jarvis-office-wave {
+    0% {
+      opacity: 0.55;
+      transform: scale(0.72);
+    }
+    70% {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+  }
+
+  /* เส้นงานไหลระหว่างโต๊ะ — เส้นประวิ่งไปทางปลายทาง (เฉพาะเส้นที่มีงานเดินจริง) */
+  .jarvis-office-live .jarvis-office-flow {
+    animation: jarvis-office-stream 1.4s linear infinite;
+  }
+  @keyframes jarvis-office-stream {
+    to {
+      stroke-dashoffset: -14;
+    }
+  }
+
+  /* วงแหวนพื้นใต้โต๊ะที่ต้องลงมือ/กำลังโทร — หายใจช้า ๆ ไม่กะพริบ */
+  .jarvis-office-live .jarvis-office-pad {
+    animation: jarvis-office-breathe 2.8s ease-in-out infinite;
+  }
+  @keyframes jarvis-office-breathe {
+    0%,
+    100% {
+      opacity: 0.22;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  /* ป้ายจำนวนของค้าง — ลอยขึ้นลงเบา ๆ ให้ตาไปเจอก่อนโต๊ะอื่น */
+  .jarvis-office-live .jarvis-office-alert {
+    animation: jarvis-office-bob 2.2s ease-in-out infinite;
+  }
+  @keyframes jarvis-office-bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  /* บรรทัดบนจอ — กะพริบจาง ๆ บอกว่าเครื่องทำงานอยู่ */
+  .jarvis-office-live .jarvis-office-screen {
+    animation: jarvis-office-flicker 3.4s ease-in-out infinite;
+  }
+  @keyframes jarvis-office-flicker {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    45% {
+      opacity: 0.55;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .jarvis-office-live .jarvis-office-walk,
+    .jarvis-office-live .jarvis-office-type .jarvis-office-arms,
+    .jarvis-office-live .jarvis-office-ring,
+    .jarvis-office-live .jarvis-office-alert,
+    .jarvis-office-live .jarvis-office-screen,
+    .jarvis-office-live .jarvis-office-flow,
+    .jarvis-office-live .jarvis-office-pad {
+      animation: none;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3D Virtual Office — ห้องทำงานเสมือนบนหน้าแรก (เจ้าของสั่ง 22 ส.ค. 2569:
+   *"มันคือ dashboard 3d virtual office"* · เคาะให้ทำด้วย **CSS 3D จริง ไม่เพิ่ม library**)
+
+   หลักที่ใช้ (เทคนิค diorama):
+   1. `world` เอียงด้วย `rotateX` แล้ว **พื้นเป็นกระดาน** (`ground`) ที่ของทุกชิ้นวางอยู่บน
+   2. ของที่ต้องอ่านออก (โต๊ะ · ตัวละคร · ป้าย) เป็น "ป้ายตั้ง" (standee) ที่ **หมุนกลับ**
+      ด้วย `rotateX(-tilt)` → ตั้งฉากกับพื้น หันหน้าเข้ากล้อง ตัวหนังสือจึงคมเสมอ
+      (ต่างจากการวาด 3D จริงที่ตัวหนังสือจะเอียงตามผนังแล้วอ่านยาก)
+   3. เส้นทางงานเป็น div แบน ๆ **นอนอยู่บนพื้น** → ได้เส้นเรืองที่ลอดใต้โต๊ะเองตามมุมกล้อง
+   4. ทุกอย่างเป็น DOM → hover/กด/คีย์บอร์ด/screen reader ใช้ของเดิมทั้งหมด
+      (เลิกใช้ปุ่มโปร่งใสทับ SVG แบบเดิมไปเลย)
+
+   🔴 มุมกล้องอ่านจากตัวแปร `--office-tilt` / `--office-spin` ที่ component ตั้งให้ตามเมาส์
+      ค่าตั้งต้นต้องใช้งานได้เองแม้ JS ไม่ทำงาน
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer utilities {
+  .jarvis-office-stage {
+    --office-tilt: 58deg;
+    --office-spin: 0deg;
+    --office-lift: 0px;
+    @apply relative w-full overflow-hidden rounded-xl;
+    perspective: 1400px;
+    perspective-origin: 50% 42%;
+  }
+
+  .jarvis-office-world {
+    @apply absolute inset-0;
+    transform-style: preserve-3d;
+    transform: rotateX(var(--office-tilt)) rotateZ(var(--office-spin))
+      translate3d(0, var(--office-lift), 0);
+    /* หมุนตามเมาส์แบบหน่วง — ไม่ใช่ตามติดทุกพิกเซล (ตามติดแล้วเวียนหัว) */
+    transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  /* กระดานพื้น — ของทุกชิ้นเป็นลูกของอันนี้ */
+  .jarvis-office-ground {
+    @apply absolute left-1/2 top-1/2;
+    transform-style: preserve-3d;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ตารางพื้น + ขอบเรือง */
+  .jarvis-office-grid {
+    @apply absolute inset-0 rounded-[28px];
+    background-image:
+      linear-gradient(to right, rgba(94, 234, 212, 0.16) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(94, 234, 212, 0.16) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(94, 234, 212, 0.1) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(255, 255, 255, 0.02) 100%);
+    background-size:
+      58px 58px,
+      58px 58px,
+      100% 100%;
+    box-shadow:
+      inset 0 0 0 1px rgba(94, 234, 212, 0.22),
+      inset 0 40px 90px rgba(94, 234, 212, 0.05),
+      0 0 80px rgba(94, 234, 212, 0.06);
+  }
+
+  /* ผนังหลังห้อง — ตั้งขึ้นจากขอบไกลของพื้น · ตัวที่ทำให้ฉากอ่านเป็น "ห้อง" ไม่ใช่กระดานลอย */
+  .jarvis-office-wall {
+    @apply pointer-events-none absolute left-0 top-0 w-full rounded-t-2xl;
+    transform-origin: top center;
+    transform: rotateX(-90deg);
+    background:
+      linear-gradient(180deg, rgba(94, 234, 212, 0.05), rgba(255, 255, 255, 0.015) 60%, transparent),
+      repeating-linear-gradient(90deg, rgba(94, 234, 212, 0.07) 0 1px, transparent 1px 74px);
+    box-shadow: inset 0 -1px 0 rgba(94, 234, 212, 0.22);
+  }
+
+  /* เส้นทางงานบนพื้น — นอนราบ ลอดใต้โต๊ะเองตามมุมกล้อง */
+  .jarvis-office-path {
+    @apply pointer-events-none absolute origin-left rounded-full;
+    height: 3px;
+  }
+  .jarvis-office-live .jarvis-office-path[data-flow='1'] {
+    animation: jarvis-office-path-run 1.5s linear infinite;
+  }
+  @keyframes jarvis-office-path-run {
+    to {
+      background-position-x: -24px;
+    }
+  }
+
+  /* ป้ายตั้ง — ตั้งฉากกับพื้น หันหน้าเข้ากล้อง */
+  .jarvis-office-standee {
+    @apply absolute flex flex-col items-center;
+    transform-style: preserve-3d;
+    /* ยกขึ้นจากพื้นเล็กน้อยกันขอบล่างจมพื้น แล้วหมุนกลับให้ตั้งตรง */
+    transform: translate(-50%, -100%) rotateX(calc(-1 * var(--office-tilt)));
+    transform-origin: bottom center;
+  }
+
+  /* เงาที่ตกลงบนพื้น (นอนราบ ไม่หมุนกลับ) */
+  .jarvis-office-shadow {
+    @apply pointer-events-none absolute rounded-[50%];
+    background: radial-gradient(closest-side, rgba(0, 0, 0, 0.42), transparent 78%);
+    transform: translate(-50%, -50%);
+  }
+
+  /* วงแหวนเรืองบนพื้นใต้โต๊ะที่ต้องลงมือ/กำลังโทร — "แสงคือสถานะ" ไม่ใช่ของประดับ */
+  .jarvis-office-ring-pad {
+    @apply pointer-events-none absolute rounded-[50%];
+    transform: translate(-50%, -50%);
+  }
+  .jarvis-office-live .jarvis-office-ring-pad {
+    animation: jarvis-office-breathe 2.8s ease-in-out infinite;
+  }
+
+  /* กล่องโต๊ะ — ใช้เงา 2 ชั้นแทนการทำ 6 หน้า (เบากว่า และไม่มีรอยต่อ) */
+  .jarvis-office-desk {
+    @apply relative rounded-md;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.13) 52%,
+      rgba(255, 255, 255, 0.06) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(94, 234, 212, 0.34),
+      0 6px 0 rgba(255, 255, 255, 0.07),
+      0 10px 18px rgba(0, 0, 0, 0.34);
+  }
+
+  /* จอลอยบนโต๊ะ */
+  .jarvis-office-holo {
+    @apply relative rounded-md;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(1px);
+  }
+
+  /* ลำแสงใต้จอ */
+  .jarvis-office-beam {
+    @apply pointer-events-none absolute left-1/2 -translate-x-1/2;
+    clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%);
+    opacity: 0.14;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .jarvis-office-world {
+      transition: none;
+    }
+    .jarvis-office-live .jarvis-office-path[data-flow='1'],
+    .jarvis-office-live .jarvis-office-ring-pad {
+      animation: none;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3D Virtual Office — รอบยกระดับตามภาพอ้างอิงที่เจ้าของส่งมา (22-23 ส.ค. 2569)
+   เจ้าของติว่าของเดิม *"บ้านนอกมาก"* → เปลี่ยนภาษาภาพทั้งชุด:
+
+   เดิม: โต๊ะแบน ๆ เรียงเป็นแถว + ตัวละครเส้น            (อ่านเป็น "ไดอะแกรม")
+   ใหม่: **แท่นวงกลมเรืองแสง** วางรอบ **แกนกลาง (Core)** + มาสคอตกลม ๆ +
+         จอโฮโลหลายแผ่น + ป้ายชื่อทีมเรืองใต้แท่น + ฉากหลังเมืองกลางคืน
+         (อ่านเป็น "ศูนย์ปฏิบัติการ")
+
+   🔴 ยังเป็น CSS/SVG ล้วน ไม่เพิ่ม library · ตัวหนังสือยังเป็น HTML จึงคมทุกมุมกล้อง
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer utilities {
+  /* ── ฉากหลัง: เมืองกลางคืน + ฝุ่นแสง (อยู่นอก world จึงไม่เอียงตามกล้อง) ── */
+  .jarvis-office-sky {
+    @apply pointer-events-none absolute inset-0;
+    background:
+      radial-gradient(120% 70% at 50% 0%, rgba(56, 189, 248, 0.14), transparent 62%),
+      radial-gradient(80% 50% at 12% 18%, rgba(94, 234, 212, 0.09), transparent 70%),
+      radial-gradient(80% 50% at 88% 16%, rgba(129, 140, 248, 0.1), transparent 70%),
+      linear-gradient(180deg, #0a1526 0%, #070d18 58%, #05080f 100%);
+  }
+  /* เส้นตึกจาง ๆ — บอกว่าเป็นห้องบนตึกสูง ไม่ใช่กล่องลอย */
+  .jarvis-office-skyline {
+    @apply pointer-events-none absolute inset-x-0;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(125, 211, 252, 0.05) 0 2px, transparent 2px 9px),
+      repeating-linear-gradient(90deg, transparent 0 26px, rgba(148, 163, 184, 0.07) 26px 30px);
+    mask-image: linear-gradient(180deg, transparent, #000 45%, #000);
+  }
+
+  /* ── แท่นวงกลมของแต่ละทีม ── */
+  .jarvis-office-pod {
+    @apply pointer-events-none absolute rounded-[50%];
+    transform: translate(-50%, -50%);
+    /* พื้นแท่น — ต้องอ่านเป็น "วัตถุแข็งที่มาสคอตยืนอยู่บน" ไม่ใช่วงแสงจาง ๆ
+       (รอบแรกทำจางเกินแล้วมาสคอตดูลอย) : พื้นทึบขึ้น + ขอบสว่าง + เงาใต้แท่น */
+    background:
+      radial-gradient(
+        closest-side,
+        rgba(226, 240, 255, 0.2) 0%,
+        rgba(148, 180, 214, 0.12) 55%,
+        rgba(120, 150, 185, 0.07) 78%,
+        transparent 100%
+      );
+    box-shadow:
+      0 10px 26px rgba(0, 0, 0, 0.45),
+      inset 0 0 30px rgba(255, 255, 255, 0.06);
+  }
+  /* ขอบยกของแท่น — เส้นสว่างบาง ๆ รอบขอบนอก ทำให้เห็นความหนา */
+  .jarvis-office-pod::after {
+    content: '';
+    @apply absolute rounded-[50%];
+    inset: 12%;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  }
+  /* ขอบเรืองของแท่น — สีมาจากสถานะของทีมนั้น (component ส่งมาทาง inline style) */
+  .jarvis-office-pod-rim {
+    @apply pointer-events-none absolute rounded-[50%];
+    transform: translate(-50%, -50%);
+  }
+  .jarvis-office-live .jarvis-office-pod-rim[data-pulse='1'] {
+    animation: jarvis-office-breathe 3s ease-in-out infinite;
+  }
+
+  /* ── แกนกลาง JARVIS Core ── */
+  .jarvis-office-core-base {
+    @apply pointer-events-none absolute rounded-[50%];
+    transform: translate(-50%, -50%);
+    background:
+      radial-gradient(closest-side, rgba(56, 189, 248, 0.3), rgba(56, 189, 248, 0.08) 60%, transparent),
+      radial-gradient(closest-side, transparent 58%, rgba(125, 211, 252, 0.22) 78%, transparent);
+    box-shadow: 0 0 60px rgba(56, 189, 248, 0.22);
+  }
+  .jarvis-office-live .jarvis-office-core-ring {
+    animation: jarvis-office-core-spin 14s linear infinite;
+  }
+  @keyframes jarvis-office-core-spin {
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+  /* ลำแสงทรงกระบอกของแกนกลาง (ตั้งขึ้น หันเข้ากล้อง) */
+  .jarvis-office-core-beam {
+    @apply pointer-events-none absolute left-1/2 bottom-0 rounded-t-[46%];
+    transform: translateX(-50%);
+    background: linear-gradient(
+      180deg,
+      rgba(125, 211, 252, 0.02) 0%,
+      rgba(56, 189, 248, 0.16) 45%,
+      rgba(56, 189, 248, 0.32) 100%
+    );
+    box-shadow: inset 0 0 30px rgba(125, 211, 252, 0.22);
+  }
+
+  /* ป้ายชื่อทีม — แผ่นเรืองใต้แท่น (แบบเดียวกับภาพอ้างอิง) */
+  .jarvis-office-plate {
+    @apply relative rounded-lg px-3 py-1 text-center;
+    background: linear-gradient(180deg, rgba(8, 15, 28, 0.92), rgba(8, 15, 28, 0.72));
+  }
+
+  /* จอโฮโลลอย */
+  .jarvis-office-panel {
+    @apply relative rounded-md p-1.5;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  }
+
+  /**
+   * โต๊ะทำงานของแท่น (Phase 10.1) — ชิ้นที่ขาดไปแล้วทำให้ฉากเดิมอ่านเป็น "ตัวการ์ตูนลอย"
+   * แผ่นนี้ทับตัวล่างของมาสคอตพอดี ⇒ สายตาอ่านว่า "นั่งอยู่หลังโต๊ะ" ไม่ใช่ "ยืนลอย"
+   * สีขอบบนมาจาก inline style (สีของทีม) — ที่นี่คุมแต่ทรงกับกระจก
+   */
+  .jarvis-office-desk {
+    @apply pointer-events-none absolute rounded-[10px];
+    background: linear-gradient(
+      180deg,
+      rgba(226, 240, 255, 0.16) 0%,
+      rgba(148, 180, 214, 0.09) 38%,
+      rgba(8, 15, 28, 0.72) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.24),
+      0 10px 18px rgba(0, 0, 0, 0.45);
+  }
+
+  /* แถบไฟใต้ขอบโต๊ะ — เงาแสงบนพื้น ทำให้แท่นดู "ตั้งอยู่" ไม่ใช่แปะทับ */
+  .jarvis-office-desk-glow {
+    @apply pointer-events-none absolute rounded-[50%];
+    filter: blur(2px);
+  }
+
+  /* พนักเก้าอี้หลังมาสคอต */
+  .jarvis-office-chair {
+    @apply pointer-events-none absolute rounded-t-[22px];
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  }
+
+  /* แถบหัวจอ (จุดสามจุด) — รายละเอียดเล็กที่ทำให้จอดูเป็นอุปกรณ์จริง */
+  .jarvis-office-screen-bar {
+    @apply pointer-events-none absolute left-1.5 top-1 flex gap-[3px];
+  }
+  .jarvis-office-screen-bar > i {
+    @apply block h-[3px] w-[3px] rounded-full;
+    background: rgba(255, 255, 255, 0.45);
+  }
+
+  /**
+   * แกนกลาง — ตัวกระบอกแก้ว (Phase 10.1)
+   * ของเดิมมีแต่ลำแสง จึงอ่านเป็น "แท่งสี" · เพิ่มผนังกระจก + ฝาบน + ขอบเรือง
+   * ให้เป็นทรงกระบอกที่มีปริมาตรจริงตามภาพอ้างอิงที่เจ้าของส่งมา
+   */
+  .jarvis-office-core-glass {
+    @apply pointer-events-none absolute left-1/2 bottom-0 rounded-[42px];
+    transform: translateX(-50%);
+    background: linear-gradient(
+      90deg,
+      rgba(125, 211, 252, 0.05) 0%,
+      rgba(226, 245, 255, 0.16) 22%,
+      rgba(125, 211, 252, 0.07) 50%,
+      rgba(226, 245, 255, 0.14) 78%,
+      rgba(125, 211, 252, 0.05) 100%
+    );
+    box-shadow:
+      inset 0 0 0 1px rgba(125, 211, 252, 0.4),
+      inset 0 0 34px rgba(56, 189, 248, 0.22),
+      0 0 46px rgba(56, 189, 248, 0.28);
+  }
+
+  /* ฝาบนของกระบอก — วงรีสว่างที่บอกว่ามันเป็นทรงกลม ไม่ใช่แผ่น */
+  .jarvis-office-core-cap {
+    @apply pointer-events-none absolute left-1/2 rounded-[50%];
+    transform: translateX(-50%);
+    background: radial-gradient(
+      closest-side,
+      rgba(236, 254, 255, 0.85),
+      rgba(56, 189, 248, 0.35) 60%,
+      rgba(56, 189, 248, 0) 100%
+    );
+  }
+
+  /* จุดข้อมูลวิ่งบนสายจากแกนกลางไปแท่น (หยุดเองเมื่อ prefers-reduced-motion) */
+  .jarvis-office-spark {
+    @apply pointer-events-none absolute top-1/2 h-[5px] w-[5px] rounded-full;
+    margin-top: -2.5px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .jarvis-office-live .jarvis-office-spark {
+      animation: jarvis-office-spark-run 2.4s linear infinite;
+    }
+  }
+  @keyframes jarvis-office-spark-run {
+    0% {
+      left: 4%;
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      left: 96%;
+      opacity: 0;
+    }
+  }
+}
