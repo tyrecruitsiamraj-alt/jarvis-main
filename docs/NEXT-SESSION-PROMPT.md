@@ -1,75 +1,70 @@
-# Prompt เปิด session ใหม่ (อัปเดต 23 ส.ค. 2569 — จบรอบสามสิบสอง · Phase 1-7 ปิดครบ)
+# Prompt สำหรับเปิด session ใหม่ (คัดลอกทั้งบล็อกไปวาง)
 
-ก๊อปทั้งบล็อกข้างล่างไปวางเป็นข้อความแรกของ session ใหม่:
+> อัปเดตล่าสุด 25 ส.ค. 2569 · รอบสี่สิบ · HEAD `63a7792`
 
 ---
 
-ทำงานต่อโปรเจกต์ jarvis / So Recruit — เซสชันก่อน context เต็ม (ส่งต่อ 23 ส.ค. 2569 · รอบสามสิบสอง)
+ทำงานต่อโปรเจกต์ jarvis / So Recruit — เซสชันก่อน context เต็ม (ส่งต่อ 25 ส.ค. 2569 · รอบสี่สิบ)
 
 อ่านก่อนแตะโค้ด ตามลำดับ:
-1. docs/SESSION-HANDOFF.md — เริ่มหัวข้อ "รอบสามสิบสอง · 23 ส.ค. 2569" ที่อยู่บนสุด
-   (สถานะ · 3 ข้อที่รอผมเคาะ · ของที่ทำเสร็จ Phase 6-7 · บั๊กเก่าที่เจอ · ตารางสวิตช์ตอน deploy)
-2. ~/.claude/plans/shiny-knitting-glacier.md — แผนแม่ 8 Phase มี checkbox
-   (Phase 1-7 ติ๊กครบแล้ว · Phase 8 = 3/6) · ห้ามทำงานนอกแผน · เจอของใหม่ให้เพิ่มเป็นข้อก่อนลงมือ
-3. .claude/skills/request-control-tower-advisor/references/09-editing-map.md
-   — อ่าน "รอบสามสิบเอ็ด" และ "รอบสามสิบสอง" ท้ายไฟล์ (แผนที่ไฟล์ + กับดักทุกข้อ)
-4. docs/board-redesign-panel-2569-08-21.md — anti-patterns 22 ข้อ (ก่อนออกแบบอะไรบนบอร์ด)
-5. memory: system-redesign-master-plan · redesign-round-traps · no-guessing-ask-instead ·
-   owner-review-workflow · shared-prod-database · jarvis-verify-with-real-writes ·
-   delete-test-rows-by-id-only · shadcn-ui-rules-and-saturday-cleanup
-6. เรียก skill "system-builder" ทุกครั้งก่อนแก้โค้ด
+1. `docs/SESSION-HANDOFF.md` — เริ่มหัวข้อ "รอบสี่สิบ · 25 ส.ค. 2569" ที่อยู่บนสุด
+   (สถานะ · ของค้าง 7 ข้อ · คำเคาะผูกมัดของเจ้าของ)
+2. `~/.claude/plans/shiny-knitting-glacier.md` — แผนแม่ 8 Phase + Phase 10
+   อ่านหัวข้อ "สถานะแผน ณ 25 ส.ค. 2569" ท้ายไฟล์ · ห้ามทำงานนอกแผน เจอของใหม่ให้เพิ่มเป็นข้อก่อน
+3. `.claude/skills/request-control-tower-advisor/references/09-editing-map.md`
+   — อ่าน **รอบสามสิบสี่ ถึง รอบสามสิบเก้า** ท้ายไฟล์ (แผนที่ไฟล์ + กับดักทุกข้อ)
+4. memory: `system-redesign-master-plan` · `jarvis-home-scene-is-rendered-image` ·
+   `jarvis-bu-lives-in-site-code` · `redesign-round-traps` · `no-guessing-ask-instead` ·
+   `owner-review-workflow` · `shared-prod-database` · `jarvis-verify-with-real-writes`
+5. เรียก skill **"system-builder"** ทุกครั้งก่อนแก้โค้ด
 
-สถานะ: 🟢 **Phase 1-7 ปิดครบทั้งหมด** · Phase 8 = 3/6
-ด่านตรวจของ tree นี้ผ่านหมด (วัดจริงตอนส่งต่อ): test **2,111 ผ่าน / 6 skip (206 ไฟล์)** ·
-tsc 4 config = 0 · eslint 0 error / 18 warning · registry **95 route** ·
-migration ถึง **107** (รันบนฐานจริงครบแล้ว) · HEAD `9182f90`
-🟡 working tree **131 รายการ** · 🔴 **ห้าม commit/push จนผมบอก**
-(tsc 4 config = tsconfig.json · app · node · **tsconfig.api.json** ·
-⚠️ `api/tsconfig.json` เป็นคอนฟิกค้างไม่มี paths ของ `@/` → 62 error อยู่แล้วบน HEAD ห้ามใช้เป็นด่าน)
+## สถานะ (วัดจริงตอนส่งต่อ)
 
-⚠️ พฤติกรรมที่เปลี่ยนจริงแล้วในเครื่องนี้ (รู้ก่อนแตะ):
-- `/apply` ว่างจนกดปล่อยใบ (ทะเบียน `job_public_releases` 0 แถว) → deploy ต้องกด "ปล่อยทั้งหน้านี้" ก่อน
-- หน้า Login ซ่อนช่องรหัสผ่านเมื่อ Azure พร้อม (เครื่อง dev fail-safe โชว์ตามเดิม)
-- หน้าแรกมีฉาก 3D Virtual Office เหนือ funnel เดิม
-- worker กันชื่อดอง · หน้า "ดูแลหลังเริ่มงาน" (`/aftercare` เมนูหลักของตัวเอง) ·
-  สถานะชุดเดียว (ตารางกลาง `selection_progress` คีย์ job_id + เบอร์ E.164) — ใช้งานได้แล้ว
-- กัน declined ระดับ **หน่วยงาน** แล้ว (ไซต์เดียวมีได้ 28 ใบขอ)
-🔴 ก่อน deploy: ตั้ง `CLAIM_GUARD_ENABLED=true` (worker กันชื่อดอง ปิดเป็นค่าตั้งต้น)
+🟢 **ขึ้น production หมดแล้ว** — HEAD `63a7792` ตรงกับ origin (0/0) · **working tree ว่าง 0 ไฟล์**
+test **2,177 ผ่าน / 6 skip (211 ไฟล์)** · tsc 4 config = 0 · eslint 0 error / 18 warning ·
+registry **97 route** · migration **110 ไฟล์ apply ครบ** · build ผ่าน
 
-เหลือ 3 ข้อที่ต้องให้ผมเคาะ (ห้ามลงมือเอง):
-1. **8.2 ล้างของเดิมให้ตรงกติกา UI** — `rounded-[...]` 60 จุด · hex ดิบ 41 บรรทัด/14 ไฟล์ ·
-   spacing สุ่ม 2 จุด (อยู่ใน `ui/scroll-area.tsx` ของ shadcn เอง)
-   งานนี้เปลี่ยนหน้าตาทั้งระบบ · ของใหม่ทุกไฟล์รอบนี้ตรงกติกาอยู่แล้ว
-2. **8.3 preset `b27GcrRo`** — ย้าย Radix → Base UI ทั้ง 47 component (ทำหรือพัก)
-3. **8.4 เปิด `APPLICATION_AUTO_MOVE_APPLY=true`** (รอผม review dry-run)
-พัก: Phase 2.12 ฉาก 3D เป็นไฟล์ภาพ render (ต้องมี fallback ฉาก CSS เสมอ) · Phase 2.8/2.9
-ค้างไว้ทีหลัง: คิว Lumos `delivered` ที่ไม่มีผลกลับ 19 สาย (เก่าสุด 16 ส.ค.)
+🔴 **push เข้า main = deploy อัตโนมัติทันที** (~1-1.5 นาที) · `git commit` เฉย ๆ ไม่กระทบ
+⚠️ `api/tsconfig.json` เป็นคอนฟิกค้างไม่มี paths ของ `@/` → 62 error อยู่แล้ว **ห้ามใช้เป็นด่าน**
+(ด่านจริงคือ `tsconfig.json` · `tsconfig.app.json` · `tsconfig.node.json` · `tsconfig.api.json`)
 
-🔴 กติกาที่ห้ามพลาด:
-- ห้ามเดา ไม่ชัวร์ให้ถามเป็น Choice ทันที · สั่งจำนวนเท่าไหร่ต้องได้เท่านั้น ห้ามยุบเอง
-- UI ใช้ shadcn เท่านั้น · ห้าม Dialog ซ้อน Dialog (ใช้ Popover / prop `embedded`) ·
-  ห้าม hex/radius/spacing สุ่ม · สีมาจาก designTokens (TONE/DASH/HUD/HUD_SCENE) ต้องมีคู่ dark ครบ
-- ก่อนคิดว่า "logic มีแล้วแต่ UI ไม่ต่อ" ให้เช็ก git ก่อน — บางอย่างผมสั่งถอดไปแล้ว
-- ปุ่มที่ยิงสายจริงต้องมี popup ยืนยันรายชื่อทุกตัว · ปุ่มคำเดียวกันแต่คนละพฤติกรรม = บั๊ก
-- ฐาน dev = prod · ทดสอบเขียนต้องคืนค่าเดิม · ลบด้วย id เท่านั้น ห้าม LIKE ·
-  🔴 ห้ามรัน worker ทดสอบ (มันเขียนแจ้งเตือนถึงคนจริง) — เตรียมข้อมูลด้วย SQL ตรง ๆ
-- ตรวจงานเองในเบราว์เซอร์ วัดจาก DOM ไม่ใช่ screenshot · `preview_start` (vite 8080 + api 3100)
-  ห้าม Bash รัน server · token dev 30 นาที เด้ง login ให้ยิง POST /api/auth/dev-role {"role":"admin"}
-- หลัง git pull ต้องรันเทสต์เต็มชุด · แก้ตรรกะ = แก้เทสต์ · เพิ่มไฟล์ = อัปเดต 09-editing-map.md
-- สคริปต์คุยฐานใน scratchpad ต้องใช้ `createRequire` ชี้ package.json ของโปรเจกต์ +
-  `SET search_path TO jarvis_rm, public`
+## ข้อมูลจริงบน production
 
-เริ่มโดยเช็คสถานะจริง (git status ต้องเห็น 131 รายการ · เทสต์ · tsc 4 · registry 95 · migration 107)
-แล้วสรุปสั้น ๆ ว่าเข้าใจอะไร จากนั้นถามผมเป็น Choice ว่าจะเคาะ 3 ข้อของ Phase 8 อย่างไร
+ปล่อยใบขึ้น `/apply` **177 ใบ** · ราชการ/เอกชน กรอกแล้ว **79/138 หน่วยงาน** ·
+ใบสมัครทั้งระบบ **1 ใบ** · Lumos ค้างไม่มีผลกลับ **19 สาย** (เก่าสุด 15 ส.ค.)
 
----
+## ของค้างที่รู้อยู่ (ยังไม่มีใครสั่งให้แก้)
 
-## หมายเหตุสำหรับคนอ่าน (ไม่ต้องก๊อป)
+1. `job_category` ฮาร์ดโค้ด `'private'` ทุกใบทั้งสองเส้น feed → ค้นหา "เอกชน" เจอทุกใบ
+2. `/api/office-floor` ไม่ส่งเลขโต๊ะ `aftercare` → การ์ดขึ้น "ยังไม่เปิดใช้" ทั้งที่ทำเสร็จแล้ว
+3. Lumos delivered ไม่มีผลกลับ 19 สาย
+4. `CLAIM_GUARD_ENABLED` ไม่มีใน `deploy.yml` (worker กันชื่อดองไม่ทำงานบน production)
+5. `APPLICATION_AUTO_MOVE_APPLY=false` (เจ้าของเลื่อน · ดู 8.4)
+6. ผล dry-run auto-move เก็บใน memory รีสตาร์ตแล้วหาย · ย้ายใบแล้วไม่แจ้งเตือนใคร
+7. Phase 8 เหลือ 8.2 (ล้าง rounded/hex ของเดิม) · 8.3 (Radix→Base UI) — เจ้าของสั่งพัก
+8. Phase 10.5 (2.8/2.9 กันรกหน้าแรก) ยังไม่เริ่ม
 
-* เอกสารที่แบกความรู้รอบนี้ไว้แล้ว: `docs/SESSION-HANDOFF.md` (รอบสามสิบสอง) ·
-  `09-editing-map.md` (รอบสามสิบสอง — ตารางไฟล์ Phase 6-7 + บั๊กเก่า 3 ตัว) ·
-  `~/.claude/plans/shiny-knitting-glacier.md` (checkbox) · memory 2 ไฟล์
-  (`system-redesign-master-plan` · `redesign-round-traps`)
-* บั๊กเก่าที่เจอและแก้รอบนี้ (มีเทสต์กันถอยทุกตัว): ช่อง "ไป" บนหน้า Follow นับต่ำกว่าจริง
-  ตั้งแต่ migration 101 · `followup_state` ไม่เคยถูก SELECT ส่งมาฝั่งจอ ·
-  id ใบขอล่วงหน้า `siamraj-pre:` ตาย 500 ที่ `jobs` / `job-assignments`
+## 🔴 กติกาที่ห้ามพลาด
+
+- **ห้ามเดา ไม่ชัวร์ให้ถามเป็น Choice ทันที** · สั่งจำนวนเท่าไหร่ต้องได้เท่านั้น ห้ามยุบเอง
+- **ก่อนสร้างของใหม่ ให้ไปวัดฐานจริงก่อนเสมอ** — รอบนี้เจอสามครั้งที่ข้อมูลจริงหักล้างสมมติฐาน
+  (BU อยู่ใน site_code ไม่ใช่ prefix ใบขอ · ERP มี ms_customer_group 7 กลุ่มไม่ใช่ 2 ·
+  เงินคนที่ออกมี 2 ตัวคนละความหมาย)
+- **ก่อนถอด/ย้าย UI ที่มีคนใช้อยู่ ต้องวัดว่ามีใครใช้อยู่ไหม แล้วบอกเจ้าของก่อน push**
+- หน้าแรก: **ฉากเป็นภาพ render ห้ามปั้น CSS ใหม่** · ภาพใหม่ต้องไม่มีตัวหนังสือฝัง
+  และต้องวัด `ROOM_SPOTS` ใหม่
+- UI ใช้ shadcn เท่านั้น · ห้าม Dialog ซ้อน Dialog · ห้าม hex/radius/spacing สุ่ม
+  สีมาจาก `designTokens` (TONE/DASH/HUD/HUD_SCENE) ต้องมีคู่ dark ครบ
+- ฐาน dev = prod · **ทดสอบเขียนต้องคืนค่าเดิม · ลบด้วย id เท่านั้น ห้าม LIKE**
+- 🔴 **ห้ามรัน worker ทดสอบ** (เขียนแจ้งเตือนถึงคนจริง) — เตรียมข้อมูลด้วย SQL ตรง ๆ
+- ตรวจงานเองในเบราว์เซอร์ **วัดจาก DOM ไม่ใช่ screenshot** · `preview_start` (vite + api 3100)
+  ห้าม Bash รัน server · token dev 30 นาที เด้ง login ให้ยิง
+  `POST /api/auth/dev-role {"role":"admin"}`
+- แก้ตรรกะ = แก้เทสต์ · เพิ่มไฟล์ = อัปเดต `09-editing-map.md`
+- สคริปต์คุยฐานต้องวางใน `scripts/` (ไม่งั้น import `mssql`/`pg` ไม่เจอ) แล้วลบทิ้งหลังใช้
+  · ฝั่ง pg ใช้ `import '../server/bootstrap-env.js'` แล้ว import `api/_lib/postgres.js`
+
+## เริ่มยังไง
+
+เช็คสถานะจริงก่อน (git status ต้องว่าง · HEAD ตรง origin · test · tsc 4 · registry 97 ·
+migration 110) แล้วสรุปสั้น ๆ ว่าเข้าใจอะไร จากนั้นถามผมว่าจะทำอะไรต่อ
