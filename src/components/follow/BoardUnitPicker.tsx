@@ -27,36 +27,38 @@ export type BoardUnitPickerProps = {
   onPick: (unit: BoardUnitOption) => void;
 };
 
-const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, units, onPick }) => {
+/**
+ * เนื้อของ picker (ค้นหา + รายการ) แยกออกมาเพื่อ **ใช้ซ้ำแบบไม่ห่อ Dialog**
+ *
+ * 🔴 เหตุผล: Phase 6.6 ต้องเลือกหน่วยงานจากในป๊อปที่เป็น Dialog อยู่แล้ว
+ * (dialog รายคนของหน้าจับคู่งาน) — **ห้าม Dialog ซ้อน Dialog** ตามกติกาโปรเจกต์
+ * จึงแยกเนื้อออกมาให้ฝังตรง ๆ ได้ · ตรรกะค้นหายังเป็น `filterBoardUnits` ตัวเดียวกัน
+ * (ห้ามก๊อปรายการนี้ไปไว้ที่อื่น — แก้ที่นี่ที่เดียวแล้วได้ทั้งสองแบบ)
+ */
+export const BoardUnitPickerBody: React.FC<{
+  units: BoardUnitOption[];
+  onPick: (unit: BoardUnitOption) => void;
+  /** จำกัดความสูงของรายการเมื่อฝังในพื้นที่แคบ */
+  listClassName?: string;
+}> = ({ units, onPick, listClassName }) => {
   const [query, setQuery] = useState('');
   const shown = useMemo(() => filterBoardUnits(units, query), [units, query]);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : undefined)}>
-      <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <Building2 className="h-4 w-4" /> เลือกหน่วยงานจากบอร์ด
-          </DialogTitle>
-          <DialogDescription>
-            ทุกหน่วยงานที่มีใบขอตั้งแต่ปี 2567 — กดเพื่อเติมชื่อหน่วยงานและรหัสไซต์ลงฟอร์ม
-            (หน่วยงานที่ยังมีใบขอเปิดอยู่ขึ้นก่อน)
-          </DialogDescription>
-        </DialogHeader>
-
-        <SearchField
+    <>
+      <SearchField
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="ค้นชื่อหน่วยงาน / รหัสไซต์ / เลขที่ใบขอ / ตำแหน่ง"
           wrapperClassName="w-full"
         />
 
-        {units.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            ยังโหลดหน่วยงานไม่ได้ — ปิดหน้าต่างนี้แล้วพิมพ์ชื่อหน่วยงานเองได้
-          </p>
-        ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto">
+      {units.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          ยังโหลดหน่วยงานไม่ได้ — ปิดหน้าต่างนี้แล้วพิมพ์ชื่อหน่วยงานเองได้
+        </p>
+      ) : (
+        <div className={listClassName ?? 'min-h-0 flex-1 overflow-y-auto'}>
             {shown.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 ไม่พบหน่วยงานที่ค้น — ลองคำสั้นลง หรือค้นด้วยรหัสไซต์
@@ -99,16 +101,32 @@ const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, units,
                 ))}
               </ul>
             )}
-            <p className="pt-2 text-[11px] text-muted-foreground">
-              แสดง {shown.length.toLocaleString('th-TH')} จาก {units.length.toLocaleString('th-TH')}{' '}
-              หน่วยงาน
-              {shown.length >= 100 ? ' (พิมพ์ค้นเพิ่มเพื่อแคบผลลง)' : ''}
-            </p>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          <p className="pt-2 text-[11px] text-muted-foreground">
+            แสดง {shown.length.toLocaleString('th-TH')} จาก {units.length.toLocaleString('th-TH')}{' '}
+            หน่วยงาน
+            {shown.length >= 100 ? ' (พิมพ์ค้นเพิ่มเพื่อแคบผลลง)' : ''}
+          </p>
+        </div>
+      )}
+    </>
   );
 };
+
+const BoardUnitPicker: React.FC<BoardUnitPickerProps> = ({ open, onClose, units, onPick }) => (
+  <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : undefined)}>
+    <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2 text-base">
+          <Building2 className="h-4 w-4" /> เลือกหน่วยงานจากบอร์ด
+        </DialogTitle>
+        <DialogDescription>
+          ทุกหน่วยงานที่มีใบขอตั้งแต่ปี 2567 — กดเพื่อเติมชื่อหน่วยงานและรหัสไซต์ลงฟอร์ม
+          (หน่วยงานที่ยังมีใบขอเปิดอยู่ขึ้นก่อน)
+        </DialogDescription>
+      </DialogHeader>
+      <BoardUnitPickerBody units={units} onPick={onPick} />
+    </DialogContent>
+  </Dialog>
+);
 
 export default BoardUnitPicker;

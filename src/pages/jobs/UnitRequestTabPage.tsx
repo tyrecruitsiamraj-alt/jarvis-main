@@ -3,10 +3,14 @@ import { useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import UnitRequestTabs, { type UnitRequestTabId } from '@/components/jobs/UnitRequestTabs';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
-import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import { fetchAllUnitOptions, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
+import type { BoardUnitOption } from '@/lib/boardUnitPicker';
 import { fetchJobApplications, type PublicApplication } from '@/lib/publicApplicationsApi';
 import { fetchRecruitLaneCandidates, tierChipClass, type RecruitLaneMatch } from '@/lib/recruitLaneApi';
 import { fetchBoardMatchForJob } from '@/lib/boardMatchApi';
+import { dispatchLumosCalls } from '@/lib/lumosDispatchApi';
+import { acquireCallHold } from '@/lib/callHoldsApi';
+import { LumosSendBar } from '@/components/matching/LumosPanels';
 import type { BoardMatchResponse } from '@/lib/boardCandidateTypes';
 import {
   groupApplicationsByOrigin,
@@ -17,11 +21,22 @@ import {
 } from '@/lib/unitMatchingView';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import SelectionProgressControls from '@/components/recruit-rm/SelectionProgressControls';
-import { isInterestedOutcome } from '@/lib/applicantCallOutcome';
+import { isInterestedApplicant, isInterestedOutcome } from '@/lib/applicantCallOutcome';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { EM_DASH } from '@/lib/displayFallback';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import { SEARCH_ALL_POOLS } from '@/lib/candidateSearchLabels';
 import type { JobRequest } from '@/types';
 import { LoaderCircle, RefreshCw, Search, Users } from 'lucide-react';
 
@@ -62,7 +77,116 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
    */
   const [board, setBoard] = useState<BoardMatchResponse | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
+  /**
+   * ยืนยันก่อนสั่ง AI คิดใหม่ — ผลใหม่ **ทับผลเดิม** ที่ทีมอาจกำลังไล่โทรอยู่
+   * (หน้าจับคู่งานมี popup นี้ตั้งแต่ต้น แต่แท็บนี้ไม่มี · เจ้าของสั่งให้มีทุกที่ 22 ส.ค. 2569)
+   */
+  const [rematchConfirm, setRematchConfirm] = useState(false);
   const [boardWaiting, setBoardWaiting] = useState(false);
+
+  /**
+   * หน่วยงานให้เลือกในขั้น "รอหน่วยงานพิจารณา/รอสัมภาษณ์" (Phase 6.6)
+   * ⚠️ โหลดพัง = `[]` → ปุ่มเลือกหน่วยงานไม่โผล่ (ห้ามบล็อกงานอื่นในแท็บ)
+   * ใช้ชุดเดียวกับหน้า Follow (`?units=1`) เพื่อให้ชื่อ/รหัสไซต์ตรงกันทั้งระบบ
+   */
+  const [units, setUnits] = useState<BoardUnitOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAllUnitOptions()
+      .then((v) => {
+        if (!cancelled) setUnits(v);
+      })
+      .catch(() => {
+        if (!cancelled) setUnits([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * ติ๊กคนจากผล AI Match แล้วลงมือได้จากแท็บนี้เลย (Phase 6.7 · เจ้าของเคาะ 22 ส.ค. 2569)
+   *
+   * 🔴 เดิมแท็บนี้ "ดูอย่างเดียว" — เห็นว่า AI แนะนำใครแล้วต้องเด้งไปหน้าจับคู่งานเพื่อกดส่ง
+   * ตอนนี้ใช้ **แถบปุ่มตัวเดียวกับหน้าจับคู่งาน** (`LumosSendBar` → `lumosSendActions`)
+   * และ **เส้นส่งเดียวกัน** (`dispatchLumosCalls`) — ห้ามก๊อปตรรกะปุ่ม/เส้นส่งมาไว้ที่นี่
+   * ⚠️ ส่ง AI = ยิงสายจริง → ต้องผ่านป๊อปยืนยันรายชื่อก่อนทุกครั้ง
+   */
+  const [picked, setPicked] = useState<number[]>([]);
+  const [sendConfirm, setSendConfirm] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  /** คนที่ส่ง/ล็อกได้ต้องมีเบอร์ — ไม่มีเบอร์ติ๊กไม่ได้ (ปุ่มจะบอกเหตุผลเอง) */
+  const sendableMatches = useMemo(
+    () => (board?.matches ?? []).filter((m) => (m.mobile ?? '').trim()),
+    [board],
+  );
+  const pickedMatches = useMemo(
+    () => sendableMatches.filter((m) => picked.includes(m.card_id)),
+    [sendableMatches, picked],
+  );
+  const togglePick = (cardId: number) =>
+    setPicked((prev) => (prev.includes(cardId) ? prev.filter((x) => x !== cardId) : [...prev, cardId]));
+
+  const sendPickedToAi = async () => {
+    const jobKey = job?.id;
+    if (!jobKey || pickedMatches.length === 0 || sending) return;
+    setSending(true);
+    setActionNotice(null);
+    try {
+      const r = await dispatchLumosCalls({
+        jobId: jobKey,
+        boardCardIds: pickedMatches.map((m) => m.card_id),
+        irecruitIds: [],
+      });
+      const parts = [`เข้าคิว AI โทร ${r.queued} คน`];
+      if (r.duplicated.length > 0) parts.push(`เคยส่งแล้ว ${r.duplicated.length} คน (ไม่ส่งซ้ำ)`);
+      if (r.skipped.length > 0) {
+        parts.push(`ส่งไม่ได้ ${r.skipped.length} คน — ${r.skipped[0].reason}`);
+      }
+      setActionNotice(parts.join(' · '));
+      setPicked([]);
+      setSendConfirm(false);
+    } catch (e) {
+      setActionNotice(e instanceof Error ? e.message : 'ส่ง AI โทรไม่สำเร็จ');
+      setSendConfirm(false);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /** เก็บไปโทรเอง = ล็อกเบอร์กัน AI ทับ (คนพวกนี้ยังไม่มีใบสมัคร จึงไม่มี claim ให้จอง) */
+  const holdPickedForSelf = async () => {
+    const jobKey = job?.id;
+    if (!jobKey || pickedMatches.length === 0 || holding) return;
+    setHolding(true);
+    setActionNotice(null);
+    let ok = 0;
+    const failed: string[] = [];
+    for (const m of pickedMatches) {
+      const r = await acquireCallHold({
+        phone: (m.mobile ?? '').trim(),
+        source: 'board',
+        candidateRef: String(m.card_id),
+        candidateName: m.full_name,
+        jobId: jobKey,
+      });
+      if (r.ok) ok += 1;
+      else failed.push(`${m.full_name} (${r.heldBy?.heldByName || 'มีคนถืออยู่'})`);
+    }
+    setActionNotice(
+      [
+        ok > 0 ? `เก็บไปโทรเอง ${ok} คน — ล็อกเบอร์กัน AI โทรทับแล้ว` : 'ยังเก็บไม่ได้เลย',
+        failed.length > 0 ? `ข้าม ${failed.length} คน: ${failed.join(', ')}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    );
+    setPicked([]);
+    setHolding(false);
+  };
 
   const reload = useCallback(async () => {
     setError(null);
@@ -130,6 +254,11 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
 
   const summary = useMemo(() => summarizeUnitMatches(items ?? []), [items]);
   const groups = useMemo(() => groupApplicationsByOrigin(items ?? []), [items]);
+  /** คนที่ "สนใจ" ของใบขอนี้ (Phase 6.10) — กติกาเดียวกับแท็บ/กล่องอื่นทั้งระบบ */
+  const interestedItems = useMemo(
+    () => (items ?? []).filter((a) => isInterestedApplicant(a)),
+    [items],
+  );
 
   /**
    * ค้นคนที่ยังไม่สมัคร (เลนสรรหา) — **ไม่ส่งเข้าคิวโทร** จากหน้านี้
@@ -241,7 +370,8 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
                         {a.appointment_at || isInterestedOutcome(a.last_call_outcome) || a.selection_status ? (
                           <div className="sm:col-span-3">
                             <SelectionProgressControls
-                              application={a}
+                              subject={{ kind: 'application', application: a }}
+                              units={units}
                               onSaved={(next) =>
                                 setItems((cur) =>
                                   (cur ?? []).map((x) => (x.id === next.id ? next : x)),
@@ -274,7 +404,7 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
               <button
                 type="button"
                 disabled={boardWaiting}
-                onClick={() => void loadBoardMatch(true)}
+                onClick={() => setRematchConfirm(true)}
                 title="สั่งให้หลังบ้านคิดใหม่ — ผลเดิมยังแสดงอยู่ระหว่างรอ"
                 className={cn(
                   'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-50',
@@ -310,8 +440,19 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
                     className="grid gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[1.3fr_1.3fr_auto] sm:items-center"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-semibold text-foreground">
-                        {m.full_name}
+                      <span className="flex items-center gap-2">
+                        {/* ติ๊กได้เฉพาะคนที่มีเบอร์ — ไม่มีเบอร์ส่ง/ล็อกไม่ได้ทั้งคู่ */}
+                        <input
+                          type="checkbox"
+                          checked={picked.includes(m.card_id)}
+                          disabled={!(m.mobile ?? '').trim() || sending || holding}
+                          onChange={() => togglePick(m.card_id)}
+                          aria-label={`เลือก ${m.full_name}`}
+                          className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed"
+                        />
+                        <span className="min-w-0 truncate font-semibold text-foreground">
+                          {m.full_name}
+                        </span>
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
                         {[m.job1_name, m.province_name, m.column_label].filter(Boolean).join(' · ') ||
@@ -338,14 +479,39 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
               <div className="rounded-xl border border-border/70 bg-card px-4 py-8 text-center">
                 <p className="text-sm font-medium text-foreground">ยังไม่มีคนของเราที่เข้าข่ายใบนี้</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  ลองกด “หาผู้สมัครเพิ่ม” ข้างล่างเพื่อค้นจากฐานคนที่ยังไม่สมัคร
+                  ลองกด “{SEARCH_ALL_POOLS.label}” ข้างล่าง — {SEARCH_ALL_POOLS.hint}
                 </p>
               </div>
             ) : null}
 
+            {/* แถบปุ่มลงมือ (Phase 6.7) — ตัวเดียวกับหน้าจับคู่งาน (lumosSendActions คุมเหตุผล)
+                ⚠️ ไม่มีปุ่ม "ส่งทั้งหมด" ที่นี่: แท็บนี้เป็นมุมของใบขอเดียว ส่งทั้งใบทำที่หน้าจับคู่งาน
+                (ปุ่มเดียวกันคนละพฤติกรรม = บั๊ก — จึงส่ง allCount = จำนวนที่ติ๊กเท่านั้น) */}
+            {board && sendableMatches.length > 0 ? (
+              <LumosSendBar
+                count={pickedMatches.length}
+                allCount={pickedMatches.length}
+                matchedCount={sendableMatches.length}
+                onSend={() => setSendConfirm(true)}
+                onSendAll={() => setSendConfirm(true)}
+                onCreateBatch={() => setActionNotice('ตั้งคิวแบบหน่วงเวลาทำที่หน้าจับคู่งาน')}
+                onClear={() => setPicked([])}
+                busy={sending}
+                creatingBatch={false}
+                onHoldSelf={() => void holdPickedForSelf()}
+                holdingSelf={holding}
+              />
+            ) : null}
+
+            {actionNotice ? (
+              <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.info.soft, TONE.info.value)}>
+                {actionNotice}
+              </p>
+            ) : null}
+
             {/* ── หาผู้สมัครเพิ่ม (เลนสรรหา · คนที่ยังไม่สมัคร) ─────────────── */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <span className="font-semibold">หาผู้สมัครเพิ่ม</span>
+              <span className="font-semibold">{SEARCH_ALL_POOLS.label}</span>
               <span className="text-xs text-muted-foreground">
                 · ค้นจากฐานคนที่ยังไม่สมัคร (Checklist · ฐานใหม่ · iRecruit) — หน้านี้ดูอย่างเดียว
                 ไม่ส่งเข้าคิวโทร
@@ -364,7 +530,7 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
                 ) : (
                   <Search className="h-3.5 w-3.5" />
                 )}
-                {aiMatches ? 'ค้นใหม่' : 'หาผู้สมัครเพิ่ม'}
+                {aiMatches ? SEARCH_ALL_POOLS.again : SEARCH_ALL_POOLS.label}
               </button>
             </div>
 
@@ -404,6 +570,44 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
         {/* ── การติดต่อ ─────────────────────────────────── */}
         {tab === 'contact' ? (
           <>
+            {/* คนที่ตอบว่าสนใจจากการโทร — ของทั้งใบขอ (Phase 6.10 · เจ้าของเคาะ 22 ส.ค. 2569)
+                🔴 เดิมแท็บนี้มีแต่ "ถังโทรของฉัน" ซึ่งเป็นของคนที่เปิดดูคนเดียว → คนสนใจ
+                ที่คนอื่นโทรได้มาไม่โผล่ที่ไหนในใบขอเลย · กติกา "ใครสนใจ" มาจาก
+                `applicantCallOutcome` ที่เดียว (เทียบผลโทรกับผลติดต่อ อันใหม่กว่าชนะ) */}
+            {interestedItems.length > 0 ? (
+              <section className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.success.soft)}>
+                <p className={cn('text-xs font-semibold', TONE.success.value)}>
+                  คนที่ตอบว่าสนใจจากการโทร {interestedItems.length} คน — ของทั้งใบขอ (ทุกคนเห็น)
+                </p>
+                <ul className="space-y-1.5">
+                  {interestedItems.map((a) => (
+                    <li key={a.id} className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <b className="font-semibold text-foreground">{a.full_name}</b>
+                        <span className="font-mono text-[11px] text-muted-foreground">{a.phone}</span>
+                        {unitMatchOriginLabel(a) ? (
+                          <span className="jarvis-chip jarvis-chip-violet">{unitMatchOriginLabel(a)}</span>
+                        ) : null}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {unitMatchFactLine(a) || EM_DASH}
+                      </span>
+                      {/* ตั้งขั้น/เช็คลิสต์ได้จากที่นี่เลย ไม่ต้องเด้งไปแท็บผู้สมัคร */}
+                      <div className="mt-2">
+                        <SelectionProgressControls
+                          subject={{ kind: 'application', application: a }}
+                          units={units}
+                          onSaved={(next) =>
+                            setItems((cur) => (cur ?? []).map((x) => (x.id === next.id ? next : x)))
+                          }
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             <p className="rounded-xl border border-border/70 bg-card px-3 py-2 text-[11px] text-muted-foreground">
               งานโทรที่คุณเก็บไว้เอง — เก็บแล้ว AI จะไม่โทรทับเบอร์นั้น ·
               รายการนี้เป็นของคุณคนเดียว ไม่ใช่ของทั้งใบขอ
@@ -412,6 +616,64 @@ const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }>
           </>
         ) : null}
       </div>
+
+      {/* 🔴 ยืนยันก่อนให้ AI โทรจริง — โชว์รายชื่อ (กติกา: ปุ่มที่ยิงสายต้องมีป๊อปทุกตัว) */}
+      <AlertDialog open={sendConfirm} onOpenChange={setSendConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ให้ AI โทรหา {pickedMatches.length} คนนี้?</AlertDialogTitle>
+            <AlertDialogDescription>
+              AI จะโทรออกหาคนในรายชื่อนี้จริง (เว้นช่วง 20:00–08:00 น. ระบบเลื่อนให้เอง) ·
+              คนที่มีเจ้าหน้าที่ถือไปโทรอยู่ · เบอร์ที่พักไว้ · คนที่เคยปฏิเสธงานใบนี้
+              ระบบจะข้ามให้เองและรายงานกลับ
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-48 overflow-y-auto rounded-xl border border-border/70 px-3 py-2">
+            <ul className="space-y-0.5 text-xs">
+              {pickedMatches.slice(0, 12).map((m, i) => (
+                <li key={m.card_id}>
+                  {i + 1}. {m.full_name}
+                </li>
+              ))}
+              {pickedMatches.length > 12 ? (
+                <li className="pt-1 text-[11px] text-muted-foreground">
+                  และอีก {pickedMatches.length - 12} คน
+                </li>
+              ) : null}
+            </ul>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sending}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={sending || pickedMatches.length === 0}
+              onClick={() => void sendPickedToAi()}
+            >
+              {sending ? 'กำลังส่ง…' : `ส่ง ${pickedMatches.length} คนเข้าคิวโทร`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ยืนยันก่อนสั่งคิดใหม่ — ใช้ AlertDialog ของ shadcn (ไม่สร้าง Dialog เอง ตามกติกาโปรเจกต์)
+          คำอธิบายตรงกับของหน้าจับคู่งาน: ผลเดิมยังอยู่ระหว่างรอ แล้วผลใหม่มาแทนเอง */}
+      <AlertDialog open={rematchConfirm} onOpenChange={setRematchConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ให้ AI คิดคนใหม่สำหรับใบขอนี้?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ระบบจะส่งใบนี้ให้ AI ที่หลังบ้านประเมินใหม่ทั้งหมด — ระหว่างรอยังเห็นรายชื่อเดิม
+              และ <b>ผลใหม่จะมาแทนที่ผลเดิม</b> เมื่อคิดเสร็จ (ปกติไม่กี่นาที)
+              ถ้ากำลังไล่โทรจากรายชื่อชุดนี้อยู่ ให้โทรให้จบก่อน
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void loadBoardMatch(true)}>
+              คิดใหม่
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -21,6 +21,7 @@ import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMa
 import { toBangkokYmd } from './businessDate.js';
 import { listSiamrajSqlServerUnits } from './siamrajSqlServerUnits.js';
 import { jobAllowedByDepartmentScope, loadUserDepartmentScope } from './departmentScope.js';
+import { rememberJobSites } from './jobSiteMap.js';
 import type { DepartmentScope } from './departmentScope.js';
 import type { UserRole } from './auth.js';
 
@@ -45,6 +46,19 @@ function normalizeLookupId(id: string): string {
   if (t.startsWith('siamraj-sql:')) return t.slice('siamraj-sql:'.length);
   if (t.startsWith('siamraj:')) return t.slice('siamraj:'.length);
   return t;
+}
+
+/**
+ * id นี้เป็นใบขอจาก **ERP** ไหม (ไม่ใช่ของตาราง `jarvis_rm.jobs` ฝั่งเรา) — **ที่เดียว**
+ *
+ * 🔴 ครอบ prefix ทั้งสามแบบที่ระบบสร้างจริง: `siamraj:` (เส้น pg เก่า) ·
+ * `siamraj-sql:` (ใบขอจริง) · `siamraj-pre:` (**ใบล่วงหน้า**)
+ * เดิมแต่ละ handler เขียน `startsWith` ของตัวเองแล้ว **ลืมใบล่วงหน้าทุกที่** →
+ * id แบบ `siamraj-pre:` หลุดไปคิวรีตารางฝั่งเรา แล้ว **ตาย 500 เพราะ cast `::uuid` ไม่ได้**
+ * (ไม่ใช่แค่ 404) · เจอตอนแก้บั๊ก pre:/sql: 23 ส.ค. 2569
+ */
+export function isErpJobId(id: string): boolean {
+  return /^siamraj[a-z-]*:/.test(id.trim());
 }
 
 function quotePgIdent(ident: string): string {
@@ -239,7 +253,14 @@ export async function listSiamrajUnitRequests(options: {
         departmentScope: options.departmentScope,
       }).catch(() => []),
     ]);
-    return [...real, ...pre] as typeof real;
+    const all = [...real, ...pre] as typeof real;
+    /**
+     * จำหน่วยงาน (site_code) ของใบขอไว้ฝั่งเรา (Phase 6.8 · migration 106)
+     * — คิว/ล็อกเก็บแค่ job_ref จึงกันเสนอซ้ำระดับหน่วยงานไม่ได้ถ้าไม่มีแมปนี้
+     * ⚠️ ไม่ await: feed ใบขอคือของหลัก ห้ามรอ/ห้ามล้มเพราะตัวช่วยกันซ้ำ
+     */
+    void rememberJobSites(all as Array<{ id?: unknown; site_code?: unknown; unit_name?: unknown }>);
+    return all;
   }
 
   const schema = getSiamrajSchema();
@@ -259,6 +280,7 @@ export async function listSiamrajUnitRequests(options: {
   );
 
   const mapped = rows.map(mapSiamrajRow);
+  void rememberJobSites(mapped as Array<{ id?: unknown; site_code?: unknown; unit_name?: unknown }>);
   const scope = options.departmentScope;
   if (!scope || scope.mode === 'all') return mapped;
   return mapped.filter((j) => jobAllowedByDepartmentScope(j, scope));

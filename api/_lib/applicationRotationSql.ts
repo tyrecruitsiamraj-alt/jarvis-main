@@ -6,11 +6,15 @@
  *   1. คิว Lumos: job_ref = งานนั้น + เบอร์ตรง + มีผล (ไม่ cancelled)
  *   2. hold: job_id = งานนั้น + result_outcome ไม่ null
  *   3. contact log: log ของใบสมัครที่ job_id = งานนั้น + เบอร์เดียวกัน
+ *      🔴 เทียบทั้ง `c.job_id` (ใบที่นัดลง — เขียนเฉพาะตอนนัดได้) และ `a.job_id`
+ *      (ใบที่เขาสมัคร) เพราะ log ที่ `ok=false` มี `c.job_id` เป็น null เสมอ
+ *      ⇒ เดิมผล "ติดต่อไม่สำเร็จ" หลุด cooldown ทั้งหมด (แก้ 24 ส.ค. 2569)
  * เวลาใช้ first_result_at/result_at (088 เขียนครั้งเดียว) — ห้าม updated_at/created_at เดี่ยว
  * (เหตุผลเดียวกับ applicantOverviewSql: updated_at ขยับทุกครั้งที่แตะแถว)
  */
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { jobIdsInSameSite } from './jobSiteMap.js';
 
 export const ROTATION_COOLDOWN_DAYS = 30;
 
@@ -47,7 +51,7 @@ export function buildContactedAboutJobSql(): string {
     select distinct a.phone_e164 as phone
       from ${CONTACTS} c
       join ${APPS} a on a.id = c.application_id
-     where c.job_id = $1
+     where (c.job_id = $1 or a.job_id = $1)
        and a.phone_e164 = any($2::text[])
        and c.created_at >= $3::timestamptz`;
 }
@@ -114,9 +118,15 @@ export async function phonesContactedAnyJob(
  * param: $1 = jobId · $2 = phones text[]
  *
  * ⚠️ ต่างจาก cooldown 30 วันข้างบนสองอย่าง: (1) **ไม่มี cutoff** — ปฏิเสธเมื่อไหร่ก็ตาม
- * = ไม่เสนอใบนั้นอีกตลอด (2) นับเฉพาะ outcome `declined` เท่านั้น ไม่ใช่ทุกการติดต่อ
- * · แหล่งผลมี 2 ทาง (คิว AI + ถังที่คนรับไปโทร) — contact log ไม่มีคอลัมน์ outcome ตรง
- * จึงไม่นับ (ผลจากคนถูกเขียนลง holds อยู่แล้ว)
+ * = ไม่เสนอใบนั้นอีกตลอด (2) นับเฉพาะการปฏิเสธ ไม่ใช่ทุกการติดต่อ
+ * · แหล่งผลมี **3 ทาง**: คิว AI (`declined`) + ถังที่คนรับไปโทร (`declined`) +
+ * ผลติดต่อจากมือคน (`ok = false` — เจ้าของเคาะว่านับเป็น "ไม่สนใจ")
+ *
+ * 🔴 ทางที่ 3 ต้อง join ผ่านใบสมัคร — log ที่ `ok=false` มี `job_id` เป็น null เสมอ
+ * (คอลัมน์นั้นคือ "ใบที่นัดลง" ไม่ใช่ "ใบที่คุยเรื่อง") งานที่คุยคือใบที่เขาสมัคร (`a.job_id`)
+ * เดิมไม่นับทางนี้เพราะเชื่อว่า "ผลจากคนถูกเขียนลง holds อยู่แล้ว" — **ไม่จริง**:
+ * เส้น 086 (`createContactLog`) เขียนแค่ log + status ไม่แตะ holds ⇒ คนที่บอก
+ * เจ้าหน้าที่ว่าไม่เอา ยังถูก AI โทรซ้ำได้ (ช่องโหว่ที่เจอ 24 ส.ค. 2569)
  */
 export function buildDeclinedThisJobSql(): string {
   return `
@@ -130,7 +140,44 @@ export function buildDeclinedThisJobSql(): string {
       from ${HOLDS} h
      where h.job_id = $1
        and h.phone_e164 = any($2::text[])
-       and h.result_outcome = 'declined'`;
+       and h.result_outcome = 'declined'
+    union
+    select distinct a.phone_e164 as phone
+      from ${CONTACTS} c
+      join ${APPS} a on a.id = c.application_id
+     where a.job_id = $1
+       and a.phone_e164 = any($2::text[])
+       and c.ok = false`;
+}
+
+/**
+ * แบบ **หลายใบขอ** — ใช้กันซ้ำระดับ**หน่วยงาน** (Phase 6.8)
+ *
+ * 🔴 เจ้าของสั่ง: *"กันหน่วยงานที่เคยปฏิเสธระดับหน่วยงาน"* — คนที่บอกไม่เอาไซต์หนึ่งแล้ว
+ * ไม่ควรถูกเสนอไซต์เดิมซ้ำผ่านใบขอใบอื่นของไซต์นั้น (ใบขอไซต์เดียวกันมีได้หลายใบ)
+ * ⚠️ ชุด job ids มาจาก `jobSiteMap.jobIdsInSameSite()` — ไม่รู้หน่วยงาน = ได้ `[jobId]`
+ * ตัวเดียว ⇒ พฤติกรรมเท่าเดิมพอดี (fail-safe ไม่กันมากขึ้นแบบมั่ว)
+ */
+export function buildDeclinedAnyJobSql(): string {
+  return `
+    select distinct ${QUEUE_PHONE} as phone
+      from ${QUEUE} q
+     where q.job_ref = any($1::text[])
+       and ${QUEUE_PHONE} = any($2::text[])
+       and ${QUEUE_OUTCOME} = 'declined'
+    union
+    select distinct h.phone_e164 as phone
+      from ${HOLDS} h
+     where h.job_id = any($1::text[])
+       and h.phone_e164 = any($2::text[])
+       and h.result_outcome = 'declined'
+    union
+    select distinct a.phone_e164 as phone
+      from ${CONTACTS} c
+      join ${APPS} a on a.id = c.application_id
+     where a.job_id = any($1::text[])
+       and a.phone_e164 = any($2::text[])
+       and c.ok = false`;
 }
 
 /**
@@ -146,6 +193,35 @@ export async function phonesDeclinedThisJob(
   try {
     const { rows } = await dbQuery<{ phone: string | null }>(buildDeclinedThisJobSql(), [
       jobId,
+      uniq,
+    ]);
+    const out = new Set<string>();
+    for (const r of rows) if (r.phone) out.add(r.phone);
+    return out;
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === '42P01' || code === '42703') return new Set();
+    throw e;
+  }
+}
+
+/**
+ * เบอร์ที่เคยปฏิเสธ **หน่วยงานนี้** (ทุกใบขอของไซต์เดียวกัน) — Phase 6.8
+ *
+ * ⚠️ ไม่รู้ว่าใบนี้อยู่ไซต์ไหน → `jobIdsInSameSite` คืนแค่ใบนี้ ⇒ ผลเท่ากับกันระดับใบขอ
+ * (fail-safe: ไม่กันเกินจริง · ไม่หยุดกันทั้งหมด)
+ */
+export async function phonesDeclinedThisUnit(
+  jobId: string,
+  phones: string[],
+): Promise<Set<string>> {
+  const uniq = [...new Set(phones.filter(Boolean))];
+  if (!jobId.trim() || uniq.length === 0) return new Set();
+  const jobIds = await jobIdsInSameSite(jobId);
+  if (jobIds.length === 0) return new Set();
+  try {
+    const { rows } = await dbQuery<{ phone: string | null }>(buildDeclinedAnyJobSql(), [
+      jobIds,
       uniq,
     ]);
     const out = new Set<string>();

@@ -33,7 +33,7 @@ import {
 import {
   phonesContactedAboutJob,
   phonesContactedAnyJob,
-  phonesDeclinedThisJob,
+  phonesDeclinedThisUnit,
 } from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
@@ -445,14 +445,16 @@ async function insertQueueItems(
     suppressedPhones = null;
   }
 
-  // เบอร์ที่เคยปฏิเสธ "งานนี้" — ไม่เสนอซ้ำตลอดไป (ไม่ใช่แค่ 30 วัน)
+  // เบอร์ที่เคยปฏิเสธ **หน่วยงานนี้** — ไม่เสนอซ้ำตลอดไป (ไม่ใช่แค่ 30 วัน · Phase 6.8)
+  // 🔴 เดิมกันแค่ระดับใบขอ → คนที่บอกไม่เอาไซต์หนึ่งยังถูกเสนอไซต์เดิมซ้ำผ่านใบขอใบอื่น
+  // ตอนนี้กันทุกใบขอของไซต์เดียวกัน (jobSiteMap) · ไม่รู้ไซต์ = กันระดับใบขอเหมือนเดิม
   // อ่านไม่ได้ = ไม่กรอง (ตารางเดียวกับคิวเอง — ถ้าพังจริง insert ข้างล่างก็พังอยู่ดี)
   let declinedPhones: Set<string>;
   try {
     declinedPhones =
       jobRef === 'follow'
         ? new Set()
-        : await phonesDeclinedThisJob(
+        : await phonesDeclinedThisUnit(
             jobRef,
             items.map((i) => payloadPhone(i.payload)).filter((p): p is string => Boolean(p)),
           );

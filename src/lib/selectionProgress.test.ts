@@ -30,7 +30,7 @@ describe('6 ขั้นตามที่เจ้าของสั่ง', ()
       'รอนัดวันสัมภาษณ์',
       'รอผลสัมภาษณ์',
       'รอเริ่มงาน',
-      'ช่วงประเมิน',
+      'เรียนงาน',
       'รอแจ้งเข้า',
     ]);
   });
@@ -55,14 +55,16 @@ describe('6 ขั้นตามที่เจ้าของสั่ง', ()
   });
 });
 
-describe('เช็คลิสต์ 5 ข้อตามที่เจ้าของสั่ง', () => {
-  it('ครบ 5 ข้อ ชื่อตรงตามที่สั่ง', () => {
+describe('เช็คลิสต์ 6 ข้อตามที่เจ้าของสั่ง (เดิม 5 + "ทำบัตร")', () => {
+  it('ครบ 6 ข้อ ชื่อ+ลำดับตรงตามที่สั่ง', () => {
     expect(PREP_CHECKLIST_ITEMS.map((k) => PREP_CHECKLIST_LABEL[k])).toEqual([
       'ลงแผนแจ้งเข้า',
       'ผลคดี',
       'ผลตรวจสุขภาพ',
       'เบิกเสื้อ',
       'แจ้งประกัน',
+      // เจ้าของเคาะเพิ่มข้อที่ 6 (22 ส.ค. 2569) — ต่อท้าย ไม่แทรกกลาง (ลำดับคือลำดับบนจอ)
+      'ทำบัตร',
     ]);
     expect(INFORM_PLAN_KEY).toBe('inform_plan');
   });
@@ -89,16 +91,20 @@ describe('เช็คลิสต์ 5 ข้อตามที่เจ้า�
     expect(normalizePrepChecklist('x')).toEqual({});
   });
 
-  it('นับความคืบหน้าถูก และครบ 5 ข้อถึงจะนับว่าเสร็จ', () => {
-    expect(prepChecklistProgress({})).toEqual({ done: 0, total: 5 });
-    expect(prepChecklistProgress({ uniform: true, insurance: true })).toEqual({ done: 2, total: 5 });
+  it('นับความคืบหน้าถูก และครบ 6 ข้อถึงจะนับว่าเสร็จ', () => {
+    expect(prepChecklistProgress({})).toEqual({ done: 0, total: 6 });
+    expect(prepChecklistProgress({ uniform: true, insurance: true })).toEqual({ done: 2, total: 6 });
+    // 🔴 ครบ 5 ข้อเดิมยังไม่พอแล้ว — ต้องมีทำบัตรด้วย
+    const oldFive = { inform_plan: true, case_result: true, health_check: true, uniform: true, insurance: true };
+    expect(isPrepChecklistComplete(oldFive)).toBe(false);
+    expect(isPrepChecklistComplete({ ...oldFive, id_card: true })).toBe(true);
     expect(isPrepChecklistComplete({ uniform: true })).toBe(false);
     const all = Object.fromEntries(PREP_CHECKLIST_ITEMS.map((k) => [k, true]));
     expect(isPrepChecklistComplete(all)).toBe(true);
   });
 
   it('ค่าขยะไม่ทำให้ยอดเฟ้อ', () => {
-    expect(prepChecklistProgress({ ไม่รู้จัก: true } as never)).toEqual({ done: 0, total: 5 });
+    expect(prepChecklistProgress({ ไม่รู้จัก: true } as never)).toEqual({ done: 0, total: 6 });
   });
 
   it('isPrepChecklistKey กันคีย์แปลก', () => {

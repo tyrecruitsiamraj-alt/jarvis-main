@@ -26,7 +26,12 @@ export const SELECTION_STATUS_LABEL: Record<SelectionStatus, string> = {
   await_interview_date: 'รอนัดวันสัมภาษณ์',
   await_interview_result: 'รอผลสัมภาษณ์',
   await_start: 'รอเริ่มงาน',
-  probation: 'ช่วงประเมิน',
+  /**
+   * เจ้าของเคาะ 23 ส.ค. 2569 (Phase 6.4): *"อันเดียว — แค่เปลี่ยนคำบนจอเป็น เรียนงาน"*
+   * ⚠️ **ค่าในฐานยังเป็น `probation`** (ไม่ต้อง migrate · ข้อมูลเก่าไม่กระทบ)
+   * ที่เปลี่ยนคือคำบนจอที่เดียว — ห้ามเพิ่มขั้นใหม่ให้ dropdown ยาวขึ้นโดยไม่ได้สั่ง
+   */
+  probation: 'เรียนงาน',
   await_inform: 'รอแจ้งเข้า',
 };
 
@@ -57,6 +62,13 @@ export const PREP_CHECKLIST_ITEMS = [
   'health_check',
   'uniform',
   'insurance',
+  /**
+   * "ทำบัตร" — เจ้าของเคาะเพิ่มเป็นข้อที่ 6 (22 ส.ค. 2569 · Phase 6.3)
+   * ⚠️ เก็บใน jsonb จึง **ไม่ต้อง migrate** · ใบที่ติ๊กครบ 5 ข้อเดิมไว้แล้วจะกลายเป็น 5/6
+   * ซึ่งถูกต้องตามที่สั่ง (ยังขาดทำบัตรจริง) — ไม่มีตรรกะใดย้ายสถานะอัตโนมัติจากเลขนี้
+   * (ผู้ใช้เดียวของ `isPrepChecklistComplete` คือแถบแสดงผล ไม่ใช่ตัวสั่งงาน)
+   */
+  'id_card',
 ] as const;
 export type PrepChecklistKey = (typeof PREP_CHECKLIST_ITEMS)[number];
 
@@ -68,6 +80,7 @@ export const PREP_CHECKLIST_LABEL: Record<PrepChecklistKey, string> = {
   health_check: 'ผลตรวจสุขภาพ',
   uniform: 'เบิกเสื้อ',
   insurance: 'แจ้งประกัน',
+  id_card: 'ทำบัตร',
 };
 
 export type PrepChecklist = Partial<Record<PrepChecklistKey, boolean>>;
