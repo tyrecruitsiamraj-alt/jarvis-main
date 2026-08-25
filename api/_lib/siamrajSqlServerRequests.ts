@@ -235,6 +235,12 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     resigned_wage_fee_rate: r.resigned_wage_fee_rate ?? null,
     resigned_wage_effective_date: toYmd(r.resigned_wage_effective_date) || null,
     job_type: jobType,
+    /**
+     * 🔴 ค่าโครงสร้าง ไม่ใช่ของจริง — ERP ไม่มีฟิลด์นี้ และ CHECK ของตาราง `jobs`
+     * รับได้แค่ private/government/bank จึงยัด 'private' ไว้ให้ type ผ่าน
+     * **ห้ามเอาไปแสดง/ค้นหา** — ราชการ/เอกชนของจริงอยู่ที่ `unit_sector`
+     * (แปะโดย `attachUnitSector` · แสดงผ่าน `jobSectorLabel` ที่เดียว)
+     */
     job_category: 'private' as const,
     penalty_per_day: r.abs_customer_fine ?? 0,
     days_without_worker: 0,

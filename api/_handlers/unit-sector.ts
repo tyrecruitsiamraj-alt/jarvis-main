@@ -15,27 +15,18 @@
 import { sendError, withAuth, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
-import { normalizeUnitSector, type UnitSector } from '@/lib/unitSector';
+import { normalizeUnitSector } from '@/lib/unitSector';
+// อ่านที่เดียวกับ feed ใบขอ — กันสองที่คิดไม่ตรงกัน (นิยามซ้ำสองที่แล้วเลขเพี้ยน)
+import { getUnitSectorMap } from '../_lib/unitSectorStore.js';
 
 const TABLE = tableInAppSchema('unit_sector');
 
-type Row = { site_code: string; sector: UnitSector };
-
-async function readAll(): Promise<Record<string, UnitSector>> {
-  const { rows } = await dbQuery<Row>(`select site_code, sector from ${TABLE}`);
-  const out: Record<string, UnitSector> = {};
-  for (const r of rows) {
-    const code = String(r.site_code ?? '').trim();
-    if (code) out[code] = r.sector;
-  }
-  return out;
-}
 
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
     if (method === 'GET') {
-      return res.status(200).json({ sectors: await readAll() });
+      return res.status(200).json({ sectors: await getUnitSectorMap() });
     }
 
     if (method === 'PATCH') {

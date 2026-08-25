@@ -19,6 +19,7 @@ import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
+import { attachUnitSector } from '../_lib/unitSectorStore.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
@@ -175,6 +176,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       await attachAssignments([item]);
       await attachNotes([item]);
       await attachWorkStatus([item]);
+      await attachUnitSector([item]);
       return res.status(200).json(item);
     }
 
@@ -215,13 +217,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // แนบชื่อผู้รับผิดชอบเหมือนเส้นใบเปิด — ไม่งั้น "ปิดแล้ว" ต่อคนใน
       // ภาระงานตามผู้รับผิดชอบ (buildRecruiterOverview) จะเป็น 0 เพราะยอดไปกองที่ "ยังไม่มอบหมาย"
       await attachAssignments(items);
+      await attachUnitSector(items);
       return res.status(200).json(items);
     }
 
     const limit = Number(getQuery(req, 'limit') || '200');
     const mode = getQuery(req, 'mode');
     const items = await listSiamrajUnitRequests({ limit, mode, departmentScope });
-    await Promise.all([attachAssignments(items), attachNotes(items), attachWorkStatus(items)]);
+    await Promise.all([
+      attachAssignments(items),
+      attachNotes(items),
+      attachWorkStatus(items),
+      // ราชการ/เอกชนของจริง — `job_category` ที่ feed ส่งมาเป็นค่าโครงสร้าง เชื่อไม่ได้
+      attachUnitSector(items),
+    ]);
     // Push ให้ precompute worker — urgency ต้องคิดก่อนเพื่อให้ priority sort ถูกต้อง
     enqueuePrecomputeJobs(enrichJobsWithUrgency(items as Parameters<typeof enrichJobsWithUrgency>[0]));
     return res.status(200).json(items);

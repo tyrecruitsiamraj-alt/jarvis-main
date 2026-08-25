@@ -148,6 +148,12 @@ function mapPrequestRow(r: PrequestRow) {
     rate_unit: txt(r.rate_unit),
     fee_name: txt(r.fee_name),
     job_type: inferJobTypeFromDescription(r.job_name_1, r.job_name_2, r.staff_title_name, null),
+    /**
+     * 🔴 ค่าโครงสร้าง ไม่ใช่ของจริง — ERP ไม่มีฟิลด์นี้ และ CHECK ของตาราง `jobs`
+     * รับได้แค่ private/government/bank จึงยัด 'private' ไว้ให้ type ผ่าน
+     * **ห้ามเอาไปแสดง/ค้นหา** — ราชการ/เอกชนของจริงอยู่ที่ `unit_sector`
+     * (แปะโดย `attachUnitSector` · แสดงผ่าน `jobSectorLabel` ที่เดียว)
+     */
     job_category: 'private' as const,
     penalty_per_day: 0,
     days_without_worker: 0,

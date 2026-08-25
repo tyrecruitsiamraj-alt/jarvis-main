@@ -1,5 +1,6 @@
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
+import { unitSectorLabel } from '@/lib/unitSector';
 
 /** ชื่อหน่วยงานที่ติ๊กส่งคนแทน — ใช้ใน WL assignment */
 export function unitNamesForSendReplacement(jobs: JobRequest[]): string[] {
@@ -63,6 +64,22 @@ export function publicJobPositionLabel(job: JobRequest): string {
   return job.job_description_code_1?.trim() || JOB_TYPE_LABELS[job.job_type] || 'อื่นๆ';
 }
 
+/**
+ * ป้าย "ราชการ / เอกชน" ของแถวหนึ่ง — **ที่เดียวที่ตัดสินว่าจะเชื่อค่าไหน**
+ *
+ * 🔴 ใบขอจาก ERP ไม่เคยมี `job_category` จริง — feed ทั้งสี่เส้นฮาร์ดโค้ด `'private'`
+ * ทุกใบตั้งแต่วันแรก ⇒ เดิมช่องค้นหาหน้าหน่วยงานพิมพ์ "เอกชน" แล้ว **เจอทุกใบ**
+ * รวมใบที่ทีมระบุไว้ว่าเป็นราชการ (แก้ 25 ส.ค. 2569 · รอบสี่สิบเอ็ด)
+ *
+ * ตัวแยก: มี property `unit_sector` (feed แปะให้ทุกใบ ERP แม้ยังไม่ระบุ = `null`)
+ * ⇒ ใช้ค่านั้น · ไม่มี property = งานในตาราง `jobs` ของเราเอง ⇒ `job_category` เชื่อได้
+ */
+export function jobSectorLabel(job: JobRequest): string {
+  return job.unit_sector !== undefined
+    ? unitSectorLabel(job.unit_sector)
+    : JOB_CATEGORY_LABELS[job.job_category];
+}
+
 /** คำค้นหาแบบรวมฟิลด์หลัก */
 export function unitRequestSearchBlob(job: JobRequest): string {
   return [
@@ -73,7 +90,7 @@ export function unitRequestSearchBlob(job: JobRequest): string {
     job.job_description_code_1,
     job.job_description_code_2,
     JOB_TYPE_LABELS[job.job_type],
-    JOB_CATEGORY_LABELS[job.job_category],
+    jobSectorLabel(job),
     job.resigned_employee_name,
     job.work_schedule,
   ]

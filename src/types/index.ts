@@ -1,3 +1,4 @@
+import type { UnitSector } from '@/lib/unitSector';
 import type { UnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
 
 // ============ AUTH & USERS ============
@@ -193,7 +194,18 @@ export interface JobRequest {
   lat?: number;
   lng?: number;
   job_type: JobType;
+  /**
+   * 🔴 **ใบขอจาก ERP เชื่อค่านี้ไม่ได้** — feed ทั้งสี่เส้นฮาร์ดโค้ด `'private'` มาตลอด
+   * เพราะ ERP ไม่มีฟิลด์นี้ · ของจริงอยู่ที่ `unit_sector` ข้างล่าง
+   * (ค่านี้เป็นของจริงเฉพาะงานที่สร้างในตาราง `jobs` ของเราเอง)
+   */
   job_category: JobCategory;
+  /**
+   * ราชการ/เอกชน ที่ทีมระบุเองระดับหน่วยงาน (migration 108 · คีย์ `site_code`)
+   * - `undefined` = แถวนี้ไม่ใช่ใบขอจาก ERP (ให้ใช้ `job_category`)
+   * - `null` = ใบขอจาก ERP ที่ **ยังไม่มีใครระบุ** (ห้ามเดาเป็นเอกชน)
+   */
+  unit_sector?: UnitSector | null;
   recruiter_id?: string;
   recruiter_name?: string;
   screener_id?: string;

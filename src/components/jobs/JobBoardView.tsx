@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
-import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
+import { JOB_TYPE_LABELS } from '@/types';
+import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -1211,7 +1212,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     </span>
                   ) : (
                     <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                      {JOB_CATEGORY_LABELS[job.job_category]}
+                      {jobSectorLabel(job)}
                     </span>
                   )}
                 </div>
@@ -1669,7 +1670,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </span>
                 ) : (
                   <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">
-                    {JOB_CATEGORY_LABELS[selected.job_category]}
+                    {jobSectorLabel(selected)}
                   </span>
                 )}
                 {selected.urgency === 'urgent' && (
