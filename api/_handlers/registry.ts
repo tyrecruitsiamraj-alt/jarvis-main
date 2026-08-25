@@ -44,6 +44,9 @@ import applicationContactsHandler from './application-contacts.js';
 import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
 import applicationDispatchHandler from './application-dispatch.js';
+import applicationCallChoiceHandler from './application-call-choice.js';
+import selectionProgressHandler from './selection-progress.js';
+import aftercareHandler from './aftercare.js';
 import applicationAutoMoveHandler from './application-auto-move.js';
 import applicationAutoMoveStatusHandler from './application-auto-move-status.js';
 import jobApplicationDocumentHandler from './job-application-document.js';
@@ -94,6 +97,9 @@ import notificationsHandler from './notifications.js';
 import matchingFlowSummaryHandler from './matching-flow-summary.js';
 import matchingJobPostingsHandler from './matching-job-postings.js';
 import matchingWorkerStatusHandler from './matching-worker-status.js';
+import homeKpisHandler from './home-kpis.js';
+import officeFloorHandler from './office-floor.js';
+import jobPublicReleaseHandler from './job-public-release.js';
 import systemHealthHandler from './system-health.js';
 
 export type ApiHandler = (req: ApiReq, res: ApiRes) => Promise<void>;
@@ -159,6 +165,11 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/flow-summary': matchingFlowSummaryHandler as ApiHandler,
   '/api/matching/job-postings': matchingJobPostingsHandler as ApiHandler,
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
+  // ฉาก "ห้องทำงาน" บนหน้าแรก — ตัวนับ read-only (ไม่มีข้อมูลบุคคล)
+  '/api/office-floor': officeFloorHandler as ApiHandler,
+  '/api/home-kpis': homeKpisHandler as ApiHandler,
+  // ปล่อย/ดึงลง ใบขอบนหน้าสาธารณะ (เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)
+  '/api/job-public-release': jobPublicReleaseHandler as ApiHandler,
   '/api/branding': brandingHandler as ApiHandler,
   '/api/match-priority-weights': matchPriorityWeightsHandler as ApiHandler,
   '/api/work-status-master': workStatusMasterHandler as ApiHandler,
@@ -175,6 +186,12 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/application-attendance': applicationAttendanceHandler as ApiHandler,
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
   '/api/application-dispatch': applicationDispatchHandler as ApiHandler,
+  // "ใครจะโทรหาคนนี้" — ปุ่มเก็บไปโทรเอง (claim+ล็อกเบอร์) / ส่ง AI โทร · กอง "เลือกวิธีโทร"
+  '/api/application-call-choice': applicationCallChoiceHandler as ApiHandler,
+  // ขั้นในกระบวนการจ้าง "ชุดเดียว" — เส้นของคนที่ยังไม่มีใบสมัคร (คนจาก match)
+  '/api/selection-progress': selectionProgressHandler as ApiHandler,
+  // "ดูแลหลังเริ่มงาน" — คนที่ตามครบแล้วและเข้าช่วงดูแล (Phase 7)
+  '/api/aftercare': aftercareHandler as ApiHandler,
   '/api/application-auto-move': applicationAutoMoveHandler as ApiHandler,
   // สถานะ/ผลรอบล่าสุดของตัวตั้งเวลา — อ่านอย่างเดียว ไม่ย้ายจริง
   '/api/application-auto-move-status': applicationAutoMoveStatusHandler as ApiHandler,
