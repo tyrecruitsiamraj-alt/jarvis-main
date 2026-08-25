@@ -27,7 +27,8 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { ChevronDown, Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { moneyFieldText } from '@/lib/unitRequestDetail';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
@@ -53,6 +54,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
    */
   const [sector, setSector] = React.useState<UnitSector | null>(null);
   const [savingSector, setSavingSector] = React.useState(false);
+  /**
+   * กล่อง "ข้อมูลใบขอ" กาง/หุบ — เจ้าของสั่ง 25 ส.ค. 2569:
+   * *"ทำไอคำว่า ข้อมูลใบขอ ทำเป็นแบบลูกศรแล้วโชว์รายละเอียด"*
+   * 🔴 **หุบเป็นค่าตั้งต้น** (เจ้าของเคาะ: *"หุบไว้ กดลูกศรค่อยกาง"*)
+   * เปิดใบขอมาจะเห็นหัวข้อ + ส่วนอื่น (ผู้รับผิดชอบ/หมายเหตุ/ผู้สมัคร) ก่อน
+   */
+  const [infoOpen, setInfoOpen] = React.useState(false);
   const backPath = resolveUnitDetailBackPath({
     stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
     search: location.search,
@@ -244,10 +252,25 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             </div>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              {/* หัวข้อเป็นปุ่มกาง/หุบ (เจ้าของสั่ง 25 ส.ค. 2569) — ลูกศรหมุนตามสถานะ
+                  ทั้งแถวกดได้ ไม่ใช่แค่ลูกศร (นิ้วบนมือถือกดโดนง่ายกว่า) */}
+              <button
+                type="button"
+                onClick={() => setInfoOpen((v) => !v)}
+                aria-expanded={infoOpen}
+                className="flex min-h-9 w-full items-center gap-1.5 text-left text-sm font-semibold"
+              >
                 <ExternalLink className={cn("w-4 h-4", TONE.primary.value)} />
                 ข้อมูลใบขอ
-              </h3>
+                <ChevronDown
+                  className={cn(
+                    'ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                    infoOpen && 'rotate-180',
+                  )}
+                  aria-hidden
+                />
+              </button>
+              {infoOpen ? (
               <div className="grid sm:grid-cols-2 gap-2">
                 <Field label="เลขที่ใบขอ" value={data.request_no} />
                 <Field label="ชื่อผู้ส่ง" value={data.submittedByName} />
@@ -318,7 +341,25 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <Field label="วันเวลาเข้างาน" value={data.work_schedule} />
                 <Field label="ชื่อผู้ติดต่อหน่วยงาน" value={data.contact_name} />
                 <Field label="เบอร์ติดต่อ" value={data.contact_phone} />
+                <Field label="ค่าปรับต่อวันถ้าไม่มีคน" value={moneyFieldText(data.penalty_per_day)} />
+                {/* เงินล่าสุดของคนที่ออก (เจ้าของเคาะ 25 ส.ค. 2569: โชว์ทั้งสองก้อนพร้อมป้ายกำกับ)
+                    🔴 สองตัวเลขคนละความหมาย ห้ามรวมกัน — draw = เงินที่จ่ายพนักงาน ·
+                    fee = ค่าที่เก็บลูกค้า · ความครบแค่ 76% ของใบขอ ⇒ ไม่รู้ขึ้น "—" ห้ามขึ้น 0
+                    แต่ 0 ที่มาจากฐานจริงต้องขึ้น "0 บาท" (แปลว่าไม่ได้เบิกส่วนนั้น) */}
+                <Field
+                  label="คนเดิม — เงินที่พนักงานได้ (draw)"
+                  value={moneyFieldText(data.resigned_wage_draw_rate)}
+                />
+                <Field
+                  label="คนเดิม — ค่าที่เก็บลูกค้า (fee)"
+                  value={moneyFieldText(data.resigned_wage_fee_rate)}
+                />
+                <Field
+                  label="คนเดิม — วันที่ของรายการล่าสุดใน ERP"
+                  value={data.resigned_wage_effective_date}
+                />
               </div>
+              ) : null}
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
@@ -328,7 +369,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               </h3>
               {canAssignStaff ? (
                 <>
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  {/* ผู้รับผิดชอบ 3 ช่อง **อยู่บรรทัดเดียวกัน** (เจ้าของสั่ง 25 ส.ค. 2569)
+                      เดิม 2 คอลัมน์ทำให้ช่องที่สามตกไปบรรทัดใหม่เสมอ */}
+                  <div className="grid gap-3 sm:grid-cols-3">
                     <RosterBackedStaffSelect
                       role="recruiter"
                       label="เจ้าหน้าที่สรรหา"
@@ -376,11 +419,11 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="grid sm:grid-cols-2 gap-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <Field label="เจ้าหน้าที่สรรหา" value={data.recruiter_name} />
                   <Field label="เจ้าหน้าที่คัดสรร" value={data.screener_name} />
                   <Field label="เจ้าหน้าที่ OPL" value={data.opl_name} />
-                  <p className="sm:col-span-2 text-xs text-muted-foreground">
+                  <p className="sm:col-span-3 text-xs text-muted-foreground">
                     กำหนดผู้รับผิดชอบได้เฉพาะ Supervisor ขึ้นไป
                   </p>
                 </div>

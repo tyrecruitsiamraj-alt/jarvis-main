@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
-import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
+import { JOB_TYPE_LABELS } from '@/types';
+import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import SearchField from '@/components/shared/SearchField';
 import { FilterSelect } from '@/components/shared/FilterSelect';
 import { FilterMultiSelect } from '@/components/shared/FilterMultiSelect';
@@ -13,14 +14,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from '@/hooks/use-toast';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNavigation';
-import { ChevronDown, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
-import UnitRequestDetailPanel from '@/components/jobs/UnitRequestDetailPanel';
-import { detailSummary } from '@/lib/unitRequestDetail';
 import {
   resolveUnitRequestWorkStatus,
   UNIT_REQUEST_WORK_STATUS_LABELS,
@@ -177,19 +176,6 @@ const JobListPage: React.FC = () => {
 
   const [lookupJob, setLookupJob] = useState<JobRequest | null>(null);
   const { jobs, loading, refreshing, siamrajPrimary, loadError, refetch } = useUnitRequestsFeed();
-  /**
-   * แถวที่กางรายละเอียดอยู่ (เจ้าของสั่ง 25 ส.ค. 2569: *"กดลงมาค่อยเห็นข้อมูล"*)
-   * เก็บเป็น Set ของ id — กางพร้อมกันหลายแถวได้ · ปิดหน้าแล้วลืม (ไม่ต้องจำข้ามหน้า)
-   */
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
-  const toggleExpanded = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     saveUnitLastPath('/jobs/list');
@@ -365,7 +351,7 @@ const JobListPage: React.FC = () => {
       })
       .filter((j) => {
         if (requestNoMatchesSearch(q, j.request_no)) return true;
-        return `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${JOB_CATEGORY_LABELS[j.job_category]} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
+        return `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${jobSectorLabel(j)} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
           .toLowerCase()
           .includes(q);
       })
@@ -803,24 +789,6 @@ const JobListPage: React.FC = () => {
                   </div>
                 </button>
 
-                {/* กดดูรายละเอียด (เจ้าของสั่ง 25 ส.ค. 2569) — อยู่นอกปุ่มเปิดใบขอ */}
-                <button
-                  type="button"
-                  onClick={() => toggleExpanded(j.id)}
-                  aria-expanded={expanded.has(j.id)}
-                  className="mt-3 flex min-h-9 w-full items-center justify-between gap-2 border-t border-border/50 pt-3 text-left"
-                >
-                  <span className="text-xs text-muted-foreground">{detailSummary(j)}</span>
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                      expanded.has(j.id) && 'rotate-180',
-                    )}
-                    aria-hidden
-                  />
-                </button>
-                {expanded.has(j.id) ? <UnitRequestDetailPanel job={j} className="mt-1" /> : null}
-
                 {j.list_note?.trim() ? (
                   <div className="mt-3 pt-3 border-t border-border/50">
                     <p className="text-[10px] text-muted-foreground mb-1">หมายเหตุ</p>
@@ -899,8 +867,8 @@ const JobListPage: React.FC = () => {
 
               <tbody>
                 {paginated.map((j) => (
-                  <React.Fragment key={j.id}>
                   <tr
+                    key={j.id}
                     onClick={(e) => openJob(j, e)}
                     onAuxClick={(e) => {
                       if (e.button === 1) {
@@ -912,30 +880,6 @@ const JobListPage: React.FC = () => {
                   >
                     <td className={cn('px-3 py-3 whitespace-nowrap', DASH.cellStrong)}>
                       <span className="flex flex-wrap items-center gap-1.5">
-                        {/* ปุ่มกางรายละเอียด — แยกจากการกดแถว (กดแถว = เปิดใบขอเหมือนเดิม)
-                            ⚠️ ต้อง stopPropagation ไม่งั้นกางแล้วเด้งออกจากหน้าทันที */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleExpanded(j.id);
-                          }}
-                          aria-expanded={expanded.has(j.id)}
-                          aria-label={`${expanded.has(j.id) ? 'ซ่อน' : 'ดู'}รายละเอียดใบขอ ${j.request_no || j.unit_name} — ${detailSummary(j)}`}
-                          title={detailSummary(j)}
-                          className={cn(
-                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
-                            'hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                          )}
-                        >
-                          <ChevronDown
-                            className={cn(
-                              'h-3.5 w-3.5 transition-transform',
-                              expanded.has(j.id) && 'rotate-180',
-                            )}
-                            aria-hidden
-                          />
-                        </button>
                         {j.request_no || '—'}
                         <PrequestBadge job={j} compact />
                       </span>
@@ -960,25 +904,23 @@ const JobListPage: React.FC = () => {
                     <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>
                     <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{extractJobSubtypeLabel(j)}</td>
                     <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.resigned_employee_name || '—'}</td>
-                    {/* ผู้รับผิดชอบ — เจ้าของสั่ง 25 ส.ค. 2569: **บรรทัดเดียว** (เดิมซ้อน 3 บรรทัด
-                        ทำให้แถวสูงกว่าแถวอื่นสามเท่า) · คนที่ยังไม่มีชื่อ ตัดทิ้งไปเลย
-                        ไม่โชว์ "OPL —" ให้รก · ไม่มีใครเลยค่อยขึ้นขีดเดียว */}
+                    {/* ผู้รับผิดชอบ — เจ้าของสั่ง 25 ส.ค. 2569 (รอบสี่สิบเอ็ด): หน้ารายการ
+                        **คงของเดิมสามบรรทัด** · ที่สั่งให้เป็นบรรทัดเดียวคือในหน้าใบขอ */}
                     <td className="px-3 py-3">
-                      {j.opl_name || j.recruiter_name || j.screener_name ? (
-                        <div className={cn('text-xs whitespace-nowrap', DASH.cell)}>
-                          {[
-                            j.opl_name ? ['OPL', j.opl_name] : null,
-                            j.recruiter_name ? ['สรรหา', j.recruiter_name] : null,
-                            j.screener_name ? ['คัดสรร', j.screener_name] : null,
-                          ]
-                            .filter((x): x is [string, string] => x !== null)
-                            .map(([role, name], i, arr) => (
-                              <React.Fragment key={role}>
-                                <span className={DASH.muted}>{role} </span>
-                                {name}
-                                {i < arr.length - 1 ? <span className={DASH.muted}> · </span> : null}
-                              </React.Fragment>
-                            ))}
+                      {j.recruiter_name || j.screener_name || j.opl_name ? (
+                        <div className={cn('text-xs leading-tight whitespace-nowrap', DASH.cell)}>
+                          <div>
+                            <span className={DASH.muted}>OPL </span>
+                            {j.opl_name || '—'}
+                          </div>
+                          <div>
+                            <span className={DASH.muted}>สรรหา </span>
+                            {j.recruiter_name || '—'}
+                          </div>
+                          <div>
+                            <span className={DASH.muted}>คัดสรร </span>
+                            {j.screener_name || '—'}
+                          </div>
                         </div>
                       ) : (
                         <span className={cn('text-xs', DASH.cellMuted)}>—</span>
@@ -1004,16 +946,6 @@ const JobListPage: React.FC = () => {
                       <UnitRequestNotePreview note={j.list_note} />
                     </td>
                   </tr>
-                  {/* แถวรายละเอียด — โผล่เมื่อกดปุ่มลูกศรเท่านั้น
-                      ⚠️ ไม่ผูก onClick เปิดใบขอ ไม่งั้นกดอ่านรายละเอียดแล้วเด้งออก */}
-                  {expanded.has(j.id) ? (
-                    <tr className={cn('border-b', DASH.divider)}>
-                      <td colSpan={14} className="px-4 pb-3 pt-0">
-                        <UnitRequestDetailPanel job={j} />
-                      </td>
-                    </tr>
-                  ) : null}
-                  </React.Fragment>
                 ))}
               </tbody>
             </table>

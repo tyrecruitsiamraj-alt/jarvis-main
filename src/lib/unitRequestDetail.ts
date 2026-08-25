@@ -1,8 +1,10 @@
 /**
- * แถบรายละเอียดที่ "กดลงมาค่อยเห็น" ของใบขอ (เจ้าของสั่ง 25 ส.ค. 2569)
+ * รายละเอียดเงินของใบขอ — ตรรกะล้วน แปลง `JobRequest` เป็น "ป้าย → ค่า" ที่พร้อมวาด
  *
- * ตรรกะล้วน: แปลง `JobRequest` เป็นรายการ "ป้าย → ค่า" ที่พร้อมวาด
- * ฝั่งจอไม่ต้องรู้ว่าเงินตัวไหนมาจากไหน และไม่ต้องคิดเรื่อง null เอง
+ * 🔴 25 ส.ค. 2569 (รอบสี่สิบเอ็ด) เจ้าของสั่งย้ายที่แสดง: **หน้ารายการกลับเป็นของเดิม**
+ * แถบกางในตารางถูกถอดออก · ข้อมูลชุดนี้ไปอยู่ในกล่อง "ข้อมูลใบขอ" ของหน้าใบขอแทน
+ * (`SiamrajUnitRequestDetailPage` ใช้ `moneyFieldText`) — `buildUnitRequestDetail`
+ * เก็บไว้เป็นนิยามกลางของกลุ่ม/ป้ายกำกับ พร้อมเทสต์ที่ล็อกกติกา "ไม่รู้ ≠ ศูนย์บาท"
  *
  * 🔴 กติกาที่ฝังไว้:
  * 1. **ไม่รู้ ≠ ศูนย์บาท** — ค่าที่เป็น `null`/`undefined` ต้องขึ้นว่า "ไม่มีข้อมูล"
@@ -49,6 +51,17 @@ const known = (v: DetailValue): boolean => v.kind !== 'unknown';
 /** จำนวนเงินเป็นข้อความไทย — ผู้เรียกใช้กับ `kind: 'money'` เท่านั้น */
 export function formatMoney(amount: number): string {
   return `${amount.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
+}
+
+/**
+ * จำนวนเงินสำหรับช่อง `Field` บนหน้าใบขอ — **ไม่รู้คืน `undefined`** (จอขึ้น "—")
+ *
+ * 🔴 แยก "ไม่รู้" ออกจาก "ศูนย์บาท" ที่นี่ที่เดียว: `null`/`undefined` = ไม่รู้ ·
+ * `0` ที่มาจากฐานจริงต้องขึ้น "0 บาท" เพราะแปลว่า **ไม่ได้เบิกส่วนนั้น**
+ * (ถ้าปล่อยให้จอเขียน `v || undefined` เอง ศูนย์จะกลายเป็น "—" เงียบ ๆ)
+ */
+export function moneyFieldText(v: number | null | undefined): string | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? formatMoney(v) : undefined;
 }
 
 /** ข้อความของค่าหนึ่งช่อง (ที่เดียว — จอไม่ต้องเขียนเงื่อนไขเอง) */
@@ -125,16 +138,4 @@ export function buildUnitRequestDetail(job: JobRequest): DetailGroup[] {
 
   // กลุ่มที่ไม่มีของจริงสักช่อง = ไม่ต้องโชว์ (ห้ามขึ้นหัวข้อว่าง)
   return groups.filter((g) => g.items.some((i) => known(i.value)));
-}
-
-/** สรุปสั้นบรรทัดเดียวสำหรับปุ่มกด — บอกล่วงหน้าว่ากดแล้วจะเจออะไร */
-export function detailSummary(job: JobRequest): string {
-  const bits: string[] = [];
-  if (typeof job.total_income === 'number' && job.total_income > 0) {
-    bits.push(`ค่าจ้าง ${formatMoney(job.total_income)}`);
-  }
-  if (typeof job.resigned_wage_draw_rate === 'number') {
-    bits.push(`คนเดิมได้ ${formatMoney(job.resigned_wage_draw_rate)}`);
-  }
-  return bits.length ? bits.join(' · ') : 'ดูรายละเอียดใบขอ';
 }

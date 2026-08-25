@@ -1,6 +1,7 @@
 // @vitest-environment node
 /**
- * แถบรายละเอียดที่กดลงมา (เจ้าของสั่ง 25 ส.ค. 2569)
+ * รายละเอียดเงินของใบขอ — ตอนนี้แสดงในกล่อง "ข้อมูลใบขอ" ของหน้าใบขอ
+ * (รอบสี่สิบเอ็ด 25 ส.ค. 2569 เจ้าของสั่งคืนหน้ารายการเป็นของเดิม)
  *
  * ด่านที่ห้ามหลุด:
  * 1. 🔴 **ไม่รู้ ≠ ศูนย์บาท** — เงินคนที่ออกหาเจอแค่ 76% ของใบขอ (วัดจริง)
@@ -11,9 +12,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildUnitRequestDetail,
-  detailSummary,
   detailValueText,
   formatMoney,
+  moneyFieldText,
 } from '../../src/lib/unitRequestDetail.js';
 import type { JobRequest } from '../../src/types/index.js';
 
@@ -97,14 +98,18 @@ describe('กลุ่มที่ว่างทั้งกลุ่มต้�
   });
 });
 
-describe('สรุปบรรทัดเดียวบนปุ่ม', () => {
-  it('บอกค่าจ้างและเงินคนเดิมเมื่อมี', () => {
-    const s = detailSummary(job({ total_income: 12000, resigned_wage_draw_rate: 9000 }));
-    expect(s).toContain('12,000');
-    expect(s).toContain('9,000');
+describe('moneyFieldText — ช่องเงินบนหน้าใบขอ', () => {
+  it('ไม่รู้คืน undefined (จอขึ้น "—") ไม่ใช่ 0', () => {
+    expect(moneyFieldText(null)).toBeUndefined();
+    expect(moneyFieldText(undefined)).toBeUndefined();
+    expect(moneyFieldText(Number.NaN)).toBeUndefined();
   });
 
-  it('ไม่มีเลขอะไรเลย ก็ยังมีคำให้กดอ่านออก', () => {
-    expect(detailSummary(job())).toBe('ดูรายละเอียดใบขอ');
+  it('🔴 ศูนย์ที่มาจากฐานจริงต้องขึ้น "0 บาท" ไม่ใช่ "—"', () => {
+    expect(moneyFieldText(0)).toBe('0 บาท');
+  });
+
+  it('เลขปกติใส่คั่นหลักพร้อมหน่วย', () => {
+    expect(moneyFieldText(23861)).toBe('23,861 บาท');
   });
 });
