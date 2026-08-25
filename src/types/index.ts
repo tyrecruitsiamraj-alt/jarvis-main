@@ -126,6 +126,14 @@ export interface JobRequest {
   /** ประเภทสัญญา Siamraj — C = Cls (รถอย่างเดียว) */
   contract_type_code?: string;
   contract_type_name?: string;
+  /**
+   * เงินล่าสุดของ **คนที่ลาออก** จากใบขอนี้ (เจ้าของสั่ง 25 ส.ค. 2569)
+   * `draw` = เงินที่จ่ายพนักงาน · `fee` = ค่าที่เก็บลูกค้า — **คนละความหมาย ห้ามรวมกัน**
+   * ⚠️ `undefined`/`null` = **ไม่รู้** (วัดจริงหาเจอ 76% ของใบขอ) ห้ามแสดงเป็น 0
+   */
+  resigned_wage_draw_rate?: number | null;
+  resigned_wage_fee_rate?: number | null;
+  resigned_wage_effective_date?: string | null;
   position_units?: number;
   /** จำนวนตำแหน่งที่ขอมา (Siamraj request_qty) */
   request_positions?: number;

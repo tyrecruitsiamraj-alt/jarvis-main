@@ -67,6 +67,16 @@ type SqlServerRequestRow = {
   sex: string | null;
   payment_rate: number | null;
   draw_rate: number | null;
+  /**
+   * เงินของ **คนที่ลาออก** จากใบขอนี้ (เจ้าของสั่ง 25 ส.ค. 2569)
+   * มาจาก `hr_staff_changing` แถว `effective_date` ล่าสุดของ staff_id ที่ผูกกับใบขอ
+   * ⚠️ สองตัวคนละความหมาย: `draw` = เงินที่จ่ายพนักงาน · `fee` = ค่าที่เก็บลูกค้า
+   * ⚠️ วัดจริง 25 ส.ค. 2569: หาเจอ **3,914 / 5,158 ใบ (76%)** — ที่เหลือไม่มีคนผูก/ไม่มีประวัติ
+   *    ⇒ `null` = ไม่รู้ ห้ามแสดงเป็น 0
+   */
+  resigned_wage_draw_rate: number | null;
+  resigned_wage_fee_rate: number | null;
+  resigned_wage_effective_date: string | Date | null;
   fee_name: string | null;
   abs_customer_fine: number | null;
   contact_name: string | null;
@@ -220,6 +230,10 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     created_at: toIso(r.act_saleco_datetime) || new Date().toISOString(),
     urgency: 'advance' as const,
     total_income: r.payment_rate ?? 0,
+    // 🔴 คงค่า null ไว้ — ไม่มีข้อมูล ≠ ได้ศูนย์บาท (จอต้องแยกสองเคสนี้ได้)
+    resigned_wage_draw_rate: r.resigned_wage_draw_rate ?? null,
+    resigned_wage_fee_rate: r.resigned_wage_fee_rate ?? null,
+    resigned_wage_effective_date: toYmd(r.resigned_wage_effective_date) || null,
     job_type: jobType,
     job_category: 'private' as const,
     penalty_per_day: r.abs_customer_fine ?? 0,
@@ -289,6 +303,10 @@ const BASE_SQL = `
     (SELECT z.fee_name FROM wg2_ms_fee z WHERE z.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)) AS fee_name,
     C.payment_rate,
     C.draw_rate,
+    -- เงินล่าสุดของคนที่ออก (25 ส.ค. 2569) — แถวล่าสุดของ hr_staff_changing
+    WCH.wage_draw_rate AS resigned_wage_draw_rate,
+    WCH.wage_fee_rate AS resigned_wage_fee_rate,
+    WCH.effective_date AS resigned_wage_effective_date,
     B.work_date,
     B.work_time,
     B.age,
@@ -302,6 +320,14 @@ const BASE_SQL = `
     ) AS rn
   FROM st_request_head A
   LEFT JOIN st_request_staff S ON S.request_no = A.request_no
+  /* เงินล่าสุดของคนที่ออก — OUTER APPLY เพราะต้องการ "แถวล่าสุดแถวเดียว" ต่อคน
+     ⚠️ ห้ามใช้ JOIN ธรรมดา จะได้หลายแถวต่อใบขอแล้วใบขอถูกนับซ้ำ */
+  OUTER APPLY (
+    SELECT TOP 1 ch.wage_draw_rate, ch.wage_fee_rate, ch.effective_date
+      FROM hr_staff_changing ch
+     WHERE ch.staff_id = S.staff_id
+     ORDER BY ch.effective_date DESC, ch.runno DESC
+  ) WCH
   INNER JOIN st_request_p2 B ON A.request_no = B.request_no
   INNER JOIN st_request_p3_rate C ON B.request_no = C.request_no
   INNER JOIN ms_site SS ON A.site_code = SS.site_code
@@ -332,7 +358,8 @@ const SELECT_COLUMNS = `
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
   request_qty, inform_qty, is_inform_all, effective_inform_qty,
   reason_main_name, work_addr, work_place, boss_nationality, work_date, work_time, age, sex,
-  payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name
+  payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name,
+  resigned_wage_draw_rate, resigned_wage_fee_rate, resigned_wage_effective_date
 `;
 
 function boardRequestTypeExtraWhere(alias = 'A'): string {
