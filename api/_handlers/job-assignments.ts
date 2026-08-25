@@ -13,6 +13,7 @@ import {
   resolveUserAgent,
 } from '../_lib/audit.js';
 import { tableInAppSchema } from '../_lib/schema.js';
+import { isErpJobId } from '../_lib/siamrajUnitRequests.js';
 import {
   createJobAssignment,
   parseCreateAssignmentInput,
@@ -31,7 +32,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const jobId = getString(req.query?.job_id);
       if (!jobId) return sendError(res, 400, 'Bad request', 'job_id query is required');
 
-      if (jobId.startsWith('siamraj:') || jobId.startsWith('siamraj-sql:')) {
+      // ใบขอ ERP ไม่มีตารางมอบหมายฝั่งเรา — คืนว่าง (ไม่ใช่ปล่อยไปคิวรี `::uuid` แล้วตาย 500)
+      // ⚠️ `isErpJobId` ครอบ `siamraj-pre:` ด้วย — เดิมเช็คเองแล้วลืมใบล่วงหน้า
+      if (isErpJobId(jobId)) {
         return res.status(200).json([]);
       }
 

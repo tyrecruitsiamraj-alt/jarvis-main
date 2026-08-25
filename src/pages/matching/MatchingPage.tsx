@@ -8,6 +8,11 @@ import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Phone, MapPin, Search, Users, RefreshCw, Building2, ExternalLink, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  SEARCH_LEGACY_POOL,
+  SEARCH_LEGACY_POOL_AND_CALL,
+} from '@/lib/candidateSearchLabels';
+import { PAGE_SIZE_OPTIONS } from '@/lib/pagination';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { JobRequest } from '@/types';
@@ -76,7 +81,7 @@ import {
    ยังอยู่ครบใน callHoldsApi.ts และยังถูกใช้ที่ถัง "ต้องคนตาม" ในแถบการไหลของงาน */
 import { acquireCallHold, fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { partitionHoldTargets, summarizeAcquireResults, type HoldTarget } from '@/lib/callHoldsBulk';
-import { CheckCircle2, Megaphone, X, PhoneCall, UserCheck, UserX, SlidersHorizontal } from 'lucide-react';
+import { CheckCircle2, Megaphone, X, PhoneCall, PhoneForwarded, UserCheck, UserX, SlidersHorizontal } from 'lucide-react';
 import { cancelCallBatch, createCallBatch } from '@/lib/callBatchApi';
 import { CALL_BATCH_UNDO_MINUTES, type CallBatch } from '@/lib/callBatch';
 import ContactHistoryStrip from '@/components/matching/ContactHistoryStrip';
@@ -208,8 +213,16 @@ type IrecruitDisplayRow =
 const MATCHING_SERVER_LIST_ENABLED = import.meta.env.VITE_MATCHING_SERVER_LIST !== 'false';
 /** ค่าเริ่มต้นจำนวนใบขอต่อหน้า — ผู้ใช้เลือกเองได้ (จำไว้ในเครื่อง) */
 const MATCHING_LIST_BATCH_SIZE = 60;
-/** ตัวเลือกจำนวนต่อหน้า — เพดาน 100 ตรงกับที่ API ยอมรับ (pageSize > 100 ถูกตัดเป็น 100) */
-const MATCHING_PAGE_SIZE_OPTIONS = [20, 40, 60, 100] as const;
+/**
+ * ตัวเลือกจำนวนต่อหน้า — เพดาน 100 ตรงกับที่ API ยอมรับ (pageSize > 100 ถูกตัดเป็น 100)
+ *
+ * เจ้าของสั่ง 22 ส.ค. 2569: *"ทุกหน้าที่มีข้อมูลเยอะๆ ทำเป็น Pagination เลือกได้ว่าจะโชว์
+ * 10 20 30 40 ฯลฯ โดยทำเป็น Dropdown"* → เอาชุดกลางของระบบ (10/20/30/40/50) มาก่อน
+ * แล้ว **คงตัวเลือกใหญ่ 60/100 ไว้** เพราะหน้านี้มีคนไล่ดูทีละร้อยใบจริง
+ * (ถอด 100 ออก = ลดความสามารถที่เคยมี ซึ่งไม่ใช่สิ่งที่สั่ง)
+ * ค่าที่เคยจำไว้ในเครื่องยังใช้ได้ทั้งหมด เพราะชุดใหม่ครอบชุดเดิม
+ */
+const MATCHING_PAGE_SIZE_OPTIONS = [...PAGE_SIZE_OPTIONS, 60, 100] as const;
 const MATCHING_PAGE_SIZE_KEY = 'jarvis:matching-page-size';
 
 function loadSavedPageSize(): number {
@@ -844,6 +857,14 @@ const MatchingPage: React.FC = () => {
   const [postingError, setPostingError] = useState<string | null>(null);
   // ยืนยันก่อน "ค้นหาใหม่" (Rematching) — กันกดโดนแล้วสั่งคิดใหม่ทับผลเดิมโดยไม่ตั้งใจ
   const [rematchConfirmJobId, setRematchConfirmJobId] = useState<string | null>(null);
+  /**
+   * ยืนยันก่อนกด "หาคนเพิ่ม + ส่ง AI โทร"
+   *
+   * 🔴 ปุ่มนี้ **ยิงสายจริงทันที** (ค้นเจอ → เข้าคิว Lumos เขียว+เหลือง ไม่ต้องอนุมัติ)
+   * แต่เดิมไม่มีการถามก่อนเลย ต่างจากปุ่มส่งโทรอื่นในหน้าเดียวกันที่มี popup ครบ
+   * — กติกาโปรเจกต์: ปุ่มที่โทรหาคนจริงต้องเห็นสิ่งที่จะเกิดก่อนกด (กู้คืนไม่ได้)
+   */
+  const [irSendConfirmJobId, setIrSendConfirmJobId] = useState<string | null>(null);
   /** ใบที่รอผลจาก worker หลังบ้าน — baseline = computed_at เดิม (null = ยังไม่เคยมีผล) */
   const [boardWaitingById, setBoardWaitingById] = useState<Record<string, { baseline: string | null }>>({});
 
@@ -3402,16 +3423,17 @@ const MatchingPage: React.FC = () => {
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
                         className="jarvis-btn-ghost"
+                        title={SEARCH_LEGACY_POOL.hint}
                       >
                         {irLoadingId === jobDetail.id ? (
                           'กำลังค้นหา…'
                         ) : irMatchById[jobDetail.id] ? (
                           <>
-                            <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+                            <RefreshCw className="h-3 w-3" /> {SEARCH_LEGACY_POOL.again}
                           </>
                         ) : (
                           <>
-                            <Search className="h-3 w-3" /> ค้นหาคนที่ยังไม่สมัคร
+                            <Search className="h-3 w-3" /> {SEARCH_LEGACY_POOL.label}
                           </>
                         )}
                       </button>
@@ -3420,11 +3442,11 @@ const MatchingPage: React.FC = () => {
                       <button
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
-                        onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id], true)}
+                        onClick={() => setIrSendConfirmJobId(jobDetail.id)}
                         className="jarvis-btn-primary"
-                        title="ค้นหาคนที่ยังไม่สมัคร แล้วส่งคนที่ AI แนะนำ (เขียว/เหลือง) เข้าคิว Lumos โทรทันที"
+                        title={SEARCH_LEGACY_POOL_AND_CALL.hint}
                       >
-                        <Search className="h-3 w-3" /> หาคนเพิ่ม + ส่ง AI โทร
+                        <PhoneForwarded className="h-3 w-3" /> {SEARCH_LEGACY_POOL_AND_CALL.label}
                       </button>
                     </div>
                   </div>
@@ -4406,6 +4428,51 @@ const MatchingPage: React.FC = () => {
                 className="jarvis-btn-primary px-4 py-2"
               >
                 <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ยืนยันก่อน "หาคนเพิ่ม + ส่ง AI โทร" — ปุ่มนี้เข้าคิวโทรจริงทันทีที่ค้นเจอ */}
+      <Dialog
+        open={!!irSendConfirmJobId}
+        onOpenChange={(o) => !o && setIrSendConfirmJobId(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">ให้ AI โทรหาคนที่ยังไม่สมัคร?</DialogTitle>
+            <DialogDescription className="sr-only">
+              ยืนยันค้นหาคนที่ยังไม่สมัคร แล้วส่งคนที่ AI แนะนำเข้าคิวโทรของ Lumos
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-foreground">
+              ระบบจะค้นคนที่ <b>ยังไม่สมัครงานนี้</b> แล้วส่งคนที่ AI แนะนำ (เขียว/เหลือง)
+              <b> เข้าคิวให้ AI โทรทันที</b> โดยไม่ต้องอนุมัติอีกรอบ
+            </p>
+            <p className="text-xs text-muted-foreground">
+              คนที่เคยปฏิเสธงานนี้ · เบอร์ที่มีคนถืออยู่ · และคนที่เพิ่งถูกโทรไปภายใน 30 วัน
+              จะถูกตัดออกให้เองที่หลังบ้าน · โทรออกไปแล้วเรียกคืนไม่ได้
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIrSendConfirmJobId(null)}
+                className="jarvis-btn-ghost px-4 py-2"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = irSendConfirmJobId;
+                  setIrSendConfirmJobId(null);
+                  if (id) void fetchIrecruit(id, !!irMatchById[id], true);
+                }}
+                className="jarvis-btn-primary px-4 py-2"
+              >
+                <PhoneForwarded className="h-3 w-3" /> {SEARCH_LEGACY_POOL_AND_CALL.label}
               </button>
             </div>
           </div>

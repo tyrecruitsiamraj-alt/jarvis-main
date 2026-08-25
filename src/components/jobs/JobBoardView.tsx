@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
-import { jobBoardCardTitle, unitRequestCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
@@ -34,6 +34,16 @@ import {
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import { selectSilentLinkRows } from '@/lib/jobLinkSilence';
+import { buildCountIndex, buildJobKeyIndex, countFor } from '@/lib/jobKeyIndex';
+import JobBoardSilentLinks from '@/components/jobs/JobBoardSilentLinks';
+import {
+  buildReleaseIndex,
+  fetchJobReleases,
+  releaseJobsToPublic,
+  unreleaseJobsFromPublic,
+  type JobRelease,
+} from '@/lib/jobPublicReleaseApi';
 import { fetchUnitEditLog, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import { describeUnitEdit, UNIT_EDIT_TITLE, type UnitEditLogItem } from '@/lib/unitEditLog';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
@@ -55,10 +65,10 @@ import {
 } from '@/lib/jobBoxGroups';
 import { CLOSED_RANGE_OPTIONS } from '@/hooks/useClosedRequestsFeed';
 import { jobPositionUnits, sumJobPositionUnits } from '@/lib/jobPositionUnits';
-import { TONE, type ToneKey } from '@/lib/designTokens';
+import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
-import { compareJobsByAgeDaysDesc } from '@/lib/jobUrgency';
+import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import {
   Dialog,
   DialogContent,
@@ -76,6 +86,7 @@ import {
 } from '@/lib/unitRequestWorkStatus';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { cn } from '@/lib/utils';
+import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import { Button } from '@/components/ui/button';
 
 function staffAssigneeLine(j: JobRequest): string | null {
@@ -254,6 +265,45 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** ค่าที่เพิ่งแก้ — ทับบนการ์ดทันทีโดยไม่ต้องรีเฟรชทั้งบอร์ด */
   const [publicPatchById, setPublicPatchById] = useState<Record<string, Partial<JobRequest>>>({});
 
+  /**
+   * ทะเบียน "ปล่อยใบขอขึ้นหน้าสาธารณะ" (Phase 5 · เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)
+   *
+   * 🔴 โหลดเฉพาะ `isStaff` — เส้นนี้เป็นของภายใน · `/apply` ห้ามยิง (ไฟล์นี้ใช้ร่วมสองหน้า)
+   * ⚠️ ใบที่ไม่อยู่ในทะเบียนนี้ = คนนอกไม่เห็น และ AI (Lumos) ก็ไม่เห็น
+   */
+  const [releases, setReleases] = useState<JobRelease[] | null>(null);
+  const [releaseBusyId, setReleaseBusyId] = useState<string | null>(null);
+  const releaseIdx = useMemo(() => buildReleaseIndex(releases ?? []), [releases]);
+
+  const loadReleases = React.useCallback(async () => {
+    if (!isStaff) return;
+    try {
+      setReleases(await fetchJobReleases());
+    } catch {
+      setReleases([]); // อ่านไม่ได้ = ถือว่ายังไม่มีใบไหนปล่อย (ตรงกับ fail-closed ฝั่ง server)
+    }
+  }, [isStaff]);
+
+  useEffect(() => {
+    void loadReleases();
+  }, [loadReleases]);
+
+  const [bulkReleaseBusy, setBulkReleaseBusy] = useState(false);
+
+  /** ปล่อย/ดึงลง 1 ใบ แล้วรีเฟรชทะเบียน */
+  const toggleRelease = async (job: JobRequest, next: boolean) => {
+    setReleaseBusyId(job.id);
+    try {
+      if (next) await releaseJobsToPublic([job.id]);
+      else await unreleaseJobsFromPublic([job.id]);
+      await loadReleases();
+    } catch {
+      /* ข้อความบอกความล้มเหลวอยู่ที่ปุ่ม (กลับสภาพเดิมเพราะทะเบียนไม่เปลี่ยน) */
+    } finally {
+      setReleaseBusyId(null);
+    }
+  };
+
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
@@ -266,6 +316,43 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** กล่องปิดแล้ว/ยกเลิกที่เลือกอยู่ — null = กำลังดูชุดใบเปิด */
   const closedBox: ClosedBoxKey | null = openBox && isClosedBox(openBox) ? openBox : null;
   const openBoxKey: OpenBoxKey | null = openBox && !isClosedBox(openBox) ? openBox : null;
+  /**
+   * ประกาศของบอร์ด (mockup rev.3 ข้อ 04) — ใช้ 2 ที่:
+   * แถวกล่องลอย = รวมผู้สมัครต่อประเภทที่ไม่ผูกใบขอ · ชิปบนการ์ด = ช่องทางที่ปล่อยลิงก์ + ยอดคลิก
+   * ล้มเหลวก็ปล่อยเงียบเหมือน applicantCounts — เป็นข้อมูลเสริม ไม่ใช่ตัวหลักของหน้า
+   */
+  const [postings, setPostings] = useState<Awaited<ReturnType<typeof fetchRecruitPostings>>>([]);
+  /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
+  const [postingsRev, setPostingsRev] = useState(0);
+
+  /**
+   * ใบที่ **ปล่อยลิงก์รับสมัครแล้ว** (มีประกาศผูกใบขอ) — ใช้กับชิปเตือนบนการ์ด
+   * ⚠️ `postings` โหลดทีหลัง ระหว่างยังว่างจะยังไม่นับใบไหนว่าปล่อยแล้ว จึงต้องเช็ค
+   * `postingsReady` ก่อนโชว์ชิป ไม่งั้นเปิดหน้ามาทุกใบขึ้น "ยังไม่ปล่อยลิงก์" แวบหนึ่ง
+   */
+  /**
+   * 🔴 เทียบ **สองคีย์** ไม่ใช่ Set ของ id เต็ม — ประกาศเก็บ `siamraj-sql:XXX` แต่ใบ
+   * ล่วงหน้าที่ feed ส่งมาเป็น `siamraj-pre:XXX` (บั๊กที่แก้ 23 ส.ค. 2569 · ดู `jobKeyIndex.ts`)
+   * เดิมใช้ `Set(p.jobId)` → ใบล่วงหน้าที่ปล่อยลิงก์แล้วไม่ขึ้นชิปเขียวเลยทั้งกอง
+   */
+  const postedJobIds = useMemo(
+    () => buildJobKeyIndex(postings.map((p) => [p.jobId, true] as const)),
+    [postings],
+  );
+
+  /**
+   * ยอดผู้สมัคร/Lead/ที่มา — ยอดจาก API คีย์ด้วย `public_job_applications.job_id`
+   * ซึ่งสืบทอด `posting.jobId` (= `sql:` เสมอ) → ใบล่วงหน้าที่ feed ส่งมาเป็น `pre:`
+   * เคยอ่านได้ 0 ทั้งที่มีคนสมัครจริง · ต้องผ่านตัวเทียบสองคีย์เหมือนกันทุกตัว
+   */
+  const applicantIdx = useMemo(() => buildCountIndex(applicantCounts), [applicantCounts]);
+  const leadIdx = useMemo(() => buildCountIndex(leadCounts), [leadCounts]);
+  const originIdx = useMemo(
+    () => buildJobKeyIndex(Object.entries(originCounts)),
+    [originCounts],
+  );
+  const postingsReady = postings.length > 0;
+
   const boxCounts = useMemo(() => countOpenBoxes(filters.filtered), [filters.filtered]);
   /** ชุดใบปิด/ยกเลิกหลังผ่าน**ตัวกรองชุดเดียวกับใบเปิด** (จังหวัด/ตำแหน่ง/คำค้น/…) */
   const closedFiltered = useMemo(
@@ -323,18 +410,52 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     // ใบปิด/ยกเลิกไม่มี "ค้างมานาน" แล้ว — เรียงตามวันที่ปิดล่าสุดขึ้นก่อน
     if (closedBox) return [...boxedJobs].sort(compareByClosedDateDesc);
     const today = new Date();
-    const hasApplicants = (id: string) => ((applicantCounts[id] ?? 0) > 0 ? 0 : 1);
+    const hasApplicants = (id: string) => (countFor(applicantIdx, id) > 0 ? 0 : 1);
     return [...boxedJobs].sort((a, b) => {
       const byAge = compareJobsByAgeDaysDesc(a, b, today);
       if (byAge !== 0) return byAge;
       return hasApplicants(a.id) - hasApplicants(b.id);
     });
-  }, [boxedJobs, applicantCounts, closedBox]);
+  }, [boxedJobs, applicantIdx, closedBox]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
-  // เปิดใบใหม่ = เริ่มที่แท็บรายละเอียดเสมอ ไม่ค้างแท็บของใบก่อน
+  /**
+   * ตัวนับของแถบ "หน้าสาธารณะ" — นับจาก **ชุดที่กรองอยู่บนจอ** (boxedJobs)
+   * ไม่ใช่ทั้งฐาน เพื่อให้เลขตรงกับที่ตาเห็นเสมอ (กติกาเดิมของบอร์ด)
+   */
+  const releasedCount = useMemo(
+    () => boxedJobs.filter((j) => releaseIdx.has(j.id)).length,
+    [boxedJobs, releaseIdx],
+  );
+  const unreleasedCount = boxedJobs.length - releasedCount;
+
+  /**
+   * ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (เครื่องมือวันเปลี่ยนผ่าน)
+   * ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server — กดซ้ำได้จนหมด
+   */
+  const bulkReleaseVisible = async () => {
+    const ids = boxedJobs.filter((j) => !releaseIdx.has(j.id)).map((j) => j.id).slice(0, 300);
+    if (ids.length === 0) return;
+    setBulkReleaseBusy(true);
+    try {
+      await releaseJobsToPublic(ids, 'ปล่อยเป็นชุดจากบอร์ดรับสมัคร');
+      await loadReleases();
+    } catch {
+      /* ทะเบียนไม่เปลี่ยน = ตัวเลขบนแถบยังเป็นของเดิม */
+    } finally {
+      setBulkReleaseBusy(false);
+    }
+  };
+
+  /**
+   * เปิดใบใหม่ = เริ่มที่แท็บรายละเอียดเสมอ ไม่ค้างแท็บของใบก่อน
+   * 🔴 ยกเว้นตอนที่ผู้เรียกสั่งแท็บมาล่วงหน้า (ปุ่มในแถบลิงก์เงียบ "เพิ่มช่องทาง"/"แก้ประกาศ")
+   * — ถ้าไม่มี ref ตัวนี้ effect จะทับแท็บที่ปุ่มสั่งกลับเป็น detail ทุกครั้ง
+   */
+  const pendingPopupTabRef = React.useRef<'detail' | 'edit' | 'genlink' | null>(null);
   useEffect(() => {
-    setPopupTab('detail');
+    setPopupTab(pendingPopupTabRef.current ?? 'detail');
+    pendingPopupTabRef.current = null;
   }, [selected?.id]);
 
   // เปลี่ยนกล่อง = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของกล่องเดิม)
@@ -368,15 +489,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   // เจ้าหน้าที่: แก้เนื้อหาประกาศที่สร้างไว้แล้ว (mockup rev.3 ข้อ 04)
   // สาธารณะ: เปิดฟอร์มสมัครอัตโนมัติจาก deep link /apply?job=<id>
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
-
-  /**
-   * ประกาศของบอร์ด (mockup rev.3 ข้อ 04) — ใช้ 2 ที่:
-   * แถวกล่องลอย = รวมผู้สมัครต่อประเภทที่ไม่ผูกใบขอ · ชิปบนการ์ด = ช่องทางที่ปล่อยลิงก์ + ยอดคลิก
-   * ล้มเหลวก็ปล่อยเงียบเหมือน applicantCounts — เป็นข้อมูลเสริม ไม่ใช่ตัวหลักของหน้า
-   */
-  const [postings, setPostings] = useState<Awaited<ReturnType<typeof fetchRecruitPostings>>>([]);
-  /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
-  const [postingsRev, setPostingsRev] = useState(0);
 
   useEffect(() => {
     if (!isStaff) return;
@@ -426,30 +538,61 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ใบเดียวมีได้หลายประกาศ เลือกใบล่าสุดเพราะเป็นตัวที่กำลังใช้รับสมัครอยู่
    * (API เรียงมาแบบ created_at DESC แล้ว จึงเอาตัวแรกที่เจอ)
    */
-  const latestPostingByJob = useMemo(() => {
-    const map = new Map<string, RecruitPosting>();
-    for (const p of postings) {
-      if (!p.jobId || map.has(p.jobId)) continue;
-      map.set(p.jobId, p);
-    }
-    return map;
-  }, [postings]);
+  /** ⚠️ เทียบสองคีย์เหมือน `postedJobIds` — ไม่งั้นใบล่วงหน้าไม่มีแท็บ "แก้ไข" ในป๊อป */
+  const latestPostingByJob = useMemo(
+    // API เรียง created_at DESC มาแล้ว → ตัวแรกที่เจอคือล่าสุด (merge เก็บของเดิมไว้)
+    () => buildJobKeyIndex(postings.map((p) => [p.jobId, p] as const), (existing) => existing),
+    [postings],
+  );
 
   /** ใบขอ → ช่องทางที่ปล่อยลิงก์ไว้ (รวมยอดคลิกของช่องทางเดียวกันเข้าด้วยกัน) */
-  const channelsByJob = useMemo(() => {
-    const map = new Map<string, { label: string; hits: number }[]>();
-    for (const p of postings) {
-      if (!p.jobId) continue;
-      const acc = new Map<string, number>();
-      for (const l of p.links) {
-        const label = (l.channelLabel || 'ลิงก์กลาง').trim();
-        acc.set(label, (acc.get(label) ?? 0) + (l.hitCount ?? 0));
-      }
-      const prev = map.get(p.jobId) ?? [];
-      map.set(p.jobId, [...prev, ...[...acc].map(([label, hits]) => ({ label, hits }))]);
-    }
-    return map;
-  }, [postings]);
+  const channelsByJob = useMemo(
+    () =>
+      buildJobKeyIndex(
+        postings
+          .filter((p) => p.jobId)
+          .map((p) => {
+            const acc = new Map<string, number>();
+            for (const l of p.links) {
+              const label = (l.channelLabel || 'ลิงก์กลาง').trim();
+              acc.set(label, (acc.get(label) ?? 0) + (l.hitCount ?? 0));
+            }
+            return [p.jobId, [...acc].map(([label, hits]) => ({ label, hits }))] as const;
+          }),
+        // ใบเดียวมีได้หลายประกาศ → ต่อรายการช่องทางเข้าด้วยกัน (เหมือนพฤติกรรมเดิม)
+        (a, b) => [...a, ...b],
+      ),
+    [postings],
+  );
+
+  /**
+   * แถว "ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร" — ตรรกะอยู่ที่ `jobLinkSilence.ts` (pure + เทสต์)
+   * 🔴 กองนี้เล็กจริงโดยธรรมชาติ (ทั้งระบบปล่อยลิงก์ 12 ใบจาก 283 — วัดจริง 21 ส.ค. 2569
+   * เข้าเงื่อนไข 4 ใบ) · **ห้ามขยายไปครอบใบที่ยังไม่ปล่อยลิงก์** นั่นคือกล่องส้ม 277 ใบที่ถูกตีตก
+   * ⚠️ staff เท่านั้น · รอ postings + ยอดผู้สมัครมาก่อน ไม่งั้นแถบกระพริบ
+   */
+  const silentLinkRows = useMemo(() => {
+    if (!isStaff || closedBox || !postingsReady) return [];
+    // สร้างตัวอ่านจาก postings ตรง ๆ (คีย์สองชั้นเหมือนกันทุกตัว) แทนการไล่ Map เดิม
+    const latestPostedAt = buildJobKeyIndex(
+      postings.filter((p) => p.jobId && p.createdAt).map((p) => [p.jobId, p.createdAt] as const),
+      (existing) => existing,
+    );
+    const clicksByJob = buildJobKeyIndex(
+      postings
+        .filter((p) => p.jobId)
+        .map((p) => [p.jobId, p.links.reduce((s, l) => s + (l.hitCount ?? 0), 0)] as const),
+      (a, b) => a + b,
+    );
+    return selectSilentLinkRows({
+      jobs: boxedJobs,
+      latestPostedAt,
+      clicksByJob,
+      // ยอดจาก API คีย์ด้วย job_id ของฝั่งเรา (`sql:`) → ต้องผ่านตัวเทียบสองคีย์ด้วย
+      applicantCounts: applicantIdx,
+      leadCounts: leadIdx,
+    });
+  }, [isStaff, closedBox, postingsReady, postings, boxedJobs, applicantIdx, leadIdx]);
 
   useEffect(() => {
     if (!isStaff) return;
@@ -654,6 +797,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           loading={loading}
           searchPlaceholder={searchPlaceholder}
           hideSearch={isStaff}
+          /* ฝั่งเจ้าหน้าที่: แถบบรรทัดเดียว + ป้ายทองยุบเข้ามาในแถบ (คืนที่ ~84px ให้การ์ด)
+             /apply ไม่ส่ง prop → การ์ด frost เดิมทุกพิกเซล */
+          variant={isStaff ? 'bar' : 'card'}
+          eyebrow={isStaff ? (closedBox ? JOB_BOX_LABEL[closedBox] : 'ประกาศจากใบขอ') : undefined}
           resultCount={loading ? undefined : boxedJobs.length}
           totalCount={
             loading
@@ -681,8 +828,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
         {isStaff && view === 'board' ? (
           <div className="mt-3 space-y-2">
-            <div className="overflow-x-auto pb-1">
-              <div className="inline-flex w-max items-stretch gap-2">
+            {/* 🔴 เลิกเลื่อนซ้าย-ขวา (กติกาข้อ 7 — เดิม overflow-x-auto ทำให้ 3 กล่องท้าย
+                ตกขอบบนจอแคบ ต้องลากหาเอง) → flex-wrap ตกบรรทัดเอง · จอ 1440 ลงแถวเดียวพอดี */}
+            <div className="flex flex-wrap items-stretch gap-2">
+              <div className="flex flex-wrap items-stretch gap-2">
                 {/* ทั้งหมด — ไม่มีสีประจำ ใช้เป็นตัวล้างตัวกรอง */}
                 <button
                   type="button"
@@ -741,11 +890,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   );
                 })}
 
-                {/* เส้นคั่น — ของสองกล่องขวามาจากอีก feed (ใบที่หลุดจากกล่องงานไปแล้ว)
-                    แต่**กดแล้วกรองในหน้าเดิมเหมือนกล่องอื่นทุกกล่อง** (เจ้าของสั่ง 19 ส.ค. 2569:
-                    *"กดแล้วเด้งไปหน้าอื่นทำไม ทำไมไม่ทำให้มันเหมือนกัน"*) */}
-                <span className="mx-1 w-px shrink-0 self-stretch bg-border" aria-hidden />
+              </div>
 
+              {/* สองกล่องขวามาจากอีก feed (ใบที่หลุดจากกล่องงานแล้ว) — จัดเป็นกลุ่มของตัวเอง
+                  แล้วใส่เส้นที่ขอบกลุ่ม ⚠️ ห้ามใช้ <span w-px> ลอย ๆ — ใน flex-wrap
+                  เส้นจะโดดไปขึ้นต้นบรรทัดใหม่แบบสุ่มเมื่อแถวตก */}
+              <div className="flex flex-wrap items-stretch gap-2 sm:border-l sm:border-border sm:pl-3">
                 {CLOSED_BOX_KEYS.map((key) => {
                   const tone = TONE[JOB_BOX_TONE[key]];
                   const active = openBox === key;
@@ -881,12 +1031,61 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        {/* สีหัวข้อส่วนมาจาก TONE.warn (ทองด้าน) — เดิมเป็น hex ดิบ #b08d4f ขัดกติกา */}
-        {isStaff ? (
-          <p className={cn('mt-6 text-[11px] font-bold uppercase tracking-[0.14em]', TONE.warn.value)}>
-            {closedBox ? JOB_BOX_LABEL[closedBox] : 'ประกาศจากใบขอ'}
-          </p>
+        {/* แถบ "หน้าสาธารณะ" — ปล่อยแล้วกี่ใบ / ยังไม่ปล่อยกี่ใบ + ปล่อยเป็นชุด
+            (Phase 5 · เจ้าของเคาะ 22 ส.ค. 2569 "กลับด้านหมด ทุกใบต้องกดปล่อย")
+            🔴 staff เท่านั้น — /apply ห้ามเห็นแถบนี้ */}
+        {isStaff && !closedBox && releases !== null ? (
+          <div className={cn('mt-3 rounded-xl border px-3 py-2.5', TONE.info.soft)}>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className={DASH.eyebrow}>หน้าสาธารณะ (/apply)</span>
+              <span className="text-xs">
+                <b className={TONE.success.value}>ปล่อยแล้ว {releasedCount}</b>
+                <span className={cn('mx-1', DASH.muted)}>·</span>
+                <b className={TONE.warn.value}>ยังไม่ปล่อย {unreleasedCount}</b>
+                <span className={cn('ml-1', DASH.muted)}>จาก {boxedJobs.length} ใบที่กรองอยู่</span>
+              </span>
+              {unreleasedCount > 0 ? (
+                <button
+                  type="button"
+                  disabled={bulkReleaseBusy}
+                  onClick={() => void bulkReleaseVisible()}
+                  title={`ปล่อยใบที่ยังไม่ปล่อยในหน้านี้ทั้งหมด (${Math.min(unreleasedCount, 300)} ใบ) ขึ้นหน้าสาธารณะ`}
+                  className={cn(
+                    'ml-auto rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
+                    TONE.success.outline,
+                  )}
+                >
+                  {bulkReleaseBusy
+                    ? 'กำลังปล่อย…'
+                    : `ปล่อยทั้งหน้านี้ (${Math.min(unreleasedCount, 300)})`}
+                </button>
+              ) : null}
+            </div>
+            {releasedCount === 0 ? (
+              <p className={cn('mt-1 text-[11px]', DASH.muted)}>
+                ยังไม่มีใบไหนถูกปล่อย — หน้า /apply จะว่างจนกดปล่อยใบแรก
+                (คนนอกและ AI เห็นเฉพาะใบที่ปล่อยแล้ว)
+              </p>
+            ) : null}
+          </div>
         ) : null}
+
+        {/* แถบ "ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร" — ซ่อนตัวเองเมื่อไม่มีของ
+            ปุ่มพาเข้าป๊อป 3 ขั้นตัวเดิม (setSelected + popupTab) ไม่มี Dialog ใหม่ */}
+        {isStaff ? (
+          <JobBoardSilentLinks
+            rows={silentLinkRows}
+            onOpen={(job, tab) => {
+              // ตั้งแท็บล่วงหน้าก่อน setSelected — effect รีเซ็ตจะอ่านค่านี้แทน 'detail'
+              pendingPopupTabRef.current = tab;
+              setSelected(job);
+              setPopupTab(tab);
+            }}
+          />
+        ) : null}
+
+        {/* ป้ายทอง "ประกาศจากใบขอ" ย้ายไปอยู่ในแถบสรุป+ตัวกรอง (eyebrow) แล้ว —
+            เดิมกินแถวของตัวเอง ~40px (21 ส.ค. 2569) */}
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleJobs.map((job) => (
             <Card
@@ -927,15 +1126,37 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <p className="mt-1 line-clamp-2 text-sm font-bold leading-snug text-blue-700 dark:text-blue-300">
                       {publicJobPositionLabel(job)}
                     </p>
+                    {/* บรรทัดรอง: ตัดตำแหน่งที่ซ้ำกับบรรทัดสีน้ำเงินข้างบนออก (เดิมพิมพ์ซ้ำทุกใบ) */}
                     <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
-                      {unitRequestCardSubtitle(job) || EM_DASH}
+                      {jobBoardCardSubtitle(job) || EM_DASH}
                     </p>
                     {/* เลขที่ใบขอโชว์เฉพาะเจ้าหน้าที่ (หน้าสมัครสาธารณะไม่ต้องเห็น จึงไม่จองที่)
                         แต่ในฝั่งเจ้าหน้าที่ต้องมีที่ยืนทุกใบ ไม่งั้นแถวล่างเลื่อนไม่ตรงกัน */}
                     {isStaff ? (
-                      <p className="mt-0.5 font-mono text-[11px] leading-4 text-muted-foreground/80">
-                        {dashIfEmpty(job.request_no)}
-                      </p>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <p className="font-mono text-[11px] leading-4 text-muted-foreground/80">
+                          {dashIfEmpty(job.request_no)}
+                        </p>
+                        {/* ชิปอายุ = เหตุผลที่ใบนี้อยู่ลำดับนี้ (บอร์ดเรียงด้วย
+                            compareJobsByAgeDaysDesc แต่เดิมไม่มีเลขให้เห็นบนการ์ดเลย)
+                            🔴 ข้อความ/สี/tooltip จาก getJobAgeChipInfo **ที่เดียว** —
+                            ห้ามสร้างสเกลสีอายุที่สอง (บทเรียน "ป้ายบอกล่วงหน้า สีบอกด่วน")
+                            🔴 staff เท่านั้น — คนนอกไม่ควรรู้ว่างานค้างมานานเท่าไหร่ */}
+                        {(() => {
+                          const age = getJobAgeChipInfo(job);
+                          return (
+                            <span
+                              className={cn(
+                                'shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+                                JOB_AGE_CHIP_META[age.level].chipCls,
+                              )}
+                              title={age.title}
+                            >
+                              {age.cardText}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     ) : null}
                   </div>
                   {/* มุมขวาบน = ป้ายสถานะ + ปุ่มแก้ข้อมูลประกาศ (เจ้าของสั่ง 17 ส.ค. 2569
@@ -1050,6 +1271,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                 {isStaff ? (
                   <>
+                    {/**
+                      * ชิปเดียวที่เพิ่มเข้ามา — **ติดเฉพาะใบที่ปล่อยลิงก์แล้ว** (21 ส.ค. 2569)
+                      *
+                      * 🔴 เคยทำกลับกัน (เตือนส้มใบที่ยังไม่ปล่อย) แล้ว**ใช้ไม่ได้จริง**:
+                      * ของจริงมีประกาศผูกใบขอแค่ **12 จาก 283 ใบ** → ชิปเตือนขึ้น 271 ใบ
+                      * = เกือบทุกใบ · คำเตือนที่ขึ้นทุกใบไม่ใช่คำเตือน มันคือพื้นหลัง
+                      * (เจ้าของเคาะ: *"กลับด้าน ติดเขียวเฉพาะ 12 ใบที่ปล่อยแล้ว"*)
+                      * → ของน้อยคือสัญญาณ ของเยอะคือพื้น
+                      * ⚠️ รอ `postingsReady` ก่อน ไม่งั้นแวบแรกไม่มีใบไหนติดเขียวเลย
+                      */}
+                    {postingsReady && postedJobIds.has(job.id) ? (
+                      <span className={cn('self-start', TONE.success.chip)}>✓ ปล่อยลิงก์แล้ว</span>
+                    ) : null}
                     {/* ชิปช่องทางที่ปล่อยลิงก์ไว้ + ยอดคลิก (mockup rev.3 ข้อ 04) */}
                     {(channelsByJob.get(job.id) ?? []).length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
@@ -1070,19 +1304,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <div className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                       <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-foreground">
                         <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
-                        ผู้สมัคร {applicantCounts[job.id] ?? 0} คน
+                        ผู้สมัคร {countFor(applicantIdx, job.id)} คน
                         {/* Lead = ใบที่ถูกปัดเข้าคลัง ไม่ถูกนับในยอดซ้าย — โชว์เป็นเลขที่สอง
                             แทนที่จะยุบรวม (ยุบรวมแล้วเลขบนการ์ดจะไม่ตรงกับที่กดเข้าไปเห็น
                             ซึ่งเป็นเหตุผลที่ตัวนับกรอง Lead ออกตั้งแต่แรก) */}
-                        {(leadCounts[job.id] ?? 0) > 0 ? (
+                        {countFor(leadIdx, job.id) > 0 ? (
                           <span className="font-normal text-muted-foreground">
-                            · Lead {leadCounts[job.id]}
+                            · Lead {countFor(leadIdx, job.id)}
                           </span>
                         ) : null}
                         {/* แยกที่มาให้เห็นบนใบขอเลย — ไม่รู้ที่มา = ไม่ขึ้นบรรทัดนี้ */}
-                        {applicantOriginSummary(originCounts[job.id]) ? (
+                        {applicantOriginSummary(originIdx.get(job.id)) ? (
                           <span className="font-normal text-muted-foreground">
-                            ({applicantOriginSummary(originCounts[job.id])})
+                            ({applicantOriginSummary(originIdx.get(job.id))})
                           </span>
                         ) : null}
                       </span>
@@ -1104,13 +1338,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             e.stopPropagation();
                             setLaneJob(job);
                           }}
-                          title="ค้นคนที่ยังไม่สมัครจาก Checklist + ฐานใหม่ + iRecruit แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos โทรทันที"
+                          title={SEARCH_ALL_POOLS_AND_CALL.hint}
                           /* 🔴 ui/button.tsx variant เป็นธีมสว่างล้วน (bg-white/50 ไม่มีคู่ dark)
                              → ทับด้วย TONE.*.outline ที่มีคู่ dark ครบ (กติกาข้อ 4) */
                           className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.success.outline)}
                         >
                           <Send className="h-3.5 w-3.5" />
-                          หาผู้สมัครเพิ่ม
+                          {SEARCH_ALL_POOLS_AND_CALL.label}
                         </Button>
                           </>
                         )}
@@ -1660,6 +1894,44 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     สมัครตำแหน่งนี้
                     <Send className="h-4 w-4" />
                   </Button>
+                ) : null}
+
+                {/* ── ปล่อย / ดึงลง หน้าสาธารณะ (Phase 5 · เจ้าของเคาะ 22 ส.ค. 2569) ──
+                    วางไว้ก่อนปุ่ม "ถัดไป" เพราะนี่คือปุ่มตัดสินใจของ flow นี้:
+                    ดูรายละเอียด → (แก้รายได้/สวัสดิการ) → **ปล่อย**
+                    🔴 ปล่อย = คนนอกและ AI เห็นใบนี้ทันที · ดึงลง = หายจากทั้งสองที่ทันที */}
+                {isStaff && !closedBox && selected && releases !== null ? (
+                  (() => {
+                    const isOut = releaseIdx.has(selected.id);
+                    const busy = releaseBusyId === selected.id;
+                    return (
+                      <div className={cn('rounded-xl border px-3 py-2.5', isOut ? TONE.success.soft : TONE.warn.soft)}>
+                        <p className="text-xs font-semibold text-foreground">
+                          {isOut ? 'ใบนี้อยู่บนหน้าสาธารณะแล้ว' : 'ใบนี้ยังไม่ขึ้นหน้าสาธารณะ'}
+                        </p>
+                        <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
+                          {isOut
+                            ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
+                            : 'คนนอกยังไม่เห็น · แก้รายได้/สวัสดิการให้เรียบร้อยก่อนปล่อยได้'}
+                        </p>
+                        <Button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void toggleRelease(selected, !isOut)}
+                          className={cn(
+                            'mt-2 w-full rounded-xl py-2.5 text-sm',
+                            isOut ? TONE.neutral.outline : TONE.success.solid,
+                          )}
+                        >
+                          {busy
+                            ? 'กำลังบันทึก…'
+                            : isOut
+                              ? 'ดึงลงจากหน้าสาธารณะ'
+                              : 'ปล่อยขึ้นหน้าสาธารณะ'}
+                        </Button>
+                      </div>
+                    );
+                  })()
                 ) : null}
 
                 {/* ปุ่ม "ถัดไป" ของ flow (เจ้าของสั่ง 20 ส.ค. 2569: *"เลือกกด next เพื่อไปแก้ไข

@@ -146,11 +146,16 @@ export type SelectionRecallResult = {
 
 export async function fetchSelectionRecall(
   jobId: string,
-  options?: { send?: boolean; refresh?: boolean },
+  /**
+   * `refs` = ส่งเฉพาะคนที่ติ๊กเลือก (Phase 5.12) — ไม่ส่ง = ทั้งชุดเหมือนเดิม
+   * ⚠️ ใช้คู่กับ `send: true` เท่านั้น (ตอนแค่ดูรายชื่อไม่ต้องกรอง)
+   */
+  options?: { send?: boolean; refresh?: boolean; refs?: string[] },
 ): Promise<SelectionRecallResult> {
   const params = new URLSearchParams({ jobId });
   if (options?.send) params.set('send', '1');
   if (options?.refresh) params.set('refresh', '1');
+  if (options?.refs && options.refs.length > 0) params.set('refs', options.refs.join(','));
   const r = await apiFetch(`/api/matching/selection-recall?${params.toString()}`);
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as {

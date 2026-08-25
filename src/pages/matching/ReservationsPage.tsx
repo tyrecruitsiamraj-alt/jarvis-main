@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { useListPagination } from '@/hooks/useListPagination';
 import { DASH, TONE } from '@/lib/designTokens';
 import { PhoneOff, Phone, ExternalLink, X } from 'lucide-react';
 import {
@@ -63,6 +65,9 @@ const ReservationsPage: React.FC = () => {
     [items, sourceFilter],
   );
 
+  /** แบ่งหน้า (เจ้าของสั่ง 22 ส.ค. 2569) — hook กลาง ได้ dropdown ต่อหน้าชุดเดียวกันทุกหน้า */
+  const { pageItems, bar, resetPage } = useListPagination(rows);
+
   const cancel = async (id: string) => {
     setBusyId(id);
     setError(null);
@@ -104,7 +109,10 @@ const ReservationsPage: React.FC = () => {
           <h2 className="text-sm font-semibold text-foreground">คนที่จองอยู่ ({rows.length})</h2>
           <select
             value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value as 'all' | ProposalSource)}
+            onChange={(e) => {
+              setSourceFilter(e.target.value as 'all' | ProposalSource);
+              resetPage();
+            }}
             className="jarvis-soft-field min-h-[40px] text-xs w-auto"
           >
             <option value="all">ทุกแหล่ง</option>
@@ -123,7 +131,7 @@ const ReservationsPage: React.FC = () => {
           </p>
         ) : (
           <ul className="space-y-3">
-            {rows.map((it) => {
+            {pageItems.map((it) => {
               const src = SOURCE_META[it.source];
               const confirming = confirmingId === it.id;
               const busy = busyId === it.id;
@@ -261,6 +269,9 @@ const ReservationsPage: React.FC = () => {
             })}
           </ul>
         )}
+
+        {/* แถบเลขหน้า — ตัวเดียวกับทุกหน้าในระบบ */}
+        {!loading && rows.length > 0 ? <ListPaginationBar {...bar} /> : null}
       </div>
     </div>
   );

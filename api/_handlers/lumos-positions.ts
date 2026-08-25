@@ -14,6 +14,7 @@ import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
 } from '../_lib/siamrajUnitRequests.js';
+import { isReleased, loadReleasedJobKeys } from '../_lib/jobPublicReleases.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { withLumosAuth } from '../_lib/lumos-auth.js';
@@ -190,8 +191,19 @@ const parseIntOrNull = (v: unknown): number | null => {
 
 async function listSiamrajPositions(limit: number): Promise<LumosPosition[]> {
   const items = await listSiamrajUnitRequests({ limit, mode: 'all' });
+  /**
+   * 🔴 ด่าน "ปล่อยขึ้นหน้าสาธารณะแล้ว" — **ต้องเหมือน `/api/public/jobs` เป๊ะ**
+   * (เจ้าของเคาะ 22 ส.ค. 2569: ทุกใบต้องกดปล่อย)
+   *
+   * เหตุที่ AI ต้องเห็นเท่าที่คนนอกเห็น: Lumos เอา positions ชุดนี้ไปพูดกับผู้สมัครจริง
+   * ถ้า AI เห็นใบที่ทีมยังไม่ปล่อย = ไปเสนองานที่ยังไม่พร้อมให้คนนอก (รายได้/สวัสดิการ
+   * ยังไม่ได้แก้) ซึ่งเป็นเหตุผลที่เจ้าของอยากมี gating ตั้งแต่แรก
+   * fail-closed เหมือนกัน: อ่านทะเบียนไม่ได้ = ไม่ส่งอะไรออกไป
+   */
+  const keys = await loadReleasedJobKeys();
   return items
     .filter(isActiveStatus)
+    .filter((j) => isReleased(keys, String((j as { id?: unknown }).id ?? '')))
     .map((j) => toLumosPosition(j as unknown as Record<string, unknown>));
 }
 

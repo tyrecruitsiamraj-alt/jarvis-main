@@ -9,12 +9,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[#141210] text-white shadow-[0_4px_20px_rgba(0,0,0,0.18)] hover:bg-[#1f1c18] hover:-translate-y-0.5",
+        // สีมาจากตัวแปรธีม (--jarvis-ink* ประกาศใน src/index.css ทั้ง :root และ .dark)
+        // จึงสลับตามธีมเองโดยไม่ต้องมี dark: ที่นี่ · เส้นในโทน teal เฉพาะธีมมืดให้เข้าภาษา HUD
+        default:
+          "bg-[var(--jarvis-ink)] text-white shadow-[var(--jarvis-ink-shadow)] hover:bg-[var(--jarvis-ink-hover)] hover:-translate-y-0.5 dark:ring-1 dark:ring-inset dark:ring-teal-300/20 dark:hover:ring-teal-300/40",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full",
-        outline: "border border-white/80 bg-white/50 hover:bg-white/75 text-foreground",
-        secondary: "bg-white/60 border border-white/80 text-secondary-foreground hover:bg-white/80",
-        ghost: "hover:bg-white/50 hover:text-foreground rounded-full",
-        link: "text-blue-600 underline-offset-4 hover:underline rounded-none",
+        outline:
+          "border border-white/80 bg-white/50 hover:bg-white/75 text-foreground dark:border-white/15 dark:bg-white/5 dark:hover:bg-white/10",
+        secondary:
+          "bg-white/60 border border-white/80 text-secondary-foreground hover:bg-white/80 dark:border-white/15 dark:bg-white/[0.08] dark:hover:bg-white/15",
+        ghost: "hover:bg-white/50 hover:text-foreground rounded-full dark:hover:bg-white/10",
+        link: "text-blue-600 underline-offset-4 hover:underline rounded-none dark:text-blue-300",
       },
       size: {
         default: "h-10 px-5 py-2",

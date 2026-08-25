@@ -16,6 +16,10 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import NameAvatar from '@/components/shared/NameAvatar';
 import { DASH, TONE } from '@/lib/designTokens';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
+import DateRangeCalendarPicker, {
+  isYmdInRange,
+  type DateRangeYmd,
+} from '@/components/shared/DateRangeCalendarPicker';
 
 /**
  * คนของเรา · ตามถังบนบอร์ด — รายชื่อทั้ง 3 ถัง (To do / ไม่มีงาน / Re Use) กดดูทีละถัง
@@ -177,6 +181,15 @@ const OurPeoplePage: React.FC = () => {
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
   /** เดือนที่กรองอยู่จากปฏิทินวันที่สมัคร (YYYY-MM) — null = ไม่กรอง */
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
+  /**
+   * ช่วงวันแบบละเอียด (เจ้าของสั่ง 22 ส.ค. 2569: *"หน้าผู้สมัครขอเป็นแบบ filter แบบ
+   * calendar ที่กดแล้วข้อมูลเปลี่ยนตามวันที่เลือก"*)
+   *
+   * อยู่คู่กับแท่งเดือนเดิม **ไม่แทนกัน** — แท่งเดือนตอบ "เดือนไหนคนสมัครเยอะ"
+   * (เป็นกราฟด้วย) ส่วนปฏิทินตอบ "เอาช่วงนี้" · เลือกอันหนึ่งแล้วอีกอันถูกล้างให้
+   * เพื่อไม่ให้เกิดสองตัวกรองซ้อนกันแล้วคนอ่านไม่รู้ว่าเหลือเท่านี้เพราะอะไร
+   */
+  const [dateRange, setDateRange] = useState<DateRangeYmd | null>(null);
   /** คนที่กดดูรายละเอียดอยู่ */
   const [detail, setDetail] = useState<BoardPerson | null>(null);
   /** ถังที่กดดูอยู่ — โชว์ทีละถัง (ค่าเริ่มจาก ?bucket= เช่น tile บน dashboard) */
@@ -221,6 +234,11 @@ const OurPeoplePage: React.FC = () => {
     const terms = q.split(/\s+/).filter(Boolean);
     const filtered = (people ?? []).filter((p) => {
       if (terms.length > 0 && !terms.every((t) => personBlob(p).includes(t))) return false;
+      if (dateRange) {
+        // ไม่รู้วันสมัคร = ตกออกเมื่อกรองวัน (เหมือนหน้ารายชื่อผู้สมัคร)
+        const ymd = (p.application_date || '').slice(0, 10);
+        if (!isYmdInRange(/^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null, dateRange)) return false;
+      }
       if (!activeMonth) return true;
       const d = p.application_date ? new Date(p.application_date) : null;
       if (!d || Number.isNaN(d.getTime())) return false;
@@ -230,7 +248,7 @@ const OurPeoplePage: React.FC = () => {
       ...b,
       items: filtered.filter((p) => (p.column_label || '').trim().toLowerCase() === b.match),
     }));
-  }, [people, query, activeMonth]);
+  }, [people, query, activeMonth, dateRange]);
 
   const setQueryAndResetPages = (q: string) => {
     setQuery(q);
@@ -265,8 +283,18 @@ const OurPeoplePage: React.FC = () => {
             แพตเทิร์นเดียวกับแท่งเดือนบน Dashboard: เดือนที่เลือกเข้ม เดือนอื่นหรี่ กดซ้ำเพื่อปลด */}
         {people && monthOptions.length > 0 ? (
           <div className={cn('rounded-2xl border p-3', DASH.card)}>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className={DASH.eyebrow}>ปฏิทินวันที่สมัคร · 12 เดือนล่าสุด</p>
+              {/* เลือกช่วงวันละเอียด (เจ้าของสั่ง 22 ส.ค. 2569) — เลือกแล้วล้างเดือนที่ติ๊กไว้
+                  ไม่ให้สองตัวกรองซ้อนกันจนคนอ่านไม่รู้ว่าเหลือเท่านี้เพราะอะไร */}
+              <DateRangeCalendarPicker
+                value={dateRange}
+                onChange={(next) => {
+                  setDateRange(next);
+                  if (next) setActiveMonth(null);
+                  setPageByBucket({});
+                }}
+              />
               {activeMonth ? (
                 <button
                   type="button"
@@ -287,7 +315,12 @@ const OurPeoplePage: React.FC = () => {
                   <button
                     key={m.ym}
                     type="button"
-                    onClick={() => setActiveMonth(active ? null : m.ym)}
+                    onClick={() => {
+                      // กดเดือน = ล้างช่วงวัน (สมมาตรกับข้างบน — ให้เหลือตัวกรองวันเดียวเสมอ)
+                      setActiveMonth(active ? null : m.ym);
+                      setDateRange(null);
+                      setPageByBucket({});
+                    }}
                     aria-pressed={active}
                     title={`${m.ym} · สมัคร ${m.n.toLocaleString('th-TH')} คน`}
                     className="flex min-w-0 flex-1 flex-col items-center gap-1"

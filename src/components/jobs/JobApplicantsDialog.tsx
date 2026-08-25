@@ -14,9 +14,11 @@ import {
   GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
   claimJobApplication,
+  chooseApplicationCall,
   setJobApplicationLead,
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
+import { summarizeCallChoice } from '@/lib/callChoiceSummary';
 import { cn } from '@/lib/utils';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
 import { applicantAddressLine, applicantFactLine } from '@/lib/applicantDisplay';
@@ -32,6 +34,8 @@ import {
 } from '@/components/ui/dialog';
 import { ClipboardCheck, Download, Loader2, MapPin, Phone, UserMinus, UserPlus, Users } from 'lucide-react';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
+import CallChoiceConfirmDialog from '@/components/recruit-rm/CallChoiceConfirmDialog';
+import JobRecallSuggestions from '@/components/jobs/JobRecallSuggestions';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 
@@ -74,6 +78,8 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [sendBusy, setSendBusy] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
+  /** เปิดแผงยืนยันรายชื่อก่อนยิงสายจริง (ฝังในป๊อปนี้ ไม่ซ้อน Dialog) */
+  const [confirmSend, setConfirmSend] = useState(false);
 
   const reload = (jobId: string) => {
     fetchJobApplications(jobId)
@@ -85,14 +91,20 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
    * ปุ่ม "🤖 ส่งให้ AI โทร" (S8 · เจ้าของเคาะ 15 ส.ค. 2569) — เส้น auto ส่งตอนกรอกอยู่แล้ว
    * ปุ่มนี้ไว้เก็บใบตกค้าง (กรอกก่อนเปิดระบบ / เพิ่งแก้เบอร์) · server คัดคนเข้าเกณฑ์เอง
    * ทั้งหมด (client ส่งแค่ jobId) — ตัวเลขบนปุ่มเป็นค่าประมาณฝั่งหน้า ของจริงดูผลตอบกลับ
+   *
+   * 🔴 24 ส.ค. 2569: เดิมยืนยันด้วย `window.confirm` ที่บอกแค่จำนวน — ขัดกติกา
+   * "ปุ่มที่ยิงสายจริงต้องเห็นรายชื่อ" → ใช้ `CallChoiceConfirmDialog` แบบ `embedded`
+   * (ตัวนี้อยู่ในป๊อปอยู่แล้ว ห้ามซ้อน Dialog ใน Dialog)
    */
-  const sendableApprox = items.filter(
+  const sendableList = items.filter(
     (a) => a.phone_callable !== false && !isKnownOutcome(a.last_call_outcome) && !a.is_lead && !a.claimed,
-  ).length;
+  );
+  const sendableApprox = sendableList.length;
+  const sendableNames = sendableList.map((a) => a.full_name || EM_DASH);
 
   const sendAi = async () => {
     if (!job || sendBusy) return;
-    if (!window.confirm(`ส่งผู้สมัครที่ยังไม่ถูกโทร (~${sendableApprox} คน) ให้ AI โทรถามความสนใจ?`)) return;
+    setConfirmSend(false);
     setSendBusy(true);
     setSendNotice(null);
     try {
@@ -158,15 +170,27 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
     }
   };
 
-  /** เก็บไปติดต่อ / คืน — ไม่ optimistic เพราะอาจชนกับเพื่อน (409) ให้ server ตัดสินก่อน */
+  /**
+   * "เก็บไปโทรเอง" / คืน — **ปุ่มรวมของเดิมสองปุ่ม** (เจ้าของเคาะ 22 ส.ค. 2569):
+   * เก็บ = จองใบ (claim) + ล็อกเบอร์กัน AI โทรทับ (call hold) ในกดเดียว ผ่านเส้นเดียว
+   * คืน = ปล่อย claim ตามเดิม (ล็อกเบอร์มีอายุ 1 วันของตัวเอง — ปล่อยที่หน้าการโทรของฉัน)
+   * ⚠️ ไม่ optimistic เพราะอาจชนกับเพื่อน (409) ให้ server ตัดสินก่อน
+   */
   const toggleClaim = async (a: PublicApplication) => {
     setSavingId(a.id);
     setError(null);
     try {
-      const updated = await claimJobApplication(a.id, !a.claimed_by_me);
-      setItems((prev) => prev.map((x) => (x.id === a.id ? updated : x)));
+      if (a.claimed_by_me) {
+        const updated = await claimJobApplication(a.id, false);
+        setItems((prev) => prev.map((x) => (x.id === a.id ? updated : x)));
+      } else {
+        const outcome = await chooseApplicationCall([a.id], 'manual');
+        // ข้ามบางส่วนได้ (เก็บใบได้แต่ล็อกเบอร์ไม่ได้) — ต้องบอก ไม่ใช่เงียบ
+        if (outcome.skipped.length > 0) setError(summarizeCallChoice(outcome));
+        if (job) reload(job.id);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'เก็บไปติดต่อไม่สำเร็จ');
+      setError(e instanceof Error ? e.message : 'เก็บไปโทรเองไม่สำเร็จ');
     } finally {
       setSavingId(null);
     }
@@ -351,7 +375,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
           </button>
           {a.claimed && !a.claimed_by_me ? (
             <span className="rounded-full border border-transparent bg-muted/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-              🔒 เพื่อนเก็บไปติดต่อแล้ว
+              🔒 เพื่อนเก็บไปโทรแล้ว
             </span>
           ) : (
             <button
@@ -365,7 +389,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                   : 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300',
               )}
             >
-              {a.claimed_by_me ? '✓ อยู่ในการติดต่อของฉัน — กดเพื่อคืน' : 'เก็บไปติดต่อ'}
+              {a.claimed_by_me ? '✓ ฉันเก็บไปโทรเองแล้ว — กดเพื่อคืน' : 'เก็บไปโทรเอง'}
             </button>
           )}
         </div>
@@ -401,7 +425,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             <button
               type="button"
               disabled={sendBusy || items.length === 0}
-              onClick={() => void sendAi()}
+              onClick={() => setConfirmSend(true)}
               className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {sendBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '🤖'} ส่งให้ AI โทร
@@ -421,6 +445,20 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
             </button>
             {sendNotice ? <span className="text-[11px] text-muted-foreground">{sendNotice}</span> : null}
           </div>
+
+          {/* ยืนยันรายชื่อก่อนยิงสายจริง — ฝังในป๊อปนี้ (ห้าม Dialog ซ้อน Dialog) */}
+          {confirmSend ? (
+            <div className="mt-3">
+              <CallChoiceConfirmDialog
+                embedded
+                open={confirmSend}
+                names={sendableNames}
+                busy={sendBusy}
+                onCancel={() => setConfirmSend(false)}
+                onConfirm={() => void sendAi()}
+              />
+            </div>
+          ) : null}
 
           {/* แถวชิป "ที่มาของคน" (ทั้งหมด/สมัครใหม่/AI หาให้/เจ้าหน้าที่คีย์) ถูกถอดออก
               (เจ้าของสั่ง 17 ส.ค. 2569: "รายชื่อภายในกล่องมีแค่ รายชื่อทั้งหมด กับ คนที่สนใจ")
@@ -527,6 +565,9 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({ open, job, on
                 )}
               </div>
 
+              {/* แท็บไม่สนใจเคยเป็นทางตัน — เติมกอง "AI จับให้จากคนที่เคยปฏิเสธงานอื่น"
+                  ให้มีงานทำต่อ (Phase 5.12) · ต้องกดค้นเอง ไม่ค้น/ไม่โทรเองตอนเปิดแท็บ */}
+              {tab === 'not_interested' && job ? <JobRecallSuggestions jobId={job.id} /> : null}
             </>
           )}
         </div>

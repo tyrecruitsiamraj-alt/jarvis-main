@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '@/components/shared/PageHeader';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { useListPagination } from '@/hooks/useListPagination';
 import { TONE } from '@/lib/designTokens';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
@@ -20,6 +22,7 @@ import {
 import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
+import FollowCompletedPanel from '@/components/follow/FollowCompletedPanel';
 import { splitPickerName, type BoardPickerPerson } from '@/lib/boardPickerApi';
 import { buildBoardUnitOptions, mergeBoardUnitOptions, type BoardUnitOption } from '@/lib/boardUnitPicker';
 import { findScheduleDuplicates, type DuplicateRound } from '@/lib/followDuplicateGuard';
@@ -180,6 +183,8 @@ const FollowPage: React.FC = () => {
    */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+  /** ข้อความยืนยันการย้ายไปดูแลหลังเริ่มงาน (Phase 7.2) — แยกจาก pickedFrom ของฟอร์ม */
+  const [aftercareNotice, setAftercareNotice] = useState<string | null>(null);
   /** ตัวเลือกหน่วยงานจากบอร์ด (18 ส.ค. 2569) — คู่แฝดของ picker ชื่อคน */
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   /**
@@ -255,6 +260,9 @@ const FollowPage: React.FC = () => {
     }
     if (prefill.phone) setPhone(prefill.phone);
     if (prefill.topic) setTopic(prefill.topic);
+    // หน่วยงานที่เลือกไว้แล้วตอนตั้งขั้น (Phase 6.6/6.9) — เติมให้ ไม่ต้องเลือกซ้ำ
+    // ⚠️ เติมแค่ชื่อ · รหัสไซต์ให้คนยืนยันจาก picker เอง (ชื่ออาจซ้ำข้ามไซต์)
+    if (prefill.unitName) setUnitName(prefill.unitName);
     setPickedFrom('มาจากหน้าคัดสรร — เหลือเลือกวันและเวลา');
     setFormOpen(true);
     setSearchParams({}, { replace: true });
@@ -632,6 +640,13 @@ const FollowPage: React.FC = () => {
    */
   const groups = useMemo(() => groupFollowEntries(filtered), [filtered]);
 
+  /**
+   * แบ่งหน้าการ์ดติดตาม (เจ้าของสั่ง 22 ส.ค. 2569) — นับเป็น **การ์ด (คน)** ไม่ใช่รอบ
+   * เพราะการ์ดเดียวมีหลายรอบอยู่ข้างใน (กติกา 18 ส.ค.: คนเดียวต้องเป็นการ์ดเดียว)
+   * ⚠️ ใช้กับมุมมอง "การ์ด" เท่านั้น — มุมมอง "ตารางเดือน" ต้องเห็นทั้งเดือนพร้อมกัน
+   */
+  const { pageItems: groupPage, bar: groupBar, resetPage: resetGroupPage } = useListPagination(groups);
+
   const counts = useMemo(() => {
     const pending = items.filter((i) => i.call_status === 'pending').length;
     const done = items.filter((i) => i.call_status === 'completed').length;
@@ -684,6 +699,19 @@ const FollowPage: React.FC = () => {
             ) : null
           }
         />
+
+        {/* กล่อง "โทรครบแล้ว" (Phase 7.1-7.2) — ซ่อนตัวเองเมื่อไม่มีของ
+            🔴 รับ `groups` ชุดเดียวกับลิสต์ข้างล่าง (ยอดกับรายชื่อต้องมาจากชุดเดียวกัน)
+            วางเหนือแท็บ เพื่อให้ไม่หายเวลาสลับแท็บ (แท็บ active กรองคนที่ปิดงานแล้วออก) */}
+        <FollowCompletedPanel
+          groups={groups}
+          onMoved={(name) => setAftercareNotice(`ย้าย ${name} ไปดูแลหลังเริ่มงานแล้ว`)}
+        />
+        {aftercareNotice ? (
+          <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.value)}>
+            {aftercareNotice}
+          </p>
+        ) : null}
 
         {/* สรุป + ปุ่มเพิ่ม */}
         <div className="flex flex-wrap items-center gap-2.5">
@@ -749,7 +777,10 @@ const FollowPage: React.FC = () => {
               <button
                 key={t}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t);
+                  resetGroupPage();
+                }}
                 aria-pressed={tab === t}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium transition-colors',
@@ -807,7 +838,10 @@ const FollowPage: React.FC = () => {
                 id="fDate"
                 type="date"
                 value={fDate}
-                onChange={(e) => setFDate(e.target.value)}
+                onChange={(e) => {
+                  setFDate(e.target.value);
+                  resetGroupPage();
+                }}
                 className="jarvis-soft-field min-h-[40px] w-full"
               />
             </div>
@@ -818,7 +852,10 @@ const FollowPage: React.FC = () => {
               <select
                 id="fBand"
                 value={fBand}
-                onChange={(e) => setFBand(e.target.value as TimeBand)}
+                onChange={(e) => {
+                  setFBand(e.target.value as TimeBand);
+                  resetGroupPage();
+                }}
                 className="jarvis-soft-field min-h-[40px] w-full"
               >
                 <option value="">ทุกช่วง</option>
@@ -834,7 +871,10 @@ const FollowPage: React.FC = () => {
               <select
                 id="fOwner"
                 value={fOwner}
-                onChange={(e) => setFOwner(e.target.value)}
+                onChange={(e) => {
+                  setFOwner(e.target.value);
+                  resetGroupPage();
+                }}
                 className="jarvis-soft-field min-h-[40px] w-full"
               >
                 <option value="">ทุกคน</option>
@@ -1430,7 +1470,7 @@ const FollowPage: React.FC = () => {
              ข้างใน = ทุกรอบพร้อมสถานะ + ปุ่มของแต่ละรอบ (แก้ไข/ปิดงาน/ยกเลิก ตามเงื่อนไขเดิม)
              ⚠️ "เริ่มงานวันไหน" ไม่มีฟิลด์เก็บ — ตั้งใจไม่โชว์ (รอเจ้าของเคาะว่าจะเพิ่มฟิลด์ไหม) */
           <div className="space-y-2.5">
-            {groups.map((g) => {
+            {groupPage.map((g) => {
               const barStatus =
                 g.nextRound?.call_status ??
                 g.rounds.find((r) => !r.cancelled)?.call_status ??
@@ -1602,6 +1642,8 @@ const FollowPage: React.FC = () => {
                 </div>
               );
             })}
+            {/* แถบเลขหน้า — ตัวเดียวกับทุกหน้าในระบบ (10/20/30/40/50) */}
+            <ListPaginationBar {...groupBar} />
           </div>
         )}
       </div>

@@ -16,6 +16,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EM_DASH } from '@/lib/displayFallback';
+import {
+  SEARCH_ALL_POOLS,
+  SEARCH_ALL_POOLS_AND_CALL,
+} from '@/lib/candidateSearchLabels';
 import { Loader2, Search } from 'lucide-react';
 
 /**
@@ -35,14 +39,30 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RecruitLaneResult | null>(null);
+  /**
+   * 🔴 **ยังไม่ยิงสายจนกดยืนยัน** (Phase 3 ข้อ 3.4 · 23 ส.ค. 2569)
+   *
+   * ของเดิมยิง `send: true` ทันทีที่ป๊อปเปิด → แค่กดปุ่มบนการ์ดคือโทรหาคนจริงไปแล้ว
+   * โดยไม่มีจังหวะให้ทาน และปุ่มนั้นเคยใช้คำเดียวกับปุ่มที่ "ไม่โทร" ในหน้าอื่น
+   * ทุกเส้นที่ยิงสายในระบบนี้มี popup ยืนยันหมดแล้ว เหลือเส้นนี้เส้นเดียว
+   */
+  const [confirmed, setConfirmed] = useState(false);
+
+  // ปิด/เปลี่ยนใบขอ = เริ่มนับหนึ่งใหม่ (กันกดยืนยันของใบก่อนหน้าค้างมา)
+  useEffect(() => {
+    if (!open) {
+      setConfirmed(false);
+      setResult(null);
+      setError(null);
+    }
+  }, [open, job?.id]);
 
   useEffect(() => {
-    if (!open || !job) return;
+    if (!open || !job || !confirmed) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     setResult(null);
-    // send=1 ตั้งแต่ครั้งแรก — ปุ่มนี้คือ "ค้นแล้วส่งเลย" ไม่ใช่ "ค้นดูก่อน"
     fetchRecruitLaneCandidates(job.id, { send: true })
       .then((r) => {
         if (!cancelled) setResult(r);
@@ -56,7 +76,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
     return () => {
       cancelled = true;
     };
-  }, [open, job]);
+  }, [open, job, confirmed]);
 
   const matches = result?.matches ?? [];
 
@@ -65,13 +85,40 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
       <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Search className="h-4 w-4" /> หาคนเพิ่ม + ส่ง AI โทร (เลนสรรหา)
+            <Search className="h-4 w-4" /> {SEARCH_ALL_POOLS_AND_CALL.label}
           </DialogTitle>
           <DialogDescription>
-            {job ? jobBoardCardTitle(job) : EM_DASH} — ค้นคนที่ยังไม่สมัครจาก 3 แหล่ง
-            (Checklist · ฐานใหม่ · iRecruit) แล้วส่งคนที่ AI แนะนำเข้าคิว Lumos ทันที
+            {job ? jobBoardCardTitle(job) : EM_DASH} — {SEARCH_ALL_POOLS_AND_CALL.hint}
           </DialogDescription>
         </DialogHeader>
+
+        {/* ขั้นยืนยัน — ยังไม่มีสายไหนออกจนกดปุ่มขวา (ห้ามยิงตอนป๊อปเปิด) */}
+        {!confirmed ? (
+          <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/40 px-4 py-4">
+            <p className="text-sm text-foreground">
+              ระบบจะค้น <b>ทุกกอง</b> ที่มี (คนฝากประวัติเดิม · ผู้สมัครใหม่ · ถังคัดกรอง)
+              แล้วส่งคนที่ AI แนะนำ (เขียว/เหลือง) <b>เข้าคิวให้ AI โทรทันที</b>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              คนที่เคยปฏิเสธงานนี้ · เบอร์ที่มีคนถืออยู่ · และคนที่เพิ่งถูกโทรไปภายใน 30 วัน
+              ถูกตัดออกให้เองที่หลังบ้าน · <b>โทรออกไปแล้วเรียกคืนไม่ได้</b>
+              <br />
+              ถ้าอยากดูรายชื่อก่อนโดยไม่โทร ให้ใช้ปุ่ม “{SEARCH_ALL_POOLS.label}” ในหน้าใบขอ
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={onClose} className="jarvis-btn-ghost px-4 py-2">
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmed(true)}
+                className="jarvis-btn-primary px-4 py-2"
+              >
+                <Search className="h-3 w-3" /> {SEARCH_ALL_POOLS_AND_CALL.label}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {loading ? (
           <p className="flex items-center gap-2 rounded-xl border border-border/70 bg-secondary/40 px-3 py-6 text-sm text-muted-foreground">

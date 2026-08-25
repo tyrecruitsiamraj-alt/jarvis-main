@@ -33,6 +33,22 @@ export function unitRequestCardSubtitle(job: JobRequest): string {
   return parts.join(' • ');
 }
 
+/**
+ * บรรทัดรองบนการ์ด**บอร์ด** — เหมือน `unitRequestCardSubtitle` แต่**ตัดตำแหน่ง
+ * (`job_description_code_1`) ออก** เพราะการ์ดบอร์ดพิมพ์ตำแหน่งเป็นบรรทัดไฮไลต์
+ * สีน้ำเงินอยู่แล้ว (publicJobPositionLabel = ฟิลด์เดียวกัน) → เดิมพิมพ์ซ้ำสองรอบทุกใบ
+ * ⚠️ **ห้ามแก้ตัวเดิม** — `unitRequestCardSubtitle` ถูกใช้ที่ MatchingPage/PreCheck
+ * ที่ไม่มีบรรทัดตำแหน่งแยก (21 ส.ค. 2569)
+ */
+export function jobBoardCardSubtitle(job: JobRequest): string {
+  const parts: string[] = [];
+  const action = job.request_action_name || JOB_TYPE_LABELS[job.job_type];
+  if (action) parts.push(action);
+  if (job.job_description_code_2) parts.push(job.job_description_code_2);
+  if (job.resigned_employee_name) parts.push(job.resigned_employee_name);
+  return parts.join(' • ');
+}
+
 /** ป้ายเลือกใน dropdown */
 export function unitRequestSelectLabel(job: JobRequest): string {
   const unit = job.unit_name || '—';

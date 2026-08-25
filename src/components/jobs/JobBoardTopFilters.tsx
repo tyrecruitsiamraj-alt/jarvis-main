@@ -58,6 +58,14 @@ type Props = {
    * · หน้าสาธารณะไม่ส่ง prop นี้ = ช่องค้นหาอยู่ที่เดิม)
    */
   hideSearch?: boolean;
+  /**
+   * 'card' (ตั้งต้น) = การ์ด frost เดิมทุกพิกเซล — หน้าสมัครสาธารณะ /apply ใช้ตัวนี้
+   * 'bar' = แถบบรรทัดเดียวโปร่ง ๆ (ฝั่งเจ้าหน้าที่ 21 ส.ค. 2569 — คืนที่ ~44px ให้การ์ดงาน)
+   * ⚠️ สเตตตัวกรองทั้งหมดยังอยู่ไฟล์นี้ — ห้ามย้ายปุ่มออกไปข้างนอก (มือถือจะไม่เหลือปุ่มเปิด Sheet)
+   */
+  variant?: 'card' | 'bar';
+  /** ป้ายทองหน้าแถบ (โหมด bar) เช่น "ประกาศจากใบขอ" — ยุบแถวป้ายหัวข้อเดิมเข้ามาในแถบเดียว */
+  eyebrow?: string;
 };
 
 function countActiveFilters(...values: string[]): number {
@@ -109,6 +117,8 @@ const JobBoardTopFilters: React.FC<Props> = ({
   countUnitLabel = 'ตำแหน่ง',
   positionsNote,
   hideSearch = false,
+  variant = 'card',
+  eyebrow,
 }) => {
   const [sheetOpen, setSheetOpen] = useState(false);
   /**
@@ -228,14 +238,32 @@ const JobBoardTopFilters: React.FC<Props> = ({
     </>
   );
 
+  const isBar = variant === 'bar';
+
   return (
     <>
-      <div className="mt-6">
-        {/* ⚠️ padding เดิม p-4/md:p-5 + บรรทัด "พบ N" แยกแถว = การ์ดนี้สูง 209px
-            ตอนนี้ยุบเป็นแถวเดียว (ค้นหา · ปุ่มตัวกรอง · ผลลัพธ์) เหลือ ~80px */}
-        <div className="jarvis-frost rounded-2xl border border-white/70 p-3 shadow-sm md:p-4">
-          <div className="flex flex-col gap-3">
+      <div className={isBar ? 'mt-3' : 'mt-6'}>
+        {/* โหมด card = การ์ด frost เดิม (/apply) · โหมด bar = แถบโปร่งบรรทัดเดียว (staff)
+            ⚠️ ห้ามล็อกความสูงเป็นเลขดิบ — ให้สูงตามเนื้อ (ข้างในมี Button h-8) */}
+        <div
+          className={
+            isBar
+              ? 'rounded-xl border border-border/60 bg-secondary/30 px-3 py-1.5'
+              : 'jarvis-frost rounded-2xl border border-white/70 p-3 shadow-sm md:p-4'
+          }
+        >
+          <div className={isBar ? 'flex flex-col gap-1.5' : 'flex flex-col gap-3'}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              {isBar && eyebrow ? (
+                <span
+                  className={cn(
+                    'shrink-0 text-[11px] font-bold uppercase tracking-[0.14em]',
+                    TONE.warn.value,
+                  )}
+                >
+                  {eyebrow}
+                </span>
+              ) : null}
               {hideSearch ? null : (
                 <SearchField
                   wrapperClassName="flex-1 min-w-0"

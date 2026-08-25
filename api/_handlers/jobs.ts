@@ -11,6 +11,7 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import {
   isSiamrajUnitRequestsEnabled,
   getSiamrajUnitRequestById,
+  isErpJobId,
 } from '../_lib/siamrajUnitRequests.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 
@@ -140,7 +141,9 @@ async function jobsHandler(req: AuthedReq, res: ApiRes) {
     try {
       const id = getString(req.query?.id);
       if (id) {
-        if (id.startsWith('siamraj:') || id.startsWith('siamraj-sql:')) {
+        // ⚠️ ต้องใช้ `isErpJobId` — เดิมเช็ค prefix เองแล้วลืม `siamraj-pre:` (ใบล่วงหน้า)
+        // → id ใบล่วงหน้าตกไปคิวรีตารางฝั่งเรา แล้วตาย 500 (cast uuid ไม่ได้)
+        if (isErpJobId(id)) {
           if (!isSiamrajUnitRequestsEnabled()) return sendError(res, 404, 'Not found', 'Job not found');
           // จำกัดตาม BU — เส้นนี้เป็นประตูหลังอ่านใบขอ ERP ต้อง scope เหมือน /api/siamraj/unit-requests
           const row = await getSiamrajUnitRequestById(id, await loadUserDepartmentScope(req.user));

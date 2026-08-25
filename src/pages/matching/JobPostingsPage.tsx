@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
 import { cn } from '@/lib/utils';
+import ListPaginationBar from '@/components/shared/ListPaginationBar';
+import { useListPagination } from '@/hooks/useListPagination';
 import { DASH, TONE } from '@/lib/designTokens';
 import { Copy, Check, ExternalLink } from 'lucide-react';
 import {
@@ -164,6 +166,12 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
     return c;
   }, [items]);
 
+  /**
+   * แบ่งหน้า (เจ้าของสั่ง 22 ส.ค. 2569) — คำขอสะสมเรื่อย ๆ ไม่มีวันลด
+   * ใช้ hook กลางตัวเดียวกับทุกหน้า จึงได้ dropdown ต่อหน้าชุดเดียวกัน
+   */
+  const { pageItems, bar, resetPage } = useListPagination(items);
+
   return (
     <div>
       {embedded ? null : (
@@ -180,7 +188,10 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
           </h2>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as 'all' | JobPostingStatus)}
+            onChange={(e) => {
+              setFilterStatus(e.target.value as 'all' | JobPostingStatus);
+              resetPage(); // เปลี่ยนตัวกรอง = กลับหน้า 1 (ไม่งั้นค้างหน้าที่ไม่มีของ)
+            }}
             className="jarvis-soft-field min-h-[40px] text-xs w-auto"
           >
             <option value="all">ทุกสถานะ</option>
@@ -202,7 +213,7 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
           </p>
         ) : (
           <ul className="space-y-3">
-            {items.map((it) => (
+            {pageItems.map((it) => (
               <li key={it.id} className="glass-card rounded-2xl border border-white/70 p-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={jobPostingStatusChip(it.status)}>
@@ -257,6 +268,9 @@ const JobPostingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false })
             ))}
           </ul>
         )}
+
+        {/* แถบเลขหน้า — ตัวเดียวกับทุกหน้าในระบบ (10/20/30/40/50) */}
+        {!loading && items.length > 0 ? <ListPaginationBar {...bar} /> : null}
       </div>
     </div>
   );
