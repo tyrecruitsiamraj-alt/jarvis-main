@@ -19,6 +19,8 @@ import {
   type FollowEntry,
   updateFollowEntry,
 } from '@/lib/followApi';
+import FollowDispatchBadge from '@/components/follow/FollowDispatchBadge';
+import { summarizeDispatchResults } from '@/lib/followDispatchState';
 import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
@@ -471,9 +473,11 @@ const FollowPage: React.FC = () => {
       const runSchedule = async (sendDays: string[]) => {
         setSubmitting(true);
         let done = 0;
+        // เก็บผล "ส่งให้ AI ได้ไหม" ของทุกรายการ แล้วสรุปทีเดียวตอนจบ
+        const dispatchStates: Array<string | null> = [];
         try {
           for (const day of sendDays) {
-            await createFollowEntry({
+            const createdEntry = await createFollowEntry({
               recipient_name: recipientName,
               recipient_phone: phone,
               topic,
@@ -486,14 +490,21 @@ const FollowPage: React.FC = () => {
               unit_name: unitName.trim() || undefined,
               site_code: siteCode.trim() || undefined,
             });
+            dispatchStates.push(createdEntry.dispatch_state ?? null);
             done += 1;
           }
           resetForm();
           setFormOpen(false);
-          setOkMessage(
-            `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย)`,
-          );
-          window.setTimeout(() => setOkMessage(null), 6000);
+          /* 🔴 บอกทันทีถ้ามีรายการที่ "ไม่ได้ส่งให้ AI" — เดิมขึ้นว่าสำเร็จอย่างเดียว
+             คนนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569) */
+          const warn = summarizeDispatchResults(dispatchStates);
+          const okText = `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย)`;
+          if (warn) {
+            setFormError(`${okText}\n${warn.text}`);
+          } else {
+            setOkMessage(okText);
+            window.setTimeout(() => setOkMessage(null), 6000);
+          }
           await reload();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'ตั้งตารางไม่สำเร็จ';
@@ -545,9 +556,10 @@ const FollowPage: React.FC = () => {
     const runTimes = async (sendIso: string[]) => {
       setSubmitting(true);
       let done = 0;
+      const dispatchStates: Array<string | null> = [];
       try {
         for (const t of sendIso) {
-          await createFollowEntry({
+          const createdEntry = await createFollowEntry({
             recipient_name: recipientName,
             recipient_phone: phone,
             topic,
@@ -557,14 +569,20 @@ const FollowPage: React.FC = () => {
             unit_name: unitName.trim() || undefined,
             site_code: siteCode.trim() || undefined,
           });
+          dispatchStates.push(createdEntry.dispatch_state ?? null);
           done += 1;
         }
         resetForm();
         setFormOpen(false);
-        setOkMessage(
-          sendIso.length > 1 ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${sendIso.length} รอบ` : 'เพิ่มรายชื่อแล้ว',
-        );
-        window.setTimeout(() => setOkMessage(null), 5000);
+        const warn = summarizeDispatchResults(dispatchStates);
+        const okText =
+          sendIso.length > 1 ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${sendIso.length} รอบ` : 'เพิ่มรายชื่อแล้ว';
+        if (warn) {
+          setFormError(`${okText}\n${warn.text}`);
+        } else {
+          setOkMessage(okText);
+          window.setTimeout(() => setOkMessage(null), 5000);
+        }
         await reload();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'เพิ่มรายชื่อไม่สำเร็จ';
@@ -648,9 +666,11 @@ const FollowPage: React.FC = () => {
   const { pageItems: groupPage, bar: groupBar, resetPage: resetGroupPage } = useListPagination(groups);
 
   const counts = useMemo(() => {
+    // 🔴 นับเฉพาะที่อยู่ในคิวจริง — เดิม API เดา 'pending' ให้แถวที่ไม่เคยส่ง ตัวเลขจึงเกินจริง
     const pending = items.filter((i) => i.call_status === 'pending').length;
+    const notSent = items.filter((i) => !i.call_status && !i.cancelled).length;
     const done = items.filter((i) => i.call_status === 'completed').length;
-    return { total: items.length, pending, done };
+    return { total: items.length, pending, done, notSent };
   }, [items]);
 
   return (
@@ -744,6 +764,18 @@ const FollowPage: React.FC = () => {
             ทั้งหมด <span className="font-bold tabular-nums text-foreground">{counts.total}</span> · รอโทร{' '}
             <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">{counts.pending}</span> · สำเร็จ{' '}
             <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{counts.done}</span>
+            {/* 🔴 ของค้างที่ไม่มีใครจะโทร — โชว์เฉพาะเมื่อมีจริง (กติกา: ห้ามป้ายที่ขึ้น 0 ทุกวัน) */}
+            {counts.notSent > 0 ? (
+              <>
+                {' '}·{' '}
+                <span
+                  title="รายการที่ยังไม่ได้ส่งให้ AI โทร — ดูเหตุผลที่ป้ายในแต่ละรายการ"
+                  className="font-bold tabular-nums text-amber-700 dark:text-amber-300"
+                >
+                  ไม่ได้ส่งให้ AI {counts.notSent}
+                </span>
+              </>
+            ) : null}
           </p>
           {/* สลับมุมมอง: การ์ดต่อคน / ตารางเดือน (คน × วัน) — เจ้าของสั่ง ค่ำ-5 */}
           <div className="ml-auto flex items-center gap-1 rounded-full border border-border p-0.5 text-[11px]">
@@ -1471,6 +1503,8 @@ const FollowPage: React.FC = () => {
              ⚠️ "เริ่มงานวันไหน" ไม่มีฟิลด์เก็บ — ตั้งใจไม่โชว์ (รอเจ้าของเคาะว่าจะเพิ่มฟิลด์ไหม) */
           <div className="space-y-2.5">
             {groupPage.map((g) => {
+              /* แถบสีของกลุ่ม — ไม่มีรอบไหนอยู่ในคิวเลยก็ยังต้องมีสี ใช้ 'pending' เป็นค่าวาด
+                 ⚠️ เป็นแค่สีของแถบ **ไม่ใช่คำที่บอกสถานะ** (คำอยู่ที่ป้ายรายรอบข้างใน) */
               const barStatus =
                 g.nextRound?.call_status ??
                 g.rounds.find((r) => !r.cancelled)?.call_status ??
@@ -1550,9 +1584,16 @@ const FollowPage: React.FC = () => {
                         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                           <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
                             <span className="font-medium text-foreground">{formatWhen(it.scheduled_at)}</span>
-                            <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
-                              {FOLLOW_STATUS_LABEL[it.call_status]}
-                            </span>
+                            {/* 🔴 ป้ายนี้ต้องบอกได้ด้วยว่า "ไม่ได้ส่งให้ AI เพราะอะไร"
+                                เดิมอ่านจาก call_status ตรง ๆ ซึ่งเป็น null เมื่อไม่มีแถวในคิว
+                                ⇒ วาดออกมาเป็นช่องว่างเปล่า คนเห็นแล้วนึกว่าปกติ
+                                (รายการ 24 ส.ค. 2569 หายเงียบแบบนี้) */}
+                            {it.call_status ? (
+                              <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
+                                {FOLLOW_STATUS_LABEL[it.call_status]}
+                              </span>
+                            ) : null}
+                            <FollowDispatchBadge entry={it} />
                             {/* ปิดงานแล้ว (095) — ป้ายแยกจากสถานะโทร: สถานะโทร = AI ไปถึงไหน
                                 · ป้ายนี้ = เจ้าหน้าที่สรุปว่าจบแบบไหน */}
                             {it.completed_at && it.outcome_code ? (

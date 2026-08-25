@@ -19,6 +19,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody, getString } from '../_lib/body.js';
+import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { logWarn } from '../_lib/logger.js';
 import { auditFromAuthed } from '../_lib/audit.js';
@@ -70,6 +71,11 @@ type FollowRow = {
   outcome_note: string | null;
   completed_by_name: string | null;
   created_at: string | Date;
+  /**
+   * ผลตอนพยายามส่งเข้าคิว AI ตอนสร้าง (migration 109)
+   * `null` = แถวเก่าก่อนมีคอลัมน์นี้ ⇒ **ไม่รู้ว่าทำไม** ห้ามตีความว่าส่งแล้ว
+   */
+  dispatch_state: string | null;
   call_status: string | null;
   call_outcome: string | null;
   /** รอบที่โทรล่าสุดของแถวคิว — ใช้จัดกลุ่ม "ใครอยู่รอบไหน" บนแผงหน้าหลัก */
@@ -92,6 +98,7 @@ function toResponse(r: FollowRow) {
     topic: r.topic,
     note: r.note,
     staff_phone: r.staff_phone ?? null,
+    dispatch_state: r.dispatch_state ?? null,
     scheduled_at: iso(r.scheduled_at),
     unit_name: r.unit_name ?? null,
     site_code: r.site_code ?? null,
@@ -107,7 +114,16 @@ function toResponse(r: FollowRow) {
     outcome_note: r.outcome_note ?? null,
     completed_by_name: r.completed_by_name ?? null,
     /** สถานะจากคิว Lumos: pending=รอโทร, delivered=Lumos รับไปแล้ว, completed/failed/cancelled */
-    call_status: r.cancelled_at != null ? 'cancelled' : (r.call_status ?? 'pending'),
+    /**
+     * 🔴 **ห้ามเดา `'pending'` เมื่อไม่มีแถวในคิว** (แก้ 25 ส.ค. 2569)
+     *
+     * เดิม `r.call_status ?? 'pending'` ⇒ รายการที่ **ไม่เคยถูกส่งให้ AI เลย**
+     * ขึ้นบนจอว่า **"รอ AI โทร"** · นี่คือเหตุผลที่งานหายไป 5 วันโดยไม่มีใครสังเกต
+     * (รายการ 24 ส.ค. 2569 — ไม่มีแถวในคิว แต่จอบอกว่ากำลังรอโทร)
+     *
+     * `null` = ไม่อยู่ในคิว · ฝั่งจอใช้ `followDispatchLabel()` บอกว่าไม่ได้ส่งเพราะอะไร
+     */
+    call_status: r.cancelled_at != null ? 'cancelled' : (r.call_status ?? null),
     call_outcome: r.call_outcome,
     call_attempt: r.call_attempt == null ? null : Number(r.call_attempt),
     call_summary: r.call_summary,
@@ -279,10 +295,19 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   }
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
 
-  // ส่งให้ Lumos โทรตาม **เฉพาะเมื่อตั้งโหมดเป็น auto**
-  // ปิดอยู่ = รายการถูกบันทึกไว้แต่ยังไม่มีใครโทร (ตั้งใจ — เจ้าของสั่งปิด auto ก่อน)
+  /**
+   * ส่งให้ Lumos โทรตาม **เฉพาะเมื่อตั้งโหมดเป็น auto**
+   *
+   * 🔴 **ผลต้องกลับไปถึงคนกด** (เจ้าของสั่ง 25 ส.ค. 2569) — เดิมเรียกแล้วทิ้งผล
+   * ระบบ "ไม่ส่ง" ได้หลายทางและถูกต้องทุกทาง แต่**เงียบสนิท** ⇒ คนสร้างรายการเสร็จ
+   * เห็นว่าสำเร็จ แล้วนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569 กว่าจะรู้ต้องไล่ฐาน)
+   * ตอนนี้จด `dispatch_state` ไว้ที่แถว + ส่งกลับใน response ให้จอบอกได้ทันที
+   *
+   * ⚠️ จดผลล้มเหลวห้ามทำให้สร้างรายการล้ม — รายการถูกบันทึกไปแล้ว
+   */
+  let dispatchState: FollowDispatchState = 'off';
   if (await isAutoDispatchEnabled('follow_entry')) {
-    await enqueueFollowReminder({
+    dispatchState = await enqueueFollowReminder({
       id: created.id,
       recipient_name: name,
       recipient_phone: phone,
@@ -292,6 +317,16 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
       scheduled_at: when,
       callTimes,
     });
+  }
+  try {
+    await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [
+      created.id,
+      dispatchState,
+    ]);
+    created = { ...created, dispatch_state: dispatchState };
+  } catch (e) {
+    // ฐานยังไม่รัน 109 → ข้ามการจด (จอถอยไปอ่านสถานะจากคิวเหมือนเดิม)
+    if (!isUndefinedColumn(e)) throw e;
   }
 
   await auditFromAuthed(req, {

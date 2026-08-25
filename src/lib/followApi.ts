@@ -13,6 +13,11 @@ export type FollowEntry = {
   note: string | null;
   /** เบอร์เจ้าหน้าที่ผู้ติดตาม — AI บอกผู้สมัครไว้โทรกลับ */
   staff_phone?: string | null;
+  /**
+   * ผลตอนพยายามส่งเข้าคิว AI ตอนสร้าง (migration 109)
+   * `null` = แถวเก่าก่อนมีคอลัมน์นี้ ⇒ ไม่รู้ว่าทำไม (ห้ามตีความว่าส่งแล้ว)
+   */
+  dispatch_state?: string | null;
   scheduled_at: string | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — null = ไม่ได้ระบุ */
   unit_name?: string | null;
@@ -32,7 +37,12 @@ export type FollowEntry = {
   outcome_code?: string | null;
   outcome_note?: string | null;
   completed_by_name?: string | null;
-  call_status: FollowCallStatus;
+  /**
+   * สถานะในคิว AI — 🔴 **`null` ได้** เมื่อรายการนี้ไม่เคยเข้าคิวเลย
+   * (SQL เป็น LEFT JOIN) · เดิมประกาศเป็น non-null ⇒ จอวาดป้ายว่างเปล่า
+   * คนเห็นช่องโล่ง ๆ แล้วไม่รู้ว่า "ไม่ได้ส่ง" — ใช้ `followDispatchLabel()` แทน
+   */
+  call_status: FollowCallStatus | null;
   call_outcome: string | null;
   /** รอบที่โทรล่าสุด — null = ยังไม่มีแถวคิว (ยังไม่ได้ส่งให้ AI) */
   call_attempt?: number | null;

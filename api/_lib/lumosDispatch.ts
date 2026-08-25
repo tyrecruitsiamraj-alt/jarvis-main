@@ -19,6 +19,7 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { logInfo, logError } from './logger.js';
+import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { applyCallFollowupToQueueRow, listSuppressedPhones } from './callFollowup.js';
 import { countPendingApprovalByJob, releaseDueCallBatches } from './callBatchStore.js';
 import type { BoardMatchResult } from './boardCandidateMatcher.js';
@@ -307,9 +308,15 @@ export async function enqueueLumosInterviewForApplications(
     // ใบสมัครไม่มี tier จาก AI แมท — null = MATCH_RANK_UNKNOWN (เท่าเหลือง) ตอนเสิร์ฟ
     items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
   }
-  const { added, held, suppressed, declined } = await insertQueueItems('interview', jobId, items);
+  const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
+  /**
+   * 🔴 "ไม่ได้ส่ง" ทุกเหตุผลรวมที่เดียว — เดิมนับ `duplicated` โดยตัดแค่ held/declined
+   * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
+   * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
+   */
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded]);
   const nameByRef = new Map(applications.map((a) => [`app-${a.id}`, a.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
   for (const ref of suppressed) {
@@ -318,10 +325,13 @@ export async function enqueueLumosInterviewForApplications(
   for (const ref of declined) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
   }
+  for (const ref of guarded) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: GUARDED_REASON });
+  }
   const declinedSet = new Set(declined);
   const duplicated = items
     .map((i) => i.personRef)
-    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
+    .filter((ref) => !addedSet.has(ref) && !skippedSet.has(ref));
   logInfo('lumos.dispatch.application', {
     jobId,
     requested: applications.length,
@@ -421,12 +431,29 @@ async function insertQueueItems(
    * ตั้งตาราง (แถววันอนาคตต้องไม่ถูกเสิร์ฟ+bump มาโทรวันนี้) · จะ max กับ quiet-hours
    */
   items: Array<{ personRef: string; payload: unknown; matchRank?: number | null; scheduledFor?: string | null }>,
-): Promise<{ added: string[]; held: string[]; suppressed: string[]; declined: string[] }> {
+): Promise<{
+  added: string[];
+  held: string[];
+  suppressed: string[];
+  declined: string[];
+  /**
+   * 🔴 **กันไว้ก่อนเพราะ "ตรวจไม่ได้" ไม่ใช่ "ติดเงื่อนไข"** (แยกออกมา 25 ส.ค. 2569)
+   *
+   * เดิมเคสนี้ถูกยัดรวมไปกับ `held` ทำให้รายงานบอกว่า "เจ้าหน้าที่รับไปโทรเอง"
+   * ทั้งที่ไม่มีใครรับ · ตามหาสาเหตุไม่เจอเลยว่างานหายไปไหน
+   * (เจอจริง: รายการติดตาม 24 ส.ค. 2569 ไม่เข้าคิวโดยไม่มีใครรู้)
+   *
+   * ต่างกันตรง **แก้ได้ไหม**: `held` ต้องรอเจ้าหน้าที่ปล่อยเบอร์ ·
+   * `guarded` แค่ลองส่งใหม่ก็ผ่าน (ตอนนั้นอ่านตารางไม่ได้ชั่วคราว)
+   */
+  guarded: string[];
+}> {
   const added: string[] = [];
   const held: string[] = [];
   const suppressed: string[] = [];
+  const guarded: string[] = [];
   const declined: string[] = [];
-  if (items.length === 0) return { added, held, suppressed, declined };
+  if (items.length === 0) return { added, held, suppressed, declined, guarded };
 
   let heldPhones: Set<string>;
   try {
@@ -484,8 +511,9 @@ async function insertQueueItems(
         continue;
       }
       if (suppressedPhones === null) {
-        // อ่านรายการพักเบอร์ไม่ได้ → กันไว้ก่อน (นับเป็น held เพื่อให้รายงานบอกว่ายังไม่ส่ง)
-        held.push(item.personRef);
+        // อ่านรายการพักเบอร์ไม่ได้ → กันไว้ก่อน · 🔴 นับเป็น `guarded` **ไม่ใช่ `held`**
+        // (เดิมยัดรวมกับ held แล้วรายงานโกหกว่า "เจ้าหน้าที่รับไปโทรเอง" ทั้งที่ไม่มีใครรับ)
+        guarded.push(item.personRef);
         continue;
       }
       if (suppressedPhones.has(phone)) {
@@ -531,7 +559,7 @@ async function insertQueueItems(
     }
     if (rows.length > 0) added.push(item.personRef);
   }
-  return { added, held, suppressed, declined };
+  return { added, held, suppressed, declined, guarded };
 }
 
 export type LumosDispatchOutcome = {
@@ -547,6 +575,11 @@ const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที�
 const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
 const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
 const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';
+/**
+ * 🔴 คนละเรื่องกับ HELD — อันนี้คือ "ระบบตรวจไม่ได้" ไม่ใช่ "มีคนจองไปแล้ว"
+ * ต้องบอกให้ชัดว่า **ลองใหม่ได้** ไม่งั้นคนนั่งรอสายที่ไม่มีวันออก (เจอจริง 24 ส.ค. 2569)
+ */
+const GUARDED_REASON = 'ระบบตรวจบัญชีห้ามโทรไม่ได้ตอนนั้น จึงกันไว้ก่อน — กดส่งใหม่ได้';
 
 /** ผู้สมัคร "คนของเรา" ที่คนติ๊กเลือก → คิว reminder */
 export async function enqueueLumosReminderForSelected(
@@ -571,9 +604,15 @@ export async function enqueueLumosReminderForSelected(
     }
     items.push({ personRef: `card-${m.card_id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
-  const { added, held, suppressed, declined } = await insertQueueItems('reminder', result.jobId, items);
+  const { added, held, suppressed, declined, guarded } = await insertQueueItems('reminder', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
+  /**
+   * 🔴 "ไม่ได้ส่ง" ทุกเหตุผลรวมที่เดียว — เดิมนับ `duplicated` โดยตัดแค่ held/declined
+   * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
+   * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
+   */
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded]);
   const nameByRef = new Map(selected.map((m) => [`card-${m.card_id}`, m.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
   for (const ref of suppressed) {
@@ -582,10 +621,13 @@ export async function enqueueLumosReminderForSelected(
   for (const ref of declined) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
   }
+  for (const ref of guarded) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: GUARDED_REASON });
+  }
   const declinedSet = new Set(declined);
   const duplicated = items
     .map((i) => i.personRef)
-    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
+    .filter((ref) => !addedSet.has(ref) && !skippedSet.has(ref));
   logInfo('lumos.dispatch.reminder.manual', {
     jobId: result.jobId,
     requested: selected.length,
@@ -634,9 +676,15 @@ export async function enqueueLumosInterviewForSelected(
     }
     items.push({ personRef: `ir-${m.id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
-  const { added, held, suppressed, declined } = await insertQueueItems('interview', result.jobId, items);
+  const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
+  /**
+   * 🔴 "ไม่ได้ส่ง" ทุกเหตุผลรวมที่เดียว — เดิมนับ `duplicated` โดยตัดแค่ held/declined
+   * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
+   * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
+   */
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded]);
   const nameByRef = new Map(selected.map((m) => [`ir-${m.id}`, m.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
   for (const ref of suppressed) {
@@ -645,10 +693,13 @@ export async function enqueueLumosInterviewForSelected(
   for (const ref of declined) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
   }
+  for (const ref of guarded) {
+    skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: GUARDED_REASON });
+  }
   const declinedSet = new Set(declined);
   const duplicated = items
     .map((i) => i.personRef)
-    .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
+    .filter((ref) => !addedSet.has(ref) && !skippedSet.has(ref));
   logInfo('lumos.dispatch.interview.manual', {
     jobId: result.jobId,
     requested: selected.length,
@@ -891,9 +942,15 @@ export async function enqueueLumosInterviewForRecruitLane(
       items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
     }
 
-    const { added, held, suppressed, declined } = await insertQueueItems('interview', result.jobId, items);
+    const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
+  /**
+   * 🔴 "ไม่ได้ส่ง" ทุกเหตุผลรวมที่เดียว — เดิมนับ `duplicated` โดยตัดแค่ held/declined
+   * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
+   * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
+   */
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded]);
     for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
     for (const ref of suppressed) {
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
@@ -904,7 +961,7 @@ export async function enqueueLumosInterviewForRecruitLane(
     const declinedSet = new Set(declined);
     const duplicated = items
       .map((i) => i.personRef)
-      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
+      .filter((ref) => !addedSet.has(ref) && !skippedSet.has(ref));
 
     const queuedBySource = { irecruit: 0, so_recruit: 0, checklist: 0, declined: 0 };
     for (const ref of added) {
@@ -997,9 +1054,15 @@ export async function enqueueLumosInterviewForRecall(
       items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
     }
 
-    const { added, held, suppressed, declined } = await insertQueueItems('interview', result.jobId, items);
+    const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
+  /**
+   * 🔴 "ไม่ได้ส่ง" ทุกเหตุผลรวมที่เดียว — เดิมนับ `duplicated` โดยตัดแค่ held/declined
+   * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
+   * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
+   */
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded]);
     for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
     for (const ref of suppressed) {
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
@@ -1010,7 +1073,7 @@ export async function enqueueLumosInterviewForRecall(
     const declinedSet = new Set(declined);
     const duplicated = items
       .map((i) => i.personRef)
-      .filter((ref) => !addedSet.has(ref) && !heldSet.has(ref) && !declinedSet.has(ref));
+      .filter((ref) => !addedSet.has(ref) && !skippedSet.has(ref));
 
     logInfo('lumos.dispatch.recall', {
       jobId: result.jobId,
@@ -1349,14 +1412,29 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
 }
 
 /** รายชื่อ Follow ที่คนกรอก → คิว reminder (throw ให้ handler จัดการ เพราะผู้ใช้ต้องรู้ว่าเข้าคิวไหม) */
-export async function enqueueFollowReminder(entry: FollowEntryInput): Promise<void> {
+/**
+ * 🔴 **คืนผลออกไป ไม่ใช่ log ทิ้ง** (เจ้าของสั่ง 25 ส.ค. 2569)
+ *
+ * เดิมคืน `void` แล้ว log อย่างเดียว ⇒ เวลาระบบ "ไม่ส่ง" (ซึ่งมีหลายทางและถูกต้องทั้งนั้น)
+ * **ไม่มีอะไรไปถึงคนใช้งานเลย** · รายการติดตาม 24 ส.ค. 2569 หายเงียบแบบนี้
+ * กว่าจะรู้ต้องไล่ฐานย้อนหลังทีละตาราง
+ */
+export async function enqueueFollowReminder(
+  entry: FollowEntryInput,
+): Promise<FollowDispatchState> {
   const payload = buildFollowReminderPayload(entry);
   // แถวตั้งตาราง (มีหลายรอบ) เสิร์ฟเร็วสุด = รอบแรกของวันนั้น (step แรก) — กันวันอนาคตถูก bump มาโทรก่อน
   const scheduledFor = payload.steps[0]?.scheduled_at ?? entry.scheduled_at.toISOString();
-  const { added, held, suppressed } = await insertQueueItems('reminder', 'follow', [
+  const { added, held, suppressed, guarded } = await insertQueueItems('reminder', 'follow', [
     { personRef: `follow-${entry.id}`, payload, scheduledFor },
   ]);
-  logInfo('lumos.dispatch.follow', { followId: entry.id, added, held, suppressed });
+  logInfo('lumos.dispatch.follow', { followId: entry.id, added, held, suppressed, guarded });
+  if (added.length > 0) return 'queued';
+  if (held.length > 0) return 'held';
+  if (suppressed.length > 0) return 'suppressed';
+  if (guarded.length > 0) return 'guarded';
+  // ไม่เข้าถังไหนเลย = ชน unique เดิม (ส่งซ้ำ) — ถือว่าอยู่ในคิวแล้ว
+  return 'queued';
 }
 
 /** ยกเลิกรายการ Follow ในคิว — ได้ผลเฉพาะที่ Lumos ยังไม่ดึงไป (pending) */

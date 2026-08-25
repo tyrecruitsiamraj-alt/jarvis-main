@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { shiftMonth } from '@/lib/followCallCalendar';
+import FollowDispatchBadge from '@/components/follow/FollowDispatchBadge';
 
 /**
  * **ตารางสรุปรายเดือน** ของหน้า Follow — คน × วัน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5
@@ -46,7 +47,12 @@ function CellEntryRow({ e }: { e: FollowEntry }) {
     <li className={cn('rounded-lg border px-2.5 py-2', TONE.neutral.soft, e.cancelled && 'opacity-60')}>
       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
         <span className="font-semibold text-foreground">{time} น.</span>
-        <span className={FOLLOW_STATUS_CLASS[e.call_status]}>{FOLLOW_STATUS_LABEL[e.call_status]}</span>
+        {/* null = ไม่มีแถวในคิว (ไม่เคยส่งให้ AI) — ป้ายสถานะโทรไม่มีคำสำหรับกรณีนี้
+            ⇒ ปล่อยว่างแล้วให้ป้าย "ไม่ได้ส่ง" ข้างล่างเป็นคนบอกแทน */}
+        {e.call_status ? (
+          <span className={FOLLOW_STATUS_CLASS[e.call_status]}>{FOLLOW_STATUS_LABEL[e.call_status]}</span>
+        ) : null}
+        <FollowDispatchBadge entry={e} />
         {e.completed_at && e.outcome_code ? (
           <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.success.chip)}>
             ปิดงาน: {FOLLOW_OUTCOME_LABEL[e.outcome_code as FollowOutcomeAny] ?? e.outcome_code}
