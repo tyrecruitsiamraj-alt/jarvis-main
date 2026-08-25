@@ -47,6 +47,7 @@ const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnit
 // แท็บย่อยของใบขอ (16 ส.ค. 2569 เย็น) — ผู้สมัคร / AI Match / การติดต่อ
 const UnitRequestTabPage = lazy(() => import("@/pages/jobs/UnitRequestTabPage"));
 const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
+const AftercarePage = lazy(() => import("@/pages/aftercare/AftercarePage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazy(() => import("@/pages/settings/AdminSettings"));
 const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
@@ -118,6 +119,8 @@ const ProtectedRoutes = () => {
             <Route path="/matching/call-team" element={<Navigate to="/matching/match" replace />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
+            {/* "ดูแลหลังเริ่มงาน" (Phase 7.3) — คนเข้ามาจากกล่อง "โทรครบแล้ว" บนหน้า Follow */}
+            <Route path="/aftercare" element={<AftercarePage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/overview" element={<JobDashboard />} />
             <Route path="/jobs/list" element={<JobListPage />} />

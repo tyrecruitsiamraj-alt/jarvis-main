@@ -20,7 +20,8 @@ const PERIOD_PRESETS = [
 const YEAR_OPTIONS_COUNT = 6;
 
 const QUEUE_STATUS_OPTIONS: { value: DashboardStatusFilter; label: string }[] = [
-  { value: 'all', label: 'ทุกสถานะ (ตาราง)' },
+  // ⚠️ คำเดิมคือ "ทุกสถานะ (ตาราง)" ซึ่งอ้างถึงตารางที่ไม่มีบนจอ — ป้ายที่ชี้ของที่ไม่มีคือความงง
+  { value: 'all', label: 'ทุกสถานะ' },
   ...(Object.keys(DASHBOARD_STATUS_LABELS) as DashboardTaskStatus[]).map((s) => ({
     value: s as DashboardStatusFilter,
     label: DASHBOARD_STATUS_LABELS[s],
@@ -263,8 +264,23 @@ const DashboardFilterBar: React.FC<Props> = ({
         className="!space-y-3"
       />
 
+      {/**
+       * 🔴 ตัวกรองก้อนนี้ (และ **ช่องค้นหาบนหัว Dashboard**) มีผลกับ **ไฟล์ CSV เท่านั้น**
+       * ไม่มีผลกับอะไรบนจอเลย — ตารางที่มันกรอง (`DashboardWorkQueueTable`) เป็น dead code
+       * ไม่มีใครเรนเดอร์ · วัดจริง 23 ส.ค. 2569: เปลี่ยนตัวกรอง/พิมพ์คำค้นแล้ว
+       * ข้อความบนจอไม่เปลี่ยนแม้ตัวอักษรเดียว (6,678 ตัวอักษรเท่าเดิม)
+       *
+       * เจ้าของเคาะ 23 ส.ค. 2569: **เขียนกำกับว่ามีผลกับ CSV** (ไม่ถอด · ไม่เอาตารางกลับมา)
+       * ถ้าวันหนึ่งเอาตารางกลับมาเรนเดอร์ ให้ลบคำกำกับนี้ออกด้วย ไม่งั้นป้ายจะโกหก
+       */}
       <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
-        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">กรองตารางงานติดตาม</label>
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+          กรองข้อมูลในไฟล์ CSV
+        </label>
+        <p className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+          ตัวกรองนี้กับช่องค้นหาด้านบน มีผลกับไฟล์ที่กด <b>Export CSV</b> เท่านั้น —
+          ไม่เปลี่ยนตัวเลข/กราฟบนหน้านี้
+        </p>
         <select
           value={queueStatus}
           onChange={(e) => onQueueStatusChange(e.target.value as DashboardStatusFilter)}

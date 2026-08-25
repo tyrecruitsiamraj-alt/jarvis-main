@@ -5,8 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { cn } from '@/lib/utils';
+import { useAuthConfig } from '@/hooks/useAuthConfig';
+import { shouldShowPasswordUi } from '@/lib/authConfig';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import JobNotificationWatcher from '@/components/notifications/JobNotificationWatcher';
+import ClaimIdleAlertDialog from '@/components/notifications/ClaimIdleAlertDialog';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
@@ -20,6 +23,8 @@ import { loadThemeMode, resolveTheme, setThemeMode } from '@/lib/theme';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
+  // ล็อกเข้าทาง Microsoft = ซ่อนของที่เกี่ยวกับรหัสผ่าน (ดู shouldShowPasswordUi)
+  const showPasswordUi = shouldShowPasswordUi(useAuthConfig());
   const { config } = useBranding();
   const { isFunctionEnabled } = useRolePermissions();
   const location = useLocation();
@@ -122,6 +127,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
       <JobNotificationWatcher />
+      {/* เตือนหัวหน้าทันทีเมื่อระบบถอดชื่อที่เก็บไว้แล้วไม่โทร (Phase 5.8) —
+          อ่านจากกล่องขาเข้าที่ poll อยู่แล้ว ไม่ยิง query ใหม่ · เด้งครั้งเดียวต่อใบ */}
+      <ClaimIdleAlertDialog />
 
       {/* Top header — จอใหญ่ (lg+) */}
       <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-white/60 bg-white/45 dark:border-white/10 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-40">
@@ -169,15 +177,20 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             ) : null}
           </div>
           {themeSwitch}
-          <button
-            type="button"
-            onClick={() => navigate('/account/change-password')}
-            className="p-2.5 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-white/60 dark:hover:bg-white/10 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="เปลี่ยนรหัสผ่าน"
-            title="เปลี่ยนรหัสผ่าน"
-          >
-            <KeyRound className="w-4 h-4" />
-          </button>
+          {/* ซ่อนเมื่อระบบล็อกให้เข้าทาง Microsoft (เจ้าของสั่ง 22 ส.ค. 2569)
+              เงื่อนไขเดียวกับฟอร์มบนหน้า Login — อยู่ที่ shouldShowPasswordUi ที่เดียว
+              🔴 หน้า /account/change-password กับ API ยังอยู่ครบ (ทางหนีไฟ) แค่ไม่มีทางเข้าจาก UI */}
+          {showPasswordUi ? (
+            <button
+              type="button"
+              onClick={() => navigate('/account/change-password')}
+              className="p-2.5 rounded-full text-muted-foreground hover:text-blue-600 hover:bg-white/60 dark:hover:bg-white/10 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="เปลี่ยนรหัสผ่าน"
+              title="เปลี่ยนรหัสผ่าน"
+            >
+              <KeyRound className="w-4 h-4" />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => void logout()}

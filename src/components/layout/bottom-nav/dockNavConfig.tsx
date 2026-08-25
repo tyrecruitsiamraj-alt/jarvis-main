@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, } from 'lucide-react';
+import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, UserCheck, } from 'lucide-react';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -29,6 +29,8 @@ export const DOCK_NAV_ITEMS: DockNavItem[] = [
   { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
   // ← กลุ่ม "บอร์ดรับสมัคร" ถูกแทรกตรงนี้โดย AppNavDrawer
   { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
+  // เจ้าของเคาะ 23 ส.ค. 2569: **เมนูหลักของตัวเอง ข้าง Follow** (ไม่ใช่แท็บในหน้า Follow)
+  { path: '/aftercare', label: 'ดูแลหลังเริ่มงาน', icon: UserCheck, functionId: 'aftercare_read' },
   { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
   { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
   // หัวข้อ "Matching" ถูกถอดจากเมนู 17 ส.ค. 2569 (เจ้าของ: "อันนี้ก็เอาออกได้เลย") —

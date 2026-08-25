@@ -8,13 +8,14 @@ import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/apiFetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { shouldShowPasswordUi, type AuthConfig as SharedAuthConfig } from '@/lib/authConfig';
 
-type AuthConfig = {
-  companyEmailLogin: boolean;
-  passwordLogin: boolean;
-  microsoftLogin: boolean;
+/**
+ * รูปร่างที่หน้านี้ใช้ — ต่อยอดจาก type กลาง (`@/lib/authConfig`) โดยบังคับให้ฟิลด์
+ * ที่หน้า Login ต้องมีจริง เป็น required · กฎ "โชว์ของรหัสผ่านไหม" ใช้ของกลางที่เดียว
+ */
+type AuthConfig = SharedAuthConfig & {
   devRoleLogin: boolean;
-  publicRegister?: boolean;
   emailLoginGate: boolean;
   companyEmailRequired: boolean;
   allowedDomains: string[];
@@ -237,9 +238,13 @@ const LoginPage: React.FC = () => {
     };
   }, [configAttempt]);
 
-  // แสดง form email+password ถ้า JWT ถูกตั้งค่า (passwordLogin) ไม่ต้องรอ Postmark
-  const showEmail = authConfig?.passwordLogin ?? authConfig?.companyEmailLogin ?? false;
   const showMicrosoft = authConfig?.microsoftLogin ?? false;
+  /**
+   * แสดงฟอร์มอีเมล+รหัสผ่านไหม — **กฎอยู่ที่ `shouldShowPasswordUi` ที่เดียว**
+   * (ใช้ร่วมกับปุ่ม/เมนู "เปลี่ยนรหัสผ่าน" ในเปลือกแอป ไม่งั้นซ่อนไม่ครบ)
+   * เจ้าของสั่ง 22 ส.ค. 2569 ให้ล็อกเข้าทางปุ่ม Microsoft · fail-safe อยู่ในฟังก์ชันนั้น
+   */
+  const showEmail = shouldShowPasswordUi(authConfig);
 
   return (
     <div

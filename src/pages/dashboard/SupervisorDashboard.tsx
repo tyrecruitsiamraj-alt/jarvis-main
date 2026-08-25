@@ -52,6 +52,12 @@ import {
   filterRecordsForSlaBucket,
 } from '@/lib/dashboard/drillDownFilters';
 import {
+  buildSlaByLeadKind,
+  filterRecordsForLeadKind,
+  filterRecordsForSlaCell,
+  type SlaCellKey,
+} from '@/lib/dashboard/slaByLeadKind';
+import {
   jobsToRequestControlRecords,
   mergeRequestControlJobs,
 } from '@/lib/requestControl';
@@ -281,6 +287,29 @@ const SupervisorDashboard: React.FC = () => {
     const merged = mergeRequestControlJobs(jobsWithoutAgeFilter, scopedClosedJobs);
     return jobsToRequestControlRecords(merged);
   }, [jobsWithoutAgeFilter, scopedClosedJobs]);
+
+  /**
+   * ชุดของ **ตาราง SLA ปิดทัน/ไม่ทัน เท่านั้น** — เหมือน `controlRecords` แต่รวมชุดใบปิด
+   * ของโหมด "ทั้งหมด" (`closedAllJobs`) เข้ามาด้วย
+   *
+   * 🔴 ทำไมไม่ยัดเข้า `controlRecords` ตรง ๆ: คอมเมนต์เหนือ `recruiterOverviewAllMode`
+   * เตือนไว้ว่าชุดใบปิดชุดใหญ่จะไปขยับ KPI/cohort/กระทบยอด ของโหมดนี้ ซึ่งคิดจาก
+   * throughput อยู่แล้ว → เลขบนการ์ดจะเปลี่ยนแบบไม่มีใครสั่ง
+   * จึงแยกชุดให้ตาราง SLA ใช้เอง (ตารางนี้นับ "ใบ" ตรง ๆ ไม่เกี่ยวกับกระทบยอด)
+   *
+   * ⚠️ ถ้าไม่ทำแบบนี้จะได้บั๊กที่เจอตอนตรวจงาน: กด "ดึงชุดใบที่ปิดแล้ว" แล้วคำเตือนหาย
+   * แต่คอลัมน์ ปิดทัน/ไม่ทัน ไม่โผล่ เพราะข้อมูลไม่ได้ไหลเข้าตาราง
+   */
+  const slaControlRecords = useMemo(() => {
+    if (period) return controlRecords;
+    if (!closedAllJobs) return controlRecords;
+    const scopedAll = filterUnitRequests(closedAllJobs, siamrajPrimary, unitFilters, {
+      statusFilter: true,
+      ageDaysFilter: true,
+      urgencyFilter: true,
+    });
+    return jobsToRequestControlRecords(mergeRequestControlJobs(jobsWithoutAgeFilter, scopedAll));
+  }, [period, controlRecords, closedAllJobs, siamrajPrimary, unitFilters, jobsWithoutAgeFilter]);
 
   useEffect(() => {
     saveDashboardFilters(filters);
@@ -747,6 +776,28 @@ const SupervisorDashboard: React.FC = () => {
     [openControlList, controlRecords],
   );
 
+  /**
+   * ตาราง "ปิดทัน / ไม่ทัน ตามชนิดใบขอ" (เจ้าของสั่ง 22 ส.ค. 2569)
+   *
+   * ⚠️ ใช้ `controlRecords` ชุดเดียวกับที่การ์ด KPI / drill-down อื่นใช้ — ตารางจึงขยับ
+   * ตามตัวกรองของหน้าเองโดยไม่ต้องมี state แยก (กติกาเดียวกับกราฟชนิดใบขอ)
+   */
+  const slaByLeadKind = useMemo(() => buildSlaByLeadKind(slaControlRecords), [slaControlRecords]);
+
+  const handleSlaCellClick = useCallback(
+    (kind: RequestLeadKind, cell: SlaCellKey, label: string) => {
+      openControlList(`SLA · ${label}`, filterRecordsForSlaCell(slaControlRecords, kind, cell));
+    },
+    [openControlList, slaControlRecords],
+  );
+
+  const handleSlaLeadKindClick = useCallback(
+    (kind: RequestLeadKind, label: string) => {
+      openControlList(`ใบขอชนิด ${label}`, filterRecordsForLeadKind(slaControlRecords, kind));
+    },
+    [openControlList, slaControlRecords],
+  );
+
   const handleFilledBreakdownClick = useCallback(
     (segment: 'same' | 'backlog', label: string) => {
       if (!period) return;
@@ -858,6 +909,13 @@ const SupervisorDashboard: React.FC = () => {
       onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
       onSiteClick={DEMO_MODE ? undefined : handleSiteClick}
+      slaByLeadKind={slaByLeadKind}
+      /* ใบปิดถูกดึงเมื่อ (ก) เลือกช่วงเวลา หรือ (ข) กดดึงเองในโหมด "ทั้งหมด"
+         ไม่ครบสองข้อนี้ = ตารางบอกตรง ๆ ว่ายังตอบ ปิดทัน/ไม่ทัน ไม่ได้ */
+      slaClosedLoaded={period != null || closedAllJobs != null}
+      onLoadClosedForSla={period ? undefined : requestClosedTotals}
+      onSlaCellClick={DEMO_MODE ? undefined : handleSlaCellClick}
+      onSlaRowClick={DEMO_MODE ? undefined : handleSlaLeadKindClick}
       closedTotalsAvailable={closedTotalsAvailable}
       onRecruiterPanelOpen={requestClosedTotals}
       closedTotalsLoading={closedAllLoading}

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, ExternalLink, KeyRound, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuthConfig } from '@/hooks/useAuthConfig';
+import { shouldShowPasswordUi } from '@/lib/authConfig';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import {
   isDockPathActive,
@@ -33,6 +35,8 @@ const AppNavDrawer: React.FC<Props> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  // ล็อกเข้าทาง Microsoft = ซ่อนเมนูเปลี่ยนรหัสผ่าน (เงื่อนไขเดียวกับแถบบน/หน้า Login)
+  const showPasswordUi = shouldShowPasswordUi(useAuthConfig());
 
   /**
    * "บอร์ดรับสมัคร" กับ "หน้าสมัครสาธารณะ" เคยเป็นสองแถวเรียงกันในเมนู ซึ่งอ่านแล้วดูเหมือน
@@ -190,15 +194,18 @@ const AppNavDrawer: React.FC<Props> = ({
               <span className="truncate">ตั้งค่า</span>
             </button>
           ) : null}
-          {/* ย้ายมาจากหัวเว็บ — จอมือถือใส่ปุ่มพวกนี้ไว้บนหัวไม่พอ ปุ่มจะเบียดทับกัน */}
-          <button
-            type="button"
-            onClick={() => go('/account/change-password')}
-            className={rowClass(location.pathname.startsWith('/account/change-password'))}
-          >
-            <KeyRound className="h-4 w-4 shrink-0" />
-            <span className="truncate">เปลี่ยนรหัสผ่าน</span>
-          </button>
+          {/* ย้ายมาจากหัวเว็บ — จอมือถือใส่ปุ่มพวกนี้ไว้บนหัวไม่พอ ปุ่มจะเบียดทับกัน
+              ซ่อนพร้อมกับปุ่มบนแถบบนเมื่อระบบล็อกให้เข้าทาง Microsoft (เงื่อนไขเดียวกัน) */}
+          {showPasswordUi ? (
+            <button
+              type="button"
+              onClick={() => go('/account/change-password')}
+              className={rowClass(location.pathname.startsWith('/account/change-password'))}
+            >
+              <KeyRound className="h-4 w-4 shrink-0" />
+              <span className="truncate">เปลี่ยนรหัสผ่าน</span>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {

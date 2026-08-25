@@ -20,6 +20,7 @@ export type AppFunctionId =
   | 'work_calendar_manage'
   | 'follow_read'
   | 'follow_manage'
+  | 'aftercare_read'
   | 'settings_access'
   | 'users_manage'
   | 'audit_logs';
@@ -54,6 +55,7 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'work_calendar_manage', label: 'จัดการปฏิทินทีม', group: 'ปฏิทิน', minimumRole: 'supervisor' },
   { id: 'follow_read', label: 'ดูรายชื่อ Follow', group: 'Follow', minimumRole: 'staff' },
   { id: 'follow_manage', label: 'เพิ่ม / ยกเลิกรายชื่อ Follow', group: 'Follow', minimumRole: 'staff' },
+  { id: 'aftercare_read', label: 'ดูแลหลังเริ่มงาน', group: 'Follow', minimumRole: 'staff' },
   { id: 'settings_access', label: 'เข้า Settings', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
   { id: 'users_manage', label: 'จัดการ Users / Role', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
   { id: 'audit_logs', label: 'ดู Audit Log', group: 'ผู้ดูแลระบบ', minimumRole: 'admin' },
@@ -68,6 +70,7 @@ export const OPL_READ_FUNCTIONS: ReadonlySet<AppFunctionId> = new Set([
   'clients_read',
   'work_calendar_read',
   'follow_read',
+  'aftercare_read',
 ]);
 
 export const ROLE_ORDER: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
@@ -109,6 +112,7 @@ export function primaryFunctionForPath(pathname: string): AppFunctionId | null {
   if (path.startsWith('/matching')) return 'candidates_read';
   if (path.startsWith('/jobs')) return 'unit_requests_read';
   if (path.startsWith('/wl')) return 'work_calendar_read';
+  if (path.startsWith('/aftercare')) return 'aftercare_read';
   if (path.startsWith('/follow')) return 'follow_read';
   return null;
 }

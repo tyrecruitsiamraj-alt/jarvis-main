@@ -103,7 +103,9 @@ export const PERMISSION_MATRIX = {
   employees: { staff: 'read limited', supervisor: 'create/update', admin: 'all', opl: 'read' },
   clients: { staff: 'read', supervisor: 'create/update/delete', admin: 'all', opl: 'read' },
   workCalendar: { staff: 'read + create entries', supervisor: 'manage team', admin: 'all', opl: 'read' },
-  follow: { staff: 'read + add/cancel follow entries', supervisor: 'same', admin: 'all', opl: 'read' },
+  // ⚠️ key `follow` ครอบ **หน้าดูแลหลังเริ่มงาน** ด้วย (`/api/aftercare` · Phase 7)
+  //    งวดเดียวกันของคนเดิม สิทธิ์เท่ากัน จึงไม่เพิ่ม key ใหม่ให้ตารางสิทธิ์ยาวขึ้น
+  follow: { staff: 'read + add/cancel follow entries + aftercare', supervisor: 'same', admin: 'all', opl: 'read' },
   lumosDispatch: { staff: 'read call results + select & send', supervisor: 'same', admin: 'all', opl: 'read' },
   settings: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },
   auditLogs: { staff: 'none', supervisor: 'none', admin: 'all', opl: 'none' },

@@ -10,6 +10,7 @@ import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardHeroStrip from './DashboardHeroStrip';
 import DashboardLeadKindChart from './DashboardLeadKindChart';
+import DashboardSlaByLeadKind from './DashboardSlaByLeadKind';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
@@ -20,6 +21,7 @@ import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 import type { LeadKindBreakdown } from '@/lib/dashboard/leadKindBreakdown';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
+import type { SlaByLeadKind, SlaCellKey } from '@/lib/dashboard/slaByLeadKind';
 
 type FilterOptions = {
   departmentOptions: { value: string; label: string }[];
@@ -67,6 +69,17 @@ type Props = {
   onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
   onSiteClick?: (siteCode: string | undefined, label: string) => void;
+  /**
+   * ตาราง "ปิดทัน / ไม่ทัน ตามชนิดใบขอ" (เจ้าของสั่ง 22 ส.ค. 2569)
+   * ไม่ส่ง `slaByLeadKind` = ไม่แสดงตาราง (โหมด demo / ยังโหลดไม่เสร็จ)
+   */
+  slaByLeadKind?: SlaByLeadKind | null;
+  /** ชุดใบปิดของช่วงที่กำลังดูถูกดึงมาแล้วหรือยัง (ดูเหตุผลใน DashboardSlaByLeadKind) */
+  slaClosedLoaded?: boolean;
+  /** ปุ่มดึงชุดใบปิดจากในตาราง SLA — โหมด "ทั้งหมด" เท่านั้น */
+  onLoadClosedForSla?: () => void;
+  onSlaCellClick?: (kind: RequestLeadKind, cell: SlaCellKey, label: string) => void;
+  onSlaRowClick?: (kind: RequestLeadKind, label: string) => void;
   /** false = ยังไม่ได้ดึงชุดใบปิด (โหมด "ทั้งหมด") → ช่อง "ปิด" ต่อคนต้องโชว์ "—" ไม่ใช่ 0 */
   closedTotalsAvailable?: boolean;
   /** โหมด "ทั้งหมด" ใบปิดถูกดึงตอนกางแผงผู้รับผิดชอบเท่านั้น (ช่วงเต็มใช้เวลานาน) */
@@ -102,6 +115,11 @@ const DashboardShell: React.FC<Props> = ({
   onFullyClosedBreakdownClick,
   onAgeBucketClick,
   onSiteClick,
+  slaByLeadKind,
+  slaClosedLoaded,
+  onLoadClosedForSla,
+  onSlaCellClick,
+  onSlaRowClick,
   closedTotalsAvailable = true,
   onRecruiterPanelOpen,
   closedTotalsLoading = false,
@@ -146,10 +164,17 @@ const DashboardShell: React.FC<Props> = ({
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+                {/**
+                 * 🔴 ช่องนี้กรอง **เฉพาะไฟล์ CSV** — ไม่มีผลกับตัวเลข/กราฟบนหน้านี้
+                 * (`filters.search` ถูกใช้ที่ `applyDashboardFilters` → `data.workQueue`
+                 * ซึ่งมีผู้ใช้เดียวคือปุ่ม Export CSV · ตารางที่ควรแสดงเป็น dead code)
+                 * เจ้าของเคาะ 23 ส.ค. 2569: เขียนกำกับให้ชัด ไม่ถอดช่องออก
+                 */}
                 <input
                   value={filters.search}
                   onChange={(e) => onFiltersChange({ search: e.target.value })}
-                  placeholder="ค้นหาใบงาน, คน, ปลายทาง..."
+                  placeholder="ค้นหาเพื่อกรองไฟล์ CSV (ไม่เปลี่ยนตัวเลขบนหน้า)"
+                  title="ช่องนี้กรองข้อมูลในไฟล์ที่กด Export CSV เท่านั้น — ตัวเลขและกราฟบนหน้านี้ไม่เปลี่ยน"
                   className="w-full rounded-full border-0 bg-slate-100 dark:bg-slate-800 py-2.5 pl-9 pr-3 text-sm text-slate-900 dark:text-slate-100 shadow-inner placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
                 />
               </div>
@@ -285,6 +310,19 @@ const DashboardShell: React.FC<Props> = ({
                   scopeLabel={data.activityTrendLabel || data.periodLabel}
                   mismatchNote={leadKindMismatch ?? null}
                   onSliceClick={onLeadKindClick}
+                />
+              ) : null}
+
+              {/* ต่อจากกราฟชนิดใบขอทันที — คนอ่านเพิ่งเห็นว่า "ฉุกเฉิน/ล่วงหน้ามีกี่ใบ"
+                  คำถามถัดไปคือ "แล้วปิดทันไหม" (เจ้าของสั่งตรง 22 ส.ค. 2569) */}
+              {slaByLeadKind ? (
+                <DashboardSlaByLeadKind
+                  table={slaByLeadKind}
+                  onCellClick={onSlaCellClick}
+                  onRowClick={onSlaRowClick}
+                  closedLoaded={slaClosedLoaded}
+                  onLoadClosed={onLoadClosedForSla}
+                  loadingClosed={closedTotalsLoading}
                 />
               ) : null}
 
