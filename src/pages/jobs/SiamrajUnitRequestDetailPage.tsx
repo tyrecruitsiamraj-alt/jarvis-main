@@ -28,7 +28,13 @@ import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { ChevronDown, Database, ExternalLink, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
-import { moneyFieldText, paidPeriodText } from '@/lib/unitRequestDetail';
+import {
+  amountText,
+  formatMoney,
+  moneyFieldText,
+  summarizeResignedIncome,
+  visibleRateLines,
+} from '@/lib/unitRequestDetail';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 
@@ -197,6 +203,9 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
   const urgencyMeta = data ? computeJobUrgency(data) : null;
   const urgencyHint = URGENCY_FILTER_OPTIONS.find((o) => o.value === urgencyMeta?.kind)?.hint;
+  /** อัตราของใบขอ + รายได้จริงของคนเดิม — คิดที่ pure lib ที่เดียว (มีเทสต์คุม) */
+  const rateLines = React.useMemo(() => (data ? visibleRateLines(data) : []), [data]);
+  const income = React.useMemo(() => (data ? summarizeResignedIncome(data) : null), [data]);
 
   return (
     <div>
@@ -347,29 +356,96 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     ชุดที่ 2 = **เงินที่ได้รับจริง** จากรอบจ่ายจริง wg2_ppayment
                     เคสจริง: อัตรา 19,588 ทุกงวด แต่จ่ายจริง 20,345 / 21,220 / 20,927 ไม่ตรงสักงวด
                     ⚠️ ไม่รู้ขึ้น "—" ห้ามขึ้น 0 · แต่ 0 ที่มาจากฐานจริงต้องขึ้น "0 บาท" */}
+                {/* 🔴 ใช้คำของ ERP ตรง ๆ ("อัตราจ่าย"/"อัตราเบิก") ไม่ตีความว่าฝั่งไหนคือใคร
+                    พิสูจน์การจับคู่แล้ว: ใบขอ payment_rate ↔ fee_amount ในงวดจ่ายจริง ·
+                    draw_rate ↔ draw_amount · แต่ "เบิก = ของใคร" เป็นนิยามทางบัญชี ไม่ใช่ของเรา */}
                 <Field
-                  label="คนเดิม — อัตราตามเงื่อนไข ฝั่งพนักงาน (draw)"
+                  label="คนเดิม — อัตราตามเงื่อนไข (ฝั่งเบิก)"
                   value={moneyFieldText(data.resigned_wage_draw_rate)}
                 />
                 <Field
-                  label="คนเดิม — อัตราตามเงื่อนไข ที่เก็บลูกค้า (fee)"
+                  label="คนเดิม — อัตราตามเงื่อนไข (ฝั่งจ่าย)"
                   value={moneyFieldText(data.resigned_wage_fee_rate)}
                 />
                 <Field
                   label="คนเดิม — อัตรานี้มีผลตั้งแต่"
                   value={data.resigned_wage_effective_date}
                 />
-                {/* 🔴 งวดสุดท้ายมักเป็นงวด**ไม่เต็มเดือน** (ออกกลางเดือน) ยอดจึงต่ำกว่าปกติ
-                    ⇒ ต้องโชว์ช่วงวันที่ของงวดคู่กันเสมอ ไม่งั้นคนอ่านว่า "เงินเดือนเขาแค่นี้เอง" */}
-                <Field
-                  label="คนเดิม — เงินที่ได้รับจริง งวดล่าสุด"
-                  value={moneyFieldText(data.resigned_paid_amount)}
-                />
-                <Field
-                  label="คนเดิม — งวดที่จ่ายจริงนั้นคือช่วงไหน"
-                  value={paidPeriodText(data.resigned_paid_from, data.resigned_paid_to)}
-                />
               </div>
+              ) : null}
+
+              {/* ── อัตราของใบขอจาก ERP (เจ้าของสั่ง 25 ส.ค. 2569) ──────────────────
+                  🔴 ใบขอหนึ่งใบมีเฉลี่ย 15 บรรทัด · ตัดแถวที่ทั้งจ่ายและเบิกเป็น 0 ทิ้ง
+                  แต่บรรทัดค่าจ้างหลักโชว์เสมอ (ตัวที่ประกาศเป็นรายได้ให้ผู้สมัคร) */}
+              {infoOpen && rateLines.length > 0 ? (
+                <div className="rounded-xl border border-white/70 bg-white/40 p-3">
+                  <div className="text-xs font-semibold text-foreground">อัตราตามใบขอ (ERP)</div>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full table-fixed text-xs">
+                      <thead>
+                        <tr className="text-left text-[10px] text-muted-foreground">
+                          {/* table-fixed + ความกว้างคงที่ — บนมือถือ 375px ตัวเลขทั้งสองคอลัมน์
+                              ต้องเห็นครบโดยไม่ต้องเลื่อนแนวนอน (ชื่อรายการตัดบรรทัดเอา) */}
+                          <th className="w-1/2 pb-1 pr-2 font-medium">รายการ</th>
+                          <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
+                          <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rateLines.map((l) => (
+                          <tr key={l.seq} className="border-t border-white/60">
+                            <td className="py-1 pr-2 break-words">
+                              {l.fee_name || '—'}
+                              {l.is_wage ? (
+                                <span className="ml-1 text-[10px] text-muted-foreground">
+                                  (ค่าจ้างหลัก)
+                                </span>
+                              ) : null}
+                              {l.remark ? (
+                                <div className="text-[10px] text-muted-foreground">{l.remark}</div>
+                              ) : null}
+                            </td>
+                            {/* 0 ที่มาจากฐานจริงต้องขึ้น 0 — ต่างจากไม่มีค่าที่ขึ้น "—"
+                                หน่วยอยู่บนหัวคอลัมน์แล้ว ตัวเลขจึงไม่ตัดบรรทัดบนมือถือ */}
+                            <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
+                              {amountText(l.payment_rate) ?? '—'}
+                            </td>
+                            <td className="whitespace-nowrap py-1 text-right tabular-nums">
+                              {amountText(l.draw_rate) ?? '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* ── รายได้จริง 3 งวดล่าสุดของคนที่ออก/เปลี่ยนตัว ──────────────────
+                  🔴 เป็นค่า **ประมาณ** — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
+                  จึงต้องบอกทั้งช่วงวันและจำนวนงวด ห้ามโชว์เป็นตัวเลขชี้ขาด */}
+              {infoOpen && income ? (
+                <div className="rounded-xl border border-white/70 bg-white/40 p-3">
+                  <div className="text-xs font-semibold text-foreground">
+                    {data.resigned_employee_name || 'คนเดิม'} — รายได้จริงย้อนหลัง
+                  </div>
+                  <div className="mt-1 text-sm text-foreground">
+                    ประมาณเดือนละ{' '}
+                    <span className="font-semibold">{formatMoney(income.average)}</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    รวม {formatMoney(income.total)} จาก {income.periods} งวด
+                    {income.period ? ` · ${income.period}` : ''}
+                  </div>
+                  {income.drawTotal !== null ? (
+                    <div className="text-[11px] text-muted-foreground">
+                      ฝั่งอัตราเบิกรวม {formatMoney(income.drawTotal)}
+                    </div>
+                  ) : null}
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    ยอดจริงที่จ่ายแล้ว (รวมล่วงเวลา/เบี้ยเลี้ยง) — งวดสุดท้ายอาจไม่เต็มเดือน
+                  </div>
+                </div>
               ) : null}
             </section>
 

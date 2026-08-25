@@ -85,16 +85,25 @@ type SqlServerRequestRow = {
   resigned_wage_fee_rate: number | null;
   resigned_wage_effective_date: string | Date | null;
   /**
-   * **เงินที่ได้รับจริงงวดล่าสุด** — ยอดรวมของงวดที่ `is_payment = 'Y'` ใน `wg2_ppayment_*`
-   * (ตารางรอบจ่ายจริง · เคสตัวอย่างมี 18 งวด) · ความครบ **238 / 298 ใบ** — มากกว่าอัตราด้วยซ้ำ
+   * **รายได้จริงของคนที่ออก รวม 3 งวดล่าสุด** (เจ้าของสั่ง 25 ส.ค. 2569 รอบสี่สิบสี่:
+   * *"3 เดือนล่าสุดเขาได้รายได้ประมาณเท่าไหร่"*) — จาก `wg2_ppayment_*` เฉพาะ `is_payment='Y'`
    *
-   * 🔴 **งวดล่าสุดมักเป็นงวดไม่เต็มเดือน** (คนออกกลางเดือน) ⇒ ยอดจะต่ำกว่าปกติ
-   * จอ **ต้องโชว์ช่วงวันที่ของงวดคู่กันเสมอ** ไม่งั้นคนอ่านว่า "เงินเดือนเขาแค่นี้เอง"
-   * วัดจริง: OPL6908107 อัตรา 16,093 แต่จ่ายจริงงวดสุดท้าย 6,823 (งวดไม่เต็ม)
+   * 🔴 **สองฝั่งตามคำของ ERP เอง ห้ามตีความใหม่** (พิสูจน์การจับคู่แล้ว 25 ส.ค. 2569):
+   * ใบขอ `payment_rate` (**อัตราจ่าย**) = 15,565 ↔ `fee_amount` ในงวดจ่ายจริง = 15,565
+   * ใบขอ `draw_rate` (**อัตราเบิก**) = 19,588 ↔ `draw_amount` ในงวดจ่ายจริง = 19,587.9
+   * ⇒ `pay` = ฝั่งอัตราจ่าย (ตัวเดียวกับ `total_income` ที่ประกาศเป็นรายได้ให้ผู้สมัคร)
+   *   · `draw` = ฝั่งอัตราเบิก
+   *
+   * ⚠️ **`draw` เป็น 0 อยู่ 72 / 238 ใบ (30%)** — ไม่ใช่ทุกสัญญาที่มีบรรทัดเบิก
+   *   ⇒ ห้ามเอา `draw` ไปเป็นตัวหลัก · `pay` มีครบ 238/238
+   * ⚠️ `periods` อาจน้อยกว่า 3 (เพิ่งเข้างาน) ⇒ **ต้องส่งมาด้วย** จอจะได้หารถูก
+   *   และบอกได้ว่าเฉลี่ยจากกี่งวด
    */
-  resigned_paid_amount: number | null;
-  resigned_paid_from: string | Date | null;
-  resigned_paid_to: string | Date | null;
+  resigned_income_3m_pay: number | null;
+  resigned_income_3m_draw: number | null;
+  resigned_income_3m_periods: number | null;
+  resigned_income_3m_from: string | Date | null;
+  resigned_income_3m_to: string | Date | null;
   fee_name: string | null;
   abs_customer_fine: number | null;
   contact_name: string | null;
@@ -252,9 +261,11 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     resigned_wage_draw_rate: r.resigned_wage_draw_rate ?? null,
     resigned_wage_fee_rate: r.resigned_wage_fee_rate ?? null,
     resigned_wage_effective_date: toYmd(r.resigned_wage_effective_date) || null,
-    resigned_paid_amount: r.resigned_paid_amount ?? null,
-    resigned_paid_from: toYmd(r.resigned_paid_from) || null,
-    resigned_paid_to: toYmd(r.resigned_paid_to) || null,
+    resigned_income_3m_pay: r.resigned_income_3m_pay ?? null,
+    resigned_income_3m_draw: r.resigned_income_3m_draw ?? null,
+    resigned_income_3m_periods: r.resigned_income_3m_periods ?? null,
+    resigned_income_3m_from: toYmd(r.resigned_income_3m_from) || null,
+    resigned_income_3m_to: toYmd(r.resigned_income_3m_to) || null,
     job_type: jobType,
     /**
      * 🔴 ค่าโครงสร้าง ไม่ใช่ของจริง — ERP ไม่มีฟิลด์นี้ และ CHECK ของตาราง `jobs`
@@ -334,10 +345,12 @@ const BASE_SQL = `
     WCH.wage_draw_rate AS resigned_wage_draw_rate,
     WCH.wage_fee_rate AS resigned_wage_fee_rate,
     WCH.effective_date AS resigned_wage_effective_date,
-    -- เงินที่ได้รับจริงงวดล่าสุด (25 ส.ค. 2569) — คนละเรื่องกับอัตราข้างบน
-    PAY.paid_amount AS resigned_paid_amount,
-    PAY.begin_date AS resigned_paid_from,
-    PAY.end_date AS resigned_paid_to,
+    -- รายได้จริง 3 งวดล่าสุด (25 ส.ค. 2569) — คนละเรื่องกับอัตราข้างบน
+    PAY3.pay_total AS resigned_income_3m_pay,
+    PAY3.draw_total AS resigned_income_3m_draw,
+    PAY3.periods AS resigned_income_3m_periods,
+    PAY3.from_date AS resigned_income_3m_from,
+    PAY3.to_date AS resigned_income_3m_to,
     B.work_date,
     B.work_time,
     B.age,
@@ -359,19 +372,25 @@ const BASE_SQL = `
      WHERE ch.staff_id = S.staff_id
      ORDER BY ch.effective_date DESC, ch.runno DESC
   ) WCH
-  /* เงินที่ **ได้รับจริง** งวดล่าสุด — ตารางรอบจ่ายจริง (เอาเฉพาะงวดที่จ่ายแล้ว
-     is_payment = 'Y' · งวดที่ยังไม่จ่ายห้ามนับ)
-     TOP 1 ด้วยเหตุผลเดียวกับ WCH: ต้องได้แถวเดียวต่อใบขอ ไม่งั้นใบขอถูกนับซ้ำ
+  /* รายได้จริง 3 งวดล่าสุด — เอาเฉพาะงวดที่จ่ายแล้ว (is_payment = 'Y')
+     ต้องซ้อน derived table เพราะ SUM ของ SUM ตรง ๆ SQL Server ไม่ยอม
+     (Cannot perform an aggregate function on an expression containing an aggregate)
      ⚠️ ห้ามใส่ backtick ในคอมเมนต์ตรงนี้ — SQL ก้อนนี้อยู่ใน template literal
-        เผลอใส่แล้วสตริงขาดกลางคัน (เจอมาแล้ว 25 ส.ค. 2569) */
+        เผลอใส่แล้วสตริงขาดกลางคัน tsc ฟ้อง comma expected (เจอมาแล้ว 25 ส.ค. 2569) */
   OUTER APPLY (
-    SELECT TOP 1 h.begin_date, h.end_date,
-           (SELECT SUM(d.fee_amount) FROM wg2_ppayment_detail d
-             WHERE d.ppayment_no = h.ppayment_no) AS paid_amount
-      FROM wg2_ppayment_head h
-     WHERE h.staff_id = S.staff_id AND h.is_payment = 'Y'
-     ORDER BY h.begin_date DESC
-  ) PAY
+    SELECT COUNT(*) AS periods, MIN(p.begin_date) AS from_date, MAX(p.end_date) AS to_date,
+           SUM(p.pay_amt) AS pay_total, SUM(p.draw_amt) AS draw_total
+      FROM (
+        SELECT TOP 3 h.begin_date, h.end_date,
+               (SELECT SUM(d.fee_amount)  FROM wg2_ppayment_detail d
+                 WHERE d.ppayment_no = h.ppayment_no) AS pay_amt,
+               (SELECT SUM(d.draw_amount) FROM wg2_ppayment_detail d
+                 WHERE d.ppayment_no = h.ppayment_no) AS draw_amt
+          FROM wg2_ppayment_head h
+         WHERE h.staff_id = S.staff_id AND h.is_payment = 'Y'
+         ORDER BY h.begin_date DESC
+      ) p
+  ) PAY3
   INNER JOIN st_request_p2 B ON A.request_no = B.request_no
   INNER JOIN st_request_p3_rate C ON B.request_no = C.request_no
   INNER JOIN ms_site SS ON A.site_code = SS.site_code
@@ -404,7 +423,8 @@ const SELECT_COLUMNS = `
   reason_main_name, work_addr, work_place, boss_nationality, work_date, work_time, age, sex,
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name,
   resigned_wage_draw_rate, resigned_wage_fee_rate, resigned_wage_effective_date,
-  resigned_paid_amount, resigned_paid_from, resigned_paid_to
+  resigned_income_3m_pay, resigned_income_3m_draw, resigned_income_3m_periods,
+  resigned_income_3m_from, resigned_income_3m_to
 `;
 
 function boardRequestTypeExtraWhere(alias = 'A'): string {
@@ -497,6 +517,66 @@ async function fetchSqlServerUnitRequestRows(
   `,
     params,
   );
+}
+
+/**
+ * บรรทัดอัตราของใบขอ — **อัตราจ่าย / อัตราเบิก** ตามคำของ ERP เอง
+ * (เจ้าของสั่ง 25 ส.ค. 2569: *"ถ้าบน Erp มันจะมี อัตราเบิก อัตราจ่าย เอาพวกนั้นมาอยู่ในข้อมูลใบขอด้วย"*)
+ *
+ * 🔴 **ใบขอหนึ่งใบมีหลายบรรทัด** — วัดจริง 4,469 แถว / 294 ใบ = **เฉลี่ย 15 บรรทัดต่อใบ**
+ * (เงินเดือน · ค่าล่วงเวลาหลายเรต · เบี้ยเลี้ยง · ค่าปรับขาดงาน · มาสาย …)
+ * feed รายการหลักเลือกมาแค่บรรทัดเดียว (`rn = 1` = บรรทัดค่าจ้างหลัก) เพื่อทำ `total_income`
+ * ⇒ ของครบต้องดึงแยก **เฉพาะหน้ารายละเอียด** ไม่งั้น feed 292 ใบพองขึ้น 15 เท่า
+ *
+ * ⚠️ ไม่กรองแถวที่เป็น 0 ทิ้งที่นี่ — ฝั่งจอเป็นคนตัดสินใจ (0 ที่มาจากฐานจริงมีความหมาย
+ * ว่า "รายการนี้ไม่มีอัตรา" ต่างจากไม่มีบรรทัดนั้นเลย)
+ */
+export type SiamrajRequestRateLine = {
+  seq: number;
+  /** ชื่อรายการจาก `wg2_ms_fee` (เงินเดือน · ค่าล่วงเวลา 1.5 เท่า · เบี้ยขยัน …) */
+  fee_name: string | null;
+  /** บรรทัดค่าจ้างหลักของใบขอ (ตัวที่ feed เอาไปทำ `total_income`) */
+  is_wage: boolean;
+  payment_rate: number | null;
+  draw_rate: number | null;
+  remark: string | null;
+};
+
+export async function getSiamrajSqlServerRequestRateLines(
+  requestNo: string,
+): Promise<SiamrajRequestRateLine[]> {
+  const trimmed = requestNo.trim();
+  if (!trimmed) return [];
+  try {
+    const rows = await siamrajSqlQuery<{
+      seq: number;
+      fee_name: string | null;
+      is_wage: string | null;
+      payment_rate: number | null;
+      draw_rate: number | null;
+      remark: string | null;
+    }>(
+      `SELECT C.seq,
+              (SELECT TOP 1 z.fee_name FROM wg2_ms_fee z
+                WHERE z.fee_codex = (C.withdraw_type_code + C.income1_code + C.income2_code + C.fee_code)) AS fee_name,
+              C.is_wage, C.payment_rate, C.draw_rate, C.remark
+         FROM st_request_p3_rate C
+        WHERE UPPER(RTRIM(C.request_no)) = UPPER(RTRIM(@requestNo))
+        ORDER BY C.seq`,
+      { requestNo: trimmed },
+    );
+    return rows.map((r) => ({
+      seq: Number(r.seq) || 0,
+      fee_name: (r.fee_name || '').trim() || null,
+      is_wage: String(r.is_wage || '').trim().toUpperCase() === 'Y',
+      payment_rate: r.payment_rate ?? null,
+      draw_rate: r.draw_rate ?? null,
+      remark: (r.remark || '').trim() || null,
+    }));
+  } catch {
+    // ข้อมูลเสริม — อ่านไม่ได้ต้องไม่ทำหน้ารายละเอียดล่ม
+    return [];
+  }
 }
 
 export async function getSiamrajSqlServerUnitRequestById(

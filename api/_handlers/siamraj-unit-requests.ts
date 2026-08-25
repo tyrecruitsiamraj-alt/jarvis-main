@@ -16,6 +16,7 @@ import {
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
+import { getSiamrajSqlServerRequestRateLines } from '../_lib/siamrajSqlServerRequests.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
@@ -177,7 +178,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       await attachNotes([item]);
       await attachWorkStatus([item]);
       await attachUnitSector([item]);
-      return res.status(200).json(item);
+      /**
+       * บรรทัดอัตราของใบขอ (อัตราจ่าย/อัตราเบิก) — **เฉพาะหน้ารายละเอียด**
+       * ใบละ ~15 บรรทัด ⇒ ใส่ใน feed รายการจะพองขึ้น 15 เท่าโดยไม่มีใครใช้
+       * อ่านไม่ได้ = ลิสต์ว่าง (ข้อมูลเสริม ห้ามทำหน้าล่ม)
+       */
+      const rateLines = await getSiamrajSqlServerRequestRateLines(
+        String((item as { request_no?: string }).request_no || ''),
+      );
+      return res.status(200).json({ ...(item as object), rate_lines: rateLines });
     }
 
     /**

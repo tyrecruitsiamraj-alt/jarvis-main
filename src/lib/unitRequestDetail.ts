@@ -15,7 +15,7 @@
  * 3. **กลุ่มที่ไม่มีข้อมูลเลย ไม่ต้องโชว์ทั้งกลุ่ม** — ดีกว่าโชว์หัวข้อว่าง ๆ ให้คนเลื่อนผ่าน
  */
 
-import type { JobRequest } from '@/types';
+import type { JobRequest, UnitRequestRateLine } from '@/types';
 
 export type DetailValue =
   | { kind: 'money'; amount: number }
@@ -65,11 +65,20 @@ export function moneyFieldText(v: number | null | undefined): string | undefined
 }
 
 /**
- * ช่วงวันของงวดจ่ายจริง — "1 ก.ค. 2569 – 31 ก.ค. 2569"
+ * ตัวเลขเงินแบบ **ไม่มีหน่วยต่อท้าย** — ใช้ในตารางที่หน่วยอยู่บนหัวคอลัมน์แล้ว
  *
- * 🔴 มีไว้เพราะ **งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน** (ออกกลางเดือน) ยอดจึงต่ำกว่าปกติ
- * วัดจริง 25 ส.ค. 2569: OPL6908107 อัตรา 16,093 แต่จ่ายจริงงวดสุดท้าย 6,823
- * ⇒ โชว์ยอดโดยไม่บอกช่วงวัน = คนอ่านว่า "เงินเดือนเขาแค่ 6,823"
+ * 🔴 กติกาเดียวกับ `moneyFieldText`: ไม่รู้ = `undefined` (จอขึ้น "—") ·
+ * **0 ที่มาจากฐานจริงต้องขึ้น "0"** เพราะแปลว่า "รายการนี้ไม่มีอัตรา" ไม่ใช่ไม่รู้
+ * (มีหน่วยต่อท้ายทุกช่องแล้วบนมือถือ 375px ตัวเลขตัดบรรทัดกลางคัน อ่านยาก)
+ */
+export function amountText(v: number | null | undefined): string | undefined {
+  return typeof v === 'number' && Number.isFinite(v)
+    ? v.toLocaleString('th-TH', { maximumFractionDigits: 2 })
+    : undefined;
+}
+
+/**
+ * ช่วงวันของงวดจ่ายจริง — "2026-05-01 ถึง 2026-07-31"
  * ไม่รู้ช่วงวัน คืน `undefined` (จอขึ้น "—") ไม่ใช่เดาว่าเต็มเดือน
  */
 export function paidPeriodText(
@@ -81,6 +90,56 @@ export function paidPeriodText(
   if (!a && !b) return undefined;
   if (a && b) return `${a} ถึง ${b}`;
   return a || b;
+}
+
+/**
+ * สรุป "3 เดือนล่าสุดคนที่ออกได้เท่าไหร่" (เจ้าของสั่ง 25 ส.ค. 2569)
+ *
+ * 🔴 กติกาที่ฝังไว้:
+ * 1. **หารด้วยจำนวนงวดจริง ไม่ใช่หาร 3 ตายตัว** — คนที่เพิ่งเข้างานมีไม่ครบ 3 งวด
+ *    หาร 3 แล้วค่าเฉลี่ยจะต่ำกว่าจริงเงียบ ๆ
+ * 2. **บอกจำนวนงวดบนจอเสมอ** — "เฉลี่ยเดือนละ X (จาก 2 งวด)" ต่างจาก "จาก 3 งวด"
+ * 3. **ไม่มีงวดเลย = `null` ทั้งก้อน** ห้ามคืน 0 (0 บาทกับ "ไม่มีข้อมูล" คนละเรื่อง)
+ * 4. งวดของคนที่ออก **งวดสุดท้ายมักไม่เต็มเดือน** ⇒ เป็นค่า **ประมาณ** เท่านั้น
+ *    จอต้องใช้คำว่า "ประมาณ" ห้ามทำเป็นตัวเลขชี้ขาด
+ */
+export type ResignedIncomeSummary = {
+  /** ยอดรวมฝั่งอัตราจ่าย */
+  total: number;
+  /** เฉลี่ยต่องวด */
+  average: number;
+  periods: number;
+  /** ยอดรวมฝั่งอัตราเบิก — `null` = สัญญานี้ไม่มีบรรทัดเบิก (72/238 ใบเป็นแบบนี้) */
+  drawTotal: number | null;
+  period: string | undefined;
+};
+
+export function summarizeResignedIncome(job: JobRequest): ResignedIncomeSummary | null {
+  const periods = Math.trunc(job.resigned_income_3m_periods ?? 0);
+  const total = job.resigned_income_3m_pay;
+  if (periods <= 0 || typeof total !== 'number' || !Number.isFinite(total)) return null;
+  const draw = job.resigned_income_3m_draw;
+  return {
+    total,
+    average: total / periods,
+    periods,
+    // 0 = สัญญาไม่มีบรรทัดเบิก ⇒ ไม่ต้องโชว์ (ต่างจากมีบรรทัดแล้วเบิก 0 บาท ซึ่งฐานนี้แยกไม่ได้)
+    drawTotal: typeof draw === 'number' && draw > 0 ? draw : null,
+    period: paidPeriodText(job.resigned_income_3m_from, job.resigned_income_3m_to),
+  };
+}
+
+/**
+ * บรรทัดอัตราของใบขอที่ "ควรโชว์" — ตัดแถวที่ทั้งจ่ายและเบิกเป็น 0/ว่างทิ้ง
+ * ⚠️ ใบขอมีเฉลี่ย **15 บรรทัด** และส่วนใหญ่เป็น 0 (ค่าปรับ/เบี้ยเลี้ยงที่ไม่ได้ตั้ง)
+ * โชว์ทั้งหมดคือกำแพงเลขศูนย์ · แต่ **บรรทัดค่าจ้างหลัก (`is_wage`) โชว์เสมอ**
+ * แม้เป็น 0 เพราะนั่นคือตัวที่หน้าอื่นเอาไปประกาศเป็นรายได้
+ */
+export function visibleRateLines(job: JobRequest): UnitRequestRateLine[] {
+  const lines = job.rate_lines ?? [];
+  return lines.filter(
+    (l) => l.is_wage || (l.payment_rate ?? 0) !== 0 || (l.draw_rate ?? 0) !== 0,
+  );
 }
 
 /** ข้อความของค่าหนึ่งช่อง (ที่เดียว — จอไม่ต้องเขียนเงื่อนไขเอง) */

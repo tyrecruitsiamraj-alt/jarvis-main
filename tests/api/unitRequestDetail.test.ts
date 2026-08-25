@@ -16,6 +16,8 @@ import {
   formatMoney,
   moneyFieldText,
   paidPeriodText,
+  summarizeResignedIncome,
+  visibleRateLines,
 } from '../../src/lib/unitRequestDetail.js';
 import type { JobRequest } from '../../src/types/index.js';
 
@@ -137,5 +139,98 @@ describe('paidPeriodText — งวดจ่ายจริง', () => {
     expect(paidPeriodText('2026-07-01T00:00:00.000Z', '2026-07-31T00:00:00.000Z')).toBe(
       '2026-07-01 ถึง 2026-07-31',
     );
+  });
+});
+
+/**
+ * รายได้จริง 3 งวดล่าสุดของคนที่ออก (เจ้าของสั่ง 25 ส.ค. 2569)
+ * 🔴 ด่านที่ห้ามหลุด: หารด้วยจำนวนงวดจริง · ไม่มีงวด = null ห้ามคืน 0
+ */
+describe('summarizeResignedIncome', () => {
+  it('เฉลี่ยหารด้วยจำนวนงวดจริง ไม่ใช่หาร 3 ตายตัว', () => {
+    const r = summarizeResignedIncome(
+      job({ resigned_income_3m_pay: 40000, resigned_income_3m_periods: 2 }),
+    )!;
+    expect(r.average).toBe(20000);
+    expect(r.periods).toBe(2);
+  });
+
+  it('ครบ 3 งวดก็หาร 3', () => {
+    const r = summarizeResignedIncome(
+      job({ resigned_income_3m_pay: 60000, resigned_income_3m_periods: 3 }),
+    )!;
+    expect(r.average).toBe(20000);
+  });
+
+  it('🔴 ไม่มีงวดเลย = null ห้ามคืน 0 (0 บาทกับไม่มีข้อมูลคนละเรื่อง)', () => {
+    expect(summarizeResignedIncome(job({ resigned_income_3m_periods: 0 }))).toBeNull();
+    expect(summarizeResignedIncome(job())).toBeNull();
+    expect(
+      summarizeResignedIncome(job({ resigned_income_3m_periods: 3, resigned_income_3m_pay: null })),
+    ).toBeNull();
+  });
+
+  it('ฝั่งเบิกเป็น 0 = สัญญาไม่มีบรรทัดเบิก ⇒ ไม่ต้องโชว์ (72/238 ใบเป็นแบบนี้)', () => {
+    const r = summarizeResignedIncome(
+      job({ resigned_income_3m_pay: 30000, resigned_income_3m_periods: 3, resigned_income_3m_draw: 0 }),
+    )!;
+    expect(r.drawTotal).toBeNull();
+  });
+
+  it('ฝั่งเบิกมีเลข = ส่งต่อให้จอ', () => {
+    const r = summarizeResignedIncome(
+      job({
+        resigned_income_3m_pay: 30000,
+        resigned_income_3m_periods: 3,
+        resigned_income_3m_draw: 37000,
+      }),
+    )!;
+    expect(r.drawTotal).toBe(37000);
+  });
+
+  it('ส่งช่วงวันของงวดไปด้วย (งวดสุดท้ายอาจไม่เต็มเดือน)', () => {
+    const r = summarizeResignedIncome(
+      job({
+        resigned_income_3m_pay: 30000,
+        resigned_income_3m_periods: 3,
+        resigned_income_3m_from: '2026-05-01',
+        resigned_income_3m_to: '2026-07-31',
+      }),
+    )!;
+    expect(r.period).toBe('2026-05-01 ถึง 2026-07-31');
+  });
+});
+
+/** บรรทัดอัตราของใบขอ — ใบละ ~15 บรรทัด ส่วนใหญ่เป็น 0 */
+describe('visibleRateLines', () => {
+  const line = (over: Partial<import('../../src/types/index.js').UnitRequestRateLine>) => ({
+    seq: 1,
+    fee_name: 'x',
+    is_wage: false,
+    payment_rate: 0,
+    draw_rate: 0,
+    remark: null,
+    ...over,
+  });
+
+  it('ตัดแถวที่ทั้งจ่ายและเบิกเป็น 0 ทิ้ง', () => {
+    const out = visibleRateLines(
+      job({ rate_lines: [line({ seq: 1 }), line({ seq: 2, payment_rate: 500 })] }),
+    );
+    expect(out.map((l) => l.seq)).toEqual([2]);
+  });
+
+  it('🔴 บรรทัดค่าจ้างหลักโชว์เสมอ แม้เป็น 0 (เป็นตัวที่ประกาศเป็นรายได้)', () => {
+    const out = visibleRateLines(job({ rate_lines: [line({ seq: 1, is_wage: true })] }));
+    expect(out).toHaveLength(1);
+  });
+
+  it('มีแต่ฝั่งเบิกก็ยังโชว์', () => {
+    const out = visibleRateLines(job({ rate_lines: [line({ seq: 1, draw_rate: 44.13 })] }));
+    expect(out).toHaveLength(1);
+  });
+
+  it('ยังไม่ได้โหลด (undefined) = ลิสต์ว่าง ไม่ระเบิด', () => {
+    expect(visibleRateLines(job())).toEqual([]);
   });
 });
