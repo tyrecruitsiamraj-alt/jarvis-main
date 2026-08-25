@@ -387,6 +387,86 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {/* ── คนที่ออก / เปลี่ยนตัว ── อยู่ในกล่อง "ข้อมูลใบขอ" เดียวกัน
+                  (เจ้าของสั่ง 25 ส.ค. 2569: *"มันต้องไปอยู่รวมกับ [ข้อมูลใบขอ]"*)
+                  ⇒ หุบกล่องนี้แล้วส่วนนี้หายตามไปด้วย เพราะเป็นข้อมูลอ่านอย่างเดียวชุดเดียวกัน
+                  ⚠️ "เบอร์ติดต่อ" ไม่ซ้ำที่นี่แล้ว — กริดข้างบนมีอยู่ช่องเดียว
+                  ⚠️ คอมเมนต์ JSX ต้องอยู่**นอก** `cond ? (` — วางในนั้นแล้ว TS ฟ้อง ')' expected */}
+              {infoOpen ? (
+                <div className="rounded-xl border border-white/70 bg-white/40 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <UserMinus className={cn('w-3.5 h-3.5', TONE.primary.value)} />
+                    คนที่ออก / เปลี่ยนตัว
+                  </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Field label="ชื่อ - นามสกุล" value={data.resigned_employee_name} />
+                  <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />
+                  <Field label="รุ่น/ประเภทรถ" value={data.vehicle_required} />
+                </div>
+
+                {/* อัตราตามเงื่อนไขของคนคนนี้ — คนละเรื่องกับรายได้จริงข้างล่าง
+                    🔴 ใช้คำ ERP ตรง ๆ ("ฝั่งจ่าย"/"ฝั่งเบิก") ไม่ตีความว่าฝั่งไหนเป็นเงินของใคร */}
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Field
+                    label="อัตราตามเงื่อนไข (ฝั่งจ่าย)"
+                    value={moneyFieldText(data.resigned_wage_fee_rate)}
+                  />
+                  <Field
+                    label="อัตราตามเงื่อนไข (ฝั่งเบิก)"
+                    value={moneyFieldText(data.resigned_wage_draw_rate)}
+                  />
+                  <Field label="อัตรานี้มีผลตั้งแต่" value={data.resigned_wage_effective_date} />
+                </div>
+
+                {/* ── รายได้จริงย้อนหลัง 3 งวด — **แยกรายงวด ไม่ใช่ค่าเฉลี่ย** ──────────
+                    (เจ้าของสั่ง: *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
+                    🔴 ต้องมีช่วงวันของทุกงวด — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
+                    ยอดจะดูต่ำผิดปกติถ้าไม่บอกว่าเป็นงวดสั้น */}
+                <div className="rounded-xl border border-white/70 bg-white/40 p-3">
+                  <div className="text-xs font-semibold text-foreground">
+                    รายได้จริงย้อนหลัง 3 งวด
+                  </div>
+                  {incomeRows ? (
+                    <table className="mt-2 w-full table-fixed text-xs">
+                      <thead>
+                        <tr className="text-left text-[10px] text-muted-foreground">
+                          <th className="w-1/2 pb-1 pr-2 font-medium">งวด</th>
+                          <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
+                          {showDraw ? (
+                            <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
+                          ) : null}
+                        </tr>
+                    </thead>
+                    <tbody>
+                      {incomeRows.map((r) => (
+                        <tr key={r.key} className="border-t border-white/60">
+                          <td className="py-1 pr-2 break-words">{r.period}</td>
+                          {/* null = งวดนั้นไม่มีบรรทัดฝั่งนี้ ⇒ "—" ห้ามขึ้น 0 */}
+                          <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
+                            {amountText(r.pay) ?? '—'}
+                          </td>
+                          {showDraw ? (
+                            <td className="whitespace-nowrap py-1 text-right tabular-nums">
+                              {amountText(r.draw) ?? '—'}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  // ไม่มีของ ต้องบอกว่าไม่มี ห้ามปล่อยว่างให้คนเดาว่าพัง
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    ไม่พบงวดจ่ายจริงของคนคนนี้ในระบบ ERP
+                  </p>
+                )}
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    ยอดจริงที่จ่ายแล้ว (รวมล่วงเวลา/เบี้ยเลี้ยง) — งวดสุดท้ายอาจไม่เต็มเดือน
+                  </p>
+                  </div>
+                </div>
+              ) : null}
+
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
@@ -557,82 +637,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 (เจ้าของ clarify 21 ส.ค. 2569: *"ฉันหมายถึงหน้ากล่องงาน — ของหน้าใบงาน
                 ทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*) — ดูที่ JobBoardView แท็บรายละเอียดงาน */}
 
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
-              {/* กล่องเดียวจบเรื่องคนที่ออก (เจ้าของสั่ง 25 ส.ค. 2569: *"มันข้อมูลเหมือนกันอะ
-                  รวมกันให้ที จะกลายเป็น มี ชื่อ นามสกุล สาเหตุที่ลาออก รายได้ย้อนหลัง 3 เดือน"*)
-                  เดิมชื่อ/สาเหตุซ้ำอยู่ในกริด "ข้อมูลใบขอ" ด้วย — ถอดออกจากที่นั่นแล้ว */}
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <UserMinus className={cn('w-4 h-4', TONE.primary.value)} />
-                คนที่ออก / เปลี่ยนตัว
-              </h3>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Field label="ชื่อ - นามสกุล" value={data.resigned_employee_name} />
-                <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />
-                <Field label="รุ่น/ประเภทรถ" value={data.vehicle_required} />
-                <Field label="เบอร์ติดต่อหน่วยงาน" value={data.contact_phone} />
-              </div>
-
-              {/* อัตราตามเงื่อนไขของคนคนนี้ — คนละเรื่องกับรายได้จริงข้างล่าง
-                  🔴 ใช้คำ ERP ตรง ๆ ("ฝั่งจ่าย"/"ฝั่งเบิก") ไม่ตีความว่าฝั่งไหนเป็นเงินของใคร */}
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Field
-                  label="อัตราตามเงื่อนไข (ฝั่งจ่าย)"
-                  value={moneyFieldText(data.resigned_wage_fee_rate)}
-                />
-                <Field
-                  label="อัตราตามเงื่อนไข (ฝั่งเบิก)"
-                  value={moneyFieldText(data.resigned_wage_draw_rate)}
-                />
-                <Field label="อัตรานี้มีผลตั้งแต่" value={data.resigned_wage_effective_date} />
-              </div>
-
-              {/* ── รายได้จริงย้อนหลัง 3 งวด — **แยกรายงวด ไม่ใช่ค่าเฉลี่ย** ──────────
-                  (เจ้าของสั่ง: *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
-                  🔴 ต้องมีช่วงวันของทุกงวด — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
-                  ยอดจะดูต่ำผิดปกติถ้าไม่บอกว่าเป็นงวดสั้น */}
-              <div className="rounded-xl border border-white/70 bg-white/40 p-3">
-                <div className="text-xs font-semibold text-foreground">
-                  รายได้จริงย้อนหลัง 3 งวด
-                </div>
-                {incomeRows ? (
-                  <table className="mt-2 w-full table-fixed text-xs">
-                    <thead>
-                      <tr className="text-left text-[10px] text-muted-foreground">
-                        <th className="w-1/2 pb-1 pr-2 font-medium">งวด</th>
-                        <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
-                        {showDraw ? (
-                          <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
-                        ) : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {incomeRows.map((r) => (
-                        <tr key={r.key} className="border-t border-white/60">
-                          <td className="py-1 pr-2 break-words">{r.period}</td>
-                          {/* null = งวดนั้นไม่มีบรรทัดฝั่งนี้ ⇒ "—" ห้ามขึ้น 0 */}
-                          <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
-                            {amountText(r.pay) ?? '—'}
-                          </td>
-                          {showDraw ? (
-                            <td className="whitespace-nowrap py-1 text-right tabular-nums">
-                              {amountText(r.draw) ?? '—'}
-                            </td>
-                          ) : null}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  // ไม่มีของ ต้องบอกว่าไม่มี ห้ามปล่อยว่างให้คนเดาว่าพัง
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    ไม่พบงวดจ่ายจริงของคนคนนี้ในระบบ ERP
-                  </p>
-                )}
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  ยอดจริงที่จ่ายแล้ว (รวมล่วงเวลา/เบี้ยเลี้ยง) — งวดสุดท้ายอาจไม่เต็มเดือน
-                </p>
-              </div>
-            </section>
 
             <p className="text-xs text-muted-foreground">
               ข้อมูลมาจาก schema so-operation บน Siamraj — Jarvis อ่านอย่างเดียว แก้ไขที่ระบบต้นทาง
