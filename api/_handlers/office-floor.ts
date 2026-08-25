@@ -26,6 +26,7 @@ const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const HOLDS = tableInAppSchema('candidate_call_holds');
 const FOLLOW = tableInAppSchema('follow_entries');
 const POSTING_REQ = tableInAppSchema('job_posting_requests');
+const AFTERCARE = tableInAppSchema('aftercare_people');
 
 /** ผลโทรในคิว — reminder เก็บที่ last_outcome · interview บางแถวอยู่ใน result (กับดักซ้ำ) */
 const QUEUE_OUTCOME = `coalesce(q.last_outcome, q.result->>'outcome')`;
@@ -132,14 +133,34 @@ async function loadAwaitingChoice(): Promise<number | undefined> {
   }
 }
 
+/**
+ * โต๊ะ "ดูแลหลังเริ่มงาน" (107) — **ยิงแยก** ด้วยเหตุผลเดียวกับ `loadAwaitingChoice`:
+ * ฐานที่ยังไม่รัน migration 107 จะได้ 42P01 แล้วลากทั้งเส้นล่ม
+ *
+ * 🔴 แยก "ยังไม่มีตาราง" (undefined → โต๊ะขึ้น *ยังไม่เปิดใช้*) ออกจาก "เปิดแล้วแต่ไม่มีคน"
+ * (`{ enabled: true, count: 0 }` → โต๊ะขึ้น *ไม่มีคนต้องตามในรอบนี้*) — คนละความหมาย
+ * เดิมเส้นนี้ไม่เคยส่งคีย์นี้เลย โต๊ะจึงค้างที่ "กำลังสร้างในเฟสถัดไป" ทั้งที่ Phase 7 เสร็จแล้ว
+ */
+async function loadAftercare(): Promise<{ enabled: boolean; count: number } | undefined> {
+  try {
+    const { rows } = await dbQuery<Row>(
+      `select count(*)::int as n from ${AFTERCARE} where closed_at is null`,
+    );
+    return { enabled: true, count: n(rows[0]?.n) };
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadCounts(): Promise<OfficeFloorCounts> {
-  const [intake, queue, holds, follow, content, awaitingChoice] = await Promise.all([
+  const [intake, queue, holds, follow, content, awaitingChoice, aftercare] = await Promise.all([
     dbQuery<Row>(INTAKE_SQL),
     dbQuery<Row>(QUEUE_SQL),
     dbQuery<Row>(HOLDS_SQL),
     dbQuery<Row>(FOLLOW_SQL),
     dbQuery<Row>(CONTENT_SQL),
     loadAwaitingChoice(),
+    loadAftercare(),
   ]);
   const i = intake.rows[0] ?? {};
   const q = queue.rows[0] ?? {};
@@ -181,6 +202,7 @@ async function loadCounts(): Promise<OfficeFloorCounts> {
       scraping: n(c.scraping),
       oldestDays: orNull(c.oldest_days),
     },
+    aftercare,
   };
 }
 

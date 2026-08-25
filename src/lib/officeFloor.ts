@@ -141,6 +141,12 @@ export type OfficeFloorCounts = {
   selection: Pick<OfficeFloorRaw['selection'], 'holdsActive' | 'holdsNoResult' | 'oldestDays'>;
   follow: OfficeFloorRaw['follow'];
   content: OfficeFloorRaw['content'];
+  /**
+   * โต๊ะ "ดูแลหลังเริ่มงาน" — Phase 7 เปิดหน้าจริงแล้ว (ตาราง `aftercare_people` · 107)
+   * `enabled: false` = ฐานยังไม่มีตาราง (ยังไม่รัน migration) ⇒ โต๊ะขึ้นว่า "ยังไม่เปิดใช้"
+   * ⚠️ optional เพราะ API รุ่นเก่ายังไม่ส่งคีย์นี้มา — ไม่มีมาให้ถือว่ายังไม่เปิด
+   */
+  aftercare?: OfficeFloorRaw['aftercare'];
 };
 
 /** เลขฝั่งใบขอที่มาจาก ERP (หน้าแรกได้จาก flow-summary อยู่แล้ว) */
@@ -155,7 +161,11 @@ export type OfficeFloorErpPart = {
 export function composeOfficeFloorRaw(
   counts: OfficeFloorCounts,
   erp: OfficeFloorErpPart,
-  aftercare: OfficeFloorRaw['aftercare'] = { enabled: false, count: 0 },
+  /**
+   * ค่าบังคับจากผู้เรียก — ปกติ **ไม่ต้องส่ง** เพราะ `counts.aftercare` มาจาก API แล้ว
+   * (เก็บพารามิเตอร์ไว้เพื่อเทสต์/ผู้เรียกที่มีแหล่งอื่น)
+   */
+  aftercare?: OfficeFloorRaw['aftercare'],
 ): OfficeFloorRaw {
   return {
     intake: counts.intake,
@@ -163,7 +173,7 @@ export function composeOfficeFloorRaw(
     selection: { ...counts.selection, jobsOpen: erp.jobsOpen, jobsWithMatch: erp.jobsWithMatch },
     follow: counts.follow,
     content: counts.content,
-    aftercare,
+    aftercare: aftercare ?? counts.aftercare ?? { enabled: false, count: 0 },
   };
 }
 
@@ -296,14 +306,20 @@ function buildSelection(r: OfficeFloorRaw['selection']): Desk {
     oldestDays: backlog > 0 ? (r.oldestDays ?? null) : null,
     tone: backlog > 0 ? 'warn' : 'primary',
     stats: [
-      { key: 'jobsWithMatch', label: 'AI คิดคนให้แล้ว', value: nz(r.jobsWithMatch), unit: 'ใบขอ', tone: 'info' },
+      /**
+       * 🔴 สองช่องแรกนับ **ใบขอ** ไม่ใช่คน — ป้ายต้องขึ้นต้นด้วยคำว่า "ใบขอ" ให้ชัด
+       * (Phase 10.3 · เจ้าของสั่ง: กล่องที่พูดถึงคน ต้องไม่เอายอดใบขอมาโชว์ปนโดยไม่บอก)
+       * เดิมเขียนว่า "AI คิดคนให้แล้ว 12" แล้วต่อท้ายด้วยหน่วยเล็ก ๆ ว่า ใบขอ
+       * คนอ่านผ่าน ๆ นับเป็นจำนวนคนทันที
+       */
+      { key: 'jobsWithMatch', label: 'ใบขอที่ AI คิดคนให้แล้ว', value: nz(r.jobsWithMatch), unit: 'ใบขอ', tone: 'info' },
       // โชว์เฉพาะเมื่อรู้ยอดใบเปิดจริง — null แปลว่า "ยังไม่รู้" ไม่ใช่ "ไม่มี"
       ...(noMatch === null
         ? []
         : [
             {
               key: 'noMatch',
-              label: 'ยังไม่มีคนแนะนำ',
+              label: 'ใบขอที่ยังไม่มีคนแนะนำ',
               value: noMatch,
               unit: 'ใบขอ',
               tone: 'warn' as ToneKey,
