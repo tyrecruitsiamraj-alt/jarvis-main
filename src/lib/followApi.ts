@@ -36,6 +36,11 @@ export type FollowEntry = {
   call_outcome: string | null;
   /** รอบที่โทรล่าสุด — null = ยังไม่มีแถวคิว (ยังไม่ได้ส่งให้ AI) */
   call_attempt?: number | null;
+  /**
+   * สถานะ followup ของคิว (070): `retry_scheduled` · **`needs_human`** · `closed`
+   * — กล่อง "โทรครบแล้ว" (Phase 7.1) นับ `needs_human` เข้ากองด้วย
+   */
+  followup_state?: string | null;
   call_summary: string | null;
   next_action: LumosNextAction | null;
   called_at: string | null;

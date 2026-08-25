@@ -101,3 +101,44 @@ describe('นับทั้งรอบ', () => {
     expect(sum).toBeGreaterThan(c.all);
   });
 });
+
+/**
+ * 🐛 บั๊กที่เจอ 23 ส.ค. 2569 (Phase 7) — ช่อง "ไป" เคยเช็คแค่ `'done'` (คำชุดเก่า)
+ * ไม่รับ `went`/`arrived` ของ migration 101 ⇒ ตั้งแต่เปลี่ยนชุดคำ **เลขช่องนี้ต่ำกว่าจริง
+ * ทุกแถว** และเทสต์ชุดเดิมไม่จับเพราะไม่มีเคสของคำใหม่เลย
+ */
+describe('ช่อง "ไป/ไม่ไป" ต้องรับชุดคำใหม่ของ migration 101', () => {
+  const closed = (code: string) => ({
+    call_status: 'completed',
+    call_outcome: 'confirmed',
+    outcome_code: code,
+  });
+
+  it('went / arrived / done เข้าช่อง "ไป" ทั้งสามคำ', () => {
+    for (const code of ['went', 'arrived', 'done']) {
+      expect(inFollowRoundBucket(closed(code), 'went')).toBe(true);
+      expect(inFollowRoundBucket(closed(code), 'not_went')).toBe(false);
+    }
+  });
+
+  it('cancelled / job_cancelled / no_show_start เข้าช่อง "ไม่ไป"', () => {
+    for (const code of ['cancelled', 'job_cancelled', 'no_show_start']) {
+      expect(inFollowRoundBucket(closed(code), 'not_went')).toBe(true);
+      expect(inFollowRoundBucket(closed(code), 'went')).toBe(false);
+    }
+  });
+
+  it('ลา / เลื่อน / อื่น ๆ ไม่เข้าทั้งสองช่อง (ยังไม่รู้ผลจริง)', () => {
+    for (const code of ['leave', 'postponed', 'other']) {
+      expect(inFollowRoundBucket(closed(code), 'went')).toBe(false);
+      expect(inFollowRoundBucket(closed(code), 'not_went')).toBe(false);
+    }
+  });
+
+  it('นิยาม "สำเร็จ" มาจากแหล่งเดียว — ตรงกับที่แท็บ success ใช้', async () => {
+    const { FOLLOW_OUTCOME_SUCCESS } = await import('../../src/lib/followOutcome.js');
+    for (const code of FOLLOW_OUTCOME_SUCCESS) {
+      expect(inFollowRoundBucket(closed(code), 'went')).toBe(true);
+    }
+  });
+});

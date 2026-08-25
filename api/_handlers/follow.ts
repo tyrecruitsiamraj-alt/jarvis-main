@@ -77,6 +77,8 @@ type FollowRow = {
   call_summary: string | null;
   call_next_action: LumosNextAction | null;
   called_at: string | Date | null;
+  /** สถานะ followup ของคิว (070) — 'needs_human' = AI เอาไม่อยู่ ต้องคนตาม */
+  followup_state: string | null;
 };
 
 const iso = (v: string | Date | null): string | null =>
@@ -111,6 +113,11 @@ function toResponse(r: FollowRow) {
     call_summary: r.call_summary,
     next_action: r.call_next_action ?? null,
     called_at: iso(r.called_at),
+    /**
+     * 'needs_human' = AI เอาไม่อยู่ ต้องคนตาม (070) — กล่อง "โทรครบแล้ว" (Phase 7.1) ใช้ตัวนี้
+     * ⚠️ ส่งมาดิบ ๆ · การตีความอยู่ที่ `followCompletion.ts` ฝั่งเดียว
+     */
+    followup_state: r.followup_state ?? null,
   };
 }
 
@@ -132,7 +139,8 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
             q.attempt_count                                as call_attempt,
             q.result->>'summary'                           as call_summary,
             q.result->'next_action'                        as call_next_action,
-            q.updated_at                                   as called_at
+            q.updated_at                                   as called_at,
+            q.followup_state                               as followup_state
        from ${followTable} f
        left join ${queueTable} q
               on q.channel = 'reminder'

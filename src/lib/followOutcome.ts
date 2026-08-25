@@ -86,6 +86,21 @@ export function isLostOutcome(v: unknown): boolean {
 }
 
 /**
+ * ผลที่แปลว่า **ไปจบดี** — ชุดใหม่ `went`/`arrived` + ของเก่า `done`
+ *
+ * 🔴 **แหล่งเดียวของทั้งระบบ** (เพิ่ม 23 ส.ค. 2569 · Phase 7)
+ * เดิมนิยามนี้ถูกเขียนซ้ำสองที่แล้ว**ไม่ตรงกัน**: `followListFilter` รับครบ 3 ค่า
+ * แต่ `followRoundBuckets` ช่อง "ไป" เช็คแค่ `'done'` ⇒ **เลขช่อง "ไป" บนแผงรอบ
+ * ต่ำกว่าจริง** ทุกครั้งที่ปิดงานด้วยคำใหม่ (ซึ่งคือทุกครั้งตั้งแต่ migration 101)
+ * ⚠️ `leave`/`postponed` ไม่นับ (ยังกลับมาได้) · `other` ไม่นับ (ไม่รู้ว่าเรื่องอะไร)
+ */
+export const FOLLOW_OUTCOME_SUCCESS: readonly FollowOutcomeAny[] = ['went', 'arrived', 'done'];
+
+export function isSuccessOutcome(v: unknown): boolean {
+  return isFollowOutcome(v) && (FOLLOW_OUTCOME_SUCCESS as readonly string[]).includes(v);
+}
+
+/**
  * ผลที่ต้องบังคับให้ใส่หมายเหตุ — เหลือแค่ของเก่า `other`
  * ชุดใหม่ทั้ง 5 คำชัดในตัวเองอยู่แล้ว (เจ้าของไม่ได้ขอ "อื่น ๆ" ในชุดใหม่)
  * หมายเหตุยังใส่ได้ทุกคำ แค่ไม่บังคับ

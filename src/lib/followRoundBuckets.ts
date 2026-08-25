@@ -1,5 +1,5 @@
 import { bucketOfCall } from '@/lib/callOutcomeBuckets';
-import { isFollowOutcome, FOLLOW_OUTCOME_LOST, type FollowOutcome } from '@/lib/followOutcome';
+import { isFollowOutcome, isLostOutcome, isSuccessOutcome } from '@/lib/followOutcome';
 
 /**
  * ช่องของแต่ละรอบโทรบนหน้า Follow (เจ้าของสั่ง 18 ส.ค. 2569)
@@ -74,10 +74,14 @@ export function inFollowRoundBucket(row: FollowRoundRow, bucket: FollowRoundBuck
   if (bucket === 'went' || bucket === 'not_went') {
     const code = row.outcome_code;
     if (!isFollowOutcome(code)) return false;
-    const lost = (FOLLOW_OUTCOME_LOST as readonly string[]).includes(code as FollowOutcome);
-    // 'ลา' กับ 'อื่น ๆ' ไม่เข้าทั้งสองช่อง — ยังไม่รู้ผลจริง เดาไม่ได้
-    if (bucket === 'not_went') return lost;
-    return code === 'done';
+    // 'ลา' กับ 'เลื่อน'/'อื่น ๆ' ไม่เข้าทั้งสองช่อง — ยังไม่รู้ผลจริง เดาไม่ได้
+    if (bucket === 'not_went') return isLostOutcome(code);
+    /**
+     * 🔴 แก้ 23 ส.ค. 2569: เดิมเช็ค `code === 'done'` เท่านั้น — ไม่รับ `went`/`arrived`
+     * ของ migration 101 ⇒ ตั้งแต่เปลี่ยนชุดคำ **เลขช่อง "ไป" ต่ำกว่าจริงทุกแถว**
+     * (ที่อื่นในระบบรับครบ 3 ค่ามาตลอด — นิยามอยู่ที่ `followOutcome.ts` ที่เดียวแล้ว)
+     */
+    return isSuccessOutcome(code);
   }
 
   const call = bucketOfCall(row.cancelled ? 'cancelled' : row.call_status, row.call_outcome);

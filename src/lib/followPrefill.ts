@@ -8,9 +8,19 @@
  * ⚠️ **ห้ามใส่ข้อมูลอ่อนไหวเกินชื่อ/เบอร์/หัวข้อ** — query string ไปโผล่ใน log ของ
  * เบราว์เซอร์และ proxy ได้ · แค่นี้พอให้ฟอร์มกรอกให้เอง
  */
-export const FOLLOW_PREFILL_KEYS = { name: 'pf_name', phone: 'pf_phone', topic: 'pf_topic' } as const;
+export const FOLLOW_PREFILL_KEYS = {
+  name: 'pf_name',
+  phone: 'pf_phone',
+  topic: 'pf_topic',
+  /**
+   * ชื่อหน่วยงานที่เลือกไว้แล้วตอนตั้งขั้น (Phase 6.6/6.9) — ส่งต่อมาให้ฟอร์มไม่ต้องเลือกซ้ำ
+   * ⚠️ ส่ง **ชื่อ** ไม่ส่ง site_code: ฟอร์ม Follow ให้คนยืนยันหน่วยงานจาก picker เองอยู่แล้ว
+   * ค่านี้เป็นแค่ตัวช่วยกรอก (ชื่อหน่วยงานไม่ใช่ข้อมูลอ่อนไหว ต่างจากรหัสภายใน)
+   */
+  unitName: 'pf_unit',
+} as const;
 
-export type FollowPrefill = { name?: string; phone?: string; topic?: string };
+export type FollowPrefill = { name?: string; phone?: string; topic?: string; unitName?: string };
 
 /** สร้าง path ไปหน้า Follow พร้อมค่าที่จะให้ฟอร์มกรอกให้ */
 export function buildFollowPrefillPath(prefill: FollowPrefill): string {
@@ -18,6 +28,9 @@ export function buildFollowPrefillPath(prefill: FollowPrefill): string {
   if (prefill.name?.trim()) params.set(FOLLOW_PREFILL_KEYS.name, prefill.name.trim().slice(0, 200));
   if (prefill.phone?.trim()) params.set(FOLLOW_PREFILL_KEYS.phone, prefill.phone.trim().slice(0, 20));
   if (prefill.topic?.trim()) params.set(FOLLOW_PREFILL_KEYS.topic, prefill.topic.trim().slice(0, 200));
+  if (prefill.unitName?.trim()) {
+    params.set(FOLLOW_PREFILL_KEYS.unitName, prefill.unitName.trim().slice(0, 200));
+  }
   const qs = params.toString();
   return qs ? `/follow?${qs}` : '/follow';
 }
@@ -33,12 +46,13 @@ export function readFollowPrefill(search: string | URLSearchParams): FollowPrefi
     name: pick(FOLLOW_PREFILL_KEYS.name),
     phone: pick(FOLLOW_PREFILL_KEYS.phone),
     topic: pick(FOLLOW_PREFILL_KEYS.topic),
+    unitName: pick(FOLLOW_PREFILL_KEYS.unitName),
   };
 }
 
 /** มีค่าอะไรส่งมาบ้างไหม — ใช้ตัดสินว่าจะเปิดฟอร์มให้เองหรือเปล่า */
 export function hasFollowPrefill(prefill: FollowPrefill): boolean {
-  return Boolean(prefill.name || prefill.phone || prefill.topic);
+  return Boolean(prefill.name || prefill.phone || prefill.topic || prefill.unitName);
 }
 
 /**

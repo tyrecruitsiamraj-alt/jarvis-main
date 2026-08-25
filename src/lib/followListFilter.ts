@@ -1,4 +1,5 @@
 import type { FollowEntry } from '@/lib/followApi';
+import { FOLLOW_OUTCOME_SUCCESS } from '@/lib/followOutcome';
 
 /**
  * **แยกหน้าตามสถานะ + filter ประจำวัน** ของหน้า Follow
@@ -20,8 +21,11 @@ export const FOLLOW_TAB_LABEL: Record<FollowTab, string> = {
 
 export const FOLLOW_TABS: FollowTab[] = ['active', 'success', 'ended', 'cancelled'];
 
-/** ผลปิดงานที่ถือว่า "สำเร็จ" (ไปแล้ว/ถึงแล้ว + เสร็จสิ้นของชุดเก่า) */
-const SUCCESS_OUTCOMES = new Set(['went', 'arrived', 'done']);
+/**
+ * ผลปิดงานที่ถือว่า "สำเร็จ" — ⚠️ นิยามอยู่ที่ `followOutcome.ts` **ที่เดียว**
+ * (เดิมประกาศซ้ำที่นี่ แล้วอีกที่ (`followRoundBuckets`) เขียนไม่ตรงกัน = เลขช่อง "ไป" เพี้ยน)
+ */
+const SUCCESS_OUTCOMES = new Set<string>(FOLLOW_OUTCOME_SUCCESS);
 /** ผลปิดงานที่ถือว่า "ยกเลิก" (งานถูกยกเลิก — คู่กับ entry.cancelled ที่ตัดสายทิ้งก่อนถึงวัน) */
 const CANCELLED_OUTCOMES = new Set(['cancelled', 'job_cancelled']);
 

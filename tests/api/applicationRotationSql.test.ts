@@ -76,10 +76,22 @@ describe('buildDeclinedThisJobSql — ปฏิเสธแล้วปฏิเ
     expect(sql).not.toContain('is not null');
   });
 
-  it('รวมผลสองทาง (คิว AI + ถังที่คนรับไปโทร)', () => {
+  /**
+   * 24 ส.ค. 2569 — เพิ่มแหล่งที่สาม: ผลติดต่อจากมือคน (`ok = false` ในตาราง 086)
+   * เดิมนับสองทางแล้วเชื่อว่า "ผลจากคนถูกเขียนลง holds อยู่แล้ว" ซึ่งไม่จริง
+   * (`createContactLog` เขียนแค่ log + status) ⇒ คนที่บอกเจ้าหน้าที่ว่าไม่เอา
+   * ยังถูก AI โทรงานเดิมซ้ำได้
+   */
+  it('รวมผลสามทาง (คิว AI + ถังที่คนรับไปโทร + ผลติดต่อจากมือคน)', () => {
     expect(sql).toContain('lumos_dispatch_queue');
     expect(sql).toContain('candidate_call_holds');
-    expect((sql.match(/\bunion\b/g) || []).length).toBe(1);
+    expect(sql).toContain('application_contact_logs');
+    expect((sql.match(/\bunion\b/g) || []).length).toBe(2);
+  });
+
+  it('เส้นผลจากมือคนใช้ ok = false และเทียบใบที่เขาสมัคร', () => {
+    expect(sql).toContain('c.ok = false');
+    expect(sql).toContain('a.job_id = $1');
   });
 
   it('เบอร์ในคิวอ่านสองคีย์ (reminder/interview)', () => {
@@ -93,8 +105,14 @@ describe('ด่านถาวรอยู่ที่คอขวดเข้�
     'utf8',
   );
 
-  it('insertQueueItems เรียก phonesDeclinedThisJob และคัดออกเป็นกลุ่ม declined', () => {
-    expect(src).toContain('phonesDeclinedThisJob(');
+  /**
+   * ⚠️ เปลี่ยน 23 ส.ค. 2569 (Phase 6.8): คอขวดเรียก `phonesDeclinedThisUnit` แทน
+   * `phonesDeclinedThisJob` — **กันระดับหน่วยงาน ครอบระดับใบขอไปแล้ว**
+   * (ไม่รู้ว่าใบนี้อยู่ไซต์ไหน → ตัวใหม่ถอยไปกันระดับใบขอเท่าเดิม · ดู jobSiteMap)
+   * ตัวเดิมยังอยู่ในไฟล์ lib ไม่ได้ลบ — แค่ไม่ใช่ตัวที่คอขวดเรียกแล้ว
+   */
+  it('insertQueueItems เรียกด่านปฏิเสธ (ระดับหน่วยงาน) และคัดออกเป็นกลุ่ม declined', () => {
+    expect(src).toContain('phonesDeclinedThisUnit(');
     expect(src).toMatch(/declinedPhones\.has\(phone\)/);
   });
 

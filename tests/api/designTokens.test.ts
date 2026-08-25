@@ -4,6 +4,11 @@ import path from 'node:path';
 import {
   DASH,
   DASH_DARK_EXEMPT_KEYS,
+  HUD,
+  HUD_CSS_CLASS_KEYS,
+  HUD_HEX,
+  HUD_SCENE,
+  HUD_DARK_EXEMPT_KEYS,
   TONE,
   TONE_DARK_REQUIRED_VARIANTS,
   type ToneKey,
@@ -130,5 +135,85 @@ describe('designTokens — DASH (พื้นผิวหน้า /dashboard)',
     expect(DASH.hero).toBe('jarvis-hero-card');
     expect(indexCss).toContain('.jarvis-hero-card {');
     expect(indexCss).toContain('.dark .jarvis-hero-card {');
+  });
+});
+
+describe('designTokens — HUD (แผงควบคุมล้ำ · Jarvis HUD)', () => {
+  it('class กลางทุกตัวมีตัวจริงใน index.css', () => {
+    for (const key of HUD_CSS_CLASS_KEYS) {
+      const cls = HUD[key];
+      expect(cls, `HUD.${key} ต้องเป็นชื่อ class เดียว ไม่ใช่ชุด utility`).not.toContain(' ');
+      expect(indexCss, `HUD.${key}: ไม่พบ .${cls} ใน index.css`).toContain(`.${cls} {`);
+    }
+  });
+
+  it('เป็นแผง ink เข้มเท่ากันสองธีมโดยตั้งใจ — ห้ามมี dark: ปนเข้ามาทีละตัว', () => {
+    // ถ้าวันหนึ่งอยากได้คู่สว่าง ให้ประกาศชุดใหม่ (HUD_LIGHT) ไม่ใช่เติม dark: ที่นี่
+    // ไม่งั้นแผงเดียวจะมีสองภาษาปนกัน (เหตุผลเต็มอยู่ในคอมเมนต์ของ HUD)
+    const exempt = new Set<string>(HUD_DARK_EXEMPT_KEYS);
+    for (const [key, value] of Object.entries(HUD)) {
+      expect(exempt.has(key), `HUD.${key} ต้องอยู่ใน HUD_DARK_EXEMPT_KEYS`).toBe(true);
+      expect(value, `HUD.${key} ไม่ควรมี dark:`).not.toContain('dark:');
+    }
+  });
+
+  it('ไม่มีสีใหม่นอกจานเดิม — เส้น/ตัวหนังสือใช้ teal/sky/slate/white ที่ระบบใช้บนพื้นเข้มอยู่แล้ว', () => {
+    const allowed = new Set(['teal', 'sky', 'slate', 'white', 'black']);
+    // จับเฉพาะ utility ที่เป็น "สี" จริง (มีเลขเฉด หรือเป็น white/black) — ไม่จับขนาดอย่าง text-2xl
+    const colorUtility = /^(?:text|bg|border)-([a-z]+)(?:-\d{2,3})?(?:\/\d{1,3})?$/;
+    for (const [key, value] of Object.entries(HUD)) {
+      for (const cls of value.split(' ')) {
+        if (cls.includes('[')) continue; // ค่าดิบ (ขนาด/ระยะ) ไม่ใช่สี
+        const m = colorUtility.exec(cls);
+        if (!m) continue;
+        const family = m[1];
+        const hasShade = /-\d{2,3}(?:\/\d{1,3})?$/.test(cls);
+        if (!hasShade && family !== 'white' && family !== 'black') continue; // เช่น text-xs
+        expect(allowed.has(family), `HUD.${key}: สี "${cls}" อยู่นอกจานที่อนุญาต`).toBe(true);
+      }
+    }
+  });
+
+  it('ตัวเลขบนแผงต้องเป็น mono + tabular — กันความกว้างเด้งตอนค่าเปลี่ยน', () => {
+    for (const key of ['figure', 'figureSm'] as const) {
+      expect(HUD[key], `HUD.${key} ต้องเป็น font-mono`).toContain('font-mono');
+      expect(HUD[key], `HUD.${key} ต้องเป็น tabular-nums`).toContain('tabular-nums');
+    }
+  });
+
+  it('เส้นสแกนต้องถูกปิดเมื่อผู้ใช้ตั้งว่าไม่เอาแอนิเมชัน', () => {
+    expect(indexCss).toContain('prefers-reduced-motion: reduce');
+    const reduced = indexCss.slice(indexCss.indexOf('prefers-reduced-motion: reduce'));
+    expect(reduced, 'ต้องมีกฎปิด .jarvis-hud-scan ใน prefers-reduced-motion').toContain(
+      '.jarvis-hud-scan',
+    );
+  });
+
+  it('HUD_SCENE ใช้แต่ rgba (ขาว/ดำ/teal) — ห้ามมีสีความหมายใหม่หลุดเข้ามา', () => {
+    for (const [key, value] of Object.entries(HUD_SCENE)) {
+      expect(value, `HUD_SCENE.${key} ต้องเป็น rgba() ไม่ใช่ hex/ชื่อสี`).toMatch(/^rgba?\(/);
+      const [r, g, b] = value
+        .replace(/^rgba?\(|\)$/g, '')
+        .split(',')
+        .map((n) => Number(n.trim()));
+      const isNeutral = r === g && g === b; // ขาว/ดำ/เทา
+      const isTeal = r === 94 && g === 234 && b === 212; // teal-300 ชุดเดียวกับ HUD
+      const isSlate = r === 148 && g === 163 && b === 184; // slate-400 (เส้นเชื่อมที่ยังไม่มีงานไหล)
+      expect(isNeutral || isTeal || isSlate, `HUD_SCENE.${key} = ${value} อยู่นอกจานที่อนุญาต`).toBe(
+        true,
+      );
+    }
+  });
+
+  it('HUD_HEX ครบทุกโทน · เป็นเฉดสว่างที่ต่างจาก TONE.hex (ไม่งั้นจมพื้นเข้ม)', () => {
+    expect(Object.keys(HUD_HEX).sort()).toEqual([...TONE_KEYS].sort());
+    for (const key of TONE_KEYS) {
+      expect(HUD_HEX[key], `HUD_HEX.${key}`).toMatch(/^#[0-9a-f]{6}$/);
+      expect(HUD_HEX[key], `HUD_HEX.${key} ต้องไม่เท่า TONE.${key}.hex (ต้องสว่างกว่า)`).not.toBe(
+        TONE[key].hex,
+      );
+    }
+    const hexes = TONE_KEYS.map((k) => HUD_HEX[k]);
+    expect(new Set(hexes).size, 'สีเกจต้องไม่ซ้ำกันระหว่างโทน').toBe(hexes.length);
   });
 });

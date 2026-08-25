@@ -357,3 +357,68 @@ describe('คอลัมน์ใหม่ของตารางรายช�
     });
   });
 });
+
+describe('filterApplications — ช่วงวันที่สมัคร (เจ้าของสั่ง 22 ส.ค. 2569)', () => {
+  const mk = (id: string, createdAt: string): PublicApplication =>
+    ({
+      id,
+      full_name: `คน ${id}`,
+      first_name: 'คน',
+      last_name: id,
+      phone: '0900000000',
+      status: 'new',
+      created_at: createdAt,
+    }) as unknown as PublicApplication;
+
+  const rows = [
+    mk('A', '2026-08-01T03:00:00.000Z'),
+    mk('B', '2026-08-15T03:00:00.000Z'),
+    mk('C', '2026-08-31T03:00:00.000Z'),
+  ];
+
+  it('ไม่ส่งช่วงวัน = ไม่กรอง (ของเดิมต้องไม่เปลี่ยนพฤติกรรม)', () => {
+    expect(filterApplications(rows, 'candidates', EMPTY_RM_FILTERS, '')).toHaveLength(3);
+  });
+
+  it('กรองตั้งแต่–ถึง เอาเฉพาะใบในช่วง (รวมวันหัวท้าย)', () => {
+    const out = filterApplications(
+      rows,
+      'candidates',
+      { ...EMPTY_RM_FILTERS, dateFrom: '2026-08-15', dateTo: '2026-08-31' },
+      '',
+    );
+    expect(out.map((r) => r.id)).toEqual(['B', 'C']);
+  });
+
+  it('ใส่แต่ "ตั้งแต่" หรือแต่ "ถึง" ก็กรองได้', () => {
+    expect(
+      filterApplications(rows, 'candidates', { ...EMPTY_RM_FILTERS, dateFrom: '2026-08-16' }, '').map(
+        (r) => r.id,
+      ),
+    ).toEqual(['C']);
+    expect(
+      filterApplications(rows, 'candidates', { ...EMPTY_RM_FILTERS, dateTo: '2026-08-01' }, '').map(
+        (r) => r.id,
+      ),
+    ).toEqual(['A']);
+  });
+
+  it('ใบที่ไม่รู้วันสมัคร ตกออกเมื่อมีการกรองวัน (ห้ามปล่อยผ่านให้คนเข้าใจผิด)', () => {
+    const noDate = { ...mk('X', ''), created_at: '' } as PublicApplication;
+    const all = [...rows, noDate];
+    expect(filterApplications(all, 'candidates', EMPTY_RM_FILTERS, '')).toHaveLength(4);
+    expect(
+      filterApplications(all, 'candidates', { ...EMPTY_RM_FILTERS, dateFrom: '2026-08-01' }, '').map(
+        (r) => r.id,
+      ),
+    ).toEqual(['A', 'B', 'C']);
+  });
+
+  it('countActiveRmFilters นับช่วงวันเป็น 1 (ไม่ว่าจะใส่ข้างเดียวหรือสองข้าง)', () => {
+    expect(countActiveRmFilters(EMPTY_RM_FILTERS)).toBe(0);
+    expect(countActiveRmFilters({ ...EMPTY_RM_FILTERS, dateFrom: '2026-08-01' })).toBe(1);
+    expect(
+      countActiveRmFilters({ ...EMPTY_RM_FILTERS, dateFrom: '2026-08-01', dateTo: '2026-08-31' }),
+    ).toBe(1);
+  });
+});

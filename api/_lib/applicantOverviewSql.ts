@@ -143,6 +143,34 @@ export const HAS_APPOINTMENT_SQL = `(
           and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
 )`;
 
+/** วันนัดล่าสุดของใบ (contact log ชนะ hold — กติกาเดียวกับ HAS_APPOINTMENT_SQL) */
+const APPOINTMENT_AT_SQL = `coalesce(
+  (select c.appointment_at from ${CONTACTS} c
+    where c.application_id = a.id and c.ok and c.appointment_at is not null
+    order by c.created_at desc limit 1),
+  (select h.appointment_at from ${HOLDS} h
+    where a.phone_e164 is not null and h.phone_e164 = a.phone_e164
+      and h.appointment_at is not null and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at
+    order by ${qcol('h', HOLD_EVENT_AT)} desc limit 1)
+)`;
+
+/**
+ * "เลยนัดแล้วยังไม่บันทึกผล" แบบ **expression บน alias `a`** (Phase 7.6)
+ *
+ * 🔴 เดิมเลขนี้คิดใน CTE ของ `buildAttendanceSummarySql` เท่านั้น จึงเป็นเลขที่
+ * **กดดูรายชื่อไม่ได้** (ไม่มี fragment ให้ `?bucket=` ใช้) · ย้ายมาเป็น expression
+ * เพื่อให้ตัวนับกับ drill-down ใช้เงื่อนไขเดียวกัน (เทสต์ bucket-parity ครอบให้เอง)
+ * ⚠️ `rescheduled` นับเป็น "ยังไม่มีผล" เหมือนเดิม (เลื่อนนัด = ยังไม่รู้ว่ามาหรือไม่มา)
+ */
+const OVERDUE_NO_RESULT_SQL = `(
+  ${APPOINTMENT_AT_SQL} < now()
+  and coalesce((
+    select r.result from ${ATTENDANCE} r
+     where r.application_id = a.id
+     order by r.appointment_at desc nulls last, r.created_at desc limit 1
+  ), 'rescheduled') = 'rescheduled'
+)`;
+
 /**
  * ถังของ drill-down `?bucket=` — เงื่อนไขเดียวกับตัวนับ **ห้ามนิยามซ้ำที่อื่น**
  * (เทสต์ bucket-parity บังคับว่ากล่องกับตารางใช้ fragment ตัวเดียวกัน)
@@ -168,15 +196,37 @@ export const OVERVIEW_BUCKETS = {
   success_unscheduled: `(${CALLED_SQL} and ${LATEST_CLASS_SQL} = 'success' and not ${HAS_APPOINTMENT_SQL})`,
   /** ยังไม่ถูกโทรและกรอกมาเกิน 5 วัน (เจ้าของถามเลขนี้ตรง ๆ · ประชากรทุกช่วงเวลา) */
   over5d: `(not ${CALLED_SQL} and a.created_at < now() - interval '5 days')`,
-  /** เก็บไปแล้ว (claim) ไม่มีความคืบหน้าหลังเวลาเก็บ เกิน 1 วัน */
+  /**
+   * เก็บไปแล้ว (claim) ไม่มีความคืบหน้าหลังเวลาเก็บ เกิน 1 วัน
+   *
+   * ⚠️ นิยามนี้คือเงื่อนไขเดียวกับที่ worker กันชื่อดอง (callChoiceWorker · Phase 5.7)
+   * ใช้ **ถอด claim อัตโนมัติ** — แก้เงื่อนไขที่นี่ = แก้ว่าใครโดนถอด ห้ามนิยามซ้ำที่อื่น
+   * "ความคืบหน้า" = dial stamp (095 · เจ้าของเคาะ "เกิน 1 วันไม่ stamp → ถอด")
+   * หรือบันทึกผลติดต่อ หรือผลโทรบน hold — อย่างใดอย่างหนึ่งหลังเวลาเก็บ
+   */
   claimed_idle: `(
     a.claimed_by is not null and a.claimed_at < now() - interval '1 day'
+    and (a.dialed_last_at is null or a.dialed_last_at < a.claimed_at)
     and not exists (select 1 from ${CONTACTS} c
                      where c.application_id = a.id and c.created_at >= a.claimed_at)
     and not (a.phone_e164 is not null and exists (
           select 1 from ${HOLDS} h
            where h.phone_e164 = a.phone_e164 and h.result_outcome is not null
              and ${qcol('h', HOLD_EVENT_AT)} >= a.claimed_at))
+  )`,
+  /**
+   * เลยวันนัดแล้วยังไม่บันทึกผล มา/ไม่มา (Phase 7.6) — กดดูรายชื่อได้
+   * ⚠️ ตาราง 089 ยังไม่ migrate → subquery คืน null → coalesce เป็น 'rescheduled'
+   *    ⇒ นับเป็น "ยังไม่มีผล" (ถูกต้อง: ยังไม่มีที่เก็บผล = ยังไม่มีผล)
+   */
+  overdue_no_result: OVERDUE_NO_RESULT_SQL,
+  /**
+   * กอง "เลือกวิธีโทร" (Phase 5.9) — ใบที่ worker ถอด claim แล้ว ยังไม่มีใครเลือกว่า
+   * จะโทรเองหรือส่ง AI · `claimed_by is null` กันแถวที่มีคนกดเก็บใหม่ระหว่างรอ
+   * (การเก็บใหม่ = เลือกโทรเองโดยพฤตินัย — patchClaim/patchKeep ล้าง unclaimed_at ให้)
+   */
+  awaiting_call_choice: `(
+    a.unclaimed_at is not null and a.call_choice is null and a.claimed_by is null
   )`,
 } as const;
 
@@ -254,6 +304,17 @@ export function buildClaimedIdleSql(): string {
   group by a.claimed_by_name
   order by n desc, oldest_claimed_at asc
   limit 50`;
+}
+
+/** สรุปกอง "เลือกวิธีโทร" (Phase 5.9) — นับแยกเพราะคอลัมน์ 104 อาจยังไม่ migrate */
+export function buildAwaitingChoiceSql(): string {
+  return `
+  select count(*)::int as n,
+         min(a.unclaimed_at) as oldest_unclaimed_at
+  from ${APPS} a
+  where ($1::text[] is null or a.job_id = any($1::text[])
+         or ($2::text is not null and a.department_code = $2::text))
+    and ${OVERVIEW_BUCKETS.awaiting_call_choice}`;
 }
 
 /** ผลติดตามนัด (089) — นับแยกเพราะตารางอาจยังไม่ migrate (คืน null + ธง ไม่ใช่ 0) */
