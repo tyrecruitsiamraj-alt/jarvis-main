@@ -1,5 +1,5 @@
 /**
- * KPI แถวบนหน้าหลัก — 5 ใบ พร้อมตัวเทียบ "วันนี้ vs เมื่อวาน" ของจริง
+ * KPI แถวบนหน้าหลัก — ยอดคงค้าง 1 ใบ + เหตุการณ์ 8 ใบ พร้อมตัวเทียบ "วันนี้ vs เมื่อวาน"
  * (Phase 10.2 · เจ้าของเคาะ 24 ส.ค. 2569: *"ทำตัวเทียบจริงเลย"*)
  *
  * 🔴 กติกาบนจอ:
@@ -56,7 +56,8 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
     <div
       className={cn(
         'grid grid-cols-2 gap-2 sm:grid-cols-3 xl:gap-3',
-        standing ? 'xl:grid-cols-6' : 'xl:grid-cols-5',
+        // 9 ใบ (ยอดคงค้าง 1 + เหตุการณ์ 8) — แถวละ 5 บนจอกว้าง
+        'xl:grid-cols-5',
         className,
       )}
     >
@@ -71,7 +72,7 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
             'group min-h-[92px] rounded-xl px-3 py-2.5 text-left transition-shadow',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60',
           )}
-          aria-label={`${standing.label} — ${standing.value} ${standing.unit} · ${standing.sub}`}
+          aria-label={`${standing.label} — ${standing.value} ${standing.unit} · ${standing.sub}${standing.sla ? ` · ${standing.sla}` : ''}`}
         >
           <span className={cn(HUD.label, 'block normal-case')}>{standing.label}</span>
           <span className="mt-1 flex items-baseline gap-1">
@@ -86,6 +87,13 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
           >
             {standing.sub}
           </span>
+          {/* 🔴 SLA โชว์คู่กันเสมอ (หลุดแล้ว + ใกล้หลุด) — ตัวเดียวทำให้เข้าใจผิด
+              ไม่รู้ตัวเลข = ไม่วาดบรรทัดนี้ ไม่ใช่วาด 0 */}
+          {standing.sla ? (
+            <span className="mt-0.5 block text-[11px] font-medium" style={{ color: HUD_HEX.danger }}>
+              {standing.sla}
+            </span>
+          ) : null}
           <span className={cn(HUD.unit, 'mt-0.5 block opacity-80')}>ยอดคงค้างตอนนี้</span>
         </button>
       ) : null}

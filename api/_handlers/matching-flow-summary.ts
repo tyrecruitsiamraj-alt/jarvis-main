@@ -23,6 +23,9 @@ import { jobPositionLabel } from '../_lib/lumosDispatch.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
 import { isBoardCandidateAvailable } from '@/lib/boardMatchAvailability';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
+import { computeJobSla } from '@/lib/jobSla';
+import { positionBreakdownFromJob, resolveRequestControlStatus } from '@/lib/requestControl';
+import { buFromSiteCode } from '@/lib/homeBu';
 import type { JobRequest } from '@/types';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -215,6 +218,47 @@ async function handler(req: AuthedReq, res: ApiRes) {
       entry.tiers = entry.tiers.filter((t) => isBoardCandidateAvailable(t.cardId, jobId, availCtx));
     }
 
+    /**
+     * SLA ของใบขอที่เปิดอยู่ (Phase 10.5 · เจ้าของเคาะ 25 ส.ค. 2569: *"โชว์ทั้งคู่"*)
+     *
+     * 🔴 **ต้องโชว์คู่กันเสมอ** — วัดจริง 25 ส.ค. 2569: ใกล้หลุด 15 ใบ แต่
+     * **หลุดไปแล้ว 199 ใบ (68%)** ⇒ โชว์แต่ "ใกล้หลุด 15" เดี่ยว ๆ คนจะเข้าใจว่า
+     * มีปัญหาแค่ 15 ใบ ทั้งที่ของจริงหนักกว่านั้นสิบเท่า
+     *
+     * ใช้ `computeJobSla` ตัวเดียวกับ Dashboard — ห้ามเขียนสูตรใหม่ที่นี่
+     * (นิยามซ้ำสองที่แล้วเลขเพี้ยน — กับดักที่เจอมาแล้วรอบก่อน)
+     */
+    const now = new Date();
+    let slaAtRisk = 0;
+    let slaBreached = 0;
+    for (const j of jobs) {
+      const status = resolveRequestControlStatus(positionBreakdownFromJob(j));
+      const meta = computeJobSla(j, status, now);
+      if (meta.slaStatus === 'at_risk') slaAtRisk += 1;
+      else if (meta.slaStatus === 'breached') slaBreached += 1;
+    }
+
+    /**
+     * ใบขอที่ "ส่งเข้ามา" วันนี้/เมื่อวาน — แยกราย BU ด้วย เพราะแถบ KPI หน้าแรก
+     * มีปุ่มสลับ BU และการ์ดใบนี้ต้องขยับตามปุ่มเหมือนใบอื่น
+     * ⚠️ วันเป็นวันปฏิทินไทย (เขต +07) — ห้าม `toISOString().slice(0,10)`
+     * (ช่วงเที่ยงคืน–07:00 น. จะกลายเป็นเมื่อวานทุกใบ)
+     */
+    const ymdBkk = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    const todayYmd = ymdBkk(now);
+    const ydayYmd = ymdBkk(new Date(now.getTime() - 86_400_000));
+    const newReqTotal = { today: 0, yesterday: 0 };
+    const newReqByBu: Record<string, { today: number; yesterday: number }> = {};
+    for (const j of jobs) {
+      const submitted = String(j.submittedAt || j.request_date || j.created_at || '').slice(0, 10);
+      const slot = submitted === todayYmd ? 'today' : submitted === ydayYmd ? 'yesterday' : null;
+      if (!slot) continue;
+      newReqTotal[slot] += 1;
+      const bu = buFromSiteCode(j.site_code);
+      if (!bu) continue;
+      (newReqByBu[bu] ??= { today: 0, yesterday: 0 })[slot] += 1;
+    }
+
     const analyzed = jobs.filter((j) => tierMap.has(j.id));
     const withRecommend = analyzed.filter((j) =>
       (tierMap.get(j.id)?.tiers ?? []).some((t) => t.tier === 'green' || t.tier === 'yellow'),
@@ -368,6 +412,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         analyzed: analyzed.length,
         with_recommend: withRecommend.length,
         urgent_stuck: urgentStuck.length,
+        /** 🔴 คู่กันเสมอ — "ใกล้หลุด" เดี่ยว ๆ ทำให้เข้าใจผิด (ดูเหตุผลตอนคำนวณ) */
+        sla_at_risk: slaAtRisk,
+        sla_breached: slaBreached,
+        /** ใบขอที่ส่งเข้ามาวันนี้/เมื่อวาน + แยกราย BU ให้ปุ่มสลับ BU ใช้ */
+        new_today: newReqTotal.today,
+        new_yesterday: newReqTotal.yesterday,
+        new_by_bu: newReqByBu,
       },
       lumos: {
         sent_month: Number(lumosAgg[0]?.sent_month) || 0,

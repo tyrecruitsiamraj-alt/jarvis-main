@@ -17,10 +17,13 @@
 export const MIN_RATE_SAMPLE = 5;
 
 export type KpiKey =
+  | 'newRequests'
   | 'newApplicants'
   | 'callResults'
   | 'interested'
   | 'appointments'
+  | 'apptToday'
+  | 'followToday'
   | 'connectRate';
 
 /** เลขดิบที่ API นับมา — คู่วันนี้/เมื่อวาน ตัวต่อตัว */
@@ -30,9 +33,30 @@ export type KpiPair = {
   /** ตัวหารของอัตรา (เฉพาะ KPI ที่เป็น %) — วันนี้ / เมื่อวาน */
   todayBase?: number;
   yesterdayBase?: number;
+  /**
+   * ตัวแยกย่อยที่ต้องเห็นคู่กับตัวเลขหลัก (เจ้าของสั่ง 25 ส.ค. 2569: *"นัดวันนี้แยก
+   * มา/ไม่มา"* · *"Follow แยก ต้องโทร/โทรแล้ว/สำเร็จ"*)
+   * มีค่าเมื่อไหร่ `sub` ของการ์ดจะเป็นตัวแยกย่อยแทนบรรทัด "เมื่อวาน N"
+   * (ตัวเทียบเมื่อวานยังอยู่ครบที่ `delta` ซึ่งจอวาดเป็นชิปแยกอยู่แล้ว)
+   */
+  parts?: readonly { label: string; value: number }[];
+  /**
+   * ตัวเลขนี้เทียบวันต่อวันได้ไหม — ค่าตั้งต้น `true`
+   *
+   * 🔴 `false` สำหรับ **ยอดคงค้าง** (เช่น "Follow ต้องโทร" ที่รวมของค้างจากวันก่อน)
+   * ตามกติกาข้อ 1 ของไฟล์นี้: สถานะปัจจุบันไม่มี snapshot รายวัน ⇒ เทียบไม่ได้
+   * ปล่อยให้คิด `today - yesterday` เมื่อไหร่ จะได้ลูกศรที่ **แต่งขึ้นมา** ซึ่งห้ามเด็ดขาด
+   */
+  comparable?: boolean;
 };
 
-export type KpiRaw = Record<KpiKey, KpiPair>;
+/**
+ * เลขดิบทั้งชุด — **บางคีย์ขาดได้** โดยตั้งใจ
+ * `newRequests` ไม่ได้มาจาก `/api/home-kpis` (ฝั่ง pg ไม่มีวันที่ส่งใบขอ) แต่มาจาก
+ * flow-summary แล้วหน้าแรกยัดเข้ามาทีหลัง ⇒ ประกาศเป็น Partial ตามความจริง
+ * `buildKpiCards` เติม `{today:0,yesterday:0}` ให้คีย์ที่ขาดอยู่แล้ว (การ์ดขึ้น "ยังไม่มีวันนี้")
+ */
+export type KpiRaw = Partial<Record<KpiKey, KpiPair>>;
 
 export type KpiCard = {
   key: KpiKey;
@@ -53,6 +77,9 @@ export type KpiCard = {
 };
 
 const META: Record<KpiKey, { label: string; unit: string; isRate: boolean; href: string }> = {
+  newRequests: { label: 'ใบขอเข้าใหม่วันนี้', unit: 'ใบ', isRate: false, href: '/jobs/list' },
+  apptToday: { label: 'นัดถึงกำหนดวันนี้', unit: 'นัด', isRate: false, href: '/follow' },
+  followToday: { label: 'Follow ต้องโทรวันนี้', unit: 'ราย', isRate: false, href: '/follow' },
   newApplicants: { label: 'ผู้สมัครใหม่วันนี้', unit: 'คน', isRate: false, href: '/recruit/rm' },
   callResults: { label: 'ผลโทรกลับวันนี้', unit: 'สาย', isRate: false, href: '/recruit/rm?tab=calls' },
   interested: { label: 'ตอบว่าสนใจวันนี้', unit: 'คน', isRate: false, href: '/recruit/rm?bucket=interested' },
@@ -83,10 +110,16 @@ export function buildKpiCard(key: KpiKey, pair: KpiPair): KpiCard {
       value: today,
       unit: meta.unit,
       isRate: false,
-      // วันนี้ 0 และเมื่อวาน 0 = ไม่มีอะไรให้เทียบ (ไม่ใช่ "เท่าเดิม")
-      delta: today === 0 && yday === 0 ? null : today - yday,
+      // เทียบไม่ได้ (ยอดคงค้าง) หรือวันนี้ 0 และเมื่อวาน 0 = ไม่มีอะไรให้เทียบ
+      // (ไม่ใช่ "เท่าเดิม") — ทั้งสองกรณีห้ามวาดลูกศร
+      delta: pair.comparable === false || (today === 0 && yday === 0) ? null : today - yday,
       quiet,
-      sub: yday > 0 ? `เมื่อวาน ${yday} ${meta.unit}` : 'เมื่อวานไม่มี',
+      // มีตัวแยกย่อย = เอาตัวแยกย่อยขึ้นแทน (ตัวเทียบเมื่อวานอยู่ที่ชิป delta อยู่แล้ว)
+      sub: pair.parts?.length
+        ? pair.parts.map((x) => `${x.label} ${x.value}`).join(' · ')
+        : yday > 0
+          ? `เมื่อวาน ${yday} ${meta.unit}`
+          : 'เมื่อวานไม่มี',
       href: meta.href,
     };
   }
@@ -116,10 +149,13 @@ export function buildKpiCard(key: KpiKey, pair: KpiPair): KpiCard {
 
 /** ลำดับการ์ดบนแถว — ซ้ายไปขวาตามลำดับงานจริง (สมัคร → โทร → สนใจ → นัด → คุณภาพสาย) */
 export const KPI_ORDER: readonly KpiKey[] = [
+  'newRequests',
   'newApplicants',
   'callResults',
   'interested',
   'appointments',
+  'apptToday',
+  'followToday',
   'connectRate',
 ];
 
@@ -162,21 +198,39 @@ export type StandingCard = {
   unit: string;
   /** บรรทัดใต้ตัวเลข — บอกของด่วน ไม่ใช่คำเชียร์ */
   sub: string;
+  /**
+   * บรรทัดที่สอง — สถานะ SLA (Phase 10.5 · เจ้าของเคาะ 25 ส.ค. 2569: *"โชว์ทั้งคู่"*)
+   * `null` = ยังไม่รู้ตัวเลข SLA (API รุ่นเก่า) ⇒ ไม่วาดบรรทัดนี้เลย
+   * 🔴 **หลุดแล้วกับใกล้หลุดต้องมาคู่กัน** — วัดจริง 25 ส.ค. 2569 ใกล้หลุด 15 ใบ แต่
+   * หลุดไปแล้ว 199 ใบ (68%) · โชว์ตัวเดียวคนจะเข้าใจว่ามีปัญหาแค่ 15 ใบ
+   */
+  sla: string | null;
   /** มีของด่วนค้าง = ต้องเห็นก่อน */
   alert: boolean;
   href: string;
 };
 
 /** ใบขอที่ยังเปิดรับอยู่ + จำนวนใบด่วน (มาจาก flow-summary ที่หน้าแรกโหลดอยู่แล้ว) */
-export function buildOpenRequestsCard(openTotal: number, urgent: number): StandingCard {
+export function buildOpenRequestsCard(
+  openTotal: number,
+  urgent: number,
+  sla?: { breached?: number | null; atRisk?: number | null },
+): StandingCard {
   const total = Math.max(0, Math.trunc(openTotal || 0));
   const rush = Math.max(0, Math.trunc(urgent || 0));
+  const breached = typeof sla?.breached === 'number' ? Math.max(0, Math.trunc(sla.breached)) : null;
+  const atRisk = typeof sla?.atRisk === 'number' ? Math.max(0, Math.trunc(sla.atRisk)) : null;
   return {
     key: 'openRequests',
     label: 'ใบขอที่ยังเปิดรับ',
     value: total,
     unit: 'ใบ',
     sub: rush > 0 ? `ด่วน ${rush} ใบ` : total > 0 ? 'ไม่มีใบด่วน' : 'ยังไม่มีใบขอเปิด',
+    // 🔴 ไม่รู้ตัวใดตัวหนึ่ง = ไม่วาดทั้งบรรทัด ดีกว่าโชว์ครึ่งเดียวแล้วคนอ่านผิด
+    sla:
+      breached === null || atRisk === null
+        ? null
+        : `หลุด SLA ${breached} ใบ · ใกล้หลุด ${atRisk} ใบ`,
     alert: rush > 0,
     href: '/jobs/board',
   };

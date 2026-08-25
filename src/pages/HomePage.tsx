@@ -229,6 +229,23 @@ const HomePage: React.FC = () => {
     );
   }, [office, flow]);
 
+  /**
+   * "ใบขอเข้าใหม่วันนี้" มาจาก **flow-summary (ERP)** ไม่ใช่ `/api/home-kpis`
+   * เพราะฝั่ง PostgreSQL ไม่มีวันที่ส่งใบขอ (`job_site_map` เก็บแค่ job_id/site_code)
+   * และ `/api/home-kpis` ตั้งใจไม่แตะ MSSQL เพื่อให้หน้าแรกเบา
+   *
+   * 🔴 ต้องขยับตามปุ่มสลับ BU เหมือนการ์ดใบอื่น ⇒ flow-summary ส่ง `new_by_bu` มาให้
+   * เลือกเอง · BU ที่ยังไม่มีใบเข้าใหม่ = ไม่มีคีย์ ⇒ ถือเป็น 0 (ถูกต้อง ไม่ใช่ "ไม่รู้")
+   */
+  const kpisWithRequests = React.useMemo(() => {
+    if (!hud) return null;
+    if (!flow) return hud.kpis;
+    const pair = bu
+      ? (flow.jobs.new_by_bu?.[bu] ?? { today: 0, yesterday: 0 })
+      : { today: flow.jobs.new_today ?? 0, yesterday: flow.jobs.new_yesterday ?? 0 };
+    return { ...hud.kpis, newRequests: pair };
+  }, [hud, flow, bu]);
+
   /** คีย์กันกดซ้ำ — คนเดียวโผล่ได้หลายใบขอ จึงต้องผูกกับใบด้วย ไม่ใช่แค่ตัวคน */
   const bookingKeyOf = (item: FlowFollowUpItem) => `${item.job_ref}::${item.person_ref}`;
 
@@ -293,10 +310,17 @@ const HomePage: React.FC = () => {
             className="mb-3"
           />
           <HomeKpiRow
-            kpis={hud.kpis}
-            /* ใบขอเปิดอยู่ + ด่วน — ย้ายขึ้นมาจากแถบ funnel ที่ถอดออก (24 ส.ค. 2569)
-               ยังไม่มี flow-summary = ไม่ส่งการ์ดนี้ (ห้ามโชว์ 0 ที่ยังไม่รู้จริง) */
-            standing={flow ? buildOpenRequestsCard(flow.jobs.open_total, flow.jobs.urgent) : null}
+            kpis={kpisWithRequests}
+            /* ใบขอเปิดอยู่ + ด่วน + สถานะ SLA — ย้ายขึ้นมาจากแถบ funnel ที่ถอดออก
+               (24 ส.ค. 2569) · ยังไม่มี flow-summary = ไม่ส่งการ์ดนี้ (ห้ามโชว์ 0 ที่ยังไม่รู้จริง) */
+            standing={
+              flow
+                ? buildOpenRequestsCard(flow.jobs.open_total, flow.jobs.urgent, {
+                    breached: flow.jobs.sla_breached ?? null,
+                    atRisk: flow.jobs.sla_at_risk ?? null,
+                  })
+                : null
+            }
             className="mb-6"
           />
         </>

@@ -46,6 +46,17 @@ export type FlowSummary = {
     with_recommend: number;
     /** ใบด่วนที่ AI ไม่พบคนแนะนำ และยังไม่ส่งโพสหาคนใหม่ */
     urgent_stuck: number;
+    /**
+     * SLA ของใบขอที่เปิดอยู่ — 🔴 **ต้องอ่านคู่กันเสมอ** (เจ้าของเคาะ 25 ส.ค. 2569)
+     * วัดจริงวันนั้น: ใกล้หลุด 15 ใบ · **หลุดไปแล้ว 199 ใบ** ⇒ โชว์ตัวเดียวทำให้เข้าใจผิด
+     * ⚠️ optional — API รุ่นก่อนหน้ายังไม่ส่งคีย์นี้มา
+     */
+    sla_at_risk?: number;
+    sla_breached?: number;
+    /** ใบขอที่ส่งเข้ามาวันนี้/เมื่อวาน (+ แยกราย BU ให้ปุ่มสลับ BU ของแถบ KPI ใช้) */
+    new_today?: number;
+    new_yesterday?: number;
+    new_by_bu?: Record<string, { today: number; yesterday: number }>;
   };
   lumos: {
     sent_month: number;

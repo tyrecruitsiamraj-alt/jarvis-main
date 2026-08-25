@@ -31,6 +31,13 @@ const AFTERCARE = tableInAppSchema('aftercare_people');
 const POSTING_REQ = tableInAppSchema('job_posting_requests');
 
 const QUEUE_OUTCOME = `coalesce(q.last_outcome, q.result->>'outcome')`;
+
+/**
+ * ผลติดตามที่นับว่า "ไปตามนัดจริง" — ต้องตรงกับ `FOLLOW_OUTCOME_SUCCESS`
+ * ใน `src/lib/followOutcome.ts` เป๊ะ ๆ (`went`/`arrived` ชุดใหม่ 101 + `done` ชุดเก่า 095)
+ * 🔴 เคยพลาดมาแล้ว: แผงรอบ Follow เช็คแค่ `'done'` ⇒ เลขต่ำกว่าจริงทุกแถวตั้งแต่เปลี่ยนชุดคำ
+ */
+const FOLLOW_SUCCESS = `('went','arrived','done')`;
 const QUEUE_RESULT_AT = `coalesce(q.first_result_at, q.updated_at)`;
 
 /**
@@ -78,7 +85,11 @@ async function safeRow(sql: string, params: unknown[] = []): Promise<Row> {
   }
 }
 
-async function loadKpis(bu: string | null): Promise<Record<KpiKey, KpiPair>> {
+/**
+ * ⚠️ คืน **Partial** โดยตั้งใจ — `newRequests` ไม่อยู่ในเส้นนี้ เพราะวันที่ส่งใบขออยู่บน
+ * ERP (MSSQL) และเส้นนี้ตั้งใจไม่แตะ MSSQL (กติกาข้อ 3) · หน้าแรกเอามาจาก flow-summary
+ */
+async function loadKpis(bu: string | null): Promise<Partial<Record<KpiKey, KpiPair>>> {
   const p = bu ? [bu] : [];
 
   const apps = await safeRow(
@@ -122,8 +133,69 @@ async function loadKpis(bu: string | null): Promise<Record<KpiKey, KpiPair>> {
     p,
   );
 
+  /**
+   * นัดที่ **ถึงกำหนดวันนี้** + ไปจริงไหม (Phase 10.5 · 2.8 "นัดวันนี้ มี/มา/ไม่มา")
+   *
+   * 🔴 ที่มาคือ `follow_entries` ไม่ใช่ `application_contact_logs` — วัดจริง 25 ส.ค. 2569:
+   * ตารางนัดสัมภาษณ์ (086) **ไม่มีช่องบันทึกว่ามาหรือไม่มาเลย** มีแต่ `appointment_at`
+   * ⇒ ที่เดียวในระบบที่รู้ว่า "ไปแล้ว/ถึงแล้ว" คือ `outcome_code` ของรายการติดตาม
+   * (KPI `appointments` ที่มีอยู่เดิมนับคนละเรื่อง: **นัดได้กี่นัดวันนี้** ไม่ใช่ถึงวันนัด)
+   */
+  const apptDue = await safeRow(
+    `select
+       count(*) filter (where f.scheduled_at >= ${TODAY}
+                          and f.scheduled_at < ${TODAY} + interval '1 day')::int as today,
+       count(*) filter (where f.scheduled_at >= ${YDAY} and f.scheduled_at < ${TODAY})::int as yday,
+       count(*) filter (where f.scheduled_at >= ${TODAY}
+                          and f.scheduled_at < ${TODAY} + interval '1 day'
+                          and f.outcome_code in ${FOLLOW_SUCCESS})::int as came,
+       count(*) filter (where f.scheduled_at >= ${TODAY}
+                          and f.scheduled_at < ${TODAY} + interval '1 day'
+                          and f.outcome_code is not null
+                          and f.outcome_code not in ${FOLLOW_SUCCESS})::int as no_show
+     from ${FOLLOW} f
+     where f.cancelled_at is null${buDirect('f.site_code', bu)}`,
+    p,
+  );
+
+  /**
+   * งาน Follow วันนี้ — ต้องโทร / โทรแล้ว / สำเร็จ (Phase 10.5 · 2.8)
+   * "ต้องโทร" = ถึงกำหนดแล้วและยังไม่บันทึกผล (รวมของค้างจากวันก่อน — ของค้างคือของที่ต้องโทร)
+   */
+  const followWork = await safeRow(
+    `select
+       count(*) filter (where f.cancelled_at is null and f.outcome_code is null
+                          and f.scheduled_at < ${TODAY} + interval '1 day')::int as due,
+       count(*) filter (where f.completed_at >= ${TODAY})::int as done_today,
+       count(*) filter (where f.completed_at >= ${YDAY} and f.completed_at < ${TODAY})::int as done_yday,
+       count(*) filter (where f.completed_at >= ${TODAY}
+                          and f.outcome_code in ${FOLLOW_SUCCESS})::int as success_today
+     from ${FOLLOW} f
+     where true${buDirect('f.site_code', bu)}`,
+    p,
+  );
+
   return {
     newApplicants: { today: n(apps.today), yesterday: n(apps.yday) },
+    apptToday: {
+      today: n(apptDue.today),
+      yesterday: n(apptDue.yday),
+      parts: [
+        { label: 'มาแล้ว', value: n(apptDue.came) },
+        { label: 'ไม่มา', value: n(apptDue.no_show) },
+      ],
+    },
+    followToday: {
+      today: n(followWork.due),
+      yesterday: 0,
+      // 🔴 "ต้องโทร" เป็น**ยอดคงค้าง** (รวมของค้างจากวันก่อน) ไม่ใช่เหตุการณ์ของวันนี้
+      // ⇒ เทียบเมื่อวานไม่ได้ · ถ้าปล่อยให้คิด today-0 จะได้ลูกศรเขียว "+1" ที่แต่งขึ้นมา
+      comparable: false,
+      parts: [
+        { label: 'โทรแล้ววันนี้', value: n(followWork.done_today) },
+        { label: 'สำเร็จ', value: n(followWork.success_today) },
+      ],
+    },
     callResults: { today: n(calls.today), yesterday: n(calls.yday) },
     interested: { today: n(calls.interested_today), yesterday: n(calls.interested_yday) },
     appointments: { today: n(appts.today), yesterday: n(appts.yday) },

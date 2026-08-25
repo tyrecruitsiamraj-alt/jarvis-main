@@ -14,6 +14,7 @@ import {
   MIN_RATE_SAMPLE,
   buildKpiCard,
   buildKpiCards,
+  buildOpenRequestsCard,
   deltaIsGood,
   deltaText,
   ratePct,
@@ -109,13 +110,16 @@ describe('KPI ที่เป็นอัตรา', () => {
 });
 
 describe('แถว KPI', () => {
-  it('เรียงตามลำดับงานจริง 5 ใบ ไม่ขาดไม่เกิน', () => {
-    expect(KPI_ORDER).toHaveLength(5);
+  it('เรียงตามลำดับงานจริง 8 ใบ ไม่ขาดไม่เกิน', () => {
+    expect(KPI_ORDER).toHaveLength(8);
     const cards = buildKpiCards({
+      newRequests: { today: 1, yesterday: 0 },
       newApplicants: { today: 1, yesterday: 0 },
       callResults: { today: 1, yesterday: 0 },
       interested: { today: 1, yesterday: 0 },
       appointments: { today: 1, yesterday: 0 },
+      apptToday: { today: 1, yesterday: 0 },
+      followToday: { today: 1, yesterday: 0 },
       connectRate: { today: 1, yesterday: 0, todayBase: 10, yesterdayBase: 10 },
     });
     expect(cards.map((c) => c.key)).toEqual([...KPI_ORDER]);
@@ -125,7 +129,7 @@ describe('แถว KPI', () => {
 
   it('ช่องที่ API ไม่ส่งมาก็ไม่ระเบิด', () => {
     const cards = buildKpiCards({} as never);
-    expect(cards).toHaveLength(5);
+    expect(cards).toHaveLength(8);
     expect(cards.every((c) => c.delta === null && c.quiet)).toBe(true);
   });
 });
@@ -170,5 +174,77 @@ describe('BU มาจาก site_code เท่านั้น', () => {
     expect(normalizeBu('all', allowed)).toBeNull();
     expect(normalizeBu('DROP TABLE', allowed)).toBeNull();
     expect(normalizeBu(undefined, allowed)).toBeNull();
+  });
+});
+
+/**
+ * ตัวแยกย่อยบนการ์ด (เจ้าของสั่ง 25 ส.ค. 2569: นัดวันนี้แยก มา/ไม่มา ·
+ * Follow แยก ต้องโทร/โทรแล้ว/สำเร็จ)
+ */
+describe('ตัวแยกย่อยใต้ตัวเลขหลัก', () => {
+  it('มี parts = sub เป็นตัวแยกย่อย ไม่ใช่บรรทัด "เมื่อวาน N"', () => {
+    const c = buildKpiCard('apptToday', {
+      today: 5,
+      yesterday: 2,
+      parts: [
+        { label: 'มาแล้ว', value: 3 },
+        { label: 'ไม่มา', value: 1 },
+      ],
+    });
+    expect(c.sub).toBe('มาแล้ว 3 · ไม่มา 1');
+    // ตัวเทียบเมื่อวานต้องไม่หาย — ย้ายไปอยู่ที่ delta ซึ่งจอวาดเป็นชิปแยก
+    expect(c.delta).toBe(3);
+  });
+
+  it('ไม่มี parts = ยังใช้บรรทัดเมื่อวานเหมือนเดิม', () => {
+    expect(buildKpiCard('newRequests', { today: 2, yesterday: 1 }).sub).toBe('เมื่อวาน 1 ใบ');
+  });
+
+  it('parts ที่เป็น 0 ต้องยังโชว์ — 0 คนมาคือข่าว ไม่ใช่ความว่างเปล่า', () => {
+    const c = buildKpiCard('apptToday', {
+      today: 4,
+      yesterday: 0,
+      parts: [
+        { label: 'มาแล้ว', value: 0 },
+        { label: 'ไม่มา', value: 4 },
+      ],
+    });
+    expect(c.sub).toContain('มาแล้ว 0');
+  });
+});
+
+/** 🔴 SLA ต้องมาคู่กันเสมอ — ตัวเดียวทำให้เข้าใจผิด (ใกล้หลุด 15 vs หลุดแล้ว 199) */
+describe('การ์ดใบขอ — บรรทัด SLA', () => {
+  it('รู้ทั้งคู่ = โชว์ทั้งคู่', () => {
+    const c = buildOpenRequestsCard(292, 199, { breached: 199, atRisk: 15 });
+    expect(c.sla).toBe('หลุด SLA 199 ใบ · ใกล้หลุด 15 ใบ');
+  });
+
+  it('รู้แค่ตัวเดียว = ไม่วาดบรรทัดนี้เลย', () => {
+    expect(buildOpenRequestsCard(292, 199, { breached: 199 }).sla).toBeNull();
+    expect(buildOpenRequestsCard(292, 199, { atRisk: 15 }).sla).toBeNull();
+  });
+
+  it('API รุ่นเก่าไม่ส่ง SLA มา = ไม่วาด ไม่ใช่โชว์ 0', () => {
+    expect(buildOpenRequestsCard(292, 199).sla).toBeNull();
+  });
+
+  it('ไม่มีใบหลุดเลยก็ยังโชว์ (0 ที่รู้จริง ต่างจากไม่รู้)', () => {
+    expect(buildOpenRequestsCard(10, 0, { breached: 0, atRisk: 0 }).sla).toBe(
+      'หลุด SLA 0 ใบ · ใกล้หลุด 0 ใบ',
+    );
+  });
+});
+
+/** 🔴 ยอดคงค้างห้ามมีลูกศรเทียบเมื่อวาน (กติกาข้อ 1 ของ homeKpi.ts) */
+describe('ยอดคงค้างเทียบวันต่อวันไม่ได้', () => {
+  it('comparable:false ⇒ delta เป็น null แม้วันนี้มีเลข', () => {
+    const c = buildKpiCard('followToday', { today: 7, yesterday: 0, comparable: false });
+    expect(c.value).toBe(7);
+    expect(c.delta).toBeNull();
+  });
+
+  it('ไม่ระบุ comparable = เทียบได้เหมือนเดิม', () => {
+    expect(buildKpiCard('newRequests', { today: 7, yesterday: 2 }).delta).toBe(5);
   });
 });
