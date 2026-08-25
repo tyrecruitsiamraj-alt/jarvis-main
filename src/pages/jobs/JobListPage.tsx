@@ -6,6 +6,7 @@ import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
+import { unitSectorLabel } from '@/lib/unitSector';
 import SearchField from '@/components/shared/SearchField';
 import { FilterSelect } from '@/components/shared/FilterSelect';
 import { FilterMultiSelect } from '@/components/shared/FilterMultiSelect';
@@ -646,43 +647,45 @@ const JobListPage: React.FC = () => {
               <table className="w-full text-sm min-w-[1000px]">
                 <thead>
                   <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                    <th className="px-3 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้ลาออก</th>
-                    <th className="px-3 py-3 text-left font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                    <th className="px-3 py-3 text-center font-medium whitespace-nowrap">ส่งคนแทน</th>
-                    <th className="px-3 py-3 text-center font-medium whitespace-nowrap">สถานะทำงาน</th>
-                    <th className="px-3 py-3 text-left font-medium min-w-[180px]">หมายเหตุ</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ราชการ/เอกชน</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ผู้ลาออก</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap">ส่งคนแทน</th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap">สถานะทำงาน</th>
+                    <th className="px-1.5 py-3 text-left font-medium min-w-[180px]">หมายเหตุ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i} className="border-b border-border/50">
-                      <td className="px-3 py-3"><Skeleton className="h-4 w-24" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-36" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
-                      <td className="px-3 py-3 text-center"><Skeleton className="h-3 w-6 mx-auto" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-24" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-24" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-20" /></td>
-                      <td className="px-3 py-3 space-y-1">
+                      <td className="px-1.5 py-3"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-5 w-14 rounded-full" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-36" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-16" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-1.5 py-3 text-center"><Skeleton className="h-3 w-6 mx-auto" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-24" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-24" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
+                      <td className="px-1.5 py-3 space-y-1">
                         <Skeleton className="h-3 w-20" />
                         <Skeleton className="h-3 w-20" />
                         <Skeleton className="h-3 w-20" />
                       </td>
-                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-16 rounded-full mx-auto" /></td>
-                      <td className="px-3 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
-                      <td className="px-3 py-3"><Skeleton className="h-3 w-32" /></td>
+                      <td className="px-1.5 py-3 text-center"><Skeleton className="h-5 w-16 rounded-full mx-auto" /></td>
+                      <td className="px-1.5 py-3 text-center"><Skeleton className="h-5 w-14 rounded-full mx-auto" /></td>
+                      <td className="px-1.5 py-3"><Skeleton className="h-3 w-32" /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -810,6 +813,7 @@ const JobListPage: React.FC = () => {
                       ['request_no', 'left'],
                       ['age', 'left'],
                       ['unit', 'left'],
+                      ['sector', 'left'],
                       ['submitted', 'left'],
                       ['required', 'left'],
                       ['remaining', 'center'],
@@ -831,9 +835,13 @@ const JobListPage: React.FC = () => {
                         key={col}
                         aria-sort={active ? (tableSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
                         className={cn(
-                          'px-3 py-3 font-medium whitespace-nowrap',
+                          // 🔴 หัวคอลัมน์ **ตัดบรรทัดได้** (เจ้าของสั่ง 25 ส.ค. 2569:
+                          // *"ทำให้มันเห็นครบ ๆ เพราะตอนนี้ข้อมูลตกหน้าจอ"*)
+                          // เดิม whitespace-nowrap ทำให้ป้ายยาว ๆ อย่าง "ลักษณะงานย่อย"
+                          // ดันคอลัมน์กว้าง 158px ทั้งที่ค่าจริงคือ "ชนิดที่ 2"
+                          // วัดจริงก่อนแก้: ตารางกว้าง 1,798px ในกล่อง 1,306px = ตกขอบ 492px
+                          'px-1.5 py-3 align-bottom font-medium',
                           align === 'center' ? 'text-center' : 'text-left',
-                          col === 'note' && 'min-w-[180px]',
                         )}
                       >
                         <button
@@ -843,7 +851,7 @@ const JobListPage: React.FC = () => {
                           }
                           title={`เรียงตาม ${label}`}
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors hover:text-foreground',
+                            'inline-flex items-start gap-0.5 rounded-md py-0.5 text-left transition-colors hover:text-foreground',
                             align === 'center' && 'justify-center',
                             active ? 'font-bold text-foreground' : '',
                           )}
@@ -878,7 +886,7 @@ const JobListPage: React.FC = () => {
                     }}
                     className={cn('cursor-pointer border-b', DASH.tableRow)}
                   >
-                    <td className={cn('px-3 py-3 whitespace-nowrap', DASH.cellStrong)}>
+                    <td className={cn('px-1.5 py-3 whitespace-nowrap', DASH.cellStrong)}>
                       <span className="flex flex-wrap items-center gap-1.5">
                         {j.request_no || '—'}
                         <PrequestBadge job={j} compact />
@@ -887,26 +895,32 @@ const JobListPage: React.FC = () => {
                     {/* ชิปอายุใบขอ (mockup rev.3 ข้อ 05) — 4 ระดับตามวันที่ค้าง
                         \+ "ล่วงหน้า" อีกระดับที่เป็นเขียวชุดเดียวเสมอ (19 ส.ค. 2569)
                         เกณฑ์ถังไม่เปลี่ยน · ดู JobAgeChip ข้างบน */}
-                    <td className="px-3 py-3 text-xs whitespace-nowrap">
+                    <td className="px-1.5 py-3 text-xs whitespace-nowrap">
                       <JobAgeChip job={j} />
                     </td>
                     {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) เพื่อคุมคอนทราสต์
                         ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline
                         บน <html> จนไม่สลับตามธีมนั้น แก้แล้วที่ brandingStorage.applyBrandSurfaceVars()
                         และมีเทสต์คุมที่ tests/api/brandingSurfaceTheme.test.ts */}
-                    <td className={cn('px-3 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
-                    <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
-                    <td className={cn('px-3 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
-                    <td className={cn('px-3 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
+                    {/* ราชการ/เอกชน — **อ่านอย่างเดียว** (เจ้าของสั่ง 25 ส.ค. 2569:
+                        *"เอาไปบอกด้วยว่าเป็นอะไร แต่ถ้าจะเลือกต้องมาเลือกข้างใน"*)
+                        ⚠️ ห้ามเอา dropdown กลับมาที่นี่ — เคยอยู่ตรงนี้แล้วเจ้าของสั่งย้ายออก (รอบ 39) */}
+                    <td className={cn('px-1.5 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>
+                      {unitSectorLabel(j.unit_sector)}
+                    </td>
+                    <td className={cn('px-1.5 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
+                    <td className={cn('px-1.5 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
+                    <td className={cn('px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
                       {jobPositionUnits(j)}
                     </td>
-                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
-                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>
-                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{extractJobSubtypeLabel(j)}</td>
-                    <td className={cn('px-3 py-3 text-xs', DASH.cellMuted)}>{j.resigned_employee_name || '—'}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{extractJobSubtypeLabel(j)}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.resigned_employee_name || '—'}</td>
                     {/* ผู้รับผิดชอบ — เจ้าของสั่ง 25 ส.ค. 2569 (รอบสี่สิบเอ็ด): หน้ารายการ
                         **คงของเดิมสามบรรทัด** · ที่สั่งให้เป็นบรรทัดเดียวคือในหน้าใบขอ */}
-                    <td className="px-3 py-3">
+                    <td className="px-1.5 py-3">
                       {j.recruiter_name || j.screener_name || j.opl_name ? (
                         <div className={cn('text-xs leading-tight whitespace-nowrap', DASH.cell)}>
                           <div>
@@ -926,11 +940,11 @@ const JobListPage: React.FC = () => {
                         <span className={cn('text-xs', DASH.cellMuted)}>—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-center">
+                    <td className="px-1.5 py-3 text-center">
                       <PrequestBadge job={j} compact />
                       <UnitRequestReplacementBadge value={j.send_replacement} compact />
                     </td>
-                    <td className="px-3 py-3 text-center">
+                    <td className="px-1.5 py-3 text-center">
                       <div className="inline-flex flex-col items-center gap-1">
                         <UnitRequestWorkStatusBadge
                           status={j.work_status}

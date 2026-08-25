@@ -215,3 +215,31 @@ describe('jobListTableSort', () => {
   });
 });
 
+
+/**
+ * ราชการ/เอกชน บนหน้ารายการ — **อ่านอย่างเดียว** (เจ้าของสั่ง 25 ส.ค. 2569)
+ * 🔴 "ยังไม่ระบุ" ถือเป็นค่าว่าง ต้องตกท้ายเสมอ เหมือนทุกคอลัมน์ของหน้านี้
+ */
+describe('เรียงคอลัมน์ ราชการ/เอกชน', () => {
+  const j = (id: string, unit_sector?: 'government' | 'private' | null) =>
+    ({ id, unit_name: 'x', status: 'open', created_at: '2026-01-01', unit_sector }) as never;
+
+  it('มีคอลัมน์ sector ให้กดเรียงได้', () => {
+    expect(JOB_LIST_TABLE_COLUMNS).toContain('sector');
+    expect(JOB_LIST_TABLE_COLUMN_LABEL.sector).toBe('ราชการ/เอกชน');
+  });
+
+  it('ยังไม่ระบุตกท้ายเสมอ ไม่ว่าจะเรียงขึ้นหรือลง', () => {
+    const rows = [j('a', null), j('b', 'government'), j('c', 'private')];
+    const asc = sortJobsByTableColumn(rows, { column: 'sector', dir: 'asc' });
+    const desc = sortJobsByTableColumn(rows, { column: 'sector', dir: 'desc' });
+    expect(asc[asc.length - 1].id).toBe('a');
+    expect(desc[desc.length - 1].id).toBe('a');
+  });
+
+  it('เรียงตามคำไทยที่โชว์จริง (ราชการ ก่อน เอกชน)', () => {
+    const rows = [j('c', 'private'), j('b', 'government')];
+    const asc = sortJobsByTableColumn(rows, { column: 'sector', dir: 'asc' });
+    expect(asc.map((r) => r.id)).toEqual(['b', 'c']);
+  });
+});

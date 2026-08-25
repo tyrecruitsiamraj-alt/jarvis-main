@@ -111,6 +111,18 @@ export type JobUrgency = 'urgent' | 'advance';
 export type JobStatus = 'open' | 'in_progress' | 'closed' | 'cancelled';
 export type JobRequestSource = 'jarvis' | 'siamraj';
 
+/** รายได้จริงหนึ่งงวดของคนที่ออก (จาก `wg2_ppayment_*`) */
+export type ResignedIncomeMonth = {
+  /** วันเริ่มงวด `YYYY-MM-DD` */
+  from: string | null;
+  /** วันจบงวด — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน */
+  to: string | null;
+  /** ฝั่งอัตราจ่าย — `null` = งวดนั้นไม่มีบรรทัดฝั่งนี้ (ห้ามอ่านเป็น 0 บาท) */
+  pay: number | null;
+  /** ฝั่งอัตราเบิก */
+  draw: number | null;
+};
+
 /** บรรทัดอัตราหนึ่งรายการบนใบขอ ERP (`st_request_p3_rate`) */
 export type UnitRequestRateLine = {
   seq: number;
@@ -151,19 +163,15 @@ export interface JobRequest {
   resigned_wage_fee_rate?: number | null;
   resigned_wage_effective_date?: string | null;
   /**
-   * **รายได้จริงของคนที่ออก รวม 3 งวดล่าสุด** (จาก `wg2_ppayment_*` เฉพาะงวดที่จ่ายแล้ว)
+   * **รายได้จริงของคนที่ออก แยกรายงวด 3 งวดล่าสุด** (เจ้าของสั่ง 25 ส.ค. 2569:
+   * *"ไม่ได้เอาแบบเฉลี่ย ขอดูแบบย้อนหลัง 3 เดือนเลย"*)
    *
-   * 🔴 `pay` = ฝั่ง **อัตราจ่าย** (ตัวเดียวกับ `total_income` ที่ประกาศเป็นรายได้ให้ผู้สมัคร)
-   * · `draw` = ฝั่ง **อัตราเบิก** · พิสูจน์การจับคู่แล้ว: ใบขอ payment_rate 15,565 ↔
-   * fee_amount 15,565 · draw_rate 19,588 ↔ draw_amount 19,587.9
-   * ⚠️ **`draw` เป็น 0 อยู่ 72/238 ใบ** ⇒ ห้ามใช้เป็นตัวหลัก · `pay` มีครบ 238/238
-   * ⚠️ `periods` อาจน้อยกว่า 3 ⇒ เฉลี่ยต้องหารด้วยเลขนี้ ไม่ใช่หาร 3 ตายตัว
+   * 🔴 `null` = **อ่านค่าไม่ได้/ไม่รู้** ต่างจากลิสต์ว่างที่แปลว่า "ไม่มีงวดจ่ายเลย"
+   * ⚠️ `pay` = ฝั่งอัตราจ่าย (ตัวเดียวกับ `total_income` ที่ประกาศให้ผู้สมัคร) ·
+   * `draw` = ฝั่งอัตราเบิก ซึ่ง **เป็น 0 อยู่ 72/238 ใบ** ⇒ ห้ามใช้เป็นตัวหลัก
+   * ⚠️ งวดสุดท้าย**มักไม่เต็มเดือน** (ออกกลางเดือน) ⇒ ต้องโชว์ช่วงวันของแต่ละงวดเสมอ
    */
-  resigned_income_3m_pay?: number | null;
-  resigned_income_3m_draw?: number | null;
-  resigned_income_3m_periods?: number | null;
-  resigned_income_3m_from?: string | null;
-  resigned_income_3m_to?: string | null;
+  resigned_income_3m?: ResignedIncomeMonth[] | null;
   /**
    * บรรทัดอัตราของใบขอ (อัตราจ่าย/อัตราเบิก) — **มีเฉพาะตอนโหลดหน้ารายละเอียด**
    * `undefined` = ยังไม่ได้โหลด (feed รายการไม่ส่งมา เพราะใบละ ~15 บรรทัด)

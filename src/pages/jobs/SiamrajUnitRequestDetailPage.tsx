@@ -19,7 +19,7 @@ import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
-import { UnitRequestReplacementDetail } from '@/components/jobs/UnitRequestReplacementToggle';
+import { UnitRequestReplacementSelect } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
   UnitRequestWorkStatusBadge,
   UnitRequestWorkStatusEditor,
@@ -27,12 +27,12 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, UserMinus, ClipboardList } from 'lucide-react';
 import {
   amountText,
-  formatMoney,
+  hasDrawSide,
   moneyFieldText,
-  summarizeResignedIncome,
+  resignedIncomeRows,
   visibleRateLines,
 } from '@/lib/unitRequestDetail';
 
@@ -205,7 +205,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   const urgencyHint = URGENCY_FILTER_OPTIONS.find((o) => o.value === urgencyMeta?.kind)?.hint;
   /** อัตราของใบขอ + รายได้จริงของคนเดิม — คิดที่ pure lib ที่เดียว (มีเทสต์คุม) */
   const rateLines = React.useMemo(() => (data ? visibleRateLines(data) : []), [data]);
-  const income = React.useMemo(() => (data ? summarizeResignedIncome(data) : null), [data]);
+  const incomeRows = React.useMemo(() => (data ? resignedIncomeRows(data) : null), [data]);
+  const showDraw = React.useMemo(() => (incomeRows ? hasDrawSide(incomeRows) : false), [incomeRows]);
 
   return (
     <div>
@@ -326,8 +327,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <Field label="เพศ" value={data.gender_requirement} />
                 <Field label="สัญชาติเจ้านาย" value={data.boss_nationality} />
                 <Field label="ประเภทใบขอ" value={data.request_action_name} />
-                <Field label="ชื่อคนลาออก" value={data.resigned_employee_name} />
-                <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />
                 <Field label="รายได้ (อัตราจ่าย)" value={data.total_income ? `฿${data.total_income.toLocaleString()}` : undefined} />
                 <Field label="วันเวลาเข้างาน" value={data.work_schedule} />
                 <Field label="ชื่อผู้ติดต่อหน่วยงาน" value={data.contact_name} />
@@ -338,21 +337,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     ชุดที่ 2 = **เงินที่ได้รับจริง** จากรอบจ่ายจริง wg2_ppayment
                     เคสจริง: อัตรา 19,588 ทุกงวด แต่จ่ายจริง 20,345 / 21,220 / 20,927 ไม่ตรงสักงวด
                     ⚠️ ไม่รู้ขึ้น "—" ห้ามขึ้น 0 · แต่ 0 ที่มาจากฐานจริงต้องขึ้น "0 บาท" */}
-                {/* 🔴 ใช้คำของ ERP ตรง ๆ ("อัตราจ่าย"/"อัตราเบิก") ไม่ตีความว่าฝั่งไหนคือใคร
-                    พิสูจน์การจับคู่แล้ว: ใบขอ payment_rate ↔ fee_amount ในงวดจ่ายจริง ·
-                    draw_rate ↔ draw_amount · แต่ "เบิก = ของใคร" เป็นนิยามทางบัญชี ไม่ใช่ของเรา */}
-                <Field
-                  label="คนเดิม — อัตราตามเงื่อนไข (ฝั่งเบิก)"
-                  value={moneyFieldText(data.resigned_wage_draw_rate)}
-                />
-                <Field
-                  label="คนเดิม — อัตราตามเงื่อนไข (ฝั่งจ่าย)"
-                  value={moneyFieldText(data.resigned_wage_fee_rate)}
-                />
-                <Field
-                  label="คนเดิม — อัตรานี้มีผลตั้งแต่"
-                  value={data.resigned_wage_effective_date}
-                />
               </div>
               ) : null}
 
@@ -403,32 +387,6 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 </div>
               ) : null}
 
-              {/* ── รายได้จริง 3 งวดล่าสุดของคนที่ออก/เปลี่ยนตัว ──────────────────
-                  🔴 เป็นค่า **ประมาณ** — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
-                  จึงต้องบอกทั้งช่วงวันและจำนวนงวด ห้ามโชว์เป็นตัวเลขชี้ขาด */}
-              {infoOpen && income ? (
-                <div className="rounded-xl border border-white/70 bg-white/40 p-3">
-                  <div className="text-xs font-semibold text-foreground">
-                    {data.resigned_employee_name || 'คนเดิม'} — รายได้จริงย้อนหลัง
-                  </div>
-                  <div className="mt-1 text-sm text-foreground">
-                    ประมาณเดือนละ{' '}
-                    <span className="font-semibold">{formatMoney(income.average)}</span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">
-                    รวม {formatMoney(income.total)} จาก {income.periods} งวด
-                    {income.period ? ` · ${income.period}` : ''}
-                  </div>
-                  {income.drawTotal !== null ? (
-                    <div className="text-[11px] text-muted-foreground">
-                      ฝั่งอัตราเบิกรวม {formatMoney(income.drawTotal)}
-                    </div>
-                  ) : null}
-                  <div className="mt-1 text-[10px] text-muted-foreground">
-                    ยอดจริงที่จ่ายแล้ว (รวมล่วงเวลา/เบี้ยเลี้ยง) — งวดสุดท้ายอาจไม่เต็มเดือน
-                  </div>
-                </div>
-              ) : null}
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
@@ -499,31 +457,83 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               )}
             </section>
 
-            {/* ประเภทหน่วยงาน ราชการ/เอกชน — เจ้าของสั่ง 25 ส.ค. 2569 (รอบสี่สิบห้า):
-                *"เอามาไว้ใต้ [ผู้รับผิดชอบ]"* · เดิมอยู่ในกริด "ข้อมูลใบขอ" ซึ่งหุบไว้เป็นค่าตั้งต้น
-                ⇒ คนที่ต้องกรอกต้องกางกล่องก่อนถึงจะเจอ · ย้ายออกมาแล้วเห็นทันทีที่เปิดใบ
-                🔴 คีย์ด้วย site_code ⇒ เลือกที่ใบนี้มีผลกับทุกใบขอของหน่วยงานเดียวกัน */}
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <Landmark className={cn("w-4 h-4", TONE.primary.value)} />
-                ราชการ / เอกชน
-              </h3>
-              <UnitSectorSelect
-                siteCode={data.site_code}
-                value={sector}
-                onChange={(code, next) => void changeSector(code, next)}
-                saving={savingSector}
-              />
-              {data.site_code ? (
-                <p className="text-xs text-muted-foreground">
-                  มีผลกับทุกใบขอของหน่วยงานนี้ ({data.site_code})
-                </p>
-              ) : (
-                // ใบขอล่วงหน้าไม่มีรหัสไซต์ ⇒ ไม่มีคีย์ให้บันทึก ต้องบอกตรง ๆ ว่าทำไมเลือกไม่ได้
-                <p className="text-xs text-muted-foreground">
-                  ใบขอนี้ยังไม่มีรหัสไซต์ จึงระบุประเภทหน่วยงานไม่ได้
-                </p>
-              )}
+
+            {/* ── สามช่องตั้งค่าใบขอ อยู่แถวเดียวกัน (เจ้าของสั่ง 25 ส.ค. 2569:
+                *"ทำให้อยู่แถวเดียวกันที และทำเป็น Dropdown รูปแบบเดียวกัน ... เพื่อความสวยงาม
+                ไม่ได้รวมข้อมูลกัน"*) — **ข้อมูลยังแยกกันเหมือนเดิม ไม่ได้ยุบรวม**
+                วางไว้เหนือ "หมายเหตุ" ตามที่สั่ง
+                ⚠️ สถานะทำงานมีฟอร์มย่อย (ชื่อคน/วันที่) โผล่เมื่อเลือกสถานะที่ต้องระบุคน
+                จึงให้ทั้งกล่องกินเต็มแถวเมื่อฟอร์มนั้นเปิด — ไม่งั้นช่องกรอกแคบจนใช้ไม่ได้ */}
+            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+              <div className="grid items-start gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Landmark className={cn('w-3.5 h-3.5', TONE.primary.value)} />
+                    ราชการ / เอกชน
+                  </label>
+                  <UnitSectorSelect
+                    siteCode={data.site_code}
+                    value={sector}
+                    onChange={(code, next) => void changeSector(code, next)}
+                    saving={savingSector}
+                    className="w-full"
+                    triggerClassName="w-full"
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    {data.site_code
+                      ? `มีผลกับทุกใบขอของหน่วยงานนี้ (${data.site_code})`
+                      : 'ใบขอนี้ยังไม่มีรหัสไซต์ จึงระบุประเภทหน่วยงานไม่ได้'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <UserCheck className={cn('w-3.5 h-3.5', TONE.primary.value)} />
+                    ส่งคนแทน
+                  </label>
+                  <UnitRequestReplacementSelect
+                    job={data}
+                    onSaved={(sendReplacement) => {
+                      queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                        old ? { ...old, send_replacement: sendReplacement } : old,
+                      );
+                    }}
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    ใบขอนี้ส่งคนแทนหรือไม่
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <ClipboardList className={cn('w-3.5 h-3.5', TONE.primary.value)} />
+                    สถานะทำงาน
+                  </label>
+                  {requestKey ? (
+                    <UnitRequestWorkStatusEditor
+                      requestKey={requestKey}
+                      initialStatus={data.work_status}
+                      initialFirstName={data.work_person_first_name}
+                      initialLastName={data.work_person_last_name}
+                      initialStatusDate={data.work_status_date}
+                      initialPersons={data.work_persons}
+                      hideLabel
+                      onSaved={(next) => {
+                        queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
+                          old ? { ...old, ...next } : old,
+                        );
+                      }}
+                    />
+                  ) : (
+                    <p className="text-xs text-destructive">
+                      ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกสถานะไม่ได้
+                    </p>
+                  )}
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    เก็บใน Jarvis — ไม่แก้สถานะบน Siamraj
+                  </p>
+                </div>
+              </div>
             </section>
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
@@ -541,60 +551,86 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               />
             </section>
 
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <UserCheck className={cn("w-4 h-4", TONE.primary.value)} />
-                ส่งคนแทน
-              </h3>
-              <p className="text-xs text-muted-foreground">เลือกว่าใบขอนี้ส่งคนแทนหรือไม่ส่งคนแทน</p>
-              <UnitRequestReplacementDetail
-                job={data}
-                onSaved={(sendReplacement) => {
-                  queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
-                    old ? { ...old, send_replacement: sendReplacement } : old,
-                  );
-                }}
-              />
-            </section>
 
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <ClipboardList className={cn("w-4 h-4", TONE.primary.value)} />
-                สถานะทำงาน
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                เก็บในฐานข้อมูล Jarvis สำหรับติดตามงานและ Dashboard — ไม่แก้สถานะบน Siamraj
-              </p>
-              {requestKey ? (
-                <UnitRequestWorkStatusEditor
-                  requestKey={requestKey}
-                  initialStatus={data.work_status}
-                  initialFirstName={data.work_person_first_name}
-                  initialLastName={data.work_person_last_name}
-                  initialStatusDate={data.work_status_date}
-                  initialPersons={data.work_persons}
-                  onSaved={(next) => {
-                    queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>
-                      old ? { ...old, ...next } : old,
-                    );
-                  }}
-                />
-              ) : (
-                <p className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกสถานะไม่ได้</p>
-              )}
-            </section>
 
             {/* ⚠️ ส่วน "ประวัติการแก้ไข" ถูกย้ายไปป๊อปอัปการ์ดในกล่องงานแล้ว
                 (เจ้าของ clarify 21 ส.ค. 2569: *"ฉันหมายถึงหน้ากล่องงาน — ของหน้าใบงาน
                 ทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*) — ดูที่ JobBoardView แท็บรายละเอียดงาน */}
 
             <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
-              <h3 className="text-sm font-semibold">ผู้ลาออก / ตำแหน่ง</h3>
-              <div className="grid sm:grid-cols-2 gap-2">
-                <Field label="ชื่อคนลาออก" value={data.resigned_employee_name} />
+              {/* กล่องเดียวจบเรื่องคนที่ออก (เจ้าของสั่ง 25 ส.ค. 2569: *"มันข้อมูลเหมือนกันอะ
+                  รวมกันให้ที จะกลายเป็น มี ชื่อ นามสกุล สาเหตุที่ลาออก รายได้ย้อนหลัง 3 เดือน"*)
+                  เดิมชื่อ/สาเหตุซ้ำอยู่ในกริด "ข้อมูลใบขอ" ด้วย — ถอดออกจากที่นั่นแล้ว */}
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <UserMinus className={cn('w-4 h-4', TONE.primary.value)} />
+                คนที่ออก / เปลี่ยนตัว
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Field label="ชื่อ - นามสกุล" value={data.resigned_employee_name} />
                 <Field label="สาเหตุที่ลาออก" value={data.resigned_reason} />
                 <Field label="รุ่น/ประเภทรถ" value={data.vehicle_required} />
-                <Field label="เบอร์ติดต่อ" value={data.contact_phone} />
+                <Field label="เบอร์ติดต่อหน่วยงาน" value={data.contact_phone} />
+              </div>
+
+              {/* อัตราตามเงื่อนไขของคนคนนี้ — คนละเรื่องกับรายได้จริงข้างล่าง
+                  🔴 ใช้คำ ERP ตรง ๆ ("ฝั่งจ่าย"/"ฝั่งเบิก") ไม่ตีความว่าฝั่งไหนเป็นเงินของใคร */}
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Field
+                  label="อัตราตามเงื่อนไข (ฝั่งจ่าย)"
+                  value={moneyFieldText(data.resigned_wage_fee_rate)}
+                />
+                <Field
+                  label="อัตราตามเงื่อนไข (ฝั่งเบิก)"
+                  value={moneyFieldText(data.resigned_wage_draw_rate)}
+                />
+                <Field label="อัตรานี้มีผลตั้งแต่" value={data.resigned_wage_effective_date} />
+              </div>
+
+              {/* ── รายได้จริงย้อนหลัง 3 งวด — **แยกรายงวด ไม่ใช่ค่าเฉลี่ย** ──────────
+                  (เจ้าของสั่ง: *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
+                  🔴 ต้องมีช่วงวันของทุกงวด — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
+                  ยอดจะดูต่ำผิดปกติถ้าไม่บอกว่าเป็นงวดสั้น */}
+              <div className="rounded-xl border border-white/70 bg-white/40 p-3">
+                <div className="text-xs font-semibold text-foreground">
+                  รายได้จริงย้อนหลัง 3 งวด
+                </div>
+                {incomeRows ? (
+                  <table className="mt-2 w-full table-fixed text-xs">
+                    <thead>
+                      <tr className="text-left text-[10px] text-muted-foreground">
+                        <th className="w-1/2 pb-1 pr-2 font-medium">งวด</th>
+                        <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
+                        {showDraw ? (
+                          <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
+                        ) : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {incomeRows.map((r) => (
+                        <tr key={r.key} className="border-t border-white/60">
+                          <td className="py-1 pr-2 break-words">{r.period}</td>
+                          {/* null = งวดนั้นไม่มีบรรทัดฝั่งนี้ ⇒ "—" ห้ามขึ้น 0 */}
+                          <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
+                            {amountText(r.pay) ?? '—'}
+                          </td>
+                          {showDraw ? (
+                            <td className="whitespace-nowrap py-1 text-right tabular-nums">
+                              {amountText(r.draw) ?? '—'}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  // ไม่มีของ ต้องบอกว่าไม่มี ห้ามปล่อยว่างให้คนเดาว่าพัง
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    ไม่พบงวดจ่ายจริงของคนคนนี้ในระบบ ERP
+                  </p>
+                )}
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  ยอดจริงที่จ่ายแล้ว (รวมล่วงเวลา/เบี้ยเลี้ยง) — งวดสุดท้ายอาจไม่เต็มเดือน
+                </p>
               </div>
             </section>
 

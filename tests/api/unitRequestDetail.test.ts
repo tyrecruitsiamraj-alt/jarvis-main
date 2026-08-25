@@ -16,7 +16,8 @@ import {
   formatMoney,
   moneyFieldText,
   paidPeriodText,
-  summarizeResignedIncome,
+  resignedIncomeRows,
+  hasDrawSide,
   visibleRateLines,
 } from '../../src/lib/unitRequestDetail.js';
 import type { JobRequest } from '../../src/types/index.js';
@@ -143,61 +144,53 @@ describe('paidPeriodText — งวดจ่ายจริง', () => {
 });
 
 /**
- * รายได้จริง 3 งวดล่าสุดของคนที่ออก (เจ้าของสั่ง 25 ส.ค. 2569)
- * 🔴 ด่านที่ห้ามหลุด: หารด้วยจำนวนงวดจริง · ไม่มีงวด = null ห้ามคืน 0
+ * รายได้จริงของคนที่ออก **แยกรายงวด** (เจ้าของสั่ง 25 ส.ค. 2569:
+ * "ไม่ได้เอาแบบเฉลี่ย ขอดูแบบย้อนหลัง 3 เดือนเลย")
  */
-describe('summarizeResignedIncome', () => {
-  it('เฉลี่ยหารด้วยจำนวนงวดจริง ไม่ใช่หาร 3 ตายตัว', () => {
-    const r = summarizeResignedIncome(
-      job({ resigned_income_3m_pay: 40000, resigned_income_3m_periods: 2 }),
-    )!;
-    expect(r.average).toBe(20000);
-    expect(r.periods).toBe(2);
+describe('resignedIncomeRows', () => {
+  const m = (over: Partial<import('../../src/types/index.js').ResignedIncomeMonth>) => ({
+    from: '2026-07-01',
+    to: '2026-07-31',
+    pay: 20345.32,
+    draw: 24974.38,
+    ...over,
   });
 
-  it('ครบ 3 งวดก็หาร 3', () => {
-    const r = summarizeResignedIncome(
-      job({ resigned_income_3m_pay: 60000, resigned_income_3m_periods: 3 }),
-    )!;
-    expect(r.average).toBe(20000);
-  });
-
-  it('🔴 ไม่มีงวดเลย = null ห้ามคืน 0 (0 บาทกับไม่มีข้อมูลคนละเรื่อง)', () => {
-    expect(summarizeResignedIncome(job({ resigned_income_3m_periods: 0 }))).toBeNull();
-    expect(summarizeResignedIncome(job())).toBeNull();
-    expect(
-      summarizeResignedIncome(job({ resigned_income_3m_periods: 3, resigned_income_3m_pay: null })),
-    ).toBeNull();
-  });
-
-  it('ฝั่งเบิกเป็น 0 = สัญญาไม่มีบรรทัดเบิก ⇒ ไม่ต้องโชว์ (72/238 ใบเป็นแบบนี้)', () => {
-    const r = summarizeResignedIncome(
-      job({ resigned_income_3m_pay: 30000, resigned_income_3m_periods: 3, resigned_income_3m_draw: 0 }),
-    )!;
-    expect(r.drawTotal).toBeNull();
-  });
-
-  it('ฝั่งเบิกมีเลข = ส่งต่อให้จอ', () => {
-    const r = summarizeResignedIncome(
+  it('คืนรายงวดตรง ๆ ไม่ยุบเป็นค่าเฉลี่ย', () => {
+    const rows = resignedIncomeRows(
       job({
-        resigned_income_3m_pay: 30000,
-        resigned_income_3m_periods: 3,
-        resigned_income_3m_draw: 37000,
+        resigned_income_3m: [
+          m({}),
+          m({ from: '2026-06-01', to: '2026-06-30', pay: 21220.84 }),
+        ],
       }),
     )!;
-    expect(r.drawTotal).toBe(37000);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].period).toBe('2026-07-01 ถึง 2026-07-31');
+    expect(rows[0].pay).toBe(20345.32);
   });
 
-  it('ส่งช่วงวันของงวดไปด้วย (งวดสุดท้ายอาจไม่เต็มเดือน)', () => {
-    const r = summarizeResignedIncome(
-      job({
-        resigned_income_3m_pay: 30000,
-        resigned_income_3m_periods: 3,
-        resigned_income_3m_from: '2026-05-01',
-        resigned_income_3m_to: '2026-07-31',
-      }),
-    )!;
-    expect(r.period).toBe('2026-05-01 ถึง 2026-07-31');
+  it('🔴 ไม่มีของ = null (จอบอกว่าไม่พบ) ไม่ใช่ลิสต์ว่างเงียบ ๆ', () => {
+    expect(resignedIncomeRows(job())).toBeNull();
+    expect(resignedIncomeRows(job({ resigned_income_3m: [] }))).toBeNull();
+    expect(resignedIncomeRows(job({ resigned_income_3m: null }))).toBeNull();
+  });
+
+  it('งวดที่ไม่มีฝั่งจ่าย คง null ไว้ ห้ามแปลงเป็น 0 บาท', () => {
+    const rows = resignedIncomeRows(job({ resigned_income_3m: [m({ pay: null })] }))!;
+    expect(rows[0].pay).toBeNull();
+  });
+
+  it('ไม่รู้ช่วงงวดก็ยังต้องมีคำอ่านออก', () => {
+    const rows = resignedIncomeRows(job({ resigned_income_3m: [m({ from: null, to: null })] }))!;
+    expect(rows[0].period).toBe('ไม่ทราบช่วงงวด');
+  });
+
+  it('hasDrawSide: ฝั่งเบิกเป็น 0/null ทุกงวด = ไม่ต้องวาดคอลัมน์นั้น', () => {
+    const zero = resignedIncomeRows(job({ resigned_income_3m: [m({ draw: 0 })] }))!;
+    expect(hasDrawSide(zero)).toBe(false);
+    const some = resignedIncomeRows(job({ resigned_income_3m: [m({ draw: 100 })] }))!;
+    expect(hasDrawSide(some)).toBe(true);
   });
 });
 

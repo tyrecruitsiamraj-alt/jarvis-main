@@ -31,6 +31,8 @@ const UNSET = '__unset__';
 
 export type UnitSectorSelectProps = {
   siteCode?: string | null;
+  /** คลาสของตัวปุ่ม select — ใช้ตอนวางในกริดที่ต้องกว้างเต็มช่อง */
+  triggerClassName?: string;
   value: UnitSector | null;
   onChange: (siteCode: string, next: UnitSector | null) => void;
   /** กำลังบันทึกอยู่ — กันกดรัว */
@@ -40,6 +42,7 @@ export type UnitSectorSelectProps = {
 
 export const UnitSectorSelect: React.FC<UnitSectorSelectProps> = ({
   siteCode,
+  triggerClassName,
   value,
   onChange,
   saving = false,
@@ -67,7 +70,7 @@ export const UnitSectorSelect: React.FC<UnitSectorSelectProps> = ({
         onValueChange={(v) => onChange(code, v === UNSET ? null : (v as UnitSector))}
       >
         <SelectTrigger
-          className="h-8 min-h-8 w-[104px] px-2 text-xs"
+          className={cn('h-8 min-h-8 w-[104px] px-2 text-xs', triggerClassName)}
           aria-label={`ประเภทหน่วยงาน ${code} — มีผลกับทุกใบขอของหน่วยงานนี้`}
           title="เลือกแล้วมีผลกับทุกใบขอของหน่วยงานนี้"
         >

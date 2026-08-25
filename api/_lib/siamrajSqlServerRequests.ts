@@ -12,6 +12,7 @@ import {
   primaryJobRoleLabel,
 } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
+import type { ResignedIncomeMonth } from '@/types';
 import {
   boardStaffingRequestTypeWhereSql,
   excludeInternalReplacementRoleWhereSql,
@@ -85,31 +86,51 @@ type SqlServerRequestRow = {
   resigned_wage_fee_rate: number | null;
   resigned_wage_effective_date: string | Date | null;
   /**
-   * **รายได้จริงของคนที่ออก รวม 3 งวดล่าสุด** (เจ้าของสั่ง 25 ส.ค. 2569 รอบสี่สิบสี่:
-   * *"3 เดือนล่าสุดเขาได้รายได้ประมาณเท่าไหร่"*) — จาก `wg2_ppayment_*` เฉพาะ `is_payment='Y'`
+   * **รายได้จริงของคนที่ออก แยกรายงวด 3 งวดล่าสุด** (เจ้าของสั่ง 25 ส.ค. 2569:
+   * *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
+   *
+   * เป็น **JSON string** จาก `FOR JSON PATH` — คืนรายงวดตรง ๆ ไม่ยุบเป็นยอดรวม
+   * รูปแบบ: `[{ "f": วันเริ่มงวด, "t": วันจบงวด, "pay": ฝั่งอัตราจ่าย, "drw": ฝั่งอัตราเบิก }]`
    *
    * 🔴 **สองฝั่งตามคำของ ERP เอง ห้ามตีความใหม่** (พิสูจน์การจับคู่แล้ว 25 ส.ค. 2569):
-   * ใบขอ `payment_rate` (**อัตราจ่าย**) = 15,565 ↔ `fee_amount` ในงวดจ่ายจริง = 15,565
-   * ใบขอ `draw_rate` (**อัตราเบิก**) = 19,588 ↔ `draw_amount` ในงวดจ่ายจริง = 19,587.9
-   * ⇒ `pay` = ฝั่งอัตราจ่าย (ตัวเดียวกับ `total_income` ที่ประกาศเป็นรายได้ให้ผู้สมัคร)
-   *   · `draw` = ฝั่งอัตราเบิก
-   *
-   * ⚠️ **`draw` เป็น 0 อยู่ 72 / 238 ใบ (30%)** — ไม่ใช่ทุกสัญญาที่มีบรรทัดเบิก
-   *   ⇒ ห้ามเอา `draw` ไปเป็นตัวหลัก · `pay` มีครบ 238/238
-   * ⚠️ `periods` อาจน้อยกว่า 3 (เพิ่งเข้างาน) ⇒ **ต้องส่งมาด้วย** จอจะได้หารถูก
-   *   และบอกได้ว่าเฉลี่ยจากกี่งวด
+   * ใบขอ `payment_rate` (**อัตราจ่าย**) 15,565 ↔ `fee_amount` 15,565 ·
+   * `draw_rate` (**อัตราเบิก**) 19,588 ↔ `draw_amount` 19,587.9
+   * ⚠️ **ฝั่งเบิกเป็น 0 อยู่ 72/238 ใบ (30%)** ⇒ ห้ามใช้เป็นตัวหลัก · ฝั่งจ่ายมีครบ 238/238
+   * ⚠️ อาจได้น้อยกว่า 3 งวด (เพิ่งเข้างาน) และงวดสุดท้าย**มักไม่เต็มเดือน** (ออกกลางเดือน)
    */
-  resigned_income_3m_pay: number | null;
-  resigned_income_3m_draw: number | null;
-  resigned_income_3m_periods: number | null;
-  resigned_income_3m_from: string | Date | null;
-  resigned_income_3m_to: string | Date | null;
+  resigned_income_3m: string | null;
   fee_name: string | null;
   abs_customer_fine: number | null;
   contact_name: string | null;
   contract_type_code: string | null;
   contract_type_name: string | null;
 };
+
+/**
+ * แปลง JSON รายงวดจาก `FOR JSON PATH` เป็นลิสต์ที่ฝั่งจอใช้ได้เลย
+ *
+ * 🔴 อ่านไม่ออก/ไม่มีของ = `null` **ห้ามคืน `[]`** — ลิสต์ว่างแปลว่า "ไม่มีงวดจ่ายเลย"
+ * ซึ่งคนละเรื่องกับ "อ่านค่าไม่ได้" · จอจะได้เลือกคำที่ถูก
+ * ⚠️ `pay`/`drw` อาจเป็น null รายงวด (งวดนั้นไม่มีบรรทัดฝั่งนั้น) — คงไว้เป็น null ห้ามแปลงเป็น 0
+ */
+function parseIncomeMonths(raw: unknown): ResignedIncomeMonth[] | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const out = parsed
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+      .map((x) => ({
+        from: toYmd(x.f as string | Date | null) || null,
+        to: toYmd(x.t as string | Date | null) || null,
+        pay: typeof x.pay === 'number' && Number.isFinite(x.pay) ? x.pay : null,
+        draw: typeof x.drw === 'number' && Number.isFinite(x.drw) ? x.drw : null,
+      }));
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
 
 function toIso(v: Date | string | null | undefined): string | null {
   if (v == null) return null;
@@ -261,11 +282,7 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     resigned_wage_draw_rate: r.resigned_wage_draw_rate ?? null,
     resigned_wage_fee_rate: r.resigned_wage_fee_rate ?? null,
     resigned_wage_effective_date: toYmd(r.resigned_wage_effective_date) || null,
-    resigned_income_3m_pay: r.resigned_income_3m_pay ?? null,
-    resigned_income_3m_draw: r.resigned_income_3m_draw ?? null,
-    resigned_income_3m_periods: r.resigned_income_3m_periods ?? null,
-    resigned_income_3m_from: toYmd(r.resigned_income_3m_from) || null,
-    resigned_income_3m_to: toYmd(r.resigned_income_3m_to) || null,
+    resigned_income_3m: parseIncomeMonths(r.resigned_income_3m),
     job_type: jobType,
     /**
      * 🔴 ค่าโครงสร้าง ไม่ใช่ของจริง — ERP ไม่มีฟิลด์นี้ และ CHECK ของตาราง `jobs`
@@ -345,12 +362,8 @@ const BASE_SQL = `
     WCH.wage_draw_rate AS resigned_wage_draw_rate,
     WCH.wage_fee_rate AS resigned_wage_fee_rate,
     WCH.effective_date AS resigned_wage_effective_date,
-    -- รายได้จริง 3 งวดล่าสุด (25 ส.ค. 2569) — คนละเรื่องกับอัตราข้างบน
-    PAY3.pay_total AS resigned_income_3m_pay,
-    PAY3.draw_total AS resigned_income_3m_draw,
-    PAY3.periods AS resigned_income_3m_periods,
-    PAY3.from_date AS resigned_income_3m_from,
-    PAY3.to_date AS resigned_income_3m_to,
+    -- รายได้จริง 3 งวดล่าสุด **แยกรายงวด** (25 ส.ค. 2569) — คนละเรื่องกับอัตราข้างบน
+    PAY3.months AS resigned_income_3m,
     B.work_date,
     B.work_time,
     B.age,
@@ -372,24 +385,22 @@ const BASE_SQL = `
      WHERE ch.staff_id = S.staff_id
      ORDER BY ch.effective_date DESC, ch.runno DESC
   ) WCH
-  /* รายได้จริง 3 งวดล่าสุด — เอาเฉพาะงวดที่จ่ายแล้ว (is_payment = 'Y')
-     ต้องซ้อน derived table เพราะ SUM ของ SUM ตรง ๆ SQL Server ไม่ยอม
-     (Cannot perform an aggregate function on an expression containing an aggregate)
+  /* รายได้จริง 3 งวดล่าสุด **แยกรายงวด** — เอาเฉพาะงวดที่จ่ายแล้ว (is_payment = 'Y')
+     คืนเป็น JSON เพราะเจ้าของขอเห็นรายเดือน ไม่ใช่ยอดรวม/ค่าเฉลี่ย
      ⚠️ ห้ามใส่ backtick ในคอมเมนต์ตรงนี้ — SQL ก้อนนี้อยู่ใน template literal
         เผลอใส่แล้วสตริงขาดกลางคัน tsc ฟ้อง comma expected (เจอมาแล้ว 25 ส.ค. 2569) */
   OUTER APPLY (
-    SELECT COUNT(*) AS periods, MIN(p.begin_date) AS from_date, MAX(p.end_date) AS to_date,
-           SUM(p.pay_amt) AS pay_total, SUM(p.draw_amt) AS draw_total
-      FROM (
-        SELECT TOP 3 h.begin_date, h.end_date,
-               (SELECT SUM(d.fee_amount)  FROM wg2_ppayment_detail d
-                 WHERE d.ppayment_no = h.ppayment_no) AS pay_amt,
-               (SELECT SUM(d.draw_amount) FROM wg2_ppayment_detail d
-                 WHERE d.ppayment_no = h.ppayment_no) AS draw_amt
-          FROM wg2_ppayment_head h
-         WHERE h.staff_id = S.staff_id AND h.is_payment = 'Y'
-         ORDER BY h.begin_date DESC
-      ) p
+    SELECT (
+      SELECT TOP 3 h.begin_date AS f, h.end_date AS t,
+             (SELECT SUM(d.fee_amount)  FROM wg2_ppayment_detail d
+               WHERE d.ppayment_no = h.ppayment_no) AS pay,
+             (SELECT SUM(d.draw_amount) FROM wg2_ppayment_detail d
+               WHERE d.ppayment_no = h.ppayment_no) AS drw
+        FROM wg2_ppayment_head h
+       WHERE h.staff_id = S.staff_id AND h.is_payment = 'Y'
+       ORDER BY h.begin_date DESC
+       FOR JSON PATH
+    ) AS months
   ) PAY3
   INNER JOIN st_request_p2 B ON A.request_no = B.request_no
   INNER JOIN st_request_p3_rate C ON B.request_no = C.request_no
@@ -423,8 +434,7 @@ const SELECT_COLUMNS = `
   reason_main_name, work_addr, work_place, boss_nationality, work_date, work_time, age, sex,
   payment_rate, draw_rate, fee_name, abs_customer_fine, contact_name,
   resigned_wage_draw_rate, resigned_wage_fee_rate, resigned_wage_effective_date,
-  resigned_income_3m_pay, resigned_income_3m_draw, resigned_income_3m_periods,
-  resigned_income_3m_from, resigned_income_3m_to
+  resigned_income_3m
 `;
 
 function boardRequestTypeExtraWhere(alias = 'A'): string {

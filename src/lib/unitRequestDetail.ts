@@ -93,40 +93,37 @@ export function paidPeriodText(
 }
 
 /**
- * สรุป "3 เดือนล่าสุดคนที่ออกได้เท่าไหร่" (เจ้าของสั่ง 25 ส.ค. 2569)
+ * รายได้จริงของคนที่ออก **แยกรายงวด** (เจ้าของสั่ง 25 ส.ค. 2569:
+ * *"ไม่ได้เอาแบบเฉลี่ย ขอดูแบบย้อนหลัง 3 เดือนเลย"*)
  *
  * 🔴 กติกาที่ฝังไว้:
- * 1. **หารด้วยจำนวนงวดจริง ไม่ใช่หาร 3 ตายตัว** — คนที่เพิ่งเข้างานมีไม่ครบ 3 งวด
- *    หาร 3 แล้วค่าเฉลี่ยจะต่ำกว่าจริงเงียบ ๆ
- * 2. **บอกจำนวนงวดบนจอเสมอ** — "เฉลี่ยเดือนละ X (จาก 2 งวด)" ต่างจาก "จาก 3 งวด"
- * 3. **ไม่มีงวดเลย = `null` ทั้งก้อน** ห้ามคืน 0 (0 บาทกับ "ไม่มีข้อมูล" คนละเรื่อง)
- * 4. งวดของคนที่ออก **งวดสุดท้ายมักไม่เต็มเดือน** ⇒ เป็นค่า **ประมาณ** เท่านั้น
- *    จอต้องใช้คำว่า "ประมาณ" ห้ามทำเป็นตัวเลขชี้ขาด
+ * 1. **ไม่ยุบเป็นค่าเฉลี่ย** — คืนรายงวดตรง ๆ ให้จอวาดทีละบรรทัด
+ * 2. **`null` (อ่านไม่ได้) ต่างจากลิสต์ว่าง (ไม่มีงวดจ่ายเลย)** ⇒ คืน `null` ทั้งก้อนเมื่อไม่รู้
+ * 3. งวดที่ `pay` เป็น `null` = งวดนั้นไม่มีบรรทัดฝั่งจ่าย **ห้ามแปลงเป็น 0 บาท**
+ * 4. งวดสุดท้าย**มักไม่เต็มเดือน** ⇒ ทุกงวดต้องมีช่วงวันติดไปด้วยเสมอ
  */
-export type ResignedIncomeSummary = {
-  /** ยอดรวมฝั่งอัตราจ่าย */
-  total: number;
-  /** เฉลี่ยต่องวด */
-  average: number;
-  periods: number;
-  /** ยอดรวมฝั่งอัตราเบิก — `null` = สัญญานี้ไม่มีบรรทัดเบิก (72/238 ใบเป็นแบบนี้) */
-  drawTotal: number | null;
-  period: string | undefined;
+export type ResignedIncomeRow = {
+  key: string;
+  /** ป้ายงวด — "2026-07-01 ถึง 2026-07-31" */
+  period: string;
+  pay: number | null;
+  draw: number | null;
 };
 
-export function summarizeResignedIncome(job: JobRequest): ResignedIncomeSummary | null {
-  const periods = Math.trunc(job.resigned_income_3m_periods ?? 0);
-  const total = job.resigned_income_3m_pay;
-  if (periods <= 0 || typeof total !== 'number' || !Number.isFinite(total)) return null;
-  const draw = job.resigned_income_3m_draw;
-  return {
-    total,
-    average: total / periods,
-    periods,
-    // 0 = สัญญาไม่มีบรรทัดเบิก ⇒ ไม่ต้องโชว์ (ต่างจากมีบรรทัดแล้วเบิก 0 บาท ซึ่งฐานนี้แยกไม่ได้)
-    drawTotal: typeof draw === 'number' && draw > 0 ? draw : null,
-    period: paidPeriodText(job.resigned_income_3m_from, job.resigned_income_3m_to),
-  };
+export function resignedIncomeRows(job: JobRequest): ResignedIncomeRow[] | null {
+  const months = job.resigned_income_3m;
+  if (!Array.isArray(months) || months.length === 0) return null;
+  return months.map((m, i) => ({
+    key: `${m.from ?? 'x'}-${m.to ?? 'x'}-${i}`,
+    period: paidPeriodText(m.from, m.to) ?? 'ไม่ทราบช่วงงวด',
+    pay: typeof m.pay === 'number' && Number.isFinite(m.pay) ? m.pay : null,
+    draw: typeof m.draw === 'number' && Number.isFinite(m.draw) ? m.draw : null,
+  }));
+}
+
+/** มีงวดไหนที่ฝั่งเบิกมีเลขจริงไหม — ไม่มีเลยก็ไม่ต้องวาดคอลัมน์เบิกให้รก */
+export function hasDrawSide(rows: readonly ResignedIncomeRow[]): boolean {
+  return rows.some((r) => typeof r.draw === 'number' && r.draw > 0);
 }
 
 /**

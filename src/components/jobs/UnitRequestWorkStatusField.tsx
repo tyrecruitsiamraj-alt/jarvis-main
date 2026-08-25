@@ -35,6 +35,8 @@ type Props = {
   initialLastName?: string | null;
   initialStatusDate?: string | null;
   initialPersons?: Array<{ first_name?: string | null; last_name?: string | null; status_date?: string | null }> | null;
+  /** ซ่อนป้าย "สถานะทำงาน" ของตัวเอง (ผู้เรียกวางป้ายให้แล้ว) */
+  hideLabel?: boolean;
   onSaved?: (next: SavedPayload) => void;
 };
 
@@ -124,6 +126,7 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
   initialLastName,
   initialStatusDate,
   initialPersons,
+  hideLabel,
   onSaved,
 }) => {
   const { isFunctionEnabled } = useRolePermissions();
@@ -249,7 +252,10 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1 block">สถานะทำงาน</label>
+        {/* ป้ายซ่อนได้ — บนหน้าใบขอ กริดสามช่องเป็นคนวางป้ายให้เอง จะได้ไม่ซ้ำสองชั้น */}
+        {hideLabel ? null : (
+          <label className="text-xs font-medium text-muted-foreground mb-1 block">สถานะทำงาน</label>
+        )}
         <select
           value={status}
           disabled={readOnly || saving}

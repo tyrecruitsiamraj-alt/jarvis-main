@@ -19,12 +19,14 @@ import { publicJobPositionLabel } from './unitRequestDisplay';
 import { extractJobSubtypeLabel } from './siamrajUnitFilters';
 import { positionBreakdownFromJob } from './requestControl';
 import { UNIT_REQUEST_WORK_STATUS_LABELS, isUnitRequestWorkStatus } from './unitRequestWorkStatus';
+import { UNIT_SECTOR_LABEL } from './unitSector';
 
 /** คอลัมน์ที่กดเรียงได้ — เรียงตามลำดับที่โผล่บนตารางจริง */
 export const JOB_LIST_TABLE_COLUMNS = [
   'request_no',
   'age',
   'unit',
+  'sector',
   'submitted',
   'required',
   'remaining',
@@ -45,6 +47,7 @@ export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   request_no: 'เลขที่ใบขอ',
   age: 'ผ่านมา',
   unit: 'หน่วยงาน',
+  sector: 'ราชการ/เอกชน',
   submitted: 'วันที่กรอก',
   required: 'วันที่ต้องการ',
   remaining: 'คงเหลือ',
@@ -172,6 +175,14 @@ export function tableSortValue(
         text: isUnitRequestWorkStatus(raw) ? UNIT_REQUEST_WORK_STATUS_LABELS[raw] : raw,
       };
     }
+    /**
+     * ราชการ/เอกชน — **อ่านอย่างเดียวบนหน้ารายการ** (เจ้าของสั่ง 25 ส.ค. 2569:
+     * *"เอาราชการ/เอกชนไปบอกด้วยว่าเป็นอะไร แต่ถ้าจะเลือกต้องมาเลือกข้างใน"*)
+     * 🔴 "ยังไม่ระบุ" ถือเป็น**ค่าว่าง ตกท้ายเสมอ** เหมือนคอลัมน์อื่น — ไม่ใช่คำที่เอาไปเรียง
+     * (กติกาเดิมจากรอบสามสิบเจ็ด ตอนคอลัมน์นี้เคยอยู่ในตาราง)
+     */
+    case 'sector':
+      return job.unit_sector ? { text: UNIT_SECTOR_LABEL[job.unit_sector] } : {};
     case 'note':
       return textVal(job.list_note);
     default:

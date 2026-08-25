@@ -5,6 +5,16 @@ import { saveUnitRequestMeta } from '@/lib/siamrajUnitRequestsApi';
 import { unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import { cn } from '@/lib/utils';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+/** ค่าที่แทน "ยังไม่ระบุ" ใน Select — Radix ห้าม value ว่าง */
+const UNSET = '__unset__';
 
 type Props = {
   job: JobRequest;
@@ -99,6 +109,69 @@ export function UnitRequestReplacementDetail({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * ส่งคนแทน แบบ **dropdown** — เจ้าของสั่ง 25 ส.ค. 2569 ให้สามกล่องบนหน้าใบขอ
+ * (ราชการ/เอกชน · ส่งคนแทน · สถานะทำงาน) อยู่แถวเดียวกันและ **หน้าตาเหมือนกัน**
+ *
+ * 🔴 ยังเป็นสามค่าเหมือนปุ่มเดิม: ยังไม่ระบุ (`null`) / ส่งคนแทน (`true`) / ไม่ส่งคนแทน (`false`)
+ * **ห้ามยุบ "ยังไม่ระบุ" ทิ้ง** — ใบที่ยังไม่มีใครตัดสินใจต้องต่างจาก "ไม่ส่งคนแทน"
+ * (ปุ่มเดิมล้างค่าได้ด้วยการกดซ้ำ · dropdown ต้องมีตัวเลือกนี้ให้ชัดแทน)
+ */
+export function UnitRequestReplacementSelect({
+  job,
+  onSaved,
+  className,
+}: {
+  job: JobRequest;
+  onSaved?: (sendReplacement: boolean | null) => void;
+  className?: string;
+}) {
+  const { isFunctionEnabled } = useRolePermissions();
+  const readOnly = !isFunctionEnabled('unit_notes_edit');
+  const [value, setValue] = useState<boolean | null | undefined>(job.send_replacement);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(job.send_replacement);
+  }, [job.id, job.send_replacement]);
+
+  const current = value === true ? 'yes' : value === false ? 'no' : UNSET;
+
+  const persist = async (next: boolean | null) => {
+    const key = unitRequestNoteKey(job);
+    if (!key) return;
+    const prev = value;
+    setValue(next);
+    setSaving(true);
+    try {
+      await saveUnitRequestMeta(key, { send_replacement: next });
+      onSaved?.(next);
+    } catch {
+      // ล้มแล้วถอยกลับค่าเดิม — ห้ามให้จอโกหกว่าบันทึกแล้ว
+      setValue(prev);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Select
+      value={current}
+      disabled={readOnly || saving}
+      onValueChange={(v) => void persist(v === UNSET ? null : v === 'yes')}
+    >
+      <SelectTrigger className={cn('w-full', className)} aria-label="ส่งคนแทนหรือไม่">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={UNSET}>ยังไม่ระบุ</SelectItem>
+        <SelectItem value="yes">ส่งคนแทน</SelectItem>
+        <SelectItem value="no">ไม่ส่งคนแทน</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
