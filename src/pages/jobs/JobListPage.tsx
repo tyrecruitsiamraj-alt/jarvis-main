@@ -6,7 +6,11 @@ import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
-import { unitSectorLabel } from '@/lib/unitSector';
+import {
+  UNIT_SECTOR_FILTER_OPTIONS,
+  matchesAnyUnitSectorFilter,
+  unitSectorLabel,
+} from '@/lib/unitSector';
 import SearchField from '@/components/shared/SearchField';
 import { FilterSelect } from '@/components/shared/FilterSelect';
 import { FilterMultiSelect } from '@/components/shared/FilterMultiSelect';
@@ -138,6 +142,7 @@ const JobListPage: React.FC = () => {
     workStatusFilter,
     noteFilter,
     replacementFilter,
+    sectorFilter,
     ageDaysFilter,
     sort,
     tableSort,
@@ -345,6 +350,7 @@ const JobListPage: React.FC = () => {
         }
       if (!matchesAnyNoteFilter(j, noteFilter)) return false;
       if (!matchesAnyReplacementFilter(j, replacementFilter)) return false;
+      if (!matchesAnyUnitSectorFilter(j.unit_sector, sectorFilter)) return false;
       if (!matchesAnyAgeDaysFilter(j, ageDaysFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
@@ -362,7 +368,7 @@ const JobListPage: React.FC = () => {
           ? compareJobsByTableColumn(a, b, tableSort)
           : compareJobsForListSort(a, b, sort),
       );
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, ageDaysFilter, sort, tableSort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -589,6 +595,15 @@ const JobListPage: React.FC = () => {
             values={replacementFilter}
             onChange={(v) => updateListState({ replacementFilter: v as typeof replacementFilter })}
             options={REPLACEMENT_FILTER_OPTIONS.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+          />
+
+          <FilterMultiSelect
+            id="job-list-sector"
+            label="ราชการ / เอกชน"
+            summaryNoun="ประเภท"
+            values={sectorFilter}
+            onChange={(v) => updateListState({ sectorFilter: v as typeof sectorFilter })}
+            options={UNIT_SECTOR_FILTER_OPTIONS}
           />
 
           <FilterMultiSelect

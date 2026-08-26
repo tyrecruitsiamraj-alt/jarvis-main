@@ -73,3 +73,41 @@ export function sectorCoverage(
   for (const s of sites) if (known[s]) filled += 1;
   return { total: sites.size, filled, missing: sites.size - filled };
 }
+
+/* ── ตัวกรองราชการ/เอกชน ในหน้ารายการใบขอ (เจ้าของสั่ง 26 ส.ค. 2569) ────────── */
+
+/**
+ * ค่าที่กรองได้ = สองค่าจริง + **`unset`**
+ *
+ * 🔴 ต้องมี `unset` เป็นตัวเลือกจริง — วัดจากฐาน 26 ส.ค. 2569: ใบเปิด 296 ใบ
+ * มี **ยังไม่ระบุอยู่จำนวนมาก** (หน่วยงานที่ยังไม่มีใครกรอก) · ถ้าไม่มีตัวเลือกนี้
+ * คนจะหา "ใบที่ยังไม่ได้ระบุประเภท" ไม่ได้เลย ซึ่งเป็นงานที่ต้องตามอยู่จริง
+ * (แพตเทิร์นเดียวกับ `REPLACEMENT_FILTER_OPTIONS` ที่มี `unset`)
+ */
+export type UnitSectorFilter = UnitSector | 'unset';
+
+export const UNIT_SECTOR_FILTER_OPTIONS: { value: UnitSectorFilter; label: string }[] = [
+  { value: 'government', label: UNIT_SECTOR_LABEL.government },
+  { value: 'private', label: UNIT_SECTOR_LABEL.private },
+  { value: 'unset', label: UNIT_SECTOR_UNSET_LABEL },
+];
+
+export const UNIT_SECTOR_FILTER_VALUES: readonly UnitSectorFilter[] = [
+  ...UNIT_SECTORS,
+  'unset',
+] as const;
+
+/**
+ * ใบขอนี้ตรงกับตัวกรองไหม — `[]` = ทั้งหมด (แพตเทิร์นเดียวกับ matchesAny* ตัวอื่น)
+ *
+ * ⚠️ **ใบขอ ERP ที่ยังไม่ระบุ กับใบที่ไม่มี property เลย ต้องนับเป็น `unset` เหมือนกัน**
+ * (`unit_sector` ถูกแปะทุกใบที่มาจาก ERP แม้เป็น null — ดู 09-editing-map รอบสี่สิบเอ็ด)
+ */
+export function matchesAnyUnitSectorFilter(
+  sector: UnitSector | null | undefined,
+  filters: readonly UnitSectorFilter[],
+): boolean {
+  if (filters.length === 0) return true;
+  const key: UnitSectorFilter = isUnitSector(sector) ? sector : 'unset';
+  return filters.includes(key);
+}
