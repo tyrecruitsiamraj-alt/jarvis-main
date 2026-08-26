@@ -53,7 +53,12 @@ import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   shiftOutOfQuietHours,
 } from '../../src/lib/callFollowupPolicy.js';
-import { getLumosPushConfig, pushInterviews, pushReminders } from './lumosPushClient.js';
+import {
+  cancelPushedReminder,
+  getLumosPushConfig,
+  pushInterviews,
+  pushReminders,
+} from './lumosPushClient.js';
 import type { LumosPushInterviewRecord, LumosPushReminderRecord } from './lumosPushClient.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -1429,15 +1434,63 @@ export async function enqueueFollowReminder(
     { personRef: `follow-${entry.id}`, payload, scheduledFor },
   ]);
   logInfo('lumos.dispatch.follow', { followId: entry.id, added, held, suppressed, guarded });
-  if (added.length > 0) return 'queued';
+  if (added.length > 0) {
+    await pushFollowReminderToLumos(entry.id, payload);
+    return 'queued';
+  }
   if (held.length > 0) return 'held';
   if (suppressed.length > 0) return 'suppressed';
   if (guarded.length > 0) return 'guarded';
-  // ไม่เข้าถังไหนเลย = ชน unique เดิม (ส่งซ้ำ) — ถือว่าอยู่ในคิวแล้ว
+  // ไม่เข้าถังไหนเลย = ชน unique เดิม (ส่งซ้ำ) — ถือว่าอยู่ในคิวแล้ว (push ไปแล้วตอนสร้างครั้งแรก)
   return 'queued';
 }
 
-/** ยกเลิกรายการ Follow ในคิว — ได้ผลเฉพาะที่ Lumos ยังไม่ดึงไป (pending) */
+/**
+ * แปลง payload ของคิวเป็น record สำหรับดันตรงไปหา Lumos (push mode)
+ *
+ * 🔴 ต้อง bump เวลาที่ผ่านมาแล้วก่อนส่งเสมอ — Lumos บังคับ scheduled_at เป็น
+ * "now or future" ไม่งั้น**ปัดทิ้งตอน ingest แบบเงียบ ๆ** (เคสจริง 18 ส.ค. 2569)
+ * เวลาใน Follow เป็นเวลาที่คนเลือกเอง (เช่นบ่ายสองตั้งรายการให้โทร 09:00 วันนี้)
+ * เส้น poll แก้เรื่องนี้ตอนเสิร์ฟด้วย bumpScheduledAtForward — push ไม่ผ่านจุดเสิร์ฟ
+ * จึงต้องทำเองที่นี่ (ตัวเดียวกัน: อดีต → now+10 นาที · ทุกค่าเขียนเป็นเวลาไทย +07:00)
+ */
+export function buildFollowPushRecord(
+  payload: LumosReminderPayload,
+  now = new Date(),
+): LumosPushReminderRecord {
+  return bumpScheduledAtForward(payload, now) as unknown as LumosPushReminderRecord;
+}
+
+/**
+ * ดันรายการ Follow ตรงไปหา Lumos ทันทีหลังเข้าคิว (เจ้าของสั่ง 26 ส.ค. 2569:
+ * "กรอกจากระบบเรา แล้วไปขึ้นเขาเลย") — แพตเทิร์นเดียวกับ autoPush ของเลนอื่น:
+ * best-effort · push ล้มห้ามทำให้การสร้างรายการล้ม เพราะแถวยังอยู่ในคิว
+ * Lumos โทรดึงได้เอง (pull เป็นทางถอยเสมอ) · ไม่ได้ตั้ง env push = ข้ามเงียบ
+ *
+ * Idempotency-Key = follow-<id> — หนึ่งรายการติดตามส่งได้ครั้งเดียว
+ * กันเคสยิงซ้ำ (retry/กดเบิ้ล) กลายเป็นสายที่สองไปหาคนจริง
+ */
+async function pushFollowReminderToLumos(
+  followId: string,
+  payload: LumosReminderPayload,
+): Promise<void> {
+  if (!getLumosPushConfig()) return;
+  try {
+    await pushReminders(buildFollowPushRecord(payload), `follow-${followId}`);
+    logInfo('lumos.push.follow.ok', { followId });
+  } catch (e) {
+    logError('lumos.push.follow failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { followId });
+  }
+}
+
+/**
+ * ยกเลิกรายการ Follow ในคิว — ฝั่งเราได้ผลเฉพาะแถวที่ Lumos ยังไม่ดึงไป (pending)
+ *
+ * 🔴 เมื่อเปิด push mode ต้องแจ้งยกเลิกฝั่ง Lumos ด้วยเสมอ — record ไปอยู่ในระบบเขา
+ * ตั้งแต่ตอนสร้างแล้ว ยกเลิกแค่คิวฝั่งเรา = AI ยังโทรหาคนจริงเรื่องงานที่ยกเลิกไปแล้ว
+ * (กู้คืนไม่ได้) · best-effort เหมือนตอน push: แจ้งไม่สำเร็จแค่ log ไม่ทำให้การยกเลิกล้ม
+ * และยิงแม้คิวฝั่งเราไม่มีแถว pending (Lumos อาจถือ record อยู่โดยที่ฝั่งเราปิดไปแล้ว)
+ */
 export async function cancelFollowReminder(followId: string): Promise<boolean> {
   const { rows } = await dbQuery<{ id: number }>(
     `update ${queueTable}
@@ -1447,6 +1500,14 @@ export async function cancelFollowReminder(followId: string): Promise<boolean> {
       returning id`,
     [`follow-${followId}`],
   );
+  if (getLumosPushConfig()) {
+    try {
+      await cancelPushedReminder(`follow-${followId}`);
+      logInfo('lumos.push.follow.cancel.ok', { followId });
+    } catch (e) {
+      logError('lumos.push.follow.cancel failed (คิวฝั่งเรายกเลิกแล้ว)', e, { followId });
+    }
+  }
   return rows.length > 0;
 }
 
@@ -1459,6 +1520,11 @@ export async function cancelFollowReminder(followId: string): Promise<boolean> {
  *
  * ⚠️ ได้ผลเฉพาะแถวที่ **Lumos ยังไม่ดึงไป** (`status='pending'`) — ดึงไปแล้วเรียกคืนไม่ได้
  * คืนจำนวนแถวที่แก้ได้จริง เพื่อให้ฝั่ง API บอกคนใช้ได้ว่า "สายที่ออกไปแล้วใช้ข้อมูลเดิม"
+ *
+ * ⚠️ **ช่องโหว่ push mode (รู้แล้ว ตั้งใจยังไม่ปิด — 26 ส.ค. 2569):** ตอนสร้างเรา push
+ * record ไปหา Lumos แล้ว การแก้ตรงนี้อัปเดตแค่คิวฝั่งเรา ⇒ ฝั่ง Lumos ยังถือบทพูดชุดเก่า
+ * ยังไม่ wire re-push เพราะไม่รู้ว่า Lumos เจอ client_contact_id ซ้ำแล้ว "ทับ" หรือ
+ * "สร้างซ้ำ" — ถ้าสร้างซ้ำ = คนจริงโดนโทรสองสาย ซึ่งแย่กว่าบทพูดเก่า · รอยืนยันจากทีม Lumos
  */
 export async function refreshFollowReminderPayload(entry: FollowEntryInput): Promise<number> {
   const payload = buildFollowReminderPayload(entry);
