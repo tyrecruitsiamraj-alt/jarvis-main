@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 
 /** ⚠️ ชนิด + ป้ายชื่อ + การจัดกลุ่ม อยู่ที่ `src/lib/settingsNav.ts` ที่เดียว (มีเทสต์คุม) */
 type SettingsTab = SettingsTabId;
@@ -177,7 +178,7 @@ const AdminSettings: React.FC = () => {
 
   const updateUser = async (
     id: string,
-    patch: { role?: User['role']; is_active?: boolean; department_code?: string | null },
+    patch: { role?: User['role']; is_active?: boolean; department_code?: string | null; phone?: string | null },
   ) => {
     setSavingUserId(id);
     setUserActionError('');
@@ -377,6 +378,7 @@ const AdminSettings: React.FC = () => {
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">แผนก</th>
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">เบอร์โทร</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สถานะ</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Actions</th>
                   </tr>
@@ -384,7 +386,7 @@ const AdminSettings: React.FC = () => {
                 <tbody>
                   {apiUsers.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
+                      <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
                         ยังไม่มีผู้ใช้ (หรือโหลดไม่สำเร็จ)
                       </td>
                     </tr>
@@ -438,6 +440,26 @@ const AdminSettings: React.FC = () => {
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Input
+                          type="tel"
+                          key={`${u.id}-${u.phone || ''}`}
+                          defaultValue={u.phone || ''}
+                          disabled={savingUserId === u.id}
+                          placeholder="08xxxxxxxx"
+                          title="เบอร์นี้เป็น admin_phone ที่ AI โทรกลับเมื่อโทรหาผู้สมัครไม่สำเร็จ"
+                          className={cn(
+                            'h-8 w-32 mx-auto text-center text-xs',
+                            savingUserId === u.id && 'opacity-60',
+                          )}
+                          onBlur={(e) => {
+                            const next = e.target.value.trim();
+                            const cur = u.phone || '';
+                            if (next === cur) return;
+                            void updateUser(u.id, { phone: next || null });
+                          }}
+                        />
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button

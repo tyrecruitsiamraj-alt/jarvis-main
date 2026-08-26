@@ -55,6 +55,7 @@ import {
 } from '../../src/lib/callFollowupPolicy.js';
 import { getLumosPushConfig, pushInterviews, pushReminders } from './lumosPushClient.js';
 import type { LumosPushInterviewRecord, LumosPushReminderRecord } from './lumosPushClient.js';
+import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
@@ -64,6 +65,20 @@ const queueTable = tableInAppSchema('lumos_dispatch_queue');
 export { toE164Thai };
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * ใส่ `admin_phone` ให้ทุก item ในคิวสัมภาษณ์ — เรียกครั้งเดียวต่อใบขอ (ไม่ใช่ต่อผู้สมัคร)
+ * เพราะเบอร์ผู้รับผิดชอบเป็นค่าเดียวกันทั้งใบ — กันยิง DB ซ้ำต่อคน
+ */
+async function attachInterviewAdminPhone(
+  items: Array<{ payload: LumosInterviewPayload }>,
+  requestNo: string | null,
+): Promise<void> {
+  if (items.length === 0) return;
+  const adminPhone = await resolveInterviewAdminPhone(requestNo);
+  if (!adminPhone) return;
+  for (const item of items) item.payload.admin_phone = adminPhone;
+}
 
 /** ป้ายตำแหน่งจากใบขอ — ใช้ในข้อความ/คำถามที่ส่งให้ Lumos */
 export function jobPositionLabel(job: Record<string, unknown>, familyLabel?: string | null): string {
@@ -131,6 +146,8 @@ export type LumosInterviewPayload = {
   client_interview_id: string;
   candidate_name: string;
   phone: string;
+  /** เบอร์เจ้าหน้าที่ — AI โทรหาเมื่อโทรหาผู้สมัครไม่สำเร็จ ใส่ตอน enqueue (ดู resolveInterviewAdminPhone) */
+  admin_phone?: string;
   position: string;
   scheduled_at: string;
   questions: string[];
@@ -308,6 +325,7 @@ export async function enqueueLumosInterviewForApplications(
     // ใบสมัครไม่มี tier จาก AI แมท — null = MATCH_RANK_UNKNOWN (เท่าเหลือง) ตอนเสิร์ฟ
     items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
   }
+  await attachInterviewAdminPhone(items, requestNoFromJobRef(jobId));
   const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
@@ -676,6 +694,7 @@ export async function enqueueLumosInterviewForSelected(
     }
     items.push({ personRef: `ir-${m.id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
+  await attachInterviewAdminPhone(items, result.request_no || requestNoFromJobRef(result.jobId));
   const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
@@ -942,6 +961,7 @@ export async function enqueueLumosInterviewForRecruitLane(
       items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
     }
 
+    await attachInterviewAdminPhone(items, requestNoFromJobRef(result.jobId));
     const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
@@ -1054,6 +1074,7 @@ export async function enqueueLumosInterviewForRecall(
       items.push({ personRef: m.ref, payload, matchRank: matchRankFromTier(m.tier) });
     }
 
+    await attachInterviewAdminPhone(items, requestNoFromJobRef(result.jobId));
     const { added, held, suppressed, declined, guarded } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);

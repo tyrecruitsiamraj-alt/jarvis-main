@@ -4,6 +4,7 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { readJsonBody, getString } from '../_lib/body.js';
 import { isAllowedDepartmentCode, normalizeDepartmentCode } from '../_lib/departmentScope.js';
+import { toE164Thai } from '../_lib/thaiPhone.js';
 
 const usersTable = tableInAppSchema('users');
 
@@ -15,6 +16,7 @@ type UserRow = {
   is_active: boolean;
   created_at: string | Date;
   department_code: string | null;
+  phone: string | null;
 };
 type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
@@ -39,6 +41,7 @@ function toUserJson(u: UserRow) {
     is_active: u.is_active,
     created_at: toYmd(u.created_at),
     ...(department_code ? { department_code } : {}),
+    ...(u.phone ? { phone: u.phone } : {}),
   };
 }
 
@@ -71,6 +74,23 @@ async function handler(req: AuthedReq, res: ApiRes) {
         department_code = raw === null ? null : raw.trim().toUpperCase();
       }
 
+      const hasPhonePatch = Object.prototype.hasOwnProperty.call(body, 'phone');
+      let phone: string | null | undefined;
+      if (hasPhonePatch) {
+        const rawPhone = body.phone;
+        if (rawPhone === null || rawPhone === '') {
+          phone = null;
+        } else if (typeof rawPhone === 'string') {
+          const e164 = toE164Thai(rawPhone);
+          if (!e164) {
+            return sendError(res, 400, 'Bad request', 'phone ต้องเป็นเบอร์มือถือไทยที่ถูกต้อง');
+          }
+          phone = e164;
+        } else {
+          return sendError(res, 400, 'Bad request', 'phone must be a string');
+        }
+      }
+
       if (!id) return sendError(res, 400, 'Bad request', 'id is required');
       if (role !== undefined && !isRole(role)) {
         return sendError(res, 400, 'Bad request', 'role must be admin/supervisor/staff/opl');
@@ -78,12 +98,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (is_active !== undefined && typeof is_active !== 'boolean') {
         return sendError(res, 400, 'Bad request', 'is_active must be boolean');
       }
-      if (role === undefined && is_active === undefined && !hasDepartmentPatch) {
+      if (role === undefined && is_active === undefined && !hasDepartmentPatch && !hasPhonePatch) {
         return sendError(res, 400, 'Bad request', 'Nothing to update');
       }
 
       const { rows: beforeRows } = await dbQuery<UserRow>(
-        `select id, email, role, full_name, is_active, created_at, department_code from ${usersTable} where id = $1 limit 1`,
+        `select id, email, role, full_name, is_active, created_at, department_code, phone from ${usersTable} where id = $1 limit 1`,
         [id],
       );
       const beforeUser = beforeRows[0];
@@ -108,9 +128,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
         set
           role = coalesce($2, role),
           is_active = coalesce($3, is_active),
-          department_code = case when $4::boolean then $5 else department_code end
+          department_code = case when $4::boolean then $5 else department_code end,
+          phone = case when $6::boolean then $7 else phone end
         where id = $1
-        returning id, email, role, full_name, is_active, created_at, department_code
+        returning id, email, role, full_name, is_active, created_at, department_code, phone
         `,
         [
           id,
@@ -118,6 +139,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           is_active ?? null,
           hasDepartmentPatch,
           hasDepartmentPatch ? department_code : null,
+          hasPhonePatch,
+          hasPhonePatch ? phone : null,
         ],
       );
       const u = updatedRows[0];
@@ -132,12 +155,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
           is_active: beforeUser.is_active,
           email: beforeUser.email,
           department_code: beforeUser.department_code,
+          phone: beforeUser.phone,
         },
         after: {
           role: u.role,
           is_active: u.is_active,
           email: u.email,
           department_code: u.department_code,
+          phone: u.phone,
         },
       });
 
@@ -145,7 +170,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const { rows } = await dbQuery<UserRow>(
-      `select id, email, role, full_name, is_active, created_at, department_code from ${usersTable} order by created_at desc`,
+      `select id, email, role, full_name, is_active, created_at, department_code, phone from ${usersTable} order by created_at desc`,
     );
     return res.status(200).json(rows.map(toUserJson));
   } catch (e) {

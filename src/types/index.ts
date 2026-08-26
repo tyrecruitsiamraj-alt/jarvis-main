@@ -15,6 +15,8 @@ export interface User {
   created_at: string;
   /** แผนกที่ล็อกสิทธิ์เห็นใบขอ เช่น LBD — ไม่มี = เห็นทุกแผนก (admin มักว่าง) */
   department_code?: string;
+  /** เบอร์โทร (E.164) — ใช้เป็น admin_phone ส่งให้ Lumos ตอน AI โทรผู้สมัครสัมภาษณ์ไม่สำเร็จ */
+  phone?: string;
 }
 
 // ============ EMPLOYEES (WL) ============

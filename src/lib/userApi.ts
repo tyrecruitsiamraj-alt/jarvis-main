@@ -39,6 +39,7 @@ export function parseAppUser(value: unknown): User | null {
     ...(typeof value.department_code === 'string' && value.department_code.trim()
       ? { department_code: value.department_code.trim().toUpperCase() }
       : {}),
+    ...(typeof value.phone === 'string' && value.phone.trim() ? { phone: value.phone.trim() } : {}),
   };
 }
 
