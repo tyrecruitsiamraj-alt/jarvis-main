@@ -4494,3 +4494,64 @@ eslint 0 error/18 warning · registry 97 · build ผ่าน
 ⚠️ **ที่ยังไม่ได้ทดสอบ (ตั้งใจ):** ไม่ได้กดสร้างรายการติดตามจริงเพื่อทดสอบ `dispatch_state`
 เพราะการสร้าง = **เข้าคิวโทรหาคนจริง** (กติกาโปรเจกต์: ห้ามรันทดสอบที่ยิงถึงคนจริง)
 เส้นนั้นผ่าน tsc + เทสต์ pure logic แล้ว แต่ **ยังไม่มีการยืนยันด้วยการเขียนจริง**
+
+### รอบห้าสิบ · 26 ส.ค. 2569 — **หน้า Follow ดันตรงไปหา Lumos (push mode) ตอนสร้าง + แจ้งยกเลิกฝั่งเขา**
+
+**เจ้าของสั่ง:** *"หน้า Follow ให้มันไปเส้น Reminders เหมือนกัน ทำไงก็ได้ให้กรอกจากระบบเรา
+แล้วไปขึ้นเขาเลย"* — เดิมเส้น Follow เป็น pull ล้วน (เข้าคิวรอ Lumos มา poll)
+เลนอื่นมี autoPush อยู่แล้ว 3 จุด (application/board/irecruit) แต่ Follow ไม่มี
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `api/_lib/lumosDispatch.ts` | `enqueueFollowReminder` — หลังเข้าคิวสำเร็จ (`added > 0`) เรียก `pushFollowReminderToLumos()` (best-effort) · **ใหม่** `buildFollowPushRecord()` (pure — bump เวลาก่อน push) · `cancelFollowReminder` ยิง `cancelPushedReminder()` คู่กันเมื่อมี push config · หมายเหตุช่องโหว่ push mode บน `refreshFollowReminderPayload` |
+| `tests/api/lumosPushClient.test.ts` | **ใหม่** — เทสต์ config/bump/รูป request ด้วย fetch จำลองทั้งหมด (8 เคส) |
+
+🔴 **กติกาที่ฝังไว้:**
+* **push ต้อง bump เวลาเองก่อนส่ง** — เส้น poll มี `bumpScheduledAtForward` ที่จุดเสิร์ฟ
+  แต่ push ไม่ผ่านจุดเสิร์ฟ · เวลาใน Follow คนเลือกเอง อาจเป็นอดีต (บ่ายสองตั้งให้โทร 09:00)
+  ส่งดิบ ๆ Lumos **ปัดทิ้งตอน ingest แบบเงียบ ๆ** (บทเรียน 18 ส.ค. 2569)
+* **Idempotency-Key = `follow-<id>`** — หนึ่งรายการส่งครั้งเดียว กันยิงซ้ำกลายเป็นสายที่สอง
+* **push ล้ม = log แล้วไปต่อ** — แถวยังอยู่ในคิว pull เป็นทางถอยเสมอ · ไม่ตั้ง env = ข้ามเงียบ
+  (`getLumosPushConfig()` คืน null — local ไม่ได้ตั้ง มีแต่ .env บน server)
+* **ยกเลิกฝั่งเราต้องแจ้งฝั่ง Lumos ด้วย** — record ไปอยู่ระบบเขาตั้งแต่สร้าง
+  ยกเลิกแค่คิวเรา = AI ยังโทรหาคนจริงเรื่องงานที่ยกเลิกแล้ว · ยิงแม้คิวเราไม่มีแถว pending
+* ⚠️ **ช่องโหว่ที่รู้แล้วตั้งใจยังไม่ปิด: แก้ไขรายการ (`refreshFollowReminderPayload`)
+  ไม่ re-push** — ไม่รู้ว่า Lumos เจอ `client_contact_id` ซ้ำแล้วทับหรือสร้างซ้ำ
+  (สร้างซ้ำ = โทรสองสาย แย่กว่าบทพูดเก่า) · รอยืนยันจากทีม Lumos ก่อน wire
+
+**บริบทที่วัดจริงก่อนลงมือ (26 ส.ค. 2569):** โหมด `follow_entry` = **auto อยู่แล้ว**
+(ตั้งแต่ 18 ส.ค.) · คิว follow มีแค่ 4 แถวประวัติ (completed 2 · cancelled 1 · delivered 1) ·
+env push (`LUMOS_BASE_URL/CONNECTION_ID/PUSH_API_KEY`) **local ไม่ได้ตั้ง** — โค้ด push
+จึงเงียบบนเครื่อง dev · บน server ใส่ใน .env ตรง ๆ · ⚠️ **push บน prod ยังติด 401**
+(ของค้างเดิมที่ Wutthipong ไล่อยู่ — สคริปต์ `scripts/test-lumos-push-interviews.mts`)
+⇒ จนกว่า key จะถูกแก้ push จะล้มแบบ log ไว้ แล้วถอยไป pull เหมือนเดิมโดยอัตโนมัติ
+
+**ตรวจจริง 26 ส.ค. 2569:** เทสต์ใหม่ 8 เคสยืนยันรูป request (URL/Bearer/Idempotency-Key/
+body array) + bump (อดีต → now+10 เวลาไทย · อนาคตคงเดิม · ไม่แก้ต้นฉบับ) ด้วย fetch จำลอง ·
+⚠️ **ไม่ได้ยิง Lumos จริง + ไม่ได้กดสร้างรายการจริง (ตั้งใจ)** — สร้างจริง = โทรหาคนจริง
+และ push จริงต้องรอ key หาย 401 · test เต็มชุดผ่าน · tsc 4 = 0 · eslint 0 error/18 warning
+
+### รอบห้าสิบเก้า · 26 ส.ค. 2569 — **ตัวกรองราชการ/เอกชน ในหน้ารายการใบขอ**
+
+**เจ้าของสั่ง:** *"หน้าใบขอเพิ่ม Filter ของ ราชการ เอกชน มาที"*
+
+| ไฟล์ | ทำอะไร |
+|---|---|
+| `src/lib/unitSector.ts` | **ใหม่** `UnitSectorFilter` (`government`/`private`/**`unset`**) · `UNIT_SECTOR_FILTER_OPTIONS` · `UNIT_SECTOR_FILTER_VALUES` · `matchesAnyUnitSectorFilter()` |
+| `src/lib/jobListPageState.ts` | `sectorFilter: UnitSectorFilter[]` เข้า state + parse/serialize param **`sec`** + เข้าลิสต์ปุ่มล้างตัวกรอง |
+| `src/pages/jobs/JobListPage.tsx` | `FilterMultiSelect` ป้าย **"ราชการ / เอกชน"** วางถัดจาก "ส่งคนแทน" + เงื่อนไขกรองใน pipeline + deps |
+| `tests/api/unitSectorFilter.test.ts` | **ใหม่** 8 เคส (ตรรกะกรอง · unset · หลายค่า OR · URL ครบวง · ค่ามั่วถูกทิ้ง · ไม่ชน `sc`) |
+
+🔴 **กติกาที่ฝังไว้:**
+* 🔴 **param ต้องเป็น `sec` ไม่ใช่ `sc`** — `sc` ถูกใช้เป็น **เจ้าหน้าที่คัดสรร** อยู่แล้ว
+  ทับแล้วตัวกรองสองตัวจะกินกันเงียบ ๆ (มีเทสต์คุมว่าสองตัวอยู่ร่วมกันได้)
+* 🔴 **ต้องมีตัวเลือก "ยังไม่ระบุ" (`unset`)** — วัดฐาน 26 ส.ค. 2569: ใบเปิด 298 ใบ
+  = ราชการ **7** · เอกชน **173** · **ยังไม่ระบุ 118** ⇒ ถังใหญ่อันดับสอง
+  ไม่มีตัวเลือกนี้ = หา "ใบที่ยังไม่มีใครกรอกประเภท" ไม่ได้เลย ซึ่งเป็นงานที่ต้องตามจริง
+* **ใบที่ไม่มี property / null / ค่ามั่ว นับเป็น `unset` เหมือนกันหมด** (กติกาเดิมของ
+  `unit_sector`: ยังไม่ระบุ ≠ เอกชน — ห้ามให้ค่าใดเป็น default)
+
+**ตรวจจริงบนจอ + เทียบฐาน 26 ส.ค. 2569:** dropdown ขึ้นครบ 4 ตัวเลือก
+(ทั้งหมด/ราชการ/เอกชน/ยังไม่ระบุ) · ผลกรองตรงฐานทุกค่า:
+**ราชการ 7 · เอกชน 173 · ยังไม่ระบุ 118 · เอกชน+ยังไม่ระบุ 291 · ทั้งหมด 298**
+(7+173+118 = 298 ครบพอดี) · แชร์ลิงก์ `?sec=` แล้วตัวกรองยังติด

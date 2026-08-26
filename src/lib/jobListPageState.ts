@@ -1,5 +1,6 @@
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
 import type { AgeDaysFilter, JobListSort, NoteFilter, ReplacementFilter, UrgencyFilter } from '@/lib/jobUrgency';
+import { UNIT_SECTOR_FILTER_VALUES, type UnitSectorFilter } from '@/lib/unitSector';
 import {
   parseTableSort,
   serializeTableSort,
@@ -31,6 +32,8 @@ export type JobListPageState = {
   workStatusFilter: JobListWorkStatusFilter;
   noteFilter: JobListNoteFilter;
   replacementFilter: JobListReplacementFilter;
+  /** ราชการ/เอกชน/ยังไม่ระบุ (เจ้าของสั่ง 26 ส.ค. 2569) — [] = ทั้งหมด */
+  sectorFilter: UnitSectorFilter[];
   ageDaysFilter: JobListAgeDaysFilter;
   sort: JobListSort;
   /**
@@ -56,6 +59,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   workStatusFilter: [],
   noteFilter: [],
   replacementFilter: [],
+  sectorFilter: [],
   ageDaysFilter: [],
   sort: 'assignee_age',
   tableSort: null,
@@ -136,6 +140,9 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
       .map((t) => t.trim())
       .filter(isUnitRequestWorkStatus),
     noteFilter: parseMulti(params.get('nf'), { allowed: NOTE_VALUES }) as JobListNoteFilter,
+    sectorFilter: parseMulti(params.get('sec'), {
+      allowed: new Set<string>(UNIT_SECTOR_FILTER_VALUES),
+    }) as UnitSectorFilter[],
     replacementFilter: parseMulti(params.get('sr'), {
       allowed: REPLACEMENT_VALUES,
     }) as JobListReplacementFilter,
@@ -169,6 +176,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   setMulti('ws', state.workStatusFilter);
   setMulti('nf', state.noteFilter);
   setMulti('sr', state.replacementFilter);
+  setMulti('sec', state.sectorFilter);
   setMulti('ag', state.ageDaysFilter);
   if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
   const tsort = serializeTableSort(state.tableSort);
@@ -195,6 +203,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'workStatusFilter',
   'noteFilter',
   'replacementFilter',
+  'sectorFilter',
   'ageDaysFilter',
   'pageSize',
 ];
