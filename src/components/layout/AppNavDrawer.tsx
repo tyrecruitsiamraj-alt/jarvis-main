@@ -141,7 +141,8 @@ const AppNavDrawer: React.FC<Props> = ({
         ) : null}
 
         {/*
-          โครงเดียวกับแถบสายพานบนจอใหญ่ (ConveyorSidebar) — จอเล็กเห็นลำดับงานชุดเดียวกัน
+          🔴 **เมนูหลักของทั้งระบบอยู่ที่นี่ที่เดียวแล้ว** (27 ส.ค. 2569 ถอดแถบติดซ้ายออก
+          ตามที่เจ้าของสั่งให้กลับไปเป็น burger เพื่อไม่ให้กินพื้นที่) — ทั้งจอเล็กและจอใหญ่
           🔴 **ลำดับขั้นห้ามสลับ** เพราะเลข "ขั้นที่ N" ผูกกับหัวหน้าจอทุกหน้า
           ⇒ ที่นี่จึงไม่ใช้ลำดับจาก `items` (navPreferences) เหมือนเดิม แต่ยัง
           **เคารพการซ่อนของแอดมิน**: เมนูที่แอดมินซ่อนไว้จะไม่โผล่ (ดู hiddenPaths)
@@ -188,7 +189,7 @@ const AppNavDrawer: React.FC<Props> = ({
               key={item.key}
               type="button"
               onClick={() => go(item.path)}
-              className={rowClass(isVaultActive(item, location.pathname))}
+              className={rowClass(isVaultActive(item, location.pathname, location.search))}
             >
               <item.icon className="h-4 w-4 shrink-0" />
               <span className="truncate">{item.label}</span>

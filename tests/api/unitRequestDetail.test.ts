@@ -10,6 +10,8 @@
  * 3. กลุ่มที่ไม่มีของจริงสักช่อง ต้องไม่โชว์หัวข้อว่าง
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   buildUnitRequestDetail,
   detailValueText,
@@ -17,7 +19,7 @@ import {
   moneyFieldText,
   paidPeriodText,
   resignedIncomeRows,
-  hasDrawSide,
+  hasDeductSide,
   visibleRateLines,
 } from '../../src/lib/unitRequestDetail.js';
 import type { JobRequest } from '../../src/types/index.js';
@@ -152,7 +154,8 @@ describe('resignedIncomeRows', () => {
     from: '2026-07-01',
     to: '2026-07-31',
     pay: 20345.32,
-    draw: 24974.38,
+    deduct: 1672,
+    net: 18673.32,
     ...over,
   });
 
@@ -186,11 +189,30 @@ describe('resignedIncomeRows', () => {
     expect(rows[0].period).toBe('ไม่ทราบช่วงงวด');
   });
 
-  it('hasDrawSide: ฝั่งเบิกเป็น 0/null ทุกงวด = ไม่ต้องวาดคอลัมน์นั้น', () => {
-    const zero = resignedIncomeRows(job({ resigned_income_3m: [m({ draw: 0 })] }))!;
-    expect(hasDrawSide(zero)).toBe(false);
-    const some = resignedIncomeRows(job({ resigned_income_3m: [m({ draw: 100 })] }))!;
-    expect(hasDrawSide(some)).toBe(true);
+  it('hasDeductSide: หักเป็น 0/null ทุกงวด = ไม่ต้องวาดคอลัมน์หัก', () => {
+    const zero = resignedIncomeRows(job({ resigned_income_3m: [m({ deduct: 0 })] }))!;
+    expect(hasDeductSide(zero)).toBe(false);
+    const some = resignedIncomeRows(job({ resigned_income_3m: [m({ deduct: 100 })] }))!;
+    expect(hasDeductSide(some)).toBe(true);
+  });
+
+  /**
+   * 🔴 สุทธิคือตัวที่เจ้าของถามหา ("ยอดที่เขารับจริง") — ต้องเดินทางถึงจอครบ
+   * และ null ต้องคงเป็น null (จอเขียน "—" ห้ามอ่านเป็น 0 บาท)
+   */
+  it('พาเงินได้ / หัก / สุทธิ ไปถึงจอครบทั้งสามช่อง', () => {
+    const rows = resignedIncomeRows(
+      job({ resigned_income_3m: [m({ pay: 12917, deduct: 1672, net: 11245 })] }),
+    )!;
+    expect(rows[0]).toMatchObject({ pay: 12917, deduct: 1672, net: 11245 });
+  });
+
+  it('สุทธิที่อ่านไม่ได้คงเป็น null ห้ามแปลงเป็น 0', () => {
+    const rows = resignedIncomeRows(
+      job({ resigned_income_3m: [m({ net: null, deduct: null })] }),
+    )!;
+    expect(rows[0].net).toBeNull();
+    expect(rows[0].deduct).toBeNull();
   });
 });
 
@@ -225,5 +247,61 @@ describe('visibleRateLines', () => {
 
   it('ยังไม่ได้โหลด (undefined) = ลิสต์ว่าง ไม่ระเบิด', () => {
     expect(visibleRateLines(job())).toEqual([]);
+  });
+});
+
+/**
+ * 🔴 คิวรี "รายได้จริง 3 งวด" ต้องกรองด้วยไซต์ของใบขอนี้
+ * เจ้าของเคาะ 27 ส.ค. 2569 หลังทักว่า "เหมือนมันไม่ตรง" — วัดฐานพบว่า
+ * 22,946 จาก 39,041 คน (59%) มีงวดจ่ายข้ามไซต์ ⇒ ไม่กรอง = เอาเงินจากงานอื่นมาโชว์
+ */
+describe('แหล่งของรายได้จริง 3 งวด (สแกน SQL)', () => {
+  const sql = readFileSync(
+    resolve(__dirname, '../../api/_lib/siamrajSqlServerRequests.ts'),
+    'utf8',
+  );
+
+  it('กรองด้วย site_code ของใบขอ ไม่ใช่เอาทุกไซต์ของคนคนนั้น', () => {
+    expect(sql).toContain('p.site_code = A.site_code');
+  });
+
+  /**
+   * 🔴 ต้องดึงจากตาราง **จ่ายจริง** (wg2_payment_*) ไม่ใช่ตารางเตรียมจ่าย (wg2_ppayment_*)
+   * ของเตรียมจ่าย = ยอดรวมก่อนหัก · ของจ่ายจริง = เงินได้/เงินหัก/สุทธิ แบบ eSlip
+   */
+  it('ดึงจากตารางจ่ายจริง + ตารางภาษี ไม่ใช่ตารางเตรียมจ่าย', () => {
+    expect(sql).toContain('FROM wg2_payment_head p');
+    expect(sql).toContain('JOIN wg2_payment_tax x ON x.payment_no = p.payment_no');
+    expect(sql).not.toContain('FROM wg2_ppayment_head');
+  });
+
+  it('คืนสุทธิ = เงินได้ − เงินหัก และเรียงงวดล่าสุดก่อน', () => {
+    expect(sql).toContain('(x.seq_paid - x.seq_deduct)');
+    expect(sql).toContain('ORDER BY p.begin_date DESC');
+  });
+});
+
+/**
+ * จอต้องบอกที่มาของตัวเลข — เจ้าของถามตรง ๆ ว่า "ดึงมาจากไหน"
+ * และ "งวด" ที่นี่ส่วนใหญ่เป็นครึ่งเดือน (71,542 งวด เทียบเต็มเดือน 31,876)
+ * ⇒ ถ้าไม่เขียนไว้ คนจะอ่าน 3 งวดเป็น 3 เดือนแล้วสรุปว่าเลขผิด
+ */
+describe('จอบอกที่มาของรายได้จริง', () => {
+  const page = readFileSync(
+    resolve(__dirname, '../../src/pages/jobs/SiamrajUnitRequestDetailPage.tsx'),
+    'utf8',
+  );
+
+  it('บอกว่าเป็นยอดเดียวกับ eSlip และชี้เมนู ERP ที่เอาไปทานได้', () => {
+    expect(page).toContain('ใบแจ้งเงินเดือน (eSlip)');
+    expect(page).toContain('PR-4813');
+  });
+
+  it('เตือนว่าหนึ่งงวดมักเป็นครึ่งเดือน — กันอ่าน 3 งวดเป็น 3 เดือน', () => {
+    expect(page).toContain('หนึ่งงวดมักเป็นครึ่งเดือน');
+  });
+
+  it('ไม่มีงวดในไซต์นี้ ต้องบอกเหตุผล ไม่ใช่ "ไม่พบ" เฉย ๆ', () => {
+    expect(page).toContain('อาจยังไม่ถึงรอบจ่าย');
   });
 });

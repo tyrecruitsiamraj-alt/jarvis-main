@@ -53,3 +53,36 @@ describe('buildFollowReminderPayload — หลายรอบต่อวัน
     expect(p.steps.length).toBe(1);
   });
 });
+
+/**
+ * `admin_phone` ของเลน Follow (เจ้าของสั่ง 27 ส.ค. 2569)
+ * 🔴 คนละเรื่องกับเบอร์ที่ AI **พูด** ให้โทรกลับ (อันนั้นอยู่ใน steps[].message)
+ * อันนี้คือเบอร์ที่ **AI โทรไปหา** เมื่อติดต่อผู้รับไม่ได้
+ */
+describe('admin_phone ในคิว Follow', () => {
+  const base = {
+    id: 'f1',
+    recipient_name: 'สมชาย ใจดี',
+    recipient_phone: '+66812345678',
+    topic: 'ยืนยันวันเริ่มงาน',
+    scheduled_at: new Date('2026-08-27T09:00:00+07:00'),
+  };
+
+  it('ส่งเบอร์ที่ให้มา และแปลงเป็น E.164 ตั้งแต่ตอนประกอบ payload', () => {
+    const p = buildFollowReminderPayload(base, '+66898143230');
+    expect(p.admin_phone).toBe('+66898143230');
+  });
+
+  it('ไม่มีเบอร์ = ไม่มีคีย์นี้เลย ห้ามส่งค่าว่างไปให้ AI โทร', () => {
+    expect('admin_phone' in buildFollowReminderPayload(base)).toBe(false);
+    expect('admin_phone' in buildFollowReminderPayload(base, null)).toBe(false);
+    expect('admin_phone' in buildFollowReminderPayload(base, '')).toBe(false);
+  });
+
+  it('ไม่ไปทับเบอร์ที่ AI พูดให้โทรกลับ — สองช่องอยู่คนละที่', () => {
+    const p = buildFollowReminderPayload({ ...base, staffPhone: '0812223333' }, '+66898143230');
+    expect(p.admin_phone).toBe('+66898143230');
+    // บทพูดเว้นวรรคเบอร์ให้ AI อ่านทีละชุด — ตรวจรูปที่ใช้จริง
+    expect(p.steps[0].message).toContain('081 222 3333');
+  });
+});

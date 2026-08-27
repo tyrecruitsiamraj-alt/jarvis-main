@@ -12,7 +12,6 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import ClaimIdleAlertDialog from '@/components/notifications/ClaimIdleAlertDialog';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
-import ConveyorSidebar from '@/components/layout/ConveyorSidebar';
 import StageBanner from '@/components/layout/StageBanner';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
 import { applyNavPreferences, type NavPreferences } from '@/lib/navPreferences';
@@ -233,18 +232,16 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       {/*
-        โครงใหม่ (26 ส.ค. 2569): แถบสายพานติดซ้ายบนจอใหญ่ · จอเล็กยังใช้ drawer เดิม
-        `items-start` สำคัญ — ไม่มีแล้ว sidebar `sticky` จะยืดเต็มความสูงแล้วไม่ติดตาม
+        🔴 **แถบสายพานติดซ้ายถูกถอดออก 27 ส.ค. 2569** — เจ้าของสั่ง:
+        *"หน้า Menu ทำเป็น Burger ไว้แบบเดิมเพราะมันจะได้ไม่กินพื้นที่"*
+        เมนูสายพานชุดเดียวกันอยู่ใน `AppNavDrawer` อยู่แล้ว (ทั้งจอเล็กและจอใหญ่)
+        และปุ่ม burger มีอยู่บนหัวทั้งสองขนาดจอ ⇒ ไม่มีอะไรหาย ได้พื้นที่คืน 240px
+        ⚠️ ระยะขอบ lg กลับไป px-8 ตามเดิม (ที่หด px-6 ไว้เพราะแถบเมนูกินที่)
       */}
-      <div className="flex flex-1 items-start">
-        <ConveyorSidebar />
-        {/* lg ใช้ px-6 (เดิม px-8) — แถบเมนูกินที่ไปแล้ว ระยะขอบเท่าเดิมทำให้ตาราง
-            ที่จูนไว้พอดีจอ (รอบสี่สิบหก) ตกขอบ · จอเล็กไม่มีแถบ จึงคงระยะเดิมไว้ */}
-        <main className="relative min-w-0 flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 pb-8 pt-3 overflow-x-clip">
-          <StageBanner />
-          {children}
-        </main>
-      </div>
+      <main className="relative min-w-0 flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-8 pt-3 overflow-x-clip">
+        <StageBanner />
+        {children}
+      </main>
 
       <AppNavDrawer
         open={navOpen}

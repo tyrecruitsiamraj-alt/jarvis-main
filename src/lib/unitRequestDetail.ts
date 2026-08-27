@@ -106,8 +106,12 @@ export type ResignedIncomeRow = {
   key: string;
   /** ป้ายงวด — "2026-07-01 ถึง 2026-07-31" */
   period: string;
+  /** เงินได้รวมของงวด */
   pay: number | null;
-  draw: number | null;
+  /** เงินหักรวมของงวด (ภาษี · ประกันสังคม · เงินประกัน · หนี้อื่น) */
+  deduct: number | null;
+  /** **สุทธิที่เขารับจริง** — ตัวเดียวกับที่ขึ้นใบแจ้งเงินเดือน (eSlip) */
+  net: number | null;
 };
 
 export function resignedIncomeRows(job: JobRequest): ResignedIncomeRow[] | null {
@@ -117,13 +121,18 @@ export function resignedIncomeRows(job: JobRequest): ResignedIncomeRow[] | null 
     key: `${m.from ?? 'x'}-${m.to ?? 'x'}-${i}`,
     period: paidPeriodText(m.from, m.to) ?? 'ไม่ทราบช่วงงวด',
     pay: typeof m.pay === 'number' && Number.isFinite(m.pay) ? m.pay : null,
-    draw: typeof m.draw === 'number' && Number.isFinite(m.draw) ? m.draw : null,
+    deduct: typeof m.deduct === 'number' && Number.isFinite(m.deduct) ? m.deduct : null,
+    net: typeof m.net === 'number' && Number.isFinite(m.net) ? m.net : null,
   }));
 }
 
-/** มีงวดไหนที่ฝั่งเบิกมีเลขจริงไหม — ไม่มีเลยก็ไม่ต้องวาดคอลัมน์เบิกให้รก */
-export function hasDrawSide(rows: readonly ResignedIncomeRow[]): boolean {
-  return rows.some((r) => typeof r.draw === 'number' && r.draw > 0);
+/**
+ * มีงวดไหนที่ **หักเงินจริง** ไหม — ไม่มีเลยก็ไม่ต้องวาดคอลัมน์หักให้รก
+ * (เดิมฟังก์ชันนี้ถามเรื่อง "ฝั่งเบิก" ซึ่งเป็นเงินที่บริษัทเรียกเก็บลูกค้า
+ *  คนละเรื่องกับเงินที่พนักงานได้ — เปลี่ยนแหล่งเป็น eSlip แล้วจึงถามเรื่องเงินหักแทน)
+ */
+export function hasDeductSide(rows: readonly ResignedIncomeRow[]): boolean {
+  return rows.some((r) => typeof r.deduct === 'number' && r.deduct > 0);
 }
 
 /**

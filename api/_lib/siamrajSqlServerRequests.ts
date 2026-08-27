@@ -90,13 +90,12 @@ type SqlServerRequestRow = {
    * *"ฉันไม่ได้เอาแบบเฉลี่ย ฉันขอดูแบบย้อนหลัง 3 เดือนเลย"*)
    *
    * เป็น **JSON string** จาก `FOR JSON PATH` — คืนรายงวดตรง ๆ ไม่ยุบเป็นยอดรวม
-   * รูปแบบ: `[{ "f": วันเริ่มงวด, "t": วันจบงวด, "pay": ฝั่งอัตราจ่าย, "drw": ฝั่งอัตราเบิก }]`
+   * รูปแบบ: `[{ "f": วันเริ่มงวด, "t": วันจบงวด, "pay": เงินได้, "ded": เงินหัก, "net": สุทธิ }]`
    *
-   * 🔴 **สองฝั่งตามคำของ ERP เอง ห้ามตีความใหม่** (พิสูจน์การจับคู่แล้ว 25 ส.ค. 2569):
-   * ใบขอ `payment_rate` (**อัตราจ่าย**) 15,565 ↔ `fee_amount` 15,565 ·
-   * `draw_rate` (**อัตราเบิก**) 19,588 ↔ `draw_amount` 19,587.9
-   * ⚠️ **ฝั่งเบิกเป็น 0 อยู่ 72/238 ใบ (30%)** ⇒ ห้ามใช้เป็นตัวหลัก · ฝั่งจ่ายมีครบ 238/238
-   * ⚠️ อาจได้น้อยกว่า 3 งวด (เพิ่งเข้างาน) และงวดสุดท้าย**มักไม่เต็มเดือน** (ออกกลางเดือน)
+   * 🔴 **เป็นยอดแบบ eSlip (สุทธิที่เขารับจริง)** ไม่ใช่ยอดรวมก่อนหักแบบเดิม
+   * เจ้าของเคาะ 27 ส.ค. 2569 — ดูเหตุผลเต็มในคอมเมนต์ของคิวรี PAY3
+   * ⚠️ อาจได้น้อยกว่า 3 งวด (เพิ่งเข้างาน) และงวดแรก/สุดท้าย**มักไม่เต็มงวด**
+   * ⚠️ **หนึ่งงวดส่วนใหญ่เป็นครึ่งเดือน** ⇒ 3 งวด ≈ 1.5 เดือน ไม่ใช่ 3 เดือน
    */
   resigned_income_3m: string | null;
   fee_name: string | null;
@@ -124,7 +123,8 @@ function parseIncomeMonths(raw: unknown): ResignedIncomeMonth[] | null {
         from: toYmd(x.f as string | Date | null) || null,
         to: toYmd(x.t as string | Date | null) || null,
         pay: typeof x.pay === 'number' && Number.isFinite(x.pay) ? x.pay : null,
-        draw: typeof x.drw === 'number' && Number.isFinite(x.drw) ? x.drw : null,
+        deduct: typeof x.ded === 'number' && Number.isFinite(x.ded) ? x.ded : null,
+        net: typeof x.net === 'number' && Number.isFinite(x.net) ? x.net : null,
       }));
     return out.length > 0 ? out : null;
   } catch {
@@ -385,20 +385,51 @@ const BASE_SQL = `
      WHERE ch.staff_id = S.staff_id
      ORDER BY ch.effective_date DESC, ch.runno DESC
   ) WCH
-  /* รายได้จริง 3 งวดล่าสุด **แยกรายงวด** — เอาเฉพาะงวดที่จ่ายแล้ว (is_payment = 'Y')
-     คืนเป็น JSON เพราะเจ้าของขอเห็นรายเดือน ไม่ใช่ยอดรวม/ค่าเฉลี่ย
+  /* รายได้จริง 3 งวดล่าสุด **แยกรายงวด** — คืนเป็น JSON เพราะเจ้าของขอเห็นรายงวด
+     ไม่ใช่ยอดรวม/ค่าเฉลี่ย
+
+     🔴🔴 **ย้ายแหล่งจาก wg2_ppayment_* (เตรียมจ่าย) มา wg2_payment_* (จ่ายจริง)**
+        เจ้าของเคาะ 27 ส.ค. 2569: *"เอายอด eSlip เพราะฉันต้องการยอดที่เขารับจริง ๆ
+        ของ Site นั้น ๆ ด้วย"*
+        - ของเดิมคือ **ยอดรวมทุกบรรทัดก่อนหักอะไรเลย** (ทานกับเมนู PR-3001 / PR-5012)
+        - ของใหม่คือ **เงินได้ - เงินหัก = สุทธิ** แบบเดียวกับใบแจ้งเงินเดือน/eSlip
+          (เมนู PR-4813) ซึ่งคือ "เงินที่เขารับจริง"
+        ⚠️ ตาราง app_eslip_head ที่เก็บสุทธิไว้ **มีข้อมูลแค่ 3 แถว = ตารางเปล่า**
+           ดึงจากที่นั่นไม่ได้ · ตัวเลขจริงอยู่ที่ wg2_payment_tax (seq_paid/seq_deduct)
+
+     ✅ **แยกรายไซต์ได้จริง ไม่ใช่การเฉลี่ย** — วัดฐานแล้ว wg2_payment_head
+        มี 1,803,541 ใบ **payment_no ไม่ซ้ำเลยสักใบ** (1 ใบ = 1 คน + 1 ไซต์ + 1 งวด)
+        และ wg2_payment_tax เป็น 1:1 กับ payment_no
+     ✅ ความครอบคลุมเท่าแหล่งเดิม: ใบขอที่มีคนออกได้ครบ 3 งวด 13,308 (เดิม 13,306)
+        · มี 1-2 งวด 2,992 · ไม่มีเลย 413
+     ✅ วัดแล้วไม่มีงวดที่สุทธิติดลบ และไม่มี seq_paid ที่เป็น null
+
+     ⚠️ ไม่ต้องเช็ค is_payment แล้ว — ตารางนี้คือ "จ่ายจริง" ทุกแถวโดยนิยาม
+        (is_payment = 'Y' เป็นธงของฝั่งเตรียมจ่ายเท่านั้น)
+
+     🔴 **กรองด้วย site_code ของใบขอนี้** (เจ้าของเคาะ 27 ส.ค. 2569:
+        "เอาเฉพาะเงินที่ได้จากงานนี้") — วัดฐานแล้ว **22,946 จาก 39,041 คน (59%)**
+        มีงวดจ่ายข้ามไซต์ ⇒ ไม่กรอง = เอาเงินจากงานอื่นมาโชว์เป็นรายได้ของงานนี้
+        ผลกระทบที่วัดไว้: ใบที่ได้ครบ 3 งวด 15,485 -> 13,306 · เหลือ 1-2 งวด 2,993
+        · ไม่มีงวดในไซต์นี้เลย 414 ใบ (จอต้องบอกว่าไม่มี ห้ามปล่อยว่าง)
+
+     ⚠️ **หนึ่งงวดที่นี่ส่วนใหญ่เป็นครึ่งเดือน** (15-16 วัน 71,542 งวด เทียบกับ
+        เต็มเดือน 28-31 วัน 31,876 งวด) ⇒ "3 งวด" มักเท่ากับ ~1.5 เดือน ไม่ใช่ 3 เดือน
+        เจ้าของเคาะให้คงเป็น 3 งวดตามเดิม แต่**จอต้องเขียนที่มาให้ชัด**
+
      ⚠️ ห้ามใส่ backtick ในคอมเมนต์ตรงนี้ — SQL ก้อนนี้อยู่ใน template literal
         เผลอใส่แล้วสตริงขาดกลางคัน tsc ฟ้อง comma expected (เจอมาแล้ว 25 ส.ค. 2569) */
   OUTER APPLY (
     SELECT (
-      SELECT TOP 3 h.begin_date AS f, h.end_date AS t,
-             (SELECT SUM(d.fee_amount)  FROM wg2_ppayment_detail d
-               WHERE d.ppayment_no = h.ppayment_no) AS pay,
-             (SELECT SUM(d.draw_amount) FROM wg2_ppayment_detail d
-               WHERE d.ppayment_no = h.ppayment_no) AS drw
-        FROM wg2_ppayment_head h
-       WHERE h.staff_id = S.staff_id AND h.is_payment = 'Y'
-       ORDER BY h.begin_date DESC
+      SELECT TOP 3 p.begin_date AS f, p.end_date AS t,
+             x.seq_paid                     AS pay,
+             x.seq_deduct                   AS ded,
+             (x.seq_paid - x.seq_deduct)    AS net
+        FROM wg2_payment_head p
+        JOIN wg2_payment_tax x ON x.payment_no = p.payment_no
+       WHERE p.staff_id = S.staff_id
+         AND p.site_code = A.site_code
+       ORDER BY p.begin_date DESC
        FOR JSON PATH
     ) AS months
   ) PAY3

@@ -98,6 +98,11 @@ export type LumosReminderPayload = {
   client_contact_id: string;
   recipient_name: string;
   recipient_phone: string;
+  /**
+   * เบอร์เจ้าหน้าที่ — AI โทรหาเบอร์นี้เมื่อโทรหาผู้รับไม่สำเร็จ (E.164)
+   * ⚠️ คนละเรื่องกับเบอร์ที่ AI **พูด** ให้ผู้รับโทรกลับ (อันนั้นอยู่ใน `steps[].message`)
+   */
+  admin_phone?: string;
   title: string;
   language: string;
   tone: string;
@@ -1401,10 +1406,13 @@ function dayAtTime(day: Date, hhmm: string): string {
   return `${ymd}T${hh}:${m[2]}:00+07:00`;
 }
 
-export function buildFollowReminderPayload(entry: FollowEntryInput): LumosReminderPayload {
-  // ⚠️ schema ของ Lumos ไม่มีช่องใส่เบอร์ติดต่อกลับ — ช่องเดียวที่ถึงหูผู้สมัครคือ
-  // `steps[].message` (ดู docs/lumos-api.md · ห้ามเพิ่มฟิลด์ใหม่เข้า payload
-  // เพราะเราคุมฝั่ง Lumos ไม่ได้) จึงต่อเข้าไปในบทพูดแทน
+export function buildFollowReminderPayload(
+  entry: FollowEntryInput,
+  adminPhone?: string | null,
+): LumosReminderPayload {
+  // ⚠️ เบอร์ที่ AI **พูด** ให้ผู้สมัครโทรกลับ ไปได้ทางเดียวคือ `steps[].message`
+  // (ช่องนั้นคือสิ่งที่ถึงหูผู้รับ) — ส่วน `admin_phone` เป็นเบอร์ที่ **AI โทรไปหา**
+  // เมื่อติดต่อผู้รับไม่ได้ คนละเรื่องกัน จึงต้องมีทั้งสองทาง
   const message = buildFollowMessage({
     recipientName: entry.recipient_name,
     topic: entry.topic,
@@ -1430,6 +1438,8 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
     client_contact_id: `follow-${entry.id}`,
     recipient_name: entry.recipient_name,
     recipient_phone: entry.recipient_phone,
+    // ไม่มีเบอร์ = ไม่ส่งคีย์นี้เลย (ดีกว่าส่งค่าว่าง/เบอร์ผิดไปให้ AI โทร)
+    ...(adminPhone ? { admin_phone: adminPhone } : {}),
     title: entry.topic,
     language: 'th',
     tone: 'professional',
@@ -1448,7 +1458,17 @@ export function buildFollowReminderPayload(entry: FollowEntryInput): LumosRemind
 export async function enqueueFollowReminder(
   entry: FollowEntryInput,
 ): Promise<FollowDispatchState> {
-  const payload = buildFollowReminderPayload(entry);
+  /**
+   * 🔴 `admin_phone` ของเลน Follow — เจ้าของสั่งเพิ่ม 27 ส.ค. 2569
+   * ลำดับ: **เบอร์เจ้าหน้าที่ที่คนกรอกเลือกไว้กับรายการนี้** มาก่อนเสมอ (เขาเจาะจงเอง)
+   * ไม่มีค่อยถอยไปใช้ตัวหาเบอร์กลางตัวเดียวกับเลนสัมภาษณ์ (ผู้รับผิดชอบใบขอ →
+   * สุ่ม supervisor) · หาไม่ได้เลย = ไม่ส่งคีย์นี้ ไม่ใช่ส่งค่าว่าง
+   * ⚠️ รายการ Follow ไม่ผูกกับเลขที่ใบขอ จึงส่ง `null` เข้าไป = ข้ามขั้นผู้รับผิดชอบ
+   */
+  const adminPhone =
+    (entry.staffPhone ? toE164Thai(entry.staffPhone) : null) ||
+    (await resolveInterviewAdminPhone(null));
+  const payload = buildFollowReminderPayload(entry, adminPhone);
   // แถวตั้งตาราง (มีหลายรอบ) เสิร์ฟเร็วสุด = รอบแรกของวันนั้น (step แรก) — กันวันอนาคตถูก bump มาโทรก่อน
   const scheduledFor = payload.steps[0]?.scheduled_at ?? entry.scheduled_at.toISOString();
   const { added, held, suppressed, guarded } = await insertQueueItems('reminder', 'follow', [
@@ -1548,7 +1568,17 @@ export async function cancelFollowReminder(followId: string): Promise<boolean> {
  * "สร้างซ้ำ" — ถ้าสร้างซ้ำ = คนจริงโดนโทรสองสาย ซึ่งแย่กว่าบทพูดเก่า · รอยืนยันจากทีม Lumos
  */
 export async function refreshFollowReminderPayload(entry: FollowEntryInput): Promise<number> {
-  const payload = buildFollowReminderPayload(entry);
+  /**
+   * 🔴 `admin_phone` ของเลน Follow — เจ้าของสั่งเพิ่ม 27 ส.ค. 2569
+   * ลำดับ: **เบอร์เจ้าหน้าที่ที่คนกรอกเลือกไว้กับรายการนี้** มาก่อนเสมอ (เขาเจาะจงเอง)
+   * ไม่มีค่อยถอยไปใช้ตัวหาเบอร์กลางตัวเดียวกับเลนสัมภาษณ์ (ผู้รับผิดชอบใบขอ →
+   * สุ่ม supervisor) · หาไม่ได้เลย = ไม่ส่งคีย์นี้ ไม่ใช่ส่งค่าว่าง
+   * ⚠️ รายการ Follow ไม่ผูกกับเลขที่ใบขอ จึงส่ง `null` เข้าไป = ข้ามขั้นผู้รับผิดชอบ
+   */
+  const adminPhone =
+    (entry.staffPhone ? toE164Thai(entry.staffPhone) : null) ||
+    (await resolveInterviewAdminPhone(null));
+  const payload = buildFollowReminderPayload(entry, adminPhone);
   const scheduledFor = payload.steps[0]?.scheduled_at ?? entry.scheduled_at.toISOString();
   const { rows } = await dbQuery<{ id: number }>(
     `update ${queueTable}

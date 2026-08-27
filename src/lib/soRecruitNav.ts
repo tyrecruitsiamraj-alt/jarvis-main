@@ -18,6 +18,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   BarChart3,
+  LayoutGrid,
   CalendarDays,
   ClipboardList,
   Megaphone,
@@ -73,7 +74,8 @@ export type VaultItem = {
 /** ขั้น 0 = "วันนี้" (หน้าแรก) — ไม่ใช่ขั้นของสายพาน แต่เป็นทางเข้าอันดับหนึ่ง */
 export const CONVEYOR_HOME = {
   key: 'today' as const,
-  label: 'วันนี้',
+  /** เจ้าของสั่งเปลี่ยนจาก "วันนี้" → "หน้าหลัก" (27 ส.ค. 2569) */
+  label: 'หน้าหลัก',
   blurb: 'งานถัดไปของคุณ เรียงตามความด่วนให้แล้ว',
   path: '/',
   icon: PhoneCall,
@@ -144,6 +146,22 @@ export const CONVEYOR_STEPS: ConveyorStep[] = [
 ];
 
 export const CONVEYOR_VAULT: VaultItem[] = [
+  /**
+   * 🔴 **กล่องงาน** — เจ้าของทัก 27 ส.ค. 2569: *"ใน Menu ไม่เห็นมีคำไหนที่บอกว่า
+   * จะพาไปหน้ากล่องงานเลย"* · หน้านี้มีมาตลอดแต่เข้าได้ทางเดียวคือกดจากที่อื่น
+   * เพราะขั้น 2/3 ของสายพานจองมุมมอง `?view=postings` / `?view=list` ไว้
+   * ส่วนกล่องงานคือ `/jobs/board` **ที่ไม่มี `?view=`** จึงไม่มีเมนูไหนชี้ถึง
+   * ⚠️ อยู่กลุ่ม "คลังข้อมูล" ไม่ใช่สายพาน — มันเป็นมุมมองรวมของทุกใบ ไม่ใช่ขั้นของงาน
+   */
+  {
+    key: 'job-boxes',
+    label: 'กล่องงาน',
+    blurb: 'ใบขอทั้งหมดแยกเป็นกล่องตามสถานะ — กำลังสรรหา · คัดเลือก · รอเริ่มงาน · ปิดแล้ว',
+    path: '/jobs/board',
+    icon: LayoutGrid,
+    functionId: 'unit_requests_read',
+    match: [],
+  },
   {
     key: 'candidates',
     label: 'คลังคน',
@@ -214,10 +232,18 @@ function stepScore(step: ConveyorStep, pathname: string, search: string): number
   let best: number | null = null;
   for (const prefix of [own, ...step.match]) {
     if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) continue;
-    // มุมมองของบอร์ดรับสมัครตัดสินด้วย ?view= เท่านั้น (ขั้น 2 vs 3)
+    /**
+     * มุมมองของบอร์ดรับสมัครตัดสินด้วย `?view=` เท่านั้น (ขั้น 2 vs 3)
+     *
+     * 🔴 **ไม่มี `?view=` = "กล่องงาน" ไม่ใช่ขั้นไหนของสายพาน** (แก้ 27 ส.ค. 2569)
+     * เดิม default เป็น `'list'` ⇒ `/jobs/board` เปล่า ๆ นับเป็นขั้น 3 เพราะตอนนั้น
+     * ยังไม่มีเมนูของกล่องงาน เลยยืมขั้น 3 เป็นทางเข้า · พอเจ้าของทักว่าเมนูไม่มี
+     * ทางไปกล่องงานและเราเพิ่มเข้าคลังข้อมูลแล้ว การยืมนั้นทำให้**สว่างพร้อมกันสองที่**
+     * ⇒ ใช้ `'board'` เป็นค่าตั้งต้นแทน ซึ่งไม่มีขั้นไหนเป็นเจ้าของ
+     */
     if (prefix === own && (view !== null || own === '/jobs/board')) {
       const current = new URLSearchParams(search).get('view');
-      if ((current ?? 'list') !== (view ?? 'list')) continue;
+      if ((current ?? 'board') !== (view ?? 'board')) continue;
     }
     if (best === null || prefix.length > best) best = prefix.length;
   }
@@ -243,10 +269,21 @@ export function isStepActive(step: ConveyorStep, pathname: string, search: strin
   return stepForPath(pathname, search)?.key === step.key;
 }
 
-export function isVaultActive(item: VaultItem, pathname: string): boolean {
-  return [item.path, ...item.match].some(
+export function isVaultActive(item: VaultItem, pathname: string, search = ''): boolean {
+  const hit = [item.path, ...item.match].some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+  if (!hit) return false;
+  /**
+   * 🔴 บอร์ดรับสมัครเป็นหน้าเดียวสามมุมมอง — "กล่องงาน" คือมุมมองที่**ไม่มี `?view=`**
+   * (หรือ `?view=board`) · ไม่เช็คตรงนี้ กล่องงานจะสว่างพร้อมขั้น 2/3 ของสายพาน
+   * ตลอดเวลา ซึ่งคือปัญหาเดียวกับที่ `stepScore` แก้ไว้ฝั่งสายพาน
+   */
+  if (pathname === '/jobs/board') {
+    const view = new URLSearchParams(search).get('view');
+    return view === null || view === 'board';
+  }
+  return true;
 }
 
 /**

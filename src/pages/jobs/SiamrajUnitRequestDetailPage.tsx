@@ -30,7 +30,7 @@ import { TONE } from '@/lib/designTokens';
 import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, UserMinus, ClipboardList } from 'lucide-react';
 import {
   amountText,
-  hasDrawSide,
+  hasDeductSide,
   moneyFieldText,
   resignedIncomeRows,
   visibleRateLines,
@@ -206,7 +206,10 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   /** อัตราของใบขอ + รายได้จริงของคนเดิม — คิดที่ pure lib ที่เดียว (มีเทสต์คุม) */
   const rateLines = React.useMemo(() => (data ? visibleRateLines(data) : []), [data]);
   const incomeRows = React.useMemo(() => (data ? resignedIncomeRows(data) : null), [data]);
-  const showDraw = React.useMemo(() => (incomeRows ? hasDrawSide(incomeRows) : false), [incomeRows]);
+  const showDeduct = React.useMemo(
+    () => (incomeRows ? hasDeductSide(incomeRows) : false),
+    [incomeRows],
+  );
 
   return (
     <div>
@@ -423,18 +426,36 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                     🔴 ต้องมีช่วงวันของทุกงวด — งวดสุดท้ายของคนที่ออกมักไม่เต็มเดือน
                     ยอดจะดูต่ำผิดปกติถ้าไม่บอกว่าเป็นงวดสั้น */}
                 <div className="rounded-xl border border-white/70 bg-white/40 p-3">
+                  {/* 🔴 **ต้องบอกที่มา** (เจ้าของถาม 27 ส.ค. 2569: "ดึงมาจากไหน
+                      เพราะเหมือนมันไม่ตรง") · สองอย่างที่ทำให้อ่านแล้วเข้าใจผิดมาตลอด:
+                      (1) "งวด" ที่นี่ **ส่วนใหญ่เป็นครึ่งเดือน** ⇒ 3 งวด ~ 1.5 เดือน
+                          ไม่ใช่ 3 เดือน (วัดฐาน: ครึ่งเดือน 71,542 · เต็มเดือน 31,876)
+                      (2) เดิม **ไม่กรองไซต์** ⇒ เอาเงินจากงานอื่นมาปน (59% ของคน
+                          มีงวดข้ามไซต์) — ตอนนี้กรองด้วยไซต์ของใบขอนี้แล้ว
+                      (3) เดิมเป็น **ยอดรวมก่อนหัก** ⇒ สูงกว่าที่เขารับจริง
+                          เจ้าของเคาะ 27 ส.ค. 2569 ให้ใช้ยอด eSlip (สุทธิ) แทน */}
                   <div className="text-xs font-semibold text-foreground">
-                    รายได้จริงย้อนหลัง 3 งวด
+                    รายได้จริง 3 งวดล่าสุดของงานนี้
                   </div>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    ยอดเดียวกับ<span className="font-medium">ใบแจ้งเงินเดือน (eSlip)</span>
+                    ของไซต์นี้เท่านั้น — เมนู ERP <span className="font-mono">PR-4813</span>
+                    · <span className="font-medium">หนึ่งงวดมักเป็นครึ่งเดือน</span>
+                    ดูช่วงวันในตารางก่อนเอาไปเทียบกับเงินเดือน
+                  </p>
                   {incomeRows ? (
-                    <table className="mt-2 w-full table-fixed text-xs">
+                    <table className="mt-2 w-full text-xs">
                       <thead>
                         <tr className="text-left text-[10px] text-muted-foreground">
-                          <th className="w-1/2 pb-1 pr-2 font-medium">งวด</th>
-                          <th className="w-1/4 pb-1 pr-2 text-right font-medium">อัตราจ่าย (บาท)</th>
-                          {showDraw ? (
-                            <th className="w-1/4 pb-1 text-right font-medium">อัตราเบิก (บาท)</th>
+                          {/* 🔴 คอลัมน์ตามใบแจ้งเงินเดือน — **สุทธิ** คือตัวที่เจ้าของถาม
+                              ("ยอดที่เขารับจริง") จึงอยู่ขวาสุดและเป็นตัวหนา
+                              เงินหักโชว์เฉพาะตอนมีจริง (บางงวดหัก 0) */}
+                          <th className="pb-1 pr-2 font-medium">งวด</th>
+                          <th className="pb-1 pr-2 text-right font-medium">เงินได้ (บาท)</th>
+                          {showDeduct ? (
+                            <th className="pb-1 pr-2 text-right font-medium">หัก (บาท)</th>
                           ) : null}
+                          <th className="pb-1 text-right font-medium">สุทธิ (บาท)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -445,11 +466,15 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                           <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums">
                             {amountText(r.pay) ?? '—'}
                           </td>
-                          {showDraw ? (
-                            <td className="whitespace-nowrap py-1 text-right tabular-nums">
-                              {amountText(r.draw) ?? '—'}
+                          {showDeduct ? (
+                            <td className="whitespace-nowrap py-1 pr-2 text-right tabular-nums text-muted-foreground">
+                              {amountText(r.deduct) ?? '—'}
                             </td>
                           ) : null}
+                          {/* สุทธิ = ตัวที่เจ้าของถามหา ทำให้เด่นกว่าช่องอื่น */}
+                          <td className="whitespace-nowrap py-1 text-right font-semibold tabular-nums text-foreground">
+                            {amountText(r.net) ?? '—'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -457,11 +482,16 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 ) : (
                   // ไม่มีของ ต้องบอกว่าไม่มี ห้ามปล่อยว่างให้คนเดาว่าพัง
                   <p className="mt-1 text-xs text-muted-foreground">
-                    ไม่พบงวดจ่ายจริงของคนคนนี้ในระบบ ERP
+                    {/* 414 ใบเข้าเคสนี้หลังกรองไซต์ (วัดแล้ว) — ต้องบอกว่าทำไมถึงไม่มี
+                        ไม่ใช่แค่ "ไม่พบ" เฉย ๆ ซึ่งอ่านเหมือนระบบพัง */}
+                    ไม่พบงวดจ่ายของคนคนนี้ในไซต์ของใบขอนี้ — อาจยังไม่ถึงรอบจ่าย
+                    หรือเงินที่เคยได้มาจากไซต์อื่น
                   </p>
                 )}
                   <p className="mt-1 text-[10px] text-muted-foreground">
-                    ยอดจริงที่จ่ายแล้ว (รวมล่วงเวลา/เบี้ยเลี้ยง) — งวดสุดท้ายอาจไม่เต็มเดือน
+                    เงินได้ = ค่าแรง · ล่วงเวลา · เบี้ยเลี้ยง รวมกัน · หัก = ภาษี · ประกันสังคม ·
+                    เงินประกัน · หนี้อื่น — งวดแรกหรืองวดสุดท้ายของคนที่เพิ่งเข้า/เพิ่งออก
+                    มักไม่เต็มงวด ยอดจึงดูต่ำ
                   </p>
                   </div>
                 </div>

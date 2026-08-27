@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CONVEYOR_HOME,
   CONVEYOR_STEPS,
   HOME_TEAM_NAV,
   CONVEYOR_VAULT,
@@ -31,8 +32,8 @@ describe('stepForPath — หน้าไหนอยู่ขั้นไหน
     expect(stepForPath('/jobs/siamraj/OPL6908052/applicants')?.step).toBe(1);
   });
 
-  it('บอร์ดรับสมัคร = ขั้น 3 · จับคู่ = ขั้น 4 · ติดตาม = 5 · ดูแล = 6', () => {
-    expect(stepForPath('/jobs/board')?.step).toBe(3);
+  it('บอร์ดรับสมัคร ?view=list = ขั้น 3 · จับคู่ = ขั้น 4 · ติดตาม = 5 · ดูแล = 6', () => {
+    expect(stepForPath('/jobs/board', '?view=list')?.step).toBe(3);
     expect(stepForPath('/matching/match')?.step).toBe(4);
     expect(stepForPath('/follow')?.step).toBe(5);
     expect(stepForPath('/aftercare')?.step).toBe(6);
@@ -64,9 +65,14 @@ describe('isStepActive — ขั้น 2 กับ 3 อยู่ path เด�
     expect(isStepActive(postings, '/jobs/board', '?view=list')).toBe(false);
   });
 
-  it('ไม่มี ?view= (กล่องงาน) นับเป็นขั้น 3 — ไม่ใช่สว่างทั้งคู่', () => {
-    expect(isStepActive(applicants, '/jobs/board', '')).toBe(true);
+  /**
+   * 🔴 เปลี่ยน 27 ส.ค. 2569: ไม่มี `?view=` = **กล่องงาน** ซึ่งอยู่กลุ่มคลังข้อมูล
+   * ไม่ใช่ขั้นไหนของสายพาน (เดิมยืมขั้น 3 เป็นทางเข้าเพราะยังไม่มีเมนูของตัวเอง)
+   */
+  it('ไม่มี ?view= (กล่องงาน) ไม่ใช่ขั้นไหนของสายพาน', () => {
+    expect(isStepActive(applicants, '/jobs/board', '')).toBe(false);
     expect(isStepActive(postings, '/jobs/board', '')).toBe(false);
+    expect(stepForPath('/jobs/board', '')).toBeNull();
   });
 
   it('หน้ารายละเอียดใบขอสว่างที่ขั้น 1 ไม่ใช่ขั้น 3', () => {
@@ -76,14 +82,48 @@ describe('isStepActive — ขั้น 2 กับ 3 อยู่ path เด�
 });
 
 describe('isVaultActive', () => {
+  /** อ้างด้วยคีย์ ไม่ใช่ตำแหน่ง — เพิ่มรายการใหม่ในคลังแล้วลำดับเลื่อน เทสต์ต้องไม่พัง */
+  const vault = (key: string) => {
+    const item = CONVEYOR_VAULT.find((v) => v.key === key);
+    if (!item) throw new Error(`ไม่มีรายการคลังข้อมูลคีย์ ${key}`);
+    return item;
+  };
+
   it('คลังคนสว่างทั้งหน้าลิสต์และหน้าโปรไฟล์', () => {
-    expect(isVaultActive(CONVEYOR_VAULT[0], '/matching/candidates')).toBe(true);
-    expect(isVaultActive(CONVEYOR_VAULT[0], '/matching/candidates/9')).toBe(true);
-    expect(isVaultActive(CONVEYOR_VAULT[0], '/matching/match')).toBe(false);
+    expect(isVaultActive(vault('candidates'), '/matching/candidates')).toBe(true);
+    expect(isVaultActive(vault('candidates'), '/matching/candidates/9')).toBe(true);
+    expect(isVaultActive(vault('candidates'), '/matching/match')).toBe(false);
   });
 
   it('WL สว่างในหน้าลูกทุกหน้า', () => {
-    expect(isVaultActive(CONVEYOR_VAULT[1], '/wl/employees/3')).toBe(true);
+    expect(isVaultActive(vault('wl'), '/wl/employees/3')).toBe(true);
+  });
+
+  /**
+   * 🔴 กล่องงาน = `/jobs/board` **ที่ไม่มี `?view=`** (เจ้าของทัก 27 ส.ค. 2569 ว่า
+   * เมนูไม่มีทางไปหน้านี้เลย) · ไม่เช็ค `?view=` มันจะสว่างพร้อมขั้น 2/3 ตลอดเวลา
+   */
+  it('กล่องงานสว่างเฉพาะตอนไม่มี ?view= (หรือ view=board)', () => {
+    const box = vault('job-boxes');
+    expect(isVaultActive(box, '/jobs/board', '')).toBe(true);
+    expect(isVaultActive(box, '/jobs/board', '?view=board')).toBe(true);
+    expect(isVaultActive(box, '/jobs/board', '?view=postings')).toBe(false);
+    expect(isVaultActive(box, '/jobs/board', '?view=list')).toBe(false);
+  });
+
+  it('กล่องงานกับขั้นสายพานไม่สว่างพร้อมกันสักกรณี', () => {
+    const box = vault('job-boxes');
+    for (const search of ['', '?view=board', '?view=postings', '?view=list']) {
+      const vaultOn = isVaultActive(box, '/jobs/board', search);
+      const stepOn = CONVEYOR_STEPS.some((st) => isStepActive(st, '/jobs/board', search));
+      expect(vaultOn && stepOn, `ชนกันที่ "${search}"`).toBe(false);
+    }
+  });
+});
+
+describe('ชื่อหน้าแรกในเมนู', () => {
+  it('เรียกว่า "หน้าหลัก" (เจ้าของสั่งเปลี่ยนจาก "วันนี้" 27 ส.ค. 2569)', () => {
+    expect(CONVEYOR_HOME.label).toBe('หน้าหลัก');
   });
 });
 
