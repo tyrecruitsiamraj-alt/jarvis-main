@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
@@ -431,6 +432,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const unreleasedCount = boxedJobs.length - releasedCount;
 
   /**
+   * 🔴 ตัวนับ "มีผู้สมัครแล้ว / ยังไม่มีใครสมัคร" — เกิดขึ้นเพราะบอร์ดทีมหน้าแรก
+   * ส่งคนมาที่นี่ด้วยเลข "ยังไม่มีใครสมัคร 298 ใบ" แต่หน้านี้ **ไม่มีเลขนั้นอยู่เลย**
+   * ต้องไล่เปิดดูทีละใบเอง (audit มุมพนักงานใหม่ 26 ส.ค. 2569)
+   * นับจาก `boxedJobs` (ชุดที่กรองอยู่บนจอ) แบบเดียวกับแถบหน้าสาธารณะ — เลขตรงกับตาเห็นเสมอ
+   */
+  const withApplicantsCount = useMemo(
+    () => boxedJobs.filter((j) => countFor(applicantIdx, j.id) > 0).length,
+    [boxedJobs, applicantIdx],
+  );
+  const withoutApplicantsCount = boxedJobs.length - withApplicantsCount;
+
+  /**
    * ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (เครื่องมือวันเปลี่ยนผ่าน)
    * ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server — กดซ้ำได้จนหมด
    */
@@ -629,8 +642,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         {/* ฝั่งเจ้าหน้าที่ = hero เข้มตาม mockup rev.3 ข้อ 04 · ฝั่งคนนอกคงหัวสว่างเดิมไว้ (หน้าแบรนด์) */}
         {isStaff ? (
           <PageHeroStrip
-            eyebrow="บอร์ดงานเปิดรับ · เจ้าหน้าที่"
-            title="งานสรรหา"
+            eyebrow="บอร์ดรับสมัคร · เจ้าหน้าที่"
+            /* 🔴 หน้านี้รับสองขั้นของสายพาน (ประกาศรับ / ผู้สมัคร) ต่างกันที่ `?view=`
+               ⇒ ชื่อหัวต้องเปลี่ยนตามมุมมอง ไม่งั้นกดเมนูคนละขั้นแล้วเจอหัวเดียวกัน
+               คนใหม่จะไม่แน่ใจว่ามาถูกหน้าหรือเปล่า (audit 26 ส.ค. 2569)
+               ชื่อมาจาก `conveyorLabel` ที่เดียวกับเมนู ห้ามพิมพ์เอง */
+            title={conveyorLabel(view === 'postings' ? 'postings' : 'applicants')}
             /* 🔴 บอกหน่วยให้ครบทั้ง "ใบขอ" และ "อัตรา" — เดิมเขียน "292 ตำแหน่ง" ทั้งที่ 292
                คือจำนวน**ใบ** ทำให้เอาไปเทียบกับ Dashboard (340 อัตรา) แล้วสรุปว่าใบขอหาย */
             meta={
@@ -1068,6 +1085,16 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 (คนนอกและ AI เห็นเฉพาะใบที่ปล่อยแล้ว)
               </p>
             ) : null}
+            {/* แถวผู้สมัคร — เลขชุดเดียวกับที่บอร์ดทีมหน้าแรกใช้ส่งคนมาที่นี่ */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-current/10 pt-1.5">
+              <span className={DASH.eyebrow}>ผู้สมัคร</span>
+              <span className="text-xs">
+                <b className={TONE.success.value}>มีคนสมัครแล้ว {withApplicantsCount}</b>
+                <span className={cn('mx-1', DASH.muted)}>·</span>
+                <b className={TONE.warn.value}>ยังไม่มีใครสมัคร {withoutApplicantsCount}</b>
+                <span className={cn('ml-1', DASH.muted)}>จาก {boxedJobs.length} ใบที่กรองอยู่</span>
+              </span>
+            </div>
           </div>
         ) : null}
 

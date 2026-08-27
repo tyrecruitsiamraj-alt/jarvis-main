@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -19,7 +20,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from '@/hooks/use-toast';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNavigation';
-import { RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import Term from '@/components/shared/Term';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
@@ -75,6 +77,7 @@ import { fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
 import {
+  JOB_LIST_DEFAULTS,
   buildJobListSearchParams,
   jobListReturnTo,
   mergeJobListState,
@@ -177,6 +180,57 @@ const JobListPage: React.FC = () => {
     },
     [setSearchParams],
   );
+
+  /**
+   * จำนวนตัวกรองที่ถูกเลือกอยู่จริง — ใช้ทั้งป้ายบนหัวและตัดสินว่าจะกางกล่องไหม
+   * ⚠️ `filter` (ใบขอเปิด/ปิด) ค่าตั้งต้นคือ 'active' จึงนับเฉพาะตอนถูกเปลี่ยน
+   * ⚠️ แผนกที่ถูก**ล็อกด้วยสิทธิ์**ไม่นับ — ผู้ใช้ไม่ได้เลือกเอง และปลดไม่ได้
+   */
+  const activeFilterCount = useMemo(() => {
+    const lists = [
+      lockedDepartmentCode ? [] : departmentFilterRaw,
+      unitFilter,
+      jobSubtypeFilter,
+      recruiterFilter,
+      screenerFilter,
+      oplFilter,
+      urgencyFilter,
+      workStatusFilter,
+      noteFilter,
+      replacementFilter,
+      sectorFilter,
+      ageDaysFilter,
+    ];
+    let n = lists.reduce((acc, v) => acc + (Array.isArray(v) ? v.length : v ? 1 : 0), 0);
+    /**
+     * 🔴 เทียบกับ **ค่าตั้งต้นจริง** (`JOB_LIST_DEFAULTS.filter` = 'all') ห้าม hardcode
+     * เคยเขียน `!== 'active'` แล้วพัง: เปิดหน้าเปล่า ๆ ได้ 'all' ⇒ นับเป็น 1 ตลอด
+     * ⇒ กล่องกางทุกครั้งและขึ้นป้าย "เลือกอยู่ 1" ทั้งที่ไม่ได้เลือกอะไร
+     */
+    if (filter !== JOB_LIST_DEFAULTS.filter) n += 1;
+    return n;
+  }, [
+    lockedDepartmentCode,
+    departmentFilterRaw,
+    unitFilter,
+    jobSubtypeFilter,
+    recruiterFilter,
+    screenerFilter,
+    oplFilter,
+    urgencyFilter,
+    workStatusFilter,
+    noteFilter,
+    replacementFilter,
+    sectorFilter,
+    ageDaysFilter,
+    filter,
+  ]);
+
+  /** กางเองเมื่อมีตัวกรองติดอยู่ — ไม่งั้นเลขน้อยลงโดยไม่มีอะไรบอกว่าเพราะอะไร */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    if (activeFilterCount > 0) setFiltersOpen(true);
+  }, [activeFilterCount]);
 
   const [staffRosterRev, setStaffRosterRev] = useState(0);
 
@@ -406,7 +460,8 @@ const JobListPage: React.FC = () => {
   return (
     <div>
       <PageHeader
-        title="หน่วยงาน"
+        /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ (audit คนใหม่ 26 ส.ค. 2569) */
+        title={conveyorLabel('requests')}
         subtitle={
           siamrajPrimary
             ? filtered.length > 0
@@ -460,10 +515,35 @@ const JobListPage: React.FC = () => {
 
         {/* ตัวกรองเป็นแถบบนเต็มความกว้าง — ช่องกรองครบทุกช่อง อยู่ในกริดเดียวกันหมด
             (ค้นหาย้ายขึ้นไปอยู่คู่ปุ่มรีเฟรชบนหัวหน้า · สถานะใบขอกลายเป็นช่องกรองตัวหนึ่ง) */}
+        {/* 🔴 **หุบเป็นค่าตั้งต้น** (audit มุมพนักงานใหม่ 26 ส.ค. 2569):
+            เดิมตัวกรอง 13 ช่องกินจอแรกทั้งหน้า ตารางอยู่ใต้ fold ⇒ คนใหม่เปิดมาแล้ว
+            **ไม่เห็นงานสักใบ** เห็นแต่ช่องเปล่าที่ยังไม่รู้ว่าต้องเลือกอะไร
+            ⚠️ ถ้ามีตัวกรองที่เลือกไว้อยู่ ต้อง**กางเอง** ไม่งั้นเลขจะดูน้อยโดยไม่รู้สาเหตุ */}
         <div className={cn(DASH.cardLg, 'p-3 md:p-4')}>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground"
+          >
+            <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+            ตัวกรอง
+            {activeFilterCount > 0 ? (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                เลือกอยู่ {activeFilterCount}
+              </span>
+            ) : (
+              <span className="text-xs font-normal text-muted-foreground">แสดงทุกใบอยู่</span>
+            )}
+            <ChevronRight
+              className={cn('ml-auto h-4 w-4 shrink-0 transition-transform', filtersOpen && 'rotate-90')}
+              aria-hidden
+            />
+          </button>
           <div
             className={cn(
               'grid gap-3',
+              filtersOpen ? 'mt-3' : 'hidden',
               siamrajPrimary ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2',
             )}
           >
@@ -662,20 +742,20 @@ const JobListPage: React.FC = () => {
               <table className="w-full text-sm min-w-[1000px]">
                 <thead>
                   <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
-                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">เลขที่ใบขอ</th>
-                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ผ่านมา</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap"><Term k="request_no">เลขที่ใบขอ</Term></th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap"><Term k="days_elapsed">ผ่านมา</Term></th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ราชการ/เอกชน</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่ต้องการ</th>
-                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap">คงเหลือ</th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap"><Term k="remaining">คงเหลือ</Term></th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ประเภทใบขอ</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ตำแหน่ง</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ลักษณะงานย่อย</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ผู้ลาออก</th>
-                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ผู้รับผิดชอบ</th>
-                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap">ส่งคนแทน</th>
-                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap">สถานะทำงาน</th>
+                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap"><Term k="recruit_vs_selection">ผู้รับผิดชอบ</Term></th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap"><Term k="substitute">ส่งคนแทน</Term></th>
+                    <th className="px-1.5 py-3 text-center font-medium whitespace-nowrap"><Term k="work_status">สถานะทำงาน</Term></th>
                     <th className="px-1.5 py-3 text-left font-medium min-w-[180px]">หมายเหตุ</th>
                   </tr>
                 </thead>
@@ -899,12 +979,20 @@ const JobListPage: React.FC = () => {
                         openJob(j, e);
                       }
                     }}
-                    className={cn('cursor-pointer border-b', DASH.tableRow)}
+                    /* 🔴 ทุกแถวกดได้แต่ไม่มีอะไรบอก (audit คนใหม่ 26 ส.ค. 2569 —
+                       รู้ได้ตอนเอาเมาส์ไปชี้เท่านั้น) ⇒ ใส่ทั้ง title และลูกศรจาง
+                       ท้ายเลขที่ใบขอ แบบเดียวกับบอร์ดทีมบนหน้าแรกที่ทำถูกอยู่แล้ว */
+                    title="กดที่แถวเพื่อเปิดรายละเอียดใบขอนี้"
+                    className={cn('group/jobrow cursor-pointer border-b', DASH.tableRow)}
                   >
                     <td className={cn('px-1.5 py-3 whitespace-nowrap', DASH.cellStrong)}>
                       <span className="flex flex-wrap items-center gap-1.5">
                         {j.request_no || '—'}
                         <PrequestBadge job={j} compact />
+                        <ChevronRight
+                          className="h-3 w-3 shrink-0 text-slate-300 transition-colors group-hover/jobrow:text-slate-600 dark:text-slate-700 dark:group-hover/jobrow:text-slate-300"
+                          aria-hidden
+                        />
                       </span>
                     </td>
                     {/* ชิปอายุใบขอ (mockup rev.3 ข้อ 05) — 4 ระดับตามวันที่ค้าง

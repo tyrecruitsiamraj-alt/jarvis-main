@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { conveyorLabel } from '@/lib/soRecruitNav';
+import Term from '@/components/shared/Term';
+import { incomeDisplay } from '@/lib/incomeLabel';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
@@ -2333,7 +2336,8 @@ const MatchingPage: React.FC = () => {
       {/* ช่องค้นหาอยู่แถวเดียวกับหัวเรื่องแบบหน้า Dashboard (เจ้าของสั่ง 10 ส.ค. 2569)
           เดิมอยู่ในกล่องตัวกรองใต้แผง funnel ซึ่งต้องเลื่อนลงไปหา */}
       <PageHeader
-        title="Matching — คนของเรา"
+        /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ — เดิมเป็น "Matching — คนของเรา" */
+        title={conveyorLabel('matching')}
         /* คำโปรยใต้หัวเรื่องเอาออก (เจ้าของสั่ง 13 ส.ค. 2569) — หน้านี้คนใช้ทุกวันอยู่แล้ว */
         subtitle=""
         backPath="/matching"
@@ -2469,11 +2473,11 @@ const MatchingPage: React.FC = () => {
               >
                 {(
                   [
-                    ['default', 'SLA / ด่วนก่อน'],
+                    ['default', 'เลยกำหนดและงานด่วนก่อน'],
                     ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
                     ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
                     ['recommend', 'มีคนแนะนำก่อน'],
-                    ['green_desc', 'คนเขียวมากสุดก่อน'],
+                    ['green_desc', 'ใบที่มีคนตรงสเปกมากสุดก่อน'],
                     ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
                   ] as Array<[MatchingListSort, string]>
                 ).map(([value, label]) => (
@@ -2516,7 +2520,7 @@ const MatchingPage: React.FC = () => {
               <div>
                 <p className="text-sm font-semibold text-foreground">กำลังโหลดใบขอ…</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  ดึงใบขอจากระบบ ERP พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
+                  ดึงใบขอจากระบบ <Term k="erp" /> พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
                 </p>
               </div>
             </div>
@@ -2658,9 +2662,27 @@ const MatchingPage: React.FC = () => {
                       ขวา = แถบผลโทร 6 ช่อง (ใบที่ยังไม่ได้ส่งโทร ใช้ยอดคนบนบอร์ดแทน ไม่ปล่อยว่าง) */}
                   <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
                     <div className="min-w-0">
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        {j.total_income.toLocaleString()} บาท · ต้องการ {formatYmdDmyBe(j.required_date)}
-                      </span>
+                      {/* 🔴 หน่วยต้องติดมากับเลขเสมอ — "400 บาท" ข้าง ๆ "45,000 บาท"
+                          โดยไม่มีหน่วย ทำให้คนใหม่อ่านว่าเงินเดือน 400 บาท
+                          (ใบรายวันมีจริง วัดเจอ 20 จาก 200 ใบ) · ไม่รู้หน่วย = ไม่เดา
+                          แต่ติดคำเตือนไว้ใน tooltip แทน (ดู lib/incomeLabel) */}
+                      {(() => {
+                        const inc = incomeDisplay({
+                          totalIncome: j.total_income,
+                          monthlyIncome: j.monthly_income,
+                          displayPeriod: j.income_display?.period ?? null,
+                        });
+                        return (
+                          <span
+                            className="block truncate text-[11px] text-muted-foreground"
+                            title={inc?.hint ?? undefined}
+                          >
+                            {inc ? inc.text : '— บาท'}
+                            {inc?.period === 'unknown' ? ' ⚠' : ''} · ต้องการ{' '}
+                            {formatYmdDmyBe(j.required_date)}
+                          </span>
+                        );
+                      })()}
                       {/* ยอด ขอมา/เหลือหา ย้ายขึ้นบรรทัดแรกแล้ว ตรงนี้เหลือเลขที่ใบขอ
                           ซึ่งเป็นของอ้างอิง — ตามหลักบนลงล่าง ของอ้างอิงอยู่ล่างสุด
                           ใบที่ไม่มีเลขที่ก็ต้องกินที่บรรทัดเดิม (คงไว้ให้ตรงกัน) */}
