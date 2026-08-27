@@ -37,6 +37,7 @@ import {
   phonesDeclinedThisUnit,
 } from './applicationRotationSql.js';
 import { toE164Thai } from './thaiPhone.js';
+import { ensureCallScriptsFresh } from './callScriptStore.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
 import {
@@ -324,6 +325,8 @@ export async function enqueueLumosInterviewForApplications(
   }>,
   opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number | null }> = [];
   for (const app of applications) {
@@ -622,6 +625,8 @@ export async function enqueueLumosReminderForSelected(
   }>,
   opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosReminderPayload; matchRank: number }> = [];
   for (const m of selected) {
@@ -694,6 +699,8 @@ export async function enqueueLumosInterviewForSelected(
   priority?: 'high' | 'medium' | 'low',
   opts?: { autoPush?: boolean },
 ): Promise<LumosDispatchOutcome> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   const skipped: LumosDispatchOutcome['skipped'] = [];
   const items: Array<{ personRef: string; payload: LumosInterviewPayload; matchRank: number }> = [];
   for (const m of selected) {
@@ -905,6 +912,8 @@ export async function enqueueLumosInterviewForRecruitLane(
   job: Record<string, unknown>,
   result: { jobId: string; job_family_label: string | null; matches: RecruitLaneDispatchInput[] },
 ): Promise<RecruitLaneDispatchOutcome> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   const empty: RecruitLaneDispatchOutcome = {
     queued: 0,
     duplicated: [],
@@ -1038,6 +1047,8 @@ export async function enqueueLumosInterviewForRecall(
   job: Record<string, unknown>,
   result: { jobId: string; job_family_label: string | null; matches: RecruitLaneDispatchInput[] },
 ): Promise<RecruitLaneDispatchOutcome> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   const empty: RecruitLaneDispatchOutcome = {
     queued: 0,
     duplicated: [],
@@ -1458,6 +1469,8 @@ export function buildFollowReminderPayload(
 export async function enqueueFollowReminder(
   entry: FollowEntryInput,
 ): Promise<FollowDispatchState> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   /**
    * 🔴 `admin_phone` ของเลน Follow — เจ้าของสั่งเพิ่ม 27 ส.ค. 2569
    * ลำดับ: **เบอร์เจ้าหน้าที่ที่คนกรอกเลือกไว้กับรายการนี้** มาก่อนเสมอ (เขาเจาะจงเอง)
@@ -1568,6 +1581,8 @@ export async function cancelFollowReminder(followId: string): Promise<boolean> {
  * "สร้างซ้ำ" — ถ้าสร้างซ้ำ = คนจริงโดนโทรสองสาย ซึ่งแย่กว่าบทพูดเก่า · รอยืนยันจากทีม Lumos
  */
 export async function refreshFollowReminderPayload(entry: FollowEntryInput): Promise<number> {
+  // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
+  await ensureCallScriptsFresh();
   /**
    * 🔴 `admin_phone` ของเลน Follow — เจ้าของสั่งเพิ่ม 27 ส.ค. 2569
    * ลำดับ: **เบอร์เจ้าหน้าที่ที่คนกรอกเลือกไว้กับรายการนี้** มาก่อนเสมอ (เขาเจาะจงเอง)

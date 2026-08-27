@@ -40,7 +40,10 @@ describe('ชื่อหัวหน้าจอ = ชื่อเมนู', (
 
   it('บอร์ดรับสมัครเปลี่ยนหัวตาม ?view= — ขั้น 2 กับ 3 ต้องไม่ได้หัวเดียวกัน', () => {
     const src = read('src/components/jobs/JobBoardView.tsx');
-    expect(src).toContain("conveyorLabel(view === 'postings' ? 'postings' : 'applicants')");
+    expect(src).toContain("conveyorLabel('postings')");
+    expect(src).toContain("conveyorLabel('applicants')");
+    // มุมมองกล่องงาน (ไม่มี ?view=) ใช้ชื่อของตัวเอง — ตรงกับเมนูคลังข้อมูล
+    expect(src).toContain("'กล่องงาน'");
     // ชื่อเก่าที่เคยชนกันทั้งสองขั้นต้องหายไป
     expect(src).not.toContain('title="งานสรรหา"');
   });

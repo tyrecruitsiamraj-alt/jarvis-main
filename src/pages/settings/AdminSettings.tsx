@@ -4,7 +4,9 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, SlidersHorizontal, PhoneForwarded, MoveRight, Activity } from 'lucide-react';
+import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
+  MessageSquareText,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import JobStaffRosterTab from '@/pages/settings/JobStaffRosterTab';
@@ -12,6 +14,7 @@ import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
 import LumosDispatchModeTab from '@/pages/settings/LumosDispatchModeTab';
+import CallScriptsTab from '@/pages/settings/CallScriptsTab';
 import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
 import NavMenuTab from '@/pages/settings/NavMenuTab';
@@ -70,6 +73,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   workStatus: ListChecks,
   matchWeights: SlidersHorizontal,
   lumosMode: PhoneForwarded,
+  callScripts: MessageSquareText,
   autoMove: MoveRight,
   health: Activity,
   reference: Database,
@@ -495,6 +499,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'workStatus' && <WorkStatusMasterTab />}
         {activeTab === 'matchWeights' && <MatchPriorityWeightsTab />}
         {activeTab === 'lumosMode' && <LumosDispatchModeTab />}
+        {activeTab === 'callScripts' && <CallScriptsTab />}
         {activeTab === 'autoMove' && <ApplicationAutoMoveTab />}
         {activeTab === 'health' && <SystemHealthTab />}
 

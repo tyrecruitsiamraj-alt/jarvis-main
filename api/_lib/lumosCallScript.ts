@@ -47,6 +47,37 @@ export const EXTRA_INFO_PREFIX: string = T.ของแถม.ขึ้นต้
  */
 export const MAX_QUESTIONS = 14;
 
+// ─── บทฉบับแก้จากหน้าตั้งค่า (เจ้าของสั่ง 27 ส.ค. 2569) ─────────────────────
+//
+// เจ้าหน้าที่แก้บทได้จากหน้าตั้งค่า → เก็บใน pg (call_script_overrides) →
+// `callScriptStore` โหลดมาวางไว้ที่นี่ก่อนประกอบ payload ทุกครั้ง
+// ไฟล์นี้ยัง pure: ไม่แตะ DB เอง แค่อ่านค่าที่ถูก "วาง" ไว้ · ไม่มีฉบับแก้ = ใช้ T เดิม
+// ⇒ เทสต์เดิมทั้งชุดผ่านโดยไม่ต้องรู้จักฟีเจอร์นี้ และลบแถวใน DB = กลับบทมาตรฐานทันที
+
+/** คีย์บทที่แก้ได้จากหน้าตั้งค่า → array บทในไฟล์ template */
+export type EditableScriptKey = 'interview' | 'offer' | 'follow';
+
+export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string[]> = {
+  interview: T.สัมภาษณ์เบื้องต้น,
+  offer: T.เสนองาน,
+  follow: T.ติดตาม,
+};
+
+let scriptOverrides: Partial<Record<EditableScriptKey, readonly string[]>> = {};
+
+/** วางฉบับแก้ (callScriptStore เรียก) — ส่ง `{}` = ล้างทั้งหมดกลับบทมาตรฐาน */
+export function setCallScriptOverrides(
+  next: Partial<Record<EditableScriptKey, readonly string[]>>,
+): void {
+  scriptOverrides = next;
+}
+
+/** บทที่ใช้จริงตอนนี้ — ฉบับแก้ก่อน ไม่มีค่อยถอยไปบทในไฟล์ */
+export function activeScriptLines(key: EditableScriptKey): readonly string[] {
+  const o = scriptOverrides[key];
+  return o && o.length > 0 ? o : EDITABLE_SCRIPT_DEFAULTS[key];
+}
+
 // ─── ตัวเติมค่าลงบท ───────────────────────────────────────────────────────────
 
 /**
@@ -187,7 +218,7 @@ function jobValues(f: CallScriptFacts): ScriptValues {
  * คัดกรองพอรู้ว่าไปต่อได้ไหม **ถามเหตุผลเมื่อไม่สนใจ** (ML ขั้น 1) แล้วบอกขั้นถัดไป
  */
 export function buildScreeningQuestions(f: CallScriptFacts): string[] {
-  return renderLines(T.สัมภาษณ์เบื้องต้น, jobValues(f));
+  return renderLines(activeScriptLines('interview'), jobValues(f));
 }
 
 // ─── บทที่ 2 · เสนองานให้คนที่สมัครไว้แล้ว ───────────────────────────────────
@@ -206,7 +237,7 @@ export type OfferOptions = {
  * ตอนสมัครแล้วและเรามีโปรไฟล์อยู่) · **ปิดด้วยการนัด** ไม่ใช่ "เดี๋ยวเจ้าหน้าที่ติดต่อกลับ"
  */
 export function buildOfferQuestions(f: CallScriptFacts, opts: OfferOptions = {}): string[] {
-  return renderLines(T.เสนองาน, {
+  return renderLines(activeScriptLines('offer'), {
     ...jobValues(f),
     เคยปฏิเสธงานอื่น: flag(opts.askStillLooking),
   });
@@ -326,14 +357,15 @@ export function buildFollowMessage(input: FollowMessageInput): string {
   const note = clean(input.note);
   // โน้ตที่พิมพ์ซ้ำหัวเรื่อง (หรือคลุมหัวเรื่องอยู่แล้ว) — พูดรอบเดียวพอ
   const sameAsTopic = Boolean(note) && (note === topic || note.includes(topic) || topic.includes(note));
+  const lines = activeScriptLines('follow');
   return renderLines(
-    T.ติดตาม,
+    lines,
     {
       ผู้โทร: CALLER_ORG,
       ชื่อผู้รับ: polite(input.recipientName),
       เรื่อง: orDrop([topic, sameAsTopic ? '' : note].filter(Boolean).join(' ')),
       เบอร์เจ้าหน้าที่: orDrop(speakablePhoneTh(clean(input.staffPhone))),
     },
-    T.ติดตาม.length,
+    lines.length,
   ).join(' ');
 }

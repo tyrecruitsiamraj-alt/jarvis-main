@@ -59,11 +59,11 @@ describe('settingsNav', () => {
     expect(nav[0].tabs.map((t) => t.id)).toEqual(['appearance']);
   });
 
-  it('สิทธิ์ครบ = ได้ 5 กลุ่ม ครบ 12 แท็บ', () => {
+  it('สิทธิ์ครบ = ได้ 5 กลุ่ม ครบ 13 แท็บ (เพิ่ม "บทพูดของ AI" 27 ส.ค. 2569)', () => {
     const nav = buildSettingsNav(SETTINGS_TAB_IDS);
     expect(nav).toHaveLength(5);
     const total = nav.reduce((n, g) => n + g.tabs.length, 0);
-    expect(total).toBe(12);
+    expect(total).toBe(13);
   });
 
   it('ลำดับกลุ่มนิ่ง — คนและสิทธิ์ก่อน ตรวจสอบระบบท้ายสุด', () => {

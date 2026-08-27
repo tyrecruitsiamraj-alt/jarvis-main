@@ -101,6 +101,7 @@ import homeKpisHandler from './home-kpis.js';
 import unitSectorHandler from './unit-sector.js';
 import officeFloorHandler from './office-floor.js';
 import officeTeamHandler from './office-team.js';
+import callScriptsHandler from './call-scripts.js';
 import jobPublicReleaseHandler from './job-public-release.js';
 import systemHealthHandler from './system-health.js';
 
@@ -170,6 +171,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   // ฉาก "ห้องทำงาน" บนหน้าแรก — ตัวนับ read-only (ไม่มีข้อมูลบุคคล)
   '/api/office-floor': officeFloorHandler as ApiHandler,
   '/api/office-team': officeTeamHandler as ApiHandler,
+  // บทพูด AI แก้ได้จากหน้าตั้งค่า (27 ส.ค. 2569) — GET ทุก role · PUT/DELETE supervisor+
+  '/api/call-scripts': callScriptsHandler as ApiHandler,
   '/api/home-kpis': homeKpisHandler as ApiHandler,
   '/api/unit-sector': unitSectorHandler as ApiHandler,
   // ปล่อย/ดึงลง ใบขอบนหน้าสาธารณะ (เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)
