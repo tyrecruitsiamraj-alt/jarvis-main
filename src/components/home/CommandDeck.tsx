@@ -1,0 +1,370 @@
+/**
+ * Command Deck — หน้าแรกทั้งผืนเป็นจอบัญชาการเดียว (เจ้าของสั่งรอบสอง 26 ส.ค. 2569)
+ *
+ * 🔴 บทเรียนจากรอบที่ถูกตีตก (*"รก ไม่สวย"*): การ์ดมืดใบเล็กหลายใบบนหน้าขาว = รก
+ * ตัวอย่างที่เจ้าของให้ (cayla-flax.vercel.app) สวยเพราะเป็น**ผืนเดียวทั้งจอ**
+ *
+ * กติกาความสวยที่ยึดทั้งไฟล์:
+ * 1. **ผืนเดียว** — ทุก section อยู่ใน canvas ink เดียว คั่นด้วยเส้น 1px เท่านั้น
+ *    ห้ามมีกล่องมีเงาซ้อนข้างใน (ยกเว้นปุ่มกับ tile ขั้นซึ่งเป็นของกดได้)
+ * 2. **โฟกัสเดียว** — หน้าปัดวงแหวน + งานถัดไป คือพระเอก ที่เหลือเป็นตัวประกอบ
+ * 3. **mono เล็ก ตัวพิมพ์ห่าง** สำหรับป้ายทุกป้าย · ตัวเลขทุกตัว tabular
+ * 4. **ที่ว่างคือของแพง** — padding กว้าง ไม่ยัด
+ * 5. สี: teal/sky สองสีหลัก · แดงเฉพาะของด่วนจริง · ที่เหลือ slate
+ *
+ * โครง: แถบหัว (โลโก้+สถานะสด+นาฬิกา) → hero (หน้าปัด | งานถัดไป) →
+ * คิวที่เหลือ → แถบ 6 ขั้น · ตรรกะอยู่ src/lib/homeDeck.ts + nextTask.ts (pure + เทสต์)
+ */
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useNowTick } from '@/hooks/useNowTick';
+import { deckStatusLine } from '@/lib/homeDeck';
+import { CONVEYOR_STEPS } from '@/lib/soRecruitNav';
+import type { NextTask, NextTaskTone } from '@/lib/nextTask';
+
+/** ⚠️ Intl ระดับโมดูลเสมอ — กติกาโปรเจกต์ (เคยทำหน้าช้า 4.7 วิ มีเทสต์คุม) */
+const CLOCK_FMT = new Intl.DateTimeFormat('th-TH', {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+const DATE_FMT = new Intl.DateTimeFormat('th-TH', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+const TONE_TEXT: Record<NextTaskTone | 'ok', string> = {
+  danger: 'text-red-700 dark:text-red-300',
+  warn: 'text-amber-700 dark:text-amber-300',
+  info: 'text-sky-700 dark:text-sky-300',
+  ok: 'text-teal-700 dark:text-teal-300',
+};
+
+/** ป้าย mono ตัวพิมพ์ห่าง — ภาษาป้ายเดียวของทั้ง deck */
+const eyebrow = 'font-mono text-[10px] font-semibold uppercase tracking-[0.22em]';
+
+/* ── หน้าปัดวงแหวน — พระเอกของหน้า ────────────────────────────────────────── */
+
+const DIAL = 420; // viewBox หน่วยเดียว (สเกลด้วย CSS width)
+const C = DIAL / 2;
+
+/** ขีดสเกลรอบนอก 72 ขีด — ทุกขีดที่ 6 ยาวและสว่างขึ้น (แบบหน้าปัดเครื่องมือวัดจริง) */
+const TICKS = Array.from({ length: 72 }, (_, i) => {
+  const a = (Math.PI * 2 * i) / 72 - Math.PI / 2;
+  const major = i % 6 === 0;
+  const r1 = major ? 186 : 192;
+  const r2 = 199;
+  return {
+    x1: C + r1 * Math.cos(a),
+    y1: C + r1 * Math.sin(a),
+    x2: C + r2 * Math.cos(a),
+    y2: C + r2 * Math.sin(a),
+    major,
+  };
+});
+
+const HEX_POINTS = Array.from({ length: 6 }, (_, i) => {
+  const a = (Math.PI / 3) * i - Math.PI / 2;
+  return `${C + 118 * Math.cos(a)},${C + 118 * Math.sin(a)}`;
+}).join(' ');
+
+const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: string } }> = ({
+  tasksLeft,
+  status,
+}) => (
+  <div className="relative mx-auto w-72 shrink-0 lg:w-80">
+    <svg viewBox={`0 0 ${DIAL} ${DIAL}`} className="block w-full" role="presentation" aria-hidden>
+      <defs>
+        <radialGradient id="deck-core-glow">
+          <stop offset="0%" stopColor="rgb(94 234 212 / 0.20)" />
+          <stop offset="60%" stopColor="rgb(56 189 248 / 0.07)" />
+          <stop offset="100%" stopColor="rgb(94 234 212 / 0)" />
+        </radialGradient>
+      </defs>
+
+      <circle cx={C} cy={C} r={190} fill="url(#deck-core-glow)" />
+
+      {/* สเกลขีดนิ่งรอบนอก */}
+      {TICKS.map((t, i) => (
+        <line
+          key={i}
+          x1={t.x1}
+          y1={t.y1}
+          x2={t.x2}
+          y2={t.y2}
+          strokeWidth={t.major ? 2 : 1}
+          className={t.major ? 'stroke-sky-600/50 dark:stroke-sky-300/50' : 'stroke-slate-400/50 dark:stroke-slate-500/30'}
+        />
+      ))}
+
+      {/* วงหมุน 3 ชั้น คนละทิศคนละความเร็ว */}
+      <g className="jarvis-core-spin-slow">
+        <circle
+          cx={C}
+          cy={C}
+          r={172}
+          fill="none"
+          strokeWidth="1"
+          className="stroke-teal-600/40 dark:stroke-teal-300/40"
+          strokeDasharray="2 9"
+        />
+      </g>
+      <g className="jarvis-core-spin-rev">
+        <circle
+          cx={C}
+          cy={C}
+          r={150}
+          fill="none"
+          strokeWidth="3"
+          className="stroke-sky-600/45 dark:stroke-sky-300/45"
+          strokeDasharray="70 34 16 34 8 46"
+          strokeLinecap="round"
+        />
+      </g>
+      <g className="jarvis-core-spin-fast">
+        <circle
+          cx={C}
+          cy={C}
+          r={128}
+          fill="none"
+          strokeWidth="1.5"
+          className="stroke-teal-600/55 dark:stroke-teal-300/55"
+          strokeDasharray="1 7"
+        />
+        <line
+          x1={C}
+          y1={C - 133}
+          x2={C}
+          y2={C - 119}
+          strokeWidth="3"
+          className="stroke-teal-600 dark:stroke-teal-300"
+          strokeLinecap="round"
+        />
+      </g>
+
+      <polygon points={HEX_POINTS} fill="none" strokeWidth="1" className="stroke-sky-600/35 dark:stroke-sky-300/35" />
+      <circle cx={C} cy={C} r={96} fill="none" strokeWidth="1" className="stroke-slate-900/15 dark:stroke-white/12" />
+      <circle cx={C} cy={C} r={78} className="fill-teal-600/5 dark:fill-teal-300/5 jarvis-core-breathe" />
+    </svg>
+
+    {/* ใจกลาง: ตัวเลขเดียว — เหลือกี่เรื่องที่ต้องลงมือ */}
+    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+      <span className={cn(eyebrow, 'text-slate-500 dark:text-slate-400')}>ต้องลงมือ</span>
+      <span className="font-mono text-6xl font-semibold tabular-nums leading-none text-slate-900 dark:text-white">
+        {tasksLeft === null ? '—' : tasksLeft}
+      </span>
+      <span className={cn(eyebrow, 'mt-1 text-slate-500 dark:text-slate-500')}>เรื่อง</span>
+    </div>
+
+    {/* บรรทัดสถานะใต้หน้าปัด */}
+    <p className={cn('mt-1 text-center text-xs', TONE_TEXT[status.tone as NextTaskTone | 'ok'])}>
+      {status.text}
+    </p>
+  </div>
+);
+
+/* ── Deck ─────────────────────────────────────────────────────────────────── */
+
+const CommandDeck: React.FC<{
+  greeting: string;
+  userName: string;
+  tasks: NextTask[];
+  statusInput: Parameters<typeof deckStatusLine>[0];
+  loading?: boolean;
+  className?: string;
+}> = ({ greeting, userName, tasks, statusInput, loading, className }) => {
+  const now = useNowTick(true);
+  const [head, ...rest] = tasks;
+  const status = loading
+    ? ({ text: 'กำลังเชื่อมข้อมูล…', tone: 'ok' } as const)
+    : deckStatusLine(statusInput);
+
+  return (
+    <section className={cn('jarvis-deck rounded-2xl', className)} aria-label="ศูนย์บัญชาการงานวันนี้">
+      {(['tl', 'tr', 'bl', 'br'] as const).map((c) => (
+        <span key={c} className="jarvis-hud-corner" data-c={c} aria-hidden />
+      ))}
+      <div className="jarvis-hud-scan" aria-hidden />
+
+      {/* ── แถบหัว: ระบบ · สถานะสด · วันเวลาเดินวินาที ── */}
+      <div className="relative flex items-center gap-3 border-b border-slate-900/10 px-6 py-3.5 dark:border-white/10 lg:px-9">
+        <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-300')}>SO RECRUIT</span>
+        <span className="flex items-center gap-1.5 rounded-full border border-teal-600/30 px-2.5 py-0.5 dark:border-teal-300/30">
+          <span className="jarvis-core-breathe h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-teal-300" aria-hidden />
+          <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-200')}>สถานะสด</span>
+        </span>
+        <span className="flex-1" />
+        <span className="hidden font-mono text-[11px] text-slate-500 dark:text-slate-500 sm:block">
+          {DATE_FMT.format(now)}
+        </span>
+        <span className="font-mono text-sm font-medium tabular-nums text-slate-800 dark:text-slate-200">
+          {CLOCK_FMT.format(now)}
+        </span>
+      </div>
+
+      {/* ── Hero: หน้าปัด | งานถัดไป ── */}
+      <div className="relative grid items-center gap-8 px-6 py-8 lg:grid-cols-[auto,1fr] lg:gap-16 lg:px-9 lg:py-10">
+        <Dial tasksLeft={loading ? null : tasks.length} status={status} />
+
+        <div className="min-w-0">
+          <p className={cn(eyebrow, 'text-slate-500 dark:text-slate-400')}>
+            {greeting}, {userName} — งานถัดไปของคุณ
+          </p>
+
+          {loading ? (
+            <div className="mt-4 space-y-3" aria-busy="true">
+              <div className="h-9 w-3/4 animate-pulse rounded-lg bg-slate-900/5 dark:bg-white/5" />
+              <div className="h-4 w-1/2 animate-pulse rounded-lg bg-slate-900/5 dark:bg-white/5" />
+            </div>
+          ) : head ? (
+            <>
+              <h1 className="mt-3 text-2xl font-bold leading-snug tracking-tight lg:text-[34px] lg:leading-[1.25]">
+                {head.title}
+              </h1>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {head.reason}
+                <span className={cn('ml-2 font-mono text-xs', TONE_TEXT[head.tone])}>
+                  ● {head.badge}
+                </span>
+              </p>
+              <div className="mt-6 flex items-center gap-4">
+                <Button
+                  asChild
+                  className="h-11 rounded-xl bg-gradient-to-b from-sky-400 to-teal-300 px-6 text-sm font-semibold text-slate-900 shadow-[0_8px_28px_-6px_rgba(94,234,212,0.55)] hover:from-sky-300 hover:to-teal-200"
+                >
+                  <Link to={head.path}>
+                    {head.action}
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                </Button>
+                {rest.length > 0 ? (
+                  <span className="font-mono text-xs text-slate-500 dark:text-slate-500">
+                    +{rest.length} เรื่องรอต่อคิว
+                  </span>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="mt-3 text-2xl font-bold leading-snug tracking-tight lg:text-[34px]">
+                ไม่มีงานค้างที่ต้องลงมือตอนนี้
+              </h1>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                ถังที่ระบบเฝ้าอยู่ว่างหมด — เปิดภาพรวมด้านล่างเพื่อดูตัวเลขวันนี้
+              </p>
+            </>
+          )}
+
+          {/* งานนี้อยู่ขั้นไหนของสายพาน — **แผนที่บอกตำแหน่ง ไม่ใช่แถบความคืบหน้า**
+              🔴 เดิมติ๊กถูก (✓) ทุกขั้นก่อนหน้า เพราะคิดว่าเป็น stepper ⇒ คนใหม่อ่านว่า
+              "ใบขอ/ประกาศรับ/ผู้สมัคร/จับคู่ เสร็จหมดแล้ว" ทั้งที่บอร์ดใต้ลงมาบอกว่า
+              ยังไม่ประกาศ 123 ใบ · ยังไม่มีใครสมัคร 298 ใบ (audit คนใหม่ 26 ส.ค. 2569)
+              ตอนนี้ขั้นก่อนหน้าเป็นเลขจาง ๆ เฉย ๆ — ไม่มีอะไรอ้างว่าเสร็จแล้ว */}
+          {head ? (
+            <p className="mt-8 text-[10px] text-slate-500 dark:text-slate-500">
+              งานถัดไปข้างบนอยู่ขั้นที่ {head.step} ของสายพาน — แถบนี้บอกตำแหน่งเฉย ๆ
+              ไม่ได้แปลว่าขั้นก่อนหน้าทำเสร็จแล้ว
+            </p>
+          ) : null}
+          {head ? (
+            <ol
+              className="mt-2 flex items-center"
+              aria-label={`งานถัดไปอยู่ขั้นที่ ${head.step} ของสายพาน`}
+            >
+              {CONVEYOR_STEPS.map((s, i) => {
+                const before = s.step < head.step;
+                const nowStep = s.step === head.step;
+                return (
+                  <React.Fragment key={s.key}>
+                    {i > 0 ? (
+                      /* เส้นเชื่อมเป็นเส้นจาง ๆ เท่ากันหมด — เส้นที่ "ทึบถึงขั้นนี้"
+                         คือภาษาของแถบความคืบหน้า ซึ่งไม่ใช่สิ่งที่แถบนี้บอก */
+                      <span className="h-px min-w-3 flex-1 bg-slate-900/10 dark:bg-white/10" aria-hidden />
+                    ) : null}
+                    <li className="flex flex-col items-center gap-1.5 px-1">
+                      <span
+                        className={cn(
+                          'flex h-5 w-5 items-center justify-center rounded-full border font-mono text-[10px]',
+                          nowStep
+                            ? 'border-sky-600 text-sky-700 shadow-[0_0_12px_theme(colors.sky.400/40%)] dark:border-sky-300 dark:text-sky-200'
+                            : before
+                              ? 'border-slate-900/15 text-slate-400 dark:border-white/15 dark:text-slate-600'
+                              : 'border-slate-900/15 text-slate-500 dark:border-white/15 dark:text-slate-500',
+                        )}
+                      >
+                        {s.step}
+                      </span>
+                      <span
+                        className={cn(
+                          'hidden whitespace-nowrap text-[10px] md:block',
+                          nowStep ? 'font-medium text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-500',
+                        )}
+                      >
+                        {s.label}
+                      </span>
+                    </li>
+                  </React.Fragment>
+                );
+              })}
+            </ol>
+          ) : null}
+        </div>
+      </div>
+
+      {/* ── คิวที่เหลือ — แถวบาง คั่นเส้น ไม่มีกล่อง ── */}
+      {rest.length > 0 ? (
+        <div className="relative border-t border-slate-900/10 dark:border-white/10">
+          <div className="flex items-baseline justify-between px-6 pb-1 pt-4 lg:px-9">
+            <span className={cn(eyebrow, 'text-slate-500 dark:text-slate-400')}>คิวของคุณวันนี้</span>
+            <span className="font-mono text-[11px] tabular-nums text-slate-500 dark:text-slate-500">
+              เหลือ {rest.length}
+            </span>
+          </div>
+          <ol>
+            {rest.map((t, i) => (
+              <li key={t.key}>
+                <Link
+                  to={t.path}
+                  className="group flex items-center gap-4 px-6 py-3 transition-colors hover:bg-slate-900/5 dark:hover:bg-white/5 lg:px-9"
+                >
+                  <span className="font-mono text-xs tabular-nums text-teal-700/70 dark:text-teal-300/60">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {t.title}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500 dark:text-slate-500">{t.reason}</span>
+                  </span>
+                  <span className={cn('hidden font-mono text-[11px] sm:block', TONE_TEXT[t.tone])}>
+                    {t.badge}
+                  </span>
+                  <ArrowRight
+                    className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-teal-700 dark:text-slate-600 dark:group-hover:text-teal-300"
+                    aria-hidden
+                  />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
+      {/* 🔴 แถบ tile 6 ขั้นเคยอยู่ตรงนี้ — **เจ้าของสั่งถอด 26 ส.ค. 2569**
+          เหตุ: หน้าแรกมีปุ่มนำทาง **สองชุดพาไปหน้าเดียวกัน** (tile 6 ขั้น กับ
+          ก้อนทีม 4 ใบใต้ deck) กด "ทีมสรรหา" กับกด tile "ผู้สมัคร" ได้หน้าเดียวกันเป๊ะ
+          แถมชื่อที่กดไม่ตรงชื่อหน้าปลายทาง ⇒ เจ้าของกดแล้วงง
+          👉 เคาะว่า **เก็บก้อนทีม เอาตัวเลขจาก tile ไปใส่ในก้อนทีมแทน**
+          ⚠️ เลขทั้ง 6 ขั้นไม่หาย — เมนูสายพานซ้ายมือมี badge ครบอยู่แล้ว
+          และเลขที่ใช้บ่อยถูกยกไปอยู่บนก้อนทีม (ดู TeamNavRow) */}
+    </section>
+  );
+};
+
+export default CommandDeck;

@@ -1,15 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, ExternalLink, KeyRound, LayoutGrid, LogOut, Settings, X } from 'lucide-react';
+import { ExternalLink, KeyRound, LogOut, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { shouldShowPasswordUi } from '@/lib/authConfig';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
+import { resolveDockNavTarget, type DockNavItem } from '@/components/layout/bottom-nav/dockNavConfig';
 import {
-  isDockPathActive,
-  resolveDockNavTarget,
-  type DockNavItem,
-} from '@/components/layout/bottom-nav/dockNavConfig';
+  CONVEYOR_HOME,
+  CONVEYOR_STEPS,
+  CONVEYOR_VAULT,
+  isStepActive,
+  isVaultActive,
+} from '@/lib/soRecruitNav';
+
+const groupLabelClass =
+  'px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground';
 
 type Props = {
   open: boolean;
@@ -39,11 +45,30 @@ const AppNavDrawer: React.FC<Props> = ({
   const showPasswordUi = shouldShowPasswordUi(useAuthConfig());
 
   /**
-   * "บอร์ดรับสมัคร" กับ "หน้าสมัครสาธารณะ" เคยเป็นสองแถวเรียงกันในเมนู ซึ่งอ่านแล้วดูเหมือน
-   * เมนูซ้ำกันสองอัน (เจ้าของทัก 10 ส.ค. 2569) — ยุบเป็นหัวข้อเดียวที่กดกางเห็นทั้งสอง
-   * เปิดค้างไว้ให้เองเมื่ออยู่ในบอร์ดอยู่แล้ว จะได้ไม่ต้องกดหาทุกครั้ง
+   * เมนูที่แอดมินซ่อนไว้ที่หน้าตั้งค่า — ยังต้องมีผลกับโครงใหม่
+   * (ลำดับกับชื่อไม่รับแล้ว เพราะเลขขั้นผูกกับหัวหน้าจอทุกหน้า · ดูคอมเมนต์ที่ <nav>)
+   *
+   * ⚠️ `applyNavPreferences` **กรองของที่ซ่อนออกไปแล้ว** ก่อนส่งมาที่นี่
+   * ⇒ ตรวจจาก "หายไปจากลิสต์" ไม่ใช่จากธง `hidden` (ซึ่งไม่มีในชนิดข้อมูลนี้)
+   * ขั้นที่ไม่มีเมนูเดิมคู่กัน (ขั้น 2/3/4) ไม่มีอะไรให้ซ่อน — โชว์เสมอ
    */
-  const [boardOpen, setBoardOpen] = useState(() => location.pathname.startsWith('/jobs/board'));
+  const OWNER_DOCK_PATH: Record<string, string> = {
+    requests: '/jobs/list',
+    follow: '/follow',
+    aftercare: '/aftercare',
+    candidates: '/matching/candidates',
+    wl: '/wl',
+    dashboard: '/dashboard',
+  };
+  const visiblePaths = React.useMemo(() => new Set(items.map((i) => i.path)), [items]);
+  const shown = (key: string) => {
+    const owner = OWNER_DOCK_PATH[key];
+    return owner === undefined || visiblePaths.has(owner);
+  };
+  const visibleSteps = CONVEYOR_STEPS.filter(
+    (s) => shown(s.key) && (s.key === 'requests' || !s.path.startsWith('/jobs/board') || showJobBoard),
+  );
+  const visibleVault = CONVEYOR_VAULT.filter((v) => shown(v.key));
 
   useEffect(() => {
     if (!open) return;
@@ -115,72 +140,73 @@ const AppNavDrawer: React.FC<Props> = ({
           </div>
         ) : null}
 
+        {/*
+          โครงเดียวกับแถบสายพานบนจอใหญ่ (ConveyorSidebar) — จอเล็กเห็นลำดับงานชุดเดียวกัน
+          🔴 **ลำดับขั้นห้ามสลับ** เพราะเลข "ขั้นที่ N" ผูกกับหัวหน้าจอทุกหน้า
+          ⇒ ที่นี่จึงไม่ใช้ลำดับจาก `items` (navPreferences) เหมือนเดิม แต่ยัง
+          **เคารพการซ่อนของแอดมิน**: เมนูที่แอดมินซ่อนไว้จะไม่โผล่ (ดู hiddenPaths)
+        */}
         <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="เมนูหลัก">
-          {items.map((item) => {
-            const Icon = item.icon;
+          <div className={groupLabelClass}>งานของฉัน</div>
+          <button
+            type="button"
+            onClick={() => go(CONVEYOR_HOME.path)}
+            className={rowClass(location.pathname === '/')}
+          >
+            <CONVEYOR_HOME.icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{CONVEYOR_HOME.label}</span>
+          </button>
 
-            const rows = [
+          <div className={groupLabelClass}>สายพานงาน</div>
+          {visibleSteps.map((step) => {
+            const active = isStepActive(step, location.pathname, location.search);
+            return (
               <button
-                key={item.path}
+                key={step.key}
                 type="button"
-                onClick={() => go(item.path)}
-                className={rowClass(isDockPathActive(item.path, location.pathname))}
+                onClick={() => go(step.path)}
+                className={rowClass(active)}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </button>,
-            ];
-            // แทรกกลุ่ม "บอร์ดรับสมัคร" ต่อจาก "หน่วยงาน" — หัวข้อเดียว กดแล้วกางเห็น 2 ทางเข้า
-            if (item.path === '/jobs/list' && showJobBoard) {
-              const inBoard = location.pathname.startsWith('/jobs/board');
-              rows.push(
-                <button
-                  key="board-group"
-                  type="button"
-                  onClick={() => setBoardOpen((v) => !v)}
-                  aria-expanded={boardOpen}
-                  className={rowClass(inBoard)}
+                <span
+                  className={cn(
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-[11px] font-semibold',
+                    active
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-200/80 text-slate-500 dark:bg-slate-700 dark:text-slate-300',
+                  )}
                 >
-                  <LayoutGrid className="h-4 w-4 shrink-0" />
-                  <span className="truncate">บอร์ดรับสมัคร</span>
-                  <ChevronDown
-                    className={cn(
-                      'ml-auto h-4 w-4 shrink-0 transition-transform',
-                      boardOpen && 'rotate-180',
-                    )}
-                    aria-hidden
-                  />
-                </button>,
-              );
-              if (boardOpen) {
-                rows.push(
-                  <button
-                    key="/jobs/board"
-                    type="button"
-                    onClick={() => go('/jobs/board')}
-                    className={cn(rowClass(inBoard), 'pl-10')}
-                  >
-                    <span className="truncate">กล่องงาน (เปิดบอร์ด)</span>
-                  </button>,
-                  // ⚠️ ลิงก์ "รายชื่อผู้สมัคร (RM)" เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก
-                  // 13 ส.ค. 2569 ("มันอยู่หน้าบอร์ดรับสมัครแล้ว") · ทางเข้า = แท็บบนบอร์ด
-                  <button
-                    key="apply-public"
-                    type="button"
-                    onClick={() => {
-                      window.open('/apply', '_blank', 'noopener,noreferrer');
-                      onClose();
-                    }}
-                    className={cn(rowClass(false), 'pl-10 text-muted-foreground')}
-                  >
-                    <ExternalLink className="h-4 w-4 shrink-0" />
-                    <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
-                  </button>,
-                );
-              }
-            }
-            return rows;
+                  {step.step}
+                </span>
+                <span className="truncate">{step.label}</span>
+              </button>
+            );
           })}
+
+          <div className={groupLabelClass}>คลังข้อมูล</div>
+          {visibleVault.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => go(item.path)}
+              className={rowClass(isVaultActive(item, location.pathname))}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </button>
+          ))}
+
+          <div className={groupLabelClass}>ทางเข้าอื่น</div>
+          <button
+            type="button"
+            onClick={() => {
+              window.open('/apply', '_blank', 'noopener,noreferrer');
+              onClose();
+            }}
+            className={cn(rowClass(false), 'text-muted-foreground')}
+          >
+            <ExternalLink className="h-4 w-4 shrink-0" />
+            <span className="truncate">หน้าสมัครสาธารณะ (/apply)</span>
+          </button>
         </nav>
 
         <div className="space-y-1 border-t border-white/60 p-3 dark:border-slate-700/70">

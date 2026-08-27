@@ -7,14 +7,13 @@ import {
   PhoneCall,
   AlertTriangle,
   RefreshCw,
-  LoaderCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrandTitle } from '@/components/shared/BrandMark';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { HUD, HUD_HEX, HUD_INK, TONE, type ToneKey } from '@/lib/designTokens';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 import {
   fetchFlowSummary,
   confirmedThisMonth,
@@ -28,14 +27,15 @@ import {
   bookingTargetFromPersonRef,
 } from '@/lib/callResultBooking';
 import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
-import FollowTodayPanel from '@/components/home/FollowTodayPanel';
-import LumosCallHealthPanel from '@/components/home/LumosCallHealthPanel';
-import OfficeRooms from '@/components/home/OfficeRooms';
-import { buildOfficeFloor, composeOfficeFloorRaw } from '@/lib/officeFloor';
+import TeamBoardPanel from '@/components/home/TeamBoardPanel';
+import { fetchOfficeTeam, type OfficeTeamResponse } from '@/lib/officeTeamApi';
 import { fetchOfficeFloor, type OfficeFloorResponse } from '@/lib/officeFloorApi';
+import { buildNextTasks } from '@/lib/nextTask';
+import CommandDeck from '@/components/home/CommandDeck';
+import { useConveyorCounts } from '@/hooks/useConveyorCounts';
+
 import HomeKpiRow from '@/components/home/HomeKpiRow';
 import HomeBuFilter from '@/components/home/HomeBuFilter';
-import HomeDigestPanels from '@/components/home/HomeDigestPanels';
 import { fetchHomeKpis, type HomeKpisResponse } from '@/lib/homeKpiApi';
 import { buildOpenRequestsCard } from '@/lib/homeKpi';
 import { lumosConnectRate } from '@/lib/lumosLinkHealth';
@@ -142,9 +142,6 @@ const HomePage: React.FC = () => {
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [flowLoading, setFlowLoading] = useState(true);
-  // เวลาที่ใช้คิด "Lumos เงียบมานานแค่ไหน" — ตั้งใหม่ทุกครั้งที่โหลดข้อมูล
-  // (ไม่ใช้ Date.now() ตอน render ตรง ๆ เพื่อให้เลขนิ่ง ไม่ขยับทุก re-render)
-  const [nowMs, setNowMs] = useState(() => Date.now());
   // กดชื่อคนในกล่องผลโทร → เปิดรายละเอียดคน + งานที่แมทไป ก่อนตัดสินใจเปิดใบขอ
   const [personDetail, setPersonDetail] = useState<{ item: FlowFollowUpItem; tone: FollowUpTone } | null>(null);
   // กดขั้น "ผลจากการโทร" → dialog 4 กล่อง (สนใจ/รอโทรซ้ำ/ต้องเร่งจัดการ/ไม่สนใจ) พร้อมชื่อคน
@@ -168,12 +165,29 @@ const HomePage: React.FC = () => {
   const [bu, setBu] = useState<string | null>(null);
   const [hud, setHud] = useState<HomeKpisResponse | null>(null);
   const [officeLoading, setOfficeLoading] = useState(true);
+  /** ภาพรวม (KPI · ฉาก · funnel) หุบเป็นค่าตั้งต้น — เหตุผลเต็มอยู่ที่ปุ่มใน JSX */
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  /** บอร์ด 4 ทีม — โหลดล้มไม่ล้มหน้า (แผงบอกเอง "โหลดไม่สำเร็จ" กดรีเฟรชได้) */
+  const [team, setTeam] = useState<OfficeTeamResponse | null>(null);
+  const [teamLoading, setTeamLoading] = useState(true);
+
+  const loadTeam = async () => {
+    setTeamLoading(true);
+    try {
+      setTeam(await fetchOfficeTeam());
+    } catch {
+      setTeam(null);
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+  /** เลขบน node ของฉาก JARVIS Core — cache เดียวกับแถบเมนู (ไม่ยิงเส้นเพิ่ม) */
+  const conveyorCounts = useConveyorCounts();
 
   const loadFlow = async () => {
     setFlowLoading(true);
     try {
       setFlow(await fetchFlowSummary());
-      setNowMs(Date.now());
     } catch {
       setFlow(null);
     } finally {
@@ -208,26 +222,12 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     void loadFlow();
     void loadOffice();
+    void loadTeam();
   }, []);
 
   useEffect(() => {
     void loadHud(bu);
   }, [bu]);
-
-  /**
-   * เลขฝั่งใบขอ (เปิดกี่ใบ · AI คิดให้แล้วกี่ใบ) มาจาก flow-summary ที่หน้านี้โหลดอยู่แล้ว
-   * — ยังไม่มา = ส่ง null ไป แล้วโต๊ะคัดสรรจะไม่โชว์ช่อง "ยังไม่มีคนแนะนำ" (ห้ามโชว์ 0
-   * ที่แปลว่าคนละเรื่องกับ "ยังไม่รู้")
-   */
-  const officeDesks = React.useMemo(() => {
-    if (!office) return null;
-    return buildOfficeFloor(
-      composeOfficeFloorRaw(office.counts, {
-        jobsOpen: flow ? flow.jobs.open_total : null,
-        jobsWithMatch: flow ? flow.jobs.with_recommend : 0,
-      }),
-    );
-  }, [office, flow]);
 
   /**
    * "ใบขอเข้าใหม่วันนี้" มาจาก **flow-summary (ERP)** ไม่ใช่ `/api/home-kpis`
@@ -245,6 +245,24 @@ const HomePage: React.FC = () => {
       : { today: flow.jobs.new_today ?? 0, yesterday: flow.jobs.new_yesterday ?? 0 };
     return { ...hud.kpis, newRequests: pair };
   }, [hud, flow, bu]);
+
+  /**
+   * คิวงาน "ต้องทำอะไรก่อน" — ประกอบจากสองเส้นที่หน้านี้โหลดอยู่แล้ว **ไม่ยิงเส้นใหม่**
+   * เส้นไหนยังไม่มา ช่องของเส้นนั้นเป็น `undefined` ⇒ ถังนั้นหายไปจากคิว
+   * (ไม่ใช่กลายเป็น 0 ซึ่งจะอ่านว่า "ตรวจแล้วไม่มีงาน")
+   */
+  const nextTasks = React.useMemo(
+    () =>
+      buildNextTasks({
+        followPastDue: office ? office.counts.follow.pastDue : null,
+        applicantsUntouched: office ? office.counts.intake.untouched : null,
+        claimedIdle: office ? office.counts.intake.claimedIdle : null,
+        callsStale: flow ? flow.lumos.stale_delivered : null,
+        needsHuman: flow ? flow.call_boxes.needs_human.length : null,
+        slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
+      }),
+    [office, flow],
+  );
 
   /** คีย์กันกดซ้ำ — คนเดียวโผล่ได้หลายใบขอ จึงต้องผูกกับใบด้วย ไม่ใช่แค่ตัวคน */
   const bookingKeyOf = (item: FlowFollowUpItem) => `${item.job_ref}::${item.person_ref}`;
@@ -291,11 +309,70 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 px-4 sm:px-5 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* ทักทายสั้น ๆ บรรทัดเดียว — login ปุ๊บต้องเห็น "การไหลของงานสรรหา" ทันที */}
-      <p className="mb-4 text-sm text-muted-foreground">
-        {greeting} <span className="font-semibold text-foreground">{user?.full_name}</span> ·{' '}
-        <BrandTitle className="font-medium" />
-      </p>
+      {/* ── Command Deck — ทั้งหน้าเป็นจอบัญชาการผืนเดียว (เจ้าของสั่งรอบสอง
+          26 ส.ค. 2569 หลังตีตกรอบแรกว่า "รก ไม่สวย" · อ้างอิง cayla-flax.vercel.app) ──
+          ทักทาย · หน้าปัด · งานถัดไป · คิว · แถบ 6 ขั้น รวมอยู่ใน canvas เดียว
+          เลขมาจาก cache เดียวกับแถบเมนู (useConveyorCounts) ไม่ยิงเส้นเพิ่ม
+          ใต้ deck คือบอร์ด 4 ทีมเมตริกครบ ทุกแถวกดนำทางได้ (TeamBoardPanel) */}
+      <CommandDeck
+        greeting={greeting}
+        userName={user?.full_name || user?.username || ''}
+        tasks={nextTasks}
+        loading={flowLoading || officeLoading}
+        statusInput={{
+          followPastDue: office ? office.counts.follow.pastDue : null,
+          applicantsUntouched: office ? office.counts.intake.untouched : null,
+          slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
+        }}
+        className="mb-5"
+      />
+
+      {/* ── บอร์ด 4 ทีม — เมตริกครบตามสเปกเจ้าของ + ทุกบรรทัดกดนำทางได้ ──
+          🔴 ลำดับคำสั่งที่วนมาสามรอบ (จำให้ขึ้นใจ):
+          1. เจ้าของพิมพ์สเปกเมตริก 4 ทีมเอง → ทำบอร์ด+ฉาก iso → ตีตก "ฉาก/ความ
+             พยายาม visual" (ไม่ใช่เมตริก)
+          2. ผมเข้าใจผิด ยุบเหลือการ์ดเปล่า 4 ใบ → โดนด่า "กล่องโง่ ๆ ที่ไม่รู้อะไร
+             แล้วก็ต้องไปไล่กดหาเอง"
+          3. เจ้าของ clarify: *"กล่องแต่ละทีมตอนแรกบอกรายละเอียดหมดเลย ฉันโอเคกะ
+             แบบนั้น เลยให้ทำเป็นกดรายละเอียดอันไหนก็นำทางไปอันนั้น"*
+          ⇒ เมตริกครบ + ทุกแถวกดได้ · ไม่มีฉาก/รายชื่อคน · tile 6 ขั้นบน deck
+          ถูกตัดไปแล้ว (นำทางซ้ำ) — เลข 6 ขั้นอยู่ที่เมนูสายพานซ้ายมือ */}
+      <TeamBoardPanel
+        team={team}
+        loading={teamLoading}
+        onRefresh={() => void loadTeam()}
+        floor={office ? office.counts : null}
+        onOpenCallResults={() => setCallResultsOpen(true)}
+        onOpenActiveCalls={() => setActiveCallsOpen(true)}
+        className="mb-5"
+      />
+
+      {/*
+        🔴 **ภาพรวมหุบเป็นค่าตั้งต้น** (เจ้าของเคาะ 26 ส.ค. 2569) — และถูก **ยุบ**
+        รอบสอง (เจ้าของสั่ง: *"อันไหนข้อมูลเดียวกันก็ยุบ ๆ รวม ๆ ไป มันจะได้ไม่เยอะ"*)
+        เหลือแค่แถบ KPI "เหตุการณ์วันนี้" ที่ไม่ซ้ำกับใคร · ของที่ถูกยุบและ**ที่ไปของมัน**:
+        - ผังห้อง (OpsRoomsPanel) → บอร์ดทีมแผนก (ตัวเลขถัง = deck + โซน AI)
+        - LumosCallHealthPanel → โซน AI ของบอร์ดทีม (dialog เดิมสองตัวยังเปิดได้จากที่นั่น)
+        - FollowTodayPanel → คิวบน deck (เลยนัด/ไม่ได้ส่ง AI) + หน้า Follow เอง
+        - HomeDigestPanels → แถบ "ขยับล่าสุด" ของบอร์ดทีม + Dashboard
+      */}
+      <button
+        type="button"
+        onClick={() => setOverviewOpen((v) => !v)}
+        aria-expanded={overviewOpen}
+        className="mb-4 inline-flex h-10 items-center gap-2 rounded-xl border border-white/60 bg-white/55 px-4 text-sm font-medium text-foreground/80 transition-colors hover:bg-white/80 dark:border-white/10 dark:bg-slate-900/45 dark:hover:bg-slate-900/70"
+      >
+        <ChevronDown
+          className={cn('h-4 w-4 transition-transform', overviewOpen && 'rotate-180')}
+          aria-hidden
+        />
+        {overviewOpen ? 'ซ่อนตัวเลขวันนี้' : 'ดูตัวเลขวันนี้'}
+        <span className="text-xs text-muted-foreground">KPI เทียบเมื่อวาน · แยกตาม BU</span>
+      </button>
+
+      {overviewOpen ? (
+      <>
+
 
       {/* ── KPI แถวบน + ตัวกรอง BU (Phase 10 · ตามภาพอ้างอิง 24 ส.ค. 2569) ──
           ตัวเลขทุกใบเป็น "เหตุการณ์วันนี้เทียบเมื่อวาน" ของจริง — ตัวที่เทียบไม่ได้
@@ -326,116 +403,11 @@ const HomePage: React.FC = () => {
         </>
       ) : null}
 
-      {/* ฉากห้องทำงาน (เจ้าของสั่ง 22 ส.ค. 2569) — วางไว้เหนือ funnel เพราะตอบคำถามแรก
-          ที่คนเปิดระบบมาถาม: "วันนี้ต้องไปช่วยโต๊ะไหน" · funnel ด้านล่างตอบ "งานไหลไปถึงไหน"
-          ⚠️ ฉากซ่อนตัวเองเมื่อโหลดไม่ได้ — ห้ามขึ้นกรอบเปล่าคาหน้าแรก */}
-      {officeDesks ? (
-        <OfficeRooms
-          desks={officeDesks}
-          generatedAt={office?.generated_at ?? null}
-          loading={officeLoading}
-          onRefresh={() => void loadOffice()}
-          className="mb-8"
-        />
-      ) : null}
-
-      {/* การไหลของงานสรรหา — งานเข้า → AI → โทร → จอง → ลงงาน (กดตัวเลขเพื่อไปหน้านั้น) */}
-      {flowLoading && !flow ? (
-        <p className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
-          <LoaderCircle className="h-4 w-4 animate-spin text-blue-500" aria-hidden />
-          กำลังโหลดภาพรวมการไหลของงาน…
-        </p>
-      ) : null}
-      {!flowLoading && !flow ? (
-        <div className="glass-card mb-8 rounded-2xl border border-white/70 p-5 text-sm text-muted-foreground">
-          โหลดภาพรวมไม่สำเร็จ —{' '}
-          <button type="button" onClick={() => void loadFlow()} className="font-medium text-blue-600 hover:underline">
-            ลองใหม่
-          </button>{' '}
-          หรือเปิดเมนูจากปุ่ม ☰ มุมซ้ายบน
-        </div>
-      ) : null}
-      {flow ? (
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 space-y-3"
-        >
-          {/* Funnel อยู่ใน hero เข้มตาม mockup rev.3 ข้อ 01 — เข้าระบบมาเจอการไหลของงานก่อนทุกอย่าง
-              เจ้าของสั่ง 10 ส.ค. 2569: แยก 2 บรรทัด — แถวบนคือเส้นที่ "มีคนแนะนำ" เดินต่อได้
-              แถวล่างคือใบที่ AI ไม่พบคน ซึ่งไม่ได้เดินต่อในเส้นนี้ แต่โยงไป Content/Scraping
-              (เดิมทั้งหมดอยู่แถวเดียว เส้นแยกเลยจมหาย อ่านผิดว่า Content ต่อจาก "จองตัว/ลงงาน") */}
-          {/* ไม่ติดป้าย "เดือนนี้" ทั้งแถบ — ตัวเลขปนกันสองแบบ (ของค้างนับทั้งหมด ·
-              การเคลื่อนไหวนับเดือนนี้) ป้ายรวมจะโกหกครึ่งนึงเสมอ ให้บรรทัดท้ายอธิบายแทน */}
-          {/* ⚠️ แถบ "การไหลของงานสรรหา" (funnel 7 กล่อง) เคยอยู่ตรงนี้ —
-              **เจ้าของสั่งถอดออก 24 ส.ค. 2569**: *"อยากให้มีแค่ 4 ห้องแต่มี Dashboard
-              บอกครบทั้งระบบ"* · วัดจริงก่อนถอด: 4 ใน 7 กล่องซ้ำกับการ์ดห้องไปแล้ว
-              (AI แนะนำคนแล้ว = ห้องคัดสรร · Content/Scraping = Online Room ·
-              ผลจากการโทร = แผง "ผลโทรเดือนนี้")
-              🔴 สองเลขที่ไม่ซ้ำใครถูกย้ายไปแล้ว ไม่ได้ทิ้ง:
-              • "ใบขอเปิดอยู่ + ด่วนกี่ใบ" → การ์ดใบแรกของแถว KPI (`buildOpenRequestsCard`)
-              • "ยังไม่มีคนแนะนำ" → แถวในการ์ดห้องคัดสรร (`fillRows` ของ officeRooms)
-              dialog สองตัว (ผลจากการโทร · รายชื่อรอผล) ไม่กำพร้า — เปิดจากแผง Lumos ได้เหมือนเดิม */}
-
-          {/* ⚠️ เคยมี <CallFunnelPanel defaultSource="all" /> ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
-              funnel การโทรอยู่หน้า Follow (ล็อกของหน้านั้น) และหน้า Matching (กดสลับต้นทางได้) */}
-
-          {/* ⚠️ แผงอนุมัติชุด (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
-              **ย้ายไปหน้า Matching ไม่ได้ลบ** เพราะชุดที่รออนุมัติต้องมีที่ให้กด
-              ไม่งั้นจะค้างถาวร (ตอนนี้มีค้างจริงบนฐาน) · หน้า Matching คือที่ที่ชุดถูกสร้าง
-              จึงเป็นที่ที่ตรงกับงานที่สุด */}
-          {/* ⚠️ กล่อง "งานโทรของฉัน" (CallStatusPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก
-              10 ส.ค. 2569 · ลบคอมโพเนนต์ทิ้งด้วย ไม่มีหน้าไหนใช้แล้ว
-              งานโทรที่ตัวเองถืออยู่ยังเห็นได้ที่การ์ดผู้สมัครในหน้า Matching (CallHoldPanel) */}
-
-          {/* ⚠️ กล่องติดตามท้ายหน้า ("สนใจงานแล้ว — รอคนกดจอง" · "ไม่รับสาย — ควรโทรซ้ำ" ·
-              "ติดขัด — ต้องมีคนตัดสินใจ") เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 12 ส.ค. 2569
-              เพราะหลักการเดียวกับ "ผลจากการโทร": รายชื่อทั้งหมดย้ายเข้า dialog 4 กล่อง
-              (กดที่ขั้น "ผลจากการโทร") · ใบด่วนค้าง → บรรทัดย่อยของ "ยังไม่มีคนแนะนำ" ·
-              ค้างเกิน 2 วัน → ธงแดงใน dialog "ส่ง AI โทร" — ทุกตัวเลขมีที่ไป ไม่มีตัวไหนหาย */}
-
-          {/* แผงผลโทรจาก AI (เจ้าของสั่ง 13 ส.ค. 2569: "ดูว่าเขาส่งผลลัพมาไหม ส่งไปกี่คน
-              โทรไปกี่คน ผลเป็นยังไง") — วางใต้แถบการไหลของงานเพราะเป็นการซูมเข้าไปที่
-              ขั้น "ส่ง AI โทร → ผลจากการโทร" ของแถบนั้น ไม่ใช่เรื่องใหม่คนละเรื่อง */}
-          {/* ── สามแผงล่าง (Phase 10.2) — อัปเดตล่าสุด · ผลงานเด่นวันนี้ · ผลโทรเดือนนี้ ── */}
-          {hud ? (
-            <HomeDigestPanels
-              deskToday={hud.desk_today}
-              outcomesMonth={flow?.lumos.outcomes_month ?? null}
-              className="mb-6"
-            />
-          ) : null}
-
-          {/* ── ห้อง 4 · AI Call (ทีม Lumos) ──────────────────────────────────
-              เจ้าของสั่ง 24 ส.ค. 2569: สองแผงเรื่องสาย *"เอาไว้กับทีม Lumos"*
-              ⇒ จับเข้ากลุ่มเดียวกันใต้หัวข้อของห้อง AI Call (สีเดียวกับห้องในฉาก)
-              ไม่ใช่แผงลอยท้ายหน้าที่ไม่รู้ว่าเป็นของทีมไหน */}
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center gap-2">
-              <span
-                className="flex h-5 w-5 items-center justify-center rounded-full font-mono text-[11px] font-bold"
-                style={{ background: HUD_HEX.danger, color: HUD_INK.hex }}
-              >
-                4
-              </span>
-              <span className={HUD.eyebrow} style={{ color: HUD_HEX.danger }}>
-                ห้อง AI Call · ทีม Lumos
-              </span>
-              <span className={cn('flex-1 border-t', HUD.divider)} />
-            </div>
-
-            <LumosCallHealthPanel
-              flow={flow}
-              nowMs={nowMs}
-              onOpenWaiting={() => setActiveCallsOpen(true)}
-              onOpenResults={() => setCallResultsOpen(true)}
-            />
-
-          {/* "งาน Follow วันนี้" (เจ้าของสั่ง 14 ส.ค. 2569) — แทนที่ "โทรของฉัน" ที่ย้าย
-              ไปหน้า Matching แล้ว · เห็นทันทีว่าวันนี้ส่งกี่คน + ผลราย 3 รอบ */}
-            <FollowTodayPanel />
-          </div>
-        </motion.section>
+      {/* ⚠️ ของที่เคยอยู่ตรงนี้ถูก **ยุบ** ตามคำสั่ง 26 ส.ค. 2569 (*"อันไหนข้อมูลเดียวกัน
+          ก็ยุบ ๆ รวม ๆ ไป"*) — OpsRoomsPanel · funnel hero · HomeDigestPanels ·
+          LumosCallHealthPanel · FollowTodayPanel — ที่ไปของแต่ละตัวเขียนไว้ที่
+          คอมเมนต์เหนือปุ่ม "ดูตัวเลขวันนี้" ข้างบน */}
+      </>
       ) : null}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}
 

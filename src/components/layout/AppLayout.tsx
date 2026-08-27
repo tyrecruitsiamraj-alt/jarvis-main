@@ -12,6 +12,8 @@ import JobNotificationWatcher from '@/components/notifications/JobNotificationWa
 import ClaimIdleAlertDialog from '@/components/notifications/ClaimIdleAlertDialog';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
+import ConveyorSidebar from '@/components/layout/ConveyorSidebar';
+import StageBanner from '@/components/layout/StageBanner';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
 import { applyNavPreferences, type NavPreferences } from '@/lib/navPreferences';
 import { fetchNavPreferences } from '@/lib/navPreferencesApi';
@@ -230,9 +232,19 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </header>
 
-      <main className="relative flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-8 overflow-x-clip">
-        {children}
-      </main>
+      {/*
+        โครงใหม่ (26 ส.ค. 2569): แถบสายพานติดซ้ายบนจอใหญ่ · จอเล็กยังใช้ drawer เดิม
+        `items-start` สำคัญ — ไม่มีแล้ว sidebar `sticky` จะยืดเต็มความสูงแล้วไม่ติดตาม
+      */}
+      <div className="flex flex-1 items-start">
+        <ConveyorSidebar />
+        {/* lg ใช้ px-6 (เดิม px-8) — แถบเมนูกินที่ไปแล้ว ระยะขอบเท่าเดิมทำให้ตาราง
+            ที่จูนไว้พอดีจอ (รอบสี่สิบหก) ตกขอบ · จอเล็กไม่มีแถบ จึงคงระยะเดิมไว้ */}
+        <main className="relative min-w-0 flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 pb-8 pt-3 overflow-x-clip">
+          <StageBanner />
+          {children}
+        </main>
+      </div>
 
       <AppNavDrawer
         open={navOpen}

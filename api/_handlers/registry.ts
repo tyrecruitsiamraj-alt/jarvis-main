@@ -100,6 +100,7 @@ import matchingWorkerStatusHandler from './matching-worker-status.js';
 import homeKpisHandler from './home-kpis.js';
 import unitSectorHandler from './unit-sector.js';
 import officeFloorHandler from './office-floor.js';
+import officeTeamHandler from './office-team.js';
 import jobPublicReleaseHandler from './job-public-release.js';
 import systemHealthHandler from './system-health.js';
 
@@ -168,6 +169,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/matching/worker-status': matchingWorkerStatusHandler as ApiHandler,
   // ฉาก "ห้องทำงาน" บนหน้าแรก — ตัวนับ read-only (ไม่มีข้อมูลบุคคล)
   '/api/office-floor': officeFloorHandler as ApiHandler,
+  '/api/office-team': officeTeamHandler as ApiHandler,
   '/api/home-kpis': homeKpisHandler as ApiHandler,
   '/api/unit-sector': unitSectorHandler as ApiHandler,
   // ปล่อย/ดึงลง ใบขอบนหน้าสาธารณะ (เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)

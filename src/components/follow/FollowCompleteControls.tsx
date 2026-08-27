@@ -42,6 +42,8 @@ const FollowCompleteControls: React.FC<{
         type="button"
         disabled={busy}
         onClick={() => setOpen(true)}
+        /* กดแล้วยัง**ไม่ปิดทันที** — กางให้เลือกเหตุผลก่อน · คนใหม่ไม่รู้ ต้องบอก */
+        title="ปิดงานติดตามรายนี้ — กดแล้วเลือกก่อนว่าปิดเพราะอะไร ยังไม่ปิดทันที"
         className={cn(
           'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
           TONE.success.outline,

@@ -32,6 +32,15 @@ export type FollowGroup = {
   /** รอบถัดไปที่ยังรอโทรและเวลายังไม่ผ่าน — null = ไม่มีนัดข้างหน้าแล้ว */
   nextRound: FollowEntry | null;
   /**
+   * รอบที่ **เลยเวลานัดแล้วแต่ยังไม่มีผล** (เก่าสุดก่อน) — null = ไม่มีของค้าง
+   *
+   * 🔴 ทำไมต้องแยกช่องนี้ (audit มุมพนักงานใหม่ 26 ส.ค. 2569): เดิมการ์ดมีแค่
+   * `nextRound` ⇒ รอบที่เลยเวลาแล้วตกไปทั้งสองทาง จอจึงขึ้น
+   * **"ไม่มีนัดโทรข้างหน้าแล้ว" คู่กับป้าย "รอ AI โทร" บนใบเดียวกัน**
+   * ซึ่งอ่านแล้วขัดกันเอง · ของค้างต้องมีที่ยืนของตัวเอง ห้ามตกไปเงียบ ๆ
+   */
+  overdueRound: FollowEntry | null;
+  /**
    * วันนี้เป็นการติดตามครั้งที่เท่าไหร่ — ลำดับ (1-based) ของรอบแรกของวันนี้
    * ในบรรดารอบที่ไม่ถูกยกเลิก · null = วันนี้ไม่มีรอบ
    */
@@ -95,6 +104,16 @@ export function groupFollowEntries(entries: FollowEntry[], now = new Date()): Fo
           time(r.scheduled_at) >= now.getTime(),
       ) ?? null;
 
+    /** เลยเวลานัดแล้วยังไม่มีผล — นิยามเดียวกับ `followScheduleCounts` (ยกเลิกไม่นับอยู่แล้ว) */
+    const overdueRound =
+      active.find(
+        (r) =>
+          !r.call_outcome &&
+          !r.completed_at &&
+          !Number.isNaN(time(r.scheduled_at)) &&
+          time(r.scheduled_at) < now.getTime(),
+      ) ?? null;
+
     const todayIdx = active.findIndex((r) => bangkokDay(r.scheduled_at) === todayKey);
 
     groups.push({
@@ -108,6 +127,7 @@ export function groupFollowEntries(entries: FollowEntry[], now = new Date()): Fo
       rounds,
       activeCount: active.length,
       nextRound,
+      overdueRound,
       todayOrdinal: todayIdx === -1 ? null : todayIdx + 1,
       latestCreatedAt: latest.created_at ?? null,
     });

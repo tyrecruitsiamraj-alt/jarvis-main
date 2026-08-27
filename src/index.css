@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -71,9 +71,11 @@
     --jarvis-orange: #007aff;
     --jarvis-orange-soft: #5ac8fa;
 
-    /* Apple SF Pro สำหรับ Latin (native บนเครื่อง Apple) + Anuphan สำหรับไทย (คมชัด/luxury)
-       browser fallback ต่อตัวอักษร: Latin→SF Pro, ไทย→Anuphan */
-    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Anuphan', 'Segoe UI', 'Helvetica Neue', sans-serif;
+    /* Kanit ทั้งไทยและ Latin (ดีไซน์ใหม่ 26 ส.ค. 2569 — ฟอนต์เดียวกับต้นแบบที่เจ้าของเคาะ)
+       ⚠️ เดิมเป็น SF Pro (Latin) + Anuphan (ไทย) ⇒ **สองฟอนต์ในบรรทัดเดียว**
+       เลขกับตัวอักษรไทยความสูงไม่เท่ากัน · Kanit มีทั้งสองชุดในตัวเดียว
+       (tailwind.config ประกาศ Kanit เป็น font-sans มาตั้งแต่ต้นแล้ว แต่ไม่เคยโหลดจริง) */
+    --font-display: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   }
 
@@ -700,11 +702,124 @@
     }
   }
 
+  /* ── Command Deck — หน้าแรกทั้งผืนเป็นจอบัญชาการเดียว (26 ส.ค. 2569) ──
+     บทเรียนรอบแรกที่ถูกตีตก ("รก ไม่สวย"): การ์ดมืดใบเล็กแปะบนหน้าขาวหลายใบ = รก
+     ของจริงต้องเป็น**ผืนเดียว** คั่นด้วยเส้นบาง
+
+     🔴 **ตามธีมจริง ไม่ใช่ ink ตายตัว** (เจ้าของสั่ง 26 ส.ค. 2569:
+     "หน้าหลักขอสี Tone สว่างเพราะตอนนี้เปิดโหมดสว่าง") — โหมดสว่างใช้ glass ขาว
+     แบบต้นแบบที่เจ้าของเคาะ (workfiles/so-redesign/Requests.dc.html) · โหมดมืด = ink เดิม
+     ⚠️ ห้ามเอา dark: ไปเติมชุด HUD_* (เทสต์ designTokens ห้าม) — deck เป็นคนละชุดกัน */
+  .jarvis-deck {
+    --jarvis-hud-line: rgba(13, 120, 110, 0.35);
+    --jarvis-hud-line-soft: rgba(20, 20, 30, 0.1);
+    @apply relative overflow-hidden text-slate-900;
+    background:
+      radial-gradient(1100px 480px at 72% -12%, rgba(56, 130, 230, 0.08), transparent 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(246, 247, 250, 0.86) 100%);
+    border: 1px solid var(--jarvis-hud-line-soft);
+    box-shadow: 0 8px 30px rgba(17, 17, 26, 0.08);
+  }
+  .dark .jarvis-deck {
+    --jarvis-hud-line: rgba(94, 234, 212, 0.32);
+    --jarvis-hud-line-soft: rgba(94, 234, 212, 0.1);
+    @apply text-white;
+    background:
+      radial-gradient(1100px 480px at 72% -12%, rgba(56, 130, 230, 0.14), transparent 60%),
+      radial-gradient(800px 420px at -5% 105%, rgba(94, 234, 212, 0.08), transparent 55%),
+      linear-gradient(170deg, #070d1a 0%, #0b1426 55%, #081120 100%);
+    box-shadow:
+      0 24px 70px -20px rgba(6, 12, 24, 0.55),
+      inset 0 1px 0 rgba(160, 215, 255, 0.08);
+  }
+  /* กริดจางทั้งผืน — จุดพิกัด ไม่ใช่ตารางทึบ (ยิ่งจางยิ่งแพง) */
+  .jarvis-deck::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0;
+    background-image: radial-gradient(rgba(30, 60, 120, 0.12) 1px, transparent 1.5px);
+    background-size: 30px 30px;
+    mask-image: radial-gradient(110% 80% at 50% 0%, #000 0%, transparent 78%);
+  }
+  .dark .jarvis-deck::before {
+    background-image: radial-gradient(rgba(125, 211, 252, 0.14) 1px, transparent 1.5px);
+  }
+
+  /* ── JARVIS Core — แกนวงแหวนของหน้าปัด (วาดด้วยโค้ดล้วน · 26 ส.ค. 2569) ──
+     ภาษาเดียวกับ .jarvis-hud-* : เข้มเท่ากันสองธีม · เส้น teal/sky ชุดเดิม ไม่มีสีใหม่
+     ทุกแอนิเมชันเป็นของประดับ (ไม่ถือข้อมูล) — ปิดหมดใน prefers-reduced-motion */
+  .jarvis-core-spin-slow {
+    animation: jarvis-core-spin 70s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .jarvis-core-spin-rev {
+    animation: jarvis-core-spin 45s linear infinite reverse;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .jarvis-core-spin-fast {
+    animation: jarvis-core-spin 16s linear infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  @keyframes jarvis-core-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ใจกลางหายใจช้า ๆ — จังหวะเดียว ไม่วูบวาบ (แสงคือสถานะ ไม่ใช่ไฟดิสโก้) */
+  .jarvis-core-breathe {
+    animation: jarvis-core-breathe 4s ease-in-out infinite;
+  }
+  @keyframes jarvis-core-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  /* เส้นเชื่อมแกน→ขั้น: ประจุวิ่งช้า ๆ บอกว่า "ข้อมูลไหลอยู่" */
+  .jarvis-core-flow {
+    stroke-dasharray: 3 9;
+    animation: jarvis-core-flow 2.6s linear infinite;
+  }
+  @keyframes jarvis-core-flow {
+    to {
+      stroke-dashoffset: -12;
+    }
+  }
+
+  /* จุดแดงบนถังที่ต้องลงมือ — ตัวเดียวที่กะพริบแรง เพราะถือข้อมูลจริง */
+  .jarvis-core-ping {
+    animation: jarvis-core-ping 1.8s ease-in-out infinite;
+  }
+  @keyframes jarvis-core-ping {
+    0%,
+    100% {
+      box-shadow: 0 0 0 3px rgba(252, 165, 165, 0.25), 0 0 12px rgba(252, 165, 165, 0.8);
+    }
+    50% {
+      box-shadow: 0 0 0 7px rgba(252, 165, 165, 0.08), 0 0 20px rgba(252, 165, 165, 1);
+    }
+  }
+
   /* คนที่ตั้งเครื่องว่าไม่เอาแอนิเมชัน = ไม่มีเส้นวิ่ง (สถานะยังอ่านครบเพราะเส้นนี้ไม่ถือข้อมูล) */
   @media (prefers-reduced-motion: reduce) {
     .jarvis-hud-scan {
       animation: none;
       opacity: 0;
+    }
+    .jarvis-core-spin-slow,
+    .jarvis-core-spin-rev,
+    .jarvis-core-spin-fast,
+    .jarvis-core-breathe,
+    .jarvis-core-flow,
+    .jarvis-core-ping {
+      animation: none;
     }
   }
 }

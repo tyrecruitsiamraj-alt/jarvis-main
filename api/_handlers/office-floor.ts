@@ -19,6 +19,14 @@ import { sendError, withAuth, handleApiError, type ApiRes, type AuthedReq } from
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { OVERVIEW_BUCKETS } from '../_lib/applicantOverviewSql.js';
+import {
+  queueOutcome,
+  queuePending,
+  queueResultAt,
+  queueSentAt,
+  queueStale,
+  queueWaiting,
+} from '../_lib/lumosQueueDefs.js';
 import type { OfficeFloorCounts } from '@/lib/officeFloor';
 
 const APPS = tableInAppSchema('public_job_applications');
@@ -28,11 +36,14 @@ const FOLLOW = tableInAppSchema('follow_entries');
 const POSTING_REQ = tableInAppSchema('job_posting_requests');
 const AFTERCARE = tableInAppSchema('aftercare_people');
 
-/** ผลโทรในคิว — reminder เก็บที่ last_outcome · interview บางแถวอยู่ใน result (กับดักซ้ำ) */
-const QUEUE_OUTCOME = `coalesce(q.last_outcome, q.result->>'outcome')`;
-/** เวลาที่ถูกส่งออก — แถวเก่าก่อน migration 088 ไม่มี first_delivered_at จึง fallback updated_at */
-const QUEUE_SENT_AT = `coalesce(q.first_delivered_at, q.updated_at)`;
-const QUEUE_RESULT_AT = `coalesce(q.first_result_at, q.updated_at)`;
+/**
+ * ผลโทร/เวลาในคิว — 🔴 **ยกไปไว้ที่ `_lib/lumosQueueDefs.ts` แล้ว ห้ามเขียนซ้ำที่นี่**
+ * (เส้นนี้เขียนถูกมาตลอด แต่ flow-summary เขียน `result is null` เองแล้วได้ 38 ทั้งที่
+ * ความจริงคือ 0 — จอสองอันบนหน้าเดียวกันจึงเถียงกัน · ดูที่มาเต็มในไฟล์นิยาม)
+ */
+const QUEUE_OUTCOME = queueOutcome('q');
+const QUEUE_SENT_AT = queueSentAt('q');
+const QUEUE_RESULT_AT = queueResultAt('q');
 
 /** จำนวนวันเต็มจากเวลาหนึ่งถึงเดี๋ยวนี้ */
 const daysSince = (expr: string) => `floor(extract(epoch from (now() - ${expr})) / 86400)`;
@@ -52,13 +63,18 @@ select
   ))::int as oldest_days
 from ${APPS} a`;
 
-/** ส่งให้ Lumos แล้วยังไม่มีผลกลับ */
-const WAITING = `(q.status = 'delivered' and ${QUEUE_OUTCOME} is null)`;
-const STALE = `(${WAITING} and ${QUEUE_SENT_AT} < now() - interval '1 day')`;
+/** ส่งให้ Lumos แล้วยังไม่มีผลกลับ · เกณฑ์ "เงียบ" ของโต๊ะ AI = 1 วัน */
+const QUEUE_PENDING = queuePending('q');
+const WAITING = queueWaiting('q');
+const STALE = queueStale("'1 day'", 'q');
 
 const QUEUE_SQL = `
 select
-  count(*) filter (where q.status = 'pending')::int as pending,
+  -- 🔴 ต้องเช็คว่า "ยังไม่มีผล" ด้วย ไม่ใช่ดูแค่ status
+  --    วัดฐาน 26 ส.ค. 2569: 8 แถวมี status='pending' ทั้งที่มีผลกลับครบแล้ว
+  --    ⇒ หน้าแรกเคยบอก "รายชื่อรอส่งให้ AI โทร 8 สาย" ทั้งที่ไม่มีใครรอสักคน
+  --    (บั๊กตระกูลเดียวกับ result is null · ดู _lib/lumosQueueDefs.ts)
+  count(*) filter (where ${QUEUE_PENDING})::int as pending,
   count(*) filter (where ${WAITING})::int as waiting_result,
   count(*) filter (where ${STALE})::int as stale_over_day,
   count(*) filter (where ${QUEUE_OUTCOME} is not null

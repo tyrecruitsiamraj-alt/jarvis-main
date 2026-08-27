@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { useListPagination } from '@/hooks/useListPagination';
 import { TONE } from '@/lib/designTokens';
+import { followScheduleCounts } from '@/lib/followSchedule';
+import { conveyorLabel } from '@/lib/soRecruitNav';
+import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
 import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome, type FollowOutcomeAny } from '@/lib/followOutcome';
@@ -90,6 +93,14 @@ const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as co
 /** ประกอบชื่อที่จะส่งให้ API — API รับ `recipient_name` ก้อนเดียว */
 function composeRecipientName(prefix: string, first: string, last: string): string {
   return `${prefix}${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * ผลโทรเป็นคำไทย — อ่านจาก `CALL_OUTCOME_LABEL` ที่เป็นแหล่งเดียวของทั้งระบบ
+ * 🔴 รหัสที่ไม่รู้จักให้คืนรหัสเดิมไปตามตรง (จอที่เดาแล้วบอกผิด แย่กว่าจอที่ยอมรับว่าไม่รู้)
+ */
+function callOutcomeText(code: string): string {
+  return (CALL_OUTCOME_LABEL as Record<string, string>)[code] ?? code;
 }
 
 const FollowPage: React.FC = () => {
@@ -673,10 +684,18 @@ const FollowPage: React.FC = () => {
     return { total: items.length, pending, done, notSent };
   }, [items]);
 
+  /**
+   * 🔴 ถังตามเวลานัด — **นิยามเดียวกับหน้าแรก** (`followScheduleCounts`)
+   * หน้าแรกส่งคนมาที่นี่ด้วยพาดหัว "เลยเวลานัดแล้ว N ราย" แต่เดิมหน้านี้ไม่มีเลขนั้น
+   * อยู่เลย ⇒ คนกดมาแล้วหาไม่เจอว่าต้องโทรใคร (audit คนใหม่ 26 ส.ค. 2569)
+   */
+  const schedule = useMemo(() => followScheduleCounts(items), [items]);
+
   return (
     <div className="relative">
       <PageHeader
-        title="Follow"
+        /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ — เดิมเป็น "Follow" */
+        title={conveyorLabel('follow')}
         subtitle="ลงรายชื่อคนที่ต้องติดตาม แล้ว AI จะโทรตามให้"
         backPath="/"
       />
@@ -692,6 +711,11 @@ const FollowPage: React.FC = () => {
             2569 ค่ำ-5 — แทนกล่อง TopicManager ของค่ำ-4 ที่ถูกถอดออก) · โผล่เฉพาะ
             supervisor+ เท่านั้น server กันอีกชั้นที่ rbac ไม่ใช่แค่ซ่อนปุ่ม */}
         <FollowCallRoundsPanel
+          /* 🔴 ส่งรายการก้อนเดียวกับที่หน้านี้ใช้ — แผงนี้ห้ามโหลดเอง
+             (เดิมโหลดแยก ⇒ จอเดียวมี "ทั้งหมด" สามค่าที่ไม่ตรงกัน) */
+          entries={items}
+          loading={loading}
+          onReload={() => void reload()}
           headerExtras={
             canManageMasters ? (
               <>
@@ -760,7 +784,34 @@ const FollowPage: React.FC = () => {
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden />
             รีเฟรช
           </button>
+          {/* 🔴 แถบเวลานัด — เลขชุดเดียวกับที่หน้าแรกใช้พาดหัวส่งคนมาที่นี่
+              ต้องมาก่อนยอดรวมสถานะสาย เพราะนี่คือ "ต้องโทรใครตอนนี้" ส่วนข้างล่างคือ
+              "สายไปถึงไหนแล้ว" — คนละคำถาม เดิมมีแต่อย่างหลังจึงหาของด่วนไม่เจอ */}
           <p className="text-xs text-muted-foreground">
+            <span className="text-foreground/70">ต้องโทรใครตอนนี้ · </span>
+            <span title="คนที่ตั้งเวลาโทรไว้ในวันนี้ (ยังไม่ถึงเวลาก็นับ)">
+              นัดวันนี้{' '}
+              <span className="font-bold tabular-nums text-foreground">{schedule.today}</span>
+            </span>
+            {' · '}
+            <span
+              title="เลยเวลาที่นัดจะโทรแล้วยังไม่มีผลกลับ — มีคนรอสายอยู่จริง (เลขเดียวกับที่หน้าแรกพาดหัว)"
+              className={schedule.pastDue > 0 ? 'text-red-700 dark:text-red-300' : undefined}
+            >
+              เลยเวลานัดแล้ว{' '}
+              <span className="font-bold tabular-nums">{schedule.pastDue}</span>
+            </span>
+            {' · '}
+            <span title="คนที่ตั้งเวลาโทรไว้เป็นวันถัดไป ยังไม่ถึงคิววันนี้">
+              นัดล่วงหน้า{' '}
+              <span className="font-bold tabular-nums text-foreground">{schedule.upcoming}</span>
+            </span>
+          </p>
+          {/* 🔴 บอกให้ชัดว่ายอดชุดนี้นับอะไร — บนจอเดียวมีสามชุดที่ตอบคนละคำถาม
+              (แถบเวลานัด = ต้องโทรใครตอนนี้ · ชุดนี้ = สายไปถึงไหน · แท็บ = งานจบยัง)
+              เดิมทั้งสามชุดขึ้นคำว่า "ทั้งหมด" เฉย ๆ แล้วเลขไม่ตรงกัน คนใหม่เลยไม่รู้ว่าอันไหนจริง */}
+          <p className="text-xs text-muted-foreground">
+            <span className="text-foreground/70">สถานะสาย · </span>
             ทั้งหมด <span className="font-bold tabular-nums text-foreground">{counts.total}</span> · รอโทร{' '}
             <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">{counts.pending}</span> · สำเร็จ{' '}
             <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{counts.done}</span>
@@ -804,6 +855,9 @@ const FollowPage: React.FC = () => {
         {/* แท็บสถานะ + ปุ่ม Filter (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6) — แยกหน้าตามสถานะ
             เพื่อดูง่าย · ปุ่ม Filter เช็คสถานะประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* ยอดชุดที่สาม = "งานจบหรือยัง" — ติดป้ายกำกับเหมือนอีกสองชุด
+              ทั้งสามชุดนับจากรายการก้อนเดียวกันแล้ว ต่างกันแค่คำถามที่ตอบ */}
+          <span className="text-xs text-foreground/70">งานจบหรือยัง ·</span>
           <div className="flex flex-wrap items-center gap-1 rounded-full border border-border p-0.5 text-xs">
             {FOLLOW_TABS.map((t) => (
               <button
@@ -1533,19 +1587,26 @@ const FollowPage: React.FC = () => {
                             📞 โทรกลับด่วน
                           </span>
                         ) : null}
+                        {/* 🔴 รวม "ครั้งที่เท่าไหร่" กับ "ทั้งหมดกี่รอบ" ไว้ประโยคเดียว
+                            เดิมแยกกันคนละบรรทัด ⇒ การ์ดใบเดียวขึ้น "ครั้งที่ 1" กับ
+                            "ติดตาม 3 รอบ" พร้อมกัน อ่านแล้วเหมือนเลขขัดกัน (ทั้งที่ถูกทั้งคู่) */}
                         {g.todayOrdinal != null ? (
                           <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
-                            วันนี้เป็นการติดตามครั้งที่ {g.todayOrdinal}
+                            วันนี้คือรอบที่ {g.todayOrdinal} จาก {g.activeCount.toLocaleString('th-TH')} รอบ
                           </span>
                         ) : null}
                       </div>
                       <p className="mt-1 text-sm text-foreground">{g.topic}</p>
                       {/* สรุปที่เจ้าของขอ: โทรวันไหนกี่โมง (รอบถัดไป) · หน่วยงาน · ใครคีย์ */}
                       <p className="mt-1 text-[11px] text-muted-foreground">
+                        {/* 🔴 ของค้างต้องมีที่ยืน — เดิมรอบที่เลยเวลาแล้วตกทั้งสองทาง
+                            จอเลยขึ้น "ไม่มีนัดโทรข้างหน้าแล้ว" คู่กับป้าย "รอ AI โทร" */}
                         {g.nextRound
                           ? `รอบถัดไป โทร ${formatWhen(g.nextRound.scheduled_at)}`
-                          : 'ไม่มีนัดโทรข้างหน้าแล้ว'}
-                        {` · ติดตาม ${g.activeCount.toLocaleString('th-TH')} รอบ`}
+                          : g.overdueRound
+                            ? `เลยเวลานัดแล้ว (นัดไว้ ${formatWhen(g.overdueRound.scheduled_at)}) ยังไม่มีผลกลับ`
+                            : 'ไม่มีนัดโทรข้างหน้าแล้ว'}
+                        {` · ติดตามมาแล้ว ${g.activeCount.toLocaleString('th-TH')} รอบ`}
                         {g.createdByName ? ` · คนคีย์ ${g.createdByName}` : ''}
                       </p>
                       {g.unitName || g.siteCode ? (
@@ -1588,9 +1649,25 @@ const FollowPage: React.FC = () => {
                                 เดิมอ่านจาก call_status ตรง ๆ ซึ่งเป็น null เมื่อไม่มีแถวในคิว
                                 ⇒ วาดออกมาเป็นช่องว่างเปล่า คนเห็นแล้วนึกว่าปกติ
                                 (รายการ 24 ส.ค. 2569 หายเงียบแบบนี้) */}
+                            {/* 🔴 **มีผลกลับแล้ว = ไม่ใช่ "รอ AI โทร" อีกต่อไป**
+                                `call_status` ค้างเป็น 'pending' ได้แม้ผลจะกลับมาแล้ว
+                                (วัดฐาน 26 ส.ค. 2569: 8 แถวเป็นแบบนี้) ⇒ การ์ดเคยขึ้น
+                                ป้าย "รอ AI โทร" คู่กับบรรทัด "ผลการโทร — ไม่ตอบ"
+                                บนใบเดียวกัน · ผลชนะสถานะเสมอ (บทเรียนเดียวกับ
+                                `_lib/lumosQueueDefs`: ดู outcome ไม่ใช่ status เปล่า ๆ) */}
                             {it.call_status ? (
-                              <span className={FOLLOW_STATUS_CLASS[it.call_status]}>
-                                {FOLLOW_STATUS_LABEL[it.call_status]}
+                              <span
+                                className={
+                                  FOLLOW_STATUS_CLASS[
+                                    it.call_outcome && it.call_status === 'pending'
+                                      ? 'completed'
+                                      : it.call_status
+                                  ]
+                                }
+                              >
+                                {it.call_outcome && it.call_status === 'pending'
+                                  ? 'โทรแล้ว มีผลกลับ'
+                                  : FOLLOW_STATUS_LABEL[it.call_status]}
                               </span>
                             ) : null}
                             <FollowDispatchBadge entry={it} />
@@ -1672,7 +1749,11 @@ const FollowPage: React.FC = () => {
                         {it.note ? <p className="mt-1 text-[11px] text-muted-foreground">{it.note}</p> : null}
                         {it.call_outcome || it.call_summary ? (
                           <p className="mt-1 rounded-lg bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700 dark:bg-white/10 dark:text-slate-200">
-                            ผลการโทร{it.call_outcome ? ` (${it.call_outcome})` : ''}
+                            {/* 🔴 เดิมพ่นรหัสอังกฤษดิบขึ้นจอ (declined / wrong_person /
+                                reschedule_requested ...) · คำไทยมีอยู่แล้วที่
+                                CALL_OUTCOME_LABEL แต่หน้านี้ไม่ได้เรียกใช้
+                                รหัสที่ยังไม่มีคำแปลให้โชว์รหัสไปตามตรง ห้ามซ่อน */}
+                            ผลการโทร{it.call_outcome ? ` — ${callOutcomeText(it.call_outcome)}` : ''}
                             {it.call_summary ? `: ${it.call_summary}` : ''}
                             {it.called_at ? ` · ${formatWhen(it.called_at)}` : ''}
                           </p>

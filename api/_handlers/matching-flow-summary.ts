@@ -21,6 +21,13 @@ import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { loadBoardMatchTierMap } from '../_lib/boardMatchStore.js';
 import { jobPositionLabel } from '../_lib/lumosDispatch.js';
 import { loadBoardAvailabilityContext } from '../_lib/boardAvailability.js';
+import {
+  queueHasResult,
+  queuePending,
+  queueStale,
+  queueStalePending,
+  queueWaiting,
+} from '../_lib/lumosQueueDefs.js';
 import { isBoardCandidateAvailable } from '@/lib/boardMatchAvailability';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import { computeJobSla } from '@/lib/jobSla';
@@ -93,6 +100,16 @@ function toFollowUp(r: FollowUpSqlRow): FlowFollowUpItem {
   };
 }
 
+/**
+ * ถังของคิวโทรในคิวรีรวม — คิวรีนั้น `from <table>` เปล่า ๆ จึงใช้ alias `''`
+ * เกณฑ์ "เงียบ" ของหน้าแรก = 2 วัน (โต๊ะ AI ใน office-floor ใช้ 1 วัน — คนละเกณฑ์
+ * โดยตั้งใจ แต่**นิยาม "ยังไม่มีผล" ตัวเดียวกัน** ซึ่งคือจุดที่เคยพัง)
+ */
+const QUEUE_PENDING = queuePending('');
+const QUEUE_WAITING = queueWaiting('');
+const QUEUE_STALE_2D = queueStale("'2 days'", '');
+const QUEUE_STALE_PENDING_2D = queueStalePending("'2 days'", '');
+
 /** คอลัมน์ชื่อ/เบอร์จาก payload — ชื่อคีย์ต่างกันตามช่อง (reminder ↔ interview) เหมือน PAYLOAD_PHONE_KEYS */
 const PERSON_COLS = `
   coalesce(q.payload->>'recipient_name', q.payload->>'candidate_name') as name,
@@ -108,10 +125,10 @@ async function listActiveCalls(jobIds: string[], limit: number): Promise<FlowFol
     `select q.job_ref, q.person_ref, q.channel, q.updated_at, ${PERSON_COLS},
             null as summary,
             q.last_outcome as outcome,
-            (q.status = 'delivered' and q.delivered_at < now() - interval '2 days') as stale
+            ${queueStale("'2 days'", 'q')} as stale
        from ${queueTable} q
       where q.job_ref = any($1)
-        and q.result is null
+        and not ${queueHasResult('q')}
         and q.status in ('pending', 'delivered')
       order by (q.status = 'delivered' and q.delivered_at < now() - interval '2 days') desc,
                q.updated_at desc
@@ -324,13 +341,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       `select
          count(*) filter (where created_at >= date_trunc('month', now()))                        as sent_month,
          count(distinct ${phoneExpr}) filter (where created_at >= date_trunc('month', now()))    as sent_month_people,
-         count(*) filter (where status = 'pending' and result is null)                           as waiting_call,
-         count(*) filter (where status = 'delivered' and result is null)                         as delivered_waiting,
-         count(*) filter (where status = 'delivered' and result is null
-                            and delivered_at < now() - interval '2 days')                        as stale_delivered,
-         count(*) filter (where status = 'pending' and result is null
-                            and coalesce(next_attempt_at, created_at) < now() - interval '2 days')
-                                                                                                 as stale_pending,
+         -- 🔴 ทั้งสี่ช่องนี้เคยเขียนเงื่อนไข result is null เองแล้วนับผิด 38 ทั้งที่จริงคือ 0
+         --    (ผลจริงอยู่ที่ last_outcome · ดู _lib/lumosQueueDefs.ts) ห้ามเขียนเองอีก
+         count(*) filter (where ${QUEUE_PENDING})                                                as waiting_call,
+         count(*) filter (where ${QUEUE_WAITING})                                                as delivered_waiting,
+         count(*) filter (where ${QUEUE_STALE_2D})                                               as stale_delivered,
+         count(*) filter (where ${QUEUE_STALE_PENDING_2D})                                       as stale_pending,
          count(*) filter (where followup_state = 'retry_scheduled')                              as retry_scheduled,
          coalesce(sum(attempt_count) filter (where updated_at >= date_trunc('month', now())), 0) as attempts_total,
          max(updated_at) filter (where coalesce(last_outcome, result->>'outcome') is not null)   as last_result_at,

@@ -147,3 +147,36 @@ describe('groupFollowEntries', () => {
     expect(g.rounds).toHaveLength(2);
   });
 });
+
+/**
+ * 🔴 ของค้างต้องมีที่ยืน — เดิมรอบที่เลยเวลานัดแล้วตกทั้ง `nextRound` และทุกช่อง
+ * ⇒ การ์ดขึ้น "ไม่มีนัดโทรข้างหน้าแล้ว" คู่กับป้าย "รอ AI โทร" บนใบเดียวกัน
+ * (audit มุมพนักงานใหม่ 26 ส.ค. 2569)
+ */
+describe('overdueRound — รอบที่เลยเวลานัดแล้วยังไม่มีผล', () => {
+  it('รอบที่เลยเวลาและยังไม่มีผล ต้องโผล่ที่ overdueRound ไม่ใช่หายเงียบ', () => {
+    const [g] = groupFollowEntries(
+      [entry({ id: 'a', scheduled_at: '2026-08-18T08:00:00+07:00', call_status: 'pending', call_outcome: null })],
+      NOW,
+    );
+    expect(g.nextRound).toBeNull();
+    expect(g.overdueRound?.id).toBe('a');
+  });
+
+  it('มีผลกลับแล้วไม่ใช่ของค้าง', () => {
+    const [g] = groupFollowEntries(
+      [entry({ id: 'a', scheduled_at: '2026-08-18T08:00:00+07:00', call_status: 'completed', call_outcome: 'confirmed' })],
+      NOW,
+    );
+    expect(g.overdueRound).toBeNull();
+  });
+
+  it('นัดข้างหน้าไม่ใช่ของค้าง — และ nextRound ต้องมาแทน', () => {
+    const [g] = groupFollowEntries(
+      [entry({ id: 'a', scheduled_at: '2026-08-18T15:00:00+07:00', call_status: 'pending', call_outcome: null })],
+      NOW,
+    );
+    expect(g.overdueRound).toBeNull();
+    expect(g.nextRound?.id).toBe('a');
+  });
+});

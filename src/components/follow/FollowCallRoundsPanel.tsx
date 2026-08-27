@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
+import { type FollowEntry } from '@/lib/followApi';
+import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
 import { callAttemptSlot } from '@/lib/callOutcomeBuckets';
 import {
   countFollowRoundBuckets,
@@ -65,7 +66,8 @@ function PersonRow({ p }: { p: FollowEntry }) {
           </p>
           {p.call_outcome || p.call_summary ? (
             <p className={cn('mt-1 rounded bg-background/60 px-1.5 py-1 text-[10px]', DASH.muted)}>
-              ผล{p.call_outcome ? ` (${p.call_outcome})` : ''}
+              {/* 🔴 คำไทยจาก CALL_OUTCOME_LABEL — เดิมพ่นรหัสอังกฤษดิบเหมือนหน้าแม่ */}
+              ผล{p.call_outcome ? ` — ${(CALL_OUTCOME_LABEL as Record<string, string>)[p.call_outcome] ?? p.call_outcome}` : ''}
               {p.call_summary ? `: ${p.call_summary}` : ''}
             </p>
           ) : null}
@@ -94,6 +96,9 @@ type PeopleDialogState = {
 
 export default function FollowCallRoundsPanel({
   headerExtras,
+  entries,
+  loading = false,
+  onReload,
 }: {
   /**
    * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
@@ -101,22 +106,21 @@ export default function FollowCallRoundsPanel({
    * และถือ dialog เอง แผงนี้แค่ให้ที่วาง)
    */
   headerExtras?: React.ReactNode;
-} = {}) {
-  const [entries, setEntries] = useState<FollowEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  /**
+   * 🔴 **รายการมาจากหน้าแม่เท่านั้น ห้ามโหลดเองอีก**
+   * เดิมแผงนี้ยิง `listFollowEntries()` เป็นของตัวเองอีกชุด คนละก้อนกับที่หน้าแม่โหลด
+   * ⇒ ยิงคนละจังหวะ ได้คนละยอด · จอเดียวจึงเคยขึ้น "ทั้งหมด 11" (แผงนี้) คู่กับ
+   * "ทั้งหมด 17" (หัวหน้า) และ "กำลังตาม 12" (แท็บ) — สามยอดที่ไม่มีทางตรงกัน
+   * และคนใหม่ไม่มีทางรู้ว่าอันไหนจริง (audit มุมพนักงานใหม่ 26 ส.ค. 2569)
+   */
+  entries: FollowEntry[];
+  loading?: boolean;
+  onReload?: () => void;
+}) {
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
   const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
   /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
   const [activeRound, setActiveRound] = useState(1);
-
-  const load = () => {
-    setLoading(true);
-    void listFollowEntries()
-      .then(setEntries)
-      .catch(() => setEntries([]))
-      .finally(() => setLoading(false));
-  };
-  useEffect(load, []);
 
   /**
    * คนในแต่ละรอบ — นับจาก **ชุดเดียวกับที่แสดงชื่อ** ยอดกับรายชื่อจึงตรงกันเสมอ
@@ -169,7 +173,7 @@ export default function FollowCallRoundsPanel({
           {headerExtras}
           <button
             type="button"
-            onClick={load}
+            onClick={onReload}
             disabled={loading}
             aria-label="รีเฟรช"
             title="รีเฟรช"
@@ -213,7 +217,10 @@ export default function FollowCallRoundsPanel({
                 <span className={cn('ml-1 text-[10px] font-normal', DASH.muted)}>คน</span>
               </span>
               <span className={cn('block truncate text-[10px]', DASH.muted)}>
-                {actionableSummary(counts) ?? (rows.length > 0 ? 'ไม่มีของค้าง' : '—')}
+                {/* 🔴 "ไม่มีของค้าง" กว้างเกินจริง — มันดูแค่ **ผลโทรของรอบนี้**
+                    ไม่ได้ดูว่ามีใครเลยเวลานัดแล้วหรือยัง · จอเคยขึ้น "ไม่มีของค้าง"
+                    คู่กับ "เลยเวลานัดแล้ว 4" บนหน้าเดียวกัน (audit 26 ส.ค. 2569) */}
+                {actionableSummary(counts) ?? (rows.length > 0 ? 'ไม่มีผลที่ต้องตามต่อ' : '—')}
               </span>
             </button>
           );
