@@ -8,13 +8,19 @@
  * 2. **วันเงียบไม่แปะเลข 0 ตัวโต** — เปลี่ยนเป็นคำว่า "ยังไม่มีวันนี้" (anti-pattern ข้อ 3
  *    ของแผงบอร์ด: ห้ามตัวนับที่ขึ้น 0 แทบทุกวัน)
  * 3. ทุกใบกดได้ ไปหน้างานจริงของ KPI นั้น
- * 4. สีมาจาก token เท่านั้น (`HUD`/`HUD_HEX`) — ห้าม hex ดิบ
+ * 4. สีมาจาก token เท่านั้น (`DASH`/`TONE`) — ห้าม hex ดิบ
+ *
+ * 🔴 **โทนสว่าง** (เจ้าของสั่ง 27 ส.ค. 2569: *"แก้สีเป็น Tone สว่างด้วย"*)
+ * เดิมใช้ชุด `HUD` ซึ่งเป็นแผงพื้นดำเข้มทั้งสองธีมโดยตั้งใจ ⇒ กลายเป็นแถบดำ
+ * โดดอยู่กลางหน้าแรกที่เป็นโทนสว่างทั้งหน้า · ตอนนี้ใช้ `DASH`/`TONE` ซึ่งมีคู่
+ * light/dark ครบเหมือนบอร์ดทีมข้างบน
+ * ⚠️ ห้ามเติม `dark:` เข้าชุด HUD_* เพื่อแก้ปัญหานี้ — เทสต์ designTokens ห้ามไว้
  */
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 
-import { HUD, HUD_HEX } from '@/lib/designTokens';
+import { DASH, TONE } from '@/lib/designTokens';
 import {
   buildKpiCards,
   deltaIsGood,
@@ -25,17 +31,24 @@ import {
 } from '@/lib/homeKpi';
 import { cn } from '@/lib/utils';
 
+/** ชุดคลาสของแถบนี้ — คู่ light/dark ครบทุกตัว (แทนชุด HUD เดิมที่เป็นพื้นดำอย่างเดียว) */
+const CARD =
+  'group min-h-[92px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/60';
+const LABEL = 'block text-[11px] font-medium tracking-[0.02em] text-slate-500 dark:text-slate-400';
+const FIGURE = 'font-mono text-2xl font-semibold tabular-nums';
+const UNIT = 'text-[11px] text-slate-500 dark:text-slate-400';
+
 const DeltaChip: React.FC<{ card: KpiCard }> = ({ card }) => {
   const text = deltaText(card.delta, card.isRate ? '%' : card.unit);
   if (!text) {
     // เทียบไม่ได้ — บอกตรง ๆ ว่าไม่มีของเทียบ ไม่ใช่วาดลูกศรศูนย์
-    return <span className={cn(HUD.unit, 'opacity-70')}>ยังไม่มีของเทียบ</span>;
+    return <span className={cn(UNIT, 'opacity-70')}>ยังไม่มีของเทียบ</span>;
   }
   const good = deltaIsGood(card.delta);
-  const color = good === null ? HUD_HEX.neutral : good ? HUD_HEX.success : HUD_HEX.danger;
+  const tone = good === null ? TONE.neutral.value : good ? TONE.success.value : TONE.danger.value;
   const Icon = good === null ? Minus : good ? ArrowUpRight : ArrowDownRight;
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color }}>
+    <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium', tone)}>
       <Icon className="h-3 w-3" aria-hidden />
       {text}
     </span>
@@ -68,71 +81,67 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
           type="button"
           onClick={() => navigate(standing.href)}
           className={cn(
-            HUD.panel,
-            'group min-h-[92px] rounded-xl px-3 py-2.5 text-left transition-shadow',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60',
+            CARD,
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
           )}
           aria-label={`${standing.label} — ${standing.value} ${standing.unit} · ${standing.sub}${standing.sla ? ` · ${standing.sla}` : ''}`}
         >
-          <span className={cn(HUD.label, 'block normal-case')}>{standing.label}</span>
+          <span className={LABEL}>{standing.label}</span>
           <span className="mt-1 flex items-baseline gap-1">
-            <span className={HUD.figure} style={{ color: HUD_HEX.teal }}>
-              {standing.value}
-            </span>
-            <span className={HUD.unit}>{standing.unit}</span>
+            <span className={cn(FIGURE, DASH.cellStrong)}>{standing.value}</span>
+            <span className={UNIT}>{standing.unit}</span>
           </span>
           <span
-            className="mt-1 block text-[11px] font-medium"
-            style={{ color: standing.alert ? HUD_HEX.danger : HUD_HEX.neutral }}
+            className={cn(
+              'mt-1 block text-[11px] font-medium',
+              standing.alert ? TONE.danger.value : DASH.muted,
+            )}
           >
             {standing.sub}
           </span>
           {/* 🔴 SLA โชว์คู่กันเสมอ (หลุดแล้ว + ใกล้หลุด) — ตัวเดียวทำให้เข้าใจผิด
               ไม่รู้ตัวเลข = ไม่วาดบรรทัดนี้ ไม่ใช่วาด 0 */}
           {standing.sla ? (
-            <span className="mt-0.5 block text-[11px] font-medium" style={{ color: HUD_HEX.danger }}>
+            <span className={cn('mt-0.5 block text-[11px] font-medium', TONE.danger.value)}>
               {standing.sla}
             </span>
           ) : null}
-          <span className={cn(HUD.unit, 'mt-0.5 block opacity-80')}>ยอดคงค้างตอนนี้</span>
+          <span className={cn(UNIT, 'mt-0.5 block')}>ยอดคงค้างตอนนี้ (ไม่ใช่ของวันนี้)</span>
         </button>
       ) : null}
 
       {cards.map((c) => {
-        const accent = HUD_HEX[c.quiet ? 'neutral' : 'teal'];
+        const accent = c.quiet ? DASH.muted : DASH.cellStrong;
         return (
           <button
             key={c.key}
             type="button"
             onClick={() => navigate(c.href)}
             className={cn(
-              HUD.panel,
-              'group min-h-[92px] rounded-xl px-3 py-2.5 text-left transition-shadow',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60',
+              CARD,
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
             )}
             aria-label={`${c.label} — ${c.value}${c.isRate ? '%' : ` ${c.unit}`}`}
           >
-            <span className={cn(HUD.label, 'block normal-case')}>{c.label}</span>
+            <span className={LABEL}>{c.label}</span>
             <span className="mt-1 flex items-baseline gap-1">
               {/* 🔴 วันเงียบห้ามแปะเลขตัวโต — อัตราที่ตัวอย่างไม่พอก็ห้ามโชว์ "0 %"
                   (คนอ่านว่าโทรไม่ติดเลย ทั้งที่จริงคือยังไม่มีสายให้คิด) */}
               {c.quiet ? (
-                <span className={cn(HUD.bodyStrong, 'py-1')}>
+                <span className={cn('py-1 text-xs font-medium', DASH.cell)}>
                   {c.isRate ? 'ยังไม่พอตัดสิน' : 'ยังไม่มีวันนี้'}
                 </span>
               ) : (
                 <>
-                  <span className={HUD.figure} style={{ color: accent }}>
-                    {c.value}
-                  </span>
-                  <span className={HUD.unit}>{c.isRate ? '%' : c.unit}</span>
+                  <span className={cn(FIGURE, accent)}>{c.value}</span>
+                  <span className={UNIT}>{c.isRate ? '%' : c.unit}</span>
                 </>
               )}
             </span>
             <span className="mt-1 block">
               <DeltaChip card={c} />
             </span>
-            <span className={cn(HUD.unit, 'mt-0.5 block opacity-80')}>{c.sub}</span>
+            <span className={cn(UNIT, 'mt-0.5 block')}>{c.sub}</span>
           </button>
         );
       })}

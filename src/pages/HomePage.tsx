@@ -7,7 +7,6 @@ import {
   PhoneCall,
   AlertTriangle,
   RefreshCw,
-  ChevronDown,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -166,7 +165,6 @@ const HomePage: React.FC = () => {
   const [hud, setHud] = useState<HomeKpisResponse | null>(null);
   const [officeLoading, setOfficeLoading] = useState(true);
   /** ภาพรวม (KPI · ฉาก · funnel) หุบเป็นค่าตั้งต้น — เหตุผลเต็มอยู่ที่ปุ่มใน JSX */
-  const [overviewOpen, setOverviewOpen] = useState(false);
   /** บอร์ด 4 ทีม — โหลดล้มไม่ล้มหน้า (แผงบอกเอง "โหลดไม่สำเร็จ" กดรีเฟรชได้) */
   const [team, setTeam] = useState<OfficeTeamResponse | null>(null);
   const [teamLoading, setTeamLoading] = useState(true);
@@ -356,22 +354,20 @@ const HomePage: React.FC = () => {
         - FollowTodayPanel → คิวบน deck (เลยนัด/ไม่ได้ส่ง AI) + หน้า Follow เอง
         - HomeDigestPanels → แถบ "ขยับล่าสุด" ของบอร์ดทีม + Dashboard
       */}
-      <button
-        type="button"
-        onClick={() => setOverviewOpen((v) => !v)}
-        aria-expanded={overviewOpen}
-        className="mb-4 inline-flex h-10 items-center gap-2 rounded-xl border border-white/60 bg-white/55 px-4 text-sm font-medium text-foreground/80 transition-colors hover:bg-white/80 dark:border-white/10 dark:bg-slate-900/45 dark:hover:bg-slate-900/70"
-      >
-        <ChevronDown
-          className={cn('h-4 w-4 transition-transform', overviewOpen && 'rotate-180')}
-          aria-hidden
-        />
-        {overviewOpen ? 'ซ่อนตัวเลขวันนี้' : 'ดูตัวเลขวันนี้'}
-        <span className="text-xs text-muted-foreground">KPI เทียบเมื่อวาน · แยกตาม BU</span>
-      </button>
-
-      {overviewOpen ? (
-      <>
+      {/* 🔴 **เลิกหุบแล้ว** (เจ้าของสั่ง 27 ส.ค. 2569: *"ซ่อนตัวเลขวันนี้ ข้อมูลในกล่องนี้
+          เอาขึ้นมาโชว์เลยไม่ต้องคอยกดซ่อน"*) — ปุ่ม "ดูตัวเลขวันนี้" ถูกถอดออก
+          ⚠️ หัวข้อต้องบอกให้ชัดว่าอะไรเป็นของวันนี้ อะไรเป็นยอดสะสม เพราะแถวนี้ปนกันอยู่:
+          การ์ดใบแรก (ใบขอเปิดอยู่) เป็น **ยอดคงค้างตอนนี้** ส่วนที่เหลือเป็น
+          **เหตุการณ์ของวันนี้เทียบเมื่อวาน** — เจ้าของถามตรง ๆ ว่า "ข้อมูลมันเฉพาะ
+          วันนี้หรอหรือตลอด" ⇒ ต้องเขียนไว้บนจอ ไม่ใช่ให้เดา */}
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h2 className="text-sm font-semibold text-foreground">ตัวเลขวันนี้</h2>
+        <p className="text-xs text-muted-foreground">
+          เทียบกับเมื่อวาน · แยกตามหน่วยธุรกิจได้ —{' '}
+          <span className="font-medium">การ์ด &ldquo;ใบขอเปิดอยู่&rdquo; ใบเดียวเป็นยอดสะสม
+          ไม่ใช่ของวันนี้</span>
+        </p>
+      </div>
 
 
       {/* ── KPI แถวบน + ตัวกรอง BU (Phase 10 · ตามภาพอ้างอิง 24 ส.ค. 2569) ──
@@ -406,9 +402,7 @@ const HomePage: React.FC = () => {
       {/* ⚠️ ของที่เคยอยู่ตรงนี้ถูก **ยุบ** ตามคำสั่ง 26 ส.ค. 2569 (*"อันไหนข้อมูลเดียวกัน
           ก็ยุบ ๆ รวม ๆ ไป"*) — OpsRoomsPanel · funnel hero · HomeDigestPanels ·
           LumosCallHealthPanel · FollowTodayPanel — ที่ไปของแต่ละตัวเขียนไว้ที่
-          คอมเมนต์เหนือปุ่ม "ดูตัวเลขวันนี้" ข้างบน */}
-      </>
-      ) : null}
+          คอมเมนต์เหนือหัวข้อ "ตัวเลขวันนี้" ข้างบน */}
       {/* เมนูหลักถูกถอดออก — ทุกโมดูลเข้าถึงได้จากปุ่ม ☰ (burger) ที่ header อยู่แล้ว */}
 
       {/* dialog "ผลจากการโทร" — 4 กล่องปลายทางพร้อมชื่อคน (เจ้าของกำหนดชุดกล่อง 12 ส.ค. 2569)
