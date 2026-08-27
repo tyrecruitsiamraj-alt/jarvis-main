@@ -113,9 +113,9 @@ describe('selectSilentLinkRows', () => {
 
   it('🔴 ปุ่มขั้นถัดไปต้องพาไปแท็บที่ถูกในป๊อปเดิม (ห้ามเปิด Dialog ใหม่)', () => {
     const zero = selectSilentLinkRows(input(), TODAY)[0];
-    expect(silentRowNextStep(zero)).toEqual({ label: 'เพิ่มช่องทาง', popupTab: 'genlink' });
+    expect(silentRowNextStep(zero)).toEqual({ label: 'เพิ่มช่องทาง', action: 'genlink' });
     const viewed = selectSilentLinkRows(input({ clicksByJob: new Map([['a', 3]]) }), TODAY)[0];
-    expect(silentRowNextStep(viewed)).toEqual({ label: 'แก้ประกาศ', popupTab: 'edit' });
+    expect(silentRowNextStep(viewed)).toEqual({ label: 'แก้ประกาศ', action: 'edit' });
   });
 });
 
@@ -163,7 +163,7 @@ describe('ใบล่วงหน้า: id ของ feed ไม่ตรง�
     );
     expect(rows[0].clicks).toBe(12);
     expect(rows[0].reason).toBe('viewed_no_apply');
-    expect(silentRowNextStep(rows[0])).toEqual({ label: 'แก้ประกาศ', popupTab: 'edit' });
+    expect(silentRowNextStep(rows[0])).toEqual({ label: 'แก้ประกาศ', action: 'edit' });
   });
 
   it('ห้าม over-match — เลขที่ใกล้กันต้องไม่ถูกจับคู่', () => {

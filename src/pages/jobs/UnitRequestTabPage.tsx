@@ -47,7 +47,10 @@ const STATUS_CLASS: Record<string, string> = {
   neutral: 'jarvis-chip jarvis-chip-neutral',
 };
 
-const TAB_TITLE: Record<Exclude<UnitRequestTabId, 'detail'>, string> = {
+/** 🔴 แท็บ `posting` มีหน้าของตัวเอง (`UnitRequestPostingTabPage`) — ไฟล์นี้ไม่รับ */
+export type UnitRequestSubTab = Exclude<UnitRequestTabId, 'detail' | 'posting'>;
+
+const TAB_TITLE: Record<UnitRequestSubTab, string> = {
   applicants: 'ผู้สมัคร',
   'ai-match': 'AI Match',
   contact: 'การติดต่อ',
@@ -60,7 +63,7 @@ const TAB_TITLE: Record<Exclude<UnitRequestTabId, 'detail'>, string> = {
  * ⚠️ **ผู้สมัคร ≠ AI Match** — ผู้สมัครคือคนที่มีใบสมัครจริงกับใบขอนี้ ส่วน AI Match
  * คือคนที่ AI แนะนำ ซึ่งยังไม่ใช่ใบสมัคร · เอาปนกันแล้วยอด "ผู้สมัคร" จะเฟ้อทันที
  */
-const UnitRequestTabPage: React.FC<{ tab: Exclude<UnitRequestTabId, 'detail'> }> = ({ tab }) => {
+const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   const { id = '' } = useParams();
   const [job, setJob] = useState<JobRequest | null>(null);
   const [items, setItems] = useState<PublicApplication[] | null>(null);

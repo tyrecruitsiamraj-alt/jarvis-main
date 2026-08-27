@@ -21,8 +21,8 @@ import { cn } from '@/lib/utils';
  * 🔴 **ไม่ใช่คำเตือน** — เป็นรายการงานที่ "ลงแรงไปแล้วแต่ยังไม่ได้ผล"
  * จึงใช้พื้น `TONE.info.soft` ห้ามแดง/ส้ม และห้าม `TONE.*.solid`
  *
- * 🔴 **ไม่ใช่ Dialog** — เป็นบล็อกในหน้า · ปุ่มพาเข้าป๊อปอัป 3 ขั้น**ตัวเดิม**
- * ด้วย `onOpen(job, tab)` (ห้ามซ้อน Dialog ใน Dialog — กติกาข้อ 2)
+ * 🔴 **ไม่ใช่ Dialog และไม่เปิด Dialog** — เป็นบล็อกในหน้า · ปุ่ม**พาไปหน้าใบขอ**
+ * ด้วย `onOpen(job, target)` (เจ้าของสั่ง 27 ส.ค. 2569: *"ไม่เอาแบบ Popup เด้งนะ"*)
  *
  * ⚠️ staff เท่านั้น — ผู้เรียกต้องกั้น `isStaff` เอง (component นี้อยู่ในไฟล์ที่ /apply ใช้ร่วม)
  */
@@ -30,7 +30,8 @@ const ICON = { genlink: Link2, edit: Pencil } as const;
 
 const JobBoardSilentLinks: React.FC<{
   rows: SilentLinkRow[];
-  onOpen: (job: JobRequest, tab: 'detail' | 'edit' | 'genlink') => void;
+  /** พาไปหน้าใบขอ — `'detail'` = รายละเอียด · `'posting'` = ประกาศ / ลิงก์สมัคร */
+  onOpen: (job: JobRequest, target: 'detail' | 'posting') => void;
 }> = ({ rows, onOpen }) => {
   const [expanded, setExpanded] = useState(false);
   if (rows.length === 0) return null;
@@ -47,7 +48,7 @@ const JobBoardSilentLinks: React.FC<{
       <ul className="space-y-1">
         {shown.map((row) => {
           const next = silentRowNextStep(row);
-          const Icon = ICON[next.popupTab];
+          const Icon = ICON[next.action];
           return (
             <li key={row.job.id}>
               {/* กดที่แถว = เปิดป๊อปขั้น "รายละเอียดงาน" · กดปุ่ม = ข้ามไปขั้นที่ควรทำ */}
@@ -75,11 +76,11 @@ const JobBoardSilentLinks: React.FC<{
                   variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onOpen(row.job, next.popupTab);
+                    onOpen(row.job, 'posting');
                   }}
                   className={cn(
                     'h-7 shrink-0 rounded-lg px-2 text-[11px]',
-                    next.popupTab === 'genlink' ? TONE.violet.outline : TONE.neutral.outline,
+                    next.action === 'genlink' ? TONE.violet.outline : TONE.neutral.outline,
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />

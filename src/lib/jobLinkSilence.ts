@@ -102,13 +102,18 @@ export function silentRowFactLine(row: SilentLinkRow): string {
     : `${base} · มีคนกดดู ${row.clicks.toLocaleString('th-TH')} ครั้ง แต่ยังไม่มีใครกรอก`;
 }
 
-/** ปุ่มขั้นถัดไป — เลขสั่งงาน ไม่ใช่คนเดา */
+/**
+ * ปุ่มขั้นถัดไป — เลขสั่งงาน ไม่ใช่คนเดา
+ *
+ * 🔴 `action` เคยชื่อ `popupTab` ตอนที่ยังเด้งป๊อป 3 ขั้น (เปลี่ยน 27 ส.ค. 2569)
+ * ทั้งสองงานย้ายไปอยู่หน้าเดียวกันแล้ว (แท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอ)
+ * ค่านี้จึงเหลือหน้าที่เดียว: เลือก**คำบนปุ่มกับไอคอน** ไม่ได้เลือกปลายทางอีก
+ */
 export function silentRowNextStep(row: SilentLinkRow): {
   label: string;
-  /** แท็บในป๊อปอัปที่ควรเปิด */
-  popupTab: 'edit' | 'genlink';
+  action: 'edit' | 'genlink';
 } {
   return row.reason === 'no_views'
-    ? { label: 'เพิ่มช่องทาง', popupTab: 'genlink' }
-    : { label: 'แก้ประกาศ', popupTab: 'edit' };
+    ? { label: 'เพิ่มช่องทาง', action: 'genlink' }
+    : { label: 'แก้ประกาศ', action: 'edit' };
 }

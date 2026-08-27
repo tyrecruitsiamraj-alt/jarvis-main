@@ -16,15 +16,11 @@ import JobBoardTopFilters from '@/components/jobs/JobBoardTopFilters';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import SearchField from '@/components/shared/SearchField';
 import PublicApplyDialog from '@/components/jobs/PublicApplyDialog';
-import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 /**
  * เลนสรรหา — lazy ตั้งใจ: ไฟล์นี้ใช้ร่วมกับหน้าสมัครสาธารณะ /apply
  * กล่องผลค้น (+ ตัวเรียก API หลังบ้าน) ต้องไม่ถูกลากเข้า bundle ฝั่ง public
  */
-const EditPublicJobFieldsDialog = React.lazy(
-  () => import('@/components/jobs/EditPublicJobFieldsDialog'),
-);
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
@@ -38,6 +34,14 @@ import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { selectSilentLinkRows } from '@/lib/jobLinkSilence';
 import { buildCountIndex, buildJobKeyIndex, countFor } from '@/lib/jobKeyIndex';
+import {
+  BOARD_STAGE_ORDER,
+  buildBoardStages,
+  openJobStage,
+  type BoardStageFacts,
+  type BoardStageKey,
+} from '@/lib/boardFlow';
+import BoardFlowStrip from '@/components/jobs/BoardFlowStrip';
 import JobBoardSilentLinks from '@/components/jobs/JobBoardSilentLinks';
 import {
   buildReleaseIndex,
@@ -46,8 +50,7 @@ import {
   unreleaseJobsFromPublic,
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
-import { fetchUnitEditLog, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
-import { describeUnitEdit, UNIT_EDIT_TITLE, type UnitEditLogItem } from '@/lib/unitEditLog';
+import { navigateToUnitRequest, type UnitRequestTabName } from '@/lib/jobNavigation';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   CLOSED_BOX_KEYS,
@@ -71,16 +74,8 @@ import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { useJobBoardFilters } from '@/hooks/useJobBoardFilters';
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { MapPin, Briefcase, Calendar, Banknote, RefreshCw, Send, Users, Link2, Pencil, Search, ClipboardCheck, Flag, EyeOff, LoaderCircle } from 'lucide-react';
-import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 const RecruitLaneDialog = React.lazy(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
@@ -101,16 +96,6 @@ function staffAssigneeLine(j: JobRequest): string | null {
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
-
-/**
- * ขั้นตอนในป๊อปอัปการ์ด (เจ้าของสั่ง 20 ส.ค. 2569 — flow ของงาน ไม่ใช่แท็บอิสระ):
- * 1 รายละเอียดงาน → 2 แก้ไข → 3 Gen link · **ต้องเห็นครบ 3 ขั้นเสมอ** (คำสั่งเดิมยังอยู่)
- */
-const POPUP_STEPS = [
-  { id: 'detail', label: 'รายละเอียดงาน' },
-  { id: 'edit', label: 'แก้ไข' },
-  { id: 'genlink', label: 'Gen link' },
-] as const;
 
 /** BU ตั้งต้นของกล่องลอยที่ยังไม่มีประกาศ — ผู้ใช้แก้ได้ในฟอร์ม (ชุดเดียวกับ RecruitBoardTools) */
 const BOARD_DEFAULT_BU = 'LBD';
@@ -189,16 +174,25 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   initialBox = null,
 }) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [selected, setSelected] = useState<JobRequest | null>(null);
-  /**
-   * แท็บในป๊อปอัปที่กดการ์ด (เจ้าของเคาะ 19 ส.ค. 2569 — เลือกแบบ "แท็บมีไอคอน 3 อัน ชิดขวา"):
-   * **รายละเอียดงาน → แก้ไข → Gen link** · กดแล้ว**เนื้อกลางเปลี่ยนในป๊อปเดิม** ไม่เปลี่ยนหน้า
-   * 🔴 ฟอร์มแก้ไข/Gen link ใช้ component ตัวเดิมในโหมด `embedded` (ห้ามก๊อปฟอร์มมาทำใหม่
-   * และห้ามซ้อน Dialog ใน Dialog)
-   */
-  const [popupTab, setPopupTab] = useState<'detail' | 'edit' | 'genlink'>('detail');
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  /**
+   * 🔴 **กดอะไรบนบอร์ดก็ "ไปหน้า" ไม่ใช่ "เด้งป๊อป"** (เจ้าของสั่ง 27 ส.ค. 2569:
+   * *"พอกดแล้วก็พาไปดูข้อมูล ไม่เอาแบบ Popup เด้งนะ"*)
+   *
+   * ⚠️ ต้องผ่าน `navigateToUnitRequest` เท่านั้น — ตัวนั้นรู้เรื่อง prefix ของใบขอล่วงหน้า
+   * (ประกอบ URL เองแล้วเปิดผิดบริษัท เคยเกิดจริง 18 ส.ค. 2569)
+   * `returnTo` = หน้าบอร์ดพร้อมขั้นที่กรองอยู่ ⇒ ปุ่มย้อนกลับพากลับมาที่เดิมเป๊ะ
+   */
+  const openUnit = React.useCallback(
+    (job: JobRequest, tab?: UnitRequestTabName) => {
+      navigateToUnitRequest(job, navigate, {
+        tab,
+        returnTo: `${window.location.pathname}${window.location.search}`,
+      });
+    },
+    [navigate],
+  );
   const positionPreset = useMemo(
     () => (variant === 'public' ? resolveApplyPositionPreset(searchParams.get('pos')) : null),
     [variant, searchParams],
@@ -211,33 +205,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const isStaff = variant === 'staff';
 
   /**
-   * ประวัติ "ใครแก้อะไรไป" ของใบที่เปิดอยู่ — **ย้ายมาจากหน้าใบงาน** (เจ้าของ clarify
-   * 21 ส.ค. 2569: *"ฉันหมายถึงหน้ากล่องงาน — ของหน้าใบงานทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*
-   * · คำสั่งเดิม 18 ส.ค.: "เพิ่ม log การแก้ไขไว้ด้วยนะหน้ากล่องงาน ว่าใครแก้อะไรไป")
-   * ⚠️ **staff เท่านั้น** — ชื่อคนแก้เป็นข้อมูลภายใน ห้ามหลุดหน้าสมัครสาธารณะ
-   * · คีย์เดียวกับที่ audit เก็บ (unitRequestNoteKey) · โหลดล้ม = โชว์ข้อความ ไม่พาป๊อปล้ม
+   * 🔴 **ประวัติ "ใครแก้อะไรไป" ย้ายออกจากหน้านี้ 27 ส.ค. 2569**
+   * เดิมอยู่ในป๊อปการ์ด · ตอนนี้เป็น `UnitEditLogSection` บนแท็บ "ประกาศ / ลิงก์สมัคร"
+   * ของใบขอ ซึ่งเป็นที่ที่การแก้เกิดขึ้นจริง (คำสั่งเดิม 18 ส.ค. 2569 ยังอยู่ครบ)
    */
-  const [editLog, setEditLog] = useState<UnitEditLogItem[] | null>(null);
-  const [editLogError, setEditLogError] = useState(false);
-  useEffect(() => {
-    if (!isStaff || !selected) {
-      setEditLog(null);
-      return;
-    }
-    let cancelled = false;
-    setEditLog(null);
-    setEditLogError(false);
-    fetchUnitEditLog(unitRequestNoteKey(selected))
-      .then((items) => {
-        if (!cancelled) setEditLog(items);
-      })
-      .catch(() => {
-        if (!cancelled) setEditLogError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isStaff, selected]);
 
   /**
    * ตัวกรอง "ประเภทงาน" + "เจ้าหน้าที่สรรหา" (เจ้าของสั่งเพิ่ม 13 ส.ค. 2569)
@@ -263,9 +234,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   >({});
   /** ยอด Lead แยกต่างหาก — ใบที่ปัดเข้าคลังไม่ถูกนับใน applicantCounts (17 ส.ค. 2569) */
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
-  /** ใบที่กำลังแก้ข้อมูลประกาศ (จังหวัด/รายได้/สวัสดิการ) — 17 ส.ค. 2569 */
-  /** ค่าที่เพิ่งแก้ — ทับบนการ์ดทันทีโดยไม่ต้องรีเฟรชทั้งบอร์ด */
-  const [publicPatchById, setPublicPatchById] = useState<Record<string, Partial<JobRequest>>>({});
+  /**
+   * 🔴 **ฟอร์มแก้ข้อมูลประกาศย้ายออกจากหน้านี้แล้ว** (27 ส.ค. 2569)
+   * อยู่ที่แท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอ ⇒ ไม่ต้องมี patch ทับการ์ดที่นี่อีก
+   * (กลับมาที่บอร์ดค่าใหม่มาพร้อมการโหลดใบขอรอบถัดไป)
+   */
 
   /**
    * ทะเบียน "ปล่อยใบขอขึ้นหน้าสาธารณะ" (Phase 5 · เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)
@@ -274,7 +247,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⚠️ ใบที่ไม่อยู่ในทะเบียนนี้ = คนนอกไม่เห็น และ AI (Lumos) ก็ไม่เห็น
    */
   const [releases, setReleases] = useState<JobRelease[] | null>(null);
-  const [releaseBusyId, setReleaseBusyId] = useState<string | null>(null);
   const releaseIdx = useMemo(() => buildReleaseIndex(releases ?? []), [releases]);
 
   const loadReleases = React.useCallback(async () => {
@@ -292,19 +264,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
   const [bulkReleaseBusy, setBulkReleaseBusy] = useState(false);
 
-  /** ปล่อย/ดึงลง 1 ใบ แล้วรีเฟรชทะเบียน */
-  const toggleRelease = async (job: JobRequest, next: boolean) => {
-    setReleaseBusyId(job.id);
-    try {
-      if (next) await releaseJobsToPublic([job.id]);
-      else await unreleaseJobsFromPublic([job.id]);
-      await loadReleases();
-    } catch {
-      /* ข้อความบอกความล้มเหลวอยู่ที่ปุ่ม (กลับสภาพเดิมเพราะทะเบียนไม่เปลี่ยน) */
-    } finally {
-      setReleaseBusyId(null);
-    }
-  };
+  /**
+   * 🔴 **ปล่อย/ดึงลงทีละใบย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอแล้ว** (27 ส.ค. 2569)
+   * หน้านี้เหลือเฉพาะ "ปล่อยทั้งหน้านี้" ที่ท้ายแถบเส้นทาง (ทำหลายใบพร้อมกัน)
+   */
 
   // แบ่งหน้าการ์ดประกาศ — ใช้แถบเลขหน้ากลางของระบบ (เลือกจำนวนต่อหน้าได้เหมือนหน้าอื่น)
   const [page, setPage] = useState(1);
@@ -314,10 +277,49 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⚠️ กรอง**หลัง**ตัวกรองปกติ (จังหวัด/ตำแหน่ง/ฯลฯ) — เลขบนกล่องจึงเป็น
    * "ในผลที่กรองอยู่ตอนนี้" ไม่ใช่ยอดทั้งระบบ ซึ่งตรงกับที่คนกำลังมองบนจอ
    */
-  const [openBox, setOpenBox] = useState<JobBoxKey | null>(initialBox);
-  /** กล่องปิดแล้ว/ยกเลิกที่เลือกอยู่ — null = กำลังดูชุดใบเปิด */
-  const closedBox: ClosedBoxKey | null = openBox && isClosedBox(openBox) ? openBox : null;
-  const openBoxKey: OpenBoxKey | null = openBox && !isClosedBox(openBox) ? openBox : null;
+  /**
+   * ขั้นบนเส้นทางที่เลือกอยู่ — `null` = ดูใบเปิดทั้งหมดที่กรองอยู่
+   *
+   * 🔴 **อยู่ใน URL ไม่ใช่ state ในหน้า** (27 ส.ค. 2569) — เจ้าของสั่งว่ากดแล้วต้อง
+   * "พาไปดูข้อมูล" ⇒ ขั้นที่เลือกต้องเป็นที่ ๆ ส่งลิงก์ให้กันได้ · รีเฟรชไม่หาย ·
+   * ปุ่มย้อนกลับของเบราว์เซอร์พากลับขั้นก่อนหน้า และกลับจากหน้าใบขอมาเจอขั้นเดิม
+   * ⚠️ ค่าที่ไม่รู้จักใน URL = ถือว่าไม่ได้เลือกขั้น (ห้าม throw ใส่คนที่แก้ URL เล่น)
+   */
+  const stageParam = searchParams.get('stage');
+  const stage = useMemo<BoardStageKey | null>(
+    () =>
+      (BOARD_STAGE_ORDER as readonly string[]).includes(stageParam ?? '')
+        ? (stageParam as BoardStageKey)
+        : null,
+    [stageParam],
+  );
+  const setStage = React.useCallback(
+    (next: BoardStageKey | null) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (next) params.set('stage', next);
+          else params.delete('stage');
+          return params;
+        },
+        { replace: false },
+      );
+    },
+    [setSearchParams],
+  );
+  /** ลิงก์เก่า `?view=closed|cancelled` → แปลงเป็นขั้นบนเส้นครั้งเดียว */
+  useEffect(() => {
+    if ((initialBox === 'closed' || initialBox === 'cancelled') && !stageParam) setStage(initialBox);
+  }, [initialBox, stageParam, setStage]);
+  /**
+   * 🔴 **กล่องสถานะ 6 กล่องถูกยุบเข้าเส้นทางแล้ว** (เจ้าของสั่งรื้อ 27 ส.ค. 2569)
+   * ตัวแปรพวกนี้จึงไม่มี state ของตัวเองอีก — อนุมานจากขั้นที่เลือกบนเส้น
+   * (ยังต้องมีอยู่เพราะส่วนอื่นของหน้าใช้: การเรียงการ์ด · ตัวเลือกช่วงวันใบปิด ·
+   *  ป้ายบนหัวตาราง) · `initialBox` ที่ลิงก์เก่าส่งมาแปลงเป็นขั้นตั้งต้นแทน
+   */
+  const closedBox: ClosedBoxKey | null =
+    stage === 'closed' || stage === 'cancelled' ? stage : null;
+  const openBoxKey: OpenBoxKey | null = null;
   /**
    * ประกาศของบอร์ด (mockup rev.3 ข้อ 04) — ใช้ 2 ที่:
    * แถวกล่องลอย = รวมผู้สมัครต่อประเภทที่ไม่ผูกใบขอ · ชิปบนการ์ด = ช่องทางที่ปล่อยลิงก์ + ยอดคลิก
@@ -390,7 +392,45 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => (closedBox ? closedBoxCounts[closedBox] : filterByOpenBox(filters.filtered, openBoxKey)),
     [closedBox, closedBoxCounts, filters.filtered, openBoxKey],
   );
-  const totalPages = getTotalPages(boxedJobs.length, pageSize);
+
+  /**
+   * ── เส้นทางงาน (เจ้าของสั่ง 27 ส.ค. 2569: "ทำให้มันไหลเป็นเส้น") ──
+   * ตรรกะอยู่ lib/boardFlow (มีเทสต์) — ที่นี่แค่ประกอบ facts จาก index ที่โหลดอยู่แล้ว
+   *
+   * 🔴 **เลขบนเส้นนับจาก `boxedJobs` (ก่อนกรองขั้น)** — กดขั้นไหนเลขขั้นอื่นต้องไม่เปลี่ยน
+   * ไม่งั้นกดปุ๊บเลขทุกช่องกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามขั้นไม่ได้อีก
+   * ส่วน **การ์ดที่โชว์** ใช้ชุดหลังกรอง (`flowJobs`) — แพตเทิร์นเดียวกับกล่องสถานะ
+   */
+  const stageFacts = useMemo<BoardStageFacts>(
+    () => ({
+      hasLink: (j) => (postingsReady ? postedJobIds.has(j.id) : false),
+      isReleased: (j) => releaseIdx.has(j.id),
+      applicants: (j) => countFor(applicantIdx, j.id),
+    }),
+    [postingsReady, postedJobIds, releaseIdx, applicantIdx],
+  );
+  const stages = useMemo(
+    () =>
+      isStaff
+        ? buildBoardStages(filters.filtered, stageFacts, {
+            closed: closedBoxCounts.closed.length,
+            cancelled: closedBoxCounts.cancelled.length,
+          })
+        : null,
+    [isStaff, filters.filtered, stageFacts, closedBoxCounts],
+  );
+
+  /**
+   * การ์ดที่โชว์ = ใบในขั้นที่เลือก · ไม่เลือก = ใบเปิดทั้งหมดที่กรองอยู่
+   * ⚠️ ขั้น "ปิดแล้ว/ยกเลิก" มาคนละ feed — ต้องหยิบจากชุดใบปิด ไม่ใช่กรองใบเปิด
+   */
+  const flowJobs = useMemo(() => {
+    if (!stage) return boxedJobs;
+    if (stage === 'closed' || stage === 'cancelled') return closedBoxCounts[stage];
+    return filters.filtered.filter((j) => openJobStage(j, stageFacts) === stage);
+  }, [stage, boxedJobs, closedBoxCounts, filters.filtered, stageFacts]);
+
+  const totalPages = getTotalPages(flowJobs.length, pageSize);
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
   /**
@@ -410,15 +450,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const orderedJobs = useMemo(() => {
     // ใบปิด/ยกเลิกไม่มี "ค้างมานาน" แล้ว — เรียงตามวันที่ปิดล่าสุดขึ้นก่อน
-    if (closedBox) return [...boxedJobs].sort(compareByClosedDateDesc);
+    if (closedBox) return [...flowJobs].sort(compareByClosedDateDesc);
     const today = new Date();
     const hasApplicants = (id: string) => (countFor(applicantIdx, id) > 0 ? 0 : 1);
-    return [...boxedJobs].sort((a, b) => {
+    return [...flowJobs].sort((a, b) => {
       const byAge = compareJobsByAgeDaysDesc(a, b, today);
       if (byAge !== 0) return byAge;
       return hasApplicants(a.id) - hasApplicants(b.id);
     });
-  }, [boxedJobs, applicantIdx, closedBox]);
+  }, [flowJobs, applicantIdx, closedBox]);
   const visibleJobs = orderedJobs.slice(pageStart, pageStart + pageSize);
 
   /**
@@ -461,21 +501,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     }
   };
 
-  /**
-   * เปิดใบใหม่ = เริ่มที่แท็บรายละเอียดเสมอ ไม่ค้างแท็บของใบก่อน
-   * 🔴 ยกเว้นตอนที่ผู้เรียกสั่งแท็บมาล่วงหน้า (ปุ่มในแถบลิงก์เงียบ "เพิ่มช่องทาง"/"แก้ประกาศ")
-   * — ถ้าไม่มี ref ตัวนี้ effect จะทับแท็บที่ปุ่มสั่งกลับเป็น detail ทุกครั้ง
-   */
-  const pendingPopupTabRef = React.useRef<'detail' | 'edit' | 'genlink' | null>(null);
-  useEffect(() => {
-    setPopupTab(pendingPopupTabRef.current ?? 'detail');
-    pendingPopupTabRef.current = null;
-  }, [selected?.id]);
-
   // เปลี่ยนกล่อง = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของกล่องเดิม)
   useEffect(() => {
     setPage(1);
-  }, [openBox]);
+  }, [stage]);
 
   // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
   useEffect(() => {
@@ -490,9 +519,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     setApplyOpen(true);
   };
 
-  // เจ้าหน้าที่: กดการ์ดเพื่อดูผู้สมัครที่กรอกฟอร์มของงานนั้น
-  // (state จำนวนผู้สมัครต่อใบย้ายไปประกาศไว้ข้างบน — การเรียงการ์ดต้องใช้ก่อนถึงตรงนี้)
-  const [applicantsJob, setApplicantsJob] = useState<JobRequest | null>(null);
+  /** เจ้าหน้าที่: รายชื่อผู้สมัครของใบนั้น **ไปหน้าแท็บผู้สมัคร** แล้ว ไม่ใช่ป๊อป (27 ส.ค. 2569) */
   const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
@@ -647,7 +674,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                ⇒ ชื่อหัวต้องเปลี่ยนตามมุมมอง ไม่งั้นกดเมนูคนละขั้นแล้วเจอหัวเดียวกัน
                คนใหม่จะไม่แน่ใจว่ามาถูกหน้าหรือเปล่า (audit 26 ส.ค. 2569)
                ชื่อมาจาก `conveyorLabel` ที่เดียวกับเมนู ห้ามพิมพ์เอง */
-            title={conveyorLabel(view === 'postings' ? 'postings' : 'applicants')}
+            title={
+              /* หน้าเดียวสามมุมมอง — หัวต้องตรงกับเมนูที่พามา (กล่องงานมีชื่อ
+                 ของตัวเองในเมนูคลังข้อมูลแล้ว 27 ส.ค. 2569 — เดิมยืมชื่อ "ผู้สมัคร") */
+              view === 'postings'
+                ? conveyorLabel('postings')
+                : view === 'board'
+                  ? 'กล่องงาน'
+                  : conveyorLabel('applicants')
+            }
             /* 🔴 บอกหน่วยให้ครบทั้ง "ใบขอ" และ "อัตรา" — เดิมเขียน "292 ตำแหน่ง" ทั้งที่ 292
                คือจำนวน**ใบ** ทำให้เอาไปเทียบกับ Dashboard (340 อัตรา) แล้วสรุปว่าใบขอหาย */
             meta={
@@ -837,132 +872,50 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           }
         />
 
-        {/* กล่องสถานะ (เจ้าของสั่ง 19 ส.ค. 2569: *"มีกล่องเพื่อดูข้อมูลได้หมดอะ"* +
-            *"ทำเป็น visual ให้เห็นแบ่งสีแบ่งอะไรให้ชัดเจน"*)
+        {/* ── เส้นทางงาน — เส้นเดียวจบ (เจ้าของสั่งรื้อ 27 ส.ค. 2569) ──
+            *"ทำเป็นเส้นบอกเลยไหม แบบ งานเข้ามาเท่าไหร่ คนก็ตรวจจากตรงนั้น ตรวจเสร็จ
+             กดตามเส้นเลย แล้วไปจบที่ตรงไหน · ตอนนี้หน้ากล่องงานเยอะแยะเละเทะไปหมด"*
 
-            สีเรียงตามการเดินทางของงาน: ฟ้า = เพิ่งเริ่มหา → ม่วง = กำลังคัดคน →
-            ส้ม = รอ → เขียว = ได้คนเริ่มงานแล้ว · เทา = จบแล้ว · แดง = ยกเลิก
-            ⚠️ สีมาจาก `JOB_BOX_TONE` → `designTokens` ที่เดียว ห้ามเขียน class สีสดตรงนี้
+            🔴 **แถบนี้แทนที่ของเดิม 3 ชุด**: กล่องสถานะ 6 กล่อง · แถบหน้าสาธารณะ
+            · แถบผู้สมัคร — ทั้งสามพูดเรื่องเดียวกันคนละมุม และเลขซ้อนกันจนบวกไม่ลงตัว
+            ตอนนี้ทุกใบอยู่ขั้นเดียว บวกทุกขั้นแล้วได้จำนวนใบทั้งหมดพอดี
             ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
         {isStaff && view === 'board' ? (
           <div className="mt-3 space-y-2">
-            {/* 🔴 เลิกเลื่อนซ้าย-ขวา (กติกาข้อ 7 — เดิม overflow-x-auto ทำให้ 3 กล่องท้าย
-                ตกขอบบนจอแคบ ต้องลากหาเอง) → flex-wrap ตกบรรทัดเอง · จอ 1440 ลงแถวเดียวพอดี */}
-            <div className="flex flex-wrap items-stretch gap-2">
-              <div className="flex flex-wrap items-stretch gap-2">
-                {/* ทั้งหมด — ไม่มีสีประจำ ใช้เป็นตัวล้างตัวกรอง */}
-                <button
-                  type="button"
-                  onClick={() => setOpenBox(null)}
-                  className={cn(
-                    'min-w-[7rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
-                    openBox === null
-                      ? 'border-primary bg-primary/10'
-                      : 'border-transparent bg-secondary/60 hover:bg-secondary',
-                  )}
-                >
-                  <span className="block whitespace-nowrap text-[11px] font-semibold text-muted-foreground">
-                    ทั้งหมด
-                  </span>
-                  <span className="block text-2xl font-bold leading-tight tabular-nums text-foreground">
-                    {filters.filtered.length.toLocaleString('th-TH')}
-                    <span className="ml-1 text-[11px] font-semibold text-muted-foreground">ใบขอ</span>
-                  </span>
-                  <span className="block text-[10px] text-muted-foreground">
-                    {filteredPositions.toLocaleString('th-TH')} อัตราที่ยังต้องหา
-                  </span>
-                </button>
-
-                {OPEN_BOX_KEYS.map((key) => {
-                  const tone = TONE[JOB_BOX_TONE[key]];
-                  const active = openBox === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
-                      aria-pressed={active}
-                      title={`${JOB_BOX_LABEL[key]} — ${JOB_BOX_HINT[key]}`}
-                      className={cn(
-                        'min-w-[9rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
-                        tone.soft,
-                        tone.softHover,
-                        active ? 'border-primary' : 'border-transparent',
-                      )}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                        <span className="truncate whitespace-nowrap text-[11px] font-semibold text-foreground">
-                          {JOB_BOX_LABEL[key]}
-                        </span>
-                      </span>
-                      {/* 🔴 เหลือ 2 บรรทัด (เจ้าของสั่ง 20 ส.ค. 2569) — เดิม 4 บรรทัดต่อกล่อง
-                          ตัวหนังสือจิ๋วอ่านไม่ทัน · คำอธิบายย้ายไปอยู่ใน title (ชี้แล้วเห็น) */}
-                      <span className={cn('block text-2xl font-bold leading-tight tabular-nums', tone.num)}>
-                        {boxCounts[key].toLocaleString('th-TH')}
-                        <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
-                          ใบขอ · {boxPositions[key].toLocaleString('th-TH')} อัตรา
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-
-              </div>
-
-              {/* สองกล่องขวามาจากอีก feed (ใบที่หลุดจากกล่องงานแล้ว) — จัดเป็นกลุ่มของตัวเอง
-                  แล้วใส่เส้นที่ขอบกลุ่ม ⚠️ ห้ามใช้ <span w-px> ลอย ๆ — ใน flex-wrap
-                  เส้นจะโดดไปขึ้นต้นบรรทัดใหม่แบบสุ่มเมื่อแถวตก */}
-              <div className="flex flex-wrap items-stretch gap-2 sm:border-l sm:border-border sm:pl-3">
-                {CLOSED_BOX_KEYS.map((key) => {
-                  const tone = TONE[JOB_BOX_TONE[key]];
-                  const active = openBox === key;
-                  const rows = closedBoxCounts[key];
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setOpenBox((prev) => (prev === key ? null : key))}
-                      aria-pressed={active}
-                      className={cn(
-                        'min-w-[9rem] rounded-xl border-2 px-3 py-2 text-left transition-colors',
-                        tone.soft,
-                        tone.softHover,
-                        active ? 'border-primary' : 'border-transparent',
-                      )}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                        <span className="truncate whitespace-nowrap text-[11px] font-semibold text-foreground">
-                          {JOB_BOX_LABEL[key]}
-                        </span>
-                      </span>
-                      <span className={cn('block text-2xl font-bold leading-tight tabular-nums', tone.num)}>
-                        {closedLoading && rows.length === 0 ? (
-                          <LoaderCircle className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            {rows.length.toLocaleString('th-TH')}
-                            <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
-                              ใบขอ · {sumJobPositionUnits(rows).toLocaleString('th-TH')} อัตรา
-                            </span>
-                          </>
+            {stages ? (
+              <div className={cn('rounded-xl border px-3 py-2.5', DASH.card)}>
+                <BoardFlowStrip
+                  stages={stages}
+                  active={stage}
+                  onPick={setStage}
+                  action={
+                    /* ปุ่มลงมือของขั้น "รอปล่อยประกาศ" — ย้ายมาจากแถบหน้าสาธารณะที่ถอดออก
+                       ⚠️ ปล่อยให้ใบที่ยังไม่ปล่อย **ในชุดที่กรองอยู่** ไม่ใช่แค่ขั้นที่เลือก */
+                    releases !== null && unreleasedCount > 0 ? (
+                      <button
+                        type="button"
+                        disabled={bulkReleaseBusy}
+                        onClick={() => void bulkReleaseVisible()}
+                        title={`ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (${Math.min(unreleasedCount, 300)} ใบ) ขึ้นหน้าสมัครงานสาธารณะ`}
+                        className={cn(
+                          'rounded-lg px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+                          TONE.success.outline,
                         )}
-                      </span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        {closedDays} วันล่าสุด
-                      </span>
-                    </button>
-                  );
-                })}
+                      >
+                        {bulkReleaseBusy
+                          ? 'กำลังปล่อย…'
+                          : `ปล่อยขึ้นหน้าสมัคร (${Math.min(unreleasedCount, 300)})`}
+                      </button>
+                    ) : null
+                  }
+                />
+                {stage ? (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    กำลังดูเฉพาะขั้นที่เลือก — การ์ดข้างล่าง{' '}
+                    {flowJobs.length.toLocaleString('th-TH')} ใบ · กดขั้นเดิมซ้ำเพื่อดูทั้งหมด
+                  </p>
+                ) : null}
               </div>
-            </div>
-
-            {openBox ? (
-              <p className="text-[11px] text-muted-foreground">
-                กรองอยู่: <span className="font-semibold text-foreground">{JOB_BOX_LABEL[openBox]}</span>{' '}
-                — {JOB_BOX_HINT[openBox]} · กดกล่องเดิมซ้ำเพื่อล้าง
-              </p>
             ) : null}
 
             {/* ช่วงวันที่ของชุดใบปิด/ยกเลิก — โผล่เฉพาะตอนเลือกสองกล่องนั้น
@@ -1049,66 +1002,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           </div>
         )}
 
-        {/* แถบ "หน้าสาธารณะ" — ปล่อยแล้วกี่ใบ / ยังไม่ปล่อยกี่ใบ + ปล่อยเป็นชุด
-            (Phase 5 · เจ้าของเคาะ 22 ส.ค. 2569 "กลับด้านหมด ทุกใบต้องกดปล่อย")
-            🔴 staff เท่านั้น — /apply ห้ามเห็นแถบนี้ */}
-        {isStaff && !closedBox && releases !== null ? (
-          <div className={cn('mt-3 rounded-xl border px-3 py-2.5', TONE.info.soft)}>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <span className={DASH.eyebrow}>หน้าสาธารณะ (/apply)</span>
-              <span className="text-xs">
-                <b className={TONE.success.value}>ปล่อยแล้ว {releasedCount}</b>
-                <span className={cn('mx-1', DASH.muted)}>·</span>
-                <b className={TONE.warn.value}>ยังไม่ปล่อย {unreleasedCount}</b>
-                <span className={cn('ml-1', DASH.muted)}>จาก {boxedJobs.length} ใบที่กรองอยู่</span>
-              </span>
-              {unreleasedCount > 0 ? (
-                <button
-                  type="button"
-                  disabled={bulkReleaseBusy}
-                  onClick={() => void bulkReleaseVisible()}
-                  title={`ปล่อยใบที่ยังไม่ปล่อยในหน้านี้ทั้งหมด (${Math.min(unreleasedCount, 300)} ใบ) ขึ้นหน้าสาธารณะ`}
-                  className={cn(
-                    'ml-auto rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-50',
-                    TONE.success.outline,
-                  )}
-                >
-                  {bulkReleaseBusy
-                    ? 'กำลังปล่อย…'
-                    : `ปล่อยทั้งหน้านี้ (${Math.min(unreleasedCount, 300)})`}
-                </button>
-              ) : null}
-            </div>
-            {releasedCount === 0 ? (
-              <p className={cn('mt-1 text-[11px]', DASH.muted)}>
-                ยังไม่มีใบไหนถูกปล่อย — หน้า /apply จะว่างจนกดปล่อยใบแรก
-                (คนนอกและ AI เห็นเฉพาะใบที่ปล่อยแล้ว)
-              </p>
-            ) : null}
-            {/* แถวผู้สมัคร — เลขชุดเดียวกับที่บอร์ดทีมหน้าแรกใช้ส่งคนมาที่นี่ */}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-current/10 pt-1.5">
-              <span className={DASH.eyebrow}>ผู้สมัคร</span>
-              <span className="text-xs">
-                <b className={TONE.success.value}>มีคนสมัครแล้ว {withApplicantsCount}</b>
-                <span className={cn('mx-1', DASH.muted)}>·</span>
-                <b className={TONE.warn.value}>ยังไม่มีใครสมัคร {withoutApplicantsCount}</b>
-                <span className={cn('ml-1', DASH.muted)}>จาก {boxedJobs.length} ใบที่กรองอยู่</span>
-              </span>
-            </div>
-          </div>
-        ) : null}
+        {/* 🔴 **แถบ "หน้าสาธารณะ" กับ "ผู้สมัคร" ถูกถอดออก 27 ส.ค. 2569**
+            ทั้งสองแถบพูดเลขเดียวกับขั้นบนเส้นทางเป๊ะ ("ปล่อยแล้ว 176" = ขั้นรอคนสมัคร +
+            มีคนสมัคร · "มีคนสมัครแล้ว 1" = ขั้นมีคนสมัคร) — เจ้าของสั่งว่าหน้านี้เละ
+            และเคยสั่งไว้ตั้งแต่แรกว่า "อันไหนข้อมูลเดียวกันก็ยุบ ๆ รวม ๆ ไป"
+            ⚠️ **ปุ่ม "ปล่อยทั้งหน้านี้" ไม่ได้หายไป** — ย้ายไปอยู่ท้ายแถบเส้นทางแล้ว */}
 
         {/* แถบ "ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร" — ซ่อนตัวเองเมื่อไม่มีของ
-            ปุ่มพาเข้าป๊อป 3 ขั้นตัวเดิม (setSelected + popupTab) ไม่มี Dialog ใหม่ */}
+            กดแถว = ไปหน้ารายละเอียดใบขอ · กดปุ่ม = ไปแท็บ "ประกาศ / ลิงก์สมัคร"
+            ซึ่งเป็นที่ที่แก้ข้อความประกาศและสร้างลิงก์ (ของเดิมเด้งป๊อป 3 ขั้น) */}
         {isStaff ? (
           <JobBoardSilentLinks
             rows={silentLinkRows}
-            onOpen={(job, tab) => {
-              // ตั้งแท็บล่วงหน้าก่อน setSelected — effect รีเซ็ตจะอ่านค่านี้แทน 'detail'
-              pendingPopupTabRef.current = tab;
-              setSelected(job);
-              setPopupTab(tab);
-            }}
+            onOpen={(job, target) => openUnit(job, target)}
           />
         ) : null}
 
@@ -1118,16 +1024,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           {visibleJobs.map((job) => (
             <Card
               key={job.id}
-              /* กดที่กล่อง = เปิดรายละเอียดใบงานเลย (เจ้าของสั่ง 17 ส.ค. 2569)
-                 เดิมกดกล่องแล้วได้รายชื่อผู้สมัคร ส่วนรายละเอียดต้องไปหาปุ่มเล็ก ๆ ใน footer
-                 ตอนนี้สลับกัน: กล่อง = รายละเอียด · รายชื่อเป็นปุ่มที่กดตรง ๆ */
-              onClick={() => setSelected(job)}
+              /**
+               * กดที่กล่อง — **ปลายทางต่างกันตามหน้า** (ไฟล์นี้ใช้ร่วมสองหน้า)
+               *
+               * เจ้าหน้าที่ (กล่องงาน): ไปหน้ารายละเอียดใบขอจริง
+               * (เจ้าของสั่ง 27 ส.ค. 2569: *"พอกดแล้วก็พาไปดูข้อมูล ไม่เอาแบบ Popup เด้งนะ"*)
+               *
+               * 🔴 หน้าสมัครสาธารณะ (`/apply`): **ห้ามพาไปหน้าใบขอ** — หน้านั้นต้องล็อกอิน
+               * คนนอกกดแล้วจะเจอหน้าล็อกอินทันที ⇒ เปิดฟอร์มสมัครเลย (ตัวเดียวกับปุ่ม
+               * "สมัครงาน" บนการ์ด) · การ์ดโชว์ตำแหน่ง/สถานที่/รายได้/สวัสดิการอยู่แล้ว
+               */
+              onClick={() => (isStaff ? openUnit(job) : openApply(job))}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setSelected(job);
+                  if (isStaff) openUnit(job);
+                  else openApply(job);
                 }
               }}
               className={cn(
@@ -1379,8 +1293,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         {/* 🔴 Gen link กับ แก้ไข **ย้ายไปอยู่ในป๊อปอัปที่กดการ์ด** แล้ว
                             (เจ้าของเคาะ 19 ส.ค. 2569: การ์ดเหลือแค่ "ดูรายชื่อ" กับ
                             "หาผู้สมัครเพิ่ม") — ห้ามใส่ปุ่มกลับมาบนการ์ดโดยไม่ถามก่อน */}
-                        {/* รายชื่อผู้สมัครย้ายมาเป็นปุ่มจริง เพราะคลิกของกล่องถูกใช้เปิด
-                            รายละเอียดใบงานแล้ว (เจ้าของสั่ง 17 ส.ค. 2569)
+                        {/* "ดูรายชื่อ" = **ไปแท็บผู้สมัครของใบขอ** ไม่ใช่ป๊อปอีกแล้ว
+                            (เจ้าของสั่ง 27 ส.ค. 2569) — หน้านั้นมีตัวกรอง/ปุ่มลงมือครบกว่าป๊อป
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
                         <Button
                           type="button"
@@ -1388,7 +1302,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setApplicantsJob(job);
+                            openUnit(job, 'applicants');
                           }}
                           className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.info.outline)}
                         >
@@ -1568,429 +1482,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         ) : null}
       </div>
 
-      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="flex max-h-[min(92dvh,820px)] w-[min(calc(100vw-1.25rem),32rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
-          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
-            <div className="flex items-start justify-between gap-3 pr-8">
-              <DialogTitle className="text-base font-semibold leading-snug sm:text-lg break-words">
-                {selected ? jobBoardCardTitle(selected) : ''}
-              </DialogTitle>
-            </div>
-            {/* แถบขั้นตอนการไหลของงาน (เจ้าของสั่ง 20 ส.ค. 2569: *"ทำเป็นแบบการไหลของงาน …
-                ด้านบนก็จะมีบอกว่าตอนนี้เราอยู่ในหน้าไหน"*)
-                1 รายละเอียดงาน → 2 แก้ไข → 3 Gen link · กดขั้นไหนก็กระโดดได้ +
-                มีปุ่ม "ถัดไป" ท้ายเนื้อแต่ละขั้น
-                ⚠️ เจ้าหน้าที่เท่านั้น · ใบปิด/ยกเลิก = งานจบแล้ว ไม่มีขั้นแก้ไข/Gen link */}
-            {isStaff && selected && !closedBox ? (
-              <div className="mt-3 flex items-center gap-1.5" role="tablist" aria-label="ขั้นตอน">
-                {POPUP_STEPS.map((t, i) => {
-                  const active = popupTab === t.id;
-                  const passed = POPUP_STEPS.findIndex((x) => x.id === popupTab) > i;
-                  return (
-                    <React.Fragment key={t.id}>
-                      {i > 0 ? (
-                        <span
-                          className={cn('h-px w-4 shrink-0 sm:w-6', passed || active ? 'bg-primary' : 'bg-border')}
-                          aria-hidden
-                        />
-                      ) : null}
-                      <button
-                        type="button"
-                        role="tab"
-                        onClick={() => setPopupTab(t.id)}
-                        aria-label={t.label}
-                        aria-selected={active}
-                        className={cn(
-                          'inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
-                          active
-                            ? cn(TONE.primary.solid, 'border-transparent')
-                            : passed
-                              ? cn(TONE.primary.value, 'border-primary/40 bg-background hover:bg-secondary')
-                              : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground',
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                            active ? 'bg-white/25' : 'bg-secondary',
-                          )}
-                          aria-hidden
-                        >
-                          {i + 1}
-                        </span>
-                        <span className="truncate">{t.label}</span>
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            ) : null}
-            <DialogDescription className="sr-only">
-              รายละเอียดตำแหน่งงาน
-            </DialogDescription>
-          </DialogHeader>
-          {selected && (
-            <>
-              {/* เนื้อกลางเปลี่ยนตามแท็บ — ฟอร์มแก้ไข/Gen link ใช้ component ตัวเดิม
-                  ในโหมด embedded (คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog) */}
-              {popupTab === 'edit' ? (
-                /**
-                 * แท็บ "แก้ไข" = **สองส่วนในที่เดียว** (เจ้าของเคาะ 20 ส.ค. 2569 —
-                 * ถอดไอคอนดินสอบนการ์ดแล้วย้ายฟอร์มมารวมที่นี่)
-                 *   1. ข้อความประกาศ (มีเฉพาะใบที่สร้างประกาศแล้ว — ใบที่ยังไม่มีก็ไม่ต้อง
-                 *      ขึ้นโน้ตชวนไป Gen link เพราะ Gen link เป็นแท็บข้าง ๆ อยู่แล้ว
-                 *      เจ้าของสั่งถอดโน้ตนั้นออก 20 ส.ค. 2569: *"มันอยู่อีกหน้าแล้ว"*)
-                 *   2. ข้อมูลที่จะขึ้นประกาศ — จังหวัด/อำเภอ/ตำบล · รายได้รวม · สวัสดิการ
-                 *      (แก้ได้ทุกใบ ไม่ต้องมีประกาศก่อน) → แท็บนี้จึงไม่เคยเป็นทางตัน
-                 */
-                <div className="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
-                  {latestPostingByJob.has(selected.id) ? (
-                    <EditPostingDialog
-                      embedded
-                      posting={latestPostingByJob.get(selected.id) ?? null}
-                      onClose={() => setPopupTab('detail')}
-                      onSaved={() => {
-                        setPostingsRev((n) => n + 1);
-                        setPopupTab('detail');
-                      }}
-                    />
-                  ) : null}
-
-                  <div className="space-y-3 px-5 py-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                      ข้อมูลที่จะขึ้นประกาศ
-                    </p>
-                    <React.Suspense
-                      fallback={<p className="text-xs text-muted-foreground">กำลังโหลดฟอร์ม…</p>}
-                    >
-                      <EditPublicJobFieldsDialog
-                        embedded
-                        job={{ ...selected, ...(publicPatchById[selected.id] || {}) }}
-                        onClose={() => setPopupTab('detail')}
-                        onSaved={(patch) =>
-                          setPublicPatchById((prev) => ({
-                            ...prev,
-                            [selected.id]: { ...(prev[selected.id] || {}), ...patch },
-                          }))
-                        }
-                      />
-                    </React.Suspense>
-                  </div>
-                </div>
-              ) : popupTab === 'genlink' ? (
-                <GenApplyLinkDialog
-                  embedded
-                  open
-                  job={selected}
-                  onClose={() => setPopupTab('detail')}
-                  onCreated={() => setPostingsRev((n) => n + 1)}
-                />
-              ) : (
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 text-sm">
-                <div className="flex flex-wrap gap-2">
-                <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium">
-                  {publicJobPositionLabel(selected)}
-                </span>
-                {selected.job_description_code_1 ? (
-                  <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">
-                    {JOB_TYPE_LABELS[selected.job_type]}
-                  </span>
-                ) : (
-                  <span className="rounded-lg bg-muted px-2.5 py-1 text-xs">
-                    {jobSectorLabel(selected)}
-                  </span>
-                )}
-                {selected.urgency === 'urgent' && (
-                  <span className="rounded-lg bg-destructive/15 px-2.5 py-1 text-xs font-semibold text-destructive">
-                    รับด่วน
-                  </span>
-                )}
-              </div>
-              <dl className="grid gap-0 text-xs sm:text-sm">
-                {isStaff && selected.request_no ? (
-                  <div className="border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">เลขที่ใบขอ</dt>
-                    <dd className="mt-0.5 font-mono font-medium text-foreground">{selected.request_no}</dd>
-                  </div>
-                ) : null}
-                <div className="border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">สถานที่</dt>
-                  <dd className="mt-0.5 font-medium leading-relaxed text-foreground break-words">
-                    {selected.location_address}
-                  </dd>
-                </div>
-                <div className="border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">ตำบล / แขวง</dt>
-                  <dd className="mt-0.5 font-medium text-foreground break-words">
-                    {selected.override_subdistrict ||
-                      (inferSubdistrictFromAddress(selected.location_address || '') ?? '—')}
-                  </dd>
-                </div>
-                <div className="border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">อำเภอ / เขต</dt>
-                  <dd className="mt-0.5 font-medium text-foreground break-words">
-                    {selected.override_district ||
-                      (displayDistrictLine(selected.location_address || '') ?? '—')}
-                  </dd>
-                </div>
-                <div className="border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">จังหวัด</dt>
-                  <dd className="mt-0.5 font-medium text-foreground break-words">
-                    {selected.override_province ||
-                      (inferProvinceFromAddress(selected.location_address || '') ?? '—')}
-                  </dd>
-                </div>
-                {extractJobSubtypeLabel(selected) !== 'ไม่ระบุ' ? (
-                  <div className="border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">ลักษณะงานย่อย</dt>
-                    <dd className="mt-0.5 font-medium text-foreground break-words">
-                      {extractJobSubtypeLabel(selected)}
-                    </dd>
-                  </div>
-                ) : null}
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  {/**
-                   * ⚠️ **ค่านี้ไม่ใช่ยอดรวม** — วัดจาก ERP 16 ส.ค. 2569:
-                   * `total_income` = `payment_rate` ของแถว `is_wage='Y'` **แถวเดียว**
-                   * (ดู siamrajSqlServerRequests.ts — ROW_NUMBER เลือกแถวค่าแรงหลัก)
-                   * ใบ LAO6908007 มี 12 แถว: ค่าแรงหลัก 16,000 + อีก 11 แถวที่เป็น
-                   * **คนละหน่วย** (โอทีต่อชั่วโมง · เบี้ยเลี้ยงต่อวัน) และมี **รายการหัก**
-                   * ปนอยู่ด้วย (ค่าปรับขาดงาน) → บวกกันตรง ๆ ได้เลขที่ไม่มีความหมาย
-                   * จึงห้ามเรียกว่า "รายได้รวม" · ของแถมที่เหลือโชว์เป็นชิปสวัสดิการแทน
-                   * (ต่างจาก JobDetailPage/AddJobPage ที่เป็นใบขอฝั่งเราซึ่งคนกรอกยอดรวมเอง)
-                   */}
-                  <dt className="text-muted-foreground">
-                    {selected.income_display
-                      ? `รายได้รวม${INCOME_PERIOD_LABEL[selected.income_display.period]}`
-                      : selected.monthly_income
-                        ? 'รายได้ต่อเดือน'
-                        : 'ค่าแรง (อัตราจาก ERP)'}
-                  </dt>
-                  <dd className="text-success font-semibold">
-                    ฿
-                    {(
-                      selected.income_display?.total ??
-                      selected.monthly_income ??
-                      selected.total_income
-                    ).toLocaleString('th-TH')}
-                  </dd>
-                </div>
-                {/* รายได้แบบแยกส่วนที่เจ้าหน้าที่ตั้งเอง (20 ส.ค. 2569) — มาก่อน breakdown
-                    อัตโนมัติจาก ERP · เลข balance แล้วจาก buildIncomeDisplay (บรรทัด
-                    "อื่น ๆ" = ส่วนต่างของยอดรวมที่ใส่เอง) */}
-                {selected.income_display ? (
-                  <div className="border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">คิดจาก</dt>
-                    <dd className="mt-0.5 space-y-0.5 text-xs">
-                      {selected.income_display.lines.map((it, i) => (
-                        <div key={`${it.label}-${i}`} className="flex justify-between gap-4">
-                          <span className="text-muted-foreground">
-                            {i === 0 ? it.label : `+ ${it.label}`}
-                          </span>
-                          <span className="font-medium">฿{it.amount.toLocaleString('th-TH')}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between gap-4 border-t border-border/50 pt-1">
-                        <span className="font-semibold text-foreground">รวม</span>
-                        <span className="font-semibold text-success">
-                          ฿{selected.income_display.total.toLocaleString('th-TH')}
-                        </span>
-                      </div>
-                    </dd>
-                  </div>
-                ) : null}
-                {/* แจกแจงที่มาของยอด — ผู้สมัครต้องเห็นว่าเลขมาจากไหน ไม่ใช่เชื่อยอดรวมลอย ๆ
-                    ⚠️ ไม่รวมโอที/เบี้ยเลี้ยง/เบี้ยขยัน เพราะไม่การันตี (โชว์เป็นชิปแยก) */}
-                {!selected.income_display && selected.monthly_income ? (
-                  <div className="border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">คิดจาก</dt>
-                    <dd className="mt-0.5 space-y-0.5 text-xs">
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">ค่าแรงหลัก</span>
-                        <span className="font-medium">
-                          ฿{(selected.monthly_income_base ?? 0).toLocaleString('th-TH')}
-                        </span>
-                      </div>
-                      {(selected.monthly_income_items ?? []).map((it) => (
-                        <div key={it.label} className="flex justify-between gap-4">
-                          <span className="text-muted-foreground">+ {it.label}</span>
-                          <span className="font-medium">฿{it.monthly.toLocaleString('th-TH')}</span>
-                        </div>
-                      ))}
-                      <p className="pt-1 text-[11px] text-muted-foreground">
-                        ยังไม่รวมโอที เบี้ยขยัน และเบี้ยเลี้ยง ซึ่งได้เพิ่มตามงานจริง
-                      </p>
-                    </dd>
-                  </div>
-                ) : null}
-                <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                  <dt className="text-muted-foreground">วันที่ต้องการคน</dt>
-                  <dd>{formatYmdDmyBe(selected.required_date)}</dd>
-                </div>
-                {(selected.age_range_min != null || selected.age_range_max != null) && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">ช่วงอายุ</dt>
-                    <dd>
-                      {selected.age_range_min ?? '—'} – {selected.age_range_max ?? '—'} ปี
-                    </dd>
-                  </div>
-                )}
-                {selected.gender_requirement && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">เพศ</dt>
-                    <dd>{selected.gender_requirement}</dd>
-                  </div>
-                )}
-                {selected.vehicle_required && (
-                  <div className="flex justify-between gap-4 border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">รถที่ใช้</dt>
-                    <dd className="text-right break-words">{selected.vehicle_required}</dd>
-                  </div>
-                )}
-                {selected.work_schedule && (
-                  <div className="border-b border-border/60 py-2.5">
-                    <dt className="text-muted-foreground">เวลาทำงาน</dt>
-                    <dd className="mt-0.5 break-words">{selected.work_schedule}</dd>
-                  </div>
-                )}
-                {isStaff && staffAssigneeLine(selected) ? (
-                  <div className="py-2.5">
-                    <dt className="text-muted-foreground">ผู้รับผิดชอบ</dt>
-                    <dd className="mt-0.5 font-medium leading-relaxed text-foreground break-words">
-                      {staffAssigneeLine(selected)}
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
-
-              {/* ประวัติการแก้ไข — อยู่ที่ป๊อปกล่องงานที่เดียว (ย้ายมาจากหน้าใบงาน 21 ส.ค. 2569) */}
-              {isStaff ? (
-                <div className="space-y-1.5 border-t border-border/50 pt-3">
-                  <p className="text-xs font-semibold text-foreground">ประวัติการแก้ไข — ใครแก้อะไรไป</p>
-                  {editLogError ? (
-                    <p className="text-xs text-muted-foreground">โหลดประวัติไม่ได้ตอนนี้ — ข้อมูลใบขอด้านบนยังใช้ได้ปกติ</p>
-                  ) : editLog == null ? (
-                    <p className="text-xs text-muted-foreground">กำลังโหลดประวัติ…</p>
-                  ) : editLog.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">ยังไม่มีการแก้ไขใบนี้ในระบบ Jarvis</p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {editLog.map((it) => {
-                        const lines = describeUnitEdit(it);
-                        return (
-                          <li key={it.id} className="rounded-xl border border-border/60 bg-secondary/30 px-3 py-2">
-                            <p className="text-[11px] text-muted-foreground">
-                              <span className="font-semibold text-foreground">{it.user_name || 'ไม่ทราบชื่อ'}</span>
-                              {' · '}
-                              {UNIT_EDIT_TITLE[it.entity_type] ?? it.entity_type}
-                              {' · '}
-                              {new Date(it.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
-                            </p>
-                            {lines.length > 0 ? (
-                              <ul className="mt-0.5 space-y-0.5">
-                                {lines.map((line, i) => (
-                                  <li key={i} className="text-xs text-foreground">{line}</li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="mt-0.5 text-xs text-muted-foreground">บันทึกโดยไม่มีช่องที่เปลี่ยน</p>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              ) : null}
-              </div>
-              )}
-              <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 px-5 py-4">
-                {/* 19 ส.ค. 2569 เจ้าของสั่งเอาปุ่ม "เปิดใบขอในระบบ" ออก —
-                    กดที่กล่องบนบอร์ดก็เข้าหน้ารายละเอียดอยู่แล้ว ปุ่มนี้ซ้ำซ้อน */}
-                {/* 🔴 "สมัครตำแหน่งนี้" มีเฉพาะหน้าสาธารณะ (เจ้าของสั่ง 19 ส.ค. 2569) —
-                    กล่องงานเป็นหน้าเจ้าหน้าที่ ไม่ใช่หน้าที่คนสมัครเอง */}
-                {!isStaff ? (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      const job = selected;
-                      setSelected(null);
-                      openApply(job);
-                    }}
-                    className={cn('w-full rounded-xl py-3 text-sm', TONE.primary.solid)}
-                  >
-                    สมัครตำแหน่งนี้
-                    <Send className="h-4 w-4" />
-                  </Button>
-                ) : null}
-
-                {/* ── ปล่อย / ดึงลง หน้าสาธารณะ (Phase 5 · เจ้าของเคาะ 22 ส.ค. 2569) ──
-                    วางไว้ก่อนปุ่ม "ถัดไป" เพราะนี่คือปุ่มตัดสินใจของ flow นี้:
-                    ดูรายละเอียด → (แก้รายได้/สวัสดิการ) → **ปล่อย**
-                    🔴 ปล่อย = คนนอกและ AI เห็นใบนี้ทันที · ดึงลง = หายจากทั้งสองที่ทันที */}
-                {isStaff && !closedBox && selected && releases !== null ? (
-                  (() => {
-                    const isOut = releaseIdx.has(selected.id);
-                    const busy = releaseBusyId === selected.id;
-                    return (
-                      <div className={cn('rounded-xl border px-3 py-2.5', isOut ? TONE.success.soft : TONE.warn.soft)}>
-                        <p className="text-xs font-semibold text-foreground">
-                          {isOut ? 'ใบนี้อยู่บนหน้าสาธารณะแล้ว' : 'ใบนี้ยังไม่ขึ้นหน้าสาธารณะ'}
-                        </p>
-                        <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
-                          {isOut
-                            ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
-                            : 'คนนอกยังไม่เห็น · แก้รายได้/สวัสดิการให้เรียบร้อยก่อนปล่อยได้'}
-                        </p>
-                        <Button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void toggleRelease(selected, !isOut)}
-                          className={cn(
-                            'mt-2 w-full rounded-xl py-2.5 text-sm',
-                            isOut ? TONE.neutral.outline : TONE.success.solid,
-                          )}
-                        >
-                          {busy
-                            ? 'กำลังบันทึก…'
-                            : isOut
-                              ? 'ดึงลงจากหน้าสาธารณะ'
-                              : 'ปล่อยขึ้นหน้าสาธารณะ'}
-                        </Button>
-                      </div>
-                    );
-                  })()
-                ) : null}
-
-                {/* ปุ่ม "ถัดไป" ของ flow (เจ้าของสั่ง 20 ส.ค. 2569: *"เลือกกด next เพื่อไปแก้ไข
-                    … แก้ไขเสร็จ กด next ไปหน้า gen link"*) — ขั้นสุดท้าย (Gen link) ไม่มีถัดไป
-                    เพราะปุ่มลงมือคือ "สร้างประกาศ + ลิงก์" ในเนื้อขั้นนั้นเอง */}
-                {isStaff && !closedBox && popupTab !== 'genlink' ? (
-                  <Button
-                    type="button"
-                    onClick={() => setPopupTab(popupTab === 'detail' ? 'edit' : 'genlink')}
-                    className={cn('w-full rounded-xl py-2.5 text-sm', TONE.primary.solid)}
-                  >
-                    ถัดไป — {popupTab === 'detail' ? 'แก้ไข' : 'Gen link'}
-                    <Send className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* 🔴 **ป๊อปอัป 3 ขั้นของการ์ดถูกถอดทั้งดวง 27 ส.ค. 2569**
+          เจ้าของสั่ง: *"พอกดแล้วก็พาไปดูข้อมูล ไม่เอาแบบ Popup เด้งนะ"*
+          กดการ์ด = ไปหน้ารายละเอียดใบขอจริง · ของที่ป๊อปเคยเป็นบ้านหลังเดียว
+          (ปล่อยหน้าสาธารณะ · แก้ข้อความประกาศ · แก้ข้อมูลที่จะขึ้นประกาศ · Gen link ·
+          ประวัติการแก้ไข) ย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอครบแล้ว
+          ⇒ `/jobs/siamraj/:id/posting` (`UnitRequestPostingTabPage`) */}
 
       <PublicApplyDialog
         open={applyOpen}
         job={applyJob}
         onClose={() => setApplyOpen(false)}
-      />
-
-      <JobApplicantsDialog
-        open={!!applicantsJob}
-        job={applicantsJob}
-        onClose={() => setApplicantsJob(null)}
       />
 
       {/* ⚠️ Gen link/แก้ไขประกาศ **ของใบขอ** ไม่ใช้ Dialog แยกอีกแล้ว — ฝังเป็นแท็บ

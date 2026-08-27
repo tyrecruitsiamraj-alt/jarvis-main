@@ -28,10 +28,28 @@ export function unitRequestPath(job: JobRequest): string {
   return `/jobs/${job.id}`;
 }
 
+/**
+ * path ของ **แท็บ** ในใบขอ — `'detail'` คือหน้าหลัก (ไม่มีส่วนต่อท้าย)
+ *
+ * 🔴 ต้องต่อท้าย `unitRequestPath()` เท่านั้น ห้ามประกอบ `/jobs/siamraj/${id}` เอง
+ * (ไม่งั้นใบขอล่วงหน้าจะหลุด prefix แล้วเปิดผิดบริษัท — เหตุผลเต็มอยู่บน `unitRequestPath`)
+ * ⚠️ ใบที่ไม่ใช่ของ Siamraj ไม่มีแท็บ → คืน path เดิมของใบนั้น
+ */
+export function unitRequestTabPath(job: JobRequest, tab: UnitRequestTabName): string {
+  const base = unitRequestPath(job);
+  if (tab === 'detail' || !base.startsWith('/jobs/siamraj/')) return base;
+  return `${base}/${tab}`;
+}
+
+/** ชื่อแท็บของใบขอที่ลิงก์จากหน้าอื่นได้ (ตรงกับ route ใน App.tsx) */
+export type UnitRequestTabName = 'detail' | 'posting' | 'applicants' | 'ai-match' | 'contact';
+
 export type OpenUnitRequestOptions = {
   returnTo?: string;
   /** เปิดใบขอในแท็บใหม่ของเบราว์เซอร์ */
   openInNewTab?: boolean;
+  /** เปิดตรงไปที่แท็บนี้เลย — ไม่ระบุ = หน้ารายละเอียด */
+  tab?: UnitRequestTabName;
 };
 
 /** true เมื่อกด Ctrl/Cmd หรือปุ่มกลางเมาส์ — เปิดแท็บใหม่ */
@@ -49,7 +67,7 @@ export function navigateToUnitRequest(
   navigate: NavigateFunction,
   options?: OpenUnitRequestOptions,
 ): void {
-  const path = unitRequestPath(job);
+  const path = unitRequestTabPath(job, options?.tab ?? 'detail');
   const returnTo = sanitizeUnitReturnTo(options?.returnTo);
 
   if (returnTo?.startsWith('/jobs/list')) {
