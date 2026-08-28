@@ -18,7 +18,6 @@ import {
 
 export type StageTile = {
   key: ConveyorBadgeKey;
-  step: number;
   label: string;
   path: string;
   /** จำนวนของในถัง — `null` = ยังไม่รู้ (จอเขียน "—" ห้ามเขียน 0) */
@@ -35,16 +34,20 @@ export type StageTile = {
  */
 const COUNT_LABEL = CONVEYOR_BADGE_SHORT;
 
-const URGENT_KEYS: ReadonlySet<string> = new Set(['applicants', 'follow']);
+/**
+ * ถังที่ "มีของ = ต้องลงมือ" ⇒ ติดจุดแดง
+ * 🔴 ถอด `applicants` ออก 28 ส.ค. 2569 — หน้าผู้สมัครไม่อยู่ในลำดับงานแล้ว
+ * (งานนั้นอยู่ในแท็บของกล่องงาน) · เหลือ `follow` ที่มีคนรอสายอยู่ปลายทางจริง
+ */
+const URGENT_KEYS: ReadonlySet<string> = new Set(['follow']);
 
-/** แถบ 6 ขั้นท้าย deck — เลขเดียวกับเมนูสายพาน (cache เดียวกัน) */
+/** แถบลำดับงานท้าย deck — ชุดเดียวกับเมนู (cache เดียวกัน · ไม่มีเลขขั้นแล้ว) */
 export function buildStageTiles(counts: ConveyorCounts): StageTile[] {
   return CONVEYOR_STEPS.map((s) => {
     const v = counts[s.key];
     const count = typeof v === 'number' ? v : null;
     return {
       key: s.key,
-      step: s.step,
       label: s.label,
       path: s.path,
       count,

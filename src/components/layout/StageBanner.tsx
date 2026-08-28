@@ -73,7 +73,9 @@ const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
 
   const step = stepForPath(pathname, search);
   if (!step) return null;
-  const next = CONVEYOR_STEPS.find((s) => s.step === step.step + 1) ?? null;
+  /** หน้าถัดไปในลำดับ — อ่านจาก**ลำดับใน array** ไม่ใช่เลขขั้น (เลขขั้นถูกถอดออกแล้ว) */
+  const at = CONVEYOR_STEPS.findIndex((s) => s.key === step.key);
+  const next = at >= 0 ? (CONVEYOR_STEPS[at + 1] ?? null) : null;
 
   return (
     /*
@@ -86,13 +88,14 @@ const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
         className,
       )}
     >
-      <span className="font-mono font-semibold text-blue-700 dark:text-blue-300">
-        ขั้นที่ {step.step}/6
+      {/* 🔴 **ไอคอน + ชื่อหน้า เป็นชิ้นเดียว ไม่มีเลขขั้น ไม่มี `·` คั่น**
+          เจ้าของสั่ง 28 ส.ค. 2569: *"ไม่เอาตัวเลข ขอเป็นสัญลักษณ์ที่บ่งบอกถึงข้อนั้น ๆ
+          ไม่ต้องแยก ขอเป็นอันเดียวกัน ตอนนี้มันมีขีดคั่นไว้ไม่เอา"* และ
+          *"จะมีชื่อคำนี้ทำไม ในเมื่อมันคือใบขอ ก็ใช้ชื่อใบขอสิ"* */}
+      <span className="flex shrink-0 items-center gap-1.5 font-semibold text-foreground">
+        <step.icon className="h-4 w-4 text-blue-700 dark:text-blue-300" aria-hidden />
+        {step.label}
       </span>
-      <span className="text-muted-foreground/50" aria-hidden>
-        ·
-      </span>
-      <span className="font-semibold text-foreground">{step.label}</span>
       <span className="hidden min-w-0 flex-1 truncate text-muted-foreground sm:block">
         {step.blurb}
       </span>

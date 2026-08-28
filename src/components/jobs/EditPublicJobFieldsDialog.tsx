@@ -46,13 +46,23 @@ import {
  * ล้างช่องให้ว่าง = กลับไปใช้ค่าจาก ERP ตามเดิม
  * ⚠️ รายได้ที่แก้ **ทับเฉพาะเลขที่โชว์** ไม่ใช่อัตราจ่ายจริง และไม่ใช่ตัวที่ AI ใช้คิด
  */
+/**
+ * ส่วนของฟอร์มที่จะโชว์ — 🔴 เพิ่ม 28 ส.ค. 2569 เพราะเจ้าของแยกงานเป็นขั้น:
+ * *"กดถัดไปจะเจอช่องให้ใส่สถานที่ปฏิบัติงาน · กดถัดไปจะเจอช่อง Checklist ให้เลือกว่า
+ * จากข้อมูลใบขอจะเอาอะไรมาเป็นสวัสดิการบ้าง"*
+ * ⇒ ขั้น 2 โชว์ `place` · ขั้น 3 โชว์ `income` + `benefits`
+ * ⚠️ ไม่ส่งมา = โชว์ครบทุกส่วนเหมือนเดิม (หน้าอื่นที่เรียกอยู่แล้วไม่ต้องแก้)
+ */
+export type PublicFieldSection = 'place' | 'income' | 'benefits';
+
 const EditPublicJobFieldsDialog: React.FC<{
   job: JobRequest | null;
+  sections?: PublicFieldSection[];
   onClose: () => void;
   onSaved?: (patch: Partial<JobRequest>) => void;
   /** true = คืนเนื้อฟอร์มเปล่า ๆ ไม่ห่อ Dialog (ฝังในแท็บ "แก้ไข" ของป๊อปอัปการ์ด) */
   embedded?: boolean;
-}> = ({ job, onClose, onSaved, embedded = false }) => {
+}> = ({ job, sections, onClose, onSaved, embedded = false }) => {
   const [province, setProvince] = useState('');
   const [district, setDistrict] = useState('');
   const [subdistrict, setSubdistrict] = useState('');
@@ -171,8 +181,12 @@ const EditPublicJobFieldsDialog: React.FC<{
   const fieldCls =
     'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary';
 
+  /** โชว์ส่วนนี้ไหม — ไม่ส่ง `sections` มา = โชว์หมด */
+  const show = (k: PublicFieldSection) => !sections || sections.includes(k);
+
   const body = (
         <div className="space-y-4">
+          {show('place') ? (
           <section className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground">พื้นที่ทำงาน</p>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -264,7 +278,9 @@ const EditPublicJobFieldsDialog: React.FC<{
               </p>
             ) : null}
           </section>
+          ) : null}
 
+          {show('income') ? (
           <section className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold text-muted-foreground">รายได้ที่จะโชว์บนประกาศ</p>
@@ -398,7 +414,9 @@ const EditPublicJobFieldsDialog: React.FC<{
               </p>
             )}
           </section>
+          ) : null}
 
+          {show('benefits') ? (
           <section className="space-y-2">
             {/* เจ้าของเคาะ 20 ส.ค. 2569: "Freetext ล้วน จำกัดจำนวน" — ถอดชิปติ๊กทิ้ง
                 ค่าเก่าที่เคยติ๊กไว้ถูกแปลงเป็นข้อความมาให้แก้ต่อแล้ว (ห้ามหายเงียบ) */}
@@ -422,6 +440,7 @@ const EditPublicJobFieldsDialog: React.FC<{
               </p>
             ) : null}
           </section>
+          ) : null}
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

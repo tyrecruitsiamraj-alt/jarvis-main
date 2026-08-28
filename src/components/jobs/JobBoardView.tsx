@@ -41,12 +41,34 @@ import {
 } from '@/lib/boardFlow';
 import BoardReleaseHeader from '@/components/jobs/BoardReleaseHeader';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+const BoardPostingSteps = React.lazy(() =>
+  import('@/pages/jobs/BoardPostingPage').then((m) => ({ default: m.BoardPostingSteps })),
+);
+
+/**
+ * id ที่หน้าไล่งานต้องใช้ — 🔴 ต้องเป็นรูปเดียวกับที่ URL ของใบขอใช้
+ * (ใบขอล่วงหน้าต้องพก prefix `siamraj-pre:` ไม่งั้นอ่านผิดบริษัท)
+ * ⚠️ ถอดจาก `boardPostingPath()` เพื่อไม่ให้มีสูตรประกอบ id สองชุด
+ */
+function postingUnitId(job: JobRequest): string {
+  const p = boardPostingPath(job);
+  const m = /^\/jobs\/board\/(.+)\/posting$/.exec(p);
+  return m ? decodeURIComponent(m[1]) : job.id;
+}
+import {
   RELEASE_LANE_TEXT,
   RELEASE_STEP_ORDER,
   RELEASE_STEP_TEXT,
   buildReleaseLedger,
   filterByReleaseLane,
   filterByReleaseStep,
+  releasableJobsOf,
   type ReleaseFacts,
   type ReleaseLaneKey,
   type ReleaseStepKey,
@@ -197,20 +219,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * (ประกอบ URL เองแล้วเปิดผิดบริษัท เคยเกิดจริง 18 ส.ค. 2569)
    * `returnTo` = หน้าบอร์ดพร้อมขั้นที่กรองอยู่ ⇒ ปุ่มย้อนกลับพากลับมาที่เดิมเป๊ะ
    */
-  /**
-   * เปิด **หน้างานประกาศ/ลิงก์สมัคร** ของใบนั้น — 🔴 หน้านี้อยู่ใต้ `/jobs/board/`
-   * เพราะเป็นงานของกล่องงาน (เจ้าของสั่ง 27 ส.ค. 2569:
-   * *"ประกาศ/ลิงก์สมัคร ต้องอยู่กล่องงานสิ ทำไมไม่เข้าใจ"*)
-   */
-  const openPosting = React.useCallback(
-    (job: JobRequest) => {
-      navigate(boardPostingPath(job), {
-        state: { returnTo: `${window.location.pathname}${window.location.search}` },
-      });
-    },
-    [navigate],
-  );
-
   const openUnit = React.useCallback(
     (job: JobRequest, tab?: UnitRequestTabName) => {
       navigateToUnitRequest(job, navigate, {
@@ -334,10 +342,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   }, [laneParam, legacyStage]);
 
   const lane = useMemo<ReleaseLaneKey | null>(
-    () =>
-      laneParam === 'toRelease' || laneParam === 'released' || laneParam === 'movedOn'
-        ? laneParam
-        : null,
+    () => (laneParam === 'released' || laneParam === 'unreleased' ? laneParam : null),
     [laneParam],
   );
   const step = useMemo<ReleaseStepKey | null>(
@@ -584,7 +589,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * (เจอตอนต่อหัวหน้าจอใหม่แล้วเลขสองที่ไม่ตรงกัน — นี่คือประโยชน์ของ "เลขต้องกระทบยอด")
    */
   const releasableJobs = useMemo(
-    () => filterByReleaseLane(boxedJobs, releaseFacts, 'toRelease'),
+    () => releasableJobsOf(boxedJobs, releaseFacts),
     [boxedJobs, releaseFacts],
   );
   const unreleasedCount = releasableJobs.length;
@@ -625,7 +630,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     if (doneLane) return JOB_BOX_LABEL[doneLane];
     if (step) {
       const st = RELEASE_STEP_TEXT[step];
-      return `${RELEASE_LANE_TEXT.toRelease.label} · ขั้น ${st.step} ${st.label}`;
+      return `${RELEASE_LANE_TEXT.unreleased.label} · ขั้น ${st.step} ${st.label}`;
     }
     return lane ? RELEASE_LANE_TEXT[lane].label : null;
   }, [doneLane, lane, step]);
@@ -670,6 +675,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
   /** เจ้าหน้าที่: รายชื่อผู้สมัครของใบนั้น **ไปหน้าแท็บผู้สมัคร** แล้ว ไม่ใช่ป๊อป (27 ส.ค. 2569) */
   const [laneJob, setLaneJob] = useState<JobRequest | null>(null);
+  /**
+   * 🔴 **ใบที่กำลังไล่งานอยู่ใน popup** (เจ้าของสั่ง 28 ส.ค. 2569:
+   * *"ไม่ได้ให้เด้งไปหน้าถัดไปนะ ให้เด้ง Popup ทำเสร็จก็จะได้อยู่หน้าเดิม"*)
+   * ⚠️ นี่คือ**คำสั่งล่าสุด** ทับของ 27 ส.ค. ที่สั่งว่ากดแล้วให้เปลี่ยนหน้า —
+   * เหตุผลที่ต่างกัน: อันนั้นคือ "ป๊อปเอาไว้ดูข้อมูล" ส่วนอันนี้คือ **ป๊อปเอาไว้ทำงาน**
+   * ทำเสร็จต้องได้อยู่ที่กล่องงานต่อ ไม่ต้องเดินกลับ
+   */
+  const [postingJob, setPostingJob] = useState<JobRequest | null>(null);
   // เจ้าหน้าที่: สร้างลิงก์รับสมัครของงาน (Gen Link)
   /** ใบขอที่กำลังกด "หาคนเพิ่ม + ส่ง AI โทร" ของเลนสรรหา (R2b) */
   /** สร้างลิงก์ของกล่องลอย — กดจากการ์ดกล่องลอยตรง ๆ ไม่ต้องผ่านตัวเลือกประเภทอีกชั้น */
@@ -1045,9 +1058,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               /* 🔴 กดขั้น = เข้าเลน "เหลือปล่อย" ด้วยเสมอ — ขั้นมีอยู่ในเลนนั้นเท่านั้น
                  (ขั้นโชว์ตั้งแต่เปิดหน้าโดยยังไม่ได้เลือกเลน ถ้าไม่ตั้งเลนให้ กดแล้วจะไม่กรองอะไร) */
               onStepChange={(next) =>
-                setSelection(next ? { lane: 'toRelease', step: next } : { lane: null, step: null })
+                setSelection(next ? { lane: 'unreleased', step: next } : { lane: null, step: null })
               }
-              movedOnStages={movedOnStages}
               doneCounts={{
                 closed: closedBoxCounts.closed.length,
                 cancelled: closedBoxCounts.cancelled.length,
@@ -1062,7 +1074,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     type="button"
                     disabled={bulkReleaseBusy}
                     onClick={() => void bulkReleaseVisible()}
-                    title={`ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (${Math.min(unreleasedCount, 300)} ใบ) ขึ้นหน้าสมัครงานสาธารณะ`}
+                    /* 🔴 เลขบนปุ่ม **น้อยกว่า** "ยังไม่ปล่อย" บนหัว เพราะตัดใบที่ ERP
+                       พาไปเริ่มงานแล้วออก — ประกาศหาคนของตำแหน่งที่มีคนทำอยู่ไม่มีประโยชน์
+                       ⚠️ ต้องเขียนบอกไว้ ไม่งั้นคนเห็นเลขสองที่ไม่ตรงแล้วไม่เชื่อทั้งคู่ */
+                    title={`ส่งประกาศใบที่ยังต้องหาคนและยังไม่ปล่อย ${Math.min(unreleasedCount, 300)} ใบ ขึ้นหน้าสมัครงานสาธารณะ — เลขนี้น้อยกว่า "ยังไม่ปล่อย" เพราะตัดใบที่มีคนเริ่มงานแล้วออก`}
                     className={cn(
                       'rounded-lg px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50',
                       TONE.success.outline,
@@ -1070,7 +1085,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   >
                     {bulkReleaseBusy
                       ? 'กำลังปล่อย…'
-                      : `ปล่อยทีเดียว ${Math.min(unreleasedCount, 300)} ใบ`}
+                      : `ส่งประกาศทีเดียว ${Math.min(unreleasedCount, 300)} ใบที่ยังต้องหาคน`}
                   </button>
                 ) : null
               }
@@ -1206,7 +1221,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             rows={silentLinkRows}
             /* ทั้งกดแถวและกดปุ่ม = ไปหน้าประกาศของใบนั้น — อยู่ในกล่องงานเหมือนกัน
                (เจ้าของสั่ง: กดของในกล่องงานห้ามเด้งไปหน้าใบขอ) */
-            onOpen={(job) => openPosting(job)}
+            onOpen={(job) => setPostingJob(job)}
           />
         ) : null}
 
@@ -1231,13 +1246,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                * 🔴 หน้าสมัครสาธารณะ (`/apply`): **ห้ามพาไปหน้าไหนที่ต้องล็อกอิน**
                * ⇒ เปิดฟอร์มสมัครเลย (ตัวเดียวกับปุ่ม "สมัครงาน" บนการ์ด)
                */
-              onClick={() => (isStaff ? openPosting(job) : openApply(job))}
+              onClick={() => (isStaff ? setPostingJob(job) : openApply(job))}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  if (isStaff) openPosting(job);
+                  if (isStaff) setPostingJob(job);
                   else openApply(job);
                 }
               }}
@@ -1684,6 +1699,48 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           (ปล่อยหน้าสาธารณะ · แก้ข้อความประกาศ · แก้ข้อมูลที่จะขึ้นประกาศ · Gen link ·
           ประวัติการแก้ไข) ย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอครบแล้ว
           ⇒ `/jobs/siamraj/:id/posting` (`UnitRequestPostingTabPage`) */}
+
+      {/* ── 🔴 popup ไล่งาน 4 ขั้น — ทำเสร็จปิดแล้วอยู่ที่กล่องงานต่อ ──
+          เนื้อในเป็น component เดียวกับหน้า deep-link `/jobs/board/:id/posting`
+          (ห้ามก๊อปเนื้อมาทำใหม่) · ปิดแล้วโหลดทะเบียนใหม่ ตัวเลขบนหัวจะขยับตามทันที */}
+      <Dialog
+        open={!!postingJob}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPostingJob(null);
+            void loadReleases();
+            setPostingsRev((n) => n + 1);
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[min(92dvh,860px)] w-[min(calc(100vw-1.25rem),40rem)] max-w-none flex-col gap-0 overflow-hidden border-border/80 p-0">
+          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-3 pt-5 text-left">
+            <DialogTitle className="text-base font-semibold leading-snug sm:text-lg break-words">
+              {postingJob ? jobBoardCardTitle(postingJob) : ''}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ไล่งานประกาศของใบนี้ทีละขั้น — ปิดกล่องแล้วกลับมาที่กล่องงานเหมือนเดิม
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
+            {postingJob ? (
+              <React.Suspense
+                fallback={<p className="py-6 text-center text-xs text-muted-foreground">กำลังโหลด…</p>}
+              >
+                <BoardPostingSteps
+                  id={postingUnitId(postingJob)}
+                  chrome={false}
+                  onDone={() => {
+                    setPostingJob(null);
+                    void loadReleases();
+                    setPostingsRev((n) => n + 1);
+                  }}
+                />
+              </React.Suspense>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <PublicApplyDialog
         open={applyOpen}

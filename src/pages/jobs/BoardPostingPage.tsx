@@ -31,10 +31,10 @@
  * 🔴 **ฟอร์มทุกตัวฝังในหน้า ไม่ห่อ Dialog** (เจ้าของสั่ง: *"ไม่เอาแบบ Popup เด้งนะ"*)
  */
 import React from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  Check,
   ChevronRight,
+  ChevronDown,
   ClipboardCheck,
   History,
   Link2,
@@ -71,6 +71,7 @@ import {
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
 import { EM_DASH } from '@/lib/displayFallback';
+import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -107,27 +108,55 @@ function Block({
   );
 }
 
-const BoardPostingPage: React.FC = () => {
-  const { id = '' } = useParams();
+export type BoardPostingStepsProps = {
+  /** เลขที่ใบ / id ของใบขอ */
+  id: string;
+  /** ปลายทางของปุ่มย้อนกลับ/ยกเลิก — popup ส่ง `onDone` มาแทน */
+  backPath?: string;
+  /** popup: ปิดกล่องแล้วอยู่หน้าเดิม (เจ้าของสั่ง 28 ส.ค. 2569) */
+  onDone?: () => void;
+  /** โหมด popup ไม่ต้องมีหัวหน้าจอของตัวเอง */
+  chrome?: boolean;
+};
+
+/**
+ * เนื้อ 4 ขั้น — ใช้ทั้งใน **popup บนกล่องงาน** และหน้า deep-link
+ * (`/jobs/board/:id/posting` เก็บไว้ให้ลิงก์ที่บันทึกไว้ยังเปิดได้)
+ */
+export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
+  id,
+  backPath: backPathProp,
+  onDone,
+  chrome = true,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
-  /** ปุ่มย้อนกลับ = กลับหน้าที่พามา (บอร์ดพร้อมขั้นที่กรองอยู่) ไม่ใช่ path ตายตัว */
-  const backPath = resolveUnitDetailBackPath({
-    stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
-    search: location.search,
-  });
+  /** ปุ่มย้อนกลับของโหมดหน้า = กลับหน้าที่พามา · โหมด popup ใช้ `onDone` */
+  const backPath =
+    backPathProp ??
+    resolveUnitDetailBackPath({
+      stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+      search: location.search,
+    });
   /**
    * ปุ่ม "ยกเลิก" ในฟอร์มที่ฝังไว้ — ฟอร์มพวกนี้เกิดมาเพื่ออยู่ในป๊อป `onClose` จึงหมายถึง
    * "ปิดกล่อง" · 🔴 ฝังในหน้าแล้วต้องมีปลายทางจริง ไม่งั้นเป็น**ปุ่มตาย**
    * ⇒ ยกเลิก = กลับไปแท็บรายละเอียดของใบเดิม
    */
-  const leaveToDetail = React.useCallback(
-    () => navigate(unitTabPath(id, 'detail')),
-    [navigate, id],
-  );
-  /** ⚠️ ชื่อคนแก้เป็นข้อมูลภายใน — ประวัติการแก้ไขโชว์เฉพาะเจ้าหน้าที่ */
+  const leaveToDetail = React.useCallback(() => {
+    if (onDone) {
+      onDone();
+      return;
+    }
+    navigate(unitTabPath(id, 'detail'));
+  }, [onDone, navigate, id]);
+  /**
+   * 🔴 **ประวัติการแก้ไขโชว์เฉพาะ Admin** (เจ้าของสั่ง 28 ส.ค. 2569:
+   * *"ใครแก้อะไรไป ซ่อนไว้เห็นแค่ Admin"*)
+   * เดิมกั้นที่ `staff` ⇒ สรรหา/คัดสรรเห็นชื่อกันหมด ซึ่งไม่ใช่เรื่องของพวกเขา
+   */
   const { hasPermission } = useAuth();
-  const isStaff = hasPermission('staff');
+  const canSeeEditLog = hasPermission('admin');
 
   const [job, setJob] = React.useState<JobRequest | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -223,13 +252,16 @@ const BoardPostingPage: React.FC = () => {
     });
   }, [job, postings, releases, released, latestPosting]);
 
-  /** ขั้นที่กำลังเปิดดู — ตั้งต้นเป็นขั้นที่ใบนี้ค้างอยู่ · กดแถบเปลี่ยนได้ */
-  const [openStep, setOpenStep] = React.useState<ReleaseStepKey | null>(null);
-  React.useEffect(() => {
-    if (openStep === null && currentStep) setOpenStep(currentStep);
-    if (openStep === null && released) setOpenStep('publish');
-  }, [openStep, currentStep, released]);
-  const step: ReleaseStepKey = openStep ?? 'check';
+  /**
+   * ขั้นที่กำลังเปิดดู — 🔴 **เริ่มที่ขั้น 1 เสมอ** (เจ้าของสั่ง 28 ส.ค. 2569:
+   * *"พอกดเข้าไปทำไมไปโผล่ กดปล่อย เลยอะ ไม่ไล่ไปจาก 1.ตรวจใบขอ ไล่ไปอะ"*)
+   * ⚠️ ผมเคยทำให้เด้งไปขั้นที่ใบนั้นค้างอยู่ ซึ่งข้ามขั้นตรวจใบขอไปเลย — ผิด
+   * `currentStep` ยังใช้อยู่ แต่ใช้แค่ติดป้าย "ค้างที่นี่" ไม่ได้ใช้เลือกขั้นเริ่ม
+   */
+  const [openStep, setOpenStep] = React.useState<ReleaseStepKey>('info');
+  /** กล่อง "ข้อมูลใบขอ" กาง/หุบ — 🔴 หุบเป็นค่าตั้งต้น (เหมือนหน้าใบขอ) */
+  const [infoOpen, setInfoOpen] = React.useState(false);
+  const step: ReleaseStepKey = openStep;
 
   /**
    * ขั้นนี้ทำไปแล้วหรือยัง — ใช้กับติ๊กถูกบนแถบ
@@ -252,14 +284,16 @@ const BoardPostingPage: React.FC = () => {
 
   return (
     <div className="relative">
-      <PageHeader
-        title="ไล่งานของใบนี้"
-        subtitle={job ? jobBoardCardTitle(job) : id}
-        backPath={backPath}
-        backLabel={backLabelFor(backPath)}
-      />
+      {chrome ? (
+        <PageHeader
+          title="ไล่งานของใบนี้"
+          subtitle={job ? jobBoardCardTitle(job) : id}
+          backPath={backPath}
+          backLabel={backLabelFor(backPath)}
+        />
+      ) : null}
 
-      <div className="space-y-4 px-4 py-4 md:px-6">
+      <div className={cn('space-y-4', chrome ? 'px-4 py-4 md:px-6' : 'py-1')}>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {/* ── 🔴 แถบขั้น 1-4 — หัวใจของหน้านี้ ──
@@ -302,7 +336,11 @@ const BoardPostingPage: React.FC = () => {
                     )}
                     aria-hidden
                   >
-                    {passed ? <Check className="h-3 w-3" /> : t.step}
+                    {/* 🔴 **ห้ามใส่เครื่องหมายถูก** (เจ้าของสั่ง 28 ส.ค. 2569: *"เครื่องหมายถูก เอาออก"*)
+                        บทเรียนเดิมของบ้านนี้: ติ๊กถูกบนแถบขั้น = อ้างว่า "ทำเสร็จแล้ว"
+                        ทั้งที่ระบบไม่มีเหตุการณ์ยืนยันว่าใครทำขั้นนั้นจริง (เคยถอดออกจาก
+                        หน้าแรกไปแล้วรอบหนึ่ง 26 ส.ค. 2569) ⇒ โชว์เลขขั้นเสมอ */}
+                    {t.step}
                   </span>
                   <span className="whitespace-nowrap">{t.label}</span>
                   {here ? (
@@ -336,27 +374,47 @@ const BoardPostingPage: React.FC = () => {
         </div>
 
         {/* ── ① ตรวจใบขอ ── */}
-        {step === 'check' ? (
+        {step === 'info' ? (
           <>
-            <Block icon={ClipboardCheck} title="ข้อมูลใบขอ" hint="อ่านให้ครบก่อนไปต่อ">
-              <div className="px-4 py-3">
+            {/* ── ① ข้อมูลใบขอ — 🔴 **หุบไว้ กดลูกศรกางในกล่องเลย** ──
+                เจ้าของสั่ง 28 ส.ค. 2569: *"เปิดใบขอเต็ม ๆ ก็ไม่ต้องเด้งไปหน้าใบงานสิ
+                กดแล้วก็ขยายให้ดูเลยสิ"* ⇒ ถอดลิงก์ "เปิดใบขอเต็ม ๆ →" ที่พาออกไปหน้าอื่น
+                แล้วกางชุดช่องเดียวกับหน้าใบขอ (`UnitRequestInfoFields`) ในที่เดิม
+                ⚠️ สรุปสั้น 4 ช่องยังอยู่ข้างบน — คนไม่ต้องกางก็เห็นของสำคัญแล้ว */}
+            <Block
+              icon={ClipboardCheck}
+              title="ข้อมูลใบขอ"
+              hint="ดูสรุปได้ทันที · กดกางเพื่อดูครบทุกช่องแบบเดียวกับหน้าใบขอ"
+            >
+              <div className="space-y-3 px-4 py-3">
                 {job ? (
                   <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
                     <Fact label="เลขที่ใบขอ" value={job.request_no} />
                     <Fact label="ตำแหน่ง" value={job.job_description_code_1} />
                     <Fact label="สถานที่" value={job.location_address} />
-                    <Fact label="ต้องการวันที่" value={job.required_date ? formatYmdDmyBe(job.required_date) : null} />
+                    <Fact
+                      label="ต้องการวันที่"
+                      value={job.required_date ? formatYmdDmyBe(job.required_date) : null}
+                    />
                   </dl>
                 ) : (
                   <p className={cn('text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
                 )}
-                <Link
-                  to={unitTabPath(id, 'detail')}
-                  state={{ returnTo: backPath }}
-                  className="mt-3 inline-block text-[11px] font-semibold text-blue-700 hover:underline dark:text-blue-300"
+
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen((v) => !v)}
+                  aria-expanded={infoOpen}
+                  className="flex min-h-9 w-full items-center gap-1.5 text-left text-[11px] font-semibold text-blue-700 dark:text-blue-300"
                 >
-                  เปิดใบขอเต็ม ๆ →
-                </Link>
+                  {infoOpen ? 'ย่อข้อมูลใบขอ' : 'กางดูข้อมูลใบขอทั้งใบ'}
+                  <ChevronDown
+                    className={cn('h-3.5 w-3.5 transition-transform', infoOpen && 'rotate-180')}
+                    aria-hidden
+                  />
+                </button>
+
+                {infoOpen && job ? <UnitRequestInfoFields job={job} /> : null}
               </div>
             </Block>
 
@@ -374,7 +432,7 @@ const BoardPostingPage: React.FC = () => {
               </div>
             </Block>
 
-            {isStaff ? (
+            {canSeeEditLog ? (
               <Block
                 icon={History}
                 title="ใครแก้อะไรไป"
@@ -388,12 +446,12 @@ const BoardPostingPage: React.FC = () => {
           </>
         ) : null}
 
-        {/* ── ② แก้ข้อมูลประกาศ ── */}
-        {step === 'fields' ? (
+        {/* ── ② สถานที่ปฏิบัติงาน (เจ้าของเคาะขั้นนี้เอง) ── */}
+        {step === 'place' ? (
           <Block
             icon={Pencil}
-            title="ข้อมูลที่จะขึ้นประกาศ"
-            hint="จังหวัด / อำเภอ / ตำบล · รายได้รวม · สวัสดิการ — แก้ได้ทุกใบ ไม่ต้องมีประกาศก่อน"
+            title="สถานที่ปฏิบัติงาน"
+            hint="จังหวัด / อำเภอ / ตำบล ที่ผู้สมัครจะเห็นบนประกาศ"
           >
             {jobWithPatch ? (
               <React.Suspense
@@ -402,6 +460,7 @@ const BoardPostingPage: React.FC = () => {
                 <div className="px-4 py-3">
                   <EditPublicJobFieldsDialog
                     embedded
+                    sections={['place']}
                     job={jobWithPatch}
                     onClose={leaveToDetail}
                     onSaved={(patch) => setPublicPatch((prev) => ({ ...prev, ...patch }))}
@@ -414,12 +473,41 @@ const BoardPostingPage: React.FC = () => {
           </Block>
         ) : null}
 
-        {/* ── ③ สร้างลิงก์สมัคร (+ แก้ข้อความประกาศถ้ามีแล้ว) ── */}
-        {step === 'link' ? (
+        {/* ── ③ Checklist สวัสดิการ (เจ้าของเคาะขั้นนี้เอง) ──
+            *"ให้เลือกว่าจากข้อมูลใบขอจะเอาอะไรมาเป็นสวัสดิการบ้าง เช่น ถ้าติ๊กเลือก
+             เบี้ยขยัน ในช่องสวัสดิการก็จะบอกว่าเบี้ยขยันเท่าไหร่"* */}
+        {step === 'benefits' ? (
+          <Block
+            icon={ClipboardCheck}
+            title="รายได้ + สวัสดิการที่จะขึ้นประกาศ"
+            hint="เลือกจากข้อมูลใบขอว่าจะเอาอะไรขึ้นให้ผู้สมัครเห็น"
+          >
+            {jobWithPatch ? (
+              <React.Suspense
+                fallback={<p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดฟอร์ม…</p>}
+              >
+                <div className="px-4 py-3">
+                  <EditPublicJobFieldsDialog
+                    embedded
+                    sections={['income', 'benefits']}
+                    job={jobWithPatch}
+                    onClose={leaveToDetail}
+                    onSaved={(patch) => setPublicPatch((prev) => ({ ...prev, ...patch }))}
+                  />
+                </div>
+              </React.Suspense>
+            ) : (
+              <p className={cn('px-4 py-3 text-xs', DASH.muted)}>กำลังโหลดใบขอ…</p>
+            )}
+          </Block>
+        ) : null}
+
+        {/* ── ④ สร้างลิงก์ + ส่งประกาศ — 🔴 ปุ่มส่งอยู่ขั้นสุดท้ายเท่านั้น ── */}
+        {step === 'publish' ? (
           <>
             <Block
               icon={Link2}
-              title="ลิงก์สมัคร"
+              title="สร้างลิงก์สมัคร"
               hint="สร้างลิงก์ต่อช่องทาง แล้วเอาไปโพสต์ — ยอดคลิกนับแยกต่อช่องทาง"
             >
               {job ? (
@@ -449,55 +537,52 @@ const BoardPostingPage: React.FC = () => {
                 />
               </Block>
             ) : null}
-          </>
-        ) : null}
 
-        {/* ── ④ ปล่อย — 🔴 ปลายทางของเส้น ต้องอยู่ขั้นสุดท้ายเท่านั้น ── */}
-        {step === 'publish' ? (
-          <Block
-            icon={Send}
-            title="ปล่อยขึ้นหน้าสมัครสาธารณะ"
-            hint="ปล่อยแล้วคนนอกเห็นและสมัครได้ · AI (Lumos) ก็เห็นใบนี้ด้วย"
-          >
-            <div className="px-4 py-3">
-              {released === null ? (
-                <p className={cn('text-xs', DASH.muted)}>กำลังอ่านทะเบียนการปล่อย…</p>
-              ) : (
-                <div
-                  className={cn(
-                    'rounded-xl border px-3 py-2.5',
-                    released ? TONE.success.soft : TONE.warn.soft,
-                  )}
-                >
-                  <p className="text-xs font-semibold text-foreground">
-                    {released ? 'ใบนี้อยู่บนหน้าสาธารณะแล้ว' : 'ใบนี้ยังไม่ขึ้นหน้าสาธารณะ'}
-                  </p>
-                  <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
-                    {released
-                      ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
-                      : latestPosting
-                        ? 'มีลิงก์สมัครแล้ว — กดปล่อยได้เลย'
-                        : 'ยังไม่มีลิงก์สมัคร — กลับไปขั้น 3 สร้างลิงก์ก่อนจะดีกว่า'}
-                  </p>
-                  <Button
-                    type="button"
-                    disabled={releaseBusy || !job}
-                    onClick={() => void toggleRelease(!released)}
+            <Block
+              icon={Send}
+              title="ส่งประกาศขึ้นหน้าสมัครสาธารณะ"
+              hint="ส่งแล้วคนนอกเห็นและสมัครได้ · AI (Lumos) ก็เห็นใบนี้ด้วย"
+            >
+              <div className="px-4 py-3">
+                {released === null ? (
+                  <p className={cn('text-xs', DASH.muted)}>กำลังอ่านทะเบียนการปล่อย…</p>
+                ) : (
+                  <div
                     className={cn(
-                      'mt-2 w-full rounded-xl py-2.5 text-sm',
-                      released ? TONE.neutral.outline : TONE.success.solid,
+                      'rounded-xl border px-3 py-2.5',
+                      released ? TONE.success.soft : TONE.warn.soft,
                     )}
                   >
-                    {releaseBusy
-                      ? 'กำลังบันทึก…'
-                      : released
-                        ? 'ดึงลงจากหน้าสาธารณะ'
-                        : 'ปล่อยขึ้นหน้าสาธารณะ'}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Block>
+                    <p className="text-xs font-semibold text-foreground">
+                      {released ? 'ใบนี้อยู่บนหน้าสาธารณะแล้ว' : 'ใบนี้ยังไม่ขึ้นหน้าสาธารณะ'}
+                    </p>
+                    <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
+                      {released
+                        ? 'คนนอกเห็นและสมัครได้ · AI (Lumos) เห็นใบนี้ด้วย'
+                        : latestPosting
+                          ? 'มีลิงก์สมัครแล้ว — กดส่งประกาศได้เลย'
+                          : 'ยังไม่มีลิงก์สมัคร — สร้างลิงก์ข้างบนก่อนจะดีกว่า'}
+                    </p>
+                    <Button
+                      type="button"
+                      disabled={releaseBusy || !job}
+                      onClick={() => void toggleRelease(!released)}
+                      className={cn(
+                        'mt-2 w-full rounded-xl py-2.5 text-sm',
+                        released ? TONE.neutral.outline : TONE.success.solid,
+                      )}
+                    >
+                      {releaseBusy
+                        ? 'กำลังบันทึก…'
+                        : released
+                          ? 'ดึงประกาศลงจากหน้าสาธารณะ'
+                          : 'ส่งประกาศขึ้นหน้าสาธารณะ'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Block>
+          </>
         ) : null}
 
         {/* ── ปุ่มไปขั้นต่อไป — ขั้น 4 ไม่มี เพราะปุ่มลงมือคือ "ปล่อย" ในขั้นนั้นเอง ── */}
@@ -527,5 +612,15 @@ function Fact({ label, value }: { label: string; value?: string | number | null 
     </div>
   );
 }
+
+/**
+ * หน้า deep-link `/jobs/board/:id/posting` — เก็บไว้ให้ลิงก์ที่ใครบันทึกไว้ยังเปิดได้
+ * 🔴 ทางเข้าหลักคือ **popup บนกล่องงาน** (เจ้าของสั่ง 28 ส.ค. 2569:
+ * *"ไม่ได้ให้เด้งไปหน้าถัดไปนะ ให้เด้ง Popup ทำเสร็จก็จะได้อยู่หน้าเดิม"*)
+ */
+const BoardPostingPage: React.FC = () => {
+  const { id = '' } = useParams();
+  return <BoardPostingSteps id={id} />;
+};
 
 export default BoardPostingPage;

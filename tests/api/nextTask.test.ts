@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+
+import { CONVEYOR_STEPS } from '@/lib/soRecruitNav';
 import { buildNextTasks, pickNextTask } from '@/lib/nextTask';
 
 describe('buildNextTasks — คิวงานหน้าแรก', () => {
@@ -23,10 +25,10 @@ describe('buildNextTasks — คิวงานหน้าแรก', () => {
     expect(t.reason).toBeTruthy();
     expect(t.badge).toBeTruthy();
     expect(t.path).toBe('/jobs/board?view=list');
-    expect(t.step).toBe(3);
+    expect(t.stepKey).toBe('matching');
   });
 
-  it('ทุกใบมีทางไปต่อและอยู่ในขั้น 1–6 ของสายพาน', () => {
+  it('ทุกใบมีทางไปต่อ และคีย์ลำดับงานมีอยู่จริง', () => {
     const tasks = buildNextTasks({
       followPastDue: 1,
       followNotDispatched: 1,
@@ -40,8 +42,11 @@ describe('buildNextTasks — คิวงานหน้าแรก', () => {
     for (const t of tasks) {
       expect(t.path.startsWith('/'), t.key).toBe(true);
       expect(t.action, t.key).toBeTruthy();
-      expect(t.step, t.key).toBeGreaterThanOrEqual(1);
-      expect(t.step, t.key).toBeLessThanOrEqual(6);
+      /** 🔴 ผูกกับลำดับงานด้วย **คีย์** ไม่ใช่เลขขั้น (เลิกใช้เลข 28 ส.ค. 2569) */
+      expect(
+        CONVEYOR_STEPS.some((s) => s.key === t.stepKey),
+        `${t.key} -> ${t.stepKey}`,
+      ).toBe(true);
     }
     expect(new Set(tasks.map((t) => t.key)).size).toBe(7);
   });

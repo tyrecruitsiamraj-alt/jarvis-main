@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildStageTiles, deckStatusLine } from '@/lib/homeDeck';
 
-describe('buildStageTiles — แถบ 6 ขั้นท้าย Command Deck', () => {
-  it('ครบ 6 ขั้นเรียงตามสายพาน ทุกใบมีป้ายหน่วยและทางไป', () => {
+describe('buildStageTiles — แถบลำดับงานท้าย Command Deck', () => {
+  it('ครบทุกหน้าเรียงตามลำดับงาน ทุกใบมีป้ายหน่วยและทางไป', () => {
     const tiles = buildStageTiles({});
-    expect(tiles.map((t) => t.step)).toEqual([1, 2, 3, 4, 5, 6]);
+    /** 🔴 เหลือ 4 หน้า และไม่มีเลขขั้นแล้ว — ผูกด้วยคีย์ (เจ้าของสั่ง 28 ส.ค. 2569) */
+    expect(tiles.map((t) => t.key)).toEqual(['requests', 'matching', 'follow', 'aftercare']);
     for (const t of tiles) {
       expect(t.countLabel, t.key).toBeTruthy();
       expect(t.path.startsWith('/'), t.key).toBe(true);
@@ -17,10 +18,11 @@ describe('buildStageTiles — แถบ 6 ขั้นท้าย Command Deck'
   });
 
   it('จุดแดงเฉพาะถังต้องลงมือที่รู้ค่าและมีของ — ถังบอกปริมาณเยอะแค่ไหนก็ไม่แดง', () => {
-    const tiles = buildStageTiles({ follow: 2, applicants: 0, requests: 293 });
+    const tiles = buildStageTiles({ follow: 2, requests: 293, matching: 59 });
     expect(tiles.find((t) => t.key === 'follow')?.urgent).toBe(true);
-    expect(tiles.find((t) => t.key === 'applicants')?.urgent).toBe(false);
+    /** ถังบอกปริมาณ (ใบขอค้าง 293 · สายในคิว 59) ไม่ใช่ "ต้องลงมือวันนี้" ⇒ ห้ามแดง */
     expect(tiles.find((t) => t.key === 'requests')?.urgent).toBe(false);
+    expect(tiles.find((t) => t.key === 'matching')?.urgent).toBe(false);
     expect(buildStageTiles({}).every((t) => !t.urgent)).toBe(true);
   });
 });

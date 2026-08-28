@@ -181,6 +181,12 @@ const CommandDeck: React.FC<{
 }> = ({ greeting, userName, tasks, statusInput, loading, className }) => {
   const now = useNowTick(true);
   const [head, ...rest] = tasks;
+  /**
+   * งานถัดไปอยู่ที่หน้าไหนของลำดับงาน — หาด้วย **คีย์** ไม่ใช่เลขขั้น
+   * (เจ้าของสั่งเลิกใช้เลขขั้น 28 ส.ค. 2569 · `-1` = ถังนี้ไม่ได้อยู่ในลำดับ)
+   */
+  const headAt = head ? CONVEYOR_STEPS.findIndex((s) => s.key === head.stepKey) : -1;
+  const headLabel = headAt >= 0 ? CONVEYOR_STEPS[headAt].label : '';
   const status = loading
     ? ({ text: 'กำลังเชื่อมข้อมูล…', tone: 'ok' } as const)
     : deckStatusLine(statusInput);
@@ -268,18 +274,15 @@ const CommandDeck: React.FC<{
               ตอนนี้ขั้นก่อนหน้าเป็นเลขจาง ๆ เฉย ๆ — ไม่มีอะไรอ้างว่าเสร็จแล้ว */}
           {head ? (
             <p className="mt-8 text-[10px] text-slate-500 dark:text-slate-500">
-              งานถัดไปข้างบนอยู่ขั้นที่ {head.step} ของสายพาน — แถบนี้บอกตำแหน่งเฉย ๆ
-              ไม่ได้แปลว่าขั้นก่อนหน้าทำเสร็จแล้ว
+              งานถัดไปข้างบนอยู่ที่ <span className="font-medium text-slate-700 dark:text-slate-300">{headLabel}</span>{' '}
+              — แถบนี้บอกตำแหน่งเฉย ๆ ไม่ได้แปลว่าอันก่อนหน้าทำเสร็จแล้ว
             </p>
           ) : null}
           {head ? (
-            <ol
-              className="mt-2 flex items-center"
-              aria-label={`งานถัดไปอยู่ขั้นที่ ${head.step} ของสายพาน`}
-            >
+            <ol className="mt-2 flex items-center" aria-label={`งานถัดไปอยู่ที่ ${headLabel}`}>
               {CONVEYOR_STEPS.map((s, i) => {
-                const before = s.step < head.step;
-                const nowStep = s.step === head.step;
+                const before = i < headAt;
+                const nowStep = i === headAt;
                 return (
                   <React.Fragment key={s.key}>
                     {i > 0 ? (
@@ -288,9 +291,10 @@ const CommandDeck: React.FC<{
                       <span className="h-px min-w-3 flex-1 bg-slate-900/10 dark:bg-white/10" aria-hidden />
                     ) : null}
                     <li className="flex flex-col items-center gap-1.5 px-1">
+                      {/* 🔴 ไอคอนแทนเลขขั้น (เจ้าของสั่ง 28 ส.ค. 2569) */}
                       <span
                         className={cn(
-                          'flex h-5 w-5 items-center justify-center rounded-full border font-mono text-[10px]',
+                          'flex h-5 w-5 items-center justify-center rounded-full border',
                           nowStep
                             ? 'border-sky-600 text-sky-700 shadow-[0_0_12px_theme(colors.sky.400/40%)] dark:border-sky-300 dark:text-sky-200'
                             : before
@@ -298,7 +302,7 @@ const CommandDeck: React.FC<{
                               : 'border-slate-900/15 text-slate-500 dark:border-white/15 dark:text-slate-500',
                         )}
                       >
-                        {s.step}
+                        <s.icon className="h-3 w-3" aria-hidden />
                       </span>
                       <span
                         className={cn(

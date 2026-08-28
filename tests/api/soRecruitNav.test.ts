@@ -10,10 +10,38 @@ import {
   stepForPath,
 } from '@/lib/soRecruitNav';
 
-describe('โครงสายพาน', () => {
-  it('มี 6 ขั้น เลข 1–6 เรียงไม่ซ้ำ — เลขนี้คือเลขที่หัวหน้าจอประกาศ', () => {
-    expect(CONVEYOR_STEPS.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(new Set(CONVEYOR_STEPS.map((s) => s.key)).size).toBe(6);
+describe('โครงลำดับงาน', () => {
+  /**
+   * 🔴 เจ้าของสั่ง 28 ส.ค. 2569: เลิกใช้เลขขั้น · ตัด "ประกาศรับ" กับ "ผู้สมัคร" ออก
+   * (ซ้ำกับแท็บในกล่องงาน) · "จับคู่ & โทร" → "จับคู่งาน" ย้ายมาอยู่ใต้ใบขอ
+   * ⇒ เหลือ 4 หน้า เรียงตามลำดับใน array **ไม่มี `step: number` แล้ว**
+   */
+  it('เหลือ 4 หน้า เรียงตามลำดับงาน คีย์ไม่ซ้ำ', () => {
+    expect(CONVEYOR_STEPS.map((s) => s.key)).toEqual([
+      'requests',
+      'matching',
+      'follow',
+      'aftercare',
+    ]);
+    expect(CONVEYOR_STEPS.map((s) => s.label)).toEqual([
+      'ใบขอ',
+      'จับคู่งาน',
+      'ติดตาม',
+      'ดูแลหลังเริ่มงาน',
+    ]);
+  });
+
+  it('ห้ามมีเลขขั้นกลับมา — ป้ายต้องเป็นไอคอน + ชื่อหน้า', () => {
+    for (const s of CONVEYOR_STEPS) {
+      expect((s as { step?: unknown }).step, `${s.label} ต้องไม่มี step`).toBeUndefined();
+      expect(s.icon, `${s.label}.icon`).toBeTruthy();
+    }
+  });
+
+  it('ประกาศรับ/ผู้สมัคร ไม่อยู่ในลำดับงานแล้ว (ไปอยู่แท็บในกล่องงาน)', () => {
+    const keys = CONVEYOR_STEPS.map((s) => s.key);
+    expect(keys).not.toContain('postings');
+    expect(keys).not.toContain('applicants');
   });
 
   it('ทุกขั้นมีคำอธิบายและ path จริง — ห้ามมีขั้นที่กดแล้วไม่ไปไหน', () => {
@@ -25,18 +53,24 @@ describe('โครงสายพาน', () => {
   });
 });
 
-describe('stepForPath — หน้าไหนอยู่ขั้นไหน', () => {
-  it('หน้าใบขอและหน้ารายละเอียดใบขอเป็นขั้น 1', () => {
-    expect(stepForPath('/jobs/list')?.step).toBe(1);
-    expect(stepForPath('/jobs/siamraj/OPL6908052')?.step).toBe(1);
-    expect(stepForPath('/jobs/siamraj/OPL6908052/applicants')?.step).toBe(1);
+describe('stepForPath — หน้าไหนอยู่ตรงไหนของลำดับ', () => {
+  it('หน้าใบขอและหน้ารายละเอียดใบขอ = ใบขอ', () => {
+    expect(stepForPath('/jobs/list')?.key).toBe('requests');
+    expect(stepForPath('/jobs/siamraj/OPL6908052')?.key).toBe('requests');
+    expect(stepForPath('/jobs/siamraj/OPL6908052/applicants')?.key).toBe('requests');
   });
 
-  it('บอร์ดรับสมัคร ?view=list = ขั้น 3 · จับคู่ = ขั้น 4 · ติดตาม = 5 · ดูแล = 6', () => {
-    expect(stepForPath('/jobs/board', '?view=list')?.step).toBe(3);
-    expect(stepForPath('/matching/match')?.step).toBe(4);
-    expect(stepForPath('/follow')?.step).toBe(5);
-    expect(stepForPath('/aftercare')?.step).toBe(6);
+  it('จับคู่ = จับคู่งาน · ติดตาม · ดูแลหลังเริ่มงาน', () => {
+    expect(stepForPath('/matching/match')?.key).toBe('matching');
+    expect(stepForPath('/follow')?.key).toBe('follow');
+    expect(stepForPath('/aftercare')?.key).toBe('aftercare');
+  });
+
+  /** 🔴 กล่องงานเป็นเจ้าของ `/jobs/board` เต็มตัวแล้ว — ไม่มีหน้าไหนมาแย่ง */
+  it('ทุกมุมมองของกล่องงานไม่อยู่ในลำดับงาน', () => {
+    for (const q of ['', '?view=list', '?view=postings', '?lane=toRelease']) {
+      expect(stepForPath('/jobs/board', q), `/jobs/board${q}`).toBeNull();
+    }
   });
 
   it('หน้านอกสายพานคืน null — หน้าแรก/คลังข้อมูล/ตั้งค่าไม่มีเลขขั้น', () => {
@@ -45,39 +79,33 @@ describe('stepForPath — หน้าไหนอยู่ขั้นไหน
     }
   });
 
-  it('เจาะจงชนะกว้าง — /matching/candidates ห้ามถูกขั้น 4 กินไป', () => {
+  it('เจาะจงชนะกว้าง — /matching/candidates ห้ามถูกจับคู่งานกินไป', () => {
     expect(stepForPath('/matching/candidates/12')).toBeNull();
-    expect(stepForPath('/matching/pre-check')?.step).toBe(4);
+    expect(stepForPath('/matching/pre-check')?.key).toBe('matching');
   });
 });
 
-describe('isStepActive — ขั้น 2 กับ 3 อยู่ path เดียวกัน ต่างที่ ?view=', () => {
-  const postings = CONVEYOR_STEPS[1];
-  const applicants = CONVEYOR_STEPS[2];
-
-  it('?view=postings สว่างเฉพาะขั้น 2', () => {
-    expect(isStepActive(postings, '/jobs/board', '?view=postings')).toBe(true);
-    expect(isStepActive(applicants, '/jobs/board', '?view=postings')).toBe(false);
-  });
-
-  it('?view=list สว่างเฉพาะขั้น 3', () => {
-    expect(isStepActive(applicants, '/jobs/board', '?view=list')).toBe(true);
-    expect(isStepActive(postings, '/jobs/board', '?view=list')).toBe(false);
-  });
+describe('isStepActive — กล่องงานไม่ใช่หน้าในลำดับงาน', () => {
+  const requests = CONVEYOR_STEPS[0];
+  const matching = CONVEYOR_STEPS[1];
 
   /**
-   * 🔴 เปลี่ยน 27 ส.ค. 2569: ไม่มี `?view=` = **กล่องงาน** ซึ่งอยู่กลุ่มคลังข้อมูล
-   * ไม่ใช่ขั้นไหนของสายพาน (เดิมยืมขั้น 3 เป็นทางเข้าเพราะยังไม่มีเมนูของตัวเอง)
+   * 🔴 เดิมขั้น 2/3 ยืม `/jobs/board` เป็น path ของตัวเอง ต่างกันแค่ `?view=`
+   * เจ้าของสั่งถอดสองหน้านั้นออกจากลำดับ 28 ส.ค. 2569 ⇒ ไม่มีใครมาสว่างที่กล่องงานแล้ว
    */
-  it('ไม่มี ?view= (กล่องงาน) ไม่ใช่ขั้นไหนของสายพาน', () => {
-    expect(isStepActive(applicants, '/jobs/board', '')).toBe(false);
-    expect(isStepActive(postings, '/jobs/board', '')).toBe(false);
-    expect(stepForPath('/jobs/board', '')).toBeNull();
+  it('ทุกมุมมองของกล่องงาน ไม่ทำให้หน้าไหนในลำดับสว่าง', () => {
+    for (const q of ['', '?view=list', '?view=postings']) {
+      for (const st of CONVEYOR_STEPS) {
+        expect(isStepActive(st, '/jobs/board', q), `${st.label} @ ${q}`).toBe(false);
+      }
+    }
   });
 
-  it('หน้ารายละเอียดใบขอสว่างที่ขั้น 1 ไม่ใช่ขั้น 3', () => {
-    expect(isStepActive(CONVEYOR_STEPS[0], '/jobs/siamraj/X', '')).toBe(true);
-    expect(isStepActive(applicants, '/jobs/siamraj/X', '')).toBe(false);
+  it('หน้าใบขอสว่างที่ "ใบขอ" · หน้าจับคู่สว่างที่ "จับคู่งาน"', () => {
+    expect(isStepActive(requests, '/jobs/list', '')).toBe(true);
+    expect(isStepActive(matching, '/jobs/list', '')).toBe(false);
+    expect(isStepActive(matching, '/matching/match', '')).toBe(true);
+    expect(isStepActive(requests, '/matching/match', '')).toBe(false);
   });
 });
 
@@ -162,8 +190,12 @@ describe('HOME_TEAM_NAV — ก้อนทีมกดนำทางบนห�
     expect(HOME_TEAM_NAV.find((t) => t.key === 'lumos')?.path).toBeNull();
   });
 
-  it('ทุกปลายทางของก้อนทีมต้องเป็นหน้าที่มีอยู่ในสายพาน (กันลิงก์ตาย)', () => {
-    const stepPaths = new Set(CONVEYOR_STEPS.map((s) => s.path));
+  /**
+   * ⚠️ ตั้งแต่ 28 ส.ค. 2569 ก้อนทีมชี้ไปกล่องงานได้ด้วย — "ประกาศรับ/ผู้สมัคร"
+   * ถูกถอดออกจากลำดับงานแล้ว งานสองอย่างนั้นอยู่ในแท็บของกล่องงาน
+   */
+  it('ทุกปลายทางของก้อนทีมต้องเป็นหน้าที่มีจริง (กันลิงก์ตาย)', () => {
+    const stepPaths = new Set([...CONVEYOR_STEPS.map((s) => s.path), '/jobs/board']);
     for (const t of HOME_TEAM_NAV) {
       if (t.path === null) continue;
       // ยอมให้ต่างได้ถ้าเป็นหน้าย่อยของขั้นนั้น — เช็คแค่ว่าขึ้นต้นด้วย path ของขั้นใดขั้นหนึ่ง

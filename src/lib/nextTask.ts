@@ -16,6 +16,8 @@
  */
 
 /** ระดับความด่วน — เรียงจากมากไปน้อย และเป็นตัวกำหนดสีป้ายบนจอ */
+import type { ConveyorBadgeKey } from '@/lib/soRecruitNav';
+
 export type NextTaskTone = 'danger' | 'warn' | 'info';
 
 export type NextTask = {
@@ -33,8 +35,12 @@ export type NextTask = {
   path: string;
   /** ข้อความบนปุ่ม */
   action: string;
-  /** ขั้นของสายพานที่ถังนี้อยู่ — ผูกกับ CONVEYOR_STEPS ด้วยเลขเดียวกัน */
-  step: number;
+  /**
+   * หน้าในลำดับงานที่ถังนี้อยู่ — ผูกกับ `CONVEYOR_STEPS` ด้วย **คีย์** ไม่ใช่เลข
+   * 🔴 เดิมเป็น `step: number` · เจ้าของสั่งเลิกใช้เลขขั้น 28 ส.ค. 2569
+   * ⚠️ ถังที่อยู่ในหน้าที่ถูกถอดออกจากลำดับ (ประกาศรับ/ผู้สมัคร) ใช้คีย์ของหน้าที่รับงานต่อ
+   */
+  stepKey: ConveyorBadgeKey;
 };
 
 /** สิ่งที่หน้าแรกรู้อยู่แล้ว — ทุกช่องเป็น `null` ได้ = ยังไม่รู้ (ต่างจาก 0) */
@@ -71,7 +77,7 @@ const ORDER: Array<{
   tone: NextTaskTone;
   path: string;
   action: string;
-  step: number;
+  stepKey: ConveyorBadgeKey;
 }> = [
   {
     key: 'follow-past-due',
@@ -82,7 +88,7 @@ const ORDER: Array<{
     tone: 'danger',
     path: '/follow',
     action: 'เปิดหน้าติดตาม',
-    step: 5,
+    stepKey: 'follow',
   },
   {
     key: 'follow-not-dispatched',
@@ -93,7 +99,7 @@ const ORDER: Array<{
     tone: 'danger',
     path: '/follow',
     action: 'ดูว่าติดอะไร',
-    step: 5,
+    stepKey: 'follow',
   },
   {
     key: 'needs-human',
@@ -104,7 +110,7 @@ const ORDER: Array<{
     tone: 'danger',
     path: '/matching/match',
     action: 'เปิดหน้าจับคู่',
-    step: 4,
+    stepKey: 'matching',
   },
   {
     key: 'claimed-idle',
@@ -115,7 +121,7 @@ const ORDER: Array<{
     tone: 'warn',
     path: '/jobs/board?view=list',
     action: 'เปิดรายชื่อผู้สมัคร',
-    step: 3,
+    stepKey: 'matching',
   },
   {
     key: 'applicants-untouched',
@@ -126,7 +132,7 @@ const ORDER: Array<{
     tone: 'warn',
     path: '/jobs/board?view=list',
     action: 'เปิดรายชื่อผู้สมัคร',
-    step: 3,
+    stepKey: 'matching',
   },
   {
     key: 'calls-stale',
@@ -137,7 +143,7 @@ const ORDER: Array<{
     tone: 'warn',
     path: '/matching/match',
     action: 'เปิดหน้าจับคู่',
-    step: 4,
+    stepKey: 'matching',
   },
   {
     key: 'sla-breached',
@@ -148,7 +154,7 @@ const ORDER: Array<{
     tone: 'info',
     path: '/jobs/list',
     action: 'เปิดรายการใบขอ',
-    step: 1,
+    stepKey: 'requests',
   },
 ];
 
@@ -170,7 +176,7 @@ export function buildNextTasks(input: NextTaskInput): NextTask[] {
       tone: spec.tone,
       path: spec.path,
       action: spec.action,
-      step: spec.step,
+      stepKey: spec.stepKey,
     });
   }
   return out;

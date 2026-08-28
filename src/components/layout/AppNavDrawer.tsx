@@ -168,16 +168,16 @@ const AppNavDrawer: React.FC<Props> = ({
                 onClick={() => go(step.path)}
                 className={rowClass(active)}
               >
-                <span
+                {/* 🔴 **ไอคอนแทนเลขขั้น** (เจ้าของสั่ง 28 ส.ค. 2569:
+                    *"ไม่เอาตัวเลข ขอเป็นสัญลักษณ์ที่บ่งบอกถึงข้อนั้น ๆ"*)
+                    ไอคอนมาจาก `CONVEYOR_STEPS[].icon` — แหล่งเดียวกับหัวหน้าจอ */}
+                <step.icon
                   className={cn(
-                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-[11px] font-semibold',
-                    active
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-200/80 text-slate-500 dark:bg-slate-700 dark:text-slate-300',
+                    'h-4 w-4 shrink-0',
+                    active ? 'text-blue-600 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500',
                   )}
-                >
-                  {step.step}
-                </span>
+                  aria-hidden
+                />
                 <span className="truncate">{step.label}</span>
               </button>
             );

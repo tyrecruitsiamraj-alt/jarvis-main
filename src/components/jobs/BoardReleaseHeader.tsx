@@ -25,7 +25,6 @@ import {
   type ReleaseLedger,
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
-import type { BoardStage } from '@/lib/boardFlow';
 import { cn } from '@/lib/utils';
 
 export type BoardReleaseHeaderProps = {
@@ -42,8 +41,6 @@ export type BoardReleaseHeaderProps = {
   /** ขั้นที่เลือก (ใช้ได้เฉพาะเลน "เหลือปล่อย") */
   step: ReleaseStepKey | null;
   onStepChange: (step: ReleaseStepKey | null) => void;
-  /** ขั้นปลายเส้นของใบที่ระบบงานหลักพาไปต่อ — โชว์เมื่อเลือกเลน "ไม่ต้องปล่อย" */
-  movedOnStages: BoardStage[];
   /** ใบที่จบไปแล้ว (คนละ feed) */
   doneCounts: { closed: number; cancelled: number };
   doneLane: 'closed' | 'cancelled' | null;
@@ -193,7 +190,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   onLaneChange,
   step,
   onStepChange,
-  movedOnStages,
   doneCounts,
   doneLane,
   onDoneLaneChange,
@@ -222,31 +218,24 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {/* ── แถวบน: สามเลน + แถบความคืบหน้า ───────────────────────────── */}
+      {/* ── แถวบน: 3 ก้อน (เจ้าของเคาะชื่อเอง 28 ส.ค. 2569) ─────────────────
+          ทั้งหมด · ปล่อยแล้ว · ยังไม่ปล่อย — สองก้อนหลังบวกกันได้ก้อนแรกเป๊ะ
+          🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** (เดิมกล่องงานใช้นิยามของตัวเองแล้วเลขสองหน้าไม่ตรง) */}
       <div className="space-y-2 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          {/* ⚠️ "ใบขอ" มีคำอธิบายติดตัว — โมเดลอ่อนสุดที่มาลองเล่นบอกว่าไม่รู้ว่าคืออะไร */}
+          {/* ⚠️ "ใบขอ" มีคำอธิบายติดตัว — โมเดลที่มาลองเล่นบอกว่าไม่รู้ว่าคืออะไร */}
           <p className="text-[13px] font-semibold text-foreground">
-            <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.openTotal)} ใบ
+            <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.all)} ใบ
           </p>
-          {ledger.percent === null ? (
-            <p className={cn('text-[11px]', DASH.muted)}>ไม่มีใบที่ต้องปล่อยประกาศตอนนี้</p>
-          ) : (
-            /* 🔴 **บอกที่มาของตัวหารบนจอ** — ของเดิมเขียนแค่ "50% ของ 206 ใบ" แล้วคนอ่าน
-               ต้องเดาเองว่า 206 มาจากไหน (โมเดลที่มาลองเล่นถามตรง ๆ ว่า "104+102=206 รึ?") */
+          {ledger.percent === null ? null : (
             <p className={cn('text-[11px]', DASH.muted)}>
               <Term k="released">ปล่อยประกาศ</Term>ไปแล้ว{' '}
               <span className="font-semibold text-foreground">{ledger.percent}%</span> —{' '}
-              {th(ledger.released)} จาก {th(ledger.needsRelease)} ใบที่ต้องปล่อย{' '}
-              <span className="whitespace-nowrap">
-                (= เหลือปล่อย {th(ledger.toRelease)} + ปล่อยแล้ว {th(ledger.released)})
-              </span>
+              {th(ledger.released)} จาก {th(ledger.all)} ใบ
             </p>
           )}
         </div>
 
-        {/* แถบความคืบหน้า — 🔴 ตัวหารคือ "ใบที่ยังต้องหาคน" ไม่ใช่ใบเปิดทั้งหมด
-            (ใบที่ ERP พาไปต่อแล้วไม่ต้องปล่อย เอามาเป็นตัวหารจะทำให้เลขดูแย่กว่าจริง) */}
         {ledger.percent === null ? null : (
           <div
             className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800"
@@ -262,11 +251,11 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
 
         <div className="flex flex-wrap items-stretch gap-2">
           <LaneTile
-            laneKey="toRelease"
-            count={ledger.toRelease}
-            tone="warn"
-            active={lane === 'toRelease'}
-            onClick={() => onLaneChange(lane === 'toRelease' ? null : 'toRelease')}
+            laneKey="all"
+            count={ledger.all}
+            tone="neutral"
+            active={lane === 'all' || lane === null}
+            onClick={() => onLaneChange(null)}
           />
           <LaneTile
             laneKey="released"
@@ -276,28 +265,24 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             onClick={() => onLaneChange(lane === 'released' ? null : 'released')}
           />
           <LaneTile
-            laneKey="movedOn"
-            count={ledger.movedOn}
-            tone="neutral"
-            active={lane === 'movedOn'}
-            onClick={() => onLaneChange(lane === 'movedOn' ? null : 'movedOn')}
+            laneKey="unreleased"
+            count={ledger.unreleased}
+            tone="warn"
+            active={lane === 'unreleased'}
+            onClick={() => onLaneChange(lane === 'unreleased' ? null : 'unreleased')}
           />
         </div>
       </div>
 
-      {/* ── แถวล่าง: เปลี่ยนตามเลนที่เลือก (ทีละชุดเท่านั้น) ─────────────
-          🔴 **ขั้นตอน 1-4 โชว์ตั้งแต่เปิดหน้า ไม่ต้องกดเลนก่อน** (แก้ 27 ส.ค. 2569)
-          ของเดิมต้องกด "เหลือปล่อย" ก่อนจึงเห็น ⇒ โมเดลที่มาลองเล่นไม่เจอว่านี่คือ
-          ขั้นตอนที่ต้องลงมือ · นี่คือกองงานหลักของหน้า ต้องเห็นก่อนใคร */}
-      {lane === null || lane === 'toRelease' ? (
+      {/* ── ยังไม่ปล่อย: ติดขั้นไหน — 🔴 โชว์ตั้งแต่เปิดหน้า ไม่ต้องกดก้อนก่อน ── */}
+      {lane === null || lane === 'all' || lane === 'unreleased' ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-semibold text-foreground">
-              งานที่ต้องทำกับ {th(ledger.toRelease)} ใบที่เหลือปล่อย — ไล่จากซ้ายไปขวา
+              ยังไม่ปล่อย {th(ledger.unreleased)} ใบ — ติดขั้นไหน
             </p>
             {action}
           </div>
-          {/* ขั้นตอน 1 2 3 4 ที่เจ้าของเคาะ — เลข/คำกริยามาจาก RELEASE_STEP_TEXT ห้ามพิมพ์เอง */}
           <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
             {ledger.steps.map((s, i) => (
               <React.Fragment key={s.key}>
@@ -321,13 +306,14 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             ))}
           </div>
           <p className={cn('text-[11px]', DASH.muted)}>
-            บวกทุกขั้นแล้วได้ {th(ledger.toRelease)} ใบพอดี — หนึ่งใบรออยู่ขั้นเดียว ·
+            บวกทุกขั้นแล้วได้ {th(ledger.unreleased)} ใบพอดี — หนึ่งใบติดได้ขั้นเดียว ·
             <span className="font-medium text-foreground"> กดขั้นไหนก็เห็นแต่ใบในขั้นนั้น</span>{' '}
-            แล้วกดเข้าไปในใบ ทำตามขั้น 1→4 จบที่ปุ่มปล่อย
+            แล้วกดใบเพื่อทำตามขั้น 1→4
           </p>
         </div>
       ) : null}
 
+      {/* ── ปล่อยแล้ว: ได้ผลยังไง ── */}
       {lane === 'released' ? (
         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
           <p className="text-[11px] font-semibold text-foreground">
@@ -337,7 +323,8 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             <Chip
               label="มีคนสมัครเข้ามาแล้ว"
               count={ledger.releasedWithApplicants}
-              hint="ปล่อยแล้วมีคนกรอกใบสมัคร — ไปคัดคนต่อได้"
+              sub={ledger.applicantHeads > 0 ? `${th(ledger.applicantHeads)} คน` : null}
+              hint="ปล่อยแล้วมีคนกรอกใบสมัคร — ไปคัดคนต่อได้ (เลขในวงเล็บคือหัวคนรวม)"
               tone="success"
               active={false}
               onClick={() => undefined}
@@ -353,39 +340,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
           </div>
           <p className={cn('text-[11px]', DASH.muted)}>
             สองก้อนบวกกันได้ {th(ledger.released)} ใบพอดี
-          </p>
-        </div>
-      ) : null}
-
-      {lane === 'movedOn' ? (
-        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-          <p className="text-[11px] font-semibold text-foreground">
-            {th(ledger.movedOn)} ใบที่ไม่ต้องปล่อย — ระบบงานหลักพาไปถึงไหนแล้ว
-          </p>
-          <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
-            {movedOnStages.map((st, i) => (
-              <React.Fragment key={st.key}>
-                {i > 0 ? (
-                  <ChevronRight
-                    className="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-700"
-                    aria-hidden
-                  />
-                ) : null}
-                <Chip
-                  label={st.label}
-                  count={st.count}
-                  hint={st.hint}
-                  tone="neutral"
-                  active={false}
-                  onClick={() => undefined}
-                />
-              </React.Fragment>
-            ))}
-          </div>
-          {/* 🔴 ตอบคำถาม "ทำไมยังโชว์ ควรซ่อนไหม" ที่โมเดลถามตอนมาลองเล่น */}
-          <p className={cn('text-[11px]', DASH.muted)}>
-            ยังโชว์อยู่เพราะถ้าซ่อน สามก้อนข้างบนจะบวกไม่ครบ {th(ledger.openTotal)} ใบ —
-            ต้องเห็นทั้งหมดจึงเชื่อเลขได้
           </p>
         </div>
       ) : null}
