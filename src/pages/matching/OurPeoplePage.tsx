@@ -179,15 +179,13 @@ const OurPeoplePage: React.FC = () => {
   /** หน้าปัจจุบันของแต่ละถัง (คีย์ = bucket key) — ค้นหาเมื่อไหร่รีเซ็ตทุกถัง */
   const [pageByBucket, setPageByBucket] = useState<Record<string, number>>({});
   const [pageSize, setPageSize] = useState<PageSizeOption>(20);
-  /** เดือนที่กรองอยู่จากปฏิทินวันที่สมัคร (YYYY-MM) — null = ไม่กรอง */
-  const [activeMonth, setActiveMonth] = useState<string | null>(null);
   /**
-   * ช่วงวันแบบละเอียด (เจ้าของสั่ง 22 ส.ค. 2569: *"หน้าผู้สมัครขอเป็นแบบ filter แบบ
-   * calendar ที่กดแล้วข้อมูลเปลี่ยนตามวันที่เลือก"*)
+   * ช่วงวันที่สมัครที่กรองอยู่ (เจ้าของสั่ง 22 ส.ค. 2569: *"หน้าผู้สมัครขอเป็นแบบ filter
+   * แบบ calendar ที่กดแล้วข้อมูลเปลี่ยนตามวันที่เลือก"*)
    *
-   * อยู่คู่กับแท่งเดือนเดิม **ไม่แทนกัน** — แท่งเดือนตอบ "เดือนไหนคนสมัครเยอะ"
-   * (เป็นกราฟด้วย) ส่วนปฏิทินตอบ "เอาช่วงนี้" · เลือกอันหนึ่งแล้วอีกอันถูกล้างให้
-   * เพื่อไม่ให้เกิดสองตัวกรองซ้อนกันแล้วคนอ่านไม่รู้ว่าเหลือเท่านี้เพราะอะไร
+   * 🔴 **นี่คือตัวกรองวันตัวเดียวของหน้านี้แล้ว** — เดิมมีแท่งเดือน 12 เดือนคู่กันด้วย
+   * เจ้าของสั่งถอดทิ้ง 28 ส.ค. 2569 (*"เอากล่องนี้ออก แล้วเอาไว้แค่ calendar ไง"*)
+   * ⇒ ห้ามเอาแท่งเดือนกลับมาโดยไม่ถาม
    */
   const [dateRange, setDateRange] = useState<DateRangeYmd | null>(null);
   /** คนที่กดดูรายละเอียดอยู่ */
@@ -208,27 +206,6 @@ const OurPeoplePage: React.FC = () => {
       .catch((e) => setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ'));
   }, []);
 
-  /**
-   * ปฏิทินจากวันที่สมัคร (เจ้าของสั่ง 10 ส.ค. 2569) — 12 เดือนล่าสุดที่มีคนสมัครจริง
-   * กดเดือน = กรองรายชื่อทุกถังเหลือเฉพาะคนที่สมัครเดือนนั้น · กดซ้ำ = ปลด
-   * แพตเทิร์นเดียวกับแท่งเดือนบน Dashboard (เดือนที่เลือกเข้ม เดือนอื่นหรี่)
-   */
-  const monthOptions = useMemo(() => {
-    const count = new Map<string, number>();
-    for (const p of people ?? []) {
-      const d = p.application_date ? new Date(p.application_date) : null;
-      if (!d || Number.isNaN(d.getTime())) continue;
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      count.set(ym, (count.get(ym) ?? 0) + 1);
-    }
-    return [...count.entries()]
-      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .slice(0, 12)
-      .reverse()
-      .map(([ym, n]) => ({ ym, n }));
-  }, [people]);
-  const maxMonth = Math.max(...monthOptions.map((m) => m.n), 0);
-
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const terms = q.split(/\s+/).filter(Boolean);
@@ -239,16 +216,13 @@ const OurPeoplePage: React.FC = () => {
         const ymd = (p.application_date || '').slice(0, 10);
         if (!isYmdInRange(/^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null, dateRange)) return false;
       }
-      if (!activeMonth) return true;
-      const d = p.application_date ? new Date(p.application_date) : null;
-      if (!d || Number.isNaN(d.getTime())) return false;
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === activeMonth;
+      return true;
     });
     return BUCKETS.map((b) => ({
       ...b,
       items: filtered.filter((p) => (p.column_label || '').trim().toLowerCase() === b.match),
     }));
-  }, [people, query, activeMonth, dateRange]);
+  }, [people, query, dateRange]);
 
   const setQueryAndResetPages = (q: string) => {
     setQuery(q);
@@ -279,75 +253,18 @@ const OurPeoplePage: React.FC = () => {
           </p>
         ) : null}
 
-        {/* ปฏิทินวันที่สมัคร — กดเดือนเพื่อกรองรายชื่อทุกถัง (เจ้าของสั่ง 10 ส.ค. 2569)
-            แพตเทิร์นเดียวกับแท่งเดือนบน Dashboard: เดือนที่เลือกเข้ม เดือนอื่นหรี่ กดซ้ำเพื่อปลด */}
-        {people && monthOptions.length > 0 ? (
-          <div className={cn('rounded-2xl border p-3', DASH.card)}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className={DASH.eyebrow}>ปฏิทินวันที่สมัคร · 12 เดือนล่าสุด</p>
-              {/* เลือกช่วงวันละเอียด (เจ้าของสั่ง 22 ส.ค. 2569) — เลือกแล้วล้างเดือนที่ติ๊กไว้
-                  ไม่ให้สองตัวกรองซ้อนกันจนคนอ่านไม่รู้ว่าเหลือเท่านี้เพราะอะไร */}
-              <DateRangeCalendarPicker
-                value={dateRange}
-                onChange={(next) => {
-                  setDateRange(next);
-                  if (next) setActiveMonth(null);
-                  setPageByBucket({});
-                }}
-              />
-              {activeMonth ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveMonth(null)}
-                  className={cn('text-[11px] font-semibold underline', TONE.info.value)}
-                >
-                  ล้างตัวกรองเดือน
-                </button>
-              ) : (
-                <p className={cn('text-[11px]', DASH.muted)}>กดเดือนเพื่อดูเฉพาะคนที่สมัครเดือนนั้น</p>
-              )}
-            </div>
-            <div className="mt-2 flex items-end gap-1.5">
-              {monthOptions.map((m) => {
-                const active = activeMonth === m.ym;
-                const [yy, mm] = m.ym.split('-');
-                return (
-                  <button
-                    key={m.ym}
-                    type="button"
-                    onClick={() => {
-                      // กดเดือน = ล้างช่วงวัน (สมมาตรกับข้างบน — ให้เหลือตัวกรองวันเดียวเสมอ)
-                      setActiveMonth(active ? null : m.ym);
-                      setDateRange(null);
-                      setPageByBucket({});
-                    }}
-                    aria-pressed={active}
-                    title={`${m.ym} · สมัคร ${m.n.toLocaleString('th-TH')} คน`}
-                    className="flex min-w-0 flex-1 flex-col items-center gap-1"
-                  >
-                    <span className="flex h-14 w-full items-end">
-                      <span
-                        className={cn(
-                          'w-full rounded-t-[5px] rounded-b-sm transition-all',
-                          active ? TONE.primary.dot : 'bg-slate-300 dark:bg-slate-600',
-                          activeMonth && !active && 'opacity-30',
-                        )}
-                        style={{ height: `${Math.max(8, Math.round((m.n / Math.max(maxMonth, 1)) * 100))}%` }}
-                      />
-                    </span>
-                    <span
-                      className={cn(
-                        'w-full truncate text-center text-[10px] tabular-nums',
-                        active ? cn('font-bold', TONE.primary.value) : DASH.muted,
-                      )}
-                    >
-                      {mm}/{yy.slice(2)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        {/* ตัวกรองวันที่สมัคร — เหลือแค่ปฏิทิน (เจ้าของสั่ง 28 ส.ค. 2569: *"เอากล่องนี้ออก
+            แล้วเอาไว้แค่ calendar ไง"*) ⇒ กราฟแท่ง 12 เดือนกับกล่องครอบถูกถอดทิ้งทั้งดวง
+            ปุ่มปฏิทินบอกช่วงที่เลือกอยู่ในตัวเอง ("ทั้งหมด" = ไม่กรอง) และมีกากบาทล้างค่า */}
+        {people ? (
+          <DateRangeCalendarPicker
+            value={dateRange}
+            onChange={(next) => {
+              setDateRange(next);
+              setPageByBucket({});
+            }}
+            className="w-full sm:w-64"
+          />
         ) : null}
 
         {/* แท็บถัง — กดดูทีละถัง */}
