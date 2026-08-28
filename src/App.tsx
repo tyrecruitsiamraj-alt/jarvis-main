@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useParams } from "react-router-dom";
 import PublicApplyLayout from "@/components/layout/PublicApplyLayout";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -46,7 +46,17 @@ const JobDetailPage = lazy(() => import("@/pages/jobs/JobDetailPage"));
 const SiamrajUnitRequestDetailPage = lazy(() => import("@/pages/jobs/SiamrajUnitRequestDetailPage"));
 // แท็บย่อยของใบขอ (16 ส.ค. 2569 เย็น) — ผู้สมัคร / AI Match / การติดต่อ
 const UnitRequestTabPage = lazy(() => import("@/pages/jobs/UnitRequestTabPage"));
-const UnitRequestPostingTabPage = lazy(() => import("@/pages/jobs/UnitRequestPostingTabPage"));
+const BoardPostingPage = lazy(() => import("@/pages/jobs/BoardPostingPage"));
+
+/**
+ * ลิงก์เก่า `/jobs/siamraj/:id/posting` → `/jobs/board/:id/posting`
+ * (แท็บ "ประกาศ / ลิงก์สมัคร" เคยอยู่ในหน้าใบขอหนึ่งรอบ · เจ้าของสั่งย้ายไปกล่องงาน
+ *  27 ส.ค. 2569 — ลิงก์ที่ใครบันทึกไว้ต้องไม่ 404)
+ */
+function LegacyPostingRedirect() {
+  const { id = '' } = useParams();
+  return <Navigate to={`/jobs/board/${encodeURIComponent(id)}/posting`} replace />;
+}
 const FollowPage = lazy(() => import("@/pages/follow/FollowPage"));
 const AftercarePage = lazy(() => import("@/pages/aftercare/AftercarePage"));
 const SupervisorDashboard = lazy(() => import("@/pages/dashboard/SupervisorDashboard"));
@@ -126,9 +136,16 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/overview" element={<JobDashboard />} />
             <Route path="/jobs/list" element={<JobListPage />} />
             <Route path="/jobs/board" element={<StaffJobBoardPage />} />
+            {/* 🔴 งานประกาศ/ลิงก์สมัคร = **ของกล่องงาน** (เจ้าของสั่ง 27 ส.ค. 2569)
+                path จึงอยู่ใต้ /jobs/board ไม่ใช่ /jobs/siamraj — เหตุผลเต็มอยู่หัวไฟล์หน้านั้น */}
+            <Route path="/jobs/board/:id/posting" element={<BoardPostingPage />} />
+            {/* ลิงก์เก่าที่ชี้ไปแท็บของใบขอ — ส่งต่อมาที่หน้าฝั่งกล่องงาน ไม่ให้ 404 */}
+            <Route
+              path="/jobs/siamraj/:id/posting"
+              element={<LegacyPostingRedirect />}
+            />
             <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
-            <Route path="/jobs/siamraj/:id/posting" element={<UnitRequestPostingTabPage />} />
             <Route path="/jobs/siamraj/:id/applicants" element={<UnitRequestTabPage tab="applicants" />} />
             <Route path="/jobs/siamraj/:id/ai-match" element={<UnitRequestTabPage tab="ai-match" />} />
             <Route path="/jobs/siamraj/:id/contact" element={<UnitRequestTabPage tab="contact" />} />

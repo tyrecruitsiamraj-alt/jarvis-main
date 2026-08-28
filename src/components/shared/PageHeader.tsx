@@ -1,15 +1,28 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
   backPath?: string;
+  /**
+   * คำบนปุ่มย้อนกลับ — 🔴 **ลูกศรเปล่าไม่บอกว่ากลับไปไหน**
+   * เจ้าของทัก 27 ส.ค. 2569 ว่ากดจากกล่องงานมาแล้วงงว่าอยู่ไหน ⇒ ปุ่มต้องมีคำ
+   * ไม่ส่งมาก็ยังเป็นลูกศรเปล่าเหมือนเดิม (หน้าอื่นทั้งระบบไม่ต้องแก้)
+   */
+  backLabel?: string;
   actions?: React.ReactNode;
 }
 
-const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, backPath, actions }) => {
+const PageHeader: React.FC<PageHeaderProps> = ({
+  title,
+  subtitle,
+  backPath,
+  backLabel,
+  actions,
+}) => {
   const navigate = useNavigate();
 
   return (
@@ -24,9 +37,14 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, backPath, acti
           <button
             type="button"
             onClick={() => navigate(backPath)}
-            className="p-2.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/60 border border-transparent hover:border-white/80 transition-all touch-manipulation"
+            aria-label={backLabel ? undefined : 'ย้อนกลับ'}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-full border border-transparent text-muted-foreground transition-all touch-manipulation hover:border-white/80 hover:bg-white/60 hover:text-foreground',
+              backLabel ? 'px-3 py-2 text-sm font-medium' : 'p-2.5',
+            )}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5 shrink-0" />
+            {backLabel ? <span className="whitespace-nowrap">{backLabel}</span> : null}
           </button>
         )}
         <div className="min-w-0">

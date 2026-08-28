@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { JobRequest } from '@/types';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import { buildOnlineNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import {
@@ -18,8 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Check, Copy, Link2, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Copy, Link2, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiFetch';
+import { cn } from '@/lib/utils';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
@@ -87,6 +88,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   embedded = false,
 }) => {
   const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
+  /** ลิสต์ช่องทางหุบไว้ก่อน — กางเมื่อจะเลือกจริง (เหตุผลอยู่ที่จุดเรียกใช้) */
+  const [channelsOpen, setChannelsOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [locationText, setLocationText] = useState('');
@@ -121,7 +124,26 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setLinks([]);
     setSaving(false);
     // เติมค่าจากใบขอให้อัตโนมัติ — ไม่ต้องพิมพ์ซ้ำสิ่งที่ ERP มีอยู่แล้ว
-    setTitle(job ? jobBoardCardTitle(job) : standalone ? standalone.kindLabel : '');
+    /**
+     * 🔴 **หัวข้อประกาศต้องนำด้วยตำแหน่งงาน ไม่ใช่ชื่อบริษัท** (แก้ 27 ส.ค. 2569)
+     *
+     * ของเดิมเติม `jobBoardCardTitle` = `unit_name` = **ชื่อหน่วยงาน** ลงช่องนี้
+     * แล้วค่านี้ไปเป็น `<h1>` บนหน้าสมัครสาธารณะ (`PublicPostingApplyPage`)
+     * ⇒ คนหางานกดลิงก์มาเจอหัวเรื่องว่า *"ธนบุรีประกอบรถยนต์"* ไม่ได้บอกว่ารับตำแหน่งอะไร
+     *
+     * เจอตอนให้โมเดลอ่อนสุดสวมบทพนักงานใหม่มาทำภารกิจ "ไปสร้างลิงก์รับสมัคร" —
+     * มันเดินถึงฟอร์มได้ แต่ **ไม่กล้ากดปุ่มสุดท้าย (มั่นใจ 1/10)** เหตุผลข้อแรกคือ
+     * *"หัวข้อประกาศ 'ธนบุรีประกอบรถยนต์' อาจไม่ใช่ตำแหน่งที่เหมาะสม"* — มันถูก
+     *
+     * ⚠️ เปลี่ยนแค่**ค่าตั้งต้นของประกาศใหม่** · ประกาศเก่าที่สร้างไปแล้วไม่ถูกแตะ
+     */
+    setTitle(
+      job
+        ? [publicJobPositionLabel(job), jobBoardCardTitle(job)].filter(Boolean).join(' · ')
+        : standalone
+          ? standalone.kindLabel
+          : '',
+    );
     setDetail('');
     setLocationText(job?.location_address ?? '');
     setSalaryText('');
@@ -136,6 +158,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setFormType('rm');
     setShortLinks({});
     setPicked([]);
+    setChannelsOpen(false);
     /**
      * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
      * เดิมดึงผู้ใช้ทั้งระบบมาให้เลือก ซึ่งได้ชื่อคนที่ไม่เกี่ยวกับงานประกาศเลย
@@ -236,12 +259,19 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
           ) : (
             <>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">หัวข้อประกาศ *</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  หัวข้อประกาศ <span className="text-destructive">*</span>
+                </label>
                 <input className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} />
+                {/* 🔴 บอกให้รู้ว่าค่านี้ไปโผล่ที่ไหน — คนกรอกจะได้รู้ว่าต้องเขียนให้คนนอกอ่านเข้าใจ */}
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  บรรทัดนี้คือ<span className="font-medium text-foreground">หัวเรื่องตัวใหญ่ที่ผู้สมัครเห็น</span>เมื่อกดลิงก์เข้ามา
+                  — ควรขึ้นต้นด้วยตำแหน่งงาน
+                </p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  รายละเอียดที่ผู้สมัครเห็น
+                  รายละเอียดที่ผู้สมัครเห็น <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
                 </label>
                 <textarea
                   className={`${fieldCls} min-h-[76px]`}
@@ -252,7 +282,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">สถานที่ทำงาน</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    สถานที่ทำงาน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                  </label>
                   <input
                     className={fieldCls}
                     value={locationText}
@@ -260,7 +292,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">ค่าตอบแทน</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    ค่าตอบแทน <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                  </label>
                   <input
                     className={fieldCls}
                     value={salaryText}
@@ -269,7 +303,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">ผู้ติดต่อ</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    ผู้ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                  </label>
                   <input
                     className={fieldCls}
                     value={contactName}
@@ -277,7 +313,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">เบอร์ติดต่อ</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    เบอร์ติดต่อ <span className="font-normal opacity-70">(ไม่ใส่ก็ได้)</span>
+                  </label>
                   <input
                     className={fieldCls}
                     value={contactPhone}
@@ -349,14 +387,44 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  ช่องทางที่จะส่ง (เลือกได้หลายช่อง — ได้ลิงก์แยกช่องละอัน)
-                </label>
-                <ChannelPicker value={picked} onChange={setPicked} multiple reloadKey={open} />
-                <p className="text-[11px] text-muted-foreground">
-                  ไม่เลือกช่องทางจะได้ลิงก์กลาง 1 อัน
-                </p>
+              {/* ── ช่องทางที่จะส่ง — 🔴 **หุบไว้เป็นค่าตั้งต้น** (แก้ 27 ส.ค. 2569) ──
+                  ของเดิมกางลิสต์ช่องทางทั้งหมด (30+ ช่อง) ⇒ กินครึ่งหน้าจอ
+                  โมเดลที่สวมบทพนักงานใหม่มาลองทำภารกิจนี้บอกว่า
+                  *"ช่องทางที่จะส่งเต็มครึ่งหน้า ยากต่อการมองหาช่องที่ต้องการ"*
+                  ⚠️ ไม่เลือกช่องทางก็สร้างได้ (ได้ลิงก์กลาง 1 อัน) ⇒ หุบได้โดยไม่ขัดขวางใคร */}
+              <div className="space-y-1.5 rounded-xl border border-border/60 px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setChannelsOpen((v) => !v)}
+                  aria-expanded={channelsOpen}
+                  className="flex w-full items-center justify-between gap-2 text-left"
+                >
+                  <span className="text-xs font-medium text-muted-foreground">
+                    ช่องทางที่จะส่ง{' '}
+                    {picked.length > 0 ? (
+                      <span className="font-semibold text-foreground">
+                        — เลือกไว้ {picked.length} ช่อง
+                      </span>
+                    ) : (
+                      <span className="font-normal opacity-70">(ไม่เลือกก็ได้ — จะได้ลิงก์กลาง 1 อัน)</span>
+                    )}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                      channelsOpen && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {channelsOpen ? (
+                  <>
+                    <ChannelPicker value={picked} onChange={setPicked} multiple reloadKey={open} />
+                    <p className="text-[11px] text-muted-foreground">
+                      เลือกได้หลายช่อง — ได้ลิงก์แยกช่องละอัน จะรู้ว่าคนสมัครมาจากช่องไหน
+                    </p>
+                  </>
+                ) : null}
               </div>
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}

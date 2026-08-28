@@ -42,7 +42,20 @@ export function unitRequestTabPath(job: JobRequest, tab: UnitRequestTabName): st
 }
 
 /** ชื่อแท็บของใบขอที่ลิงก์จากหน้าอื่นได้ (ตรงกับ route ใน App.tsx) */
-export type UnitRequestTabName = 'detail' | 'posting' | 'applicants' | 'ai-match' | 'contact';
+export type UnitRequestTabName = 'detail' | 'applicants' | 'ai-match' | 'contact';
+
+/**
+ * path ของ **หน้างานประกาศ/ลิงก์สมัคร — ฝั่งกล่องงาน**
+ *
+ * 🔴 เจ้าของสั่ง 27 ส.ค. 2569: *"ประกาศ/ลิงก์สมัคร ต้องอยู่กล่องงานสิ"*
+ * ⇒ อยู่ใต้ `/jobs/board/` **ห้ามย้ายไปใต้ `/jobs/siamraj/`** (path บอกความเป็นเจ้าของ)
+ * ⚠️ ยังต้องพก id แบบเดียวกับหน้าใบขอ — ใบขอล่วงหน้าหลุด prefix แล้วเปิดผิดบริษัท
+ */
+export function boardPostingPath(job: JobRequest): string {
+  const base = unitRequestPath(job);
+  const id = base.startsWith('/jobs/siamraj/') ? base.slice('/jobs/siamraj/'.length) : null;
+  return id ? `/jobs/board/${id}/posting` : base;
+}
 
 export type OpenUnitRequestOptions = {
   returnTo?: string;

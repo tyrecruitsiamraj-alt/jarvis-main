@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
+import { backLabelFor } from '@/lib/stageOrigin';
 import UnitRequestTabs, { type UnitRequestTabId } from '@/components/jobs/UnitRequestTabs';
 import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import { fetchAllUnitOptions, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
@@ -65,6 +67,15 @@ const TAB_TITLE: Record<UnitRequestSubTab, string> = {
  */
 const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   const { id = '' } = useParams();
+  /**
+   * 🔴 ปุ่มย้อนกลับต้องพากลับ **หน้าที่พามา** ไม่ใช่ `/jobs/list` ตายตัว
+   * (เจ้าของทัก 27 ส.ค. 2569: กดจากกล่องงานแล้วงงว่าอยู่ไหน · กดกลับไปโผล่หน้าอื่น)
+   */
+  const location = useLocation();
+  const backPath = resolveUnitDetailBackPath({
+    stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
+    search: location.search,
+  });
   const [job, setJob] = useState<JobRequest | null>(null);
   const [items, setItems] = useState<PublicApplication[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -286,7 +297,8 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
       <PageHeader
         title={TAB_TITLE[tab]}
         subtitle={job ? jobBoardCardTitle(job) : id}
-        backPath="/jobs/list"
+        backPath={backPath}
+        backLabel={backLabelFor(backPath)}
       />
 
       <div className="space-y-4 px-4 py-4 md:px-6">

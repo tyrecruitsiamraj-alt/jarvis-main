@@ -7,17 +7,70 @@
  *
  * แถบนี้ตอบ 3 คำถามในบรรทัดเดียว: **นี่ขั้นที่เท่าไหร่ · ขั้นนี้ทำอะไร · ต่อไปคือขั้นอะไร**
  *
+ * ═══ 🔴 ยกเว้น: มาจากหน้าอื่นที่ไม่ได้อยู่บนสายพาน (27 ส.ค. 2569) ═══
+ *
+ * เจ้าของทัก: *"หน้ากล่องงาน พอกดแล้วทำไมไปหน้าใบงาน มันงงนะ"*
+ * วัดบนจอจริง: กดการ์ดจากกล่องงาน → หน้าใบขอขึ้นว่า **"ขั้นที่ 1/6 · ใบขอ …
+ * ต่อไป: ประกาศรับ →"** ⇒ อ่านเหมือน**ถูกดีดถอยกลับไปขั้น 1 ของอีกแผนก**
+ * ทั้งที่คนกำลังทำงานปล่อยประกาศอยู่ที่กล่องงาน (ซึ่งไม่ใช่ขั้นไหนของสายพานเลย)
+ *
+ * ⇒ ถ้ามี `returnTo` ที่บอกว่ามาจากหน้าไหน **ให้แถบบอกทางกลับ ไม่ใช่บอกเลขขั้น**
+ * เจ้าของเคาะเอง: *"ไปหน้าเดิม แต่เลิกหลอกว่าอยู่ขั้น 1"*
+ *
  * ⚠️ ตั้งใจ **ไม่แตะหัวข้อเดิมของแต่ละหน้า** — วางเป็นแถบเหนือเนื้อหา
- * (แก้หัวข้อในหน้า 4,826 บรรทัดอย่าง MatchingPage = เสี่ยงเกินความจำเป็นของงานจัดเมนู)
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CONVEYOR_STEPS, stepForPath } from '@/lib/soRecruitNav';
+import { ORIGIN_LABELS, originFromReturnTo } from '@/lib/stageOrigin';
+import { sanitizeUnitReturnTo } from '@/lib/jobUnitSessionState';
 
 const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search } = location;
+
+  /**
+   * มาจากไหน — อ่านจาก `returnTo` ที่ผู้พามาแนบไว้ (state ก่อน แล้วค่อย query)
+   * ⚠️ ต้องผ่าน `sanitizeUnitReturnTo` เสมอ (กัน open redirect · ตัวเดียวกับที่ปุ่มย้อนกลับใช้)
+   */
+  const returnTo = React.useMemo(() => {
+    const fromState = sanitizeUnitReturnTo(
+      (location.state as { returnTo?: string } | null)?.returnTo,
+    );
+    if (fromState) return fromState;
+    return sanitizeUnitReturnTo(new URLSearchParams(search).get('returnTo'));
+  }, [location.state, search]);
+
+  const origin = originFromReturnTo(returnTo);
+
+  /* ── มาจากหน้าที่ไม่ได้อยู่บนสายพาน = บอกทางกลับ ไม่ต้องบอกเลขขั้น ── */
+  if (origin) {
+    const t = ORIGIN_LABELS[origin];
+    return (
+      <div
+        className={cn('mb-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs', className)}
+      >
+        {/* ⚠️ แถบนี้เป็น **เบรดครัมบ์** ไม่ใช่ปุ่มย้อนกลับ — คำว่า "กลับไป…" อยู่ที่ปุ่ม
+            ในหัวหน้าจอแล้ว (ใส่ทั้งสองที่ = คำเดียวกันขึ้นสองรอบติดกัน) */}
+        <Link
+          to={returnTo ?? t.path}
+          className="shrink-0 font-semibold text-blue-700 hover:underline dark:text-blue-300"
+        >
+          {t.label}
+        </Link>
+        <span className="text-muted-foreground/50" aria-hidden>
+          ›
+        </span>
+        <span className="font-semibold text-foreground">ใบนี้</span>
+        <span className="hidden min-w-0 flex-1 truncate text-muted-foreground sm:block">
+          {t.blurb}
+        </span>
+      </div>
+    );
+  }
+
   const step = stepForPath(pathname, search);
   if (!step) return null;
   const next = CONVEYOR_STEPS.find((s) => s.step === step.step + 1) ?? null;

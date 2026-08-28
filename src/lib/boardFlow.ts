@@ -148,6 +148,13 @@ const ACTIONABLE: ReadonlySet<BoardStageKey> = new Set(['review', 'toRelease', '
 /** ขั้นที่มาจาก feed ใบปิด (คนละชุดกับใบเปิด) */
 export const CLOSED_STAGES: readonly BoardStageKey[] = ['closed', 'cancelled'];
 
+/**
+ * ขั้นที่ **ระบบงานหลักเป็นคนพา** — ใบพวกนี้เดินพ้นงานปล่อยประกาศไปแล้ว
+ * 🔴 ใช้ที่หัวหน้ากล่องงานใต้เลน "ไม่ต้องปล่อย" (`boardRelease.ts`)
+ * ⚠️ ต้องตรงกับกล่องที่ไม่ใช่ `sourcing` ใน `jobBoxGroups` เสมอ
+ */
+export const MOVED_ON_STAGE_KEYS: readonly BoardStageKey[] = ['selecting', 'waiting', 'started'];
+
 export const BOARD_STAGE_ORDER: readonly BoardStageKey[] = [
   'review',
   'toRelease',

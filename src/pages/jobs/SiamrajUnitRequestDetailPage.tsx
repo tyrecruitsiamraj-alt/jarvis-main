@@ -37,6 +37,7 @@ import {
 } from '@/lib/unitRequestDetail';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
+import { backLabelFor } from '@/lib/stageOrigin';
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   const display =
@@ -217,6 +218,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
         title="รายละเอียดใบขอ"
         subtitle={data?.request_no || 'อ่านจาก Siamraj'}
         backPath={backPath}
+        backLabel={backLabelFor(backPath)}
         actions={
           <>
             {/* ป้ายใบขอชั่วคราว — หน้ารายละเอียดคือที่ที่คนตัดสินใจว่าจะสัญญาอะไรกับผู้สมัคร */}

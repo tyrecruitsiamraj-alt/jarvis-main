@@ -35,13 +35,22 @@ import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { selectSilentLinkRows } from '@/lib/jobLinkSilence';
 import { buildCountIndex, buildJobKeyIndex, countFor } from '@/lib/jobKeyIndex';
 import {
-  BOARD_STAGE_ORDER,
+  MOVED_ON_STAGE_KEYS,
   buildBoardStages,
-  openJobStage,
   type BoardStageFacts,
-  type BoardStageKey,
 } from '@/lib/boardFlow';
-import BoardFlowStrip from '@/components/jobs/BoardFlowStrip';
+import BoardReleaseHeader from '@/components/jobs/BoardReleaseHeader';
+import {
+  RELEASE_LANE_TEXT,
+  RELEASE_STEP_ORDER,
+  RELEASE_STEP_TEXT,
+  buildReleaseLedger,
+  filterByReleaseLane,
+  filterByReleaseStep,
+  type ReleaseFacts,
+  type ReleaseLaneKey,
+  type ReleaseStepKey,
+} from '@/lib/boardRelease';
 import JobBoardSilentLinks from '@/components/jobs/JobBoardSilentLinks';
 import {
   buildReleaseIndex,
@@ -50,7 +59,11 @@ import {
   unreleaseJobsFromPublic,
   type JobRelease,
 } from '@/lib/jobPublicReleaseApi';
-import { navigateToUnitRequest, type UnitRequestTabName } from '@/lib/jobNavigation';
+import {
+  boardPostingPath,
+  navigateToUnitRequest,
+  type UnitRequestTabName,
+} from '@/lib/jobNavigation';
 import { STANDALONE_POSTING_KINDS, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   CLOSED_BOX_KEYS,
@@ -184,6 +197,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * (ประกอบ URL เองแล้วเปิดผิดบริษัท เคยเกิดจริง 18 ส.ค. 2569)
    * `returnTo` = หน้าบอร์ดพร้อมขั้นที่กรองอยู่ ⇒ ปุ่มย้อนกลับพากลับมาที่เดิมเป๊ะ
    */
+  /**
+   * เปิด **หน้างานประกาศ/ลิงก์สมัคร** ของใบนั้น — 🔴 หน้านี้อยู่ใต้ `/jobs/board/`
+   * เพราะเป็นงานของกล่องงาน (เจ้าของสั่ง 27 ส.ค. 2569:
+   * *"ประกาศ/ลิงก์สมัคร ต้องอยู่กล่องงานสิ ทำไมไม่เข้าใจ"*)
+   */
+  const openPosting = React.useCallback(
+    (job: JobRequest) => {
+      navigate(boardPostingPath(job), {
+        state: { returnTo: `${window.location.pathname}${window.location.search}` },
+      });
+    },
+    [navigate],
+  );
+
   const openUnit = React.useCallback(
     (job: JobRequest, tab?: UnitRequestTabName) => {
       navigateToUnitRequest(job, navigate, {
@@ -285,40 +312,77 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ปุ่มย้อนกลับของเบราว์เซอร์พากลับขั้นก่อนหน้า และกลับจากหน้าใบขอมาเจอขั้นเดิม
    * ⚠️ ค่าที่ไม่รู้จักใน URL = ถือว่าไม่ได้เลือกขั้น (ห้าม throw ใส่คนที่แก้ URL เล่น)
    */
-  const stageParam = searchParams.get('stage');
-  const stage = useMemo<BoardStageKey | null>(
+  /**
+   * ── เลน/ขั้นที่เลือกอยู่ — **อยู่ใน URL** ──
+   *
+   * 🔴 เจ้าของสั่งรื้อหน้านี้รอบสี่ 27 ส.ค. 2569: *"อยากเปิดมาแล้วรู้ว่า อ้อ ตอนนี้มีใบขอ
+   * เท่านี้นะ เราปล่อยไปหน้าสาธารณะเท่านี้แล้วนะ เหลืออีกเท่านี้นะ"*
+   * ⇒ หัวหน้าจอเป็น **เลนของงานปล่อยประกาศ** ไม่ใช่เส้น 9 ขั้นแบบเดิม
+   * (ขั้น 9 ตัวไม่ได้หายไป — ปลายเส้นย้ายไปอยู่ใต้เลน "ไม่ต้องปล่อย" ที่เป็นเจ้าของมันจริง)
+   *
+   * `?lane=` = เลน · `?step=` = ขั้นที่ติด (เฉพาะเลนเหลือปล่อย)
+   * ⚠️ ค่าที่ไม่รู้จัก = ถือว่าไม่ได้เลือก (ห้าม throw ใส่คนที่แก้ URL เล่น)
+   * ⚠️ ลิงก์เก่า `?stage=closed|cancelled` ยังพาไปถังใบจบได้เหมือนเดิม
+   */
+  const laneParam = searchParams.get('lane');
+  const stepParam = searchParams.get('step');
+  const legacyStage = searchParams.get('stage');
+
+  const doneLane = useMemo<ClosedBoxKey | null>(() => {
+    const raw = laneParam ?? legacyStage;
+    return raw === 'closed' || raw === 'cancelled' ? raw : null;
+  }, [laneParam, legacyStage]);
+
+  const lane = useMemo<ReleaseLaneKey | null>(
     () =>
-      (BOARD_STAGE_ORDER as readonly string[]).includes(stageParam ?? '')
-        ? (stageParam as BoardStageKey)
+      laneParam === 'toRelease' || laneParam === 'released' || laneParam === 'movedOn'
+        ? laneParam
         : null,
-    [stageParam],
+    [laneParam],
   );
-  const setStage = React.useCallback(
-    (next: BoardStageKey | null) => {
-      setSearchParams(
-        (prev) => {
-          const params = new URLSearchParams(prev);
-          if (next) params.set('stage', next);
-          else params.delete('stage');
-          return params;
-        },
-        { replace: false },
-      );
+  const step = useMemo<ReleaseStepKey | null>(
+    () =>
+      (RELEASE_STEP_ORDER as readonly string[]).includes(stepParam ?? '')
+        ? (stepParam as ReleaseStepKey)
+        : null,
+    [stepParam],
+  );
+
+  /** เขียนเลน/ขั้นลง URL — 🔴 เปลี่ยนเลนต้องล้างขั้นทิ้ง ไม่งั้นกรองสองชั้นแล้วได้ 0 ใบ */
+  const setSelection = React.useCallback(
+    (next: { lane?: ReleaseLaneKey | ClosedBoxKey | null; step?: ReleaseStepKey | null }) => {
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete('stage'); // ลิงก์เก่าถูกแปลงแล้ว ไม่ต้องค้างไว้
+        if ('lane' in next) {
+          if (next.lane) params.set('lane', next.lane);
+          else params.delete('lane');
+          if (!('step' in next)) params.delete('step');
+        }
+        if ('step' in next) {
+          if (next.step) params.set('step', next.step);
+          else params.delete('step');
+        }
+        return params;
+      });
     },
     [setSearchParams],
   );
-  /** ลิงก์เก่า `?view=closed|cancelled` → แปลงเป็นขั้นบนเส้นครั้งเดียว */
+
+  /** ลิงก์เก่า `?view=closed|cancelled` → แปลงเป็นเลนใบจบครั้งเดียว */
   useEffect(() => {
-    if ((initialBox === 'closed' || initialBox === 'cancelled') && !stageParam) setStage(initialBox);
-  }, [initialBox, stageParam, setStage]);
+    if ((initialBox === 'closed' || initialBox === 'cancelled') && !laneParam && !legacyStage) {
+      setSelection({ lane: initialBox });
+    }
+  }, [initialBox, laneParam, legacyStage, setSelection]);
+
   /**
    * 🔴 **กล่องสถานะ 6 กล่องถูกยุบเข้าเส้นทางแล้ว** (เจ้าของสั่งรื้อ 27 ส.ค. 2569)
    * ตัวแปรพวกนี้จึงไม่มี state ของตัวเองอีก — อนุมานจากขั้นที่เลือกบนเส้น
    * (ยังต้องมีอยู่เพราะส่วนอื่นของหน้าใช้: การเรียงการ์ด · ตัวเลือกช่วงวันใบปิด ·
    *  ป้ายบนหัวตาราง) · `initialBox` ที่ลิงก์เก่าส่งมาแปลงเป็นขั้นตั้งต้นแทน
    */
-  const closedBox: ClosedBoxKey | null =
-    stage === 'closed' || stage === 'cancelled' ? stage : null;
+  const closedBox: ClosedBoxKey | null = doneLane;
   const openBoxKey: OpenBoxKey | null = null;
   /**
    * ประกาศของบอร์ด (mockup rev.3 ข้อ 04) — ใช้ 2 ที่:
@@ -328,6 +392,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [postings, setPostings] = useState<Awaited<ReturnType<typeof fetchRecruitPostings>>>([]);
   /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
   const [postingsRev, setPostingsRev] = useState(0);
+  /**
+   * 🔴 **โหลดประกาศเสร็จหรือยัง — ไม่ใช่ `postings.length > 0`**
+   * ต้องรู้แน่ ๆ เพราะเลขบนหัวหน้าจอพึ่ง "ใบนี้มีลิงก์ไหม" · ยังไม่รู้ = ห้ามโชว์เลข
+   */
+  const [postingsLoaded, setPostingsLoaded] = useState(false);
 
   /**
    * ใบที่ **ปล่อยลิงก์รับสมัครแล้ว** (มีประกาศผูกใบขอ) — ใช้กับชิปเตือนบนการ์ด
@@ -421,14 +490,51 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   );
 
   /**
+   * ── เลขบนหัวหน้าจอ (ตรรกะอยู่ `lib/boardRelease` มีเทสต์คุมว่าบวกลงตัว) ──
+   * 🔴 นับจาก `filters.filtered` = ใบเปิดหลังตัวกรองบนจอ **ก่อน**กรองเลน/ขั้น
+   * ไม่งั้นกดเลนปุ๊บเลขเลนอื่นกลายเป็นของกลุ่มที่กรอง แล้วเทียบข้ามเลนไม่ได้อีก
+   */
+  const releaseFacts: ReleaseFacts = stageFacts;
+  /**
+   * 🔴 **เลขบนหัวเชื่อได้แล้วหรือยัง** (เพิ่ม 27 ส.ค. 2569)
+   *
+   * เจอตอนให้โมเดลอ่อนสุดมาลองเล่น: มันกด "เหลือปล่อย" แล้วรายงานว่า
+   * *"ตัวเลขเปลี่ยนเป็น 0 ทั้งหมด"* และตอนกดย้อนกลับจากหน้าใบขอก็เป็น 0 อีก
+   * — เพราะหน้าถูกสร้างใหม่แล้วยังโหลดข้อมูลไม่เสร็จ **แต่หัวหน้าจอโชว์ 0 ไปเลย**
+   *
+   * 🔴 ที่แย่กว่า 0 คือช่วงที่ใบขอมาแล้วแต่**ทะเบียนลิงก์/การปล่อยยังไม่มา**:
+   * `hasLink`/`isReleased` จะเป็น false ทุกใบ ⇒ "เหลือปล่อย" เฟ้อ "ปล่อยแล้ว" = 0
+   * ซึ่ง **ดูเหมือนเลขจริง** จับไม่ได้ด้วยตา · กติกาข้อแรกของโปรเจกต์นี้คือห้ามโกหกตัวเลข
+   * ⇒ ยังไม่ครบทั้งสามเส้น = โชว์ "กำลังอ่านตัวเลข…" ไม่ใช่โชว์เลข
+   */
+  const ledgerReady = !loading && postingsLoaded && releases !== null;
+  const ledger = useMemo(
+    () => buildReleaseLedger(filters.filtered, releaseFacts),
+    [filters.filtered, releaseFacts],
+  );
+  /** ปลายเส้น 9 ขั้น — โชว์ใต้เลน "ไม่ต้องปล่อย" (ขั้นพวกนี้คือเจ้าของเลนนั้นจริง ๆ) */
+  const movedOnStages = useMemo(
+    () => (stages ?? []).filter((st) => MOVED_ON_STAGE_KEYS.includes(st.key)),
+    [stages],
+  );
+
+  /**
    * การ์ดที่โชว์ = ใบในขั้นที่เลือก · ไม่เลือก = ใบเปิดทั้งหมดที่กรองอยู่
    * ⚠️ ขั้น "ปิดแล้ว/ยกเลิก" มาคนละ feed — ต้องหยิบจากชุดใบปิด ไม่ใช่กรองใบเปิด
    */
   const flowJobs = useMemo(() => {
-    if (!stage) return boxedJobs;
-    if (stage === 'closed' || stage === 'cancelled') return closedBoxCounts[stage];
-    return filters.filtered.filter((j) => openJobStage(j, stageFacts) === stage);
-  }, [stage, boxedJobs, closedBoxCounts, filters.filtered, stageFacts]);
+    if (doneLane) return closedBoxCounts[doneLane];
+    /**
+     * 🔴 ยังอ่านทะเบียนลิงก์/การปล่อยไม่ครบ = **ยังไม่รู้ว่าใบไหนอยู่เลนไหน**
+     * กรองไปก็ได้ชุดผิด (ทุกใบจะตกเลน "เหลือปล่อย") ⇒ โชว์ทั้งหมดไว้ก่อน
+     * แล้วหัวหน้าจอจะบอกเองว่ากำลังอ่านตัวเลข
+     */
+    if (!ledgerReady) return boxedJobs;
+    /** ขั้นมีได้แค่ในเลน "เหลือปล่อย" ⇒ มี `step` ก็พอ ไม่ต้องรอ `lane` (กัน URL พิมพ์มือ) */
+    if (step) return filterByReleaseStep(filters.filtered, releaseFacts, step);
+    if (lane) return filterByReleaseLane(filters.filtered, releaseFacts, lane);
+    return boxedJobs;
+  }, [doneLane, ledgerReady, lane, step, closedBoxCounts, filters.filtered, releaseFacts, boxedJobs]);
 
   const totalPages = getTotalPages(flowJobs.length, pageSize);
   const currentPage = Math.min(page, totalPages);
@@ -469,7 +575,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () => boxedJobs.filter((j) => releaseIdx.has(j.id)).length,
     [boxedJobs, releaseIdx],
   );
-  const unreleasedCount = boxedJobs.length - releasedCount;
+  /**
+   * 🔴 **ใบที่ "ปล่อยได้จริง" = เลน "เหลือปล่อย" เท่านั้น** (แก้ 27 ส.ค. 2569 รอบสี่)
+   *
+   * ของเดิมนับ `ใบเปิดทั้งหมด − ที่ปล่อยแล้ว` ⇒ วัดบนจอจริงได้ **127** ทั้งที่
+   * เหลือปล่อยจริง **104** · ส่วนต่าง 23 ใบคือใบที่ ERP พาไปคัดเลือก/เริ่มงานแล้ว
+   * แต่เราไม่เคยกดปล่อย ⇒ ปุ่มเดิมจะไปปล่อยประกาศหาคนของตำแหน่งที่มีคนทำอยู่แล้ว
+   * (เจอตอนต่อหัวหน้าจอใหม่แล้วเลขสองที่ไม่ตรงกัน — นี่คือประโยชน์ของ "เลขต้องกระทบยอด")
+   */
+  const releasableJobs = useMemo(
+    () => filterByReleaseLane(boxedJobs, releaseFacts, 'toRelease'),
+    [boxedJobs, releaseFacts],
+  );
+  const unreleasedCount = releasableJobs.length;
 
   /**
    * 🔴 ตัวนับ "มีผู้สมัครแล้ว / ยังไม่มีใครสมัคร" — เกิดขึ้นเพราะบอร์ดทีมหน้าแรก
@@ -488,7 +606,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server — กดซ้ำได้จนหมด
    */
   const bulkReleaseVisible = async () => {
-    const ids = boxedJobs.filter((j) => !releaseIdx.has(j.id)).map((j) => j.id).slice(0, 300);
+    /** 🔴 ชุดเดียวกับเลขบนปุ่มเป๊ะ — ห้ามคำนวณคนละที่ (เคยเพี้ยน 23 ใบ) */
+    const ids = releasableJobs.map((j) => j.id).slice(0, 300);
     if (ids.length === 0) return;
     setBulkReleaseBusy(true);
     try {
@@ -501,10 +620,40 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     }
   };
 
-  // เปลี่ยนกล่อง = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของกล่องเดิม)
+  /** คำบอกว่ากำลังดูอะไรอยู่ — 🔴 ป้ายทุกอันมาจาก lib ห้ามพิมพ์เอง */
+  const selectionLabel = useMemo(() => {
+    if (doneLane) return JOB_BOX_LABEL[doneLane];
+    if (step) {
+      const st = RELEASE_STEP_TEXT[step];
+      return `${RELEASE_LANE_TEXT.toRelease.label} · ขั้น ${st.step} ${st.label}`;
+    }
+    return lane ? RELEASE_LANE_TEXT[lane].label : null;
+  }, [doneLane, lane, step]);
+
+  /** จุดยึดของรายการการ์ด — ใช้เลื่อนจอไปให้เห็นว่าการ์ดเปลี่ยนตามที่กด */
+  const cardListRef = React.useRef<HTMLDivElement | null>(null);
+  /** ครั้งแรกที่โหลดหน้าไม่ต้องเลื่อน — เลื่อนเฉพาะตอนคน**กด**เปลี่ยนตัวเลือก */
+  const selectionTouchedRef = React.useRef(false);
+
+  // เปลี่ยนเลน/ขั้น = กลับหน้าแรกเสมอ (ไม่งั้นค้างหน้า 5 ของเลนเดิม)
   useEffect(() => {
     setPage(1);
-  }, [stage]);
+    if (!selectionTouchedRef.current) {
+      selectionTouchedRef.current = true;
+      return;
+    }
+    /**
+     * 🔴 เลื่อนจอไปที่การ์ด — ไม่งั้นกดเลขแล้ว "ไม่มีอะไรเกิดขึ้น" ในสายตาคนใช้
+     * (โมเดลที่มาลองเล่นสรุปผิดเพราะเรื่องนี้เป๊ะ ๆ: *"กดแล้วมันแค่ขยายบอกความหมาย
+     * ไม่ได้เปลี่ยนหน้าไป"*)
+     */
+    const el = cardListRef.current;
+    if (!el) return;
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  }, [lane, step, doneLane]);
 
   // เปลี่ยนตัวกรองแล้วจำนวนผลลด — กันค้างอยู่หน้าที่หายไป
   useEffect(() => {
@@ -536,10 +685,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     let cancelled = false;
     fetchRecruitPostings()
       .then((p) => {
-        if (!cancelled) setPostings(p);
+        if (!cancelled) {
+          setPostings(p);
+          setPostingsLoaded(true);
+        }
       })
       .catch(() => {
-        /* ข้อมูลเสริม — ไม่ต้องรบกวนคนใช้งาน */
+        /* ข้อมูลเสริม — ไม่ต้องรบกวนคนใช้งาน · แต่ต้องปลดล็อกหัวหน้าจอ ไม่ให้ค้าง "กำลังอ่าน" */
+        if (!cancelled) setPostingsLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -872,49 +1025,81 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           }
         />
 
-        {/* ── เส้นทางงาน — เส้นเดียวจบ (เจ้าของสั่งรื้อ 27 ส.ค. 2569) ──
-            *"ทำเป็นเส้นบอกเลยไหม แบบ งานเข้ามาเท่าไหร่ คนก็ตรวจจากตรงนั้น ตรวจเสร็จ
-             กดตามเส้นเลย แล้วไปจบที่ตรงไหน · ตอนนี้หน้ากล่องงานเยอะแยะเละเทะไปหมด"*
+        {/* ── หัวหน้าจอ = "ปล่อยไปแล้วเท่าไหร่ เหลืออีกเท่าไหร่" ──
+            เจ้าของสั่งรื้อรอบสี่ 27 ส.ค. 2569: *"ฉันอยากเปิดมาแล้วรู้ว่า อ้อ ตอนนี้มีใบขอ
+            เท่านี้นะ เราปล่อยไปหน้าสาธารณะเท่านี้แล้วนะ เหลืออีกเท่านี้นะ แล้วพอจะปล่อย
+            ก็ไปกดดูแล้วก็ตามขั้นตอน 1 2 3 4 แล้วก็ปล่อยไป"*
 
-            🔴 **แถบนี้แทนที่ของเดิม 3 ชุด**: กล่องสถานะ 6 กล่อง · แถบหน้าสาธารณะ
-            · แถบผู้สมัคร — ทั้งสามพูดเรื่องเดียวกันคนละมุม และเลขซ้อนกันจนบวกไม่ลงตัว
-            ตอนนี้ทุกใบอยู่ขั้นเดียว บวกทุกขั้นแล้วได้จำนวนใบทั้งหมดพอดี
+            🔴 **เส้น 9 ขั้นไม่ได้ถูกทิ้ง** — ปลายเส้น (คัดเลือก/รอแจ้งเข้า/เริ่มแล้ว)
+            ย้ายไปอยู่ใต้เลน "ไม่ต้องปล่อย" ซึ่งเป็นเจ้าของขั้นพวกนั้นจริง ๆ ·
+            ต้นเส้น (รอตรวจ/รอปล่อย) กลายเป็นขั้น 1-4 ของเลน "เหลือปล่อย"
             ⚠️ staff เท่านั้น — หน้าสมัครสาธารณะใช้ component ตัวเดียวกันนี้ */}
         {isStaff && view === 'board' ? (
           <div className="mt-3 space-y-2">
-            {stages ? (
-              <div className={cn('rounded-xl border px-3 py-2.5', DASH.card)}>
-                <BoardFlowStrip
-                  stages={stages}
-                  active={stage}
-                  onPick={setStage}
-                  action={
-                    /* ปุ่มลงมือของขั้น "รอปล่อยประกาศ" — ย้ายมาจากแถบหน้าสาธารณะที่ถอดออก
-                       ⚠️ ปล่อยให้ใบที่ยังไม่ปล่อย **ในชุดที่กรองอยู่** ไม่ใช่แค่ขั้นที่เลือก */
-                    releases !== null && unreleasedCount > 0 ? (
-                      <button
-                        type="button"
-                        disabled={bulkReleaseBusy}
-                        onClick={() => void bulkReleaseVisible()}
-                        title={`ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (${Math.min(unreleasedCount, 300)} ใบ) ขึ้นหน้าสมัครงานสาธารณะ`}
-                        className={cn(
-                          'rounded-lg px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50',
-                          TONE.success.outline,
-                        )}
-                      >
-                        {bulkReleaseBusy
-                          ? 'กำลังปล่อย…'
-                          : `ปล่อยขึ้นหน้าสมัคร (${Math.min(unreleasedCount, 300)})`}
-                      </button>
-                    ) : null
-                  }
-                />
-                {stage ? (
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">
-                    กำลังดูเฉพาะขั้นที่เลือก — การ์ดข้างล่าง{' '}
-                    {flowJobs.length.toLocaleString('th-TH')} ใบ · กดขั้นเดิมซ้ำเพื่อดูทั้งหมด
-                  </p>
-                ) : null}
+            <BoardReleaseHeader
+              ready={ledgerReady}
+              ledger={ledger}
+              lane={lane}
+              onLaneChange={(next) => setSelection({ lane: next })}
+              step={step}
+              /* 🔴 กดขั้น = เข้าเลน "เหลือปล่อย" ด้วยเสมอ — ขั้นมีอยู่ในเลนนั้นเท่านั้น
+                 (ขั้นโชว์ตั้งแต่เปิดหน้าโดยยังไม่ได้เลือกเลน ถ้าไม่ตั้งเลนให้ กดแล้วจะไม่กรองอะไร) */
+              onStepChange={(next) =>
+                setSelection(next ? { lane: 'toRelease', step: next } : { lane: null, step: null })
+              }
+              movedOnStages={movedOnStages}
+              doneCounts={{
+                closed: closedBoxCounts.closed.length,
+                cancelled: closedBoxCounts.cancelled.length,
+              }}
+              doneLane={doneLane}
+              onDoneLaneChange={(next) => setSelection({ lane: next })}
+              action={
+                /* ปุ่มลงมือของเลน "เหลือปล่อย" — ปล่อยใบที่ยังไม่ปล่อย **ในชุดที่กรองอยู่**
+                   ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server · กดซ้ำได้จนหมด */
+                releases !== null && unreleasedCount > 0 ? (
+                  <button
+                    type="button"
+                    disabled={bulkReleaseBusy}
+                    onClick={() => void bulkReleaseVisible()}
+                    title={`ปล่อยใบที่ยังไม่ปล่อยในชุดที่กรองอยู่ (${Math.min(unreleasedCount, 300)} ใบ) ขึ้นหน้าสมัครงานสาธารณะ`}
+                    className={cn(
+                      'rounded-lg px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+                      TONE.success.outline,
+                    )}
+                  >
+                    {bulkReleaseBusy
+                      ? 'กำลังปล่อย…'
+                      : `ปล่อยทีเดียว ${Math.min(unreleasedCount, 300)} ใบ`}
+                  </button>
+                ) : null
+              }
+            />
+
+            {/* 🔴 **แถบ "กำลังดูอะไรอยู่"** (แก้ 27 ส.ค. 2569)
+                โมเดลที่มาลองเล่นสรุปว่า *"กดเลขแล้วมันแค่ขยายบอกความหมาย ไม่ได้เปลี่ยนหน้าไป"*
+                — คือ **ไม่เห็นว่าการ์ดข้างล่างถูกกรอง** เพราะการ์ดอยู่ต่ำกว่าขอบจอ
+                ⇒ ต้องมีแถบสีบอกชัด + ปุ่มล้าง + เลื่อนจอไปที่การ์ดให้เห็นว่ามันเปลี่ยน */}
+            {ledgerReady && selectionLabel ? (
+              <div
+                className={cn(
+                  'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2',
+                  TONE.primary.soft,
+                )}
+              >
+                <p className="text-[11px] font-semibold text-foreground">
+                  กำลังดู: {selectionLabel} — {flowJobs.length.toLocaleString('th-TH')} ใบข้างล่าง
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelection({ lane: null, step: null })}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1 text-[11px] font-semibold',
+                    TONE.neutral.outline,
+                  )}
+                >
+                  ล้างตัวกรอง — ดูทั้งหมด
+                </button>
               </div>
             ) : null}
 
@@ -1010,37 +1195,49 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
 
         {/* แถบ "ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร" — ซ่อนตัวเองเมื่อไม่มีของ
             กดแถว = ไปหน้ารายละเอียดใบขอ · กดปุ่ม = ไปแท็บ "ประกาศ / ลิงก์สมัคร"
-            ซึ่งเป็นที่ที่แก้ข้อความประกาศและสร้างลิงก์ (ของเดิมเด้งป๊อป 3 ขั้น) */}
-        {isStaff ? (
+
+            🔴 **โชว์เฉพาะเลน "ปล่อยแล้ว" เท่านั้น** (แก้ 27 ส.ค. 2569)
+            ของเดิมโชว์ตลอด ⇒ โมเดลที่มาลองเล่นถามว่า *"ลิงก์ที่ปล่อยแล้วยังไม่มีใบสมัคร
+            5 ใบ กับ ปล่อยแล้ว 102 ต่างกันยังไง ต่างหรือไม่?"* — เป็นอาการ "สองที่พูด
+            เลขเดียวกัน" ที่เจ้าของห้ามไว้ · ที่จริงมันเป็น**ส่วนย่อยของเลนปล่อยแล้ว**
+            (ใบที่ปล่อยไปนานแล้วแต่ยังเงียบ) จึงต้องอยู่ใต้เลนนั้นที่เดียว */}
+        {isStaff && lane === 'released' ? (
           <JobBoardSilentLinks
             rows={silentLinkRows}
-            onOpen={(job, target) => openUnit(job, target)}
+            /* ทั้งกดแถวและกดปุ่ม = ไปหน้าประกาศของใบนั้น — อยู่ในกล่องงานเหมือนกัน
+               (เจ้าของสั่ง: กดของในกล่องงานห้ามเด้งไปหน้าใบขอ) */
+            onOpen={(job) => openPosting(job)}
           />
         ) : null}
 
         {/* ป้ายทอง "ประกาศจากใบขอ" ย้ายไปอยู่ในแถบสรุป+ตัวกรอง (eyebrow) แล้ว —
             เดิมกินแถวของตัวเอง ~40px (21 ส.ค. 2569) */}
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div ref={cardListRef} className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleJobs.map((job) => (
             <Card
               key={job.id}
               /**
                * กดที่กล่อง — **ปลายทางต่างกันตามหน้า** (ไฟล์นี้ใช้ร่วมสองหน้า)
                *
-               * เจ้าหน้าที่ (กล่องงาน): ไปหน้ารายละเอียดใบขอจริง
-               * (เจ้าของสั่ง 27 ส.ค. 2569: *"พอกดแล้วก็พาไปดูข้อมูล ไม่เอาแบบ Popup เด้งนะ"*)
+               * 🔴🔴 **เจ้าหน้าที่ (กล่องงาน): ไปหน้า "ประกาศ / ลิงก์สมัคร" ของใบนั้น**
+               * **ห้ามเด้งไปหน้าใบขอ** — เจ้าของทัก 27 ส.ค. 2569 สองรอบติด:
+               * > *"ประกาศ/ลิงก์สมัคร ต้องอยู่กล่องงานสิ ทำไมไม่เข้าใจ"*
+               * > *"กดงานที่หน้ากล่องงานเด้งไปหน้าใบขออยู่เลย งงไรเนี่ย"*
                *
-               * 🔴 หน้าสมัครสาธารณะ (`/apply`): **ห้ามพาไปหน้าใบขอ** — หน้านั้นต้องล็อกอิน
-               * คนนอกกดแล้วจะเจอหน้าล็อกอินทันที ⇒ เปิดฟอร์มสมัครเลย (ตัวเดียวกับปุ่ม
-               * "สมัครงาน" บนการ์ด) · การ์ดโชว์ตำแหน่ง/สถานที่/รายได้/สวัสดิการอยู่แล้ว
+               * เหตุผล: กล่องงานมีหน้าที่**ปล่อยประกาศ** ⇒ กดใบในหน้านี้ = จะทำงานประกาศของใบนั้น
+               * ไม่ใช่จะไปอ่านว่าใบนี้คืออะไร (อันนั้นเป็นหน้าใบขอ ซึ่งมีลิงก์ไปให้ในหน้าประกาศ
+               * และมีปุ่ม "ดูรายชื่อ" บนการ์ดพาไปแท็บผู้สมัครโดยตรง)
+               *
+               * 🔴 หน้าสมัครสาธารณะ (`/apply`): **ห้ามพาไปหน้าไหนที่ต้องล็อกอิน**
+               * ⇒ เปิดฟอร์มสมัครเลย (ตัวเดียวกับปุ่ม "สมัครงาน" บนการ์ด)
                */
-              onClick={() => (isStaff ? openUnit(job) : openApply(job))}
+              onClick={() => (isStaff ? openPosting(job) : openApply(job))}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  if (isStaff) openUnit(job);
+                  if (isStaff) openPosting(job);
                   else openApply(job);
                 }
               }}
@@ -1290,9 +1487,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         </Button>
                           </>
                         )}
-                        {/* 🔴 Gen link กับ แก้ไข **ย้ายไปอยู่ในป๊อปอัปที่กดการ์ด** แล้ว
-                            (เจ้าของเคาะ 19 ส.ค. 2569: การ์ดเหลือแค่ "ดูรายชื่อ" กับ
-                            "หาผู้สมัครเพิ่ม") — ห้ามใส่ปุ่มกลับมาบนการ์ดโดยไม่ถามก่อน */}
+                        {/* ⚠️ **ไม่มีปุ่ม "ประกาศ / ลิงก์" บนการ์ด** — กดตัวการ์ดคือไปหน้านั้นแล้ว
+                            (ใส่ปุ๊มซ้ำ = ปุ่มที่ทำงานเหมือนการกดกล่องที่มันอยู่ข้างใน) */}
                         {/* "ดูรายชื่อ" = **ไปแท็บผู้สมัครของใบขอ** ไม่ใช่ป๊อปอีกแล้ว
                             (เจ้าของสั่ง 27 ส.ค. 2569) — หน้านั้นมีตัวกรอง/ปุ่มลงมือครบกว่าป๊อป
                             ⚠️ stopPropagation — ไม่งั้นโดนคลิกของกล่องทับ */}
