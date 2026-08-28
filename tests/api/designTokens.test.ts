@@ -7,6 +7,7 @@ import {
   HUD,
   HUD_CSS_CLASS_KEYS,
   HUD_HEX,
+  FRONT_SCENE,
   HUD_SCENE,
   HUD_DARK_EXEMPT_KEYS,
   TONE,
@@ -215,5 +216,44 @@ describe('designTokens — HUD (แผงควบคุมล้ำ · Jarvis H
     }
     const hexes = TONE_KEYS.map((k) => HUD_HEX[k]);
     expect(new Set(hexes).size, 'สีเกจต้องไม่ซ้ำกันระหว่างโทน').toBe(hexes.length);
+  });
+});
+
+/**
+ * ฉากของหน้าด่านหน้า — ยกมาจาก mockup `tundralogin_v3.html` ที่เจ้าของส่งมา
+ * 27 ส.ค. 2569 (*"อยากได้ค่าภาพกับอะไรต่าง ๆ ของเขา แต่การทำงานเป็นแบบเรา"*)
+ *
+ * 🔴 เทสต์นี้คุมว่า **จานสีของ mockup ยังอยู่ครบ** และห้ามใครแอบเปลี่ยนภาพ/สีทีหลัง
+ * โดยไม่รู้ตัว — ถ้าจะเปลี่ยนต้องมาแก้ที่นี่ด้วย = มีคนอ่านคำสั่งเจ้าของอีกรอบ
+ */
+describe('designTokens — FRONT_SCENE (หน้า login)', () => {
+  it('มีค่าครบทุกตัวที่หน้า login ใช้ และไม่มีค่าว่าง', () => {
+    for (const key of [
+      'photo',
+      'base',
+      'paper',
+      'glass',
+      'glassStrong',
+      'line',
+      'ink',
+      'muted',
+      'forest',
+      'forest2',
+      'sage',
+      'sageStrong',
+      'photoFilter',
+    ] as const) {
+      expect(String(FRONT_SCENE[key]).trim().length, `FRONT_SCENE.${key}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('ภาพพื้นหลังเป็นภาพเดียวกับใน mockup', () => {
+    expect(FRONT_SCENE.photo).toContain('photo-1441974231531-c6227db76b6e');
+  });
+
+  it('จานสีเป็นกระดาษ + เขียวป่า ตาม mockup (ไม่ใช่ฟ้าของระบบ)', () => {
+    expect(FRONT_SCENE.paper).toBe('#f5f2e9');
+    expect(FRONT_SCENE.ink).toBe('#15251c');
+    expect(FRONT_SCENE.forest).toBe('#1e3a2b');
   });
 });

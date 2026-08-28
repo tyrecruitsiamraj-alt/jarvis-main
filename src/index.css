@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -921,6 +921,21 @@
   .jarvis-office-live .jarvis-office-pad {
     animation: jarvis-office-breathe 2.8s ease-in-out infinite;
   }
+  /* ═══ ฉากภาพถ่ายของหน้าด่านหน้า (PhotoScene) ═══
+     แสงนวลที่ "หายใจ" ช้า ๆ — ของชิ้นเดียวในฉากที่ขยับ
+     ⚠️ Tailwind `motion-safe:` กั้น prefers-reduced-motion ให้แล้วที่จุดเรียกใช้ */
+  @keyframes jarvis-breathe {
+    0%,
+    100% {
+      opacity: 0.7;
+      transform: scale(0.98);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
   @keyframes jarvis-office-breathe {
     0%,
     100% {
