@@ -26,7 +26,18 @@ import {
 
 const tbl = tableInAppSchema('call_script_overrides');
 
-export const EDITABLE_SCRIPT_KEYS: readonly EditableScriptKey[] = ['interview', 'offer', 'follow'];
+/**
+ * ลำดับบทที่โชว์ในหน้าตั้งค่า — หน้าจอ render ตามลำดับนี้ตรง ๆ
+ * ⚠️ เพิ่มคีย์ใน `EditableScriptKey` เมื่อไหร่ **ต้องเติมที่นี่ด้วย** ไม่งั้นบทใหม่
+ * จะไม่โผล่ในหน้าตั้งค่าและบันทึกไม่ได้ (ตัวตรวจ `isEditableScriptKey` ใช้ลิสต์นี้)
+ * — มีเทสต์คุมว่าลิสต์นี้ครบทุกคีย์
+ */
+export const EDITABLE_SCRIPT_KEYS: readonly EditableScriptKey[] = [
+  'interview',
+  'offer',
+  'follow',
+  'follow_repeat',
+];
 
 export function isEditableScriptKey(v: unknown): v is EditableScriptKey {
   return typeof v === 'string' && (EDITABLE_SCRIPT_KEYS as readonly string[]).includes(v);

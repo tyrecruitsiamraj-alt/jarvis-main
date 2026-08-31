@@ -126,7 +126,7 @@ describe('parseFollowInput', () => {
 });
 
 describe('buildFollowReminderPayload', () => {
-  it('ส่งเรื่องที่กรอกเป็นข้อความให้ Lumos ผ่าน step แบบ follow_up', () => {
+  it('ส่งเรื่องที่กรอกเป็นข้อความให้ Lumos — รอบเดียวคือสายแรก จึงเป็น step แบบ remind', () => {
     const p = buildFollowReminderPayload({
       id: 'e6c1f0aa-1111-4222-8333-444455556666',
       recipient_name: 'สมชาย ใจดี',
@@ -140,7 +140,13 @@ describe('buildFollowReminderPayload', () => {
     expect(p.recipient_phone).toBe('+66812345678');
     expect(p.title).toBe('ยืนยันวันเริ่มงาน 15 ส.ค.');
     expect(p.steps).toHaveLength(1);
-    expect(p.steps[0].type).toBe('follow_up');
+    /**
+     * 🔴 เปลี่ยนจาก 'follow_up' เป็น 'remind' เมื่อ 31 ส.ค. 2569
+     * เจ้าของสั่ง: *"การติดตามต้องมี 2 บทอะ เพราะโทรรอบแรกกับรอบที่ 2 มันไม่เหมือนกันอะ"*
+     * ⇒ สายแรกของงานติดตาม = แจ้งครั้งแรก (`remind`) · รอบถัดไปถึงจะเป็น `follow_up`
+     * ทั้งสองค่าอยู่ในชุดที่ Lumos รับอยู่แล้ว ไม่ใช่ค่าใหม่
+     */
+    expect(p.steps[0].type).toBe('remind');
     // บทใหม่ 16 ส.ค. 2569 (lumosCallScript.buildFollowMessage) — แนะนำตัว + เรียกชื่อ +
     // บอกให้ยืนยันกลับ · เดิมต่อสามท่อนด้วย "—" เฉย ๆ ฟังแล้วห้วนไม่มีหัวไม่มีท้าย
     expect(p.steps[0].message).toContain('สยามราชธานี');

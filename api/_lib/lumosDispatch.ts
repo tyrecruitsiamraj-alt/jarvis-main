@@ -481,6 +481,23 @@ function scriptKeyFor(channel: 'reminder' | 'interview', jobRef: string): Editab
  * 🔴 **ไม่ยัดลง payload** เพราะ payload ถูกส่งให้ Lumos ทั้งก้อน และ Lumos กลืน field
  *   ที่ไม่รู้จักแบบเงียบ ๆ — เพิ่มเข้า payload ได้ต่อเมื่อฝั่งนั้นยืนยันว่ารับได้
  */
+/**
+ * งานติดตามหนึ่งแถวใช้ **สองบท** (สายแรก + รอบถัดไป) — ป้ายจึงต้องครอบทั้งคู่
+ * ไม่งั้นแก้บทรอบสองแล้วลายนิ้วมือไม่ขยับ ย้อนดูไม่รู้ว่าเปลี่ยนอะไรไป
+ */
+function dispatchScriptFingerprint(key: EditableScriptKey): string {
+  if (key !== 'follow') return activeScriptFingerprint(key);
+  return `${activeScriptFingerprint('follow')}+${activeScriptFingerprint('follow_repeat')}`;
+}
+
+/** แก้บทไหนก็ตามในงานติดตาม ถือว่าเป็นฉบับแก้ */
+function dispatchScriptSource(key: EditableScriptKey): 'default' | 'custom' {
+  if (key !== 'follow') return activeScriptSource(key);
+  return activeScriptSource('follow') === 'custom' || activeScriptSource('follow_repeat') === 'custom'
+    ? 'custom'
+    : 'default';
+}
+
 async function stampScriptTag(
   ids: number[],
   channel: 'reminder' | 'interview',
@@ -493,7 +510,7 @@ async function stampScriptTag(
       `update ${queueTable}
           set script_key = $2, script_source = $3, script_fingerprint = $4
         where id = any($1::bigint[])`,
-      [ids, key, activeScriptSource(key), activeScriptFingerprint(key)],
+      [ids, key, dispatchScriptSource(key), dispatchScriptFingerprint(key)],
     );
   } catch (e) {
     if (!isUndefinedColumnError(e)) throw e;
@@ -1481,18 +1498,42 @@ export function buildFollowReminderPayload(
   // ⚠️ เบอร์ที่ AI **พูด** ให้ผู้สมัครโทรกลับ ไปได้ทางเดียวคือ `steps[].message`
   // (ช่องนั้นคือสิ่งที่ถึงหูผู้รับ) — ส่วน `admin_phone` เป็นเบอร์ที่ **AI โทรไปหา**
   // เมื่อติดต่อผู้รับไม่ได้ คนละเรื่องกัน จึงต้องมีทั้งสองทาง
-  const message = buildFollowMessage({
-    recipientName: entry.recipient_name,
-    topic: entry.topic,
-    note: entry.note,
-    staffPhone: entry.staffPhone,
-  });
+  /**
+   * 🔴 **สายแรกกับสายรอบถัดไปพูดคนละบท** (เจ้าของสั่ง 31 ส.ค. 2569:
+   * *"การติดตามต้องมี 2 บทอะ เพราะโทรรอบแรกกับรอบที่ 2 มันไม่เหมือนกันอะ"*)
+   *
+   * ของเดิมสร้างข้อความครั้งเดียวแล้วยัดให้ทุกรอบ ⇒ รอบสองพูดคำต่อคำเหมือนรอบแรก
+   * ทั้งที่เพิ่งคุยกันไป ฟังแล้วเหมือนหุ่นยนต์ที่ไม่รู้ว่าเคยโทรมา
+   *
+   * `type` ก็เปลี่ยนตามให้ตรงความหมาย — รอบแรกเป็น `remind` (แจ้งครั้งแรก)
+   * รอบถัดไปเป็น `follow_up` · ทั้งสองค่าอยู่ในชุดที่ Lumos รับอยู่แล้ว ไม่ใช่ของใหม่
+   */
+  const messageFor = (round: 'first' | 'repeat') =>
+    buildFollowMessage(
+      {
+        recipientName: entry.recipient_name,
+        topic: entry.topic,
+        note: entry.note,
+        staffPhone: entry.staffPhone,
+      },
+      round,
+    );
   // หลายรอบในวันเดียว → หลาย step (เวลาต่างกัน) · Lumos หยุดที่เหลือเองเมื่อยืนยัน (stop_early)
   const times = (entry.callTimes || []).filter((t) => /^\d{1,2}:\d{2}$/.test((t || '').trim()));
   const steps =
     times.length > 0
-      ? times.map((t) => ({ type: 'follow_up' as const, message, scheduled_at: dayAtTime(entry.scheduled_at, t) }))
-      : [{ type: 'follow_up' as const, message, scheduled_at: bangkokIso(entry.scheduled_at) }];
+      ? times.map((t, i) => ({
+          type: (i === 0 ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
+          message: messageFor(i === 0 ? 'first' : 'repeat'),
+          scheduled_at: dayAtTime(entry.scheduled_at, t),
+        }))
+      : [
+          {
+            type: 'remind' as const,
+            message: messageFor('first'),
+            scheduled_at: bangkokIso(entry.scheduled_at),
+          },
+        ];
   return {
     /**
      * 🔴 **ห้ามมี `::` ในรหัสอ้างอิง** (18 ส.ค. 2569: Lumos ดึงไปแล้วแต่ไม่ขึ้น

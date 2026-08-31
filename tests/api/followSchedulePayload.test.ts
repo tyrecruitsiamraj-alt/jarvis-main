@@ -30,16 +30,25 @@ describe('buildFollowReminderPayload — หลายรอบต่อวัน
     expect(p.client_contact_id).not.toContain('::');
   });
 
-  it('2 รอบ 07:00/08:00 → 2 step วันเดียวกัน คนละเวลา (เวลาไทย)', () => {
+  it('2 รอบ 07:00/08:00 → 2 step วันเดียวกัน คนละเวลา และพูดคนละบท', () => {
     const p = buildFollowReminderPayload({ ...baseEntry, callTimes: ['07:00', '08:00'] });
     expect(p.steps.length).toBe(2);
     expect(p.steps[0].scheduled_at).toBe('2026-08-20T07:00:00+07:00');
     expect(p.steps[1].scheduled_at).toBe('2026-08-20T08:00:00+07:00');
-    // ทุก step พูดบทเดียวกัน (topic + เบอร์ติดต่อกลับ)
-    expect(p.steps[0].message).toContain('ติดตามนัดสัมภาษณ์');
-    // เบอร์ถูกอ่านเป็นกลุ่มตัวเลข (16 ส.ค. 2569 — ดู lumosCallScript.speakablePhoneTh)
-    expect(p.steps[0].message).toContain('089 111 2222');
-    expect(p.steps[1].message).toBe(p.steps[0].message);
+    /**
+     * 🔴 เปลี่ยนเมื่อ 31 ส.ค. 2569 — เดิมทุกรอบพูดบทเดียวกันเป๊ะ
+     * เจ้าของสั่ง: *"การติดตามต้องมี 2 บทอะ เพราะโทรรอบแรกกับรอบที่ 2 มันไม่เหมือนกันอะ"*
+     * ⇒ รอบแรก = บท "ติดตาม" · รอบถัดไป = บท "ติดตามรอบถัดไป" (ไม่แนะนำตัวใหม่)
+     */
+    expect(p.steps[0].type).toBe('remind');
+    expect(p.steps[1].type).toBe('follow_up');
+    expect(p.steps[1].message).not.toBe(p.steps[0].message);
+    // แต่ทั้งสองรอบยังบอกเรื่องที่ตามกับเบอร์ติดต่อกลับเหมือนกัน
+    for (const step of p.steps) {
+      expect(step.message).toContain('ติดตามนัดสัมภาษณ์');
+      // เบอร์ถูกอ่านเป็นกลุ่มตัวเลข (16 ส.ค. 2569 — ดู lumosCallScript.speakablePhoneTh)
+      expect(step.message).toContain('089 111 2222');
+    }
   });
 
   it('รอบเวล่ารูปแบบผิด (ไม่ใช่ HH:MM) ถูกกรองทิ้ง — เหลือแต่รอบที่ถูก', () => {

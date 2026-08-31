@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   activeScriptFingerprint,
   activeScriptSource,
+  buildFollowMessage,
+  EDITABLE_SCRIPT_DEFAULTS,
   setCallScriptOverrides,
   type EditableScriptKey,
 } from '../../api/_lib/lumosCallScript';
+import { EDITABLE_SCRIPT_KEYS } from '../../api/_lib/callScriptStore';
 
 /**
  * ป้ายบอกว่า "สายนี้ AI ใช้บทชุดไหน เวอร์ชันไหน"
@@ -14,7 +17,7 @@ import {
  * — เนื้อบทที่ AI พูดถูกส่งไปครบอยู่แล้ว ที่ขาดคือป้ายบอกเวอร์ชัน
  * 🔴 เก็บฝั่งเราเท่านั้น ไม่ยัดลง payload ที่ส่งออก (Lumos กลืน field แปลกแบบเงียบ ๆ)
  */
-const KEYS: EditableScriptKey[] = ['interview', 'offer', 'follow'];
+const KEYS: EditableScriptKey[] = ['interview', 'offer', 'follow', 'follow_repeat'];
 
 describe('ป้ายบทที่จดลงคิวโทร', () => {
   it('ยังไม่มีใครแก้บท = ใช้บทมาตรฐาน', () => {
@@ -57,5 +60,64 @@ describe('ป้ายบทที่จดลงคิวโทร', () => {
     const b = activeScriptFingerprint('offer');
     expect(a).toBe(b);
     setCallScriptOverrides({});
+  });
+});
+
+/**
+ * งานติดตามมี 2 บท — สายแรกกับรอบถัดไปพูดไม่เหมือนกัน
+ * (เจ้าของสั่ง 31 ส.ค. 2569: *"โทรรอบแรกกับรอบที่ 2 มันไม่เหมือนกันอะ"*)
+ */
+describe('บทติดตาม 2 รอบ', () => {
+  const input = {
+    recipientName: 'สมชาย',
+    topic: 'ยืนยันวันเริ่มงาน',
+    note: '',
+    staffPhone: '0812345678',
+  };
+
+  it('สายแรกกับรอบถัดไป ต้องพูดคนละอย่าง', () => {
+    setCallScriptOverrides({});
+    const first = buildFollowMessage(input, 'first');
+    const repeat = buildFollowMessage(input, 'repeat');
+    expect(first).not.toBe(repeat);
+    expect(first.length).toBeGreaterThan(0);
+    expect(repeat.length).toBeGreaterThan(0);
+  });
+
+  it('ไม่ส่งรอบมา = สายแรก (ของเดิมที่เรียกอยู่ต้องไม่เปลี่ยนพฤติกรรม)', () => {
+    setCallScriptOverrides({});
+    expect(buildFollowMessage(input)).toBe(buildFollowMessage(input, 'first'));
+  });
+
+  it('รอบถัดไปต้องอ้างว่าเคยติดต่อไปแล้ว ไม่ใช่แนะนำตัวเหมือนไม่เคยคุย', () => {
+    setCallScriptOverrides({});
+    expect(buildFollowMessage(input, 'repeat')).toMatch(/อีกครั้ง|ก่อนหน้านี้/);
+  });
+
+  it('ทั้งสองบทยังพูดชื่อผู้รับกับเรื่องที่ตามเหมือนกัน', () => {
+    setCallScriptOverrides({});
+    for (const round of ['first', 'repeat'] as const) {
+      const msg = buildFollowMessage(input, round);
+      expect(msg).toMatch(/สมชาย/);
+      expect(msg).toMatch(/ยืนยันวันเริ่มงาน/);
+    }
+  });
+
+  it('แก้บทรอบไหน ก็กระทบเฉพาะรอบนั้น', () => {
+    setCallScriptOverrides({ follow_repeat: ['บทรอบสองที่แก้เอง'] });
+    expect(buildFollowMessage(input, 'repeat')).toBe('บทรอบสองที่แก้เอง');
+    expect(buildFollowMessage(input, 'first')).toMatch(/สมชาย/);
+    setCallScriptOverrides({});
+  });
+});
+
+/**
+ * 🔴 เพิ่มบทใหม่แล้วลืมเติมในลิสต์ของหน้าตั้งค่า = บทนั้นแก้ไม่ได้เลยและไม่มีใครรู้
+ * (เจอกับตัวตอนเพิ่มบท "ติดตามรอบถัดไป" 31 ส.ค. 2569 — บทใหม่ไม่โผล่บนจอ)
+ */
+describe('ลิสต์บทในหน้าตั้งค่า ต้องครบทุกคีย์', () => {
+  it('ทุกคีย์ใน EDITABLE_SCRIPT_DEFAULTS ต้องอยู่ในลิสต์ที่หน้าตั้งค่าใช้', () => {
+    const all = Object.keys(EDITABLE_SCRIPT_DEFAULTS).sort();
+    expect([...EDITABLE_SCRIPT_KEYS].sort()).toEqual(all);
   });
 });

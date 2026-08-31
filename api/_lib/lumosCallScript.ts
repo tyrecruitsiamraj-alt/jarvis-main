@@ -55,12 +55,13 @@ export const MAX_QUESTIONS = 14;
 // ⇒ เทสต์เดิมทั้งชุดผ่านโดยไม่ต้องรู้จักฟีเจอร์นี้ และลบแถวใน DB = กลับบทมาตรฐานทันที
 
 /** คีย์บทที่แก้ได้จากหน้าตั้งค่า → array บทในไฟล์ template */
-export type EditableScriptKey = 'interview' | 'offer' | 'follow';
+export type EditableScriptKey = 'interview' | 'offer' | 'follow' | 'follow_repeat';
 
 export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string[]> = {
   interview: T.สัมภาษณ์เบื้องต้น,
   offer: T.เสนองาน,
   follow: T.ติดตาม,
+  follow_repeat: T.ติดตามรอบถัดไป,
 };
 
 let scriptOverrides: Partial<Record<EditableScriptKey, readonly string[]>> = {};
@@ -374,12 +375,20 @@ export function speakablePhoneTh(phone: string): string {
  * ฟังทางโทรศัพท์แล้วเป็นคำพูดห้วน ๆ ไม่มีหัวไม่มีท้าย · บทใหม่แนะนำตัว เรียกชื่อ
  * บอกให้ยืนยันกลับ และอ่านเบอร์เป็นกลุ่มตัวเลข
  */
-export function buildFollowMessage(input: FollowMessageInput): string {
+export function buildFollowMessage(
+  input: FollowMessageInput,
+  /**
+   * `'first'` = สายแรกของงานติดตามนี้ · `'repeat'` = รอบที่สองเป็นต้นไป
+   * (เจ้าของสั่ง 31 ส.ค. 2569: *"โทรรอบแรกกับรอบที่ 2 มันไม่เหมือนกัน"*)
+   * ไม่ส่ง = รอบแรก — ของเดิมที่เรียกอยู่จึงไม่ต้องแก้
+   */
+  round: 'first' | 'repeat' = 'first',
+): string {
   const topic = clean(input.topic);
   const note = clean(input.note);
   // โน้ตที่พิมพ์ซ้ำหัวเรื่อง (หรือคลุมหัวเรื่องอยู่แล้ว) — พูดรอบเดียวพอ
   const sameAsTopic = Boolean(note) && (note === topic || note.includes(topic) || topic.includes(note));
-  const lines = activeScriptLines('follow');
+  const lines = activeScriptLines(round === 'repeat' ? 'follow_repeat' : 'follow');
   return renderLines(
     lines,
     {
