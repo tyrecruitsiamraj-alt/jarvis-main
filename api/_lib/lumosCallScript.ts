@@ -78,6 +78,28 @@ export function activeScriptLines(key: EditableScriptKey): readonly string[] {
   return o && o.length > 0 ? o : EDITABLE_SCRIPT_DEFAULTS[key];
 }
 
+/** ใช้บทมาตรฐานอยู่ หรือฉบับที่แอดมินแก้ */
+export function activeScriptSource(key: EditableScriptKey): 'default' | 'custom' {
+  const o = scriptOverrides[key];
+  return o && o.length > 0 ? 'custom' : 'default';
+}
+
+/**
+ * ลายนิ้วมือสั้นของบทที่ใช้อยู่ตอนนี้ — บทถูกแก้เมื่อไหร่ค่านี้เปลี่ยน
+ *
+ * ใช้จดลงคิวว่า "สายนี้ AI พูดบทเวอร์ชันไหน" เพื่อย้อนตรวจได้ว่าผลสายช่วงหนึ่งแย่ลง
+ * เพราะบทเปลี่ยนหรือเปล่า · **ไม่ได้ใช้เรื่องความปลอดภัย** จึงไม่ต้องเป็น hash เข้ารหัส
+ * (djb2 พอ — สั้น อ่านง่ายในล็อก และไม่ต้องพึ่ง crypto ให้ไฟล์นี้เลิก pure)
+ */
+export function activeScriptFingerprint(key: EditableScriptKey): string {
+  const text = activeScriptLines(key).join('\n');
+  let h = 5381;
+  for (let i = 0; i < text.length; i += 1) {
+    h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+  }
+  return `${key}-${h.toString(36)}`;
+}
+
 // ─── ตัวเติมค่าลงบท ───────────────────────────────────────────────────────────
 
 /**

@@ -41,12 +41,15 @@ import { ensureCallScriptsFresh } from './callScriptStore.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
 import {
+  activeScriptFingerprint,
+  activeScriptSource,
   appendExtraInfoToPayload,
   buildExtraInfoSentence,
   buildFollowMessage,
   buildOfferMessage,
   buildOfferQuestions,
   buildScreeningQuestions,
+  type EditableScriptKey,
 } from './lumosCallScript.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import {
@@ -453,6 +456,53 @@ const REVIVE_CANCELLED_ON_CONFLICT_NO_RANK = `on conflict (channel, job_ref, per
  * เพื่อครอบทุกทางเข้า (auto / คนติ๊กเลือก / เส้นชวนกลับ) · ยกเว้น job_ref='follow'
  * (ตารางโทรตามคนละเรื่อง — ปฏิเสธหัวข้อหนึ่งไม่ได้แปลว่าห้ามตามเรื่องอื่นตลอดไป)
  */
+/**
+ * ═══ "สายนี้ AI ใช้บทชุดไหน" ═══
+ *
+ * เดาได้จากคอขวดเข้าคิวโดยไม่ต้องให้ทุกจุดที่เรียกส่งมาเอง:
+ *   ช่อง interview            → บทสัมภาษณ์เบื้องต้น (คนยังไม่ได้สมัครใบนี้)
+ *   ช่อง reminder + job_ref 'follow' → บทติดตาม (งานตามนัดที่เจ้าหน้าที่ตั้งเอง)
+ *   ช่อง reminder อื่น ๆ       → บทเสนองาน (คนที่ติดต่อเรามาแล้ว)
+ *
+ * ⚠️ ผูกกับกติกา `job_ref='follow'` ที่ใช้อยู่แล้วในไฟล์นี้ (ดูตัวกรอง "ปฏิเสธถาวร")
+ * เปลี่ยนค่านั้นเมื่อไหร่ ต้องแก้ที่นี่ด้วย
+ */
+function scriptKeyFor(channel: 'reminder' | 'interview', jobRef: string): EditableScriptKey {
+  if (channel === 'interview') return 'interview';
+  return jobRef === 'follow' ? 'follow' : 'offer';
+}
+
+/**
+ * จดป้ายบทลงแถวคิว — **แยกจาก insert โดยตั้งใจ**
+ *
+ * 🔴 ห้ามให้เรื่องนี้ทำให้คิวเข้าไม่ได้ · เป็นข้อมูลไว้ย้อนตรวจ ไม่ใช่ของที่สายต้องใช้
+ * ⇒ ยังไม่ได้รัน migration 112 ก็แค่ไม่มีป้าย คิวเดินปกติ (แพตเทิร์นเดียวกับ
+ *   `first_delivered_at` ของ 088)
+ * 🔴 **ไม่ยัดลง payload** เพราะ payload ถูกส่งให้ Lumos ทั้งก้อน และ Lumos กลืน field
+ *   ที่ไม่รู้จักแบบเงียบ ๆ — เพิ่มเข้า payload ได้ต่อเมื่อฝั่งนั้นยืนยันว่ารับได้
+ */
+async function stampScriptTag(
+  ids: number[],
+  channel: 'reminder' | 'interview',
+  jobRef: string,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const key = scriptKeyFor(channel, jobRef);
+  try {
+    await dbQuery(
+      `update ${queueTable}
+          set script_key = $2, script_source = $3, script_fingerprint = $4
+        where id = any($1::bigint[])`,
+      [ids, key, activeScriptSource(key), activeScriptFingerprint(key)],
+    );
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) throw e;
+    logError('lumos.queue.script_tag.missing', {
+      hint: 'ยังไม่ได้รัน migration 112 — คิวเดินปกติแต่ไม่มีป้ายบอกว่าใช้บทไหน',
+    });
+  }
+}
+
 async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
@@ -480,6 +530,8 @@ async function insertQueueItems(
   guarded: string[];
 }> {
   const added: string[] = [];
+  /** id ของแถวที่เพิ่ง insert สำเร็จ — ใช้จดป้ายบทท้ายลูป */
+  const insertedIds: number[] = [];
   const held: string[] = [];
   const suppressed: string[] = [];
   const guarded: string[] = [];
@@ -588,8 +640,13 @@ async function insertQueueItems(
         base,
       ));
     }
-    if (rows.length > 0) added.push(item.personRef);
+    if (rows.length > 0) {
+      added.push(item.personRef);
+      insertedIds.push(rows[0].id);
+    }
   }
+  // จดว่าแถวพวกนี้ใช้บทชุดไหน — ล้มก็ไม่กระทบการเข้าคิว (ดู stampScriptTag)
+  await stampScriptTag(insertedIds, channel, jobRef);
   return { added, held, suppressed, declined, guarded };
 }
 
