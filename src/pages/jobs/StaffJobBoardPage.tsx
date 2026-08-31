@@ -44,7 +44,8 @@ const VIEW_TO_RM_TAB = {
 } as const;
 
 const StaffJobBoardPage: React.FC = () => {
-  const { jobs, loading, refreshing, loadError, refetch } = useUnitRequestsFeed();
+  const { jobs, loading, refreshing, loadError, feedState, dataAgeSeconds, refetch } =
+    useUnitRequestsFeed();
   const closed = useClosedRequestsFeed();
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('view');
@@ -78,8 +79,11 @@ const StaffJobBoardPage: React.FC = () => {
         jobs={jobs}
         loading={loading}
         loadError={loadError}
+        feedState={feedState}
+        dataAgeSeconds={dataAgeSeconds}
         variant="staff"
-        onRefresh={refetch}
+        /* กดรีเฟรช = ข้ามสำเนา ไปถามระบบงานหลักสด */
+        onRefresh={() => refetch({ fresh: true })}
         refreshing={refreshing}
         detailReturnTo="/jobs/board"
         // ช่องค้นหาย้ายไปอยู่ในแถบหัวแล้ว (แคบกว่าเดิม) — ข้อความยาวจะถูกตัดกลางคัน

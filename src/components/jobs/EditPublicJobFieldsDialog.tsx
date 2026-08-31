@@ -7,10 +7,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saveUnitRequestMeta, siamrajExternalId } from '@/lib/siamrajUnitRequestsApi';
+import {
+  fetchSiamrajUnitRequest,
+  saveUnitRequestMeta,
+  siamrajExternalId,
+} from '@/lib/siamrajUnitRequestsApi';
 import { inferProvinceFromAddress, inferSubdistrictFromAddress } from '@/lib/parseThaiJobAddress';
 import { displayDistrictLine } from '@/lib/displayJobLocation';
 import { benefitDisplayLabels } from '@/lib/extraBenefits';
+import {
+  mergePickedIntoLines,
+  rateLineChoices,
+  type BenefitChoice,
+} from '@/lib/jobBenefitPicks';
 import {
   BENEFIT_LINE_MAX,
   INCOME_LINE_MAX,
@@ -24,7 +33,8 @@ import {
   type IncomeLine,
   type IncomePeriod,
 } from '@/lib/incomeBreakdown';
-import { TONE } from '@/lib/designTokens';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import {
   getDistrictOptions,
@@ -76,6 +86,16 @@ const EditPublicJobFieldsDialog: React.FC<{
   const [incomeTotal, setIncomeTotal] = useState('');
   /** สวัสดิการ freetext บรรทัดละรายการ (เจ้าของเคาะ: จำกัด 5 รายการ ไม่งั้นเยอะเกิน) */
   const [benefitText, setBenefitText] = useState('');
+  /**
+   * ตารางอัตราตามใบขอ (ERP) — เจ้าของชี้ตารางนี้มาเองให้เอามาทำ checklist
+   * ⚠️ ตารางนี้มาจากเส้น "ใบเดียว" (`?id=`) ไม่ได้ติดมากับรายการ จึงต้องดึงตอนเปิดป๊อป
+   */
+  const [rateChoices, setRateChoices] = useState<BenefitChoice[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  /** เปิด/ปิดแผงติ๊กจากตารางอัตรา (กดจากปุ่ม "เพิ่มรายการรายได้") */
+  const [showRatePicker, setShowRatePicker] = useState(false);
+  /** บรรทัดที่ติ๊กไว้ — 🔴 ค่าตั้งต้นคือไม่ติ๊กอะไรเลย (เจ้าของเคาะ) */
+  const [pickedKeys, setPickedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +118,28 @@ const EditPublicJobFieldsDialog: React.FC<{
     }
     // ค่าเก่าที่ติ๊กเป็นคีย์ → แปลงเป็นคำอ่านให้แก้ต่อได้ (ห้ามหายเงียบ)
     setBenefitText(benefitDisplayLabels(job.extra_benefits).join('\n'));
+    setShowRatePicker(false);
+    /**
+     * ดึงตารางอัตราของใบนี้ — เส้น "ใบเดียว" เท่านั้นที่มี `rate_lines`
+     * ⚠️ ล้มไม่เป็นไร (แค่ไม่มีอะไรให้ติ๊ก ยังพิมพ์เองได้) — ห้ามทำให้ป๊อปเปิดไม่ได้
+     */
+    const id = siamrajExternalId(job);
+    if (!id) return;
+    let cancelled = false;
+    setRatesLoading(true);
+    void fetchSiamrajUnitRequest(`siamraj-sql:${id}`)
+      .then((full) => {
+        if (!cancelled) setRateChoices(rateLineChoices(full.rate_lines));
+      })
+      .catch(() => {
+        if (!cancelled) setRateChoices([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRatesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [job]);
 
   /**
@@ -132,6 +174,8 @@ const EditPublicJobFieldsDialog: React.FC<{
     parsedLines.length > 0 ? { period: incomePeriod, lines: parsedLines, total: totalNum } : null,
   );
   const benefitLines = cleanBenefitLines(benefitText.split('\n'));
+  // ⚠️ ห้ามใช้ useMemo ตรงนี้ — อยู่ใต้ early return ของ `open` แล้ว (rules-of-hooks)
+  const mergedBenefitLines = benefitLines;
 
   const save = async () => {
     const requestNo = siamrajExternalId(job) || job.request_no;
@@ -156,7 +200,8 @@ const EditPublicJobFieldsDialog: React.FC<{
           : incomeTotal.trim() === ''
             ? null
             : Math.max(0, Math.trunc(Number(incomeTotal) || 0)),
-        benefits: benefitLines.length > 0 ? benefitLines : null,
+        // ที่ติ๊กจากตารางอัตรา ต่อท้ายของที่พิมพ์เอง — ตัวซ้ำถูกตัดให้แล้ว
+        benefits: mergedBenefitLines.length > 0 ? mergedBenefitLines : null,
         income: hasBreakdown
           ? { period: incomePeriod, lines: parsedLines, total: totalNum }
           : null,
@@ -185,7 +230,8 @@ const EditPublicJobFieldsDialog: React.FC<{
   const show = (k: PublicFieldSection) => !sections || sections.includes(k);
 
   const body = (
-        <div className="space-y-4">
+        // `relative` = ที่ยึดของแผงเด้ง "อัตราตามใบขอ" (absolute inset-0) ข้างล่าง
+        <div className="relative space-y-4">
           {show('place') ? (
           <section className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground">พื้นที่ทำงาน</p>
@@ -360,7 +406,7 @@ const EditPublicJobFieldsDialog: React.FC<{
             {incomeRows.length < INCOME_LINE_MAX ? (
               <button
                 type="button"
-                onClick={() => setIncomeRows((prev) => [...prev, { label: '', amount: '' }])}
+                onClick={() => setShowRatePicker((v) => !v)}
                 className={cn('rounded-lg border px-2.5 py-1 text-xs font-semibold', TONE.info.outline)}
               >
                 + เพิ่มรายการรายได้
@@ -368,6 +414,146 @@ const EditPublicJobFieldsDialog: React.FC<{
             ) : (
               <p className="text-[11px] text-muted-foreground">ครบ {INCOME_LINE_MAX} รายการแล้ว</p>
             )}
+
+            {/**
+              * ═══ กด "เพิ่มรายการรายได้" แล้ว **เด้งป๊อป** ตารางอัตราตามใบขอมาให้ติ๊ก ═══
+              *
+              * เจ้าของสั่ง 31 ส.ค. 2569: *"ต้องการกดคำว่า เพิ่มรายการรายได้ แล้วให้ popup
+              * เด้งอัตราตามใบขอ (ERP) ขึ้นมาพร้อมกับกล่อง Checkbox"*
+              *
+              * 🔴 **ไม่ใช้ `Dialog`** — ฟอร์มนี้ถูกฝังอยู่ในป๊อปไล่งานอยู่แล้ว (`embedded`)
+              * ใส่ Dialog ซ้อนเข้าไปคือผิดกติกาบ้านนี้ตรง ๆ ⇒ ทำเป็นแผงคลุมทับ**ในกล่องเดิม**
+              * ได้ความรู้สึกเด้งเหมือนกัน แต่ไม่ซ้อนชั้นป๊อป
+              *
+              * 🔴 ติ๊กหลายอันแล้วกดเพิ่มทีเดียว · ตัวเลขที่ใส่ให้คือ**อัตราจ่าย** เท่านั้น
+              */}
+            {showRatePicker ? (
+              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/25 p-3">
+                <div
+                  className={cn(
+                    'flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl border shadow-lg',
+                    'border-border bg-card',
+                  )}
+                >
+                  <div className="border-b border-border/70 px-3.5 py-2.5">
+                    <p className="text-sm font-semibold text-foreground">อัตราตามใบขอ (ERP)</p>
+                    <p className={cn('text-[11px]', DASH.muted)}>
+                      ติ๊กอันที่จะเอาไปเป็นรายการรายได้ — ตัวเลขคืออัตราจ่าย อัตราเบิกไม่ขึ้นประกาศ
+                    </p>
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
+                    {ratesLoading ? (
+                      <p className={cn('py-4 text-center text-xs', DASH.muted)}>
+                        กำลังอ่านตารางอัตราของใบนี้…
+                      </p>
+                    ) : rateChoices.length === 0 ? (
+                      <p className={cn('py-4 text-center text-xs', DASH.muted)}>
+                        ใบนี้ไม่มีตารางอัตราจากระบบงานหลัก — กด "พิมพ์เองแทน" ข้างล่าง
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-border/60">
+                        {rateChoices.map((c) => {
+                          const already = incomeRows.some((r) => r.label.trim() === c.name);
+                          const on = pickedKeys.includes(c.key);
+                          return (
+                            <li key={c.key}>
+                              <label
+                                className={cn(
+                                  'flex cursor-pointer items-center gap-2.5 py-2',
+                                  already && 'opacity-45',
+                                )}
+                              >
+                                <Checkbox
+                                  checked={on}
+                                  disabled={already}
+                                  onCheckedChange={(v) =>
+                                    setPickedKeys((cur) =>
+                                      v === true
+                                        ? [...cur, c.key]
+                                        : cur.filter((k) => k !== c.key),
+                                    )
+                                  }
+                                />
+                                <span className="min-w-0 flex-1 text-xs text-foreground">
+                                  {c.isPenalty ? (
+                                    <span className={cn('mr-1 font-semibold', TONE.warn.value)}>⚠</span>
+                                  ) : null}
+                                  {c.name}
+                                  {already ? (
+                                    <span className={cn('ml-1 text-[11px]', DASH.muted)}>
+                                      (ใส่ไปแล้ว)
+                                    </span>
+                                  ) : null}
+                                  {c.isPenalty ? (
+                                    <span className={cn('block text-[10px]', TONE.warn.value)}>
+                                      บรรทัดค่าปรับ ไม่ใช่รายได้
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="shrink-0 text-xs font-semibold tabular-nums text-foreground">
+                                  {c.amount != null && c.amount > 0
+                                    ? c.amount.toLocaleString('th-TH')
+                                    : '—'}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 border-t border-border/70 px-3.5 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncomeRows((prev) => [...prev, { label: '', amount: '' }]);
+                        setPickedKeys([]);
+                        setShowRatePicker(false);
+                      }}
+                      className="text-[11px] font-semibold text-muted-foreground underline"
+                    >
+                      พิมพ์เองแทน
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickedKeys([]);
+                          setShowRatePicker(false);
+                        }}
+                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pickedKeys.length === 0}
+                        onClick={() => {
+                          const add = rateChoices
+                            .filter((c) => pickedKeys.includes(c.key))
+                            .slice(0, Math.max(0, INCOME_LINE_MAX - incomeRows.length))
+                            .map((c) => ({
+                              label: c.name,
+                              amount: c.amount != null ? String(c.amount) : '',
+                            }));
+                          setIncomeRows((prev) => [...prev, ...add]);
+                          setPickedKeys([]);
+                          setShowRatePicker(false);
+                        }}
+                        className={cn(
+                          'rounded-lg px-3 py-1 text-xs font-semibold disabled:opacity-40',
+                          TONE.info.solid,
+                        )}
+                      >
+                        เพิ่ม {pickedKeys.length} รายการ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <label className="flex items-center gap-2 pt-1">
               <span className="shrink-0 text-xs text-muted-foreground">
@@ -417,9 +603,18 @@ const EditPublicJobFieldsDialog: React.FC<{
           ) : null}
 
           {show('benefits') ? (
-          <section className="space-y-2">
-            {/* เจ้าของเคาะ 20 ส.ค. 2569: "Freetext ล้วน จำกัดจำนวน" — ถอดชิปติ๊กทิ้ง
-                ค่าเก่าที่เคยติ๊กไว้ถูกแปลงเป็นข้อความมาให้แก้ต่อแล้ว (ห้ามหายเงียบ) */}
+          <section className="space-y-3">
+            {/**
+              * ═══ ติ๊กเลือกจากสวัสดิการจริงของใบนี้ (เจ้าของสั่ง 31 ส.ค. 2569) ═══
+              * *"หน้าเลือกสวัสดิการ เอาจากใบขอขึ้นมาให้เป็น Checklist ได้ไหม
+              *  จะได้ไม่ต้องพิมพ์เอง"* · *"อยากได้แบบกดแล้วมีรายการให้เลือก"*
+              *
+              * 🔴 **คนละชุดกับชิปติ๊กที่ถอดไปเมื่อ 20 ส.ค.** — อันนั้นเป็นรายการสำเร็จรูป
+              * 12 อันเหมือนกันทุกใบ · อันนี้คือ**อัตราจริงของใบนี้จาก ERP** ต่างกันทุกใบ
+              * เจ้าของเคาะเองว่าเอาเฉพาะชุดนี้ ไม่เอารายการสำเร็จรูปกลับมา
+              *
+              * ทุกอันติ๊กไว้ให้ตั้งแต่แรก (ของเดิมขึ้นประกาศเองอยู่แล้ว) — ปลดติ๊ก = ไม่ให้คนนอกเห็น
+              */}
             <p className="text-xs font-semibold text-muted-foreground">
               สวัสดิการเพิ่มเติม ({benefitLines.length}/{BENEFIT_LINE_MAX} รายการ)
             </p>

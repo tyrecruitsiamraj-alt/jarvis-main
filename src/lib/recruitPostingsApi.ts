@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/apiFetch';
+import { apiFetch, HttpError } from '@/lib/apiFetch';
 import { readErrorMessage, readJsonSafe } from '@/lib/api';
 import type {
   RecruitChannel,
@@ -132,7 +132,8 @@ export async function fetchRecruitPostings(options: {
   if (options.standaloneOnly) params.set('standalone', '1');
   const qs = params.toString();
   const r = await apiFetch(`/api/recruit/postings${qs ? `?${qs}` : ''}`);
-  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดประกาศไม่สำเร็จ'));
+  // พก status มาด้วย — หน้ากล่องงานต้องแยก "ไม่มีสิทธิ์" ออกจาก "ต่อไม่ติด" (ดู HttpError)
+  if (!r.ok) throw new HttpError(r.status, await readErrorMessage(r, 'โหลดประกาศไม่สำเร็จ'));
   const data = await readJsonSafe<RecruitPosting[]>(r);
   return Array.isArray(data) ? data : [];
 }

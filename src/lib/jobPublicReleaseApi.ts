@@ -8,7 +8,7 @@
  * ⚠️ DELETE ส่งทาง query — body ของ DELETE ไม่ถึง handler ในเซิร์ฟเวอร์ท้องถิ่น
  *    (เจอจริงตอนตรวจ 23 ส.ค. 2569)
  */
-import { apiFetch } from '@/lib/apiFetch';
+import { apiFetch, HttpError } from '@/lib/apiFetch';
 import { requestNoOf } from '@/lib/jobKeyIndex';
 
 export type JobRelease = {
@@ -21,7 +21,8 @@ export type JobRelease = {
 
 async function readError(r: Response, fallback: string): Promise<never> {
   const data = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
-  throw new Error(data.message || data.error || `${fallback} (HTTP ${r.status})`);
+  // พก status มาด้วย — หน้าจอต้องแยก "ไม่มีสิทธิ์" ออกจาก "ต่อไม่ติด" (ดู HttpError)
+  throw new HttpError(r.status, data.message || data.error || `${fallback} (HTTP ${r.status})`);
 }
 
 export async function fetchJobReleases(): Promise<JobRelease[]> {

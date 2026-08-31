@@ -15,6 +15,8 @@ import {
   listSiamrajClosedRequests,
   getSiamrajUnitRequestById,
 } from '../_lib/siamrajUnitRequests.js';
+import { ageSeconds, readThroughCache } from '../_lib/unitRequestCache.js';
+import { fetchJobBenefitChipsById } from '../_lib/siamrajJobBenefits.js';
 import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { getSiamrajSqlServerRequestRateLines } from '../_lib/siamrajSqlServerRequests.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
@@ -132,6 +134,22 @@ export async function attachWorkStatus(items: unknown[]): Promise<void> {
   }
 }
 
+/**
+ * แนบสวัสดิการจากอัตราจริงใน ERP ให้ใบขอ — ชุดเดียวกับที่หน้าประกาศสาธารณะโชว์
+ * 🔴 คีย์ด้วย **id เต็ม** (`siamraj-sql:` / `siamraj-pre:`) ไม่ใช่เลขที่ใบเปล่า —
+ * เลขที่ใบของใบปกติกับใบล่วงหน้าซ้ำกันจริง 23 ใบ (บทเรียนเดียวกับฝั่งสาธารณะ)
+ */
+async function attachErpBenefits(items: Array<Record<string, unknown>>): Promise<void> {
+  const ids = items.map((it) => String(it.id || '')).filter(Boolean);
+  if (ids.length === 0) return;
+  const chips = await fetchJobBenefitChipsById(ids);
+  if (chips.size === 0) return;
+  for (const it of items) {
+    const found = chips.get(String(it.id || ''));
+    if (found && found.length > 0) it.benefits = found;
+  }
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
@@ -232,14 +250,44 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     const limit = Number(getQuery(req, 'limit') || '200');
     const mode = getQuery(req, 'mode');
-    const items = await listSiamrajUnitRequests({ limit, mode, departmentScope });
-    await Promise.all([
-      attachAssignments(items),
-      attachNotes(items),
-      attachWorkStatus(items),
-      // ราชการ/เอกชนของจริง — `job_category` ที่ feed ส่งมาเป็นค่าโครงสร้าง เชื่อไม่ได้
-      attachUnitSector(items),
-    ]);
+    /**
+     * 🔴 เส้นนี้ช้าที่สุดของระบบ — วัดจริง 10 วิตอนเร็ว ตาย 60 วิตอนช้า และตาย 4 ใน 6 ครั้ง
+     * ⇒ อ่านผ่านสำเนาอายุสั้น · `?fresh=1` = ข้ามสำเนาไปถามสด (ปุ่มรีเฟรชบนจอ)
+     * ⚠️ ถามใหม่ไม่ได้แต่มีสำเนาเก่า = ส่งของเก่าไปพร้อมบอกอายุ · ไม่มีสำเนาเลย = พังให้เห็น
+     * (รายละเอียดกติกาอยู่หัวไฟล์ `unitRequestCache.ts`)
+     */
+    const cacheKey = JSON.stringify(['list', limit, mode ?? '', departmentScope ?? null]);
+    const fresh = getQuery(req, 'fresh') === '1';
+    const outcome = await readThroughCache(
+      cacheKey,
+      async () => {
+        const rows = await listSiamrajUnitRequests({ limit, mode, departmentScope });
+        await Promise.all([
+          attachAssignments(rows),
+          attachNotes(rows),
+          attachWorkStatus(rows),
+          // ราชการ/เอกชนของจริง — `job_category` ที่ feed ส่งมาเป็นค่าโครงสร้าง เชื่อไม่ได้
+          attachUnitSector(rows),
+          /**
+           * 🔴 สวัสดิการจากอัตราจริงใน ERP (31 ส.ค. 2569)
+           *
+           * เดิมเส้นนี้ **ไม่เคยแนบมาเลย** มีแต่ฝั่งหน้าสาธารณะ ⇒ ป๊อปกล่องงานที่ให้
+           * ติ๊กเลือกสวัสดิการเห็น 0 รายการทุกใบ ทั้งที่ของจริงมีครบ 100% ของประกาศ
+           * (วัดแล้ว: 117/117 ใบมีสวัสดิการ เฉลี่ยใบละ 3-4 รายการ)
+           *
+           * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChipsById` — ERP ล่มก็แค่ไม่มีชิป
+           * และอยู่ใต้สำเนาอายุสั้นแล้ว จึงยิงอย่างมาก 1 ครั้งต่อ 90 วินาที
+           */
+          attachErpBenefits(rows),
+        ]);
+        return rows;
+      },
+      { fresh },
+    );
+    const items = outcome.value;
+    // หน้าจอเอาไปเขียนว่า "ข้อมูลเมื่อ X นาทีที่แล้ว" — ไม่แตะรูปคำตอบเดิม (ยังเป็น array)
+    res.setHeader?.('x-data-age-seconds', String(ageSeconds(outcome.fetchedAt)));
+    res.setHeader?.('x-data-source', outcome.source);
     // Push ให้ precompute worker — urgency ต้องคิดก่อนเพื่อให้ priority sort ถูกต้อง
     enqueuePrecomputeJobs(enrichJobsWithUrgency(items as Parameters<typeof enrichJobsWithUrgency>[0]));
     return res.status(200).json(items);

@@ -6,6 +6,13 @@ import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import BoardCardProgress from '@/components/jobs/BoardCardProgress';
+import {
+  canShowNumbers,
+  combineFeedStates,
+  dataAgeLabel,
+  type FeedState,
+} from '@/lib/boardDataState';
+import { httpStatusOf } from '@/lib/apiFetch';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
@@ -154,6 +161,10 @@ export type JobBoardViewProps = {
   variant?: 'public' | 'staff';
   searchPlaceholder?: string;
   onRefresh?: () => void;
+  /** สภาพของเส้นใบขอจากหน้าแม่ — `failed`/`forbidden` = ห้ามโชว์เลข (ดู boardDataState) */
+  feedState?: FeedState;
+  /** ข้อมูลใบขอที่ถืออยู่เก่ากี่วินาที — `null` = ไม่รู้ */
+  dataAgeSeconds?: number | null;
   refreshing?: boolean;
   detailReturnTo?: string;
   /**
@@ -198,6 +209,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   variant = 'public',
   searchPlaceholder,
   onRefresh,
+  feedState = 'ready',
+  dataAgeSeconds = null,
   refreshing,
   detailReturnTo = '/jobs/board',
   view = 'board',
@@ -287,12 +300,24 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [releases, setReleases] = useState<JobRelease[] | null>(null);
   const releaseIdx = useMemo(() => buildReleaseIndex(releases ?? []), [releases]);
 
+  /**
+   * 🔴 **อ่านไม่ได้ ≠ ไม่มีใบไหนปล่อย** (แก้ 31 ส.ค. 2569)
+   *
+   * ของเดิม catch แล้ว `setReleases([])` ⇒ เส้นล่ม = จอบอกว่า "ปล่อยแล้ว 0" ทั้งที่จริง 173 ใบ
+   * และคนที่สิทธิ์ไม่ถึง (403) ก็เห็นเลขเดียวกันซึ่งผิดทั้งแถวแต่ดูเหมือนจริง
+   * ⇒ ตอนนี้เก็บสภาพไว้ตรง ๆ แล้วให้หัวจอเป็นคนบอกว่า "ยังบอกไม่ได้"
+   */
+  const [releasesState, setReleasesState] = useState<FeedState>('loading');
+
   const loadReleases = React.useCallback(async () => {
     if (!isStaff) return;
+    setReleasesState('loading');
     try {
       setReleases(await fetchJobReleases());
-    } catch {
-      setReleases([]); // อ่านไม่ได้ = ถือว่ายังไม่มีใบไหนปล่อย (ตรงกับ fail-closed ฝั่ง server)
+      setReleasesState('ready');
+    } catch (e) {
+      setReleases(null);
+      setReleasesState(httpStatusOf(e) === 403 ? 'forbidden' : 'failed');
     }
   }, [isStaff]);
 
@@ -404,7 +429,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * 🔴 **โหลดประกาศเสร็จหรือยัง — ไม่ใช่ `postings.length > 0`**
    * ต้องรู้แน่ ๆ เพราะเลขบนหัวหน้าจอพึ่ง "ใบนี้มีลิงก์ไหม" · ยังไม่รู้ = ห้ามโชว์เลข
    */
-  const [postingsLoaded, setPostingsLoaded] = useState(false);
+  const [postingsState, setPostingsState] = useState<FeedState>('loading');
 
   /**
    * ใบที่ **ปล่อยลิงก์รับสมัครแล้ว** (มีประกาศผูกใบขอ) — ใช้กับชิปเตือนบนการ์ด
@@ -515,7 +540,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ซึ่ง **ดูเหมือนเลขจริง** จับไม่ได้ด้วยตา · กติกาข้อแรกของโปรเจกต์นี้คือห้ามโกหกตัวเลข
    * ⇒ ยังไม่ครบทั้งสามเส้น = โชว์ "กำลังอ่านตัวเลข…" ไม่ใช่โชว์เลข
    */
-  const ledgerReady = !loading && postingsLoaded && releases !== null;
+  /**
+   * สภาพรวมของตัวเลขทั้งหัวจอ — รวมสามเส้น: ใบขอ (จากหน้าแม่) · ประกาศ · ทะเบียนปล่อย
+   * 🔴 เส้นไหนพัง = พังทั้งชุด ห้ามโชว์เลขบางส่วนที่ดูเหมือนจริง (ดู combineFeedStates)
+   */
+  const ledgerState = useMemo(
+    () =>
+      combineFeedStates(
+        loading ? 'loading' : feedState,
+        postingsState,
+        releasesState,
+      ),
+    [loading, feedState, postingsState, releasesState],
+  );
+  const ledgerReady = canShowNumbers(ledgerState);
   const ledger = useMemo(
     () => buildReleaseLedger(filters.filtered, releaseFacts),
     [filters.filtered, releaseFacts],
@@ -699,16 +737,21 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   useEffect(() => {
     if (!isStaff) return;
     let cancelled = false;
+    setPostingsState('loading');
     fetchRecruitPostings()
       .then((p) => {
         if (!cancelled) {
           setPostings(p);
-          setPostingsLoaded(true);
+          setPostingsState('ready');
         }
       })
-      .catch(() => {
-        /* ข้อมูลเสริม — ไม่ต้องรบกวนคนใช้งาน · แต่ต้องปลดล็อกหัวหน้าจอ ไม่ให้ค้าง "กำลังอ่าน" */
-        if (!cancelled) setPostingsLoaded(true);
+      .catch((e) => {
+        /**
+         * 🔴 เดิมปลดล็อกหัวจอด้วย `setPostingsLoaded(true)` = แกล้งว่าโหลดครบแต่ไม่มีประกาศ
+         * ⇒ ขั้น "มีลิงก์แล้ว" กลายเป็น 0 ทุกใบ แล้วเลขทั้งชุดเพี้ยนแบบดูเหมือนจริง
+         * ตอนนี้บอกตรง ๆ ว่าเส้นนี้พัง แล้วให้หัวจอโชว์ว่ายังบอกเลขไม่ได้
+         */
+        if (!cancelled) setPostingsState(httpStatusOf(e) === 403 ? 'forbidden' : 'failed');
       });
     return () => {
       cancelled = true;
@@ -854,8 +897,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             }
             /* 🔴 บอกหน่วยให้ครบทั้ง "ใบขอ" และ "อัตรา" — เดิมเขียน "292 ตำแหน่ง" ทั้งที่ 292
                คือจำนวน**ใบ** ทำให้เอาไปเทียบกับ Dashboard (340 อัตรา) แล้วสรุปว่าใบขอหาย */
+            /* 🔴 ตัวเลขยังบอกไม่ได้ (กำลังโหลด/พัง/ไม่มีสิทธิ์) = **ไม่พิมพ์อะไรเลย**
+               เดิมเช็คแค่ `loading` ⇒ ตอนเส้นข้อมูลพังจะขึ้น "0 ใบขอ · 0 อัตรา"
+               ซึ่งเป็นเลขปลอมที่ดูเหมือนจริง (31 ส.ค. 2569) */
             meta={
-              loading
+              !ledgerReady
                 ? undefined
                 : `· ${filters.visibleCount.toLocaleString('th-TH')} ใบขอ · ${filters.visiblePositions.toLocaleString('th-TH')} อัตรา`
             }
@@ -1023,9 +1069,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
              /apply ไม่ส่ง prop → การ์ด frost เดิมทุกพิกเซล */
           variant={isStaff ? 'bar' : 'card'}
           eyebrow={isStaff ? (closedBox ? JOB_BOX_LABEL[closedBox] : 'ประกาศจากใบขอ') : undefined}
-          resultCount={loading ? undefined : boxedJobs.length}
+          /* 🔴 เหตุผลเดียวกับ meta ข้างบน — พังแล้วห้ามขึ้น "พบ 0 ใบขอ" */
+          resultCount={!ledgerReady ? undefined : boxedJobs.length}
           totalCount={
-            loading
+            !ledgerReady
               ? undefined
               : closedBox
                 ? filterByClosedBox(closedJobs ?? [], closedBox).length
@@ -1035,7 +1082,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
              สาธารณะ: คงคำว่า "ตำแหน่ง" เดิม (คนนอกไม่ได้ดูหน่วยอัตราของ ERP) */
           countUnitLabel={isStaff ? 'ใบขอ' : undefined}
           positionsNote={
-            isStaff && !loading
+            isStaff && ledgerReady
               ? `${sumJobPositionUnits(boxedJobs).toLocaleString('th-TH')} อัตรา${closedBox ? '' : 'ที่ยังต้องหา'}`
               : undefined
           }
@@ -1053,7 +1100,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         {isStaff && view === 'board' ? (
           <div className="mt-3 space-y-2">
             <BoardReleaseHeader
-              ready={ledgerReady}
+              state={ledgerState}
+              ageLabel={dataAgeLabel(dataAgeSeconds)}
+              onRetry={() => {
+                void loadReleases();
+                setPostingsRev((n) => n + 1);
+                onRefresh?.();
+              }}
               ledger={ledger}
               lane={lane}
               onLaneChange={(next) => setSelection({ lane: next })}
@@ -1072,7 +1125,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               action={
                 /* ปุ่มลงมือของเลน "เหลือปล่อย" — ปล่อยใบที่ยังไม่ปล่อย **ในชุดที่กรองอยู่**
                    ⚠️ เพดาน 300 ใบต่อครั้งตรงกับฝั่ง server · กดซ้ำได้จนหมด */
-                releases !== null && unreleasedCount > 0 ? (
+                /**
+                 * 🔴 ตัวเลขยังไม่พร้อม = **ปุ่มต้องหาย** ไม่ใช่โผล่พร้อมเลขที่เดาเอา
+                 * (หนี้ Redteam ข้อ 2 — เดิมทะเบียนโหลดล้มแล้วยังโชว์ปุ่มอยู่)
+                 * ⚠️ ตอนนี้หัวจอ return ก่อนตั้งแต่ยังไม่ ready อยู่แล้ว แต่กันไว้อีกชั้น
+                 * เผื่อวันหน้ามีคนย้ายปุ่มออกไปไว้นอกหัวจอ
+                 */
+                ledgerReady && unreleasedCount > 0 ? (
                   <button
                     type="button"
                     disabled={bulkReleaseBusy}

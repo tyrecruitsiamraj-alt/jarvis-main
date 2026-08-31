@@ -26,14 +26,26 @@ import {
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
 import { cn } from '@/lib/utils';
+import {
+  ledgerStateText,
+  UNKNOWN_NUMBER,
+  type LedgerState,
+} from '@/lib/boardDataState';
 
 export type BoardReleaseHeaderProps = {
   /**
-   * 🔴 `false` = ข้อมูลยังมาไม่ครบ **ห้ามโชว์เลข** โชว์ว่ากำลังอ่านแทน
+   * 🔴 สภาพของตัวเลข — **โชว์เลขได้เฉพาะตอน `ready`**
    * (เจอตอนให้โมเดลมาลองเล่น: กดแล้วเลขกลายเป็น 0 ทั้งแถว เพราะหน้าถูกสร้างใหม่
    * แล้วยังโหลดไม่เสร็จ · เลขปลอมที่ "ดูเหมือนจริง" อันตรายกว่า 0 ด้วย)
+   *
+   * 31 ส.ค. 2569: เปลี่ยนจาก `ready: boolean` เป็นสภาพเต็ม เพราะ "กำลังโหลด" กับ "พัง"
+   * กับ "ไม่มีสิทธิ์" ต้องบอกคนละอย่าง — เดิมทั้งสามอันหน้าตาเหมือนกันหมด
    */
-  ready: boolean;
+  state: LedgerState;
+  /** กดลองอ่านใหม่ — โชว์เฉพาะตอนพังแบบที่ลองใหม่แล้วมีโอกาสสำเร็จ */
+  onRetry?: () => void;
+  /** ป้ายบอกอายุข้อมูล (จาก `dataAgeLabel`) — `null` = สดพอจนไม่ต้องบอก */
+  ageLabel?: string | null;
   ledger: ReleaseLedger;
   /** เลนที่เลือก — `null` = ดูทุกใบเปิด */
   lane: ReleaseLaneKey | null;
@@ -51,6 +63,9 @@ export type BoardReleaseHeaderProps = {
 };
 
 const th = (n: number) => n.toLocaleString('th-TH');
+
+/** ลำดับก้อนบนแถวบน — ใช้ทั้งตอนโชว์เลขจริงและตอนโชว์ขีดแทนเลข */
+const LANE_ORDER = ['all', 'released', 'unreleased'] as const;
 
 /** ก้อนตัวเลขใหญ่บนแถวบน */
 function LaneTile({
@@ -184,7 +199,9 @@ function Chip({
 }
 
 const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
-  ready,
+  state,
+  onRetry,
+  ageLabel,
   ledger,
   lane,
   onLaneChange,
@@ -196,21 +213,64 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
   action,
   className,
 }) => {
-  /** ยังอ่านเลขไม่ครบ — โชว์โครงเปล่าที่บอกตรง ๆ ว่ากำลังอ่าน ไม่โชว์เลขที่ยังไม่จริง */
-  if (!ready) {
+  /**
+   * ยังบอกเลขไม่ได้ — 🔴 **ห้ามโชว์ 0** ให้โชว์ขีดกับบอกตรง ๆ ว่าทำไม
+   * กำลังโหลด = โครงเปล่ากะพริบ · พัง = ขีด + ปุ่มลองใหม่ · ไม่มีสิทธิ์ = ขีด + บอกว่าต้องขอสิทธิ์
+   */
+  const stateText = ledgerStateText(state);
+  if (stateText) {
+    const broken = state.status === 'broken';
     return (
       <div className={cn('space-y-2', className)}>
-        <div className="space-y-2 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
-          <p className={cn('text-[11px]', DASH.muted)}>กำลังอ่านตัวเลขของงานปล่อยประกาศ…</p>
-          <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-200/70 dark:bg-slate-800" />
-          <div className="flex flex-wrap items-stretch gap-2">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-14 min-w-0 flex-1 animate-pulse rounded-xl bg-slate-100/80 dark:bg-slate-800/60"
-              />
-            ))}
+        <div
+          className={cn(
+            'space-y-2 rounded-2xl border px-3.5 py-3',
+            broken ? 'border-amber-300/70 bg-amber-50/60 dark:border-amber-800/60 dark:bg-amber-950/20' : 'border-border/60 bg-card/50',
+          )}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className={cn('text-[11px] font-semibold', broken ? TONE.warn.value : DASH.muted)}>
+              {stateText.title}
+            </p>
+            {stateText.canRetry && onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className={cn(
+                  'rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  TONE.warn.outline,
+                )}
+              >
+                กดลองใหม่
+              </button>
+            ) : null}
           </div>
+          <p className={cn('text-[11px] leading-4', DASH.muted)}>{stateText.hint}</p>
+          {broken ? (
+            <div className="flex flex-wrap items-stretch gap-2">
+              {LANE_ORDER.map((laneKey) => (
+                <div
+                  key={laneKey}
+                  className="min-w-0 flex-1 rounded-xl border border-border/60 bg-card/60 px-3 py-2"
+                >
+                  <p className={cn('text-[11px]', DASH.muted)}>{RELEASE_LANE_TEXT[laneKey].label}</p>
+                  <p className={cn('text-2xl font-bold leading-none', DASH.muted)}>{UNKNOWN_NUMBER}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="h-1.5 w-full animate-pulse rounded-full bg-slate-200/70 dark:bg-slate-800" />
+              <div className="flex flex-wrap items-stretch gap-2">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-14 min-w-0 flex-1 animate-pulse rounded-xl bg-slate-100/80 dark:bg-slate-800/60"
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -224,9 +284,13 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       <div className="space-y-2 rounded-2xl border border-border/60 bg-card/50 px-3.5 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           {/* ⚠️ "ใบขอ" มีคำอธิบายติดตัว — โมเดลที่มาลองเล่นบอกว่าไม่รู้ว่าคืออะไร */}
-          <p className="text-[13px] font-semibold text-foreground">
-            <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.all)} ใบ
-          </p>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-foreground">
+              <Term k="unit_request">ใบขอที่เปิดอยู่</Term> {th(ledger.all)} ใบ
+            </p>
+            {/* อายุข้อมูล — โชว์เฉพาะตอนที่เก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
+            {ageLabel ? <p className={cn('text-[11px]', DASH.muted)}>{ageLabel}</p> : null}
+          </div>
           {ledger.percent === null ? null : (
             <p className={cn('text-[11px]', DASH.muted)}>
               <Term k="released">ปล่อยประกาศ</Term>ไปแล้ว{' '}

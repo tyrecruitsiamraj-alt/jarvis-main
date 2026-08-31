@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/apiFetch';
+import { apiFetch, HttpError } from '@/lib/apiFetch';
 import { readErrorMessage, readJsonSafe } from '@/lib/api';
 import type { JobRequest } from '@/types';
 
@@ -19,10 +19,42 @@ export async function fetchSiamrajFeedMeta(): Promise<SiamrajFeedMeta> {
   return readJsonSafe<SiamrajFeedMeta>(r);
 }
 
+/**
+ * ผลของการโหลดใบขอ + **อายุของข้อมูล**
+ *
+ * 🔴 ฝั่ง server อ่านผ่านสำเนาอายุสั้น (เส้นนี้ช้า 10-60 วิและตายบ่อย) จึงต้องบอกคนใช้งาน
+ * ตรง ๆ ว่ากำลังดูของเมื่อไหร่ — ของเก่าที่บอกอายุ ดีกว่าจอค้างหรือจอพัง
+ * แต่ **ห้ามแอบส่งของเก่าเงียบ ๆ** (ดูหัวไฟล์ `api/_lib/unitRequestCache.ts`)
+ */
+export type UnitRequestsResult = {
+  items: JobRequest[];
+  /** ข้อมูลชุดนี้ไปเอามาจากระบบงานหลักเมื่อกี่วินาทีที่แล้ว — `null` = ไม่รู้ */
+  ageSeconds: number | null;
+  /** `stale-after-error` = ถามใหม่ไม่สำเร็จ เลยหยิบสำเนาเก่ามาให้ */
+  source: 'live' | 'cache' | 'stale-after-error' | null;
+};
+
+export async function fetchSiamrajUnitRequestsWithMeta(
+  limit = 200,
+  opts: { fresh?: boolean } = {},
+): Promise<UnitRequestsResult> {
+  const qs = `limit=${limit}${opts.fresh ? '&fresh=1' : ''}`;
+  const r = await apiFetch(`/api/siamraj/unit-requests?${qs}`, { cache: 'no-store' });
+  if (!r.ok) {
+    throw new HttpError(r.status, await readErrorMessage(r, 'โหลดใบขอจาก Siamraj ไม่สำเร็จ'));
+  }
+  const rawAge = r.headers.get('x-data-age-seconds');
+  const age = rawAge === null ? null : Number(rawAge);
+  return {
+    items: await readJsonSafe<JobRequest[]>(r),
+    ageSeconds: Number.isFinite(age) ? age : null,
+    source: (r.headers.get('x-data-source') as UnitRequestsResult['source']) ?? null,
+  };
+}
+
+/** รูปเดิม — ที่เรียกอยู่แล้วไม่ต้องแก้ */
 export async function fetchSiamrajUnitRequests(limit = 200): Promise<JobRequest[]> {
-  const r = await apiFetch(`/api/siamraj/unit-requests?limit=${limit}`, { cache: 'no-store' });
-  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดใบขอจาก Siamraj ไม่สำเร็จ'));
-  return readJsonSafe<JobRequest[]>(r);
+  return (await fetchSiamrajUnitRequestsWithMeta(limit)).items;
 }
 
 export async function fetchSiamrajUnitRequest(id: string): Promise<JobRequest> {
