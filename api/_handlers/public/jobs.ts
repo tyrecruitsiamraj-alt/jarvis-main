@@ -1,4 +1,5 @@
 import { buildIncomeDisplay, type IncomeDisplay } from '../../../src/lib/incomeBreakdown.js';
+import { publicSafeAddress } from '../../../src/lib/publicJobPrivacy.js';
 import {
   isSiamrajUnitRequestsEnabled,
   listSiamrajUnitRequests,
@@ -69,12 +70,21 @@ function toPublicJob(row: JobRow | Record<string, unknown>) {
     unit_name: r.unit_name,
     request_no: r.request_no ?? undefined,
     request_action_name: r.request_action_name ?? undefined,
-    resigned_employee_name: r.resigned_employee_name ?? undefined,
+    /**
+     * 🔴 `resigned_employee_name` **ถูกถอดออกจากคำตอบสาธารณะแล้ว** (29 ส.ค. 2569)
+     * วัดเจอว่าเส้นนี้แจกชื่อ-นามสกุลพนักงานจริง 102 ชื่อให้คนที่ไม่ล็อกอิน
+     * ⇒ ห้ามใส่กลับ · เหตุผลเต็มอยู่หัวไฟล์ `src/lib/publicJobPrivacy.ts`
+     */
     request_date: toYmd(r.request_date),
     required_date: toYmd(r.required_date),
     urgency: r.urgency,
     total_income: r.total_income,
-    location_address: r.location_address,
+    /**
+     * 🔴 ที่อยู่ดิบจากระบบงานหลัก **ห้ามออกหน้าสาธารณะ** — ในนั้นมีเบอร์มือถือคนของลูกค้า
+     * ทะเบียนรถ อีเมล และรหัสภายใน (WF/OC/รหัสสาขา) ปนอยู่ 32/20 ใบตามลำดับ
+     * ตัวกรองประกอบข้อความขึ้นใหม่จาก จังหวัด/อำเภอ/ตำบล เท่านั้น (whitelist)
+     */
+    location_address: publicSafeAddress(r),
     lat: r.lat === null || r.lat === undefined ? undefined : r.lat,
     lng: r.lng === null || r.lng === undefined ? undefined : r.lng,
     job_type: r.job_type,
