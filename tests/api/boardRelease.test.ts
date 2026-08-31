@@ -8,6 +8,7 @@ import {
   filterByReleaseStep,
   releasableJobsOf,
   releaseLaneOf,
+  releaseProgressOf,
   releaseStepOf,
   stillSourcing,
   type ReleaseFacts,
@@ -242,5 +243,54 @@ describe('ตัวกรอง — เลขบนหัวต้องตร�
       (j) => j.id,
     );
     expect(all).not.toContain('r');
+  });
+});
+
+/**
+ * แถบความคืบหน้าบนการ์ด (เจ้าของสั่ง 31 ส.ค. 2569)
+ * 🔴 ปลายสเกล = "ส่งประกาศขึ้นหน้าสาธารณะ" ไม่ใช่ "หาคนได้ครบ"
+ */
+describe('releaseProgressOf — ใบนี้อยู่ขั้นไหน กี่ %', () => {
+  const plain = job({ id: 'p1' });
+  const noted = job({ id: 'p2', list_note: 'อ่านแล้ว' });
+
+  it('ปล่อยแล้ว = 100% เสมอ ถึงจะยังไม่มีคนสมัคร', () => {
+    const p = releaseProgressOf(plain, factsOf({ released: ['p1'] }));
+    expect(p.released).toBe(true);
+    expect(p.percent).toBe(100);
+    expect(p.doneSteps).toBe(p.totalSteps);
+    expect(p.currentStep).toBeNull();
+  });
+
+  it('ค้างขั้น 1 = ยังไม่ได้ทำอะไรเลย ⇒ 0% (ห้ามปัดขึ้นให้ดูสวย)', () => {
+    const p = releaseProgressOf(plain, factsOf({}));
+    expect(p.currentStep).toBe(1);
+    expect(p.doneSteps).toBe(0);
+    expect(p.percent).toBe(0);
+  });
+
+  it('มีลิงก์แล้วรอกดส่ง = ขั้น 4 ทำเสร็จ 3 ขั้น ⇒ 75%', () => {
+    const p = releaseProgressOf(plain, factsOf({ links: ['p1'] }));
+    expect(p.currentStep).toBe(4);
+    expect(p.doneSteps).toBe(3);
+    expect(p.percent).toBe(75);
+  });
+
+  it('% เดินหน้าตามขั้นเสมอ ไม่มีขั้นไหนถอยหลัง', () => {
+    const seen = [
+      releaseProgressOf(plain, factsOf({})).percent,
+      releaseProgressOf(noted, factsOf({})).percent,
+      releaseProgressOf(plain, factsOf({ links: ['p1'] })).percent,
+      releaseProgressOf(plain, factsOf({ released: ['p1'] })).percent,
+    ];
+    for (let i = 1; i < seen.length; i += 1) {
+      expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1]);
+    }
+  });
+
+  it('ป้ายของใบที่ยังไม่ปล่อย ต้องเป็นงานที่ต้องทำ ไม่ใช่สภาพของใบ', () => {
+    const p = releaseProgressOf(plain, factsOf({}));
+    expect(p.label).toBe(RELEASE_STEP_TEXT.info.label);
+    expect(p.label).not.toMatch(/^(ยัง|ไม่|รอ)/);
   });
 });

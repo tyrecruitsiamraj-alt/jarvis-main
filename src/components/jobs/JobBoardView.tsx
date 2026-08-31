@@ -5,6 +5,7 @@ import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import BoardCardProgress from '@/components/jobs/BoardCardProgress';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
@@ -66,6 +67,8 @@ import {
   RELEASE_STEP_ORDER,
   RELEASE_STEP_TEXT,
   buildReleaseLedger,
+  releaseProgressOf,
+  releaseProgressTitle,
   filterByReleaseLane,
   filterByReleaseStep,
   releasableJobsOf,
@@ -1312,6 +1315,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         })()}
                       </div>
                     ) : null}
+                    {/* แถบ "ใบนี้อยู่ขั้นไหน" (เจ้าของสั่ง 31 ส.ค. 2569 — ส่งภาพตัวอย่างมาให้ดู)
+                        🔴 เจ้าหน้าที่เท่านั้น · 100% = ส่งประกาศขึ้นหน้าสาธารณะแล้ว ไม่ใช่หาคนได้ครบ
+                        ⚠️ ต้องรอทะเบียนโหลดครบก่อน (`ledgerReady`) ไม่งั้นทุกใบจะขึ้น "ขั้น 1 · 0%"
+                        ซึ่งดูเหมือนเลขจริง — บทเรียนเดียวกับหัวกล่องงานที่เคยขึ้น 0 ทั้งแถว */}
+                    {isStaff && ledgerReady
+                      ? (() => {
+                          const progress = releaseProgressOf(job, releaseFacts);
+                          return (
+                            <div className="mt-2" title={releaseProgressTitle(progress)}>
+                              <BoardCardProgress progress={progress} />
+                            </div>
+                          );
+                        })()
+                      : null}
                   </div>
                   {/* มุมขวาบน = ป้ายสถานะ + ปุ่มแก้ข้อมูลประกาศ (เจ้าของสั่ง 17 ส.ค. 2569
                       ให้ย้ายปุ่มมาไว้ตรงนี้) · วางเป็นคอลัมน์ให้ป้ายอยู่บน ปุ่มอยู่ล่าง

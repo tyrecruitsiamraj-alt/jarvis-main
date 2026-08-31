@@ -154,6 +154,77 @@ export const RELEASE_LANE_TEXT: Record<ReleaseLaneKey, { label: string; hint: st
   },
 };
 
+/**
+ * ═══ ความคืบหน้าของ **ใบเดียว** สำหรับโชว์บนการ์ด ═══
+ *
+ * เจ้าของสั่ง 31 ส.ค. 2569 (ส่งภาพตัวอย่างบอร์ดงานแปลเกมมาให้ดู):
+ * > *"หน้ากล่องงานทำแบบนี้ก็ดี จะได้รู้ว่าใบไหนอยู่ขั้นตอนไหน
+ * >  **100% คือถึงแค่ส่งประกาศไปหน้าสาธารณะ ก็พอนะ**"*
+ *
+ * 🔴 **ปลายสเกลคือ "ปล่อยขึ้นหน้าสาธารณะ" ไม่ใช่ "หาคนได้"**
+ * ⇒ ใบที่ปล่อยแล้ว = 100% เสมอ ถึงจะยังไม่มีคนสมัครก็ตาม
+ * (ห้ามเอาจำนวนผู้สมัคร/การปิดใบขอมาปนในแถบนี้ — คนละเรื่อง คนละหน้า)
+ *
+ * 🔴 **นับจาก "ทำเสร็จกี่ขั้น" ไม่ใช่ "อยู่ขั้นไหน"** — ใบที่ค้างอยู่ขั้น 1 คือยังไม่ได้ทำอะไรเลย
+ * จึงเป็น 0% (ไม่ปัดขึ้นให้ดูสวย · จอต้องไม่โม้ว่ามีความคืบหน้าทั้งที่ไม่มี)
+ *
+ * ⚠️ **ห้ามใส่เครื่องหมายถูก** ในแถบขั้น — บ้านนี้ถอดติ๊กถูกออกไปสองรอบแล้ว
+ * (ติ๊กถูก = อ้างว่าเสร็จ ทั้งที่ระบบไม่มีหลักฐานว่าใครทำ) ให้โชว์ **เลขขั้น** เสมอ
+ */
+export type ReleaseProgress = {
+  /** ขั้นที่ใบนี้ค้างอยู่ (1-4) · ใบที่ปล่อยแล้วเป็น `null` เพราะจบสเกลไปแล้ว */
+  currentStep: number | null;
+  /** ทำเสร็จไปกี่ขั้น (0-4) */
+  doneSteps: number;
+  /** ทั้งหมดกี่ขั้น — ปลายทางคือ "ส่งประกาศขึ้นหน้าสาธารณะ" */
+  totalSteps: number;
+  released: boolean;
+  /** 0-100 · 100 = ปล่อยขึ้นหน้าสาธารณะแล้ว */
+  percent: number;
+  /** ป้ายบรรทัดเดียวใต้แถบขั้น */
+  label: string;
+};
+
+export const RELEASE_TOTAL_STEPS = RELEASE_STEP_ORDER.length;
+
+/** ความคืบหน้าของใบนี้ — 🔴 แหล่งเดียว ห้ามคำนวณ % ซ้ำที่หน้าจอ */
+export function releaseProgressOf(job: JobRequest, facts: ReleaseFacts): ReleaseProgress {
+  const total = RELEASE_TOTAL_STEPS;
+  if (facts.isReleased(job)) {
+    return {
+      currentStep: null,
+      doneSteps: total,
+      totalSteps: total,
+      released: true,
+      percent: 100,
+      label: RELEASE_LANE_TEXT.released.label,
+    };
+  }
+  const key = releaseStepOf(job, facts);
+  const stepNo = RELEASE_STEP_TEXT[key].step;
+  const done = stepNo - 1;
+  return {
+    currentStep: stepNo,
+    doneSteps: done,
+    totalSteps: total,
+    released: false,
+    percent: Math.round((done / total) * 100),
+    label: RELEASE_STEP_TEXT[key].label,
+  };
+}
+
+/**
+ * ข้อความ tooltip ของแถบความคืบหน้าบนการ์ด
+ * 🔴 ต้องบอกให้ชัดว่า 100% คือ "ปล่อยประกาศแล้ว" ไม่ใช่ "หาคนได้ครบ"
+ * (ไม่งั้นคนอ่านผิดว่าใบนี้จบงานแล้ว — คนละเรื่องกับการปิดใบขอ)
+ */
+export function releaseProgressTitle(progress: ReleaseProgress): string {
+  const end = 'ครบ 100% = ส่งประกาศขึ้นหน้าสมัครงานสาธารณะแล้ว (ไม่ใช่ว่าหาคนได้ครบ)';
+  if (progress.released) return `ปล่อยขึ้นหน้าสาธารณะแล้ว · ${end}`;
+  const key = RELEASE_STEP_ORDER[(progress.currentStep ?? 1) - 1];
+  return `ต้องทำ: ${RELEASE_STEP_TEXT[key].todo} · ${end}`;
+}
+
 export type ReleaseStepCount = {
   key: ReleaseStepKey;
   step: number;
