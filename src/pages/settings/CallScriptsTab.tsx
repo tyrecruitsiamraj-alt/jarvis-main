@@ -211,8 +211,28 @@ const CallScriptsTab: React.FC = () => {
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden /> คืนบทมาตรฐาน
                 </button>
               ) : null}
+              {/* 🔴 แก้ค้างแล้วต้องมี **ทางออกสองทาง** เสมอ (เจ้าของทัก 1 ก.ย. 2569:
+                  *"บทพูดของ AI ตอนโทร แก้ค้างอยู่ ยังไม่ได้บันทึก แก้ไขที"*)
+                  เดิมมีแต่คำเตือนลอย ๆ กับปุ่มบันทึก — ถ้าไม่อยากเอาที่แก้ ไม่มีปุ่มทิ้ง
+                  ต้องรีเฟรชหน้าเอง และไม่มีอะไรบอกว่า "ของที่บันทึกไว้จริง ๆ คืออะไร" */}
               {dirty ? (
-                <span className={cn('text-[11px]', TONE.warn.value)}>แก้ค้างอยู่ ยังไม่ได้บันทึก</span>
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setDraft((d) => ({ ...d, [s.key]: [...s.lines] }))}
+                    title="ทิ้งข้อความที่พิมพ์ค้างไว้ แล้วดึงบทที่บันทึกไว้จริงกลับมาแสดง"
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium disabled:opacity-50',
+                      TONE.neutral.outline,
+                    )}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden /> ทิ้งที่แก้ค้าง
+                  </button>
+                  <span className={cn('text-[11px]', TONE.warn.value)}>
+                    แก้ค้างอยู่ ยังไม่ได้บันทึก — ข้อความในช่องต่างจากบทที่ใช้จริงตอนนี้
+                  </span>
+                </>
               ) : null}
             </div>
           </section>
