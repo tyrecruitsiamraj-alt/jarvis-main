@@ -1,12 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { monthGridDays, shiftMonth } from '@/lib/followCallCalendar';
-import { toYmdBangkok, THAI_MONTHS, ceToBeYear } from '@/lib/dateTh';
+import { shiftMonth } from '@/lib/followCallCalendar';
+import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
-  buildFollowPlanningDays,
+  buildFollowMonthRows,
+  monthDayColumns,
   FOLLOW_ROUND_STATE_LABEL,
+  type FollowPlanningRound,
   type FollowPlanningRow,
   type FollowRoundState,
 } from '@/lib/followPlanning';
@@ -16,32 +18,38 @@ import {
  *
  * > *"ตรง Planning ยังไม่ได้เป็นแบบปฏิทินที่มีรายละเอียด มีชื่อคนบอกไรงี้
  * >  เหมือนเป็นตารางบอกว่าวันนี้มีใครต้องติดตาม"*
+ * > *"ตรงปฏิทินเอาชื่อคนไปไว้ด้านซ้ายสิ"*
  *
- * ⇒ **ช่องวันต้องมีชื่อคนอยู่ในนั้นจริง ๆ** ไม่ใช่แค่ตัวเลขจำนวนสาย
- * กดวันไหน = ทั้งหน้ากรองเหลือวันนั้น (ตอบข้อ 1.1 *"เผื่อต้องการดูแค่วันนั้นวันเดียว"*)
- * กดซ้ำที่วันเดิม = ล้างตัวกรอง กลับมาดูทั้งหมด
+ * ⇒ **แถว = คน (ชื่ออยู่ซ้าย ตรึงไว้) · คอลัมน์ = วันของเดือน · ช่อง = เวลาที่ต้องโทร**
+ * ⚠️ เคยทำเป็นช่องปฏิทิน 7 คอลัมน์แล้วเอาชื่อยัดในช่อง — เจ้าของสั่งแก้เป็นแบบนี้
+ * กดช่อง/กดหัวคอลัมน์วัน = ทั้งหน้ากรองเหลือวันนั้น · กดซ้ำ = กลับมาดูทั้งหมด
  *
  * 🔴 **ตัวกรองวันใช้ช่องเดียวกับแผงตัวกรอง (`fDate`)** — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว
- * (เคยเจอมาแล้วกับ "ทั้งหมด" สามค่าบนจอเดียว: เลขไม่ตรงกันแล้วคนเลิกเชื่อทั้งหมด)
  */
 
-/** สีจุดหน้าชื่อในช่องวัน — ความหมายเดียวกับชิปเวลาในตาราง */
-const DOT: Record<FollowRoundState, string> = {
-  overdue: TONE.danger.dot,
-  sent: TONE.primary.dot,
-  waiting: TONE.neutral.dot,
-  result: TONE.success.dot,
-  closed: TONE.success.dot,
-  cancelled: TONE.neutral.dot,
+/** สีของช่อง — ความหมายเดียวกับชิปเวลาในตารางรายละเอียดข้างล่าง */
+const CELL_TONE: Record<FollowRoundState, string> = {
+  overdue: TONE.danger.chip,
+  sent: TONE.primary.chip,
+  waiting: TONE.neutral.chip,
+  result: TONE.success.chip,
+  closed: TONE.success.chip,
+  cancelled: TONE.neutral.chip,
 };
-
-const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 /** ชื่อเดือนไทย + ปี พ.ศ. จากคีย์ YYYY-MM */
 function monthLabel(monthKey: string): string {
   const [y, m] = monthKey.split('-');
   const name = THAI_MONTHS.find((x) => x.value === Number(m))?.label ?? m;
   return `${name} ${ceToBeYear(Number(y))}`;
+}
+
+/** ข้อความบอกช่อง — ตัวเลขลอย ๆ อ่านไม่ออกว่าคืออะไร ต้องมีคำกำกับตอนเอาเมาส์จ่อ */
+function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): string {
+  const detail = rounds
+    .map((r) => `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${FOLLOW_ROUND_STATE_LABEL[r.state]}`)
+    .join(' · ');
+  return `${name} · ${formatYmdDmyBe(ymd)} — ${detail} (กดเพื่อดูเฉพาะวันนี้)`;
 }
 
 const FollowPlanningCalendar: React.FC<{
@@ -52,9 +60,29 @@ const FollowPlanningCalendar: React.FC<{
   selectedYmd: string;
   onSelect: (ymd: string) => void;
 }> = ({ rows, month, onMonthChange, selectedYmd, onSelect }) => {
-  const days = useMemo(() => buildFollowPlanningDays(rows), [rows]);
-  const cells = useMemo(() => monthGridDays(month), [month]);
+  const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
+  const cols = useMemo(() => monthDayColumns(month), [month]);
   const today = toYmdBangkok(new Date());
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * เดือนหนึ่งมี 30 คอลัมน์ ⇒ เปิดมาเจอต้นเดือนซึ่งมักว่างเปล่า **ดูเหมือนไม่มีงาน**
+   * จึงเลื่อนไปที่วันนี้เอง (ถ้าไม่ได้อยู่ในเดือนนี้ก็ไปวันแรกที่มีนัด)
+   */
+  const focusYmd = useMemo(() => {
+    if (today.slice(0, 7) === month) return today;
+    const all = monthRows.flatMap((r) => Array.from(r.byDay.keys())).sort();
+    return all[0] ?? '';
+  }, [today, month, monthRows]);
+
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box || !focusYmd) return;
+    const cell = box.querySelector<HTMLElement>(`[data-ymd="${focusYmd}"]`);
+    if (!cell) return;
+    // เว้นที่ทางซ้ายไว้หน่อย ให้เห็นวันก่อนหน้าด้วย — กระโดดไปชิดขอบแล้วงงว่าอยู่ตรงไหน
+    box.scrollLeft = Math.max(0, cell.offsetLeft - 220);
+  }, [focusYmd]);
 
   return (
     <div className="glass-card rounded-2xl border border-white/70 p-3 dark:border-slate-700/70">
@@ -62,7 +90,7 @@ const FollowPlanningCalendar: React.FC<{
         <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden />
         <span className="text-sm font-bold text-foreground">ปฏิทินติดตาม</span>
         <span className="text-[11px] text-muted-foreground">
-          กดวันไหน = ดูเฉพาะวันนั้น · กดซ้ำ = กลับมาดูทั้งหมด
+          แถว = คน · คอลัมน์ = วัน · กดช่องหรือหัววัน = ดูเฉพาะวันนั้น · กดซ้ำ = กลับมาดูทั้งหมด
         </span>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -109,83 +137,123 @@ const FollowPlanningCalendar: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="px-1 pb-1 text-center text-[10px] font-semibold text-muted-foreground">
-            {w}
-          </div>
+      {/* คำอธิบายสี — ไม่มีคือเดาไม่ได้ว่าช่องสีหมายถึงอะไร */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        {(
+          [
+            ['overdue', 'เลยเวลานัด'],
+            ['sent', 'ส่งแล้วรอผล'],
+            ['waiting', 'ยังไม่ถึงเวลา'],
+            ['result', 'ได้ผลแล้ว / ปิดงาน'],
+          ] as const
+        ).map(([state, label]) => (
+          <span key={state} className="inline-flex items-center gap-1">
+            <span className={cn('h-2.5 w-2.5 rounded-sm', TONE[
+              state === 'overdue' ? 'danger' : state === 'sent' ? 'primary' : state === 'waiting' ? 'neutral' : 'success'
+            ].dot)} aria-hidden />
+            {label}
+          </span>
         ))}
-        {cells.map((ymd, i) => {
-          if (!ymd) return <div key={`x${i}`} aria-hidden />;
-          const day = days.get(ymd);
-          const selected = selectedYmd === ymd;
-          const isToday = ymd === today;
-          return (
-            <button
-              key={ymd}
-              type="button"
-              /* กดซ้ำวันเดิม = ล้าง (ปุ่มเดียวทำสองทาง ดีกว่ามีปุ่มล้างซ่อนอยู่ที่อื่น) */
-              onClick={() => onSelect(selected ? '' : ymd)}
-              aria-pressed={selected}
-              className={cn(
-                'min-h-[92px] rounded-xl border p-1.5 text-left transition-colors',
-                selected
-                  ? 'border-primary bg-primary/10'
-                  : day
-                    ? cn(TONE.neutral.soft, 'hover:bg-secondary')
-                    : 'border-border/60 bg-background/40 hover:bg-secondary/60',
-              )}
-            >
-              <div className="flex items-center gap-1">
-                <span
-                  className={cn(
-                    'inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums',
-                    isToday ? 'bg-primary text-primary-foreground' : 'text-foreground',
-                  )}
-                >
-                  {Number(ymd.slice(8))}
-                </span>
-                {day ? (
-                  <span className="ml-auto text-[10px] font-semibold tabular-nums text-muted-foreground">
-                    {day.calls} สาย
-                  </span>
-                ) : null}
-              </div>
-              {day ? (
-                <>
-                  <ul className="mt-1 space-y-0.5">
-                    {day.people.slice(0, 3).map((p) => (
-                      <li key={p.key} className="flex items-center gap-1">
-                        <span
-                          aria-hidden
-                          title={FOLLOW_ROUND_STATE_LABEL[p.worst]}
-                          className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT[p.worst])}
-                        />
-                        <span className="truncate text-[10px] font-medium text-foreground">{p.name}</span>
-                        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                          {p.rounds[0]?.time ?? ''}
-                          {p.rounds.length > 1 ? ` +${p.rounds.length - 1}` : ''}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {day.people.length > 3 ? (
-                    <p className="mt-0.5 text-[10px] font-medium text-primary">
-                      +อีก {day.people.length - 3} คน
-                    </p>
-                  ) : null}
-                  {/* ของค้างของวันนั้นต้องเห็นจากนอกช่อง ไม่ต้องกดเข้าไปหา */}
-                  {day.overdue > 0 ? (
-                    <p className="mt-0.5 text-[10px] font-bold text-rose-700 dark:text-red-300">
-                      เลยเวลา {day.overdue}
-                    </p>
-                  ) : null}
-                </>
-              ) : null}
-            </button>
-          );
-        })}
       </div>
+
+      {monthRows.length === 0 ? (
+        <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.neutral.soft)}>
+          เดือนนี้ไม่มีนัดโทรของใครเลย
+        </p>
+      ) : (
+        <div ref={scrollRef} className="overflow-x-auto rounded-xl border border-border">
+          <table className="min-w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                {/* 🔴 ชื่อคนอยู่ซ้ายและตรึงไว้ — เลื่อนดูวันท้ายเดือนแล้วต้องยังรู้ว่าแถวนี้ใคร */}
+                <th className="sticky left-0 z-10 min-w-[190px] max-w-[260px] bg-card px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground">
+                  คนที่ต้องติดตาม
+                </th>
+                {cols.map((c) => {
+                  const selected = selectedYmd === c.ymd;
+                  return (
+                    <th key={c.ymd} data-ymd={c.ymd} className={cn('p-0.5', c.isSunday && 'bg-secondary/40')}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(selected ? '' : c.ymd)}
+                        aria-pressed={selected}
+                        title={`${formatYmdDmyBe(c.ymd)} — กดเพื่อดูเฉพาะวันนี้`}
+                        className={cn(
+                          'flex min-w-[42px] flex-col items-center rounded-lg px-1 py-1 font-medium transition-colors hover:bg-secondary',
+                          selected && 'bg-primary text-primary-foreground hover:bg-primary',
+                          !selected && c.isSunday && 'text-rose-800 dark:text-red-300',
+                          !selected && !c.isSunday && 'text-muted-foreground',
+                          !selected && c.ymd === today && 'underline underline-offset-4',
+                        )}
+                      >
+                        <span className="text-[9px] leading-none opacity-80">{c.weekday}</span>
+                        <span className="text-[11px] tabular-nums">{c.day}</span>
+                      </button>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {monthRows.map(({ row, byDay }) => (
+                <tr key={row.group.key} className="border-b border-border/50 last:border-0">
+                  <td className="sticky left-0 z-10 max-w-[260px] bg-card px-3 py-1.5 align-middle">
+                    <span className="block truncate text-[11px] font-bold text-foreground">
+                      {row.group.name}
+                    </span>
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {row.group.unitName || row.group.phone}
+                    </span>
+                  </td>
+                  {cols.map((c) => {
+                    const rounds = byDay.get(c.ymd);
+                    const selected = selectedYmd === c.ymd;
+                    return (
+                      <td
+                        key={c.ymd}
+                        className={cn(
+                          'p-0.5 text-center align-middle',
+                          c.isSunday && 'bg-secondary/40',
+                          selected && 'bg-primary/10',
+                        )}
+                      >
+                        {rounds ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelect(selected ? '' : c.ymd)}
+                            title={cellTitle(row.group.name, c.ymd, rounds)}
+                            className="flex w-full flex-col items-stretch gap-0.5"
+                          >
+                            {/* โชว์เวลาจริง ไม่ใช่จุดสีลอย ๆ — เจ้าของอยากเห็น "เวลาไหนบ้าง" */}
+                            {rounds.slice(0, 2).map((r) => (
+                              <span
+                                key={r.entry.id}
+                                className={cn(
+                                  'block rounded px-0.5 py-0.5 text-[9px] font-bold leading-tight tabular-nums',
+                                  CELL_TONE[r.state],
+                                )}
+                              >
+                                {r.time ?? '—'}
+                              </span>
+                            ))}
+                            {rounds.length > 2 ? (
+                              <span className="text-[9px] font-semibold text-primary">
+                                +{rounds.length - 2}
+                              </span>
+                            ) : null}
+                          </button>
+                        ) : (
+                          <div className="mx-auto h-4 w-full rounded bg-secondary/25" aria-hidden />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

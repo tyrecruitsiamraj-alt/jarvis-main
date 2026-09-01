@@ -156,79 +156,62 @@ export function buildFollowPlanningRows(
   });
 }
 
-/* ═══ มุมปฏิทินของ Planning (เจ้าของสั่งเพิ่ม 1 ก.ย. 2569) ═══
- *
- * > *"ตรง Planning ยังไม่ได้เป็นแบบปฏิทินที่มีรายละเอียด มีชื่อคนบอก
- * >  เหมือนเป็นตารางบอกว่าวันนี้มีใครต้องติดตาม"*
- *
- * ⇒ ตารางแถวยาวอย่างเดียวไม่พอ ต้องเห็น **ทั้งเดือนเป็นช่องวัน แล้วในช่องมีชื่อคน**
- * ⚠️ นับตามปฏิทินกรุงเทพเสมอ (สายตี 1 ของไทยยังเป็น "เมื่อวาน" ที่ UTC)
- * ⚠️ รอบที่ยกเลิกไม่ใช่งานของวันนั้นอีกแล้ว — ไม่นับ ไม่โชว์
+/**
+ * วันทั้งหมดของเดือน (YYYY-MM-DD) + เลขวัน + ตัวย่อวันไทย + ธงวันอาทิตย์
+ * — คอลัมน์ของตาราง Planning ที่ชื่อคนอยู่ซ้าย (เจ้าของสั่ง 1 ก.ย. 2569:
+ * *"ตรงปฏิทินเอาชื่อคนไปไว้ด้านซ้ายสิ"*)
+ * ⚠️ คำนวณด้วย UTC ล้วน — ไม่เกี่ยวกับเขตเวลาเครื่องผู้ใช้ (คีย์วันเป็นสตริงอยู่แล้ว)
  */
-
-export type FollowDayPerson = {
-  /** คีย์กลุ่ม (เบอร์|เรื่อง) — ใช้เป็น React key ได้ */
-  key: string;
-  name: string;
-  /** รอบของคนนี้ในวันนั้น เรียงตามเวลา */
-  rounds: FollowPlanningRound[];
-  /** สภาพที่ "แรงที่สุด" ของวันนั้น — ใช้เป็นสีจุดหน้าชื่อ */
-  worst: FollowRoundState;
-};
-
-export type FollowPlanningDay = {
-  ymd: string;
-  people: FollowDayPerson[];
-  /** จำนวนสายของวันนั้น (ไม่นับที่ยกเลิก) */
-  calls: number;
-  /** เลยเวลานัดแล้วยังไม่มีผล — ของค้างของวันนั้น */
-  overdue: number;
-  /** ได้ผลกลับมาแล้ว/ปิดงานแล้ว */
-  done: number;
-};
-
-/** ความแรงของสภาพ — ของค้างชนะทุกอย่าง (จอต้องเตือนก่อน ไม่ใช่กลบ) */
-const STATE_RANK: Record<FollowRoundState, number> = {
-  overdue: 5,
-  sent: 4,
-  waiting: 3,
-  result: 2,
-  closed: 1,
-  cancelled: 0,
-};
-
-/** ปฏิทินรายวันของทั้งชุด — คีย์เป็น YYYY-MM-DD ตามเวลาไทย */
-export function buildFollowPlanningDays(
-  rows: readonly FollowPlanningRow[],
-): Map<string, FollowPlanningDay> {
-  const out = new Map<string, FollowPlanningDay>();
-  for (const row of rows) {
-    for (const round of row.rounds) {
-      if (!round.ymd || round.state === 'cancelled') continue;
-      const day = out.get(round.ymd) ?? { ymd: round.ymd, people: [], calls: 0, overdue: 0, done: 0 };
-      out.set(round.ymd, day);
-      day.calls += 1;
-      if (round.state === 'overdue') day.overdue += 1;
-      if (round.state === 'result' || round.state === 'closed') day.done += 1;
-      const person =
-        day.people.find((p) => p.key === row.group.key) ??
-        (() => {
-          const p: FollowDayPerson = { key: row.group.key, name: row.group.name, rounds: [], worst: round.state };
-          day.people.push(p);
-          return p;
-        })();
-      person.rounds.push(round);
-      if (STATE_RANK[round.state] > STATE_RANK[person.worst]) person.worst = round.state;
-    }
+export function monthDayColumns(
+  month: string,
+): Array<{ ymd: string; day: number; weekday: string; isSunday: boolean }> {
+  const m = /^(\d{4})-(\d{2})$/.exec(month.trim());
+  if (!m) return [];
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (mo < 1 || mo > 12) return [];
+  const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  const out: Array<{ ymd: string; day: number; weekday: string; isSunday: boolean }> = [];
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    const dow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+    out.push({
+      ymd: `${month}-${String(d).padStart(2, '0')}`,
+      day: d,
+      weekday: WEEKDAYS[dow],
+      isSunday: dow === 0,
+    });
   }
-  // ในแต่ละวัน: คนที่มีของค้างขึ้นก่อน แล้วเรียงตามเวลานัดแรกของวันนั้น
-  for (const day of out.values()) {
-    for (const p of day.people) p.rounds.sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
-    day.people.sort(
-      (a, b) =>
-        STATE_RANK[b.worst] - STATE_RANK[a.worst] ||
-        (a.rounds[0]?.time ?? '').localeCompare(b.rounds[0]?.time ?? ''),
-    );
+  return out;
+}
+
+/**
+ * แถวของตาราง Planning แบบชื่ออยู่ซ้าย — เฉพาะคนที่มีนัดในเดือนนั้น
+ * คีย์ของ `byDay` เป็น YYYY-MM-DD · เรียงรอบในวันตามเวลา
+ */
+export type FollowMonthRow = {
+  row: FollowPlanningRow;
+  byDay: Map<string, FollowPlanningRound[]>;
+};
+
+export function buildFollowMonthRows(
+  rows: readonly FollowPlanningRow[],
+  month: string,
+): FollowMonthRow[] {
+  const out: FollowMonthRow[] = [];
+  for (const row of rows) {
+    const byDay = new Map<string, FollowPlanningRound[]>();
+    for (const round of row.rounds) {
+      // รอบที่ยกเลิกไม่ใช่งานของวันนั้นอีกแล้ว — เกณฑ์เดียวกับ buildFollowPlanningDays
+      if (!round.ymd || round.state === 'cancelled') continue;
+      if (round.ymd.slice(0, 7) !== month) continue;
+      const list = byDay.get(round.ymd);
+      if (list) list.push(round);
+      else byDay.set(round.ymd, [round]);
+    }
+    if (byDay.size === 0) continue; // ไม่มีนัดในเดือนนี้ = ไม่ต้องมีแถว
+    for (const list of byDay.values()) list.sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+    out.push({ row, byDay });
   }
   return out;
 }

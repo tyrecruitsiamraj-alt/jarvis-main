@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { FollowEntry } from '../../src/lib/followApi';
 import { groupFollowEntries } from '../../src/lib/followGrouping';
 import {
-  buildFollowPlanningDays,
+  buildFollowMonthRows,
   buildFollowPlanningRows,
+  monthDayColumns,
   followRoundState,
   isRoundOpen,
 } from '../../src/lib/followPlanning';
@@ -123,36 +124,38 @@ describe('buildFollowPlanningRows', () => {
   });
 });
 
-describe('buildFollowPlanningDays — ปฏิทินต้องมีชื่อคนในช่องวัน ไม่ใช่แค่เลข', () => {
-  const days = (list: FollowEntry[]) =>
-    buildFollowPlanningDays(buildFollowPlanningRows(groupFollowEntries(list, NOW), NOW));
+describe('ตาราง Planning แบบชื่ออยู่ซ้าย (เจ้าของสั่ง: "เอาชื่อคนไปไว้ด้านซ้าย")', () => {
+  const monthRows = (list: FollowEntry[], month: string) =>
+    buildFollowMonthRows(buildFollowPlanningRows(groupFollowEntries(list, NOW), NOW), month);
 
-  it('รวมคนของแต่ละวัน พร้อมเวลาและจำนวนสาย', () => {
-    const d = days([
-      entry({ id: 'p1', recipient_phone: '0800000001', scheduled_at: '2026-09-01T02:00:00Z' }),
-      entry({ id: 'p2', recipient_phone: '0800000001', scheduled_at: '2026-09-01T09:00:00Z' }),
-      entry({ id: 'p3', recipient_phone: '0800000002', scheduled_at: '2026-09-01T09:30:00Z' }),
-      entry({ id: 'p4', recipient_phone: '0800000002', scheduled_at: '2026-09-02T09:00:00Z' }),
-    ]);
-    expect(d.get('2026-09-01')?.calls).toBe(3);
-    expect(d.get('2026-09-01')?.people).toHaveLength(2);
-    expect(d.get('2026-09-01')?.people[0].rounds).toHaveLength(2);
-    expect(d.get('2026-09-02')?.calls).toBe(1);
+  it('คอลัมน์ = ทุกวันของเดือน พร้อมตัวย่อวันไทยและธงวันอาทิตย์', () => {
+    const cols = monthDayColumns('2026-09');
+    expect(cols).toHaveLength(30);
+    expect(cols[0]).toEqual({ ymd: '2026-09-01', day: 1, weekday: 'อ', isSunday: false });
+    expect(cols.filter((c) => c.isSunday).map((c) => c.day)).toEqual([6, 13, 20, 27]);
+    expect(monthDayColumns('พัง')).toEqual([]);
   });
 
-  it('รอบที่ยกเลิกไม่ใช่งานของวันนั้น — ไม่นับ ไม่โชว์', () => {
-    const d = days([entry({ id: 'p5', scheduled_at: '2026-09-04T02:00:00Z', cancelled: true })]);
-    expect(d.get('2026-09-04')).toBeUndefined();
+  it('แถว = คนที่มีนัดในเดือนนั้นเท่านั้น · ช่องเก็บรอบของวันนั้นเรียงตามเวลา', () => {
+    const rows = monthRows(
+      [
+        entry({ id: 'm1', recipient_phone: '0800000001', scheduled_at: '2026-09-01T09:00:00Z' }),
+        entry({ id: 'm2', recipient_phone: '0800000001', scheduled_at: '2026-09-01T02:00:00Z' }),
+        entry({ id: 'm3', recipient_phone: '0800000002', scheduled_at: '2026-08-20T02:00:00Z' }),
+      ],
+      '2026-09',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].row.group.phone).toBe('0800000001');
+    const cell = rows[0].byDay.get('2026-09-01');
+    expect(cell?.map((r) => r.time)).toEqual(['09:00', '16:00']);
   });
 
-  it('🔴 คนที่มีของค้างขึ้นก่อนในช่องวัน และนับยอดเลยเวลาแยกไว้', () => {
-    const d = days([
-      entry({ id: 'p6', recipient_phone: '0800000001', scheduled_at: '2026-09-01T09:00:00Z' }),
-      entry({ id: 'p7', recipient_phone: '0800000002', scheduled_at: '2026-09-01T02:00:00Z' }),
-    ]);
-    const day = d.get('2026-09-01');
-    expect(day?.overdue).toBe(1);
-    expect(day?.people[0].worst).toBe('overdue');
-    expect(day?.people[0].key.startsWith('800000002')).toBe(true);
+  it('รอบที่ยกเลิกไม่โผล่ในตาราง — คนที่ยกเลิกหมดก็ไม่มีแถว', () => {
+    const rows = monthRows(
+      [entry({ id: 'm4', scheduled_at: '2026-09-03T02:00:00Z', cancelled: true })],
+      '2026-09',
+    );
+    expect(rows).toHaveLength(0);
   });
 });
