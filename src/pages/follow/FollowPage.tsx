@@ -64,6 +64,7 @@ import { hasFollowPrefill, readFollowPrefill, splitPrefillName } from '@/lib/fol
 import { fetchSiamrajUnitRequests, fetchAllUnitOptions } from '@/lib/siamrajUnitRequestsApi';
 import type { JobRequest } from '@/types';
 import FollowEditDialog from '@/components/follow/FollowEditDialog';
+import RoundScriptNote from '@/components/follow/RoundScriptNote';
 import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
@@ -1442,6 +1443,9 @@ const FollowPage: React.FC = () => {
                       onChange={(next) => setStaffPhoneAt(i, next)}
                       reloadSignal={contactsRev}
                     />
+                    {/* บอกว่ารอบนี้ AI ใช้บทไหน + กางดูเนื้อบทได้ (เจ้าของสั่ง 1 ก.ย. 2569:
+                        *"หน้าติดตามฉันแก้บทแล้ว พาไปดูตอนเพิ่มคนที"*) */}
+                    <RoundScriptNote roundIndex={i} />
                   </div>
                 ))}
               </div>
