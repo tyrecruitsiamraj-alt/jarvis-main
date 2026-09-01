@@ -9,16 +9,19 @@ import { EM_DASH } from '@/lib/displayFallback';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
   fetchAftercarePeople,
+  moveToAftercare,
   updateAftercare,
   type AftercarePerson,
 } from '@/lib/aftercareApi';
+import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
+import { pickerDisplayName } from '@/lib/boardPickerApi';
 import {
   AFTERCARE_TOPIC,
   aftercareRoundsSummary,
   buildAftercareRounds,
 } from '@/lib/aftercareRounds';
 import { buildFollowPrefillPath } from '@/lib/followPrefill';
-import { LoaderCircle, RefreshCw, UserCheck } from 'lucide-react';
+import { LoaderCircle, RefreshCw, UserCheck, Users } from 'lucide-react';
 
 /**
  * หน้า **"ดูแลหลังเริ่มงาน"** (Phase 7.3-7.5 · ชื่อหน้าเจ้าของเคาะเอง)
@@ -39,6 +42,14 @@ const AftercarePage: React.FC = () => {
   const [includeClosed, setIncludeClosed] = useState(false);
   const [savingPhone, setSavingPhone] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * เลือกชื่อจากบอร์ด ERP มาเพิ่มเข้าความดูแล (เจ้าของสั่ง 1 ก.ย. 2569:
+   * *"เพิ่มให้ดึงชื่อคนเพื่อเอามาโทรจาก erp ทำเหมือนหน้าติดตามที่กดปุ่มมีชื่อให้เลือก"*)
+   * 🔴 ใช้ `BoardPersonPicker` **ตัวเดียวกับหน้าติดตาม** — ขอบเขตรายชื่อ/การค้นหา
+   * จึงเหมือนกันเป๊ะ ไม่ต้องมีลิสต์คนสองชุดที่วันหนึ่งจะไม่ตรงกัน
+   */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -128,6 +139,15 @@ const AftercarePage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            disabled={adding}
+            className="jarvis-pill-btn inline-flex min-h-[40px] items-center gap-1.5 px-4 py-2 text-sm touch-manipulation disabled:opacity-50"
+          >
+            <Users className="h-4 w-4" aria-hidden />
+            {adding ? 'กำลังเพิ่ม…' : 'เพิ่มคนจากบอร์ด ERP'}
+          </button>
           <button type="button" onClick={load} disabled={loading} className="jarvis-btn-secondary">
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </button>
@@ -168,11 +188,17 @@ const AftercarePage: React.FC = () => {
             <UserCheck className={cn('mx-auto h-8 w-8', DASH.muted)} />
             <p className="mt-2 text-sm font-medium text-foreground">ยังไม่มีใครอยู่ในความดูแล</p>
             <p className={cn('mt-1 text-xs', DASH.muted)}>
-              คนจะเข้ามาที่นี่เมื่อกด "ย้ายไปดูแลหลังเริ่มงาน" จากกล่อง <b>โทรครบแล้ว</b> บนหน้า Follow
+              คนเข้ามาที่นี่ได้สองทาง — กด "ย้ายไปดูแลหลังเริ่มงาน" จากกล่อง <b>โทรครบแล้ว</b> บนหน้า Follow
+              หรือกดเพิ่มเองจากบอร์ด ERP
             </p>
-            <button type="button" onClick={() => navigate('/follow')} className="jarvis-btn-secondary mt-3">
-              ไปหน้า Follow
-            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button type="button" onClick={() => setPickerOpen(true)} className="jarvis-btn-secondary">
+                เพิ่มคนจากบอร์ด ERP
+              </button>
+              <button type="button" onClick={() => navigate('/follow')} className="jarvis-btn-secondary">
+                ไปหน้า Follow
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -294,6 +320,43 @@ const AftercarePage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* เลือกชื่อจากบอร์ด ERP — ตัวเดียวกับหน้าติดตาม (เจ้าของสั่ง 1 ก.ย. 2569)
+          ⚠️ เพิ่มแล้ว **ยังไม่รู้วันเริ่มงาน** ⇒ ตั้งรอบโทรไม่ได้จนกว่าจะกรอกวัน
+          (กติกาเดิมของหน้านี้: ห้ามเดาวันเริ่มงานจากวันที่ย้ายเข้ามา) */}
+      <BoardPersonPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(person) => {
+          setPickerOpen(false);
+          const phone = (person.mobile || '').trim();
+          if (!phone) {
+            setError('คนนี้ไม่มีเบอร์ในบอร์ด — เพิ่มเข้าความดูแลไม่ได้ (คีย์หลักของหน้านี้คือเบอร์)');
+            return;
+          }
+          setAdding(true);
+          setError(null);
+          setNotice(null);
+          void moveToAftercare({
+            phone,
+            full_name: pickerDisplayName(person),
+            /* ⚠️ **ไม่เดาหน่วยงานจาก `area` ของบอร์ด** — นั่นคือ "พื้นที่ที่เขาสะดวก"
+               (เช่น "เขตพระโขนง กรุงเทพมหานคร") ไม่ใช่หน่วยงานที่ไปทำงาน
+               ปล่อยว่างให้คนกรอกเอง ดีกว่าเติมค่าที่ดูเหมือนจริงแต่ผิด */
+            source: 'manual',
+          })
+            .then((added) => {
+              setNotice(
+                `เพิ่ม ${added.full_name} เข้าความดูแลแล้ว — กรอกวันเริ่มงานก่อน จึงจะตั้งรอบโทรได้`,
+              );
+              return load();
+            })
+            .catch((e: unknown) =>
+              setError(e instanceof Error ? e.message : 'เพิ่มเข้าความดูแลไม่สำเร็จ'),
+            )
+            .finally(() => setAdding(false));
+        }}
+      />
     </div>
   );
 };

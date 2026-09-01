@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowEntry,
@@ -32,7 +32,6 @@ import { groupFollowEntries } from '@/lib/followGrouping';
 import {
   filterFollowEntries,
   countFollowTabs,
-  listFollowOwners,
   FOLLOW_TABS,
   FOLLOW_TAB_LABEL,
   TIME_BAND_LABEL,
@@ -60,6 +59,7 @@ import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
+import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
@@ -99,10 +99,8 @@ const FollowPage: React.FC = () => {
    * + filter ประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) · ตรรกะที่ followListFilter.ts
    */
   const [tab, setTab] = useState<FollowTab>('active');
-  const [filterOpen, setFilterOpen] = useState(false);
   const [fDate, setFDate] = useState('');
   const [fBand, setFBand] = useState<TimeBand>('');
-  const [fOwner, setFOwner] = useState('');
   /** เดือนที่ปฏิทิน Planning กางอยู่ (YYYY-MM) — เริ่มที่เดือนนี้ตามปฏิทินไทย */
   const [calMonth, setCalMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
   /**
@@ -682,12 +680,11 @@ const FollowPage: React.FC = () => {
   );
 
   const filtered = useMemo(
-    () => filterFollowEntries(items, { tab, date: fDate, band: fBand, owner: fOwner }),
-    [items, tab, fDate, fBand, fOwner],
+    () => filterFollowEntries(items, { tab, date: fDate, band: fBand }),
+    [items, tab, fDate, fBand],
   );
   const tabCounts = useMemo(() => countFollowTabs(items), [items]);
-  const owners = useMemo(() => listFollowOwners(items), [items]);
-  const hasActiveFilter = Boolean(fDate || fBand || fOwner);
+  const hasActiveFilter = Boolean(fDate || fBand);
 
   /**
    * การ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: คนเดียวหลายรอบแตกหลายแถว "งงตาย")
@@ -851,67 +848,9 @@ const FollowPage: React.FC = () => {
           activeRound={activeRound}
         />
 
-        {/* สรุปยอด + รีเฟรช (ปุ่มเพิ่มคนย้ายขึ้นไปอยู่กับ "เพิ่มเจ้าหน้าที่" แล้ว) */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            disabled={loading}
-            className={cn(
-              'inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium shadow-sm disabled:opacity-50',
-              // เดิมเขียนคลาสเองแบบไม่มีคู่ dark: → โหมดมืดได้ปุ่มขาวทึบบนพื้นดำ
-              // (วัดจริง: rgb(255,255,255) บนพื้น rgb(19,19,22)) · TONE.info.outline คือชุดเดียวกันแต่ครบสองธีม
-              TONE.info.outline,
-            )}
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden />
-            รีเฟรช
-          </button>
-          {/* 🔴 แถบเวลานัด — เลขชุดเดียวกับที่หน้าแรกใช้พาดหัวส่งคนมาที่นี่
-              ต้องมาก่อนยอดรวมสถานะสาย เพราะนี่คือ "ต้องโทรใครตอนนี้" ส่วนข้างล่างคือ
-              "สายไปถึงไหนแล้ว" — คนละคำถาม เดิมมีแต่อย่างหลังจึงหาของด่วนไม่เจอ */}
-          <p className="text-xs text-muted-foreground">
-            <span className="text-foreground/70">ต้องโทรใครตอนนี้ · </span>
-            <span title="คนที่ตั้งเวลาโทรไว้ในวันนี้ (ยังไม่ถึงเวลาก็นับ)">
-              นัดวันนี้{' '}
-              <span className="font-bold tabular-nums text-foreground">{schedule.today}</span>
-            </span>
-            {' · '}
-            <span
-              title="เลยเวลาที่นัดจะโทรแล้วยังไม่มีผลกลับ — มีคนรอสายอยู่จริง (เลขเดียวกับที่หน้าแรกพาดหัว)"
-              className={schedule.pastDue > 0 ? 'text-red-700 dark:text-red-300' : undefined}
-            >
-              เลยเวลานัดแล้ว{' '}
-              <span className="font-bold tabular-nums">{schedule.pastDue}</span>
-            </span>
-            {' · '}
-            <span title="คนที่ตั้งเวลาโทรไว้เป็นวันถัดไป ยังไม่ถึงคิววันนี้">
-              นัดล่วงหน้า{' '}
-              <span className="font-bold tabular-nums text-foreground">{schedule.upcoming}</span>
-            </span>
-          </p>
-          {/* 🔴 บอกให้ชัดว่ายอดชุดนี้นับอะไร — บนจอเดียวมีสามชุดที่ตอบคนละคำถาม
-              (แถบเวลานัด = ต้องโทรใครตอนนี้ · ชุดนี้ = สายไปถึงไหน · แท็บ = งานจบยัง)
-              เดิมทั้งสามชุดขึ้นคำว่า "ทั้งหมด" เฉย ๆ แล้วเลขไม่ตรงกัน คนใหม่เลยไม่รู้ว่าอันไหนจริง */}
-          <p className="text-xs text-muted-foreground">
-            <span className="text-foreground/70">สถานะสาย · </span>
-            ทั้งหมด <span className="font-bold tabular-nums text-foreground">{counts.total}</span> · รอโทร{' '}
-            <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">{counts.pending}</span> · สำเร็จ{' '}
-            <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{counts.done}</span>
-            {/* 🔴 ของค้างที่ไม่มีใครจะโทร — โชว์เฉพาะเมื่อมีจริง (กติกา: ห้ามป้ายที่ขึ้น 0 ทุกวัน) */}
-            {counts.notSent > 0 ? (
-              <>
-                {' '}·{' '}
-                <span
-                  title="รายการที่ยังไม่ได้ส่งให้ AI โทร — ดูเหตุผลที่ป้ายในแต่ละรายการ"
-                  className="font-bold tabular-nums text-amber-700 dark:text-amber-300"
-                >
-                  ไม่ได้ส่งให้ AI {counts.notSent}
-                </span>
-              </>
-            ) : null}
-          </p>
-        </div>
+        {/* 🔴 แถบสรุปเลข (ต้องโทรใครตอนนี้ / สถานะสาย) กับปุ่มรีเฟรช **ถูกถอดออก**
+            (เจ้าของสั่ง 1 ก.ย. 2569) — เลขชุดเดียวกันกับปุ่มรีเฟรชอยู่บนแผง
+            "การโทรของงาน Follow" ข้างบนอยู่แล้ว ไม่ต้องมีสองที่ */}
 
         {/* แท็บสถานะ + ปุ่ม Filter (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6) — แยกหน้าตามสถานะ
             เพื่อดูง่าย · ปุ่ม Filter เช็คสถานะประจำวัน (วันที่/ช่วงเวลา/เจ้าของงาน) */}
@@ -945,26 +884,32 @@ const FollowPage: React.FC = () => {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setFilterOpen((v) => !v)}
-            aria-expanded={filterOpen}
+          {/* ═══ ตัวกรอง = ไอคอนปฏิทิน + ช่วงเวลา (เจ้าของสั่ง 1 ก.ย. 2569) ═══
+              *"เปลี่ยนเป็นโลโก้ Calendar กดไปแล้วเลือกวัน เดือน ปี · ช่วงเวลาทำเป็น Dropdown"*
+              🔴 แผงตัวกรอง 3 ช่องแบบพับได้ถูกถอดทิ้ง — สองอันนี้อยู่บนจอเลย ไม่ต้องกดเปิด
+              ⚠️ ตัวกรอง "เจ้าของงาน (คนคีย์)" ถูกถอดออกตามคำสั่งชุดนี้ด้วย */}
+          <DayCalendarPicker value={fDate} onChange={pickCalendarDay} emptyLabel="เลือกวัน" />
+          <select
+            id="fBand"
+            aria-label="ช่วงเวลา"
+            value={fBand}
+            onChange={(e) => setFBand(e.target.value as TimeBand)}
             className={cn(
-              'inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
-              hasActiveFilter ? cn(TONE.info.soft, TONE.info.value, 'border-transparent') : TONE.neutral.outline,
+              'min-h-[36px] rounded-full border px-3 py-1.5 text-xs font-medium',
+              fBand ? cn(TONE.info.soft, TONE.info.value, 'border-transparent') : TONE.neutral.outline,
             )}
           >
-            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-            ตัวกรอง
-            {hasActiveFilter ? <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden /> : null}
-          </button>
+            <option value="">ทุกช่วงเวลา</option>
+            <option value="morning">{TIME_BAND_LABEL.morning}</option>
+            <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
+            <option value="evening">{TIME_BAND_LABEL.evening}</option>
+          </select>
           {hasActiveFilter ? (
             <button
               type="button"
               onClick={() => {
-                setFDate('');
+                pickCalendarDay('');
                 setFBand('');
-                setFOwner('');
               }}
               className="text-[11px] font-medium text-primary underline"
             >
@@ -972,64 +917,6 @@ const FollowPage: React.FC = () => {
             </button>
           ) : null}
         </div>
-
-        {/* แผงตัวกรองประจำวัน — วันที่ / ช่วงเวลา / เจ้าของงาน (พับได้) */}
-        {filterOpen ? (
-          <div className={cn('grid gap-3 rounded-xl border p-3 sm:grid-cols-3', TONE.neutral.soft)}>
-            <div className="space-y-1">
-              <label htmlFor="fDate" className="ml-1 text-[11px] font-medium text-muted-foreground">
-                วันที่
-              </label>
-              <input
-                id="fDate"
-                type="date"
-                value={fDate}
-                onChange={(e) => {
-                  setFDate(e.target.value);
-                }}
-                className="jarvis-soft-field min-h-[40px] w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="fBand" className="ml-1 text-[11px] font-medium text-muted-foreground">
-                ช่วงเวลา
-              </label>
-              <select
-                id="fBand"
-                value={fBand}
-                onChange={(e) => {
-                  setFBand(e.target.value as TimeBand);
-                }}
-                className="jarvis-soft-field min-h-[40px] w-full"
-              >
-                <option value="">ทุกช่วง</option>
-                <option value="morning">{TIME_BAND_LABEL.morning}</option>
-                <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
-                <option value="evening">{TIME_BAND_LABEL.evening}</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="fOwner" className="ml-1 text-[11px] font-medium text-muted-foreground">
-                เจ้าของงาน (คนคีย์)
-              </label>
-              <select
-                id="fOwner"
-                value={fOwner}
-                onChange={(e) => {
-                  setFOwner(e.target.value);
-                }}
-                className="jarvis-soft-field min-h-[40px] w-full"
-              >
-                <option value="">ทุกคน</option>
-                {owners.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        ) : null}
 
         {okMessage ? (
           <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.success.soft, TONE.success.value)}>
