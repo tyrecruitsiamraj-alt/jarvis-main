@@ -14,24 +14,16 @@ import { useListPagination } from '@/hooks/useListPagination';
 import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
-import { Phone, Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Pencil, Building2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
-import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
-import { FOLLOW_OUTCOME_LABEL, type FollowOutcome, type FollowOutcomeAny } from '@/lib/followOutcome';
+import { Plus, X, LoaderCircle, RefreshCw, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowEntry,
   cancelFollowEntry,
   completeFollowEntry,
-  FOLLOW_STATUS_LABEL,
-  FOLLOW_STATUS_CLASS,
-  FOLLOW_STATUS_BAR,
   type FollowEntry,
   updateFollowEntry,
 } from '@/lib/followApi';
-import FollowDispatchBadge from '@/components/follow/FollowDispatchBadge';
 import { summarizeDispatchResults } from '@/lib/followDispatchState';
-import NameAvatar from '@/components/shared/NameAvatar';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
 import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
 import FollowCompletedPanel from '@/components/follow/FollowCompletedPanel';
@@ -68,7 +60,9 @@ import RoundScriptNote from '@/components/follow/RoundScriptNote';
 import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
-import FollowMonthGrid from '@/components/follow/FollowMonthGrid';
+import FollowPlanningTable from '@/components/follow/FollowPlanningTable';
+import { type FollowOutcome } from '@/lib/followOutcome';
+import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
   listStaffContacts,
@@ -76,14 +70,6 @@ import {
   type FollowStaffContact,
 } from '@/lib/followStaffContactsApi';
 import { useAuth } from '@/contexts/AuthContext';
-
-
-function formatWhen(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
-}
 
 /** ค่าเริ่มต้นช่องวันเวลา = ตอนนี้ (รูปแบบ datetime-local ตามเวลาเครื่อง) */
 function nowForInput(): string {
@@ -101,14 +87,6 @@ const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as co
 /** ประกอบชื่อที่จะส่งให้ API — API รับ `recipient_name` ก้อนเดียว */
 function composeRecipientName(prefix: string, first: string, last: string): string {
   return `${prefix}${first.trim()} ${last.trim()}`.trim().replace(/\s+/g, ' ');
-}
-
-/**
- * ผลโทรเป็นคำไทย — อ่านจาก `CALL_OUTCOME_LABEL` ที่เป็นแหล่งเดียวของทั้งระบบ
- * 🔴 รหัสที่ไม่รู้จักให้คืนรหัสเดิมไปตามตรง (จอที่เดาแล้วบอกผิด แย่กว่าจอที่ยอมรับว่าไม่รู้)
- */
-function callOutcomeText(code: string): string {
-  return (CALL_OUTCOME_LABEL as Record<string, string>)[code] ?? code;
 }
 
 const FollowPage: React.FC = () => {
@@ -186,11 +164,6 @@ const FollowPage: React.FC = () => {
   const { user } = useAuth();
   /** เพิ่มเรื่อง/เจ้าหน้าที่ได้เฉพาะ supervisor ขึ้นไป (เจ้าของสั่ง ค่ำ-5) */
   const canManageMasters = user?.role === 'supervisor' || user?.role === 'admin';
-  /**
-   * มุมมองลิสต์ (เจ้าของสั่ง ค่ำ-5: อยากได้ตารางสรุปแบบ คน × วันของเดือน)
-   * — 'cards' = การ์ดต่อคนแบบเดิม · 'grid' = ตารางเดือน (FollowMonthGrid)
-   */
-  const [view, setView] = useState<'cards' | 'grid'>('cards');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -678,11 +651,19 @@ const FollowPage: React.FC = () => {
   const groups = useMemo(() => groupFollowEntries(filtered), [filtered]);
 
   /**
-   * แบ่งหน้าการ์ดติดตาม (เจ้าของสั่ง 22 ส.ค. 2569) — นับเป็น **การ์ด (คน)** ไม่ใช่รอบ
-   * เพราะการ์ดเดียวมีหลายรอบอยู่ข้างใน (กติกา 18 ส.ค.: คนเดียวต้องเป็นการ์ดเดียว)
-   * ⚠️ ใช้กับมุมมอง "การ์ด" เท่านั้น — มุมมอง "ตารางเดือน" ต้องเห็นทั้งเดือนพร้อมกัน
+   * ═══ แถวของตาราง Planning (F3 · เจ้าของสั่ง 1 ก.ย. 2569) ═══
+   * **มาแทนรายการการ์ดเดิม** — หนึ่งแถวหนึ่งคน · ติดตามวันไหน · กี่รอบ · เวลาไหน · ไปถึงไหน
+   *
+   * 🔴 **เรียงก่อนแบ่งหน้าเสมอ** — "คนที่ต้องโทรก่อนอยู่บนสุด" จะจริงก็ต่อเมื่อเรียงทั้งชุด
+   * ถ้าไปเรียงในตาราง (หลังแบ่งหน้า) ลำดับจะถูกแค่ภายในหน้านั้น หน้า 2 มีของด่วนกว่าซ่อนอยู่
    */
-  const { pageItems: groupPage, bar: groupBar, resetPage: resetGroupPage } = useListPagination(groups);
+  const planningRows = useMemo(() => buildFollowPlanningRows(groups), [groups]);
+
+  /**
+   * แบ่งหน้า (เจ้าของสั่ง 22 ส.ค. 2569) — นับเป็น **คน** ไม่ใช่รอบ
+   * (กติกา 18 ส.ค.: คนเดียวต้องเป็นแถวเดียว)
+   */
+  const { pageItems: rowPage, bar: groupBar, resetPage: resetGroupPage } = useListPagination(planningRows);
 
   const counts = useMemo(() => {
     // 🔴 นับเฉพาะที่อยู่ในคิวจริง — เดิม API เดา 'pending' ให้แถวที่ไม่เคยส่ง ตัวเลขจึงเกินจริง
@@ -836,28 +817,6 @@ const FollowPage: React.FC = () => {
               </>
             ) : null}
           </p>
-          {/* สลับมุมมอง: การ์ดต่อคน / ตารางเดือน (คน × วัน) — เจ้าของสั่ง ค่ำ-5 */}
-          <div className="ml-auto flex items-center gap-1 rounded-full border border-border p-0.5 text-[11px]">
-            {(
-              [
-                ['cards', 'การ์ด'],
-                ['grid', 'ตารางเดือน'],
-              ] as const
-            ).map(([v, label]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                aria-pressed={view === v}
-                className={cn(
-                  'rounded-full px-3 py-1 font-medium transition-colors',
-                  view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* แท็บสถานะ + ปุ่ม Filter (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-6) — แยกหน้าตามสถานะ
@@ -1576,223 +1535,21 @@ const FollowPage: React.FC = () => {
               </button>
             ) : null}
           </div>
-        ) : view === 'grid' ? (
-          /* ตารางเดือน คน × วัน (เจ้าของสั่ง ค่ำ-5) — ใช้ชุดข้อมูลเดียวกับการ์ดเป๊ะ ๆ */
-          <FollowMonthGrid entries={filtered} />
         ) : (
-          /* การ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ: *"งงตาย"* กับคนเดียวหลายแถว)
-             หัวการ์ด = สรุป (รอบถัดไป · วันนี้ครั้งที่เท่าไหร่ · หน่วยงาน · ใครคีย์)
-             ข้างใน = ทุกรอบพร้อมสถานะ + ปุ่มของแต่ละรอบ (แก้ไข/ปิดงาน/ยกเลิก ตามเงื่อนไขเดิม)
-             ⚠️ "เริ่มงานวันไหน" ไม่มีฟิลด์เก็บ — ตั้งใจไม่โชว์ (รอเจ้าของเคาะว่าจะเพิ่มฟิลด์ไหม) */
+          /* ═══ ตาราง Planning — มาแทนรายการการ์ดเดิม (เจ้าของเคาะ 1 ก.ย. 2569) ═══
+             หนึ่งแถวหนึ่งคน · ติดตามวันไหน · กี่รอบ · เวลาไหน · รอบนั้นไปถึงไหนแล้ว
+             🔴 ปุ่มรายรอบ (แก้ไข/เสร็จสิ้น/ยกเลิก) อยู่ในแถวเลย — เจ้าของสั่งเอง
+             *"เข้ามาหน้าการติดตามก็เห็นเลย"* ห้ามซ่อนไว้หลังการกด */
           <div className="space-y-2.5">
-            {groupPage.map((g) => {
-              /* แถบสีของกลุ่ม — ไม่มีรอบไหนอยู่ในคิวเลยก็ยังต้องมีสี ใช้ 'pending' เป็นค่าวาด
-                 ⚠️ เป็นแค่สีของแถบ **ไม่ใช่คำที่บอกสถานะ** (คำอยู่ที่ป้ายรายรอบข้างใน) */
-              const barStatus =
-                g.nextRound?.call_status ??
-                g.rounds.find((r) => !r.cancelled)?.call_status ??
-                g.rounds[0]?.call_status ??
-                'pending';
-              const urgent = g.rounds.find((r) => r.next_action?.urgency === 'urgent');
-              return (
-                <div
-                  key={g.key}
-                  className="glass-card relative overflow-hidden rounded-2xl border border-white/70 pl-4 pr-3.5 py-3 dark:border-slate-700/70"
-                >
-                  <span
-                    aria-hidden
-                    className={cn('absolute left-0 top-0 bottom-0 w-1', FOLLOW_STATUS_BAR[barStatus])}
-                  />
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <NameAvatar name={g.name} />
-                        <span className="font-bold text-foreground">{g.name}</span>
-                        {urgent ? (
-                          <span
-                            title={urgent.next_action?.reason || 'AI แนะนำให้โทรกลับหาคนนี้ด่วน'}
-                            className="inline-flex items-center gap-0.5 rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-700 dark:bg-red-950/50 dark:text-red-300"
-                          >
-                            📞 โทรกลับด่วน
-                          </span>
-                        ) : null}
-                        {/* 🔴 รวม "ครั้งที่เท่าไหร่" กับ "ทั้งหมดกี่รอบ" ไว้ประโยคเดียว
-                            เดิมแยกกันคนละบรรทัด ⇒ การ์ดใบเดียวขึ้น "ครั้งที่ 1" กับ
-                            "ติดตาม 3 รอบ" พร้อมกัน อ่านแล้วเหมือนเลขขัดกัน (ทั้งที่ถูกทั้งคู่) */}
-                        {g.todayOrdinal != null ? (
-                          <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
-                            วันนี้คือรอบที่ {g.todayOrdinal} จาก {g.activeCount.toLocaleString('th-TH')} รอบ
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-sm text-foreground">{g.topic}</p>
-                      {/* สรุปที่เจ้าของขอ: โทรวันไหนกี่โมง (รอบถัดไป) · หน่วยงาน · ใครคีย์ */}
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {/* 🔴 ของค้างต้องมีที่ยืน — เดิมรอบที่เลยเวลาแล้วตกทั้งสองทาง
-                            จอเลยขึ้น "ไม่มีนัดโทรข้างหน้าแล้ว" คู่กับป้าย "รอ AI โทร" */}
-                        {g.nextRound
-                          ? `รอบถัดไป โทร ${formatWhen(g.nextRound.scheduled_at)}`
-                          : g.overdueRound
-                            ? `เลยเวลานัดแล้ว (นัดไว้ ${formatWhen(g.overdueRound.scheduled_at)}) ยังไม่มีผลกลับ`
-                            : 'ไม่มีนัดโทรข้างหน้าแล้ว'}
-                        {` · ติดตามมาแล้ว ${g.activeCount.toLocaleString('th-TH')} รอบ`}
-                        {g.createdByName ? ` · คนคีย์ ${g.createdByName}` : ''}
-                      </p>
-                      {g.unitName || g.siteCode ? (
-                        <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Building2 className="h-3 w-3 shrink-0" aria-hidden />
-                          <span className="font-medium text-foreground">{g.unitName || '—'}</span>
-                          {g.siteCode ? <span className="font-mono">({g.siteCode})</span> : null}
-                        </p>
-                      ) : null}
-                      {urgent?.next_action?.reason ? (
-                        <p className="mt-1 rounded-lg border border-red-200 bg-red-50/70 px-2.5 py-1 text-[11px] font-medium text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300">
-                          AI แนะนำ: {urgent.next_action.reason}
-                          {urgent.next_action.due_at ? ` · ภายใน ${formatWhen(urgent.next_action.due_at)}` : ''}
-                        </p>
-                      ) : null}
-                    </div>
-                    <a
-                      href={`tel:${g.phone}`}
-                      className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50/70 px-3 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300 dark:hover:bg-sky-950"
-                    >
-                      <Phone className="h-3 w-3" aria-hidden />
-                      {g.phone}
-                    </a>
-                  </div>
-
-                  {/* ติดตามวันไหนบ้าง — ทุกรอบ+สถานะ · ปุ่มของแต่ละรอบเงื่อนไขเดิมทุกอย่าง */}
-                  <ul className="mt-2 space-y-1.5">
-                    {g.rounds.map((it) => (
-                      <li
-                        key={it.id}
-                        className={cn(
-                          'rounded-xl bg-white/60 px-2.5 py-2 dark:bg-white/5',
-                          it.cancelled && 'opacity-60',
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                          <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
-                            <span className="font-medium text-foreground">{formatWhen(it.scheduled_at)}</span>
-                            {/* 🔴 ป้ายนี้ต้องบอกได้ด้วยว่า "ไม่ได้ส่งให้ AI เพราะอะไร"
-                                เดิมอ่านจาก call_status ตรง ๆ ซึ่งเป็น null เมื่อไม่มีแถวในคิว
-                                ⇒ วาดออกมาเป็นช่องว่างเปล่า คนเห็นแล้วนึกว่าปกติ
-                                (รายการ 24 ส.ค. 2569 หายเงียบแบบนี้) */}
-                            {/* 🔴 **มีผลกลับแล้ว = ไม่ใช่ "รอ AI โทร" อีกต่อไป**
-                                `call_status` ค้างเป็น 'pending' ได้แม้ผลจะกลับมาแล้ว
-                                (วัดฐาน 26 ส.ค. 2569: 8 แถวเป็นแบบนี้) ⇒ การ์ดเคยขึ้น
-                                ป้าย "รอ AI โทร" คู่กับบรรทัด "ผลการโทร — ไม่ตอบ"
-                                บนใบเดียวกัน · ผลชนะสถานะเสมอ (บทเรียนเดียวกับ
-                                `_lib/lumosQueueDefs`: ดู outcome ไม่ใช่ status เปล่า ๆ) */}
-                            {it.call_status ? (
-                              <span
-                                className={
-                                  FOLLOW_STATUS_CLASS[
-                                    it.call_outcome && it.call_status === 'pending'
-                                      ? 'completed'
-                                      : it.call_status
-                                  ]
-                                }
-                              >
-                                {it.call_outcome && it.call_status === 'pending'
-                                  ? 'โทรแล้ว มีผลกลับ'
-                                  : FOLLOW_STATUS_LABEL[it.call_status]}
-                              </span>
-                            ) : null}
-                            <FollowDispatchBadge entry={it} />
-                            {/* ปิดงานแล้ว (095) — ป้ายแยกจากสถานะโทร: สถานะโทร = AI ไปถึงไหน
-                                · ป้ายนี้ = เจ้าหน้าที่สรุปว่าจบแบบไหน */}
-                            {it.completed_at && it.outcome_code ? (
-                              <span
-                                title={it.outcome_note || undefined}
-                                className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.success.chip)}
-                              >
-                                ปิดงาน: {FOLLOW_OUTCOME_LABEL[it.outcome_code as FollowOutcomeAny] ?? it.outcome_code}
-                              </span>
-                            ) : null}
-                            {it.staff_phone ? (
-                              <span className="text-muted-foreground">โทรกลับ {it.staff_phone}</span>
-                            ) : null}
-                            {it.updated_by_name ? (
-                              <span className="text-muted-foreground">แก้ล่าสุดโดย {it.updated_by_name}</span>
-                            ) : null}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            {/* แก้ไข (096) — เฉพาะรอบที่ยังไม่ปิด/ยกเลิก (server กันอีกชั้น) */}
-                            {!it.cancelled && !it.completed_at ? (
-                              <button
-                                type="button"
-                                onClick={() => setEditing(it)}
-                                title="แก้ไขรอบนี้"
-                                className={cn(
-                                  'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium',
-                                  TONE.neutral.outline,
-                                )}
-                              >
-                                <Pencil className="h-3 w-3" aria-hidden />
-                                แก้ไข
-                              </button>
-                            ) : null}
-                            {/* ปิดงาน (095) — ไม่ผูกกับ call_status: ตามจนจบเองโดย AI ยังไม่โทรก็ปิดได้ */}
-                            {!it.cancelled && !it.completed_at ? (
-                              <FollowCompleteControls
-                                busy={busyId === it.id}
-                                onComplete={(outcome, note) => doComplete(it.id, outcome, note)}
-                              />
-                            ) : null}
-                            {!it.cancelled && it.call_status === 'pending' && !it.completed_at ? (
-                              cancellingId === it.id ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    disabled={busyId === it.id}
-                                    onClick={() => void doCancel(it.id)}
-                                    className="inline-flex min-h-[36px] items-center rounded-full bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                                  >
-                                    {busyId === it.id ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setCancellingId(null)}
-                                    className={cn(
-                                      'inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium',
-                                      TONE.neutral.outline,
-                                    )}
-                                  >
-                                    ไม่
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancellingId(it.id)}
-                                  className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
-                                >
-                                  <X className="h-3 w-3" aria-hidden />
-                                  ยกเลิก
-                                </button>
-                              )
-                            ) : null}
-                          </div>
-                        </div>
-                        {it.note ? <p className="mt-1 text-[11px] text-muted-foreground">{it.note}</p> : null}
-                        {it.call_outcome || it.call_summary ? (
-                          <p className="mt-1 rounded-lg bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700 dark:bg-white/10 dark:text-slate-200">
-                            {/* 🔴 เดิมพ่นรหัสอังกฤษดิบขึ้นจอ (declined / wrong_person /
-                                reschedule_requested ...) · คำไทยมีอยู่แล้วที่
-                                CALL_OUTCOME_LABEL แต่หน้านี้ไม่ได้เรียกใช้
-                                รหัสที่ยังไม่มีคำแปลให้โชว์รหัสไปตามตรง ห้ามซ่อน */}
-                            ผลการโทร{it.call_outcome ? ` — ${callOutcomeText(it.call_outcome)}` : ''}
-                            {it.call_summary ? `: ${it.call_summary}` : ''}
-                            {it.called_at ? ` · ${formatWhen(it.called_at)}` : ''}
-                          </p>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
+            <FollowPlanningTable
+              rows={rowPage}
+              busyId={busyId}
+              cancellingId={cancellingId}
+              onAskCancel={setCancellingId}
+              onCancel={(id) => void doCancel(id)}
+              onEdit={setEditing}
+              onComplete={doComplete}
+            />
             {/* แถบเลขหน้า — ตัวเดียวกับทุกหน้าในระบบ (10/20/30/40/50) */}
             <ListPaginationBar {...groupBar} />
           </div>
