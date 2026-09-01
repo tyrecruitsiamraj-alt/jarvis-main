@@ -40,6 +40,15 @@ export function parseAppUser(value: unknown): User | null {
       ? { department_code: value.department_code.trim().toUpperCase() }
       : {}),
     ...(typeof value.phone === 'string' && value.phone.trim() ? { phone: value.phone.trim() } : {}),
+    /**
+     * ชื่อเล่น + สายงาน (114) — ⚠️ **ตัวตรวจนี้ทิ้งฟิลด์ที่ไม่ได้เขียนไว้**
+     * เพิ่มช่องใหม่ที่ API แล้วลืมมาเติมตรงนี้ = จอไม่เห็นค่า ทั้งที่ฐานบันทึกไว้แล้ว
+     * (เจอจริงตอนตรวจ 1 ก.ย. 2569 — บันทึกผ่าน แต่รีเฟรชแล้วช่องว่าง)
+     */
+    nickname: typeof value.nickname === 'string' && value.nickname.trim() ? value.nickname.trim() : null,
+    job_lanes: Array.isArray(value.job_lanes)
+      ? value.job_lanes.filter((x): x is string => typeof x === 'string')
+      : [],
   };
 }
 

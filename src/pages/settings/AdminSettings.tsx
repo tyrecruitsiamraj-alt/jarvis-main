@@ -31,6 +31,7 @@ import {
   type SettingsTabId,
 } from '@/lib/settingsNav';
 import { TONE } from '@/lib/designTokens';
+import { JOB_LANES, JOB_LANE_LABEL } from '@/lib/jobLanes';
 import {
   Select,
   SelectContent,
@@ -185,7 +186,14 @@ const AdminSettings: React.FC = () => {
 
   const updateUser = async (
     id: string,
-    patch: { role?: User['role']; is_active?: boolean; department_code?: string | null; phone?: string | null },
+    patch: {
+      role?: User['role'];
+      is_active?: boolean;
+      department_code?: string | null;
+      phone?: string | null;
+      nickname?: string | null;
+      job_lanes?: string[];
+    },
   ) => {
     setSavingUserId(id);
     setUserActionError('');
@@ -381,6 +389,9 @@ const AdminSettings: React.FC = () => {
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อ</th>
+                    {/* ชื่อเล่น + สายงาน (114 · เจ้าของสั่ง 1 ก.ย. 2569) — ตั้งทุกอย่างของคนคนนี้ในแถวเดียว */}
+                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อเล่น</th>
+                    <th className="px-4 py-3 text-center text-muted-foreground font-medium">สายงาน</th>
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">Username</th>
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
@@ -393,7 +404,7 @@ const AdminSettings: React.FC = () => {
                 <tbody>
                   {apiUsers.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-6 text-center text-muted-foreground">
+                      <td colSpan={10} className="px-4 py-6 text-center text-muted-foreground">
                         ยังไม่มีผู้ใช้ (หรือโหลดไม่สำเร็จ)
                       </td>
                     </tr>
@@ -401,6 +412,50 @@ const AdminSettings: React.FC = () => {
                   {visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
                       <td className="px-4 py-3 font-medium text-foreground">{u.full_name}</td>
+                      {/* ชื่อเล่น — ชื่อที่คนเรียกกันจริง (ชื่อบนสุดเป็นชื่ออังกฤษจาก Microsoft) */}
+                      <td className="px-4 py-3">
+                        <Input
+                          key={`${u.id}-nick-${u.nickname || ''}`}
+                          defaultValue={u.nickname || ''}
+                          disabled={savingUserId === u.id}
+                          placeholder="เช่น ครีม"
+                          maxLength={60}
+                          title="ชื่อเล่นที่ใช้เรียกกันจริง — อนาคตจะให้ dropdown ทั้งระบบดึงชื่อจากช่องนี้"
+                          className={cn('h-8 w-28 text-xs', savingUserId === u.id && 'opacity-60')}
+                          onBlur={(e) => {
+                            const next = e.target.value.trim();
+                            if (next === (u.nickname || '')) return;
+                            void updateUser(u.id, { nickname: next || null });
+                          }}
+                        />
+                      </td>
+                      {/* สายงาน — ติ๊กได้หลายสาย · 🔴 คนละเรื่องกับ Role ที่เป็นสิทธิ์ในระบบ */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          {JOB_LANES.map((lane) => {
+                            const on = (u.job_lanes ?? []).includes(lane);
+                            return (
+                              <button
+                                key={lane}
+                                type="button"
+                                disabled={savingUserId === u.id}
+                                onClick={() => {
+                                  const cur = u.job_lanes ?? [];
+                                  const next = on ? cur.filter((x) => x !== lane) : [...cur, lane];
+                                  void updateUser(u.id, { job_lanes: next });
+                                }}
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors',
+                                  on ? cn(TONE.info.soft, TONE.info.value, 'border-transparent') : TONE.neutral.outline,
+                                  savingUserId === u.id && 'opacity-60',
+                                )}
+                              >
+                                {JOB_LANE_LABEL[lane]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
                       <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                       <td className="px-4 py-3 text-center">

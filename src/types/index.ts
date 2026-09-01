@@ -17,6 +17,16 @@ export interface User {
   department_code?: string;
   /** เบอร์โทร (E.164) — ใช้เป็น admin_phone ส่งให้ Lumos ตอน AI โทรผู้สมัครสัมภาษณ์ไม่สำเร็จ */
   phone?: string;
+  /**
+   * ชื่อเล่นไทย (114) — ชื่อที่คนเรียกกันจริง · `full_name` เป็นชื่ออังกฤษจาก Microsoft
+   * `null` = ยังไม่ได้ตั้ง (ต่างจาก "ไม่มีชื่อเล่น")
+   */
+  nickname?: string | null;
+  /**
+   * สายงานที่อยู่: recruiter/screener/opl/online (114) — **คนละเรื่องกับ `role`**
+   * (`role` = สิทธิ์ในระบบ · สายงาน = งานที่ทำ) · `[]` = ยังไม่ได้ตั้ง
+   */
+  job_lanes?: string[];
 }
 
 // ============ EMPLOYEES (WL) ============

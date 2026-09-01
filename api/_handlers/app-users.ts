@@ -17,7 +17,18 @@ type UserRow = {
   created_at: string | Date;
   department_code: string | null;
   phone: string | null;
+  /** ชื่อเล่นไทย (114) — ชื่อที่คนเรียกกันจริง · full_name เป็นชื่ออังกฤษจาก Microsoft */
+  nickname: string | null;
+  /** สายงาน (114) — คนละเรื่องกับ `role` ที่เป็นสิทธิ์ในระบบ */
+  job_lanes: string[] | null;
 };
+
+/**
+ * สายงานที่รับได้ (114) — ชุดเดียวกับ `job_staff_roster.role`
+ * ⚠️ ตรวจที่นี่แทน CHECK constraint ในฐาน (บ้านนี้โดน CHECK ล็อกค่าใหม่มาสองรอบ)
+ */
+const JOB_LANES = ['recruiter', 'screener', 'opl', 'online'] as const;
+
 type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
 
 function isRole(v: unknown): v is UserRole {
@@ -42,6 +53,9 @@ function toUserJson(u: UserRow) {
     created_at: toYmd(u.created_at),
     ...(department_code ? { department_code } : {}),
     ...(u.phone ? { phone: u.phone } : {}),
+    /* ส่งค่าว่างมาด้วยเสมอ — จอต้องรู้ว่า "ยังไม่ตั้ง" ต่างจาก "ไม่มีข้อมูล" */
+    nickname: u.nickname ?? null,
+    job_lanes: u.job_lanes ?? [],
   };
 }
 
@@ -74,6 +88,29 @@ async function handler(req: AuthedReq, res: ApiRes) {
         department_code = raw === null ? null : raw.trim().toUpperCase();
       }
 
+      const hasNicknamePatch = Object.prototype.hasOwnProperty.call(body, 'nickname');
+      let nickname: string | null | undefined;
+      if (hasNicknamePatch) {
+        const raw = body.nickname;
+        if (raw === null || raw === '') nickname = null;
+        else if (typeof raw === 'string') {
+          const t = raw.trim();
+          if (t.length > 60) return sendError(res, 400, 'Bad request', 'ชื่อเล่นยาวเกิน 60 ตัวอักษร');
+          nickname = t || null;
+        } else return sendError(res, 400, 'Bad request', 'nickname ต้องเป็นข้อความ');
+      }
+
+      const hasLanesPatch = Object.prototype.hasOwnProperty.call(body, 'job_lanes');
+      let jobLanes: string[] | undefined;
+      if (hasLanesPatch) {
+        const raw = body.job_lanes;
+        if (!Array.isArray(raw)) return sendError(res, 400, 'Bad request', 'job_lanes ต้องเป็นรายการ');
+        const uniq = [...new Set(raw.map((x) => (typeof x === 'string' ? x.trim() : '')))].filter(Boolean);
+        const bad = uniq.find((x) => !(JOB_LANES as readonly string[]).includes(x));
+        if (bad) return sendError(res, 400, 'Bad request', `สายงาน "${bad}" ไม่อยู่ในชุดที่รู้จัก`);
+        jobLanes = uniq;
+      }
+
       const hasPhonePatch = Object.prototype.hasOwnProperty.call(body, 'phone');
       let phone: string | null | undefined;
       if (hasPhonePatch) {
@@ -98,12 +135,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (is_active !== undefined && typeof is_active !== 'boolean') {
         return sendError(res, 400, 'Bad request', 'is_active must be boolean');
       }
-      if (role === undefined && is_active === undefined && !hasDepartmentPatch && !hasPhonePatch) {
+      if (
+        role === undefined &&
+        is_active === undefined &&
+        !hasDepartmentPatch &&
+        !hasPhonePatch &&
+        !hasNicknamePatch &&
+        !hasLanesPatch
+      ) {
         return sendError(res, 400, 'Bad request', 'Nothing to update');
       }
 
       const { rows: beforeRows } = await dbQuery<UserRow>(
-        `select id, email, role, full_name, is_active, created_at, department_code, phone from ${usersTable} where id = $1 limit 1`,
+        `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+           from ${usersTable} where id = $1 limit 1`,
         [id],
       );
       const beforeUser = beforeRows[0];
@@ -129,9 +174,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
           role = coalesce($2, role),
           is_active = coalesce($3, is_active),
           department_code = case when $4::boolean then $5 else department_code end,
-          phone = case when $6::boolean then $7 else phone end
+          phone = case when $6::boolean then $7 else phone end,
+          nickname = case when $8::boolean then $9 else nickname end,
+          job_lanes = case when $10::boolean then $11::text[] else job_lanes end
         where id = $1
-        returning id, email, role, full_name, is_active, created_at, department_code, phone
+        returning id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
         `,
         [
           id,
@@ -141,6 +188,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
           hasDepartmentPatch ? department_code : null,
           hasPhonePatch,
           hasPhonePatch ? phone : null,
+          hasNicknamePatch,
+          hasNicknamePatch ? nickname : null,
+          hasLanesPatch,
+          hasLanesPatch ? (jobLanes ?? []) : null,
         ],
       );
       const u = updatedRows[0];
@@ -156,6 +207,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
           email: beforeUser.email,
           department_code: beforeUser.department_code,
           phone: beforeUser.phone,
+          nickname: beforeUser.nickname,
+          job_lanes: beforeUser.job_lanes,
         },
         after: {
           role: u.role,
@@ -170,7 +223,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const { rows } = await dbQuery<UserRow>(
-      `select id, email, role, full_name, is_active, created_at, department_code, phone from ${usersTable} order by created_at desc`,
+      `select id, email, role, full_name, is_active, created_at, department_code, phone, nickname, job_lanes
+         from ${usersTable} order by created_at desc`,
     );
     return res.status(200).json(rows.map(toUserJson));
   } catch (e) {
