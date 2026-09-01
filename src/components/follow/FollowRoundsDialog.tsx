@@ -97,16 +97,22 @@ const FollowRoundsDialog: React.FC<{
         <ul className="space-y-2">
           {rounds.map((r) => {
             const it = r.entry;
+            /* 🔴 **กรอบของกล่องต้องเป็นสีเดียวกับชิป** (เจ้าของทัก 1 ก.ย. 2569: *"สีกรอบไม่แก้ไขหรอ"*)
+               เดิมกรอบเป็นเทาทุกใบ ⇒ กวาดตาแล้วทุกรอบดูเหมือนกันหมด สีที่ชิปเลยไม่ช่วยอะไร */
+            const tone = roundTone(r);
+            /* รอบที่ยกเลิก/ปิดไปแล้วไม่มีปุ่มอะไรให้กด — ซ่อนหัวข้อ "จัดการรอบนี้" ไปด้วย
+               ไม่งั้นเหลือหัวข้อลอยที่ไม่มีของอยู่ข้างใต้ */
+            const canCancel = !it.cancelled && !it.completed_at && it.call_status === 'pending';
             const busy = busyId === it.id;
             const canWork = !it.cancelled && !it.completed_at;
             return (
               <li
                 key={it.id}
-                className={cn('rounded-xl border p-2.5', TONE.neutral.soft, it.cancelled && 'opacity-60')}
+                className={cn('rounded-xl border p-2.5', TONE[tone].soft, it.cancelled && 'opacity-60')}
               >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   {/* 🔴 สีตาม "ผลเป็นยังไง" ไม่ใช่ "มีผลหรือยัง" — ชุดเดียวกับช่องในปฏิทิน */}
-                  <span className={cn('tabular-nums', TONE[roundTone(r)].chip)}>
+                  <span className={cn('tabular-nums', TONE[tone].chip)}>
                     {r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
                   </span>
                   <span className="text-[11px] font-medium text-foreground">
@@ -143,6 +149,8 @@ const FollowRoundsDialog: React.FC<{
                     *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก"* — สิ่งที่เห็นคือ
                     **ปุ่มสีเขียว "เสร็จสิ้น"** ไม่ใช่สถานะของสาย) ⇒ มีหัวข้อกำกับว่าเป็นแถวคำสั่ง
                     และคำบนปุ่มขึ้นต้นด้วยกริยา */}
+                {canWork || canCancel ? (
+                  <>
                 <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {canWork ? (
@@ -163,7 +171,7 @@ const FollowRoundsDialog: React.FC<{
                   {canWork ? (
                     <FollowCompleteControls busy={busy} onComplete={(o, n) => onComplete(it.id, o, n)} />
                   ) : null}
-                  {canWork && it.call_status === 'pending' ? (
+                  {canCancel ? (
                     cancellingId === it.id ? (
                       <>
                         <button
@@ -197,6 +205,8 @@ const FollowRoundsDialog: React.FC<{
                     )
                   ) : null}
                 </div>
+                  </>
+                ) : null}
               </li>
             );
           })}
