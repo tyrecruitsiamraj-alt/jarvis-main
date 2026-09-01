@@ -366,3 +366,28 @@ export function filterPlanningRowsByRound(
   }
   return out;
 }
+
+/**
+ * **ผลของ "สายแรก" ของคนคนนี้** — `null` = ยังไม่มีสายแรกในชุดที่ส่งมา
+ *
+ * เจ้าของสั่ง 1 ก.ย. 2569 (ข้อ 8): *"เพิ่มผลการโทรของสายแรกทุกคน และแสดงสัญลักษณ์สีเขียว"*
+ *
+ * 🔴 "สายแรก" = สายที่ **คนตั้งไว้ว่าเป็นสายที่ 1** (`call_round`) ไม่ใช่ "สายที่เวลาน้อยสุด"
+ * — คนตั้งรอบ 2 ก่อนแล้วค่อยเพิ่มรอบ 1 ทีหลังก็มี · ไม่มี `call_round` (แถวเก่า)
+ * ค่อยถอยไปใช้สายที่เวลาเร็วสุด
+ */
+export function firstCallOfRow(row: FollowPlanningRow): FollowPlanningRound | null {
+  const active = row.rounds.filter((r) => r.state !== 'cancelled');
+  if (active.length === 0) return null;
+  const marked = active.filter((r) => r.entry.call_round === 1);
+  const pool = marked.length > 0 ? marked : active;
+  return (
+    [...pool].sort((a, b) => (a.entry.scheduled_at ?? '').localeCompare(b.entry.scheduled_at ?? ''))[0] ??
+    null
+  );
+}
+
+/** สายแรกจบด้วยดีแล้วหรือยัง — ใช้ติดเครื่องหมายถูกสีเขียว */
+export function isGoodResult(round: FollowPlanningRound): boolean {
+  return roundTone(round) === 'success';
+}

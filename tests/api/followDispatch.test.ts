@@ -126,69 +126,40 @@ describe('parseFollowInput', () => {
 });
 
 describe('buildFollowReminderPayload', () => {
-  it('ส่งเรื่องที่กรอกเป็นข้อความให้ Lumos — รอบเดียวคือสายแรก จึงเป็น step แบบ remind', () => {
+  it('ส่งของครบให้ Lumos — รอบเดียวคือสายแรก จึงเป็น step แบบ remind', () => {
     const p = buildFollowReminderPayload({
       id: 'e6c1f0aa-1111-4222-8333-444455556666',
-      recipient_name: 'สมชาย ใจดี',
+      recipient_name: 'นายสมชาย ใจดี',
       recipient_phone: '+66812345678',
-      topic: 'ยืนยันวันเริ่มงาน 15 ส.ค.',
-      note: 'ถ้ายังไม่พร้อมให้ถามวันที่สะดวก',
+      topic: 'ติดตามเริ่มงาน',
+      note: null,
+      staffName: 'น้ำหวาน',
+      unitName: 'ธนาคารกรุงศรีอยุธยา',
       scheduled_at: WHEN,
     });
     // 🔴 ไม่มี `::` ในรหัสอ้างอิง (18 ส.ค. 2569 — Lumos ไม่ขึ้นรายการ) · ตรงกับ person_ref
     expect(p.client_contact_id).toBe('follow-e6c1f0aa-1111-4222-8333-444455556666');
     expect(p.recipient_phone).toBe('+66812345678');
-    expect(p.title).toBe('ยืนยันวันเริ่มงาน 15 ส.ค.');
+    // เรื่องยังส่งไปเป็น `title` — แค่ไม่ได้อยู่ในบทพูดแล้ว (บทใหม่ 1 ก.ย. 2569)
+    expect(p.title).toBe('ติดตามเริ่มงาน');
     expect(p.steps).toHaveLength(1);
-    /**
-     * 🔴 เปลี่ยนจาก 'follow_up' เป็น 'remind' เมื่อ 31 ส.ค. 2569
-     * เจ้าของสั่ง: *"การติดตามต้องมี 2 บทอะ เพราะโทรรอบแรกกับรอบที่ 2 มันไม่เหมือนกันอะ"*
-     * ⇒ สายแรกของงานติดตาม = แจ้งครั้งแรก (`remind`) · รอบถัดไปถึงจะเป็น `follow_up`
-     * ทั้งสองค่าอยู่ในชุดที่ Lumos รับอยู่แล้ว ไม่ใช่ค่าใหม่
-     */
     expect(p.steps[0].type).toBe('remind');
-    // บทใหม่ 16 ส.ค. 2569 (lumosCallScript.buildFollowMessage) — แนะนำตัว + เรียกชื่อ +
-    // บอกให้ยืนยันกลับ · เดิมต่อสามท่อนด้วย "—" เฉย ๆ ฟังแล้วห้วนไม่มีหัวไม่มีท้าย
     expect(p.steps[0].message).toContain('สยามราชธานี');
+    expect(p.steps[0].message).toContain('น้ำหวาน');
     expect(p.steps[0].message).toContain('คุณสมชาย ใจดี');
-    expect(p.steps[0].message).toContain('ยืนยันวันเริ่มงาน 15 ส.ค.');
-    expect(p.steps[0].message).toContain('ถ้ายังไม่พร้อมให้ถามวันที่สะดวก');
-    expect(p.steps[0].message).toContain('ยืนยันกลับ');
+    expect(p.steps[0].message).toContain('ธนาคารกรุงศรีอยุธยา');
     // เวลาไทย +07:00 (instant เดิม) — ไม่ใช่รูป UTC `Z` แล้ว (18 ส.ค. 2569)
     expect(p.steps[0].scheduled_at).toBe('2026-08-15T09:30:00+07:00');
   });
 
-  it('ไม่มีหมายเหตุ → ใช้เฉพาะหัวเรื่อง', () => {
-    const p = buildFollowReminderPayload({
-      id: 'abc',
-      recipient_name: 'ก',
-      recipient_phone: '+66800000000',
-      topic: 'ตามเอกสาร',
-      note: null,
-      scheduled_at: WHEN,
-    });
-    expect(p.steps[0].message).toContain('ตามเอกสาร');
-    // ไม่มีเบอร์เจ้าหน้าที่ = ไม่พูดท่อนติดต่อกลับ (ไม่ใช่พูดว่า "โทร ว่าง")
-    expect(p.steps[0].message).not.toContain('โทร');
-  });
-
-  it('มีเบอร์เจ้าหน้าที่ → ต่อท้ายบทพูดให้ผู้สมัครโทรกลับได้', () => {
-    // ⚠️ schema ของ Lumos ไม่มีช่องใส่เบอร์ติดต่อกลับ — ช่องเดียวที่ถึงหูผู้สมัคร
-    // คือ steps[].message · ถ้าเทสต์นี้ล้มแปลว่าเบอร์หายจากบท ผู้สมัครโทรกลับไม่ได้
-    const p = buildFollowReminderPayload({
-      id: 'abc',
-      recipient_name: 'ก',
-      recipient_phone: '+66800000000',
-      topic: 'ตามเอกสาร',
-      note: null,
-      staffPhone: '021234567',
-      scheduled_at: WHEN,
-    });
-    // เบอร์อ่านเป็นกลุ่มตัวเลข — 021234567 ติดกันเสี่ยงถูก TTS อ่านเป็นจำนวนเต็มก้อนเดียว
-    expect(p.steps[0].message).toContain('02 123 4567');
-  });
-
-  it('มีทั้งหมายเหตุและเบอร์ → พูดครบทั้งสามท่อน เรียงหัวเรื่อง → หมายเหตุ → เบอร์', () => {
+  /**
+   * 🔴 **บทใหม่ 1 ก.ย. 2569 ไม่พูด "เรื่อง" และไม่บอกเบอร์ติดต่อกลับแล้ว**
+   * เจ้าของเขียนบทมาคำต่อคำ (อัปเดต Lumos 17:00 น.) และไม่มีสองท่อนนี้อยู่ในบท
+   * ⚠️ เบอร์เจ้าหน้าที่ยัง **ส่งไปเป็น `admin_phone`** เหมือนเดิม (เบอร์ที่ AI โทรหาเมื่อ
+   * ติดต่อผู้รับไม่ได้) แค่ไม่ได้พูดออกไปให้ผู้รับสายจดอีกต่อไป
+   * เทสต์นี้เฝ้าไว้ว่า "ไม่พูด" เป็นของที่ตั้งใจ ไม่ใช่หายไปเพราะบั๊ก
+   */
+  it('บทใหม่ไม่พูดเรื่องที่กรอกและไม่อ่านเบอร์ให้ผู้รับสาย', () => {
     const p = buildFollowReminderPayload({
       id: 'abc',
       recipient_name: 'ก',
@@ -198,9 +169,9 @@ describe('buildFollowReminderPayload', () => {
       staffPhone: '021234567',
       scheduled_at: WHEN,
     });
-    const msg = p.steps[0].message;
-    expect(msg.indexOf('ตามเอกสาร')).toBeLessThan(msg.indexOf('ถามวันสะดวก'));
-    expect(msg.indexOf('ถามวันสะดวก')).toBeLessThan(msg.indexOf('02 123 4567'));
+    expect(p.steps[0].message).not.toContain('ตามเอกสาร');
+    expect(p.steps[0].message).not.toContain('ถามวันสะดวก');
+    expect(p.steps[0].message).not.toContain('02 123 4567');
   });
 });
 

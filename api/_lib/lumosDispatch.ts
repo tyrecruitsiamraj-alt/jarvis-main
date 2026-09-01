@@ -1475,6 +1475,10 @@ export type FollowEntryInput = {
    * ไม่ส่ง/null = สายแรก — ของเดิมที่เรียกอยู่จึงไม่ต้องแก้
    */
   callRound?: number | null;
+  /** ชื่อเจ้าหน้าที่ผู้ติดตาม — ใช้แนะนำตัวต้นสาย (1 ก.ย. 2569) · ไม่มี = ทักทายโดยไม่เอ่ยชื่อ */
+  staffName?: string | null;
+  /** หน่วยงานที่ไปทำงาน — บทถามว่า "ไปหน่วยงาน...แล้วใช่ไหม" */
+  unitName?: string | null;
 };
 
 /**
@@ -1525,6 +1529,8 @@ export function buildFollowReminderPayload(
         topic: entry.topic,
         note: entry.note,
         staffPhone: entry.staffPhone,
+        staffName: entry.staffName,
+        unitName: entry.unitName,
       },
       round,
     );

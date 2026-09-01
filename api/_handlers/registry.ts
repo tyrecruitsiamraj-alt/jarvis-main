@@ -102,6 +102,7 @@ import unitSectorHandler from './unit-sector.js';
 import officeFloorHandler from './office-floor.js';
 import officeTeamHandler from './office-team.js';
 import callScriptsHandler from './call-scripts.js';
+import callSuppressionHandler from './call-suppression.js';
 import jobPublicReleaseHandler from './job-public-release.js';
 import systemHealthHandler from './system-health.js';
 
@@ -173,6 +174,8 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/office-team': officeTeamHandler as ApiHandler,
   // บทพูด AI แก้ได้จากหน้าตั้งค่า (27 ส.ค. 2569) — GET ทุก role · PUT/DELETE supervisor+
   '/api/call-scripts': callScriptsHandler as ApiHandler,
+  // บัญชีห้ามโทร (1 ก.ย. 2569) — GET ดูได้ทุก role · DELETE (ปลดเบอร์) supervisor+
+  '/api/call-suppression': callSuppressionHandler as ApiHandler,
   '/api/home-kpis': homeKpisHandler as ApiHandler,
   '/api/unit-sector': unitSectorHandler as ApiHandler,
   // ปล่อย/ดึงลง ใบขอบนหน้าสาธารณะ (เจ้าของเคาะ 22 ส.ค. 2569 — ทุกใบต้องกดปล่อย)

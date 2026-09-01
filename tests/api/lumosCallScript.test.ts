@@ -247,35 +247,47 @@ describe('ประโยคที่เติมตอนเสิร์ฟ (�
 });
 
 describe('Part 3 · Follow', () => {
-  const base = { recipientName: 'สมหญิง', topic: 'นัดสัมภาษณ์วันจันทร์', staffPhone: '0812345678' };
+  /**
+   * 🔴 บทชุดนี้เจ้าของเขียนมาคำต่อคำ (อัปเดต Lumos 1 ก.ย. 2569 17:00 น.)
+   * *"สวัสดีค่ะ (ชื่อเจ้าของงาน) จากสยามราชธานีนะคะ · คุณ (ชื่อพนักงาน) เตรียมตัว
+   * ไปทำงาน หน่วยงาน... แล้วใช่ไหมคะ · รับทราบค่ะ ขอให้เดินทางปลอดภัยค่ะ"*
+   * เปลี่ยนบทเมื่อไหร่ต้องได้รับคำสั่งใหม่ ไม่ใช่แก้ให้สวยเอง
+   */
+  const base = {
+    recipientName: 'นายสมชาย ใจดี',
+    topic: 'ติดตามเริ่มงาน',
+    staffPhone: '0812345678',
+    staffName: 'น้ำหวาน',
+    unitName: 'ธนาคารกรุงศรีอยุธยา',
+  };
 
-  it('แนะนำตัว + เรียกชื่อ + บอกให้ยืนยันกลับ', () => {
+  it('สายแรก: ทักด้วยชื่อเจ้าหน้าที่ + ถามว่าเตรียมตัวไปหน่วยงานหรือยัง + ปิดท้ายอวยพร', () => {
     const m = buildFollowMessage(base);
+    expect(m).toContain('น้ำหวาน');
     expect(m).toContain(CALLER_ORG);
-    expect(m).toContain('คุณสมหญิง');
-    expect(m).toContain('นัดสัมภาษณ์วันจันทร์');
-    expect(m).toContain('ยืนยันกลับ');
+    expect(m).toContain('เตรียมตัวไปทำงาน');
+    expect(m).toContain('ธนาคารกรุงศรีอยุธยา');
+    expect(m).toContain('ขอให้เดินทางปลอดภัย');
   });
 
-  it('เบอร์อ่านเป็นกลุ่มตัวเลข ไม่ใช่ 10 หลักติดกัน', () => {
-    expect(buildFollowMessage(base)).toContain('081 234 5678');
-    expect(buildFollowMessage(base)).not.toContain('0812345678');
+  it('รอบถัดไป: ถามว่าถึงหน่วยงานแล้วหรือยัง + ปิดท้ายคนละคำกับสายแรก', () => {
+    const m = buildFollowMessage(base, 'repeat');
+    expect(m).toContain('ถึงหน่วยงาน');
+    expect(m).toContain('ขอให้เป็นวันที่ดี');
+    expect(m).not.toBe(buildFollowMessage(base));
   });
 
-  it('โน้ตซ้ำหัวเรื่อง = พูดรอบเดียว', () => {
-    const m = buildFollowMessage({ ...base, note: 'นัดสัมภาษณ์วันจันทร์' });
-    expect(m.match(/นัดสัมภาษณ์วันจันทร์/g)).toHaveLength(1);
+  it('🔴 ตัดคำนำหน้าออกก่อนเติม "คุณ" — ห้ามพูดว่า "คุณนายสมชาย"', () => {
+    const m = buildFollowMessage(base);
+    expect(m).toContain('คุณสมชาย ใจดี');
+    expect(m).not.toContain('คุณนาย');
   });
 
-  it('โน้ตต่างจากหัวเรื่อง = พูดทั้งคู่', () => {
-    const m = buildFollowMessage({ ...base, note: 'เตรียมบัตรประชาชนมาด้วย' });
-    expect(m).toContain('นัดสัมภาษณ์วันจันทร์');
-    expect(m).toContain('เตรียมบัตรประชาชนมาด้วย');
-  });
-
-  it('ไม่มีเบอร์ = ไม่พูดท่อนติดต่อกลับ (ไม่ใช่พูดว่า "โทร ว่าง")', () => {
-    const m = buildFollowMessage({ ...base, staffPhone: null });
-    expect(m).not.toContain('โทร');
+  it('ไม่รู้ชื่อเจ้าหน้าที่/หน่วยงาน = บรรทัดยังอยู่ แค่ไม่มีคำนั้น (ห้ามทั้งบรรทัดหาย)', () => {
+    const m = buildFollowMessage({ ...base, staffName: null, unitName: null });
+    expect(m).toContain('สวัสดีค่ะ');
+    expect(m).toContain('เตรียมตัวไปทำงาน');
+    expect(m).not.toContain('undefined');
   });
 
   it('ไม่มีชื่อผู้รับ = ไม่พูดคำว่า "คุณ" ลอย ๆ', () => {

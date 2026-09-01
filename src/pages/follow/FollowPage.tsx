@@ -61,7 +61,11 @@ import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import { type FollowOutcome } from '@/lib/followOutcome';
-import { buildFollowPlanningRows, filterPlanningRowsByRound } from '@/lib/followPlanning';
+import {
+  buildFollowPlanningRows,
+  filterPlanningRowsByRound,
+  firstCallOfRow,
+} from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -108,6 +112,14 @@ const FollowPage: React.FC = () => {
    * (ปิดงาน/ยกเลิกแล้วป้ายในป๊อปต้องเปลี่ยนตาม ไม่ใช่ค้างของเก่า)
    */
   const [openCell, setOpenCell] = useState<{ key: string; ymd: string } | null>(null);
+  /**
+   * ช่องที่กำลังพักไว้ระหว่างเปิดกล่องแก้ไข (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 10:
+   * *"กรณีแก้ไขสถานะเสร็จแล้ว อยากให้ทำได้ต่อเนื่อง (ย้อนกลับ) ไม่ต้องเริ่มใหม่ทุกครั้ง"*)
+   *
+   * 🔴 กติกา "ห้ามซ้อน Dialog" บังคับให้ปิดป๊อปก่อนเปิดกล่องแก้ไข ⇒ เดิมแก้เสร็จแล้ว
+   * ต้องไล่หาช่องเดิมในปฏิทินใหม่ทุกครั้ง · จำไว้แล้วเปิดกลับให้เองเมื่อกล่องแก้ไขปิด
+   */
+  const [cellToReopen, setCellToReopen] = useState<{ key: string; ymd: string } | null>(null);
   /**
    * "การโทรครั้งที่" ที่แผงข้างบนเลือกอยู่ (เจ้าของสั่ง 1 ก.ย. 2569:
    * *"ถ้าเลือกการโทรครั้งที่ 1 ตารางปฏิทินก็โชว์ข้อมูลแค่ของครั้งที่ 1 สิ"*)
@@ -712,6 +724,15 @@ const FollowPage: React.FC = () => {
   );
 
   /**
+   * ผลสายแรกของทุกคน (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 8) — คิดจาก **ชุดที่ยังไม่กรองรอบ**
+   * ไม่งั้นเลือก "ครั้งที่ 2" แล้วช่องนี้จะเอาสายที่ 2 มาแปะป้ายว่าเป็นสายแรก
+   */
+  const firstCalls = useMemo(
+    () => new Map(planningRowsAllRounds.map((r) => [r.group.key, firstCallOfRow(r)])),
+    [planningRowsAllRounds],
+  );
+
+  /**
    * 🔴 **ชุดเต็มไม่ผ่านตัวกรองใด ๆ** — ใช้เฉพาะกับป๊อปรายละเอียด
    *
    * เจ้าของทัก 1 ก.ย. 2569: *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก
@@ -873,6 +894,7 @@ const FollowPage: React.FC = () => {
           onSelect={pickCalendarDay}
           onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
           activeRound={activeRound}
+          firstCalls={firstCalls}
         />
 
         {/* 🔴 แถบสรุปเลข (ต้องโทรใครตอนนี้ / สถานะสาย) กับปุ่มรีเฟรช **ถูกถอดออก**
@@ -1546,6 +1568,7 @@ const FollowPage: React.FC = () => {
         onAskCancel={setCancellingId}
         onCancel={(id) => void doCancel(id)}
         onEdit={(entry) => {
+          setCellToReopen(openCell);
           setOpenCell(null);
           setEditing(entry);
         }}
@@ -1663,7 +1686,14 @@ const FollowPage: React.FC = () => {
               )
             : []
         }
-        onClose={() => setEditing(null)}
+        /* ปิดกล่องแก้ไข = กลับเข้าป๊อปของช่องเดิมให้เอง — ทำงานต่อได้ไม่ต้องไล่หาใหม่ */
+        onClose={() => {
+          setEditing(null);
+          if (cellToReopen) {
+            setOpenCell(cellToReopen);
+            setCellToReopen(null);
+          }
+        }}
         onSaved={(msg) => {
           setOkMessage(msg);
           window.setTimeout(() => setOkMessage(null), 7000);

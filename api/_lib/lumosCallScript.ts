@@ -133,6 +133,8 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'สวัสดิการ',
   'เรื่อง',
   'เบอร์เจ้าหน้าที่',
+  /** ชื่อเจ้าหน้าที่ผู้ติดตาม — ใช้แนะนำตัวต้นสาย (เจ้าของสั่ง 1 ก.ย. 2569) */
+  'ชื่อเจ้าหน้าที่',
   // ตัวแปรธง — ไม่พิมพ์อะไรออกมา แค่บอกว่าบรรทัดนี้ใช้กับใบแบบไหน
   'ต้องมีรถ',
   'ไม่มีวันเริ่มงาน',
@@ -201,9 +203,40 @@ export type CallScriptFacts = {
   startDate?: string | null;
 };
 
+/**
+ * คำนำหน้าไทยที่ต้องตัดก่อนเติม "คุณ" — เรียงยาว→สั้น ("นางสาว" ต้องชนะ "นาง")
+ *
+ * 🔴 เจ้าของสั่ง 1 ก.ย. 2569: *"คุณ...(ชื่อพนักงาน)... **ตัดนาย/นางสาวออก**"*
+ * ของเดิมเติม "คุณ" หน้าชื่อดิบ ⇒ AI พูดว่า **"คุณนายสุรเดช"** (ซ้อนคำนำหน้า)
+ * ⚠️ ชื่อในฐานมาจากหลายทาง (ERP · บอร์ด · คนพิมพ์เอง) จึงตัดที่นี่ที่เดียวตอนประกอบบท
+ * ไม่ไปไล่แก้ข้อมูลต้นทาง
+ */
+const THAI_NAME_PREFIXES = [
+  'นางสาว',
+  'น.ส.',
+  'นาง',
+  'นาย',
+  'ด.ช.',
+  'ด.ญ.',
+  'เด็กชาย',
+  'เด็กหญิง',
+] as const;
+
+/** ตัดคำนำหน้าไทยออกจากชื่อ — ไม่มีคำนำหน้าก็คืนชื่อเดิม */
+export function stripThaiNamePrefix(name?: string | null): string {
+  let n = clean(name);
+  for (const pre of THAI_NAME_PREFIXES) {
+    if (n.startsWith(pre)) {
+      n = n.slice(pre.length).trim();
+      break;
+    }
+  }
+  return n;
+}
+
 /** "คุณสมชาย " เมื่อมีชื่อ · "" เมื่อไม่มี — กันประโยคขึ้นต้นว่า "สวัสดีครับ คุณ ผมโทรจาก…" */
 function polite(name?: string | null): string {
-  const n = clean(name);
+  const n = stripThaiNamePrefix(name);
   return n ? `คุณ${n} ` : '';
 }
 
@@ -352,6 +385,14 @@ export type FollowMessageInput = {
   note?: string | null;
   /** เบอร์เจ้าหน้าที่ให้โทรกลับ */
   staffPhone?: string | null;
+  /**
+   * ชื่อเจ้าหน้าที่ผู้ติดตาม — ใช้แนะนำตัวต้นสาย (เจ้าของสั่ง 1 ก.ย. 2569:
+   * *"สวัสดีค่ะ ...(ชื่อเจ้าของงาน)... จากสยามราชธานีนะคะ"*)
+   * ⚠️ ไม่มีชื่อ = ส่งค่าว่าง **ไม่ใช่ undefined** — บรรทัดทักทายต้องยังอยู่ (แค่ไม่มีชื่อ)
+   */
+  staffName?: string | null;
+  /** หน่วยงานที่ไปทำงาน — บทถามว่า "ไปหน่วยงาน...แล้วใช่ไหม" */
+  unitName?: string | null;
 };
 
 /**
@@ -396,6 +437,10 @@ export function buildFollowMessage(
       ชื่อผู้รับ: polite(input.recipientName),
       เรื่อง: orDrop([topic, sameAsTopic ? '' : note].filter(Boolean).join(' ')),
       เบอร์เจ้าหน้าที่: orDrop(speakablePhoneTh(clean(input.staffPhone))),
+      /* 🔴 สองตัวนี้ส่งค่าว่างเมื่อไม่มีข้อมูล **ห้ามใช้ orDrop** — ไม่งั้นบรรทัดทักทาย
+         กับบรรทัดคำถามหลักจะหายไปทั้งบรรทัด เหลือสายที่ไม่ได้ถามอะไรเลย */
+      ชื่อเจ้าหน้าที่: stripThaiNamePrefix(input.staffName),
+      หน่วยงาน: clean(input.unitName),
     },
     lines.length,
   ).join(' ');

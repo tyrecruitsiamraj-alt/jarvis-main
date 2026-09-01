@@ -89,17 +89,25 @@ describe('บทติดตาม 2 รอบ', () => {
     expect(buildFollowMessage(input)).toBe(buildFollowMessage(input, 'first'));
   });
 
-  it('รอบถัดไปต้องอ้างว่าเคยติดต่อไปแล้ว ไม่ใช่แนะนำตัวเหมือนไม่เคยคุย', () => {
+  /**
+   * 🔴 บทชุดใหม่ 1 ก.ย. 2569 (เจ้าของเขียนคำต่อคำ) — สายแรกถามว่า "เตรียมตัวไปทำงาน…"
+   * รอบถัดไปถามว่า "ถึงหน่วยงาน…แล้วใช่ไหม" · ไม่ได้อ้างถึงสายก่อนหน้าอีกแล้ว
+   * ที่ต้องต่างกันคือ **คำถามหลักกับคำปิดท้าย** ไม่ใช่คำว่า "อีกครั้ง"
+   */
+  it('รอบถัดไปถามคนละคำถามกับสายแรก และปิดท้ายคนละคำ', () => {
     setCallScriptOverrides({});
-    expect(buildFollowMessage(input, 'repeat')).toMatch(/อีกครั้ง|ก่อนหน้านี้/);
+    expect(buildFollowMessage(input, 'first')).toMatch(/เตรียมตัวไปทำงาน/);
+    expect(buildFollowMessage(input, 'first')).toMatch(/เดินทางปลอดภัย/);
+    expect(buildFollowMessage(input, 'repeat')).toMatch(/ถึงหน่วยงาน/);
+    expect(buildFollowMessage(input, 'repeat')).toMatch(/เป็นวันที่ดี/);
   });
 
-  it('ทั้งสองบทยังพูดชื่อผู้รับกับเรื่องที่ตามเหมือนกัน', () => {
+  it('ทั้งสองบทยังเรียกชื่อผู้รับและทักในนามบริษัทเหมือนกัน', () => {
     setCallScriptOverrides({});
     for (const round of ['first', 'repeat'] as const) {
       const msg = buildFollowMessage(input, round);
       expect(msg).toMatch(/สมชาย/);
-      expect(msg).toMatch(/ยืนยันวันเริ่มงาน/);
+      expect(msg).toMatch(/สยามราชธานี/);
     }
   });
 

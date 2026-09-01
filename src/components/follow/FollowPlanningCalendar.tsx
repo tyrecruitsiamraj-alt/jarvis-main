@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowMonthRows,
+  firstCallOfRow,
+  isGoodResult,
   monthDayColumns,
   roundDispatchReason,
   roundResultLabel,
@@ -60,7 +62,13 @@ const FollowPlanningCalendar: React.FC<{
    * ไม่งั้นเห็นแถวน้อยกว่าเลขบนกล่องแล้วนึกว่าจอผิด (เลขบนกล่องนับทุกเดือน · ตารางนี้เดือนเดียว)
    */
   activeRound?: number;
-}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound }) => {
+  /**
+   * ผลสายแรกของแต่ละคน (คีย์กลุ่ม → สายแรก) — **ต้องมาจากชุดที่ยังไม่ถูกกรองรอบ**
+   * 🔴 ถ้าคำนวณจาก `rows` ที่กรองแล้ว พอเลือก "ครั้งที่ 2" ช่องนี้จะเอาสายที่ 2
+   * มาแปะป้ายว่า "ผลสายแรก" ซึ่งเป็นการโกหก
+   */
+  firstCalls?: Map<string, FollowPlanningRound | null>;
+}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound, firstCalls }) => {
   const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
   const cols = useMemo(() => monthDayColumns(month), [month]);
   const today = toYmdBangkok(new Date());
@@ -177,6 +185,10 @@ const FollowPlanningCalendar: React.FC<{
                 <th className="sticky left-0 z-10 min-w-[190px] max-w-[260px] bg-card px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground">
                   คนที่ต้องติดตาม
                 </th>
+                {/* ผลสายแรกของทุกคน อ่านได้โดยไม่ต้องกวาดหาในตาราง (เจ้าของสั่งข้อ 8) */}
+                <th className="min-w-[110px] px-2 py-2 text-left text-[11px] font-semibold text-muted-foreground">
+                  ผลสายแรก
+                </th>
                 {cols.map((c) => {
                   const selected = selectedYmd === c.ymd;
                   return (
@@ -212,6 +224,27 @@ const FollowPlanningCalendar: React.FC<{
                     <span className="block truncate text-[10px] text-muted-foreground">
                       {row.group.unitName || row.group.phone}
                     </span>
+                  </td>
+                  <td className="px-2 py-1.5 align-middle">
+                    {(() => {
+                      const first = firstCalls ? (firstCalls.get(row.group.key) ?? null) : firstCallOfRow(row);
+                      if (!first) {
+                        return <span className="text-[10px] text-muted-foreground">—</span>;
+                      }
+                      return (
+                        <span
+                          className={cn(
+                            'inline-flex max-w-[104px] items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
+                            TONE[roundTone(first)].chip,
+                          )}
+                          title={`สายแรก ${first.time ?? ''} — ${roundResultLabel(first)}`}
+                        >
+                          {/* ✅ เขียว = จบดี (เจ้าของขอสัญลักษณ์สีเขียวโดยเฉพาะ) */}
+                          {isGoodResult(first) ? <Check className="h-3 w-3 shrink-0" aria-hidden /> : null}
+                          <span className="truncate">{roundResultLabel(first)}</span>
+                        </span>
+                      );
+                    })()}
                   </td>
                   {cols.map((c) => {
                     const rounds = byDay.get(c.ymd);

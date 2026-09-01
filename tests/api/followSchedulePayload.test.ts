@@ -43,11 +43,11 @@ describe('buildFollowReminderPayload — หลายรอบต่อวัน
     expect(p.steps[0].type).toBe('remind');
     expect(p.steps[1].type).toBe('follow_up');
     expect(p.steps[1].message).not.toBe(p.steps[0].message);
-    // แต่ทั้งสองรอบยังบอกเรื่องที่ตามกับเบอร์ติดต่อกลับเหมือนกัน
+    // ⚠️ บทใหม่ 1 ก.ย. 2569 ไม่พูด "เรื่อง" และไม่อ่านเบอร์ให้ผู้รับสายแล้ว
+    // (เจ้าของเขียนบทมาคำต่อคำ) — ที่เหมือนกันทั้งสองรอบคือทักทายจากบริษัทเดียวกัน
     for (const step of p.steps) {
-      expect(step.message).toContain('ติดตามนัดสัมภาษณ์');
-      // เบอร์ถูกอ่านเป็นกลุ่มตัวเลข (16 ส.ค. 2569 — ดู lumosCallScript.speakablePhoneTh)
-      expect(step.message).toContain('089 111 2222');
+      expect(step.message).toContain('สยามราชธานี');
+      expect(step.message).toContain('คุณทดสอบ ระบบ');
     }
   });
 
@@ -91,8 +91,11 @@ describe('admin_phone ในคิว Follow', () => {
   it('ไม่ไปทับเบอร์ที่ AI พูดให้โทรกลับ — สองช่องอยู่คนละที่', () => {
     const p = buildFollowReminderPayload({ ...base, staffPhone: '0812223333' }, '+66898143230');
     expect(p.admin_phone).toBe('+66898143230');
-    // บทพูดเว้นวรรคเบอร์ให้ AI อ่านทีละชุด — ตรวจรูปที่ใช้จริง
-    expect(p.steps[0].message).toContain('081 222 3333');
+    /**
+     * ⚠️ **บทใหม่ 1 ก.ย. 2569 ไม่อ่านเบอร์ให้ผู้รับสายแล้ว** (เจ้าของเขียนบทมาคำต่อคำ)
+     * ที่ยังต้องกันคือ **เบอร์เจ้าหน้าที่ห้ามหลุดไปทับ `admin_phone`** — คนละช่อง คนละหน้าที่
+     */
+    expect(p.steps[0].message).not.toContain('081 222 3333');
   });
 });
 
