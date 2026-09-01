@@ -151,11 +151,29 @@ describe('ตาราง Planning แบบชื่ออยู่ซ้าย
     expect(cell?.map((r) => r.time)).toEqual(['09:00', '16:00']);
   });
 
-  it('รอบที่ยกเลิกไม่โผล่ในตาราง — คนที่ยกเลิกหมดก็ไม่มีแถว', () => {
+  it('🔴 รอบที่ยกเลิกต้องยังอยู่ในตาราง — Lumos โชว์ว่ายกเลิก จอเราต้องโชว์ด้วย', () => {
+    // เจ้าของทัก 1 ก.ย. 2569: *"ในระบบ Lumos บอกยกเลิก งี้จะเชื่อนายได้ไง"*
+    // สายที่ถูกยกเลิกเคยหายจากปฏิทินเงียบ ๆ ⇒ สองระบบเล่าคนละเรื่อง
     const rows = monthRows(
       [entry({ id: 'm4', scheduled_at: '2026-09-03T02:00:00Z', cancelled: true })],
       '2026-09',
     );
-    expect(rows).toHaveLength(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].byDay.get('2026-09-03')?.[0].state).toBe('cancelled');
+    // แต่ยังไม่นับเป็น "รอบที่ต้องตาม" — เลขสรุปต้องไม่โป่งด้วยสายที่ตายแล้ว
+    expect(rows[0].row.roundCount).toBe(0);
+  });
+
+  it('วันเดียวมีทั้งสายที่ยกเลิกและสายที่ได้ผล — ต้องเห็นทั้งคู่ (เคสนายวิศิษฐ์ 1 ก.ย. 2569)', () => {
+    const rows = monthRows(
+      [
+        entry({ id: 'v1', scheduled_at: '2026-09-01T04:00:00Z', cancelled: true }),
+        entry({ id: 'v2', scheduled_at: '2026-09-01T04:00:00Z', call_outcome: 'acknowledged' }),
+        entry({ id: 'v3', scheduled_at: '2026-09-01T04:15:00Z', call_outcome: 'declined' }),
+      ],
+      '2026-09',
+    );
+    const day = rows[0].byDay.get('2026-09-01');
+    expect(day?.map((r) => r.state).sort()).toEqual(['cancelled', 'result', 'result']);
   });
 });

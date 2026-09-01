@@ -61,7 +61,12 @@ const FollowPlanningCalendar: React.FC<{
   onSelect: (ymd: string) => void;
   /** กดช่องเวลา = เปิดป๊อปรายละเอียดของคนนั้นในวันนั้น (เจ้าของเลือกเอง 1 ก.ย. 2569) */
   onOpenCell: (row: FollowPlanningRow, ymd: string, rounds: FollowPlanningRound[]) => void;
-}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell }) => {
+  /**
+   * "การโทรครั้งที่" ที่แผงข้างบนเลือกอยู่ — ตารางนี้กรองตามแล้ว **ต้องเขียนบอกด้วย**
+   * ไม่งั้นเห็นแถวน้อยกว่าเลขบนกล่องแล้วนึกว่าจอผิด (เลขบนกล่องนับทุกเดือน · ตารางนี้เดือนเดียว)
+   */
+  activeRound?: number;
+}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound }) => {
   const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
   const cols = useMemo(() => monthDayColumns(month), [month]);
   const today = toYmdBangkok(new Date());
@@ -94,6 +99,11 @@ const FollowPlanningCalendar: React.FC<{
         <span className="text-[11px] text-muted-foreground">
           แถว = คน · คอลัมน์ = วัน · กดช่องเวลา = เปิดรายละเอียด/จัดการรอบนั้น · กดหัววัน = ดูเฉพาะวันนั้น
         </span>
+        {activeRound ? (
+          <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
+            กำลังดู การโทรครั้งที่ {activeRound} · เฉพาะเดือนนี้
+          </span>
+        ) : null}
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -147,12 +157,26 @@ const FollowPlanningCalendar: React.FC<{
             ['sent', 'ส่งแล้วรอผล'],
             ['waiting', 'ยังไม่ถึงเวลา'],
             ['result', 'ได้ผลแล้ว / ปิดงาน'],
+            ['cancelled', 'ยกเลิกแล้ว (ขีดฆ่า)'],
           ] as const
         ).map(([state, label]) => (
           <span key={state} className="inline-flex items-center gap-1">
-            <span className={cn('h-2.5 w-2.5 rounded-sm', TONE[
-              state === 'overdue' ? 'danger' : state === 'sent' ? 'primary' : state === 'waiting' ? 'neutral' : 'success'
-            ].dot)} aria-hidden />
+            <span
+              className={cn(
+                'h-2.5 w-2.5 rounded-sm',
+                TONE[
+                  state === 'overdue'
+                    ? 'danger'
+                    : state === 'sent'
+                      ? 'primary'
+                      : state === 'result'
+                        ? 'success'
+                        : 'neutral'
+                ].dot,
+                state === 'cancelled' && 'opacity-60',
+              )}
+              aria-hidden
+            />
             {label}
           </span>
         ))}
@@ -161,6 +185,7 @@ const FollowPlanningCalendar: React.FC<{
       {monthRows.length === 0 ? (
         <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.neutral.soft)}>
           เดือนนี้ไม่มีนัดโทรของใครเลย
+          {activeRound ? ` ใน "การโทรครั้งที่ ${activeRound}" — กดครั้งที่อื่นข้างบนเพื่อดูรอบอื่น` : ''}
         </p>
       ) : (
         <div ref={scrollRef} className="overflow-x-auto rounded-xl border border-border">
@@ -233,6 +258,9 @@ const FollowPlanningCalendar: React.FC<{
                                 className={cn(
                                   'block rounded px-0.5 py-0.5 text-[9px] font-bold leading-tight tabular-nums',
                                   CELL_TONE[r.state],
+                                  /* 🔴 ยกเลิกแล้วต้องยังเห็น — แต่ต้องดูออกทันทีว่าไม่ใช่สายที่จะเกิดขึ้น
+                                     (Lumos โชว์ว่ายกเลิก จอเราซ่อนไว้ = สองระบบเล่าคนละเรื่อง) */
+                                  r.state === 'cancelled' && 'line-through opacity-60',
                                 )}
                               >
                                 {r.time ?? '—'}

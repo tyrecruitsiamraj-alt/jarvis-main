@@ -99,6 +99,7 @@ export default function FollowCallRoundsPanel({
   entries,
   loading = false,
   onReload,
+  onRoundChange,
 }: {
   /**
    * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
@@ -116,11 +117,21 @@ export default function FollowCallRoundsPanel({
   entries: FollowEntry[];
   loading?: boolean;
   onReload?: () => void;
+  /**
+   * บอกหน้าแม่ว่ากำลังดูรอบไหนอยู่ (เจ้าของสั่ง 1 ก.ย. 2569:
+   * *"ถ้าเลือกการโทรครั้งที่ 1 ตารางปฏิทินก็โชว์ข้อมูลแค่ของครั้งที่ 1 สิ"*)
+   */
+  onRoundChange?: (slot: number) => void;
 }) {
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
   const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
   /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
   const [activeRound, setActiveRound] = useState(1);
+  /** เปลี่ยนรอบ = บอกหน้าแม่ด้วย ปฏิทินข้างล่างจะได้กรองตาม */
+  const pickRound = (slot: number) => {
+    setActiveRound(slot);
+    onRoundChange?.(slot);
+  };
 
   /**
    * คนในแต่ละรอบ — นับจาก **ชุดเดียวกับที่แสดงชื่อ** ยอดกับรายชื่อจึงตรงกันเสมอ
@@ -199,7 +210,7 @@ export default function FollowCallRoundsPanel({
             <button
               key={slot}
               type="button"
-              onClick={() => setActiveRound(slot)}
+              onClick={() => pickRound(slot)}
               aria-pressed={active}
               className={cn(
                 'rounded-xl border px-2.5 py-2 text-left transition-colors',

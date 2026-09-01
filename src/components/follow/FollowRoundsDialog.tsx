@@ -157,7 +157,12 @@ const FollowRoundsDialog: React.FC<{
                   </p>
                 ) : null}
 
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {/* 🔴 **ปุ่มต้องอ่านออกว่าเป็นปุ่ม ไม่ใช่ป้ายสถานะ** (เจ้าของทัก 1 ก.ย. 2569:
+                    *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก"* — สิ่งที่เห็นคือ
+                    **ปุ่มสีเขียว "เสร็จสิ้น"** ไม่ใช่สถานะของสาย) ⇒ มีหัวข้อกำกับว่าเป็นแถวคำสั่ง
+                    และคำบนปุ่มขึ้นต้นด้วยกริยา */}
+                <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {canWork ? (
                     <button
                       type="button"

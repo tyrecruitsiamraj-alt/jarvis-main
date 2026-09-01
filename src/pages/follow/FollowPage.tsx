@@ -62,6 +62,7 @@ import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -110,6 +111,12 @@ const FollowPage: React.FC = () => {
    * (ปิดงาน/ยกเลิกแล้วป้ายในป๊อปต้องเปลี่ยนตาม ไม่ใช่ค้างของเก่า)
    */
   const [openCell, setOpenCell] = useState<{ key: string; ymd: string } | null>(null);
+  /**
+   * "การโทรครั้งที่" ที่แผงข้างบนเลือกอยู่ (เจ้าของสั่ง 1 ก.ย. 2569:
+   * *"ถ้าเลือกการโทรครั้งที่ 1 ตารางปฏิทินก็โชว์ข้อมูลแค่ของครั้งที่ 1 สิ"*)
+   * 🔴 นิยาม "อยู่รอบไหน" ใช้ `followRoundSlot` ตัวเดียวกับที่แผงนับ — ห้ามเขียนซ้ำ
+   */
+  const [activeRound, setActiveRound] = useState(1);
 
   const [formOpen, setFormOpen] = useState(false);
   const [prefix, setPrefix] = useState('');
@@ -695,23 +702,50 @@ const FollowPage: React.FC = () => {
    * 🔴 **เรียงก่อนแบ่งหน้าเสมอ** — "คนที่ต้องโทรก่อนอยู่บนสุด" จะจริงก็ต่อเมื่อเรียงทั้งชุด
    * ถ้าไปเรียงในตาราง (หลังแบ่งหน้า) ลำดับจะถูกแค่ภายในหน้านั้น หน้า 2 มีของด่วนกว่าซ่อนอยู่
    */
-  const planningRows = useMemo(() => buildFollowPlanningRows(groups), [groups]);
+  const planningRowsAllRounds = useMemo(() => buildFollowPlanningRows(groups), [groups]);
 
   /**
-   * รายละเอียดของช่องที่กดในปฏิทิน — **อ่านจากชุดที่กำลังแสดงอยู่**
-   * ไม่เจอแล้ว (โดนตัวกรอง/ถูกลบ) = ส่ง null ให้ป๊อปว่างแทนที่จะค้างข้อมูลเก่า
+   * ปฏิทินโชว์เฉพาะคนที่อยู่ใน "การโทรครั้งที่" ที่เลือกไว้ข้างบน
+   * ⚠️ กรองระดับ **คน** ไม่ใช่ระดับรอบ — แผงข้างบนก็นับคนแบบนี้ (คนหนึ่งอยู่ครั้งเดียว)
+   * กรองระดับรอบเมื่อไหร่ เลขบนกล่องกับจำนวนแถวจะไม่ตรงกันทันที
+   */
+  const planningRows = useMemo(
+    () =>
+      planningRowsAllRounds.filter((r) =>
+        r.rounds.some((x) => followRoundSlot(x.entry) === activeRound),
+      ),
+    [planningRowsAllRounds, activeRound],
+  );
+
+  /**
+   * 🔴 **ชุดเต็มไม่ผ่านตัวกรองใด ๆ** — ใช้เฉพาะกับป๊อปรายละเอียด
+   *
+   * เจ้าของทัก 1 ก.ย. 2569: *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก
+   * งี้จะเชื่อนายได้ไง"* — เคสจริงคือคนนั้นมี **3 สายในวันเดียว** (11:00 ที่ถูกยกเลิก ·
+   * 11:00 ที่คุยจบ · 11:15) แต่แท็บ "กำลังตาม" กรองสายที่ยกเลิกออก ⇒ จอเราโชว์ 2
+   * ส่วน Lumos โชว์ 3 · **ป๊อปคือที่ที่คนมาถามว่า "ตกลงเกิดอะไรขึ้น"** จึงต้องเล่าครบเสมอ
+   * (ปฏิทิน/เลขบนแท็บยังเคารพตัวกรองเหมือนเดิม ไม่งั้นเลขกับจอจะเถียงกันเอง)
+   */
+  const allRows = useMemo(
+    () => buildFollowPlanningRows(groupFollowEntries(items)),
+    [items],
+  );
+
+  /**
+   * รายละเอียดของช่องที่กดในปฏิทิน — **อ่านจากชุดเต็ม**
+   * ไม่เจอแล้ว (ถูกลบ) = ส่ง null ให้ป๊อปว่างแทนที่จะค้างข้อมูลเก่า
    */
   const cellDetail = useMemo(() => {
     if (!openCell) return null;
-    const row = planningRows.find((r) => r.group.key === openCell.key);
+    const row = allRows.find((r) => r.group.key === openCell.key);
     if (!row) return null;
     return {
       group: row.group,
       ymd: openCell.ymd,
-      // รอบที่ยกเลิกไม่ใช่งานของวันนั้นอีกแล้ว — เกณฑ์เดียวกับช่องในปฏิทิน
-      rounds: row.rounds.filter((r) => r.ymd === openCell.ymd && r.state !== 'cancelled'),
+      /* 🔴 รวมรอบที่ยกเลิกด้วย — Lumos โชว์ว่ายกเลิก จอเราต้องโชว์ด้วย ไม่งั้นสองระบบเล่าคนละเรื่อง */
+      rounds: row.rounds.filter((r) => r.ymd === openCell.ymd),
     };
-  }, [openCell, planningRows]);
+  }, [openCell, allRows]);
 
 
   /** เลือกวันจากปฏิทิน = ใช้ช่องกรองวันเดิม (`fDate`) — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว */
@@ -760,8 +794,23 @@ const FollowPage: React.FC = () => {
           entries={items}
           loading={loading}
           onReload={() => void reload()}
+          onRoundChange={setActiveRound}
+          /* 🔴 ปุ่ม "เพิ่มคนที่ต้องการติดตาม" ย้ายมาอยู่แถวเดียวกับ "เพิ่มเจ้าหน้าที่"
+             (เจ้าของสั่ง 1 ก.ย. 2569) · ปุ่มนี้ **ทุกคนกดได้** ต่างจากอีกสองปุ่มที่เป็น
+             supervisor+ จึงอยู่นอกเงื่อนไข canManageMasters */
           headerExtras={
-            canManageMasters ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormOpen(true);
+                  setFormError(null);
+                }}
+                className="jarvis-pill-btn inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
+              >
+                <Plus className="h-3 w-3" aria-hidden /> เพิ่มคนที่ต้องการติดตาม
+              </button>
+              {canManageMasters ? (
               <>
                 <button
                   type="button"
@@ -784,7 +833,8 @@ const FollowPage: React.FC = () => {
                   <Plus className="h-3 w-3" aria-hidden /> เพิ่มเจ้าหน้าที่
                 </button>
               </>
-            ) : null
+              ) : null}
+            </>
           }
         />
 
@@ -798,21 +848,11 @@ const FollowPage: React.FC = () => {
           selectedYmd={fDate}
           onSelect={pickCalendarDay}
           onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
+          activeRound={activeRound}
         />
 
-        {/* สรุป + ปุ่มเพิ่ม */}
+        {/* สรุปยอด + รีเฟรช (ปุ่มเพิ่มคนย้ายขึ้นไปอยู่กับ "เพิ่มเจ้าหน้าที่" แล้ว) */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              setFormOpen(true);
-              setFormError(null);
-            }}
-            className="jarvis-pill-btn inline-flex min-h-[44px] items-center gap-1.5 px-5 py-2.5 text-sm touch-manipulation"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            เพิ่มคนที่ต้องการติดตาม
-          </button>
           <button
             type="button"
             onClick={() => void reload()}

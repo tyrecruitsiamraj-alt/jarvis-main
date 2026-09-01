@@ -1,4 +1,4 @@
-import { bucketOfCall } from '@/lib/callOutcomeBuckets';
+import { bucketOfCall, callAttemptSlot } from '@/lib/callOutcomeBuckets';
 import { isFollowOutcome, isLostOutcome, isSuccessOutcome } from '@/lib/followOutcome';
 
 /**
@@ -105,4 +105,22 @@ export function countFollowRoundBuckets(
     out[b] = rows.filter((r) => inFollowRoundBucket(r, b)).length;
   }
   return out;
+}
+
+/**
+ * **รายการนี้อยู่ "การโทรครั้งที่" เท่าไหร่** — `null` = ยังไม่อยู่รอบไหนเลย
+ * (ยังไม่เคยเข้าคิวและยังไม่มีผล)
+ *
+ * 🔴 **นิยามเดียวใช้สองที่** (เจ้าของสั่ง 1 ก.ย. 2569: *"ถ้าเลือกการโทรครั้งที่ 1
+ * ตารางปฏิทินก็โชว์ข้อมูลแค่ของครั้งที่ 1 สิ"*) — แผงข้างบนนับด้วยกติกานี้
+ * และปฏิทินข้างล่างกรองด้วยกติกาเดียวกัน · แยกเขียนสองที่เมื่อไหร่ เลขกับจอจะเถียงกัน
+ * (กติกา "หนึ่งเมตริกหนึ่งนิยาม" ที่โดนมาแล้วกับหน้าแรก)
+ */
+export function followRoundSlot(row: {
+  call_attempt?: number | null;
+  call_status?: string | null;
+  call_outcome?: string | null;
+}): 1 | 2 | 3 | null {
+  if (row.call_attempt == null && row.call_status === 'pending' && !row.call_outcome) return null;
+  return callAttemptSlot(row.call_attempt);
 }

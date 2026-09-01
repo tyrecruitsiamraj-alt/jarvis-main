@@ -194,6 +194,14 @@ export type FollowMonthRow = {
   byDay: Map<string, FollowPlanningRound[]>;
 };
 
+/**
+ * 🔴 **รอบที่ยกเลิกต้องอยู่ในตารางด้วย** (เจ้าของทัก 1 ก.ย. 2569:
+ * *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก งี้จะเชื่อนายได้ไง"*)
+ *
+ * เดิมกรองรอบที่ยกเลิกออกจากปฏิทินด้วยเหตุผลว่า "ไม่ใช่งานของวันนั้นแล้ว" — ผลคือ
+ * สายที่ Lumos โชว์ว่า **ยกเลิก** หายไปจากจอเราเงียบ ๆ ⇒ สองระบบเล่าไม่ตรงกัน
+ * แล้วคนเลิกเชื่อทั้งจอ · ของที่เกิดขึ้นจริงต้องเห็นได้ ต่อให้จบไปแล้ว (โชว์จาง ๆ + ป้ายกำกับ)
+ */
 export function buildFollowMonthRows(
   rows: readonly FollowPlanningRow[],
   month: string,
@@ -202,8 +210,7 @@ export function buildFollowMonthRows(
   for (const row of rows) {
     const byDay = new Map<string, FollowPlanningRound[]>();
     for (const round of row.rounds) {
-      // รอบที่ยกเลิกไม่ใช่งานของวันนั้นอีกแล้ว — เกณฑ์เดียวกับ buildFollowPlanningDays
-      if (!round.ymd || round.state === 'cancelled') continue;
+      if (!round.ymd) continue;
       if (round.ymd.slice(0, 7) !== month) continue;
       const list = byDay.get(round.ymd);
       if (list) list.push(round);
