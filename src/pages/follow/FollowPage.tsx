@@ -61,8 +61,10 @@ import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
 import FollowPlanningTable from '@/components/follow/FollowPlanningTable';
+import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
+import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
   listStaffContacts,
@@ -102,6 +104,8 @@ const FollowPage: React.FC = () => {
   const [fDate, setFDate] = useState('');
   const [fBand, setFBand] = useState<TimeBand>('');
   const [fOwner, setFOwner] = useState('');
+  /** เดือนที่ปฏิทิน Planning กางอยู่ (YYYY-MM) — เริ่มที่เดือนนี้ตามปฏิทินไทย */
+  const [calMonth, setCalMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
 
   const [formOpen, setFormOpen] = useState(false);
   const [prefix, setPrefix] = useState('');
@@ -660,10 +664,30 @@ const FollowPage: React.FC = () => {
   const planningRows = useMemo(() => buildFollowPlanningRows(groups), [groups]);
 
   /**
+   * ═══ ปฏิทิน Planning (เจ้าของสั่งเพิ่ม 1 ก.ย. 2569) ═══
+   * 🔴 **ปฏิทินต้องไม่โดนตัวกรองวันของตัวเอง** — ไม่งั้นพอกดเลือกวัน ปฏิทินจะเหลือวันเดียว
+   * แล้วกดวันอื่นต่อไม่ได้เลย · จึงกรองแค่แท็บ/ช่วงเวลา/เจ้าของงาน แล้วปล่อยวันไว้
+   */
+  const calendarRows = useMemo(
+    () =>
+      buildFollowPlanningRows(
+        groupFollowEntries(filterFollowEntries(items, { tab, date: '', band: fBand, owner: fOwner })),
+      ),
+    [items, tab, fBand, fOwner],
+  );
+
+  /**
    * แบ่งหน้า (เจ้าของสั่ง 22 ส.ค. 2569) — นับเป็น **คน** ไม่ใช่รอบ
    * (กติกา 18 ส.ค.: คนเดียวต้องเป็นแถวเดียว)
    */
   const { pageItems: rowPage, bar: groupBar, resetPage: resetGroupPage } = useListPagination(planningRows);
+
+  /** เลือกวันจากปฏิทิน = ใช้ช่องกรองวันเดิม (`fDate`) — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว */
+  const pickCalendarDay = (ymd: string) => {
+    setFDate(ymd);
+    setCalMonth(ymd ? ymd.slice(0, 7) : calMonth);
+    resetGroupPage();
+  };
 
   const counts = useMemo(() => {
     // 🔴 นับเฉพาะที่อยู่ในคิวจริง — เดิม API เดา 'pending' ให้แถวที่ไม่เคยส่ง ตัวเลขจึงเกินจริง
@@ -733,18 +757,16 @@ const FollowPage: React.FC = () => {
           }
         />
 
-        {/* กล่อง "โทรครบแล้ว" (Phase 7.1-7.2) — ซ่อนตัวเองเมื่อไม่มีของ
-            🔴 รับ `groups` ชุดเดียวกับลิสต์ข้างล่าง (ยอดกับรายชื่อต้องมาจากชุดเดียวกัน)
-            วางเหนือแท็บ เพื่อให้ไม่หายเวลาสลับแท็บ (แท็บ active กรองคนที่ปิดงานแล้วออก) */}
-        <FollowCompletedPanel
-          groups={groups}
-          onMoved={(name) => setAftercareNotice(`ย้าย ${name} ไปดูแลหลังเริ่มงานแล้ว`)}
+        {/* ═══ ปฏิทิน Planning (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 1.1 + ข้อ 3 ของ concept) ═══
+            *"เปิดมาปุ๊บ เจอ 3 หลัก ๆ: ปฏิทิน · ปุ่มเพิ่มคน · Planning"* — เรียงตามนั้นเลย
+            🔴 ช่องวันต้องมีชื่อคนอยู่ในนั้นจริง ๆ ไม่ใช่แค่จำนวนสาย (เจ้าของทักเอง) */}
+        <FollowPlanningCalendar
+          rows={calendarRows}
+          month={calMonth}
+          onMonthChange={setCalMonth}
+          selectedYmd={fDate}
+          onSelect={pickCalendarDay}
         />
-        {aftercareNotice ? (
-          <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.value)}>
-            {aftercareNotice}
-          </p>
-        ) : null}
 
         {/* สรุป + ปุ่มเพิ่ม */}
         <div className="flex flex-wrap items-center gap-2.5">
@@ -1541,6 +1563,22 @@ const FollowPage: React.FC = () => {
              🔴 ปุ่มรายรอบ (แก้ไข/เสร็จสิ้น/ยกเลิก) อยู่ในแถวเลย — เจ้าของสั่งเอง
              *"เข้ามาหน้าการติดตามก็เห็นเลย"* ห้ามซ่อนไว้หลังการกด */
           <div className="space-y-2.5">
+            {/* หัวตาราง — บอกตรง ๆ ว่ากำลังดูวันไหนอยู่ (กดมาจากปฏิทินแล้วต้องรู้ตัว) */}
+            <p className="text-xs font-semibold text-foreground">
+              {fDate ? `Planning วันที่ ${formatYmdDmyBe(fDate)}` : 'Planning ทุกวัน'}
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                {planningRows.length.toLocaleString('th-TH')} คน
+              </span>
+              {fDate ? (
+                <button
+                  type="button"
+                  onClick={() => pickCalendarDay('')}
+                  className="ml-2 text-[11px] font-medium text-primary underline"
+                >
+                  ดูทุกวัน
+                </button>
+              ) : null}
+            </p>
             <FollowPlanningTable
               rows={rowPage}
               busyId={busyId}
@@ -1554,6 +1592,21 @@ const FollowPage: React.FC = () => {
             <ListPaginationBar {...groupBar} />
           </div>
         )}
+
+        {/* กล่อง "โทรครบแล้ว" (Phase 7.1-7.2) — ซ่อนตัวเองเมื่อไม่มีของ
+            🔴 รับ `groups` ชุดเดียวกับตารางข้างบน (ยอดกับรายชื่อต้องมาจากชุดเดียวกัน)
+            🔴 **ย้ายลงมาไว้ท้ายหน้า 1 ก.ย. 2569** — เจ้าของสั่ง *"เปิดมาปุ๊บ เจอ 3 หลัก ๆ"*
+            (ปฏิทิน · ปุ่มเพิ่มคน · Planning) กล่องนี้เคยอยู่บน แล้วดันปฏิทินตกจอไปเลย
+            ยังอยู่นอกแท็บเหมือนเดิม จึงไม่หายเวลาสลับแท็บ */}
+        <FollowCompletedPanel
+          groups={groups}
+          onMoved={(name) => setAftercareNotice(`ย้าย ${name} ไปดูแลหลังเริ่มงานแล้ว`)}
+        />
+        {aftercareNotice ? (
+          <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.success.soft, TONE.success.value)}>
+            {aftercareNotice}
+          </p>
+        ) : null}
       </div>
 
       <BoardPersonPicker

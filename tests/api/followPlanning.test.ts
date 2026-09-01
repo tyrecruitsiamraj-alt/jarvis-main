@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { FollowEntry } from '../../src/lib/followApi';
 import { groupFollowEntries } from '../../src/lib/followGrouping';
 import {
+  buildFollowPlanningDays,
   buildFollowPlanningRows,
   followRoundState,
   isRoundOpen,
@@ -119,5 +120,39 @@ describe('buildFollowPlanningRows', () => {
     expect(r.map((x) => x.group.phone)).toEqual(['0800000002', '0800000001']);
     expect(r[1].openCount).toBe(0);
     expect(r[1].dueAtMs).toBeNull();
+  });
+});
+
+describe('buildFollowPlanningDays — ปฏิทินต้องมีชื่อคนในช่องวัน ไม่ใช่แค่เลข', () => {
+  const days = (list: FollowEntry[]) =>
+    buildFollowPlanningDays(buildFollowPlanningRows(groupFollowEntries(list, NOW), NOW));
+
+  it('รวมคนของแต่ละวัน พร้อมเวลาและจำนวนสาย', () => {
+    const d = days([
+      entry({ id: 'p1', recipient_phone: '0800000001', scheduled_at: '2026-09-01T02:00:00Z' }),
+      entry({ id: 'p2', recipient_phone: '0800000001', scheduled_at: '2026-09-01T09:00:00Z' }),
+      entry({ id: 'p3', recipient_phone: '0800000002', scheduled_at: '2026-09-01T09:30:00Z' }),
+      entry({ id: 'p4', recipient_phone: '0800000002', scheduled_at: '2026-09-02T09:00:00Z' }),
+    ]);
+    expect(d.get('2026-09-01')?.calls).toBe(3);
+    expect(d.get('2026-09-01')?.people).toHaveLength(2);
+    expect(d.get('2026-09-01')?.people[0].rounds).toHaveLength(2);
+    expect(d.get('2026-09-02')?.calls).toBe(1);
+  });
+
+  it('รอบที่ยกเลิกไม่ใช่งานของวันนั้น — ไม่นับ ไม่โชว์', () => {
+    const d = days([entry({ id: 'p5', scheduled_at: '2026-09-04T02:00:00Z', cancelled: true })]);
+    expect(d.get('2026-09-04')).toBeUndefined();
+  });
+
+  it('🔴 คนที่มีของค้างขึ้นก่อนในช่องวัน และนับยอดเลยเวลาแยกไว้', () => {
+    const d = days([
+      entry({ id: 'p6', recipient_phone: '0800000001', scheduled_at: '2026-09-01T09:00:00Z' }),
+      entry({ id: 'p7', recipient_phone: '0800000002', scheduled_at: '2026-09-01T02:00:00Z' }),
+    ]);
+    const day = d.get('2026-09-01');
+    expect(day?.overdue).toBe(1);
+    expect(day?.people[0].worst).toBe('overdue');
+    expect(day?.people[0].key.startsWith('800000002')).toBe(true);
   });
 });
