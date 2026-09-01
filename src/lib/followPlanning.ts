@@ -1,5 +1,7 @@
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
+import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import { FOLLOW_OUTCOME_LABEL, type FollowOutcomeAny } from '@/lib/followOutcome';
 
 /**
  * ═══ ตาราง Planning ของหน้าติดตาม (F3 · เจ้าของสั่ง 1 ก.ย. 2569) ═══
@@ -221,4 +223,35 @@ export function buildFollowMonthRows(
     out.push({ row, byDay });
   }
   return out;
+}
+
+/**
+ * **คำสั้นบอกว่า "รอบนี้ผลเป็นยังไง"** — สำหรับโชว์ใต้เวลาในช่องปฏิทิน
+ *
+ * เจ้าของทัก 1 ก.ย. 2569: *"แล้วทำไมไม่มีบอกผลด้วยเลยอะว่าผลเป็นยังไง"* —
+ * ช่องปฏิทินเดิมมีแต่เวลากับสี ⇒ ต้องกดเข้าไปดูถึงจะรู้ว่าคุยจบยังไง
+ *
+ * 🔴 **อ่านจากตารางคำแปลกลาง ไม่ประดิษฐ์คำเอง** (`CALL_OUTCOME_LABEL` /
+ * `FOLLOW_OUTCOME_LABEL`) · รหัสที่ไม่มีคำแปลให้คืนรหัสไปตามตรง ห้ามซ่อน
+ * ⚠️ ลำดับต้องตรงกับ `followRoundState` — ไม่งั้นสีกับคำบนชิปเดียวกันจะขัดกันเอง
+ */
+export function roundResultLabel(round: FollowPlanningRound): string {
+  const e = round.entry;
+  switch (round.state) {
+    case 'cancelled':
+      return 'ยกเลิก';
+    case 'closed':
+      return e.outcome_code
+        ? (FOLLOW_OUTCOME_LABEL[e.outcome_code as FollowOutcomeAny] ?? e.outcome_code)
+        : 'ปิดงาน';
+    case 'result':
+      return e.call_outcome ? (CALL_OUTCOME_LABEL[e.call_outcome] ?? e.call_outcome) : 'มีผลแล้ว';
+    case 'overdue':
+      // เลยเวลาแล้วยังไม่มีผล — ต้องบอกว่า "ยังไม่มีผล" ไม่ใช่ปล่อยว่างให้เดา
+      return 'ยังไม่มีผล';
+    case 'sent':
+      return 'รอผล';
+    default:
+      return 'รอถึงเวลา';
+  }
 }

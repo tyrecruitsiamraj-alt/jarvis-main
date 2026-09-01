@@ -5,6 +5,7 @@ import {
   buildFollowMonthRows,
   buildFollowPlanningRows,
   monthDayColumns,
+  roundResultLabel,
   followRoundState,
   isRoundOpen,
 } from '../../src/lib/followPlanning';
@@ -175,5 +176,34 @@ describe('ตาราง Planning แบบชื่ออยู่ซ้าย
     );
     const day = rows[0].byDay.get('2026-09-01');
     expect(day?.map((r) => r.state).sort()).toEqual(['cancelled', 'result', 'result']);
+  });
+});
+
+describe('roundResultLabel — ช่องปฏิทินต้องบอกผลด้วย ไม่ใช่มีแต่เวลา', () => {
+  // เจ้าของทัก 1 ก.ย. 2569: *"ทำไมไม่มีบอกผลด้วยเลยอะว่าผลเป็นยังไง"*
+  const label = (over: Partial<FollowEntry>) => {
+    const rows = buildFollowPlanningRows(groupFollowEntries([entry(over)], NOW), NOW);
+    return roundResultLabel(rows[0].rounds[0]);
+  };
+
+  it('ผลการโทรเป็นคำไทยจากตารางกลาง', () => {
+    expect(label({ call_outcome: 'acknowledged' })).toBe('รับทราบ');
+    expect(label({ call_outcome: 'declined' })).toBe('ไม่สนใจ');
+    expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
+  });
+
+  it('ปิดงานแล้วโชว์คำปิดงาน · ยกเลิกโชว์ว่ายกเลิก', () => {
+    expect(label({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('ไปแล้ว');
+    expect(label({ cancelled: true })).toBe('ยกเลิก');
+  });
+
+  it('🔴 ยังไม่มีผลต้องเขียนว่า "ยังไม่มีผล" ไม่ใช่ปล่อยว่างให้เดา', () => {
+    expect(label({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('ยังไม่มีผล');
+    expect(label({ scheduled_at: '2026-09-01T09:00:00Z' })).toBe('รอผล');
+    expect(label({ scheduled_at: '2026-09-01T09:00:00Z', call_status: null })).toBe('รอถึงเวลา');
+  });
+
+  it('รหัสผลที่ไม่มีคำแปล = โชว์รหัสไปตามตรง ห้ามซ่อน', () => {
+    expect(label({ call_outcome: 'weird_code' })).toBe('weird_code');
   });
 });

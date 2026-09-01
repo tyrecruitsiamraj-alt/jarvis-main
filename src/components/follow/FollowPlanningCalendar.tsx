@@ -7,6 +7,7 @@ import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dat
 import {
   buildFollowMonthRows,
   monthDayColumns,
+  roundResultLabel,
   FOLLOW_ROUND_STATE_LABEL,
   type FollowPlanningRound,
   type FollowPlanningRow,
@@ -206,7 +207,7 @@ const FollowPlanningCalendar: React.FC<{
                         aria-pressed={selected}
                         title={`${formatYmdDmyBe(c.ymd)} — กดเพื่อดูเฉพาะวันนี้`}
                         className={cn(
-                          'flex min-w-[42px] flex-col items-center rounded-lg px-1 py-1 font-medium transition-colors hover:bg-secondary',
+                          'flex min-w-[64px] flex-col items-center rounded-lg px-1 py-1 font-medium transition-colors hover:bg-secondary',
                           selected && 'bg-primary text-primary-foreground hover:bg-primary',
                           !selected && c.isSunday && 'text-rose-800 dark:text-red-300',
                           !selected && !c.isSunday && 'text-muted-foreground',
@@ -256,14 +257,27 @@ const FollowPlanningCalendar: React.FC<{
                               <span
                                 key={r.entry.id}
                                 className={cn(
-                                  'block rounded px-0.5 py-0.5 text-[9px] font-bold leading-tight tabular-nums',
+                                  'block rounded px-0.5 py-0.5 leading-tight',
                                   CELL_TONE[r.state],
                                   /* 🔴 ยกเลิกแล้วต้องยังเห็น — แต่ต้องดูออกทันทีว่าไม่ใช่สายที่จะเกิดขึ้น
                                      (Lumos โชว์ว่ายกเลิก จอเราซ่อนไว้ = สองระบบเล่าคนละเรื่อง) */
-                                  r.state === 'cancelled' && 'line-through opacity-60',
+                                  r.state === 'cancelled' && 'opacity-60',
                                 )}
                               >
-                                {r.time ?? '—'}
+                                <span
+                                  className={cn(
+                                    'block text-[9px] font-bold tabular-nums',
+                                    r.state === 'cancelled' && 'line-through',
+                                  )}
+                                >
+                                  {r.time ?? '—'}
+                                </span>
+                                {/* 🔴 ผลต้องอ่านได้จากในช่องเลย (เจ้าของทัก 1 ก.ย. 2569:
+                                    *"ทำไมไม่มีบอกผลด้วยเลยอะว่าผลเป็นยังไง"*)
+                                    เดิมมีแต่เวลากับสี ⇒ ต้องกดเข้าไปดูถึงจะรู้ว่าคุยจบยังไง */}
+                                <span className="block truncate text-[8px] font-medium leading-tight">
+                                  {roundResultLabel(r)}
+                                </span>
                               </span>
                             ))}
                             {rounds.length > 2 ? (
