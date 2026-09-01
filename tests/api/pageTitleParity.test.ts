@@ -66,8 +66,8 @@ describe('ชื่อหัวหน้าจอ = ชื่อเมนู', (
  * ทั้งที่ `CALL_OUTCOME_LABEL` มีคำไทยครบอยู่แล้ว
  */
 describe('หน้าติดตามแสดงผลโทรเป็นคำไทย', () => {
-  // ผลการโทรย้ายไปวาดที่ตาราง Planning แล้ว (F3 · 1 ก.ย. 2569) — ด่านนี้ต้องตามไปเฝ้าที่นั่น
-  const src = read('src/components/follow/FollowPlanningTable.tsx');
+  // ผลการโทรย้ายไปวาดที่ป๊อปของช่องปฏิทินแล้ว (1 ก.ย. 2569) — ด่านนี้ต้องตามไปเฝ้าที่นั่น
+  const src = read('src/components/follow/FollowRoundsDialog.tsx');
 
   it('เรียกใช้ตารางคำแปลกลาง ไม่พ่นรหัสดิบ', () => {
     expect(src).toContain('CALL_OUTCOME_LABEL');

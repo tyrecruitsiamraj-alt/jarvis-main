@@ -9,8 +9,6 @@ import {
 } from '@/components/ui/dialog';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
-import ListPaginationBar from '@/components/shared/ListPaginationBar';
-import { useListPagination } from '@/hooks/useListPagination';
 import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { conveyorLabel } from '@/lib/soRecruitNav';
@@ -60,7 +58,7 @@ import RoundScriptNote from '@/components/follow/RoundScriptNote';
 import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
 import FollowMasterManagerDialog from '@/components/follow/FollowMasterManagerDialog';
-import FollowPlanningTable from '@/components/follow/FollowPlanningTable';
+import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
@@ -106,6 +104,12 @@ const FollowPage: React.FC = () => {
   const [fOwner, setFOwner] = useState('');
   /** เดือนที่ปฏิทิน Planning กางอยู่ (YYYY-MM) — เริ่มที่เดือนนี้ตามปฏิทินไทย */
   const [calMonth, setCalMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
+  /**
+   * ช่องในปฏิทินที่กดเปิดอยู่ (คน + วัน) — null = ไม่ได้เปิด
+   * เก็บเป็น **คีย์** ไม่ใช่ก้อนข้อมูล เพื่อให้ป๊อปอ่านของสดหลังโหลดใหม่เสมอ
+   * (ปิดงาน/ยกเลิกแล้วป้ายในป๊อปต้องเปลี่ยนตาม ไม่ใช่ค้างของเก่า)
+   */
+  const [openCell, setOpenCell] = useState<{ key: string; ymd: string } | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [prefix, setPrefix] = useState('');
@@ -664,29 +668,26 @@ const FollowPage: React.FC = () => {
   const planningRows = useMemo(() => buildFollowPlanningRows(groups), [groups]);
 
   /**
-   * ═══ ปฏิทิน Planning (เจ้าของสั่งเพิ่ม 1 ก.ย. 2569) ═══
-   * 🔴 **ปฏิทินต้องไม่โดนตัวกรองวันของตัวเอง** — ไม่งั้นพอกดเลือกวัน ปฏิทินจะเหลือวันเดียว
-   * แล้วกดวันอื่นต่อไม่ได้เลย · จึงกรองแค่แท็บ/ช่วงเวลา/เจ้าของงาน แล้วปล่อยวันไว้
+   * รายละเอียดของช่องที่กดในปฏิทิน — **อ่านจากชุดที่กำลังแสดงอยู่**
+   * ไม่เจอแล้ว (โดนตัวกรอง/ถูกลบ) = ส่ง null ให้ป๊อปว่างแทนที่จะค้างข้อมูลเก่า
    */
-  const calendarRows = useMemo(
-    () =>
-      buildFollowPlanningRows(
-        groupFollowEntries(filterFollowEntries(items, { tab, date: '', band: fBand, owner: fOwner })),
-      ),
-    [items, tab, fBand, fOwner],
-  );
+  const cellDetail = useMemo(() => {
+    if (!openCell) return null;
+    const row = planningRows.find((r) => r.group.key === openCell.key);
+    if (!row) return null;
+    return {
+      group: row.group,
+      ymd: openCell.ymd,
+      // รอบที่ยกเลิกไม่ใช่งานของวันนั้นอีกแล้ว — เกณฑ์เดียวกับช่องในปฏิทิน
+      rounds: row.rounds.filter((r) => r.ymd === openCell.ymd && r.state !== 'cancelled'),
+    };
+  }, [openCell, planningRows]);
 
-  /**
-   * แบ่งหน้า (เจ้าของสั่ง 22 ส.ค. 2569) — นับเป็น **คน** ไม่ใช่รอบ
-   * (กติกา 18 ส.ค.: คนเดียวต้องเป็นแถวเดียว)
-   */
-  const { pageItems: rowPage, bar: groupBar, resetPage: resetGroupPage } = useListPagination(planningRows);
 
   /** เลือกวันจากปฏิทิน = ใช้ช่องกรองวันเดิม (`fDate`) — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว */
   const pickCalendarDay = (ymd: string) => {
     setFDate(ymd);
     setCalMonth(ymd ? ymd.slice(0, 7) : calMonth);
-    resetGroupPage();
   };
 
   const counts = useMemo(() => {
@@ -761,11 +762,12 @@ const FollowPage: React.FC = () => {
             *"เปิดมาปุ๊บ เจอ 3 หลัก ๆ: ปฏิทิน · ปุ่มเพิ่มคน · Planning"* — เรียงตามนั้นเลย
             🔴 ช่องวันต้องมีชื่อคนอยู่ในนั้นจริง ๆ ไม่ใช่แค่จำนวนสาย (เจ้าของทักเอง) */}
         <FollowPlanningCalendar
-          rows={calendarRows}
+          rows={planningRows}
           month={calMonth}
           onMonthChange={setCalMonth}
           selectedYmd={fDate}
           onSelect={pickCalendarDay}
+          onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
         />
 
         {/* สรุป + ปุ่มเพิ่ม */}
@@ -854,7 +856,6 @@ const FollowPage: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setTab(t);
-                  resetGroupPage();
                 }}
                 aria-pressed={tab === t}
                 className={cn(
@@ -915,7 +916,6 @@ const FollowPage: React.FC = () => {
                 value={fDate}
                 onChange={(e) => {
                   setFDate(e.target.value);
-                  resetGroupPage();
                 }}
                 className="jarvis-soft-field min-h-[40px] w-full"
               />
@@ -929,7 +929,6 @@ const FollowPage: React.FC = () => {
                 value={fBand}
                 onChange={(e) => {
                   setFBand(e.target.value as TimeBand);
-                  resetGroupPage();
                 }}
                 className="jarvis-soft-field min-h-[40px] w-full"
               >
@@ -948,7 +947,6 @@ const FollowPage: React.FC = () => {
                 value={fOwner}
                 onChange={(e) => {
                   setFOwner(e.target.value);
-                  resetGroupPage();
                 }}
                 className="jarvis-soft-field min-h-[40px] w-full"
               >
@@ -1525,57 +1523,17 @@ const FollowPage: React.FC = () => {
           </p>
         ) : null}
 
-        {/* รายการ */}
-        {loading && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin text-blue-500" aria-hidden />
-            กำลังโหลดรายการ…
-          </p>
-        ) : filtered.length === 0 ? (
+        {/* ═══ ไม่มีอะไรให้ตามเลย — ปฏิทินข้างบนจะว่างเปล่า ต้องบอกว่าต้องทำอะไรต่อ ═══
+            🔴 ตารางรายละเอียดใต้ปฏิทินถูกถอดทิ้ง (เจ้าของสั่ง 1 ก.ย. 2569:
+            *"คนที่ต้องติดตาม/หน่วยงาน/ติดตามวันไหน/แต่ละรอบ — เอากล่องพวกนี้ออกไปเลย"*)
+            ปุ่มทำงานย้ายไปอยู่ในป๊อปที่เด้งตอนกดช่องเวลาในปฏิทิน */}
+        {!loading && items.length === 0 ? (
           <div className="glass-card rounded-2xl border border-white/70 p-8 text-center text-muted-foreground">
             <PhoneForwarded className="mx-auto mb-2 h-8 w-8 text-blue-400/60" aria-hidden />
-            <p className="text-sm font-medium text-foreground">
-              {items.length === 0
-                ? 'ยังไม่มีรายชื่อที่ต้องติดตาม'
-                : hasActiveFilter
-                  ? `ไม่มีรายการในแท็บ "${FOLLOW_TAB_LABEL[tab]}" ตามตัวกรองนี้`
-                  : `ยังไม่มีรายการในแท็บ "${FOLLOW_TAB_LABEL[tab]}"`}
-            </p>
-            {items.length === 0 ? (
-              <p className="mt-1 text-xs">กด “เพิ่มรายชื่อที่ต้องติดตาม” เพื่อให้ AI โทรตามให้</p>
-            ) : hasActiveFilter ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setFDate('');
-                  setFBand('');
-                  setFOwner('');
-                }}
-                className="mt-1 text-xs font-medium text-primary underline"
-              >
-                ล้างตัวกรอง
-              </button>
-            ) : null}
+            <p className="text-sm font-medium text-foreground">ยังไม่มีรายชื่อที่ต้องติดตาม</p>
+            <p className="mt-1 text-xs">กด “เพิ่มคนที่ต้องการติดตาม” เพื่อให้ AI โทรตามให้</p>
           </div>
-        ) : (
-          /* ═══ ตาราง Planning — มาแทนรายการการ์ดเดิม (เจ้าของเคาะ 1 ก.ย. 2569) ═══
-             หนึ่งแถวหนึ่งคน · ติดตามวันไหน · กี่รอบ · เวลาไหน · รอบนั้นไปถึงไหนแล้ว
-             🔴 ปุ่มรายรอบ (แก้ไข/เสร็จสิ้น/ยกเลิก) อยู่ในแถวเลย — เจ้าของสั่งเอง
-             *"เข้ามาหน้าการติดตามก็เห็นเลย"* ห้ามซ่อนไว้หลังการกด */
-          <div className="space-y-2.5">
-            <FollowPlanningTable
-              rows={rowPage}
-              busyId={busyId}
-              cancellingId={cancellingId}
-              onAskCancel={setCancellingId}
-              onCancel={(id) => void doCancel(id)}
-              onEdit={setEditing}
-              onComplete={doComplete}
-            />
-            {/* แถบเลขหน้า — ตัวเดียวกับทุกหน้าในระบบ (10/20/30/40/50) */}
-            <ListPaginationBar {...groupBar} />
-          </div>
-        )}
+        ) : null}
 
         {/* กล่อง "โทรครบแล้ว" (Phase 7.1-7.2) — ซ่อนตัวเองเมื่อไม่มีของ
             🔴 รับ `groups` ชุดเดียวกับตารางข้างบน (ยอดกับรายชื่อต้องมาจากชุดเดียวกัน)
@@ -1592,6 +1550,25 @@ const FollowPage: React.FC = () => {
           </p>
         ) : null}
       </div>
+
+      {/* ป๊อปรายละเอียดของช่องปฏิทิน — ปุ่มทำงานทั้งหมดอยู่ในนี้
+          🔴 กด "แก้ไข" ต้องปิดป๊อปนี้ก่อน แล้วค่อยเปิดกล่องแก้ไข (ห้ามซ้อน Dialog) */}
+      <FollowRoundsDialog
+        open={Boolean(openCell)}
+        onClose={() => setOpenCell(null)}
+        group={cellDetail?.group ?? null}
+        ymd={cellDetail?.ymd ?? null}
+        rounds={cellDetail?.rounds ?? []}
+        busyId={busyId}
+        cancellingId={cancellingId}
+        onAskCancel={setCancellingId}
+        onCancel={(id) => void doCancel(id)}
+        onEdit={(entry) => {
+          setOpenCell(null);
+          setEditing(entry);
+        }}
+        onComplete={doComplete}
+      />
 
       <BoardPersonPicker
         open={pickerOpen}

@@ -49,7 +49,7 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
   const detail = rounds
     .map((r) => `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${FOLLOW_ROUND_STATE_LABEL[r.state]}`)
     .join(' · ');
-  return `${name} · ${formatYmdDmyBe(ymd)} — ${detail} (กดเพื่อดูเฉพาะวันนี้)`;
+  return `${name} · ${formatYmdDmyBe(ymd)} — ${detail} (กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
 }
 
 const FollowPlanningCalendar: React.FC<{
@@ -59,7 +59,9 @@ const FollowPlanningCalendar: React.FC<{
   /** วันที่เลือกอยู่ (YYYY-MM-DD) — '' = ดูทั้งหมด */
   selectedYmd: string;
   onSelect: (ymd: string) => void;
-}> = ({ rows, month, onMonthChange, selectedYmd, onSelect }) => {
+  /** กดช่องเวลา = เปิดป๊อปรายละเอียดของคนนั้นในวันนั้น (เจ้าของเลือกเอง 1 ก.ย. 2569) */
+  onOpenCell: (row: FollowPlanningRow, ymd: string, rounds: FollowPlanningRound[]) => void;
+}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell }) => {
   const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
   const cols = useMemo(() => monthDayColumns(month), [month]);
   const today = toYmdBangkok(new Date());
@@ -90,7 +92,7 @@ const FollowPlanningCalendar: React.FC<{
         <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden />
         <span className="text-sm font-bold text-foreground">ปฏิทินติดตาม</span>
         <span className="text-[11px] text-muted-foreground">
-          แถว = คน · คอลัมน์ = วัน · กดช่องหรือหัววัน = ดูเฉพาะวันนั้น · กดซ้ำ = กลับมาดูทั้งหมด
+          แถว = คน · คอลัมน์ = วัน · กดช่องเวลา = เปิดรายละเอียด/จัดการรอบนั้น · กดหัววัน = ดูเฉพาะวันนั้น
         </span>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -220,7 +222,7 @@ const FollowPlanningCalendar: React.FC<{
                         {rounds ? (
                           <button
                             type="button"
-                            onClick={() => onSelect(selected ? '' : c.ymd)}
+                            onClick={() => onOpenCell(row, c.ymd, rounds)}
                             title={cellTitle(row.group.name, c.ymd, rounds)}
                             className="flex w-full flex-col items-stretch gap-0.5"
                           >
