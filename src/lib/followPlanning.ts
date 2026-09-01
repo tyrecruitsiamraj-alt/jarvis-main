@@ -2,6 +2,7 @@ import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
 import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { followDispatchLabel } from '@/lib/followDispatchState';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import type { ToneKey } from '@/lib/designTokens';
 import {
   FOLLOW_OUTCOME_LABEL,
@@ -321,4 +322,47 @@ export function roundDispatchReason(round: FollowPlanningRound): string {
     state: round.entry.dispatch_state,
     callStatus: round.entry.call_status,
   }).label;
+}
+
+/**
+ * **กรองให้เหลือเฉพาะ "การโทรครั้งที่ N"** — ทั้งแถวและช่อง
+ *
+ * 🔴 เจ้าของทัก 1 ก.ย. 2569: *"ถ้าเลือกการโทรครั้งที่เท่าไหร่ ก็โชว์ข้อมูลของ
+ * การโทรรอบนั้น ๆ พอสิ"* — รอบก่อนกรองแค่ **แถว** (ใครอยู่รอบนั้น) แต่ช่องยังโชว์
+ * ทุกสายของคนนั้น ⇒ เลือกครั้งที่ 1 แล้วยังเห็นสายของครั้งที่ 2 ปนอยู่
+ *
+ * ตัวเลข `days`/`roundCount`/`openCount`/`dueAtMs` ถูก **คิดใหม่จากสายที่เหลือ**
+ * ไม่ใช่ยกของเดิมมา ไม่งั้นหัวแถวจะบอกจำนวนรอบที่มองไม่เห็นในตาราง
+ */
+export function filterPlanningRowsByRound(
+  rows: readonly FollowPlanningRow[],
+  slot: number,
+): FollowPlanningRow[] {
+  const out: FollowPlanningRow[] = [];
+  for (const row of rows) {
+    const rounds = row.rounds.filter((r) => followRoundSlot(r.entry) === slot);
+    if (rounds.length === 0) continue;
+
+    const days: string[] = [];
+    for (const r of rounds) {
+      if (r.state === 'cancelled' || !r.ymd) continue;
+      if (!days.includes(r.ymd)) days.push(r.ymd);
+    }
+    days.sort();
+
+    const open = rounds.filter((r) => isRoundOpen(r.state));
+    const dueTimes = open
+      .map((r) => (r.entry.scheduled_at ? new Date(r.entry.scheduled_at).getTime() : Number.NaN))
+      .filter((t) => Number.isFinite(t));
+
+    out.push({
+      ...row,
+      rounds,
+      days,
+      roundCount: rounds.filter((r) => r.state !== 'cancelled').length,
+      openCount: open.length,
+      dueAtMs: dueTimes.length ? Math.min(...dueTimes) : null,
+    });
+  }
+  return out;
 }

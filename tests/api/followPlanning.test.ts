@@ -4,6 +4,7 @@ import { groupFollowEntries } from '../../src/lib/followGrouping';
 import {
   buildFollowMonthRows,
   buildFollowPlanningRows,
+  filterPlanningRowsByRound,
   monthDayColumns,
   roundResultLabel,
   roundTone,
@@ -265,5 +266,43 @@ describe('สีของรอบ — ต้องแปลว่า "ดี/�
   it('ไม่ได้ส่งให้ AI = ส้ม (ต้องคนจัดการ) · ยกเลิกทิ้ง = เทา', () => {
     expect(tone({ call_status: null })).toBe('orange');
     expect(tone({ cancelled: true })).toBe('neutral');
+  });
+});
+
+describe('เลือก "การโทรครั้งที่ N" — ต้องกรองทั้งแถวและช่อง', () => {
+  // เจ้าของทัก 1 ก.ย. 2569: *"เลือกการโทรครั้งที่เท่าไหร่ ก็โชว์ข้อมูลของรอบนั้น ๆ พอสิ"*
+  const rows = () =>
+    buildFollowPlanningRows(
+      groupFollowEntries(
+        [
+          entry({ id: 'r1', call_attempt: 1, call_outcome: 'no_answer' }),
+          entry({ id: 'r2', call_attempt: 2, call_outcome: 'acknowledged' }),
+          entry({ id: 'r3', recipient_phone: '0899999999', call_attempt: 2, call_outcome: 'declined' }),
+        ],
+        NOW,
+      ),
+      NOW,
+    );
+
+  it('ครั้งที่ 1 เหลือเฉพาะสายของครั้งที่ 1 — สายครั้งที่ 2 ของคนเดียวกันต้องไม่ปน', () => {
+    const out = filterPlanningRowsByRound(rows(), 1);
+    expect(out).toHaveLength(1);
+    expect(out[0].rounds.map((r) => r.entry.id)).toEqual(['r1']);
+  });
+
+  it('ครั้งที่ 2 ได้สองคน คนละหนึ่งสาย', () => {
+    const out = filterPlanningRowsByRound(rows(), 2);
+    expect(out).toHaveLength(2);
+    expect(out.flatMap((r) => r.rounds.map((x) => x.entry.id)).sort()).toEqual(['r2', 'r3']);
+  });
+
+  it('เลขสรุปของแถวคิดใหม่จากสายที่เหลือ ไม่ใช่ยกของเดิมมา', () => {
+    const out = filterPlanningRowsByRound(rows(), 1);
+    expect(out[0].roundCount).toBe(1);
+    expect(out[0].days).toHaveLength(1);
+  });
+
+  it('ครั้งที่ไม่มีใครอยู่ = ไม่มีแถว', () => {
+    expect(filterPlanningRowsByRound(rows(), 3)).toHaveLength(0);
   });
 });

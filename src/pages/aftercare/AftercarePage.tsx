@@ -14,6 +14,10 @@ import {
   type AftercarePerson,
 } from '@/lib/aftercareApi';
 import BoardPersonPicker from '@/components/follow/BoardPersonPicker';
+import AftercarePlanningCalendar from '@/components/aftercare/AftercarePlanningCalendar';
+import { aftercareMissingStartDate } from '@/lib/aftercarePlanning';
+import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
+import { toYmdBangkok } from '@/lib/dateTh';
 import { pickerDisplayName } from '@/lib/boardPickerApi';
 import {
   AFTERCARE_TOPIC,
@@ -50,6 +54,12 @@ const AftercarePage: React.FC = () => {
    */
   const [pickerOpen, setPickerOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  /**
+   * สายจริงของงาน "ถามความเป็นอยู่ฯ" — มาจากหน้าติดตาม (หน้านี้ไม่มีระบบโทรของตัวเอง)
+   * ⚠️ โหลดไม่ได้ = ปฏิทินยังขึ้นได้ แค่ไม่มีชั้น "สายจริง" · ห้ามทำให้หน้าพังทั้งหน้า
+   */
+  const [calls, setCalls] = useState<FollowEntry[]>([]);
+  const [calMonth, setCalMonth] = useState(() => toYmdBangkok(new Date()).slice(0, 7));
 
   const load = useCallback(() => {
     setLoading(true);
@@ -61,6 +71,10 @@ const AftercarePage: React.FC = () => {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ'))
       .finally(() => setLoading(false));
+    /* สายจริงของหัวข้อนี้ — พลาดแล้วปฏิทินยังขึ้นได้ (แค่ไม่มีชั้น "สายจริง") จึงกลืน error */
+    listFollowEntries()
+      .then((rows) => setCalls(rows.filter((r) => r.topic === AFTERCARE_TOPIC)))
+      .catch(() => setCalls([]));
   }, [includeClosed]);
 
   useEffect(load, [load]);
@@ -164,6 +178,29 @@ const AftercarePage: React.FC = () => {
 
         {notice ? (
           <p className={cn('rounded-xl border px-3 py-2 text-xs', TONE.info.soft, TONE.info.value)}>{notice}</p>
+        ) : null}
+
+        {/* ═══ ปฏิทิน Planning (เจ้าของสั่ง 1 ก.ย. 2569) ═══
+            *"ขอเป็นภาพแบบ Planning ให้เห็นว่าแต่ละวันต้องโทรหาใครอะไรยังไงบ้าง"*
+            รูปเดียวกับหน้าติดตาม — แถว = คน · คอลัมน์ = วัน */}
+        {!loading && open.length > 0 ? (
+          <AftercarePlanningCalendar
+            people={open}
+            calls={calls}
+            month={calMonth}
+            onMonthChange={setCalMonth}
+            missingStartDate={aftercareMissingStartDate(open).length}
+            onOpenCell={(row) =>
+              navigate(
+                buildFollowPrefillPath({
+                  name: row.person.full_name,
+                  phone: row.person.phone_e164,
+                  topic: AFTERCARE_TOPIC,
+                  unitName: row.person.unit_name ?? undefined,
+                }),
+              )
+            }
+          />
         ) : null}
 
         {!migrated ? (

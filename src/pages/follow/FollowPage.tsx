@@ -61,8 +61,7 @@ import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import { type FollowOutcome } from '@/lib/followOutcome';
-import { buildFollowPlanningRows } from '@/lib/followPlanning';
-import { followRoundSlot } from '@/lib/followRoundBuckets';
+import { buildFollowPlanningRows, filterPlanningRowsByRound } from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -702,15 +701,13 @@ const FollowPage: React.FC = () => {
   const planningRowsAllRounds = useMemo(() => buildFollowPlanningRows(groups), [groups]);
 
   /**
-   * ปฏิทินโชว์เฉพาะคนที่อยู่ใน "การโทรครั้งที่" ที่เลือกไว้ข้างบน
-   * ⚠️ กรองระดับ **คน** ไม่ใช่ระดับรอบ — แผงข้างบนก็นับคนแบบนี้ (คนหนึ่งอยู่ครั้งเดียว)
-   * กรองระดับรอบเมื่อไหร่ เลขบนกล่องกับจำนวนแถวจะไม่ตรงกันทันที
+   * ปฏิทินโชว์เฉพาะ "การโทรครั้งที่" ที่เลือกไว้ข้างบน — **ทั้งแถวและช่อง**
+   * (เจ้าของทัก 1 ก.ย. 2569: *"เลือกครั้งที่เท่าไหร่ ก็โชว์ข้อมูลของรอบนั้น ๆ พอสิ"*
+   * รอบแรกกรองแค่แถว ช่องเลยยังมีสายของรอบอื่นปนอยู่)
+   * 🔴 ป๊อปรายละเอียดยังอ่านจาก `allRows` ที่ไม่ผ่านตัวกรอง — กดเข้าไปต้องเห็นครบทุกรอบเสมอ
    */
   const planningRows = useMemo(
-    () =>
-      planningRowsAllRounds.filter((r) =>
-        r.rounds.some((x) => followRoundSlot(x.entry) === activeRound),
-      ),
+    () => filterPlanningRowsByRound(planningRowsAllRounds, activeRound),
     [planningRowsAllRounds, activeRound],
   );
 
