@@ -6,6 +6,7 @@ import {
   buildFollowPlanningRows,
   monthDayColumns,
   roundResultLabel,
+  roundTone,
   followRoundState,
   isRoundOpen,
 } from '../../src/lib/followPlanning';
@@ -55,14 +56,19 @@ describe('followRoundState — สภาพของรอบต้องต่�
     expect(followRoundState(entry({ scheduled_at: '2026-09-01T09:00:00Z' }), NOW)).toBe('sent');
   });
 
-  it('ยังไม่ถึงเวลา + ไม่เคยเข้าคิว = ยังไม่ถึงเวลา', () => {
+  it('🔴 ไม่เคยเข้าคิวเลย = "ไม่ได้ส่ง" ไม่ใช่ "รอโทร/เลยเวลา"', () => {
+    // เจ้าของถามเอง 1 ก.ย. 2569: *"แล้วทำไมไม่มีผล"* — เพราะสายไม่เคยออก
+    // (เบอร์อยู่ในบัญชีห้ามโทร / มีคนจองโทรเอง ฯลฯ) จอต้องบอกตรง ๆ ไม่ใช่ให้นั่งรอ
     expect(followRoundState(entry({ scheduled_at: '2026-09-01T09:00:00Z', call_status: null }), NOW)).toBe(
-      'waiting',
+      'notSent',
+    );
+    expect(followRoundState(entry({ scheduled_at: '2026-09-01T02:00:00Z', call_status: null }), NOW)).toBe(
+      'notSent',
     );
   });
 
-  it('ไม่มีเวลานัด — ห้ามเดาว่าเลยเวลา', () => {
-    expect(followRoundState(entry({ scheduled_at: null, call_status: null }), NOW)).toBe('waiting');
+  it('ไม่มีเวลานัดแต่อยู่ในคิวแล้ว — ห้ามเดาว่าเลยเวลา', () => {
+    expect(followRoundState(entry({ scheduled_at: null }), NOW)).toBe('sent');
   });
 
   it('รอบที่ยังต้องตามต่อ = เลยเวลา/ส่งแล้ว/ยังไม่ถึงเวลา', () => {
@@ -197,10 +203,10 @@ describe('roundResultLabel — ช่องปฏิทินต้องบอ�
     expect(label({ cancelled: true })).toBe('ยกเลิก');
   });
 
-  it('🔴 ยังไม่มีผลต้องเขียนว่า "ยังไม่มีผล" ไม่ใช่ปล่อยว่างให้เดา', () => {
+  it('🔴 ยังไม่มีผลต้องเขียนว่าอะไร — แยก "ยังไม่มีผล" กับ "ไม่ได้ส่ง" ออกจากกัน', () => {
     expect(label({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('ยังไม่มีผล');
     expect(label({ scheduled_at: '2026-09-01T09:00:00Z' })).toBe('รอผล');
-    expect(label({ scheduled_at: '2026-09-01T09:00:00Z', call_status: null })).toBe('รอถึงเวลา');
+    expect(label({ scheduled_at: '2026-09-01T09:00:00Z', call_status: null })).toBe('ไม่ได้ส่ง');
   });
 
   it('รหัสผลที่ไม่มีคำแปล = โชว์รหัสไปตามตรง ห้ามซ่อน', () => {
@@ -228,5 +234,36 @@ describe('คำผลโทรฉบับงานติดตาม (เจ�
   it('คำที่ไม่ได้ทับ ใช้ของตารางกลางเหมือนเดิม', () => {
     expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
     expect(label({ call_outcome: 'no_answer' })).toBe('ไม่รับสาย');
+  });
+});
+
+describe('สีของรอบ — ต้องแปลว่า "ดี/ร้าย" ไม่ใช่ "มีผลหรือยัง"', () => {
+  // เจ้าของทัก 1 ก.ย. 2569: *"ไม่ไปแล้วแต่เป็นเขียวเนี่ยนะ · ไม่มีผลเป็นสีแดงเพราะอะไร"*
+  const tone = (over: Partial<FollowEntry>) => {
+    const rows = buildFollowPlanningRows(groupFollowEntries([entry(over)], NOW), NOW);
+    return roundTone(rows[0].rounds[0]);
+  };
+
+  it('🔴 ไม่ไปแล้ว = แดง ไม่ใช่เขียว', () => {
+    expect(tone({ call_outcome: 'declined' })).toBe('danger');
+  });
+
+  it('🔴 เลยเวลายังไม่มีผล = เหลือง (ยังไม่จบ) ไม่ใช่แดง', () => {
+    expect(tone({ scheduled_at: '2026-09-01T02:00:00Z' })).toBe('warn');
+  });
+
+  it('ยืนยันว่าไป/ปิดงานว่าไปแล้ว = เขียว', () => {
+    expect(tone({ call_outcome: 'confirmed' })).toBe('success');
+    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('success');
+  });
+
+  it('ปิดงานว่ายกเลิก = แดง · ลา/เลื่อน = เหลือง', () => {
+    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('danger');
+    expect(tone({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'postponed' })).toBe('warn');
+  });
+
+  it('ไม่ได้ส่งให้ AI = ส้ม (ต้องคนจัดการ) · ยกเลิกทิ้ง = เทา', () => {
+    expect(tone({ call_status: null })).toBe('orange');
+    expect(tone({ cancelled: true })).toBe('neutral');
   });
 });

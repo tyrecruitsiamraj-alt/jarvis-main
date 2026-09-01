@@ -1,7 +1,14 @@
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
-import { followCallOutcomeText } from '@/lib/callOutcomeTone';
-import { FOLLOW_OUTCOME_LABEL, type FollowOutcomeAny } from '@/lib/followOutcome';
+import { CALL_OUTCOME_TONE, followCallOutcomeText } from '@/lib/callOutcomeTone';
+import { followDispatchLabel } from '@/lib/followDispatchState';
+import type { ToneKey } from '@/lib/designTokens';
+import {
+  FOLLOW_OUTCOME_LABEL,
+  isLostOutcome,
+  isSuccessOutcome,
+  type FollowOutcomeAny,
+} from '@/lib/followOutcome';
 
 /**
  * ═══ ตาราง Planning ของหน้าติดตาม (F3 · เจ้าของสั่ง 1 ก.ย. 2569) ═══
@@ -29,6 +36,14 @@ export type FollowRoundState =
   | 'result'
   /** เลยเวลานัดแล้วยังไม่มีผลกลับ — มีคนรอสายอยู่จริง */
   | 'overdue'
+  /**
+   * **ไม่เคยถูกส่งให้ AI เลย** — เบอร์อยู่ในบัญชีห้ามโทร / มีคนจองโทรเอง /
+   * ตรวจไม่ได้ / ไม่มีเบอร์ / ปิดส่งอัตโนมัติ
+   *
+   * 🔴 แยกจาก `overdue` เพราะ **ไม่มีสายไหนกำลังจะเกิดขึ้น** — เขียนว่า "ยังไม่มีผล"
+   * เฉย ๆ คือหลอกให้รอ (เจ้าของถามเอง 1 ก.ย. 2569: *"แล้วทำไมไม่มีผล"*)
+   */
+  | 'notSent'
   /** ส่งเข้าคิว AI แล้ว ยังไม่ถึงเวลา/ยังไม่มีผล */
   | 'sent'
   /** ยังไม่ถึงเวลา และไม่เคยเข้าคิว AI เลย */
@@ -39,6 +54,7 @@ export const FOLLOW_ROUND_STATE_LABEL: Record<FollowRoundState, string> = {
   closed: 'ปิดงานแล้ว',
   result: 'ได้ผลแล้ว',
   overdue: 'เลยเวลานัด',
+  notSent: 'ไม่ได้ส่งให้ AI',
   sent: 'ส่งแล้วรอผล',
   waiting: 'ยังไม่ถึงเวลา',
 };
@@ -57,15 +73,20 @@ export function followRoundState(entry: FollowEntry, now: Date = new Date()): Fo
   if (entry.cancelled) return 'cancelled';
   if (entry.completed_at) return 'closed';
   if (entry.call_outcome) return 'result';
+  /**
+   * 🔴 ไม่เคยเข้าคิวเลย = **ไม่ได้ส่ง** ไม่ใช่ "เลยเวลา/รอโทร"
+   * (`call_status` เป็น null เมื่อไม่มีแถวในคิว — เหตุผลอยู่ที่ `dispatch_state`)
+   */
+  if (!entry.call_status) return 'notSent';
   const at = ms(entry.scheduled_at);
   // ไม่มีเวลานัดที่อ่านได้ = ยังไม่ถึงคิวใคร — ห้ามเดาว่าเลยเวลา
   if (at !== null && at < now.getTime()) return 'overdue';
-  return entry.call_status ? 'sent' : 'waiting';
+  return 'sent';
 }
 
 /** รอบนี้ยัง "ต้องทำอะไรต่อ" อยู่ไหม — ใช้เรียงว่าใครต้องโทรก่อน */
 export function isRoundOpen(state: FollowRoundState): boolean {
-  return state === 'overdue' || state === 'sent' || state === 'waiting';
+  return state === 'overdue' || state === 'sent' || state === 'waiting' || state === 'notSent';
 }
 
 export type FollowPlanningRound = {
@@ -246,6 +267,9 @@ export function roundResultLabel(round: FollowPlanningRound): string {
         : 'ปิดงาน';
     case 'result':
       return e.call_outcome ? followCallOutcomeText(e.call_outcome) : 'มีผลแล้ว';
+    case 'notSent':
+      // 🔴 ไม่มีสายไหนกำลังจะเกิด — บอกให้รู้ตัว ไม่ใช่ปล่อยให้นั่งรอผลที่ไม่มีวันมา
+      return 'ไม่ได้ส่ง';
     case 'overdue':
       // เลยเวลาแล้วยังไม่มีผล — ต้องบอกว่า "ยังไม่มีผล" ไม่ใช่ปล่อยว่างให้เดา
       return 'ยังไม่มีผล';
@@ -254,4 +278,47 @@ export function roundResultLabel(round: FollowPlanningRound): string {
     default:
       return 'รอถึงเวลา';
   }
+}
+
+/**
+ * **สีของรอบ — ตัดสินจาก "ผลเป็นยังไง" ไม่ใช่ "มีผลหรือยัง"**
+ *
+ * 🔴 เจ้าของทัก 1 ก.ย. 2569: *"ไม่ไปแล้วแต่เป็นเขียวเนี่ยนะ · ไม่มีผลเป็นสีแดงเพราะอะไร"*
+ * ของเดิมทาสีตาม **สภาพ** (มีผลแล้ว = เขียว · เลยเวลา = แดง) ⇒ คนที่บอกว่า
+ * "ไม่ไปแล้ว" กลายเป็นเขียวเพราะ "ได้ผลแล้ว" ส่วนสายที่แค่ยังไม่ถึงคิวกลายเป็นแดง
+ * **สีต้องแปลว่าเรื่องดีหรือเรื่องร้าย ไม่ใช่แปลว่าข้อมูลมาถึงหรือยัง**
+ *
+ * เขียว = จบดี · แดง = จบไม่ดี · เหลือง = ยังไม่จบ ต้องตามต่อ ·
+ * ส้ม = ไม่ได้ส่ง ต้องคนจัดการ · น้ำเงิน = สายกำลังเดิน · เทา = ยังไม่ถึงเวลา/ทิ้งแล้ว
+ *
+ * ⚠️ ผลการโทรใช้ `CALL_OUTCOME_TONE` ตัวกลาง — สีเดียวกันต้องแปลว่าเรื่องเดียวกันทุกหน้า
+ */
+export function roundTone(round: FollowPlanningRound): ToneKey {
+  const e = round.entry;
+  switch (round.state) {
+    case 'cancelled':
+      return 'neutral';
+    case 'closed':
+      if (isSuccessOutcome(e.outcome_code)) return 'success';
+      if (isLostOutcome(e.outcome_code)) return 'danger';
+      return 'warn'; // ลา/เลื่อน — ยังไม่จบจริง
+    case 'result':
+      return CALL_OUTCOME_TONE[(e.call_outcome ?? '') as keyof typeof CALL_OUTCOME_TONE] ?? 'warn';
+    case 'notSent':
+      return 'orange';
+    case 'overdue':
+      return 'warn';
+    case 'sent':
+      return 'primary';
+    default:
+      return 'neutral';
+  }
+}
+
+/** เหตุผลเต็มว่าทำไมไม่ได้ส่ง — ช่องในปฏิทินแคบ เก็บคำเต็มไว้ที่ tooltip/ป๊อป */
+export function roundDispatchReason(round: FollowPlanningRound): string {
+  return followDispatchLabel({
+    state: round.entry.dispatch_state,
+    callStatus: round.entry.call_status,
+  }).label;
 }

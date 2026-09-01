@@ -7,11 +7,11 @@ import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dat
 import {
   buildFollowMonthRows,
   monthDayColumns,
+  roundDispatchReason,
   roundResultLabel,
-  FOLLOW_ROUND_STATE_LABEL,
+  roundTone,
   type FollowPlanningRound,
   type FollowPlanningRow,
-  type FollowRoundState,
 } from '@/lib/followPlanning';
 
 /**
@@ -28,16 +28,6 @@ import {
  * 🔴 **ตัวกรองวันใช้ช่องเดียวกับแผงตัวกรอง (`fDate`)** — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว
  */
 
-/** สีของช่อง — ความหมายเดียวกับชิปเวลาในตารางรายละเอียดข้างล่าง */
-const CELL_TONE: Record<FollowRoundState, string> = {
-  overdue: TONE.danger.chip,
-  sent: TONE.primary.chip,
-  waiting: TONE.neutral.chip,
-  result: TONE.success.chip,
-  closed: TONE.success.chip,
-  cancelled: TONE.neutral.chip,
-};
-
 /** ชื่อเดือนไทย + ปี พ.ศ. จากคีย์ YYYY-MM */
 function monthLabel(monthKey: string): string {
   const [y, m] = monthKey.split('-');
@@ -48,7 +38,10 @@ function monthLabel(monthKey: string): string {
 /** ข้อความบอกช่อง — ตัวเลขลอย ๆ อ่านไม่ออกว่าคืออะไร ต้องมีคำกำกับตอนเอาเมาส์จ่อ */
 function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): string {
   const detail = rounds
-    .map((r) => `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${FOLLOW_ROUND_STATE_LABEL[r.state]}`)
+    .map((r) => {
+      const why = r.state === 'notSent' ? ` (${roundDispatchReason(r)})` : '';
+      return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${roundResultLabel(r)}${why}`;
+    })
     .join(' · ');
   return `${name} · ${formatYmdDmyBe(ymd)} — ${detail} (กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
 }
@@ -150,34 +143,21 @@ const FollowPlanningCalendar: React.FC<{
         </div>
       </div>
 
-      {/* คำอธิบายสี — ไม่มีคือเดาไม่ได้ว่าช่องสีหมายถึงอะไร */}
+      {/* คำอธิบายสี — 🔴 สีแปลว่า "เรื่องดีหรือเรื่องร้าย" ไม่ใช่ "ข้อมูลมาถึงหรือยัง"
+          (เจ้าของทัก 1 ก.ย. 2569: *"ไม่ไปแล้วแต่เป็นเขียวเนี่ยนะ"*) */}
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         {(
           [
-            ['overdue', 'เลยเวลานัด'],
-            ['sent', 'ส่งแล้วรอผล'],
-            ['waiting', 'ยังไม่ถึงเวลา'],
-            ['result', 'ได้ผลแล้ว / ปิดงาน'],
-            ['cancelled', 'ยกเลิกแล้ว (ขีดฆ่า)'],
+            ['success', 'จบดี — ไป/ยืนยันว่าไป'],
+            ['danger', 'จบไม่ดี — ยกเลิก/ไม่ไปแล้ว'],
+            ['warn', 'ยังไม่จบ ต้องตามต่อ'],
+            ['orange', 'ไม่ได้ส่งให้ AI — ต้องคนจัดการ'],
+            ['primary', 'สายกำลังเดิน รอผล'],
+            ['neutral', 'ยังไม่ถึงเวลา / ยกเลิกทิ้ง (ขีดฆ่า)'],
           ] as const
-        ).map(([state, label]) => (
-          <span key={state} className="inline-flex items-center gap-1">
-            <span
-              className={cn(
-                'h-2.5 w-2.5 rounded-sm',
-                TONE[
-                  state === 'overdue'
-                    ? 'danger'
-                    : state === 'sent'
-                      ? 'primary'
-                      : state === 'result'
-                        ? 'success'
-                        : 'neutral'
-                ].dot,
-                state === 'cancelled' && 'opacity-60',
-              )}
-              aria-hidden
-            />
+        ).map(([tone, label]) => (
+          <span key={tone} className="inline-flex items-center gap-1">
+            <span className={cn('h-2.5 w-2.5 rounded-sm', TONE[tone].dot)} aria-hidden />
             {label}
           </span>
         ))}
@@ -258,7 +238,7 @@ const FollowPlanningCalendar: React.FC<{
                                 key={r.entry.id}
                                 className={cn(
                                   'block rounded px-0.5 py-0.5 leading-tight',
-                                  CELL_TONE[r.state],
+                                  TONE[roundTone(r)].chip,
                                   /* 🔴 ยกเลิกแล้วต้องยังเห็น — แต่ต้องดูออกทันทีว่าไม่ใช่สายที่จะเกิดขึ้น
                                      (Lumos โชว์ว่ายกเลิก จอเราซ่อนไว้ = สองระบบเล่าคนละเรื่อง) */
                                   r.state === 'cancelled' && 'opacity-60',

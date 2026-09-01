@@ -16,9 +16,9 @@ import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
 import {
-  FOLLOW_ROUND_STATE_LABEL,
+  roundResultLabel,
+  roundTone,
   type FollowPlanningRound,
-  type FollowRoundState,
 } from '@/lib/followPlanning';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 
@@ -34,16 +34,6 @@ import { formatYmdDmyBe } from '@/lib/dateTh';
  * 🔴 **ห้ามซ้อน Dialog ใน Dialog** — ปุ่ม "แก้ไข" จึง **ปิดป๊อปนี้ก่อน** แล้วค่อยเปิด
  * กล่องแก้ไข (หน้าเรียกเป็นคนจัดให้) · ปุ่มเสร็จสิ้น/ยกเลิกไม่ใช่ Dialog จึงอยู่ในนี้ได้
  */
-
-/** สีของชิปเวลา — ความหมายเดียวกับช่องในปฏิทิน */
-const STATE_CHIP: Record<FollowRoundState, string> = {
-  cancelled: TONE.neutral.chip,
-  closed: TONE.success.chip,
-  result: TONE.success.chip,
-  overdue: TONE.danger.chip,
-  sent: TONE.primary.chip,
-  waiting: TONE.neutral.chip,
-};
 
 const FollowRoundsDialog: React.FC<{
   open: boolean;
@@ -115,11 +105,12 @@ const FollowRoundsDialog: React.FC<{
                 className={cn('rounded-xl border p-2.5', TONE.neutral.soft, it.cancelled && 'opacity-60')}
               >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className={cn('tabular-nums', STATE_CHIP[r.state])}>
+                  {/* 🔴 สีตาม "ผลเป็นยังไง" ไม่ใช่ "มีผลหรือยัง" — ชุดเดียวกับช่องในปฏิทิน */}
+                  <span className={cn('tabular-nums', TONE[roundTone(r)].chip)}>
                     {r.time ? `${r.time} น.` : 'ไม่ได้ตั้งเวลา'}
                   </span>
                   <span className="text-[11px] font-medium text-foreground">
-                    {FOLLOW_ROUND_STATE_LABEL[r.state]}
+                    {roundResultLabel(r)}
                   </span>
                   {/* ป้าย "ไม่ได้ส่งให้ AI เพราะอะไร" — call_status เป็น null เมื่อไม่เคยเข้าคิว
                       ไม่มีป้ายนี้จะกลายเป็นช่องว่างเปล่าที่คนอ่านว่าปกติ */}
