@@ -64,7 +64,7 @@ import FollowPlanningTable from '@/components/follow/FollowPlanningTable';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
-import { toYmdBangkok, formatYmdDmyBe } from '@/lib/dateTh';
+import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
   listStaffContacts,
@@ -1563,22 +1563,6 @@ const FollowPage: React.FC = () => {
              🔴 ปุ่มรายรอบ (แก้ไข/เสร็จสิ้น/ยกเลิก) อยู่ในแถวเลย — เจ้าของสั่งเอง
              *"เข้ามาหน้าการติดตามก็เห็นเลย"* ห้ามซ่อนไว้หลังการกด */
           <div className="space-y-2.5">
-            {/* หัวตาราง — บอกตรง ๆ ว่ากำลังดูวันไหนอยู่ (กดมาจากปฏิทินแล้วต้องรู้ตัว) */}
-            <p className="text-xs font-semibold text-foreground">
-              {fDate ? `Planning วันที่ ${formatYmdDmyBe(fDate)}` : 'Planning ทุกวัน'}
-              <span className="ml-1.5 font-normal text-muted-foreground">
-                {planningRows.length.toLocaleString('th-TH')} คน
-              </span>
-              {fDate ? (
-                <button
-                  type="button"
-                  onClick={() => pickCalendarDay('')}
-                  className="ml-2 text-[11px] font-medium text-primary underline"
-                >
-                  ดูทุกวัน
-                </button>
-              ) : null}
-            </p>
             <FollowPlanningTable
               rows={rowPage}
               busyId={busyId}
