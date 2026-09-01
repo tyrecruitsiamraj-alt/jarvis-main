@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '@/components/shared/PageHeader';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
@@ -762,13 +769,13 @@ const FollowPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setFormOpen((v) => !v);
+              setFormOpen(true);
               setFormError(null);
             }}
             className="jarvis-pill-btn inline-flex min-h-[44px] items-center gap-1.5 px-5 py-2.5 text-sm touch-manipulation"
           >
             <Plus className="h-4 w-4" aria-hidden />
-            เพิ่มรายชื่อที่ต้องติดตาม
+            เพิ่มคนที่ต้องการติดตาม
           </button>
           <button
             type="button"
@@ -980,8 +987,25 @@ const FollowPage: React.FC = () => {
           </p>
         ) : null}
 
-        {/* ฟอร์มเพิ่ม */}
-        {formOpen ? (
+        {/**
+          * ═══ ฟอร์มเพิ่มคน = **ป๊อป** (เจ้าของสั่ง 1 ก.ย. 2569) ═══
+          * > *"ปุ่ม เพิ่มคนที่ต้องการติดตาม เมื่อกดไปแล้ว เด้ง Popup ขึ้นมา
+          * >  แล้วพาทำทีละขั้นตอน"*
+          *
+          * 🔴 **ยกเนื้อฟอร์มเดิมเข้ามาทั้งดุ้น ไม่เขียนใหม่** — ฟอร์มนี้มีกติกาที่แลกมา
+          * ด้วยบั๊กหลายรอบ (อาร์เรย์เบอร์ต้องขยับคู่กับรอบเสมอ · ส่งเฉพาะวันที่ติ๊ก
+          * ไม่ใช่ทั้งช่วง · กันเวลาซ้ำในวันเดียว · ฟอร์มไม่รับ submit เลย)
+          * เขียนใหม่เมื่อไหร่คือรื้อกับดักพวกนี้ออกหมด
+          *
+          * ⚠️ ปิดป๊อปด้วยการกดนอกกล่อง/Esc = **ไม่ล้างของที่กรอกค้างไว้** ตั้งใจให้เปิดกลับมา
+          * ทำต่อได้ (ฟอร์มสามขั้นกรอกยาว หลุดแล้วต้องเริ่มใหม่คือเจ็บ) · ล้างตอนบันทึกสำเร็จเท่านั้น
+          */}
+        <Dialog open={formOpen} onOpenChange={(o) => (o ? undefined : setFormOpen(false))}>
+          <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto p-0">
+            <DialogHeader className="px-4 pt-4 sm:px-5">
+              <DialogTitle>เพิ่มคนที่ต้องการติดตาม</DialogTitle>
+              <DialogDescription>ทำทีละขั้น — ใครก่อน แล้วหน่วยงาน แล้วค่อยตั้งวันเวลาที่จะโทร</DialogDescription>
+            </DialogHeader>
           <form
             /**
              * 🔴 **ฟอร์มนี้ไม่รับ submit เลย** (เจ้าของโดนบันทึกเองซ้ำ 18 ส.ค. 2569) —
@@ -1499,7 +1523,8 @@ const FollowPage: React.FC = () => {
               </button>
             </div>
           </form>
-        ) : null}
+          </DialogContent>
+        </Dialog>
 
         {/* ⚠️ ชิปกรอง "ทั้งหมด / รอโทร / กำลังโทร / โทรสำเร็จ / ไม่สำเร็จ" ถูกถอดออก
             (เจ้าของสั่ง 18 ส.ค. 2569 ให้เอาไปแทนด้วยแผง 3 รอบด้านบน)
