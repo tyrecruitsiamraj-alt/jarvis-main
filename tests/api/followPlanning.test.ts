@@ -306,3 +306,30 @@ describe('เลือก "การโทรครั้งที่ N" — ต
     expect(filterPlanningRowsByRound(rows(), 3)).toHaveLength(0);
   });
 });
+
+describe('🔴 สายที่คนเลือกไว้ชนะ attempt_count (เจ้าของทัก 1 ก.ย. 2569)', () => {
+  // *"ปฏิทินติดตามต้องโชว์ช่องละ 1 สายสิ เช่นรอบแรกโทรตอน 16:30 ก็โชว์แค่นั้น"*
+  // เหตุ: หนึ่งรอบ = หนึ่งแถว = หนึ่งคิว ⇒ attempt_count เป็น 1 หมดทุกแถว
+  const twoRounds = () =>
+    buildFollowPlanningRows(
+      groupFollowEntries(
+        [
+          entry({ id: 'a', call_round: 1, call_attempt: 1, scheduled_at: '2026-09-01T09:30:00Z' }),
+          entry({ id: 'b', call_round: 2, call_attempt: 1, scheduled_at: '2026-09-01T09:40:00Z' }),
+        ] as FollowEntry[],
+        NOW,
+      ),
+      NOW,
+    );
+
+  it('เลือกครั้งที่ 1 ได้สายเดียว ไม่ใช่ทั้งสองสาย', () => {
+    const out = filterPlanningRowsByRound(twoRounds(), 1);
+    expect(out).toHaveLength(1);
+    expect(out[0].rounds.map((r) => r.entry.id)).toEqual(['a']);
+  });
+
+  it('เลือกครั้งที่ 2 ได้อีกสายหนึ่ง', () => {
+    const out = filterPlanningRowsByRound(twoRounds(), 2);
+    expect(out[0].rounds.map((r) => r.entry.id)).toEqual(['b']);
+  });
+});

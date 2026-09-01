@@ -233,7 +233,8 @@ const FollowPlanningCalendar: React.FC<{
                             className="flex w-full flex-col items-stretch gap-0.5"
                           >
                             {/* โชว์เวลาจริง ไม่ใช่จุดสีลอย ๆ — เจ้าของอยากเห็น "เวลาไหนบ้าง" */}
-                            {rounds.slice(0, 2).map((r) => (
+                            {/* 🔴 ช่องละ 1 สาย (เจ้าของสั่ง 1 ก.ย. 2569) — เกินนั้นบอกเป็น +N ไม่ตัดเงียบ */}
+                            {rounds.slice(0, 1).map((r) => (
                               <span
                                 key={r.entry.id}
                                 className={cn(
@@ -260,9 +261,9 @@ const FollowPlanningCalendar: React.FC<{
                                 </span>
                               </span>
                             ))}
-                            {rounds.length > 2 ? (
+                            {rounds.length > 1 ? (
                               <span className="text-[9px] font-semibold text-primary">
-                                +{rounds.length - 2}
+                                +{rounds.length - 1}
                               </span>
                             ) : null}
                           </button>

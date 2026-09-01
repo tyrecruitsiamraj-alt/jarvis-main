@@ -120,7 +120,20 @@ export function followRoundSlot(row: {
   call_attempt?: number | null;
   call_status?: string | null;
   call_outcome?: string | null;
+  /** สายที่เท่าไหร่ที่ **คนเลือกเอง** ตอนตั้งรอบ (migration 113) */
+  call_round?: number | null;
 }): 1 | 2 | 3 | null {
+  /**
+   * 🔴 **ค่าที่คนเลือกไว้ชนะ `attempt_count`** (เจ้าของทัก 1 ก.ย. 2569:
+   * *"ปฏิทินติดตามต้องโชว์ช่องละ 1 สายสิ เช่นรอบแรกโทรตอน 16:30 ก็โชว์แค่นั้น"*)
+   *
+   * เหตุ: โหมด "ระบุเวลาเอง" สร้าง **หนึ่งแถวต่อหนึ่งรอบ** แต่ละแถวมีคิวของตัวเอง
+   * ⇒ `attempt_count` ของทุกแถวเป็น 1 หมด (คิวนั้นเพิ่งโทรครั้งแรก)
+   * ถ้าอ่านจาก attempt อย่างเดียว **ทุกรอบจะไปกองอยู่ "ครั้งที่ 1"** — เลือกครั้งที่ 1
+   * แล้วเห็นทั้ง 16:30 และ 16:40 ในช่องเดียว ทั้งที่ 16:40 คือสายที่ 2
+   * `attempt_count` ยังใช้เป็นทางถอยของแถวเก่าที่ไม่มี `call_round`
+   */
+  if (row.call_round != null) return callAttemptSlot(row.call_round);
   if (row.call_attempt == null && row.call_status === 'pending' && !row.call_outcome) return null;
   return callAttemptSlot(row.call_attempt);
 }
