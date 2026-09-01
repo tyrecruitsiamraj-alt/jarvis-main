@@ -807,6 +807,36 @@ const FollowPage: React.FC = () => {
               >
                 <Plus className="h-3 w-3" aria-hidden /> เพิ่มคนที่ต้องการติดตาม
               </button>
+              {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
+                  *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
+                  🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — ย้ายแค่ที่วาง ไม่ได้เพิ่มตัวกรองใหม่ */}
+              <DayCalendarPicker
+                className="h-8 min-h-0 py-1 text-[11px]"
+                value={fDate}
+                onChange={pickCalendarDay}
+                emptyLabel="เลือกวัน"
+                active={hasActiveFilter}
+                suffix={fBand ? TIME_BAND_LABEL[fBand].replace(/\s*\(.*\)$/, '') : ''}
+                onClearAll={() => {
+                  pickCalendarDay('');
+                  setFBand('');
+                }}
+                extra={
+                  <label className="block space-y-1">
+                    <span className="text-[11px] font-medium text-muted-foreground">ช่วงเวลา</span>
+                    <select
+                      value={fBand}
+                      onChange={(e) => setFBand(e.target.value as TimeBand)}
+                      className="jarvis-soft-field min-h-[36px] w-full text-xs"
+                    >
+                      <option value="">ทุกช่วงเวลา</option>
+                      <option value="morning">{TIME_BAND_LABEL.morning}</option>
+                      <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
+                      <option value="evening">{TIME_BAND_LABEL.evening}</option>
+                    </select>
+                  </label>
+                }
+              />
               {canManageMasters ? (
               <>
                 <button
@@ -884,38 +914,6 @@ const FollowPage: React.FC = () => {
               </button>
             ))}
           </div>
-          {/* ═══ ตัวกรอง = ไอคอนปฏิทิน + ช่วงเวลา (เจ้าของสั่ง 1 ก.ย. 2569) ═══
-              *"เปลี่ยนเป็นโลโก้ Calendar กดไปแล้วเลือกวัน เดือน ปี · ช่วงเวลาทำเป็น Dropdown"*
-              🔴 แผงตัวกรอง 3 ช่องแบบพับได้ถูกถอดทิ้ง — สองอันนี้อยู่บนจอเลย ไม่ต้องกดเปิด
-              ⚠️ ตัวกรอง "เจ้าของงาน (คนคีย์)" ถูกถอดออกตามคำสั่งชุดนี้ด้วย */}
-          <DayCalendarPicker value={fDate} onChange={pickCalendarDay} emptyLabel="เลือกวัน" />
-          <select
-            id="fBand"
-            aria-label="ช่วงเวลา"
-            value={fBand}
-            onChange={(e) => setFBand(e.target.value as TimeBand)}
-            className={cn(
-              'min-h-[36px] rounded-full border px-3 py-1.5 text-xs font-medium',
-              fBand ? cn(TONE.info.soft, TONE.info.value, 'border-transparent') : TONE.neutral.outline,
-            )}
-          >
-            <option value="">ทุกช่วงเวลา</option>
-            <option value="morning">{TIME_BAND_LABEL.morning}</option>
-            <option value="afternoon">{TIME_BAND_LABEL.afternoon}</option>
-            <option value="evening">{TIME_BAND_LABEL.evening}</option>
-          </select>
-          {hasActiveFilter ? (
-            <button
-              type="button"
-              onClick={() => {
-                pickCalendarDay('');
-                setFBand('');
-              }}
-              className="text-[11px] font-medium text-primary underline"
-            >
-              ล้างตัวกรอง
-            </button>
-          ) : null}
         </div>
 
         {okMessage ? (

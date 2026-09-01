@@ -23,7 +23,18 @@ const DayCalendarPicker: React.FC<{
   className?: string;
   /** ข้อความบนปุ่มเมื่อยังไม่ได้เลือกวัน */
   emptyLabel?: string;
-}> = ({ value, onChange, className, emptyLabel = 'เลือกวัน' }) => {
+  /**
+   * ตัวกรองอื่นที่อยู่ในกล่องเดียวกัน (เจ้าของสั่ง 1 ก.ย. 2569:
+   * *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน"*) — วางใต้ปฏิทิน
+   */
+  extra?: React.ReactNode;
+  /** ข้อความต่อท้ายบนปุ่ม เช่นช่วงเวลาที่เลือกไว้ — บอกว่ามีตัวกรองอื่นติดอยู่ */
+  suffix?: string;
+  /** ให้ปุ่มดูว่า "กรองอยู่" แม้ยังไม่ได้เลือกวัน (เช่นเลือกแต่ช่วงเวลา) */
+  active?: boolean;
+  /** ล้างตัวกรองทั้งกล่อง — ไม่ส่ง = ปุ่มล้างจะล้างแค่วัน */
+  onClearAll?: () => void;
+}> = ({ value, onChange, className, emptyLabel = 'เลือกวัน', extra, suffix, active, onClearAll }) => {
   const [open, setOpen] = useState(false);
   const p = parseYmd(value);
   const selected = p ? new Date(p.y, p.m - 1, p.d) : undefined;
@@ -36,12 +47,15 @@ const DayCalendarPicker: React.FC<{
           type="button"
           className={cn(
             'inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium',
-            value ? cn(TONE.info.soft, TONE.info.value, 'border-transparent') : TONE.neutral.outline,
+            value || active
+              ? cn(TONE.info.soft, TONE.info.value, 'border-transparent')
+              : TONE.neutral.outline,
             className,
           )}
         >
           <CalendarIcon className="h-3.5 w-3.5" aria-hidden />
           {value ? formatYmdDmyBe(value) : emptyLabel}
+          {suffix ? <span className="opacity-80">· {suffix}</span> : null}
           {value ? (
             /* ล้างวันโดยไม่ต้องเปิดปฏิทิน — กากบาทอยู่ในปุ่มเดียวกัน (span กัน button ซ้อน button) */
             <span
@@ -93,16 +107,18 @@ const DayCalendarPicker: React.FC<{
           }}
           initialFocus
         />
+        {extra ? <div className="border-t p-2.5">{extra}</div> : null}
         <div className="border-t p-2">
           <button
             type="button"
             onClick={() => {
-              onChange('');
+              if (onClearAll) onClearAll();
+              else onChange('');
               setOpen(false);
             }}
             className="w-full rounded-lg px-3 py-1.5 text-xs font-medium text-primary hover:bg-secondary"
           >
-            ดูทุกวัน (ล้างวันที่)
+            {onClearAll ? 'ล้างตัวกรองทั้งหมด' : 'ดูทุกวัน (ล้างวันที่)'}
           </button>
         </div>
       </PopoverContent>
