@@ -57,6 +57,11 @@ type FollowRow = {
   scheduled_at: string | Date;
   /** รอบเวลาของวันนั้น (092) — ต้องพกไปด้วยตอนสร้าง payload ใหม่ ไม่งั้นตารางหลายรอบหาย */
   call_times: string[] | null;
+  /**
+   * รอบนี้คือ "สายที่เท่าไหร่" (113) — คนเลือกเองตอนเพิ่ม
+   * 1 = สายแรก (บท `follow`) · 2 ขึ้นไป = บท `follow_repeat` · null = แถวเก่า ถือเป็นสายแรก
+   */
+  call_round: number | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (migration 096) — snapshot ตอนกรอก ไม่ใช่ FK */
   unit_name: string | null;
   site_code: string | null;
@@ -102,6 +107,8 @@ function toResponse(r: FollowRow) {
     scheduled_at: iso(r.scheduled_at),
     unit_name: r.unit_name ?? null,
     site_code: r.site_code ?? null,
+    /** สายที่เท่าไหร่ (113) — null = ไม่ได้ระบุ ฝั่งจออ่านเป็นสายแรก */
+    call_round: r.call_round == null ? null : Number(r.call_round),
     /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
     created_by_name: r.created_by_name,
     updated_at: iso(r.updated_at ?? null),
@@ -185,6 +192,11 @@ export type ParsedFollowInput = {
   unitName: string | null;
   /** รหัสไซต์ของหน่วยงานนั้น — เติมเองเมื่อเลือกจากใบขอ */
   siteCode: string | null;
+  /**
+   * รอบนี้คือสายที่เท่าไหร่ (113) — คนเลือกจาก dropdown ตอนตั้งรอบ
+   * null = ไม่ได้ระบุ ⇒ ถือเป็นสายแรก (ของเดิมที่ยิงมาโดยไม่มีคีย์นี้จึงไม่พัง)
+   */
+  callRound: number | null;
 };
 
 const HHMM_RE = /^\d{1,2}:\d{2}$/;
@@ -255,9 +267,22 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   const unitName = getString(body.unit_name) || null;
   const siteCode = getString(body.site_code) || null;
 
+  /**
+   * สายที่เท่าไหร่ (113) — ตรวจที่นี่แทน CHECK constraint (บ้านนี้โดน CHECK ล็อกมาสองรอบ)
+   * ไม่ส่งมา = null (สายแรก) · ค่าที่อ่านไม่ออก/นอกช่วง = ปฏิเสธไปตรง ๆ ไม่แอบปัดให้
+   */
+  let callRound: number | null = null;
+  if (body.call_round != null && body.call_round !== '') {
+    const n = Number(body.call_round);
+    if (!Number.isInteger(n) || n < 1 || n > 9) return fail('สายที่เท่าไหร่ต้องเป็นเลข 1-9');
+    callRound = n;
+  }
+
   return {
     error: null,
-    value: { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode },
+    value: {
+      name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound,
+    },
   };
 }
 
@@ -266,7 +291,7 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
   if (parsed.error || !parsed.value) {
     return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
   }
-  const { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode } =
+  const { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound } =
     parsed.value;
 
   // ฐานที่รัน 092 แล้วเก็บ group_id/call_times · ยังไม่รัน → ถอยไป insert ชุดเดิม (42703)
@@ -275,11 +300,11 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
     const { rows } = await dbQuery<FollowRow>(
       `insert into ${followTable}
          (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at,
-          group_id, call_times, unit_name, site_code, created_by, created_by_name)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          group_id, call_times, unit_name, site_code, call_round, created_by, created_by_name)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        returning *`,
       [name, phone, topic, note, staffPhone, when.toISOString(), groupId, callTimes,
-       unitName, siteCode, req.user.sub, req.user.email],
+       unitName, siteCode, callRound, req.user.sub, req.user.email],
     );
     created = rows[0];
   } catch (e) {
@@ -316,6 +341,7 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
       staffPhone,
       scheduled_at: when,
       callTimes,
+      callRound,
     });
   }
   try {
@@ -517,6 +543,7 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
       staffPhone: v.staffPhone,
       scheduled_at: v.when,
       callTimes: updated.call_times ?? null,
+      callRound: updated.call_round ?? null,
     });
   } catch (e) {
     logWarn('follow.update.queueRefreshFailed', { followId: id, error: String(e) });

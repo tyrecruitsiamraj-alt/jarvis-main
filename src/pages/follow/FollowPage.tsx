@@ -134,6 +134,15 @@ const FollowPage: React.FC = () => {
   /** ให้โทรเมื่อไหร่ — หลายรอบได้ เพราะบางเคสต้องโทรมากกว่า 1 ครั้ง (เจ้าของสั่ง 10 ส.ค. 2569) */
   const [scheduledAts, setScheduledAts] = useState<string[]>(() => [nowForInput()]);
   /**
+   * รอบนี้คือ **"สายที่เท่าไหร่"** (เจ้าของสั่ง 1 ก.ย. 2569:
+   * *"เลือกวันเวลาเสร็จของรอบแรก ก็มี Dropdown ให้เลือกเลยว่านี่คือ สาย 1 2 3"*)
+   *
+   * 🔴 **อาร์เรย์นี้ต้องขยับคู่กับ `scheduledAts` เสมอ** (กับดักเดียวกับอาร์เรย์เบอร์)
+   * หลุดคู่เมื่อไหร่ = รอบที่ 2 ไปใช้บทของรอบที่ 3 โดยไม่มีอะไรบนจอบอก
+   * ค่านี้ถูกส่งขึ้นไปจริง (`call_round`) และเป็นตัวตัดสินว่า AI พูดบทไหน
+   */
+  const [callRounds, setCallRounds] = useState<number[]>(() => [1]);
+  /**
    * โหมดตารางโทร (16 ส.ค. · migration 092): ช่วงวัน × รอบเวลา/วัน
    * เช่น 1-7 ส.ค. วันละ 2 รอบ 07:00/08:00 → ระบบยิง 1 แถว/วัน ผูก group เดียว
    * รับสายยืนยันแล้ว Lumos หยุดรอบที่เหลือของวันนั้น (stop_early) พรุ่งนี้โทรต่อ
@@ -315,6 +324,7 @@ const FollowPage: React.FC = () => {
     setStaffPhoneByDay({});
     setPickedFrom(null);
     setScheduledAts([nowForInput()]);
+    setCallRounds([1]);
     setDateFrom('');
     setDateTo('');
     setRoundTimes(['07:00']);
@@ -335,11 +345,20 @@ const FollowPage: React.FC = () => {
   const addScheduledAt = () => {
     setScheduledAts((prev) => [...prev, nowForInput()]);
     setStaffPhones((prev) => [...prev, prev[prev.length - 1] ?? '']);
+    // รอบใหม่เดาให้ว่าเป็นสายถัดไป — เปลี่ยนเองได้จาก dropdown
+    setCallRounds((prev) => [...prev, (prev[prev.length - 1] ?? prev.length) + 1]);
   };
   const removeScheduledAt = (i: number) => {
     setScheduledAts((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
     setStaffPhones((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
+    setCallRounds((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
   };
+  const setCallRoundAt = (i: number, v: number) =>
+    setCallRounds((prev) => {
+      const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array(i + 1 - prev.length).fill(1)];
+      next[i] = v;
+      return next;
+    });
   const setStaffPhoneAt = (i: number, v: string) =>
     setStaffPhones((prev) => {
       const next = prev.length >= i + 1 ? [...prev] : [...prev, ...Array(i + 1 - prev.length).fill('')];
@@ -552,6 +571,16 @@ const FollowPage: React.FC = () => {
     });
     const phoneByIso = new Map<string, string>();
     times.forEach((t, i) => phoneByIso.set(isoTimes[i], phoneByLocal.get(t) ?? ''));
+    /**
+     * 🔴 แมป **เวลา → สายที่เท่าไหร่** ด้วยวิธีเดียวกับเบอร์ — ห้ามใช้ index ของ `times`
+     * เพราะถูก dedup + sort มาแล้ว (ใช้ index ตรง ๆ = บทไปโผล่ผิดรอบเงียบ ๆ)
+     */
+    const roundByLocal = new Map<string, number>();
+    scheduledAts.forEach((v, i) => {
+      if (v && !roundByLocal.has(v)) roundByLocal.set(v, callRounds[i] ?? i + 1);
+    });
+    const roundByIso = new Map<string, number>();
+    times.forEach((t, i) => roundByIso.set(isoTimes[i], roundByLocal.get(t) ?? 1));
     const dupCheck = findScheduleDuplicates(phone, isoTimes, items);
     const runTimes = async (sendIso: string[]) => {
       setSubmitting(true);
@@ -566,6 +595,7 @@ const FollowPage: React.FC = () => {
             note: note || undefined,
             staff_phone: phoneByIso.get(t) || undefined,
             scheduled_at: t,
+            call_round: roundByIso.get(t) ?? 1,
             unit_name: unitName.trim() || undefined,
             site_code: siteCode.trim() || undefined,
           });
@@ -1422,9 +1452,39 @@ const FollowPage: React.FC = () => {
                       onChange={(next) => setStaffPhoneAt(i, next)}
                       reloadSignal={contactsRev}
                     />
-                    {/* บอกว่ารอบนี้ AI ใช้บทไหน + กางดูเนื้อบทได้ (เจ้าของสั่ง 1 ก.ย. 2569:
-                        *"หน้าติดตามฉันแก้บทแล้ว พาไปดูตอนเพิ่มคนที"*) */}
-                    <RoundScriptNote roundIndex={i} />
+                    {/* ═══ นี่คือสายที่เท่าไหร่ (เจ้าของสั่ง 1 ก.ย. 2569) ═══
+                        *"เลือกวันเวลาเสร็จของรอบแรก ก็มี Dropdown ให้เลือกเลยว่านี่คือ สาย 1 2 3
+                         แล้วพอเพิ่มรอบก็เหมือนกัน พอเลือกแล้วบอกหน่อยว่า Scrip นั้น ๆ จะพูดอะไรบ้าง"*
+                        🔴 ค่านี้ **ส่งขึ้นไปจริง** และเป็นตัวตัดสินว่า AI พูดบทไหน
+                        (ก่อนหน้านี้ทุกรอบพูดบทสายแรกหมด ทั้งที่จอเขียนว่ารอบ 2 ใช้อีกบท) */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor={`followCallRound${i}`}
+                        className="ml-1 text-xs font-medium text-muted-foreground"
+                      >
+                        รอบนี้คือสายที่เท่าไหร่
+                      </label>
+                      <select
+                        id={`followCallRound${i}`}
+                        value={callRounds[i] ?? i + 1}
+                        onChange={(e) => setCallRoundAt(i, Number(e.target.value))}
+                        className="jarvis-soft-field min-h-[46px] w-full"
+                      >
+                        {Array.from(
+                          /* อย่างน้อย 3 ตัวเลือกเสมอ · ตั้งรอบเกิน 3 ก็ต้องเลือกเลขที่สูงกว่าได้ */
+                          { length: Math.max(3, scheduledAts.length) },
+                          (_, n) => n + 1,
+                        ).map((n) => (
+                          <option key={n} value={n}>
+                            สายที่ {n}
+                            {n === 1 ? ' (สายแรก)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* บทที่รอบนี้จะพูด — กางให้เห็นเลย ไม่ต้องกดหา (เจ้าของสั่งให้ "บอกหน่อยว่า Scrip
+                        นั้น ๆ จะพูดอะไรบ้าง") */}
+                    <RoundScriptNote callRound={callRounds[i] ?? i + 1} defaultOpen />
                   </div>
                 ))}
               </div>

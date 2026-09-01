@@ -1465,6 +1465,16 @@ export type FollowEntryInput = {
    * ว่าง/ไม่ส่ง = รอบเดียวที่ scheduled_at (แบบเดิม)
    */
   callTimes?: string[] | null;
+  /**
+   * รอบนี้คือ "สายที่เท่าไหร่" (migration 113) — **คนเลือกเอง** ตอนตั้งรอบ
+   *
+   * 🔴 ทำไมต้องมี: โหมดตั้งเวลาเป็นรอบ ๆ สร้าง **หนึ่งแถวต่อหนึ่งรอบ** แถวเดี่ยวจึงไม่รู้
+   * ว่าตัวเองเป็นรอบที่เท่าไหร่ ⇒ ก่อนหน้านี้ทุกแถวใช้บท "สายแรก" หมด ทั้งที่จอเขียนว่า
+   * รอบ 2 ใช้บทรอบถัดไป (จอกับของจริงไม่ตรงกันตั้งแต่ 31 ส.ค. 2569)
+   *
+   * ไม่ส่ง/null = สายแรก — ของเดิมที่เรียกอยู่จึงไม่ต้องแก้
+   */
+  callRound?: number | null;
 };
 
 /**
@@ -1518,19 +1528,28 @@ export function buildFollowReminderPayload(
       },
       round,
     );
+  /**
+   * สายแรกของงานนี้คือสายที่เท่าไหร่ — คนเลือกเองตอนตั้งรอบ (113) · ไม่ระบุ = 1
+   * step ถัดไปในวันเดียวกันนับต่อจากนี้ (สายที่ 2 + อีก 1 step = สายที่ 3)
+   */
+  const baseRound = Number.isInteger(entry.callRound) && (entry.callRound as number) >= 1
+    ? (entry.callRound as number)
+    : 1;
+  const roundOf = (stepIndex: number): 'first' | 'repeat' =>
+    baseRound + stepIndex === 1 ? 'first' : 'repeat';
   // หลายรอบในวันเดียว → หลาย step (เวลาต่างกัน) · Lumos หยุดที่เหลือเองเมื่อยืนยัน (stop_early)
   const times = (entry.callTimes || []).filter((t) => /^\d{1,2}:\d{2}$/.test((t || '').trim()));
   const steps =
     times.length > 0
       ? times.map((t, i) => ({
-          type: (i === 0 ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
-          message: messageFor(i === 0 ? 'first' : 'repeat'),
+          type: (roundOf(i) === 'first' ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
+          message: messageFor(roundOf(i)),
           scheduled_at: dayAtTime(entry.scheduled_at, t),
         }))
       : [
           {
-            type: 'remind' as const,
-            message: messageFor('first'),
+            type: (roundOf(0) === 'first' ? 'remind' : 'follow_up') as 'remind' | 'follow_up',
+            message: messageFor(roundOf(0)),
             scheduled_at: bangkokIso(entry.scheduled_at),
           },
         ];

@@ -9,8 +9,12 @@
  * ซ้ำฝั่งหน้าจอ วันหนึ่งสองที่จะไม่ตรงกัน แล้วจอจะโชว์คำที่ AI ไม่ได้พูดจริง
  * ⇒ โชว์บรรทัดตามที่แอดมินแก้ไว้เป๊ะ + บอกว่า {…} จะถูกเติมค่าจริงตอนโทร
  *
- * ⚠️ ระบบสลับบทให้เองตามรอบ (31 ส.ค. 2569) — รอบแรกใช้ชุด `follow`
- * รอบ 2 เป็นต้นไปใช้ `follow_repeat` · ที่นี่แค่สะท้อนกติกานั้น ห้ามตั้งกติกาใหม่
+ * ⚠️ **สายที่ 1 ใช้ชุด `follow` · สายที่ 2 ขึ้นไปใช้ `follow_repeat`**
+ * ที่นี่แค่สะท้อนกติกานั้น ห้ามตั้งกติกาใหม่
+ *
+ * 🔴 รับ `callRound` (สายที่เท่าไหร่ — **คนเลือกเอง** จาก dropdown ตั้งแต่ 1 ก.ย. 2569)
+ * ไม่ใช่ลำดับช่องบนฟอร์มอีกแล้ว · ค่าเดียวกันนี้ถูกส่งขึ้นไปเป็น `call_round`
+ * และฝั่ง API ใช้เลือกบทจริงตอนประกอบสาย ⇒ **จอกับของจริงพูดตรงกันแล้ว**
  */
 import React, { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -34,12 +38,15 @@ function loadScripts(): Promise<ScriptItem[]> {
   return cache;
 }
 
-const RoundScriptNote: React.FC<{ roundIndex: number; className?: string }> = ({
-  roundIndex,
-  className,
-}) => {
+const RoundScriptNote: React.FC<{
+  /** สายที่เท่าไหร่ (1 = สายแรก) */
+  callRound: number;
+  /** กางเนื้อบทให้เห็นตั้งแต่แรก — ตอนตั้งรอบเจ้าของอยากเห็นเลยว่าจะพูดอะไร */
+  defaultOpen?: boolean;
+  className?: string;
+}> = ({ callRound, defaultOpen = false, className }) => {
   const [scripts, setScripts] = useState<ScriptItem[] | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,8 +58,8 @@ const RoundScriptNote: React.FC<{ roundIndex: number; className?: string }> = ({
     };
   }, []);
 
-  // รอบแรกใช้บทหนึ่ง รอบถัด ๆ ไปใช้อีกบท — ตรงกับที่ระบบสลับให้ตอนส่งจริง
-  const key = roundIndex === 0 ? 'follow' : 'follow_repeat';
+  // สายที่ 1 ใช้บทหนึ่ง สายที่ 2 ขึ้นไปใช้อีกบท — ตรงกับที่ API เลือกตอนประกอบสายจริง
+  const key = callRound <= 1 ? 'follow' : 'follow_repeat';
   const item = scripts?.find((s) => s.key === key) ?? null;
   if (!scripts) return null;
   if (!item) return null;
@@ -65,7 +72,8 @@ const RoundScriptNote: React.FC<{ roundIndex: number; className?: string }> = ({
         className="flex w-full items-center justify-between gap-2 text-left"
       >
         <span className={cn('text-[11px]', DASH.muted)}>
-          รอบนี้ AI ใช้บท <span className={cn('font-semibold', TONE.info.value)}>{item.label}</span>
+          สายที่ {callRound} · AI ใช้บท{' '}
+          <span className={cn('font-semibold', TONE.info.value)}>{item.label}</span>
         </span>
         <ChevronDown
           className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}

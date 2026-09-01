@@ -324,3 +324,28 @@ describe('parseFollowEditInput', () => {
     expect(r.value!.when.getTime()).toBe(NOW.getTime());
   });
 });
+
+describe('parseFollowInput — สายที่เท่าไหร่ (113)', () => {
+  const body = {
+    recipient_name: 'ทดสอบ ระบบ',
+    recipient_phone: '0812345678',
+    topic: 'ติดตามเริ่มงาน',
+    scheduled_at: '2026-09-02T09:00:00+07:00',
+  };
+
+  it('ไม่ส่งมา = null (ถือเป็นสายแรก)', () => {
+    expect(parseFollowInput(body).value?.callRound).toBeNull();
+  });
+
+  it('รับเลข 1-9', () => {
+    expect(parseFollowInput({ ...body, call_round: 2 }).value?.callRound).toBe(2);
+    expect(parseFollowInput({ ...body, call_round: '3' }).value?.callRound).toBe(3);
+  });
+
+  it('🔴 ค่านอกช่วง/อ่านไม่ออก = ปฏิเสธ ไม่แอบปัดให้', () => {
+    expect(parseFollowInput({ ...body, call_round: 0 }).error).toBeTruthy();
+    expect(parseFollowInput({ ...body, call_round: 12 }).error).toBeTruthy();
+    expect(parseFollowInput({ ...body, call_round: 'สอง' }).error).toBeTruthy();
+    expect(parseFollowInput({ ...body, call_round: 1.5 }).error).toBeTruthy();
+  });
+});

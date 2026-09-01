@@ -95,3 +95,35 @@ describe('admin_phone ในคิว Follow', () => {
     expect(p.steps[0].message).toContain('081 222 3333');
   });
 });
+
+describe('สายที่เท่าไหร่ (call_round · เจ้าของสั่ง 1 ก.ย. 2569)', () => {
+  it('🔴 แถวเดี่ยวที่คนบอกว่าเป็นสายที่ 2 ต้องพูดบทรอบถัดไป ไม่ใช่บทสายแรก', () => {
+    const first = buildFollowReminderPayload({ ...baseEntry, callRound: 1 });
+    const second = buildFollowReminderPayload({ ...baseEntry, callRound: 2 });
+    expect(first.steps[0].type).toBe('remind');
+    expect(second.steps[0].type).toBe('follow_up');
+    expect(second.steps[0].message).not.toBe(first.steps[0].message);
+  });
+
+  it('สายที่ 3 ก็ใช้บทรอบถัดไปชุดเดียวกับสายที่ 2 (บทมีสองชุด)', () => {
+    const second = buildFollowReminderPayload({ ...baseEntry, callRound: 2 });
+    const third = buildFollowReminderPayload({ ...baseEntry, callRound: 3 });
+    expect(third.steps[0].message).toBe(second.steps[0].message);
+  });
+
+  it('ไม่ส่ง callRound = สายแรกเหมือนเดิม (ของเก่าไม่พัง)', () => {
+    const none = buildFollowReminderPayload(baseEntry);
+    const one = buildFollowReminderPayload({ ...baseEntry, callRound: 1 });
+    expect(none.steps[0].message).toBe(one.steps[0].message);
+    expect(none.steps[0].type).toBe('remind');
+  });
+
+  it('โหมดตาราง: เริ่มที่สายที่ 2 แล้ว step ถัดไปนับต่อ — ทุก step เป็นบทรอบถัดไป', () => {
+    const p = buildFollowReminderPayload({
+      ...baseEntry,
+      callTimes: ['07:00', '08:00'],
+      callRound: 2,
+    });
+    expect(p.steps.map((x) => x.type)).toEqual(['follow_up', 'follow_up']);
+  });
+});
