@@ -186,9 +186,9 @@ describe('roundResultLabel — ช่องปฏิทินต้องบอ�
     return roundResultLabel(rows[0].rounds[0]);
   };
 
-  it('ผลการโทรเป็นคำไทยจากตารางกลาง', () => {
-    expect(label({ call_outcome: 'acknowledged' })).toBe('รับทราบ');
-    expect(label({ call_outcome: 'declined' })).toBe('ไม่สนใจ');
+  it('ผลการโทรเป็นคำไทย (ชุดคำของงานติดตาม — ดู describe ท้ายไฟล์)', () => {
+    expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
+    expect(label({ call_outcome: 'declined' })).toBe('ยกเลิก — ไม่ไปแล้ว');
     expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
   });
 
@@ -205,5 +205,28 @@ describe('roundResultLabel — ช่องปฏิทินต้องบอ�
 
   it('รหัสผลที่ไม่มีคำแปล = โชว์รหัสไปตามตรง ห้ามซ่อน', () => {
     expect(label({ call_outcome: 'weird_code' })).toBe('weird_code');
+  });
+});
+
+describe('คำผลโทรฉบับงานติดตาม (เจ้าของทัก 1 ก.ย. 2569)', () => {
+  // *"ระบบเขาบอกยกเลิก ทำไมระบบเราไม่บอกยกเลิกด้วย"* — เคสนายวิศิษฐ์:
+  // Lumos สรุป declined + "ผู้รับสายแจ้งว่าไม่ไปทำงานแล้ว" แต่จอเราเขียนว่า "ไม่สนใจ"
+  const label = (over: Partial<FollowEntry>) => {
+    const rows = buildFollowPlanningRows(groupFollowEntries([entry(over)], NOW), NOW);
+    return roundResultLabel(rows[0].rounds[0]);
+  };
+
+  it('🔴 declined ในงานติดตาม = ยกเลิก ไม่ใช่ "ไม่สนใจ" (คำของงานหาคน)', () => {
+    expect(label({ call_outcome: 'declined' })).toBe('ยกเลิก — ไม่ไปแล้ว');
+  });
+
+  it('confirmed = ยืนยันว่าไป · acknowledged = รับสายแล้ว (ไม่เขียนให้ดูจบดีเกินจริง)', () => {
+    expect(label({ call_outcome: 'confirmed' })).toBe('ยืนยันว่าไป');
+    expect(label({ call_outcome: 'acknowledged' })).toBe('รับสายแล้ว');
+  });
+
+  it('คำที่ไม่ได้ทับ ใช้ของตารางกลางเหมือนเดิม', () => {
+    expect(label({ call_outcome: 'wrong_person' })).toBe('เบอร์ผิด');
+    expect(label({ call_outcome: 'no_answer' })).toBe('ไม่รับสาย');
   });
 });

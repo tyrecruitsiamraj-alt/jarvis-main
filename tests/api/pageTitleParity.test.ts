@@ -70,8 +70,9 @@ describe('หน้าติดตามแสดงผลโทรเป็น�
   const src = read('src/components/follow/FollowRoundsDialog.tsx');
 
   it('เรียกใช้ตารางคำแปลกลาง ไม่พ่นรหัสดิบ', () => {
-    expect(src).toContain('CALL_OUTCOME_LABEL');
-    expect(src).toContain('callOutcomeText(');
+    // ใช้ชุดคำ "ฉบับงานติดตาม" (1 ก.ย. 2569) — ทับเฉพาะคำที่ความหมายเพี้ยนในบริบทนี้
+    // แล้วถอยไปใช้ตารางกลางเป็นค่าตั้งต้น (ดู followCallOutcomeText)
+    expect(src).toContain('followCallOutcomeText(');
     expect(src).not.toContain('` (${it.call_outcome})`');
   });
 });

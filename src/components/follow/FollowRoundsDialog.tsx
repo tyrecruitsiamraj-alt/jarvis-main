@@ -12,7 +12,7 @@ import {
 import FollowDispatchBadge from '@/components/follow/FollowDispatchBadge';
 import FollowCompleteControls from '@/components/follow/FollowCompleteControls';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcome, type FollowOutcomeAny } from '@/lib/followOutcome';
-import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
 import {
@@ -44,15 +44,6 @@ const STATE_CHIP: Record<FollowRoundState, string> = {
   sent: TONE.primary.chip,
   waiting: TONE.neutral.chip,
 };
-
-/**
- * ผลโทรเป็นคำไทย — อ่านจาก `CALL_OUTCOME_LABEL` ที่เป็นแหล่งเดียวของทั้งระบบ
- * 🔴 รหัสที่ยังไม่มีคำแปลให้โชว์รหัสไปตามตรง **ห้ามซ่อน**
- * (จอที่เดาแล้วบอกผิด แย่กว่าจอที่ยอมรับว่าไม่รู้)
- */
-function callOutcomeText(code: string): string {
-  return CALL_OUTCOME_LABEL[code] ?? code;
-}
 
 const FollowRoundsDialog: React.FC<{
   open: boolean;
@@ -152,7 +143,7 @@ const FollowRoundsDialog: React.FC<{
                 {it.note ? <p className="mt-1 text-[11px] text-muted-foreground">{it.note}</p> : null}
                 {it.call_outcome || it.call_summary ? (
                   <p className="mt-1 rounded-lg bg-background/70 px-2.5 py-1 text-[11px] text-slate-700 dark:text-slate-200">
-                    ผลการโทร{it.call_outcome ? ` — ${callOutcomeText(it.call_outcome)}` : ''}
+                    ผลการโทร{it.call_outcome ? ` — ${followCallOutcomeText(it.call_outcome)}` : ''}
                     {it.call_summary ? `: ${it.call_summary}` : ''}
                   </p>
                 ) : null}

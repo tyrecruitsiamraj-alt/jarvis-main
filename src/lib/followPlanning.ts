@@ -1,6 +1,6 @@
 import type { FollowEntry } from '@/lib/followApi';
 import type { FollowGroup } from '@/lib/followGrouping';
-import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import { followCallOutcomeText } from '@/lib/callOutcomeTone';
 import { FOLLOW_OUTCOME_LABEL, type FollowOutcomeAny } from '@/lib/followOutcome';
 
 /**
@@ -245,7 +245,7 @@ export function roundResultLabel(round: FollowPlanningRound): string {
         ? (FOLLOW_OUTCOME_LABEL[e.outcome_code as FollowOutcomeAny] ?? e.outcome_code)
         : 'ปิดงาน';
     case 'result':
-      return e.call_outcome ? (CALL_OUTCOME_LABEL[e.call_outcome] ?? e.call_outcome) : 'มีผลแล้ว';
+      return e.call_outcome ? followCallOutcomeText(e.call_outcome) : 'มีผลแล้ว';
     case 'overdue':
       // เลยเวลาแล้วยังไม่มีผล — ต้องบอกว่า "ยังไม่มีผล" ไม่ใช่ปล่อยว่างให้เดา
       return 'ยังไม่มีผล';
