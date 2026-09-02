@@ -12,6 +12,7 @@ export type AppFunctionId =
   | 'unit_requests_read'
   | 'unit_notes_edit'
   | 'recruit_postings'
+  | 'recruit_channels_manage'
   | 'employees_read'
   | 'employees_edit'
   | 'clients_read'
@@ -47,6 +48,14 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'unit_notes_edit', label: 'แก้ไขหมายเหตุใบขอ', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
   // ฟีเจอร์ใหม่ ตั้งต้นเป็น supervisor เพื่อให้ admin ปิดเหลือเฉพาะตัวเองได้ตอนยังไม่พร้อมเปิดใช้
   { id: 'recruit_postings', label: 'ประกาศรับสมัคร / สร้างลิงก์', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
+  /**
+   * 🔴 **แยกจาก `recruit_postings` โดยตั้งใจ** (เจ้าของสั่ง 2 ก.ย. 2569:
+   * *"เพิ่มช่องทางหลัก ทางรอง ลบช่องทางหลัก ช่องทางรอง ทำให้ Staff เข้าถึงได้ด้วย"*)
+   *
+   * ช่องทางรับสมัครเป็น **ข้อมูลอ้างอิง** (คนรู้จักงานจากที่ไหน) — ผิดแล้วแก้ได้ ไม่ออกนอกบ้าน
+   * ต่างจากการปล่อยประกาศขึ้นหน้าสาธารณะซึ่งคนนอกเห็นทันที จึงยังกั้นที่หัวหน้างานเหมือนเดิม
+   */
+  { id: 'recruit_channels_manage', label: 'จัดการช่องทางรับสมัคร (หลัก/รอง)', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
   { id: 'employees_read', label: 'ดูพนักงาน WL', group: 'WL', minimumRole: 'staff' },
   { id: 'employees_edit', label: 'เพิ่ม / แก้ไขพนักงาน WL', group: 'WL', minimumRole: 'supervisor' },
   { id: 'clients_read', label: 'ดูลูกค้า / สถานที่', group: 'ลูกค้า', minimumRole: 'staff' },

@@ -143,7 +143,11 @@ const ParentSelect: React.FC<{
 
 const RecruitChannelsPage: React.FC = () => {
   const { isFunctionEnabled } = useRolePermissions();
-  const canManage = isFunctionEnabled('recruit_postings');
+  /**
+   * 🔴 ใช้สิทธิ์ของ "จัดการช่องทาง" ไม่ใช่ของ "ประกาศรับสมัคร" (เจ้าของสั่ง 2 ก.ย. 2569)
+   * — staff เข้าถึงช่องทางหลัก/รองได้ แต่การปล่อยประกาศยังกั้นที่หัวหน้างานเหมือนเดิม
+   */
+  const canManage = isFunctionEnabled('recruit_channels_manage');
 
   const [view, setView] = useState<ChannelAdminView>('roots');
   const [query, setQuery] = useState('');

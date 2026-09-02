@@ -18,6 +18,8 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   unit_notes_edit: 'staff',
   // ฟีเจอร์ใหม่ — ต้องเพิ่มทั้งที่นี่และ src/lib/roleFunctions.ts ไม่งั้น PATCH ถูกปฏิเสธเงียบ ๆ
   recruit_postings: 'supervisor',
+  // จัดการช่องทางรับสมัคร (2 ก.ย. 2569) — staff ทำได้ · แยกจากการปล่อยประกาศโดยตั้งใจ
+  recruit_channels_manage: 'staff',
   employees_read: 'staff',
   employees_edit: 'supervisor',
   clients_read: 'staff',
@@ -26,6 +28,9 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   work_calendar_manage: 'supervisor',
   follow_read: 'staff',
   follow_manage: 'staff',
+  // ⚠️ เคยตกหล่นจากตารางนี้ (มีแต่ฝั่งจอ) ⇒ admin กดเปิด/ปิดให้ role ไหนไม่ได้เลย
+  // PATCH ถูกปฏิเสธเงียบ ๆ · เจอตอนเพิ่มฟังก์ชันช่องทาง 2 ก.ย. 2569
+  aftercare_read: 'staff',
   settings_access: 'admin',
   users_manage: 'admin',
   audit_logs: 'admin',

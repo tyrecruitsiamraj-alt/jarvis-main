@@ -118,8 +118,16 @@ const RecruitBoardTools: React.FC<{
     { kind: string; kindLabel: string; departmentCode: string } | null
   >(null);
 
-  // ฟีเจอร์ปิดอยู่ (admin ยังไม่เปิดให้ role นี้) — ไม่ต้องแสดงอะไรเลย
-  if (!isFunctionEnabled('recruit_postings')) return null;
+  /**
+   * 🔴 **แถบนี้มีสองสิทธิ์ปนกัน** (เจ้าของสั่ง 2 ก.ย. 2569 ให้ staff เข้าถึงช่องทางได้)
+   * · ปุ่ม "ช่องทาง" ใช้ `recruit_channels_manage` (staff ขึ้นไป)
+   * · ปุ่ม "สร้างลิงก์ (ประกาศลอย)" กับ "เหตุผล" ยังใช้ `recruit_postings` (หัวหน้างานขึ้นไป)
+   *   เพราะอันนั้นคือของที่ออกไปให้คนนอกเห็น
+   * ปิดหมดทั้งสองอย่างค่อยซ่อนทั้งแถบ
+   */
+  const canPostings = isFunctionEnabled('recruit_postings');
+  const canChannels = isFunctionEnabled('recruit_channels_manage');
+  if (!canPostings && !canChannels) return null;
 
   /**
    * ⚠️ ปุ่ม "สร้างลิงก์" ของแถบนี้ต้องต่อท้ายว่า **(ประกาศลอย)**
@@ -157,20 +165,26 @@ const RecruitBoardTools: React.FC<{
 
   /** งานระดับตั้งค่า (ใช้ไม่บ่อย) — ยุบเข้าเมนูเดียว (เจ้าของสั่ง 20 ส.ค. 2569:
    *  จัดระเบียบหน้าบอร์ด ไม่เพิ่มของใหม่) · "สร้างลิงก์" เป็นงานประจำ คงเป็นปุ่มเด่น */
-  const MENU_KEYS: RmToolbarKey[] = ['channels', 'reasons'];
+  const MENU_KEYS: RmToolbarKey[] = [
+    ...(canChannels ? (['channels'] as RmToolbarKey[]) : []),
+    ...(canPostings ? (['reasons'] as RmToolbarKey[]) : []),
+  ];
 
   return (
     <>
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onClickKey('link')}
-            title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
-            className={btnCls('link')}
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden /> {LABEL.link}
-          </button>
+          {/* ปล่อยประกาศ = ของที่คนนอกเห็น ⇒ ยังเป็นสิทธิ์หัวหน้างานขึ้นไป */}
+          {canPostings ? (
+            <button
+              type="button"
+              onClick={() => onClickKey('link')}
+              title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
+              className={btnCls('link')}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden /> {LABEL.link}
+            </button>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger className={btnCls('channels')}>
               <Settings2 className="h-3.5 w-3.5" aria-hidden /> ตั้งค่าบอร์ด

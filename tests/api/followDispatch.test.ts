@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { buildFollowReminderPayload } from '../../api/_lib/lumosDispatch';
 import { parseFollowInput, parseFollowEditInput } from '../../api/_handlers/follow';
 import { checkApiAccess } from '../../api/_lib/rbac';
-import { APP_FUNCTIONS, primaryFunctionForPath, OPL_READ_FUNCTIONS } from '../../src/lib/roleFunctions';
+import {
+  APP_FUNCTIONS,
+  isFunctionEnabledForRole,
+  primaryFunctionForPath,
+  OPL_READ_FUNCTIONS,
+} from '../../src/lib/roleFunctions';
 
 const WHEN = new Date('2026-08-15T09:30:00+07:00');
 
@@ -318,5 +323,26 @@ describe('parseFollowInput — สายที่เท่าไหร่ (113)'
     expect(parseFollowInput({ ...body, call_round: 12 }).error).toBeTruthy();
     expect(parseFollowInput({ ...body, call_round: 'สอง' }).error).toBeTruthy();
     expect(parseFollowInput({ ...body, call_round: 1.5 }).error).toBeTruthy();
+  });
+});
+
+describe('🔴 สิทธิ์ช่องทางรับสมัคร — staff จัดการได้ (เจ้าของสั่ง 2 ก.ย. 2569)', () => {
+  /**
+   * *"เพิ่มช่องทางหลัก ทางรอง ลบช่องทางหลัก ช่องทางรอง ทำให้ Staff เข้าถึงได้ด้วย"*
+   * ⚠️ แยกจากการปล่อยประกาศ (`recruit-postings`) โดยตั้งใจ — ช่องทางเป็นข้อมูลอ้างอิงในบ้าน
+   * ส่วนประกาศคือของที่คนนอกเห็น
+   */
+  it('staff เพิ่ม/ลบช่องทางได้ · opl ยังอ่านได้อย่างเดียว', () => {
+    for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) {
+      expect(checkApiAccess('staff', 'recruit-channels', method).ok).toBe(true);
+    }
+    expect(checkApiAccess('opl', 'recruit-channels', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'recruit-channels', 'POST').ok).toBe(false);
+  });
+
+  it('ฟังก์ชัน "จัดการช่องทาง" เปิดให้ staff · "ประกาศรับสมัคร" ยังเป็นหัวหน้างาน', () => {
+    expect(isFunctionEnabledForRole('staff', 'recruit_channels_manage')).toBe(true);
+    expect(isFunctionEnabledForRole('staff', 'recruit_postings')).toBe(false);
+    expect(isFunctionEnabledForRole('supervisor', 'recruit_postings')).toBe(true);
   });
 });

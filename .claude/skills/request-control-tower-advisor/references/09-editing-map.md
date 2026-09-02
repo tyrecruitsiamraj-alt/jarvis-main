@@ -6289,3 +6289,34 @@ recruiter 11 · screener 9 · opl 18 · online 3) · `follow_staff_contacts` 4 �
 **ด่านตรวจ:** test 2,577 ผ่าน / 6 skip · tsc 4 = 0 · eslint 0 err / 18 warn · build ผ่าน
 ⚠️ **ยังไม่ได้ตรวจบนจอ** — เซสชันเบราว์เซอร์ที่ใช้ตรวจหมดอายุ (`/api/follow` ตอบ 401)
 และล็อกอินแทนเจ้าของไม่ได้ · ทานเลขด้วย SQL ตรงแทน (round 1 = 4 · round 2 = 3)
+
+
+### รอบแปดสิบสี่ — Staff จัดการช่องทางรับสมัครได้ (2 ก.ย. 2569)
+
+เจ้าของสั่ง: *"หน้ากล่องงานตรงพวกเพิ่มช่องทางหลัก ทางรอง ลบช่องทางหลัก ช่องทางรอง
+ทำให้ Staff เข้าถึงได้ด้วย ตอนนี้ Staff น่าจะไม่เห็น"*
+
+**สภาพก่อนแก้:** ทั้งแถบ "ตั้งค่าบอร์ด" บนกล่องงานผูกกับฟังก์ชันเดียว `recruit_postings`
+(ขั้นต่ำ supervisor) ⇒ staff ไม่เห็นทั้งแถบ · และ API `recruit-channels` ก็กั้นเขียนที่ supervisor
+
+🔴 **ไม่ลดขั้นของ `recruit_postings`** — นั่นคือสิทธิ์ปล่อยประกาศขึ้นหน้าสาธารณะ
+(ของที่คนนอกเห็นทันที) ⇒ **แยกฟังก์ชันใหม่** สำหรับช่องทางซึ่งเป็นข้อมูลอ้างอิงในบ้าน
+
+| ไฟล์ | แก้อะไร |
+|---|---|
+| `src/lib/roleFunctions.ts` | ฟังก์ชันใหม่ `recruit_channels_manage` (ขั้นต่ำ staff) |
+| `api/_lib/roleFunctionGrants.ts` | เพิ่มตัวเดียวกันฝั่ง API + **เติม `aftercare_read` ที่ตกหล่นมานาน** |
+| `api/_lib/rbac.ts` | `recruit-channels` เขียนได้ตั้งแต่ staff |
+| `src/pages/recruit/RecruitChannelsPage.tsx` | `canManage` ใช้ฟังก์ชันใหม่ |
+| `src/components/jobs/RecruitBoardTools.tsx` | แยกสิทธิ์รายปุ่ม — "ช่องทาง" ใช้ฟังก์ชันใหม่ · "สร้างลิงก์/เหตุผล" ยังเป็น `recruit_postings` · ปิดหมดค่อยซ่อนทั้งแถบ |
+| `tests/api/roleFunctionSync.test.ts` | **ใหม่** — บังคับให้รายชื่อฟังก์ชันสองฝั่งตรงกันทุกตัว |
+
+🔴 **กับดักที่เจอ: รายชื่อฟังก์ชันมีสองที่** (`src/lib/roleFunctions.ts` กับ
+`api/_lib/roleFunctionGrants.ts`) — เพิ่มข้างเดียวแล้ว **PATCH ถูกปฏิเสธเงียบ ๆ**
+admin กดสวิตช์แล้วเหมือนไม่มีอะไรเกิดขึ้น · ไล่เจอว่า `aftercare_read` ตกหล่นแบบนี้มานาน
+⇒ เขียนเทสต์คุมทั้งรายชื่อและระดับขั้นต่ำแล้ว
+
+**ด่านตรวจ:** test 2,582 ผ่าน / 6 skip · tsc 4 = 0 · eslint 0 err / 18 warn · build ผ่าน
+**ตรวจบนจอ/ยิงเส้นจริงแล้ว:** หน้าจัดช่องทางเปิดได้ (ช่องทางหลัก 43 · ช่องทางรอง 4,345) ·
+แท็บบทบาทและสิทธิ์ขึ้นฟังก์ชันใหม่พร้อมป้าย "ขั้นต่ำ: Staff" ·
+`/api/role-permissions` คืน staff = true (channels) · false (postings) · opl = false
