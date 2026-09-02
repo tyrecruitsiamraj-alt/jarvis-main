@@ -17,7 +17,7 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   unit_requests_read: 'staff',
   unit_notes_edit: 'staff',
   // ฟีเจอร์ใหม่ — ต้องเพิ่มทั้งที่นี่และ src/lib/roleFunctions.ts ไม่งั้น PATCH ถูกปฏิเสธเงียบ ๆ
-  recruit_postings: 'supervisor',
+  recruit_postings: 'staff',
   // จัดการช่องทางรับสมัคร (2 ก.ย. 2569) — staff ทำได้ · แยกจากการปล่อยประกาศโดยตั้งใจ
   recruit_channels_manage: 'staff',
   employees_read: 'staff',

@@ -340,9 +340,16 @@ describe('🔴 สิทธิ์ช่องทางรับสมัคร �
     expect(checkApiAccess('opl', 'recruit-channels', 'POST').ok).toBe(false);
   });
 
-  it('ฟังก์ชัน "จัดการช่องทาง" เปิดให้ staff · "ประกาศรับสมัคร" ยังเป็นหัวหน้างาน', () => {
+  it('staff ทำได้ทั้งช่องทางและประกาศ/เหตุผล (เจ้าของสั่ง 2 ก.ย. 2569) · opl ยังไม่ได้', () => {
     expect(isFunctionEnabledForRole('staff', 'recruit_channels_manage')).toBe(true);
-    expect(isFunctionEnabledForRole('staff', 'recruit_postings')).toBe(false);
-    expect(isFunctionEnabledForRole('supervisor', 'recruit_postings')).toBe(true);
+    expect(isFunctionEnabledForRole('staff', 'recruit_postings')).toBe(true);
+    expect(isFunctionEnabledForRole('opl', 'recruit_channels_manage')).toBe(false);
+    expect(isFunctionEnabledForRole('opl', 'recruit_postings')).toBe(false);
+  });
+
+  it('เหตุผลปฏิเสธ: staff แก้ได้ · opl อ่านได้อย่างเดียว', () => {
+    expect(checkApiAccess('staff', 'recruit-reasons', 'POST').ok).toBe(true);
+    expect(checkApiAccess('opl', 'recruit-reasons', 'GET').ok).toBe(true);
+    expect(checkApiAccess('opl', 'recruit-reasons', 'POST').ok).toBe(false);
   });
 });

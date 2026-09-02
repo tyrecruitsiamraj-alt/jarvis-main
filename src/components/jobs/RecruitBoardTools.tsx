@@ -119,10 +119,10 @@ const RecruitBoardTools: React.FC<{
   >(null);
 
   /**
-   * 🔴 **แถบนี้มีสองสิทธิ์ปนกัน** (เจ้าของสั่ง 2 ก.ย. 2569 ให้ staff เข้าถึงช่องทางได้)
-   * · ปุ่ม "ช่องทาง" ใช้ `recruit_channels_manage` (staff ขึ้นไป)
-   * · ปุ่ม "สร้างลิงก์ (ประกาศลอย)" กับ "เหตุผล" ยังใช้ `recruit_postings` (หัวหน้างานขึ้นไป)
-   *   เพราะอันนั้นคือของที่ออกไปให้คนนอกเห็น
+   * **แถบนี้อ่านสองสิทธิ์** (เจ้าของสั่ง 2 ก.ย. 2569 ให้ staff ทำได้ทั้งหมด)
+   * · ปุ่ม "ช่องทาง" ใช้ `recruit_channels_manage`
+   * · ปุ่ม "สร้างลิงก์ (ประกาศลอย)" กับ "เหตุผล" ใช้ `recruit_postings`
+   * ทั้งคู่ขั้นต่ำ staff แล้ว — ที่ยังแยกไว้เพราะ **admin ปิดทีละอันได้** จากหน้าตั้งค่า
    * ปิดหมดทั้งสองอย่างค่อยซ่อนทั้งแถบ
    */
   const canPostings = isFunctionEnabled('recruit_postings');
@@ -174,7 +174,7 @@ const RecruitBoardTools: React.FC<{
     <>
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap gap-2">
-          {/* ปล่อยประกาศ = ของที่คนนอกเห็น ⇒ ยังเป็นสิทธิ์หัวหน้างานขึ้นไป */}
+          {/* ลิงก์ที่ไม่ผูกใบขอ — staff สร้างได้แล้ว (2 ก.ย. 2569) · admin ปิดรายบทบาทได้ */}
           {canPostings ? (
             <button
               type="button"

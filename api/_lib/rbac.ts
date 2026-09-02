@@ -151,9 +151,11 @@ export function minimumRoleFor(
       return 'staff';
 
     case 'recruit-reasons':
-      // อ่านได้ทุกคน (ตอนบันทึกผลติดต่อต้องเลือกเหตุผล) — แก้ master เฉพาะหัวหน้างานขึ้นไป
-      if (isRead) return 'staff';
-      return 'supervisor';
+      /**
+       * อ่าน/แก้ได้ตั้งแต่ staff (เจ้าของสั่ง 2 ก.ย. 2569: *"Staff ก็ทำได้ แก้เลย"*)
+       * — เหตุผลที่ผู้สมัครปฏิเสธเป็นข้อมูลอ้างอิงในบ้าน แก้ผิดแล้วแก้กลับได้
+       */
+      return 'staff';
 
     case 'recruit-job-titles':
       // อ่านได้ทุกคน (ช่องตำแหน่งงานในฟอร์มเพิ่มผู้สมัคร/สร้างลิงก์ใช้)
