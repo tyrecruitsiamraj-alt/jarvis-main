@@ -223,11 +223,20 @@ const AftercarePlanningCalendar: React.FC<{
                                 +{cell.calls.length - 2}
                               </span>
                             ) : null}
-                            {/* 🔴 ถึงกำหนดแล้วแต่ไม่มีสาย = งานค้าง ต้องเขียนบอก ไม่ใช่ปล่อยว่าง */}
+                            {/* 🔴 คำเตือนเหลืองขึ้นเฉพาะรอบที่ **เลยกำหนดแล้ว** เท่านั้น
+                                (Haiku ทดสอบ 2 ก.ย. 2569 จับได้: รอบอนาคตก็ขึ้นข้อความเหลือง
+                                "ยังไม่ได้ตั้งสาย" ⇒ ขัดกับ legend และขัดกับเลข "เลยรอบที่ควรโทร 0"
+                                บนหัวหน้า — จอขัดกันเองแล้วคนเลิกเชื่อ) */}
                             {cell.round && cell.calls.length === 0 ? (
-                              <span className="block truncate text-[8px] font-medium text-amber-700 dark:text-amber-300">
-                                ยังไม่ได้ตั้งสาย
-                              </span>
+                              cell.round.overdue ? (
+                                <span className="block truncate text-[8px] font-medium text-amber-700 dark:text-amber-300">
+                                  เลยกำหนด · ยังไม่ได้ตั้งสาย
+                                </span>
+                              ) : (
+                                <span className="block truncate text-[8px] text-muted-foreground">
+                                  ยังไม่ถึงกำหนด
+                                </span>
+                              )
                             ) : null}
                           </button>
                         ) : (
