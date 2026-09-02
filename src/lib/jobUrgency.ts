@@ -21,8 +21,9 @@ export type ReplacementFilter = 'all' | 'send' | 'no_send' | 'unset';
 
 export const REPLACEMENT_FILTER_OPTIONS: { value: ReplacementFilter; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
-  { value: 'send', label: 'ส่งคนแทน' },
-  { value: 'no_send', label: 'ไม่ส่งคนแทน' },
+  // ภาษาสถานะให้ตรงกับป้ายบนการ์ด (แผนแก้จุดงงข้อ 4 · 2 ก.ย. 2569)
+  { value: 'send', label: 'ต้องส่งคนแทน' },
+  { value: 'no_send', label: 'ไม่ต้องส่งคนแทน' },
   { value: 'unset', label: 'ยังไม่ระบุ' },
 ];
 

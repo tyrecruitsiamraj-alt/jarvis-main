@@ -118,7 +118,7 @@ describe('actionableBuckets / actionableSummary', () => {
 
 describe('roundTabLabel', () => {
   it('คำเต็มตามที่เจ้าของสั่ง ไม่ใช่ "รอบ N"', () => {
-    expect(roundTabLabel(1)).toBe('การโทรครั้งที่ 1');
-    expect(roundTabLabel(3)).toBe('การโทรครั้งที่ 3');
+    expect(roundTabLabel(1)).toBe('สายที่ 1');
+    expect(roundTabLabel(3)).toBe('สายที่ 3');
   });
 });

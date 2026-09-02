@@ -56,8 +56,39 @@ function CallCell({ cell, side }: { cell: CallFlowCell; side: 'ai' | 'human' }) 
   );
 }
 
-/** 8 ช่องเรียงแนวนอน — คอลัมน์ตรงกันทั้งสองแถวเพราะ template เดียวกัน */
-const CELL_GRID = 'grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-8';
+/**
+ * ช่องจัดเป็น **สองกลุ่มติดหัว** (แผนแก้จุดงงข้อ 1 · 2 ก.ย. 2569) — Haiku ทดสอบแล้ว
+ * เอาทุกช่องมาบวกเทียบ "ทั้งหมด" แล้วเลิกเชื่อ · กลุ่มบอกว่าตอบคนละคำถาม
+ * คอลัมน์สองแถว (AI/คน) ยังตรงกันเพราะ template เดียวกันต่อกลุ่ม
+ */
+const WHERE_GRID = 'grid grid-cols-3 gap-1.5';
+const RESULT_GRID = 'grid grid-cols-2 gap-1.5 sm:grid-cols-5';
+
+/** แถวหนึ่งฝั่ง (AI หรือ คน) — สองกลุ่มวางคู่กัน จอแคบซ้อนเป็นสองชั้น */
+function CellRow({ cells, side }: { cells: CallFlowCell[]; side: 'ai' | 'human' }) {
+  const where = cells.filter((c) => c.group === 'where');
+  const result = cells.filter((c) => c.group === 'result');
+  return (
+    <div className="mt-2 grid gap-2 lg:grid-cols-[3fr_5fr]">
+      <div>
+        <p className="mb-1 text-[10px] font-semibold text-slate-400">สายอยู่ตรงไหน</p>
+        <div className={WHERE_GRID}>
+          {cells.length === 0
+            ? null
+            : where.map((c) => <CallCell key={`${side}-${c.key}`} cell={c} side={side} />)}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1 text-[10px] font-semibold text-slate-400">คุยแล้วผลเป็นยังไง</p>
+        <div className={RESULT_GRID}>
+          {result.map((c) => (
+            <CallCell key={`${side}-${c.key}`} cell={c} side={side} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AiCallFlowPanel({
   defaultSource = 'all',
@@ -115,21 +146,19 @@ export default function AiCallFlowPanel({
       <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
         <Bot className="h-3.5 w-3.5" aria-hidden /> ส่ง AI โทร
       </div>
-      <div className={cn('mt-2', CELL_GRID)}>
-        {cells.map((c) => (
-          <CallCell key={`ai-${c.key}`} cell={c} side="ai" />
-        ))}
-      </div>
+      <CellRow cells={cells} side="ai" />
 
-      {/* แถวคนเก็บไปโทร — คอลัมน์เดียวกันเป๊ะ (template เดียวกัน) */}
+      {/* แถวคนเก็บไปโทร — กลุ่ม/คอลัมน์เดียวกันเป๊ะ (template เดียวกัน) */}
       <div className="mt-3 flex items-center gap-1.5 border-t border-white/10 pt-3 text-[11px] font-semibold text-slate-300">
         <UserRound className="h-3.5 w-3.5" aria-hidden /> คนเก็บไปโทรเอง
       </div>
-      <div className={cn('mt-2', CELL_GRID)}>
-        {cells.map((c) => (
-          <CallCell key={`hu-${c.key}`} cell={c} side="human" />
-        ))}
-      </div>
+      <CellRow cells={cells} side="human" />
+
+      {/* 🔴 บรรทัดกันคนบวกเลขเอง — สองกลุ่มตอบคนละคำถาม ช่องซ้อนกันได้ */}
+      <p className="mt-2 text-[10px] text-slate-500">
+        คนเดียวอยู่ได้หลายช่อง (รับสายแล้ว &ldquo;สนใจ&rdquo; นับทั้งสองช่อง) —
+        เลขพวกนี้ไม่ได้บวกกันเป็น &ldquo;ทั้งหมด&rdquo;
+      </p>
     </PageHeroStrip>
   );
 }

@@ -66,3 +66,16 @@ describe('aiCallFlowCells — 2 แถวช่องเดียวกัน (A
     for (const c of cells) expect(c.human).toBe(0);
   });
 });
+
+describe('สองกลุ่มติดหัว (แผนแก้จุดงงข้อ 1 · 2 ก.ย. 2569)', () => {
+  it('ทุกช่องต้องสังกัดกลุ่ม และ "ทั้งหมด/กำลังโทร/รอ AI โทรใหม่" อยู่กลุ่ม where', () => {
+    const cells = aiCallFlowCells(EMPTY_FUNNEL);
+    for (const c of cells) expect(['where', 'result']).toContain(c.group);
+    expect(cells.filter((c) => c.group === 'where').map((c) => c.key)).toEqual([
+      'total',
+      'calling',
+      'retry',
+    ]);
+    expect(cells.filter((c) => c.group === 'result')).toHaveLength(5);
+  });
+});

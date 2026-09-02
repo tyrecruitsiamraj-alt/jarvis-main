@@ -7,6 +7,16 @@ import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import BoardCardProgress from '@/components/jobs/BoardCardProgress';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   canShowNumbers,
   combineFeedStates,
   dataAgeLabel,
@@ -326,6 +336,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   }, [loadReleases]);
 
   const [bulkReleaseBusy, setBulkReleaseBusy] = useState(false);
+  /**
+   * ป๊อปยืนยันก่อนปล่อยเป็นชุด (แผนแก้จุดงงข้อ 3 · เจ้าของเคาะ 2 ก.ย. 2569)
+   * Haiku ทดสอบแล้วไม่กล้ากดปุ่มนี้เพราะ *"กดแล้วเกิดอะไรขึ้น?"* — กติกาก้อน C:
+   * ปุ่มออกนอกบ้านต้องมีป๊อปยืนยันบอกว่าจะเกิดอะไรกี่ใบ
+   */
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   /**
    * 🔴 **ปล่อย/ดึงลงทีละใบย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอแล้ว** (27 ส.ค. 2569)
@@ -655,6 +671,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     /** 🔴 ชุดเดียวกับเลขบนปุ่มเป๊ะ — ห้ามคำนวณคนละที่ (เคยเพี้ยน 23 ใบ) */
     const ids = releasableJobs.map((j) => j.id).slice(0, 300);
     if (ids.length === 0) return;
+    setBulkConfirmOpen(false);
     setBulkReleaseBusy(true);
     try {
       await releaseJobsToPublic(ids, 'ปล่อยเป็นชุดจากบอร์ดรับสมัคร');
@@ -1135,7 +1152,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   <button
                     type="button"
                     disabled={bulkReleaseBusy}
-                    onClick={() => void bulkReleaseVisible()}
+                    /* กดแล้ว **ยังไม่ยิง** — เปิดป๊อปยืนยันก่อนเสมอ (ของจริงขึ้นหน้าสาธารณะ) */
+                    onClick={() => setBulkConfirmOpen(true)}
                     /* 🔴 เลขบนปุ่ม **น้อยกว่า** "ยังไม่ปล่อย" บนหัว เพราะตัดใบที่ ERP
                        พาไปเริ่มงานแล้วออก — ประกาศหาคนของตำแหน่งที่มีคนทำอยู่ไม่มีประโยชน์
                        ⚠️ ต้องเขียนบอกไว้ ไม่งั้นคนเห็นเลขสองที่ไม่ตรงแล้วไม่เชื่อทั้งคู่ */
@@ -1841,6 +1859,38 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           <RecruitLaneDialog open job={laneJob} onClose={() => setLaneJob(null)} />
         </React.Suspense>
       ) : null}
+
+      {/* ═══ ป๊อปยืนยันปล่อยเป็นชุด (แผนแก้จุดงงข้อ 3 · 2 ก.ย. 2569) ═══
+          ปุ่ม "ส่งประกาศทีเดียว" คือของออกนอกบ้าน — ต้องบอกก่อนว่าจะเกิดอะไร กี่ใบ
+          ใครเห็น และมีทางถอย (Haiku ทดสอบ: ไม่กล้ากดเพราะไม่รู้ว่ากดแล้วเกิดอะไร) */}
+      <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ปล่อยประกาศ {Math.min(releasableJobs.length, 300).toLocaleString('th-TH')} ใบ ขึ้นหน้าสมัครงานสาธารณะ?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1.5 text-left">
+                <p>
+                  ใบขอที่ยังต้องหาคนและยังไม่เคยปล่อย จะขึ้นหน้า /apply ให้
+                  <b>คนนอกเห็นและกดสมัครได้ทันที</b>
+                </p>
+                <p>
+                  เลขนี้น้อยกว่า &ldquo;ยังไม่ปล่อย&rdquo; บนหัว เพราะตัดใบที่มีคนเริ่มงานแล้วออก
+                  {releasableJobs.length > 300 ? ' · เกิน 300 ใบ ระบบปล่อยครั้งละ 300 กดซ้ำได้จนหมด' : ''}
+                </p>
+                <p>ปล่อยแล้วดึงลงรายใบได้ที่การ์ดของใบนั้น</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยังก่อน</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void bulkReleaseVisible()}>
+              ปล่อย {Math.min(releasableJobs.length, 300).toLocaleString('th-TH')} ใบเลย
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

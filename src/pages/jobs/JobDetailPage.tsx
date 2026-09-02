@@ -695,7 +695,7 @@ const JobDetailPage: React.FC = () => {
                     className="w-full jarvis-soft-field"
                   >
                     <option value="open">เปิด</option>
-                    <option value="in_progress">ดำเนินการ</option>
+                    <option value="in_progress">กำลังดำเนินการ</option>
                     <option value="closed">ปิดแล้ว</option>
                     <option value="cancelled">ยกเลิก</option>
                   </select>

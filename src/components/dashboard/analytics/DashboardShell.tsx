@@ -243,11 +243,26 @@ const DashboardShell: React.FC<Props> = ({
                   <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
                     {dateRange == null ? (
-                      <>
-                        <span className="font-medium text-slate-600 dark:text-slate-400">คงเหลือ = อัตราที่ยังต้องหาจากใบเปิดทั้งหมด</span>
-                        {' · '}
-                        เข้ามา/ปิดแล้ว/ยกเลิก = ของใบที่ต้องการคนในช่วงแนวโน้ม
-                      </>
+                      /**
+                       * 🔴 สมการต้องขึ้นเสมอ ไม่ใช่เฉพาะตอนเลือกช่วงวัน (แผนแก้จุดงงข้อ 2
+                       * · 2 ก.ย. 2569) — Haiku ทดสอบแล้วเอา เข้ามา−ปิด−ยกเลิก ได้ 350
+                       * แล้วถามว่า "หายไปไหน" เพราะจอไม่พิมพ์บรรทัดผลลัพธ์ให้
+                       * ⚠️ ตัวเลขชุดเดิมทั้งหมด ไม่มีนิยามใหม่ — แค่พิมพ์ผลบวกลบให้เห็น
+                       */
+                      (() => {
+                        const intake = data.kpis.find((k) => k.id === 'total_requests')?.value ?? 0;
+                        const closed = data.kpis.find((k) => k.id === 'closed')?.value ?? 0;
+                        const cancelled = data.kpis.find((k) => k.id === 'cancelled')?.value ?? 0;
+                        const stillOpen = intake - closed - cancelled;
+                        return (
+                          <>
+                            เข้ามา − ปิดแล้ว − ยกเลิก = <b>ยังเปิดหาอยู่ {stillOpen.toLocaleString('th-TH')} อัตรา</b>{' '}
+                            ({intake.toLocaleString('th-TH')} − {closed.toLocaleString('th-TH')} −{' '}
+                            {cancelled.toLocaleString('th-TH')}) · สามตัวนี้นับเฉพาะใบในช่วงแนวโน้ม —
+                            ส่วน <span className="font-medium">คงเหลือ = ใบเปิดทั้งหมดทั้งระบบ</span> จึงเป็นคนละเลขกัน
+                          </>
+                        );
+                      })()
                     ) : (
                       (() => {
                         const intake = data.kpis.find((k) => k.id === 'total_requests')?.value ?? 0;

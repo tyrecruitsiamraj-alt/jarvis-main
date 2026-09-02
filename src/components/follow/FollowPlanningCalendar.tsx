@@ -103,7 +103,7 @@ const FollowPlanningCalendar: React.FC<{
         </span>
         {activeRound ? (
           <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
-            กำลังดู การโทรครั้งที่ {activeRound} · เฉพาะเดือนนี้
+            กำลังดู สายที่ {activeRound} · เฉพาะเดือนนี้
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-1">
@@ -174,7 +174,7 @@ const FollowPlanningCalendar: React.FC<{
       {monthRows.length === 0 ? (
         <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.neutral.soft)}>
           เดือนนี้ไม่มีนัดโทรของใครเลย
-          {activeRound ? ` ใน "การโทรครั้งที่ ${activeRound}" — กดครั้งที่อื่นข้างบนเพื่อดูรอบอื่น` : ''}
+          {activeRound ? ` ใน "สายที่ ${activeRound}" — กดสายอื่นข้างบนเพื่อดูสายนั้น` : ''}
         </p>
       ) : (
         <div ref={scrollRef} className="overflow-x-auto rounded-xl border border-border">

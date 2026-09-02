@@ -77,7 +77,7 @@ const UnitRequestFilterFields: React.FC<Props> = ({
           {(
             [
               { value: 'all' as const, label: 'ทั้งหมด' },
-              { value: 'active' as const, label: 'ดำเนินการ' },
+              { value: 'active' as const, label: 'ยังดำเนินการอยู่' },
               { value: 'closed' as const, label: 'ปิดแล้ว' },
             ] satisfies { value: UnitRequestStatusFilter; label: string }[]
           ).map((f) => (

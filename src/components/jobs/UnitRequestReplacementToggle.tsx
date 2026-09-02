@@ -70,7 +70,7 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, 
             : 'bg-white/60 text-muted-foreground border-border/60 hover:border-primary/40',
         )}
       >
-        ส่งคนแทน
+        ต้องส่งคนแทน
       </button>
       <button
         type="button"
@@ -84,7 +84,7 @@ const UnitRequestReplacementToggle: React.FC<Props> = ({ job, onSaved, compact, 
             : 'bg-white/60 text-muted-foreground border-border/60 hover:border-border',
         )}
       >
-        ไม่ส่งคนแทน
+        ไม่ต้องส่งคนแทน
       </button>
     </div>
   );
@@ -168,8 +168,8 @@ export function UnitRequestReplacementSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={UNSET}>ยังไม่ระบุ</SelectItem>
-        <SelectItem value="yes">ส่งคนแทน</SelectItem>
-        <SelectItem value="no">ไม่ส่งคนแทน</SelectItem>
+        <SelectItem value="yes">ต้องส่งคนแทน</SelectItem>
+        <SelectItem value="no">ไม่ต้องส่งคนแทน</SelectItem>
       </SelectContent>
     </Select>
   );

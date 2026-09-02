@@ -166,6 +166,11 @@ const DashboardFilterBar: React.FC<Props> = ({
     >
       <div>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">ตัวกรอง</h2>
+        {/* 🔴 ขีดเส้นแบ่งขอบเขตให้ชัด (แผนแก้จุดงงข้อ 2 · 2 ก.ย. 2569) — Haiku อ่านป้าย
+            "มีผลกับ CSV เท่านั้น" ของก้อนท้าย แล้วเหมาว่าตัวกรอง**ทั้งแผง**ไม่มีผลกับหน้า */}
+        <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+          ตัวกรองข้างล่างนี้<b>เปลี่ยนตัวเลขและกราฟบนหน้า</b>ทันที — ยกเว้นก้อนล่างสุดที่เขียนกำกับว่ากรองเฉพาะไฟล์ CSV
+        </p>
       </div>
 
       <div className="space-y-1.5">

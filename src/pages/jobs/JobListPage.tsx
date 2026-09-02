@@ -555,7 +555,7 @@ const JobListPage: React.FC = () => {
             onChange={(v) => updateListState({ filter: v as typeof filter })}
           >
             <option value="all">ทั้งหมด</option>
-            <option value="active">ดำเนินการ</option>
+            <option value="active">ยังดำเนินการอยู่</option>
             <option value="closed">ปิดแล้ว</option>
           </FilterSelect>
 

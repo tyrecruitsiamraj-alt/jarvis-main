@@ -12,6 +12,15 @@ export type CallFlowCell = {
   key: string;
   label: string;
   tone: ToneKey;
+  /**
+   * ช่องนี้ตอบคำถามไหน (แผนแก้จุดงงข้อ 1 · 2 ก.ย. 2569)
+   * `where` = "ตอนนี้สายอยู่ตรงไหน" · `result` = "คุยแล้วผลเป็นยังไง"
+   *
+   * 🔴 Haiku ทดสอบแล้วเอา 7 ช่องมาบวกกันได้ 128 แล้วเทียบกับ "ทั้งหมด 47" แล้วเลิกเชื่อ
+   * — ช่องพวกนี้ซ้อนกันได้โดยธรรมชาติ (รับสายแล้ว "สนใจ" อยู่ทั้งสองช่อง) ⇒ ต้องจัดเป็น
+   * สองกลุ่มติดหัวให้เห็นว่าตอบคนละคำถาม (ท่าเดียวกับหน้าติดตามที่แก้สำเร็จมาแล้ว)
+   */
+  group: 'where' | 'result';
   /** ค่าฝั่ง AI (Lumos) · null = ช่องนี้ฝั่งนั้นไม่มีข้อมูล → หน้าจอขึ้นขีด */
   ai: number | null;
   /** ค่าฝั่งคนเก็บไปโทร (candidate_call_holds) */
@@ -41,6 +50,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'total',
       label: 'ทั้งหมด',
       tone: 'neutral',
+      group: 'where',
       ai: funnel.queuedActive,
       human: h ? h.total : null,
     },
@@ -48,6 +58,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'calling',
       label: 'กำลังโทร / ถืออยู่',
       tone: 'primary',
+      group: 'where',
       ai: funnel.delivered,
       human: h ? h.holding : null,
     },
@@ -55,6 +66,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'connected',
       label: 'รับสาย / มีผลแล้ว',
       tone: 'info',
+      group: 'result',
       ai: funnel.connected,
       human: h ? h.withResult : null,
     },
@@ -62,6 +74,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'confirmed',
       label: 'สนใจ',
       tone: 'success',
+      group: 'result',
       ai: ai.confirmed ?? 0,
       human: h ? (hby.confirmed ?? 0) : null,
     },
@@ -69,6 +82,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'declined',
       label: 'ไม่สนใจ',
       tone: 'danger',
+      group: 'result',
       ai: ai.declined ?? 0,
       human: h ? (hby.declined ?? 0) : null,
     },
@@ -76,6 +90,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'no_answer',
       label: 'ไม่รับสาย',
       tone: 'warn',
+      group: 'result',
       ai: sumOutcomes(ai, ['no_answer', 'busy', 'unresponsive', 'failed']),
       human: h ? (hby.no_answer ?? 0) : null,
     },
@@ -83,6 +98,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'reschedule',
       label: 'ไม่สะดวกคุย',
       tone: 'orange',
+      group: 'result',
       ai: ai.reschedule_requested ?? 0,
       human: h ? (hby.reschedule_requested ?? 0) : null,
     },
@@ -90,6 +106,7 @@ export function aiCallFlowCells(funnel: CallFunnel): CallFlowCell[] {
       key: 'retry',
       label: 'รอ AI โทรใหม่',
       tone: 'violet',
+      group: 'where',
       ai: funnel.retryScheduledState,
       // ฝั่งคน: "คืนให้ AI โทรต่อ" (release_reason='to_ai') = ความหมายเดียวกัน
       human: h ? h.toAi : null,
