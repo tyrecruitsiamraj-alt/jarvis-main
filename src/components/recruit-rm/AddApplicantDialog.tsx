@@ -68,7 +68,8 @@ const AddApplicantDialog: React.FC<{
   const [specificType, setSpecificType] = useState('');
   const [education, setEducation] = useState('');
   const [responsible, setResponsible] = useState('');
-  const [channel, setChannel] = useState<RecruitChannelMatch[]>([]);
+  /** ช่องทางที่ผู้สมัครมาจาก — 1:1 ตาม ChannelPicker แบบใหม่ (2 ก.ย. 2569) */
+  const [channel, setChannel] = useState<RecruitChannelMatch | null>(null);
   const [licenses, setLicenses] = useState<string[]>([]);
 
   const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
@@ -89,7 +90,7 @@ const AddApplicantDialog: React.FC<{
     setSpecificType('');
     setEducation('');
     setResponsible('');
-    setChannel([]);
+    setChannel(null);
     setLicenses([]);
     setError(null);
     setSaving(false);
@@ -142,8 +143,8 @@ const AddApplicantDialog: React.FC<{
         specific_type: specificType || null,
         education: education || null,
         responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,
-        channel_id: channel[0]?.id ?? null,
-        channel_label: channel[0] ? recruitChannelLabel(channel[0]) : null,
+        channel_id: channel?.id ?? null,
+        channel_label: channel ? recruitChannelLabel(channel) : null,
         license_types: licenses,
       });
       onSaved();

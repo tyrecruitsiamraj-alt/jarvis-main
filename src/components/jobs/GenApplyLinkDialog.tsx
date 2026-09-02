@@ -87,7 +87,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   onCreated,
   embedded = false,
 }) => {
-  const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
+  /** ช่องทางของลิงก์นี้ — **1:1** (เจ้าของเคาะ 2 ก.ย. 2569: เลิกติ๊กหลายช่อง) */
+  const [picked, setPicked] = useState<RecruitChannelMatch | null>(null);
   /** ลิสต์ช่องทางหุบไว้ก่อน — กางเมื่อจะเลือกจริง (เหตุผลอยู่ที่จุดเรียกใช้) */
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -157,7 +158,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setResponsible('');
     setFormType('rm');
     setShortLinks({});
-    setPicked([]);
+    setPicked(null);
     setChannelsOpen(false);
     /**
      * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
@@ -208,7 +209,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         salaryText: salaryText || null,
         contactName: contactName || null,
         contactPhone: contactPhone || null,
-        channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) })),
+        channels: picked ? [{ channelId: picked.id, label: recruitChannelLabel(picked) }] : [],
         positionName: positionName.trim() || null,
         province: province || null,
         responsibleName: responsible || null,
@@ -401,9 +402,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 >
                   <span className="text-xs font-medium text-muted-foreground">
                     ช่องทางที่จะส่ง{' '}
-                    {picked.length > 0 ? (
+                    {picked ? (
                       <span className="font-semibold text-foreground">
-                        — เลือกไว้ {picked.length} ช่อง
+                        — {recruitChannelLabel(picked)}
                       </span>
                     ) : (
                       <span className="font-normal opacity-70">(ไม่เลือกก็ได้ — จะได้ลิงก์กลาง 1 อัน)</span>
@@ -419,9 +420,10 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 </button>
                 {channelsOpen ? (
                   <>
-                    <ChannelPicker value={picked} onChange={setPicked} multiple reloadKey={open} />
+                    <ChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
                     <p className="text-[11px] text-muted-foreground">
-                      เลือกได้หลายช่อง — ได้ลิงก์แยกช่องละอัน จะรู้ว่าคนสมัครมาจากช่องไหน
+                      1 ลิงก์ต่อ 1 ช่องทาง — อยากส่งช่องอื่นด้วย ให้สร้างลิงก์ใหม่อีกใบ
+                      (จะได้รู้ว่าผู้สมัครมาจากช่องไหนจริง ๆ)
                     </p>
                   </>
                 ) : null}
