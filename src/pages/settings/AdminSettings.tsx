@@ -421,7 +421,9 @@ const AdminSettings: React.FC = () => {
                           placeholder="เช่น ครีม"
                           maxLength={60}
                           title="ชื่อเล่นที่ใช้เรียกกันจริง — อนาคตจะให้ dropdown ทั้งระบบดึงชื่อจากช่องนี้"
-                          className={cn('h-8 w-28 text-xs', savingUserId === u.id && 'opacity-60')}
+                          /* 🔴 ช่องต้องกว้างพออ่านออกว่าพิมพ์ใครไป (เจ้าของทัก 1 ก.ย. 2569:
+                             *"ช่องใส่ชื่อเล่นเล็กจนมองไม่ออกเลยว่าพิมพ์ใครไป เบอร์ด้วย"*) */
+                          className={cn('h-9 w-40 text-sm', savingUserId === u.id && 'opacity-60')}
                           onBlur={(e) => {
                             const next = e.target.value.trim();
                             if (next === (u.nickname || '')) return;
@@ -512,7 +514,7 @@ const AdminSettings: React.FC = () => {
                           placeholder="08xxxxxxxx"
                           title="เบอร์นี้เป็น admin_phone ที่ AI โทรกลับเมื่อโทรหาผู้สมัครไม่สำเร็จ"
                           className={cn(
-                            'h-8 w-32 mx-auto text-center text-xs',
+                            'h-9 w-40 mx-auto text-center text-sm tabular-nums',
                             savingUserId === u.id && 'opacity-60',
                           )}
                           onBlur={(e) => {
