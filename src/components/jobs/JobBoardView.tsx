@@ -1166,6 +1166,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     {bulkReleaseBusy
                       ? 'กำลังปล่อย…'
                       : `ส่งประกาศทีเดียว ${Math.min(unreleasedCount, 300)} ใบที่ยังต้องหาคน`}
+                    {/* 🔴 ส่วนต่างจาก "ยังไม่ปล่อย" ต้องพิมพ์บนจอ ไม่ใช่ซ่อนใน hover
+                        (Haiku รอบสอง: 156 − 127 = "29 ใบนี้คือใบไหน?" ทั้งที่ title อธิบายแล้ว
+                        — แต่ tooltip ต้องเอาเมาส์จ่อถึงเห็น จอสัมผัส/คนกวาดตาไม่มีวันเจอ) */}
+                    {ledger.unreleased > unreleasedCount ? (
+                      <span className="mt-0.5 block text-[10px] font-normal opacity-80">
+                        ไม่รวม {(ledger.unreleased - unreleasedCount).toLocaleString('th-TH')} ใบที่มีคนเริ่มงานแล้ว
+                      </span>
+                    ) : null}
                   </button>
                 ) : null
               }

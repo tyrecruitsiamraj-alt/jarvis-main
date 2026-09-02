@@ -69,7 +69,12 @@ const FollowCompletedPanel: React.FC<{
           <p className={cn('text-sm font-semibold', TONE.success.value)}>
             โทรครบแล้ว {people.length.toLocaleString('th-TH')} คน — พร้อมส่งไปดูแลหลังเริ่มงาน
           </p>
-          <p className={cn('text-[11px]', DASH.muted)}>{completedFollowSummary(people)}</p>
+          {/* 🔴 "โทรครบ" ≠ "สำเร็จ" — Haiku รอบสองงงว่าทำไมแท็บสำเร็จเป็น 0 ทั้งที่กล่องนี้มีคน
+              (สำเร็จ = เจ้าหน้าที่ปิดงานว่าไปทำงานแล้ว · กล่องนี้แค่ AI โทรครบรอบที่ตั้ง) */}
+          <p className={cn('text-[11px]', DASH.muted)}>
+            {completedFollowSummary(people)} · โทรครบ ≠ สำเร็จ — จะขึ้นแท็บ &ldquo;สำเร็จ&rdquo;
+            เมื่อเจ้าหน้าที่กดปิดงานว่าไปทำงานแล้ว
+          </p>
         </div>
         <button
           type="button"
