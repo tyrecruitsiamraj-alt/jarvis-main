@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -90,12 +90,31 @@ const NON_ADMIN_TABS: readonly SettingsTab[] = ['appearance'];
 const AdminSettings: React.FC = () => {
   const { hasPermission, user } = useAuth();
   const canAdmin = hasPermission('admin');
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   // ⚠️ ตัวคัดค่าอยู่ที่ `isSettingsTabId` แล้ว — เดิมไล่เทียบทีละชื่อ 11 บรรทัด
   // แล้ว 'navMenu' หายไปจากรายการ (ลิงก์ ?tab=navMenu จึงเด้งกลับ users)
   const initialTab: SettingsTab = isSettingsTabId(tabFromUrl) ? tabFromUrl : 'users';
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  const [activeTab, setActiveTabState] = useState<SettingsTab>(initialTab);
+
+  /**
+   * 🔴 **แท็บกับ URL ต้องเดินคู่กันสองทาง** (เจอตอนกวาดบั๊ก 2 ก.ย. 2569)
+   * เดิมอ่าน `?tab=` แค่ตอนเปิดหน้าครั้งแรก ⇒ ลิงก์ ?tab=... ตอนอยู่บนหน้านี้อยู่แล้ว
+   * **ไม่สลับแท็บ** (URL บอก audit แต่จอโชว์ธีม/โลโก้) และปุ่ม back ของเบราว์เซอร์
+   * ก็สลับแท็บไม่ได้ · กดแท็บ = เขียน URL ด้วย เพื่อให้คัดลอกลิงก์แชร์ได้ตรงจอจริง
+   */
+  useEffect(() => {
+    if (isSettingsTabId(tabFromUrl) && tabFromUrl !== activeTab) setActiveTabState(tabFromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ตามเฉพาะ URL (แท็บที่คนกดจัดการที่ setActiveTab แล้ว)
+  }, [tabFromUrl]);
+
+  const setActiveTab = useCallback(
+    (tab: SettingsTab) => {
+      setActiveTabState(tab);
+      setSearchParams({ tab }, { replace: false });
+    },
+    [setSearchParams],
+  );
 
   /**
    * เมนูที่คนนี้เห็นได้ — จัดกลุ่มที่ `lib/settingsNav.ts` ที่เดียว
