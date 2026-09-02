@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Pencil, Phone, X } from 'lucide-react';
+import { Building2, Pencil, Phone, RotateCcw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import {
@@ -48,6 +48,10 @@ const FollowRoundsDialog: React.FC<{
   onCancel: (id: string) => void;
   /** หน้าเรียกต้องปิดป๊อปนี้ก่อนเปิดกล่องแก้ไข — ห้ามซ้อน Dialog */
   onEdit: (entry: FollowEntry) => void;
+  /**
+   * ย้อนสถานะปิดงาน (feedback 2 ก.ย. 2569) — เลือกผลผิดแล้วแก้ต่อได้ ไม่ต้องสร้างใหม่
+   */
+  onReopen: (id: string) => void | Promise<void>;
   onComplete: (id: string, outcome: FollowOutcome, note?: string) => void | Promise<void>;
 }> = ({
   open,
@@ -61,6 +65,7 @@ const FollowRoundsDialog: React.FC<{
   onCancel,
   onEdit,
   onComplete,
+  onReopen,
 }) => {
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? undefined : onClose())}>
@@ -135,6 +140,17 @@ const FollowRoundsDialog: React.FC<{
                   {it.staff_phone ? (
                     <span className="text-[11px] text-muted-foreground">โทรกลับ {it.staff_phone}</span>
                   ) : null}
+                  {/* 🔴 สถานะเบอร์ฉุกเฉิน (feedback 2 ก.ย. 2569) — เขียนได้แค่ "ส่งเบอร์ไปแล้ว"
+                      เพราะผลที่ Lumos ส่งกลับ **ยังไม่มีช่องบอกว่าโทรเบอร์นี้หรือยัง**
+                      (ตรวจครบทุกช่องแล้ว) · เขียนว่า "โทรแล้ว" ตอนนี้คือจอโกหก */}
+                  {it.emergency_phone ? (
+                    <span
+                      title="เบอร์ที่ AI โทรหาเมื่อติดต่อผู้รับไม่ได้ — ฝั่ง Lumos ยังไม่ส่งกลับมาว่าโทรเบอร์นี้แล้วหรือยัง"
+                      className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', TONE.neutral.chip)}
+                    >
+                      เบอร์ฉุกเฉินที่ส่งไป {it.emergency_phone} · ยังไม่รู้ว่าโทรหรือยัง
+                    </span>
+                  ) : null}
                 </div>
 
                 {it.note ? <p className="mt-1 text-[11px] text-muted-foreground">{it.note}</p> : null}
@@ -149,6 +165,29 @@ const FollowRoundsDialog: React.FC<{
                     *"ทำไมขึ้นว่าเสร็จสิ้น เพราะในระบบ Lumos บอกยกเลิก"* — สิ่งที่เห็นคือ
                     **ปุ่มสีเขียว "เสร็จสิ้น"** ไม่ใช่สถานะของสาย) ⇒ มีหัวข้อกำกับว่าเป็นแถวคำสั่ง
                     และคำบนปุ่มขึ้นต้นด้วยกริยา */}
+                {/* 🔴 ปิดงานแล้วต้องมีทางย้อน (feedback 2 ก.ย. 2569:
+                    *"แก้ไขสถานะเสร็จแล้ว อยากให้ทำได้ต่อเนื่อง (ย้อนกลับ) ไม่ต้องเริ่มใหม่ทุกครั้ง"*)
+                    เดิมกดเสร็จสิ้นแล้วปุ่มหายหมด เลือกผิดคือแก้ไม่ได้เลย */}
+                {it.completed_at && !it.cancelled ? (
+                  <>
+                    <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onReopen(it.id)}
+                        title="ล้างผลปิดงานให้กลับมาแก้ต่อได้ — ไม่แตะสายที่โทรไปแล้ว"
+                        className={cn(
+                          'inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
+                          TONE.warn.outline,
+                        )}
+                      >
+                        <RotateCcw className="h-3 w-3" aria-hidden />
+                        {busy ? 'กำลังย้อน…' : 'ย้อนสถานะ'}
+                      </button>
+                    </div>
+                  </>
+                ) : null}
                 {canWork || canCancel ? (
                   <>
                 <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>

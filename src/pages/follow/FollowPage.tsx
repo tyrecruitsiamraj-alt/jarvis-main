@@ -18,6 +18,7 @@ import {
   createFollowEntry,
   cancelFollowEntry,
   completeFollowEntry,
+  reopenFollowEntry,
   type FollowEntry,
   updateFollowEntry,
 } from '@/lib/followApi';
@@ -679,6 +680,23 @@ const FollowPage: React.FC = () => {
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ปิดงานไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * ย้อนสถานะปิดงาน (feedback 2 ก.ย. 2569) — ล้างผลปิดงานแล้วโหลดใหม่ให้ปุ่มกลับมา
+   * ⚠️ ไม่แตะคิวโทร (เหมือนตอนปิดงาน) — สายที่โทรไปแล้วเป็นเหตุการณ์จริง ย้อนไม่ได้
+   */
+  const doReopen = async (id: string) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await reopenFollowEntry(id);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ย้อนสถานะไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -1573,6 +1591,7 @@ const FollowPage: React.FC = () => {
           setEditing(entry);
         }}
         onComplete={doComplete}
+        onReopen={(id) => void doReopen(id)}
       />
 
       <BoardPersonPicker

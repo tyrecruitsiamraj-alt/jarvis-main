@@ -4,12 +4,8 @@ import { DASH, TONE } from '@/lib/designTokens';
 import { EMPTY_FUNNEL, fetchCallFunnel, type CallFunnel } from '@/lib/callFunnelApi';
 import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
 import { toYmdBangkok } from '@/lib/dateTh';
-import {
-  bucketOfCall,
-  callAttemptSlot,
-  CALL_BUCKET_LABEL,
-  type CallBucket,
-} from '@/lib/callOutcomeBuckets';
+import { bucketOfCall, CALL_BUCKET_LABEL, type CallBucket } from '@/lib/callOutcomeBuckets';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { ChevronRight, Phone, PhoneOutgoing, RefreshCw, X } from 'lucide-react';
 
 /**
@@ -66,9 +62,10 @@ export default function FollowTodayPanel() {
       map.set(slot, { connected: [], unreached: [], cancelled: [], pending: [] });
     }
     for (const e of entries) {
-      // ยังไม่เคยเข้าคิว = ไม่ได้อยู่รอบไหน (ไม่นับเข้ากล่อง)
-      if (e.call_attempt == null && e.call_status === 'pending' && !e.call_outcome) continue;
-      const slot = callAttemptSlot(e.call_attempt);
+      /* 🔴 นิยาม "อยู่รอบไหน" ตัวเดียวกับฝั่งฐานและหน้าติดตาม (`followRoundSlot`)
+         — งานติดตามใช้สายที่คนเลือกไว้ (`call_round`) ก่อน `attempt_count` เสมอ */
+      const slot = followRoundSlot(e);
+      if (slot === null) continue; // ยังไม่เคยเข้าคิว = ไม่ได้อยู่รอบไหน
       const bucket = bucketOfCall(e.cancelled ? 'cancelled' : e.call_status, e.call_outcome);
       map.get(slot)?.[bucket].push(e);
     }

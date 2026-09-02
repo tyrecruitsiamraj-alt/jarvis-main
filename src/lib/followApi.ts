@@ -24,6 +24,11 @@ export type FollowEntry = {
   site_code?: string | null;
   /** สายที่เท่าไหร่ (113) — null = แถวเก่า/ไม่ได้ระบุ ⇒ ถือเป็นสายแรก */
   call_round?: number | null;
+  /**
+   * เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น — เบอร์ที่ **AI โทรหา** เมื่อติดต่อผู้รับไม่ได้
+   * ⚠️ บอกได้แค่ว่า **ส่งเบอร์ไปแล้ว** · Lumos ยังไม่ส่งกลับมาว่าโทรเบอร์นี้หรือยัง
+   */
+  emergency_phone?: string | null;
   /** 🔴 เจ้าของข้อมูล = **คนที่กรอกครั้งแรก** ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
   created_by_name: string | null;
   created_at: string | null;
@@ -190,3 +195,16 @@ export const FOLLOW_STATUS_BAR: Record<FollowCallStatus, string> = {
   failed: TONE.danger.dot,
   cancelled: TONE.neutral.dot,
 };
+
+/**
+ * **ย้อนสถานะปิดงาน** (feedback 2 ก.ย. 2569) — ล้างผลปิดงานให้กลับมาแก้ต่อได้
+ * ⚠️ ไม่แตะคิวโทร · รายการที่ยกเลิกไปแล้วย้อนทางนี้ไม่ได้
+ */
+export async function reopenFollowEntry(id: string): Promise<FollowEntry> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'reopen' }),
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  return (await r.json()) as FollowEntry;
+}

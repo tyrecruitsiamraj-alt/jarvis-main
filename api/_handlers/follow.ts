@@ -116,6 +116,15 @@ type FollowRow = {
   called_at: string | Date | null;
   /** สถานะ followup ของคิว (070) — 'needs_human' = AI เอาไม่อยู่ ต้องคนตาม */
   followup_state: string | null;
+  /**
+   * เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น (`payload->>'admin_phone'`) — เบอร์ที่ **AI โทรหา**
+   * เมื่อติดต่อผู้รับไม่ได้ · คนละช่องกับเบอร์ที่ AI พูดให้ผู้สมัครโทรกลับ
+   *
+   * 🔴 feedback 2 ก.ย. 2569: *"เพิ่มการแสดงสถานะการโทรติดต่อเบอร์ฉุกเฉิน"*
+   * ⚠️ **บอกได้แค่ "ส่งเบอร์ไปแล้ว" ไม่ใช่ "โทรไปแล้ว"** — ผลที่ Lumos ส่งกลับ
+   * ยังไม่มีช่องบอกว่าโทรเบอร์ฉุกเฉินหรือยัง (ตรวจครบทุกช่อง 2 ก.ย. 2569)
+   */
+  emergency_phone: string | null;
 };
 
 const iso = (v: string | Date | null): string | null =>
@@ -135,6 +144,8 @@ function toResponse(r: FollowRow) {
     site_code: r.site_code ?? null,
     /** สายที่เท่าไหร่ (113) — null = ไม่ได้ระบุ ฝั่งจออ่านเป็นสายแรก */
     call_round: r.call_round == null ? null : Number(r.call_round),
+    /** เบอร์ฉุกเฉินที่ส่งไปกับสายนั้น — null = ไม่เคยเข้าคิว หรือไม่มีเบอร์ให้ส่ง */
+    emergency_phone: r.emergency_phone ?? null,
     /** เจ้าของข้อมูล = คนที่กรอกครั้งแรก · ไม่เปลี่ยนแม้มีคนอื่นมาแก้ทีหลัง */
     created_by_name: r.created_by_name,
     updated_at: iso(r.updated_at ?? null),
@@ -189,7 +200,8 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
             q.result->>'summary'                           as call_summary,
             q.result->'next_action'                        as call_next_action,
             q.updated_at                                   as called_at,
-            q.followup_state                               as followup_state
+            q.followup_state                               as followup_state,
+            q.payload->>'admin_phone'                      as emergency_phone
        from ${followTable} f
        left join ${queueTable} q
               on q.channel = 'reminder'
@@ -590,15 +602,69 @@ async function updateFollow(req: AuthedReq, res: ApiRes, body: Record<string, un
   return res.status(200).json({ ...toResponse(updated), queue_refreshed: queueRefreshed });
 }
 
+/**
+ * **ย้อนสถานะปิดงาน** (feedback 2 ก.ย. 2569:
+ * *"กรณีแก้ไขสถานะเสร็จแล้ว อยากให้ทำได้ต่อเนื่อง (ย้อนกลับ) ไม่ต้องเริ่มใหม่ทุกครั้ง"*)
+ *
+ * เดิมกด "เสร็จสิ้น" แล้วปุ่มทุกปุ่มของรอบนั้นหายไป — เลือกผิดคือแก้ไม่ได้เลย
+ * ต้องสร้างรายการใหม่ทั้งชุด
+ *
+ * 🔴 **ล้างเฉพาะช่องปิดงาน ไม่แตะคิวโทรและไม่แตะการยกเลิก** — ปิดงานเป็นบันทึกของคน
+ * ส่วนสายที่โทรไปแล้วเป็นเหตุการณ์ที่เกิดขึ้นจริง ย้อนไม่ได้และไม่ควรย้อน
+ * ⚠️ รายการที่ **ยกเลิก** ไปแล้วย้อนทางนี้ไม่ได้ (คนละเรื่องกับปิดงาน)
+ */
+async function reopenFollow(req: AuthedReq, res: ApiRes) {
+  const id = typeof req.query?.id === 'string' ? req.query.id.trim() : '';
+  if (!UUID_RE.test(id)) return sendError(res, 400, 'Bad request', 'ต้องระบุ id ของรายการติดตาม');
+
+  const { rows: beforeRows } = await dbQuery<FollowRow>(
+    `select * from ${followTable} where id = $1 limit 1`,
+    [id],
+  );
+  const before = beforeRows[0];
+  if (!before) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
+  if (before.cancelled_at) {
+    return sendError(res, 400, 'Bad request', 'รายการนี้ถูกยกเลิกไปแล้ว — ย้อนสถานะปิดงานไม่ได้');
+  }
+  if (!before.completed_at) {
+    return sendError(res, 400, 'Bad request', 'รายการนี้ยังไม่ได้ปิดงาน ไม่มีอะไรให้ย้อน');
+  }
+
+  const { rows } = await dbQuery<FollowRow>(
+    `update ${followTable}
+        set completed_at = null, outcome_code = null, outcome_note = null,
+            completed_by = null, completed_by_name = null,
+            updated_at = now(), updated_by = $2, updated_by_name = $3
+      where id = $1 and cancelled_at is null
+      returning *`,
+    [id, req.user.sub, req.user.email ?? null],
+  );
+  const done = rows[0];
+  if (!done) return sendError(res, 404, 'Not found', 'ย้อนสถานะไม่สำเร็จ');
+
+  await auditFromAuthed(req, {
+    action: 'follow.reopen',
+    entityType: 'follow_entry',
+    entityId: id,
+    before: { outcome_code: before.outcome_code, outcome_note: before.outcome_note },
+    after: { outcome_code: null },
+  });
+
+  return res.status(200).json(toResponse(done));
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
     if (method === 'GET') return await listFollow(req, res);
     if (method === 'POST') return await createFollow(req, res);
     if (method === 'PATCH') {
-      // action='update' = แก้ไข · ไม่ใส่ = ปิดงาน (พฤติกรรมเดิม ห้ามเปลี่ยน)
+      // action='update' = แก้ไข · action='reopen' = ย้อนสถานะปิดงาน
+      // ไม่ใส่ = ปิดงาน (พฤติกรรมเดิม ห้ามเปลี่ยน)
       const body = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>;
-      if (getString(body.action) === 'update') return await updateFollow(req, res, body);
+      const action = getString(body.action);
+      if (action === 'update') return await updateFollow(req, res, body);
+      if (action === 'reopen') return await reopenFollow(req, res);
       return await completeFollow(req, res, body);
     }
     if (method === 'DELETE') return await cancelFollow(req, res);

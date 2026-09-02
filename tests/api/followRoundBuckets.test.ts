@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countFollowRoundBuckets,
   FOLLOW_ROUND_BUCKETS,
+  followRoundSlot,
   inFollowRoundBucket,
   type FollowRoundRow,
 } from '../../src/lib/followRoundBuckets';
@@ -140,5 +141,28 @@ describe('ช่อง "ไป/ไม่ไป" ต้องรับชุด�
     for (const code of FOLLOW_OUTCOME_SUCCESS) {
       expect(inFollowRoundBucket(closed(code), 'went')).toBe(true);
     }
+  });
+});
+
+describe('🔴 แดชบอร์ดการโทร — สายที่คนเลือกไว้ชนะ attempt_count (feedback 2 ก.ย. 2569)', () => {
+  /**
+   * เคสจริงที่ทำให้แดชบอร์ดผิด: โหมด "ระบุเวลาเอง" สร้างหนึ่งแถวต่อหนึ่งรอบ
+   * แต่ละแถวมีคิวของตัวเอง ⇒ attempt_count เป็น 1 หมด ⇒ ทุกรอบไปกองที่ครั้งที่ 1
+   * (วัดฐานจริง 2 ก.ย.: 7 สายขึ้นครั้งที่ 1 ทั้งหมด ทั้งที่เป็นสายที่ 1 สี่ · สายที่ 2 สาม)
+   */
+  it('call_round = 2 แต่ attempt_count = 1 → ต้องอยู่ครั้งที่ 2', () => {
+    expect(followRoundSlot({ call_round: 2, call_attempt: 1, call_status: 'completed' })).toBe(2);
+  });
+
+  it('แถวเก่าที่ไม่มี call_round → ถอยไปใช้ attempt_count เหมือนเดิม', () => {
+    expect(followRoundSlot({ call_attempt: 3, call_status: 'completed' })).toBe(3);
+  });
+
+  it('ยังไม่เคยเข้าคิวและไม่มีผล = ยังไม่อยู่รอบไหน', () => {
+    expect(followRoundSlot({ call_attempt: null, call_status: 'pending', call_outcome: null })).toBeNull();
+  });
+
+  it('เกิน 3 รวบเป็น 3 (เพดานเริ่มต้นคือ 3 ครั้ง)', () => {
+    expect(followRoundSlot({ call_round: 7, call_status: 'completed' })).toBe(3);
   });
 });

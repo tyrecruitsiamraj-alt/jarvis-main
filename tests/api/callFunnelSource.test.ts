@@ -81,8 +81,9 @@ describe('?source= — กรองต้นทางด้วย prefix ขอ�
       res as never,
     );
     const sql = sqlOf(0);
-    expect(sql).toMatch(/created_at >= \$1/);
-    expect(sql).toMatch(/and person_ref like 'follow-%'/);
+    // ⚠️ query นี้ join กับตารางติดตามแล้ว (2 ก.ย. 2569) คอลัมน์จึงต้องมี alias `q.` ครบ
+    expect(sql).toMatch(/q\.created_at >= \$1/);
+    expect(sql).toMatch(/and q\.person_ref like 'follow-%'/);
     expect((sql.match(/\bwhere\b/gi) || []).length).toBe(1);
   });
 

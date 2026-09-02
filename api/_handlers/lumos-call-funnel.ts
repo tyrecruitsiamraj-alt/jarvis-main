@@ -23,6 +23,7 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
+const followTable = tableInAppSchema('follow_entries');
 
 /** ผลโทรที่ถือว่า "คุยติด" — ได้คุยกับคนจริง */
 const CONNECTED_OUTCOMES: readonly string[] = CONNECTED_CALL_OUTCOMES;
@@ -91,10 +92,11 @@ export type HumanCallSummary = {
  */
 export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
 
+/** ⚠️ ระบุ alias `q.` ให้ครบ — query นี้ join กับตารางติดตามแล้ว (2 ก.ย. 2569) คอลัมน์ชื่อซ้ำกันได้ */
 const SOURCE_WHERE: Record<Exclude<CallFunnelSource, 'all'>, string> = {
-  follow: `person_ref like 'follow-%'`,
-  board: `person_ref like 'card-%'`,
-  irecruit: `person_ref like 'ir-%'`,
+  follow: `q.person_ref like 'follow-%'`,
+  board: `q.person_ref like 'card-%'`,
+  irecruit: `q.person_ref like 'ir-%'`,
 };
 
 function isCallFunnelSource(v: string): v is CallFunnelSource {
@@ -207,7 +209,7 @@ async function loadFunnel(
   const conds: string[] = [];
   if (sinceYmd) {
     params.push(`${sinceYmd}T00:00:00+07:00`);
-    conds.push(`created_at >= $${params.length}::timestamptz`);
+    conds.push(`q.created_at >= $${params.length}::timestamptz`);
   }
   // ต้นทางเป็นค่าคงที่จาก allow-list ไม่ใช่ค่าที่ผู้ใช้ส่งมาตรง ๆ (ไม่มีทาง inject)
   if (source !== 'all') conds.push(SOURCE_WHERE[source]);
@@ -217,19 +219,27 @@ async function loadFunnel(
       // อ่าน outcome จาก last_outcome ก่อน · ไม่มีก็ถอยไปดู result->>'outcome'
       // เพราะ last_outcome เป็นคอลัมน์ใหม่ (migration 070) แถวที่มีผลอยู่ก่อนหน้าจะว่าง
       // ถ้าไม่ถอยให้ หน้าเว็บจะโชว์ "มีผลกลับ 458 แต่โทรติด 0" ซึ่งดูเหมือนพัง
-      `select status,
-              coalesce(last_outcome, result->>'outcome') as last_outcome,
-              followup_state,
-              (result is not null) as has_result,
-              (next_attempt_at is not null and next_attempt_at > now()) as scheduled_ahead,
+      `select q.status,
+              coalesce(q.last_outcome, q.result->>'outcome') as last_outcome,
+              q.followup_state,
+              (q.result is not null) as has_result,
+              (q.next_attempt_at is not null and q.next_attempt_at > now()) as scheduled_ahead,
               -- รอบที่โทร — เกิน 3 รวบเป็น 3 เพราะเพดานเริ่มต้นคือ 3 ครั้ง
-              least(greatest(coalesce(attempt_count, 1), 1), 3) as attempt_no,
+              --
+              -- 🔴 งานติดตามใช้ "สายที่เท่าไหร่" ที่คนเลือกไว้ก่อน (follow_entries.call_round
+              -- · migration 113) แล้วค่อยถอยไป attempt_count (แก้ 2 ก.ย. 2569 — feedback
+              -- "แดชบอร์ดการโทรไม่ถูกต้อง") · เหตุ: โหมดระบุเวลาเองสร้างหนึ่งแถวต่อหนึ่งรอบ
+              -- แต่ละแถวมีคิวของตัวเอง attempt_count จึงเป็น 1 หมด ทุกรอบเลยไปกองที่ครั้งที่ 1
+              -- ช่องทางอื่น (จับคู่งาน/iRecruit) ไม่มีแถวติดตามคู่กัน จึงใช้ attempt_count เหมือนเดิม
+              least(greatest(coalesce(f.call_round, q.attempt_count, 1), 1), 3) as attempt_no,
               count(*)::text as n
-         from ${queueTable}
+         from ${queueTable} q
+         left join ${followTable} f
+                on q.person_ref = 'follow-' || f.id::text
          ${sinceClause}
-        group by status, coalesce(last_outcome, result->>'outcome'),
-                 followup_state, has_result, scheduled_ahead,
-                 least(greatest(coalesce(attempt_count, 1), 1), 3)`,
+        group by q.status, coalesce(q.last_outcome, q.result->>'outcome'),
+                 q.followup_state, has_result, scheduled_ahead,
+                 least(greatest(coalesce(f.call_round, q.attempt_count, 1), 1), 3)`,
       params,
     );
 

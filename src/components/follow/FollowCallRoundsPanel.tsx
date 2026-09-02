@@ -3,12 +3,13 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { type FollowEntry } from '@/lib/followApi';
 import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
-import { callAttemptSlot } from '@/lib/callOutcomeBuckets';
+
 import {
   countFollowRoundBuckets,
   FOLLOW_ROUND_BUCKETS,
   FOLLOW_ROUND_BUCKET_HINT,
   FOLLOW_ROUND_BUCKET_LABEL,
+  followRoundSlot,
   inFollowRoundBucket,
   type FollowRoundBucket,
 } from '@/lib/followRoundBuckets';
@@ -144,9 +145,18 @@ export default function FollowCallRoundsPanel({
       [3, []],
     ]);
     for (const e of entries) {
-      // ยังไม่เคยเข้าคิวและยังไม่มีผล = ยังไม่อยู่รอบไหน
-      if (e.call_attempt == null && e.call_status === 'pending' && !e.call_outcome) continue;
-      map.get(callAttemptSlot(e.call_attempt))?.push(e);
+      /**
+       * 🔴 **ใช้ `followRoundSlot` นิยามกลาง** (แก้ 2 ก.ย. 2569 — feedback "แดชบอร์ดการโทรไม่ถูกต้อง")
+       *
+       * ของเดิมอ่านจาก `attempt_count` ของคิวตรง ๆ · โหมด "ระบุเวลาเอง" สร้าง
+       * **หนึ่งแถวต่อหนึ่งรอบ** แต่ละแถวมีคิวของตัวเอง ⇒ `attempt_count` เป็น 1 หมด
+       * **ทุกรอบจึงไปกองที่ "ครั้งที่ 1"** (วัดจริง 2 ก.ย.: 7 สายขึ้นครั้งที่ 1 ทั้งหมด
+       * ทั้งที่จริงเป็นสายที่ 1 สี่ราย · สายที่ 2 สามราย)
+       * ⚠️ ปฏิทินข้างล่างใช้ตัวนี้อยู่แล้ว — ก่อนแก้ แผงกับปฏิทินเลยเถียงกันเอง
+       */
+      const slot = followRoundSlot(e);
+      if (slot === null) continue; // ยังไม่เคยเข้าคิวและยังไม่มีผล = ยังไม่อยู่รอบไหน
+      map.get(slot)?.push(e);
     }
     return map;
   }, [entries]);
