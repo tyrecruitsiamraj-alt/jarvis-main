@@ -10,11 +10,14 @@ import {
   type AppFunctionId,
 } from '@/lib/roleFunctions';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { TONE } from '@/lib/designTokens';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
 
 const RolePermissionsTab: React.FC = () => {
   const { matrix, loading, updateGrant, savingKey } = useRolePermissions();
+  const { realRole, viewAsRole, setViewAsRole } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const groups = functionGroups();
 
@@ -46,6 +49,48 @@ const RolePermissionsTab: React.FC = () => {
         <p>เปิด/ปิดฟังก์ชันให้แต่ละ role — บันทึกทันทีเมื่อสลับ</p>
         <p className="text-xs">ค่าเริ่มต้นตามลำดับ Admin &gt; Supervisor &gt; Staff · เปลี่ยน role ผู้ใช้ได้ที่แท็บ Users</p>
       </div>
+
+      {/* ═══ ลองดูหน้าจอในมุมมองของ role อื่น (เจ้าของสั่ง 2 ก.ย. 2569) ═══
+          *"ทำให้ Admin ดูมุมมองของ Role อื่นได้ จะได้ตรวจสอบว่าที่แก้ไปได้ตามนั้นไหม"*
+          🔴 เขียนไว้ตรง ๆ ว่าเป็นแค่มุมมองจอ — ไม่ได้ลดสิทธิ์จริงฝั่งเซิร์ฟเวอร์ */}
+      {realRole === 'admin' ? (
+        <div className={cn('rounded-xl border p-3', TONE.info.soft)}>
+          <p className="text-sm font-semibold text-foreground">ลองดูหน้าจอในมุมมองของ role อื่น</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            สลับแล้วเมนูและปุ่มทั้งระบบจะเหลือเท่าที่ role นั้นเห็น — ใช้ตรวจว่าที่เพิ่งแก้สิทธิ์ไปได้ผลจริงไหม
+            · <b>เป็นการจำลองหน้าจอเท่านั้น</b> ถ้ากดปุ่ม เซิร์ฟเวอร์ยังทำงานด้วยสิทธิ์ admin ของคุณ
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {(['opl', 'staff', 'supervisor'] as UserRole[]).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setViewAsRole(viewAsRole === r ? null : r)}
+                aria-pressed={viewAsRole === r}
+                className={cn(
+                  'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold uppercase',
+                  viewAsRole === r
+                    ? 'border-transparent bg-primary text-primary-foreground'
+                    : TONE.neutral.outline,
+                )}
+              >
+                {r}
+              </button>
+            ))}
+            {viewAsRole ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setViewAsRole(null)}
+                  className="text-[11px] font-medium text-primary underline"
+                >
+                  กลับเป็น admin
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">

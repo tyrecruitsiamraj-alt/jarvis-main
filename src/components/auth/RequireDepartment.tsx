@@ -10,13 +10,20 @@ import { cn } from '@/lib/utils';
  * (เช่น บัญชี Azure ที่ admin สร้างไว้ก่อน / ย้ายแผนกแล้วยังว่าง)
  */
 const RequireDepartment: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout, setMyDepartment } = useAuth();
+  const { user, logout, setMyDepartment, realRole, viewAsRole } = useAuth();
   const [department, setDepartment] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * 🔴 **ตอน admin สวมมุมมอง role อื่น ห้ามบังคับเลือกแผนก** (เจ้าของสั่ง 2 ก.ย. 2569)
+   * บัญชี admin ส่วนใหญ่ไม่มีแผนก · พอสวมเป็น staff จอเด้งหน้า "เลือกแผนกก่อนใช้งาน"
+   * ซึ่งอยู่นอก AppLayout ⇒ **ไม่มีปุ่มออกจากมุมมอง** และถ้าเผลอกดยืนยัน
+   * จะไปตั้งแผนกให้บัญชี admin จริง ๆ (แก้ข้อมูลจริงเพราะแค่มาลองดูจอ)
+   */
+  const previewing = realRole === 'admin' && Boolean(viewAsRole);
   const needsDepartment =
-    Boolean(user) && user!.role !== 'admin' && !user!.department_code?.trim();
+    Boolean(user) && !previewing && user!.role !== 'admin' && !user!.department_code?.trim();
 
   if (!needsDepartment) return <>{children}</>;
 

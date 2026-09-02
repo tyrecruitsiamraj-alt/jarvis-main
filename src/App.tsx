@@ -12,6 +12,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import RequireDepartment from "@/components/auth/RequireDepartment";
+import ViewAsRoleBanner from "@/components/layout/ViewAsRoleBanner";
 import RequireRole from "@/components/auth/RequireRole";
 
 /** โหลดทีละหน้าเมื่อถูกเรียกใช้ (code-split) — ลดขนาด JS ก้อนแรกให้เปิดแอปเร็วขึ้น */
@@ -93,6 +94,9 @@ const ProtectedRoutes = () => {
   }
   return (
     <RequireDepartment>
+      {/* 🔴 แถบ "กำลังดูมุมมองของ role อื่น" อยู่นอก AppLayout และนอก RequireRole
+          — สวมมุมมองแล้วอาจโดนเด้งไปหน้าที่ไม่มีเมนู ปุ่มออกต้องตามไปด้วยเสมอ */}
+      <ViewAsRoleBanner />
       <AppLayout>
         <RequireRole>
           <Suspense fallback={<PageLoadingFallback />}>

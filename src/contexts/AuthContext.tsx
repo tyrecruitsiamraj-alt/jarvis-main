@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { User, UserRole } from '@/types';
 import { apiFetch } from '@/lib/apiFetch';
 import { clearJobStaffApiCache, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
@@ -24,6 +24,35 @@ interface AuthContextType {
   hasPermission: (requiredRole: UserRole | UserRole[]) => boolean;
   isAuthenticated: boolean;
   bootstrapping: boolean;
+  /**
+   * ═══ ดูหน้าจอในมุมมองของ role อื่น (เจ้าของสั่ง 2 ก.ย. 2569) ═══
+   * *"ทำให้ Admin สามารถดูมุมมองของ Role อื่นได้หน่อย จะได้ตรวจสอบว่าที่แก้ไปได้ตามนั้นไหม"*
+   *
+   * 🔴 **เป็นการจำลอง "หน้าจอ" เท่านั้น ไม่ใช่การสวมสิทธิ์จริง** — โทเคนที่ส่งไปกับทุก
+   * request ยังเป็นของ admin ตัวจริง ⇒ ถ้าเผลอกดปุ่มที่ role นั้นไม่ควรกด **เซิร์ฟเวอร์
+   * จะยอมให้ผ่าน** · จอต้องเตือนตลอดเวลาที่อยู่ในมุมมองนี้ (แถบบนสุดใน AppLayout)
+   * ⚠️ ใช้ได้เฉพาะ admin ตัวจริงเท่านั้น — role อื่นเรียกแล้วไม่มีผล
+   */
+  realRole: UserRole | null;
+  viewAsRole: UserRole | null;
+  setViewAsRole: (role: UserRole | null) => void;
+  /**
+   * แผนกที่อยากเห็นระหว่างสวมมุมมอง (เจ้าของสั่ง 2 ก.ย. 2569:
+   * *"จะเห็นแผนกไหนก็ค่อยไปเลือกตอน Admin เลือกมุมมองเอา"*)
+   *
+   * 🔴 บัญชี admin ส่วนใหญ่ **ไม่มีแผนก** — พอสวมเป็น role อื่นแล้วบังคับเลือกแผนก
+   * จอจะเด้งไปหน้า "เลือกแผนกก่อนใช้งาน" ซึ่งสับสนและเสี่ยงไปตั้งแผนกให้บัญชีจริง
+   * ⇒ เลือกที่นี่แทน · `null` = ดูแบบไม่ระบุแผนก (เหมือน admin)
+   */
+  viewAsDepartment: string | null;
+  setViewAsDepartment: (code: string | null) => void;
+}
+
+const VIEW_AS_KEY = 'jarvis.viewAsRole';
+const VIEW_AS_DEPT_KEY = 'jarvis.viewAsDepartment';
+const VIEWABLE_ROLES: UserRole[] = ['opl', 'staff', 'supervisor', 'admin'];
+function isViewableRole(v: string): v is UserRole {
+  return (VIEWABLE_ROLES as string[]).includes(v);
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -68,6 +97,25 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
+  /**
+   * มุมมองที่ admin กำลังดูอยู่ — เก็บใน sessionStorage เพื่อให้รีเฟรชแล้วยังอยู่ในมุมมองเดิม
+   * (ปิดแท็บ = หลุดออกเอง · ไม่ใช่ของที่ควรค้างข้ามวัน)
+   */
+  const [viewAsRole, setViewAsRoleState] = useState<UserRole | null>(() => {
+    try {
+      const v = sessionStorage.getItem(VIEW_AS_KEY);
+      return v && isViewableRole(v) ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  const [viewAsDepartment, setViewAsDepartmentState] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(VIEW_AS_DEPT_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -331,20 +379,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
+  const realRole = user?.role ?? null;
+  /** สลับมุมมองได้เฉพาะ admin ตัวจริง — เช็คจาก `realRole` ไม่ใช่ role ที่กำลังสวมอยู่ */
+  const setViewAsRole = useCallback(
+    (role: UserRole | null) => {
+      if (realRole !== 'admin') return;
+      setViewAsRoleState(role);
+      try {
+        if (role) sessionStorage.setItem(VIEW_AS_KEY, role);
+        else sessionStorage.removeItem(VIEW_AS_KEY);
+      } catch {
+        /* โหมดส่วนตัวบางเบราว์เซอร์เขียนไม่ได้ — ยังใช้ได้ในแท็บนี้ */
+      }
+    },
+    [realRole],
+  );
+
+  /**
+   * ผู้ใช้ที่ทั้งแอปเห็น — สวม role ที่กำลังดูอยู่ให้ **ที่เดียว** แล้วทุกจุดที่อ่าน
+   * `user.role` (เมนู · route guard · ตารางสิทธิ์) เปลี่ยนตามทันที ไม่ต้องไล่แก้ทีละที่
+   */
+  const setViewAsDepartment = useCallback(
+    (code: string | null) => {
+      if (realRole !== 'admin') return;
+      setViewAsDepartmentState(code);
+      try {
+        if (code) sessionStorage.setItem(VIEW_AS_DEPT_KEY, code);
+        else sessionStorage.removeItem(VIEW_AS_DEPT_KEY);
+      } catch {
+        /* เขียน sessionStorage ไม่ได้ก็ยังใช้ได้ในแท็บนี้ */
+      }
+    },
+    [realRole],
+  );
+
+  const effectiveUser = useMemo<User | null>(() => {
+    if (!user) return null;
+    if (realRole !== 'admin' || !viewAsRole) return user;
+    /**
+     * สวม role + แผนกที่เลือกไว้ — **แผนกใส่เฉพาะตอนสวมมุมมอง** ไม่แตะข้อมูลบัญชีจริง
+     * ไม่ได้เลือกแผนก = ปล่อยตามบัญชีเดิม (admin มักว่าง = เห็นทุกแผนก)
+     */
+    return {
+      ...user,
+      role: viewAsRole,
+      ...(viewAsDepartment ? { department_code: viewAsDepartment } : {}),
+    };
+  }, [user, realRole, viewAsRole, viewAsDepartment]);
+
   const hasPermission = useCallback(
     (requiredRole: UserRole | UserRole[]) => {
-      if (!user) return false;
+      if (!effectiveUser) return false;
       const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-      const userLevel = ROLE_HIERARCHY[user.role];
+      const userLevel = ROLE_HIERARCHY[effectiveUser.role];
       return roles.some((role) => userLevel >= ROLE_HIERARCHY[role]);
     },
-    [user],
+    [effectiveUser],
   );
 
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: effectiveUser,
+        realRole,
+        viewAsRole: realRole === 'admin' ? viewAsRole : null,
+        setViewAsRole,
+        viewAsDepartment: realRole === 'admin' ? viewAsDepartment : null,
+        setViewAsDepartment,
         signIn,
         signInWithDevRole,
         requestMagicLink,
@@ -354,7 +455,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMyDepartment,
         logout,
         hasPermission,
-        isAuthenticated: !!user,
+        isAuthenticated: !!effectiveUser,
         bootstrapping,
       }}
     >
