@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { unitLabel, unitSubLabel } from '@/lib/unitDisplay';
+import { unitLabel } from '@/lib/unitDisplay';
 import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
 import { TONE } from '@/lib/designTokens';
 import { useLocation, useParams } from 'react-router-dom';
@@ -399,7 +399,6 @@ const JobDetailPage: React.FC = () => {
     <div>
       <PageHeader
         title={unitLabel(job)}
-        subtitle={unitSubLabel(job) ? `คู่สัญญา ${unitSubLabel(job)}` : undefined}
         backPath={backPath}
         actions={
           hasPermission('supervisor') ? (

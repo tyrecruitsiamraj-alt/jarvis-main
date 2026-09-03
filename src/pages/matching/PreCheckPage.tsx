@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { unitOneLine, unitTitleText } from '@/lib/unitDisplay';
+import { unitOneLine } from '@/lib/unitDisplay';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
@@ -964,7 +964,7 @@ const PreCheckPage: React.FC = () => {
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between gap-3">
                         <span className="text-muted-foreground shrink-0">หน่วยงาน</span>
-                        <span className="text-right text-foreground" title={unitTitleText(jobDetail)}>
+                        <span className="text-right text-foreground">
                           {unitOneLine(jobDetail) || '-'}
                         </span>
                       </div>

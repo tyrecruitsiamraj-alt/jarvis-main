@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { sitePlaceName, workSiteNameOf } from '../../api/_lib/siamrajUnitName';
-import { unitLabel, unitOneLine, unitSubLabel, unitTitleText } from '../../src/lib/unitDisplay';
+import { unitLabel, unitOneLine } from '../../src/lib/unitDisplay';
 import type { JobRequest } from '../../src/types';
 
 /**
  * ด่านกันเคสจริงที่เจ้าของจับได้ 3 ก.ย. 2569 — ไซต์ `69LBDL0044`
  * คู่สัญญา "บริษัท สมิติเวช ศรีราชา จำกัด (สำนักงานใหญ่)" แต่คนไปทำงาน
- * ที่ "สมิติเวช ชลบุรี" ⇒ จอต้องขึ้นชลบุรีก่อน ห้ามขึ้นศรีราชาเดี่ยว ๆ
+ * ที่ "สมิติเวช ชลบุรี" ⇒ จอต้องขึ้น "สมิติเวช ชลบุรี" **ชื่อเดียว**
  */
 const SMITIVEJ_SITE = 'สมิติเวช ชลบุรี - พขร. (Valet Parking) 4 คน';
 const SMITIVEJ_CUSTOMER = 'บริษัท สมิติเวช ศรีราชา จำกัด (สำนักงานใหญ่)';
@@ -45,7 +45,7 @@ describe('workSiteNameOf — คืน null เมื่อไม่มีข้
     expect(workSiteNameOf(SMITIVEJ_SITE, SMITIVEJ_CUSTOMER)).toBe('สมิติเวช ชลบุรี');
   });
 
-  it('ชื่อซ้ำกัน (ต่างแค่เว้นวรรค/ตัวพิมพ์) ⇒ null ไม่ต้องขึ้นสองบรรทัด', () => {
+  it('ชื่อซ้ำกัน (ต่างแค่เว้นวรรค/ตัวพิมพ์) ⇒ null ใช้ชื่อคู่สัญญาไปเลย', () => {
     expect(workSiteNameOf('krungsri - พขร. 2 คน', 'KRUNGSRI')).toBeNull();
     expect(workSiteNameOf('SO - พนง. 30 คน', 'SO  ')).toBeNull();
   });
@@ -55,31 +55,25 @@ describe('workSiteNameOf — คืน null เมื่อไม่มีข้
   });
 });
 
-describe('ชื่อหน่วยงานบนจอ — จุดทำงานนำ คู่สัญญาตาม', () => {
+describe('ชื่อหน่วยงานบนจอ — โชว์ชื่อเดียว', () => {
   const smitivej = job({ unit_name: SMITIVEJ_CUSTOMER, work_site_name: 'สมิติเวช ชลบุรี' });
 
-  it('บรรทัดแรกคือจุดทำงาน', () => {
+  it('ได้ชื่อจุดทำงาน', () => {
     expect(unitLabel(smitivej)).toBe('สมิติเวช ชลบุรี');
   });
 
-  it('บรรทัดสองคือคู่สัญญา', () => {
-    expect(unitSubLabel(smitivej)).toBe(SMITIVEJ_CUSTOMER);
+  /**
+   * 🔴 ด่านของเจ้าของ (สั่ง 3 ก.ย. 2569): *"เอาแค่ สมิติเวช ชลบุรี มา
+   * ขึ้นคู่สัญญาไม่ต้อง เดี๋ยวงง"* — ชื่อนิติบุคคลห้ามโผล่มาต่อท้ายอีก
+   */
+  it('ห้ามมีชื่อคู่สัญญาปนมาด้วย', () => {
+    expect(unitLabel(smitivej)).not.toContain('ศรีราชา');
+    expect(unitOneLine(smitivej)).toBe('สมิติเวช ชลบุรี');
   });
 
-  it('ที่แคบบรรทัดเดียวต้องมีทั้งคู่ ห้ามทิ้งข้างใดข้างหนึ่ง', () => {
-    expect(unitOneLine(smitivej)).toBe(`สมิติเวช ชลบุรี · ${SMITIVEJ_CUSTOMER}`);
-  });
-
-  it('title บอกด้วยว่าบรรทัดไหนคืออะไร', () => {
-    expect(unitTitleText(smitivej)).toBe(
-      `จุดทำงาน: สมิติเวช ชลบุรี · คู่สัญญา: ${SMITIVEJ_CUSTOMER}`,
-    );
-  });
-
-  it('ไม่มีจุดทำงาน ⇒ เหลือบรรทัดเดียว ไม่มีคำว่า "คู่สัญญา" โผล่', () => {
+  it('ไม่มีจุดทำงาน (ใบขอล่วงหน้า) ⇒ ถอยไปชื่อคู่สัญญา', () => {
     const only = job({ unit_name: 'บริษัท เอ จำกัด' });
     expect(unitLabel(only)).toBe('บริษัท เอ จำกัด');
-    expect(unitSubLabel(only)).toBeNull();
     expect(unitOneLine(only)).toBe('บริษัท เอ จำกัด');
   });
 

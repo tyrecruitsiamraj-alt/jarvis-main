@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { unitSubLabel } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
@@ -1362,13 +1361,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     <h2 className="text-base font-semibold leading-snug text-foreground line-clamp-2 group-hover:text-blue-600 transition-colors">
                       {jobBoardCardTitle(job)}
                     </h2>
-                    {/* คู่สัญญา — จุดทำงานหลายที่ตั้งชื่อเป็นชื่อย่อ (krungsri · SCB · MEGA)
-                        ถ้าไม่มีชื่อบริษัทกำกับ คนนอกทีมอ่านไม่ออกว่าที่ไหน */}
-                    {unitSubLabel(job) ? (
-                      <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-                        คู่สัญญา {unitSubLabel(job)}
-                      </p>
-                    ) : null}
                     {/* ตำแหน่งงานอยู่ใต้ชื่อไซต์ทันที + ไฮไลต์สี (เจ้าของสั่ง 17 ส.ค. 2569:
                         *"ตำแหน่งงานอยู่ใต้ Site งาน และขอไฮไลสีด้วย"*)
                         เดิมตำแหน่งเป็นชิปเทา ๆ ปนอยู่แถวล่างกับประเภทงาน กวาดตาหาไม่เจอ
