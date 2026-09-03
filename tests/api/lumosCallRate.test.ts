@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ageText,
   compareCallRate,
+  stuckLevel,
   summarizeCallRateWindow,
   ymdAddDays,
   type CallRateDay,
@@ -116,6 +118,34 @@ describe('lumosCallRate — เทียบสองช่วง', () => {
     const t = compareCallRate(series, 7, '2026-09-03');
     expect(t.current.sent).toBe(0);
     expect(t.volumeDir).toBe('down');
+  });
+});
+
+describe('lumosCallRate — "ติดตรงไหน" (ห้ามเงียบ)', () => {
+  it('ไม่มีสายค้าง = ok · อ่านไม่ได้ (null) ก็ ok เพื่อให้จอไปเขียนคำเตือนของตัวเอง', () => {
+    expect(stuckLevel({ notDelivered: 0, notDeliveredHours: null, deliveredSilent: 0, deliveredSilentHours: null })).toBe('ok');
+    expect(stuckLevel(null)).toBe('ok');
+  });
+
+  it('เพิ่งเข้าคิว = watch · เกิน 2 ชม. = warn · ค้างข้ามคืน (≥14 ชม.) = alert', () => {
+    const s = (h: number) => ({ notDelivered: 1, notDeliveredHours: h, deliveredSilent: 0, deliveredSilentHours: null });
+    expect(stuckLevel(s(0.3))).toBe('watch');
+    expect(stuckLevel(s(3))).toBe('warn');
+    // เคสจริง 3 ก.ย. 2569: 13 สายค้างตั้งแต่ 2 ก.ย. 16:16 = 21 ชม. ⇒ ต้องแดง
+    expect(stuckLevel(s(21))).toBe('alert');
+  });
+
+  it('เอาขั้นที่ค้างนานสุดเป็นตัวตัดสิน — ขั้นไหนก็ได้', () => {
+    expect(
+      stuckLevel({ notDelivered: 1, notDeliveredHours: 0.5, deliveredSilent: 3, deliveredSilentHours: 28 }),
+    ).toBe('alert');
+  });
+
+  it('คำบอกอายุอ่านแบบคน — นาที/ชั่วโมง/วัน', () => {
+    expect(ageText(null)).toBe('—');
+    expect(ageText(0.5)).toBe('30 นาที');
+    expect(ageText(21)).toBe('21 ชั่วโมง');
+    expect(ageText(72)).toBe('3 วัน');
   });
 });
 

@@ -5,11 +5,14 @@ import DashboardExpandablePanel from '@/components/dashboard/analytics/Dashboard
 import { fetchCallRateSeries } from '@/lib/callFunnelApi';
 import type { CallFunnelSource } from '@/lib/callFunnelApi';
 import {
+  ageText,
   bangkokTodayYmd,
   compareCallRate,
+  stuckLevel,
   ymdAddDays,
   type CallRateDay,
   type CallRateWindow,
+  type CallStuck,
   type TrendDir,
 } from '@/lib/lumosCallRate';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -144,6 +147,78 @@ const TrendLine: React.FC<{
   );
 };
 
+/**
+ * แถบ "ติดตรงไหน" — สายที่ยังไม่มีผลกลับ แยกสองขั้นที่คนละคนต้องแก้
+ *
+ * 🔴 ต้องพูดทุกสภาพ ห้ามเงียบ: ไม่มีค้าง = บอกว่าไม่มี · อ่านไม่ได้ = บอกว่าอ่านไม่ได้
+ * (เงียบแล้วคนอ่านว่า "ปกติ" ซึ่งอาจไม่จริง — บทเรียนเดียวกับ lumosQueueDefs)
+ */
+const StuckStrip: React.FC<{ stuck: CallStuck | null }> = ({ stuck }) => {
+  const level = stuckLevel(stuck);
+  if (!stuck) {
+    return (
+      <div className={cn('rounded-xl border px-3 py-2', TONE.neutral.soft)}>
+        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+          ติดตรงไหน — <span className={TONE.warn.value}>อ่านสถานะสายค้างไม่ได้</span>
+        </p>
+        <p className={cn('text-[11px]', DASH.muted)}>
+          ไม่ได้แปลว่าไม่มีสายค้าง แค่ตอนนี้อ่านไม่ได้ — กดรีเฟรชอีกครั้ง
+        </p>
+      </div>
+    );
+  }
+  if (level === 'ok') {
+    return (
+      <div className={cn('rounded-xl border px-3 py-2', TONE.success.soft)}>
+        <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+          ติดตรงไหน — <span className={TONE.success.value}>ไม่มีสายค้าง</span>
+        </p>
+        <p className={cn('text-[11px]', DASH.muted)}>ทุกสายที่ส่งไปมีผลกลับครบแล้ว</p>
+      </div>
+    );
+  }
+  const tone: ToneKey = level === 'alert' ? 'danger' : level === 'warn' ? 'orange' : 'info';
+  const total = stuck.notDelivered + stuck.deliveredSilent;
+  return (
+    <div className={cn('rounded-xl border px-3 py-2.5', TONE[tone].soft)}>
+      <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
+        ติดตรงไหน —{' '}
+        <span className={TONE[tone].value}>
+          ยังไม่มีผลกลับ {fmtN(total)} สาย
+          {level === 'alert' ? ' · ค้างข้ามคืนแล้ว' : ''}
+        </span>
+      </p>
+      <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+        {stuck.notDelivered > 0 ? (
+          <div className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className={cn('text-sm font-bold tabular-nums', TONE[tone].value)}>
+              {fmtN(stuck.notDelivered)}
+            </span>
+            <span className={cn('text-[11px] font-semibold', DASH.cellStrong)}>ยังไม่ถึงมือ Lumos</span>
+            <span className={cn('text-[11px]', DASH.muted)}>
+              ค้างนานสุด {ageText(stuck.notDeliveredHours)} — สายยังไม่ถูกส่งออกจากระบบเรา (ฝั่งเราต้องดู)
+            </span>
+          </div>
+        ) : null}
+        {stuck.deliveredSilent > 0 ? (
+          <div className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className={cn('text-sm font-bold tabular-nums', TONE[tone].value)}>
+              {fmtN(stuck.deliveredSilent)}
+            </span>
+            <span className={cn('text-[11px] font-semibold', DASH.cellStrong)}>Lumos รับไปแล้ว เงียบ</span>
+            <span className={cn('text-[11px]', DASH.muted)}>
+              ค้างนานสุด {ageText(stuck.deliveredSilentHours)} — ส่งถึงแล้วแต่ยังไม่ส่งผลกลับ (ฝั่ง Lumos ต้องดู)
+            </span>
+          </div>
+        ) : null}
+      </div>
+      <p className={cn('mt-1 text-[10px]', DASH.muted)}>
+        นับสายค้างทั้งหมดตอนนี้ ไม่ใช่แค่ในช่วงที่เลือก · ห้ามโทร 20:00–08:00 สายที่ตั้งไว้ตอนเย็นจึงค้างข้ามคืนได้ตามปกติ
+      </p>
+    </div>
+  );
+};
+
 const LumosCallRatePanel: React.FC = () => {
   // เปิดค้างเป็นค่าเริ่มต้น — เจ้าของสั่งทำแผงนี้เพื่อดูโดยเฉพาะ (แผงอื่นในหน้าเริ่มหุบ)
   const [open, setOpen] = useState(true);
@@ -151,10 +226,15 @@ const LumosCallRatePanel: React.FC = () => {
   const [windowDays, setWindowDays] = useState<(typeof WINDOW_CHOICES)[number]>(7);
   /** undefined = กำลังโหลด · null = อ่านไม่ได้ (ห้ามโชว์ 0) · [] = อ่านได้แต่ไม่มีสาย */
   const [series, setSeries] = useState<CallRateDay[] | null | undefined>(undefined);
+  /** งานค้างตอนนี้ (ไม่ผูกกับช่วงที่เลือก) — null = อ่านไม่ได้ ห้ามแปลว่า "ไม่มีค้าง" */
+  const [stuck, setStuck] = useState<CallStuck | null>(null);
 
   const load = useCallback(() => {
     setSeries(undefined);
-    void fetchCallRateSeries(FETCH_DAYS, source).then(setSeries);
+    void fetchCallRateSeries(FETCH_DAYS, source).then((res) => {
+      setSeries(res ? res.series : null);
+      setStuck(res?.stuck ?? null);
+    });
   }, [source]);
 
   useEffect(() => load(), [load]);
@@ -192,6 +272,9 @@ const LumosCallRatePanel: React.FC = () => {
     if (currentWin.confirmedPct !== null) parts.push(`สำเร็จ ${currentWin.confirmedPct}%`);
     if (trend?.volumeDir === 'up') parts.push('ปริมาณโตขึ้น');
     else if (trend?.volumeDir === 'down') parts.push('ปริมาณลดลง');
+    // งานค้างต้องโผล่บนหัวแผงด้วย — หุบแผงอยู่ก็ต้องเห็นว่ามีของค้าง (ห้ามเงียบ)
+    const stuckTotal = stuck ? stuck.notDelivered + stuck.deliveredSilent : 0;
+    if (stuckTotal > 0) parts.push(`🚩 ค้างไม่มีผลกลับ ${fmtN(stuckTotal)} สาย`);
     return `${parts.join(' · ')} — กดเพื่อดู`;
   })();
 
@@ -306,6 +389,11 @@ const LumosCallRatePanel: React.FC = () => {
           </div>
         ) : trend ? (
           <>
+            {/* 🔴 "ติดตรงไหน" — แถบนี้ต้องพูดทุกครั้ง ไม่ว่าจะมีค้างหรือไม่
+                (เจ้าของสั่ง 3 ก.ย. 2569: "ไม่ต้องการให้ระบบเงียบ") · ไม่ผูกกับช่วงที่เลือก
+                เพราะสายที่ค้างมาสามอาทิตย์ก็ยังเป็นงานค้างของวันนี้ */}
+            <StuckStrip stuck={stuck} />
+
             {/* สรุปช่วงนี้ — เลข + % ต่อถัง (ช่วง = N วันล่าสุดจบวันนี้) */}
             <div>
               <p className={cn('text-[11px] font-semibold', DASH.cellStrong)}>
@@ -346,7 +434,12 @@ const LumosCallRatePanel: React.FC = () => {
                   tone="warn"
                   sub="ไม่รับสาย/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ"
                 />
-                <StatBox label="รอผลกลับ" value={trend.current.pending} tone="neutral" sub="ส่งแล้ว ยังไม่มีผล" />
+                <StatBox
+                  label="รอผลกลับ"
+                  value={trend.current.pending}
+                  tone="neutral"
+                  sub="ส่งแล้ว ยังไม่มีผล — ดูว่าติดขั้นไหนที่แถบบนสุด"
+                />
               </div>
               {trend.current.withResult === 0 && trend.current.sent === 0 ? (
                 <p className={cn('mt-2 text-xs', DASH.muted)}>

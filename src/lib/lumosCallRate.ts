@@ -25,6 +25,46 @@ export type CallRateDay = {
   unreached: number;
 };
 
+/**
+ * "ติดตรงไหน" — สายที่ยังไม่มีผลกลับ แยกตามขั้นที่ค้าง (ดู `loadStuck` ฝั่ง API)
+ * `null` ของชั่วโมง = ไม่มีตัวค้างในขั้นนั้น
+ */
+export type CallStuck = {
+  notDelivered: number;
+  notDeliveredHours: number | null;
+  deliveredSilent: number;
+  deliveredSilentHours: number | null;
+};
+
+/**
+ * ค้างนานแค่ไหนถึงเรียกว่า "มีปัญหา" — เกณฑ์อยู่ที่นี่ที่เดียว
+ * 🔴 ทำไม 2 ชม.: สายปกติได้ผลกลับภายในไม่กี่นาที · แต่ห้ามโทร 20:00–08:00
+ * (`shiftOutOfQuietHours`) ⇒ สายที่ตั้งไว้ตอนเย็นค้างข้ามคืนเป็นเรื่องปกติ
+ * จอจึงบอก "รอ" (เหลือง) ก่อน แล้วค่อยเป็น "ค้างแน่นอน" (แดง) เมื่อเกินหนึ่งคืน
+ */
+export const STUCK_WARN_HOURS = 2;
+export const STUCK_ALERT_HOURS = 14;
+
+/** ระดับความร้อนของงานค้าง — 'ok' = ไม่มีสายค้างเลย */
+export type StuckLevel = 'ok' | 'watch' | 'warn' | 'alert';
+
+export function stuckLevel(stuck: CallStuck | null): StuckLevel {
+  if (!stuck) return 'ok';
+  const worst = Math.max(stuck.notDeliveredHours ?? 0, stuck.deliveredSilentHours ?? 0);
+  if (stuck.notDelivered + stuck.deliveredSilent === 0) return 'ok';
+  if (worst >= STUCK_ALERT_HOURS) return 'alert';
+  if (worst >= STUCK_WARN_HOURS) return 'warn';
+  return 'watch';
+}
+
+/** คำบอกอายุแบบคนอ่าน — ชั่วโมงต่ำกว่า 1 บอกเป็นนาที เกิน 48 บอกเป็นวัน */
+export function ageText(hours: number | null): string {
+  if (hours === null) return '—';
+  if (hours < 1) return `${Math.max(Math.round(hours * 60), 1)} นาที`;
+  if (hours < 48) return `${Math.round(hours)} ชั่วโมง`;
+  return `${Math.round(hours / 24)} วัน`;
+}
+
 /** สรุปหนึ่งช่วงเวลา */
 export type CallRateWindow = {
   fromYmd: string;

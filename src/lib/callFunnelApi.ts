@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { readJsonSafe } from '@/lib/api';
-import type { CallRateDay } from '@/lib/lumosCallRate';
+import type { CallRateDay, CallStuck } from '@/lib/lumosCallRate';
 
 /** งานโทรฝั่ง "คน" (candidate_call_holds) — คู่กับ AI ในแผงเดียว */
 export type HumanCallSummary = {
@@ -89,14 +89,15 @@ export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
 export async function fetchCallRateSeries(
   days: number,
   source: CallFunnelSource = 'all',
-): Promise<CallRateDay[] | null> {
+): Promise<{ series: CallRateDay[]; stuck: CallStuck | null } | null> {
   try {
     const params = new URLSearchParams({ series: 'day', days: String(days) });
     if (source !== 'all') params.set('source', source);
     const r = await apiFetch(`/api/lumos/call-funnel?${params.toString()}`);
     if (!r.ok) return null;
-    const data = await readJsonSafe<{ series?: CallRateDay[] }>(r);
-    return Array.isArray(data?.series) ? data.series : null;
+    const data = await readJsonSafe<{ series?: CallRateDay[]; stuck?: CallStuck | null }>(r);
+    if (!Array.isArray(data?.series)) return null;
+    return { series: data.series, stuck: data?.stuck ?? null };
   } catch {
     return null;
   }

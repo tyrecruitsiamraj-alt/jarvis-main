@@ -21,7 +21,13 @@ import {
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
-import { queueOutcome, queueCancelled } from '../_lib/lumosQueueDefs.js';
+import {
+  queueOutcome,
+  queueCancelled,
+  queuePending,
+  queueWaiting,
+  queueSentAt,
+} from '../_lib/lumosQueueDefs.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const followTable = tableInAppSchema('follow_entries');
@@ -315,6 +321,66 @@ export type CallRateDay = {
   unreached: number;
 };
 
+/**
+ * "ติดตรงไหน" — สายที่ยังไม่มีผลกลับ แยกตามขั้นที่ค้างจริง + อายุของตัวที่ค้างนานสุด
+ *
+ * 🔴 ทำไมต้องแยกสองขั้น (เจ้าของสั่ง 3 ก.ย. 2569: *"ไม่ต้องการให้ระบบเงียบ … หรือติดตรงไหน"*):
+ * "รอผลกลับ" ก้อนเดียวปิดตาคนดู — สองขั้นนี้คนละคนต้องแก้
+ * - `notDelivered` = **ยังไม่ถึงมือ Lumos เลย** (ฝั่งเราค้าง/ตัวส่งไม่วิ่ง)
+ * - `deliveredSilent` = Lumos รับไปแล้วแต่ไม่ส่งผลกลับ (ฝั่งเขาค้าง)
+ *
+ * ⚠️ ไม่ผูกกับช่วงเวลาที่เลือกบนจอโดยตั้งใจ — สายที่ค้างมาสามอาทิตย์ยังเป็นงานค้างวันนี้
+ * ถ้ากรองด้วยช่วง 7 วัน ของเก่าจะหายจากจอเงียบ ๆ ซึ่งคือสิ่งที่กติกานี้ห้าม
+ */
+export type CallStuck = {
+  /** ยังไม่ถึงมือ Lumos (status=pending, ไม่มีผล) */
+  notDelivered: number;
+  /** ค้างนานสุดกี่ชั่วโมง — null เมื่อไม่มีตัวค้าง */
+  notDeliveredHours: number | null;
+  /** Lumos รับไปแล้วแต่ยังไม่ส่งผลกลับ */
+  deliveredSilent: number;
+  deliveredSilentHours: number | null;
+};
+
+async function loadStuck(source: CallFunnelSource): Promise<CallStuck | null> {
+  const conds = source === 'all' ? [] : [SOURCE_WHERE[source]];
+  const where = conds.length ? `where ${conds.join(' and ')}` : '';
+  const pend = queuePending('q');
+  const wait = queueWaiting('q');
+  try {
+    const { rows } = await dbQuery<{
+      not_delivered: string;
+      not_delivered_s: string | null;
+      delivered_silent: string;
+      delivered_silent_s: string | null;
+    }>(
+      `select count(*) filter (where ${pend})::text as not_delivered,
+              max(extract(epoch from (now() - coalesce(q.next_attempt_at, q.created_at))))
+                filter (where ${pend})::text as not_delivered_s,
+              count(*) filter (where ${wait})::text as delivered_silent,
+              max(extract(epoch from (now() - ${queueSentAt('q')})))
+                filter (where ${wait})::text as delivered_silent_s
+         from ${queueTable} q
+         ${where}`,
+      [],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    const hrs = (s: string | null): number | null =>
+      s === null ? null : Math.round((Number(s) / 3600) * 10) / 10;
+    return {
+      notDelivered: Number(r.not_delivered) || 0,
+      notDeliveredHours: hrs(r.not_delivered_s),
+      deliveredSilent: Number(r.delivered_silent) || 0,
+      deliveredSilentHours: hrs(r.delivered_silent_s),
+    };
+  } catch (e) {
+    // อ่านไม่ได้ = null → จอเขียน "อ่านสถานะค้างไม่ได้" ห้ามแปลว่า "ไม่มีสายค้าง"
+    if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return null;
+    throw e;
+  }
+}
+
 async function loadDailySeries(days: number, source: CallFunnelSource): Promise<CallRateDay[]> {
   const params: unknown[] = [days];
   // ขอบซ้ายของช่วง = เที่ยงคืนไทยย้อนหลัง N-1 วัน (รวมวันนี้เป็นวันสุดท้าย)
@@ -397,17 +463,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const rawDays = Number(getQuery(req, 'days').trim());
     const seriesDays = Number.isFinite(rawDays) ? Math.min(Math.max(Math.trunc(rawDays), 1), 120) : 60;
 
-    const [funnel, human, needsHuman, series] = await Promise.all([
+    const [funnel, human, needsHuman, series, stuck] = await Promise.all([
       loadFunnel(sinceYmd, source),
       loadHumanCalls(sinceYmd, source),
       listNeedsHumanQueueItems(100, source === 'all' ? null : source),
       wantSeries ? loadDailySeries(seriesDays, source) : Promise.resolve(null),
+      wantSeries ? loadStuck(source) : Promise.resolve(null),
     ]);
     funnel.human = human;
 
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(
-      series ? { funnel, needsHuman, source, series, seriesDays } : { funnel, needsHuman, source },
+      series
+        ? { funnel, needsHuman, source, series, seriesDays, stuck }
+        : { funnel, needsHuman, source },
     );
   } catch (e) {
     return handleApiError(res, e, 'lumos-call-funnel', { userId: req.user?.sub });
