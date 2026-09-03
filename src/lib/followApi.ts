@@ -139,6 +139,22 @@ export async function cancelFollowEntry(id: string): Promise<void> {
 }
 
 /**
+ * **ลบทิ้งจริง** (admin เท่านั้น — server เป็นด่านตัดสิน)
+ *
+ * เจ้าของสั่ง 3 ก.ย. 2569 ให้มีทางลบข้อมูลช่วงทดลองออกให้หมดจด
+ * ⚠️ คนละเรื่องกับ `cancelFollowEntry` — ยกเลิกยังเห็นบนจอ (เป็นประวัติ)
+ * แต่ลบทิ้งคือหายจริง กู้ไม่ได้ · ลบแถวคิว Lumos ของรายการนั้นให้ด้วย
+ */
+export async function purgeFollowEntry(id: string): Promise<{ queueRowsDeleted: number }> {
+  const r = await apiFetch(`/api/follow?id=${encodeURIComponent(id)}&purge=1`, {
+    method: 'DELETE',
+  });
+  if (!r.ok) throw new Error(await readError(r));
+  const body = (await r.json()) as { queueRowsDeleted?: number };
+  return { queueRowsDeleted: body.queueRowsDeleted ?? 0 };
+}
+
+/**
  * ปิดงานติดตาม (095 · เจ้าของสั่ง 17 ส.ค. 2569 ข้อ 7 ของงานคัดสรร)
  * `outcome_note` บังคับเฉพาะ 'other' — server เป็นด่านตัดสินอีกชั้น
  */

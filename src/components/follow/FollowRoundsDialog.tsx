@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Pencil, Phone, RotateCcw, X } from 'lucide-react';
+import { Building2, Pencil, Phone, RotateCcw, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import {
@@ -53,6 +53,14 @@ const FollowRoundsDialog: React.FC<{
    */
   onReopen: (id: string) => void | Promise<void>;
   onComplete: (id: string, outcome: FollowOutcome, note?: string) => void | Promise<void>;
+  /**
+   * ลบทิ้งจริง — โชว์เฉพาะ admin (เจ้าของสั่ง 3 ก.ย. 2569: *"ทำให้ฉันลบได้หน่อย
+   * เฉพาะฉันนะ เพราะตอนนี้ทดสอบอยู่"*) · `null` = ไม่มีสิทธิ์ ไม่ต้องขึ้นปุ่ม
+   */
+  onPurge: ((id: string) => void | Promise<void>) | null;
+  /** id ที่กดลบแล้วรอยืนยัน — ลบจริงกู้ไม่ได้ ต้องถามซ้ำเสมอ */
+  purgingId: string | null;
+  onAskPurge: (id: string | null) => void;
 }> = ({
   open,
   onClose,
@@ -66,6 +74,9 @@ const FollowRoundsDialog: React.FC<{
   onEdit,
   onComplete,
   onReopen,
+  onPurge,
+  purgingId,
+  onAskPurge,
 }) => {
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? undefined : onClose())}>
@@ -245,6 +256,48 @@ const FollowRoundsDialog: React.FC<{
                   ) : null}
                 </div>
                   </>
+                ) : null}
+                {/* 🔴 ลบทิ้งจริง (admin) — แยกกล่องล่างสุดคนละแถวกับปุ่มทำงานปกติ
+                    เพื่อไม่ให้กดพลาดตอนรีบ · โชว์ได้ทุกสถานะ เพราะแถวขยะช่วงทดลอง
+                    ส่วนใหญ่คือแถวที่ยกเลิก/ปิดไปแล้วซึ่งไม่มีปุ่มอื่นเหลือ */}
+                {onPurge ? (
+                  <div className="mt-2 border-t border-dashed border-border/70 pt-2">
+                    {purgingId === it.id ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground">
+                          ลบแล้วกู้ไม่ได้ ลบเลยไหม
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onPurge(it.id)}
+                          className="inline-flex min-h-[32px] items-center rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {busy ? 'กำลังลบ…' : 'ลบเลย'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onAskPurge(null)}
+                          className={cn(
+                            'inline-flex min-h-[32px] items-center rounded-full border px-2.5 py-1 text-[11px] font-medium',
+                            TONE.neutral.outline,
+                          )}
+                        >
+                          ไม่
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onAskPurge(it.id)}
+                        title="ลบรอบนี้ออกจากระบบถาวร (ผู้ดูแลระบบเท่านั้น)"
+                        className="inline-flex min-h-[32px] items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
+                      >
+                        <Trash2 className="h-3 w-3" aria-hidden />
+                        ลบทิ้ง
+                      </button>
+                    )}
+                  </div>
                 ) : null}
               </li>
             );

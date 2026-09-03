@@ -4,6 +4,7 @@
  * GET    /api/follow            → รายการ + สถานะการโทรจาก Lumos
  * POST   /api/follow            → เพิ่มรายชื่อ (enqueue ให้ Lumos ทันที)
  * DELETE /api/follow?id=<uuid>  → ยกเลิก (soft cancel + ยกเลิกในคิวถ้ายังไม่ถูกดึง)
+ * DELETE /api/follow?id=<uuid>&purge=1 → **ลบทิ้งจริง** (admin เท่านั้น · ล้างข้อมูลทดสอบ)
  */
 import { dbQuery } from '../_lib/postgres.js';
 
@@ -431,6 +432,47 @@ async function cancelFollow(req: AuthedReq, res: ApiRes) {
 }
 
 /**
+ * **ลบทิ้งจริง** — `DELETE /api/follow?id=<uuid>&purge=1`
+ *
+ * เจ้าของสั่ง 3 ก.ย. 2569: *"หน้าการติดตาม ทำให้ฉันลบได้หน่อย เฉพาะฉันนะ
+ * เพราะตอนนี้ทดสอบอยู่"* — ช่วงทดลองมีแถวขยะค้างเยอะ "ยกเลิก" ยังโชว์บนจอ
+ * (ตั้งใจ: ยกเลิกคือประวัติ) จึงต้องมีทางลบให้หายจริง
+ *
+ * 🔴 **admin เท่านั้น** — role อื่นได้ 403 แม้เส้น `follow` จะเปิดถึง staff
+ * 🔴 **ลบแถวคิว Lumos ของรายการนั้นด้วย** ไม่งั้นคิวยังจ่อโทรหาคนจริงทั้งที่ต้นเรื่องหายแล้ว
+ *    (ลบด้วย `person_ref` แบบตรงตัวเป๊ะ ๆ ห้ามใช้ LIKE — `_` เป็นไวลด์การ์ด เคยลบของจริงพลาด)
+ * 🔴 ลบแล้วกู้ไม่ได้ — จดลง audit ก่อนลบเสมอ (เก็บค่าเดิมไว้ใน `before`)
+ */
+async function purgeFollow(req: AuthedReq, res: ApiRes) {
+  if (req.user.role !== 'admin') {
+    return sendError(res, 403, 'Forbidden', 'ลบทิ้งได้เฉพาะผู้ดูแลระบบ (admin)');
+  }
+
+  const id = getString(req.query?.id) ?? '';
+  if (!id) return sendError(res, 400, 'Bad request', 'Query id is required');
+
+  const { rows } = await dbQuery<FollowRow>(`select * from ${followTable} where id = $1`, [id]);
+  const target = rows[0];
+  if (!target) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
+
+  const { rows: removed } = await dbQuery<{ id: string }>(
+    `delete from ${queueTable} where person_ref = $1 returning id`,
+    [`follow-${id}`],
+  );
+
+  await dbQuery(`delete from ${followTable} where id = $1`, [id]);
+
+  await auditFromAuthed(req, {
+    action: 'follow.purge',
+    entityType: 'follow_entry',
+    entityId: id,
+    before: { ...toResponse(target), queueRowsDeleted: removed.length },
+  });
+
+  return res.status(200).json({ purged: true, id, queueRowsDeleted: removed.length });
+}
+
+/**
  * ปิดงานติดตาม (migration 095 · เจ้าของสั่ง 17 ส.ค. 2569) — PATCH /api/follow?id=<uuid>
  *
  * ⚠️ **คนละเรื่องกับ DELETE (ยกเลิก)** — ยกเลิก = ไม่ต้องตามแล้ว ตัดสายทิ้งก่อนถึงวัน ·
@@ -667,7 +709,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (action === 'reopen') return await reopenFollow(req, res);
       return await completeFollow(req, res, body);
     }
-    if (method === 'DELETE') return await cancelFollow(req, res);
+    if (method === 'DELETE') {
+      // purge=1 = ลบทิ้งจริง (admin) · ไม่ใส่ = ยกเลิก (พฤติกรรมเดิม ห้ามเปลี่ยน)
+      const purge = getString(req.query?.purge);
+      if (purge === '1' || purge === 'true') return await purgeFollow(req, res);
+      return await cancelFollow(req, res);
+    }
     return sendError(res, 405, 'Method not allowed', 'Use GET, POST, PATCH or DELETE');
   } catch (e) {
     return handleApiError(res, e, `follow ${method}`, { userId: req.user.sub });

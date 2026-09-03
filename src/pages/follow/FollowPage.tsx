@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
 import {
   Dialog,
@@ -17,6 +18,7 @@ import {
   listFollowEntries,
   createFollowEntry,
   cancelFollowEntry,
+  purgeFollowEntry,
   completeFollowEntry,
   reopenFollowEntry,
   type FollowEntry,
@@ -198,6 +200,9 @@ const FollowPage: React.FC = () => {
   const { user } = useAuth();
   /** เพิ่มเรื่อง/เจ้าหน้าที่ได้เฉพาะ supervisor ขึ้นไป (เจ้าของสั่ง ค่ำ-5) */
   const canManageMasters = user?.role === 'supervisor' || user?.role === 'admin';
+  /** ลบทิ้งจริงได้เฉพาะ admin — ตอนนี้เปิดไว้ให้เจ้าของล้างข้อมูลช่วงทดลอง */
+  const canPurge = user?.role === 'admin';
+  const [purgingId, setPurgingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
@@ -662,6 +667,32 @@ const FollowPage: React.FC = () => {
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * ลบทิ้งจริง — **admin เท่านั้น** (เจ้าของสั่ง 3 ก.ย. 2569: *"ทำให้ฉันลบได้หน่อย
+   * เฉพาะฉันนะ เพราะตอนนี้ทดสอบอยู่"*) · server เป็นด่านตัดสินอีกชั้น
+   *
+   * ⚠️ ปิดป๊อปหลังลบเสมอ — รอบที่เพิ่งลบหายไปจากข้อมูลแล้ว ถ้าเปิดค้างไว้
+   * ป๊อปจะโชว์รอบที่ไม่มีอยู่จริง
+   */
+  const doPurge = async (id: string) => {
+    setBusyId(id);
+    try {
+      const { queueRowsDeleted } = await purgeFollowEntry(id);
+      setPurgingId(null);
+      setOpenCell(null);
+      await reload();
+      toast.success(
+        queueRowsDeleted > 0
+          ? `ลบแล้ว · ยกสายที่จ่อโทรออกจากคิวไป ${queueRowsDeleted} สาย`
+          : 'ลบแล้ว',
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ลบไม่สำเร็จ');
     } finally {
       setBusyId(null);
     }
@@ -1592,6 +1623,9 @@ const FollowPage: React.FC = () => {
         }}
         onComplete={doComplete}
         onReopen={(id) => void doReopen(id)}
+        onPurge={canPurge ? (id) => void doPurge(id) : null}
+        purgingId={purgingId}
+        onAskPurge={setPurgingId}
       />
 
       <BoardPersonPicker
