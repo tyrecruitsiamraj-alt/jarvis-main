@@ -71,7 +71,9 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
       label="ทำงานวันสุดท้าย"
       value={data.lastWorkingDay ? formatYmdDmyBe(data.lastWorkingDay) : undefined}
     />
-    <Field label="ชื่อหน่วยงาน" value={data.unit_name} />
+    {/* จุดทำงาน = ที่คนไปจริง · คู่สัญญา = นิติบุคคลที่เซ็นสัญญา (คนละเรื่อง ห้ามยุบ) */}
+    {data.work_site_name ? <Field label="จุดทำงาน" value={data.work_site_name} /> : null}
+    <Field label={data.work_site_name ? 'คู่สัญญา' : 'ชื่อหน่วยงาน'} value={data.unit_name} />
     {/* ⚠️ ห้าม fallback ไปชื่อหน่วยงาน — เหตุผลอยู่หัวไฟล์ */}
     <Field label="รหัสไซต์" value={data.site_code} />
     <Field label="สถานที่ปฏิบัติงาน" value={data.work_place} />

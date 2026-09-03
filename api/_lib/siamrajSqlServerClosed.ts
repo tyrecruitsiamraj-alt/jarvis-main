@@ -1,4 +1,5 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import { workSiteNameOf } from './siamrajUnitName';
 import { toBangkokYmd } from './businessDate.js';
 import {
   effectiveInformedCount,
@@ -98,6 +99,7 @@ function mapClosedRow(r: ClosedRow) {
     readOnly: true,
     request_no: requestNo,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
+    work_site_name: workSiteNameOf(r.site_name, r.customer_name?.trim() || r.site_name),
     site_code: r.site_code || undefined,
     department_code: r.department_code?.trim() || undefined,
     location_address: r.site_name || r.site_code || '',

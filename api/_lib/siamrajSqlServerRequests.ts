@@ -1,4 +1,5 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import { workSiteNameOf } from './siamrajUnitName';
 import {
   openStaffingRequestWhereSql,
   effectiveInformQtySql,
@@ -227,6 +228,8 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
       new Date().toISOString().slice(0, 10),
     lastWorkingDay: toYmd(r.resign_date) || undefined,
     unit_name: r.customer_name?.trim() || r.site_name || r.site_code || '—',
+    // จุดทำงานจริง — โชว์คู่กับชื่อคู่สัญญา (ดู siamrajUnitName.ts)
+    work_site_name: workSiteNameOf(r.site_name, r.customer_name?.trim() || r.site_name),
     site_code: r.site_code || undefined,
     position_units: breakdown.remainingPositions > 0 ? breakdown.remainingPositions : undefined,
     request_positions: breakdown.requestPositions,

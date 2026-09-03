@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { unitOneLine } from '@/lib/unitDisplay';
 import type { JobRequest } from '@/types';
 import {
   Dialog,
@@ -674,7 +675,7 @@ const EditPublicJobFieldsDialog: React.FC<{
           <DialogTitle className="text-base">แก้ข้อมูลที่จะขึ้นประกาศ</DialogTitle>
           <DialogDescription className="text-xs">
             {job.request_no ? `${job.request_no} · ` : ''}
-            {job.unit_name} — แก้แล้วมีผลเฉพาะหน้าประกาศสาธารณะ ไม่ได้แก้ข้อมูลใน ERP
+            {unitOneLine(job)} — แก้แล้วมีผลเฉพาะหน้าประกาศสาธารณะ ไม่ได้แก้ข้อมูลใน ERP
           </DialogDescription>
         </DialogHeader>
 

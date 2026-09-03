@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { unitOneLine } from '@/lib/unitDisplay';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -39,7 +40,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
   const roleLabel = positionParts || JOB_TYPE_LABELS[j.job_type];
   return {
     id: j.id,
-    title: j.request_no ? `${j.unit_name} (${j.request_no})` : j.unit_name,
+    title: j.request_no ? `${unitOneLine(j)} (${j.request_no})` : unitOneLine(j),
     subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)} • ${jobPositionUnits(j)} ตำแหน่ง`,
     badge,
     badgeVariant,
@@ -231,7 +232,7 @@ const JobDashboard: React.FC = () => {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>
-                      {j.request_no ? `${j.unit_name} · ${j.request_no}` : j.unit_name}
+                      {j.request_no ? `${unitOneLine(j)} · ${j.request_no}` : unitOneLine(j)}
                     </span>
                     <div className="flex items-center gap-2">
                       {/* ชื่อ action ของใบขอ = "กำลังดำเนินการ" → primary ตาม token กลาง */}

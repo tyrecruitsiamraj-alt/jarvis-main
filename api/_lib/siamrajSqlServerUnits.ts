@@ -1,4 +1,5 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import { workSiteNameOf } from './siamrajUnitName';
 import { sqlServerDepartmentScopeClause, type DepartmentScope } from './departmentScope.js';
 import { toBangkokYmd } from './businessDate.js';
 
@@ -108,6 +109,8 @@ export async function listSiamrajSqlServerUnits(options: {
       return {
         siteCode,
         unitName,
+        // จุดทำงานจริง (ตัดหางตำแหน่ง/จำนวนคน) — ตัวเลือกหน่วยงานจะได้ไม่ชี้ผิดสาขา
+        workSiteName: workSiteNameOf(r.site_name, unitName),
         departmentCode: (r.department_code || '').trim() || null,
         openRequests: Number(r.open_cnt) || 0,
         totalRequests: Number(r.total_cnt) || 0,

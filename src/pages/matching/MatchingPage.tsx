@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { unitOneLine } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import Term from '@/components/shared/Term';
 import { incomeDisplay } from '@/lib/incomeLabel';
@@ -4835,7 +4836,7 @@ const MatchingPage: React.FC = () => {
             <DialogTitle className="text-base">น้ำหนักเรียงผู้สมัครของใบนี้</DialogTitle>
             <DialogDescription className="text-xs">
               {jobDetail?.request_no ? `${jobDetail.request_no} · ` : ''}
-              {jobDetail?.unit_name ?? ''}
+              {jobDetail ? unitOneLine(jobDetail) : ''}
             </DialogDescription>
           </DialogHeader>
           {jobDetail ? <MatchPriorityWeightsTab requestNo={jobDetail.id} /> : null}

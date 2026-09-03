@@ -21,6 +21,7 @@ import {
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
+import { queueOutcome, queueCancelled } from '../_lib/lumosQueueDefs.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const followTable = tableInAppSchema('follow_entries');
@@ -287,6 +288,84 @@ async function loadFunnel(
   return funnel;
 }
 
+/**
+ * ยอดโทรรายวัน (นับตามวันที่ส่งเข้าคิว โซนไทย) — มิติเวลาของ funnel สำหรับแผง
+ * "Rate ผลการโทร Lumos" บนแดชบอร์ด · ผลของสายผูกกับวันที่ส่ง (cohort) ไม่ใช่วันที่ผลกลับ
+ * อ่านว่า "สายที่ส่งวันนั้น สุดท้ายผลเป็นยังไง"
+ *
+ * ⚠️ `withResult` ที่นี่**หักสายยกเลิกออกแล้ว** (นิยามฐาน % ของ callFunnelMath)
+ * ต่างจาก funnel ก้อนบนที่ withResult รวมทุกแถวที่มีผล — ที่นี่แยก `cancelled` ให้ดูต่างหาก
+ */
+export type CallRateDay = {
+  /** วันที่ส่ง (YYYY-MM-DD โซนไทย) */
+  day: string;
+  /** ส่งเข้าคิวทั้งหมดวันนั้น (รวมที่ยกเลิกทีหลัง) */
+  queued: number;
+  /** ถูกยกเลิก — ไม่เคยถูกโทร ห้ามนับเป็นฐานของ % */
+  cancelled: number;
+  /** มีผลจริง (หักยกเลิกแล้ว) — ฐานของทุก % */
+  withResult: number;
+  /** คุยกับคนได้ (รวมที่ปฏิเสธ) */
+  connected: number;
+  /** ตอบยืนยัน/สนใจ */
+  confirmed: number;
+  /** ปฏิเสธ (ไม่สนใจ/ไม่ไปแล้ว) */
+  declined: number;
+  /** โทรแล้วไม่ถึงตัว (ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ) */
+  unreached: number;
+};
+
+async function loadDailySeries(days: number, source: CallFunnelSource): Promise<CallRateDay[]> {
+  const params: unknown[] = [days];
+  // ขอบซ้ายของช่วง = เที่ยงคืนไทยย้อนหลัง N-1 วัน (รวมวันนี้เป็นวันสุดท้าย)
+  const conds = [
+    `q.created_at >= date_trunc('day', now() at time zone 'Asia/Bangkok')::timestamp at time zone 'Asia/Bangkok' - make_interval(days => $1 - 1)`,
+  ];
+  if (source !== 'all') conds.push(SOURCE_WHERE[source]);
+  const outcome = queueOutcome('q');
+  const cancelled = queueCancelled('q');
+  try {
+    const { rows } = await dbQuery<{
+      day: string;
+      queued: string;
+      cancelled: string;
+      with_result: string;
+      connected: string;
+      confirmed: string;
+      declined: string;
+      unreached: string;
+    }>(
+      `select to_char(q.created_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD') as day,
+              count(*)::text as queued,
+              count(*) filter (where ${cancelled})::text as cancelled,
+              count(*) filter (where ${outcome} is not null and not ${cancelled})::text as with_result,
+              count(*) filter (where ${outcome} in ('confirmed','acknowledged','declined','reschedule_requested') and not ${cancelled})::text as connected,
+              count(*) filter (where ${outcome} = 'confirmed' and not ${cancelled})::text as confirmed,
+              count(*) filter (where ${outcome} = 'declined' and not ${cancelled})::text as declined,
+              count(*) filter (where ${outcome} in ('no_answer','busy','unresponsive','failed') and not ${cancelled})::text as unreached
+         from ${queueTable} q
+        where ${conds.join(' and ')}
+        group by 1
+        order by 1`,
+      params,
+    );
+    return rows.map((r) => ({
+      day: r.day,
+      queued: Number(r.queued) || 0,
+      cancelled: Number(r.cancelled) || 0,
+      withResult: Number(r.with_result) || 0,
+      connected: Number(r.connected) || 0,
+      confirmed: Number(r.confirmed) || 0,
+      declined: Number(r.declined) || 0,
+      unreached: Number(r.unreached) || 0,
+    }));
+  } catch (e) {
+    // ตาราง/คอลัมน์ยังไม่ migrate → ซีรีส์ว่าง แผงโชว์ "ยังไม่มีข้อมูล" ไม่พัง
+    if (isPgUndefinedTable(e) || isUndefinedColumn(e)) return [];
+    throw e;
+  }
+}
+
 function isUndefinedColumn(e: unknown): boolean {
   return (
     typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703'
@@ -312,15 +391,24 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // ค่าที่ไม่รู้จัก = ทั้งระบบ (พฤติกรรมเดิม) ไม่ใช่ error — ลิงก์เก่ายังใช้ได้
     const source: CallFunnelSource = isCallFunnelSource(rawSource) ? rawSource : 'all';
 
-    const [funnel, human, needsHuman] = await Promise.all([
+    // มิติเวลา (แผง Rate บนแดชบอร์ด) — ขอเมื่อส่ง ?series=day เท่านั้น หน้าที่ใช้ funnel
+    // ก้อนเดิมไม่ต้องจ่ายค่า query เพิ่ม · days ควบ 1-120 (ค่าเพี้ยน = ค่าตั้งต้น 60)
+    const wantSeries = getQuery(req, 'series').trim() === 'day';
+    const rawDays = Number(getQuery(req, 'days').trim());
+    const seriesDays = Number.isFinite(rawDays) ? Math.min(Math.max(Math.trunc(rawDays), 1), 120) : 60;
+
+    const [funnel, human, needsHuman, series] = await Promise.all([
       loadFunnel(sinceYmd, source),
       loadHumanCalls(sinceYmd, source),
       listNeedsHumanQueueItems(100, source === 'all' ? null : source),
+      wantSeries ? loadDailySeries(seriesDays, source) : Promise.resolve(null),
     ]);
     funnel.human = human;
 
     res.setHeader?.('Cache-Control', 'no-store');
-    return res.status(200).json({ funnel, needsHuman, source });
+    return res.status(200).json(
+      series ? { funnel, needsHuman, source, series, seriesDays } : { funnel, needsHuman, source },
+    );
   } catch (e) {
     return handleApiError(res, e, 'lumos-call-funnel', { userId: req.user?.sub });
   }

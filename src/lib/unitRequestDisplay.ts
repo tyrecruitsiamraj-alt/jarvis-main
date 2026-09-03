@@ -1,4 +1,5 @@
 import type { JobRequest } from '@/types';
+import { unitLabel } from '@/lib/unitDisplay';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
 import { unitSectorLabel } from '@/lib/unitSector';
 
@@ -20,7 +21,18 @@ export function unitRequestCardTitle(job: JobRequest): string {
 
 /** หัวข้อการ์ดบอร์ดรับสมัคร — โชว์ชื่อหน่วยงานก่อน */
 export function jobBoardCardTitle(job: JobRequest): string {
-  return job.unit_name?.trim() || job.request_no?.trim() || '—';
+  /**
+   * 🔴 **จุดทำงานนำ** (เจ้าของสั่งแก้ทั้งระบบ 3 ก.ย. 2569) — ก่อนหน้านี้ใช้ชื่อ
+   * นิติบุคคลคู่สัญญา ทำให้ไซต์ `69LBDL0044` ขึ้นว่า "สมิติเวช ศรีราชา" ทั้งที่คน
+   * ต้องไปทำงานที่ **สมิติเวช ชลบุรี** (สาขาชลบุรีจดทะเบียนใต้บริษัทศรีราชา)
+   *
+   * ⚠️ หัวข้อนี้เป็นตัวที่ **ตัวเลือกหน่วยงานของงานติดตาม** หยิบไปเก็บเป็น
+   * `follow_entries.unit_name` แล้ว AI พูดออกเสียงตอนโทรว่า *"ไปทำงาน หน่วยงาน …"*
+   * ⇒ พูดชื่อจุดทำงานถูกกว่าพูดชื่อบริษัทแม่
+   */
+  const label = unitLabel(job);
+  if (label && label !== '—') return label;
+  return job.request_no?.trim() || '—';
 }
 
 /** บรรทัดรองใต้หัวข้อ */

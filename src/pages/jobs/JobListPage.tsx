@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { unitLabel, unitSubLabel, unitTitleText } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -412,7 +413,7 @@ const JobListPage: React.FC = () => {
       })
       .filter((j) => {
         if (requestNoMatchesSearch(q, j.request_no)) return true;
-        return `${j.unit_name} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${jobSectorLabel(j)} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
+        return `${j.unit_name} ${j.work_site_name || ''} ${j.request_no || ''} ${j.department_code || ''} ${j.department_name || ''} ${j.location_address} ${j.request_action_name || ''} ${j.job_description_code_1 || ''} ${j.job_description_code_2 || ''} ${j.list_note || ''} ${JOB_TYPE_LABELS[j.job_type]} ${jobSectorLabel(j)} ${j.resigned_employee_name || ''} ${j.submittedByName || ''} ${j.recruiter_name || ''} ${j.screener_name || ''} ${j.opl_name || ''}`
           .toLowerCase()
           .includes(q);
       })
@@ -811,7 +812,12 @@ const JobListPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="text-xs font-medium text-foreground/90">{j.unit_name}</div>
+                  {/* 🔴 จุดทำงานนำ · คู่สัญญาตาม (เจ้าของสั่งแก้ทั้งระบบ 3 ก.ย. 2569
+                      หลังเจอ "สมิติเวช ศรีราชา" ขึ้นจอทั้งที่คนไปทำงานที่ชลบุรี) */}
+                  <div className="text-xs font-medium text-foreground/90">{unitLabel(j)}</div>
+                  {unitSubLabel(j) ? (
+                    <div className="text-[11px] text-muted-foreground">คู่สัญญา {unitSubLabel(j)}</div>
+                  ) : null}
 
                   <div className="text-xs text-muted-foreground mt-1">
                     {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
@@ -1005,7 +1011,14 @@ const JobListPage: React.FC = () => {
                         ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline
                         บน <html> จนไม่สลับตามธีมนั้น แก้แล้วที่ brandingStorage.applyBrandSurfaceVars()
                         และมีเทสต์คุมที่ tests/api/brandingSurfaceTheme.test.ts */}
-                    <td className={cn('px-1.5 py-3 text-xs', DASH.cell)}>{j.unit_name || '—'}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cell)} title={unitTitleText(j)}>
+                      {unitLabel(j)}
+                      {unitSubLabel(j) ? (
+                        <span className="block text-[10px] text-muted-foreground">
+                          คู่สัญญา {unitSubLabel(j)}
+                        </span>
+                      ) : null}
+                    </td>
                     {/* ราชการ/เอกชน — **อ่านอย่างเดียว** (เจ้าของสั่ง 25 ส.ค. 2569:
                         *"เอาไปบอกด้วยว่าเป็นอะไร แต่ถ้าจะเลือกต้องมาเลือกข้างใน"*)
                         ⚠️ ห้ามเอา dropdown กลับมาที่นี่ — เคยอยู่ตรงนี้แล้วเจ้าของสั่งย้ายออก (รอบ 39) */}

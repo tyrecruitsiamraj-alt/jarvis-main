@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
 import { readJsonSafe } from '@/lib/api';
+import type { CallRateDay } from '@/lib/lumosCallRate';
 
 /** งานโทรฝั่ง "คน" (candidate_call_holds) — คู่กับ AI ในแผงเดียว */
 export type HumanCallSummary = {
@@ -79,6 +80,27 @@ export const EMPTY_FUNNEL: CallFunnel = {
  * (หน้า Follow เคยโชว์ยอดทั้งระบบ ทั้งที่หน้านั้นส่งเองแค่ 1 คน)
  */
 export type CallFunnelSource = 'all' | 'follow' | 'board' | 'irecruit';
+
+/**
+ * ยอดโทรรายวันย้อนหลัง (นับตามวันที่ส่ง โซนไทย) — เส้นเดียวกับ funnel แค่ขอมิติเวลาเพิ่ม
+ * ใช้กับแผง "Rate ผลการโทร Lumos" บนแดชบอร์ด
+ * ⚠️ โหลดพลาด = คืน null (ให้จอเขียน "อ่านตัวเลขไม่ได้") — **ห้ามคืน [] แล้วดูเหมือนไม่มีสาย**
+ */
+export async function fetchCallRateSeries(
+  days: number,
+  source: CallFunnelSource = 'all',
+): Promise<CallRateDay[] | null> {
+  try {
+    const params = new URLSearchParams({ series: 'day', days: String(days) });
+    if (source !== 'all') params.set('source', source);
+    const r = await apiFetch(`/api/lumos/call-funnel?${params.toString()}`);
+    if (!r.ok) return null;
+    const data = await readJsonSafe<{ series?: CallRateDay[] }>(r);
+    return Array.isArray(data?.series) ? data.series : null;
+  } catch {
+    return null;
+  }
+}
 
 /** โหลดพลาด/ยังไม่ migrate = ศูนย์ทั้งชุด ไม่ให้หน้า Follow พัง */
 export async function fetchCallFunnel(

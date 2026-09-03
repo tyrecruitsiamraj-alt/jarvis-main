@@ -239,6 +239,15 @@ export interface JobRequest {
   resigned_reason?: string;
   resigned_employee_name?: string;
   unit_name: string;
+  /**
+   * จุดทำงานจริงจาก ERP (`ms_site.site_name` ตัดหางตำแหน่ง/จำนวนคน) — โชว์คู่กับ
+   * `unit_name` ที่เป็น**นิติบุคคลคู่สัญญา** · `null` เมื่อชื่อซ้ำกันหรือไม่มีข้อมูล
+   *
+   * 🔴 เจอของจริง: ไซต์ `69LBDL0044` คู่สัญญาคือ "สมิติเวช ศรีราชา" แต่คนไปทำงานที่
+   * **สมิติเวช ชลบุรี** ⇒ ชื่อคู่สัญญาตอบไม่ได้ว่าไปที่ไหน
+   * ห้ามเอาช่องนี้ไปแทน `unit_name` ในตรรกะใด ๆ — `unit_name` เป็นกุญแจแมตช์ WL
+   */
+  work_site_name?: string | null;
   request_date: string;
   required_date: string;
   urgency: JobUrgency;

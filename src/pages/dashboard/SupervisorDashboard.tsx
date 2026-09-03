@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardShell from '@/components/dashboard/analytics/DashboardShell';
+import LumosCallRatePanel from '@/components/dashboard/LumosCallRatePanel';
 import DetailListDialog from '@/components/shared/DetailListDialog';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
@@ -920,6 +921,9 @@ const SupervisorDashboard: React.FC = () => {
       onRecruiterPanelOpen={requestClosedTotals}
       closedTotalsLoading={closedAllLoading}
       onRecruiterClick={DEMO_MODE ? undefined : handleRecruiterClick}
+      /* Rate ผลการโทร Lumos — เรื่องการโทร แยกก้อนจากเลขใบขอ (นิยามห้ามปน)
+         แผงดึงข้อมูลเอง ไม่โดน filter/ช่วงวันของแดชบอร์ด */
+      extraPanels={DEMO_MODE ? undefined : <LumosCallRatePanel />}
     />
     <DetailListDialog
       open={detailDialogOpen}
