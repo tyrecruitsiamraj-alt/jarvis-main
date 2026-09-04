@@ -34,6 +34,8 @@ import azureAdCallbackHandler from './auth/azure-ad-callback.js';
 import publicJobsHandler from './public/jobs.js';
 import publicApplyHandler from './public/apply.js';
 import publicApplyLinkHandler from './public/apply-link.js';
+import publicClickHandler from './public/click.js';
+import publicClickStatsHandler from './public-click-stats.js';
 import recruitChannelsHandler from './recruit-channels.js';
 import recruitPostingsHandler from './recruit-postings.js';
 import recruitReasonsHandler from './recruit-reasons.js';
@@ -186,6 +188,9 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,
+  // นับคลิกหน้าสาธารณะ — ไม่ต้องล็อกอิน · คืน 204 เสมอ (ดู public/click.ts)
+  '/api/public/click': publicClickHandler as ApiHandler,
+  '/api/public-click-stats': publicClickStatsHandler as ApiHandler,
   '/api/recruit/channels': recruitChannelsHandler as ApiHandler,
   '/api/recruit/postings': recruitPostingsHandler as ApiHandler,
   '/api/recruit/reasons': recruitReasonsHandler as ApiHandler,

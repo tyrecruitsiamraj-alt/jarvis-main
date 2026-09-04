@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { trackPublicClick } from '@/lib/publicClickApi';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -219,6 +220,11 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
         throw new Error(body?.message || 'ส่งใบสมัครไม่สำเร็จ กรุณาลองใหม่');
       }
       setSubmitted(true);
+      // แท็กว่าใบนี้มีคนส่งใบสมัครจริง — คู่กับยอด "กดสมัคร" จะได้รู้ว่ากดแล้วส่งจริงกี่ %
+      trackPublicClick('submit', {
+        jobRef: job?.id ?? null,
+        postingId: posting?.postingId ?? null,
+      });
       resetForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ส่งใบสมัครไม่สำเร็จ กรุณาลองใหม่');

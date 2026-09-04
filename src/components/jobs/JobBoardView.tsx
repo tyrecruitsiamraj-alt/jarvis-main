@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { trackPublicClick } from '@/lib/publicClickApi';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { JobRequest } from '@/types';
@@ -22,7 +23,7 @@ import {
   dataAgeLabel,
   type FeedState,
 } from '@/lib/boardDataState';
-import { httpStatusOf } from '@/lib/apiFetch';
+import { apiFetch, httpStatusOf } from '@/lib/apiFetch';
 import { extractJobSubtypeLabel } from '@/lib/siamrajUnitFilters';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { EM_DASH, dashIfEmpty } from '@/lib/displayFallback';
@@ -723,10 +724,48 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  /**
+   * ยอดคลิก **บนหน้าสาธารณะ** รายใบ (เจ้าของถาม 3 ก.ย. 2569 ว่าแท็กคลิกได้ไหม)
+   * — คนละตัวกับ "คลิกลิงก์ช่องทาง" ที่มีอยู่แล้ว: อันนั้นคือกดลิงก์เข้ามา
+   * อันนี้คือเข้ามาแล้ว **กดสมัคร / ส่งใบสมัครจริง**
+   * 🔴 เส้นภายใน — `/apply` ห้ามยิง (ไฟล์นี้ใช้ร่วมสองหน้า)
+   */
+  const [publicClicks, setPublicClicks] = useState<Map<string, { apply: number; submit: number }>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    if (!isStaff) return;
+    let alive = true;
+    void apiFetch('/api/public-click-stats?days=30')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { rows?: { jobRef: string | null; action: string; hits: number }[] } | null) => {
+        if (!alive || !d?.rows) return;
+        const m = new Map<string, { apply: number; submit: number }>();
+        for (const row of d.rows) {
+          if (!row.jobRef) continue;
+          const cur = m.get(row.jobRef) ?? { apply: 0, submit: 0 };
+          if (row.action === 'open_apply') cur.apply += row.hits;
+          if (row.action === 'submit') cur.submit += row.hits;
+          m.set(row.jobRef, cur);
+        }
+        setPublicClicks(m);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [isStaff]);
+
   const [applyOpen, setApplyOpen] = useState(false);
   const [applyJob, setApplyJob] = useState<JobRequest | null>(null);
 
   const openApply = (job: JobRequest | null = null) => {
+    /**
+     * 🔴 **แท็กคลิกเฉพาะหน้าสาธารณะ** (เจ้าของถาม 3 ก.ย. 2569) — ไฟล์นี้ใช้ร่วมสองหน้า
+     * เจ้าหน้าที่กดดูใบขอในระบบ **ไม่ใช่** คนสนใจงาน ถ้านับปนกันเลขจะโป่งด้วยการกดของทีมเราเอง
+     */
+    if (!isStaff) trackPublicClick('open_apply', { jobRef: job?.id ?? null });
     setApplyJob(job);
     setApplyOpen(true);
   };
@@ -1540,6 +1579,21 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     {postingsReady && postedJobIds.has(job.id) ? (
                       <span className={cn('self-start', TONE.success.chip)}>✓ ปล่อยลิงก์แล้ว</span>
                     ) : null}
+                    {/* ยอดคลิกบนหน้าสมัครสาธารณะ 30 วัน — ขึ้นเฉพาะใบที่มีคนกดจริง
+                        (ใบที่ยังไม่มีใครกดไม่ต้องขึ้นชิป 0 · ชิปที่ขึ้นทุกใบไม่ใช่สัญญาณ) */}
+                    {(() => {
+                      const c = publicClicks.get(job.id);
+                      if (!c || c.apply === 0) return null;
+                      return (
+                        <span
+                          className={cn('self-start', TONE.info.chip)}
+                          title="นับจากหน้าสมัครงานสาธารณะ 30 วันล่าสุด — กดปุ่มสมัคร / ส่งใบสมัครจริง"
+                        >
+                          กดสมัคร {c.apply.toLocaleString('th-TH')}
+                          {c.submit > 0 ? ` · ส่งจริง ${c.submit.toLocaleString('th-TH')}` : ''}
+                        </span>
+                      );
+                    })()}
                     {/* ชิปช่องทางที่ปล่อยลิงก์ไว้ + ยอดคลิก (mockup rev.3 ข้อ 04) */}
                     {(channelsByJob.get(job.id) ?? []).length > 0 ? (
                       <div className="flex flex-wrap gap-1.5">
