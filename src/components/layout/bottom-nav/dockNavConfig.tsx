@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, UserCheck, } from 'lucide-react';
+import { CalendarDays, Search, Users, Briefcase, BarChart3, PhoneForwarded, UserCheck } from 'lucide-react';
+import { CONVEYOR_HOME, CONVEYOR_STEPS } from '@/lib/soRecruitNav';
 import type { UserRole } from '@/types';
 import type { AppFunctionId } from '@/lib/roleFunctions';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
@@ -24,15 +25,50 @@ export type DockNavItem = {
  * (`applyNavPreferences` ใน src/lib/navPreferences.ts) · แก้ตรงนี้ = เปลี่ยนค่าตั้งต้น
  * ของคนที่ยังไม่เคยตั้งเอง ไม่ทับค่าที่แอดมินตั้งไว้แล้ว
  */
+/**
+ * 🔴 **ชื่อ+ไอคอนของหน้าเดียวกันต้องตรงกันทุกเมนู** (แก้ 4 ก.ย. 2569 หลังเจ้าของ
+ * ให้ไล่ตรวจไอคอนทั้งระบบ) — เดิมลิสต์นี้ตั้งชื่อ/ไอคอนของตัวเอง ทำให้หน้าเดียวกัน
+ * มีสองชื่อสองไอคอน แล้วแต่ว่าดูจากเมนูไหน (วัดจริง 4 ก.ย.):
+ *   `/jobs/list` → แถบซ้ายว่า **"ใบขอ"** (คลิปบอร์ด) · ลิสต์นี้ว่า **"หน่วยงาน"** (กระเป๋า)
+ *   `/follow` → **"ติดตาม"** vs **"Follow"** (คนละภาษาด้วย)
+ *   `/matching/candidates` → **"คลังคน"** vs **"ผู้สมัคร"**
+ * ⇒ ยกป้าย/ไอคอนมาจาก `soRecruitNav` ที่เดียว · เหลือแค่ path/สิทธิ์ที่นี่
+ * มีเทสต์คุมว่าห้ามแตกกันอีก
+ */
+const STEP = Object.fromEntries(CONVEYOR_STEPS.map((s) => [s.path, s])) as Record<
+  string,
+  (typeof CONVEYOR_STEPS)[number]
+>;
+
 export const DOCK_NAV_ITEMS: DockNavItem[] = [
-  { path: '/', label: 'หน้าหลัก', icon: Home },
-  { path: '/jobs/list', label: 'หน่วยงาน', icon: Briefcase, functionId: 'unit_requests_read' },
+  { path: '/', label: CONVEYOR_HOME.label, icon: CONVEYOR_HOME.icon },
+  {
+    path: '/jobs/list',
+    label: STEP['/jobs/list'].label,
+    icon: STEP['/jobs/list'].icon,
+    functionId: 'unit_requests_read',
+  },
   // ← กลุ่ม "บอร์ดรับสมัคร" ถูกแทรกตรงนี้โดย AppNavDrawer
-  { path: '/follow', label: 'Follow', icon: PhoneForwarded, functionId: 'follow_read' },
+  {
+    path: '/follow',
+    label: STEP['/follow'].label,
+    icon: STEP['/follow'].icon,
+    functionId: 'follow_read',
+  },
   // เจ้าของเคาะ 23 ส.ค. 2569: **เมนูหลักของตัวเอง ข้าง Follow** (ไม่ใช่แท็บในหน้า Follow)
-  { path: '/aftercare', label: 'ดูแลหลังเริ่มงาน', icon: UserCheck, functionId: 'aftercare_read' },
+  {
+    path: '/aftercare',
+    label: STEP['/aftercare'].label,
+    icon: STEP['/aftercare'].icon,
+    functionId: 'aftercare_read',
+  },
   { path: '/wl', label: 'WL', icon: CalendarDays, functionId: 'work_calendar_read' },
-  { path: '/matching/candidates', label: 'ผู้สมัคร', icon: Users, functionId: 'candidates_read' },
+  {
+    path: '/matching/candidates',
+    label: 'คลังคน',
+    icon: Users,
+    functionId: 'candidates_read',
+  },
   // หัวข้อ "Matching" ถูกถอดจากเมนู 17 ส.ค. 2569 (เจ้าของ: "อันนี้ก็เอาออกได้เลย") —
   // ลูกย้ายออกไปอยู่กับงานจริงหมดแล้ว เหลือหัวข้อที่กดกางแล้วไม่มีอะไรข้างใน:
   //   จับคู่กับงาน → แท็บในหน้าหน่วยงาน · การติดต่อ (คัดสรร) → แท็บในใบขอ

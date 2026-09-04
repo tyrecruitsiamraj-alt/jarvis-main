@@ -5,7 +5,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
+import { Users, Shield, Database, FileText, Palette, UserCog, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, MoveRight, Activity,
   MessageSquareText,
   PhoneOff,
 } from 'lucide-react';
@@ -70,7 +70,7 @@ const DEFAULT_REF_DATA: Record<ReferenceCategory, string[]> = {
  */
 const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   appearance: Palette,
-  navMenu: ListChecks,
+  navMenu: ListOrdered,
   users: Users,
   roles: Shield,
   jobStaff: UserCog,

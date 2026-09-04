@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DOCK_NAV_ITEMS } from '../../src/components/layout/bottom-nav/dockNavConfig';
 import {
   CONVEYOR_HOME,
   CONVEYOR_STEPS,
@@ -160,6 +161,29 @@ describe('ชื่อหน้าแรกในเมนู', () => {
    */
   it('🔴 ไอคอนหน้าหลักเป็นรูปบ้าน ไม่ใช่โทรศัพท์', () => {
     expect(CONVEYOR_HOME.icon.displayName ?? CONVEYOR_HOME.icon.name).toMatch(/House|Home/);
+  });
+});
+
+describe('ชื่อ+ไอคอนของหน้าเดียวกัน ต้องตรงกันทุกเมนู', () => {
+  /**
+   * 🔴 เจ้าของให้ไล่ตรวจไอคอนทั้งระบบ 4 ก.ย. 2569 — เจอว่าหน้าเดียวกันมีสองชื่อ
+   * สองไอคอน แล้วแต่ดูจากเมนูไหน: `/jobs/list` = "ใบขอ"(คลิปบอร์ด) vs "หน่วยงาน"(กระเป๋า) ·
+   * `/follow` = "ติดตาม" vs "Follow" · `/matching/candidates` = "คลังคน" vs "ผู้สมัคร"
+   * ⇒ เมนูล่าง/หน้าตั้งค่าต้องยกป้ายกับไอคอนมาจาก soRecruitNav ที่เดียว
+   */
+  it('🔴 path ที่มีทั้งสองเมนู ต้องได้ชื่อและไอคอนตัวเดียวกัน', () => {
+    const left = new Map(
+      [CONVEYOR_HOME, ...CONVEYOR_STEPS].map((t) => [t.path, t] as const),
+    );
+    for (const item of DOCK_NAV_ITEMS) {
+      const same = left.get(item.path);
+      if (!same) continue;
+      expect({ path: item.path, label: item.label }).toEqual({
+        path: item.path,
+        label: same.label,
+      });
+      expect(item.icon, item.path).toBe(same.icon);
+    }
   });
 });
 
