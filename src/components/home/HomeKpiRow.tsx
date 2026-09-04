@@ -20,6 +20,7 @@ import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 
+import { Card, CardContent } from '@/components/ui/card';
 import { DASH, TONE } from '@/lib/designTokens';
 import {
   buildKpiCards,
@@ -31,12 +32,33 @@ import {
 } from '@/lib/homeKpi';
 import { cn } from '@/lib/utils';
 
-/** ชุดคลาสของแถบนี้ — คู่ light/dark ครบทุกตัว (แทนชุด HUD เดิมที่เป็นพื้นดำอย่างเดียว) */
-const CARD =
-  'group min-h-[92px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/60';
-const LABEL = 'block text-[11px] font-medium tracking-[0.02em] text-slate-500 dark:text-slate-400';
-const FIGURE = 'font-mono text-2xl font-semibold tabular-nums';
-const UNIT = 'text-[11px] text-slate-500 dark:text-slate-400';
+/**
+ * 🔴 **การ์ดเป็น `Card` ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่งปรับหน้าหลักให้เป็น
+ * มาตรฐานโดยใช้ shadcn คุม) · ของเดิมประกาศชุดคลาสการ์ดเอง (กรอบ/พื้น/เงา/hover
+ * พร้อมคู่ `dark:` ทุกตัว) ⇒ เป็นการ์ดคนละใบกับแผงอื่นบนหน้าเดียวกัน
+ * เหลือไว้เฉพาะ **ขนาดตัวอักษร** ซึ่งเป็น utility ล้วน ไม่ใช่การปั้นเปลือกการ์ด
+ */
+const LABEL = 'block text-[11px] font-medium text-muted-foreground';
+const FIGURE = 'text-2xl font-semibold tabular-nums';
+const UNIT = 'text-[11px] text-muted-foreground';
+
+/** การ์ด KPI ที่กดได้ — Card ของ shadcn ห่อด้วยปุ่มเพื่อให้กดทั้งใบและโฟกัสได้ */
+const KpiCardShell: React.FC<{
+  onClick: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}> = ({ onClick, ariaLabel, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={ariaLabel}
+    className="rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  >
+    <Card className="h-full min-h-[92px] transition-colors hover:bg-accent/40">
+      <CardContent className="px-3 py-2.5">{children}</CardContent>
+    </Card>
+  </button>
+);
 
 const DeltaChip: React.FC<{ card: KpiCard }> = ({ card }) => {
   const text = deltaText(card.delta, card.isRate ? '%' : card.unit);
@@ -76,15 +98,10 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
     >
       {/* การ์ดยอดคงค้าง — ไม่มีลูกศรเทียบเมื่อวานโดยตั้งใจ (ดูเหตุผลใน homeKpi.ts) */}
       {standing ? (
-        <button
+        <KpiCardShell
           key={standing.key}
-          type="button"
           onClick={() => navigate(standing.href)}
-          className={cn(
-            CARD,
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
-          )}
-          aria-label={`${standing.label} — ${standing.value} ${standing.unit} · ${standing.sub}${standing.sla ? ` · ${standing.sla}` : ''}`}
+          ariaLabel={`${standing.label} — ${standing.value} ${standing.unit} · ${standing.sub}${standing.sla ? ` · ${standing.sla}` : ''}`}
         >
           <span className={LABEL}>{standing.label}</span>
           <span className="mt-1 flex items-baseline gap-1">
@@ -107,21 +124,16 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
             </span>
           ) : null}
           <span className={cn(UNIT, 'mt-0.5 block')}>ยอดคงค้างตอนนี้ (ไม่ใช่ของวันนี้)</span>
-        </button>
+        </KpiCardShell>
       ) : null}
 
       {cards.map((c) => {
         const accent = c.quiet ? DASH.muted : DASH.cellStrong;
         return (
-          <button
+          <KpiCardShell
             key={c.key}
-            type="button"
             onClick={() => navigate(c.href)}
-            className={cn(
-              CARD,
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
-            )}
-            aria-label={`${c.label} — ${c.value}${c.isRate ? '%' : ` ${c.unit}`}`}
+            ariaLabel={`${c.label} — ${c.value}${c.isRate ? '%' : ` ${c.unit}`}`}
           >
             <span className={LABEL}>{c.label}</span>
             <span className="mt-1 flex items-baseline gap-1">
@@ -142,7 +154,7 @@ export const HomeKpiRow: React.FC<HomeKpiRowProps> = ({ kpis, standing, classNam
               <DeltaChip card={c} />
             </span>
             <span className={cn(UNIT, 'mt-0.5 block')}>{c.sub}</span>
-          </button>
+          </KpiCardShell>
         );
       })}
     </div>

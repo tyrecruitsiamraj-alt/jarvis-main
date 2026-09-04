@@ -14,6 +14,7 @@
  * ที่หน้าแรกโหลดอยู่แล้ว (`floor`) — `null` = ยังไม่รู้ ⇒ "—" ห้ามเป็น 0
  */
 import React from 'react';
+import { Card } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { ArrowRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -228,8 +229,10 @@ const TeamBoardPanel: React.FC<{
 }) => {
   const teams = team?.teams;
   return (
-    <section
-      className={cn('jarvis-deck rounded-2xl', className)}
+    /* 🔴 เปลือกเป็น Card ของ shadcn เหมือนแผงอื่นบนหน้าหลัก (4 ก.ย. 2569)
+       สกินพื้นเข้มยังเป็นคลาสเดิมที่เจ้าของเคาะไว้ · ไม่เขียน CSS ใหม่ */
+    <Card
+      className={cn('jarvis-deck overflow-hidden rounded-2xl', className)}
       aria-label="บอร์ดทีม — ใครทำอะไรอยู่"
     >
       {(['tl', 'tr', 'bl', 'br'] as const).map((c) => (
@@ -429,7 +432,7 @@ const TeamBoardPanel: React.FC<{
           </li>
         </TeamColumn>
       </div>
-    </section>
+    </Card>
   );
 };
 

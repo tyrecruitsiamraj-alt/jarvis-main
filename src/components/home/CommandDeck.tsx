@@ -16,6 +16,8 @@
  * คิวที่เหลือ → แถบ 6 ขั้น · ตรรกะอยู่ src/lib/homeDeck.ts + nextTask.ts (pure + เทสต์)
  */
 import React from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -192,7 +194,15 @@ const CommandDeck: React.FC<{
     : deckStatusLine(statusInput);
 
   return (
-    <section className={cn('jarvis-deck rounded-2xl', className)} aria-label="ศูนย์บัญชาการงานวันนี้">
+    /**
+     * 🔴 **เปลือกเป็น `Card` ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่งปรับหน้าหลัก
+     * ให้เป็นมาตรฐานโดยใช้ shadcn คุม) · สกินพื้นเข้มยังเป็นคลาสเดิมที่เจ้าของเคาะไว้
+     * ⚠️ **ห้ามเขียน CSS ใหม่** (สั่ง 4 ก.ย. 2569) — ที่นี่แค่ใช้คลาสที่มีอยู่แล้วต่อไป
+     */
+    <Card
+      className={cn('jarvis-deck overflow-hidden rounded-2xl', className)}
+      aria-label="ศูนย์บัญชาการงานวันนี้"
+    >
       {(['tl', 'tr', 'bl', 'br'] as const).map((c) => (
         <span key={c} className="jarvis-hud-corner" data-c={c} aria-hidden />
       ))}
@@ -201,10 +211,11 @@ const CommandDeck: React.FC<{
       {/* ── แถบหัว: ระบบ · สถานะสด · วันเวลาเดินวินาที ── */}
       <div className="relative flex items-center gap-3 border-b border-slate-900/10 px-6 py-3.5 dark:border-white/10 lg:px-9">
         <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-300')}>SO RECRUIT</span>
-        <span className="flex items-center gap-1.5 rounded-full border border-teal-600/30 px-2.5 py-0.5 dark:border-teal-300/30">
+        {/* ชิปสถานะ = Badge ของ shadcn (เดิมวาดกรอบ/มุมเอง) */}
+        <Badge variant="outline" className="gap-1.5 border-teal-600/30 px-2.5 py-0.5 dark:border-teal-300/30">
           <span className="jarvis-core-breathe h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-teal-300" aria-hidden />
           <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-200')}>สถานะสด</span>
-        </span>
+        </Badge>
         <span className="flex-1" />
         <span className="hidden font-mono text-[11px] text-slate-500 dark:text-slate-500 sm:block">
           {DATE_FMT.format(now)}
@@ -370,7 +381,7 @@ const CommandDeck: React.FC<{
           👉 เคาะว่า **เก็บก้อนทีม เอาตัวเลขจาก tile ไปใส่ในก้อนทีมแทน**
           ⚠️ เลขทั้ง 6 ขั้นไม่หาย — เมนูสายพานซ้ายมือมี badge ครบอยู่แล้ว
           และเลขที่ใช้บ่อยถูกยกไปอยู่บนก้อนทีม (ดู TeamNavRow) */}
-    </section>
+    </Card>
   );
 };
 

@@ -5,10 +5,18 @@
  * 🔴 รายชื่อ BU มาจากข้อมูลจริงที่ API นับมา — ห้าม hard-code
  * (วัดจริง 24 ส.ค. 2569: LBD 170 · LML 81 · LBA 22 · DSL 8 · SNJ 3 ใบขอ)
  * 🔴 ปุ่มบอกจำนวนใบขอของ BU นั้นด้วย — ไม่งั้นคนกดสุ่มแล้วเจอหน้าว่างโดยไม่รู้ว่าทำไม
+ *
+ * 🔴 **ใช้ ToggleGroup ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่งปรับหน้าหลักให้เป็น
+ * มาตรฐานโดยใช้ shadcn คุม) · ของเดิมเป็น `<button>` ที่วาดกรอบ/พื้นเองด้วย
+ * `style={{ boxShadow: 'inset 0 0 0 1px ...' }}` และสี hex จาก `HUD_HEX`
+ * ⇒ กลุ่มปุ่มเลือกอย่างเดียว = `ToggleGroup type="single"` ตรงตัว
+ * ได้พฤติกรรมคีย์บอร์ด (ลูกศรเลื่อนในกลุ่ม) และ `aria-pressed` มาให้เอง
  */
 import * as React from 'react';
 
-import { HUD, HUD_HEX } from '@/lib/designTokens';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Badge } from '@/components/ui/badge';
+import { DASH } from '@/lib/designTokens';
 import { buLabel, sortBuOptions } from '@/lib/homeBu';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +26,9 @@ export type HomeBuFilterProps = {
   onChange: (bu: string | null) => void;
   className?: string;
 };
+
+/** ค่าที่ ToggleGroup ใช้แทน "ทั้งหมด" — ว่างไม่ได้ ไม่งั้นกดแล้วหลุดเป็น null */
+const ALL = '__all__';
 
 export const HomeBuFilter: React.FC<HomeBuFilterProps> = ({
   options,
@@ -29,49 +40,34 @@ export const HomeBuFilter: React.FC<HomeBuFilterProps> = ({
   // ไม่มีตัวเลือก (ฐานยังไม่มีทะเบียนไซต์) = ซ่อนแถบไปเลย ไม่ขึ้นแถบเปล่า
   if (opts.length === 0) return null;
 
-  const chip = (active: boolean) =>
-    cn(
-      'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors',
-      active ? 'text-white' : cn(HUD.body, 'hover:text-white'),
-    );
-
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      <span className={cn(HUD.eyebrow, 'mr-1')}>สายธุรกิจ</span>
-      <button
-        type="button"
-        onClick={() => onChange(null)}
-        className={chip(value === null)}
-        style={
-          value === null
-            ? { background: `${HUD_HEX.teal}2e`, boxShadow: `inset 0 0 0 1px ${HUD_HEX.teal}` }
-            : { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14)' }
-        }
-        aria-pressed={value === null}
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      <span className={cn('text-[11px] font-medium', DASH.muted)}>สายธุรกิจ</span>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        variant="outline"
+        value={value ?? ALL}
+        /* กดซ้ำที่ตัวเดิม Radix ส่งค่าว่างมา — ถือว่าไม่เปลี่ยน (กันหลุดเป็นสถานะไม่มีตัวเลือก) */
+        onValueChange={(v) => {
+          if (!v) return;
+          onChange(v === ALL ? null : v);
+        }}
+        className="flex-wrap justify-start gap-1.5"
       >
-        ทั้งหมด
-      </button>
-      {opts.map((o) => {
-        const active = value === o.bu;
-        return (
-          <button
-            key={o.bu}
-            type="button"
-            onClick={() => onChange(o.bu)}
-            className={chip(active)}
-            style={
-              active
-                ? { background: `${HUD_HEX.teal}2e`, boxShadow: `inset 0 0 0 1px ${HUD_HEX.teal}` }
-                : { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14)' }
-            }
-            aria-pressed={active}
-            title={buLabel(o.bu)}
-          >
+        <ToggleGroupItem value={ALL} className="gap-1.5 text-xs">
+          ทั้งหมด
+        </ToggleGroupItem>
+        {opts.map((o) => (
+          <ToggleGroupItem key={o.bu} value={o.bu} title={buLabel(o.bu)} className="gap-1.5 text-xs">
             {o.bu}
-            <span className={cn(HUD.unit, 'font-mono tabular-nums')}>{o.count}</span>
-          </button>
-        );
-      })}
+            {/* จำนวนใบขอของ BU นั้น — ใช้ Badge ของ shadcn แทนชิปที่วาดเอง */}
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] tabular-nums">
+              {o.count.toLocaleString('th-TH')}
+            </Badge>
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
     </div>
   );
 };

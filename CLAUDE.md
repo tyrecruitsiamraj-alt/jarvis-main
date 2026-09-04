@@ -58,6 +58,12 @@
   CSS variable ของธีม · มีเทสต์คุมที่ `tests/api/designTokens.test.ts`
 * **ห้ามสร้าง spacing สุ่ม** — ใช้สเกลของ Tailwind (`gap-2` `p-4` `space-y-3`)
   ห้ามเขียน `px-[13px]` เอง
+* 🔴 **ห้ามเขียน CSS เอง** (เจ้าของสั่ง 4 ก.ย. 2569) — ห้ามเพิ่มคลาสใหม่ใน `src/index.css`
+  หรือไฟล์ CSS อื่น · อยากได้หน้าตาใหม่ให้ประกอบจาก component ของ shadcn + utility ของ
+  Tailwind · ต้องมี variant ใหม่จริง ให้เพิ่มที่ `src/components/ui/<component>.tsx` ที่เดียว
+  (คลาสปุ่มที่เคยปั้นเอง `jarvis-btn-*` / `jarvis-pill-btn` ถูกถอดออกหมดแล้ว 4 ก.ย. 2569)
+* **ฟอนต์เดียวทั้งระบบ = Kanit** ทั้ง `font-sans` และ `font-mono` · ห้ามกำหนด
+  `fontFamily` เองในไฟล์จอ · ตัวเลขเรียงตรงด้วย `tabular-nums` ไม่ใช่การสลับฟอนต์
 
 **อยากได้ component ใหม่:** สั่ง Claude ตรง ๆ (เช่น *"Add form and input from shadcn"*)
 หรือ `npx shadcn@latest add <component>` — **ห้ามเขียน primitive ขึ้นมาใหม่**
