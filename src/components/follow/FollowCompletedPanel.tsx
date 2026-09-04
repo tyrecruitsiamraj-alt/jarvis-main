@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -159,8 +160,10 @@ const FollowCompletedPanel: React.FC<{
                   ✓ ย้ายแล้ว
                 </span>
               ) : (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={movingKey === g.key}
                   onClick={() =>
                     void move(
@@ -173,13 +176,10 @@ const FollowCompletedPanel: React.FC<{
                       g.rounds,
                     )
                   }
-                  className={cn(
-                    'inline-flex min-h-9 shrink-0 items-center rounded-full border px-3 font-semibold disabled:opacity-50',
-                    TONE.primary.outline,
-                  )}
+                  className={cn('shrink-0 text-xs font-semibold', TONE.primary.value)}
                 >
                   {movingKey === g.key ? 'กำลังย้าย…' : 'ย้าย + ปิดงานติดตาม'}
-                </button>
+                </Button>
               )}
             </li>
           );

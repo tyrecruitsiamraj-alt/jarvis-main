@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { Building2, Pencil, Phone, RotateCcw, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -267,35 +268,40 @@ const FollowRoundsDialog: React.FC<{
                         <span className="text-[10px] text-muted-foreground">
                           ลบแล้วกู้ไม่ได้ ลบเลยไหม
                         </span>
-                        <button
+                        {/* 🔴 ใช้ Button ของ shadcn — กติกา UI ของโปรเจกต์ (เจ้าของย้ำ 3 ก.ย. 2569:
+                            *"ให้ใช้ Shadcn เพื่อคุม Framework ห้ามสร้าง component เอง"*) */}
+                        <Button
                           type="button"
+                          variant="destructive"
+                          size="sm"
                           disabled={busy}
                           onClick={() => onPurge(it.id)}
-                          className="inline-flex min-h-[32px] items-center rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          className="min-h-8 px-2.5 text-[11px]"
                         >
                           {busy ? 'กำลังลบ…' : 'ลบเลย'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => onAskPurge(null)}
-                          className={cn(
-                            'inline-flex min-h-[32px] items-center rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                            TONE.neutral.outline,
-                          )}
+                          className="min-h-8 px-2.5 text-[11px]"
                         >
                           ไม่
-                        </button>
+                        </Button>
                       </div>
                     ) : (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => onAskPurge(it.id)}
                         title="ลบรอบนี้ออกจากระบบถาวร (ผู้ดูแลระบบเท่านั้น)"
-                        className="inline-flex min-h-[32px] items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
+                        className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.danger.value)}
                       >
                         <Trash2 className="h-3 w-3" aria-hidden />
                         ลบทิ้ง
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ) : null}

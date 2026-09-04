@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { TONE } from '@/lib/designTokens';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import {
@@ -177,12 +178,14 @@ export default function LumosCallHealthPanel({
 
       {/* 4. ทำอะไรต่อ — ลัดไปที่รายชื่อจริง ไม่ใช่แค่ดูเลข */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" onClick={onOpenResults} className="jarvis-btn-secondary">
+        {/* 🔴 ใช้ Button ของ shadcn — คลาส `jarvis-btn-*` เป็นปุ่มที่ปั้นเองใน CSS
+            ซึ่งขัดกติกา UI ของโปรเจกต์ (เจ้าของย้ำ 3 ก.ย. 2569) */}
+        <Button type="button" variant="secondary" size="sm" onClick={onOpenResults}>
           ดูรายชื่อตามผลโทร
-        </button>
-        <button type="button" onClick={onOpenWaiting} className="jarvis-btn-ghost">
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onOpenWaiting}>
           <Users className="h-3 w-3" /> ดูคนที่รอผล ({waiting.toLocaleString('th-TH')})
-        </button>
+        </Button>
         {(l.retry_scheduled ?? 0) > 0 ? (
           <span className={cn(TONE.warn.chip, 'tabular-nums')}>
             ตั้งโทรซ้ำไว้ {(l.retry_scheduled ?? 0).toLocaleString('th-TH')}

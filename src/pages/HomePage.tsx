@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import HomeSection from '@/components/home/HomeSection';
+import { Button } from '@/components/ui/button';
 import {
   useNavigate } from 'react-router-dom';
 import {
@@ -306,7 +308,10 @@ const HomePage: React.FC = () => {
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
 
   return (
-    <div className="relative -mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 px-4 sm:px-5 md:px-6 lg:px-8 py-6 md:py-8">
+    /* 🔴 **จังหวะแนวตั้งชุดเดียว** (เจ้าของทัก 3 ก.ย. 2569 ว่าหน้าหลักดูสะเปะสะปะ)
+       เดิมแต่ละแผงใส่ `mb-` ของตัวเอง (mb-5 · mb-3 · mb-6) ระยะห่างจึงไม่เท่ากันทั้งหน้า
+       ⇒ ใช้ `space-y-5` ที่กล่องนอกอันเดียว แผงลูกไม่ต้องรู้เรื่องระยะห่างอีก */
+    <div className="relative -mx-4 space-y-5 px-4 py-6 sm:-mx-5 sm:px-5 md:-mx-6 md:px-6 md:py-8 lg:-mx-8 lg:px-8">
       {/* ── Command Deck — ทั้งหน้าเป็นจอบัญชาการผืนเดียว (เจ้าของสั่งรอบสอง
           26 ส.ค. 2569 หลังตีตกรอบแรกว่า "รก ไม่สวย" · อ้างอิง cayla-flax.vercel.app) ──
           ทักทาย · หน้าปัด · งานถัดไป · คิว · แถบ 6 ขั้น รวมอยู่ใน canvas เดียว
@@ -322,7 +327,6 @@ const HomePage: React.FC = () => {
           applicantsUntouched: office ? office.counts.intake.untouched : null,
           slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
         }}
-        className="mb-5"
       />
 
       {/* ── บอร์ด 4 ทีม — เมตริกครบตามสเปกเจ้าของ + ทุกบรรทัดกดนำทางได้ ──
@@ -342,7 +346,6 @@ const HomePage: React.FC = () => {
         floor={office ? office.counts : null}
         onOpenCallResults={() => setCallResultsOpen(true)}
         onOpenActiveCalls={() => setActiveCallsOpen(true)}
-        className="mb-5"
       />
 
       {/*
@@ -360,14 +363,6 @@ const HomePage: React.FC = () => {
           การ์ดใบแรก (ใบขอเปิดอยู่) เป็น **ยอดคงค้างตอนนี้** ส่วนที่เหลือเป็น
           **เหตุการณ์ของวันนี้เทียบเมื่อวาน** — เจ้าของถามตรง ๆ ว่า "ข้อมูลมันเฉพาะ
           วันนี้หรอหรือตลอด" ⇒ ต้องเขียนไว้บนจอ ไม่ใช่ให้เดา */}
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="text-sm font-semibold text-foreground">ตัวเลขวันนี้</h2>
-        <p className="text-xs text-muted-foreground">
-          เทียบกับเมื่อวาน · แยกตามหน่วยธุรกิจได้ —{' '}
-          <span className="font-medium">การ์ด &ldquo;ใบขอเปิดอยู่&rdquo; ใบเดียวเป็นยอดสะสม
-          ไม่ใช่ของวันนี้</span>
-        </p>
-      </div>
 
 
       {/* ── KPI แถวบน + ตัวกรอง BU (Phase 10 · ตามภาพอ้างอิง 24 ส.ค. 2569) ──
@@ -375,13 +370,23 @@ const HomePage: React.FC = () => {
           จะไม่วาดลูกศรให้ (เหตุผลเต็มใน src/lib/homeKpi.ts)
           ⚠️ ซ่อนตัวเองเมื่อโหลดไม่ได้ เหมือนฉากห้องทำงาน */}
       {hud ? (
-        <>
-          <HomeBuFilter
-            options={hud.bu_options}
-            value={bu}
-            onChange={setBu}
-            className="mb-3"
-          />
+        /* 🔴 หัวข้อ + ตัวกรอง + การ์ด KPI อยู่ใน **เปลือกเดียวกับแผงอื่น** (HomeSection
+           ที่ประกอบจาก Card ของ shadcn) — เดิมสามอย่างนี้ลอยอยู่บนพื้นเปล่า
+           ไม่มีขอบไม่มีพื้น เลยดูหลุดจากบอร์ดข้างบนคนละเรื่อง */
+        <HomeSection
+          title="ตัวเลขวันนี้"
+          subtitle={
+            <>
+              เทียบกับเมื่อวาน · แยกตามหน่วยธุรกิจได้ —{' '}
+              <span className="font-medium">
+                การ์ด &ldquo;ใบขอเปิดอยู่&rdquo; ใบเดียวเป็นยอดสะสม ไม่ใช่ของวันนี้
+              </span>
+            </>
+          }
+          action={
+            <HomeBuFilter options={hud.bu_options} value={bu} onChange={setBu} />
+          }
+        >
           <HomeKpiRow
             kpis={kpisWithRequests}
             /* ใบขอเปิดอยู่ + ด่วน + สถานะ SLA — ย้ายขึ้นมาจากแถบ funnel ที่ถอดออก
@@ -394,9 +399,8 @@ const HomePage: React.FC = () => {
                   })
                 : null
             }
-            className="mb-6"
           />
-        </>
+        </HomeSection>
       ) : null}
 
       {/* ⚠️ ของที่เคยอยู่ตรงนี้ถูก **ยุบ** ตามคำสั่ง 26 ส.ค. 2569 (*"อันไหนข้อมูลเดียวกัน
@@ -579,22 +583,26 @@ const HomePage: React.FC = () => {
                     })()
                   : null}
                 <div className="flex flex-wrap justify-end gap-2">
+                  {/* 🔴 ปุ่มทั้งคู่ใช้ Button ของ shadcn — เลิกใช้คลาส `jarvis-btn-*`
+                      ที่ปั้นปุ่มขึ้นเองใน CSS (ขัดกติกา UI · เจ้าของย้ำ 3 ก.ย. 2569) */}
                   {personDetail.item.phone ? (
-                    <a href={`tel:${personDetail.item.phone}`} className="jarvis-btn-secondary">
-                      <Phone className="h-3 w-3" /> {personDetail.item.phone}
-                    </a>
+                    <Button asChild variant="secondary" size="sm">
+                      <a href={`tel:${personDetail.item.phone}`}>
+                        <Phone className="h-3 w-3" /> {personDetail.item.phone}
+                      </a>
+                    </Button>
                   ) : null}
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
                     onClick={() => {
                       const jobRef = personDetail.item.job_ref;
                       setPersonDetail(null);
                       navigate(`/matching/match?jobId=${encodeURIComponent(jobRef)}`);
                     }}
-                    className="jarvis-btn-primary"
                   >
                     เปิดใบขอนี้ →
-                  </button>
+                  </Button>
                 </div>
               </div>
             </>

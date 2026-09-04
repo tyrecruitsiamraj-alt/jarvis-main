@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { EMPTY_FUNNEL, fetchCallFunnel, type CallFunnel } from '@/lib/callFunnelApi';
 import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
@@ -96,14 +97,17 @@ export default function FollowTodayPanel() {
             คน
           </span>
         </div>
-        <button
+        {/* 🔴 Button ของ shadcn — เลิกใช้ `jarvis-btn-*` ที่ปั้นปุ่มเองใน CSS */}
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={load}
           disabled={loading}
-          className="jarvis-btn-ghost shrink-0 disabled:opacity-50"
+          className="shrink-0"
         >
           <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
-        </button>
+        </Button>
       </div>
 
       {/* 3 รอบ format เดียวกัน — ส่ง · โทรติด · ไม่ติด · ยกเลิก + แถบสัดส่วน
