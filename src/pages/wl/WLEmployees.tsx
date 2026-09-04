@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -116,12 +117,12 @@ const WLEmployees: React.FC = () => {
         backPath="/wl"
         actions={
           hasPermission('supervisor') ? (
-            <button
+            <Button size="sm"
               onClick={() => navigate('/wl/employees/add')}
-              className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm"
+              className="flex items-center gap-1 px-3 py-2 text-sm"
             >
               <Plus className="w-4 h-4" /> เพิ่ม
-            </button>
+            </Button>
           ) : undefined
         }
       />

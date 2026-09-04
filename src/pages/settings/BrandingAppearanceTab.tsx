@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useBranding } from '@/contexts/BrandingContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { hexToHslComponents, hslComponentsToHex } from '@/lib/brandingStorage';
@@ -56,14 +57,14 @@ const BrandingAppearanceTab: React.FC = () => {
           </div>
           <div className="flex flex-col gap-2">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onLogoFile} />
-            <button
+            <Button size="sm"
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-2 px-3 py-2 jarvis-pill-btn text-sm font-medium w-fit"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium w-fit"
             >
               <ImagePlus className="w-4 h-4" />
               อัปโหลดโลโก้
-            </button>
+            </Button>
             {config.logoDataUrl && (
               <button
                 type="button"
@@ -189,7 +190,7 @@ const BrandingAppearanceTab: React.FC = () => {
             รีเซ็ตค่าเริ่มต้น
           </button>
           {hasPermission('admin') ? (
-            <button
+            <Button size="sm"
               type="button"
               disabled={syncing}
               onClick={() => {
@@ -203,11 +204,11 @@ const BrandingAppearanceTab: React.FC = () => {
                   });
                 });
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 jarvis-pill-btn text-sm font-medium disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
             >
               <CloudUpload className="w-4 h-4" />
               {syncing ? 'กำลังเผยแพร่…' : 'เผยแพร่ให้ทุกคน (บันทึกบนเซิร์ฟเวอร์)'}
-            </button>
+            </Button>
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">

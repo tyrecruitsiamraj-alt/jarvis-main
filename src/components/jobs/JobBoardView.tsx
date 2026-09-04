@@ -1681,17 +1681,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </>
                 ) : (
                   <div className="flex w-full gap-2">
-                    <button
+                    <Button size="sm"
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         openApply(job);
                       }}
-                      className="jarvis-pill-btn flex-1 py-2.5 text-xs font-semibold"
+                      className="flex-1 py-2.5 text-xs font-semibold"
                     >
                       สมัครงาน
                       <Send className="h-3.5 w-3.5 opacity-90" />
-                    </button>
+                    </Button>
                   </div>
                 )}
               </CardFooter>
@@ -1836,14 +1836,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             <div className="jarvis-frost rounded-2xl border border-white/70 px-6 py-8">
               <p className="text-sm font-medium text-foreground">พร้อมสมัครแล้ว?</p>
               <p className="mt-1 text-xs text-muted-foreground">กรอกใบสมัครสั้นๆ แล้วทีมสรรหาจะติดต่อกลับ</p>
-              <button
+              <Button size="sm"
                 type="button"
                 onClick={() => openApply(null)}
-                className="jarvis-pill-btn mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                className="mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 กรอกใบสมัครงาน
                 <Send className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { LoaderCircle, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -243,15 +244,15 @@ const MatchPriorityWeightsTab: React.FC<{
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <Button size="sm"
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="jarvis-pill-btn inline-flex min-h-[42px] items-center gap-1.5 px-5 py-2 text-sm disabled:opacity-50"
+          className="inline-flex min-h-[42px] items-center gap-1.5 px-5 py-2 text-sm"
         >
           {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : null}
           บันทึกน้ำหนัก
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => {

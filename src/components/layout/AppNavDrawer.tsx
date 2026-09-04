@@ -1,6 +1,13 @@
 import React, { useEffect } from 'react';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, KeyRound, LogOut, Settings, X } from 'lucide-react';
+import { ExternalLink, KeyRound, LogOut, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { shouldShowPasswordUi } from '@/lib/authConfig';
@@ -93,41 +100,26 @@ const AppNavDrawer: React.FC<Props> = ({
     );
 
   return (
-    <>
-      {/* overlay */}
-      <div
-        aria-hidden={!open}
-        onClick={onClose}
-        className={cn(
-          'fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] transition-opacity duration-200',
-          open ? 'opacity-100' : 'pointer-events-none opacity-0',
-        )}
-      />
-
-      {/* panel */}
-      <aside
-        role="dialog"
-        aria-label="เมนูหลัก"
-        aria-modal={open}
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full w-[17rem] max-w-[85vw] flex-col border-r border-white/60 bg-white/85 shadow-2xl dark:border-slate-700/70 dark:bg-slate-900/90 backdrop-blur-xl transition-transform duration-250 ease-out safe-area-pt',
-          open ? 'translate-x-0' : '-translate-x-full',
-        )}
+    /**
+     * 🔴 **ใช้ Sheet ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่ง *"ห้ามหลุด Framework"*)
+     * เดิมปั้นลิ้นชักเอง: overlay `fixed inset-0` + `<aside role="dialog">` + สั่ง
+     * translate เองตาม `open` ⇒ ไม่มี focus trap · ปิดด้วย Esc ไม่ได้ · ไม่ล็อกสกรอลล์พื้นหลัง
+     * Sheet ให้ครบทั้งสามอย่างในตัว และปุ่มปิดมากับ `SheetContent` แล้ว
+     */
+    <Sheet open={open} onOpenChange={(o) => (o ? undefined : onClose())}>
+      <SheetContent
+        side="left"
+        className="flex w-[17rem] max-w-[85vw] flex-col gap-0 p-0 sm:max-w-[17rem]"
       >
-        <div className="flex items-center justify-between gap-2 border-b border-white/60 px-4 py-3 dark:border-slate-700/70">
-          <button type="button" onClick={() => go('/')} className="flex min-w-0 items-center gap-2">
-            <BrandMark size="sm" />
-            <BrandTitle className="truncate text-base font-bold text-foreground" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิดเมนู"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <SheetHeader className="flex-row items-center justify-between gap-2 space-y-0 border-b border-white/60 px-4 py-3 text-left dark:border-slate-700/70">
+          <SheetTitle asChild>
+            <button type="button" onClick={() => go('/')} className="flex min-w-0 items-center gap-2">
+              <BrandMark size="sm" />
+              <BrandTitle className="truncate text-base font-bold text-foreground" />
+            </button>
+          </SheetTitle>
+          <SheetDescription className="sr-only">เมนูหลักของระบบ</SheetDescription>
+        </SheetHeader>
 
         {userName ? (
           <div className="flex items-center gap-2 border-b border-white/50 px-4 py-2.5 dark:border-slate-700/70">
@@ -245,8 +237,8 @@ const AppNavDrawer: React.FC<Props> = ({
             <span className="truncate">ออกจากระบบ</span>
           </button>
         </div>
-      </aside>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 };
 

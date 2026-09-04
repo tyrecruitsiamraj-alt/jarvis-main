@@ -397,14 +397,14 @@ const JobBoardTopFilters: React.FC<Props> = ({
               >
                 ล้างตัวกรอง
               </button>
-              <button
+              <Button size="sm"
                 type="button"
                 onClick={() => setSheetOpen(false)}
-                className="jarvis-pill-btn justify-center px-6 py-3 text-sm font-semibold"
+                className="justify-center px-6 py-3 text-sm font-semibold"
               >
                 แสดงผลลัพธ์
                 {resultCount != null ? ` (${resultCount})` : ''}
-              </button>
+              </Button>
             </div>
           </div>
         </SheetContent>

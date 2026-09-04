@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatCard from '@/components/shared/StatCard';
@@ -142,14 +143,14 @@ const EmployeeProfile: React.FC = () => {
             <p className="text-xs text-muted-foreground">
               รายชื่อนี้มาจากผู้สมัครที่กำหนดประเภทเป็น WL ในหน้า &quot;ผู้สมัครทั้งหมด&quot; ดูประวัติเต็มได้ที่โปรไฟล์ผู้สมัคร
             </p>
-            <button
+            <Button size="sm"
               type="button"
               onClick={() => navigate(`/matching/candidates/${wlCandidate.id}`)}
-              className="inline-flex items-center gap-2 text-sm px-3 py-2 jarvis-pill-btn"
+              className="inline-flex items-center gap-2 text-sm px-3 py-2"
             >
               <ExternalLink className="w-4 h-4" />
               เปิดโปรไฟล์ผู้สมัคร
-            </button>
+            </Button>
           </div>
         </div>
       </div>

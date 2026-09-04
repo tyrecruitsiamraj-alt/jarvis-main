@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import type { EmployeeStatus } from '@/types';
@@ -301,13 +302,13 @@ const AddEmployeePage: React.FC = () => {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button
+            <Button size="sm"
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2.5 jarvis-pill-btn font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 font-medium text-sm disabled:cursor-not-allowed"
             >
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
+            </Button>
             <button
               onClick={() => navigate('/wl/employees')}
               className="px-6 py-2.5 rounded-lg bg-secondary text-foreground font-medium text-sm"

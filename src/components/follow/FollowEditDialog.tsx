@@ -1,10 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Building2, LoaderCircle, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { createFollowEntry, updateFollowEntry, type FollowEntry } from '@/lib/followApi';
 import { buildExtraRounds, extraRoundsNote } from '@/lib/followExtraRounds';
-import BoardUnitPicker from '@/components/follow/BoardUnitPicker';
+import { BoardUnitPickerBody } from '@/components/follow/BoardUnitPicker';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import StaffContactField from '@/components/follow/StaffContactField';
 import TopicField from '@/components/follow/TopicField';
 import type { BoardUnitOption } from '@/lib/boardUnitPicker';
@@ -157,36 +165,26 @@ export default function FollowEditDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="แก้ไขรายการติดตาม"
-    >
-      <form
-        onSubmit={save}
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-border bg-background p-5 shadow-xl sm:rounded-2xl"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-foreground">แก้ไขรายการติดตาม</h2>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              เจ้าของข้อมูล{' '}
-              <span className="font-medium text-foreground">
-                {entry.created_by_name || 'ไม่ทราบ'}
-              </span>{' '}
-              — แก้ไม่ได้ ใครกรอกคนนั้นเป็นเจ้าของ
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิด"
-            className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-secondary"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
+    /**
+     * 🔴 **ใช้ Dialog ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่ง *"ห้ามหลุด Framework"*)
+     * เดิมกล่องนี้ปั้นเอง (`fixed inset-0` + `role="dialog"`) เพราะต้องเปิด picker
+     * หน่วยงานซ้อนข้างใน ซึ่งผิดกติกา "ห้าม Dialog ซ้อน Dialog"
+     * ⇒ ตอนนี้ picker ฝังเป็นแผงในฟอร์มเดียวกัน (`BoardUnitPickerBody`) ตามแพตเทิร์น
+     * `embedded` ของโปรเจกต์ · ปุ่มปิดใช้ตัวที่ DialogContent มีให้อยู่แล้ว
+     */
+    <Dialog open onOpenChange={(o) => (o ? undefined : onClose())}>
+      <DialogContent className="max-h-[92vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">แก้ไขรายการติดตาม</DialogTitle>
+          <DialogDescription className="text-[11px]">
+            เจ้าของข้อมูล{' '}
+            <span className="font-medium text-foreground">
+              {entry.created_by_name || 'ไม่ทราบ'}
+            </span>{' '}
+            — แก้ไม่ได้ ใครกรอกคนนั้นเป็นเจ้าของ
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={save}>
 
         <div className="mt-4 space-y-3">
           <div className="space-y-1.5">
@@ -226,17 +224,16 @@ export default function FollowEditDialog({
                 dropdown เดิมมีปัญหาเดียวกับที่ฟอร์มเพิ่มเคยเจอ: เลือกด้วยคีย์บอร์ดกด Enter
                 = ฟอร์มยิง submit เอง · ช่องข้อความ + ปุ่มเปิด picker ไม่มีทางนั้น */}
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
-                onClick={() => setUnitPickerOpen(true)}
-                className={cn(
-                  'inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-semibold',
-                  TONE.info.outline,
-                )}
+                variant="outline"
+                size="sm"
+                onClick={() => setUnitPickerOpen((v) => !v)}
+                className={cn('gap-1.5', TONE.info.value)}
               >
                 <Building2 className="h-3.5 w-3.5" aria-hidden />
-                เลือกหน่วยงานจากบอร์ด
-              </button>
+                {unitPickerOpen ? 'ปิดรายชื่อหน่วยงาน' : 'เลือกหน่วยงานจากบอร์ด'}
+              </Button>
             </div>
             <input
               id="feUnit"
@@ -249,6 +246,21 @@ export default function FollowEditDialog({
               placeholder="กดปุ่มด้านบนเพื่อเลือก หรือพิมพ์ชื่อหน่วยงานเอง"
               className="jarvis-soft-field min-h-[46px] w-full"
             />
+            {/* 🔴 แผงเลือกหน่วยงาน **ฝังในฟอร์มเดียวกัน** — ห้ามเปิด Dialog ซ้อน Dialog
+                (ใช้ `BoardUnitPickerBody` ตัวเดียวกับที่ picker แบบเต็มใช้ ตรรกะค้นหาไม่ซ้ำ) */}
+            {unitPickerOpen ? (
+              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/30 p-3">
+                <BoardUnitPickerBody
+                  units={unitOptions}
+                  listClassName="max-h-56"
+                  onPick={(u: BoardUnitOption) => {
+                    setUnitName(u.unitName);
+                    setSiteCode(u.siteCode);
+                    setUnitPickerOpen(false);
+                  }}
+                />
+              </div>
+            ) : null}
             {siteCode ? (
               <p className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Building2 className="h-3 w-3" aria-hidden />
@@ -429,20 +441,8 @@ export default function FollowEditDialog({
               : 'บันทึกการแก้ไข'}
           </button>
         </div>
-      </form>
-
-      {/* picker เป็น Radix Dialog ที่ portal ไป body — เปิดซ้อนกล่องแก้ไข (fixed z-50) ได้
-          เพราะ portal ถูกต่อท้าย DOM ทีหลังจึงอยู่บนสุดเสมอ */}
-      <BoardUnitPicker
-        open={unitPickerOpen}
-        onClose={() => setUnitPickerOpen(false)}
-        units={unitOptions}
-        onPick={(u: BoardUnitOption) => {
-          setUnitName(u.unitName);
-          setSiteCode(u.siteCode);
-          setUnitPickerOpen(false);
-        }}
-      />
-    </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

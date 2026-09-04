@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { apiFetch } from '@/lib/apiFetch';
@@ -112,13 +113,13 @@ const ChangePasswordPage: React.FC = () => {
             ) : null}
 
             <div className="flex items-center gap-2">
-              <button
+              <Button size="sm"
                 type="submit"
                 disabled={busy}
-                className="px-4 py-2 jarvis-pill-btn text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+                className="px-4 py-2 text-sm font-medium hover:bg-primary/90"
               >
                 {busy ? 'กำลังบันทึก…' : 'บันทึกรหัสผ่านใหม่'}
-              </button>
+              </Button>
               <button
                 type="button"
                 onClick={() => navigate('/')}

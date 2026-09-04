@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { trackPublicClick } from '@/lib/publicClickApi';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -280,13 +281,13 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                 หากสนใจงาน เจ้าหน้าที่จะโทรกลับไปนัดหมายอีกครั้ง
               </p>
             </div>
-            <button
+            <Button size="sm"
               type="button"
               onClick={onClose}
-              className="jarvis-pill-btn w-full py-3 text-sm font-semibold"
+              className="w-full py-3 text-sm font-semibold"
             >
               ปิดหน้าต่าง
-            </button>
+            </Button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
@@ -565,14 +566,14 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
 
             {/* Footer */}
             <div className="shrink-0 border-t border-border/50 bg-background/80 px-5 py-3 sm:px-6 sm:py-4">
-              <button
+              <Button size="sm"
                 type="submit"
                 disabled={submitting}
-                className="jarvis-pill-btn w-full py-3 text-sm font-semibold"
+                className="w-full py-3 text-sm font-semibold"
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 ส่งใบสมัคร
-              </button>
+              </Button>
             </div>
           </form>
         )}

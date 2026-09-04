@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { Button } from '@/components/ui/button';
 import { useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 
@@ -17,13 +18,13 @@ const NotFound = () => {
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
           ไม่พบหน้าที่คุณต้องการ — อาจถูกย้ายหรือลบออกแล้ว
         </p>
-        <Link
-          to="/"
-          className="jarvis-pill-btn mt-6 inline-flex px-6 py-3 text-sm"
-        >
-          กลับหน้าหลัก
-          <ArrowRight className="h-4 w-4" aria-hidden />
-        </Link>
+        {/* Link ห่อด้วย Button asChild — ปุ่มทั้งระบบมาจาก shadcn ที่เดียว */}
+        <Button asChild className="mt-6">
+          <Link to="/">
+            กลับหน้าหลัก
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </Button>
       </div>
     </div>
   );

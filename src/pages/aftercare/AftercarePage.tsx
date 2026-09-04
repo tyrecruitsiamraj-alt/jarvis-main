@@ -154,15 +154,15 @@ const AftercarePage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button size="sm"
             type="button"
             onClick={() => setPickerOpen(true)}
             disabled={adding}
-            className="jarvis-pill-btn inline-flex min-h-[40px] items-center gap-1.5 px-4 py-2 text-sm touch-manipulation disabled:opacity-50"
+            className="inline-flex min-h-[40px] items-center gap-1.5 px-4 py-2 text-sm touch-manipulation"
           >
             <Users className="h-4 w-4" aria-hidden />
             {adding ? 'กำลังเพิ่ม…' : 'เพิ่มคนจากบอร์ด ERP'}
-          </button>
+          </Button>
           <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </Button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -641,13 +642,13 @@ const AdminSettings: React.FC = () => {
                     placeholder="เพิ่มรายการใหม่"
                     className="jarvis-soft-field flex-1"
                   />
-                  <button
+                  <Button size="sm"
                     type="button"
                     onClick={addReferenceValue}
-                    className="px-3 py-2 jarvis-pill-btn text-sm"
+                    className="px-3 py-2 text-sm"
                   >
                     เพิ่ม
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="space-y-2">

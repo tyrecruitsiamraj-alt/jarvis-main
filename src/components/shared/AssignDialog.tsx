@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
@@ -309,14 +310,14 @@ const AssignDialog: React.FC<AssignDialogProps> = ({ open, onOpenChange, date, e
             </div>
           </div>
 
-          <button
+          <Button size="sm"
             type="button"
             onClick={() => void handleAssign()}
             disabled={saving || !selectedClient || (!employeeId && !selectedEmployee)}
-            className="w-full py-2.5 jarvis-pill-btn font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 font-medium text-sm hover:bg-primary/90 disabled:cursor-not-allowed"
           >
             {saving ? 'กำลังบันทึก…' : 'ยืนยันมอบหมาย'}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

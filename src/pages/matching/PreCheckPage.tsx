@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
@@ -709,14 +710,14 @@ const PreCheckPage: React.FC = () => {
                     }
                   }}
                 />
-                <button
+                <Button size="sm"
                   type="button"
                   onClick={() => void handleSearch()}
                   disabled={searching}
-                  className="shrink-0 px-5 py-2.5 jarvis-pill-btn text-sm disabled:opacity-60"
+                  className="shrink-0 px-5 py-2.5 text-sm"
                 >
                   {searching ? 'กำลังค้นหา…' : 'ค้นหา'}
-                </button>
+                </Button>
               </div>
             </div>
 

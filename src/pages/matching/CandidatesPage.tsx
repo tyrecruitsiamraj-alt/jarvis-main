@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -160,12 +161,12 @@ const CandidatesPage: React.FC = () => {
         backPath="/matching"
         actions={
           hasPermission('staff') ? (
-            <button
+            <Button size="sm"
               onClick={() => navigate('/matching/candidates/add')}
-              className="flex items-center gap-1 px-3 py-2 jarvis-pill-btn text-sm"
+              className="flex items-center gap-1 px-3 py-2 text-sm"
             >
               <Plus className="w-4 h-4" /> เพิ่ม
-            </button>
+            </Button>
           ) : undefined
         }
       />

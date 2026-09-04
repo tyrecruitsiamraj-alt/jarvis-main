@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { unitLabel } from '@/lib/unitDisplay';
 import { JOB_URGENCY_TONE } from '@/lib/jobUrgency';
 import { TONE } from '@/lib/designTokens';
@@ -503,13 +504,13 @@ const JobDetailPage: React.FC = () => {
             <h3 className="text-sm font-semibold text-foreground">รายชื่อที่ส่ง</h3>
 
             {hasPermission('supervisor') && (
-              <button
+              <Button size="sm"
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="text-xs px-3 py-1.5 jarvis-pill-btn hover:opacity-95"
+                className="text-xs px-3 py-1.5 hover:opacity-95"
               >
                 + เพิ่มคน
-              </button>
+              </Button>
             )}
           </div>
 

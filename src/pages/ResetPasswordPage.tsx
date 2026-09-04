@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Label } from '@/components/ui/label';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -103,14 +104,14 @@ const ResetPasswordPage: React.FC = () => {
             </p>
           ) : null}
 
-          <button
+          <Button size="sm"
             type="submit"
             disabled={busy || !token}
-            className="jarvis-pill-btn w-full min-h-[52px] disabled:opacity-60"
+            className="w-full min-h-[52px]"
           >
             {busy ? 'กำลังบันทึก…' : 'บันทึกรหัสผ่านใหม่'}
             <ArrowRight className="h-4 w-4" aria-hidden />
-          </button>
+          </Button>
         </form>
 
         <p className="text-center text-xs text-muted-foreground">

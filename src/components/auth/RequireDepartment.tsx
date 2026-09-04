@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { APP_DEPARTMENT_CODES, APP_DEPARTMENT_LABELS } from '@/lib/departmentCodes';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -88,13 +89,13 @@ const RequireDepartment: React.FC<{ children: React.ReactNode }> = ({ children }
             </p>
           ) : null}
 
-          <button
+          <Button size="sm"
             type="submit"
             disabled={busy || !department}
-            className="jarvis-pill-btn w-full min-h-[52px] px-6 py-3 text-sm touch-manipulation"
+            className="w-full min-h-[52px] px-6 py-3 text-sm touch-manipulation"
           >
             {busy ? 'กำลังบันทึก…' : 'ยืนยันแผนก'}
-          </button>
+          </Button>
         </form>
 
         <button

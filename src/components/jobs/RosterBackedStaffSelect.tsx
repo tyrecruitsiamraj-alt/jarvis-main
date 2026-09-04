@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { getJobStaffApiCache, mutateJobStaffRemote } from '@/lib/jobStaffRemote';
 
 type Role = 'recruiter' | 'screener' | 'opl' | 'online';
@@ -114,14 +115,14 @@ export const RosterBackedStaffSelect: React.FC<RosterBackedStaffSelectProps> = (
               className="flex-1 min-w-[120px] bg-background border border-border rounded-lg px-2 py-1.5 text-xs"
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), tryAdd())}
             />
-            <button
+            <Button size="sm"
               type="button"
               disabled={staffMutating}
               onClick={() => void tryAdd()}
-              className="shrink-0 text-xs px-2.5 py-1.5 jarvis-pill-btn"
+              className="shrink-0 text-xs px-2.5 py-1.5"
             >
               {staffMutating ? '…' : 'เพิ่ม'}
-            </button>
+            </Button>
           </div>
           <div className="flex flex-wrap gap-1.5 items-center">
             <select

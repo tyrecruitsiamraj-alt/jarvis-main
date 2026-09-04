@@ -295,20 +295,8 @@
     box-shadow: 0 12px 40px rgba(16, 24, 43, 0.22);
   }
 
-  .jarvis-pill-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-medium transition-all;
-    box-shadow: 0 4px 14px hsl(211 100% 50% / 0.28);
-  }
-
-  .jarvis-pill-btn:hover:not(:disabled) {
-    @apply -translate-y-0.5;
-    background: hsl(211 100% 45%);
-    box-shadow: 0 8px 22px hsl(211 100% 50% / 0.34);
-  }
-
-  .jarvis-pill-btn:disabled {
-    @apply opacity-55 cursor-not-allowed;
-  }
+  /* 🔴 `.jarvis-pill-btn` ถูกถอดออกแล้ว (4 ก.ย. 2569) — ปุ่มทุกปุ่มใช้
+     `@/components/ui/button` ของ shadcn เท่านั้น ห้ามเขียนคลาสปุ่มเองใน CSS อีก */
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-3 rounded-md border border-[#8c8c8c] bg-white px-4 py-3 text-sm font-semibold text-[#5e5e5e] shadow-sm transition-colors;

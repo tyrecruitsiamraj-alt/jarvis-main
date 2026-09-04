@@ -1,4 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
 import {
@@ -874,16 +885,16 @@ const FollowPage: React.FC = () => {
              supervisor+ จึงอยู่นอกเงื่อนไข canManageMasters */
           headerExtras={
             <>
-              <button
+              <Button size="sm"
                 type="button"
                 onClick={() => {
                   setFormOpen(true);
                   setFormError(null);
                 }}
-                className="jarvis-pill-btn inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
+                className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
               >
                 <Plus className="h-3 w-3" aria-hidden /> เพิ่มคนที่ต้องการติดตาม
-              </button>
+              </Button>
               {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
                   *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
                   🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — ย้ายแค่ที่วาง ไม่ได้เพิ่มตัวกรองใหม่ */}
@@ -1532,19 +1543,19 @@ const FollowPage: React.FC = () => {
               ) : null}
 
               {step < 3 ? (
-                <button
+                <Button size="sm"
                   type="button"
                   onClick={goNext}
-                  className="jarvis-pill-btn inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm"
+                  className="inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm"
                 >
                   ถัดไป <ChevronRight className="h-4 w-4" aria-hidden />
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button size="sm"
                   type="button"
                   onClick={() => void submit()}
                   disabled={submitting}
-                  className="jarvis-pill-btn inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm disabled:opacity-50"
+                  className="inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm"
                 >
                   {submitting ? (
                     <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
@@ -1552,7 +1563,7 @@ const FollowPage: React.FC = () => {
                     <PhoneForwarded className="h-4 w-4" aria-hidden />
                   )}
                   {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่ง AI โทร'}
-                </button>
+                </Button>
               )}
               <button
                 type="button"
@@ -1655,18 +1666,23 @@ const FollowPage: React.FC = () => {
           เลือกได้: บันทึกเฉพาะรอบที่ไม่ซ้ำ หรือกลับไปแก้ · ไม่มีปุ่ม "บันทึกซ้ำทั้งหมด"
           (ตั้งซ้อนเวลาเดิม = AI โทรหาคนเดิมสองสายพร้อมกัน ไม่มีเคสที่ตั้งใจทำแบบนั้น) */}
       {dupWarning ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="alertdialog"
-          aria-modal="true"
-          aria-label="เตือนรายการซ้ำ"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5 shadow-xl">
-            <h2 className="text-base font-semibold text-foreground">⚠️ ลงซ้ำกับรายการที่มีอยู่แล้ว</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              เบอร์นี้มีคิวโทรเวลาเดียวกันอยู่แล้ว — ตั้งซ้ำ = AI โทรซ้อนหาคนเดิม
-            </p>
-            <ul className="mt-3 space-y-1.5">
+        /**
+         * 🔴 **ใช้ AlertDialog ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่ง *"ห้ามหลุด Framework"*)
+         * เดิมปั้นเอง (`fixed inset-0` + `role="alertdialog"`) ⇒ ไม่มี focus trap
+         * และปิดด้วย Esc ไม่ได้ · กล่องเตือนแบบนี้ต้องบังคับให้เลือกทางใดทางหนึ่ง
+         * จึงเป็น AlertDialog (ไม่ใช่ Dialog ธรรมดาที่กดข้างนอกแล้วปิดได้)
+         */
+        <AlertDialog open onOpenChange={(o) => (o ? undefined : setDupWarning(null))}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-base">
+                ⚠️ ลงซ้ำกับรายการที่มีอยู่แล้ว
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-xs">
+                เบอร์นี้มีคิวโทรเวลาเดียวกันอยู่แล้ว — ตั้งซ้ำ = AI โทรซ้อนหาคนเดิม
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <ul className="space-y-1.5">
               {dupWarning.duplicates.map((d) => (
                 <li
                   key={d.iso}
@@ -1678,30 +1694,22 @@ const FollowPage: React.FC = () => {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDupWarning(null)}
-                className={cn('inline-flex min-h-[40px] items-center rounded-full border px-4 text-xs font-medium', TONE.neutral.outline)}
-              >
-                กลับไปแก้เวลา
-              </button>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDupWarning(null)}>กลับไปแก้เวลา</AlertDialogCancel>
               {dupWarning.freshIso.length > 0 ? (
-                <button
-                  type="button"
+                <AlertDialogAction
                   onClick={() => {
                     const go = dupWarning.proceed;
                     setDupWarning(null);
                     void go();
                   }}
-                  className="jarvis-pill-btn inline-flex min-h-[40px] items-center px-5 text-xs font-semibold"
                 >
                   บันทึกเฉพาะที่ไม่ซ้ำ ({dupWarning.freshIso.length.toLocaleString('th-TH')} รอบ)
-                </button>
+                </AlertDialogAction>
               ) : null}
-            </div>
-          </div>
-        </div>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ) : null}
 
       {/* dialog จัดการเรื่อง / เจ้าหน้าที่ (เปิดจากปุ่มข้างปฏิทิน · supervisor+) */}

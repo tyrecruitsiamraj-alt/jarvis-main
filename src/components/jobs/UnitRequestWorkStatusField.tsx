@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
@@ -348,14 +349,14 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
 
       {!readOnly ? (
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button size="sm"
             type="button"
             onClick={() => void persist()}
             disabled={saving || !dirty}
-            className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
+            className="text-sm px-4 py-2"
           >
             {saving ? 'กำลังบันทึก…' : 'บันทึกสถานะ'}
-          </button>
+          </Button>
           {savedMsg ? <span className="text-xs text-muted-foreground">{savedMsg}</span> : null}
           {error ? <span className="text-xs text-destructive">{error}</span> : null}
         </div>

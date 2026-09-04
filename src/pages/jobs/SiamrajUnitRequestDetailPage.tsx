@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -489,14 +490,14 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                         ในกล่องงานที่เดียว · ไม่ส่ง online_name = server คงค่าเดิม (partial update) */}
                   </div>
                   <div className="flex items-center gap-3">
-                    <button
+                    <Button size="sm"
                       type="button"
                       onClick={() => void saveAssignment()}
                       disabled={saving || !requestKey || !dirty}
-                      className="jarvis-pill-btn text-sm px-4 py-2 disabled:opacity-50"
+                      className="text-sm px-4 py-2"
                     >
                       {saving ? 'กำลังบันทึก…' : 'บันทึกผู้รับผิดชอบ'}
-                    </button>
+                    </Button>
                     {saveMsg && <span className="text-xs text-muted-foreground">{saveMsg}</span>}
                     {!requestKey && (
                       <span className="text-xs text-destructive">ใบขอนี้ไม่มีเลขที่ใบขอ จึงบันทึกไม่ได้</span>
@@ -620,13 +621,13 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               ข้อมูลมาจาก schema so-operation บน Siamraj — Jarvis อ่านอย่างเดียว แก้ไขที่ระบบต้นทาง
             </p>
 
-            <button
+            <Button size="sm"
               type="button"
               onClick={() => navigate(backPath)}
-              className="jarvis-pill-btn text-sm px-4 py-2"
+              className="text-sm px-4 py-2"
             >
               กลับรายการ
-            </button>
+            </Button>
           </>
         )}
       </div>

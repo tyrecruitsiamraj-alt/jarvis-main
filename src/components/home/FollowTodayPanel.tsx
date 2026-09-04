@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -7,7 +14,7 @@ import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { bucketOfCall, CALL_BUCKET_LABEL, type CallBucket } from '@/lib/callOutcomeBuckets';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
-import { ChevronRight, Phone, PhoneOutgoing, RefreshCw, X } from 'lucide-react';
+import { ChevronRight, Phone, PhoneOutgoing, RefreshCw } from 'lucide-react';
 
 /**
  * แผง "งาน Follow วันนี้" บนหน้าหลัก (เจ้าของสั่ง 14 ส.ค. 2569 · ปรับ 17 ส.ค. 2569)
@@ -184,36 +191,20 @@ export default function FollowTodayPanel() {
         แต่ละรอบ = คนที่ตอนนี้อยู่รอบนั้น (ไม่ใช่ยอดสะสมทุกครั้งที่โทร) · กดที่รอบเพื่อดูรายชื่อ
       </p>
 
+      {/* 🔴 **ใช้ Dialog ของ shadcn** (4 ก.ย. 2569 — เจ้าของสั่ง *"ห้ามหลุด Framework"*)
+          เดิมปั้นเอง: `fixed inset-0` + `role="dialog"` + ปิดด้วย onClick ที่ฉากหลัง
+          ⇒ ไม่มี focus trap · กด Esc ไม่ปิด · ปุ่มปิดต้องวาดเอง (ตอนนี้มากับ DialogContent) */}
       {openRoundData && openRoundPeople ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`รายชื่อในรอบ ${openRoundData.attempt}`}
-          onClick={() => setOpenRound(null)}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-background p-5 shadow-xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">
-                  งาน Follow · รอบ {openRoundData.attempt}
-                </h3>
-                <p className={cn('mt-0.5 text-[11px]', DASH.muted)}>
-                  ส่ง {openRoundData.total.toLocaleString('th-TH')} คน
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpenRound(null)}
-                aria-label="ปิด"
-                className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
+        <Dialog open onOpenChange={(o) => (o ? undefined : setOpenRound(null))}>
+          <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-bold">
+                งาน Follow · รอบ {openRoundData.attempt}
+              </DialogTitle>
+              <DialogDescription className="text-[11px]">
+                ส่ง {openRoundData.total.toLocaleString('th-TH')} คน
+              </DialogDescription>
+            </DialogHeader>
 
             {(() => {
               const listed = (Object.keys(openRoundPeople) as CallBucket[]).reduce(
@@ -282,8 +273,8 @@ export default function FollowTodayPanel() {
                 </p>
               ) : null}
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </div>
   );

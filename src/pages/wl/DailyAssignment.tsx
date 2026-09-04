@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import AssignDialog from '@/components/shared/AssignDialog';
@@ -106,13 +107,13 @@ const DailyAssignment: React.FC = () => {
                   <div className="font-medium text-foreground text-sm">{emp.first_name} {emp.last_name}</div>
                   <div className="text-xs text-muted-foreground">{emp.position} • Reliability: {emp.reliability_score}%</div>
                 </div>
-                <button
+                <Button size="sm"
                   type="button"
                   onClick={() => setAssignDialog({ open: true, empId: emp.id, empName: `${emp.first_name} ${emp.last_name}` })}
-                  className="flex items-center gap-1 text-xs px-3 py-1.5 jarvis-pill-btn hover:bg-primary/90"
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 hover:bg-primary/90"
                 >
                   <Plus className="w-3 h-3" /> มอบหมาย
-                </button>
+                </Button>
               </div>
             ))}
           </div>
