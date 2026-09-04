@@ -202,13 +202,30 @@ const TeamBoardPanel: React.FC<{
   team: OfficeTeamResponse | null;
   loading?: boolean;
   onRefresh?: () => void;
+  /**
+   * **Success Rate 7 วันล่าสุด** (เจ้าของสั่ง 4 ก.ย. 2569: *"Success rate เพิ่มไว้
+   * หน้าหลักตรง Lumos"*) — `null` = ยังโหลดไม่เสร็จ/ยังไม่มีใครรับสาย
+   *
+   * 🔴 **ใช้เลขชุดเดียวกับแดชบอร์ดเป๊ะ** (`compareCallRate(series, 7)`) — ถ้าคำนวณเอง
+   * คนละสูตร สองหน้าจะโชว์ % ไม่ตรงกัน แล้วไม่มีใครเชื่อสักหน้า
+   */
+  successRate?: { pct: number | null; connected: number } | null;
   /** เลขจาก office-floor ที่หน้าแรกโหลดอยู่แล้ว (คิว AI · Follow · aftercare · ใบสมัครค้าง) */
   floor: OfficeFloorCounts | null;
   /** dialog เดิมของสายโทร (มีปุ่มจองตัว — ฟีเจอร์ 12 ส.ค. ห้ามหาย) */
   onOpenCallResults?: () => void;
   onOpenActiveCalls?: () => void;
   className?: string;
-}> = ({ team, loading, onRefresh, floor, onOpenCallResults, onOpenActiveCalls, className }) => {
+}> = ({
+  team,
+  loading,
+  onRefresh,
+  floor,
+  onOpenCallResults,
+  onOpenActiveCalls,
+  successRate,
+  className,
+}) => {
   const teams = team?.teams;
   return (
     <section
@@ -385,6 +402,22 @@ const TeamBoardPanel: React.FC<{
             onResults={onOpenCallResults}
             onWaiting={onOpenActiveCalls}
           />
+          {/* 🔴 Success Rate — ฐานคือ "คนที่รับสาย" ไม่ใช่สายทั้งหมด (เจ้าของสั่ง 4 ก.ย. 2569)
+              ต้องเขียนฐานกำกับ ไม่งั้นอ่านสลับกับ % สำเร็จบนแดชบอร์ดที่ฐานกว้างกว่า
+              ⚠️ ไม่มีใครรับสาย = ขีด ห้ามโชว์ 0% */}
+          <li className="mt-3 list-none">
+            <span className={cn(eyebrow, T.faint)}>Success Rate · 7 วันล่าสุด</span>
+            <span className="mt-0.5 flex items-baseline gap-1.5">
+              <span className={cn('text-lg font-bold tabular-nums', ACCENT.lumos)}>
+                {successRate?.pct == null ? '—' : `${successRate.pct}%`}
+              </span>
+              <span className={cn('text-[11px]', T.mut)}>
+                {successRate?.pct == null
+                  ? 'ยังไม่มีใครรับสาย'
+                  : `จากคนที่รับสาย ${successRate.connected.toLocaleString('th-TH')} สาย`}
+              </span>
+            </span>
+          </li>
           <li className="mt-2 list-none">
             <button
               type="button"

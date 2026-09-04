@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { fetchCallRateSeries } from '@/lib/callFunnelApi';
+import { bangkokTodayYmd, compareCallRate } from '@/lib/lumosCallRate';
 import HomeSection from '@/components/home/HomeSection';
 import { Button } from '@/components/ui/button';
 import {
@@ -304,6 +306,33 @@ const HomePage: React.FC = () => {
     }
   };
 
+  /**
+   * **Success Rate ตรง Lumos บนหน้าหลัก** (เจ้าของสั่ง 4 ก.ย. 2569)
+   * 🔴 ใช้ทางเดียวกับแดชบอร์ดเป๊ะ — `fetchCallRateSeries` + `compareCallRate(series, 7)`
+   * ถ้าคำนวณเองคนละสูตร สองหน้าจะโชว์ % ไม่ตรงกัน แล้วไม่มีใครเชื่อสักหน้า
+   * ⚠️ โหลดพลาด = `null` ให้จอขึ้นขีด **ห้ามแปลงเป็น 0%**
+   */
+  const [successRate, setSuccessRate] = useState<{ pct: number | null; connected: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let alive = true;
+    void fetchCallRateSeries(60)
+      .then((d) => {
+        if (!alive || !d) return;
+        const trend = compareCallRate(d.series, 7, bangkokTodayYmd());
+        setSuccessRate({
+          pct: trend.current.successRatePct,
+          connected: trend.current.connected,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
 
@@ -346,6 +375,7 @@ const HomePage: React.FC = () => {
         floor={office ? office.counts : null}
         onOpenCallResults={() => setCallResultsOpen(true)}
         onOpenActiveCalls={() => setActiveCallsOpen(true)}
+        successRate={successRate}
       />
 
       {/*
