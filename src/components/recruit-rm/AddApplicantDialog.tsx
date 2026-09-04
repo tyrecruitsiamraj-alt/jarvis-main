@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Loader2, UserPlus } from 'lucide-react';
 import {
   Dialog,
@@ -324,22 +325,21 @@ const AddApplicantDialog: React.FC<{
         </div>
 
         <div className="flex shrink-0 justify-end gap-2 border-t border-border/50 px-5 py-3">
-          <button type="button" onClick={onClose} className="jarvis-btn-secondary">
+          <Button variant="secondary" size="sm" type="button" onClick={onClose} >
             ปิด
-          </button>
-          <button
+          </Button>
+          <Button size="sm"
             type="button"
             onClick={() => void submit()}
             disabled={saving}
-            className="jarvis-btn-primary disabled:opacity-60"
-          >
+            >
             {saving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             ) : (
               <UserPlus className="h-3.5 w-3.5" aria-hidden />
             )}
             {saving ? 'กำลังบันทึก…' : 'บันทึก'}
-          </button>
+          </Button>
         </div>
     </>
   );

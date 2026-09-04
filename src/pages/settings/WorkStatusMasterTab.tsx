@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Plus, Trash2, LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -168,15 +169,15 @@ const WorkStatusMasterTab: React.FC = () => {
               />
             </label>
           </div>
-          <button
+          <Button size="sm"
             type="button"
             onClick={() => void onAdd()}
             disabled={adding || !newCode.trim() || !newLabel.trim()}
-            className="jarvis-btn-primary px-3 py-1.5 disabled:opacity-50"
+            className="px-3 py-1.5"
           >
             {adding ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
             เพิ่มสถานะ
-          </button>
+          </Button>
         </div>
 
         {/* รายการสถานะ */}
@@ -214,24 +215,27 @@ const WorkStatusMasterTab: React.FC = () => {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <button
+                  {/* เปิด/ปิดใช้งาน — สลับ variant ของ Button แทนการสลับคลาสปุ่มที่ปั้นเอง */}
+                  <Button
                     type="button"
+                    size="sm"
+                    variant={item.is_active ? 'secondary' : 'default'}
                     disabled={busyCode === item.code}
                     onClick={() => void onToggleActive(item)}
-                    className={cn('px-2.5 py-1', item.is_active ? 'jarvis-btn-secondary' : 'jarvis-btn-primary')}
+                    className="px-2.5 py-1"
                   >
                     {item.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-                  </button>
+                  </Button>
                   {!item.is_builtin ? (
-                    <button
+                    <Button variant="destructive" size="sm"
                       type="button"
                       disabled={busyCode === item.code || !!item.usage}
                       onClick={() => void onDelete(item)}
                       title={item.usage ? 'มีใบขอใช้สถานะนี้อยู่ ลบไม่ได้' : 'ลบสถานะนี้'}
-                      className="jarvis-btn-danger px-2.5 py-1 disabled:opacity-40"
+                      className="px-2.5 py-1"
                     >
                       <Trash2 className="h-3 w-3" /> ลบ
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>

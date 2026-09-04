@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import {
@@ -303,14 +304,14 @@ export default function ApplicantContactDialog({
                   className="min-h-[44px] w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
                 {error ? <p className={cn('text-[11px]', TONE.danger.value)}>{error}</p> : null}
-                <button
+                <Button size="sm"
                   type="button"
                   onClick={() => void submit()}
                   disabled={busy}
-                  className="jarvis-btn-primary w-full justify-center disabled:opacity-50"
+                  className="w-full justify-center"
                 >
                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} บันทึกผลติดต่อ
-                </button>
+                </Button>
               </>
             ) : null}
 
@@ -341,7 +342,7 @@ export default function ApplicantContactDialog({
                     inputMode="tel"
                     className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-xs text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   />
-                  <button
+                  <Button size="sm"
                     type="button"
                     disabled={phoneBusy || phoneDraft.replace(/\D/g, '').length < 10}
                     onClick={() => {
@@ -352,10 +353,10 @@ export default function ApplicantContactDialog({
                         .catch((e) => setPhoneError(e instanceof Error ? e.message : 'แก้เบอร์ไม่สำเร็จ'))
                         .finally(() => setPhoneBusy(false));
                     }}
-                    className="jarvis-btn-primary shrink-0 justify-center disabled:opacity-50"
+                    className="shrink-0 justify-center"
                   >
                     {phoneBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} แก้เบอร์
-                  </button>
+                  </Button>
                 </div>
                 {phoneError ? <p className={cn('text-[11px]', TONE.danger.value)}>{phoneError}</p> : null}
               </div>

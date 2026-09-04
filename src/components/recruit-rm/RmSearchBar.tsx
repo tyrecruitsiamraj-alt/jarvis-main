@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { UserPlus, BookmarkPlus, PhoneCall, Trash2, Archive, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -66,18 +67,18 @@ const RmSearchBar: React.FC<{
       placeholder="ค้นหาจาก ชื่อ นามสกุล เบอร์ หรือชื่องาน"
       wrapperClassName="w-full sm:w-[22rem]"
     />
-    <button type="button" onClick={onSearch} className="jarvis-btn-primary shrink-0">
+    <Button size="sm" type="button" onClick={onSearch} className="shrink-0">
       ค้นหา
-    </button>
+    </Button>
 
     <span className={cn('hidden h-6 border-l sm:block', DASH.divider)} aria-hidden />
 
-    <button type="button" onClick={onAddApplicant} className="jarvis-btn-secondary shrink-0">
+    <Button variant="secondary" size="sm" type="button" onClick={onAddApplicant} className="shrink-0">
       <UserPlus className="h-3.5 w-3.5" aria-hidden /> เพิ่มข้อมูลผู้สมัคร
-    </button>
+    </Button>
 
     {onHoldSelected ? (
-      <button
+      <Button size="sm"
         type="button"
         onClick={onHoldSelected}
         disabled={selectedCount === 0 || holdingSelected}
@@ -86,11 +87,11 @@ const RmSearchBar: React.FC<{
             ? 'ติ๊กเลือกแถวก่อน'
             : `จอง ${selectedCount} ใบ + ล็อกเบอร์กัน AI โทรทับ — ไปโทร+บันทึกผลที่แท็บการโทรของฉัน`
         }
-        className="jarvis-btn-primary shrink-0 disabled:opacity-50"
+        className="shrink-0"
       >
         <PhoneCall className="h-3.5 w-3.5" aria-hidden />
         {holdingSelected ? 'กำลังเก็บ…' : `เก็บไปโทรเอง${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
-      </button>
+      </Button>
     ) : null}
 
     {/* ทางเลือกที่สองของงานเดียวกัน — วางคู่กันเพื่อให้เห็นว่าเลือกได้สองทาง
@@ -122,7 +123,7 @@ const RmSearchBar: React.FC<{
         {/* อยู่คลังสำรองแล้วปุ่ม "เก็บ Lead" ไม่มีความหมาย (ทุกแถวเป็น Lead อยู่แล้ว)
             — ซ่อนไปเลยดีกว่าปุ่มที่กดแล้วไม่เกิดอะไร */}
         {!leadView ? (
-          <button
+          <Button size="sm"
             type="button"
             onClick={onSaveLead}
             disabled={selectedCount === 0 || leadBusy}
@@ -131,14 +132,14 @@ const RmSearchBar: React.FC<{
                 ? 'ติ๊กเลือกแถวก่อน'
                 : `ปัด ${selectedCount} รายการเข้าคลังสำรอง — หายจากรายชื่อทำงานทุกแท็บ`
             }
-            className="jarvis-btn-primary shrink-0 disabled:opacity-50"
+            className="shrink-0"
           >
             <BookmarkPlus className="h-3.5 w-3.5" aria-hidden />
             {leadBusy ? 'กำลังเก็บ…' : 'เก็บ Lead'}
             {selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </button>
+          </Button>
         ) : null}
-        <button
+        <Button variant="secondary" size="sm"
           type="button"
           onClick={onDeleteLead}
           disabled={selectedCount === 0 || leadBusy}
@@ -147,12 +148,12 @@ const RmSearchBar: React.FC<{
               ? 'ติ๊กเลือกแถวก่อน'
               : `เรียก ${selectedCount} รายการกลับเข้ารายชื่อทำงาน`
           }
-          className="jarvis-btn-secondary shrink-0 disabled:opacity-50"
+          className="shrink-0"
         >
           <Trash2 className="h-3.5 w-3.5" aria-hidden />
           {leadBusy ? 'กำลังลบ…' : 'ลบ Lead'}
           {leadView && selectedCount > 0 ? ` (${selectedCount})` : ''}
-        </button>
+        </Button>
         {onToggleLeadView ? (
           <button
             type="button"

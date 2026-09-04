@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import Term from '@/components/shared/Term';
@@ -2706,13 +2707,13 @@ const MatchingPage: React.FC = () => {
                       กล่องซ้ายคนละขนาด แล้วเลขในแถบ 6 ช่องของแต่ละใบไม่ตรงคอลัมน์กัน
                       (วัดเจอจริง: แถบกว้าง 544.9–549.1px ต่างกันข้ามใบ) */}
                   <div className="flex w-[168px] shrink-0 flex-col items-end justify-start gap-1.5">
-                    <button
+                    <Button variant="secondary" size="sm"
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         openJob(j);
                       }}
-                      className="jarvis-btn-secondary w-full justify-center"
+                      className="w-full justify-center"
                     >
                       <Users className="h-3 w-3 shrink-0" />
                       <span className="truncate">
@@ -2724,7 +2725,7 @@ const MatchingPage: React.FC = () => {
                               ? 'AI กำลังคิดที่หลังบ้าน…'
                               : 'หาคนของเรา'}
                       </span>
-                    </button>
+                    </Button>
                     {/* ข้อ 4 ของงานคัดสรร (17 ส.ค. 2569): หมดรายชื่อแล้วกดหาคนจาก
                         กองคนที่เคยตอบไม่สนใจงานอื่น — เดิมมีแต่หลังบ้าน ไม่มีปุ่ม */}
                     <SelectionRecallButton jobId={j.id} />
@@ -3047,11 +3048,11 @@ const MatchingPage: React.FC = () => {
                       </button>
                     ) : null;
                   })()}
-                  <button
+                  <Button variant="secondary" size="sm"
                     type="button"
                     disabled={boardLoadingId === jobDetail.id || !!boardWaitingById[jobDetail.id]}
                     onClick={() => setRematchConfirmJobId(jobDetail.id)}
-                    className="jarvis-btn-secondary disabled:cursor-wait"
+                    className="disabled:cursor-wait"
                   >
                     <RefreshCw
                       className={cn(
@@ -3064,7 +3065,7 @@ const MatchingPage: React.FC = () => {
                       : boardLoadingId === jobDetail.id
                         ? 'กำลังโหลดผล…'
                         : 'ค้นหาใหม่'}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -3104,13 +3105,13 @@ const MatchingPage: React.FC = () => {
                   รายชื่อด้านล่างคือผลแมทรอบล่าสุด — คนที่เพิ่งเข้าฐานทีหลังยังไม่อยู่ในนั้น
                   กดปุ่มนี้เพื่อค้นจากคนของเราทั้งหมดแล้วเลือกส่งเอง
                 </p>
-                <button
+                <Button variant="secondary" size="sm"
                   type="button"
                   onClick={() => void openLumosPicker()}
-                  className="jarvis-btn-secondary shrink-0"
+                  className="shrink-0"
                 >
                   <PhoneCall className="h-3 w-3" /> เลือกคนส่ง AI โทร
-                </button>
+                </Button>
                 </div>
               </div>
 
@@ -3127,13 +3128,13 @@ const MatchingPage: React.FC = () => {
                     ปฏิเสธใบขอนี้ไปแล้ว {hiddenDeclinedCount.toLocaleString('th-TH')} คน —{' '}
                     {showDeclined ? 'กำลังแสดงอยู่ในรายการ' : 'ซ่อนไว้ ไม่เสนอใบนี้ให้เขาอีก'}
                   </span>
-                  <button
+                  <Button variant="ghost" size="sm"
                     type="button"
                     onClick={() => setShowDeclined((v) => !v)}
-                    className="jarvis-btn-ghost ml-auto shrink-0"
+                    className="ml-auto shrink-0"
                   >
                     {showDeclined ? 'ซ่อนอีกครั้ง' : 'ดูว่าใครบ้าง'}
-                  </button>
+                  </Button>
                 </div>
               ) : null}
 
@@ -3441,11 +3442,10 @@ const MatchingPage: React.FC = () => {
                         : 'ไม่พอ? หาคนที่ยังไม่สมัครงานนี้'}
                     </p>
                     <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                      <button
+                      <Button variant="ghost" size="sm"
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => void fetchIrecruit(jobDetail.id, !!irMatchById[jobDetail.id])}
-                        className="jarvis-btn-ghost"
                         title={SEARCH_LEGACY_POOL.hint}
                       >
                         {irLoadingId === jobDetail.id ? (
@@ -3459,18 +3459,17 @@ const MatchingPage: React.FC = () => {
                             <Search className="h-3 w-3" /> {SEARCH_LEGACY_POOL.label}
                           </>
                         )}
-                      </button>
+                      </Button>
                       {/* เลนคัดสรร (16 ส.ค.): โทรหมดแล้วไม่มีคน → ค้นเจอส่ง AI ทันที
                           เขียว+เหลือง · ไม่ต้องอนุมัติ · กัน 30 วัน (server) */}
-                      <button
+                      <Button size="sm"
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
                         onClick={() => setIrSendConfirmJobId(jobDetail.id)}
-                        className="jarvis-btn-primary"
                         title={SEARCH_LEGACY_POOL_AND_CALL.hint}
                       >
                         <PhoneForwarded className="h-3 w-3" /> {SEARCH_LEGACY_POOL_AND_CALL.label}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   {irSendNotice[jobDetail.id] ? (
@@ -4403,13 +4402,13 @@ const MatchingPage: React.FC = () => {
                 >
                   {resolvingConflict ? 'กำลังยกเลิก…' : 'ยกเลิกใบเดิม แล้วจองใบนี้แทน'}
                 </button>
-                <button
+                <Button variant="ghost" size="sm"
                   type="button"
                   onClick={() => setConflictInfo(null)}
-                  className="jarvis-btn-ghost px-4 py-2"
+                  className="px-4 py-2"
                 >
                   ปิด
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
@@ -4434,24 +4433,24 @@ const MatchingPage: React.FC = () => {
               ถ้าไม่ต้องการคิดใหม่ ระบบจะคงผลเดิมไว้ (แสดงเฉพาะคนที่ยังพร้อม)
             </p>
             <div className="flex flex-wrap justify-end gap-2">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setRematchConfirmJobId(null)}
-                className="jarvis-btn-ghost px-4 py-2"
+                className="px-4 py-2"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button size="sm"
                 type="button"
                 onClick={() => {
                   const id = rematchConfirmJobId;
                   setRematchConfirmJobId(null);
                   if (id) void fetchBoardMatch(id, true);
                 }}
-                className="jarvis-btn-primary px-4 py-2"
+                className="px-4 py-2"
               >
                 <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -4479,24 +4478,24 @@ const MatchingPage: React.FC = () => {
               จะถูกตัดออกให้เองที่หลังบ้าน · โทรออกไปแล้วเรียกคืนไม่ได้
             </p>
             <div className="flex flex-wrap justify-end gap-2">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setIrSendConfirmJobId(null)}
-                className="jarvis-btn-ghost px-4 py-2"
+                className="px-4 py-2"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button size="sm"
                 type="button"
                 onClick={() => {
                   const id = irSendConfirmJobId;
                   setIrSendConfirmJobId(null);
                   if (id) void fetchIrecruit(id, !!irMatchById[id], true);
                 }}
-                className="jarvis-btn-primary px-4 py-2"
+                className="px-4 py-2"
               >
                 <PhoneForwarded className="h-3 w-3" /> {SEARCH_LEGACY_POOL_AND_CALL.label}
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -4577,19 +4576,18 @@ const MatchingPage: React.FC = () => {
                   })
               : null}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setJobPickOpen(false)} className="jarvis-btn-ghost">
+              <Button variant="ghost" size="sm" type="button" onClick={() => setJobPickOpen(false)} >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button size="sm"
                 type="button"
                 onClick={() => {
                   setJobPickOpen(false);
                   setLumosConfirmOpen(true);
                 }}
-                className="jarvis-btn-primary"
-              >
+                >
                 ถัดไป — ไปหน้ายืนยัน
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -4679,22 +4677,22 @@ const MatchingPage: React.FC = () => {
               </div>
             ) : null}
             <div className="flex flex-wrap justify-end gap-2">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setLumosConfirmOpen(false)}
-                className="jarvis-btn-ghost px-4 py-2"
+                className="px-4 py-2"
               >
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button size="sm"
                 type="button"
                 disabled={lumosSending}
                 onClick={() => void sendSelectedToLumos()}
-                className="jarvis-btn-primary px-4 py-2"
+                className="px-4 py-2"
               >
                 <PhoneCall className="h-3 w-3" />
                 {lumosSending ? 'กำลังส่ง…' : `ยืนยันส่ง ${lumosSelectedCount} คน`}
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -4803,24 +4801,24 @@ const MatchingPage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2.5">
               <p className="text-[11px] font-semibold text-sky-900 dark:text-sky-200">เลือกไว้ {lumosSelectedBoard.length} คน</p>
               <div className="flex shrink-0 flex-wrap gap-2">
-                <button
+                <Button variant="ghost" size="sm"
                   type="button"
                   onClick={() => setLumosPickerOpen(false)}
-                  className="jarvis-btn-ghost px-4 py-2"
+                  className="px-4 py-2"
                 >
                   ปิด
-                </button>
-                <button
+                </Button>
+                <Button size="sm"
                   type="button"
                   disabled={lumosSelectedCount === 0}
                   onClick={() => {
                     setLumosPickerOpen(false);
                     setLumosConfirmOpen(true);
                   }}
-                  className="jarvis-btn-primary px-4 py-2"
+                  className="px-4 py-2"
                 >
                   <PhoneCall className="h-3 w-3" /> ถัดไป ({lumosSelectedCount} คน)
-                </button>
+                </Button>
               </div>
             </div>
           </div>

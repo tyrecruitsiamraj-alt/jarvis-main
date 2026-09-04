@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import {
   INFORM_PLAN_KEY,
@@ -207,13 +208,13 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
             🔴 เป็น **ปุ่มให้กด** ไม่ใช่เด้งเอง — การเลือก dropdown ไม่ควรพาคนออกจากหน้า
             ที่กำลังทำอยู่ (ต่างจากติ๊ก "ลงแผนแจ้งเข้า" ที่เจ้าของสั่งให้เด้งเลย) */}
         {status === 'await_inform' ? (
-          <button
+          <Button variant="secondary" size="sm"
             type="button"
             onClick={() => navigate(followPath())}
-            className="jarvis-btn-secondary text-xs"
+            className="text-xs"
           >
             ไปตั้งตารางโทรแจ้งเข้า
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -224,14 +225,14 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
           <span className="text-xs font-semibold text-foreground">หน่วยงานที่พิจารณา</span>
           <Popover open={unitOpen} onOpenChange={setUnitOpen}>
             <PopoverTrigger asChild>
-              <button
+              <Button variant="secondary" size="sm"
                 type="button"
                 disabled={busy}
-                className="jarvis-btn-secondary text-xs disabled:opacity-50"
+                className="text-xs"
               >
                 <Building2 className="h-3.5 w-3.5" aria-hidden />
                 {unitName ?? 'เลือกหน่วยงาน'}
-              </button>
+              </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-[min(28rem,90vw)] p-3">
               <BoardUnitPickerBody

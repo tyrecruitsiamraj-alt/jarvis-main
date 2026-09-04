@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import {
   lumosCallBadge,
@@ -253,9 +254,9 @@ export function LumosSendBar({
         <p className="min-w-0 text-[11px] font-semibold text-sky-900 dark:text-sky-200">
           {count > 0 ? `ติ๊กเลือกไว้ ${count} คน` : 'ยังไม่ได้ติ๊กใคร'}
         </p>
-        <button type="button" onClick={onClear} disabled={count === 0} className="jarvis-btn-ghost shrink-0 disabled:opacity-50">
+        <Button variant="ghost" size="sm" type="button" onClick={onClear} disabled={count === 0} className="shrink-0">
           ล้างที่เลือก
-        </button>
+        </Button>
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         {/* ปุ่มไม่มี shrink-0 — พื้นที่ไม่พอให้ตกบรรทัดใหม่ ห้ามทะลุขอบ */}
@@ -309,15 +310,14 @@ export function LumosSendBar({
           </button>
           {/* ผลหนักสุด — ยิงสายจริงทีเดียวทั้งใบ จึงเป็น primary ตัวเดียวและอยู่ขวาสุด
               (ยังผ่านหน้าต่างยืนยันที่โชว์รายชื่อ+เบอร์ครบทุกคนเหมือนเดิม) */}
-          <button
+          <Button size="sm"
             type="button"
             disabled={act.sendAll.disabled}
             onClick={onSendAll}
             title={act.sendAll.reason ?? 'ส่งทุกคนที่ AI แมทเจอในใบนี้ — ยังมีหน้าต่างยืนยันก่อนโทรจริง'}
-            className="jarvis-btn-primary disabled:opacity-50"
-          >
+            >
             <PhoneCall className="h-3 w-3" /> ส่งทั้งหมดที่แมท ({act.sendAll.count})
-          </button>
+          </Button>
       </div>
       <p className="min-h-4 text-[10px] leading-4 text-sky-900/70 dark:text-sky-200/70">{hint}</p>
     </div>

@@ -392,39 +392,10 @@
     @apply border-teal-300 bg-slate-50 text-teal-800;
   }
 
-  /* ปุ่มมาตรฐาน 4 ระดับ — ทุกปุ่มในระบบควรเป็นหนึ่งในนี้ */
-  .jarvis-btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors;
-  }
-  .jarvis-btn:disabled {
-    @apply cursor-not-allowed opacity-50;
-  }
-  .jarvis-btn-primary {
-    @apply jarvis-btn border-transparent font-semibold text-primary-foreground;
-    background: hsl(var(--primary));
-    box-shadow: 0 4px 14px hsl(211 100% 50% / 0.25);
-  }
-  .jarvis-btn-primary:hover:not(:disabled) {
-    background: hsl(211 100% 45%);
-  }
-  .jarvis-btn-secondary {
-    @apply jarvis-btn border-sky-200 bg-white text-sky-700;
-  }
-  .jarvis-btn-secondary:hover:not(:disabled) {
-    @apply border-sky-300 bg-sky-50;
-  }
-  .jarvis-btn-ghost {
-    @apply jarvis-btn border-slate-200 bg-white text-slate-600;
-  }
-  .jarvis-btn-ghost:hover:not(:disabled) {
-    @apply bg-slate-50;
-  }
-  .jarvis-btn-danger {
-    @apply jarvis-btn border-red-200 bg-white text-red-700;
-  }
-  .jarvis-btn-danger:hover:not(:disabled) {
-    @apply border-red-300 bg-red-50;
-  }
+  /* 🔴 คลาสปุ่ม `jarvis-btn-*` **ถูกถอดออกแล้ว** (4 ก.ย. 2569 — เจ้าของสั่ง
+     *"อย่าหลุด Framework"*) · ปุ่มทุกปุ่มในระบบใช้ `@/components/ui/button` ของ shadcn
+     เท่านั้น · ถ้าต้องการหน้าตาปุ่มแบบอื่น ให้เพิ่ม variant ที่ button.tsx ที่เดียว
+     ห้ามกลับมาเขียนคลาสปุ่มเองใน CSS อีก (มีเทสต์คุมที่ tests/api/typographyRules.test.ts) */
 
   /* กล่องตัวเลข (stat tile) — ใช้ทั้ง funnel หน้าแรก / สรุปถัง / สรุปงานด่วน */
   .jarvis-stat-tile {
@@ -543,25 +514,6 @@
     @apply border-teal-800 bg-slate-800/70 text-teal-300;
   }
 
-  /* ปุ่มมาตรฐาน — primary ใช้ตัวแปรอยู่แล้ว ไม่ต้องแตะ */
-  .dark .jarvis-btn-secondary {
-    @apply border-sky-800 bg-slate-900 text-sky-300;
-  }
-  .dark .jarvis-btn-secondary:hover:not(:disabled) {
-    @apply border-sky-700 bg-sky-950/60;
-  }
-  .dark .jarvis-btn-ghost {
-    @apply border-slate-700 bg-slate-900 text-slate-300;
-  }
-  .dark .jarvis-btn-ghost:hover:not(:disabled) {
-    @apply bg-slate-800;
-  }
-  .dark .jarvis-btn-danger {
-    @apply border-red-900 bg-slate-900 text-red-400;
-  }
-  .dark .jarvis-btn-danger:hover:not(:disabled) {
-    @apply border-red-800 bg-red-950/50;
-  }
 
   .dark .jarvis-warm-bg {
     background:

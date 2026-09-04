@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import {
@@ -106,16 +107,16 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
               ถ้าอยากดูรายชื่อก่อนโดยไม่โทร ให้ใช้ปุ่ม “{SEARCH_ALL_POOLS.label}” ในหน้าใบขอ
             </p>
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={onClose} className="jarvis-btn-ghost px-4 py-2">
+              <Button variant="ghost" size="sm" type="button" onClick={onClose} className="px-4 py-2">
                 ยกเลิก
-              </button>
-              <button
+              </Button>
+              <Button size="sm"
                 type="button"
                 onClick={() => setConfirmed(true)}
-                className="jarvis-btn-primary px-4 py-2"
+                className="px-4 py-2"
               >
                 <Search className="h-3 w-3" /> {SEARCH_ALL_POOLS_AND_CALL.label}
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
@@ -468,14 +469,17 @@ const OurPeoplePage: React.FC = () => {
                 ข้อมูลอ่านจากบอร์ด iRecruit — แก้ไขที่ระบบ iRecruit เท่านั้น
               </p>
               <div className="flex justify-end gap-2">
+                {/* ลิงก์โทร — ห่อด้วย Button asChild ให้หน้าตาเป็นปุ่มชุดเดียวกับทั้งระบบ */}
                 {detail.mobile ? (
-                  <a href={`tel:${detail.mobile}`} className="jarvis-btn-primary px-4 py-2">
-                    <Phone className="h-3 w-3" /> โทร
-                  </a>
+                  <Button asChild size="sm">
+                    <a href={`tel:${detail.mobile}`}>
+                      <Phone className="h-3 w-3" /> โทร
+                    </a>
+                  </Button>
                 ) : null}
-                <button type="button" onClick={() => setDetail(null)} className="jarvis-btn-ghost px-4 py-2">
+                <Button variant="ghost" size="sm" type="button" onClick={() => setDetail(null)} className="px-4 py-2">
                   ปิด
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}

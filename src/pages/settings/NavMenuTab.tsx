@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
 import {
@@ -179,15 +180,15 @@ const NavMenuTab: React.FC = () => {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        <Button size="sm"
           type="button"
           disabled={!isAdmin || busy || !dirty}
           onClick={() => void save()}
-          className="jarvis-btn-primary inline-flex items-center gap-1.5 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5"
         >
           {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           บันทึก
-        </button>
+        </Button>
         <button
           type="button"
           disabled={!isAdmin || busy || !dirty}

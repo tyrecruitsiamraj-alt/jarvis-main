@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Bot, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -88,15 +89,15 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
         <p className={cn('text-xs font-semibold', DASH.cellStrong)}>
           คนที่เคยปฏิเสธงานอื่น — ให้ AI จับว่าใครเข้ากับใบนี้
         </p>
-        <button
+        <Button variant="secondary" size="sm"
           type="button"
           onClick={() => void search()}
           disabled={loading}
-          className="jarvis-btn-secondary shrink-0"
+          className="shrink-0"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
           {loading ? 'AI กำลังคิด…' : result ? 'ค้นใหม่' : 'ให้ AI จับให้'}
-        </button>
+        </Button>
       </div>
 
       {error ? (
@@ -124,16 +125,16 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
           ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <button
+                <Button variant="ghost" size="sm"
                   type="button"
                   onClick={toggleAll}
                   disabled={sendable.length === 0}
-                  className="jarvis-btn-ghost text-[11px] disabled:opacity-40"
+                  className="text-[11px]"
                 >
                   {picked.length === sendable.length && sendable.length > 0
                     ? 'เอาออกทั้งหมด'
                     : `เลือกทั้งหมด (${sendable.length})`}
-                </button>
+                </Button>
                 <button
                   type="button"
                   onClick={() => setConfirming(true)}
@@ -163,22 +164,22 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
                     เบอร์ที่พักไว้ · คนที่เคยปฏิเสธใบนี้ จะถูกข้ามและรายงานกลับ
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                    <button
+                    <Button size="sm"
                       type="button"
                       onClick={() => void send()}
                       disabled={sending}
-                      className="jarvis-btn-primary text-[11px]"
+                      className="text-[11px]"
                     >
                       {sending ? 'กำลังส่ง…' : `ส่ง ${pickedNames.length} คนเข้าคิวโทร`}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="ghost" size="sm"
                       type="button"
                       onClick={() => setConfirming(false)}
                       disabled={sending}
-                      className="jarvis-btn-ghost text-[11px]"
+                      className="text-[11px]"
                     >
                       ยกเลิก
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : null}

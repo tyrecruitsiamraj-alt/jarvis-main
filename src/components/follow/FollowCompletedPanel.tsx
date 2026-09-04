@@ -110,13 +110,13 @@ const FollowCompletedPanel: React.FC<{
             เมื่อเจ้าหน้าที่กดปิดงานว่าไปทำงานแล้ว
           </p>
         </div>
-        <button
+        <Button variant="secondary" size="sm"
           type="button"
           onClick={() => navigate('/aftercare')}
-          className="jarvis-btn-secondary shrink-0 text-xs"
+          className="shrink-0 text-xs"
         >
           <UserCheck className="h-3.5 w-3.5" aria-hidden /> เปิดหน้าดูแลหลังเริ่มงาน
-        </button>
+        </Button>
       </div>
 
       {error ? (
@@ -187,13 +187,13 @@ const FollowCompletedPanel: React.FC<{
       </ul>
 
       {people.length > PREVIEW_ROWS ? (
-        <button
+        <Button variant="ghost" size="sm"
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="jarvis-btn-ghost text-[11px]"
+          className="text-[11px]"
         >
           {expanded ? 'ย่อรายการ' : `ดูอีก ${people.length - PREVIEW_ROWS} คน`}
-        </button>
+        </Button>
       ) : null}
     </section>
   );

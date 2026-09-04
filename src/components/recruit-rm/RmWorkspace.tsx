@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -475,9 +476,9 @@ const RmWorkspace: React.FC<{
           ซ้ำกับ tab bar ระดับบอร์ดที่มีชื่อแท็บ+จำนวนอยู่แล้ว · เหลือแค่ปุ่มรีเฟรช */}
       {controlledTab ? (
         <div className="flex items-center justify-end gap-2">
-          <button type="button" onClick={load} disabled={loading} className="jarvis-btn-secondary">
+          <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
-          </button>
+          </Button>
         </div>
       ) : (
         <div className={cn('flex flex-wrap items-center gap-1 border-b', DASH.divider)}>
@@ -503,14 +504,14 @@ const RmWorkspace: React.FC<{
               </button>
             );
           })}
-          <button
+          <Button variant="secondary" size="sm"
             type="button"
             onClick={load}
             disabled={loading}
-            className="jarvis-btn-secondary ml-auto"
+            className="ml-auto"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
-          </button>
+          </Button>
         </div>
       )}
 
@@ -613,9 +614,9 @@ const RmWorkspace: React.FC<{
                   จากทั้งหมด {filtered.length.toLocaleString('th-TH')} คนที่รับเข้าทำงาน ·
                   วันนัดมาจากผลโทร "สนใจ→นัดได้" หรือบันทึกผลติดต่อ "สำเร็จ→นัดได้"
                 </p>
-                <button type="button" onClick={() => window.print()} className="jarvis-btn-secondary shrink-0">
+                <Button variant="secondary" size="sm" type="button" onClick={() => window.print()} className="shrink-0">
                   🖨 โหลดเป็น PDF
-                </button>
+                </Button>
               </div>
 
               {/* ก้อน "นัด → มาไหม" ที่ย้ายมาจากศูนย์คุมงานสรรหา (20 ส.ค. 2569) —
@@ -783,9 +784,9 @@ const RmWorkspace: React.FC<{
                     กำลังดูจากกล่อง: <b>{RM_BUCKET_LABEL[bucket]}</b> ({filtered.length} ใบ) —
                     มุมมองนี้รวมทุกแท็บ/ทุกสถานะ
                   </span>
-                  <button type="button" onClick={clearBucket} className="jarvis-btn-ghost shrink-0">
+                  <Button variant="ghost" size="sm" type="button" onClick={clearBucket} className="shrink-0">
                     ✕ ล้าง
-                  </button>
+                  </Button>
                 </div>
               ) : null}
               {/* กอง "เลือกวิธีโทร" (Phase 5.9) — ใบที่ worker ถอด claim เพราะดองเกิน 1 วัน
@@ -799,20 +800,18 @@ const RmWorkspace: React.FC<{
                       ถูกถอดจากคนที่เก็บไว้แล้วไม่โทรเกิน 1 วัน
                     </p>
                     <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                      <button
+                      <Button variant="secondary" size="sm"
                         type="button"
                         onClick={() => void keepForSelf(awaitingChoiceRows.map((r) => r.id))}
-                        className="jarvis-btn-secondary"
-                      >
+                        >
                         เก็บไปโทรเองทั้งหมด
-                      </button>
-                      <button
+                      </Button>
+                      <Button size="sm"
                         type="button"
                         onClick={() => askSendAi(awaitingChoiceRows.map((r) => r.id))}
-                        className="jarvis-btn-primary"
-                      >
+                        >
                         ส่ง AI โทรทั้งหมด
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   <ul className="space-y-1">

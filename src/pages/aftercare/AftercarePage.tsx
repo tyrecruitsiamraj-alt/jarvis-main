@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
@@ -162,9 +163,9 @@ const AftercarePage: React.FC = () => {
             <Users className="h-4 w-4" aria-hidden />
             {adding ? 'กำลังเพิ่ม…' : 'เพิ่มคนจากบอร์ด ERP'}
           </button>
-          <button type="button" onClick={load} disabled={loading} className="jarvis-btn-secondary">
+          <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
             <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
-          </button>
+          </Button>
           <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
               type="checkbox"
@@ -229,12 +230,12 @@ const AftercarePage: React.FC = () => {
               หรือกดเพิ่มเองจากบอร์ด ERP
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <button type="button" onClick={() => setPickerOpen(true)} className="jarvis-btn-secondary">
+              <Button variant="secondary" size="sm" type="button" onClick={() => setPickerOpen(true)} >
                 เพิ่มคนจากบอร์ด ERP
-              </button>
-              <button type="button" onClick={() => navigate('/follow')} className="jarvis-btn-secondary">
+              </Button>
+              <Button variant="secondary" size="sm" type="button" onClick={() => navigate('/follow')} >
                 ไปหน้า Follow
-              </button>
+              </Button>
             </div>
           </div>
         ) : (

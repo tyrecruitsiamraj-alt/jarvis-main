@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
@@ -356,13 +357,13 @@ export default function RecruitControlPanel() {
               </p>
             </button>
             {stale.claimedIdle.byUser.length > 0 ? (
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => setShowIdleUsers((v) => !v)}
-                className="jarvis-btn-ghost shrink-0 text-[11px]"
+                className="shrink-0 text-[11px]"
               >
                 {showIdleUsers ? 'ซ่อนรายคน' : 'ดูรายคน'}
-              </button>
+              </Button>
             ) : null}
           </div>
           {/* กอง "รอเลือกวิธีโทร" (Phase 5.9) — ต่อท้ายกล่องเดียวกันเพราะเป็นขั้นถัดไปของ

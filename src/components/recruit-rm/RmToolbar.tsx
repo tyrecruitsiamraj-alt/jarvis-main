@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { Radio, Link2, MessageSquareWarning } from 'lucide-react';
 import { RM_TOOLBAR_KEYS, RM_TOOLBAR_LABEL, type RmToolbarKey } from '@/lib/recruitRm';
 
@@ -22,9 +23,9 @@ const RmToolbar: React.FC<{ onOpen: (key: RmToolbarKey) => void }> = ({ onOpen }
     {RM_TOOLBAR_KEYS.map((key) => {
       const Icon = ICONS[key];
       return (
-        <button key={key} type="button" onClick={() => onOpen(key)} className="jarvis-btn-secondary">
+        <Button variant="secondary" size="sm" key={key} type="button" onClick={() => onOpen(key)} >
           <Icon className="h-3.5 w-3.5" aria-hidden /> {RM_TOOLBAR_LABEL[key]}
-        </button>
+        </Button>
       );
     })}
   </div>
