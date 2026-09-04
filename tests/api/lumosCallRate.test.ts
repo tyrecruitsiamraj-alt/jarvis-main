@@ -50,6 +50,12 @@ describe('lumosCallRate — สรุปช่วง', () => {
     expect(w.connectedPct).toBe(8); // 3/40
     expect(w.confirmedPct).toBe(5); // 2/40
     expect(w.unreachedPct).toBe(93); // 37/40
+    /**
+     * 🔴 **Success Rate ฐานคือคนที่รับสาย** (เจ้าของสั่ง 4 ก.ย. 2569)
+     * 2 สำเร็จ จาก 3 คนที่รับสาย = 67% — **คนละตัวกับ `confirmedPct` (5%)**
+     * ที่ฐานเป็นสายทั้งหมด · เอาสองตัวนี้สลับกันเมื่อไหร่ เลขบนจอโกหกทันที
+     */
+    expect(w.successRatePct).toBe(67);
   });
 
   it('ไม่มีสายที่มีผลจริง = % เป็น null ทุกตัว (ห้ามโชว์ 0% ทั้งที่ยังไม่มีผล)', () => {
@@ -58,6 +64,8 @@ describe('lumosCallRate — สรุปช่วง', () => {
     expect(w.pending).toBe(5);
     expect(w.connectedPct).toBeNull();
     expect(w.confirmedPct).toBeNull();
+    // ยังไม่มีใครรับสาย ⇒ หารไม่ได้ ต้องเป็น null ห้ามโชว์ 0%
+    expect(w.successRatePct).toBeNull();
   });
 
   it('ขอบหน้าต่าง: นับเฉพาะวันใน [from..to]', () => {

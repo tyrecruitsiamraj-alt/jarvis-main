@@ -270,6 +270,9 @@ const LumosCallRatePanel: React.FC = () => {
     if (!currentWin) return undefined;
     const parts = [`${windowDays} วันล่าสุด: ส่ง ${fmtN(currentWin.sent)} สาย`];
     if (currentWin.confirmedPct !== null) parts.push(`สำเร็จ ${currentWin.confirmedPct}%`);
+    // Success Rate = คนที่รับสายแล้วปิดได้กี่ % (ฐานแคบกว่า จึงต้องมีคำกำกับเสมอ)
+    if (currentWin.successRatePct !== null)
+      parts.push(`Success Rate ${currentWin.successRatePct}% (จากคนที่รับสาย)`);
     if (trend?.volumeDir === 'up') parts.push('ปริมาณโตขึ้น');
     else if (trend?.volumeDir === 'down') parts.push('ปริมาณลดลง');
     // งานค้างต้องโผล่บนหัวแผงด้วย — หุบแผงอยู่ก็ต้องเห็นว่ามีของค้าง (ห้ามเงียบ)
@@ -418,7 +421,17 @@ const LumosCallRatePanel: React.FC = () => {
                   value={trend.current.confirmed}
                   pct={trend.current.confirmedPct}
                   tone="success"
-                  sub="ตอบยืนยัน/สนใจ — รับสายเฉย ๆ ไม่นับ"
+                  sub="ตอบยืนยัน/สนใจ — % จากสายที่มีผลทั้งหมด"
+                />
+                {/* 🔴 **Success Rate — ฐานคือคนที่รับสาย** (เจ้าของสั่ง 4 ก.ย. 2569)
+                    ตอบคำถาม *"พอได้คุยกับคนแล้ว ปิดได้กี่ %"* ต่างจากช่อง "สำเร็จ" ข้าง ๆ
+                    ที่ฐานเป็นสายทั้งหมด ⇒ ต้องเขียนฐานกำกับทั้งสองช่อง ไม่งั้นอ่านสลับกัน */}
+                <StatBox
+                  label="Success Rate"
+                  value={trend.current.confirmed}
+                  pct={trend.current.successRatePct}
+                  tone="success"
+                  sub={`% จากคนที่รับสาย ${fmtN(trend.current.connected)} สาย`}
                 />
                 <StatBox
                   label="ปฏิเสธ"

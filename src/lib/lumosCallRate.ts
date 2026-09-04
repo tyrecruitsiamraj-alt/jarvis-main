@@ -82,6 +82,14 @@ export type CallRateWindow = {
   /** % จากฐานสายที่มีผลจริง — null เมื่อไม่มีฐาน (จอต้องเขียน "ยังไม่มีผล" ไม่ใช่ 0%) */
   connectedPct: number | null;
   confirmedPct: number | null;
+  /**
+   * **Success Rate — % สำเร็จของ "คนที่รับสาย"** (เจ้าของสั่ง 4 ก.ย. 2569)
+   * = สำเร็จ ÷ โทรติด · `null` = ยังไม่มีใครรับสายเลย (หารไม่ได้ ห้ามโชว์ 0%)
+   *
+   * ⚠️ **คนละตัวกับ `confirmedPct`** (ฐาน = สายที่มีผลทั้งหมด รวมที่ยกหูไม่ได้)
+   * ตัวนี้ตัดสายที่ไม่ได้คุยออก ⇒ สูงกว่าเสมอ · บนจอต้องเขียนฐานกำกับทุกที่
+   */
+  successRatePct: number | null;
   declinedPct: number | null;
   unreachedPct: number | null;
 };
@@ -130,6 +138,7 @@ export function summarizeCallRateWindow(
     unreached: 0,
     connectedPct: null,
     confirmedPct: null,
+    successRatePct: null,
     declinedPct: null,
     unreachedPct: null,
   };
@@ -147,6 +156,17 @@ export function summarizeCallRateWindow(
   }
   w.connectedPct = pctOf(w.connected, w.withResult);
   w.confirmedPct = pctOf(w.confirmed, w.withResult);
+  /**
+   * 🔴 **Success Rate — ฐานคือ "คนที่รับสาย" ไม่ใช่สายทั้งหมด**
+   * (เจ้าของสั่ง 4 ก.ย. 2569: *"เพิ่มค่า Success Rate เข้าไปให้ด้วย เพื่อจะได้รู้ว่า
+   * คนรับสายมี % สำเร็จเท่าไหร่"*)
+   *
+   * ⚠️ **คนละตัวกับ `confirmedPct`** ที่มีอยู่แล้ว — อันนั้นฐาน = สายที่มีผลทั้งหมด
+   * (รวมสายที่ยกหูไม่ได้) เลยตอบว่า *"ส่งไปแล้วได้ผลดีกี่ %"*
+   * ส่วนตัวนี้ตัดสายที่ไม่ได้คุยออก เลยตอบว่า *"พอได้คุยกับคนแล้ว ปิดได้กี่ %"*
+   * ⇒ เลขนี้จะสูงกว่าเสมอ · **ห้ามเอาสองตัวนี้มาสลับกันใช้** ต้องเขียนฐานกำกับบนจอทุกที่
+   */
+  w.successRatePct = pctOf(w.confirmed, w.connected);
   w.declinedPct = pctOf(w.declined, w.withResult);
   w.unreachedPct = pctOf(w.unreached, w.withResult);
   return w;

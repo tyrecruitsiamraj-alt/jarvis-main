@@ -16,7 +16,9 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Kanit', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        /* 🔴 ฟอนต์เดียวทั้งระบบ (เจ้าของสั่ง 4 ก.ย. 2569) — `font-mono` ยังใช้ได้
+           ในโค้ดเดิม 73 จุด แต่ได้ Kanit เหมือนกันหมด · ตัวเลขเรียงตรงด้วย tabular-nums */
+        mono: ['Kanit', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

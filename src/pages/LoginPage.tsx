@@ -357,9 +357,10 @@ const LoginPage: React.FC = () => {
   return (
     <div
       className="relative min-h-[100dvh] overflow-x-hidden"
-      /* ตัวอักษรของ mockup — Instrument Sans นำ แล้วตกไป Kanit สำหรับไทย */
+      /* 🔴 เปลี่ยนเป็น Kanit ตามคำสั่งล่าสุด 4 ก.ย. 2569 (*"ทั้งระบบต้องเป็น font Kanit"*)
+         — ทับคำสั่งเดิมที่ให้ยก mockup มาเป๊ะด้วย Instrument Sans */
       style={{
-        fontFamily: "'Instrument Sans', Kanit, system-ui, -apple-system, 'Segoe UI', sans-serif",
+        fontFamily: "Kanit, system-ui, -apple-system, 'Segoe UI', sans-serif",
         color: FRONT_SCENE.ink,
       }}
     >

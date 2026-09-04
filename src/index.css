@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+/* 🔴 **ฟอนต์เดียวทั้งระบบ = Kanit** (เจ้าของสั่ง 4 ก.ย. 2569: *"ทั้งระบบต้องเป็น
+   font Kanit ... อย่าหลุด Framework จำไว้เลยนะ"*)
+   เดิมโหลดสามฟอนต์: Kanit (ตัวหลัก) · JetBrains Mono (`font-mono` 73 จุด) ·
+   Instrument Sans (หน้าเข้าสู่ระบบ) ⇒ หน้าจอมีสามหน้าตาปนกัน + โหลดช้าโดยไม่จำเป็น
+   ⚠️ ตัดสองตัวหลังออก · `font-mono` ถูก map ไป Kanit ที่ tailwind.config.ts แล้ว
+   ตัวเลขยังเรียงตรงกันด้วย `tabular-nums` (Kanit มีชุดตัวเลขความกว้างเท่ากัน) */
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -76,7 +82,9 @@
        เลขกับตัวอักษรไทยความสูงไม่เท่ากัน · Kanit มีทั้งสองชุดในตัวเดียว
        (tailwind.config ประกาศ Kanit เป็น font-sans มาตั้งแต่ต้นแล้ว แต่ไม่เคยโหลดจริง) */
     --font-display: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+    /* 🔴 ไม่มีฟอนต์ mono แยกแล้ว — ใช้ Kanit ตัวเดียวทั้งระบบ · ความเป็นระเบียบของ
+       ตัวเลขมาจาก `tabular-nums` (ความกว้างเท่ากัน) ไม่ใช่จากการเปลี่ยนฟอนต์ */
+    --font-mono: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
   /* ── Dark mode — สลับด้วย class `dark` บน <html> (src/lib/theme.ts) ──
