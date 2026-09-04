@@ -13,7 +13,8 @@ const sizeClass: Record<Size, { box: string; text: string; img: string }> = {
   hero: {
     box: 'w-44 h-44 rounded-full',
     text: 'text-4xl',
-    img: 'w-44 h-44 rounded-full p-5 object-contain bg-white/85 border border-white/90 shadow-[0_12px_48px_rgba(24,20,16,0.1)]',
+    /* ทรง hero — พื้นโปร่งเหมือนกัน (เจ้าของสั่ง 4 ก.ย. 2569) */
+    img: 'w-44 h-44 rounded-full p-5 object-contain',
   },
 };
 
@@ -27,7 +28,12 @@ export const BrandMark: React.FC<{ size?: Size; className?: string }> = ({ size 
       <img
         src={config.logoDataUrl}
         alt=""
-        className={cn(s.img, 'object-contain bg-card border border-border/50', className)}
+        /**
+         * 🔴 **พื้นหลังโลโก้โปร่งใส** (เจ้าของสั่ง 4 ก.ย. 2569) — เดิมใส่ `bg-card`
+         * + ขอบ ทำให้โลโก้เป็นสี่เหลี่ยมขาวแปะอยู่บนพื้นทุกที่ (เห็นชัดสุดที่หน้าล็อกอิน
+         * ซึ่งพื้นเป็นภาพ) · ไฟล์โลโก้เป็น PNG โปร่งอยู่แล้ว ไม่ต้องมีพื้นรอง
+         */
+        className={cn(s.img, 'object-contain', className)}
       />
     );
   }

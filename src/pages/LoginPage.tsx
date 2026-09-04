@@ -287,6 +287,148 @@ function OrDivider() {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
+
+/**
+ * ═══ ซ้ายมือของหน้าเข้าสู่ระบบ — **ระบบนี้ทำอะไรให้** ═══
+ * (เจ้าของสั่ง 4 ก.ย. 2569: *"แบ่งครึ่งซ้ายขวา ขวาเป็น Login ซ้ายเป็นแบบอธิบายระบบ
+ * อธิบายแบบด้วยลูกเล่นที่เท่ ๆ"*)
+ *
+ * **ลูกเล่นที่ใช้** — ทำจาก state + utility ล้วน ๆ:
+ *   1. คำหัวเรื่องสลับวนทีละคำทุก 2.2 วิ (จาง-เลื่อนขึ้น) = บอกว่าระบบทำอะไรได้หลายอย่าง
+ *   2. สี่บรรทัดงานไล่โผล่ทีละอัน แล้ว **ไฮไลต์ไล่ลงมาเรื่อย ๆ** เหมือนสายพานเดิน
+ *   3. จุดสถานะเต้น (`animate-pulse` ของ Tailwind)
+ * 🔴 **ไม่มี CSS ใหม่สักบรรทัด** (กฎเจ้าของ 4 ก.ย. 2569) — ใช้ `animate-in` ของ
+ * tailwindcss-animate + `transition` + `animate-pulse` ที่มีอยู่แล้ว
+ * 🔴 สีทุกสีมาจาก `FRONT_SCENE` (จานสีของหน้านี้) ไม่มี hex ดิบ
+ */
+const INTRO_WORDS = ['หาคนได้เร็วขึ้น', 'ไม่มีใบขอตกหล่น', 'รู้ทุกสายที่ AI โทร'] as const;
+
+const INTRO_STEPS = [
+  { title: 'รับใบขอจากหน่วยงาน', desc: 'ทุกใบบอกเองว่าค้างมากี่วัน ใบไหนต้องรีบ' },
+  { title: 'ปล่อยประกาศ + จับคู่คน', desc: 'ลงประกาศทีเดียวหลายช่องทาง แล้ว AI แนะนำคนให้' },
+  { title: 'ให้ AI โทรแทน', desc: 'โทรตามนัด บันทึกผลเอง คุยไม่ได้ค่อยส่งต่อให้คน' },
+  { title: 'ตามจนถึงวันเริ่มงาน', desc: 'ติดตามต่อหลังเริ่มงาน กันหลุดในเดือนแรก' },
+] as const;
+
+const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) => {
+  const [wordIndex, setWordIndex] = useState(0);
+  const [activeStep, setActiveStep] = useState(0);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    // ผู้ใช้ตั้งค่าไม่เอาแอนิเมชัน = อยู่นิ่ง ๆ (กติกาเดิมของโปรเจกต์)
+    if (reduceMotion) return;
+    const w = window.setInterval(() => setWordIndex((n) => (n + 1) % INTRO_WORDS.length), 2200);
+    const s2 = window.setInterval(() => setActiveStep((n) => (n + 1) % INTRO_STEPS.length), 1600);
+    return () => {
+      window.clearInterval(w);
+      window.clearInterval(s2);
+    };
+  }, [reduceMotion]);
+
+  return (
+    /**
+     * 🔴 พื้นกระจก**บางกว่า**การ์ดล็อกอิน — ตัวหนังสือเขียวเข้มบนภาพป่าอ่านไม่ออก
+     * (วัดบนจอจริง 4 ก.ย. 2569) · บางกว่าเพื่อไม่ให้กลายเป็น "สองการ์ด" อีกใบ
+     * ซึ่งเป็นสิ่งที่เจ้าของเพิ่งสั่งเอาออก
+     */
+    <motion.div
+      {...rise(0.12)}
+      className="w-full rounded-3xl p-6"
+      style={{
+        background: 'rgba(255, 255, 255, .42)',
+        border: `1px solid ${HAIRLINE}`,
+        backdropFilter: 'blur(20px) saturate(1.2)',
+      }}
+    >
+      <p
+        className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
+        style={{ color: FRONT_SCENE.muted }}
+      >
+        <span
+          className="h-1.5 w-1.5 rounded-full animate-pulse"
+          style={{ background: FRONT_SCENE.sageStrong }}
+          aria-hidden
+        />
+        SO RECRUIT
+      </p>
+
+      {/* คำสลับวน — ความสูงคงที่ ไม่ให้บรรทัดล่างกระตุก */}
+      <h2
+        className="mt-2 text-[clamp(22px,2.6vw,30px)] font-[610] leading-tight"
+        style={{ color: FRONT_SCENE.ink }}
+      >
+        ระบบสรรหาที่ทำให้
+        <span className="relative mt-1 block h-[1.35em] overflow-hidden">
+          {INTRO_WORDS.map((w, i) => (
+            <span
+              key={w}
+              aria-hidden={i !== wordIndex}
+              className={cn(
+                'absolute inset-x-0 top-0 transition-all duration-500 ease-out',
+                i === wordIndex ? 'translate-y-0 opacity-100' : '-translate-y-3 opacity-0',
+              )}
+              style={{ color: FRONT_SCENE.sageStrong }}
+            >
+              {w}
+            </span>
+          ))}
+        </span>
+      </h2>
+
+      {/* สายพาน 4 ขั้น — ไฮไลต์ไล่ลงมาเรื่อย ๆ ให้เห็นว่างานไหลยังไง */}
+      <ol className="mt-5 space-y-1.5">
+        {INTRO_STEPS.map((s, i) => {
+          const on = i === activeStep;
+          return (
+            <li
+              key={s.title}
+              className={cn(
+                'flex items-start gap-3 rounded-2xl px-3 py-2.5 transition-all duration-500 ease-out',
+                'animate-in fade-in slide-in-from-left-4',
+                i === 1 && 'delay-75',
+                i === 2 && 'delay-150',
+                i === 3 && 'delay-200',
+              )}
+              style={
+                on
+                  ? { background: 'rgba(255,255,255,.55)', boxShadow: '0 6px 20px rgba(18,39,26,.08)' }
+                  : undefined
+              }
+            >
+              <span
+                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors duration-500"
+                style={
+                  on
+                    ? { background: FRONT_SCENE.sageStrong, color: FRONT_SCENE.paper }
+                    : { background: 'rgba(255,255,255,.5)', color: FRONT_SCENE.muted }
+                }
+                aria-hidden
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span
+                  className="block text-[14px] font-semibold leading-snug"
+                  style={{ color: FRONT_SCENE.ink }}
+                >
+                  {s.title}
+                </span>
+                <span
+                  className="block text-[12.5px] leading-relaxed"
+                  style={{ color: FRONT_SCENE.muted }}
+                >
+                  {s.desc}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </motion.div>
+  );
+};
+
 const LoginPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const rise = useRise();
@@ -409,16 +551,17 @@ const LoginPage: React.FC = () => {
           </p>
         </motion.div>
 
-        {/* สองการ์ดวางคู่บนจอใหญ่ · ซ้อนกันบนมือถือ
-            🔴 การ์ด "ดูประกาศงาน" ต้องมีอยู่ — เจ้าของทักตอนผมยุบเหลือบรรทัดเล็ก ๆ
-            (*"แล้วการ์ด ดูประกาศงานอะ"*) เป็นทางเข้าของคนหางาน ไม่ใช่ของเสริม */}
-        {/* ⚠️ `items-center` ไม่ใช่ `items-stretch` — บน production เหลือปุ่ม Microsoft
-            ปุ่มเดียว การ์ดล็อกอินจึงเตี้ยมาก ถ้าสั่งยืดให้เท่าการ์ดขวาจะได้กล่องว่างสูงเปล่า ๆ
-            (วัดบนจอจริงแล้วเจอ) ⇒ ให้แต่ละการ์ดสูงเท่าเนื้อของตัวเอง */}
-        <div className="flex w-full flex-col items-center justify-center gap-4 lg:flex-row lg:items-center lg:gap-5">
-        {/* การ์ดกระจก — `.card` ของ mockup */}
+        {/* ── ซ้าย: อธิบายระบบ · ขวา: เข้าสู่ระบบ (เจ้าของสั่ง 4 ก.ย. 2569) ──
+            🔴 การ์ด "ดูประกาศรับสมัคร" **ถูกเอาออก**ตามคำสั่งเดียวกัน
+            (เดิมเป็นการ์ดขวาคู่กับฟอร์ม) · ทางเข้าของคนหางาน **ไม่หาย** —
+            ย้ายไปเป็นลิงก์ใต้ฟอร์มล็อกอิน ยังกดจากหน้านี้ได้เหมือนเดิม
+            ⚠️ คำสั่งนี้ทับของเดิม 2 ก.ย. ที่เคยสั่งว่าการ์ดนั้น "ต้องมีอยู่" */}
+        <div className="grid w-full max-w-[980px] items-center gap-6 lg:grid-cols-2 lg:gap-10">
+        {/* ═══ ซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══ */}
+        <SystemIntro rise={rise} />
+
         <motion.div {...rise(0.22)} className="w-full max-w-[410px]">
-          <div className="rounded-3xl p-6" style={GLASS_CARD}>
+          <div className="flex h-full flex-col rounded-3xl p-6" style={GLASS_CARD}>
             {authConfig === null && configError ? (
               <div className="space-y-3 py-6 text-center">
                 <p className="text-sm" style={{ color: FRONT_SCENE.muted }}>
@@ -477,63 +620,27 @@ const LoginPage: React.FC = () => {
                     เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
                   </p>
                 )}
+
+                {/* 🔴 ทางเข้าของ **คนหางาน** — การ์ดใบเดิมถูกเอาออก (เจ้าของสั่ง 4 ก.ย. 2569)
+                    แต่ทางเข้าห้ามหาย เพราะคนนอกเข้าเว็บนี้เพื่อสมัครงาน ไม่ได้มาล็อกอิน */}
+                <div className="mt-5 border-t pt-4 text-center" style={{ borderColor: HAIRLINE }}>
+                  <p className="text-[11px]" style={{ color: FRONT_SCENE.muted }}>
+                    ไม่ได้เป็นพนักงาน? มาสมัครงานได้เลย ไม่ต้องมีบัญชี
+                  </p>
+                  <Link
+                    to="/apply"
+                    className="mt-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-5 text-[13px] font-semibold transition-[filter] hover:brightness-110"
+                    style={FOREST_BTN}
+                  >
+                    เปิดบอร์ดประกาศรับสมัคร
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                </div>
               </>
             )}
           </div>
         </motion.div>
 
-        {/* ── การ์ดที่สอง: ทางเข้าของคนหางาน ──
-            🔴 ของเดิมเป็นการ์ดข้างขวาบนจอใหญ่ + ปุ่มในการ์ดล็อกอินบนมือถือ (สองที่)
-            รอบนี้เหลือ**การ์ดเดียว เห็นครบทุกจอ** ทรงกระจกเดียวกับการ์ดล็อกอิน */}
-        <motion.div {...rise(0.3)} className="w-full max-w-[410px]">
-          <div
-            className="flex h-full flex-col justify-between rounded-3xl p-6"
-            style={GLASS_CARD}
-          >
-            <div>
-              <p
-                className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-                style={{ color: FRONT_SCENE.muted }}
-              >
-                สำหรับผู้สมัครงาน
-              </p>
-              <p
-                className="mt-2 text-[19px] font-semibold leading-snug"
-                style={{ color: FRONT_SCENE.ink }}
-              >
-                ดูประกาศรับสมัครพนักงาน
-              </p>
-              <p
-                className="mt-1.5 text-[13px] leading-relaxed"
-                style={{ color: 'rgba(21, 37, 28, .62)' }}
-              >
-                เลือกตำแหน่งที่สนใจแล้วกรอกใบสมัครได้ทันที — ไม่ต้องมีบัญชี ไม่ต้องเข้าสู่ระบบ
-                ทีมสรรหาจะติดต่อกลับ
-              </p>
-            </div>
-
-            {/* ตราบริษัทตัวใหญ่ — ที่เดียวกับของเดิมในการ์ดขวา */}
-            <div className="flex flex-1 items-center justify-center py-6">
-              <div className="relative flex items-center justify-center">
-                <div
-                  className="absolute h-32 w-32 rounded-full blur-2xl"
-                  style={{ background: 'rgba(255, 241, 208, .55)' }}
-                  aria-hidden
-                />
-                <BrandMark size="xl" className="relative z-10" />
-              </div>
-            </div>
-
-            <Link
-              to="/apply"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold transition-[filter] hover:brightness-110"
-              style={FOREST_BTN}
-            >
-              เปิดบอร์ดประกาศรับสมัคร
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
-          </div>
-        </motion.div>
         </div>
       </div>
 
