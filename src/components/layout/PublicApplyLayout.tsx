@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
 import { getAppShellBackgroundStyle } from '@/lib/brandingStorage';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import { cn } from '@/lib/utils';
+import { isEmbedMode, startEmbedHeightReporter } from '@/lib/embedMode';
 
 /**
  * เลย์เอาต์สำหรับผู้สมัครงานเท่านั้น — ไม่มีเมนูเข้าระบบภายใน
@@ -10,6 +11,18 @@ import { cn } from '@/lib/utils';
 const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
+  /**
+   * 🔴 โหมดฝัง `?embed=1` (เจ้าของถาม 3 ก.ย. 2569 ว่าเอาหน้าสาธารณะไปทำ iframe ได้ไหม)
+   * ตัด **หัว-ท้าย-พื้นหลัง** ของเราออก เหลือแต่เนื้อในให้กลืนกับหน้าที่เอาไปวาง
+   * ⚠️ เนื้อหา/ปุ่มสมัคร/ตัวกรอง ยังครบเหมือนเดิมทุกอย่าง
+   */
+  const embed = isEmbedMode();
+
+  useEffect(() => startEmbedHeightReporter(), []);
+
+  if (embed) {
+    return <div className="min-h-screen bg-transparent">{children}</div>;
+  }
 
   return (
     <div
