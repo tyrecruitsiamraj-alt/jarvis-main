@@ -411,8 +411,15 @@ const AdminSettings: React.FC = () => {
                     {/* ชื่อเล่น + สายงาน (114 · เจ้าของสั่ง 1 ก.ย. 2569) — ตั้งทุกอย่างของคนคนนี้ในแถวเดียว */}
                     <th className="px-4 py-3 text-left text-muted-foreground font-medium">ชื่อเล่น</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">สายงาน</th>
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">Username</th>
-                    <th className="px-4 py-3 text-left text-muted-foreground font-medium">Email</th>
+                    {/* 🔴 จอแคบซ่อนสองคอลัมน์นี้ (แก้ 3 ก.ย. 2569) — 10 คอลัมน์ทำให้ตาราง
+                        ล้นขอบขวาจนช่องที่ต้องกรอก (ชื่อเล่น/เบอร์) หลุดออกนอกจอ
+                        อีเมลไปโชว์ใต้ชื่อแทน ข้อมูลไม่หาย */}
+                    <th className="hidden px-4 py-3 text-left text-muted-foreground font-medium xl:table-cell">
+                      Username
+                    </th>
+                    <th className="hidden px-4 py-3 text-left text-muted-foreground font-medium lg:table-cell">
+                      Email
+                    </th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">Role</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">แผนก</th>
                     <th className="px-4 py-3 text-center text-muted-foreground font-medium">เบอร์โทร</th>
@@ -430,7 +437,13 @@ const AdminSettings: React.FC = () => {
                   )}
                   {visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-secondary/20">
-                      <td className="px-4 py-3 font-medium text-foreground">{u.full_name}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {u.full_name}
+                        {/* จอแคบ: อีเมลมาอยู่ใต้ชื่อ (คอลัมน์ Email ถูกซ่อน) */}
+                        <span className="block text-[11px] font-normal text-muted-foreground lg:hidden">
+                          {u.email}
+                        </span>
+                      </td>
                       {/* ชื่อเล่น — ชื่อที่คนเรียกกันจริง (ชื่อบนสุดเป็นชื่ออังกฤษจาก Microsoft) */}
                       <td className="px-4 py-3">
                         <Input
@@ -477,8 +490,10 @@ const AdminSettings: React.FC = () => {
                           })}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.username}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
+                      <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground xl:table-cell">
+                        {u.username}
+                      </td>
+                      <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.email}</td>
                       <td className="px-4 py-3 text-center">
                         <select
                           value={u.role}

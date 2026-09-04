@@ -21,6 +21,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import Term from '@/components/shared/Term';
 import {
   RELEASE_LANE_TEXT,
+  RELEASE_STEP_TEXT,
   type ReleaseLaneKey,
   type ReleaseLedger,
   type ReleaseStepKey,
@@ -369,10 +370,35 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
               </React.Fragment>
             ))}
           </div>
+          {/* 🔴 **"ขั้นนี้ต้องทำอะไร" ต้องพิมพ์บนจอ ไม่ใช่ซ่อนใน hover** (3 ก.ย. 2569)
+              พนักงานใหม่ให้หน้านี้ 5/10 ด้วยคำถาม *"ทำไมต้อง 4 ขั้น แต่ละขั้นทำไร"*
+              — คำตอบอยู่ใน `todo` มาตลอด แต่อยู่ใน `title=` ซึ่งต้องเอาเมาส์จ่อถึงเห็น
+              (บทเรียนเดิมของโปรเจกต์: tooltip = ไม่มีอยู่จริงสำหรับคนส่วนใหญ่) */}
+          {step ? (
+            <p
+              className={cn(
+                'rounded-xl border px-3 py-2 text-[11px] leading-5',
+                TONE.warn.soft,
+                TONE.warn.value,
+              )}
+            >
+              <b>
+                ขั้น {RELEASE_STEP_TEXT[step].step} {RELEASE_STEP_TEXT[step].label}
+              </b>{' '}
+              — {RELEASE_STEP_TEXT[step].hint}
+              <span className="mt-0.5 block">
+                <b>ต้องทำ:</b> {RELEASE_STEP_TEXT[step].todo}
+              </span>
+            </p>
+          ) : (
+            <p className={cn('text-[11px] leading-5', DASH.muted)}>
+              สี่ขั้นนี้คือของที่ต้องมีก่อนประกาศจะขึ้นหน้าสาธารณะ:{' '}
+              <b className="text-foreground">อ่านใบขอ → ใส่สถานที่ทำงาน → เลือกสวัสดิการ → สร้างลิงก์แล้วกดส่ง</b>{' '}
+              · กดขั้นไหนก็เห็นแต่ใบที่ติดขั้นนั้น พร้อมบอกว่าต้องทำอะไร
+            </p>
+          )}
           <p className={cn('text-[11px]', DASH.muted)}>
-            บวกทุกขั้นแล้วได้ {th(ledger.unreleased)} ใบพอดี — หนึ่งใบติดได้ขั้นเดียว ·
-            <span className="font-medium text-foreground"> กดขั้นไหนก็เห็นแต่ใบในขั้นนั้น</span>{' '}
-            แล้วกดใบเพื่อทำตามขั้น 1→4
+            บวกทุกขั้นแล้วได้ {th(ledger.unreleased)} ใบพอดี — หนึ่งใบติดได้ขั้นเดียว
           </p>
         </div>
       ) : null}

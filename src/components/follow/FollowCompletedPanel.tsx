@@ -10,6 +10,7 @@ import {
   selectCompletedFollowPeople,
 } from '@/lib/followCompletion';
 import { moveToAftercare } from '@/lib/aftercareApi';
+import { completeFollowEntry } from '@/lib/followApi';
 import { UserCheck } from 'lucide-react';
 
 /**
@@ -44,7 +45,15 @@ const FollowCompletedPanel: React.FC<{
   /** กี่คนที่ส่งต่อได้จริง — คนที่ AI ได้คำตอบว่าไม่ไปไม่นับ */
   const readyCount = people.filter((p) => !reasonBlocksAftercare(p.reason)).length;
 
-  const move = async (key: string, name: string, phone: string, unitName: string | null, siteCode: string | null, followId: string | null) => {
+  const move = async (
+    key: string,
+    name: string,
+    phone: string,
+    unitName: string | null,
+    siteCode: string | null,
+    followId: string | null,
+    rounds: readonly { id: string; cancelled?: boolean; completed_at?: string | null }[],
+  ) => {
     setMovingKey(key);
     setError(null);
     try {
@@ -56,6 +65,22 @@ const FollowCompletedPanel: React.FC<{
         from_follow_id: followId,
         source: 'follow_done',
       });
+      /**
+       * 🔴 **ย้ายแล้วปิดงานติดตามให้เลย** (3 ก.ย. 2569 — เจ้าของสั่งดันทุกหน้าถึง 8 คะแนน)
+       *
+       * เดิมปุ่มนี้ย้ายชื่อไปหน้าดูแลอย่างเดียว งานติดตามยังค้างในกอง "กำลังตาม"
+       * ⇒ แท็บ "สำเร็จ" เป็น 0 ตลอด และคนเดิมโผล่ทั้งสองหน้า (เจ้าของทักเรื่องนี้มาแล้ว)
+       * ⚠️ ปิดเฉพาะ **รอบที่ยังไม่ปิด** และเงียบไว้ถ้าปิดพลาด — การย้ายสำเร็จแล้ว
+       * ห้ามให้ผู้ใช้เห็น error ที่ทำให้เข้าใจว่าย้ายไม่สำเร็จ
+       */
+      const openRounds = rounds.filter((r) => !r.cancelled && !r.completed_at);
+      for (const r of openRounds) {
+        try {
+          await completeFollowEntry(r.id, 'went');
+        } catch {
+          // ปิดไม่ได้ก็ไม่เป็นไร — ยังกดปิดเองได้ที่ป๊อปของสายนั้น
+        }
+      }
       setMovedKeys((prev) => [...prev, key]);
       onMoved?.(name);
     } catch (e) {
@@ -138,14 +163,22 @@ const FollowCompletedPanel: React.FC<{
                   type="button"
                   disabled={movingKey === g.key}
                   onClick={() =>
-                    void move(g.key, g.name, g.phone, g.unitName, g.siteCode, lastRound?.id ?? null)
+                    void move(
+                      g.key,
+                      g.name,
+                      g.phone,
+                      g.unitName,
+                      g.siteCode,
+                      lastRound?.id ?? null,
+                      g.rounds,
+                    )
                   }
                   className={cn(
                     'inline-flex min-h-9 shrink-0 items-center rounded-full border px-3 font-semibold disabled:opacity-50',
                     TONE.primary.outline,
                   )}
                 >
-                  {movingKey === g.key ? 'กำลังย้าย…' : 'ย้ายไปดูแลหลังเริ่มงาน'}
+                  {movingKey === g.key ? 'กำลังย้าย…' : 'ย้าย + ปิดงานติดตาม'}
                 </button>
               )}
             </li>

@@ -121,3 +121,37 @@ export async function fetchCallFunnel(
     return { funnel: EMPTY_FUNNEL, needsHuman: [] };
   }
 }
+
+
+/** คนหนึ่งคนในช่องของแผง AI โทร — ใช้กับ drill-down "กดเลขแล้วเห็นชื่อ" */
+export type CallFunnelPerson = {
+  id: number;
+  name: string | null;
+  phone: string | null;
+  outcome: string | null;
+  attempt: number;
+  status: string;
+  sentAt: string | null;
+  jobRef: string | null;
+};
+
+/**
+ * รายชื่อคนในช่องนั้น — เจ้าของสั่ง 3 ก.ย. 2569 ให้ทุกหน้าได้ ≥8 คะแนน
+ * จุดที่ฉุดหน้าจับคู่งานคือ **เห็นแต่ตัวเลข กดดูชื่อไม่ได้** (พนักงานใหม่ให้ 4/10)
+ *
+ * ⚠️ โหลดพลาด = โยน error ให้จอบอกว่าโหลดไม่ได้ **ห้ามคืนลิสต์ว่าง**
+ * (ลิสต์ว่างอ่านเหมือน "ไม่มีใครในช่องนี้" ซึ่งขัดกับเลขบนกล่อง)
+ */
+export async function fetchCallFunnelPeople(
+  cell: string,
+  sinceYmd?: string,
+  source: CallFunnelSource = 'all',
+): Promise<CallFunnelPerson[]> {
+  const params = new URLSearchParams({ people: cell });
+  if (sinceYmd) params.set('since', sinceYmd);
+  if (source !== 'all') params.set('source', source);
+  const r = await apiFetch(`/api/lumos/call-funnel?${params.toString()}`);
+  if (!r.ok) throw new Error('โหลดรายชื่อไม่ได้');
+  const data = await readJsonSafe<{ people?: CallFunnelPerson[] }>(r);
+  return data?.people ?? [];
+}

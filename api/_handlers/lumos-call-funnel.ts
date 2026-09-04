@@ -27,6 +27,9 @@ import {
   queuePending,
   queueWaiting,
   queueSentAt,
+  queueActive,
+  queuePayloadName,
+  queuePayloadPhone,
 } from '../_lib/lumosQueueDefs.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -105,6 +108,85 @@ const SOURCE_WHERE: Record<Exclude<CallFunnelSource, 'all'>, string> = {
   board: `q.person_ref like 'card-%'`,
   irecruit: `q.person_ref like 'ir-%'`,
 };
+
+/**
+ * **รายชื่อคนในแต่ละช่อง** (`?people=<cell>`) — เจ้าของสั่ง 3 ก.ย. 2569 ให้ทุกหน้า
+ * ได้ 8 คะแนนขึ้นไป · จุดที่ฉุดหน้าจับคู่งานคือ *"เห็นแต่ตัวเลขรวม ไม่เห็นรายชื่อจริง"*
+ * (ผลทดสอบพนักงานใหม่ให้ 4/10) — ตัวเลขที่กดดูชื่อไม่ได้ พิสูจน์ไม่ได้ว่าจริง
+ *
+ * 🔴 **นิยามของแต่ละช่องต้องตรงกับ `aiCallFlowCells()` เป๊ะ** ไม่งั้นเลขกับรายชื่อจะเถียงกัน
+ * (บทเรียนหน้าติดตาม: ยอดมาจาก funnel แต่ชื่อมาจากอีกชุด แล้วไม่ตรงกัน)
+ * มีเทสต์คุมว่า key ทั้งสองฝั่งเท่ากันที่ `tests/api/callFunnelPeople.test.ts`
+ */
+const CELL_WHERE: Record<string, (q?: string) => string> = {
+  total: () => queueActive('q'),
+  calling: () => queueWaiting('q'),
+  connected: () => `${queueOutcome('q')} in (${CONNECTED_OUTCOMES.map((o) => `'${o}'`).join(',')})`,
+  confirmed: () => `${queueOutcome('q')} = 'confirmed'`,
+  declined: () => `${queueOutcome('q')} = 'declined'`,
+  no_answer: () => `${queueOutcome('q')} in (${UNREACHED_OUTCOMES.map((o) => `'${o}'`).join(',')})`,
+  reschedule: () => `${queueOutcome('q')} = 'reschedule_requested'`,
+  retry: () => `q.followup_state = 'retry_scheduled'`,
+};
+
+export const CALL_FUNNEL_CELL_KEYS = Object.keys(CELL_WHERE);
+
+export type CallFunnelPerson = {
+  id: number;
+  name: string | null;
+  phone: string | null;
+  outcome: string | null;
+  attempt: number;
+  status: string;
+  sentAt: string | null;
+  jobRef: string | null;
+};
+
+async function loadCellPeople(
+  cell: string,
+  sinceYmd: string | null,
+  source: CallFunnelSource,
+  limit = 200,
+): Promise<CallFunnelPerson[]> {
+  const build = CELL_WHERE[cell];
+  if (!build) return [];
+  const params: unknown[] = [];
+  const conds: string[] = [build()];
+  if (sinceYmd) {
+    params.push(`${sinceYmd}T00:00:00+07:00`);
+    conds.push(`q.created_at >= $${params.length}::timestamptz`);
+  }
+  if (source !== 'all') conds.push(SOURCE_WHERE[source]);
+  params.push(Math.min(Math.max(limit, 1), 500));
+  const { rows } = await dbQuery<{
+    id: number;
+    payload: unknown;
+    outcome: string | null;
+    attempt_count: number;
+    status: string;
+    sent_at: string | null;
+    job_ref: string | null;
+  }>(
+    `select q.id, q.payload, ${queueOutcome('q')} as outcome, q.attempt_count, q.status,
+            ${queueSentAt('q')} as sent_at, q.job_ref
+       from ${queueTable} q
+      where ${conds.join(' and ')}
+      order by q.updated_at desc
+      limit $${params.length}`,
+    params,
+  );
+  // ส่งเฉพาะฟิลด์ที่จอใช้ — ห้าม dump payload ทั้งก้อน (ในนั้นมีบทพูด/เบอร์ฉุกเฉิน)
+  return rows.map((r) => ({
+    id: Number(r.id),
+    name: queuePayloadName(r.payload),
+    phone: queuePayloadPhone(r.payload),
+    outcome: r.outcome,
+    attempt: Number(r.attempt_count) || 1,
+    status: r.status,
+    sentAt: r.sent_at,
+    jobRef: r.job_ref,
+  }));
+}
 
 function isCallFunnelSource(v: string): v is CallFunnelSource {
   return v === 'all' || v === 'follow' || v === 'board' || v === 'irecruit';
@@ -459,6 +541,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // มิติเวลา (แผง Rate บนแดชบอร์ด) — ขอเมื่อส่ง ?series=day เท่านั้น หน้าที่ใช้ funnel
     // ก้อนเดิมไม่ต้องจ่ายค่า query เพิ่ม · days ควบ 1-120 (ค่าเพี้ยน = ค่าตั้งต้น 60)
+    // ?people=<ช่อง> = ขอรายชื่อของช่องนั้น (drill-down) — ไม่ต้องคำนวณ funnel ทั้งก้อน
+    const wantPeople = getQuery(req, 'people').trim();
+    if (wantPeople) {
+      if (!CALL_FUNNEL_CELL_KEYS.includes(wantPeople)) {
+        return sendError(res, 400, 'Bad request', `ไม่รู้จักช่อง "${wantPeople}"`);
+      }
+      const people = await loadCellPeople(wantPeople, sinceYmd, source);
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ cell: wantPeople, source, people });
+    }
+
     const wantSeries = getQuery(req, 'series').trim() === 'day';
     const rawDays = Number(getQuery(req, 'days').trim());
     const seriesDays = Number.isFinite(rawDays) ? Math.min(Math.max(Math.trunc(rawDays), 1), 120) : 60;

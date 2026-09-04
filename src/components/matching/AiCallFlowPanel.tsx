@@ -4,9 +4,19 @@ import { TONE } from '@/lib/designTokens';
 import {
   EMPTY_FUNNEL,
   fetchCallFunnel,
+  fetchCallFunnelPeople,
   type CallFunnel,
+  type CallFunnelPerson,
   type CallFunnelSource,
 } from '@/lib/callFunnelApi';
+import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { aiCallFlowCells, type CallFlowCell } from '@/lib/aiCallFlowCells';
 import { RefreshCw, Bot, UserRound } from 'lucide-react';
 import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
@@ -35,16 +45,20 @@ const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> 
  * 1 ช่องสถานะบนพื้นเข้ม — เล็กกว่า FlowStage ของ funnel เพราะมี 8 ช่อง/แถว
  * เน้นความหมายด้วย **ขีดบน (bar) + สีตัวเลข** ไม่ใช่พื้นสว่าง (หลัก "หมึกกับกระดาษ")
  */
-function CallCell({ cell, side }: { cell: CallFlowCell; side: 'ai' | 'human' }) {
+function CallCell({
+  cell,
+  side,
+  onOpen,
+}: {
+  cell: CallFlowCell;
+  side: 'ai' | 'human';
+  /** กดเพื่อดูรายชื่อ — `null` = ช่องนี้ยังกดดูชื่อไม่ได้ (ฝั่งคนยังไม่มีเส้น) */
+  onOpen: (() => void) | null;
+}) {
   const t = TONE[cell.tone];
   const value = side === 'ai' ? cell.ai : cell.human;
-  return (
-    <div
-      className={cn(
-        'min-w-0 rounded-xl border border-white/[0.14] bg-white/[0.07] px-2.5 py-2 !border-t-[3px]',
-        t.bar,
-      )}
-    >
+  const body = (
+    <>
       <div className="truncate text-[10px] font-medium leading-tight text-slate-400" title={cell.label}>
         {cell.label}
       </div>
@@ -52,7 +66,25 @@ function CallCell({ cell, side }: { cell: CallFlowCell; side: 'ai' | 'human' }) 
         {/* null = ฝั่งนั้นไม่มีข้อมูลช่องนี้ → ขีด (ต่างจาก 0 ที่เป็นคำตอบจริง) */}
         {value === null ? <span className="text-slate-500">—</span> : value.toLocaleString('th-TH')}
       </div>
-    </div>
+    </>
+  );
+  const shell = cn(
+    'min-w-0 rounded-xl border border-white/[0.14] bg-white/[0.07] px-2.5 py-2 !border-t-[3px] text-left',
+    t.bar,
+  );
+  /**
+   * 🔴 **เลขต้องกดดูชื่อได้** (เจ้าของสั่ง 3 ก.ย. 2569 ให้ดันทุกหน้าถึง 8 คะแนน)
+   * พนักงานใหม่ให้หน้านี้ 4/10 ด้วยเหตุผลว่า *"ไม่เห็นรายชื่อจริง แค่ตัวเลขรวม"*
+   * — เลขที่พิสูจน์ไม่ได้ คนก็ไม่เชื่อ (ท่าเดียวกับหน้าติดตามที่กดกล่องแล้วเห็นชื่อ)
+   */
+  if (!onOpen || value === null || value === 0) {
+    return <div className={shell}>{body}</div>;
+  }
+  return (
+    <button type="button" onClick={onOpen} className={cn(shell, 'transition hover:bg-white/[0.14]')}>
+      {body}
+      <span className="mt-0.5 block text-[9px] text-slate-500">กดดูรายชื่อ</span>
+    </button>
   );
 }
 
@@ -65,7 +97,15 @@ const WHERE_GRID = 'grid grid-cols-3 gap-1.5';
 const RESULT_GRID = 'grid grid-cols-2 gap-1.5 sm:grid-cols-5';
 
 /** แถวหนึ่งฝั่ง (AI หรือ คน) — สองกลุ่มวางคู่กัน จอแคบซ้อนเป็นสองชั้น */
-function CellRow({ cells, side }: { cells: CallFlowCell[]; side: 'ai' | 'human' }) {
+function CellRow({
+  cells,
+  side,
+  onOpenCell,
+}: {
+  cells: CallFlowCell[];
+  side: 'ai' | 'human';
+  onOpenCell: (cell: CallFlowCell) => void;
+}) {
   const where = cells.filter((c) => c.group === 'where');
   const result = cells.filter((c) => c.group === 'result');
   return (
@@ -75,14 +115,26 @@ function CellRow({ cells, side }: { cells: CallFlowCell[]; side: 'ai' | 'human' 
         <div className={WHERE_GRID}>
           {cells.length === 0
             ? null
-            : where.map((c) => <CallCell key={`${side}-${c.key}`} cell={c} side={side} />)}
+            : where.map((c) => (
+                <CallCell
+                  key={`${side}-${c.key}`}
+                  cell={c}
+                  side={side}
+                  onOpen={side === 'ai' ? () => onOpenCell(c) : null}
+                />
+              ))}
         </div>
       </div>
       <div>
         <p className="mb-1 text-[10px] font-semibold text-slate-400">คุยแล้วผลเป็นยังไง</p>
         <div className={RESULT_GRID}>
           {result.map((c) => (
-            <CallCell key={`${side}-${c.key}`} cell={c} side={side} />
+            <CallCell
+              key={`${side}-${c.key}`}
+              cell={c}
+              side={side}
+              onOpen={side === 'ai' ? () => onOpenCell(c) : null}
+            />
           ))}
         </div>
       </div>
@@ -98,6 +150,23 @@ export default function AiCallFlowPanel({
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [loading, setLoading] = useState(false);
+  /** ป๊อปรายชื่อของช่องที่กด — เจ้าของสั่งให้ทุกเลขพิสูจน์ได้ด้วยชื่อ (3 ก.ย. 2569) */
+  const [peopleCell, setPeopleCell] = useState<CallFlowCell | null>(null);
+  const [people, setPeople] = useState<CallFunnelPerson[] | null>(null);
+  const [peopleError, setPeopleError] = useState<string | null>(null);
+
+  const openPeople = useCallback(
+    (cell: CallFlowCell) => {
+      setPeopleCell(cell);
+      setPeople(null);
+      setPeopleError(null);
+      void fetchCallFunnelPeople(cell.key, undefined, source)
+        .then(setPeople)
+        // 🔴 โหลดพลาดต้องบอกว่าโหลดพลาด ห้ามขึ้นลิสต์ว่าง (อ่านเหมือน "ไม่มีใคร")
+        .catch((e) => setPeopleError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่ได้'));
+    },
+    [source],
+  );
 
   const load = useCallback(() => {
     setLoading(true);
@@ -146,13 +215,13 @@ export default function AiCallFlowPanel({
       <div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
         <Bot className="h-3.5 w-3.5" aria-hidden /> ส่ง AI โทร
       </div>
-      <CellRow cells={cells} side="ai" />
+      <CellRow cells={cells} side="ai" onOpenCell={openPeople} />
 
       {/* แถวคนเก็บไปโทร — กลุ่ม/คอลัมน์เดียวกันเป๊ะ (template เดียวกัน) */}
       <div className="mt-3 flex items-center gap-1.5 border-t border-white/10 pt-3 text-[11px] font-semibold text-slate-300">
         <UserRound className="h-3.5 w-3.5" aria-hidden /> คนเก็บไปโทรเอง
       </div>
-      <CellRow cells={cells} side="human" />
+      <CellRow cells={cells} side="human" onOpenCell={openPeople} />
 
       {/* 🔴 บรรทัดกันคนบวกเลขเอง — ต้องครอบ **ทุก** ช่อง ไม่ใช่ยกตัวอย่างเดียว
           (Haiku รอบสองยังบวก "กำลังโทร 40 + รอใหม่ 39 = 79 ≠ 77" เพราะตัวอย่างเดิม
@@ -162,6 +231,47 @@ export default function AiCallFlowPanel({
         &ldquo;สนใจ&rdquo; นับทั้งสองช่อง ⇒ <b>ห้ามเอาช่องไหนบวกกันเทียบ &ldquo;ทั้งหมด&rdquo;</b>{' '}
         (ทั้งหมด = จำนวนคนที่ส่งเข้าคิว นับหัวละครั้ง)
       </p>
+      <Dialog open={Boolean(peopleCell)} onOpenChange={(o) => (o ? undefined : setPeopleCell(null))}>
+        <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {peopleCell?.label} · {people ? `${people.length.toLocaleString('th-TH')} คน` : 'กำลังโหลด…'}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              รายชื่อจากคิวโทรจริง (ใหม่สุดก่อน · สูงสุด 200 คน)
+            </DialogDescription>
+          </DialogHeader>
+          {peopleError ? (
+            <p className="rounded-lg border border-destructive/40 px-3 py-2 text-xs text-destructive">
+              {peopleError} — ลองกดช่องนั้นอีกครั้ง
+            </p>
+          ) : people === null ? (
+            <p className="text-xs text-muted-foreground">กำลังอ่านรายชื่อ…</p>
+          ) : people.length === 0 ? (
+            <p className="text-xs text-muted-foreground">ไม่มีใครในช่องนี้</p>
+          ) : (
+            <ul className="space-y-1">
+              {people.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2 text-xs"
+                >
+                  <span className="min-w-0">
+                    <b>{p.name ?? 'ไม่มีชื่อในคิว'}</b>
+                    <span className="text-muted-foreground"> · {p.phone ?? '—'}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {p.outcome
+                      ? (CALL_OUTCOME_LABEL[p.outcome as keyof typeof CALL_OUTCOME_LABEL] ?? p.outcome)
+                      : 'ยังไม่มีผล'}
+                    {p.attempt > 1 ? ` · สายที่ ${p.attempt}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageHeroStrip>
   );
 }

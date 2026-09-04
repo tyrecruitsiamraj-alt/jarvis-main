@@ -88,3 +88,29 @@ export function queueStale(interval: string, alias = 'q'): string {
 export function queueStalePending(interval: string, alias = 'q'): string {
   return `(${queuePending(alias)} and coalesce(${col(alias, 'next_attempt_at')}, ${col(alias, 'created_at')}) < now() - interval ${interval})`;
 }
+
+
+/**
+ * ชื่อ/เบอร์ในกล่อง payload ของคิว — **นิยามเดียวของทั้งระบบ**
+ * (คิวเก็บ payload คนละคีย์ตามต้นทาง: งานติดตามใช้ `recipient_*` · บอร์ดใช้ `candidate_*`)
+ * 🔴 ห้าม dump payload ทั้งก้อนออกหน้าจอ — ในนั้นมีบทพูดและเบอร์ฉุกเฉิน
+ */
+export function queuePayloadName(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as Record<string, unknown>;
+  for (const key of ['recipient_name', 'candidate_name', 'full_name']) {
+    const v = p[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+export function queuePayloadPhone(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const p = payload as Record<string, unknown>;
+  for (const key of ['recipient_phone', 'candidate_phone', 'phone']) {
+    const v = p[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
