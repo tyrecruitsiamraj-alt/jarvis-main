@@ -473,7 +473,7 @@ const OurPeoplePage: React.FC = () => {
                 {detail.mobile ? (
                   <Button asChild size="sm">
                     <a href={`tel:${detail.mobile}`}>
-                      <Phone className="h-3 w-3" /> โทร
+                      <Phone aria-hidden /> โทร
                     </a>
                   </Button>
                 ) : null}

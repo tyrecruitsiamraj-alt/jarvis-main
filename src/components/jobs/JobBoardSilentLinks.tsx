@@ -83,7 +83,7 @@ const JobBoardSilentLinks: React.FC<{
                     next.action === 'genlink' ? TONE.violet.outline : TONE.neutral.outline,
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon aria-hidden />
                   {next.label}
                 </Button>
               </div>

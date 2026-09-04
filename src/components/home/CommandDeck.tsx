@@ -246,7 +246,7 @@ const CommandDeck: React.FC<{
                 >
                   <Link to={head.path}>
                     {head.action}
-                    <ArrowRight className="h-4 w-4" aria-hidden />
+                    <ArrowRight aria-hidden />
                   </Link>
                 </Button>
                 {rest.length > 0 ? (

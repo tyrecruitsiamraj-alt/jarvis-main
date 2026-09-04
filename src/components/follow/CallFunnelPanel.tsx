@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
@@ -13,7 +14,7 @@ import { acquireCallHold } from '@/lib/callHoldsApi';
 import { type CallOutcome } from '@/lib/callFollowupPolicy';
 import { CALL_OUTCOME_LABEL, CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
-import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
+import PageHeroStrip from '@/components/shared/PageHeroStrip';
 import { resolvedCallBase } from '@/lib/callFunnelMath';
 
 /**
@@ -280,19 +281,21 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             {lockSource
               ? null
               : SWITCHABLE_TABS.map((t) => (
-                  <button
+                  <Button
                     key={t.id}
                     type="button"
+                    variant="hero"
+                    size="sm"
                     onClick={() => setSource(t.id)}
                     title={t.hint}
-                    className={cn(heroButton, source === t.id && 'bg-white/25 text-white')}
+                    className={cn(source === t.id && 'bg-white/25 text-white')}
                   >
                     {t.label}
-                  </button>
+                  </Button>
                 ))}
-            <button type="button" onClick={load} className={cn(heroButton, 'disabled:opacity-50')}>
-              <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
-            </button>
+            <Button type="button" variant="hero" size="sm" onClick={load}>
+              <RefreshCw className={cn(loading && 'animate-spin')} /> รีเฟรช
+            </Button>
           </div>
         }
       >

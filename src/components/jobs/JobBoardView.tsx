@@ -42,7 +42,7 @@ import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
  */
 import RecruitBoardTools from '@/components/jobs/RecruitBoardTools';
 import RecruitControlPanel from '@/components/recruit-rm/RecruitControlPanel';
-import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
+import PageHeroStrip from '@/components/shared/PageHeroStrip';
 import {
   applicantOriginSummary,
   fetchJobApplicantBreakdown,
@@ -998,15 +998,16 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 {/* ปุ่มรีเฟรชนี้โหลด feed **ใบขอ** ใหม่ — แท็บอื่นแสดงรายชื่อคนคนละชุด
                     และมีปุ่มรีเฟรชของตัวเองใน RmWorkspace อยู่แล้ว */}
                 {onRefresh && view === 'board' ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="hero"
+                    size="sm"
                     onClick={() => void onRefresh()}
                     disabled={loading || refreshing}
-                    className={cn(heroButton, 'disabled:opacity-50')}
                   >
-                    <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+                    <RefreshCw className={cn(refreshing && 'animate-spin')} />
                     รีเฟรชข้อมูล
-                  </button>
+                  </Button>
                 ) : null}
               </>
             }
@@ -1276,9 +1277,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   className={cn('h-7 rounded-lg px-2.5 text-xs', TONE.neutral.outline)}
                 >
                   {closedLoading ? (
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    <LoaderCircle className="animate-spin" />
                   ) : (
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <RefreshCw aria-hidden />
                   )}
                   รีเฟรช
                 </Button>
@@ -1653,7 +1654,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                              → ทับด้วย TONE.*.outline ที่มีคู่ dark ครบ (กติกาข้อ 4) */
                           className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.success.outline)}
                         >
-                          <Send className="h-3.5 w-3.5" />
+                          <Send aria-hidden />
                           {SEARCH_ALL_POOLS_AND_CALL.label}
                         </Button>
                           </>
@@ -1673,7 +1674,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           }}
                           className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.info.outline)}
                         >
-                          <Users className="h-3.5 w-3.5" />
+                          <Users aria-hidden />
                           ดูรายชื่อ
                         </Button>
                       </div>
@@ -1690,7 +1691,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       className="flex-1 py-2.5 text-xs font-semibold"
                     >
                       สมัครงาน
-                      <Send className="h-3.5 w-3.5 opacity-90" />
+                      <Send className="opacity-90" />
                     </Button>
                   </div>
                 )}
@@ -1842,7 +1843,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 className="mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 กรอกใบสมัครงาน
-                <Send className="h-4 w-4" />
+                <Send aria-hidden />
               </Button>
             </div>
           </div>

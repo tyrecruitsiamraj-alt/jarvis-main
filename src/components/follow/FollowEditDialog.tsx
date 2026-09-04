@@ -231,7 +231,7 @@ export default function FollowEditDialog({
                 onClick={() => setUnitPickerOpen((v) => !v)}
                 className={cn('gap-1.5', TONE.info.value)}
               >
-                <Building2 className="h-3.5 w-3.5" aria-hidden />
+                <Building2 aria-hidden />
                 {unitPickerOpen ? 'ปิดรายชื่อหน่วยงาน' : 'เลือกหน่วยงานจากบอร์ด'}
               </Button>
             </div>

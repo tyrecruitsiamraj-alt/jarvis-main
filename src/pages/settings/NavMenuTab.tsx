@@ -186,7 +186,7 @@ const NavMenuTab: React.FC = () => {
           onClick={() => void save()}
           className="inline-flex items-center gap-1.5"
         >
-          {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {busy ? <LoaderCircle className="animate-spin" /> : <Save aria-hidden />}
           บันทึก
         </Button>
         <button

@@ -593,7 +593,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
             className="w-full rounded-xl py-2.5 text-sm"
           >
             ถัดไป — ขั้น {RELEASE_STEP_TEXT[nextStep].step} {RELEASE_STEP_TEXT[nextStep].label}
-            <ChevronRight className="h-4 w-4" aria-hidden />
+            <ChevronRight aria-hidden />
           </Button>
         ) : null}
       </div>

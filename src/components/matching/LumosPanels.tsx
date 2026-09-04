@@ -316,7 +316,7 @@ export function LumosSendBar({
             onClick={onSendAll}
             title={act.sendAll.reason ?? 'ส่งทุกคนที่ AI แมทเจอในใบนี้ — ยังมีหน้าต่างยืนยันก่อนโทรจริง'}
             >
-            <PhoneCall className="h-3 w-3" /> ส่งทั้งหมดที่แมท ({act.sendAll.count})
+            <PhoneCall aria-hidden /> ส่งทั้งหมดที่แมท ({act.sendAll.count})
           </Button>
       </div>
       <p className="min-h-4 text-[10px] leading-4 text-sky-900/70 dark:text-sky-200/70">{hint}</p>

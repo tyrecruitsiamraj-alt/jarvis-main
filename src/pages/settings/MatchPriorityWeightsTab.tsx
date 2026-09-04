@@ -250,7 +250,7 @@ const MatchPriorityWeightsTab: React.FC<{
           disabled={saving}
           className="inline-flex min-h-[42px] items-center gap-1.5 px-5 py-2 text-sm"
         >
-          {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : null}
+          {saving ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
           บันทึกน้ำหนัก
         </Button>
         <button

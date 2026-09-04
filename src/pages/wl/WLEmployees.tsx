@@ -121,7 +121,7 @@ const WLEmployees: React.FC = () => {
               onClick={() => navigate('/wl/employees/add')}
               className="flex items-center gap-1 px-3 py-2 text-sm"
             >
-              <Plus className="w-4 h-4" /> เพิ่ม
+              <Plus /> เพิ่ม
             </Button>
           ) : undefined
         }

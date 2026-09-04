@@ -571,7 +571,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                 disabled={submitting}
                 className="w-full py-3 text-sm font-semibold"
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {submitting ? <Loader2 className="animate-spin" /> : <Send aria-hidden />}
                 ส่งใบสมัคร
               </Button>
             </div>

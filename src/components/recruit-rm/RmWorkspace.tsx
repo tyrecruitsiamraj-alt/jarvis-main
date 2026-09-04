@@ -477,7 +477,7 @@ const RmWorkspace: React.FC<{
       {controlledTab ? (
         <div className="flex items-center justify-end gap-2">
           <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
+            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </Button>
         </div>
       ) : (
@@ -510,7 +510,7 @@ const RmWorkspace: React.FC<{
             disabled={loading}
             className="ml-auto"
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden /> รีเฟรช
+            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </Button>
         </div>
       )}

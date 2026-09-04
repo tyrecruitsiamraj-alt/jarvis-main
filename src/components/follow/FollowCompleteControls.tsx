@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
@@ -38,8 +39,10 @@ const FollowCompleteControls: React.FC<{
 
   if (!open) {
     return (
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         disabled={busy}
         onClick={() => setOpen(true)}
         /* กดแล้วยัง**ไม่ปิดทันที** — กางให้เลือกเหตุผลก่อน · คนใหม่ไม่รู้ ต้องบอก */
@@ -50,14 +53,11 @@ const FollowCompleteControls: React.FC<{
          * งี้จะเชื่อนายได้ไง"* — สิ่งที่อ่านว่าเป็นสถานะ จริง ๆ คือปุ่มสั่งปิดงานใบนี้)
          * คำว่า "เสร็จสิ้น" ยังอยู่ตามที่เจ้าของสั่งไว้ 18 ส.ค. 2569 แค่เติมกริยานำหน้า
          */
-        className={cn(
-          'inline-flex min-h-[36px] items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold disabled:opacity-50',
-          TONE.neutral.outline,
-        )}
+        className="min-h-9 gap-1 px-3 text-[11px] font-semibold"
       >
-        <CheckCircle2 className="h-3 w-3" aria-hidden />
+        <CheckCircle2 aria-hidden />
         {busy ? 'กำลังบันทึก…' : 'บันทึกว่าเสร็จสิ้น'}
-      </button>
+      </Button>
     );
   }
 
@@ -66,19 +66,18 @@ const FollowCompleteControls: React.FC<{
       <p className="text-[11px] font-semibold text-foreground">ปิดงานนี้เพราะอะไร</p>
       <div className="flex flex-wrap gap-1.5">
         {FOLLOW_OUTCOMES.map((o) => (
-          <button
+          <Button
             key={o}
             type="button"
+            variant="outline"
+            size="sm"
             disabled={busy}
             title={FOLLOW_OUTCOME_HINT[o]}
             onClick={() => void submit(o)}
-            className={cn(
-              'inline-flex min-h-[32px] items-center rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-50',
-              TONE.neutral.outline,
-            )}
+            className="min-h-8 px-3 text-[11px]"
           >
             {FOLLOW_OUTCOME_LABEL[o]}
-          </button>
+          </Button>
         ))}
       </div>
       {/* หมายเหตุไม่บังคับแล้ว (ชุดใหม่ไม่มี "อื่น ๆ") — พิมพ์ก่อนกดคำ เดี๋ยวเก็บไปด้วย */}
@@ -90,19 +89,18 @@ const FollowCompleteControls: React.FC<{
         placeholder="หมายเหตุ (ถ้ามี) — พิมพ์ก่อนกดคำด้านบน"
         className="min-h-[36px] rounded-lg border border-border bg-background px-2.5 text-[12px]"
       />
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() => {
           setOpen(false);
           setNote('');
         }}
-        className={cn(
-          'inline-flex min-h-[32px] w-fit items-center rounded-full border px-3 py-1 text-[11px] font-medium',
-          TONE.neutral.outline,
-        )}
+        className="min-h-8 w-fit px-3 text-[11px]"
       >
         ปิด
-      </button>
+      </Button>
     </div>
   );
 };

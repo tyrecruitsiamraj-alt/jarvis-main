@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import {
@@ -19,7 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { aiCallFlowCells, type CallFlowCell } from '@/lib/aiCallFlowCells';
 import { RefreshCw, Bot, UserRound } from 'lucide-react';
-import PageHeroStrip, { heroButton } from '@/components/shared/PageHeroStrip';
+import PageHeroStrip from '@/components/shared/PageHeroStrip';
 
 /**
  * แผง "AI โทร" หน้า Matching — 2 แถวสถานะเดียวกัน (AI · คนเก็บไปโทร) ในกรอบเดียว
@@ -187,27 +188,21 @@ export default function AiCallFlowPanel({
       actions={
         <div className="flex flex-wrap items-center gap-1.5">
           {SOURCE_TABS.map((t) => (
-            <button
+            <Button
               key={t.id}
               type="button"
+              variant="hero"
+              size="sm"
               title={t.hint}
               onClick={() => setSource(t.id)}
-              className={cn(
-                heroButton,
-                source === t.id && 'bg-white/25',
-              )}
+              className={cn(source === t.id && 'bg-white/25')}
             >
               {t.label}
-            </button>
+            </Button>
           ))}
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className={cn(heroButton, 'disabled:opacity-50')}
-          >
-            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
-          </button>
+          <Button type="button" variant="hero" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={cn(loading && 'animate-spin')} /> รีเฟรช
+          </Button>
         </div>
       }
     >

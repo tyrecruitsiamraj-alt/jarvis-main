@@ -288,7 +288,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                     activeFilterCount > 0 ? TONE.info.outline : TONE.neutral.outline,
                   )}
                 >
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <SlidersHorizontal aria-hidden />
                   ตัวกรอง
                   {activeFilterCount > 0 ? (
                     <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-bold', TONE.primary.solid)}>
@@ -309,7 +309,7 @@ const JobBoardTopFilters: React.FC<Props> = ({
                     activeFilterCount > 0 ? TONE.info.outline : TONE.neutral.outline,
                   )}
                 >
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <SlidersHorizontal aria-hidden />
                   ตัวกรอง
                   {activeFilterCount > 0 ? (
                     <span className={cn('ml-1 rounded-full px-1.5 text-[10px] font-bold', TONE.primary.solid)}>

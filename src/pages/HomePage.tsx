@@ -618,7 +618,7 @@ const HomePage: React.FC = () => {
                   {personDetail.item.phone ? (
                     <Button asChild variant="secondary" size="sm">
                       <a href={`tel:${personDetail.item.phone}`}>
-                        <Phone className="h-3 w-3" /> {personDetail.item.phone}
+                        <Phone aria-hidden /> {personDetail.item.phone}
                       </a>
                     </Button>
                   ) : null}

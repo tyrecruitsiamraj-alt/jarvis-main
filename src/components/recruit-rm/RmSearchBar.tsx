@@ -74,7 +74,7 @@ const RmSearchBar: React.FC<{
     <span className={cn('hidden h-6 border-l sm:block', DASH.divider)} aria-hidden />
 
     <Button variant="secondary" size="sm" type="button" onClick={onAddApplicant} className="shrink-0">
-      <UserPlus className="h-3.5 w-3.5" aria-hidden /> เพิ่มข้อมูลผู้สมัคร
+      <UserPlus aria-hidden /> เพิ่มข้อมูลผู้สมัคร
     </Button>
 
     {onHoldSelected ? (
@@ -89,7 +89,7 @@ const RmSearchBar: React.FC<{
         }
         className="shrink-0"
       >
-        <PhoneCall className="h-3.5 w-3.5" aria-hidden />
+        <PhoneCall aria-hidden />
         {holdingSelected ? 'กำลังเก็บ…' : `เก็บไปโทรเอง${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
       </Button>
     ) : null}
@@ -134,7 +134,7 @@ const RmSearchBar: React.FC<{
             }
             className="shrink-0"
           >
-            <BookmarkPlus className="h-3.5 w-3.5" aria-hidden />
+            <BookmarkPlus aria-hidden />
             {leadBusy ? 'กำลังเก็บ…' : 'เก็บ Lead'}
             {selectedCount > 0 ? ` (${selectedCount})` : ''}
           </Button>
@@ -150,7 +150,7 @@ const RmSearchBar: React.FC<{
           }
           className="shrink-0"
         >
-          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          <Trash2 aria-hidden />
           {leadBusy ? 'กำลังลบ…' : 'ลบ Lead'}
           {leadView && selectedCount > 0 ? ` (${selectedCount})` : ''}
         </Button>

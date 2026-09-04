@@ -95,7 +95,7 @@ const JobRecallSuggestions: React.FC<{ jobId: string }> = ({ jobId }) => {
           disabled={loading}
           className="shrink-0"
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+          {loading ? <Loader2 className="animate-spin" /> : <Search aria-hidden />}
           {loading ? 'AI กำลังคิด…' : result ? 'ค้นใหม่' : 'ให้ AI จับให้'}
         </Button>
       </div>

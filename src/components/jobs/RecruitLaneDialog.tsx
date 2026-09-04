@@ -115,7 +115,7 @@ const RecruitLaneDialog: React.FC<RecruitLaneDialogProps> = ({ open, job, onClos
                 onClick={() => setConfirmed(true)}
                 className="px-4 py-2"
               >
-                <Search className="h-3 w-3" /> {SEARCH_ALL_POOLS_AND_CALL.label}
+                <Search aria-hidden /> {SEARCH_ALL_POOLS_AND_CALL.label}
               </Button>
             </div>
           </div>

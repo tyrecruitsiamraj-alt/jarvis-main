@@ -148,7 +148,7 @@ const EmployeeProfile: React.FC = () => {
               onClick={() => navigate(`/matching/candidates/${wlCandidate.id}`)}
               className="inline-flex items-center gap-2 text-sm px-3 py-2"
             >
-              <ExternalLink className="w-4 h-4" />
+              <ExternalLink />
               เปิดโปรไฟล์ผู้สมัคร
             </Button>
           </div>

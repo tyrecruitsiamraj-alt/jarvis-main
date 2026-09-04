@@ -230,7 +230,7 @@ const SelectionProgressControls: React.FC<SelectionProgressControlsProps> = ({
                 disabled={busy}
                 className="text-xs"
               >
-                <Building2 className="h-3.5 w-3.5" aria-hidden />
+                <Building2 aria-hidden />
                 {unitName ?? 'เลือกหน่วยงาน'}
               </Button>
             </PopoverTrigger>

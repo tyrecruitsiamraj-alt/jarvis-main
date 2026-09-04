@@ -110,7 +110,7 @@ const ResetPasswordPage: React.FC = () => {
             className="w-full min-h-[52px]"
           >
             {busy ? 'กำลังบันทึก…' : 'บันทึกรหัสผ่านใหม่'}
-            <ArrowRight className="h-4 w-4" aria-hidden />
+            <ArrowRight aria-hidden />
           </Button>
         </form>
 

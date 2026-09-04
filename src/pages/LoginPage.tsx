@@ -237,7 +237,7 @@ function EmailPasswordForm({
       >
         {submitting ? (
           <>
-            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+            <LoaderCircle className="animate-spin" aria-hidden />
             กำลังเข้าสู่ระบบ…
           </>
         ) : (
@@ -259,7 +259,7 @@ function MicrosoftLoginButton() {
       style={SSO_BTN}
     >
       {/* ⚠️ สี่เหลี่ยม 4 สีเป็น **สีแบรนด์ Microsoft** ต้องเป๊ะ — ข้อยกเว้นของกติกา "ห้าม hex ดิบ" */}
-      <svg viewBox="0 0 21 21" className="h-4 w-4 shrink-0" aria-hidden>
+      <svg viewBox="0 0 21 21" className="shrink-0" aria-hidden>
         <rect x="1" y="1" width="9" height="9" fill="#f25022" />
         <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
         <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />

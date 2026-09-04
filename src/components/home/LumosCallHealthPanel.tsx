@@ -184,7 +184,7 @@ export default function LumosCallHealthPanel({
           ดูรายชื่อตามผลโทร
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onOpenWaiting}>
-          <Users className="h-3 w-3" /> ดูคนที่รอผล ({waiting.toLocaleString('th-TH')})
+          <Users aria-hidden /> ดูคนที่รอผล ({waiting.toLocaleString('th-TH')})
         </Button>
         {(l.retry_scheduled ?? 0) > 0 ? (
           <span className={cn(TONE.warn.chip, 'tabular-nums')}>

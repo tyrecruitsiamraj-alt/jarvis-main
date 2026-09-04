@@ -115,7 +115,7 @@ const FollowCompletedPanel: React.FC<{
           onClick={() => navigate('/aftercare')}
           className="shrink-0 text-xs"
         >
-          <UserCheck className="h-3.5 w-3.5" aria-hidden /> เปิดหน้าดูแลหลังเริ่มงาน
+          <UserCheck aria-hidden /> เปิดหน้าดูแลหลังเริ่มงาน
         </Button>
       </div>
 

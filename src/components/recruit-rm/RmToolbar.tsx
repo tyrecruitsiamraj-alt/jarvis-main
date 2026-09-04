@@ -24,7 +24,7 @@ const RmToolbar: React.FC<{ onOpen: (key: RmToolbarKey) => void }> = ({ onOpen }
       const Icon = ICONS[key];
       return (
         <Button variant="secondary" size="sm" key={key} type="button" onClick={() => onOpen(key)} >
-          <Icon className="h-3.5 w-3.5" aria-hidden /> {RM_TOOLBAR_LABEL[key]}
+          <Icon aria-hidden /> {RM_TOOLBAR_LABEL[key]}
         </Button>
       );
     })}

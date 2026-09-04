@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquareWarning, Plus, Settings2 } from 'lucide-react';
 import {
@@ -15,7 +16,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { STANDALONE_POSTING_KINDS } from '@/lib/recruitPostings';
-import { heroButton, heroButtonSolid } from '@/components/shared/PageHeroStrip';
 import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import ReasonManagerDialog from '@/components/recruit-rm/ReasonManagerDialog';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -155,12 +155,13 @@ const RecruitBoardTools: React.FC<{
     setNotice(`ปุ่ม "${RM_TOOLBAR_LABEL[key]}" — ยังไม่ได้ต่อกับระบบจริง`);
   };
 
-  const btnCls = (key: RmToolbarKey) => {
-    // "สร้างลิงก์" เป็นปุ่มหลักของแถบนี้ (เดิม "ประกาศลอย" ใช้ทรงทึบ) — คงน้ำหนักเดิมไว้
-    if (variant === 'onDark') return key === 'link' ? heroButtonSolid : heroButton;
-    return key === 'link'
-      ? 'inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15'
-      : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary';
+  /**
+   * ทรงปุ่มของแถบนี้ — คืน **variant ของ shadcn** ไม่ใช่คลาสที่ปั้นเอง (4 ก.ย. 2569)
+   * "สร้างลิงก์" เป็นปุ่มหลักของแถบ จึงได้ทรงทึบทั้งบนพื้นเข้มและพื้นสว่าง
+   */
+  const btnVariant = (key: RmToolbarKey) => {
+    if (variant === 'onDark') return key === 'link' ? ('heroSolid' as const) : ('hero' as const);
+    return key === 'link' ? ('default' as const) : ('outline' as const);
   };
 
   /** งานระดับตั้งค่า (ใช้ไม่บ่อย) — ยุบเข้าเมนูเดียว (เจ้าของสั่ง 20 ส.ค. 2569:
@@ -176,18 +177,22 @@ const RecruitBoardTools: React.FC<{
         <div className="flex flex-wrap gap-2">
           {/* ลิงก์ที่ไม่ผูกใบขอ — staff สร้างได้แล้ว (2 ก.ย. 2569) · admin ปิดรายบทบาทได้ */}
           {canPostings ? (
-            <button
+            <Button
               type="button"
+              variant={btnVariant('link')}
+              size="sm"
               onClick={() => onClickKey('link')}
               title="สร้างลิงก์รับสมัครที่ไม่ผูกกับใบขอ"
-              className={btnCls('link')}
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden /> {LABEL.link}
-            </button>
+              <Plus aria-hidden /> {LABEL.link}
+            </Button>
           ) : null}
           <DropdownMenu>
-            <DropdownMenuTrigger className={btnCls('channels')}>
-              <Settings2 className="h-3.5 w-3.5" aria-hidden /> ตั้งค่าบอร์ด
+            {/* trigger ของเมนูใช้ Button ผ่าน asChild — ทรงเดียวกับปุ่มอื่นในแถบ */}
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant={btnVariant('channels')} size="sm">
+                <Settings2 aria-hidden /> ตั้งค่าบอร์ด
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {MENU_KEYS.map((key) => {

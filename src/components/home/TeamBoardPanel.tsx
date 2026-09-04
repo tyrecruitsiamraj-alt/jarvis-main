@@ -257,7 +257,7 @@ const TeamBoardPanel: React.FC<{
             disabled={loading}
             className={cn('h-8 rounded-lg px-2.5', T.mut, 'hover:bg-slate-900/5 dark:hover:bg-white/10')}
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden />
+            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
             รีเฟรช
           </Button>
         ) : null}

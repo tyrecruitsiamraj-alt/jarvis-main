@@ -175,7 +175,7 @@ const WorkStatusMasterTab: React.FC = () => {
             disabled={adding || !newCode.trim() || !newLabel.trim()}
             className="px-3 py-1.5"
           >
-            {adding ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+            {adding ? <LoaderCircle className="animate-spin" /> : <Plus aria-hidden />}
             เพิ่มสถานะ
           </Button>
         </div>
@@ -234,7 +234,7 @@ const WorkStatusMasterTab: React.FC = () => {
                       title={item.usage ? 'มีใบขอใช้สถานะนี้อยู่ ลบไม่ได้' : 'ลบสถานะนี้'}
                       className="px-2.5 py-1"
                     >
-                      <Trash2 className="h-3 w-3" /> ลบ
+                      <Trash2 aria-hidden /> ลบ
                     </Button>
                   ) : null}
                 </div>

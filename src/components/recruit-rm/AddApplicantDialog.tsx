@@ -334,9 +334,9 @@ const AddApplicantDialog: React.FC<{
             disabled={saving}
             >
             {saving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              <Loader2 className="animate-spin" aria-hidden />
             ) : (
-              <UserPlus className="h-3.5 w-3.5" aria-hidden />
+              <UserPlus aria-hidden />
             )}
             {saving ? 'กำลังบันทึก…' : 'บันทึก'}
           </Button>

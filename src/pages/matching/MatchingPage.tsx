@@ -2715,7 +2715,7 @@ const MatchingPage: React.FC = () => {
                       }}
                       className="w-full justify-center"
                     >
-                      <Users className="h-3 w-3 shrink-0" />
+                      <Users className="shrink-0" />
                       <span className="truncate">
                         {matchCount != null
                           ? `ดูคนของเรา (${matchCount})`
@@ -3110,7 +3110,7 @@ const MatchingPage: React.FC = () => {
                   onClick={() => void openLumosPicker()}
                   className="shrink-0"
                 >
-                  <PhoneCall className="h-3 w-3" /> เลือกคนส่ง AI โทร
+                  <PhoneCall aria-hidden /> เลือกคนส่ง AI โทร
                 </Button>
                 </div>
               </div>
@@ -3452,11 +3452,11 @@ const MatchingPage: React.FC = () => {
                           'กำลังค้นหา…'
                         ) : irMatchById[jobDetail.id] ? (
                           <>
-                            <RefreshCw className="h-3 w-3" /> {SEARCH_LEGACY_POOL.again}
+                            <RefreshCw aria-hidden /> {SEARCH_LEGACY_POOL.again}
                           </>
                         ) : (
                           <>
-                            <Search className="h-3 w-3" /> {SEARCH_LEGACY_POOL.label}
+                            <Search aria-hidden /> {SEARCH_LEGACY_POOL.label}
                           </>
                         )}
                       </Button>
@@ -3468,7 +3468,7 @@ const MatchingPage: React.FC = () => {
                         onClick={() => setIrSendConfirmJobId(jobDetail.id)}
                         title={SEARCH_LEGACY_POOL_AND_CALL.hint}
                       >
-                        <PhoneForwarded className="h-3 w-3" /> {SEARCH_LEGACY_POOL_AND_CALL.label}
+                        <PhoneForwarded aria-hidden /> {SEARCH_LEGACY_POOL_AND_CALL.label}
                       </Button>
                     </div>
                   </div>
@@ -4449,7 +4449,7 @@ const MatchingPage: React.FC = () => {
                 }}
                 className="px-4 py-2"
               >
-                <RefreshCw className="h-3 w-3" /> ค้นหาใหม่
+                <RefreshCw aria-hidden /> ค้นหาใหม่
               </Button>
             </div>
           </div>
@@ -4494,7 +4494,7 @@ const MatchingPage: React.FC = () => {
                 }}
                 className="px-4 py-2"
               >
-                <PhoneForwarded className="h-3 w-3" /> {SEARCH_LEGACY_POOL_AND_CALL.label}
+                <PhoneForwarded aria-hidden /> {SEARCH_LEGACY_POOL_AND_CALL.label}
               </Button>
             </div>
           </div>
@@ -4690,7 +4690,7 @@ const MatchingPage: React.FC = () => {
                 onClick={() => void sendSelectedToLumos()}
                 className="px-4 py-2"
               >
-                <PhoneCall className="h-3 w-3" />
+                <PhoneCall aria-hidden />
                 {lumosSending ? 'กำลังส่ง…' : `ยืนยันส่ง ${lumosSelectedCount} คน`}
               </Button>
             </div>
@@ -4817,7 +4817,7 @@ const MatchingPage: React.FC = () => {
                   }}
                   className="px-4 py-2"
                 >
-                  <PhoneCall className="h-3 w-3" /> ถัดไป ({lumosSelectedCount} คน)
+                  <PhoneCall aria-hidden /> ถัดไป ({lumosSelectedCount} คน)
                 </Button>
               </div>
             </div>

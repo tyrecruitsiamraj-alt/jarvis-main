@@ -112,6 +112,38 @@ describe('ห้ามหลุด Framework', () => {
     expect(bad).toEqual([]);
   });
 
+  /**
+   * 🔴 **ขนาดไอคอนต้องมาจาก variant ของปุ่ม ไม่ใช่คลาสบนไอคอน** (4 ก.ย. 2569)
+   * เจ้าของทักเรื่องปุ่มไอคอน — วัดจริงเจอว่าไอคอนในปุ่มออกมา 3 ขนาดบนหน้าเดียว
+   * เพราะ selector ลูกของ Button (`[&_svg]:size-*`) ชนะคลาสบนตัวไอคอนเสมอ
+   * ⇒ คลาส `h-3 w-3` บนไอคอนใน `<Button>` เป็นโค้ดตายที่โกหกคนอ่าน ห้ามมี
+   */
+  it('🔴 ไอคอนใน <Button> ห้ามกำหนดขนาดเอง (ปุ่มเป็นคนกำหนด)', () => {
+    const bad: string[] = [];
+    for (const f of files) {
+      const code = codeOf(f);
+      for (const m of code.matchAll(/<Button\b[\s\S]*?<\/Button>/g)) {
+        /**
+         * ดูเฉพาะ **ลูก** ของปุ่ม — `h-7 w-7` บนตัว `<Button>` เองคือการย่อขนาดปุ่ม
+         * ซึ่งทำได้ (เช่นปุ่มไอคอนเล็กบนแถบหัว) · ที่ห้ามคือใส่ขนาดบนตัวไอคอน
+         */
+        for (const child of m[0].matchAll(/<([A-Z][A-Za-z0-9]*)\b[^>]*className="([^"]*)"/g)) {
+          if (child[1] === 'Button') continue;
+          if (/\bh-[\d.]+\b/.test(child[2]) && /\bw-[\d.]+\b/.test(child[2])) bad.push(f);
+        }
+      }
+    }
+    expect([...new Set(bad)]).toEqual([]);
+  });
+
+  it('ทุก size ของ Button กำหนดขนาดไอคอนของตัวเอง', () => {
+    const btn = read('src/components/ui/button.tsx');
+    const sizes = btn.slice(btn.indexOf('size: {'), btn.indexOf('size: {') + 400);
+    for (const key of ['default', 'sm', 'lg', 'icon']) {
+      expect(sizes, key).toMatch(new RegExp(`${key}: "[^"]*\\[&_svg\\]:size-`));
+    }
+  });
+
   it('คลาสปุ่มเก่าถูกถอดออกจาก index.css แล้ว', () => {
     const css = read('src/index.css');
     const rules = css
@@ -119,6 +151,11 @@ describe('ห้ามหลุด Framework', () => {
       .filter((l) => !l.trim().startsWith('/*') && !l.trim().startsWith('*'))
       .join('\n');
     expect(rules).not.toMatch(/\.jarvis-btn|\.jarvis-pill-btn/);
+  });
+
+  it('ไม่มีคลาสปุ่มบนแถบ hero ที่ประกาศเอง (ย้ายเป็น variant ของ Button แล้ว)', () => {
+    const strip = codeOf('src/components/shared/PageHeroStrip.tsx');
+    expect(strip).not.toMatch(/export const heroButton/);
   });
 });
 

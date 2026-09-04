@@ -184,19 +184,18 @@ const FollowRoundsDialog: React.FC<{
                   <>
                     <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         disabled={busy}
                         onClick={() => onReopen(it.id)}
                         title="ล้างผลปิดงานให้กลับมาแก้ต่อได้ — ไม่แตะสายที่โทรไปแล้ว"
-                        className={cn(
-                          'inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium disabled:opacity-50',
-                          TONE.warn.outline,
-                        )}
+                        className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.warn.value)}
                       >
-                        <RotateCcw className="h-3 w-3" aria-hidden />
+                        <RotateCcw aria-hidden />
                         {busy ? 'กำลังย้อน…' : 'ย้อนสถานะ'}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 ) : null}
@@ -205,18 +204,17 @@ const FollowRoundsDialog: React.FC<{
                 <p className="mt-2 text-[10px] font-semibold text-muted-foreground">จัดการรอบนี้</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {canWork ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => onEdit(it)}
                       title="แก้ไขรอบนี้"
-                      className={cn(
-                        'inline-flex min-h-[32px] items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                        TONE.neutral.outline,
-                      )}
+                      className="min-h-8 gap-1 px-2.5 text-[11px]"
                     >
-                      <Pencil className="h-3 w-3" aria-hidden />
+                      <Pencil aria-hidden />
                       แก้ไข
-                    </button>
+                    </Button>
                   ) : null}
                   {/* ปิดงาน — ไม่ผูกกับ call_status: ตามจนจบเองโดย AI ยังไม่โทรก็ปิดได้ */}
                   {canWork ? (
@@ -225,34 +223,37 @@ const FollowRoundsDialog: React.FC<{
                   {canCancel ? (
                     cancellingId === it.id ? (
                       <>
-                        <button
+                        <Button
                           type="button"
+                          variant="destructive"
+                          size="sm"
                           disabled={busy}
                           onClick={() => onCancel(it.id)}
-                          className="inline-flex min-h-[32px] items-center rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                          className="min-h-8 px-2.5 text-[11px]"
                         >
                           {busy ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => onAskCancel(null)}
-                          className={cn(
-                            'inline-flex min-h-[32px] items-center rounded-full border px-2.5 py-1 text-[11px] font-medium',
-                            TONE.neutral.outline,
-                          )}
+                          className="min-h-8 px-2.5 text-[11px]"
                         >
                           ไม่
-                        </button>
+                        </Button>
                       </>
                     ) : (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => onAskCancel(it.id)}
-                        className="inline-flex min-h-[32px] items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-red-950/50"
+                        className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.danger.value)}
                       >
-                        <X className="h-3 w-3" aria-hidden />
+                        <X aria-hidden />
                         ยกเลิก
-                      </button>
+                      </Button>
                     )
                   ) : null}
                 </div>
@@ -299,7 +300,7 @@ const FollowRoundsDialog: React.FC<{
                         title="ลบรอบนี้ออกจากระบบถาวร (ผู้ดูแลระบบเท่านั้น)"
                         className={cn('min-h-8 gap-1 px-2.5 text-[11px]', TONE.danger.value)}
                       >
-                        <Trash2 className="h-3 w-3" aria-hidden />
+                        <Trash2 aria-hidden />
                         ลบทิ้ง
                       </Button>
                     )}

@@ -310,7 +310,7 @@ export default function ApplicantContactDialog({
                   disabled={busy}
                   className="w-full justify-center"
                 >
-                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} บันทึกผลติดต่อ
+                  {busy ? <Loader2 className="animate-spin" /> : null} บันทึกผลติดต่อ
                 </Button>
               </>
             ) : null}
@@ -355,7 +355,7 @@ export default function ApplicantContactDialog({
                     }}
                     className="shrink-0 justify-center"
                   >
-                    {phoneBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} แก้เบอร์
+                    {phoneBusy ? <Loader2 className="animate-spin" /> : null} แก้เบอร์
                   </Button>
                 </div>
                 {phoneError ? <p className={cn('text-[11px]', TONE.danger.value)}>{phoneError}</p> : null}

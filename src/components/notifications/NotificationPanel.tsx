@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Briefcase, CheckCircle2, CheckCheck, PhoneCall, Flag, ClipboardCheck } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -31,18 +32,21 @@ const NotificationPanel: React.FC = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
+        {/* ปุ่มกระดิ่งใช้ Button ทรง icon — ขนาดเท่ากับปุ่มไอคอนอื่นบนแถบหัว (4 ก.ย. 2569) */}
+        <Button
           type="button"
-          className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          variant="ghost"
+          size="icon"
+          className="relative text-muted-foreground hover:text-foreground"
           aria-label="การแจ้งเตือน"
         >
-          <Bell className="w-5 h-5" />
+          <Bell />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
               {unreadCount}
             </span>
           )}
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 md:w-96 p-0" align="end" sideOffset={8}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">

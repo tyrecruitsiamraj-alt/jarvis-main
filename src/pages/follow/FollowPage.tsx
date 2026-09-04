@@ -893,7 +893,7 @@ const FollowPage: React.FC = () => {
                 }}
                 className="inline-flex h-8 items-center gap-1 px-3 text-[11px] touch-manipulation"
               >
-                <Plus className="h-3 w-3" aria-hidden /> เพิ่มคนที่ต้องการติดตาม
+                <Plus aria-hidden /> เพิ่มคนที่ต้องการติดตาม
               </Button>
               {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
                   *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
@@ -1548,7 +1548,7 @@ const FollowPage: React.FC = () => {
                   onClick={goNext}
                   className="inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm"
                 >
-                  ถัดไป <ChevronRight className="h-4 w-4" aria-hidden />
+                  ถัดไป <ChevronRight aria-hidden />
                 </Button>
               ) : (
                 <Button size="sm"
@@ -1558,9 +1558,9 @@ const FollowPage: React.FC = () => {
                   className="inline-flex min-h-[46px] items-center gap-1.5 px-6 py-2.5 text-sm"
                 >
                   {submitting ? (
-                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+                    <LoaderCircle className="animate-spin" aria-hidden />
                   ) : (
-                    <PhoneForwarded className="h-4 w-4" aria-hidden />
+                    <PhoneForwarded aria-hidden />
                   )}
                   {submitting ? 'กำลังบันทึก…' : 'บันทึก + ส่ง AI โทร'}
                 </Button>

@@ -113,7 +113,7 @@ export default function FollowTodayPanel() {
           disabled={loading}
           className="shrink-0"
         >
-          <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} /> รีเฟรช
+          <RefreshCw className={cn(loading && 'animate-spin')} /> รีเฟรช
         </Button>
       </div>
 

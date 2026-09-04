@@ -62,7 +62,7 @@ const BrandingAppearanceTab: React.FC = () => {
               onClick={() => fileRef.current?.click()}
               className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium w-fit"
             >
-              <ImagePlus className="w-4 h-4" />
+              <ImagePlus />
               อัปโหลดโลโก้
             </Button>
             {config.logoDataUrl && (
@@ -206,7 +206,7 @@ const BrandingAppearanceTab: React.FC = () => {
               }}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium"
             >
-              <CloudUpload className="w-4 h-4" />
+              <CloudUpload />
               {syncing ? 'กำลังเผยแพร่…' : 'เผยแพร่ให้ทุกคน (บันทึกบนเซิร์ฟเวอร์)'}
             </Button>
           ) : null}

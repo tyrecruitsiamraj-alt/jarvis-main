@@ -22,7 +22,7 @@ const NotFound = () => {
         <Button asChild className="mt-6">
           <Link to="/">
             กลับหน้าหลัก
-            <ArrowRight className="h-4 w-4" aria-hidden />
+            <ArrowRight aria-hidden />
           </Link>
         </Button>
       </div>

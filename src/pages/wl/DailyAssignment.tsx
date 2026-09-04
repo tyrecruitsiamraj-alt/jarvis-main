@@ -112,7 +112,7 @@ const DailyAssignment: React.FC = () => {
                   onClick={() => setAssignDialog({ open: true, empId: emp.id, empName: `${emp.first_name} ${emp.last_name}` })}
                   className="flex items-center gap-1 text-xs px-3 py-1.5 hover:bg-primary/90"
                 >
-                  <Plus className="w-3 h-3" /> มอบหมาย
+                  <Plus /> มอบหมาย
                 </Button>
               </div>
             ))}
