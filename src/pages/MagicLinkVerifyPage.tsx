@@ -46,7 +46,7 @@ const MagicLinkVerifyPage: React.FC = () => {
 
   return (
     <div className="jarvis-warm-bg min-h-[100dvh] flex items-center justify-center p-4">
-      <div className="jarvis-frost w-full max-w-md rounded-[1.5rem] p-8 text-center space-y-4">
+      <div className="jarvis-frost w-full max-w-md rounded-3xl p-8 text-center space-y-4">
         <div className="flex items-center justify-center gap-3">
           <BrandMark size="md" />
           <BrandTitle />

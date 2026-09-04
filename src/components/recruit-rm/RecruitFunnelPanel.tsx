@@ -74,11 +74,11 @@ const RecruitFunnelPanel: React.FC = () => {
   const detailTiles = RECRUIT_FUNNEL_TILES.filter((t) => t.step === step);
 
   return (
-    <section className="rounded-[1.5rem] border border-border/70 bg-card p-4">
+    <section className="rounded-3xl border border-border/70 bg-card p-4">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           {/* หัวเป็นป้ายทองแบบเดียวกับ section อื่นบนบอร์ด — ภาษาเดียวกันทั้งหน้า */}
-          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#b08d4f] dark:text-[#cfae72]">
+          <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gold">
             ภาพรวมงานสรรหา
           </h2>
           <p className="mt-0.5 text-[11px] text-muted-foreground">

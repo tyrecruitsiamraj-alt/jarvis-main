@@ -45,7 +45,7 @@ const RolePermissionsTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 text-sm text-muted-foreground space-y-1">
+      <div className="glass-card rounded-3xl p-4 border border-white/70 text-sm text-muted-foreground space-y-1">
         <p>เปิด/ปิดฟังก์ชันให้แต่ละ role — บันทึกทันทีเมื่อสลับ</p>
         <p className="text-xs">ค่าเริ่มต้นตามลำดับ Admin &gt; Supervisor &gt; Staff · เปลี่ยน role ผู้ใช้ได้ที่แท็บ Users</p>
       </div>
@@ -101,7 +101,7 @@ const RolePermissionsTab: React.FC = () => {
       {loading ? <div className="text-sm text-muted-foreground px-1">กำลังโหลดสิทธิ์…</div> : null}
 
       {groups.map((group) => (
-        <div key={group} className="glass-card rounded-[1.5rem] border border-white/70 overflow-hidden">
+        <div key={group} className="glass-card rounded-3xl border border-white/70 overflow-hidden">
           <div className="px-4 py-3 border-b border-border/50 bg-secondary/20">
             <h3 className="text-sm font-semibold text-foreground">{group}</h3>
           </div>

@@ -47,7 +47,7 @@ const StatCard: React.FC<StatCardProps> = ({
     <div
       onClick={onClick}
       className={cn(
-        'glass-card rounded-[1.25rem] p-4 border transition-all duration-300',
+        'glass-card p-4 border transition-all duration-300',
         variantStyles[variant],
         onClick && 'cursor-pointer jarvis-interactive-card hover:-translate-y-0.5',
         className,

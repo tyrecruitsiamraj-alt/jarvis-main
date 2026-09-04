@@ -66,7 +66,7 @@ const ChangePasswordPage: React.FC = () => {
       <PageHeader title="เปลี่ยนรหัสผ่าน" subtitle="อัปเดตรหัสผ่านสำหรับบัญชีของคุณ" backPath="/" />
 
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-xl space-y-4">
+        <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 max-w-xl space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">รหัสผ่านเดิม</label>

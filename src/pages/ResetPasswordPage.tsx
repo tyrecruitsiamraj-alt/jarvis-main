@@ -56,7 +56,7 @@ const ResetPasswordPage: React.FC = () => {
 
   return (
     <div className="jarvis-warm-bg min-h-[100dvh] flex items-center justify-center p-4">
-      <div className="jarvis-frost w-full max-w-md rounded-[1.5rem] p-8 space-y-5">
+      <div className="jarvis-frost w-full max-w-md rounded-3xl p-8 space-y-5">
         <div className="flex items-center gap-3">
           <BrandMark size="md" />
           <div>

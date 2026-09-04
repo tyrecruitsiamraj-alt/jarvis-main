@@ -72,7 +72,7 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
               onClick={() =>
                 navigate(item.path === '/jobs/list' ? resolveUnitNavPath() : item.path)
               }
-              className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-6 group touch-manipulation"
+              className="jarvis-menu-card rounded-3xl p-4 md:p-6 group touch-manipulation"
             >
               <div
                 className={cn(

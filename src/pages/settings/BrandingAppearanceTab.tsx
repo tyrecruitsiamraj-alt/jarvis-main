@@ -33,7 +33,7 @@ const BrandingAppearanceTab: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
+      <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Palette className="w-4 h-4 text-blue-600" />
           โลโก้และชื่อระบบ
@@ -80,7 +80,7 @@ const BrandingAppearanceTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
+      <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">สีหลัก (ปุ่ม ลิงก์ ไฮไลต์)</h3>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -94,7 +94,7 @@ const BrandingAppearanceTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
+      <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">สีพื้นหลังและข้อความ</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
@@ -129,7 +129,7 @@ const BrandingAppearanceTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 space-y-4">
+      <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">พื้นหลังหน้าจอ</h3>
         <div className="flex flex-wrap gap-3">
           <label className="flex items-center gap-2 text-sm cursor-pointer">

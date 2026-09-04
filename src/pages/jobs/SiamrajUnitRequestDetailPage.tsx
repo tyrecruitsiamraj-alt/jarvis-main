@@ -245,7 +245,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
         {data && (
           <>
-            <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 flex flex-wrap items-center gap-2">
+            <div className="glass-card rounded-3xl p-4 border border-white/70 flex flex-wrap items-center gap-2">
               <UnitRequestWorkStatusBadge
                 status={data.work_status}
                 firstName={data.work_person_first_name}
@@ -268,7 +268,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               ) : null}
             </div>
 
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
+            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
               {/* หัวข้อเป็นปุ่มกาง/หุบ (เจ้าของสั่ง 25 ส.ค. 2569) — ลูกศรหมุนตามสถานะ
                   ทั้งแถวกดได้ ไม่ใช่แค่ลูกศร (นิ้วบนมือถือกดโดนง่ายกว่า) */}
               <button
@@ -448,7 +448,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             </section>
 
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
                 <Users className={cn("w-4 h-4", TONE.primary.value)} />
                 ผู้รับผิดชอบ
@@ -523,7 +523,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 วางไว้เหนือ "หมายเหตุ" ตามที่สั่ง
                 ⚠️ สถานะทำงานมีฟอร์มย่อย (ชื่อคน/วันที่) โผล่เมื่อเลือกสถานะที่ต้องระบุคน
                 จึงให้ทั้งกล่องกินเต็มแถวเมื่อฟอร์มนั้นเปิด — ไม่งั้นช่องกรอกแคบจนใช้ไม่ได้ */}
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
               <div className="grid items-start gap-3 sm:grid-cols-3">
                 <div>
                   <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -595,7 +595,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               </div>
             </section>
 
-            <section className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
                 <StickyNote className={cn("w-4 h-4", TONE.primary.value)} />
                 หมายเหตุ

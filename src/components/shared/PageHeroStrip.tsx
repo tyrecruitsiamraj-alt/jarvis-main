@@ -20,7 +20,7 @@ export const heroButton =
   'inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20';
 /** ปุ่มหลักบน hero เข้ม (งานที่อยากให้กดที่สุดในหน้า) */
 export const heroButtonSolid =
-  'inline-flex items-center gap-1.5 rounded-full bg-[#5b8bff] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#7ba1ff]';
+  'inline-flex items-center gap-1.5 rounded-full bg-hero px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-hero-hover';
 
 /**
  * แถบหัวหน้าสีเข้ม (mockup rev.3) — ใช้กับหน้าที่ "เข้ามาต้องเห็นภาพรวมก่อน"

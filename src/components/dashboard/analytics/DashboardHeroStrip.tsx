@@ -163,12 +163,12 @@ const DashboardHeroStrip: React.FC<Props> = ({
                       // เจ้าของสั่ง 10 ส.ค. 2569: "กดเดือนไหนเดือนนั้นเข้มกว่า เดือนอื่นจางกว่า"
                       // เลือกอยู่ = สว่างเต็ม + วงแหวน · เดือนที่เหลือหรี่ลงให้ตาไปหยุดที่เดือนที่เลือก
                       active
-                        ? 'bg-[#8fb2ff] opacity-100 ring-1 ring-white/60'
+                        ? 'bg-hero-strong opacity-100 ring-1 ring-white/60'
                         : p === peak
-                          ? 'bg-[#5b8bff]'
-                          : 'bg-[#2b3a5e]',
+                          ? 'bg-hero'
+                          : 'bg-hero-dim',
                       hasSelection && !active && 'opacity-30',
-                      clickable && !active && 'hover:bg-[#5b8bff] hover:opacity-70',
+                      clickable && !active && 'hover:bg-hero hover:opacity-70',
                       clickable ? 'cursor-pointer' : 'cursor-default',
                     )}
                     style={{ height: `${Math.max(6, Math.round((p.value / bars.max) * 100))}%` }}

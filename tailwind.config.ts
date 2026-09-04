@@ -21,6 +21,21 @@ export default {
         mono: ['Kanit', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       colors: {
+        /* 🔴 สีของแบรนด์/ฉาก — มาจากตัวแปรธีมที่ src/index.css ที่เดียว
+           (เลิกพิมพ์ hex ดิบในไฟล์จอ · 4 ก.ย. 2569) */
+        ink: "var(--jarvis-ink)",
+        gold: "var(--jarvis-gold)",
+        hero: {
+          DEFAULT: "var(--jarvis-hero)",
+          strong: "var(--jarvis-hero-strong)",
+          dim: "var(--jarvis-hero-dim)",
+          hover: "var(--jarvis-hero-hover)",
+        },
+        splash: "var(--jarvis-splash)",
+        night: {
+          DEFAULT: "var(--jarvis-night)",
+          hover: "var(--jarvis-night-hover)",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

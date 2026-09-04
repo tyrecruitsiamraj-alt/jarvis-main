@@ -328,7 +328,7 @@ const OurPeoplePage: React.FC = () => {
             return (
               <div
                 key={bucket.key}
-                className={cn('glass-card rounded-[1.5rem] border p-3 md:p-4 space-y-2.5', bucket.boxCls)}
+                className={cn('glass-card rounded-3xl border p-3 md:p-4 space-y-2.5', bucket.boxCls)}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className={cn('text-sm font-semibold', bucket.headCls)}>

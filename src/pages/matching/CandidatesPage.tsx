@@ -176,7 +176,7 @@ const CandidatesPage: React.FC = () => {
         {error && <div className="text-sm text-destructive">เกิดข้อผิดพลาด: {error}</div>}
 
         {/* สรุปจำนวนตามสถานะ — กดเพื่อกรองรายชื่อด้านล่าง */}
-        <div className="glass-card rounded-[1.5rem] border border-white/70 p-3 md:p-4 space-y-3">
+        <div className="glass-card rounded-3xl border border-white/70 p-3 md:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">สรุปผู้สมัครตามสถานะ</h3>
             <span className="text-xs text-muted-foreground">รวม {candidates.length} คน</span>
@@ -235,7 +235,7 @@ const CandidatesPage: React.FC = () => {
         {isMobile ? (
           <div className="space-y-2">
             {filtered.map((c) => (
-              <div key={c.id} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
+              <div key={c.id} className="glass-card rounded-3xl p-4 border border-white/70">
                 <div className="flex items-center justify-between mb-2">
                   <button
                     onClick={() => navigate(`/matching/candidates/${c.id}`)}

@@ -153,7 +153,7 @@ const AddEmployeePage: React.FC = () => {
     <div>
       <PageHeader title="เพิ่มพนักงาน" backPath="/wl/employees" />
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-2xl space-y-4">
+        <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 max-w-2xl space-y-4">
           {formError && <div className="text-sm text-destructive">{formError}</div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

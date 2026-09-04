@@ -81,7 +81,7 @@ const WlBuSelector: React.FC<WlBuSelectorProps> = ({
             transition={{ delay: i * 0.04 }}
             onClick={() => onChange(bu)}
             className={cn(
-              'jarvis-menu-card rounded-[1.5rem] p-4 border text-left touch-manipulation transition-all',
+              'jarvis-menu-card rounded-3xl p-4 border text-left touch-manipulation transition-all',
               active
                 ? unassigned
                   ? 'border-amber-400/80 bg-amber-500/10 ring-2 ring-amber-400/40'

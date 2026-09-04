@@ -144,7 +144,7 @@ const AddCandidatePage: React.FC = () => {
       <PageHeader title="เพิ่มผู้สมัครใหม่" backPath={returnTo} />
 
       <div className="px-4 md:px-6">
-        <div className="glass-card rounded-[1.5rem] p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
+        <div className="glass-card rounded-3xl p-4 md:p-6 border border-white/70 max-w-3xl space-y-4">
           {error && <div className="text-sm text-destructive">{error}</div>}
 
           {selectionReason ? (

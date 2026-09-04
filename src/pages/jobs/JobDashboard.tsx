@@ -206,7 +206,7 @@ const JobDashboard: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate(loadJobListLastUrl() || '/jobs/list')}
-            className="flex-1 glass-card rounded-[1.5rem] p-4 border border-white/70 hover:border-blue-300/50 text-center"
+            className="flex-1 glass-card rounded-3xl p-4 border border-white/70 hover:border-blue-300/50 text-center"
           >
             <Briefcase className={cn('w-6 h-6 mx-auto mb-1', TONE.primary.value)} />
             <div className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>รายการงานทั้งหมด</div>
@@ -228,7 +228,7 @@ const JobDashboard: React.FC = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   onClick={() => goToJob(j)}
-                  className="w-full glass-card rounded-[1.5rem] p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
+                  className="w-full glass-card rounded-3xl p-4 border border-white/70 text-left hover:border-blue-300/50 transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className={cn('text-sm', DASH.cellStrong, 'font-semibold')}>

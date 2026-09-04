@@ -674,7 +674,7 @@ const PreCheckPage: React.FC = () => {
       <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
       <div className="px-4 md:px-6 space-y-4">
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">
-          <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-4">
+          <section className="glass-card rounded-3xl p-4 md:p-5 border border-white/70 space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-amber-500/12 flex items-center justify-center shrink-0">
                 <ClipboardCheck className="w-4 h-4 text-amber-700 dark:text-amber-300" />
@@ -771,7 +771,7 @@ const PreCheckPage: React.FC = () => {
             ) : null}
           </section>
 
-          <section className="glass-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 space-y-3">
+          <section className="glass-card rounded-3xl p-4 md:p-5 border border-white/70 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-blue-500/12 flex items-center justify-center shrink-0">
                 <Navigation className="w-4 h-4 text-blue-600 dark:text-blue-300" />
@@ -817,7 +817,7 @@ const PreCheckPage: React.FC = () => {
             </button>
           </div>
         ) : null}
-        <div className="glass-card rounded-[1.5rem] px-4 py-3 border border-white/70 flex items-center gap-2">
+        <div className="glass-card rounded-3xl px-4 py-3 border border-white/70 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-blue-600 shrink-0 dark:text-blue-300" />
           <p className="text-sm text-muted-foreground">
             {appliedCenter || appliedTextQuery ? 'งานที่ใกล้/เกี่ยวข้อง' : 'งานเปิดจาก ERP'}{' '}
@@ -830,7 +830,7 @@ const PreCheckPage: React.FC = () => {
 
         <div className="space-y-3">
           {!appliedCenter && !appliedTextQuery && filteredRows.length > 0 && (
-            <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
+            <div className="glass-card rounded-3xl p-4 border border-white/70">
               <p className="text-sm font-medium text-foreground">รายการด้านล่างคือใบงานเปิดจาก ERP</p>
               <p className="text-xs text-muted-foreground mt-1">
                 เรียงงานด่วนขึ้นก่อน กดเข้าไปดูรายละเอียดและผู้สมัครที่ AI แนะนำได้
@@ -839,7 +839,7 @@ const PreCheckPage: React.FC = () => {
           )}
 
           {!appliedCenter && !appliedTextQuery && filteredRows.length === 0 && (
-            <div className="glass-card rounded-[1.5rem] p-8 border border-white/70 text-center">
+            <div className="glass-card rounded-3xl p-8 border border-white/70 text-center">
               <ClipboardCheck className="w-8 h-8 text-amber-500/50 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground">ยังไม่พบใบงาน</p>
               <p className="text-xs text-muted-foreground mt-1">ลองค้นหาด้วย site, หน่วยงาน หรือสถานที่ทำงานจาก ERP</p>

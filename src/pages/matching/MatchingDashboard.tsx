@@ -59,7 +59,7 @@ const MatchingDashboard: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
               onClick={() => navigate(item.path)}
-              className="jarvis-menu-card rounded-[1.5rem] p-4 md:p-5 border border-white/70 group touch-manipulation text-left"
+              className="jarvis-menu-card rounded-3xl p-4 md:p-5 border border-white/70 group touch-manipulation text-left"
             >
               <div
                 className={cn(

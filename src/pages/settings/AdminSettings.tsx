@@ -602,7 +602,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'reference' && (
           <div className="space-y-3">
             {REF_CATEGORIES.map((cat) => (
-              <div key={cat} className="glass-card rounded-[1.5rem] p-4 border border-white/70">
+              <div key={cat} className="glass-card rounded-3xl p-4 border border-white/70">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-semibold text-foreground text-sm">{cat}</div>
@@ -622,7 +622,7 @@ const AdminSettings: React.FC = () => {
             ))}
 
             {editingCategory && (
-              <div className="glass-card rounded-[1.5rem] p-4 border border-white/70">
+              <div className="glass-card rounded-3xl p-4 border border-white/70">
                 <div className="flex items-center justify-between mb-3">
                   <div className="font-semibold text-foreground">จัดการ: {editingCategory}</div>
                   <button
@@ -677,7 +677,7 @@ const AdminSettings: React.FC = () => {
           (auditLoading ? (
             <p className="text-sm text-muted-foreground p-4">กำลังโหลด audit log…</p>
           ) : apiAuditLogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground glass-card rounded-[1.5rem] p-4 border border-white/70">
+            <p className="text-sm text-muted-foreground glass-card rounded-3xl p-4 border border-white/70">
               ยังไม่มีบันทึกใน audit log (ระบบจะเพิ่มเมื่อมีการบันทึกผ่าน API)
             </p>
           ) : (

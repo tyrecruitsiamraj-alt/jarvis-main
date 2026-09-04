@@ -125,7 +125,7 @@ const AppNavDrawer: React.FC<Props> = ({
           <div className="flex items-center gap-2 border-b border-white/50 px-4 py-2.5 dark:border-slate-700/70">
             <span className="truncate text-sm font-medium text-foreground">{userName}</span>
             {userRole ? (
-              <span className="ml-auto rounded-full bg-[#141210] px-2 py-0.5 text-[10px] font-medium uppercase text-white">
+              <span className="ml-auto rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium uppercase text-white">
                 {userRole}
               </span>
             ) : null}

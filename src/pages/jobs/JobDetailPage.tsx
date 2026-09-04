@@ -416,7 +416,7 @@ const JobDetailPage: React.FC = () => {
       />
 
       <div className="px-4 md:px-6 space-y-6">
-        <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+        <div className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
           <div className="flex items-center justify-between">
             <StatusBadge status={job.status} type="job" />
             <span

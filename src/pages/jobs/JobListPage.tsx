@@ -718,7 +718,7 @@ const JobListPage: React.FC = () => {
             // ─── Mobile skeleton cards ───────────────────────────────────────
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-2">
+                <div key={i} className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-5 w-16 rounded-full" />
@@ -795,7 +795,7 @@ const JobListPage: React.FC = () => {
             {paginated.map((j) => (
               <div
                 key={j.id}
-                className="glass-card rounded-[1.5rem] p-4 border border-white/70"
+                className="glass-card rounded-3xl p-4 border border-white/70"
               >
                 <button
                   type="button"

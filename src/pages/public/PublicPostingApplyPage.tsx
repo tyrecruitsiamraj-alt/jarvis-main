@@ -65,8 +65,8 @@ const PublicPostingApplyPage: React.FC = () => {
     // หน้าที่คนนอกเห็น = หน้าตาแบรนด์ที่หรูสุดในระบบ (mockup rev.3 ข้อ 10)
     // การ์ดเดี่ยวกลางจอ · ป้ายทองบรรทัดบน · ปุ่มหมึกเต็มความกว้าง · ปิดท้ายด้วยคำสัญญาว่าจะติดต่อกลับ
     <div className="mx-auto w-full max-w-md px-4 py-10 sm:py-14">
-      <div className="rounded-[1.5rem] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-28px_rgba(16,24,43,0.35),0_2px_8px_rgba(16,24,43,0.08)] sm:p-7">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#b08d4f] dark:text-[#cfae72]">
+      <div className="rounded-3xl border border-border/70 bg-card p-6 shadow-[0_24px_60px_-28px_rgba(16,24,43,0.35),0_2px_8px_rgba(16,24,43,0.08)] sm:p-7">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gold">
           So Recruit · รับสมัครงาน
         </p>
         <h1 className="mt-2 text-xl font-bold leading-snug text-foreground sm:text-2xl">{info.title}</h1>
@@ -109,7 +109,7 @@ const PublicPostingApplyPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setApplyOpen(true)}
-              className="mt-6 w-full rounded-full bg-[#10182b] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1c2949] dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+              className="mt-6 w-full rounded-full bg-night py-3 text-sm font-semibold text-white transition-colors hover:bg-night-hover dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
               กรอกใบสมัคร
             </button>

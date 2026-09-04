@@ -117,7 +117,7 @@ const WorkStatusMasterTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="glass-card rounded-[1.5rem] border border-white/70 p-4 space-y-3">
+      <div className="glass-card rounded-3xl border border-white/70 p-4 space-y-3">
         <div>
           <div className="text-sm font-semibold text-foreground">สถานะทำงานของใบขอ</div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">

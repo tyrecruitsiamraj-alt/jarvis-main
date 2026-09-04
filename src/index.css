@@ -785,10 +785,24 @@
     --jarvis-ink: #141210;
     --jarvis-ink-hover: #1f1c18;
     --jarvis-ink-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+    /* 🔴 สีที่เคยเขียนเป็น hex ดิบกระจายอยู่ในไฟล์จอ — ยกมาเป็นตัวแปรธีมที่เดียว
+       (4 ก.ย. 2569 · เจ้าของสั่ง *"ห้ามหลุด Framework"*) แล้วประกาศเป็นสีของ
+       Tailwind ที่ `tailwind.config.ts` ⇒ ไฟล์จอเรียก `bg-ink` `text-gold` ฯลฯ
+       ห้ามพิมพ์ hex ในไฟล์จออีก ยกเว้นสีแบรนด์ของคนอื่น (โลโก้ Microsoft) */
+    --jarvis-gold: #b08d4f;
+    --jarvis-hero: #5b8bff;
+    --jarvis-hero-strong: #8fb2ff;
+    --jarvis-hero-dim: #2b3a5e;
+    --jarvis-splash: #fcfbf8;
+    --jarvis-night: #10182b;
+    --jarvis-hero-hover: #7ba1ff;
+    --jarvis-night-hover: #1c2949;
   }
 
   /* ธีมมืด: ยกพื้นปุ่มขึ้นจากพื้นหลัง + เส้นในโทน teal ให้เข้าภาษา HUD (ดู HUD ใน designTokens) */
   .dark {
+    /* ทองในธีมมืดต้องสว่างขึ้น ไม่งั้นจมพื้น — สลับที่ตัวแปร ไฟล์จอไม่ต้องมี dark: */
+    --jarvis-gold: #cfae72;
     --jarvis-ink: #17262e;
     --jarvis-ink-hover: #1e3540;
     --jarvis-ink-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);

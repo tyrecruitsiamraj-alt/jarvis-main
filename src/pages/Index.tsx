@@ -3,9 +3,9 @@
 // IMPORTANT: Fully REPLACE this with your own code
 const PlaceholderIndex = () => {
   // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+  // พื้นหลังมาจาก token ของธีม (bg-splash) — เลิกเขียน hex ในไฟล์จอ (4 ก.ย. 2569)
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
+    <div className="flex min-h-screen items-center justify-center bg-splash">
       <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
     </div>
   );

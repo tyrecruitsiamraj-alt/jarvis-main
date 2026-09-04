@@ -349,7 +349,7 @@ const AddApplicantDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-[1.5rem] p-0">
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-[38rem] flex-col gap-0 overflow-hidden rounded-3xl p-0">
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 py-4 text-left">
           <DialogTitle className="text-base font-semibold">เพิ่มข้อมูลผู้สมัคร</DialogTitle>
           <DialogDescription className="text-xs">

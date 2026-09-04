@@ -146,7 +146,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[#141210] text-white shrink-0 capitalize">{user?.role}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-ink text-white shrink-0 capitalize">{user?.role}</span>
             {showSettings ? (
               <button
                 type="button"
@@ -224,7 +224,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         */}
         <div className="flex items-center gap-1 shrink-0">
           <NotificationPanel />
-          <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-[#141210] text-white font-medium uppercase">
+          <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-ink text-white font-medium uppercase">
             {user?.role}
           </span>
           {themeSwitchCompact}

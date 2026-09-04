@@ -201,7 +201,7 @@ const WLDashboard: React.FC = () => {
               transition={{ delay: i * 0.05 }}
               type="button"
               onClick={() => navigate(item.path)}
-              className="jarvis-menu-card rounded-[1.5rem] p-4 border border-white/70 text-left touch-manipulation"
+              className="jarvis-menu-card rounded-3xl p-4 border border-white/70 text-left touch-manipulation"
             >
               <item.icon className="w-6 h-6 text-blue-600 mb-2" />
               <div className="font-semibold text-foreground text-sm">{item.label}</div>

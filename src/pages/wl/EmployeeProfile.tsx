@@ -128,7 +128,7 @@ const EmployeeProfile: React.FC = () => {
           backPath="/wl/employees"
         />
         <div className="px-4 md:px-6 space-y-6">
-          <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+          <div className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-info/20 flex items-center justify-center">
                 <User className="w-6 h-6 text-info" />
@@ -171,7 +171,7 @@ const EmployeeProfile: React.FC = () => {
         backPath="/wl/employees"
       />
       <div className="px-4 md:px-6 space-y-6">
-        <div className="glass-card rounded-[1.5rem] p-4 border border-white/70 space-y-3">
+        <div className="glass-card rounded-3xl p-4 border border-white/70 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
               <User className="w-6 h-6 text-blue-600" />

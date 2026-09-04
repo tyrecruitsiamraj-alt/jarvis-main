@@ -66,6 +66,62 @@ describe('ฟอนต์เดียวทั้งระบบ = Kanit', () =>
   });
 });
 
+/**
+ * 🔴 **ด่านกันหลุด Framework** (เจ้าของสั่ง 4 ก.ย. 2569: *"เริ่มทั้งหมด ห้ามหลุด Framework"*)
+ * ไล่ล้างของเดิมครบแล้ว — ด่านนี้กันไม่ให้ย้อนกลับไปเป็นแบบเดิมอีก
+ * ⚠️ `src/components/ui/**` คือโค้ดของ shadcn เอง ไม่นับ
+ */
+describe('ห้ามหลุด Framework', () => {
+  const files = screenFiles().filter((f) => !f.startsWith('src/components/ui'));
+  /**
+   * โค้ดจริงโดยตัด **คอมเมนต์ทุกแบบ** ออกก่อน — คอมเมนต์ในโปรเจกต์นี้อ้างชื่อคลาสเก่า
+   * เพื่ออธิบายว่าเลิกใช้แล้ว ถ้าไม่ตัดออก ด่านจะจับคอมเมนต์ตัวเองว่าผิด
+   */
+  const codeOf = (f: string) =>
+    read(f)
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .filter((l) => !/^\s*\/\//.test(l))
+      .join('\n');
+
+  it('🔴 ไม่มีคลาสปุ่มที่ปั้นเองใน CSS แล้ว (jarvis-btn-* / jarvis-pill-btn)', () => {
+    const bad = files.filter((f) => /className="[^"]*jarvis-(btn|pill-btn)/.test(codeOf(f)));
+    expect(bad).toEqual([]);
+  });
+
+  it('🔴 ไม่มีกล่อง/ลิ้นชักที่ปั้นเอง — ต้องใช้ Dialog/AlertDialog/Sheet ของ shadcn', () => {
+    const bad = files.filter((f) => /role="(dialog|alertdialog)"/.test(codeOf(f)));
+    expect(bad).toEqual([]);
+  });
+
+  it('🔴 ไม่มีมุมโค้ง/ระยะที่ตั้งเอง — ต้องอยู่ในสเกลของ Tailwind', () => {
+    const badRadius = files.filter((f) => /rounded-\[/.test(codeOf(f)));
+    const badSpace = files.filter((f) =>
+      /\b(p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|space-[xy])-\[/.test(codeOf(f)),
+    );
+    expect({ badRadius, badSpace }).toEqual({ badRadius: [], badSpace: [] });
+  });
+
+  it('🔴 ไม่มีสี hex ดิบ — สีมาจาก token ของธีม (ยกเว้นสีแบรนด์โลโก้ Microsoft)', () => {
+    const MS_BRAND = /#(f25022|7fba00|00a4ef|ffb900)/i;
+    const bad = files.filter((f) => {
+      const code = codeOf(f);
+      return [...code.matchAll(/#[0-9a-fA-F]{6}\b/g)].some((m) => !MS_BRAND.test(m[0]));
+    });
+    expect(bad).toEqual([]);
+  });
+
+  it('คลาสปุ่มเก่าถูกถอดออกจาก index.css แล้ว', () => {
+    const css = read('src/index.css');
+    const rules = css
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('/*') && !l.trim().startsWith('*'))
+      .join('\n');
+    expect(rules).not.toMatch(/\.jarvis-btn|\.jarvis-pill-btn/);
+  });
+});
+
 describe('Success Rate — ต้องเขียนฐานกำกับเสมอ', () => {
   it('บนจอบอกว่า % นับจากคนที่รับสาย (ไม่งั้นอ่านสลับกับช่อง "สำเร็จ")', () => {
     const panel = read('src/components/dashboard/LumosCallRatePanel.tsx');

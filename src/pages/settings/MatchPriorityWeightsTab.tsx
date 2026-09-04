@@ -130,7 +130,7 @@ const MatchPriorityWeightsTab: React.FC<{
       {perRequest ? (
         <div
           className={cn(
-            'rounded-[1.5rem] border p-3 text-xs',
+            'rounded-3xl border p-3 text-xs',
             overridden ? TONE.primary.soft : TONE.neutral.soft,
           )}
         >
@@ -158,7 +158,7 @@ const MatchPriorityWeightsTab: React.FC<{
           ) : null}
         </div>
       ) : null}
-      <div className="glass-card rounded-[1.5rem] border border-white/70 p-4 text-sm text-muted-foreground dark:border-slate-700/70">
+      <div className="glass-card rounded-3xl border border-white/70 p-4 text-sm text-muted-foreground dark:border-slate-700/70">
         <p>
           {perRequest
             ? 'หน้า Matching เรียงผู้สมัครในใบขอนี้จากเกณฑ์ข้างล่างนี้ — ยิ่งน้ำหนักมาก ยิ่งมีผลต่อลำดับมาก'

@@ -58,7 +58,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 const HAIRLINE = 'rgba(28, 57, 39, .11)';
 
 /** ป้ายชื่อช่องกรอก */
-const FIELD_LABEL = 'mb-[7px] ml-0.5 block text-xs font-medium';
+const FIELD_LABEL = 'mb-2 ml-0.5 block text-xs font-medium';
 
 /**
  * ช่องกรอกของ mockup — พื้นขาวโปร่ง ขอบเขียวจาง มีไฮไลต์ด้านใน
@@ -381,7 +381,7 @@ const LoginPage: React.FC = () => {
       </motion.div>
 
       {/* 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้ */}
-      <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-[22px] px-6 pb-28 pt-24">
+      <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6 pb-28 pt-24">
         {/* หัวเรื่อง — ทรงเดียวกับ mockup (ตัวใหญ่ ชิดกัน คำเน้นเป็นเขียวจาง) */}
         <motion.div {...rise(0.05)} className="max-w-[720px] text-center">
           {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
@@ -418,7 +418,7 @@ const LoginPage: React.FC = () => {
         <div className="flex w-full flex-col items-center justify-center gap-4 lg:flex-row lg:items-center lg:gap-5">
         {/* การ์ดกระจก — `.card` ของ mockup */}
         <motion.div {...rise(0.22)} className="w-full max-w-[410px]">
-          <div className="rounded-3xl p-[25px]" style={GLASS_CARD}>
+          <div className="rounded-3xl p-6" style={GLASS_CARD}>
             {authConfig === null && configError ? (
               <div className="space-y-3 py-6 text-center">
                 <p className="text-sm" style={{ color: FRONT_SCENE.muted }}>
@@ -487,7 +487,7 @@ const LoginPage: React.FC = () => {
             รอบนี้เหลือ**การ์ดเดียว เห็นครบทุกจอ** ทรงกระจกเดียวกับการ์ดล็อกอิน */}
         <motion.div {...rise(0.3)} className="w-full max-w-[410px]">
           <div
-            className="flex h-full flex-col justify-between rounded-3xl p-[25px]"
+            className="flex h-full flex-col justify-between rounded-3xl p-6"
             style={GLASS_CARD}
           >
             <div>
