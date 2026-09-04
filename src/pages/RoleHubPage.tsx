@@ -1,13 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import { CalendarDays, Search, Briefcase, BarChart3, Settings, ArrowRight } from 'lucide-react';
-import FeatureCard from '@/components/shared/FeatureCard';
 import { CONVEYOR_STEPS } from '@/lib/soRecruitNav';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import type { AppFunctionId } from '@/lib/roleFunctions';
-import { type ToneKey } from '@/lib/designTokens';
+import { TONE, type ToneKey } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
 import { resolveUnitNavPath } from '@/lib/jobUnitSessionState';
 
 export type HubRole = 'opl' | 'staff' | 'supervisor' | 'admin';
@@ -24,8 +25,9 @@ type HubLink = {
 
 /**
  * 🔴 **ชื่อ+ไอคอนยกมาจาก `soRecruitNav` ที่เดียว** (4 ก.ย. 2569) — หน้านี้เคยตั้งชื่อเอง
- * ("Follow" · "หน่วยงาน") ซึ่งไม่ตรงกับเมนูหลัก ("ติดตาม" · "ใบขอ") · กติกาเดียวกับ
- * เมนูล่างที่แก้ไปแล้ว: หน้าเดียวกันต้องชื่อเดียวไอคอนเดียวทุกที่
+ * ("Follow" · "หน่วยงาน") ไม่ตรงกับเมนูหลัก ("ติดตาม" · "ใบขอ") · กติกาเดียวกับเมนูล่าง:
+ * หน้าเดียวกันต้องชื่อเดียวไอคอนเดียวทุกที่ (มีเทสต์คุม)
+ * ⚠️ หน้าตาการ์ดคืนเป็นแบบเดิมตามที่เจ้าของสั่ง 4 ก.ย. 2569 (*"ย้อนคืน ๆ ไม่สวย"*)
  */
 const STEP = Object.fromEntries(CONVEYOR_STEPS.map((s) => [s.path, s])) as Record<
   string,
@@ -34,22 +36,8 @@ const STEP = Object.fromEntries(CONVEYOR_STEPS.map((s) => [s.path, s])) as Recor
 
 const STAFF_LINKS: HubLink[] = [
   { path: '/wl', label: 'WL', desc: 'ปฏิทิน / ลงงาน / พนักงาน', icon: CalendarDays, tone: 'primary' as const, functionId: 'work_calendar_read' },
-  {
-    path: '/follow',
-    label: STEP['/follow'].label,
-    desc: 'ลงรายชื่อคนที่ต้องติดตาม — AI โทรให้',
-    icon: STEP['/follow'].icon,
-    tone: 'danger' as const,
-    functionId: 'follow_read',
-  },
-  {
-    path: '/jobs/list',
-    label: STEP['/jobs/list'].label,
-    desc: 'หน่วยงานขอคนมา — ดูว่าค้างมานานเท่าไหร่',
-    icon: STEP['/jobs/list'].icon,
-    tone: 'warn' as const,
-    functionId: 'unit_requests_read',
-  },
+  { path: '/follow', label: STEP['/follow'].label, desc: 'ลงรายชื่อคนที่ต้องติดตาม — AI โทรให้', icon: STEP['/follow'].icon, tone: 'danger' as const, functionId: 'follow_read' },
+  { path: '/jobs/list', label: STEP['/jobs/list'].label, desc: 'ดูรายการใบขอ', icon: STEP['/jobs/list'].icon, tone: 'warn' as const, functionId: 'unit_requests_read' },
   { path: '/dashboard', label: 'Dashboard', desc: 'ภาพรวมและ KPI', icon: BarChart3, tone: 'neutral' as const, functionId: 'dashboard' },
 ];
 
@@ -85,25 +73,35 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
     <div className="relative">
       <PageHeader title={title} subtitle={subtitle} backPath="/" />
       <div className="px-4 md:px-6 py-4">
-        {/* 🔴 **ภาษาการ์ดกลาง** (`FeatureCard` ประกอบจาก Card ของ shadcn) —
-            เจ้าของเลือก 4 ก.ย. 2569 ว่าเอาเฉพาะภาษาการ์ดจากสเปก Premium Features
-            ⇒ กล่องไอคอนสีประจำเรื่อง + ไหลเข้าทีละใบ + ไอคอนโตตอนชี้
-            เลิกใช้คลาส `jarvis-menu-card` ที่ปั้นเอง และเลิกใช้ framer-motion
-            (แอนิเมชันมาจาก utility ของ tailwindcss-animate ไม่ต้องมี lib เพิ่ม) */}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
           {links.map((item, i) => (
-            <FeatureCard
+            <motion.button
               key={item.path}
-              icon={item.icon}
-              title={item.label}
-              description={item.desc}
-              tone={item.tone}
-              index={i}
+              type="button"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
               onClick={() =>
                 navigate(item.path === '/jobs/list' ? resolveUnitNavPath() : item.path)
               }
-              action={<ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />}
-            />
+              className="jarvis-menu-card rounded-3xl p-4 md:p-6 group touch-manipulation"
+            >
+              <div
+                className={cn(
+                  'w-11 h-11 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-105',
+                  TONE[item.tone].tile,
+                  TONE[item.tone].value,
+                )}
+              >
+                <item.icon className="w-5 h-5" />
+              </div>
+              <div className="font-semibold text-foreground text-sm md:text-base">{item.label}</div>
+              <div className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{item.desc}</div>
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                เปิด
+                <ArrowRight className="h-3 w-3" aria-hidden />
+              </div>
+            </motion.button>
           ))}
         </div>
       </div>
