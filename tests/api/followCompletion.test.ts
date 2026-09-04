@@ -6,6 +6,10 @@
  * 1. นับที่ระดับ **คน (กลุ่ม)** ไม่ใช่ระดับรอบ — 1 วัน = 1 แถว (092) ถ้านับเป็นรอบ
  *    คนเดียวจะโผล่หลายครั้งและเลขเฟ้อ
  * 2. **ยังมีนัดข้างหน้า = ยังไม่ครบ** (กล่องนี้ต้องเป็นงานที่พร้อมส่งต่อจริง)
+ * 2.1 **สายเก่าที่ค้าง `pending` ไม่บล็อก** (แก้ 3 ก.ย. 2569) — ของจริง Lumos ตอบสายที่ 2
+ *     แล้วปิดคนนั้น ส่วนสายที่ 1 ค้างตลอดกาลเพราะไม่เคยถูกยิง · กติกาเดิม (`every`)
+ *     ทำให้ 14 คนที่ได้คำตอบแล้วไม่มีใครเข้ากองนี้ แถบส่งต่อหายทั้งแถบ
+ * 2.2 **AI นัดโทรซ้ำ (`retry_scheduled`) = ยังตามอยู่** ห้ามนับว่าจบ
  * 3. `needs_human` เข้ากองด้วย (เจ้าของระบุมาในโจทย์)
  * 4. **ผลออกมาว่าไม่ไป = ไม่เข้ากอง** (ไม่มีอะไรให้ดูแลต่อ)
  * 5. ยกเลิกหมดทุกรอบ = ไม่ใช่ "โทรครบ"
@@ -15,6 +19,7 @@ import {
   COMPLETION_REASON_LABEL,
   completedFollowSummary,
   isRoundSettled,
+  reasonBlocksAftercare,
   selectCompletedFollowPeople,
 } from '../../src/lib/followCompletion.js';
 import type { FollowGroup } from '../../src/lib/followGrouping.js';
@@ -88,11 +93,54 @@ describe('เลือกคนที่โทรครบแล้ว', () => {
     expect(people).toHaveLength(0);
   });
 
-  it('มีรอบที่ยังไม่มีผล = ยังไม่ครบ', () => {
+  /**
+   * 🔴 เคสจริง 3 ก.ย. 2569 (เจ้าของแจ้ง: *"แดชบอร์ดโชว์การโทรสำเร็จแล้ว แต่ไม่ขึ้น
+   * แถบที่ต้องย้ายไปดูแลหลังบ้าน"*) — Lumos ตอบสายที่ 2 แล้วปิดคนนั้น
+   * ส่วนสายที่ 1 ค้าง `pending` ไม่มีวันได้ผล ⇒ ต้อง**ไม่บล็อก** กองนี้
+   */
+  it('🔴 สายเก่าค้างไม่มีผล แต่มีสายที่ได้คำตอบแล้ว = ครบ (สายที่ค้างถือว่าตกไป)', () => {
     const people = selectCompletedFollowPeople([
       group('ค', [round({ call_outcome: 'confirmed' }), round({})]),
     ]);
+    expect(people).toHaveLength(1);
+    expect(people[0].reason).toBe('ai_going');
+    // นับแค่สายที่ได้คำตอบจริง ไม่นับสายที่ค้าง
+    expect(people[0].roundsDone).toBe(1);
+  });
+
+  it('ไม่มีสายไหนได้คำตอบเลย = ยังไม่ครบ (ค้างอยู่ ไม่ใช่โทรครบ)', () => {
+    const people = selectCompletedFollowPeople([group('ค2', [round({}), round({})])]);
     expect(people).toHaveLength(0);
+  });
+
+  it('🔴 AI นัดโทรซ้ำ (retry_scheduled) = ยังตามอยู่ ห้ามนับว่าจบ', () => {
+    const people = selectCompletedFollowPeople([
+      group('ค3', [
+        round({ call_outcome: 'unresponsive', followup_state: 'retry_scheduled' }),
+      ]),
+    ]);
+    expect(people).toHaveLength(0);
+  });
+
+  /**
+   * 🔴 AI ได้คำตอบว่า "ไม่ไป" ต้องขึ้นกองนี้ (เดิมตกหายเงียบ ๆ เพราะเช็คแต่
+   * `outcome_code` ที่คนกรอก) แต่ต้องติดป้ายว่า**ไม่ต้องส่งต่อ**
+   */
+  it('🔴 AI ได้คำตอบว่าไม่ไป = เข้ากองแต่ห้ามมีปุ่มย้ายไปดูแลหลังเริ่มงาน', () => {
+    const people = selectCompletedFollowPeople([
+      group('ค4', [round({ call_outcome: 'declined' })]),
+    ]);
+    expect(people).toHaveLength(1);
+    expect(people[0].reason).toBe('ai_not_going');
+    expect(reasonBlocksAftercare('ai_not_going')).toBe(true);
+    expect(reasonBlocksAftercare('ai_going')).toBe(false);
+  });
+
+  it('คำตอบล่าสุดชนะ — สายแรกรับสาย สายสองบอกไม่ไป ⇒ ไม่ไป', () => {
+    const people = selectCompletedFollowPeople([
+      group('ค5', [round({ call_outcome: 'acknowledged' }), round({ call_outcome: 'declined' })]),
+    ]);
+    expect(people[0].reason).toBe('ai_not_going');
   });
 
   it('needs_human เข้ากอง (AI เอาไม่อยู่ ต้องคนตาม)', () => {

@@ -116,8 +116,15 @@ describe('หน้าใหม่ + ทางเข้า', () => {
     const panel = stripComments(read('src/components/follow/FollowCompletedPanel.tsx'));
     expect(panel).toContain('selectCompletedFollowPeople');
     expect(panel).not.toMatch(/listFollowEntries|fetchFollow/);
+    /**
+     * 🔴 ต้องเป็น `allGroups` (ชุดเต็ม) **ไม่ใช่** `groups` ที่ผ่านตัวกรองแล้ว
+     * (แก้ 3 ก.ย. 2569 — เจ้าของแจ้งว่าแถบส่งไปดูแลหลังเริ่มงานไม่ขึ้น: เดิมแถบกิน
+     * กลุ่มที่กรองด้วยแท็บ/วันที่มาแล้ว เปลี่ยนแท็บทีเดียวแถบหายทั้งแถบ
+     * ทั้งที่งานยังค้างรอส่งต่ออยู่ · แถบนี้คือคิวงานของทั้งระบบ)
+     */
     const page = read('src/pages/follow/FollowPage.tsx');
-    expect(page).toMatch(/<FollowCompletedPanel\s+groups=\{groups\}/);
+    expect(page).toMatch(/<FollowCompletedPanel\s+groups=\{allGroups\}/);
+    expect(page).toMatch(/const allGroups = useMemo\(\(\) => groupFollowEntries\(items\)/);
   });
 });
 

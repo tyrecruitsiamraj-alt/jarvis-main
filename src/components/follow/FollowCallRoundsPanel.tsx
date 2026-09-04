@@ -14,6 +14,11 @@ import {
   type FollowRoundBucket,
 } from '@/lib/followRoundBuckets';
 import {
+  followCallResultSummary,
+  countFollowCallResults,
+  overdueWaitingCount,
+} from '@/lib/followCallResults';
+import {
   actionableSummary,
   bucketVisual,
   roundSignal,
@@ -215,7 +220,7 @@ export default function FollowCallRoundsPanel({
           const counts = countsByRound.get(slot);
           const rows = roundRows.get(slot) ?? [];
           if (!counts) return null;
-          const signal = roundSignal(counts);
+          const signal = roundSignal(counts, overdueWaitingCount(rows));
           const active = slot === activeRound;
           const tone = TONE[signal.tone];
           return (
@@ -245,6 +250,23 @@ export default function FollowCallRoundsPanel({
                     คู่กับ "เลยเวลานัดแล้ว 4" บนหน้าเดียวกัน (audit 26 ส.ค. 2569) */}
                 {actionableSummary(counts) ?? (rows.length > 0 ? 'ไม่มีผลที่ต้องตามต่อ' : '—')}
               </span>
+              {/* 🔴 ผลจากปาก AI ของสายนี้ (แก้ 3 ก.ย. 2569 — เจ้าของแจ้งว่าผลการโทร
+                  ทั้งสองสายไม่ขึ้นบนแดชบอร์ด) · ป้ายบนแท็บบอกแค่ผลเด่นสองอันดับ
+                  รายละเอียดครบอยู่บรรทัดใต้กล่อง */}
+              {(() => {
+                const res = countFollowCallResults(rows);
+                if (res.length === 0) return null;
+                const head = res
+                  .slice(0, 2)
+                  .map((r) => `${r.label} ${r.count.toLocaleString('th-TH')}`)
+                  .join(' · ');
+                return (
+                  <span className={cn('block truncate text-[10px] font-semibold', tone.value)}>
+                    {head}
+                    {res.length > 2 ? ` +${res.length - 2}` : ''}
+                  </span>
+                );
+              })()}
             </button>
           );
         })}
@@ -256,7 +278,7 @@ export default function FollowCallRoundsPanel({
       {(() => {
         const counts = countsByRound.get(activeRound);
         if (!counts) return null;
-        const signal = roundSignal(counts);
+        const signal = roundSignal(counts, overdueWaitingCount(roundRows.get(activeRound) ?? []));
         const signalTone = TONE[signal.tone];
         return (
           <div className="space-y-2">
@@ -267,6 +289,26 @@ export default function FollowCallRoundsPanel({
                 <p className={cn('text-[11px] font-semibold', signalTone.value)}>{signal.text}</p>
               </div>
             ) : null}
+
+            {/* 🔴 บรรทัดผลการโทรของสายที่เลือก — **เพิ่มใต้กล่อง ไม่แตะ 7 กล่องเดิม**
+                (เจ้าของสั่งไว้ว่าเจ็ดกล่องคือเจ็ด) · ช่อง "ไป/ไม่ไป" ในกล่องคือผลที่
+                **คนกดปิดงาน** ส่วนบรรทัดนี้คือคำตอบที่ **AI ได้มาจากปากคนรับสาย** */}
+            {(() => {
+              const rows = roundRows.get(activeRound) ?? [];
+              const text = followCallResultSummary(rows);
+              if (!text) {
+                return rows.length > 0 ? (
+                  <p className={cn('text-[11px]', DASH.muted)}>
+                    สายนี้ยังไม่มีผลกลับจาก AI เลย
+                  </p>
+                ) : null;
+              }
+              return (
+                <p className={cn('rounded-xl border px-3 py-2 text-[11px] font-semibold', TONE.info.soft, TONE.info.value)}>
+                  {text}
+                </p>
+              );
+            })()}
 
             <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
               {FOLLOW_ROUND_BUCKETS.map((b) => {

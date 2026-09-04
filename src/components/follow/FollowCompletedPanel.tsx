@@ -5,6 +5,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { FollowGroup } from '@/lib/followGrouping';
 import {
   COMPLETION_REASON_LABEL,
+  reasonBlocksAftercare,
   completedFollowSummary,
   selectCompletedFollowPeople,
 } from '@/lib/followCompletion';
@@ -40,6 +41,8 @@ const FollowCompletedPanel: React.FC<{
   if (people.length === 0) return null;
 
   const shown = expanded ? people : people.slice(0, PREVIEW_ROWS);
+  /** กี่คนที่ส่งต่อได้จริง — คนที่ AI ได้คำตอบว่าไม่ไปไม่นับ */
+  const readyCount = people.filter((p) => !reasonBlocksAftercare(p.reason)).length;
 
   const move = async (key: string, name: string, phone: string, unitName: string | null, siteCode: string | null, followId: string | null) => {
     setMovingKey(key);
@@ -66,8 +69,13 @@ const FollowCompletedPanel: React.FC<{
     <section className={cn('space-y-2 rounded-2xl border px-3.5 py-3', TONE.success.soft)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
+          {/* 🔴 หัวกล่องต้องไม่โกหก — เดิมเขียน "พร้อมส่งไปดูแลหลังเริ่มงาน" ทั้งก้อน
+              ทั้งที่คนที่ AI ได้คำตอบว่า "ไม่ไป" ไม่ต้องส่งต่อ (แก้ 3 ก.ย. 2569) */}
           <p className={cn('text-sm font-semibold', TONE.success.value)}>
-            โทรครบแล้ว {people.length.toLocaleString('th-TH')} คน — พร้อมส่งไปดูแลหลังเริ่มงาน
+            โทรได้คำตอบแล้ว {people.length.toLocaleString('th-TH')} คน
+            {readyCount > 0
+              ? ` — ส่งไปดูแลหลังเริ่มงานได้ ${readyCount.toLocaleString('th-TH')} คน`
+              : ' — ยังไม่มีใครต้องส่งต่อ'}
           </p>
           {/* 🔴 "โทรครบ" ≠ "สำเร็จ" — Haiku รอบสองงงว่าทำไมแท็บสำเร็จเป็น 0 ทั้งที่กล่องนี้มีคน
               (สำเร็จ = เจ้าหน้าที่ปิดงานว่าไปทำงานแล้ว · กล่องนี้แค่ AI โทรครบรอบที่ตั้ง) */}
@@ -106,11 +114,22 @@ const FollowCompletedPanel: React.FC<{
                 <span className={DASH.muted}> · {g.phone}</span>
                 {g.unitName ? <span className={DASH.muted}> · {g.unitName}</span> : null}
                 <span className="block text-[11px]">
-                  <span className={TONE.success.value}>{COMPLETION_REASON_LABEL[p.reason]}</span>
-                  <span className={DASH.muted}> · โทรไป {p.roundsDone} รอบ</span>
+                  <span
+                    className={
+                      reasonBlocksAftercare(p.reason) ? TONE.danger.value : TONE.success.value
+                    }
+                  >
+                    {COMPLETION_REASON_LABEL[p.reason]}
+                  </span>
+                  <span className={DASH.muted}> · ได้คำตอบจาก {p.roundsDone} สาย</span>
                 </span>
               </span>
-              {done ? (
+              {reasonBlocksAftercare(p.reason) ? (
+                /* ไม่ไปแล้ว = ไม่มีอะไรให้ดูแลต่อ · ปิดงานที่ป๊อปของสายนั้นแทน */
+                <span className={cn('shrink-0 rounded-full px-2 py-0.5 font-semibold', TONE.neutral.chip)}>
+                  ไม่ต้องส่งต่อ
+                </span>
+              ) : done ? (
                 <span className={cn('shrink-0 rounded-full px-2 py-0.5 font-semibold', TONE.success.chip)}>
                   ✓ ย้ายแล้ว
                 </span>

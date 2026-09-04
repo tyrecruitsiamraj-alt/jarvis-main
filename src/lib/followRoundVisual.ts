@@ -70,7 +70,7 @@ export type RoundSignal = {
  * สรุปว่ารอบนี้ควรทำอะไร — เรียงความเร่งด่วนจากหนักไปเบา
  * แดงชนะเหลือง · เหลืองชนะน้ำเงิน · ไม่มีอะไรค้างเลยถึงจะเขียว
  */
-export function roundSignal(counts: RoundCounts): RoundSignal {
+export function roundSignal(counts: RoundCounts, overdueWaiting = 0): RoundSignal {
   if (!(counts.all > 0)) {
     // เจ้าของสั่ง 18 ส.ค. 2569: *"ยังไม่มีใครอยู่รอบนี้ เอาออก"* —
     // รอบว่างไม่ต้องมีข้อความ (เลข 0 บนกล่องบอกอยู่แล้ว) · text ว่าง = UI ไม่เรนเดอร์แถบ
@@ -98,6 +98,21 @@ export function roundSignal(counts: RoundCounts): RoundSignal {
     };
   }
   if (counts.waiting > 0) {
+    /**
+     * 🔴 **"ยังไม่ถึงเวลา" พูดได้เฉพาะตอนที่ยังไม่ถึงเวลาจริง** (แก้ 3 ก.ย. 2569)
+     *
+     * วัดของจริง 3 ก.ย.: สายที่ 1 นัดไว้ 08:20 · บ่ายแล้วยังค้าง `pending` 12 สาย
+     * แต่จอขึ้นว่า *"รอโทร 12 คน — ยังไม่ถึงเวลาที่ตั้งไว้"* ⇒ **โกหก** และกลบ
+     * เรื่องใหญ่ที่สุดของหน้านี้ไป (สายไม่ถูกยิงออก ไม่มีใครรู้)
+     * ⇒ เลยเวลาแล้วต้องขึ้นสีเหลืองและบอกตรง ๆ ว่าให้ไปเช็ค
+     */
+    if (overdueWaiting > 0) {
+      return {
+        level: 'act',
+        tone: 'warn',
+        text: `เลยเวลานัดแล้ว ${overdueWaiting.toLocaleString('th-TH')} สาย ยังไม่ถูกส่งออกไปโทร — เช็คคิว Lumos`,
+      };
+    }
     return {
       level: 'watch',
       tone: 'neutral',
