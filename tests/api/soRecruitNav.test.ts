@@ -153,6 +153,22 @@ describe('ชื่อหน้าแรกในเมนู', () => {
   it('เรียกว่า "หน้าหลัก" (เจ้าของสั่งเปลี่ยนจาก "วันนี้" 27 ส.ค. 2569)', () => {
     expect(CONVEYOR_HOME.label).toBe('หน้าหลัก');
   });
+
+  /**
+   * 🔴 เจ้าของทัก 4 ก.ย. 2569: *"หน้าหลักมันต้องเป็นรูปบ้าน หรืออะไรก็ได้ที่ไม่ใช่
+   * รูปโทรศัพท์"* — ของเดิมใช้ `PhoneCall` ซึ่งนอกจากไม่สื่อ ยังซ้ำกับเมนู "จับคู่งาน"
+   */
+  it('🔴 ไอคอนหน้าหลักเป็นรูปบ้าน ไม่ใช่โทรศัพท์', () => {
+    expect(CONVEYOR_HOME.icon.displayName ?? CONVEYOR_HOME.icon.name).toMatch(/House|Home/);
+  });
+});
+
+describe('ไอคอนเมนู — ห้ามซ้ำกัน', () => {
+  it('🔴 ทุกเมนู (รวมหน้าหลัก) ใช้ไอคอนคนละตัว — ซ้ำแล้วกวาดตาแยกไม่ออก', () => {
+    const items = [CONVEYOR_HOME, ...CONVEYOR_STEPS];
+    const names = items.map((t) => t.icon.displayName ?? t.icon.name);
+    expect(new Set(names).size).toBe(items.length);
+  });
 });
 
 describe('conveyorBadge — 0 ที่รู้จริง ต่างจาก "ยังไม่รู้"', () => {

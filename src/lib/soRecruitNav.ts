@@ -21,6 +21,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   BarChart3,
+  House,
   LayoutGrid,
   CalendarDays,
   ClipboardList,
@@ -88,7 +89,12 @@ export const CONVEYOR_HOME = {
   label: 'หน้าหลัก',
   blurb: 'งานถัดไปของคุณ เรียงตามความด่วนให้แล้ว',
   path: '/',
-  icon: PhoneCall,
+  /**
+   * 🔴 **หน้าหลักต้องเป็นรูปบ้าน** (เจ้าของทัก 4 ก.ย. 2569) — ของเดิมเป็นรูปโทรศัพท์
+   * ซึ่งนอกจากจะไม่สื่อแล้ว ยัง **ซ้ำกับเมนู "จับคู่งาน"** ที่ใช้ `PhoneCall` เหมือนกัน
+   * ⇒ ไอคอนซ้ำ = กวาดตาแล้วแยกเมนูไม่ออก · มีเทสต์คุมว่าห้ามซ้ำกันอีก
+   */
+  icon: House,
 };
 
 /**
