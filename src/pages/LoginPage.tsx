@@ -360,14 +360,14 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
           style={{ background: LOGIN_SCENE.accent }}
           aria-hidden
         />
-        SO RECRUIT
+        ONE RECRUIT · ONE SOLUTION · ONE STOP
       </p>
 
       <h2
         className="mt-2 text-[clamp(20px,2.2vw,26px)] font-[610] leading-snug"
         style={{ color: LOGIN_SCENE.ink }}
       >
-        รวมงานสรรหาไว้ที่เดียว
+        งานสรรหา ครบ จบ ที่เดียว
       </h2>
       <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: LOGIN_SCENE.muted }}>
         ตั้งแต่รับใบขอ ปล่อยประกาศ ให้ AI โทรตาม จนถึงวันเริ่มงาน
@@ -507,6 +507,14 @@ const LoginPage: React.FC = () => {
       }}
     >
       <PhotoScene />
+      {/* ผ้าขาวไล่เฉดจากขอบบน — ทำให้หัวเรื่องอ่านออกโดยไม่ต้องมีกรอบ */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[46vh]"
+        style={{
+          background: `linear-gradient(180deg, ${LOGIN_SCENE.glassStrong} 0%, ${LOGIN_SCENE.glass} 42%, transparent 100%)`,
+        }}
+      />
 
       {/* ตราบริษัทมุมซ้ายบน — ตำแหน่งเดียวกับ `.brand` ของ mockup แต่เป็นตราของเรา */}
       <motion.div
@@ -529,24 +537,14 @@ const LoginPage: React.FC = () => {
       {/* 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้ */}
       <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6 pb-16 pt-20">
         {/* หัวเรื่อง — ทรงเดียวกับ mockup (ตัวใหญ่ ชิดกัน คำเน้นเป็นเขียวจาง) */}
-        {/* 🔴 หัวเรื่องอยู่บน **แผ่นกระจกขาว** ไม่ใช่วางบนภาพป่าเปล่า ๆ
-            (เจ้าของทัก 5 ก.ย. 2569: *"อ่านไม่รู้เรื่องเลย"*) — เคยแก้ด้วยรัศมีขาวใต้ตัวอักษร
-            แต่บนกิ่งไม้ที่ลายพร้อยยังอ่านยากอยู่ดี · แผ่นรองทึบพอให้ตัวหนังสืออ่านออกทุกจุดของภาพ */}
-        <motion.div
-          {...rise(0.05)}
-          className="w-full max-w-[720px] rounded-3xl px-6 py-5 text-center"
-          style={{
-            background: LOGIN_SCENE.glassStrong,
-            border: `1px solid ${HAIRLINE}`,
-            boxShadow: '0 18px 50px rgba(18, 32, 60, .12)',
-            backdropFilter: 'blur(22px) saturate(1.2)',
-            WebkitBackdropFilter: 'blur(22px) saturate(1.2)',
-          }}
-        >
+        {/* 🔴 **ไม่มีกรอบ** (เจ้าของทัก 5 ก.ย. 2569: *"ไม่เอากรอบแบบนี้ มันดูเสร่อมาก"*)
+            แต่ตัวหนังสือยังต้องอ่านออกบนกิ่งไม้ที่ลายพร้อย ⇒ ใช้ **ผ้าไล่เฉดขาวเต็มความกว้าง**
+            ที่ด้านบนของหน้าแทน — ไม่มีขอบ ไม่มีมุม ไม่อ่านเป็น "การ์ด" (ผ้าอยู่ที่ชั้นฉาก) */}
+        <motion.div {...rise(0.05)} className="max-w-[720px] text-center">
           {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
               ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em */}
           <h1
-            className="text-[clamp(28px,4.2vw,48px)] font-[610] leading-[1.12] tracking-[-0.01em]"
+            className="text-[clamp(30px,4.6vw,54px)] font-[610] leading-[1.1] tracking-[-0.01em]"
             style={{ color: LOGIN_SCENE.ink }}
           >
             ยินดีต้อนรับ
@@ -556,7 +554,7 @@ const LoginPage: React.FC = () => {
           </h1>
           <p
             className="mx-auto mt-2.5 max-w-[52ch] text-[14.5px] leading-[1.6]"
-            style={{ color: LOGIN_SCENE.muted }}
+            style={{ color: LOGIN_SCENE.ink }}
           >
             {todayLabel} · เข้าสู่ระบบด้วยบัญชีองค์กร
           </p>
