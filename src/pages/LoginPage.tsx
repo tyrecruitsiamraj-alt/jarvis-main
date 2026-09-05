@@ -71,7 +71,7 @@ const HAIRLINE = LOGIN_SCENE.line;
 const TEXT_ON_PHOTO = '0 1px 0 rgba(255,255,255,.55), 0 2px 20px rgba(255,255,255,.75)';
 
 /** ป้ายชื่อช่องกรอก */
-const FIELD_LABEL = 'mb-2 ml-0.5 block text-xs font-medium';
+const FIELD_LABEL = 'mb-2 block text-xs font-medium';
 
 /**
  * ช่องกรอกของ mockup — พื้นขาวโปร่ง ขอบเขียวจาง มีไฮไลต์ด้านใน
@@ -105,8 +105,9 @@ const GLASS_CARD: React.CSSProperties = {
   border: `1px solid ${HAIRLINE}`,
   boxShadow:
     '0 26px 70px rgba(18, 32, 60, .12), 0 2px 8px rgba(18, 32, 60, .05), inset 0 1px rgba(255,255,255,.9)',
-  backdropFilter: 'blur(28px) saturate(1.28)',
-  WebkitBackdropFilter: 'blur(28px) saturate(1.28)',
+  /* เบลอแรงขึ้นเพราะการ์ดโปร่งขึ้น — กิ่งไม้หลังการ์ดต้องละลายเป็นสีเรียบ ไม่งั้นอ่านยาก */
+  backdropFilter: 'blur(40px) saturate(1.3)',
+  WebkitBackdropFilter: 'blur(40px) saturate(1.3)',
 };
 
 /**
@@ -551,16 +552,28 @@ const LoginPage: React.FC = () => {
           {/* ═══ ครึ่งซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══
               🔴 บนมือถือสลับให้ **ฟอร์มเข้าระบบมาก่อน** (order) — จอแคบเรียงเป็นแถวเดียว
               ถ้าปล่อยตามลำดับโค้ด คนต้องเลื่อนผ่านคำอธิบายยาว ๆ กว่าจะถึงช่องกรอก */}
-          <div className="order-2 rounded-3xl p-7 sm:p-8 lg:order-1" style={GLASS_CARD}>
+          {/* 🔴 `justify-center` — การ์ดสองใบสูงเท่ากัน ถ้าเนื้อในชิดบนอย่างเดียว
+              ใบที่เนื้อสั้นกว่าจะเหลือที่ว่างก้นการ์ด อ่านเป็น "วางไม่ตรงกลาง"
+              (วัดจริง 5 ก.ย. 2569: ใบซ้ายเว้นบน 55px ล่าง 82px) */}
+          <div
+            className="order-2 flex flex-col justify-center rounded-3xl p-7 sm:p-8 lg:order-1"
+            style={GLASS_CARD}
+          >
             <SystemIntro rise={rise} />
           </div>
 
           {/* ═══ ครึ่งขวา — หัวเรื่อง + เข้าสู่ระบบ ═══ */}
-          <div className="order-1 rounded-3xl p-7 sm:p-8 lg:order-2" style={GLASS_CARD}>
+          <div
+            className="order-1 flex flex-col justify-center rounded-3xl p-7 sm:p-8 lg:order-2"
+            style={GLASS_CARD}
+          >
             {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
                 ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em */}
+            {/* 🔴 หัวเรื่อง+วันที่ **จัดกึ่งกลาง** ให้เข้าชุดกับข้อความใต้ฟอร์มที่กึ่งกลางอยู่แล้ว
+                (เจ้าของทัก 5 ก.ย. 2569: *"ตรง Login จัดหน้าดี ๆ มันไม่ค่อยกึ่งกลาง"*)
+                — ของเดิมหัวเรื่องชิดซ้าย แต่ตัวหนังสือท้ายการ์ดกึ่งกลาง ⇒ สองแนวในใบเดียว */}
             <h1
-              className="text-[clamp(24px,2.6vw,30px)] font-[610] leading-tight tracking-[-0.01em]"
+              className="text-center text-[clamp(24px,2.6vw,30px)] font-[610] leading-tight tracking-[-0.01em]"
               style={{ color: LOGIN_SCENE.ink }}
             >
               ยินดีต้อนรับ
@@ -568,7 +581,10 @@ const LoginPage: React.FC = () => {
                 กลับมา
               </span>
             </h1>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed" style={{ color: LOGIN_SCENE.muted }}>
+            <p
+              className="mt-1.5 text-center text-[12.5px] leading-relaxed"
+              style={{ color: LOGIN_SCENE.muted }}
+            >
               {todayLabel}
             </p>
 
