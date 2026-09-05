@@ -334,9 +334,6 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
     return () => window.clearInterval(t);
   }, [reduceMotion]);
 
-  /** ไฟบนรางเดินมาถึงไหนแล้ว — คิดเป็น % ของความสูงราง */
-  const railFill = ((activeStep + 0.5) / CONVEYOR_STEPS.length) * 100;
-
   return (
     <motion.div {...rise(0.12)} className="w-full">
       {/* ⚠️ ไม่มีจุดเต้นนำหน้าแล้ว — พอบรรทัดนี้ตกบรรทัดบนมือถือ จุดจะลอยเดี่ยว
@@ -360,21 +357,6 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
 
       {/* ── รางสายพาน 4 ขั้น — ชื่อ/คำอธิบาย/ไอคอน มาจากเมนูจริงของแอป ── */}
       <ol className="relative mt-6 space-y-1">
-        {/* รางพื้น + ไฟที่ไล่ลงมา (ซ้อนกันสองเส้น ไม่ใช่ CSS ใหม่) */}
-        <span
-          className="absolute bottom-6 left-[18px] top-6 w-px"
-          style={{ background: 'rgba(18, 32, 60, .12)' }}
-          aria-hidden
-        />
-        <span
-          className="absolute left-[18px] top-6 w-px transition-[height] duration-700 ease-out"
-          style={{
-            height: reduceMotion ? '0%' : `calc(${railFill}% - 1.5rem)`,
-            background: LOGIN_SCENE.burgundy,
-          }}
-          aria-hidden
-        />
-
         {CONVEYOR_STEPS.map((step, i) => {
           const on = !reduceMotion && i === activeStep;
           const Icon = step.icon;
@@ -390,6 +372,29 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
               )}
               style={on ? { background: 'rgba(140, 47, 57, .06)' } : undefined}
             >
+              {/**
+               * 🔴 **เส้นเชื่อมวาดทีละแถว ไม่ใช่รางยาวเส้นเดียว** (เจ้าของทัก 5 ก.ย. 2569:
+               * *"เส้นเบี้ยวนะ"*) · รางยาวเส้นเดียวต้องเดาว่าไอคอนแถวสุดท้ายอยู่สูงเท่าไหร่
+               * ซึ่งเดาไม่ได้ — แถวไหนคำอธิบายตกสองบรรทัด ความสูงก็เปลี่ยน เส้นเลยเลยจุด
+               * ⇒ ให้แต่ละแถววาดเส้นจาก **กลางไอคอนตัวเอง** ลงไปถึง **กลางไอคอนแถวถัดไป**
+               *   สูง = ความสูงแถว + ช่องไฟ (`space-y-1` = 0.25rem) ⇒ ตรงเสมอ
+               * ระยะทั้งหมดผูกกับสเกล rem เดียวกับกล่องไอคอน (ฟอนต์ฐานระบบนี้ = 18px):
+               *   ซ้าย `px-2` 0.5rem + ครึ่งไอคอน 1.125rem = **1.625rem**
+               *   บน `py-2.5` 0.625rem + ครึ่งไอคอน 1.125rem = **1.75rem**
+               */}
+              {i < CONVEYOR_STEPS.length - 1 ? (
+                <span
+                  className="absolute left-[1.625rem] top-[1.75rem] w-px -translate-x-1/2 transition-colors duration-500"
+                  style={{
+                    height: 'calc(100% + 0.25rem)',
+                    background:
+                      !reduceMotion && i < activeStep
+                        ? LOGIN_SCENE.burgundy
+                        : 'rgba(18, 32, 60, .12)',
+                  }}
+                  aria-hidden
+                />
+              ) : null}
               <span
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-500"
                 style={
@@ -529,31 +534,29 @@ const LoginPage: React.FC = () => {
       <BrandIntro />
 
       {/**
-       * 🔴 **การ์ดใบเดียว แบ่งครึ่งซ้าย-ขวา** (เจ้าของทัก 5 ก.ย. 2569: *"หน้ามันสะเปะสะปะ
-       * ไปหมด"*) — ของเดิมมีของลอยอยู่ **สามชิ้น**: หัวเรื่องกลางจอ + การ์ดซ้าย + การ์ดขวา
-       * คนละแนวจัดชิด (หัวเรื่องจัดกลาง เนื้อในจัดซ้าย) คนละความทึบ คนละเงา ⇒ อ่านเป็นของ
-       * สามอันที่ไม่เกี่ยวกัน · ตอนนี้เหลือ **ผืนเดียว มุมเดียว เงาเดียว** คั่นกลางด้วยเส้น 1px
-       *   ซ้าย = ระบบนี้ทำอะไร · ขวา = หัวเรื่อง + ฟอร์มเข้าระบบ
+       * 🔴 **สองการ์ด แต่เป็นคู่แฝด** (เจ้าของเคาะ 5 ก.ย. 2569: *"มาถูกทางแล้ว
+       * แต่ไม่รวมกัน ไม่ชอบ"* — เคยลองรวมเป็นใบเดียวแล้วไม่เอา)
+       *
+       * ต้นเหตุที่เคยดู "สะเปะสะปะ" ไม่ใช่เพราะมีสองใบ แต่เพราะ **ของสามชิ้นไม่เข้าชุดกัน**:
+       * หัวเรื่องลอยกลางจอ (จัดกลาง) + การ์ดซ้าย (ทึบแบบหนึ่ง ไม่มีเงา) + การ์ดขวา (เงาหนา)
+       * ⇒ รอบนี้เหลือ **สองใบที่หน้าตาเหมือนกันเป๊ะ** — พื้นเดียวกัน มุมเดียวกัน เงาเดียวกัน
+       * ระยะในเท่ากัน สูงเท่ากัน (`items-stretch`) · หัวเรื่องย้ายเข้าไปอยู่กับฟอร์มแล้ว
        * 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้
        */}
       <div className="relative z-10 flex min-h-[100dvh] items-center justify-center px-5 py-16 sm:px-6">
         <motion.div
           {...rise(0.05)}
-          className="grid w-full max-w-[940px] overflow-hidden rounded-3xl lg:grid-cols-[1.02fr,1fr]"
-          style={GLASS_CARD}
+          className="grid w-full max-w-[980px] items-stretch gap-5 lg:grid-cols-[1.02fr,1fr] lg:gap-6"
         >
           {/* ═══ ครึ่งซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══
               🔴 บนมือถือสลับให้ **ฟอร์มเข้าระบบมาก่อน** (order) — จอแคบเรียงเป็นแถวเดียว
               ถ้าปล่อยตามลำดับโค้ด คนต้องเลื่อนผ่านคำอธิบายยาว ๆ กว่าจะถึงช่องกรอก */}
-          <div className="order-2 p-7 sm:p-9 lg:order-1">
+          <div className="order-2 rounded-3xl p-7 sm:p-8 lg:order-1" style={GLASS_CARD}>
             <SystemIntro rise={rise} />
           </div>
 
           {/* ═══ ครึ่งขวา — หัวเรื่อง + เข้าสู่ระบบ ═══ */}
-          <div
-            className="order-1 border-b p-7 sm:p-9 lg:order-2 lg:border-b-0 lg:border-l"
-            style={{ borderColor: HAIRLINE }}
-          >
+          <div className="order-1 rounded-3xl p-7 sm:p-8 lg:order-2" style={GLASS_CARD}>
             {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
                 ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em */}
             <h1
