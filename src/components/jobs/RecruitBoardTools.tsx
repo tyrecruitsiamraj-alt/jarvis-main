@@ -119,6 +119,9 @@ const RecruitBoardTools: React.FC<{
     { kind: string; kindLabel: string; departmentCode: string } | null
   >(null);
 
+  /** โฉมใหม่ = แถบหัวขาว ⇒ ปุ่มบนแถบใช้ทรงพื้นสว่าง (5 ก.ย. 2569) */
+  const v2 = useUiV2();
+
   /**
    * **แถบนี้อ่านสองสิทธิ์** (เจ้าของสั่ง 2 ก.ย. 2569 ให้ staff ทำได้ทั้งหมด)
    * · ปุ่ม "ช่องทาง" ใช้ `recruit_channels_manage`
@@ -146,9 +149,6 @@ const RecruitBoardTools: React.FC<{
     link: Plus,
     reasons: MessageSquareWarning,
   };
-
-  /** โฉมใหม่ = แถบหัวขาว ⇒ ปุ่มบนแถบใช้ทรงพื้นสว่าง (5 ก.ย. 2569) */
-  const v2 = useUiV2();
 
   const onClickKey = (key: RmToolbarKey) => {
     setNotice(null);
