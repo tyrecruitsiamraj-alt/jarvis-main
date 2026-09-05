@@ -338,25 +338,13 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
   const railFill = ((activeStep + 0.5) / CONVEYOR_STEPS.length) * 100;
 
   return (
-    <motion.div
-      {...rise(0.12)}
-      className="w-full rounded-3xl p-6 sm:p-7"
-      style={{
-        /* ทึบพอให้ตัวหนังสืออ่านออกบนกิ่งไม้ที่ลายพร้อย (เจ้าของทัก 5 ก.ย. 2569) */
-        background: LOGIN_SCENE.glassStrong,
-        border: `1px solid ${HAIRLINE}`,
-        backdropFilter: 'blur(20px) saturate(1.2)',
-      }}
-    >
+    <motion.div {...rise(0.12)} className="w-full">
+      {/* ⚠️ ไม่มีจุดเต้นนำหน้าแล้ว — พอบรรทัดนี้ตกบรรทัดบนมือถือ จุดจะลอยเดี่ยว
+          อยู่กลางสองบรรทัด (เห็นจริงบนจอ 375px) และตัวจุดเองก็ไม่ได้บอกอะไร */}
       <p
-        className="inline-flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.18em]"
+        className="text-[10.5px] font-semibold uppercase leading-relaxed tracking-[0.18em]"
         style={{ color: LOGIN_SCENE.burgundy }}
       >
-        <span
-          className="h-1.5 w-1.5 rounded-full animate-pulse"
-          style={{ background: LOGIN_SCENE.burgundy }}
-          aria-hidden
-        />
         ONE RECRUIT · ONE SOLUTION · ONE STOP
       </p>
 
@@ -521,14 +509,6 @@ const LoginPage: React.FC = () => {
       }}
     >
       <PhotoScene />
-      {/* ผ้าขาวไล่เฉดจากขอบบน — ทำให้หัวเรื่องอ่านออกโดยไม่ต้องมีกรอบ */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[46vh]"
-        style={{
-          background: `linear-gradient(180deg, ${LOGIN_SCENE.glassStrong} 0%, ${LOGIN_SCENE.glass} 42%, transparent 100%)`,
-        }}
-      />
 
       {/* ตราบริษัทมุมซ้ายบน — ตำแหน่งเดียวกับ `.brand` ของ mockup แต่เป็นตราของเรา */}
       <motion.div
@@ -548,129 +528,130 @@ const LoginPage: React.FC = () => {
           (เจ้าของขอลองเล่น 4 ก.ย. 2569 · ดูเหตุผลทั้งชุดใน BrandIntro.tsx) */}
       <BrandIntro />
 
-      {/* 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้ */}
-      <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6 pb-16 pt-20">
-        {/* หัวเรื่อง — ทรงเดียวกับ mockup (ตัวใหญ่ ชิดกัน คำเน้นเป็นเขียวจาง) */}
-        {/* 🔴 **ไม่มีกรอบ** (เจ้าของทัก 5 ก.ย. 2569: *"ไม่เอากรอบแบบนี้ มันดูเสร่อมาก"*)
-            แต่ตัวหนังสือยังต้องอ่านออกบนกิ่งไม้ที่ลายพร้อย ⇒ ใช้ **ผ้าไล่เฉดขาวเต็มความกว้าง**
-            ที่ด้านบนของหน้าแทน — ไม่มีขอบ ไม่มีมุม ไม่อ่านเป็น "การ์ด" (ผ้าอยู่ที่ชั้นฉาก) */}
-        <motion.div {...rise(0.05)} className="max-w-[720px] text-center">
-          {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
-              ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em */}
-          <h1
-            className="text-[clamp(30px,4.6vw,54px)] font-[610] leading-[1.1] tracking-[-0.01em]"
-            style={{ color: LOGIN_SCENE.ink }}
+      {/**
+       * 🔴 **การ์ดใบเดียว แบ่งครึ่งซ้าย-ขวา** (เจ้าของทัก 5 ก.ย. 2569: *"หน้ามันสะเปะสะปะ
+       * ไปหมด"*) — ของเดิมมีของลอยอยู่ **สามชิ้น**: หัวเรื่องกลางจอ + การ์ดซ้าย + การ์ดขวา
+       * คนละแนวจัดชิด (หัวเรื่องจัดกลาง เนื้อในจัดซ้าย) คนละความทึบ คนละเงา ⇒ อ่านเป็นของ
+       * สามอันที่ไม่เกี่ยวกัน · ตอนนี้เหลือ **ผืนเดียว มุมเดียว เงาเดียว** คั่นกลางด้วยเส้น 1px
+       *   ซ้าย = ระบบนี้ทำอะไร · ขวา = หัวเรื่อง + ฟอร์มเข้าระบบ
+       * 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้
+       */}
+      <div className="relative z-10 flex min-h-[100dvh] items-center justify-center px-5 py-16 sm:px-6">
+        <motion.div
+          {...rise(0.05)}
+          className="grid w-full max-w-[940px] overflow-hidden rounded-3xl lg:grid-cols-[1.02fr,1fr]"
+          style={GLASS_CARD}
+        >
+          {/* ═══ ครึ่งซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══
+              🔴 บนมือถือสลับให้ **ฟอร์มเข้าระบบมาก่อน** (order) — จอแคบเรียงเป็นแถวเดียว
+              ถ้าปล่อยตามลำดับโค้ด คนต้องเลื่อนผ่านคำอธิบายยาว ๆ กว่าจะถึงช่องกรอก */}
+          <div className="order-2 p-7 sm:p-9 lg:order-1">
+            <SystemIntro rise={rise} />
+          </div>
+
+          {/* ═══ ครึ่งขวา — หัวเรื่อง + เข้าสู่ระบบ ═══ */}
+          <div
+            className="order-1 border-b p-7 sm:p-9 lg:order-2 lg:border-b-0 lg:border-l"
+            style={{ borderColor: HAIRLINE }}
           >
-            ยินดีต้อนรับ
-            <span className="font-[560]" style={{ color: LOGIN_SCENE.accent }}>
-              กลับมา
-            </span>
-          </h1>
-          <p
-            className="mx-auto mt-2.5 max-w-[52ch] text-[14.5px] leading-[1.6]"
-            style={{ color: LOGIN_SCENE.ink }}
-          >
-            {todayLabel} · เข้าสู่ระบบด้วยบัญชีองค์กร
-          </p>
-        </motion.div>
+            {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
+                ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em */}
+            <h1
+              className="text-[clamp(24px,2.6vw,30px)] font-[610] leading-tight tracking-[-0.01em]"
+              style={{ color: LOGIN_SCENE.ink }}
+            >
+              ยินดีต้อนรับ
+              <span className="font-[560]" style={{ color: LOGIN_SCENE.accent }}>
+                กลับมา
+              </span>
+            </h1>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed" style={{ color: LOGIN_SCENE.muted }}>
+              {todayLabel}
+            </p>
 
-        {/* ── ซ้าย: อธิบายระบบ · ขวา: เข้าสู่ระบบ (เจ้าของสั่ง 4 ก.ย. 2569) ──
-            🔴 การ์ด "ดูประกาศรับสมัคร" **ถูกเอาออก**ตามคำสั่งเดียวกัน
-            (เดิมเป็นการ์ดขวาคู่กับฟอร์ม) · ทางเข้าของคนหางาน **ไม่หาย** —
-            ย้ายไปเป็นลิงก์ใต้ฟอร์มล็อกอิน ยังกดจากหน้านี้ได้เหมือนเดิม
-            ⚠️ คำสั่งนี้ทับของเดิม 2 ก.ย. ที่เคยสั่งว่าการ์ดนั้น "ต้องมีอยู่" */}
-        <div className="grid w-full max-w-[980px] items-center gap-6 lg:grid-cols-2 lg:gap-10">
-        {/* ═══ ซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══
-            🔴 บนมือถือสลับให้ **ฟอร์มเข้าระบบมาก่อน** (order) — จอแคบเรียงเป็นแถวเดียว
-            ถ้าปล่อยตามลำดับโค้ด คนต้องเลื่อนผ่านคำอธิบายยาว ๆ กว่าจะถึงช่องกรอก */}
-        <div className="order-2 lg:order-1">
-          <SystemIntro rise={rise} />
-        </div>
-
-        <motion.div {...rise(0.22)} className="order-1 w-full max-w-[410px] lg:order-2">
-          <div className="flex h-full flex-col rounded-3xl p-6" style={GLASS_CARD}>
-            {authConfig === null && configError ? (
-              <div className="space-y-3 py-6 text-center">
-                <p className="text-sm" style={{ color: LOGIN_SCENE.muted }}>
-                  เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบว่า API ทำงานอยู่แล้วลองใหม่
-                </p>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setConfigError(false);
-                    setConfigAttempt((n) => n + 1);
-                  }}
-                  className="mx-auto min-h-11 rounded-full border-0"
-                  style={PRIMARY_BTN}
-                >
-                  ลองอีกครั้ง
-                </Button>
-              </div>
-            ) : authConfig === null ? (
-              <p
-                className="flex items-center justify-center gap-2 py-8 text-sm"
-                style={{ color: LOGIN_SCENE.muted }}
-              >
-                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
-                กำลังโหลด…
-              </p>
-            ) : (
-              <>
-                {showEmail ? (
-                  <EmailPasswordForm
-                    hint={authConfig.companyEmailHint}
-                    onError={(msg) => setError(msg || null)}
-                  />
-                ) : null}
-
-                {showEmail && showMicrosoft ? <OrDivider /> : null}
-
-                {showMicrosoft ? <MicrosoftLoginButton /> : null}
-
-                {noWayIn ? (
-                  <p className="py-4 text-center text-sm" style={{ color: LOGIN_SCENE.muted }}>
-                    ยังไม่มีวิธีเข้าสู่ระบบที่เปิดใช้งาน — ติดต่อผู้ดูแลระบบ
+            <div className="mt-6">
+              {authConfig === null && configError ? (
+                <div className="space-y-3 py-6 text-center">
+                  <p className="text-sm" style={{ color: LOGIN_SCENE.muted }}>
+                    เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบว่า API ทำงานอยู่แล้วลองใหม่
                   </p>
-                ) : null}
-
-                {error ? (
-                  <p className="mt-4 text-center text-xs text-destructive" role="alert">
-                    {error}
-                  </p>
-                ) : null}
-
-                {noWayIn ? null : (
-                  <p
-                    className="mt-4 text-center text-[11px]"
-                    style={{ color: LOGIN_SCENE.muted }}
-                  >
-                    เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
-                  </p>
-                )}
-
-                {/* 🔴 ทางเข้าของ **คนหางาน** — การ์ดใบเดิมถูกเอาออก (เจ้าของสั่ง 4 ก.ย. 2569)
-                    แต่ทางเข้าห้ามหาย เพราะคนนอกเข้าเว็บนี้เพื่อสมัครงาน ไม่ได้มาล็อกอิน */}
-                <div className="mt-5 border-t pt-4 text-center" style={{ borderColor: HAIRLINE }}>
-                  <p className="text-[11px]" style={{ color: LOGIN_SCENE.muted }}>
-                    ไม่ได้เป็นพนักงาน? มาสมัครงานได้เลย ไม่ต้องมีบัญชี
-                  </p>
-                  <Link
-                    to="/apply"
-                    className="mt-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-5 text-[13px] font-semibold transition-[filter] hover:brightness-110"
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setConfigError(false);
+                      setConfigAttempt((n) => n + 1);
+                    }}
+                    className="mx-auto min-h-11 rounded-full border-0"
                     style={PRIMARY_BTN}
                   >
-                    เปิดบอร์ดประกาศรับสมัคร
-                    <ArrowRight className="h-4 w-4" aria-hidden />
-                  </Link>
+                    ลองอีกครั้ง
+                  </Button>
                 </div>
-              </>
-            )}
+              ) : authConfig === null ? (
+                <p
+                  className="flex items-center justify-center gap-2 py-8 text-sm"
+                  style={{ color: LOGIN_SCENE.muted }}
+                >
+                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+                  กำลังโหลด…
+                </p>
+              ) : (
+                <>
+                  {showEmail ? (
+                    <EmailPasswordForm
+                      hint={authConfig.companyEmailHint}
+                      onError={(msg) => setError(msg || null)}
+                    />
+                  ) : null}
+
+                  {showEmail && showMicrosoft ? <OrDivider /> : null}
+
+                  {showMicrosoft ? <MicrosoftLoginButton /> : null}
+
+                  {noWayIn ? (
+                    <p className="py-4 text-center text-sm" style={{ color: LOGIN_SCENE.muted }}>
+                      ยังไม่มีวิธีเข้าสู่ระบบที่เปิดใช้งาน — ติดต่อผู้ดูแลระบบ
+                    </p>
+                  ) : null}
+
+                  {error ? (
+                    <p className="mt-4 text-center text-xs text-destructive" role="alert">
+                      {error}
+                    </p>
+                  ) : null}
+
+                  {noWayIn ? null : (
+                    <p className="mt-4 text-center text-[11px]" style={{ color: LOGIN_SCENE.muted }}>
+                      เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
+                    </p>
+                  )}
+
+                  {/* 🔴 ทางเข้าของ **คนหางาน** — ต้องมีอยู่ เพราะคนนอกเข้าเว็บนี้เพื่อสมัครงาน
+                      ⚠️ เป็น **ลิงก์ตัวหนังสือ** ไม่ใช่ปุ่มแคปซูลสีเดียวกับ "เข้าสู่ระบบ"
+                      (ปุ่มใหญ่สองปุ่มสีเดียวกันในการ์ดเดียว = ไม่รู้ว่าอันไหนคือทางหลัก
+                      — เป็นหนึ่งในต้นเหตุที่เจ้าของบอกว่าหน้าสะเปะสะปะ 5 ก.ย. 2569) */}
+                  <div
+                    className="mt-5 border-t pt-4 text-center"
+                    style={{ borderColor: HAIRLINE }}
+                  >
+                    <p className="text-[11px]" style={{ color: LOGIN_SCENE.muted }}>
+                      ไม่ได้เป็นพนักงาน? มาสมัครงานได้เลย ไม่ต้องมีบัญชี
+                    </p>
+                    <Link
+                      to="/apply"
+                      className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold underline-offset-4 hover:underline"
+                      style={{ color: LOGIN_SCENE.burgundy }}
+                    >
+                      เปิดบอร์ดประกาศรับสมัคร
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </motion.div>
-
-        </div>
       </div>
-
     </div>
   );
 };
