@@ -22,6 +22,7 @@ const ShortLinkRedirectPage = lazy(() => import("@/pages/public/ShortLinkRedirec
 const MagicLinkVerifyPage = lazy(() => import("@/pages/MagicLinkVerifyPage"));
 const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
+const WorkQueuePage = lazy(() => import("@/pages/work/WorkQueuePage"));
 const WLDashboard = lazy(() => import("@/pages/wl/WLDashboard"));
 const MonthlyPlanner = lazy(() => import("@/pages/wl/MonthlyPlanner"));
 const DailyAssignment = lazy(() => import("@/pages/wl/DailyAssignment"));
@@ -102,6 +103,9 @@ const ProtectedRoutes = () => {
           <Suspense fallback={<PageLoadingFallback />}>
             <Routes>
             <Route path="/" element={<HomePage />} />
+            {/* 🔴 "คิวงานของฉัน" — หน้าโฉมใหม่ล้วน (5 ก.ย. 2569) · ไม่ได้เปิดสวิตช์ `?ui=v2`
+                หน้านี้จะเด้งกลับหน้าแรกเอง ⇒ พนักงานที่ยังใช้ของเดิมไม่มีทางหลงเข้ามา */}
+            <Route path="/work" element={<WorkQueuePage />} />
             <Route path="/opl" element={<RoleHubPage role="opl" />} />
             <Route path="/staff" element={<RoleHubPage role="staff" />} />
             <Route path="/supervisor" element={<RoleHubPage role="supervisor" />} />

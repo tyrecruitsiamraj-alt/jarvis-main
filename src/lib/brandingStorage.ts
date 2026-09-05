@@ -177,8 +177,16 @@ export function applyBrandingToDocument(c: BrandingConfig): void {
 
   root.style.setProperty('--primary', c.primaryHsl);
   root.style.setProperty('--primary-foreground', '0 0% 100%');
-  root.style.setProperty('--accent', c.primaryHsl);
-  root.style.setProperty('--accent-foreground', '0 0% 100%');
+  /**
+   * 🔴 **`--accent` ไม่ใช่สีแบรนด์ — ห้ามทับด้วยสีแบรนด์อีก** (5 ก.ย. 2569)
+   * ใน shadcn `--accent` คือ **พื้นอ่อนตอนเอาเมาส์ชี้** (เมนู · รายการ · แถวที่เลือกอยู่)
+   * ของเดิมตั้งเป็นสีแบรนด์เต็ม ๆ ⇒ ชี้เมนูทีเป็นแถบสีทึบทั้งแถบ และแถวที่เลือกในคิวงาน
+   * กลายเป็นบล็อกสีทั้งก้อน (เห็นชัดบนจอจริงหลังเปลี่ยนแบรนด์เป็นเบอร์กันดี)
+   * ⇒ ปล่อยให้ `--accent` มาจากธีมใน `src/index.css` (กรมท่าจาง ๆ) ตามที่ shadcn ตั้งใจ
+   * สีแบรนด์ยังคุม `--primary` / `--ring` / `--sidebar-primary` เหมือนเดิม
+   */
+  root.style.removeProperty('--accent');
+  root.style.removeProperty('--accent-foreground');
   root.style.setProperty('--ring', c.primaryHsl);
   root.style.setProperty('--sidebar-primary', c.primaryHsl);
   root.style.setProperty('--sidebar-primary-foreground', '0 0% 100%');

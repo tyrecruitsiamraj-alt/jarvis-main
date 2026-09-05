@@ -7,8 +7,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, KeyRound, LogOut, Settings } from 'lucide-react';
+import { ExternalLink, KeyRound, ListChecks, LogOut, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useUiV2 } from '@/lib/uiV2';
 import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { shouldShowPasswordUi } from '@/lib/authConfig';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
@@ -67,6 +68,7 @@ const AppNavDrawer: React.FC<Props> = ({
     wl: '/wl',
     dashboard: '/dashboard',
   };
+  const uiV2 = useUiV2();
   const visiblePaths = React.useMemo(() => new Set(items.map((i) => i.path)), [items]);
   const shown = (key: string) => {
     const owner = OWNER_DOCK_PATH[key];
@@ -149,6 +151,19 @@ const AppNavDrawer: React.FC<Props> = ({
             <CONVEYOR_HOME.icon className="h-4 w-4 shrink-0" />
             <span className="truncate">{CONVEYOR_HOME.label}</span>
           </button>
+          {/* 🔴 "คิวงานของฉัน" — โผล่เฉพาะคนที่เปิดสวิตช์โฉมใหม่ (`?ui=v2`)
+              เมนูของคนอื่นไม่มีรายการนี้เลย ⇒ โครงเมนูเดิมไม่เปลี่ยนสำหรับพนักงานทั่วไป
+              (กติกาเจ้าของ 5 ก.ย. 2569: เมนูต้องเป็น Burger + ลิ้นชักเดิม) */}
+          {uiV2 ? (
+            <button
+              type="button"
+              onClick={() => go('/work')}
+              className={rowClass(location.pathname === '/work')}
+            >
+              <ListChecks className="h-4 w-4 shrink-0" />
+              <span className="truncate">คิวงานของฉัน</span>
+            </button>
+          ) : null}
 
           <div className={groupLabelClass}>สายพานงาน</div>
           {visibleSteps.map((step) => {
