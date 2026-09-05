@@ -374,20 +374,26 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
               style={on ? { background: 'rgba(140, 47, 57, .06)' } : undefined}
             >
               {/**
-               * 🔴 **เส้นเชื่อมวาดทีละแถว ไม่ใช่รางยาวเส้นเดียว** (เจ้าของทัก 5 ก.ย. 2569:
-               * *"เส้นเบี้ยวนะ"*) · รางยาวเส้นเดียวต้องเดาว่าไอคอนแถวสุดท้ายอยู่สูงเท่าไหร่
-               * ซึ่งเดาไม่ได้ — แถวไหนคำอธิบายตกสองบรรทัด ความสูงก็เปลี่ยน เส้นเลยเลยจุด
-               * ⇒ ให้แต่ละแถววาดเส้นจาก **กลางไอคอนตัวเอง** ลงไปถึง **กลางไอคอนแถวถัดไป**
-               *   สูง = ความสูงแถว + ช่องไฟ (`space-y-1` = 0.25rem) ⇒ ตรงเสมอ
-               * ระยะทั้งหมดผูกกับสเกล rem เดียวกับกล่องไอคอน (ฟอนต์ฐานระบบนี้ = 18px):
-               *   ซ้าย `px-2` 0.5rem + ครึ่งไอคอน 1.125rem = **1.625rem**
-               *   บน `py-2.5` 0.625rem + ครึ่งไอคอน 1.125rem = **1.75rem**
+               * 🔴 **เส้นเชื่อมอยู่ "ในช่องว่างระหว่างไอคอน" เท่านั้น — ห้ามลากผ่านตัวไอคอน**
+               * (เจ้าของทัก 5 ก.ย. 2569: *"เส้นมันทับไอคอนกันไปกันมา"*)
+               *
+               * ของเดิมลากจาก **กลางไอคอน** ถึง **กลางไอคอนถัดไป** แล้วหวังให้พื้นขาวของ
+               * กล่องไอคอนบังเส้นไว้ ⇒ **บังไม่ได้จริง** เพราะเส้นเป็น `absolute` ส่วนกล่อง
+               * ไอคอนเป็น `static` · ใน stacking context เดียวกัน ของที่ position แล้ว
+               * ทับของที่ยัง static เสมอ ไม่ว่าจะเรียงลำดับใน DOM ยังไง ⇒ เส้นพาดหน้าไอคอน
+               *
+               * รอบนี้เส้นเริ่มที่ **ก้นไอคอน** จบที่ **หัวไอคอนแถวถัดไป** ไม่แตะตัวไอคอนเลย
+               * (คิดจากขอบบนของแถว · ฟอนต์ฐานระบบนี้ = 18px ⇒ 1rem = 18px):
+               *   ก้นไอคอน = `py-2.5` 0.625rem + สูงไอคอน 2.25rem = **2.875rem**
+               *   หัวไอคอนแถวถัดไป = ความสูงแถว + ช่องไฟ 0.25rem + 0.625rem
+               *   ⇒ สูง = **calc(100% - 2rem)**
+               * และใส่ `relative` ให้กล่องไอคอนไว้ด้วย กันไม่ให้ของ absolute อันอื่นมาทับอีก
                */}
               {i < CONVEYOR_STEPS.length - 1 ? (
                 <span
-                  className="absolute left-[1.625rem] top-[1.75rem] w-px -translate-x-1/2 transition-colors duration-500"
+                  className="absolute left-[1.625rem] top-[2.875rem] w-px -translate-x-1/2 transition-colors duration-500"
                   style={{
-                    height: 'calc(100% + 0.25rem)',
+                    height: 'calc(100% - 2rem)',
                     background:
                       !reduceMotion && i < activeStep
                         ? LOGIN_SCENE.burgundy
@@ -397,7 +403,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
                 />
               ) : null}
               <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-500"
+                className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-500"
                 style={
                   on
                     ? {
