@@ -168,7 +168,10 @@ export default function RecruitControlPanel() {
     const params = new URLSearchParams(searchParams);
     if (params.get('bucket') === bucket) params.delete('bucket');
     else params.set('bucket', bucket);
-    setSearchParams(params, { replace: true });
+    // 🔴 **push ไม่ใช่ replace** (5 ก.ย. 2569) — นี่คือ "คนกดเปลี่ยนมุมมองเอง"
+    // ถ้า replace ประวัติจะถูกทับ ⇒ กดย้อนกลับแล้ว **หลุดออกจากหน้านี้ไปเลย**
+    // (เจ้าของทดสอบเจอเอง: อยู่กล่องงาน → กดแท็บรายชื่อผู้สมัคร → ย้อนกลับ → เด้งไปหน้าแรก)
+    setSearchParams(params);
   };
 
   const { intake, calling, contact, waiting, stale, meta, recruit } = data;

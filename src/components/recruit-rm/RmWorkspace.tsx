@@ -132,7 +132,10 @@ const RmWorkspace: React.FC<{
   const clearBucket = () => {
     const params = new URLSearchParams(searchParams);
     params.delete('bucket');
-    setSearchParams(params, { replace: true });
+    // 🔴 **push ไม่ใช่ replace** (5 ก.ย. 2569) — นี่คือ "คนกดเปลี่ยนมุมมองเอง"
+    // ถ้า replace ประวัติจะถูกทับ ⇒ กดย้อนกลับแล้ว **หลุดออกจากหน้านี้ไปเลย**
+    // (เจ้าของทดสอบเจอเอง: อยู่กล่องงาน → กดแท็บรายชื่อผู้สมัคร → ย้อนกลับ → เด้งไปหน้าแรก)
+    setSearchParams(params);
     setSelectedIds([]);
     setPage(1);
   };
@@ -152,7 +155,7 @@ const RmWorkspace: React.FC<{
     const next = new URLSearchParams(searchParams);
     if (on) next.set('lead', '1');
     else next.delete('lead');
-    setSearchParams(next, { replace: true });
+    setSearchParams(next);
     setSelectedIds([]);
     setPage(1);
     setNotice(null);
@@ -294,7 +297,7 @@ const RmWorkspace: React.FC<{
     const params = new URLSearchParams(searchParams);
     if (next === 'all') params.delete('list');
     else params.set('list', next);
-    setSearchParams(params, { replace: true });
+    setSearchParams(params);
     setSelectedIds([]);
     setPage(1);
   };
@@ -338,7 +341,7 @@ const RmWorkspace: React.FC<{
     // ⚠️ ต่อยอดจาก params เดิมเสมอ — ?view= ของบอร์ดต้องรอด ไม่งั้นสลับแท็บแล้วเด้งกลับกล่องงาน
     const params = new URLSearchParams(searchParams);
     params.set('tab', next);
-    setSearchParams(params, { replace: true });
+    setSearchParams(params);
     // ล้างที่ติ๊กไว้ตอนสลับแท็บ — ปุ่ม action คนละชุด ติ๊กค้างข้ามแท็บแล้วสับสน
     setSelectedIds([]);
     setNotice(null);
@@ -667,7 +670,7 @@ const RmWorkspace: React.FC<{
                       onClick={() => {
                         const params = new URLSearchParams(searchParams);
                         params.set('bucket', 'overdue_no_result');
-                        setSearchParams(params, { replace: true });
+                        setSearchParams(params);
                         setSelectedIds([]);
                         setPage(1);
                       }}

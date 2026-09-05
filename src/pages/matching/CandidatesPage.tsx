@@ -150,7 +150,8 @@ const CandidatesPage: React.FC = () => {
 
   const selectStatusFromSummary = (st: CandidateStatus) => {
     setFilter(st);
-    navigate(`/matching/candidates?status=${st}`, { replace: true });
+    // push — กดสถานะแล้วย้อนกลับต้องได้ของเดิม ไม่ใช่เด้งออกจากหน้า (5 ก.ย. 2569)
+    navigate(`/matching/candidates?status=${st}`);
   };
 
   return (

@@ -70,7 +70,10 @@ const StaffJobBoardPage: React.FC = () => {
     else params.set('view', next);
     // ?tab= เป็นของระบบแท็บย่อยเดิม — ตอนนี้แท็บถูกคุมด้วย ?view= แล้ว ล้างกันชนกัน
     params.delete('tab');
-    setSearchParams(params, { replace: true });
+    // 🔴 **push ไม่ใช่ replace** (5 ก.ย. 2569) — นี่คือ "คนกดเปลี่ยนมุมมองเอง"
+    // ถ้า replace ประวัติจะถูกทับ ⇒ กดย้อนกลับแล้ว **หลุดออกจากหน้านี้ไปเลย**
+    // (เจ้าของทดสอบเจอเอง: อยู่กล่องงาน → กดแท็บรายชื่อผู้สมัคร → ย้อนกลับ → เด้งไปหน้าแรก)
+    setSearchParams(params);
   };
 
   return (
