@@ -35,6 +35,8 @@ import { fetchOfficeTeam, type OfficeTeamResponse } from '@/lib/officeTeamApi';
 import { fetchOfficeFloor, type OfficeFloorResponse } from '@/lib/officeFloorApi';
 import { buildNextTasks } from '@/lib/nextTask';
 import CommandDeck from '@/components/home/CommandDeck';
+import HomeDeckV2 from '@/components/home/HomeDeckV2';
+import { useUiV2 } from '@/lib/uiV2';
 import { useConveyorCounts } from '@/hooks/useConveyorCounts';
 
 import HomeKpiRow from '@/components/home/HomeKpiRow';
@@ -141,6 +143,12 @@ function FollowUpList({
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
+  /**
+   * 🔴 **สวิตช์โฉมใหม่** (5 ก.ย. 2569) — ระบบอยู่บน production แล้ว
+   * ค่าตั้งต้น = ปิด ⇒ ทุกคนเห็นของเดิม 100% · เปิดดูเองด้วย `?ui=v2` (ปิดด้วย `?ui=v1`)
+   * ข้อมูลที่ป้อนให้สองโฉมเป็น **ชุดเดียวกันทุกตัว** ต่างกันแค่เปลือก
+   */
+  const uiV2 = useUiV2();
 
   // สรุปการไหลของงาน — ของหลักของหน้านี้ (เมนูทั้งหมดอยู่ใน burger แล้ว)
   const [flow, setFlow] = useState<FlowSummary | null>(null);
@@ -346,17 +354,31 @@ const HomePage: React.FC = () => {
           ทักทาย · หน้าปัด · งานถัดไป · คิว · แถบ 6 ขั้น รวมอยู่ใน canvas เดียว
           เลขมาจาก cache เดียวกับแถบเมนู (useConveyorCounts) ไม่ยิงเส้นเพิ่ม
           ใต้ deck คือบอร์ด 4 ทีมเมตริกครบ ทุกแถวกดนำทางได้ (TeamBoardPanel) */}
-      <CommandDeck
-        greeting={greeting}
-        userName={user?.full_name || user?.username || ''}
-        tasks={nextTasks}
-        loading={flowLoading || officeLoading}
-        statusInput={{
-          followPastDue: office ? office.counts.follow.pastDue : null,
-          applicantsUntouched: office ? office.counts.intake.untouched : null,
-          slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
-        }}
-      />
+      {uiV2 ? (
+        <HomeDeckV2
+          greeting={greeting}
+          userName={user?.full_name || user?.username || ''}
+          tasks={nextTasks}
+          loading={flowLoading || officeLoading}
+          statusInput={{
+            followPastDue: office ? office.counts.follow.pastDue : null,
+            applicantsUntouched: office ? office.counts.intake.untouched : null,
+            slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
+          }}
+        />
+      ) : (
+        <CommandDeck
+          greeting={greeting}
+          userName={user?.full_name || user?.username || ''}
+          tasks={nextTasks}
+          loading={flowLoading || officeLoading}
+          statusInput={{
+            followPastDue: office ? office.counts.follow.pastDue : null,
+            applicantsUntouched: office ? office.counts.intake.untouched : null,
+            slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
+          }}
+        />
+      )}
 
       {/* ── บอร์ด 4 ทีม — เมตริกครบตามสเปกเจ้าของ + ทุกบรรทัดกดนำทางได้ ──
           🔴 ลำดับคำสั่งที่วนมาสามรอบ (จำให้ขึ้นใจ):
@@ -369,6 +391,7 @@ const HomePage: React.FC = () => {
           ⇒ เมตริกครบ + ทุกแถวกดได้ · ไม่มีฉาก/รายชื่อคน · tile 6 ขั้นบน deck
           ถูกตัดไปแล้ว (นำทางซ้ำ) — เลข 6 ขั้นอยู่ที่เมนูสายพานซ้ายมือ */}
       <TeamBoardPanel
+        skin={uiV2 ? 'plain' : 'deck'}
         team={team}
         loading={teamLoading}
         onRefresh={() => void loadTeam()}

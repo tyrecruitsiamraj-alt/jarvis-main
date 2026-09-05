@@ -24,13 +24,23 @@ const DEFAULT_FAVICON_PATH = '/favicon.png';
 export const DEFAULT_BRANDING: BrandingConfig = {
   appName: 'So Recruit',
   logoDataUrl: DEFAULT_LOGO_PATH,
-  primaryHsl: '0 72% 50%',
-  backgroundHsl: '0 0% 98%',
-  foregroundHsl: '0 0% 12%',
+  /**
+   * 🔴 **จานสีตั้งต้น = ขาว · กรมท่า · เบอร์กันดี** (เจ้าของเคาะ 5 ก.ย. 2569 จากหน้า Login)
+   * เบอร์กันดี #8c2f39 = `353 50% 37%` · หมึกกรมท่า #12203c = `220 54% 15%`
+   *
+   * ⚠️ **ค่านี้ใช้กับคนที่ยังไม่มีค่าที่ตั้งไว้เท่านั้น** — ถ้าในฐานมีค่าที่ผู้ดูแลเคยบันทึกไว้
+   * (ตอนนี้ของจริงคือแดง `0 72% 50%` + หมึกเทาเข้ม `0 0% 12%`) ค่าในฐาน **ชนะเสมอ**
+   * และมันเขียนทับตัวแปรธีมของ `src/index.css` ด้วย inline style บน `<html>`
+   * ⇒ อยากให้ทั้งระบบเป็นจานใหม่จริง ๆ ต้องไปแก้ที่ **ตั้งค่า → แบรนด์** ด้วย
+   * (เป็นข้อมูลของ production จึงไม่แตะเอง — รอเจ้าของสั่ง)
+   */
+  primaryHsl: '353 50% 37%',
+  backgroundHsl: '220 24% 97%',
+  foregroundHsl: '220 54% 15%',
   cardHsl: '0 0% 100%',
   pageBackgroundMode: 'solid',
-  gradientFromHsl: '0 0% 98%',
-  gradientToHsl: '0 0% 94%',
+  gradientFromHsl: '220 24% 98%',
+  gradientToHsl: '220 20% 94%',
 };
 
 export function loadBranding(): BrandingConfig {

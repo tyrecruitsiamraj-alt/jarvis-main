@@ -222,6 +222,13 @@ const TeamBoardPanel: React.FC<{
   /** dialog เดิมของสายโทร (มีปุ่มจองตัว — ฟีเจอร์ 12 ส.ค. ห้ามหาย) */
   onOpenCallResults?: () => void;
   onOpenActiveCalls?: () => void;
+  /**
+   * 🔴 **สกินของเปลือก — ข้อมูลข้างในเหมือนกันทุกตัว** (5 ก.ย. 2569)
+   * `deck` = ของเดิมที่ทุกคนใช้อยู่ (ค่าตั้งต้น ห้ามเปลี่ยน) ·
+   * `plain` = โฉมใหม่หลังสวิตช์ `?ui=v2` — ผืนขาวเรียบ ไม่มีพื้นไล่เฉด/กริดจุด
+   * เปลี่ยนแค่ 2 บรรทัด (คลาสเปลือก + สีป้ายหัว) จึงไม่มีทางทำข้อมูลตกหล่น
+   */
+  skin?: 'deck' | 'plain';
   className?: string;
 }> = ({
   team,
@@ -231,6 +238,7 @@ const TeamBoardPanel: React.FC<{
   onOpenCallResults,
   onOpenActiveCalls,
   successRate,
+  skin = 'deck',
   className,
 }) => {
   const teams = team?.teams;
@@ -238,21 +246,39 @@ const TeamBoardPanel: React.FC<{
     /* 🔴 เปลือกเป็น Card ของ shadcn เหมือนแผงอื่นบนหน้าหลัก (4 ก.ย. 2569)
        สกินพื้นเข้มยังเป็นคลาสเดิมที่เจ้าของเคาะไว้ · ไม่เขียน CSS ใหม่ */
     <Card
-      className={cn('jarvis-deck overflow-hidden rounded-2xl', className)}
+      className={cn(
+        'overflow-hidden rounded-2xl',
+        skin === 'deck' && 'jarvis-deck',
+        className,
+      )}
       aria-label="บอร์ดทีม — ใครทำอะไรอยู่"
     >
       {/* มุมวงเล็บ HUD ถูกถอดออกพร้อมกับ deck หน้าแรก (5 ก.ย. 2569) */}
 
       <div className={cn('relative flex items-center gap-3 border-b px-6 py-3.5', T.line)}>
-        <span className={cn(eyebrow, 'text-rose-900 dark:text-rose-300')}>
+        {/* โฉมใหม่: ป้ายเป็นตัวหนังสือปกติสีเบอร์กันดี ไม่ใช่ป้าย mono ช่องไฟกว้างแบบ HUD */}
+        <span
+          className={cn(
+            skin === 'plain'
+              ? 'text-[12.5px] font-medium text-primary'
+              : cn(eyebrow, 'text-rose-900 dark:text-rose-300'),
+          )}
+        >
           ทีมปฏิบัติการ · ใครทำอะไรอยู่
         </span>
         <span className="flex-1" />
-        <span className={cn('font-mono text-[11px] tabular-nums', T.mut)}>
+        <span
+          className={cn(
+            'tabular-nums',
+            skin === 'plain' ? 'text-[12px] text-muted-foreground' : cn('font-mono text-[11px]', T.mut),
+          )}
+        >
           {team
             ? `ใบเปิด ${team.open_total} · อัปเดต ${timeText(team.generated_at)}`
             : loading
-              ? 'กำลังเชื่อมข้อมูล…'
+              ? skin === 'plain'
+                ? 'กำลังโหลดข้อมูล…'
+                : 'กำลังเชื่อมข้อมูล…'
               : 'โหลดไม่สำเร็จ'}
         </span>
         {onRefresh ? (
