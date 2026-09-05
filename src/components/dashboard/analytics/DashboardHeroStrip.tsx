@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { useSurfaceKit } from '@/components/shared/ui-v2/surface';
 import { DASH } from '@/lib/designTokens';
 import type { DashboardActivityTrendPoint, DashboardAgeDaysBreakdown } from '@/lib/dashboard/types';
 
@@ -29,12 +30,19 @@ type Props = {
  */
 
 /** สีตัวเลขบนพื้น hero เข้ม — โทนอ่อนของภาษาความด่วนเดิม (พื้นเข้มตลอดจึงไม่มีคู่ dark) */
-const HERO_BUCKET: Record<DashboardAgeDaysBreakdown['bucket'], { urgency: string; num: string }> = {
-  '30+': { urgency: 'ด่วนมาก', num: 'text-red-400' },
-  '16-30': { urgency: 'เริ่มด่วน', num: 'text-orange-300' },
-  '8-15': { urgency: 'เริ่มด่วน', num: 'text-amber-300' },
-  '1-7': { urgency: 'ยังไม่ด่วน', num: 'text-emerald-300' },
-  advance: { urgency: 'รอได้', num: 'text-sky-300' },
+/**
+ * สีของตัวเลขตามความเร่งด่วน — **ความหมายเดิมทั้งหมด** (แดง=ด่วนมาก ฯลฯ)
+ * `num` = ชุดสำหรับพื้นเข้ม (โฉมเดิม) · `numLight` = ชุดเดียวกันที่อ่านออกบนพื้นขาว (โฉมใหม่)
+ */
+const HERO_BUCKET: Record<
+  DashboardAgeDaysBreakdown['bucket'],
+  { urgency: string; num: string; numLight: string }
+> = {
+  '30+': { urgency: 'ด่วนมาก', num: 'text-red-400', numLight: 'text-red-700' },
+  '16-30': { urgency: 'เริ่มด่วน', num: 'text-orange-300', numLight: 'text-orange-700' },
+  '8-15': { urgency: 'เริ่มด่วน', num: 'text-amber-300', numLight: 'text-amber-700' },
+  '1-7': { urgency: 'ยังไม่ด่วน', num: 'text-emerald-300', numLight: 'text-emerald-700' },
+  advance: { urgency: 'รอได้', num: 'text-sky-300', numLight: 'text-sky-700' },
 };
 
 /** ลำดับโชว์: ด่วนสุดซ้ายสุด (สลับจากถังข้อมูลที่เรียงเบา→หนัก) */
@@ -82,11 +90,24 @@ const DashboardHeroStrip: React.FC<Props> = ({
   const hasSelection =
     !!selectedMonth && bars.pts.some((p) => p.date.slice(0, 7) === selectedMonth.slice(0, 7));
 
+  /**
+   * 🔴 โฉมใหม่ (5 ก.ย. 2569): แถบหัวแดชบอร์ดเลิกเป็น "ผืนกรมท่าทึบ" เป็นผืนขาวคั่นเส้น
+   * ⚠️ **ตัวเลข/นิยาม/ปุ่มกดทุกตัวเหมือนเดิม** — Control Tower ห้ามแตะตรรกะ
+   */
+  const S = useSurfaceKit();
+
   return (
-    <div className={cn(DASH.hero, 'px-4 py-4 md:px-5')}>
+    <div
+      className={cn(
+        'px-4 py-4 md:px-5',
+        S.v2 ? 'rounded-2xl border border-border/70 bg-card shadow-sm' : DASH.hero,
+      )}
+    >
       <div className="flex flex-wrap items-stretch gap-x-8 gap-y-4">
         <div className="min-w-[260px] flex-[1.2]">
-          <p className={DASH.heroLabel}>ต้องลงมือตอนนี้</p>
+          <p className={S.v2 ? 'text-[12.5px] font-medium text-primary' : DASH.heroLabel}>
+            ต้องลงมือตอนนี้
+          </p>
           <div className="mt-1.5 flex flex-wrap items-end gap-x-5 gap-y-2">
             {ordered.map((item, idx) => {
               const meta = HERO_BUCKET[item.bucket];
@@ -108,12 +129,12 @@ const DashboardHeroStrip: React.FC<Props> = ({
                     className={cn(
                       'block font-bold leading-none tracking-tight tabular-nums',
                       idx === 0 ? 'text-4xl' : 'text-[22px]',
-                      meta.num,
+                      S.v2 ? meta.numLight : meta.num,
                     )}
                   >
                     {item.count.toLocaleString('th-TH')}
                   </span>
-                  <span className="mt-1 block text-[10px] text-slate-400">
+                  <span className={cn('mt-1 block text-[10px]', S.muted)}>
                     {meta.urgency} · {item.label}
                   </span>
                 </button>
@@ -121,11 +142,18 @@ const DashboardHeroStrip: React.FC<Props> = ({
             })}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-emerald-200">
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium',
+                S.v2
+                  ? 'border border-border bg-background/60 text-emerald-700'
+                  : 'border border-white/20 bg-white/10 text-emerald-200',
+              )}
+            >
               คงเหลือทั้งระบบ {remainingPositions.toLocaleString('th-TH')} อัตรา ·{' '}
               {siteCount.toLocaleString('th-TH')} ไซต์
             </span>
-            <span className="text-[10px] text-slate-400">
+            <span className={cn('text-[10px]', S.muted)}>
               รวม {bucketTotal.toLocaleString('th-TH')} ตำแหน่ง · {requestTotal.toLocaleString('th-TH')} ใบขอ
               {positionTotal !== bucketTotal ? ` · สต็อก ${positionTotal.toLocaleString('th-TH')} ตำแหน่ง` : ''}
             </span>
@@ -136,7 +164,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
         {bars.max > 0 && bars.pts.length >= 2 ? (
           <div className="min-w-[200px] flex-1">
             {/* ช่วงยาวกว่า 12 เดือนโชว์แค่ท้ายสุด — ป้ายต้องบอกตามที่เห็นจริง ไม่ใช่ช่วงเต็มของตัวกรอง */}
-            <p className={DASH.heroLabel}>
+            <p className={S.v2 ? 'text-[12.5px] font-medium text-primary' : DASH.heroLabel}>
               เข้ามารายเดือน ·{' '}
               {bars.frozen ? 'กดเลือกเดือน' : bars.truncated ? '12 เดือนล่าสุด' : trendLabel}
             </p>
@@ -176,10 +204,10 @@ const DashboardHeroStrip: React.FC<Props> = ({
                 );
               })}
             </div>
-            <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+            <div className={cn('mt-1 flex justify-between text-[10px]', S.muted)}>
               <span>{bars.pts[0]?.label}</span>
               {peak ? (
-                <span className="text-slate-300">
+                <span className={S.strong}>
                   {peak.label} {peak.value.toLocaleString('th-TH')} อัตรา
                 </span>
               ) : null}

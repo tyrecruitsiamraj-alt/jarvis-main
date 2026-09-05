@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
+import { useUiV2 } from '@/lib/uiV2';
 
 interface StatCardProps {
   title: string;
@@ -43,20 +44,43 @@ const StatCard: React.FC<StatCardProps> = ({
   className,
   onClick,
 }) => {
+  /**
+   * 🔴 **โฉมใหม่ (5 ก.ย. 2569)** — กล่องตัวเลขเดิมมี **พื้นพาสเทล 6 สี + ไอคอนในกรอบสี**
+   * ซึ่งทำให้หน้าเดียวมีสีเยอะโดยที่สีไม่ได้แปลว่าอะไร (ต้นเหตุ "ดูตลก/สะเปะสะปะ")
+   * ⇒ เปิดสวิตช์แล้วเหลือ **การ์ดขาว เส้นบาง เลขใหญ่ ป้ายเบา** ทรงเดียวกับหน้า Login
+   * ⚠️ ข้อมูลเท่าเดิมทุกชิ้น (หัวข้อ · ตัวเลข · บรรทัดรอง · แนวโน้ม · ไอคอน)
+   */
+  const v2 = useUiV2();
   return (
     <div
       onClick={onClick}
       className={cn(
-        'glass-card p-4 border transition-all duration-300',
-        variantStyles[variant],
-        onClick && 'cursor-pointer jarvis-interactive-card hover:-translate-y-0.5',
+        'p-4 transition-all duration-300',
+        v2 ? 'rounded-2xl border border-border/70 bg-card shadow-sm' : cn('glass-card border', variantStyles[variant]),
+        onClick && 'cursor-pointer hover:-translate-y-0.5',
+        onClick && !v2 && 'jarvis-interactive-card',
+        onClick && v2 && 'hover:border-primary/30',
         className,
       )}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-muted-foreground truncate uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-bold text-foreground mt-1 tracking-tight">{value}</p>
+          <p
+            className={cn(
+              'truncate text-xs font-medium text-muted-foreground',
+              v2 ? '' : 'uppercase tracking-wide',
+            )}
+          >
+            {title}
+          </p>
+          <p
+            className={cn(
+              'mt-1 tracking-tight text-foreground',
+              v2 ? 'text-[26px] font-semibold tabular-nums' : 'text-2xl font-bold',
+            )}
+          >
+            {value}
+          </p>
           {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
           {trend && trendValue && (
             <p
@@ -70,7 +94,14 @@ const StatCard: React.FC<StatCardProps> = ({
           )}
         </div>
         {Icon && (
-          <div className={cn('p-2.5 rounded-2xl border border-white/60', iconVariantStyles[variant])}>
+          <div
+            className={cn(
+              'rounded-2xl p-2.5',
+              v2
+                ? 'border border-border/70 bg-background/60 text-muted-foreground'
+                : cn('border border-white/60', iconVariantStyles[variant]),
+            )}
+          >
             <Icon className="w-5 h-5" />
           </div>
         )}

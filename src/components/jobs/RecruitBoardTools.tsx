@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useUiV2 } from '@/lib/uiV2';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquareWarning, Plus, Settings2 } from 'lucide-react';
 import {
@@ -146,6 +147,9 @@ const RecruitBoardTools: React.FC<{
     reasons: MessageSquareWarning,
   };
 
+  /** โฉมใหม่ = แถบหัวขาว ⇒ ปุ่มบนแถบใช้ทรงพื้นสว่าง (5 ก.ย. 2569) */
+  const v2 = useUiV2();
+
   const onClickKey = (key: RmToolbarKey) => {
     setNotice(null);
     // "ช่องทาง" เป็นหน้าเต็มจอแล้ว (เจ้าของเคาะ 19 ส.ค. 2569) — ป๊อปอัปเดิมถอดออกทั้งก้อน
@@ -160,7 +164,8 @@ const RecruitBoardTools: React.FC<{
    * "สร้างลิงก์" เป็นปุ่มหลักของแถบ จึงได้ทรงทึบทั้งบนพื้นเข้มและพื้นสว่าง
    */
   const btnVariant = (key: RmToolbarKey) => {
-    if (variant === 'onDark') return key === 'link' ? ('heroSolid' as const) : ('hero' as const);
+    // โฉมใหม่: แถบหัวเป็นพื้นขาวแล้ว ⇒ ใช้ปุ่มมาตรฐานเหมือนบนพื้นสว่าง (5 ก.ย. 2569)
+    if (variant === 'onDark' && !v2) return key === 'link' ? ('heroSolid' as const) : ('hero' as const);
     return key === 'link' ? ('default' as const) : ('outline' as const);
   };
 
@@ -214,7 +219,7 @@ const RecruitBoardTools: React.FC<{
         {notice ? (
           <p
             className={
-              variant === 'onDark'
+              variant === 'onDark' && !v2
                 ? 'text-[11px] font-medium text-amber-200'
                 : 'text-[11px] font-medium text-amber-700 dark:text-amber-300'
             }

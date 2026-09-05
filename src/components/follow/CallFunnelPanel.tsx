@@ -15,6 +15,7 @@ import { type CallOutcome } from '@/lib/callFollowupPolicy';
 import { CALL_OUTCOME_LABEL, CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
 import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
 import PageHeroStrip from '@/components/shared/PageHeroStrip';
+import { useSurfaceKit } from '@/components/shared/ui-v2/surface';
 import { resolvedCallBase } from '@/lib/callFunnelMath';
 
 /**
@@ -55,6 +56,8 @@ export function FlowStage({
   title?: string;
 }) {
   const t = TONE[tone];
+  /** โฉมใหม่ = แผงอยู่บนพื้นขาว ⇒ สลับชุดสีพื้นผิว (ตัวเลข/ป้าย/ขอบ) ให้อ่านออก */
+  const S = useSurfaceKit();
   return (
     <button
       type="button"
@@ -63,21 +66,27 @@ export function FlowStage({
       title={title}
       aria-pressed={onClick ? active : undefined}
       className={cn(
-        'min-w-0 flex-1 rounded-2xl border border-white/[0.14] bg-white/[0.07] px-4 py-3 text-left transition-colors !border-t-4',
-        onClick ? 'hover:bg-white/[0.12] disabled:cursor-wait' : 'cursor-default',
+        'min-w-0 flex-1 rounded-2xl px-4 py-3 text-left transition-colors !border-t-4',
+        S.tile,
+        onClick ? cn(S.tileHover, 'disabled:cursor-wait') : 'cursor-default',
         // ⚠️ เน้นด้วย **วงแหวน** ไม่ใช่พื้นสว่างขึ้น — ลองพื้น white/[0.16] แล้ววัดได้
         // contrast ตก 3.87 → 2.92 (พื้นสว่างขึ้นแต่ตัวหนังสือยังสีเดิม) ซึ่งแย่กว่าการ์ดอื่น
         // ในแถบเดียวกัน · วงแหวนเน้นได้เท่ากันโดยไม่แตะพื้น (กติกาเดียวกับปุ่มเลขหน้า)
         // ring-blue-400/50 ของการ์ดพื้นอ่อนเดิมจมหายบนพื้นเข้ม จึงใช้ sky-300
-        active && 'ring-2 ring-sky-300/80',
+        active && (S.v2 ? 'ring-2 ring-primary/40' : 'ring-2 ring-sky-300/80'),
         t.bar,
       )}
     >
-      <div className="text-xs font-medium leading-tight text-slate-400">{label}</div>
-      <div className={cn('mt-1 text-3xl font-bold leading-none tabular-nums tracking-tight', t.onDark)}>
+      <div className={cn('text-xs font-medium leading-tight', S.label)}>{label}</div>
+      <div
+        className={cn(
+          'mt-1 text-3xl font-bold leading-none tabular-nums tracking-tight',
+          S.toneValue(t),
+        )}
+      >
         {value.toLocaleString('th-TH')}
       </div>
-      {sub ? <div className="mt-1.5 text-[11px] leading-snug text-slate-400">{sub}</div> : null}
+      {sub ? <div className={cn('mt-1.5 text-[11px] leading-snug', S.label)}>{sub}</div> : null}
     </button>
   );
 }
@@ -200,6 +209,8 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   const [takeError, setTakeError] = useState<string | null>(null);
   /** id ที่เพิ่งรับไปตามในรอบนี้ — โชว์ผลค้างไว้ ไม่ให้ดูเหมือนกดแล้วไม่มีอะไรเกิด */
   const [taken, setTaken] = useState<Set<number>>(new Set());
+  /** ชุดสีพื้นผิว — โฉมเดิม = แผงพื้นเข้ม · โฉมใหม่ = ผืนขาว (ข้อมูลเหมือนกันทุกตัว) */
+  const S = useSurfaceKit();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -224,7 +235,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
     return (
       <span className="whitespace-nowrap">
         {OUTCOME_LABEL[o]}{' '}
-        <span className={cn('font-semibold tabular-nums', TONE[CALL_OUTCOME_TONE[o]].onDark)}>
+        <span className={cn('font-semibold tabular-nums', S.toneValue(TONE[CALL_OUTCOME_TONE[o]]))}>
           {n.toLocaleString('th-TH')}
         </span>
       </span>
@@ -304,15 +315,15 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
             เดิมเป็นการ์ดพื้นอ่อนลอยอยู่คนละก้อนใต้แผงนี้ ต้องกวาดตาสองที่แล้วต่อเรื่องเอง */}
         {leadIn ? (
           <>
-            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <p className={cn('mt-3 text-[10px] font-semibold uppercase tracking-wide', S.faint)}>
               {leadInLabel}
             </p>
             {leadIn}
-            <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <div className={cn('mt-3 flex items-center gap-2 border-t pt-3', S.line)}>
+              <p className={cn('text-[10px] font-semibold uppercase tracking-wide', S.faint)}>
                 {callRowLabel}
               </p>
-              <p className="text-[10px] text-slate-500">
+              <p className={cn('text-[10px]', S.faint)}>
                 — คนที่ AI แนะนำแล้วถูกส่งเข้าคิวโทร จะมานับต่อในแถวนี้
               </p>
             </div>
@@ -360,7 +371,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                 funnel.unreached > 0 ? (
                   <span className="whitespace-nowrap">
                     ไม่รับ/ไม่ติด{' '}
-                    <span className={cn('font-semibold tabular-nums', TONE.warn.onDark)}>
+                    <span className={cn('font-semibold tabular-nums', S.toneValue(TONE.warn))}>
                       {funnel.unreached.toLocaleString('th-TH')}
                     </span>
                   </span>
@@ -391,20 +402,33 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           ].filter((a) => a.value > 0);
           if (actions.length === 0) return null;
           return (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <div className={cn('mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3', S.line)}>
+              <span className={cn('text-[10px] font-semibold uppercase tracking-wide', S.faint)}>
                 ทำก่อน → หลัง
               </span>
               {actions.map((a, i) => (
                 <span
                   key={a.label}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2.5 py-1 text-[11px] text-slate-200"
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px]',
+                    S.chip,
+                  )}
                 >
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/15 font-mono text-[10px] font-bold text-white">
+                  <span
+                    className={cn(
+                      'inline-flex h-4 w-4 items-center justify-center rounded-full font-mono text-[10px] font-bold',
+                      S.v2 ? 'bg-primary/10 text-primary' : 'bg-white/15 text-white',
+                    )}
+                  >
                     {i + 1}
                   </span>
                   {a.label}
-                  <span className="font-mono font-semibold tabular-nums text-white">
+                  <span
+                    className={cn(
+                      'font-mono font-semibold tabular-nums',
+                      S.v2 ? 'text-foreground' : 'text-white',
+                    )}
+                  >
                     {a.value.toLocaleString('th-TH')}
                   </span>
                 </span>
