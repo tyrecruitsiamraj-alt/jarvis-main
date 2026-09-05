@@ -40,6 +40,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import { shouldShowPasswordUi, type AuthConfig as SharedAuthConfig } from '@/lib/authConfig';
+import { CONVEYOR_STEPS } from '@/lib/soRecruitNav';
 import { cn } from '@/lib/utils';
 
 /**
@@ -304,27 +305,24 @@ function OrDivider() {
 /**
  * ═══ ซ้ายมือของหน้าเข้าสู่ระบบ — **ระบบนี้ทำอะไรให้** ═══
  * (เจ้าของสั่ง 4 ก.ย. 2569: *"แบ่งครึ่งซ้ายขวา ขวาเป็น Login ซ้ายเป็นแบบอธิบายระบบ
- * อธิบายแบบด้วยลูกเล่นที่เท่ ๆ"*)
+ * อธิบายแบบด้วยลูกเล่นที่เท่ ๆ"* · ทวงงานคิด 5 ก.ย.: *"ฝั่งซ้ายไม่ได้คิดหรือต่อยอดอะไรเลยหรอ"*)
  *
- * **ลูกเล่นที่ใช้** — ทำจาก state + utility ล้วน ๆ:
- *   1. สี่บรรทัดงานไล่โผล่ทีละอัน แล้ว **ไฮไลต์ไล่ลงมาเรื่อย ๆ** เหมือนสายพานเดิน
- *   2. จุดสถานะเต้น (`animate-pulse` ของ Tailwind)
+ * 🔴 **ของจริงที่คิดเพิ่มรอบนี้ — ไม่ได้เขียนคำโฆษณาใหม่ แต่เปลี่ยน "แหล่งของคำ"**
+ * สี่ขั้นบนแผงนี้ **ดึงจาก `CONVEYOR_STEPS`** ซึ่งเป็นเมนูจริงของแอป (ชื่อ · คำอธิบาย ·
+ * ไอคอน ชุดเดียวกับที่โผล่ในเมนูหลังล็อกอิน) ⇒ ได้สองอย่างพร้อมกัน:
+ *   1. **หน้า Login สอนเมนู** — ไอคอนที่เห็นตอนรอเข้าระบบ คือไอคอนที่ต้องกดจริง
+ *   2. **แก้ที่เดียว** — เปลี่ยนชื่อขั้นในเมนู หน้า Login เปลี่ยนตาม ไม่มีวันเพี้ยนกันเอง
+ *      (คำโฆษณาที่เขียนมือทิ้งไว้ 4 ขั้นแบบเดิม เพี้ยนจากเมนูจริงไปแล้ว เช่นเขียนว่า
+ *      "ปล่อยประกาศ + จับคู่คน" ทั้งที่เมนูจริงชื่อ "จับคู่งาน")
  *
- * ⚠️ **เลิกใช้คำหัวเรื่องสลับวน** (เจ้าของทัก 5 ก.ย. 2569: *"ดูไม่สมูทเลย คำมันแปลก ๆ"*)
- * ของเดิมเป็น "ระบบสรรหาที่ทำให้" + คำสลับ ⇒ ต่อกันแล้วเป็นประโยคที่คนไทยไม่พูด
- * ("ระบบสรรหาที่ทำให้ไม่มีใบขอตกหล่น") และตอนสลับคำสองคำซ้อนกันเห็นเป็นเงา
- * ⇒ เปลี่ยนเป็นประโยคเดียวนิ่ง ๆ ที่อ่านรู้เรื่อง ลูกเล่นเหลือที่สายพานอย่างเดียว
- * 🔴 **ไม่มี CSS ใหม่สักบรรทัด** (กฎเจ้าของ 4 ก.ย. 2569) — ใช้ `animate-in` ของ
- * tailwindcss-animate + `transition` + `animate-pulse` ที่มีอยู่แล้ว
- * 🔴 สีทุกสีมาจาก `LOGIN_SCENE` (จานสีของหน้านี้) ไม่มี hex ดิบ
+ * **ลูกเล่น** = รางสายพานที่ไฟไล่ลงมาทีละขั้น (เส้นเติมตามความสูง + ชิปไอคอนติดสว่าง)
+ * ทำจาก state + utility ล้วน ๆ · 🔴 **ไม่มี CSS ใหม่** (กฎเจ้าของ 4 ก.ย. 2569)
+ * · เครื่องที่ตั้ง "ลดการเคลื่อนไหว" = อยู่นิ่ง ไฟค้างที่ขั้นแรก
+ *
+ * ⚠️ เคยคิดจะโชว์ **จำนวนตำแหน่งที่เปิดรับสด ๆ** จาก `/api/public/jobs` — **ไม่เอา**
+ * วัดจริง 5 ก.ย. 2569: เส้นนั้นตอบ 124 KB ใน **4.7 วินาที** เพราะวิ่งไปถาม ERP
+ * เอามาแปะหน้า Login = หน้าที่คนเปิดบ่อยที่สุดช้าลง และเปิดทางให้คนนอกยิงถาม ERP ฟรี ๆ
  */
-const INTRO_STEPS = [
-  { title: 'รับใบขอจากหน่วยงาน', desc: 'ทุกใบบอกเองว่าค้างมากี่วัน ใบไหนต้องรีบ' },
-  { title: 'ปล่อยประกาศ + จับคู่คน', desc: 'ลงประกาศทีเดียวหลายช่องทาง แล้ว AI แนะนำคนให้' },
-  { title: 'ให้ AI โทรแทน', desc: 'โทรตามนัด บันทึกผลเอง คุยไม่ได้ค่อยส่งต่อให้คน' },
-  { title: 'ตามจนถึงวันเริ่มงาน', desc: 'ติดตามต่อหลังเริ่มงาน กันหลุดในเดือนแรก' },
-] as const;
-
 const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) => {
   const [activeStep, setActiveStep] = useState(0);
   const reduceMotion = useReducedMotion();
@@ -332,18 +330,17 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
   useEffect(() => {
     // ผู้ใช้ตั้งค่าไม่เอาแอนิเมชัน = อยู่นิ่ง ๆ (กติกาเดิมของโปรเจกต์)
     if (reduceMotion) return;
-    const t = window.setInterval(() => setActiveStep((n) => (n + 1) % INTRO_STEPS.length), 1600);
+    const t = window.setInterval(() => setActiveStep((n) => (n + 1) % CONVEYOR_STEPS.length), 2400);
     return () => window.clearInterval(t);
   }, [reduceMotion]);
 
+  /** ไฟบนรางเดินมาถึงไหนแล้ว — คิดเป็น % ของความสูงราง */
+  const railFill = ((activeStep + 0.5) / CONVEYOR_STEPS.length) * 100;
+
   return (
-    /**
-     * 🔴 พื้นกระจก**บางกว่า**การ์ดล็อกอิน (ไม่มีเงาหนา) — ไม่งั้นกลายเป็น "สองการ์ด"
-     * ซึ่งเป็นสิ่งที่เจ้าของเพิ่งสั่งเอาออก · ฝั่งนี้เป็นคำอธิบาย ฝั่งขวาคือของที่ต้องกด
-     */
     <motion.div
       {...rise(0.12)}
-      className="w-full rounded-3xl p-6"
+      className="w-full rounded-3xl p-6 sm:p-7"
       style={{
         /* ทึบพอให้ตัวหนังสืออ่านออกบนกิ่งไม้ที่ลายพร้อย (เจ้าของทัก 5 ก.ย. 2569) */
         background: LOGIN_SCENE.glassStrong,
@@ -352,73 +349,90 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
       }}
     >
       <p
-        className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
-        style={{ color: LOGIN_SCENE.muted }}
+        className="inline-flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: LOGIN_SCENE.burgundy }}
       >
         <span
           className="h-1.5 w-1.5 rounded-full animate-pulse"
-          style={{ background: LOGIN_SCENE.accent }}
+          style={{ background: LOGIN_SCENE.burgundy }}
           aria-hidden
         />
         ONE RECRUIT · ONE SOLUTION · ONE STOP
       </p>
 
       <h2
-        className="mt-2 text-[clamp(20px,2.2vw,26px)] font-[610] leading-snug"
+        className="mt-2.5 text-[clamp(21px,2.3vw,27px)] font-[610] leading-snug"
         style={{ color: LOGIN_SCENE.ink }}
       >
         งานสรรหา ครบ จบ ที่เดียว
       </h2>
       <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: LOGIN_SCENE.muted }}>
-        ตั้งแต่รับใบขอ ปล่อยประกาศ ให้ AI โทรตาม จนถึงวันเริ่มงาน
+        สี่หน้าที่เห็นข้างล่างนี้ คือเมนูจริงที่รออยู่หลังปุ่มเข้าสู่ระบบ
       </p>
 
-      {/* สายพาน 4 ขั้น — ไฮไลต์ไล่ลงมาเรื่อย ๆ ให้เห็นว่างานไหลยังไง */}
-      <ol className="mt-5 space-y-1.5">
-        {INTRO_STEPS.map((s, i) => {
-          const on = i === activeStep;
+      {/* ── รางสายพาน 4 ขั้น — ชื่อ/คำอธิบาย/ไอคอน มาจากเมนูจริงของแอป ── */}
+      <ol className="relative mt-6 space-y-1">
+        {/* รางพื้น + ไฟที่ไล่ลงมา (ซ้อนกันสองเส้น ไม่ใช่ CSS ใหม่) */}
+        <span
+          className="absolute bottom-6 left-[18px] top-6 w-px"
+          style={{ background: 'rgba(18, 32, 60, .12)' }}
+          aria-hidden
+        />
+        <span
+          className="absolute left-[18px] top-6 w-px transition-[height] duration-700 ease-out"
+          style={{
+            height: reduceMotion ? '0%' : `calc(${railFill}% - 1.5rem)`,
+            background: LOGIN_SCENE.burgundy,
+          }}
+          aria-hidden
+        />
+
+        {CONVEYOR_STEPS.map((step, i) => {
+          const on = !reduceMotion && i === activeStep;
+          const Icon = step.icon;
           return (
             <li
-              key={s.title}
+              key={step.key}
               className={cn(
-                'flex items-start gap-3 rounded-2xl px-3 py-2.5 transition-all duration-500 ease-out',
+                'relative flex items-start gap-3.5 rounded-2xl px-2 py-2.5 transition-colors duration-500',
                 'animate-in fade-in slide-in-from-left-4',
                 i === 1 && 'delay-75',
                 i === 2 && 'delay-150',
                 i === 3 && 'delay-200',
               )}
-              style={
-                on
-                  ? {
-                      background: 'rgba(255, 255, 255, .96)',
-                      boxShadow: '0 8px 22px rgba(18, 32, 60, .10)',
-                    }
-                  : undefined
-              }
+              style={on ? { background: 'rgba(140, 47, 57, .06)' } : undefined}
             >
               <span
-                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors duration-500"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-500"
                 style={
                   on
-                    ? { background: LOGIN_SCENE.burgundy, color: LOGIN_SCENE.canvas }
-                    : { background: 'rgba(18, 32, 60, .07)', color: LOGIN_SCENE.muted }
+                    ? {
+                        background: LOGIN_SCENE.burgundy,
+                        color: LOGIN_SCENE.canvas,
+                        boxShadow: '0 0 0 4px rgba(140, 47, 57, .12)',
+                      }
+                    : {
+                        background: LOGIN_SCENE.canvas,
+                        color: LOGIN_SCENE.muted,
+                        boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
+                      }
                 }
                 aria-hidden
               >
-                {i + 1}
+                <Icon className="h-[18px] w-[18px]" />
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 pt-1">
                 <span
                   className="block text-[14px] font-semibold leading-snug"
                   style={{ color: LOGIN_SCENE.ink }}
                 >
-                  {s.title}
+                  {step.label}
                 </span>
                 <span
                   className="block text-[12.5px] leading-relaxed"
                   style={{ color: LOGIN_SCENE.muted }}
                 >
-                  {s.desc}
+                  {step.blurb}
                 </span>
               </span>
             </li>
