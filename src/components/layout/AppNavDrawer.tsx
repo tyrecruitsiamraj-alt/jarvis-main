@@ -9,6 +9,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ExternalLink, KeyRound, ListChecks, LogOut, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { consumeBackMarkerForNavigation } from '@/hooks/useCloseOnBack';
 import { useUiV2 } from '@/lib/uiV2';
 import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { shouldShowPasswordUi } from '@/lib/authConfig';
@@ -89,7 +90,13 @@ const AppNavDrawer: React.FC<Props> = ({
   }, [open, onClose]);
 
   const go = (path: string) => {
-    navigate(resolveDockNavTarget(path));
+    /**
+     * 🔴 `replace` ตอนที่ลิ้นชักปักชั้นประวัติไว้ (5 ก.ย. 2569 · Wave 3.2)
+     * ไม่งั้นหน้าใหม่จะไป push **ทับ** ป้ายของลิ้นชัก แล้วคนกดย้อนกลับครั้งที่สอง
+     * จะ "ไม่ไปไหน" เพราะตกที่ป้ายซึ่ง URL เดียวกับหน้าเดิม (วัดจริงบนจอมือถือแล้ว)
+     * รายละเอียดอยู่ที่ `consumeBackMarkerForNavigation` ใน `@/hooks/useCloseOnBack`
+     */
+    navigate(resolveDockNavTarget(path), { replace: consumeBackMarkerForNavigation() });
     onClose();
   };
 

@@ -6,6 +6,7 @@ import Term from '@/components/shared/Term';
 import { incomeDisplay } from '@/lib/incomeLabel';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { useUrlDialogHistory } from '@/hooks/useUrlDialogHistory';
 import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
 import SelectionRecallButton from '@/components/matching/SelectionRecallButton';
@@ -530,6 +531,16 @@ const MatchingPage: React.FC = () => {
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const listScrollPendingRef = useRef(false);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
+
+  /**
+   * ประวัติเบราว์เซอร์ของแผงรายละเอียดใบขอ — เปิด = push `?jobId=` · ย้อนกลับ = ปิดแผง
+   * 🔴 ตัวเดียวกับที่ `PreCheckPage` ใช้ ห้ามทำพฤติกรรมสองหน้าไม่เหมือนกัน
+   */
+  const jobUrlHistory = useUrlDialogHistory({
+    param: 'jobId',
+    isOpen: !!jobDetail,
+    onClose: () => setJobDetail(null),
+  });
   const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
 
   // ── server-side pagination ของลิสต์ (/api/matching/list) — กรอง/เรียง/แบ่งหน้าที่ server
@@ -1501,6 +1512,12 @@ const MatchingPage: React.FC = () => {
 
   // เปิดใบขอ → หาคนของเราอัตโนมัติ + โหลดสถานะการเสนอ/คำขอโพสหางานที่เคยบันทึก
   const openJob = (j: JobRequest) => {
+    /**
+     * 🔴 เปิดรายละเอียด = **push `?jobId=` ลง URL** (Wave 3.3 · 5 ก.ย. 2569)
+     * เดิมเปิดโดยไม่แตะ URL เลย ⇒ กดย้อนกลับแล้ว **หลุดออกจากหน้าทั้งหน้า**
+     * ทั้งที่คนใช้แค่อยากปิดแผงกลับไปดูลิสต์เดิม · กติกาเต็มอยู่ที่ `useUrlDialogHistory`
+     */
+    jobUrlHistory.openWithUrl(j.id);
     setJobDetail({ ...j, ...(localJobEditsById[j.id] || {}) });
     setShowDistantCandidates(true);
     setProposeError(null);
@@ -2328,13 +2345,14 @@ const MatchingPage: React.FC = () => {
     ];
   }, [serverSummary, listTotal, urgentSummary, urgentOnly, workflowFilter]);
 
+  /**
+   * ปิดรายละเอียด — ถ้าเราเป็นคน push `?jobId=` มาเอง ให้ **ถอยประวัติ** แทนการลบทิ้ง
+   * (ไม่งั้นประวัติบวมขึ้นทุกครั้งที่เปิด-ปิด) · เข้ามาด้วยลิงก์ตรง = ลบทิ้งแบบเดิม
+   * พฤติกรรมนี้ใช้ร่วมกับ `PreCheckPage` ที่ `useUrlDialogHistory` **ห้ามแยกกัน**
+   */
   const closeJob = () => {
     setJobDetail(null);
-    if (searchParams.get('jobId')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('jobId');
-      setSearchParams(next, { replace: true });
-    }
+    jobUrlHistory.closeAndSyncUrl();
   };
 
   return (
@@ -2803,7 +2821,9 @@ const MatchingPage: React.FC = () => {
       </div>
 
       {/* Drawer: คนของเรา ต่อใบขอ */}
-      <Sheet open={!!jobDetail} onOpenChange={(o) => !o && closeJob()}>
+      {/* 🔴 `backClose={false}` — แผงนี้ผูกกับ `?jobId=` อยู่แล้ว ปล่อยให้ตัวห่อกลาง
+          ของ shadcn ปักประวัติซ้ำ = สองระบบแย่งกันจัดการ (ดู `useUrlDialogHistory`) */}
+      <Sheet backClose={false} open={!!jobDetail} onOpenChange={(o) => !o && closeJob()}>
         <SheetContent
           side="right"
           className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"

@@ -7156,3 +7156,40 @@ framer-motion) · **เก็บไว้อย่างเดียวคือ
 ⚠️ **ไม่ได้ลดขนาดคำตอบ 703KB** — ไล่ทุกฟิลด์ที่กินที่เกิน 1% แล้ว **ทุกตัวมีจอใช้จริง**
 (ตัวที่ใหญ่สุด `resigned_income_3m` 9.7% ใช้ที่ `src/lib/unitRequestDetail.ts`) ⇒ ตัดไม่ได้
 โดยไม่แยกเส้นรายละเอียดออกมาใหม่ ซึ่งเป็นงานคนละก้อน · ตามกติกา "ไม่ชัวร์ให้ข้าม ห้ามเดา"
+
+## รอบ 115 — Wave 3.2 + 3.3: ปุ่มย้อนกลับให้ครบระบบ (5 ก.ย. 2569)
+
+ต่อจากรอบ 114 · แผนเต็มอยู่ที่ `docs/plan-quality-100-2569-09-05.md` (Wave 3.2 · 3.3)
+🔴 **ไม่แตะนิยาม/ตรรกะของตัวเลขแม้แต่ตัวเดียว** — แตะเฉพาะเรื่องประวัติเบราว์เซอร์
+
+### ทางที่เลือก (และทางที่ไม่เลือก)
+
+สำรวจแล้วเจอ overlay ที่ render จริง **54 จุด** (43 `<Dialog>` · 6 `<AlertDialog>` · 5 `<Sheet>`
+· 0 `<Drawer>` — `ui/drawer.tsx` ไม่มีใครใช้เลย) ตัดของตายและ `ui/` ภายในออกเหลือ **~44 จุดจริง**
+⇒ **ไม่ไล่ใส่ทีละจอ** เพราะ (ก) ลืมได้ (ข) ป๊อปอัปใหม่ที่ใครเขียนต่อไปจะไม่มี
+(ค) จุดที่มีเงื่อนไขห้ามปิด (เช่น `!proposalFormBusy`) จะถูกข้ามถ้าเรียก `onClose` ตรง ๆ
+
+**ผูกที่ตัวห่อของ shadcn ที่เดียว** — เรียกผ่าน `onOpenChange(false)` ⇒ เงื่อนไขห้ามปิด
+ของแต่ละจอยังทำงานเหมือนเดิมโดยไม่ต้องแก้จอไหนเลย · จอที่ผูกกับ URL อยู่แล้ว opt-out ด้วย
+`backClose={false}` (มี 2 จุด) · ตรวจบนจอจริงครบ desktop + mobile 375px
+
+| ไฟล์ | ทำอะไร |
+| --- | --- |
+| `src/hooks/useCloseOnBack.ts` | **รื้อใหม่** — ของเดิมแต่ละป๊อปอัปปักประวัติของตัวเอง ใช้ได้ตอนมีตัวเดียว แต่พังตอนใช้ทั้งระบบ (ป๊อปซ้อนป๊อป · ปิดตัวหนึ่งเปิดอีกตัวในจังหวะเดียวกันแล้วคำสั่งถอยที่ค้างไปกินป้ายของตัวใหม่) · ของใหม่: **กองป๊อปอัประดับโมดูล + ป้ายเดียวทั้งระบบ** ปิดทีละชั้นจากบนลงล่าง ประวัติมีป้ายชั้นเดียวเสมอ · เช็คสถานะทีเดียวหลัง React วาดเสร็จ (`queueMicrotask`) จังหวะปิด-เปิดจึงหักกลบกันเอง · **คัดลอก state เดิมของ router มาด้วยตอน `pushState`** (ไม่งั้นตัวนับ `idx` หลุดหลังเปลี่ยนหน้าจากในป๊อปอัป) · ป๊อปอัปไม่ยอมปิดเพราะเงื่อนไข ⇒ ปักป้ายคืนให้ · เพิ่ม `consumeBackMarkerForNavigation()` สำหรับจุดที่ **เปลี่ยนหน้าจากในป๊อปอัป** |
+| `src/components/ui/dialog.tsx` · `alert-dialog.tsx` · `sheet.tsx` | `Root` จาก re-export เปล่า ๆ → ตัวห่อที่เรียก `useCloseOnBack` **ทำงานเฉพาะตอนคุมสถานะจากข้างนอกจริง (`open` เป็น boolean **และ** ส่ง `onOpenChange` มา)** · เพิ่ม prop `backClose` (ค่าตั้งต้น `true`) เป็นทาง opt-out |
+| `src/components/jobs/PublicApplyDialog.tsx` | ถอด `useCloseOnBack` ที่เรียกเอง — ตัวห่อกลางทำให้แล้ว (เรียกซ้ำ = ซ้อนเปล่า ๆ) พฤติกรรมเดิมยังอยู่ครบ ตรวจบนจอแล้ว |
+| `src/components/layout/AppNavDrawer.tsx` | `go()` ใช้ `navigate(target, { replace: consumeBackMarkerForNavigation() })` — 🔴 ไม่ทำแบบนี้ ประวัติจะเป็น `[หน้าเดิม, ป้าย, หน้าใหม่]` แล้ว **กดย้อนกลับครั้งที่สองไม่ไปไหน** (วัดจริงบนจอมือถือแล้ว) |
+| `src/components/notifications/ClaimIdleAlertDialog.tsx` | ปุ่ม "ไปดู" ใช้ `replace` ด้วยเหตุผลเดียวกัน |
+| **`src/hooks/useUrlDialogHistory.ts` (ไฟล์ใหม่)** | ป๊อปอัปที่ผูกสถานะกับ URL (`?jobId=`) — เปิด = **push** · ย้อนกลับ = ค่าหลุดจาก URL แล้วปิดแผงตาม · ปิดด้วยปุ่มหลังจากที่เรา push มาเอง = `history.back()` (ประวัติไม่บวม) · เข้าด้วยลิงก์ตรง = `replace` ลบค่าแบบเดิม · 🔴 ปิดแผงเฉพาะตอนค่า **"เคยมีแล้วหายไป"** — เจอบั๊กจริงบนจอ: ถ้าตีความ "ตอนนี้ไม่มีค่า" ว่าคนกดย้อนกลับ แผงจะปิดตัวเองใน 25ms ที่เปิด เพราะ `setJobDetail` (อัปเดตด่วน) กับการเปลี่ยน URL ของ react-router (transition) ลงคนละรอบวาด |
+| `src/pages/matching/MatchingPage.tsx` | `openJob()` push `?jobId=` · `closeJob()` เรียก `closeAndSyncUrl()` · `<Sheet backClose={false}>` |
+| `src/pages/matching/PreCheckPage.tsx` | เหมือนกันเป๊ะผ่าน helper ตัวเดียวกัน · เพิ่ม **fired-guard** ให้ effect ที่อ่าน `jobId` จาก URL (ตั้งแต่กดการ์ดก็ push URL แล้ว ไม่มี guard = ยิง `listProposalsForJob` ซ้ำไม่รู้จบ) |
+| `tests/api/backNavigation.test.ts` | เทสต์ guard **10 เคสใหม่**: ตัวห่อทั้งสามผูก `useCloseOnBack` และสั่งปิดผ่าน `onOpenChange(false)` · มี prop `backClose` · กองป๊อปอัประดับโมดูล + คัดลอก state ของ router · **ห้ามมีจอไหนเรียก `useCloseOnBack` เองซ้ำ** · ลิ้นชัก ☰ navigate แบบ replace · สองหน้า `?jobId=` ใช้ helper ตัวเดียวกันและไม่เหลือ replace-delete ที่เขียนเอง · `backClose={false}` ใช้ได้เฉพาะจอที่จัดการประวัติเอง · **แก้เคสเดิม** ที่ยึด `useCloseOnBack(open, onClose)` ใน `PublicApplyDialog` (พฤติกรรมย้ายไปตัวห่อกลาง) |
+
+**จุดที่ตั้งใจไม่ใส่ (พร้อมเหตุผล):**
+* `MatchingPage.tsx` แผง `?jobId=` และ `PreCheckPage.tsx` แผง `?jobId=` — ผูก URL อยู่แล้ว
+  ใส่ทั้งสองระบบ = แย่งกันจัดการประวัติ ⇒ `backClose={false}` + `useUrlDialogHistory`
+* `src/components/ui/drawer.tsx` (vaul) — **ไม่มีใครใช้เลยทั้ง repo** ใส่ไปก็ไม่มีอะไรทดสอบ
+* ป๊อปอัปที่เปิดแบบ uncontrolled (ไม่ส่ง `onOpenChange`) — ตัวห่อข้ามให้เอง
+  เพราะสั่งปิดไม่ได้ ถ้าปักป้ายไว้จะกลายเป็นกับดัก (กดย้อนกลับแล้วออกจากหน้าไม่ได้)
+* จุดที่ส่ง `embedded` (`GenApplyLinkDialog` · `EditPostingDialog` ฯลฯ) — ไม่ได้ render
+  `<Dialog>` เลย จึงไม่มีอะไรผูก (แพตเทิร์นกันซ้อน Dialog ตามกติกา UI ของโปรเจกต์)

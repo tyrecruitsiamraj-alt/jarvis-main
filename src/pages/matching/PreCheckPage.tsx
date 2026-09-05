@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { unitOneLine } from '@/lib/unitDisplay';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useUrlDialogHistory } from '@/hooks/useUrlDialogHistory';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -99,6 +100,16 @@ const PreCheckPage: React.FC = () => {
   const [projectFilter, setProjectFilter] = useState('');
   const [radius, setRadius] = useState(10);
   const [jobDetail, setJobDetail] = useState<JobRequest | null>(null);
+
+  /**
+   * ประวัติเบราว์เซอร์ของแผงรายละเอียดงาน — เปิด = push `?jobId=` · ย้อนกลับ = ปิดแผง
+   * 🔴 ตัวเดียวกับที่ `MatchingPage` ใช้ ห้ามทำพฤติกรรมสองหน้าไม่เหมือนกัน
+   */
+  const jobUrlHistory = useUrlDialogHistory({
+    param: 'jobId',
+    isOpen: !!jobDetail,
+    onClose: () => setJobDetail(null),
+  });
   const [apiClients, setApiClients] = useState<ClientWorkplace[]>([]);
   const { jobs: feedJobs, loading: loadingJobs, loadError: jobsLoadError, refetch: refetchJobs } = useUnitRequestsFeed();
   const [searching, setSearching] = useState(false);
@@ -161,6 +172,11 @@ const PreCheckPage: React.FC = () => {
 
   // เปิดรายละเอียดงาน + ค้นหาผู้สมัครที่ตรงให้อัตโนมัติ (คลิกเดียว ไม่ต้องกดวิเคราะห์ก่อน)
   const openJobAndFindCandidates = (j: JobRequest) => {
+    /**
+     * 🔴 เปิดรายละเอียด = **push `?jobId=` ลง URL** (Wave 3.3 · 5 ก.ย. 2569)
+     * เดิมเปิดโดยไม่แตะ URL ⇒ กดย้อนกลับแล้วหลุดออกจากหน้าทั้งหน้า
+     */
+    jobUrlHistory.openWithUrl(j.id);
     setJobDetail(j);
     if (!jobMatchById[j.id] && jobMatchLoadingId !== j.id) {
       void fetchIrecruitMatch(j.id);
@@ -265,22 +281,38 @@ const PreCheckPage: React.FC = () => {
 
   const allJobs = feedJobs;
 
+  /**
+   * ปิดรายละเอียด — เราเป็นคน push `?jobId=` มาเอง ⇒ **ถอยประวัติ** แทนการลบทิ้ง
+   * เข้ามาด้วยลิงก์ตรง (เช่นกลับจากหน้าเพิ่มผู้สมัคร) ⇒ ลบทิ้งแบบเดิม
+   * พฤติกรรมเดียวกับ `MatchingPage` — อยู่ที่ `useUrlDialogHistory` **ห้ามแยกกัน**
+   */
   const closeJobDetail = () => {
     setJobDetail(null);
-    if (searchParams.get('jobId')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('jobId');
-      setSearchParams(next, { replace: true });
-    }
+    jobUrlHistory.closeAndSyncUrl();
   };
 
-  // กลับจากหน้าเพิ่มผู้สมัคร — เปิด dialog ใบงานเดิมตาม jobId ใน URL
+  /**
+   * กลับจากหน้าเพิ่มผู้สมัคร — เปิด dialog ใบงานเดิมตาม `jobId` ใน URL
+   *
+   * 🔴 ต้องมี fired-guard (แพตเทิร์นเดียวกับ `MatchingPage`) — ตั้งแต่ตอนกดการ์ดเอง
+   * ก็ push `jobId` ลง URL แล้ว (Wave 3.3) effect นี้จึงยิงทุกครั้งที่ `searchParams`
+   * หรือ `allJobs` เปลี่ยน ⇒ ไม่มี guard = ยิง `listProposalsForJob` ซ้ำไม่รู้จบ
+   */
+  const openedJobIdRef = useRef<string | null>(null);
   useEffect(() => {
     const jobId = searchParams.get('jobId');
-    if (!jobId) return;
+    if (!jobId) {
+      openedJobIdRef.current = null;
+      return;
+    }
+    if (openedJobIdRef.current === jobId || jobDetail?.id === jobId) return;
     const job = allJobs.find((j) => j.id === jobId);
-    if (job) openJobAndFindCandidates(job);
-  }, [searchParams, allJobs]);
+    if (job) {
+      openedJobIdRef.current = jobId;
+      openJobAndFindCandidates(job);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, allJobs, jobDetail?.id]);
 
   const projectOptions = useMemo(
     () => Array.from(new Set(allJobs.map((j) => j.unit_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -936,7 +968,8 @@ const PreCheckPage: React.FC = () => {
         </div>
       </div>
 
-      <Sheet open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
+      {/* 🔴 `backClose={false}` — แผงนี้ผูกกับ `?jobId=` อยู่แล้ว (ดู `useUrlDialogHistory`) */}
+      <Sheet backClose={false} open={!!jobDetail} onOpenChange={(o) => !o && closeJobDetail()}>
         <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="text-foreground">รายละเอียดงาน</SheetTitle>

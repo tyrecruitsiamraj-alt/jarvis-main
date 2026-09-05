@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { trackPublicClick } from '@/lib/publicClickApi';
 import { cn } from '@/lib/utils';
-import { useCloseOnBack } from '@/hooks/useCloseOnBack';
 import { TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
@@ -87,8 +86,10 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
    * 🔴 กดย้อนกลับตอนฟอร์มเปิดอยู่ = **ปิดฟอร์ม** ไม่ใช่หลุดออกจากหน้าไปทั้งหน้า
    * (เจ้าของสั่งทดสอบเอง 5 ก.ย. 2569 · วัดจริงก่อนแก้: ย้อนกลับแล้วเด้งไปหน้าอื่น
    * และของที่ผู้สมัครกรอกค้างไว้หายหมด — บนมือถือคนใช้ปัดย้อนกลับแทนปุ่มปิดตลอด)
+   *
+   * ⚠️ ไม่ต้องเรียก `useCloseOnBack` ตรงนี้แล้ว — ย้ายไปผูกที่ `<Dialog>` ของ shadcn
+   * **ที่เดียวทั้งระบบ** แล้ว (Wave 3.2 · 5 ก.ย. 2569) เรียกซ้ำ = ซ้อนกันเปล่า ๆ
    */
-  useCloseOnBack(open, onClose);
   const [titlePrefix, setTitlePrefix] = useState('นาย');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');

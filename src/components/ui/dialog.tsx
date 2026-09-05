@@ -3,8 +3,34 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useCloseOnBack } from "@/hooks/useCloseOnBack";
 
-const Dialog = DialogPrimitive.Root;
+/**
+ * 🔴 **กดปุ่มย้อนกลับตอนป๊อปอัปเปิดอยู่ = ปิดป๊อปอัป ไม่ใช่หลุดออกจากหน้า** (5 ก.ย. 2569)
+ *
+ * เจ้าของสั่งเอง: *"เวลาทำอะไรไป แล้วจะย้อนกลับไปหน้าเดิมมันกลับไหม
+ * ไม่ใช่ย้อนแล้วไปไหนไม่รู้ งงแน่"* — บนมือถือคนปัดขอบจอแทนปุ่มปิดตลอด
+ *
+ * ผูกไว้ **ที่เดียวตรงนี้** แทนการไล่ใส่ทีละจอ (จอจริงมี 40 กว่าจุด) ⇒ ป๊อปอัปใหม่ที่ใครเขียน
+ * ต่อจากนี้ได้ฟรีทันที ไม่มีทางลืม · ตัวจัดการประวัติอยู่ที่ `@/hooks/useCloseOnBack`
+ *
+ * ทำงานเฉพาะตอนคุมสถานะจากข้างนอกจริง ๆ (`open` เป็น boolean **และ** ส่ง `onOpenChange` มา)
+ * และสั่งปิดผ่าน `onOpenChange(false)` ⇒ **เงื่อนไขห้ามปิดของแต่ละจอยังทำงานเหมือนเดิม**
+ * (เช่นตัวที่เขียนว่า `if (!open && !busy)` จะยังไม่ปิดตอนกำลังบันทึก)
+ *
+ * ⚠️ **`backClose={false}` = ปิดความสามารถนี้** ใช้กับป๊อปอัปที่ผูกสถานะเปิด-ปิดไว้กับ URL
+ * อยู่แล้ว (`?jobId=`) เพราะสองระบบจะแย่งกันจัดการประวัติ — จุดพวกนั้นใช้
+ * `useUrlDialogHistory` จัดการประวัติของตัวเอง
+ */
+function Dialog({
+  backClose = true,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Root> & { backClose?: boolean }) {
+  const { open, onOpenChange } = props;
+  const controlled = typeof open === "boolean" && typeof onOpenChange === "function";
+  useCloseOnBack(backClose && controlled && open === true, () => onOpenChange?.(false));
+  return <DialogPrimitive.Root {...props} />;
+}
 
 const DialogTrigger = DialogPrimitive.Trigger;
 

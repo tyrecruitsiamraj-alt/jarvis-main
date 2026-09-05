@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { consumeBackMarkerForNavigation } from '@/hooks/useCloseOnBack';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { pickClaimIdleAlert, shouldSeeClaimIdleAlert } from '@/lib/claimIdleAlert';
@@ -37,7 +38,11 @@ const ClaimIdleAlertDialog: React.FC = () => {
   const dismiss = () => markAsRead(alert.id);
   const goSee = () => {
     markAsRead(alert.id);
-    navigate(alert.link || '/jobs/board?view=list&bucket=awaiting_call_choice');
+    // 🔴 `replace` ตอนที่ป๊อปนี้ปักชั้นประวัติไว้ — เหตุผลเดียวกับเมนู ☰
+    // (ดู `consumeBackMarkerForNavigation` ใน `@/hooks/useCloseOnBack`)
+    navigate(alert.link || '/jobs/board?view=list&bucket=awaiting_call_choice', {
+      replace: consumeBackMarkerForNavigation(),
+    });
   };
 
   return (
