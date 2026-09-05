@@ -142,6 +142,8 @@ const PhotoScene: React.FC<PhotoSceneProps> = ({
         className="absolute -inset-[40%] mix-blend-multiply"
         style={{ backgroundImage: GRAIN_URL, opacity: 0.055 }}
       />
+
+
     </div>
   );
 };

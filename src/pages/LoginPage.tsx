@@ -7,7 +7,15 @@
  * *"บ้าหรอ จะเอาแบบไฟล์ HTML ที่ส่งให้ดิ ทำนอกเหนือจากที่สั่งอีกแล้ว"*
  * ⇒ **หน้าตายกมาเป๊ะ ห้ามตีความเอง** ภาพป่า · จานกระดาษ-เขียวป่า · ตัวอักษร Instrument Sans
  * · การ์ดกระจก · ช่องกรอกมุมโค้ง · ปุ่มแคปซูลเขียวป่า · เส้น "หรือ" ตัวพิมพ์ใหญ่
- * (ค่าสีทุกตัวอยู่ที่ `FRONT_SCENE` · ชั้นของฉากอยู่ที่ `PhotoScene`)
+ * (ค่าสีทุกตัวอยู่ที่ `LOGIN_SCENE` · ชั้นของฉากอยู่ที่ `PhotoScene`)
+ *
+ * 🔴 **ฉากเดิม จานสีใหม่** (เจ้าของเคาะ 5 ก.ย. 2569: *"หน้า Login กลับไปพื้นหลังเดิม
+ * ที่เปลี่ยนโทนเป็น ขาว + navy + burgundy เล็กน้อย"*)
+ * ⇒ **ภาพป่ากับชั้นฉากของ mockup อยู่ครบเหมือนเดิม** (`<PhotoScene />`)
+ * เปลี่ยนแค่ *จานสีที่ทาบบนฉาก* — ตัวหนังสือกรมท่า ปุ่มเบอร์กันดี การ์ดกระจกขาว
+ * เหตุ: *"ของฉันมันมีหลาย BU ถ้าเขียวเยอะไปมันจะดูเป็นการขายพวกงานสวนเกิน"*
+ * ⚠️ เคยลองทาบผ้ากรมท่าทับภาพทั้งใบ (4 ก.ย.) แล้ว **ทึบจนอ่านยาก** — ถอดทิ้งแล้ว
+ * ⚠️ หุ่นยนต์ผู้ช่วยเคยมาอยู่หน้านี้รอบเดียว เจ้าของสั่งย้ายไป **หน้าหลัก** (5 ก.ย. 2569)
  *
  * **ตัดออกแค่ของที่ไม่ใช่ "หน้าตา" แต่เป็นการทำงาน (เจ้าของสั่งว่าการทำงานเป็นของเรา):**
  * - แถบเมนู Overview/Pricing/Book a Demo — เมนูขายของ ระบบในบ้านไม่มีอะไรจะขาย
@@ -24,8 +32,9 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
-import { FRONT_SCENE } from '@/lib/designTokens';
+import { LOGIN_SCENE } from '@/lib/designTokens';
 import PhotoScene from '@/components/shared/PhotoScene';
+import BrandIntro from '@/components/auth/BrandIntro';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,8 +63,11 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   azure_not_configured: 'การเข้าสู่ระบบด้วย Microsoft ยังไม่พร้อม — ติดต่อผู้ดูแลระบบให้ตั้งค่า Azure AD',
 };
 
-/** เส้นบางในการ์ด — สูตรเดียวกับ mockup */
-const HAIRLINE = 'rgba(28, 57, 39, .11)';
+/** เส้นผมของการ์ด — กรมท่าจาง ๆ บนพื้นขาว (มาจาก token ที่เดียว) */
+const HAIRLINE = LOGIN_SCENE.line;
+
+/** รัศมีขาวหนุนตัวหนังสือที่วางบนภาพป่าโดยตรง (นอกการ์ด) */
+const TEXT_ON_PHOTO = '0 1px 0 rgba(255,255,255,.55), 0 2px 20px rgba(255,255,255,.75)';
 
 /** ป้ายชื่อช่องกรอก */
 const FIELD_LABEL = 'mb-2 ml-0.5 block text-xs font-medium';
@@ -66,32 +78,32 @@ const FIELD_LABEL = 'mb-2 ml-0.5 block text-xs font-medium';
  */
 const FIELD_CLASS = 'h-[46px] rounded-xl text-[15px] shadow-none';
 const FIELD_STYLE: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, .58)',
+  background: 'rgba(255, 255, 255, .92)',
   borderColor: HAIRLINE,
-  color: FRONT_SCENE.ink,
-  boxShadow: 'inset 0 1px rgba(255,255,255,.6)',
+  color: LOGIN_SCENE.ink,
+  boxShadow: 'inset 0 1px rgba(18, 32, 60, .04)',
 };
 
-/** ปุ่มลงมือ — แคปซูลเขียวป่าไล่เฉด */
-const FOREST_BTN: React.CSSProperties = {
-  background: `linear-gradient(180deg, ${FRONT_SCENE.forest2}, ${FRONT_SCENE.forest})`,
-  color: FRONT_SCENE.paper,
-  boxShadow: '0 9px 22px rgba(22, 50, 33, .18)',
+/** ปุ่มลงมือ — แคปซูลเบอร์กันดีไล่เฉด ตัวหนังสือขาว */
+const PRIMARY_BTN: React.CSSProperties = {
+  background: `linear-gradient(180deg, ${LOGIN_SCENE.burgundy2}, ${LOGIN_SCENE.burgundy})`,
+  color: LOGIN_SCENE.canvas,
+  boxShadow: '0 10px 24px rgba(140, 47, 57, .26)',
 };
 
-/** ปุ่ม SSO — แคปซูลกระจกขาว (`.sso` ของ mockup) */
+/** ปุ่ม SSO — แคปซูลขาว ตัวหนังสือกรมท่า */
 const SSO_BTN: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, .46)',
+  background: 'rgba(255, 255, 255, .96)',
   border: `1px solid ${HAIRLINE}`,
-  color: FRONT_SCENE.ink,
+  color: LOGIN_SCENE.ink,
 };
 
-/** การ์ดกระจก — `.card` ของ mockup (ไม่ใช่ `jarvis-frost` ที่เป็นจานฟ้าของแอป) */
+/** การ์ดกระจก — ขาวโปร่งบนพื้นขาว เห็นเป็นใบด้วย "เงา" ไม่ใช่ด้วยสี */
 const GLASS_CARD: React.CSSProperties = {
-  background: `linear-gradient(180deg, ${FRONT_SCENE.glassStrong}, ${FRONT_SCENE.glass})`,
-  border: `1px solid rgba(255, 255, 255, .66)`,
+  background: `linear-gradient(180deg, ${LOGIN_SCENE.glassStrong}, ${LOGIN_SCENE.glass})`,
+  border: `1px solid ${HAIRLINE}`,
   boxShadow:
-    '0 26px 80px rgba(18, 39, 26, .18), 0 2px 8px rgba(18, 39, 26, .05), inset 0 1px rgba(255,255,255,.7)',
+    '0 26px 70px rgba(18, 32, 60, .12), 0 2px 8px rgba(18, 32, 60, .05), inset 0 1px rgba(255,255,255,.9)',
   backdropFilter: 'blur(28px) saturate(1.28)',
   WebkitBackdropFilter: 'blur(28px) saturate(1.28)',
 };
@@ -159,7 +171,7 @@ function EmailPasswordForm({
     <form onSubmit={handleSubmit} noValidate className="space-y-3">
       <div className="space-y-3">
         <div>
-          <label htmlFor="login-email" className={FIELD_LABEL} style={{ color: FRONT_SCENE.muted }}>
+          <label htmlFor="login-email" className={FIELD_LABEL} style={{ color: LOGIN_SCENE.muted }}>
             อีเมล
           </label>
           {/* 🔴 `autoComplete` ต้องคงไว้ — ทั้งบริษัทใช้ตัวจำรหัสผ่าน
@@ -184,7 +196,7 @@ function EmailPasswordForm({
             <p
               id="login-email-hint"
               className="mt-1.5 text-[11px] leading-4"
-              style={{ color: FRONT_SCENE.muted }}
+              style={{ color: LOGIN_SCENE.muted }}
             >
               {hint}
             </p>
@@ -192,7 +204,7 @@ function EmailPasswordForm({
         </div>
 
         <div>
-          <label htmlFor="login-password" className={FIELD_LABEL} style={{ color: FRONT_SCENE.muted }}>
+          <label htmlFor="login-password" className={FIELD_LABEL} style={{ color: LOGIN_SCENE.muted }}>
             รหัสผ่าน
           </label>
           <div className="relative">
@@ -213,7 +225,7 @@ function EmailPasswordForm({
               tabIndex={-1}
               onClick={() => setShowPw((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-100 opacity-60"
-              style={{ color: FRONT_SCENE.ink }}
+              style={{ color: LOGIN_SCENE.ink }}
               aria-label={showPw ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
             >
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -233,7 +245,7 @@ function EmailPasswordForm({
         type="submit"
         disabled={submitting}
         className="mt-1.5 min-h-12 w-full rounded-full border-0 text-[15px] font-semibold hover:brightness-110"
-        style={FOREST_BTN}
+        style={PRIMARY_BTN}
       >
         {submitting ? (
           <>
@@ -277,7 +289,7 @@ function OrDivider() {
       <div className="h-px flex-1" style={{ background: HAIRLINE }} />
       <span
         className="text-[11px] uppercase tracking-[0.08em]"
-        style={{ color: FRONT_SCENE.muted }}
+        style={{ color: LOGIN_SCENE.muted }}
       >
         หรือ
       </span>
@@ -285,6 +297,7 @@ function OrDivider() {
     </div>
   );
 }
+
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -299,7 +312,7 @@ function OrDivider() {
  *   3. จุดสถานะเต้น (`animate-pulse` ของ Tailwind)
  * 🔴 **ไม่มี CSS ใหม่สักบรรทัด** (กฎเจ้าของ 4 ก.ย. 2569) — ใช้ `animate-in` ของ
  * tailwindcss-animate + `transition` + `animate-pulse` ที่มีอยู่แล้ว
- * 🔴 สีทุกสีมาจาก `FRONT_SCENE` (จานสีของหน้านี้) ไม่มี hex ดิบ
+ * 🔴 สีทุกสีมาจาก `LOGIN_SCENE` (จานสีของหน้านี้) ไม่มี hex ดิบ
  */
 const INTRO_WORDS = ['หาคนได้เร็วขึ้น', 'ไม่มีใบขอตกหล่น', 'รู้ทุกสายที่ AI โทร'] as const;
 
@@ -328,26 +341,25 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
 
   return (
     /**
-     * 🔴 พื้นกระจก**บางกว่า**การ์ดล็อกอิน — ตัวหนังสือเขียวเข้มบนภาพป่าอ่านไม่ออก
-     * (วัดบนจอจริง 4 ก.ย. 2569) · บางกว่าเพื่อไม่ให้กลายเป็น "สองการ์ด" อีกใบ
-     * ซึ่งเป็นสิ่งที่เจ้าของเพิ่งสั่งเอาออก
+     * 🔴 พื้นกระจก**บางกว่า**การ์ดล็อกอิน (ไม่มีเงาหนา) — ไม่งั้นกลายเป็น "สองการ์ด"
+     * ซึ่งเป็นสิ่งที่เจ้าของเพิ่งสั่งเอาออก · ฝั่งนี้เป็นคำอธิบาย ฝั่งขวาคือของที่ต้องกด
      */
     <motion.div
       {...rise(0.12)}
       className="w-full rounded-3xl p-6"
       style={{
-        background: 'rgba(255, 255, 255, .42)',
+        background: LOGIN_SCENE.glass,
         border: `1px solid ${HAIRLINE}`,
         backdropFilter: 'blur(20px) saturate(1.2)',
       }}
     >
       <p
         className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
-        style={{ color: FRONT_SCENE.muted }}
+        style={{ color: LOGIN_SCENE.muted }}
       >
         <span
           className="h-1.5 w-1.5 rounded-full animate-pulse"
-          style={{ background: FRONT_SCENE.sageStrong }}
+          style={{ background: LOGIN_SCENE.accent }}
           aria-hidden
         />
         SO RECRUIT
@@ -356,7 +368,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
       {/* คำสลับวน — ความสูงคงที่ ไม่ให้บรรทัดล่างกระตุก */}
       <h2
         className="mt-2 text-[clamp(22px,2.6vw,30px)] font-[610] leading-tight"
-        style={{ color: FRONT_SCENE.ink }}
+        style={{ color: LOGIN_SCENE.ink }}
       >
         ระบบสรรหาที่ทำให้
         <span className="relative mt-1 block h-[1.35em] overflow-hidden">
@@ -368,7 +380,7 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
                 'absolute inset-x-0 top-0 transition-all duration-500 ease-out',
                 i === wordIndex ? 'translate-y-0 opacity-100' : '-translate-y-3 opacity-0',
               )}
-              style={{ color: FRONT_SCENE.sageStrong }}
+              style={{ color: LOGIN_SCENE.accent }}
             >
               {w}
             </span>
@@ -392,7 +404,10 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
               )}
               style={
                 on
-                  ? { background: 'rgba(255,255,255,.55)', boxShadow: '0 6px 20px rgba(18,39,26,.08)' }
+                  ? {
+                      background: 'rgba(255, 255, 255, .96)',
+                      boxShadow: '0 8px 22px rgba(18, 32, 60, .10)',
+                    }
                   : undefined
               }
             >
@@ -400,8 +415,8 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
                 className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors duration-500"
                 style={
                   on
-                    ? { background: FRONT_SCENE.sageStrong, color: FRONT_SCENE.paper }
-                    : { background: 'rgba(255,255,255,.5)', color: FRONT_SCENE.muted }
+                    ? { background: LOGIN_SCENE.burgundy, color: LOGIN_SCENE.canvas }
+                    : { background: 'rgba(18, 32, 60, .07)', color: LOGIN_SCENE.muted }
                 }
                 aria-hidden
               >
@@ -410,13 +425,13 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
               <span className="min-w-0">
                 <span
                   className="block text-[14px] font-semibold leading-snug"
-                  style={{ color: FRONT_SCENE.ink }}
+                  style={{ color: LOGIN_SCENE.ink }}
                 >
                   {s.title}
                 </span>
                 <span
                   className="block text-[12.5px] leading-relaxed"
-                  style={{ color: FRONT_SCENE.muted }}
+                  style={{ color: LOGIN_SCENE.muted }}
                 >
                   {s.desc}
                 </span>
@@ -503,7 +518,7 @@ const LoginPage: React.FC = () => {
          — ทับคำสั่งเดิมที่ให้ยก mockup มาเป๊ะด้วย Instrument Sans */
       style={{
         fontFamily: "Kanit, system-ui, -apple-system, 'Segoe UI', sans-serif",
-        color: FRONT_SCENE.ink,
+        color: LOGIN_SCENE.ink,
       }}
     >
       <PhotoScene />
@@ -516,36 +531,37 @@ const LoginPage: React.FC = () => {
         <BrandMark size="sm" />
         <span
           className="text-[13px] font-semibold tracking-[0.015em]"
-          style={{ color: 'rgba(19, 37, 27, .82)' }}
+          style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
         >
           <BrandTitle />
         </span>
       </motion.div>
 
+      {/* ฉากเปิด "SO RECRUIT" พุ่งเข้าทีละตัว — สั้น · ข้ามได้ · โชว์ครั้งเดียวต่อการเปิดเบราว์เซอร์
+          (เจ้าของขอลองเล่น 4 ก.ย. 2569 · ดูเหตุผลทั้งชุดใน BrandIntro.tsx) */}
+      <BrandIntro />
+
       {/* 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้ */}
-      <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6 pb-28 pt-24">
+      <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6 pb-16 pt-20">
         {/* หัวเรื่อง — ทรงเดียวกับ mockup (ตัวใหญ่ ชิดกัน คำเน้นเป็นเขียวจาง) */}
         <motion.div {...rise(0.05)} className="max-w-[720px] text-center">
           {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
               ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em
               (นี่คือ "ปรับให้เป็นภาษาเรา" ไม่ใช่เปลี่ยนดีไซน์) */}
+          {/* 🔴 หัวเรื่องวางบน**ภาพป่า** ⇒ ต้องมีรัศมีขาวจาง ๆ หนุนหลัง ไม่งั้นตัวหนังสือ
+              กรมท่าจมไปกับเงาต้นไม้ (วัดบนจอจริง 5 ก.ย. 2569 · เคยถอดออกตอนพื้นเป็นกรมท่า) */}
           <h1
             className="text-[clamp(32px,5vw,60px)] font-[610] leading-[1.06] tracking-[-0.01em]"
-            style={{ textShadow: '0 1px 10px rgba(255,255,255,.45), 0 1px 0 rgba(255,255,255,.4)' }}
+            style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
           >
             ยินดีต้อนรับ
-            <span className="font-[560]" style={{ color: FRONT_SCENE.sageStrong }}>
+            <span className="font-[560]" style={{ color: LOGIN_SCENE.accent }}>
               กลับเข้าระบบ
             </span>
           </h1>
-          {/* ⚠️ mockup ใช้เทาจาง .62 บนพื้นครีม — ทับป่าแล้วอ่านไม่ออก
-              เข้มขึ้น + เงาขาวใต้ตัวอักษร (ยังเป็นตัวหนังสือบนภาพ ไม่ใช่กล่องทึบ) */}
           <p
             className="mx-auto mt-3.5 max-w-[52ch] text-[14.5px] leading-[1.6]"
-            style={{
-              color: 'rgba(18, 33, 24, .88)',
-              textShadow: '0 1px 8px rgba(255,255,255,.55), 0 1px 2px rgba(255,255,255,.7)',
-            }}
+            style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
           >
             {todayLabel} — เข้าสู่ระบบด้วยบัญชีองค์กรของคุณ
           </p>
@@ -557,14 +573,18 @@ const LoginPage: React.FC = () => {
             ย้ายไปเป็นลิงก์ใต้ฟอร์มล็อกอิน ยังกดจากหน้านี้ได้เหมือนเดิม
             ⚠️ คำสั่งนี้ทับของเดิม 2 ก.ย. ที่เคยสั่งว่าการ์ดนั้น "ต้องมีอยู่" */}
         <div className="grid w-full max-w-[980px] items-center gap-6 lg:grid-cols-2 lg:gap-10">
-        {/* ═══ ซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══ */}
-        <SystemIntro rise={rise} />
+        {/* ═══ ซ้าย — ระบบนี้ทำอะไรให้บ้าง ═══
+            🔴 บนมือถือสลับให้ **ฟอร์มเข้าระบบมาก่อน** (order) — จอแคบเรียงเป็นแถวเดียว
+            ถ้าปล่อยตามลำดับโค้ด คนต้องเลื่อนผ่านคำอธิบายยาว ๆ กว่าจะถึงช่องกรอก */}
+        <div className="order-2 lg:order-1">
+          <SystemIntro rise={rise} />
+        </div>
 
-        <motion.div {...rise(0.22)} className="w-full max-w-[410px]">
+        <motion.div {...rise(0.22)} className="order-1 w-full max-w-[410px] lg:order-2">
           <div className="flex h-full flex-col rounded-3xl p-6" style={GLASS_CARD}>
             {authConfig === null && configError ? (
               <div className="space-y-3 py-6 text-center">
-                <p className="text-sm" style={{ color: FRONT_SCENE.muted }}>
+                <p className="text-sm" style={{ color: LOGIN_SCENE.muted }}>
                   เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบว่า API ทำงานอยู่แล้วลองใหม่
                 </p>
                 <Button
@@ -574,7 +594,7 @@ const LoginPage: React.FC = () => {
                     setConfigAttempt((n) => n + 1);
                   }}
                   className="mx-auto min-h-11 rounded-full border-0"
-                  style={FOREST_BTN}
+                  style={PRIMARY_BTN}
                 >
                   ลองอีกครั้ง
                 </Button>
@@ -582,7 +602,7 @@ const LoginPage: React.FC = () => {
             ) : authConfig === null ? (
               <p
                 className="flex items-center justify-center gap-2 py-8 text-sm"
-                style={{ color: FRONT_SCENE.muted }}
+                style={{ color: LOGIN_SCENE.muted }}
               >
                 <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
                 กำลังโหลด…
@@ -601,7 +621,7 @@ const LoginPage: React.FC = () => {
                 {showMicrosoft ? <MicrosoftLoginButton /> : null}
 
                 {noWayIn ? (
-                  <p className="py-4 text-center text-sm" style={{ color: FRONT_SCENE.muted }}>
+                  <p className="py-4 text-center text-sm" style={{ color: LOGIN_SCENE.muted }}>
                     ยังไม่มีวิธีเข้าสู่ระบบที่เปิดใช้งาน — ติดต่อผู้ดูแลระบบ
                   </p>
                 ) : null}
@@ -615,7 +635,7 @@ const LoginPage: React.FC = () => {
                 {noWayIn ? null : (
                   <p
                     className="mt-4 text-center text-[11px]"
-                    style={{ color: 'rgba(21, 37, 28, .50)' }}
+                    style={{ color: LOGIN_SCENE.muted }}
                   >
                     เฉพาะผู้ใช้ที่ได้รับสิทธิ์ในองค์กรเท่านั้น
                   </p>
@@ -624,13 +644,13 @@ const LoginPage: React.FC = () => {
                 {/* 🔴 ทางเข้าของ **คนหางาน** — การ์ดใบเดิมถูกเอาออก (เจ้าของสั่ง 4 ก.ย. 2569)
                     แต่ทางเข้าห้ามหาย เพราะคนนอกเข้าเว็บนี้เพื่อสมัครงาน ไม่ได้มาล็อกอิน */}
                 <div className="mt-5 border-t pt-4 text-center" style={{ borderColor: HAIRLINE }}>
-                  <p className="text-[11px]" style={{ color: FRONT_SCENE.muted }}>
+                  <p className="text-[11px]" style={{ color: LOGIN_SCENE.muted }}>
                     ไม่ได้เป็นพนักงาน? มาสมัครงานได้เลย ไม่ต้องมีบัญชี
                   </p>
                   <Link
                     to="/apply"
                     className="mt-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-5 text-[13px] font-semibold transition-[filter] hover:brightness-110"
-                    style={FOREST_BTN}
+                    style={PRIMARY_BTN}
                   >
                     เปิดบอร์ดประกาศรับสมัคร
                     <ArrowRight className="h-4 w-4" aria-hidden />

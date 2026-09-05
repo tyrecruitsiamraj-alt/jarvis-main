@@ -16,6 +16,7 @@
  * คิวที่เหลือ → แถบ 6 ขั้น · ตรรกะอยู่ src/lib/homeDeck.ts + nextTask.ts (pure + เทสต์)
  */
 import React from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
@@ -171,6 +172,39 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
   </div>
 );
 
+
+/* ── หุ่นยนต์ผู้ช่วย ────────────────────────────────────────────────────────
+ * เจ้าของสั่ง 5 ก.ย. 2569: *"หุ่นยนต์เอาไปใส่ในหน้าหลัก แล้วเอาพื้นหลังหุ่นออก
+ * จะได้ดูไม่เอามาวางเฉย ๆ ดูมีชีวิตขึ้นหน่อย"*
+ *
+ * 🔴 **พื้นหลังถูกลบออกจากตัวไฟล์แล้ว** (ไม่ใช่ซ่อนด้วย CSS) — ไฟล์ต้นทางเป็นวิดีโอ
+ * พื้นขาว วางบน deck พื้นเข้มแล้วเป็นสี่เหลี่ยมขาวโพลน · แปลงเป็น **WebP เคลื่อนไหว
+ * ที่มีช่องโปร่งใส** `public/robot-mascot.webp` (0.66 MB · เล็กกว่าวิดีโอเดิม 4 เท่า)
+ * · `public/robot-mascot.png` เป็นภาพนิ่งสำหรับเครื่องที่ตั้ง "ลดการเคลื่อนไหว"
+ * · เก็บไฟล์เอง ไม่ดึงจาก CDN คนอื่น — เว็บนอกล่มแล้วหน้าหลักต้องไม่พัง
+ * 🔴 เป็นของประดับล้วน ๆ (`aria-hidden`) ไม่กินคลิก และซ่อนบนจอแคบ
+ */
+const RobotMascot: React.FC = () => {
+  const reduceMotion = useReducedMotion();
+  return (
+    <div className="pointer-events-none relative hidden w-[170px] shrink-0 justify-self-end xl:block">
+      {/* แสงนวลหนุนหลัง — ไม่ให้ตัวหุ่นลอยอยู่บนความว่าง */}
+      <span
+        className="absolute inset-x-2 bottom-2 top-8 rounded-full bg-teal-300/10 blur-2xl"
+        aria-hidden
+      />
+      <motion.img
+        src={reduceMotion ? '/robot-mascot.png' : '/robot-mascot.webp'}
+        alt=""
+        aria-hidden
+        className="relative block w-full select-none"
+        animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
+        transition={reduceMotion ? undefined : { duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </div>
+  );
+};
+
 /* ── Deck ─────────────────────────────────────────────────────────────────── */
 
 const CommandDeck: React.FC<{
@@ -226,7 +260,9 @@ const CommandDeck: React.FC<{
       </div>
 
       {/* ── Hero: หน้าปัด | งานถัดไป ── */}
-      <div className="relative grid items-center gap-8 px-6 py-8 lg:grid-cols-[auto,1fr] lg:gap-16 lg:px-9 lg:py-10">
+      {/* 🔴 หุ่นยนต์เป็น **คอลัมน์จริง** ของ grid (ไม่ใช่ absolute ทับของเดิม) —
+          จอ xl ขึ้นไปถึงจะขึ้น ไม่งั้นเบียดหัวเรื่องงานถัดไป */}
+      <div className="relative grid items-center gap-8 px-6 py-8 lg:grid-cols-[auto,1fr] lg:gap-16 lg:px-9 lg:py-10 xl:grid-cols-[auto,1fr,auto]">
         <Dial tasksLeft={loading ? null : tasks.length} status={status} />
 
         <div className="min-w-0">
@@ -333,6 +369,8 @@ const CommandDeck: React.FC<{
             </ol>
           ) : null}
         </div>
+
+        <RobotMascot />
       </div>
 
       {/* ── คิวที่เหลือ — แถวบาง คั่นเส้น ไม่มีกล่อง ── */}
