@@ -1013,19 +1013,52 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             }
           />
         ) : (
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-2xl min-w-0">
-              {/* เจ้าของเคาะ 18 ส.ค. 2569: **ยังไม่เอาโลโก้** — กลับมาใช้หัวข้อข้อความล้วน
-                  (เคยลองเปลี่ยนเป็นโลโก้ + ลายน้ำ แต่ไฟล์โลโก้ตัวจริงยังไม่มีในโปรเจกต์
-                  ถ้าจะเอากลับ ดู docs/LOGO-SO.md) */}
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-                ค้นหางานที่เหมาะกับคุณ
-              </h1>
-              <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-                เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
-                <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
-              </p>
-            </div>
+          /**
+           * ═══ หน้าสาธารณะ — หัวเรื่องแบบ "หน้าปกนิตยสาร" (เจ้าของเคาะ 5 ก.ย. 2569) ═══
+           *
+           * 🔴 หน้านี้ **ไม่มีสวิตช์ `?ui=v2` กั้น** เพราะคนที่เห็นคือผู้สมัครภายนอก
+           * ซึ่งไม่มีทางพิมพ์พารามิเตอร์เอง — เจ้าของเคาะแล้วว่า *"รื้อเลย ยอมให้คนนอกเห็นของใหม่"*
+           *
+           * ⚠️ **ข้อความเดิมอยู่ครบทุกคำ** — เพิ่มแค่ป้ายบรรทัดบนกับบรรทัดจำนวนตำแหน่ง
+           * ที่เปิดรับ (นับจากการ์ดที่หน้านี้แสดงอยู่แล้ว ผู้สมัครนับเองก็ได้ ไม่ใช่ยอดภายใน)
+           * ⚠️ ตัวเลขยังไม่พร้อม (กำลังโหลด/เส้นพัง) = **ไม่พิมพ์บรรทัดนั้นเลย** ห้ามโชว์ 0
+           */
+          <div className="rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-8 sm:py-10">
+            <p className="text-[12.5px] font-medium text-primary">รับสมัครงาน</p>
+            {/* เจ้าของเคาะ 18 ส.ค. 2569: **ยังไม่เอาโลโก้** — หัวข้อข้อความล้วน
+                (ถ้าจะเอากลับ ดู docs/LOGO-SO.md) */}
+            <h1 className="mt-2 max-w-3xl text-[clamp(28px,4.4vw,46px)] font-semibold leading-[1.15] tracking-tight text-foreground">
+              ค้นหางานที่เหมาะกับคุณ
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
+              เลือกตำแหน่งที่สนใจ แล้วกรอกใบสมัครได้ทันที{' '}
+              <span className="font-medium text-foreground">ทีมสรรหาจะติดต่อกลับ</span>
+            </p>
+            {/* 🔴 เงื่อนไขของ **หน้าสาธารณะ** ต้องไม่ผูกกับสถานะบัญชีปล่อยประกาศของเจ้าหน้าที่
+                (`ledgerReady` เป็นเรื่องฝั่งพนักงาน คนนอกไม่มีทางพร้อม) — ใช้แค่
+                "โหลดเสร็จแล้วและมีประกาศจริง" · ยังโหลดอยู่/ไม่มีเลย = ไม่พิมพ์บรรทัดนี้
+                (ห้ามโชว์ 0 ที่ยังไม่รู้จริง — กติกาเดิมของโปรเจกต์) */}
+            {!loading && filters.visibleCount > 0 ? (
+              <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-border/60 pt-5">
+                <span>
+                  <span className="block text-[26px] font-semibold leading-none tabular-nums text-foreground">
+                    {filters.visibleCount.toLocaleString('th-TH')}
+                  </span>
+                  <span className="mt-1 block text-[12px] text-muted-foreground">
+                    ประกาศที่เปิดรับตอนนี้
+                  </span>
+                </span>
+                <span>
+                  <span className="block text-[26px] font-semibold leading-none tabular-nums text-foreground">
+                    {filters.visiblePositions.toLocaleString('th-TH')}
+                  </span>
+                  <span className="mt-1 block text-[12px] text-muted-foreground">อัตราที่รับ</span>
+                </span>
+                <span className="text-[12px] text-muted-foreground">
+                  ไม่ต้องสมัครสมาชิก · กรอกใบสมัครออนไลน์ได้เลย
+                </span>
+              </div>
+            ) : null}
           </div>
         )}
 
