@@ -241,9 +241,7 @@ const TeamBoardPanel: React.FC<{
       className={cn('jarvis-deck overflow-hidden rounded-2xl', className)}
       aria-label="บอร์ดทีม — ใครทำอะไรอยู่"
     >
-      {(['tl', 'tr', 'bl', 'br'] as const).map((c) => (
-        <span key={c} className="jarvis-hud-corner" data-c={c} aria-hidden />
-      ))}
+      {/* มุมวงเล็บ HUD ถูกถอดออกพร้อมกับ deck หน้าแรก (5 ก.ย. 2569) */}
 
       <div className={cn('relative flex items-center gap-3 border-b px-6 py-3.5', T.line)}>
         <span className={cn(eyebrow, 'text-rose-900 dark:text-rose-300')}>

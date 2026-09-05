@@ -55,127 +55,46 @@ const TONE_TEXT: Record<NextTaskTone | 'ok', string> = {
 /** ป้าย mono ตัวพิมพ์ห่าง — ภาษาป้ายเดียวของทั้ง deck */
 const eyebrow = 'font-mono text-[10px] font-semibold uppercase tracking-[0.22em]';
 
-/* ── หน้าปัดวงแหวน — พระเอกของหน้า ────────────────────────────────────────── */
-
-const DIAL = 420; // viewBox หน่วยเดียว (สเกลด้วย CSS width)
-const C = DIAL / 2;
-
-/** ขีดสเกลรอบนอก 72 ขีด — ทุกขีดที่ 6 ยาวและสว่างขึ้น (แบบหน้าปัดเครื่องมือวัดจริง) */
-const TICKS = Array.from({ length: 72 }, (_, i) => {
-  const a = (Math.PI * 2 * i) / 72 - Math.PI / 2;
-  const major = i % 6 === 0;
-  const r1 = major ? 186 : 192;
-  const r2 = 199;
-  return {
-    x1: C + r1 * Math.cos(a),
-    y1: C + r1 * Math.sin(a),
-    x2: C + r2 * Math.cos(a),
-    y2: C + r2 * Math.sin(a),
-    major,
-  };
-});
-
-const HEX_POINTS = Array.from({ length: 6 }, (_, i) => {
-  const a = (Math.PI / 3) * i - Math.PI / 2;
-  return `${C + 118 * Math.cos(a)},${C + 118 * Math.sin(a)}`;
-}).join(' ');
-
+/* ── ตัวเลข "ต้องลงมือ" — พระเอกของหน้า ────────────────────────────────────
+ *
+ * 🔴 **รื้อหน้าปัดเรดาร์ทิ้ง** (5 ก.ย. 2569 — เจ้าของสั่ง *"ออกแบบใหม่เลย รื้อแบบเดิม
+ * ได้ไม่ว่าเลย"* และแจ้งว่า *"เว็บกระตุกมาก"*)
+ *
+ * ของเดิมเป็นหน้าปัดแบบเครื่องมือวัด: ขีดสเกล 72 เส้น + วงแหวนหมุน 3 ชั้นคนละทิศ
+ * + วงหายใจ + แสงเรือง ⇒ (ก) เป็นภาษาไซไฟที่ไม่เกี่ยวกับงานสรรหา
+ * (ข) **แอนิเมชันวนไม่มีวันหยุด 4 ตัวบนหน้าที่คนเปิดค้างไว้ทั้งวัน** ซึ่งกินเครื่องเปล่า ๆ
+ *
+ * ของใหม่: วงเดียว **ไม่หมุน** + ตัวเลขใหญ่ + บรรทัดสถานะ · ภาษาเดียวกับหน้า Login
+ * (วงกลมบาง ๆ สีเบอร์กันดี พื้นจาง ตัวเลขกรมท่า)
+ */
 const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: string } }> = ({
   tasksLeft,
   status,
 }) => (
-  <div className="relative mx-auto w-72 shrink-0 lg:w-80">
-    <svg viewBox={`0 0 ${DIAL} ${DIAL}`} className="block w-full" role="presentation" aria-hidden>
-      <defs>
-        <radialGradient id="deck-core-glow">
-          <stop offset="0%" stopColor="rgb(94 234 212 / 0.20)" />
-          <stop offset="60%" stopColor="rgb(56 189 248 / 0.07)" />
-          <stop offset="100%" stopColor="rgb(94 234 212 / 0)" />
-        </radialGradient>
-      </defs>
-
-      <circle cx={C} cy={C} r={190} fill="url(#deck-core-glow)" />
-
-      {/* สเกลขีดนิ่งรอบนอก */}
-      {TICKS.map((t, i) => (
-        <line
-          key={i}
-          x1={t.x1}
-          y1={t.y1}
-          x2={t.x2}
-          y2={t.y2}
-          strokeWidth={t.major ? 2 : 1}
-          className={t.major ? 'stroke-slate-500/50 dark:stroke-slate-300/40' : 'stroke-slate-400/40 dark:stroke-slate-500/30'}
-        />
-      ))}
-
-      {/* วงหมุน 3 ชั้น คนละทิศคนละความเร็ว */}
-      <g className="jarvis-core-spin-slow">
-        <circle
-          cx={C}
-          cy={C}
-          r={172}
-          fill="none"
-          strokeWidth="1"
-          className="stroke-rose-900/35 dark:stroke-rose-300/35"
-          strokeDasharray="2 9"
-        />
-      </g>
-      <g className="jarvis-core-spin-rev">
-        <circle
-          cx={C}
-          cy={C}
-          r={150}
-          fill="none"
-          strokeWidth="3"
-          className="stroke-slate-500/45 dark:stroke-slate-300/35"
-          strokeDasharray="70 34 16 34 8 46"
-          strokeLinecap="round"
-        />
-      </g>
-      <g className="jarvis-core-spin-fast">
-        <circle
-          cx={C}
-          cy={C}
-          r={128}
-          fill="none"
-          strokeWidth="1.5"
-          className="stroke-rose-900/50 dark:stroke-rose-300/50"
-          strokeDasharray="1 7"
-        />
-        <line
-          x1={C}
-          y1={C - 133}
-          x2={C}
-          y2={C - 119}
-          strokeWidth="3"
-          className="stroke-rose-900 dark:stroke-rose-300"
-          strokeLinecap="round"
-        />
-      </g>
-
-      <polygon points={HEX_POINTS} fill="none" strokeWidth="1" className="stroke-slate-500/30 dark:stroke-slate-300/25" />
-      <circle cx={C} cy={C} r={96} fill="none" strokeWidth="1" className="stroke-slate-900/15 dark:stroke-white/12" />
-      <circle cx={C} cy={C} r={78} className="fill-rose-900/5 dark:fill-rose-300/5 jarvis-core-breathe" />
-    </svg>
-
-    {/* ใจกลาง: ตัวเลขเดียว — เหลือกี่เรื่องที่ต้องลงมือ */}
-    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-      <span className={cn(eyebrow, 'text-slate-500 dark:text-slate-400')}>ต้องลงมือ</span>
-      <span className="font-mono text-6xl font-semibold tabular-nums leading-none text-slate-900 dark:text-white">
-        {tasksLeft === null ? '—' : tasksLeft}
-      </span>
-      <span className={cn(eyebrow, 'mt-1 text-slate-500 dark:text-slate-500')}>เรื่อง</span>
+  <div className="mx-auto w-60 shrink-0 lg:w-64">
+    <div
+      className={cn(
+        'relative mx-auto flex aspect-square items-center justify-center rounded-full',
+        'border border-primary/15 bg-primary/[0.04]',
+      )}
+    >
+      {/* วงในบาง ๆ อีกชั้น — ให้ตัวเลขมีที่ยืน ไม่ลอยกลางวงเปล่า */}
+      <div className="absolute inset-6 rounded-full border border-primary/10" aria-hidden />
+      <div className="relative flex flex-col items-center text-center">
+        <span className={cn(eyebrow, 'text-muted-foreground')}>ต้องลงมือ</span>
+        <span className="mt-1 text-6xl font-semibold leading-none tabular-nums text-foreground">
+          {tasksLeft === null ? '—' : tasksLeft}
+        </span>
+        <span className={cn(eyebrow, 'mt-1.5 text-muted-foreground')}>เรื่อง</span>
+      </div>
     </div>
 
-    {/* บรรทัดสถานะใต้หน้าปัด */}
-    <p className={cn('mt-1 text-center text-xs', TONE_TEXT[status.tone as NextTaskTone | 'ok'])}>
+    {/* บรรทัดสถานะใต้ตัวเลข */}
+    <p className={cn('mt-3 text-center text-xs', TONE_TEXT[status.tone as NextTaskTone | 'ok'])}>
       {status.text}
     </p>
   </div>
 );
-
-
 
 /**
  * 🔴 **นาฬิกาต้องอยู่ component ของตัวเอง** (5 ก.ย. 2569 — เจ้าของแจ้ง *"เว็บกระตุก"*)
@@ -260,10 +179,8 @@ const CommandDeck: React.FC<{
       className={cn('jarvis-deck overflow-hidden rounded-2xl', className)}
       aria-label="ศูนย์บัญชาการงานวันนี้"
     >
-      {(['tl', 'tr', 'bl', 'br'] as const).map((c) => (
-        <span key={c} className="jarvis-hud-corner" data-c={c} aria-hidden />
-      ))}
-      <div className="jarvis-hud-scan" aria-hidden />
+      {/* 🔴 มุมวงเล็บ 4 มุม + เส้นสแกนวิ่ง **ถูกถอดออก** (5 ก.ย. 2569)
+          เป็นของประดับภาษาไซไฟ และเส้นสแกนเป็นแอนิเมชันวนไม่หยุดบนหน้าที่เปิดค้างทั้งวัน */}
 
       {/* ── แถบหัว: ระบบ · สถานะสด · วันเวลาเดินวินาที ── */}
       <div className="relative flex items-center gap-3 border-b border-slate-900/10 px-6 py-3.5 dark:border-white/10 lg:px-9">
