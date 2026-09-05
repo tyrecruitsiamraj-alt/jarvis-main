@@ -6994,3 +6994,24 @@ framer-motion) · **เก็บไว้อย่างเดียวคือ
 🔴 **เคยคิดจะโชว์จำนวนตำแหน่งเปิดรับสด ๆ แล้วล้มไป** — วัดจริง `/api/public/jobs`
 ตอบ **124 KB ใน 4.7 วินาที** เพราะวิ่งไปถาม ERP ⇒ เอามาแปะหน้า Login = หน้าที่คนเปิด
 บ่อยที่สุดช้าลง และเปิดทางให้คนนอกยิงถาม ERP ฟรี ๆ (มีด่านเทสต์กันไว้แล้ว)
+
+## รอบ 107 — จานสีของหน้า Login ขึ้นเป็นจานสีของทั้งระบบ (5 ก.ย. 2569)
+
+เจ้าของสั่ง: *"หน้า Login สวยเลย เอาโทนสี เอา Style ไปปรับใช้กับทั้งระบบ ตอนนี้ระบบ
+ดูตลก ๆ · ห้ามหลุด Framework · ห้ามเขียน CSS เอง"*
+
+🔴 **ไม่ได้เพิ่มคลาส CSS ใหม่สักคลาส** — แก้ที่ตัวแปรของธีมกับ variant ของ Button
+ซึ่งเป็นที่ที่ shadcn อ่านสีอยู่แล้ว
+
+| ไฟล์ | ทำอะไร |
+| --- | --- |
+| `src/index.css` (ตัวแปรธีม) | `--primary` `--ring` `--accent` `--foreground` `--background` `--border` `--sidebar-*` `--gradient-*` → กรมท่า+เบอร์กันดี ทั้ง `:root` และ `.dark` · ธีมมืดเป็นกรมท่าเข้ม ไม่ใช่เทาดำ |
+| `src/index.css` (กฎเดิม) | เส้นเรือง HUD/deck teal → เบอร์กันดี · `--jarvis-hero` ฟ้า `#5b8bff` → `#b8434f` · `.glass-card`/`.jarvis-frost`/`.jarvis-dark-card` อมกรมท่า |
+| `src/components/ui/button.tsx` | `default` เลิกใช้หมึกดำ `--jarvis-ink` → `bg-primary` · `link` ฟ้า → `text-primary` · `outline`/`secondary`/`ghost` เลิก `bg-white/xx` ตายตัว → token ของธีม |
+| `src/components/home/CommandDeck.tsx` | หน้าปัด/ป้าย/สายพาน/ปุ่มหลัก teal+sky → กรมท่า+เบอร์กันดี (ปุ่มใช้ variant มาตรฐาน ไม่ปั้นไล่เฉดเอง) |
+| `src/components/home/TeamBoardPanel.tsx` | หัวทีม 4 สี → กรมท่าเหมือนกันหมด (สีที่ไม่มีความหมายออกจากหน้าแรก) |
+| `AppNavDrawer` · `SearchField` · `DashboardShell` · `MatchingPage` · `PreCheckPage` · `AddCandidatePage` | แถบเมนูที่เลือก · วงแหวนโฟกัส · สปินเนอร์ · ติ๊กถูก ฟ้า → token ของธีม |
+
+🔴 **สีที่มีความหมายไม่ถูกแตะ** — success/warn/danger/info/violet/orange ยังเป็นภาษา
+ของตัวเลขตามกติกา "หนึ่งความหมาย = หนึ่งสี" (เช่น 8 ช่องผลโทรบนหน้าจับคู่งาน สีของมัน
+คือความหมาย ไม่ใช่การตกแต่ง)
