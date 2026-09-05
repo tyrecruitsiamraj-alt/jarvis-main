@@ -66,7 +66,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 /** เส้นผมของการ์ด — กรมท่าจาง ๆ บนพื้นขาว (มาจาก token ที่เดียว) */
 const HAIRLINE = LOGIN_SCENE.line;
 
-/** รัศมีขาวหนุนตัวหนังสือที่วางบนภาพป่าโดยตรง (นอกการ์ด) */
+/** รัศมีขาวหนุนตัวหนังสือที่วางบนภาพป่าโดยตรง — เหลือใช้แค่ตราบริษัทมุมซ้ายบน */
 const TEXT_ON_PHOTO = '0 1px 0 rgba(255,255,255,.55), 0 2px 20px rgba(255,255,255,.75)';
 
 /** ป้ายชื่อช่องกรอก */
@@ -307,15 +307,17 @@ function OrDivider() {
  * อธิบายแบบด้วยลูกเล่นที่เท่ ๆ"*)
  *
  * **ลูกเล่นที่ใช้** — ทำจาก state + utility ล้วน ๆ:
- *   1. คำหัวเรื่องสลับวนทีละคำทุก 2.2 วิ (จาง-เลื่อนขึ้น) = บอกว่าระบบทำอะไรได้หลายอย่าง
- *   2. สี่บรรทัดงานไล่โผล่ทีละอัน แล้ว **ไฮไลต์ไล่ลงมาเรื่อย ๆ** เหมือนสายพานเดิน
- *   3. จุดสถานะเต้น (`animate-pulse` ของ Tailwind)
+ *   1. สี่บรรทัดงานไล่โผล่ทีละอัน แล้ว **ไฮไลต์ไล่ลงมาเรื่อย ๆ** เหมือนสายพานเดิน
+ *   2. จุดสถานะเต้น (`animate-pulse` ของ Tailwind)
+ *
+ * ⚠️ **เลิกใช้คำหัวเรื่องสลับวน** (เจ้าของทัก 5 ก.ย. 2569: *"ดูไม่สมูทเลย คำมันแปลก ๆ"*)
+ * ของเดิมเป็น "ระบบสรรหาที่ทำให้" + คำสลับ ⇒ ต่อกันแล้วเป็นประโยคที่คนไทยไม่พูด
+ * ("ระบบสรรหาที่ทำให้ไม่มีใบขอตกหล่น") และตอนสลับคำสองคำซ้อนกันเห็นเป็นเงา
+ * ⇒ เปลี่ยนเป็นประโยคเดียวนิ่ง ๆ ที่อ่านรู้เรื่อง ลูกเล่นเหลือที่สายพานอย่างเดียว
  * 🔴 **ไม่มี CSS ใหม่สักบรรทัด** (กฎเจ้าของ 4 ก.ย. 2569) — ใช้ `animate-in` ของ
  * tailwindcss-animate + `transition` + `animate-pulse` ที่มีอยู่แล้ว
  * 🔴 สีทุกสีมาจาก `LOGIN_SCENE` (จานสีของหน้านี้) ไม่มี hex ดิบ
  */
-const INTRO_WORDS = ['หาคนได้เร็วขึ้น', 'ไม่มีใบขอตกหล่น', 'รู้ทุกสายที่ AI โทร'] as const;
-
 const INTRO_STEPS = [
   { title: 'รับใบขอจากหน่วยงาน', desc: 'ทุกใบบอกเองว่าค้างมากี่วัน ใบไหนต้องรีบ' },
   { title: 'ปล่อยประกาศ + จับคู่คน', desc: 'ลงประกาศทีเดียวหลายช่องทาง แล้ว AI แนะนำคนให้' },
@@ -324,19 +326,14 @@ const INTRO_STEPS = [
 ] as const;
 
 const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) => {
-  const [wordIndex, setWordIndex] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     // ผู้ใช้ตั้งค่าไม่เอาแอนิเมชัน = อยู่นิ่ง ๆ (กติกาเดิมของโปรเจกต์)
     if (reduceMotion) return;
-    const w = window.setInterval(() => setWordIndex((n) => (n + 1) % INTRO_WORDS.length), 2200);
-    const s2 = window.setInterval(() => setActiveStep((n) => (n + 1) % INTRO_STEPS.length), 1600);
-    return () => {
-      window.clearInterval(w);
-      window.clearInterval(s2);
-    };
+    const t = window.setInterval(() => setActiveStep((n) => (n + 1) % INTRO_STEPS.length), 1600);
+    return () => window.clearInterval(t);
   }, [reduceMotion]);
 
   return (
@@ -348,7 +345,8 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
       {...rise(0.12)}
       className="w-full rounded-3xl p-6"
       style={{
-        background: LOGIN_SCENE.glass,
+        /* ทึบพอให้ตัวหนังสืออ่านออกบนกิ่งไม้ที่ลายพร้อย (เจ้าของทัก 5 ก.ย. 2569) */
+        background: LOGIN_SCENE.glassStrong,
         border: `1px solid ${HAIRLINE}`,
         backdropFilter: 'blur(20px) saturate(1.2)',
       }}
@@ -365,28 +363,15 @@ const SystemIntro: React.FC<{ rise: ReturnType<typeof useRise> }> = ({ rise }) =
         SO RECRUIT
       </p>
 
-      {/* คำสลับวน — ความสูงคงที่ ไม่ให้บรรทัดล่างกระตุก */}
       <h2
-        className="mt-2 text-[clamp(22px,2.6vw,30px)] font-[610] leading-tight"
+        className="mt-2 text-[clamp(20px,2.2vw,26px)] font-[610] leading-snug"
         style={{ color: LOGIN_SCENE.ink }}
       >
-        ระบบสรรหาที่ทำให้
-        <span className="relative mt-1 block h-[1.35em] overflow-hidden">
-          {INTRO_WORDS.map((w, i) => (
-            <span
-              key={w}
-              aria-hidden={i !== wordIndex}
-              className={cn(
-                'absolute inset-x-0 top-0 transition-all duration-500 ease-out',
-                i === wordIndex ? 'translate-y-0 opacity-100' : '-translate-y-3 opacity-0',
-              )}
-              style={{ color: LOGIN_SCENE.accent }}
-            >
-              {w}
-            </span>
-          ))}
-        </span>
+        รวมงานสรรหาไว้ที่เดียว
       </h2>
+      <p className="mt-1.5 text-[13px] leading-relaxed" style={{ color: LOGIN_SCENE.muted }}>
+        ตั้งแต่รับใบขอ ปล่อยประกาศ ให้ AI โทรตาม จนถึงวันเริ่มงาน
+      </p>
 
       {/* สายพาน 4 ขั้น — ไฮไลต์ไล่ลงมาเรื่อย ๆ ให้เห็นว่างานไหลยังไง */}
       <ol className="mt-5 space-y-1.5">
@@ -544,26 +529,36 @@ const LoginPage: React.FC = () => {
       {/* 🔴 เนื้อหาเลื่อนได้ — mockup ล็อกจอไว้ ซึ่งทำให้มือถือเข้าระบบไม่ได้ */}
       <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6 pb-16 pt-20">
         {/* หัวเรื่อง — ทรงเดียวกับ mockup (ตัวใหญ่ ชิดกัน คำเน้นเป็นเขียวจาง) */}
-        <motion.div {...rise(0.05)} className="max-w-[720px] text-center">
+        {/* 🔴 หัวเรื่องอยู่บน **แผ่นกระจกขาว** ไม่ใช่วางบนภาพป่าเปล่า ๆ
+            (เจ้าของทัก 5 ก.ย. 2569: *"อ่านไม่รู้เรื่องเลย"*) — เคยแก้ด้วยรัศมีขาวใต้ตัวอักษร
+            แต่บนกิ่งไม้ที่ลายพร้อยยังอ่านยากอยู่ดี · แผ่นรองทึบพอให้ตัวหนังสืออ่านออกทุกจุดของภาพ */}
+        <motion.div
+          {...rise(0.05)}
+          className="w-full max-w-[720px] rounded-3xl px-6 py-5 text-center"
+          style={{
+            background: LOGIN_SCENE.glassStrong,
+            border: `1px solid ${HAIRLINE}`,
+            boxShadow: '0 18px 50px rgba(18, 32, 60, .12)',
+            backdropFilter: 'blur(22px) saturate(1.2)',
+            WebkitBackdropFilter: 'blur(22px) saturate(1.2)',
+          }}
+        >
           {/* ⚠️ mockup ตั้ง `letter-spacing:-.045em` ซึ่งเป็นค่าของฟอนต์อังกฤษ —
-              ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em
-              (นี่คือ "ปรับให้เป็นภาษาเรา" ไม่ใช่เปลี่ยนดีไซน์) */}
-          {/* 🔴 หัวเรื่องวางบน**ภาพป่า** ⇒ ต้องมีรัศมีขาวจาง ๆ หนุนหลัง ไม่งั้นตัวหนังสือ
-              กรมท่าจมไปกับเงาต้นไม้ (วัดบนจอจริง 5 ก.ย. 2569 · เคยถอดออกตอนพื้นเป็นกรมท่า) */}
+              ตัวไทยสระ/วรรณยุกต์ซ้อนกันจนอ่านยาก จึงคลายเหลือ -0.01em */}
           <h1
-            className="text-[clamp(32px,5vw,60px)] font-[610] leading-[1.06] tracking-[-0.01em]"
-            style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
+            className="text-[clamp(28px,4.2vw,48px)] font-[610] leading-[1.12] tracking-[-0.01em]"
+            style={{ color: LOGIN_SCENE.ink }}
           >
             ยินดีต้อนรับ
             <span className="font-[560]" style={{ color: LOGIN_SCENE.accent }}>
-              กลับเข้าระบบ
+              กลับมา
             </span>
           </h1>
           <p
-            className="mx-auto mt-3.5 max-w-[52ch] text-[14.5px] leading-[1.6]"
-            style={{ color: LOGIN_SCENE.ink, textShadow: TEXT_ON_PHOTO }}
+            className="mx-auto mt-2.5 max-w-[52ch] text-[14.5px] leading-[1.6]"
+            style={{ color: LOGIN_SCENE.muted }}
           >
-            {todayLabel} — เข้าสู่ระบบด้วยบัญชีองค์กรของคุณ
+            {todayLabel} · เข้าสู่ระบบด้วยบัญชีองค์กร
           </p>
         </motion.div>
 
