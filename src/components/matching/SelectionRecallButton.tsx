@@ -48,7 +48,8 @@ const SelectionRecallButton: React.FC<{
         }}
         title="ค้นจากคนที่สมัครไว้แล้วแต่เคยตอบไม่สนใจงานอื่น แล้วส่ง AI โทรทันที"
         className={cn(
-          'inline-flex w-full items-center justify-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+          // Wave 2.2: มือถือสูงอย่างน้อย 36px (min-h-9) แตะติดง่าย · เดสก์ท็อปเท่าเดิม
+          'inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-50 sm:min-h-0',
           TONE.violet.outline,
         )}
       >

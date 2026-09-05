@@ -154,7 +154,10 @@ const FollowPlanningCalendar: React.FC<{
 
       {/* คำอธิบายสี — 🔴 สีแปลว่า "เรื่องดีหรือเรื่องร้าย" ไม่ใช่ "ข้อมูลมาถึงหรือยัง"
           (เจ้าของทัก 1 ก.ย. 2569: *"ไม่ไปแล้วแต่เป็นเขียวเนี่ยนะ"*) */}
-      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+      {/* Wave 2.1 (5 ก.ย. 2569): ตัวหนังสือ 10px เล็กเกินอ่าน → ขั้นต่ำ `text-xs` ·
+          มือถือเรียง 2 คอลัมน์ให้ขึ้นบรรทัดใหม่สวย ๆ (เดิมยัดแถวเดียวจนเบียด)
+          · sm ขึ้นไปกลับเป็นแถวเดียวไหลตามเดิม · คำอธิบายครบ 6 ข้อเท่าเดิม */}
+      <div className="mb-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground sm:flex sm:flex-wrap sm:items-center">
         {(
           [
             ['success', 'จบดี — ไป/ยืนยันว่าไป'],
@@ -165,8 +168,8 @@ const FollowPlanningCalendar: React.FC<{
             ['neutral', 'ยังไม่ถึงเวลา / ยกเลิกทิ้ง (ขีดฆ่า)'],
           ] as const
         ).map(([tone, label]) => (
-          <span key={tone} className="inline-flex items-center gap-1">
-            <span className={cn('h-2.5 w-2.5 rounded-sm', TONE[tone].dot)} aria-hidden />
+          <span key={tone} className="flex items-start gap-1 leading-snug sm:items-center">
+            <span className={cn('mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm sm:mt-0', TONE[tone].dot)} aria-hidden />
             {label}
           </span>
         ))}

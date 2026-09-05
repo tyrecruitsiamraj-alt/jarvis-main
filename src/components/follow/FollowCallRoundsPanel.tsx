@@ -32,7 +32,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Phone, RefreshCw } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { HelpCircle, Phone, RefreshCw } from 'lucide-react';
+
+/**
+ * คำอธิบายนิยาม "รอบโทรที่" — **ข้อความเดียว ใช้สองที่** (เดสก์ท็อปโชว์เต็ม ·
+ * มือถือพับหลังไอคอน ?) ห้ามพิมพ์ซ้ำสองชุด ไม่งั้นวันหนึ่งจะแก้ได้แค่ที่เดียว
+ */
+const ROUND_HELP_TEXT =
+  'รอบโทรที่ 1/2/3 = ลำดับสายของคนนั้น ตามที่เลือกไว้ตอนเพิ่ม (วันเวลาแต่ละสายตั้งเองได้ ไม่มีระยะห่างตายตัว) · กดรอบไหนก็เห็นเฉพาะคนที่อยู่รอบนั้น แล้วกดกล่องเพื่อดูรายชื่อ';
 
 /**
  * แผงการโทรของหน้า Follow — **3 รอบ** (เจ้าของสั่ง 18 ส.ค. 2569)
@@ -185,20 +193,38 @@ export default function FollowCallRoundsPanel({
   return (
     <div className={cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card)}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className={cn('text-sm font-bold', DASH.cellStrong)}>การโทรของงาน Follow</h2>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h2 className={cn('text-sm font-bold', DASH.cellStrong)}>การโทรของงาน Follow</h2>
+            {/* Wave 2.1 (5 ก.ย. 2569): บนมือถือคำอธิบายยาวกินจอไปทั้งหน้าจอแรก
+                ⇒ พับไว้หลังไอคอน (?) — ข้อความ **ตัวเดียวกันเป๊ะ** ไม่มีคำไหนหาย
+                เดสก์ท็อป (sm ขึ้นไป) ยังโชว์เต็มเหมือนเดิม จึงซ่อนไอคอนที่ sm */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="คำอธิบายรอบโทรที่ 1/2/3"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary sm:hidden"
+                >
+                  <HelpCircle className="h-4 w-4" aria-hidden />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-72 text-xs leading-relaxed">
+                {ROUND_HELP_TEXT}
+              </PopoverContent>
+            </Popover>
+          </div>
           {/* 🔴 นิยาม "รอบโทรที่" ต้องอ่านออกจากหน้านี้เลย (Haiku รอบสองถาม
               "สายที่ 1/2/3 ห่างกันกี่วัน" — คำตอบคือไม่ตายตัว คนตั้งเองตอนเพิ่ม)
               ⚠️ เปลี่ยนคำ "สายที่" → "รอบโทรที่" (เจ้าของเคาะ 5 ก.ย. 2569) */}
-          <p className={cn('text-[11px]', DASH.muted)}>
-            รอบโทรที่ 1/2/3 = ลำดับสายของคนนั้น ตามที่เลือกไว้ตอนเพิ่ม (วันเวลาแต่ละสายตั้งเองได้
-            ไม่มีระยะห่างตายตัว) · กดรอบไหนก็เห็นเฉพาะคนที่อยู่รอบนั้น แล้วกดกล่องเพื่อดูรายชื่อ
-          </p>
+          <p className={cn('hidden text-[11px] sm:block', DASH.muted)}>{ROUND_HELP_TEXT}</p>
         </div>
         {/* มุมขวาบน: ปุ่มเสริมจากหน้าแม่ (เพิ่มเรื่อง/เพิ่มเจ้าหน้าที่) + รีเฟรช
             ⚠️ ปุ่มปฏิทินการโทรถูกเอาออกทั้งชุด (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-10) —
-            การกรองรายวันย้ายไปที่ "ตัวกรอง" ของลิสต์ด้านล่างแล้ว (วันที่/ช่วงเวลา/เจ้าของงาน) */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+            การกรองรายวันย้ายไปที่ "ตัวกรอง" ของลิสต์ด้านล่างแล้ว (วันที่/ช่วงเวลา/เจ้าของงาน)
+            ⚠️ Wave 2.1: เดิม `shrink-0` ทำให้บนจอ 375px ปุ่มตัวท้ายถูกตัดหายไปนอกกรอบ
+            (กดไม่ได้เลย) — ปล่อยให้ยืดหยุ่นแล้วขึ้นบรรทัดใหม่แทน */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {headerExtras}
           <button
             type="button"
@@ -216,7 +242,9 @@ export default function FollowCallRoundsPanel({
       {/* แท็บ "การโทรครั้งที่ 1/2/3" (เจ้าของสั่ง 18 ส.ค. 2569 บ่าย) —
           กดแล้ว visual เปลี่ยนตามรอบ · สีบนแท็บ = สถานะของรอบนั้น ไม่ใช่แค่ที่เลือกอยู่
           จะได้กวาดตาเห็นตั้งแต่ยังไม่กดว่ารอบไหนมีของค้าง */}
-      <div className="grid grid-cols-3 gap-1.5">
+      {/* Wave 2.1: จอ < sm เรียงตั้ง 1 คอลัมน์ (การ์ดละบรรทัดกระชับ) — เดิม 3 ใบเรียงนอน
+          บน 375px ป้ายถูกตัดเหลือ "รอบโทร…" ทั้งสามใบ อ่านไม่ออกว่าใบไหนรอบไหน */}
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
         {[1, 2, 3].map((slot) => {
           const counts = countsByRound.get(slot);
           const rows = roundRows.get(slot) ?? [];
@@ -235,17 +263,26 @@ export default function FollowCallRoundsPanel({
                 active ? cn(tone.soft, 'ring-2 ring-ring') : cn(TONE.neutral.soft, TONE.neutral.softHover),
               )}
             >
-              <span className="flex items-center gap-1.5">
-                <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                <span className={cn('truncate text-[11px] font-bold', active ? tone.value : DASH.cellStrong)}>
-                  {roundTabLabel(slot)}
+              {/* มือถือ: ป้าย + ตัวเลขอยู่บรรทัดเดียวกัน (การ์ดเตี้ย เห็นครบสามรอบโดยไม่ต้องเลื่อน)
+                  · sm ขึ้นไป: กลับเป็นซ้อนบน-ล่างเหมือนเดิมทุกอย่าง */}
+              <span className="flex items-center justify-between gap-2 sm:block">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                  <span className={cn('text-[11px] font-bold sm:truncate', active ? tone.value : DASH.cellStrong)}>
+                    {roundTabLabel(slot)}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'block shrink-0 text-lg font-bold tabular-nums sm:mt-0.5',
+                    active ? tone.num : DASH.cellStrong,
+                  )}
+                >
+                  {rows.length.toLocaleString('th-TH')}
+                  <span className={cn('ml-1 text-[10px] font-normal', DASH.muted)}>คน</span>
                 </span>
               </span>
-              <span className={cn('mt-0.5 block text-lg font-bold tabular-nums', active ? tone.num : DASH.cellStrong)}>
-                {rows.length.toLocaleString('th-TH')}
-                <span className={cn('ml-1 text-[10px] font-normal', DASH.muted)}>คน</span>
-              </span>
-              <span className={cn('block truncate text-[10px]', DASH.muted)}>
+              <span className={cn('block text-[10px] sm:truncate', DASH.muted)}>
                 {/* 🔴 "ไม่มีของค้าง" กว้างเกินจริง — มันดูแค่ **ผลโทรของรอบนี้**
                     ไม่ได้ดูว่ามีใครเลยเวลานัดแล้วหรือยัง · จอเคยขึ้น "ไม่มีของค้าง"
                     คู่กับ "เลยเวลานัดแล้ว 4" บนหน้าเดียวกัน (audit 26 ส.ค. 2569) */}
@@ -262,7 +299,7 @@ export default function FollowCallRoundsPanel({
                   .map((r) => `${r.label} ${r.count.toLocaleString('th-TH')}`)
                   .join(' · ');
                 return (
-                  <span className={cn('block truncate text-[10px] font-semibold', tone.value)}>
+                  <span className={cn('block text-[10px] font-semibold sm:truncate', tone.value)}>
                     {head}
                     {res.length > 2 ? ` +${res.length - 2}` : ''}
                   </span>
@@ -311,7 +348,9 @@ export default function FollowCallRoundsPanel({
               );
             })()}
 
-            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+            {/* Wave 2.1: มือถือ 2 คอลัมน์ (ช่องกว้างพอให้ป้ายอ่านจบ) — เดิม 4 ช่องต่อแถว
+                บน 375px ป้ายถูกตัดเป็น "ทั้งห…" "กำลัง…" "โทรไม่…" · ช่องครบ 7 ช่องเท่าเดิม */}
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-7">
               {FOLLOW_ROUND_BUCKETS.map((b) => {
                 const n = counts[b];
                 const vis = bucketVisual(b, n);
@@ -342,7 +381,7 @@ export default function FollowCallRoundsPanel({
                       />
                       <span
                         className={cn(
-                          'truncate text-[10px] font-semibold',
+                          'text-[10px] font-semibold sm:truncate',
                           tone.value,
                           vis.muted && 'opacity-60',
                         )}

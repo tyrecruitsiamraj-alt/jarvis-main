@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Download, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, Download, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import type { DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
@@ -133,6 +136,13 @@ const DashboardShell: React.FC<Props> = ({
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
   const [showExecInsights, setShowExecInsights] = useState(false);
   const [showLifecycle, setShowLifecycle] = useState(false);
+  /**
+   * Wave 2.3 (5 ก.ย. 2569): บนมือถือแผงตัวกรองกินจอแรกทั้งจอ — คนใหม่เปิดหน้ามา
+   * เห็นแต่ dropdown ยังไม่เห็นตัวเลขสักตัว ⇒ **พับไว้ ค่าตั้งต้นปิด**
+   * ⚠️ ตัวกรองทุกช่องยังอยู่ครบ ไม่มีตัวไหนถูกถอด · เดสก์ท็อป (md ขึ้นไป) เหมือนเดิมทุกอย่าง
+   */
+  const isMobile = useIsMobile();
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const activeSiteCount = data.unitOverview.filter((u) => u.open > 0).length;
   const siteOpenTotal = data.unitOverview.reduce((sum, u) => sum + u.open, 0);
@@ -155,6 +165,20 @@ const DashboardShell: React.FC<Props> = ({
     return null;
   };
 
+  /** แผงตัวกรองชุดเดียว — มือถือเอาไปใส่ Collapsible · เดสก์ท็อปวางตรง ๆ เหมือนเดิม */
+  const filterBar = (
+    <DashboardFilterBar
+      dateRange={dateRange}
+      onDateRangeChange={onDateRangeChange}
+      unitFilters={unitFilters}
+      onUnitFiltersChange={onUnitFiltersChange}
+      siamrajPrimary={siamrajPrimary}
+      filterOptions={filterOptions}
+      queueStatus={filters.queueStatus}
+      onQueueStatusChange={(queueStatus: DashboardStatusFilter) => onFiltersChange({ queueStatus })}
+      lockedDepartmentCode={lockedDepartmentCode}
+    />
+  );
 
   return (
     <div className="min-h-full bg-slate-100/60 dark:bg-transparent pb-24">
@@ -213,20 +237,57 @@ const DashboardShell: React.FC<Props> = ({
 
       <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-5">
         {loading ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400 py-8 text-center">กำลังโหลดข้อมูล…</p>
+          /**
+           * Wave 2.3: โหลดครั้งแรกเคยเป็นจอเปล่า + บรรทัด "กำลังโหลดข้อมูล…" บรรทัดเดียว
+           * ⇒ คนอ่านไม่รู้ว่าหน้านี้จะมีอะไร (หรือพังไปแล้ว) · ใส่โครงกระดูกทรงเดียวกับ
+           * ของจริง (ตัวกรอง + hero + การ์ด KPI) — **ไม่มีตัวเลขปลอมสักตัว**
+           */
+          <div
+            className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5"
+            aria-busy="true"
+          >
+            <Skeleton className="hidden h-[28rem] w-full rounded-2xl lg:block" />
+            <div className="space-y-5 min-w-0">
+              <p className="text-sm text-slate-600 dark:text-slate-400">กำลังโหลดข้อมูล…</p>
+              <Skeleton className="h-40 w-full rounded-2xl" />
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+                ))}
+              </div>
+              <Skeleton className="h-64 w-full rounded-2xl" />
+            </div>
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] gap-5">
-            <DashboardFilterBar
-              dateRange={dateRange}
-              onDateRangeChange={onDateRangeChange}
-              unitFilters={unitFilters}
-              onUnitFiltersChange={onUnitFiltersChange}
-              siamrajPrimary={siamrajPrimary}
-              filterOptions={filterOptions}
-              queueStatus={filters.queueStatus}
-              onQueueStatusChange={(queueStatus: DashboardStatusFilter) => onFiltersChange({ queueStatus })}
-              lockedDepartmentCode={lockedDepartmentCode}
-            />
+            {isMobile ? (
+              <Collapsible open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      DASH.card,
+                      'flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100',
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                      ตัวกรอง
+                    </span>
+                    <span className="flex items-center gap-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+                      {mobileFiltersOpen ? 'ซ่อน' : 'กดเพื่อกรอง'}
+                      <ChevronDown
+                        className={cn('h-4 w-4 transition-transform', mobileFiltersOpen && 'rotate-180')}
+                        aria-hidden
+                      />
+                    </span>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">{filterBar}</CollapsibleContent>
+              </Collapsible>
+            ) : (
+              filterBar
+            )}
 
             <div className="space-y-5 min-w-0">
               {/* hero เข้ม "ต้องลงมือตอนนี้" — ถังอายุเดิมยกขึ้นมาไว้บนสุด + แท่งเข้ามารายเดือน */}

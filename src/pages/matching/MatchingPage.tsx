@@ -384,8 +384,12 @@ function proposalStatusClass(status: ProposalStatus): string {
   return proposalStatusChip(status);
 }
 
+/**
+ * Wave 2.2 (5 ก.ย. 2569): เดิม `min-h-8` = 32px — ผู้ทดสอบมือถือทักว่าปุ่มเล็กแตะยาก
+ * ⇒ มือถือดันเป็น `min-h-9` (36px) · จอ sm ขึ้นไปกลับเป็น 32px ความหนาแน่นเท่าเดิม
+ */
 const CANDIDATE_ACTION_BUTTON_CLASS =
-  'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
+  'inline-flex min-h-9 sm:min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
 
 /**
  * ปุ่มเปลี่ยนสถานะผู้สมัคร — สีมาจากโทนของสถานะที่แหล่งกลาง (PROPOSAL_STATUS_TONE)
@@ -2386,7 +2390,8 @@ const MatchingPage: React.FC = () => {
                 disabled={serverListLoading}
                 aria-pressed={c.active}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50',
+                  // Wave 2.2: มือถือให้สูงอย่างน้อย 36px (min-h-9) แตะติดง่าย · เดสก์ท็อปเท่าเดิม
+                  'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 sm:min-h-0',
                   c.active ? cn(t.soft, t.value, 'ring-2 ring-ring') : cn(t.soft, t.value, t.softHover),
                 )}
               >
