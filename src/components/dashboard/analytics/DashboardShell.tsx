@@ -162,7 +162,9 @@ const DashboardShell: React.FC<Props> = ({
         <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-4 space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100">Request Control Tower</h1>
+              {/* หัวหลักเป็นไทย + คง EN เดิมเป็นบรรทัดรองตัวเล็กจาง (เจ้าของเคาะ 5 ก.ย. 2569) */}
+              <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100">ศูนย์ควบคุมใบขอ</h1>
+              <p className="text-xs font-medium text-slate-400 dark:text-slate-500">Request Control Tower</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:min-w-[420px]">
               <div className="relative flex-1">

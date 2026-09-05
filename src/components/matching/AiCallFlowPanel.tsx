@@ -112,7 +112,7 @@ function CallCell({
     >
       {body}
       <span className={cn('mt-0.5 block text-[9px]', v2 ? 'text-muted-foreground' : 'text-slate-500')}>
-        กดดูรายชื่อ
+        กดดูรายชื่อ (เปิดในหน้านี้)
       </span>
     </button>
   );
@@ -143,7 +143,7 @@ function CellRow({
   return (
     <div className="mt-2 grid gap-2 lg:grid-cols-[3fr_5fr]">
       <div>
-        <p className={groupLabel}>สายอยู่ตรงไหน</p>
+        <p className={groupLabel}>ตอนนี้สายไปถึงขั้นไหน</p>
         <div className={WHERE_GRID}>
           {cells.length === 0
             ? null
@@ -158,7 +158,7 @@ function CellRow({
         </div>
       </div>
       <div>
-        <p className={groupLabel}>คุยแล้วผลเป็นยังไง</p>
+        <p className={groupLabel}>ผลจากคนที่คุยแล้ว</p>
         <div className={RESULT_GRID}>
           {result.map((c) => (
             <CallCell
@@ -257,7 +257,7 @@ export default function AiCallFlowPanel({
 
       {/* 🔴 บรรทัดกันคนบวกเลขเอง — ต้องครอบ **ทุก** ช่อง ไม่ใช่ยกตัวอย่างเดียว
           (Haiku รอบสองยังบวก "กำลังโทร 40 + รอใหม่ 39 = 79 ≠ 77" เพราะตัวอย่างเดิม
-          พูดถึงแต่ฝั่งผล เลยเข้าใจว่าฝั่ง "สายอยู่ตรงไหน" ต้องบวกลงตัว) */}
+          พูดถึงแต่ฝั่งผล เลยเข้าใจว่าฝั่ง "ตอนนี้สายไปถึงขั้นไหน" ต้องบวกลงตัว) */}
       <p className={cn('mt-2 text-[10px]', v2 ? 'text-muted-foreground' : 'text-slate-500')}>
         ทุกช่องนับคนซ้ำกันได้ — กำลังโทรอยู่ก็ถูกนัดให้ AI โทรใหม่ได้ · รับสายแล้ว
         &ldquo;สนใจ&rdquo; นับทั้งสองช่อง ⇒ <b>ห้ามเอาช่องไหนบวกกันเทียบ &ldquo;ทั้งหมด&rdquo;</b>{' '}

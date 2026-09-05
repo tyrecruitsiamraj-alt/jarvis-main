@@ -117,8 +117,10 @@ describe('actionableBuckets / actionableSummary', () => {
 });
 
 describe('roundTabLabel', () => {
+  // เจ้าของเคาะคำใหม่ 5 ก.ย. 2569 (Wave 1 ของ docs/plan-quality-100-2569-09-05.md):
+  // "สายที่ N" → "รอบโทรที่ N" ให้อ่านเข้าใจง่ายขึ้น
   it('คำเต็มตามที่เจ้าของสั่ง ไม่ใช่ "รอบ N"', () => {
-    expect(roundTabLabel(1)).toBe('สายที่ 1');
-    expect(roundTabLabel(3)).toBe('สายที่ 3');
+    expect(roundTabLabel(1)).toBe('รอบโทรที่ 1');
+    expect(roundTabLabel(3)).toBe('รอบโทรที่ 3');
   });
 });

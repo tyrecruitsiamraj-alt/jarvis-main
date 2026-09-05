@@ -3,6 +3,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
+import { roundTabLabel } from '@/lib/followRoundVisual';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowMonthRows,
@@ -103,7 +104,7 @@ const FollowPlanningCalendar: React.FC<{
         </span>
         {activeRound ? (
           <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
-            กำลังดู สายที่ {activeRound} · เฉพาะเดือนนี้
+            กำลังดู {roundTabLabel(activeRound)} · เฉพาะเดือนนี้
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-1">
@@ -174,7 +175,7 @@ const FollowPlanningCalendar: React.FC<{
       {monthRows.length === 0 ? (
         <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.neutral.soft)}>
           เดือนนี้ไม่มีนัดโทรของใครเลย
-          {activeRound ? ` ใน "สายที่ ${activeRound}" — กดสายอื่นข้างบนเพื่อดูสายนั้น` : ''}
+          {activeRound ? ` ใน "${roundTabLabel(activeRound)}" — กดรอบอื่นข้างบนเพื่อดูรอบนั้น` : ''}
         </p>
       ) : (
         <div ref={scrollRef} className="overflow-x-auto rounded-xl border border-border">

@@ -1555,11 +1555,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       คำที่ผู้สมัครทั่วไปอ่านรู้เรื่อง เพราะโผล่บนหน้าสมัครสาธารณะด้วย */}
                   {job.location_address?.trim() || 'ไม่ได้ระบุสถานที่'}
                 </p>
-                <div className="flex flex-wrap items-center gap-3 text-xs">
+                {/**
+                 * 🔴 มือถือ: แถวนี้พับเหลือแถวเดียวเลื่อนซ้าย-ขวาได้ (เจ้าของเคาะ 5 ก.ย. 2569
+                 * — Haiku ทดสอบมือถือให้ 62/100 เพราะปุ่ม "สมัครงาน" ต้องเลื่อนหาไกลเกินไป)
+                 * ⚠️ ข้อมูลห้ามหาย — ทุกฟิลด์ยังอยู่ครบ แค่ไม่ตกลงบรรทัดใหม่บนจอแคบ
+                 * จอกว้างขึ้น (`sm:`) กลับไปพับหลายบรรทัดตามเดิม
+                 */}
+                <div className="flex flex-nowrap items-center gap-3 overflow-x-auto text-xs sm:flex-wrap sm:overflow-visible">
                   {/* ยอดรายเดือน = ค่าแรงหลัก + รายได้มั่นคง (เจ้าของสั่ง 16 ส.ค. 2569)
                       ⚠️ ถอยไป total_income เมื่อคิดไม่ได้ — แต่ตัวนั้นบางใบเป็น**อัตรารายวัน**
                       (410 = ค่าแรง/วัน · 20 จาก 200 ใบ) จึงไม่ติดคำว่า "/เดือน" ให้ */}
-                  <span className="inline-flex items-center gap-1 text-foreground font-semibold">
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-foreground font-semibold">
                     <Banknote className="h-3.5 w-3.5 text-success" />
                     {/* breakdown ที่เจ้าหน้าที่ตั้งเองมาก่อนเสมอ — บอกหน่วยตามที่ตั้ง (วัน/เดือน) */}
                     {job.income_display
@@ -1568,7 +1574,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         ? `฿${job.monthly_income.toLocaleString('th-TH')} / เดือน`
                         : `฿${job.total_income.toLocaleString('th-TH')}`}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" />
                     ต้องการ {formatYmdDmyBe(job.required_date)}
                   </span>
@@ -1576,7 +1582,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       ⚠️ ERP กรอกมาแค่ ~40% ของใบขอ · ไม่มีข้อมูล = ไม่ขึ้นบรรทัดนี้
                       ห้ามขึ้นว่า "ไม่ระบุ" — การ์ดนี้โผล่บนหน้าสมัครสาธารณะด้วย */}
                   {job.boss_nationality?.trim() ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground">
                       <Flag className="h-3.5 w-3.5" />
                       นายสัญชาติ {job.boss_nationality.trim()}
                     </span>
@@ -1588,9 +1594,10 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 {/* ชิปสวัสดิการ = ของจาก ERP (อัตราจริง) + ของที่เจ้าหน้าที่ติ๊กเพิ่มเอง
                     เรียง ERP ก่อนเพราะมีตัวเลขจริงกำกับ น่าเชื่อกว่า */}
                 {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1">
+                  // 🔴 มือถือ: พับเหลือแถวเดียวเลื่อนได้เหมือนแถวเงินเดือนด้านบน (เจ้าของเคาะ 5 ก.ย. 2569)
+                  <div className="flex flex-nowrap items-center gap-1 overflow-x-auto sm:flex-wrap sm:overflow-visible">
                     {[...(job.benefits ?? []), ...benefitDisplayLabels(job.extra_benefits)].map((b) => (
-                      <span key={b} className={TONE.success.chip}>
+                      <span key={b} className={cn('shrink-0 whitespace-nowrap', TONE.success.chip)}>
                         {b}
                       </span>
                     ))}

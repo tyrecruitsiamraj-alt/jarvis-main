@@ -857,7 +857,7 @@ const RmWorkspace: React.FC<{
                                 TONE.violet.outline,
                               )}
                             >
-                              ส่ง AI โทร
+                              ส่ง AI โทร (ยิงสายจริง)
                             </button>
                           </span>
                         </li>

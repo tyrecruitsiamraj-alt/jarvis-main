@@ -38,7 +38,13 @@ export function jobBoardCardTitle(job: JobRequest): string {
 /** บรรทัดรองใต้หัวข้อ */
 export function unitRequestCardSubtitle(job: JobRequest): string {
   const parts: string[] = [];
-  const action = job.request_action_name || JOB_TYPE_LABELS[job.job_type];
+  // 🔴 มี `request_action_name` จริงจาก ERP (เช่น ลาออก/เปิดไซต์/พ้นสภาพ) → เติมคำนำหน้า
+  // "สาเหตุที่ขอ: " ให้ (เจ้าของเคาะ 5 ก.ย. 2569 — เดิมขึ้นลอย ๆ ไม่มีใครรู้ว่าคืออะไร)
+  // ⚠️ ค่าจริงจาก ERP ห้ามแปลง เติมได้แค่คำนำหน้า · ไม่มีค่า ERP จึงถอยไปใช้ JOB_TYPE_LABELS
+  // (เป็นประเภทงาน ไม่ใช่สาเหตุ) ⇒ ไม่ติดคำนำหน้านี้
+  const action = job.request_action_name
+    ? `สาเหตุที่ขอ: ${job.request_action_name}`
+    : JOB_TYPE_LABELS[job.job_type];
   if (action) parts.push(action);
   if (job.job_description_code_1) parts.push(job.job_description_code_1);
   if (job.job_description_code_2) parts.push(job.job_description_code_2);
@@ -55,7 +61,11 @@ export function unitRequestCardSubtitle(job: JobRequest): string {
  */
 export function jobBoardCardSubtitle(job: JobRequest): string {
   const parts: string[] = [];
-  const action = job.request_action_name || JOB_TYPE_LABELS[job.job_type];
+  // 🔴 เติมคำนำหน้า "สาเหตุที่ขอ: " เหมือน unitRequestCardSubtitle (เจ้าของเคาะ 5 ก.ย. 2569)
+  // — เฉพาะตอนมีค่า ERP จริงเท่านั้น ไม่ใช่ตอนถอยไปใช้ JOB_TYPE_LABELS
+  const action = job.request_action_name
+    ? `สาเหตุที่ขอ: ${job.request_action_name}`
+    : JOB_TYPE_LABELS[job.job_type];
   if (action) parts.push(action);
   if (job.job_description_code_2) parts.push(job.job_description_code_2);
   if (job.resigned_employee_name) parts.push(job.resigned_employee_name);

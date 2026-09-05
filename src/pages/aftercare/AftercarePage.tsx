@@ -222,21 +222,31 @@ const AftercarePage: React.FC = () => {
             <LoaderCircle className="mr-1.5 inline h-4 w-4 animate-spin" /> กำลังโหลด…
           </p>
         ) : items.length === 0 ? (
+          /**
+           * หน้าว่างต้องบอกทางต่อ (Wave 1 ของ docs/plan-quality-100-2569-09-05.md
+           * — เจ้าของเคาะคำ 5 ก.ย. 2569): ผู้ทดสอบตาใหม่ให้หน้านี้ 4/10 เพราะว่างเปล่า
+           * ไม่บอกว่านี่คืออะไร ทำไมว่าง แล้วจะไปต่อตรงไหน ⇒ ใส่ครบสามอย่างนี้แทน
+           * ⚠️ ปุ่ม/ลิงก์เดิมยังอยู่ครบ แค่ทำให้เด่นขึ้น + เพิ่มลิงก์ไปหน้า Follow
+           */
           <div className={cn('rounded-xl border px-4 py-10 text-center', DASH.card)}>
             <UserCheck className={cn('mx-auto h-8 w-8', DASH.muted)} />
-            <p className="mt-2 text-sm font-medium text-foreground">ยังไม่มีใครอยู่ในความดูแล</p>
+            <p className="mt-2 text-sm font-medium text-foreground">ยังไม่มีใครเข้าช่วงดูแลหลังเริ่มงาน</p>
             <p className={cn('mt-1 text-xs', DASH.muted)}>
-              คนเข้ามาที่นี่ได้สองทาง — กด "ย้ายไปดูแลหลังเริ่มงาน" จากกล่อง <b>โทรครบแล้ว</b> บนหน้า Follow
-              หรือกดเพิ่มเองจากบอร์ด ERP
+              คนจะเข้ามาหน้านี้อัตโนมัติเมื่อติดตามจนถึงวันเริ่มงานจริงแล้ว — หรือเพิ่มเองจากบอร์ด ERP ก็ได้
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <Button variant="secondary" size="sm" type="button" onClick={() => setPickerOpen(true)} >
+              <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>
+                <Users aria-hidden />
                 เพิ่มคนจากบอร์ด ERP
               </Button>
-              <Button variant="secondary" size="sm" type="button" onClick={() => navigate('/follow')} >
-                ไปหน้า Follow
-              </Button>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/follow')}
+              className="mt-3 text-xs font-medium text-primary underline underline-offset-2"
+            >
+              ไปดูคนที่กำลังติดตาม →
+            </button>
           </div>
         ) : (
           <>

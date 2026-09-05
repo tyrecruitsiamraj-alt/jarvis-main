@@ -23,6 +23,7 @@ import FollowCallRoundsPanel from '@/components/follow/FollowCallRoundsPanel';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
+import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
@@ -1517,7 +1518,7 @@ const FollowPage: React.FC = () => {
                         htmlFor={`followCallRound${i}`}
                         className="ml-1 text-xs font-medium text-muted-foreground"
                       >
-                        รอบนี้คือสายที่เท่าไหร่
+                        รอบนี้คือรอบโทรที่เท่าไหร่
                       </label>
                       <select
                         id={`followCallRound${i}`}
@@ -1531,7 +1532,7 @@ const FollowPage: React.FC = () => {
                           (_, n) => n + 1,
                         ).map((n) => (
                           <option key={n} value={n}>
-                            สายที่ {n}
+                            {roundTabLabel(n)}
                             {n === 1 ? ' (สายแรก)' : ''}
                           </option>
                         ))}

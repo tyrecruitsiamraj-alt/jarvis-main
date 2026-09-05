@@ -367,7 +367,7 @@ const WorkQueuePage: React.FC = () => {
           />
           <Stat2
             value={loading ? '—' : totalToDo.toLocaleString('th-TH')}
-            label="รวมของค้างทุกถัง"
+            label="งานค้างรวมทั้งระบบ"
           />
           <Stat2
             value={pastDue === null ? '—' : pastDue.toLocaleString('th-TH')}
