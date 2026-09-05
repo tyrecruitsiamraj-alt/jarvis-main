@@ -347,12 +347,24 @@ const DashboardShell: React.FC<Props> = ({
                   </p>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {data.kpis.map((kpi) => (
-                      <DashboardKpiCard
-                        key={kpi.id}
-                        kpi={kpi}
-                        progressPercent={kpiProgress(kpi)}
-                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
-                      />
+                      <div key={kpi.id} className="flex flex-col gap-1">
+                        <DashboardKpiCard
+                          kpi={kpi}
+                          progressPercent={kpiProgress(kpi)}
+                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
+                        />
+                        {/*
+                         * ตำหนิ QA รอบสอง (6 ก.ย. 2569): ประโยค "คงเหลือ = ใบเปิดทั้งระบบ
+                         * คนละเลขกับสามตัวแรก" จมอยู่ในย่อหน้ายาวด้านบน — ย้ายมาติดการ์ด
+                         * "คงเหลือ" เองเป็นบรรทัดรอง (เฉพาะตอนไม่ได้เลือกช่วงวัน ซึ่งเป็น
+                         * กรณีเดียวที่คงเหลือคนละที่มากับสามตัวแรก — ไม่แตะวิธีคำนวณ)
+                         */}
+                        {kpi.id === 'remaining' && dateRange == null ? (
+                          <p className="px-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
+                            ทั้งระบบ ไม่ใช่เฉพาะช่วงที่เลือก
+                          </p>
+                        ) : null}
+                      </div>
                     ))}
                   </div>
                 </div>

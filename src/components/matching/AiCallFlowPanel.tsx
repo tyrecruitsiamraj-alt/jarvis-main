@@ -145,10 +145,16 @@ function CellRow({
   const result = cells.filter((c) => c.group === 'result');
   const v2 = useUiV2();
   const groupLabel = cn('mb-1 text-[10px] font-semibold', v2 ? 'text-muted-foreground' : 'text-slate-400');
+  /**
+   * ใจความกันบวกผิด ย้ายมาติดหัวกลุ่มตัวเลข (ตำหนิ QA รอบสอง 6 ก.ย. 2569: คำเตือน
+   * เดิมอยู่ท้ายแผงไกลตัวเลขเกินไป) — ประโยคเต็มด้านล่างแผงยังคงไว้เหมือนเดิม
+   */
+  const inlineWarn = cn('mb-1 text-[9px] font-normal', v2 ? 'text-muted-foreground/80' : 'text-slate-500');
   return (
     <div className="mt-2 grid gap-2 lg:grid-cols-[3fr_5fr]">
       <div>
         <p className={groupLabel}>ตอนนี้สายไปถึงขั้นไหน</p>
+        <p className={inlineWarn}>นับซ้ำกันได้ ห้ามบวกรวม</p>
         <div className={WHERE_GRID}>
           {cells.length === 0
             ? null

@@ -81,14 +81,27 @@ const Row: React.FC<{
   alert?: boolean;
   /** ทับปลายทางของพจนานุกรมเฉพาะกรณีเปิดป๊อป (พจนานุกรมบอกได้แค่ว่า "เปิดป๊อปอะไร") */
   onPress?: () => void;
-}> = ({ metric, value, alert, onPress }) => {
+  /**
+   * แถวนี้เป็นสับเซตของแถวก่อนหน้า (นับซ้อนอยู่ในนั้น ไม่ใช่กองใหม่) — เยื้องเข้า
+   * ทางสายตา ไม่แตะป้าย/นิยามในพจนานุกรมกลาง (5 ก.ย. 2569: recruit.untouched
+   * นับซ้อนใน recruit.apps_uncontacted อยู่แล้ว ต้องเห็นด้วยตา ไม่ใช่เชิงอรรถ)
+   */
+  childOf?: boolean;
+}> = ({ metric, value, alert, onPress, childOf }) => {
   const spec: MetricSpec = METRICS[metric];
   const { label, unit } = spec;
   const to = onPress ? undefined : spec.href;
   const help = metricHelp(metric);
   const body = (
     <>
-      <span className={cn('min-w-0 flex-1 truncate text-xs', alert && value ? T.danger : T.mut)}>
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-xs',
+          alert && value ? T.danger : T.mut,
+          childOf && 'pl-3',
+        )}
+      >
+        {childOf ? <span aria-hidden>└ ในนั้น </span> : null}
         {label}
       </span>
       <span className={cn('text-sm', T.num, alert && value ? T.danger : undefined)}>
@@ -371,7 +384,12 @@ const TeamBoardPanel: React.FC<{
             value={teams?.recruit?.apps_uncontacted ?? null}
             alert
           />
-          <Row metric="recruit.untouched" value={floor ? floor.intake.untouched : null} alert />
+          <Row
+            metric="recruit.untouched"
+            value={floor ? floor.intake.untouched : null}
+            alert
+            childOf
+          />
           {/*
            * 🔴 เชิงอรรถกันบวกผิด (เจ้าของแจ้ง: คนใหม่เอา "ผู้สมัครทั้งหมด" +
            * "ยังไม่มีใครติดต่อ" + "ค้างเกิน 1 วันไม่มีใครแตะ" มาบวกกันแล้วงง)

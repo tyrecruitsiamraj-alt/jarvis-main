@@ -38,6 +38,19 @@ function monthLabel(monthKey: string): string {
   return `${name} ${ceToBeYear(Number(y))}`;
 }
 
+/**
+ * ตำหนิ QA รอบสอง (6 ก.ย. 2569): บนมือถือช่องวันเล็ก (~30px) และแยกช่อง "มีนัด/มีผล"
+ * จากช่องว่างข้าง ๆ ไม่ออก — ดึงเฉพาะโทนพื้นหลัง (bg-*) จาก TONE.*.soft มาบังคับ
+ * เฉพาะจอเล็ก (`max-sm:`) ไม่แตะเดสก์ท็อป ไม่แตะความหมายสี (ยังเป็นโทนกลางเดิม)
+ */
+function mobileSoftBg(tone: keyof typeof TONE): string {
+  return TONE[tone].soft
+    .split(' ')
+    .filter((cls) => cls.includes('bg-'))
+    .map((cls) => `max-sm:${cls}`)
+    .join(' ');
+}
+
 /** ข้อความบอกช่อง — ตัวเลขลอย ๆ อ่านไม่ออกว่าคืออะไร ต้องมีคำกำกับตอนเอาเมาส์จ่อ */
 function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): string {
   const detail = rounds
@@ -203,7 +216,7 @@ const FollowPlanningCalendar: React.FC<{
                         aria-pressed={selected}
                         title={`${formatYmdDmyBe(c.ymd)} — กดเพื่อดูเฉพาะวันนี้`}
                         className={cn(
-                          'flex min-w-[64px] flex-col items-center rounded-lg px-1 py-1 font-medium transition-colors hover:bg-secondary',
+                          'flex min-w-[64px] min-h-10 flex-col items-center justify-center rounded-lg px-1 py-1 font-medium transition-colors hover:bg-secondary sm:min-h-0',
                           selected && 'bg-primary text-primary-foreground hover:bg-primary',
                           !selected && c.isSunday && 'text-rose-800 dark:text-red-300',
                           !selected && !c.isSunday && 'text-muted-foreground',
@@ -260,6 +273,8 @@ const FollowPlanningCalendar: React.FC<{
                           'p-0.5 text-center align-middle',
                           c.isSunday && 'bg-secondary/40',
                           selected && 'bg-primary/10',
+                          /* มีนัด/มีผล = พื้นจาง ๆ ตามโทนกลาง แยกจากช่องว่างชัด ๆ บนมือถือ */
+                          rounds && rounds[0] && mobileSoftBg(roundTone(rounds[0])),
                         )}
                       >
                         {rounds ? (
@@ -267,7 +282,7 @@ const FollowPlanningCalendar: React.FC<{
                             type="button"
                             onClick={() => onOpenCell(row, c.ymd, rounds)}
                             title={cellTitle(row.group.name, c.ymd, rounds)}
-                            className="flex w-full flex-col items-stretch gap-0.5"
+                            className="flex min-h-10 w-full flex-col items-stretch justify-center gap-0.5 sm:min-h-0"
                           >
                             {/* โชว์เวลาจริง ไม่ใช่จุดสีลอย ๆ — เจ้าของอยากเห็น "เวลาไหนบ้าง" */}
                             {/* 🔴 ช่องละ 1 สาย (เจ้าของสั่ง 1 ก.ย. 2569) — เกินนั้นบอกเป็น +N ไม่ตัดเงียบ */}
