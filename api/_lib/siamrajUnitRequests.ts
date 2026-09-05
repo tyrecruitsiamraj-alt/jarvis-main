@@ -1,3 +1,4 @@
+import { readThroughCache } from './unitRequestCache.js';
 import { dbQuery } from './postgres.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import {
@@ -236,7 +237,42 @@ function staffingQueueWhere(): string {
   `;
 }
 
+/**
+ * ═══ 🔴 สำเนาอายุสั้นอยู่ **ในตัวฟังก์ชันนี้** แล้ว (5 ก.ย. 2569) ═══
+ *
+ * เจ้าของแจ้ง *"เว็บช้ามาก"* — จับเวลาจริงจากเครื่อง:
+ *   `/api/matching/list`         = **5.5 วินาที ทุกครั้ง**
+ *   `/api/matching/flow-summary` = **5.1 วินาที ทุกครั้ง**
+ *   `/api/office-team` (ครั้งแรก) = 4.6 วินาที
+ * ทั้งสามเส้นวิ่งมาที่ฟังก์ชันนี้แล้วยิงไปถาม SQL Server ของระบบงานหลัก **สด ๆ ทุกครั้ง**
+ * ⇒ ของเดิมมีสำเนาอยู่ที่ handler `/api/siamraj/unit-requests` **เส้นเดียว**
+ * เส้นอื่นที่เรียกฟังก์ชันนี้ตรง ๆ (อีก 9 ที่) จึงไม่ได้ประโยชน์เลย
+ *
+ * ย้ายสำเนามาไว้ที่นี่ = **ทุกเส้นได้พร้อมกัน** และยังคงกติกาเดิมของ `unitRequestCache`
+ * (อายุสั้น · ถามใหม่ไม่ได้แต่มีของเก่า ⇒ ส่งของเก่า · ไม่มีของเก่า ⇒ พังให้เห็น)
+ * · `fresh: true` = ข้ามสำเนา (ปุ่มรีเฟรชบนจอ/งานเบื้องหลังที่ต้องการของสด)
+ */
 export async function listSiamrajUnitRequests(options: {
+  limit?: number;
+  mode?: string;
+  departmentScope?: DepartmentScope;
+  /** ข้ามสำเนา ไปถามระบบงานหลักสด ๆ */
+  fresh?: boolean;
+}) {
+  const cacheKey = `unit-requests:${JSON.stringify({
+    limit: options.limit ?? null,
+    mode: options.mode ?? null,
+    scope: options.departmentScope ?? null,
+  })}`;
+  const outcome = await readThroughCache(
+    cacheKey,
+    () => loadSiamrajUnitRequests(options),
+    { fresh: options.fresh },
+  );
+  return outcome.value;
+}
+
+async function loadSiamrajUnitRequests(options: {
   limit?: number;
   mode?: string;
   departmentScope?: DepartmentScope;

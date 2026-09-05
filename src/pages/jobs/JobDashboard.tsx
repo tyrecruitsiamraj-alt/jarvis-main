@@ -152,7 +152,7 @@ const JobDashboard: React.FC = () => {
         )}
 
         {!loading && jobs.length > 0 ? (
-          <div className="rounded-2xl border border-black/[0.06] bg-white/35 backdrop-blur-sm p-3 md:p-4">
+          <div className="rounded-2xl border border-black/[0.06] bg-white/90 p-3 md:p-4">
             <UnitRequestFilterFields
               idPrefix="job-dashboard"
               siamrajPrimary={siamrajPrimary}

@@ -261,7 +261,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const outcome = await readThroughCache(
       cacheKey,
       async () => {
-        const rows = await listSiamrajUnitRequests({ limit, mode, departmentScope });
+        // 🔴 ส่ง `fresh` ต่อลงไปด้วย — สำเนาอยู่ **สองชั้น** แล้ว (ชั้นนี้ + ในตัว
+        // `listSiamrajUnitRequests`) ถ้าไม่ส่งต่อ ปุ่มรีเฟรชจะข้ามได้แค่ชั้นนอก
+        // แล้วได้ของเก่ากลับมาเหมือนเดิม (5 ก.ย. 2569)
+        const rows = await listSiamrajUnitRequests({ limit, mode, departmentScope, fresh });
         await Promise.all([
           attachAssignments(rows),
           attachNotes(rows),

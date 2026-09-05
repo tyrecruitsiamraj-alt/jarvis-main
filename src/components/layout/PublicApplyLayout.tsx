@@ -30,7 +30,7 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       style={config.pageBackgroundMode !== 'solid' ? shellBg : undefined}
     >
 
-      <header className="sticky top-0 z-50 border-b border-white/60 bg-white/45 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95">
         <div className="mx-auto flex h-14 md:h-16 max-w-6xl items-center gap-4 px-4 md:px-6">
           <div className="flex items-center gap-3 min-w-0">
             <BrandMark size="sm" className="md:hidden" />
@@ -47,7 +47,7 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       <div className="flex-1 relative z-10">{children}</div>
 
-      <footer className="relative z-10 border-t border-white/60 bg-white/35 backdrop-blur-md py-6 text-center text-xs text-muted-foreground">
+      <footer className="relative z-10 border-t border-border bg-background/90 py-6 text-center text-xs text-muted-foreground">
         <p className="px-4">
           หน้านี้สำหรับผู้สมัครงานเท่านั้น ข้อมูลตำแหน่งแสดงตามที่บริษัทประกาศ หากมีข้อสงสัยโปรดใช้ช่องทางสมัครที่ระบุ
         </p>

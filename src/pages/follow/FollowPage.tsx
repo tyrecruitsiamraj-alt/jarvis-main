@@ -330,20 +330,61 @@ const FollowPage: React.FC = () => {
     setFormError(null);
   };
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  /**
+   * @param silent `true` = รีเฟรชเบื้องหลัง **ห้ามขึ้นสถานะกำลังโหลด**
+   * (ไม่งั้นทุก 25 วิ จอจะกะพริบเป็นโครงกระดูกทั้งที่คนกำลังอ่านอยู่)
+   */
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
     try {
       setItems(await listFollowEntries());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
+      // รีเฟรชเงียบล้ม = เงียบต่อ ของบนจอยังเป็นของเดิมที่ยังใช้ได้
+      if (!silent) setError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void reload();
+  }, [reload]);
+
+  /**
+   * ═══ 🔴 ผลโทรต้องขึ้นเองโดยไม่ต้องกดรีเฟรช (เจ้าของแจ้ง 5 ก.ย. 2569:
+   * *"หน้าการติดตาม ข้อมูลมันมาช้า เวลาได้รับผลโทรมา มันดีเลย์มาก"*) ═══
+   *
+   * ต้นเหตุ: หน้านี้โหลดข้อมูล **ครั้งเดียวตอนเปิด** แล้วโหลดใหม่เฉพาะตอนที่คนกดทำอะไร
+   * ⇒ AI โทรจบแล้วบันทึกผลลงฐาน แต่คนที่เปิดจอค้างไว้ไม่เห็นอะไรเลยจนกว่าจะกดรีเฟรชเอง
+   *
+   * กติกาของการรีเฟรชอัตโนมัติ:
+   * 1. **เฉพาะตอนแท็บนี้เปิดอยู่จริง** — อยู่แท็บอื่นไม่ต้องยิง (เปลืองทั้งเครื่องและ ERP)
+   * 2. **กลับมาที่แท็บ = รีเฟรชทันที** ไม่ต้องรอครบรอบ (คนสลับกลับมาเพื่อดูผลพอดี)
+   * 3. 🔴 **กำลังพิมพ์อยู่ = ข้ามรอบนั้น** ห้ามแย่งของที่คนกำลังกรอก
+   * 4. เงียบเสมอ — ไม่ขึ้นโครงกระดูก ไม่เด้ง error (ดู `silent` ข้างบน)
+   */
+  useEffect(() => {
+    const REFRESH_MS = 25_000;
+    const typing = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return false;
+      return el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+    };
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (typing()) return;
+      void reload(true);
+    };
+    const id = window.setInterval(tick, REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [reload]);
 
   const resetForm = () => {

@@ -158,7 +158,7 @@ const DashboardShell: React.FC<Props> = ({
 
   return (
     <div className="min-h-full bg-slate-100/60 dark:bg-transparent pb-24">
-      <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-sm">
+      <div className="bg-white/95 dark:bg-slate-900/90">
         <div className="mx-auto w-full max-w-[1760px] px-3 md:px-5 py-4 space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>

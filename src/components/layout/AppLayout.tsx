@@ -136,7 +136,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <ClaimIdleAlertDialog />
 
       {/* Top header — จอใหญ่ (lg+) */}
-      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-white/60 bg-white/45 dark:border-white/10 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-40">
+      <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-border bg-background/95 sticky top-0 z-40">
         <div className="flex items-center gap-2 min-w-0">
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
@@ -213,7 +213,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </header>
 
       {/* หัวแบบย่อ — แท็บเล็ต/มือถือ (ต่ำกว่า lg) */}
-      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-white/60 bg-white/45 dark:border-white/10 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-40 safe-area-pt">
+      <header className="lg:hidden flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-border bg-background/95 sticky top-0 z-40 safe-area-pt">
         <div className="flex items-center gap-1 min-w-0">
           {hamburger}
           <button type="button" onClick={() => navigate('/')} className="flex items-center gap-2 text-left min-w-0 touch-manipulation py-1">

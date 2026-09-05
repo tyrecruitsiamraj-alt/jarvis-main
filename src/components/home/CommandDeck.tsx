@@ -176,6 +176,27 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
 );
 
 
+
+/**
+ * 🔴 **นาฬิกาต้องอยู่ component ของตัวเอง** (5 ก.ย. 2569 — เจ้าของแจ้ง *"เว็บกระตุก"*)
+ * ของเดิมเรียก `useNowTick` ไว้ที่ตัว deck ⇒ **ทั้งแผงเรนเดอร์ใหม่ทุก 1 วินาที**
+ * รวมหน้าปัด SVG ที่มีขีด 72 เส้น + วงแหวน + รายการงาน ทั้งที่มีแค่ตัวเลขวินาทีที่เปลี่ยน
+ * ⇒ แยกออกมา เรนเดอร์ใหม่เฉพาะสองบรรทัดนี้
+ */
+const DeckClock: React.FC = () => {
+  const now = useNowTick(true);
+  return (
+    <>
+      <span className="hidden font-mono text-[11px] text-slate-500 dark:text-slate-500 sm:block">
+        {DATE_FMT.format(now)}
+      </span>
+      <span className="font-mono text-sm font-medium tabular-nums text-slate-800 dark:text-slate-200">
+        {CLOCK_FMT.format(now)}
+      </span>
+    </>
+  );
+};
+
 /* ── หุ่นยนต์ผู้ช่วย ────────────────────────────────────────────────────────
  * เจ้าของสั่ง 5 ก.ย. 2569: *"หุ่นยนต์เอาไปใส่ในหน้าหลัก แล้วเอาพื้นหลังหุ่นออก
  * จะได้ดูไม่เอามาวางเฉย ๆ ดูมีชีวิตขึ้นหน่อย"*
@@ -218,7 +239,6 @@ const CommandDeck: React.FC<{
   loading?: boolean;
   className?: string;
 }> = ({ greeting, userName, tasks, statusInput, loading, className }) => {
-  const now = useNowTick(true);
   const [head, ...rest] = tasks;
   /**
    * งานถัดไปอยู่ที่หน้าไหนของลำดับงาน — หาด้วย **คีย์** ไม่ใช่เลขขั้น
@@ -258,12 +278,7 @@ const CommandDeck: React.FC<{
           <span className={cn(eyebrow, 'text-muted-foreground')}>สถานะสด</span>
         </Badge>
         <span className="flex-1" />
-        <span className="hidden font-mono text-[11px] text-slate-500 dark:text-slate-500 sm:block">
-          {DATE_FMT.format(now)}
-        </span>
-        <span className="font-mono text-sm font-medium tabular-nums text-slate-800 dark:text-slate-200">
-          {CLOCK_FMT.format(now)}
-        </span>
+        <DeckClock />
       </div>
 
       {/* ── Hero: หน้าปัด | งานถัดไป ── */}
