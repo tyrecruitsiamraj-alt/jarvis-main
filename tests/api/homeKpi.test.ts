@@ -248,3 +248,34 @@ describe('ยอดคงค้างเทียบวันต่อวัน�
     expect(buildKpiCard('newRequests', { today: 7, yesterday: 2 }).delta).toBe(5);
   });
 });
+
+/**
+ * 🔴 ตำหนิผู้ตรวจรับ 6 ก.ย. 2569: hero "เลยเวลานัดแล้ว" กับการ์ด "Follow ต้องโทรวันนี้"
+ * ขึ้นคนละเลข (วัดจริง 21 vs 11) — พิสูจน์จากโค้ดต้นทางแล้วว่าไม่ใช่แค่ช่วงเวลา
+ * (นับทั้งวัน vs เลยเวลา) แต่เป็นคนละเกณฑ์ "โทรแล้วหรือยัง" (outcome_code ที่การ์ดนี้ใช้
+ * vs ผลในคิว Lumos ที่ hero ใช้) ดูคอมเมนต์เต็มใน src/lib/homeKpi.ts (buildKpiCard)
+ */
+describe('ป้ายกำกับ followToday ต้องแยกจาก hero "เลยเวลานัดแล้ว"', () => {
+  it('sub ของ followToday ต้องบอกว่านับคนละมุมกับ "เลยเวลานัดแล้ว"', () => {
+    const c = buildKpiCard('followToday', {
+      today: 21,
+      yesterday: 0,
+      comparable: false,
+      parts: [
+        { label: 'โทรแล้ววันนี้', value: 0 },
+        { label: 'สำเร็จ', value: 0 },
+      ],
+    });
+    expect(c.sub).toContain('โทรแล้ววันนี้ 0');
+    expect(c.sub).toContain('เลยเวลานัดแล้ว');
+  });
+
+  it('KPI อื่นไม่โดนต่อท้ายข้อความนี้ (เฉพาะ followToday เท่านั้น)', () => {
+    const c = buildKpiCard('apptToday', {
+      today: 5,
+      yesterday: 2,
+      parts: [{ label: 'มาแล้ว', value: 3 }],
+    });
+    expect(c.sub).not.toContain('เลยเวลานัดแล้ว');
+  });
+});

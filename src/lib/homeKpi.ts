@@ -115,11 +115,33 @@ export function buildKpiCard(key: KpiKey, pair: KpiPair): KpiCard {
       delta: pair.comparable === false || (today === 0 && yday === 0) ? null : today - yday,
       quiet,
       // มีตัวแยกย่อย = เอาตัวแยกย่อยขึ้นแทน (ตัวเทียบเมื่อวานอยู่ที่ชิป delta อยู่แล้ว)
-      sub: pair.parts?.length
-        ? pair.parts.map((x) => `${x.label} ${x.value}`).join(' · ')
-        : yday > 0
-          ? `เมื่อวาน ${yday} ${meta.unit}`
-          : 'เมื่อวานไม่มี',
+      sub: (() => {
+        const base = pair.parts?.length
+          ? pair.parts.map((x) => `${x.label} ${x.value}`).join(' · ')
+          : yday > 0
+            ? `เมื่อวาน ${yday} ${meta.unit}`
+            : 'เมื่อวานไม่มี';
+        /**
+         * 🔴 "Follow ต้องโทรวันนี้" ≠ hero "เลยเวลานัดแล้ว" (เจ้าของแจ้ง: จอเดียวกัน
+         * ขึ้นสองเลขคนละอันจนงง — วัดจริง 6 ก.ย. 2569 บนเครื่องนี้: การ์ดนี้ 21 ราย ·
+         * hero 11 ราย)
+         *
+         * พิสูจน์จากนิยามจริง — **ไม่ใช่แค่ "นับทั้งวัน vs เลยเวลา"** อย่างที่ดูตอนแรก
+         * (วันนั้น floor.follow.today = 0 พอดี ตัดตัวแปรช่วงเวลาออกไปได้) ต้นเหตุจริงคือ
+         * "โทรแล้วหรือยัง" เช็คคนละที่:
+         * - การ์ดนี้ (`followWork.due` ใน api/_handlers/home-kpis.ts) นับ
+         *   `outcome_code is null` —ยังไม่มีใคร **กดปิดงาน** อย่างเป็นทางการ
+         * - hero `pastDue` (`FOLLOW_DONE` ใน api/_handlers/office-floor.ts) เช็คแค่ว่า
+         *   คิว Lumos มีผลกลับหรือยัง (`person_ref = 'follow-<id>'` มี outcome)
+         * ⇒ รายที่ AI โทรได้ผลแล้วแต่ยังไม่มีใครกดปิดงาน จะหลุดออกจาก "เลยเวลานัดแล้ว"
+         * (เพราะ AI ตอบมาแล้ว) แต่ยังค้างใน "ต้องโทรวันนี้" (เพราะยังไม่ปิดงาน) —
+         * ยืนยันด้วย query จริงบนฐาน 6 ก.ย. 2569: ในจำนวนที่การ์ดนี้นับ 21 ราย มี 10 ราย
+         * ที่คิว Lumos มีผลกลับแล้วแต่ยังไม่ปิดงาน (ตรงกับส่วนต่าง 21-11 พอดี)
+         */
+        return key === 'followToday'
+          ? `${base} · รวมรายที่คุยผลแล้วแต่ยังไม่ปิดงาน (คนละมุมกับ "เลยเวลานัดแล้ว")`
+          : base;
+      })(),
       href: meta.href,
     };
   }

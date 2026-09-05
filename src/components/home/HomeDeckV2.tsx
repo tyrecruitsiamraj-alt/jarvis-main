@@ -146,13 +146,24 @@ const HomeDeckV2: React.FC<{
           )}
         </div>
 
-        {/* วงตัวเลข "ต้องลงมือ" — บางลง ไม่หมุน ไม่เรือง */}
+        {/*
+         * วงตัวเลข "ต้องลงมือ" — บางลง ไม่หมุน ไม่เรือง
+         * 🔴 ป้ายแยกบน/ล่างของตัวเลข (ผู้ทดสอบ: "เรื่องต้องลงมือ" เบียดกับเลขใหญ่
+         * อ่านสะดุด) — เดิมยัดเป็นบรรทัดเดียวใต้เลข ชิดกันแค่ `mt-1` (4px) ทั้งที่เลขใหญ่ถึง
+         * 44px จับคู่แพตเทิร์นเดียวกับวงเดิมที่ `CommandDeck.tsx` (v1) ที่แยก "ต้องลงมือ"
+         * ไว้บนเลขและ "เรื่อง" ไว้ล่างเลขอยู่แล้ว ให้สองโฉมสอดคล้องกัน
+         */}
         <div className="mx-auto shrink-0 sm:mx-0">
           <div className="flex h-36 w-36 flex-col items-center justify-center rounded-full border border-primary/20 bg-primary/[0.04] text-center">
-            <span className="text-[44px] font-semibold leading-none tabular-nums">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              ต้องลงมือ
+            </span>
+            <span className="mt-1.5 text-[44px] font-semibold leading-none tabular-nums">
               {loading ? '—' : tasks.length}
             </span>
-            <span className="mt-1 text-[11.5px] text-muted-foreground">เรื่องต้องลงมือ</span>
+            <span className="mt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              เรื่อง
+            </span>
           </div>
           <p className={cn('mt-2.5 max-w-36 text-center text-[11.5px]', TONE_TEXT[status.tone as NextTaskTone | 'ok'])}>
             {status.text}

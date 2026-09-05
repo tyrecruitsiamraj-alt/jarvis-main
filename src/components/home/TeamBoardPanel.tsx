@@ -95,7 +95,17 @@ const Row: React.FC<{
         {value === null ? '—' : value.toLocaleString()}
       </span>
       <span className={cn('w-8 shrink-0 text-[10px]', T.faint)}>{value === null ? '' : unit}</span>
-      {to || onPress ? (
+      {/*
+       * 🔴 กดได้สองแบบต้องบอกผลต่างกัน (เจ้าของ: "แถวที่กดได้แต่ไม่บอกผล")
+       * `to` = นำทางออกจากหน้านี้ (ลูกศรบอกอยู่แล้วว่าไปที่อื่น) ·
+       * `onPress` = เปิด dialog ค้างอยู่ในหน้านี้เหมือนเดิม (ต้องมีคำกำกับ ไม่งั้นดู
+       * เหมือนนำทางเหมือนกันหมด) — คำเดียวกับปุ่ม "ผลโทรวันนี้ ... เปิดดูรายชื่อ" ท้ายคอลัมน์
+       * Lumos ข้างล่างที่ใช้คำนี้อยู่แล้ว
+       */}
+      {onPress ? (
+        <span className={cn('shrink-0 whitespace-nowrap text-[10px]', T.faint)}>กดดูรายชื่อ</span>
+      ) : null}
+      {to ? (
         <ArrowRight
           className="h-3 w-3 shrink-0 text-slate-300 transition-colors group-hover/row:text-slate-600 dark:text-slate-700 dark:group-hover/row:text-slate-300"
           aria-hidden
@@ -362,6 +372,28 @@ const TeamBoardPanel: React.FC<{
             alert
           />
           <Row metric="recruit.untouched" value={floor ? floor.intake.untouched : null} alert />
+          {/*
+           * 🔴 เชิงอรรถกันบวกผิด (เจ้าของแจ้ง: คนใหม่เอา "ผู้สมัครทั้งหมด" +
+           * "ยังไม่มีใครติดต่อ" + "ค้างเกิน 1 วันไม่มีใครแตะ" มาบวกกันแล้วงง)
+           *
+           * พิสูจน์จากนิยามจริง — ทั้งสามเลขมาจากประชากรเดียวกัน (ตาราง
+           * `public_job_applications` ไม่กรอง scope) แบ่งเป็นถังซ้อนกัน ไม่ใช่ถังแยก:
+           * - `apps_contacted` + `apps_uncontacted` = `apps_total` เป๊ะ (office-team.ts:159-161
+           *   `apps_uncontacted = total - contactedN`) ⇒ 4 + 11 = 15 (บวกกันได้แค่คู่นี้)
+           * - `recruit.untouched` (= `floor.intake.untouched`) ใช้นิยาม
+           *   `OVERVIEW_BUCKETS.untouched` (applicantOverviewSql.ts) = "not called and not
+           *   in_queue and not held_or_claimed" ซึ่งเป็นเงื่อนไขที่แคบกว่า "not called"
+           *   (= `apps_uncontacted`) เสมอ ⇒ **ค้างเกิน 1 วันไม่มีใครแตะ นับซ้อนอยู่ใน
+           *   ยังไม่มีใครติดต่อแล้ว** ไม่ใช่กองที่สี่ที่แยกออกมาบวกเพิ่มได้
+           * ยืนยันด้วยข้อมูลจริงบนเครื่องนี้ 6 ก.ย. 2569: total 15 / contacted 4 /
+           * uncontacted 11 / untouched 10 (10 จาก 11 คนที่ยังไม่ถูกโทร ซ้อนอยู่ในนี้พอดี)
+           */}
+          <li className="-mx-2 px-2 pt-0.5">
+            <p className={cn('text-[10px] leading-relaxed', T.faint)}>
+              "ค้างเกิน 1 วันไม่มีใครแตะ" นับซ้อนอยู่ใน "ยังไม่มีใครติดต่อ" ข้างบนแล้ว
+              (ไม่ใช่กลุ่มเพิ่ม) — บวกได้แค่ ติดต่อแล้ว + ยังไม่มีใครติดต่อ = ผู้สมัครทั้งหมด
+            </p>
+          </li>
           <GroupTitle>นัดสัมภาษณ์</GroupTitle>
           <Row metric="recruit.appts_made" value={teams?.recruit?.appts_made ?? null} />
           <Row metric="recruit.showed" value={teams?.recruit?.attendance.showed ?? null} />

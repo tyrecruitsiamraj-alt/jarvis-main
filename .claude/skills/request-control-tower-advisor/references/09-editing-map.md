@@ -7253,3 +7253,67 @@ framer-motion) · **เก็บไว้อย่างเดียวคือ
 ไม่ติดคำนำหน้าปลอม) · `npx vitest run` ครบ 250 ไฟล์ (2764 ผ่าน, 6 skip ของเดิม) ·
 tsc (tsconfig.json + tsconfig.app.json) ผ่าน · eslint 0 error ทั้งโปรเจกต์ (มีแต่ warning เดิม
 ที่มีอยู่ก่อนแก้ ยืนยันด้วย `git stash` เทียบ) · `npm run build` ผ่าน
+
+## รอบ 117 — ปิดตำหนิ 4 ข้อสุดท้ายจากผู้ตรวจรับ: ป้ายกำกับล้วน ๆ ไม่แตะตรรกะ (6 ก.ย. 2569)
+
+ต่อจาก `docs/plan-quality-100-2569-09-05.md` · กติกาพิเศษของงานนี้: ก่อนเขียนป้ายอธิบาย
+ความสัมพันธ์ของตัวเลขคู่ไหน ต้องอ่านโค้ดต้นทางของนิยามให้เจอก่อนแล้วอ้างในคอมเมนต์
+🔴 **ไม่แตะวิธีคำนวณตัวเลขแม้แต่บรรทัดเดียว** — ทุกจุดเป็นป้าย/ข้อความ/spacing ล้วน ๆ
+
+### ข้อ 1 — บอร์ดทีมสรรหาหน้าแรก: เลขบวกกันไม่ลงตัว
+
+พิสูจน์จากโค้ดต้นทาง + query จริงบนฐาน 6 ก.ย. 2569 (`total=15 / contacted=4 /
+uncontacted=11 / untouched=10`):
+- `apps_contacted` + `apps_uncontacted` = `apps_total` เป๊ะ (`api/_handlers/office-team.ts:159-161`
+  `apps_uncontacted = total - contactedN`)
+- `recruit.untouched` (= `floor.intake.untouched`) ใช้ `OVERVIEW_BUCKETS.untouched`
+  (`api/_lib/applicantOverviewSql.ts:188` = `not called and not in_queue and not
+  held_or_claimed`) ซึ่งเป็นเงื่อนไขที่แคบกว่า "not called" (= `apps_uncontacted`) เสมอ
+  ⇒ **นับซ้อนอยู่ในกันเสมอ ไม่ใช่กองที่สี่** — ยืนยันด้วย query จริง: 10 จาก 11 คนที่ยังไม่
+  ถูกโทร ซ้อนอยู่ในกลุ่ม "ค้างเกิน 1 วันไม่มีใครแตะ" พอดี
+
+แก้ที่ `src/components/home/TeamBoardPanel.tsx` — เติมเชิงอรรถ (`<li>` ธรรมดา ไม่ใช่ `<Row>`)
+ใต้แถว `recruit.untouched` บอกว่านับซ้อนกับ "ยังไม่มีใครติดต่อ" ห้ามบวกเพิ่ม
+(แพตเทิร์นเดียวกับเชิงอรรถของ `CallFunnelPanel.tsx` ที่มีอยู่แล้ว)
+
+### ข้อ 2 — hero "เลยเวลานัดแล้ว" vs การ์ด KPI "Follow ต้องโทรวันนี้" คนละเลข
+
+🔴 **พิสูจน์แล้วว่าไม่ใช่แค่ "นับทั้งวัน vs เลยเวลา" อย่างที่ดูตอนแรก** — วันที่วัดจริง
+`floor.follow.today = 0` พอดี ตัดตัวแปรช่วงเวลาออกไปได้ทั้งหมด ต้นเหตุจริงคือเช็ค
+"โทรแล้วหรือยัง" คนละที่:
+- การ์ด `followToday` (`followWork.due` ใน `api/_handlers/home-kpis.ts:167-168`) นับ
+  `outcome_code is null` — ยังไม่มีใคร **กดปิดงาน** อย่างเป็นทางการ
+- hero `pastDue` (`FOLLOW_DONE` ใน `api/_handlers/office-floor.ts:97-100`) เช็คแค่ว่าคิว
+  Lumos มีผลกลับหรือยัง (`person_ref = 'follow-<id>'` มี outcome)
+
+ยืนยันด้วย query จริงบนฐาน 6 ก.ย. 2569: การ์ดนี้นับ 21 ราย / hero pastDue 11 ราย — ส่วนต่าง
+10 รายตรงกับจำนวนที่คิว Lumos มีผลกลับแล้วแต่ยังไม่ปิดงาน (`outcome_code` ยังว่าง) พอดีเป๊ะ
+
+แก้ที่ `src/lib/homeKpi.ts` (`buildKpiCard`) — ต่อท้าย `sub` เฉพาะ key `followToday` ด้วย
+ข้อความคงที่ (ไม่ใช้เลข pastDue สด — เลขนั้นไม่ได้ส่งถึงการ์ดนี้อยู่แล้ว และช่องว่างที่แท้จริง
+เป็นเซตที่ไม่นิ่ง ยิงเส้นใหม่มาคำนวณจะเกินขอบเขต "ป้ายล้วน ๆ" ของงานนี้)
+
+### ข้อ 3 — วงตัวเลข "เรื่องต้องลงมือ" เบียดเลขใหญ่
+
+`src/components/home/HomeDeckV2.tsx` — เดิมยัดป้ายเป็นบรรทัดเดียวใต้เลข 44px ชิดแค่ `mt-1`
+(4px) แก้เป็นแยกป้ายบน/ล่างของตัวเลข (`ต้องลงมือ` บน · `เรื่อง` ล่าง คนละ `mt-1.5`) จับคู่
+แพตเทิร์นเดียวกับวงเดิมที่ `CommandDeck.tsx` (v1 · `Dial`) ที่แยกแบบนี้อยู่แล้ว — เช็คแล้ว
+CommandDeck.tsx ไม่ต้องแก้ (โครงเดิมกว้างพอ ระยะห่างดีอยู่แล้ว)
+
+### ข้อ 4 — แถวกดได้แต่ไม่บอกผล (dialog vs นำทาง)
+
+`src/components/home/TeamBoardPanel.tsx` (component `Row`) — แถว `onPress` (เปิด dialog
+ค้างหน้าเดิม) เดิมใช้ไอคอนลูกศรเดียวกับแถว `to` (นำทางออกจากหน้า) ดูไม่ออกว่ากดแล้วจะได้ผล
+แบบไหน แก้ให้แถว `onPress` ทั้งหมด (14 แถว: 3 เลน Lumos × 4 + `closing.queue_waiting` +
+`closing.queue_stale`) โชว์คำจิ๋ว "กดดูรายชื่อ" แทนลูกศร (แถว `to` ยังใช้ลูกศรเดิม) — คำเดียว
+กับปุ่ม "ผลโทรวันนี้ … เปิดดูรายชื่อ →" ที่มีอยู่แล้วท้ายคอลัมน์ Lumos
+
+### ทดสอบ
+
+`tests/api/homeKpi.test.ts` — เพิ่ม describe คุม sub ของ `followToday` ต้องพูดถึง
+"เลยเวลานัดแล้ว" และ KPI อื่นต้องไม่โดนต่อท้ายผิดตัว · `tests/api/metricDictionary.test.ts` —
+เพิ่มเช็ค source string "นับซ้อนอยู่ใน" และ "กดดูรายชื่อ" ต้องอยู่ใน `TeamBoardPanel.tsx` ·
+`npx vitest run` ครบ 250 ไฟล์ (2768 ผ่าน, 6 skip ของเดิม) · tsc (tsconfig.json +
+tsconfig.app.json) ผ่าน · eslint 0 error ทั้งโปรเจกต์ (มีแต่ 18 warning เดิมที่มีอยู่ก่อนแก้) ·
+`npm run build` ผ่าน · ดูจอจริงทั้ง `?ui=v1`/`?ui=v2` desktop 1400x900 + มือถือ 375x812
+ยืนยันครบทั้ง 4 ข้อ ไม่มีจอไหนพัง
