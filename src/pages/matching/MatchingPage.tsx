@@ -2518,7 +2518,7 @@ const MatchingPage: React.FC = () => {
               ชัดกว่าการ์ดหลอก 8 ใบ ที่คนเข้าใจผิดว่าหน้าค้างแล้วกด refresh ซ้ำ */}
           {rows.length === 0 && (loadingJobs || serverListLoading) ? (
             <div className="glass-card flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 px-6 py-16 text-center">
-              <LoaderCircle className="h-8 w-8 animate-spin text-sky-500" aria-hidden />
+              <LoaderCircle className="h-8 w-8 animate-spin text-primary" aria-hidden />
               <div>
                 <p className="text-sm font-semibold text-foreground">กำลังโหลดใบขอ…</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -2554,7 +2554,7 @@ const MatchingPage: React.FC = () => {
                 tabIndex={0}
                 onClick={() => openJob(j)}
                 onKeyDown={(e) => e.key === 'Enter' && openJob(j)}
-                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-sky-300/50 transition-colors dark:hover:border-sky-700/50"
+                className="glass-card relative overflow-hidden rounded-2xl border border-white/70 py-2.5 pl-4 pr-3 cursor-pointer hover:border-primary/40 transition-colors"
               >
                 {/* แถบสีซ้ายการ์ด — กวาดตาแล้วรู้ทันทีว่าใบไหนค้างนาน */}
                 <span
@@ -3242,7 +3242,7 @@ const MatchingPage: React.FC = () => {
                                   ? 'ส่ง AI โทรไปแล้ว — ติ๊กได้ เผื่อเก็บไปโทรเอง'
                                   : 'เลือกให้ AI โทร'
                             }
-                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
                           />
                         <button
                           type="button"
@@ -3556,7 +3556,7 @@ const MatchingPage: React.FC = () => {
                                             ? 'ส่ง AI โทรไปแล้ว'
                                             : 'เลือกให้ AI โทรสัมภาษณ์'
                                       }
-                                      className="h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                      className="h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
                                     />
                                     <TierCriteriaTooltip tier={m.tier}>
                                       <span
@@ -4557,7 +4557,7 @@ const MatchingPage: React.FC = () => {
                                       };
                                     })
                                   }
-                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-default"
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-primary disabled:cursor-default"
                                 />
                                 <span className="min-w-0">
                                   <span className="font-mono text-[11px]">{j.requestNo || j.jobId}</span>{' '}
@@ -4713,11 +4713,11 @@ const MatchingPage: React.FC = () => {
               value={lumosPoolSearch}
               onChange={(e) => setLumosPoolSearch(e.target.value)}
               placeholder="ค้นชื่อ / สกิล / พื้นที่ / เบอร์"
-              className="w-full rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 focus-visible:ring-2 focus-visible:ring-sky-400"
+              className="w-full rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 focus-visible:ring-2 focus-visible:ring-ring"
             />
             {lumosPoolLoading ? (
               <p className="py-6 text-center text-xs text-muted-foreground">
-                <LoaderCircle className="mx-auto mb-1.5 h-4 w-4 animate-spin text-sky-500" aria-hidden />
+                <LoaderCircle className="mx-auto mb-1.5 h-4 w-4 animate-spin text-primary" aria-hidden />
                 กำลังโหลดรายชื่อคนของเรา…
               </p>
             ) : (
@@ -4753,7 +4753,7 @@ const MatchingPage: React.FC = () => {
                               checked={lumosSelectedBoard.includes(c.card_id)}
                               disabled={!selectable}
                               onChange={() => toggleLumosBoard(c.card_id)}
-                              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
                             />
                             <span className="min-w-0 flex-1">
                               <span className="flex flex-wrap items-center gap-1.5">

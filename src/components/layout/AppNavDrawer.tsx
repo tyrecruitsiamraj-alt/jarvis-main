@@ -95,7 +95,7 @@ const AppNavDrawer: React.FC<Props> = ({
     cn(
       'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors touch-manipulation',
       active
-        ? 'bg-blue-500/12 text-blue-700 dark:bg-sky-400/15 dark:text-sky-200'
+        ? 'bg-primary/10 text-primary dark:bg-primary/25 dark:text-rose-100'
         : 'text-foreground/80 hover:bg-white/60 hover:text-foreground dark:hover:bg-white/10',
     );
 

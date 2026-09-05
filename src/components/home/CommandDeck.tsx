@@ -10,7 +10,10 @@
  * 2. **โฟกัสเดียว** — หน้าปัดวงแหวน + งานถัดไป คือพระเอก ที่เหลือเป็นตัวประกอบ
  * 3. **mono เล็ก ตัวพิมพ์ห่าง** สำหรับป้ายทุกป้าย · ตัวเลขทุกตัว tabular
  * 4. **ที่ว่างคือของแพง** — padding กว้าง ไม่ยัด
- * 5. สี: teal/sky สองสีหลัก · แดงเฉพาะของด่วนจริง · ที่เหลือ slate
+ * 5. สี: **เบอร์กันดี + กรมท่า** (จานเดียวกับหน้า Login · เจ้าของสั่ง 5 ก.ย. 2569
+ *    *"เอาโทนสี เอา Style ไปปรับใช้กับทั้งระบบ"*) · แดงเฉพาะของด่วนจริง · ที่เหลือ slate
+ *    ⚠️ ของเดิมเป็น teal/sky ซึ่งเป็นคนละจานกับที่เจ้าของเคาะ ⇒ เปลี่ยนหมดแล้ว
+ *    🔴 สีที่มีความหมาย (danger/warn/info ของงาน) ไม่ถูกแตะ — เป็นภาษาของตัวเลข
  *
  * โครง: แถบหัว (โลโก้+สถานะสด+นาฬิกา) → hero (หน้าปัด | งานถัดไป) →
  * คิวที่เหลือ → แถบ 6 ขั้น · ตรรกะอยู่ src/lib/homeDeck.ts + nextTask.ts (pure + เทสต์)
@@ -46,7 +49,7 @@ const TONE_TEXT: Record<NextTaskTone | 'ok', string> = {
   danger: 'text-red-700 dark:text-red-300',
   warn: 'text-amber-700 dark:text-amber-300',
   info: 'text-sky-700 dark:text-sky-300',
-  ok: 'text-teal-700 dark:text-teal-300',
+  ok: 'text-emerald-700 dark:text-emerald-300',
 };
 
 /** ป้าย mono ตัวพิมพ์ห่าง — ภาษาป้ายเดียวของทั้ง deck */
@@ -102,7 +105,7 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
           x2={t.x2}
           y2={t.y2}
           strokeWidth={t.major ? 2 : 1}
-          className={t.major ? 'stroke-sky-600/50 dark:stroke-sky-300/50' : 'stroke-slate-400/50 dark:stroke-slate-500/30'}
+          className={t.major ? 'stroke-slate-500/50 dark:stroke-slate-300/40' : 'stroke-slate-400/40 dark:stroke-slate-500/30'}
         />
       ))}
 
@@ -114,7 +117,7 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
           r={172}
           fill="none"
           strokeWidth="1"
-          className="stroke-teal-600/40 dark:stroke-teal-300/40"
+          className="stroke-rose-900/35 dark:stroke-rose-300/35"
           strokeDasharray="2 9"
         />
       </g>
@@ -125,7 +128,7 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
           r={150}
           fill="none"
           strokeWidth="3"
-          className="stroke-sky-600/45 dark:stroke-sky-300/45"
+          className="stroke-slate-500/45 dark:stroke-slate-300/35"
           strokeDasharray="70 34 16 34 8 46"
           strokeLinecap="round"
         />
@@ -137,7 +140,7 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
           r={128}
           fill="none"
           strokeWidth="1.5"
-          className="stroke-teal-600/55 dark:stroke-teal-300/55"
+          className="stroke-rose-900/50 dark:stroke-rose-300/50"
           strokeDasharray="1 7"
         />
         <line
@@ -146,14 +149,14 @@ const Dial: React.FC<{ tasksLeft: number | null; status: { text: string; tone: s
           x2={C}
           y2={C - 119}
           strokeWidth="3"
-          className="stroke-teal-600 dark:stroke-teal-300"
+          className="stroke-rose-900 dark:stroke-rose-300"
           strokeLinecap="round"
         />
       </g>
 
-      <polygon points={HEX_POINTS} fill="none" strokeWidth="1" className="stroke-sky-600/35 dark:stroke-sky-300/35" />
+      <polygon points={HEX_POINTS} fill="none" strokeWidth="1" className="stroke-slate-500/30 dark:stroke-slate-300/25" />
       <circle cx={C} cy={C} r={96} fill="none" strokeWidth="1" className="stroke-slate-900/15 dark:stroke-white/12" />
-      <circle cx={C} cy={C} r={78} className="fill-teal-600/5 dark:fill-teal-300/5 jarvis-core-breathe" />
+      <circle cx={C} cy={C} r={78} className="fill-rose-900/5 dark:fill-rose-300/5 jarvis-core-breathe" />
     </svg>
 
     {/* ใจกลาง: ตัวเลขเดียว — เหลือกี่เรื่องที่ต้องลงมือ */}
@@ -190,7 +193,7 @@ const RobotMascot: React.FC = () => {
     <div className="pointer-events-none relative hidden w-[170px] shrink-0 justify-self-end xl:block">
       {/* แสงนวลหนุนหลัง — ไม่ให้ตัวหุ่นลอยอยู่บนความว่าง */}
       <span
-        className="absolute inset-x-2 bottom-2 top-8 rounded-full bg-teal-300/10 blur-2xl"
+        className="absolute inset-x-2 bottom-2 top-8 rounded-full bg-rose-300/10 blur-2xl"
         aria-hidden
       />
       <motion.img
@@ -244,11 +247,15 @@ const CommandDeck: React.FC<{
 
       {/* ── แถบหัว: ระบบ · สถานะสด · วันเวลาเดินวินาที ── */}
       <div className="relative flex items-center gap-3 border-b border-slate-900/10 px-6 py-3.5 dark:border-white/10 lg:px-9">
-        <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-300')}>SO RECRUIT</span>
+        <span className={cn(eyebrow, 'text-rose-900 dark:text-rose-300')}>SO RECRUIT</span>
         {/* ชิปสถานะ = Badge ของ shadcn (เดิมวาดกรอบ/มุมเอง) */}
-        <Badge variant="outline" className="gap-1.5 border-teal-600/30 px-2.5 py-0.5 dark:border-teal-300/30">
-          <span className="jarvis-core-breathe h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-teal-300" aria-hidden />
-          <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-200')}>สถานะสด</span>
+        {/* ⚠️ จุด "สถานะสด" ยังเป็น**เขียว** — เป็นความหมาย (ระบบยังเดินอยู่) ไม่ใช่สีแบรนด์ */}
+        <Badge variant="outline" className="gap-1.5 px-2.5 py-0.5">
+          <span
+            className="jarvis-core-breathe h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"
+            aria-hidden
+          />
+          <span className={cn(eyebrow, 'text-muted-foreground')}>สถานะสด</span>
         </Badge>
         <span className="flex-1" />
         <span className="hidden font-mono text-[11px] text-slate-500 dark:text-slate-500 sm:block">
@@ -289,7 +296,10 @@ const CommandDeck: React.FC<{
               <div className="mt-6 flex items-center gap-4">
                 <Button
                   asChild
-                  className="h-11 rounded-xl bg-gradient-to-b from-sky-400 to-teal-300 px-6 text-sm font-semibold text-slate-900 shadow-[0_8px_28px_-6px_rgba(94,234,212,0.55)] hover:from-sky-300 hover:to-teal-200"
+                  /* 🔴 ใช้ปุ่มมาตรฐานของธีม (สีหลัก = เบอร์กันดี) ไม่ปั้นไล่เฉดเอง
+                     — ของเดิมเป็นไล่เฉดฟ้า→เขียวพร้อมเงาสีที่เขียน rgba ดิบในคลาส */
+                  size="lg"
+                  className="rounded-xl px-6 text-sm font-semibold"
                 >
                   <Link to={head.path}>
                     {head.action}
@@ -346,7 +356,7 @@ const CommandDeck: React.FC<{
                         className={cn(
                           'flex h-5 w-5 items-center justify-center rounded-full border',
                           nowStep
-                            ? 'border-sky-600 text-sky-700 shadow-[0_0_12px_theme(colors.sky.400/40%)] dark:border-sky-300 dark:text-sky-200'
+                            ? 'border-rose-900 text-rose-900 dark:border-rose-300 dark:text-rose-200'
                             : before
                               ? 'border-slate-900/15 text-slate-400 dark:border-white/15 dark:text-slate-600'
                               : 'border-slate-900/15 text-slate-500 dark:border-white/15 dark:text-slate-500',
@@ -389,7 +399,7 @@ const CommandDeck: React.FC<{
                   to={t.path}
                   className="group flex items-center gap-4 px-6 py-3 transition-colors hover:bg-slate-900/5 dark:hover:bg-white/5 lg:px-9"
                 >
-                  <span className="font-mono text-xs tabular-nums text-teal-700/70 dark:text-teal-300/60">
+                  <span className="font-mono text-xs tabular-nums text-rose-900/70 dark:text-rose-300/60">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -402,7 +412,7 @@ const CommandDeck: React.FC<{
                     {t.badge}
                   </span>
                   <ArrowRight
-                    className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-teal-700 dark:text-slate-600 dark:group-hover:text-teal-300"
+                    className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-rose-900 dark:text-slate-600 dark:group-hover:text-rose-300"
                     aria-hidden
                   />
                 </Link>

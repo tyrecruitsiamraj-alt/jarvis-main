@@ -49,11 +49,17 @@ const T = {
 
 type TeamKey = 'online' | 'recruit' | 'closing' | 'lumos';
 
+/**
+ * 🔴 **หัวทีมสีเดียวกันหมด** (5 ก.ย. 2569 — เจ้าของสั่งใช้จานสีเดียวกับหน้า Login)
+ * ของเดิมให้สีทีมละสี (ส้ม/เขียวน้ำทะเล/ม่วง/แดง) ⇒ หน้าแรกอ่านเป็นรุ้ง ทั้งที่
+ * สีพวกนั้น**ไม่ได้แปลว่าอะไร** — คนละคอลัมน์ก็แยกทีมออกอยู่แล้ว
+ * สีที่เหลือบนบอร์ดจึงเหลือเฉพาะสีที่มีความหมายจริง (ด่วน/เกินกำหนด)
+ */
 const ACCENT: Record<TeamKey, string> = {
-  online: 'text-orange-700 dark:text-orange-300',
-  recruit: 'text-teal-700 dark:text-teal-300',
-  closing: 'text-violet-700 dark:text-violet-300',
-  lumos: 'text-red-700 dark:text-red-300',
+  online: 'text-foreground',
+  recruit: 'text-foreground',
+  closing: 'text-foreground',
+  lumos: 'text-foreground',
 };
 
 /** ⚠️ Intl ระดับโมดูล — กติกาโปรเจกต์ (เคยทำหน้าช้า 4.7 วิ) */
@@ -240,7 +246,7 @@ const TeamBoardPanel: React.FC<{
       ))}
 
       <div className={cn('relative flex items-center gap-3 border-b px-6 py-3.5', T.line)}>
-        <span className={cn(eyebrow, 'text-teal-700 dark:text-teal-300')}>
+        <span className={cn(eyebrow, 'text-rose-900 dark:text-rose-300')}>
           ทีมปฏิบัติการ · ใครทำอะไรอยู่
         </span>
         <span className="flex-1" />

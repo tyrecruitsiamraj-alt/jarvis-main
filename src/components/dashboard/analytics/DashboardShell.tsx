@@ -178,7 +178,7 @@ const DashboardShell: React.FC<Props> = ({
                   onChange={(e) => onFiltersChange({ search: e.target.value })}
                   placeholder="ค้นหาเพื่อกรองไฟล์ CSV (ไม่เปลี่ยนตัวเลขบนหน้า)"
                   title="ช่องนี้กรองข้อมูลในไฟล์ที่กด Export CSV เท่านั้น — ตัวเลขและกราฟบนหน้านี้ไม่เปลี่ยน"
-                  className="w-full rounded-full border-0 bg-slate-100 dark:bg-slate-800 py-2.5 pl-9 pr-3 text-sm text-slate-900 dark:text-slate-100 shadow-inner placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  className="w-full rounded-full border-0 bg-slate-100 dark:bg-slate-800 py-2.5 pl-9 pr-3 text-sm text-slate-900 dark:text-slate-100 shadow-inner placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-ring/40"
                 />
               </div>
               <div className="flex gap-2">

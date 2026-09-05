@@ -9,17 +9,24 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // สีมาจากตัวแปรธีม (--jarvis-ink* ประกาศใน src/index.css ทั้ง :root และ .dark)
-        // จึงสลับตามธีมเองโดยไม่ต้องมี dark: ที่นี่ · เส้นในโทน teal เฉพาะธีมมืดให้เข้าภาษา HUD
+        /**
+         * 🔴 **สีมาจากตัวแปรธีมล้วน ๆ** (5 ก.ย. 2569 — เจ้าของสั่งให้ทั้งระบบใช้จานสี
+         * เดียวกับหน้า Login) · ของเดิม `default` เป็นหมึกดำ `--jarvis-ink` และ `link`
+         * เป็นฟ้า `text-blue-600` ⇒ ปุ่มหลักทั้งแอปเป็นสีดำ คนละเรื่องกับปุ่มเบอร์กันดี
+         * ที่เจ้าของเคาะบนหน้า Login · ตอนนี้ทุก variant อ่านจาก `--primary`/`--accent`/
+         * `--border` ⇒ เปลี่ยนจานสีที่ `src/index.css` ที่เดียว ปุ่มทั้งระบบเปลี่ยนตาม
+         * ⚠️ `outline`/`secondary`/`ghost` เดิมใช้ `bg-white/xx` ตายตัว ⇒ บนธีมมืด
+         * ต้องเขียนคู่ `dark:` ทุกครั้ง (ลืมบ่อย) · token ของธีมสลับให้เองอยู่แล้ว
+         */
         default:
-          "bg-[var(--jarvis-ink)] text-white shadow-[var(--jarvis-ink-shadow)] hover:bg-[var(--jarvis-ink-hover)] hover:-translate-y-0.5 dark:ring-1 dark:ring-inset dark:ring-teal-300/20 dark:hover:ring-teal-300/40",
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:-translate-y-0.5",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full",
         outline:
-          "border border-white/80 bg-white/50 hover:bg-white/75 text-foreground dark:border-white/15 dark:bg-white/5 dark:hover:bg-white/10",
+          "border border-border bg-background/70 text-foreground hover:bg-accent hover:text-accent-foreground",
         secondary:
-          "bg-white/60 border border-white/80 text-secondary-foreground hover:bg-white/80 dark:border-white/15 dark:bg-white/[0.08] dark:hover:bg-white/15",
-        ghost: "hover:bg-white/50 hover:text-foreground rounded-full dark:hover:bg-white/10",
-        link: "text-blue-600 underline-offset-4 hover:underline rounded-none dark:text-blue-300",
+          "border border-border bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground rounded-full",
+        link: "text-primary underline-offset-4 hover:underline rounded-none",
         /**
          * 🔴 ปุ่มบน **แถบ hero พื้นเข้ม** (4 ก.ย. 2569) — ย้ายมาจากคลาส `heroButton` /
          * `heroButtonSolid` ที่เคยประกาศเองใน `PageHeroStrip.tsx` ซึ่งผิดกติกา

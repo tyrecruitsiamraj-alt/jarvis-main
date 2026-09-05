@@ -11,71 +11,91 @@
 
 @layer base {
   :root {
-    /* ── Apple-style: cool neutral surfaces + system blue accent ── */
-    --background: 240 20% 97%;
-    --foreground: 240 6% 11%;
+    /**
+     * ═══ จานสีของทั้งระบบ = **ขาว · กรมท่า · เบอร์กันดี** ═══
+     * เจ้าของสั่ง 5 ก.ย. 2569: *"หน้า Login สวยเลย เอาโทนสี เอา Style ไปปรับใช้กับ
+     * ทั้งระบบให้หน่อย ตอนนี้ระบบดูตลก ๆ"*
+     *
+     * 🔴 **แก้ที่ตัวแปรของธีมที่เดียว ไม่ได้เพิ่มคลาสใหม่สักคลาส** (กฎ "ห้ามเขียน CSS เอง"
+     * 4 ก.ย. 2569) — component ของ shadcn ทุกตัวอ่านสีจากตัวแปรพวกนี้อยู่แล้ว
+     * เปลี่ยนค่าที่นี่ = ปุ่ม/ช่องกรอก/แท็บ/เมนู/วงแหวนโฟกัส เปลี่ยนตามทั้งแอปพร้อมกัน
+     *
+     * ค่าที่มาจากหน้า Login (`LOGIN_SCENE` ใน src/lib/designTokens.ts):
+     *   หมึกกรมท่า #12203c = hsl(220 54% 15%) · เบอร์กันดี #8c2f39 = hsl(353 50% 37%)
+     *   เส้นผม/พื้นรอง = กรมท่าจาง ๆ (ไม่ใช่เทากลาง ๆ ที่ทำให้จอดูหม่น)
+     * ⚠️ **สีที่มีความหมาย ไม่ถูกแตะ** — success/warning/info/destructive/status-*
+     * เป็นภาษาของตัวเลข ไม่ใช่ของแบรนด์ (กติกา "หนึ่งความหมาย = หนึ่งสี")
+     */
+    --background: 220 24% 97%;
+    --foreground: 220 54% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 6% 11%;
+    --card-foreground: 220 54% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 11%;
+    --popover-foreground: 220 54% 15%;
 
-    --primary: 211 100% 50%;
+    /* ปุ่มหลัก/ลิงก์/วงแหวนโฟกัส = เบอร์กันดี (เดิมเป็นฟ้า Apple ซึ่งชนกับหน้า Login) */
+    --primary: 353 50% 37%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 12% 95%;
-    --secondary-foreground: 240 5% 26%;
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 220 40% 25%;
 
-    --muted: 240 12% 95%;
-    --muted-foreground: 240 5% 42%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 220 16% 45%;
 
-    --accent: 211 100% 50%;
-    --accent-foreground: 0 0% 100%;
+    /**
+     * ⚠️ `--accent` คือ **พื้น hover ของเมนู/รายการ** ไม่ใช่สีแบรนด์
+     * เดิมตั้งเป็นฟ้าอิ่ม ⇒ เอาเมาส์ชี้เมนูทีเป็นแถบฟ้าทั้งแถบ (ต้นเหตุที่ระบบ "ดูตลก")
+     * ⇒ เปลี่ยนเป็นพื้นกรมท่าจาง ๆ ตัวหนังสือสีหมึก แบบเดียวกับการ์ดหน้า Login
+     */
+    --accent: 220 22% 94%;
+    --accent-foreground: 220 54% 15%;
 
     --destructive: 3 90% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 12% 90%;
-    --input: 240 12% 90%;
-    --ring: 211 100% 50%;
+    --border: 220 20% 89%;
+    --input: 220 20% 89%;
+    --ring: 353 50% 37%;
 
     --radius: 0.875rem;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 5% 26%;
-    --sidebar-primary: 211 100% 50%;
+    --sidebar-foreground: 220 40% 25%;
+    --sidebar-primary: 353 50% 37%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 12% 95%;
-    --sidebar-accent-foreground: 240 6% 11%;
-    --sidebar-border: 240 12% 90%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 220 22% 94%;
+    --sidebar-accent-foreground: 220 54% 15%;
+    --sidebar-border: 220 20% 89%;
+    --sidebar-ring: 353 50% 37%;
 
     --success: 145 63% 42%;
     --success-foreground: 0 0% 100%;
     --warning: 36 100% 50%;
-    --warning-foreground: 240 6% 11%;
-    --info: 211 100% 50%;
+    --warning-foreground: 220 54% 15%;
+    --info: 211 100% 45%;
     --info-foreground: 0 0% 100%;
 
     --status-normal: 145 63% 42%;
     --status-cancel-employee: 3 90% 55%;
     --status-late: 36 100% 50%;
     --status-cancel-client: 270 60% 55%;
-    --status-no-show: 240 4% 40%;
+    --status-no-show: 220 12% 45%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(205 100% 55%), hsl(217 100% 50%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.9), hsl(240 20% 98% / 0.72));
-    --gradient-hero: linear-gradient(135deg, hsl(240 20% 98%), hsl(240 14% 94%));
+    --gradient-primary: linear-gradient(135deg, hsl(355 50% 43%), hsl(353 50% 33%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.92), hsl(220 24% 98% / 0.74));
+    --gradient-hero: linear-gradient(135deg, hsl(220 24% 98%), hsl(220 20% 94%));
 
-    --shadow-glow: 0 0 40px hsl(211 100% 50% / 0.2);
-    --shadow-card: 0 8px 24px hsl(240 8% 12% / 0.06);
+    --shadow-glow: 0 0 40px hsl(353 50% 37% / 0.18);
+    --shadow-card: 0 8px 24px hsl(220 30% 15% / 0.08);
 
-    --jarvis-warm-1: #f5f5f7;
-    --jarvis-warm-2: #eeeef2;
-    --jarvis-warm-3: #e7e7ec;
-    --jarvis-orange: #007aff;
-    --jarvis-orange-soft: #5ac8fa;
+    --jarvis-warm-1: #f5f6f9;
+    --jarvis-warm-2: #eef0f5;
+    --jarvis-warm-3: #e6e9f0;
+    --jarvis-orange: #8c2f39;
+    --jarvis-orange-soft: #b8434f;
 
     /* Kanit ทั้งไทยและ Latin (ดีไซน์ใหม่ 26 ส.ค. 2569 — ฟอนต์เดียวกับต้นแบบที่เจ้าของเคาะ)
        ⚠️ เดิมเป็น SF Pro (Latin) + Anuphan (ไทย) ⇒ **สองฟอนต์ในบรรทัดเดียว**
@@ -90,26 +110,27 @@
   /* ── Dark mode — สลับด้วย class `dark` บน <html> (src/lib/theme.ts) ──
      คุมโทนเดียวกับ light: พื้นเทาเย็นแบบ Apple + system blue accent */
   .dark {
-    --background: 240 6% 8%;
-    --foreground: 240 10% 92%;
+    /* ธีมมืด = **กรมท่าเข้ม** ไม่ใช่เทาดำ ⇒ อยู่จานเดียวกับธีมสว่างและหน้า Login */
+    --background: 220 40% 8%;
+    --foreground: 220 20% 92%;
 
-    --card: 240 5% 12%;
-    --card-foreground: 240 10% 92%;
+    --card: 220 32% 12%;
+    --card-foreground: 220 20% 92%;
 
-    --popover: 240 5% 12%;
-    --popover-foreground: 240 10% 92%;
+    --popover: 220 32% 12%;
+    --popover-foreground: 220 20% 92%;
 
-    --primary: 211 100% 55%;
+    --primary: 353 55% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 16%;
-    --secondary-foreground: 240 8% 80%;
+    --secondary: 220 24% 17%;
+    --secondary-foreground: 220 16% 82%;
 
-    --muted: 240 5% 16%;
-    --muted-foreground: 240 5% 64%;
+    --muted: 220 24% 17%;
+    --muted-foreground: 220 12% 64%;
 
-    --accent: 211 100% 55%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 220 24% 18%;
+    --accent-foreground: 220 20% 92%;
 
     --destructive: 3 85% 58%;
     --destructive-foreground: 0 0% 100%;
@@ -120,32 +141,32 @@
     --success: 145 55% 52%;
     --success-foreground: 0 0% 100%;
     --warning: 36 92% 58%;
-    --warning-foreground: 240 6% 11%;
+    --warning-foreground: 220 54% 12%;
     --info: 211 100% 62%;
     --info-foreground: 0 0% 100%;
 
-    --border: 240 5% 22%;
-    --input: 240 5% 22%;
-    --ring: 211 100% 55%;
+    --border: 220 20% 22%;
+    --input: 220 20% 22%;
+    --ring: 353 55% 50%;
 
-    --sidebar-background: 240 5% 10%;
-    --sidebar-foreground: 240 8% 80%;
-    --sidebar-primary: 211 100% 55%;
+    --sidebar-background: 220 36% 10%;
+    --sidebar-foreground: 220 16% 82%;
+    --sidebar-primary: 353 55% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 16%;
-    --sidebar-accent-foreground: 240 10% 92%;
-    --sidebar-border: 240 5% 22%;
-    --sidebar-ring: 211 100% 55%;
+    --sidebar-accent: 220 24% 17%;
+    --sidebar-accent-foreground: 220 20% 92%;
+    --sidebar-border: 220 20% 22%;
+    --sidebar-ring: 353 55% 50%;
 
-    --gradient-card: linear-gradient(145deg, hsl(240 5% 13% / 0.92), hsl(240 5% 10% / 0.75));
-    --gradient-hero: linear-gradient(135deg, hsl(240 5% 11%), hsl(240 5% 8%));
+    --gradient-card: linear-gradient(145deg, hsl(220 32% 13% / 0.92), hsl(220 36% 10% / 0.75));
+    --gradient-hero: linear-gradient(135deg, hsl(220 34% 11%), hsl(220 40% 8%));
 
-    --shadow-glow: 0 0 40px hsl(211 100% 55% / 0.25);
-    --shadow-card: 0 8px 24px hsl(0 0% 0% / 0.45);
+    --shadow-glow: 0 0 40px hsl(353 55% 50% / 0.25);
+    --shadow-card: 0 8px 24px hsl(220 60% 3% / 0.5);
 
-    --jarvis-warm-1: #0e0e11;
-    --jarvis-warm-2: #121218;
-    --jarvis-warm-3: #16161d;
+    --jarvis-warm-1: #0d1220;
+    --jarvis-warm-2: #111728;
+    --jarvis-warm-3: #151d31;
   }
 }
 
@@ -556,11 +577,13 @@
    สีเส้น = teal-300 (#5eead4) ชุดเดียวกับ TONE.teal.onDark ที่ระบบใช้บนพื้นเข้มอยู่แล้ว
    ═══════════════════════════════════════════════════════════════════════════ */
 @layer utilities {
+  /* 🔴 เส้นเรืองของ HUD เปลี่ยนจาก **เขียวน้ำทะเล** เป็น **เบอร์กันดี** (5 ก.ย. 2569)
+     เจ้าของสั่งให้ทั้งระบบใช้จานสีเดียวกับหน้า Login — แก้ค่าในกฎเดิม ไม่ได้เพิ่มคลาสใหม่ */
   .jarvis-hud-panel {
-    --jarvis-hud-line: rgba(94, 234, 212, 0.32);
-    --jarvis-hud-line-soft: rgba(94, 234, 212, 0.14);
+    --jarvis-hud-line: rgba(184, 67, 79, 0.38);
+    --jarvis-hud-line-soft: rgba(184, 67, 79, 0.16);
     @apply relative overflow-hidden rounded-2xl text-white;
-    background: radial-gradient(900px 300px at 8% -35%, #12314a 0%, #0a1120 58%);
+    background: radial-gradient(900px 300px at 8% -35%, #16233f 0%, #0d1526 58%);
     border: 1px solid var(--jarvis-hud-line-soft);
     box-shadow:
       0 12px 40px rgba(6, 12, 24, 0.32),
@@ -622,14 +645,14 @@
     @apply transition-colors;
   }
   .jarvis-hud-inner-hover:hover {
-    background: rgba(94, 234, 212, 0.07);
+    background: rgba(184, 67, 79, 0.09);
     border-color: var(--jarvis-hud-line);
   }
 
   /* เส้นสแกนวิ่ง — ของประดับชิ้นเดียวที่ยอมให้มี (1 เส้นต่อแผง) */
   .jarvis-hud-scan {
     @apply pointer-events-none absolute inset-x-0 top-0 h-16;
-    background: linear-gradient(to bottom, rgba(94, 234, 212, 0.10), transparent);
+    background: linear-gradient(to bottom, rgba(184, 67, 79, 0.10), transparent);
     animation: jarvis-hud-sweep 5.5s ease-in-out infinite;
   }
 
@@ -659,23 +682,23 @@
      แบบต้นแบบที่เจ้าของเคาะ (workfiles/so-redesign/Requests.dc.html) · โหมดมืด = ink เดิม
      ⚠️ ห้ามเอา dark: ไปเติมชุด HUD_* (เทสต์ designTokens ห้าม) — deck เป็นคนละชุดกัน */
   .jarvis-deck {
-    --jarvis-hud-line: rgba(13, 120, 110, 0.35);
-    --jarvis-hud-line-soft: rgba(20, 20, 30, 0.1);
+    --jarvis-hud-line: rgba(140, 47, 57, 0.35);
+    --jarvis-hud-line-soft: rgba(18, 32, 60, 0.1);
     @apply relative overflow-hidden text-slate-900;
     background:
-      radial-gradient(1100px 480px at 72% -12%, rgba(56, 130, 230, 0.08), transparent 60%),
-      linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(246, 247, 250, 0.86) 100%);
+      radial-gradient(1100px 480px at 72% -12%, rgba(24, 46, 92, 0.08), transparent 60%),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 246, 250, 0.88) 100%);
     border: 1px solid var(--jarvis-hud-line-soft);
     box-shadow: 0 8px 30px rgba(17, 17, 26, 0.08);
   }
   .dark .jarvis-deck {
-    --jarvis-hud-line: rgba(94, 234, 212, 0.32);
-    --jarvis-hud-line-soft: rgba(94, 234, 212, 0.1);
+    --jarvis-hud-line: rgba(184, 67, 79, 0.34);
+    --jarvis-hud-line-soft: rgba(184, 67, 79, 0.12);
     @apply text-white;
     background:
-      radial-gradient(1100px 480px at 72% -12%, rgba(56, 130, 230, 0.14), transparent 60%),
-      radial-gradient(800px 420px at -5% 105%, rgba(94, 234, 212, 0.08), transparent 55%),
-      linear-gradient(170deg, #070d1a 0%, #0b1426 55%, #081120 100%);
+      radial-gradient(1100px 480px at 72% -12%, rgba(36, 66, 130, 0.16), transparent 60%),
+      radial-gradient(800px 420px at -5% 105%, rgba(140, 47, 57, 0.12), transparent 55%),
+      linear-gradient(170deg, #0a1020 0%, #0f1a2e 55%, #0b1322 100%);
     box-shadow:
       0 24px 70px -20px rgba(6, 12, 24, 0.55),
       inset 0 1px 0 rgba(160, 215, 255, 0.08);
@@ -684,12 +707,12 @@
   .jarvis-deck::before {
     content: '';
     @apply pointer-events-none absolute inset-0;
-    background-image: radial-gradient(rgba(30, 60, 120, 0.12) 1px, transparent 1.5px);
+    background-image: radial-gradient(rgba(18, 32, 60, 0.12) 1px, transparent 1.5px);
     background-size: 30px 30px;
     mask-image: radial-gradient(110% 80% at 50% 0%, #000 0%, transparent 78%);
   }
   .dark .jarvis-deck::before {
-    background-image: radial-gradient(rgba(125, 211, 252, 0.14) 1px, transparent 1.5px);
+    background-image: radial-gradient(rgba(170, 190, 225, 0.14) 1px, transparent 1.5px);
   }
 
   /* ── JARVIS Core — แกนวงแหวนของหน้าปัด (วาดด้วยโค้ดล้วน · 26 ส.ค. 2569) ──
@@ -790,12 +813,15 @@
        Tailwind ที่ `tailwind.config.ts` ⇒ ไฟล์จอเรียก `bg-ink` `text-gold` ฯลฯ
        ห้ามพิมพ์ hex ในไฟล์จออีก ยกเว้นสีแบรนด์ของคนอื่น (โลโก้ Microsoft) */
     --jarvis-gold: #b08d4f;
-    --jarvis-hero: #5b8bff;
-    --jarvis-hero-strong: #8fb2ff;
-    --jarvis-hero-dim: #2b3a5e;
+    /* 🔴 สีเน้นบนแถบ hero พื้นเข้ม — เดิมเป็น **ฟ้าสด #5b8bff** ซึ่งเป็นจานเก่า
+       (5 ก.ย. 2569 เจ้าของสั่งใช้จานเดียวกับหน้า Login) ⇒ เบอร์กันดีที่สว่างพอ
+       จะอ่านออกบนพื้นกรมท่า · เข้ม/อ่อนไล่ตามลำดับเดิม ไฟล์จอไม่ต้องแก้สักบรรทัด */
+    --jarvis-hero: #b8434f;
+    --jarvis-hero-strong: #d4636d;
+    --jarvis-hero-dim: #3a2434;
     --jarvis-splash: #fcfbf8;
     --jarvis-night: #10182b;
-    --jarvis-hero-hover: #7ba1ff;
+    --jarvis-hero-hover: #c4505c;
     --jarvis-night-hover: #1c2949;
   }
 
@@ -803,8 +829,8 @@
   .dark {
     /* ทองในธีมมืดต้องสว่างขึ้น ไม่งั้นจมพื้น — สลับที่ตัวแปร ไฟล์จอไม่ต้องมี dark: */
     --jarvis-gold: #cfae72;
-    --jarvis-ink: #17262e;
-    --jarvis-ink-hover: #1e3540;
+    --jarvis-ink: #16233f;
+    --jarvis-ink-hover: #1e3054;
     --jarvis-ink-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   }
 }
