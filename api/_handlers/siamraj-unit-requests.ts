@@ -23,8 +23,9 @@ import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { getUnitWorkStatusMap } from '../_lib/siamrajUnitWorkStatus.js';
 import { attachUnitSector } from '../_lib/unitSectorStore.js';
-import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
+import { loadUserDepartmentScope, type DepartmentScope } from '../_lib/departmentScope.js';
 import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
+import { logInfo, logWarn } from '../_lib/logger.js';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -150,6 +151,92 @@ async function attachErpBenefits(items: Array<Record<string, unknown>>): Promise
   }
 }
 
+/**
+ * ═══ ใบขอชุดเต็มพร้อมของแนบ อ่านผ่านสำเนาชั้นนอก — **ที่เดียว** ═══
+ *
+ * 🔴 เส้นนี้ช้าที่สุดของระบบ — วัดจริง 10 วิตอนเร็ว ตาย 60 วิตอนช้า และตาย 4 ใน 6 ครั้ง
+ * ⇒ อ่านผ่านสำเนาอายุสั้น · `fresh` = ข้ามสำเนาไปถามสด (ปุ่มรีเฟรชบนจอ)
+ * ⚠️ ถามใหม่ไม่ได้แต่มีสำเนาเก่า = ส่งของเก่าไปพร้อมบอกอายุ · ไม่มีสำเนาเลย = พังให้เห็น
+ * (รายละเอียดกติกาอยู่หัวไฟล์ `unitRequestCache.ts`)
+ *
+ * แยกออกมาจากตัว handler 5 ก.ย. 2569 (Wave 3.1) เพื่อให้ **ตัวอุ่นสำเนาตอนบูต**
+ * เดินเส้นเดียวกันเป๊ะ — คีย์สำเนา, ของแนบ และลำดับต้องเหมือนกัน ไม่งั้นอุ่นแล้วไม่ตรงคีย์
+ * ⚠️ ห้ามแตะรูปข้อมูล/นิยามตัวเลขใด ๆ ในนี้ — ย้ายโค้ดมาเฉย ๆ
+ */
+export function readUnitRequestListThroughCache(opts: {
+  limit: number;
+  mode?: string;
+  departmentScope: DepartmentScope;
+  fresh?: boolean;
+}) {
+  const { limit, mode, departmentScope, fresh } = opts;
+  const cacheKey = JSON.stringify(['list', limit, mode ?? '', departmentScope ?? null]);
+  return readThroughCache(
+    cacheKey,
+    async () => {
+      // 🔴 ส่ง `fresh` ต่อลงไปด้วย — สำเนาอยู่ **สองชั้น** แล้ว (ชั้นนี้ + ในตัว
+      // `listSiamrajUnitRequests`) ถ้าไม่ส่งต่อ ปุ่มรีเฟรชจะข้ามได้แค่ชั้นนอก
+      // แล้วได้ของเก่ากลับมาเหมือนเดิม (5 ก.ย. 2569)
+      const rows = await listSiamrajUnitRequests({ limit, mode, departmentScope, fresh });
+      await Promise.all([
+        attachAssignments(rows),
+        attachNotes(rows),
+        attachWorkStatus(rows),
+        // ราชการ/เอกชนของจริง — `job_category` ที่ feed ส่งมาเป็นค่าโครงสร้าง เชื่อไม่ได้
+        attachUnitSector(rows),
+        /**
+         * 🔴 สวัสดิการจากอัตราจริงใน ERP (31 ส.ค. 2569)
+         *
+         * เดิมเส้นนี้ **ไม่เคยแนบมาเลย** มีแต่ฝั่งหน้าสาธารณะ ⇒ ป๊อปกล่องงานที่ให้
+         * ติ๊กเลือกสวัสดิการเห็น 0 รายการทุกใบ ทั้งที่ของจริงมีครบ 100% ของประกาศ
+         * (วัดแล้ว: 117/117 ใบมีสวัสดิการ เฉลี่ยใบละ 3-4 รายการ)
+         *
+         * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChipsById` — ERP ล่มก็แค่ไม่มีชิป
+         * และอยู่ใต้สำเนาอายุสั้นแล้ว จึงยิงอย่างมาก 1 ครั้งต่อ 90 วินาที
+         */
+        attachErpBenefits(rows),
+      ]);
+      return rows;
+    },
+    { fresh },
+  );
+}
+
+/**
+ * ═══ อุ่นสำเนาใบขอตอนบูต — คนแรกของวันไม่ต้องจ่ายค่ารอแทนคนทั้งออฟฟิศ ═══
+ *
+ * Wave 3.1 ของ `docs/plan-quality-100-2569-09-05.md` (5 ก.ย. 2569)
+ * วัดจริงก่อนแก้ (สำเนาเย็น): `/api/siamraj/unit-requests?limit=500` = **4.4 วินาที**
+ *
+ * 🔴 ใช้เฉพาะ **เซิร์ฟเวอร์ที่อยู่ยาว** (`npm run api:local` / on-prem) —
+ * บน Vercel serverless คอนเทนเนอร์ตื่นมาตอบไม่กี่ request ก็หลับ การอุ่นตอนบูตจะกลายเป็น
+ * งานเพิ่มให้ทุก cold start แทนที่จะช่วย (ตัว stale-while-revalidate ใน `unitRequestCache`
+ * คือทางที่ได้ผลกับทั้งสองแบบ)
+ *
+ * 🔴 **ห้ามบล็อกการเปิดรับ request** — fire-and-forget · ล้มก็แค่กลับไปเป็นพฤติกรรมเดิม
+ * ⚠️ อุ่นได้เฉพาะ scope กลาง (`{ mode: 'all' }` limit 500) = ของ admin และเส้นที่ไม่ผูก BU
+ * คนที่ล็อก BU เดี่ยวยังต้องโหลดของตัวเองรอบแรก (คีย์สำเนาคนละตัว) — ตั้งใจให้เป็นแบบนั้น
+ * เพราะอุ่นทุก BU = ยิงระบบงานหลัก 5 รอบตอนบูตโดยยังไม่มีใครขอ
+ */
+export function warmUnitRequestListCache(): void {
+  if (!isSiamrajUnitRequestsEnabled()) return;
+  const started = Date.now();
+  void readUnitRequestListThroughCache({ limit: 500, departmentScope: { mode: 'all' } })
+    .then((outcome) => {
+      logInfo('siamrajUnitRequests.warmed', {
+        ms: Date.now() - started,
+        count: Array.isArray(outcome.value) ? outcome.value.length : null,
+        source: outcome.source,
+      });
+    })
+    .catch((e: unknown) => {
+      logWarn('siamrajUnitRequests.warmFailed', {
+        ms: Date.now() - started,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    });
+}
+
 async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
@@ -256,37 +343,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
      * ⚠️ ถามใหม่ไม่ได้แต่มีสำเนาเก่า = ส่งของเก่าไปพร้อมบอกอายุ · ไม่มีสำเนาเลย = พังให้เห็น
      * (รายละเอียดกติกาอยู่หัวไฟล์ `unitRequestCache.ts`)
      */
-    const cacheKey = JSON.stringify(['list', limit, mode ?? '', departmentScope ?? null]);
     const fresh = getQuery(req, 'fresh') === '1';
-    const outcome = await readThroughCache(
-      cacheKey,
-      async () => {
-        // 🔴 ส่ง `fresh` ต่อลงไปด้วย — สำเนาอยู่ **สองชั้น** แล้ว (ชั้นนี้ + ในตัว
-        // `listSiamrajUnitRequests`) ถ้าไม่ส่งต่อ ปุ่มรีเฟรชจะข้ามได้แค่ชั้นนอก
-        // แล้วได้ของเก่ากลับมาเหมือนเดิม (5 ก.ย. 2569)
-        const rows = await listSiamrajUnitRequests({ limit, mode, departmentScope, fresh });
-        await Promise.all([
-          attachAssignments(rows),
-          attachNotes(rows),
-          attachWorkStatus(rows),
-          // ราชการ/เอกชนของจริง — `job_category` ที่ feed ส่งมาเป็นค่าโครงสร้าง เชื่อไม่ได้
-          attachUnitSector(rows),
-          /**
-           * 🔴 สวัสดิการจากอัตราจริงใน ERP (31 ส.ค. 2569)
-           *
-           * เดิมเส้นนี้ **ไม่เคยแนบมาเลย** มีแต่ฝั่งหน้าสาธารณะ ⇒ ป๊อปกล่องงานที่ให้
-           * ติ๊กเลือกสวัสดิการเห็น 0 รายการทุกใบ ทั้งที่ของจริงมีครบ 100% ของประกาศ
-           * (วัดแล้ว: 117/117 ใบมีสวัสดิการ เฉลี่ยใบละ 3-4 รายการ)
-           *
-           * ⚠️ error-safe อยู่แล้วที่ `fetchJobBenefitChipsById` — ERP ล่มก็แค่ไม่มีชิป
-           * และอยู่ใต้สำเนาอายุสั้นแล้ว จึงยิงอย่างมาก 1 ครั้งต่อ 90 วินาที
-           */
-          attachErpBenefits(rows),
-        ]);
-        return rows;
-      },
-      { fresh },
-    );
+    const outcome = await readUnitRequestListThroughCache({ limit, mode, departmentScope, fresh });
     const items = outcome.value;
     // หน้าจอเอาไปเขียนว่า "ข้อมูลเมื่อ X นาทีที่แล้ว" — ไม่แตะรูปคำตอบเดิม (ยังเป็น array)
     res.setHeader?.('x-data-age-seconds', String(ageSeconds(outcome.fetchedAt)));

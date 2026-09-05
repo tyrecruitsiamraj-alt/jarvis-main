@@ -92,7 +92,7 @@ export function ledgerStateText(state: LedgerState) {
  */
 export function dataAgeLabel(
   ageSeconds: number | null,
-  source: 'live' | 'cache' | 'stale-after-error' | null = null,
+  source: 'live' | 'cache' | 'stale-revalidating' | 'stale-after-error' | null = null,
 ): string | null {
   if (ageSeconds === null) return null;
   const stale = source === 'stale-after-error';

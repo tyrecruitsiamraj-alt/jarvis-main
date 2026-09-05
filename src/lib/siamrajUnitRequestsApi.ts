@@ -30,8 +30,11 @@ export type UnitRequestsResult = {
   items: JobRequest[];
   /** ข้อมูลชุดนี้ไปเอามาจากระบบงานหลักเมื่อกี่วินาทีที่แล้ว — `null` = ไม่รู้ */
   ageSeconds: number | null;
-  /** `stale-after-error` = ถามใหม่ไม่สำเร็จ เลยหยิบสำเนาเก่ามาให้ */
-  source: 'live' | 'cache' | 'stale-after-error' | null;
+  /**
+   * `stale-revalidating` = สำเนาเกินอายุ ฝั่ง server ตอบของเก่ามาก่อนแล้วกำลังเติมของใหม่
+   * (ระบบงานหลักยังดี แค่ช้า) · `stale-after-error` = ถามใหม่ไม่สำเร็จ เลยหยิบสำเนาเก่ามาให้
+   */
+  source: 'live' | 'cache' | 'stale-revalidating' | 'stale-after-error' | null;
 };
 
 export async function fetchSiamrajUnitRequestsWithMeta(

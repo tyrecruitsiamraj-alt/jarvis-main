@@ -17,6 +17,7 @@ import { startMatchPrecomputeWorker } from '../api/_lib/matchPrecomputeWorker.ts
 import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveWorker.ts';
 import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
 import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
+import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
 type VercelLikeRes = {
@@ -189,4 +190,12 @@ server.listen(port, '127.0.0.1', () => {
   // 🔴 worker กันชื่อดอง — **ปิดโดยดีฟอลต์** (ถอด claim ของคนจริง + ยิงสายจริง)
   // เปิดที่ deploy ด้วย CLAIM_GUARD_ENABLED=true เท่านั้น (ฐาน dev = production)
   startClaimGuardWorker();
+  /**
+   * อุ่นสำเนาใบขอทันทีหลังเปิดรับ request แล้ว (Wave 3.1 · 5 ก.ย. 2569)
+   *
+   * 🔴 อยู่ **หลัง** `listen()` และเป็น fire-and-forget — คนแรกที่เข้ามาระหว่างอุ่นอยู่
+   * ยังใช้งานได้ตามปกติ (เขาจะไปเข้าคิวโหลดเดียวกันหรือรอโหลดของตัวเอง ไม่มีใครถูกบล็อก)
+   * อ่านอย่างเดียว ไม่เขียนอะไรลงฐาน
+   */
+  warmUnitRequestListCache();
 });
