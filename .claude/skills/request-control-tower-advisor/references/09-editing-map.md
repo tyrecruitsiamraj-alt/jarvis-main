@@ -7193,3 +7193,63 @@ framer-motion) · **เก็บไว้อย่างเดียวคือ
   เพราะสั่งปิดไม่ได้ ถ้าปักป้ายไว้จะกลายเป็นกับดัก (กดย้อนกลับแล้วออกจากหน้าไม่ได้)
 * จุดที่ส่ง `embedded` (`GenApplyLinkDialog` · `EditPostingDialog` ฯลฯ) — ไม่ได้ render
   `<Dialog>` เลย จึงไม่มีอะไรผูก (แพตเทิร์นกันซ้อน Dialog ตามกติกา UI ของโปรเจกต์)
+
+## รอบ 116 — ปิดงานค้าง 3 ข้อจากรายงานผู้ทดสอบ: ปุ่มมือถือ + ระยะจอ Dashboard + คำนำหน้า "สาเหตุที่ขอ:" (5 ก.ย. 2569)
+
+ต่อจากแผน `docs/plan-quality-100-2569-09-05.md` · ทั้งหมดเป็นงาน UI/spacing/ข้อความล้วน
+🔴 **ไม่แตะนิยาม/ตรรกะของตัวเลขแม้แต่ตัวเดียว** — วัดจริงบนจอมือถือ 375px ก่อนแก้ทุกจุด
+
+### ข้อ 1 — ปุ่มเล็กบนมือถือ `/jobs/board`
+
+วัดจริงด้วย `getBoundingClientRect()` ทุกปุ่มบนหน้า (แถบหัว/แท็บ/ตัวกรอง/ปุ่มในการ์ด/เลขหน้า)
+เจอ **6 จุด** สูง < 36px บนจอ 375px (ทุกจุดมี `h-7`/`py-1.5` ตายตัวคุมไว้ทับ default ของ
+`ui/button.tsx` ที่เป็น `h-9`) แก้ด้วย `min-h-9 sm:min-h-0` ควบคู่ของเดิม (จอใหญ่คืนขนาดเดิมเป๊ะ
+วัดยืนยันแล้ว desktop ไม่เปลี่ยน):
+
+| ปุ่ม | ไฟล์ | ก่อน (มือถือ) | หลัง (มือถือ) |
+| --- | --- | --- | --- |
+| หาคนทุกกอง + ให้ AI โทร (การ์ดใบขอ) | `src/components/jobs/JobBoardView.tsx` | 31.5px | 40.5px |
+| ดูรายชื่อ (การ์ดใบขอ) | `src/components/jobs/JobBoardView.tsx` | 31.5px | 40.5px |
+| ช่วงวันที่ปิด/ยกเลิก (30 วัน/90 วัน/6 เดือน/1 ปี) | `src/components/jobs/JobBoardView.tsx` | 31.5px | 40.5px |
+| รีเฟรช (แถบ "ปิดภายใน") | `src/components/jobs/JobBoardView.tsx` | 31.5px | 40.5px |
+| ก่อนหน้า / เลขหน้า / ถัดไป | `src/components/shared/ListPaginationBar.tsx` (ใช้ร่วมทั้งระบบ) | 33.5px | 40.5px |
+
+ปุ่มอื่นทั้งหมด (แถบหัว/แท็บ/ตัวกรอง/ปุ่มปิดแล้ว-ยกเลิก/"สมัครงาน") วัดแล้ว ≥ 36px อยู่แล้ว
+ไม่ต้องแตะ — ปุ่มปิด (X) ของ `Sheet`/`Dialog` ตัวกรอง (18px) **ตั้งใจไม่แก้** เพราะเป็น primitive
+กลางของ shadcn ใช้ร่วมทุก Dialog/Sheet ทั้งระบบ แก้จุดเดียวนี้จะกระทบวงกว้างเกินขอบเขตงาน
+(หน้า `/jobs/board` เพียงหน้าเดียว) รอเจ้าของเคาะถ้าจะทำทั้งระบบ
+
+### ข้อ 2 — ตัวเลขความเร่งด่วนชิดกันบน `/dashboard?ui=v2` มือถือ
+
+`src/components/dashboard/analytics/DashboardHeroStrip.tsx` — แถว "ต้องลงมือตอนนี้"
+(218/43/15/72/58) เดิม `flex flex-wrap gap-y-2` (แถวห่างกันแค่ 8px) บนจอ 375px ทำให้แถวถัดไป
+มาชิดป้ายของแถวบน ⇒ จอเล็กเปลี่ยนเป็น `grid grid-cols-2 gap-y-5` (2 คอลัมน์ แถวห่างขึ้น) ·
+`sm:` ขึ้นไปคืนเป็น `flex flex-wrap gap-y-2` เดิมเป๊ะ (วัดยืนยัน desktop เรียงแถวเดียวเหมือนเดิม)
+ตัวเลข/ป้าย/สีความหมายไม่แตะเลย · ตรวจการ์ด KPI (`สรุปอัตราในช่วงที่เลือก` + `สถานะทำงาน`) แล้ว
+ใช้ `StatCard` กับ `grid grid-cols-2 lg:grid-cols-4 gap-3` อยู่แล้ว ไม่ชิด ไม่ต้องแก้
+
+### ข้อ 3 — เติมคำนำหน้า "สาเหตุที่ขอ: " ให้ครบทุกจอ (Wave 1 เติมแค่การ์ดใบขอ + หน้าสาธารณะ)
+
+`src/lib/unitRequestDisplay.ts` — เพิ่ม helper กลาง **ที่เดียว**:
+`requestActionLabel(job)` (คืน `` `สาเหตุที่ขอ: ${request_action_name}` `` หรือ `null` ถ้าไม่มีค่า ERP)
+และ `requestActionOrTypeLabel(job)` (เหมือนกันแต่ถอยไปใช้ `JOB_TYPE_LABELS` เมื่อไม่มีค่า ERP)
+แล้วรื้อ `unitRequestCardSubtitle` / `jobBoardCardSubtitle` (ของเดิม Wave 1) ให้เรียก helper
+เดียวกันแทนพิมพ์ ternary ซ้ำเอง — จากนี้ไปมี **จุดเดียว** ที่ตัดสินคำนำหน้านี้ทั้งระบบ
+
+| ไฟล์ | จุดที่เติม |
+| --- | --- |
+| `src/pages/jobs/JobDashboard.tsx` | ชิป `request_action_name` บนการ์ด "งานล่าสุด" + subtitle ของ dialog `jobRequestToDialogItem` |
+| `src/pages/jobs/JobListPage.tsx` | บรรทัดรองการ์ดมือถือ + คอลัมน์ "ประเภทใบขอ" ในตารางเดสก์ท็อป |
+
+**จุดที่ตั้งใจไม่เติม:** ไม่มี — ทั้งสองจอไม่มีป้ายหัวคอลัมน์ที่ขึ้นคำว่า "สาเหตุ" อยู่ก่อนแล้ว
+(คอลัมน์ตารางของ JobListPage ชื่อ "ประเภทใบขอ" ไม่ใช่ "สาเหตุ" ⇒ ไม่นับเป็นพูดซ้ำ) ·
+`unitRequestSelectLabel` (ป้ายใน dropdown เลือกใบขอ) **ไม่ได้แตะ** เพราะไม่อยู่ในขอบเขตงานนี้
+(เจ้าของสั่งเฉพาะ JobDashboard + JobListPage)
+
+### ทดสอบ
+
+`tests/api/unitRequestDisplay.test.ts` — เพิ่ม 3 เคสคุม `requestActionLabel`/`requestActionOrTypeLabel`
+(มีค่า ERP → เติมคำนำหน้า · ไม่มีค่า ERP → `null` · ไม่มีค่า ERP ผ่านตัวถอย → `JOB_TYPE_LABELS`
+ไม่ติดคำนำหน้าปลอม) · `npx vitest run` ครบ 250 ไฟล์ (2764 ผ่าน, 6 skip ของเดิม) ·
+tsc (tsconfig.json + tsconfig.app.json) ผ่าน · eslint 0 error ทั้งโปรเจกต์ (มีแต่ warning เดิม
+ที่มีอยู่ก่อนแก้ ยืนยันด้วย `git stash` เทียบ) · `npm run build` ผ่าน

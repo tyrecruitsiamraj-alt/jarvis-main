@@ -7,7 +7,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
-import { jobSectorLabel } from '@/lib/unitRequestDisplay';
+import { jobSectorLabel, requestActionOrTypeLabel } from '@/lib/unitRequestDisplay';
 import {
   UNIT_SECTOR_FILTER_OPTIONS,
   matchesAnyUnitSectorFilter,
@@ -818,7 +818,7 @@ const JobListPage: React.FC = () => {
                   <div className="text-xs font-medium text-foreground/90">{unitLabel(j)}</div>
 
                   <div className="text-xs text-muted-foreground mt-1">
-                    {j.request_action_name || JOB_TYPE_LABELS[j.job_type]}
+                    {requestActionOrTypeLabel(j)}
                     {j.job_description_code_1 ? ` • ${j.job_description_code_1}` : ''}
                     {j.job_description_code_2 ? ` • ${j.job_description_code_2}` : ''}
                     {j.resigned_employee_name ? ` • ${j.resigned_employee_name}` : ''}
@@ -1021,7 +1021,7 @@ const JobListPage: React.FC = () => {
                     <td className={cn('px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
                       {jobPositionUnits(j)}
                     </td>
-                    <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.request_action_name || JOB_TYPE_LABELS[j.job_type]}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{requestActionOrTypeLabel(j)}</td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{extractJobSubtypeLabel(j)}</td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.resigned_employee_name || '—'}</td>

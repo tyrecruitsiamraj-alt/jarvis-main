@@ -108,7 +108,11 @@ const DashboardHeroStrip: React.FC<Props> = ({
           <p className={S.v2 ? 'text-[12.5px] font-medium text-primary' : DASH.heroLabel}>
             ต้องลงมือตอนนี้
           </p>
-          <div className="mt-1.5 flex flex-wrap items-end gap-x-5 gap-y-2">
+          {/* 🔴 ผู้ทดสอบมือถือทัก "ตัวเลขชิดกัน" (5 ก.ย. 2569) — จอ 375px แถวเดิม
+              (flex-wrap + gap-y-2 แค่ 8px) ดันให้แถวถัดไปมาติดป้ายแถวบนแทบไม่มีช่องหายใจ
+              ⇒ จอเล็กใช้ grid 2 คอลัมน์ + แถวห่างขึ้น (gap-y-5) · sm: คืนค่า flex เดิมเป๊ะ
+              (ตัวเลข/ป้าย/สีความหมายเดิมทุกตัว ไม่แตะ) */}
+          <div className="mt-1.5 grid grid-cols-2 items-end gap-x-5 gap-y-5 sm:flex sm:flex-wrap sm:gap-y-2">
             {ordered.map((item, idx) => {
               const meta = HERO_BUCKET[item.bucket];
               const clickable = !!onBucketClick && item.count > 0;

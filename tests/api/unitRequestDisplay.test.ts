@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { jobSectorLabel, unitNamesForSendReplacement, unitRequestSearchBlob } from '../../src/lib/unitRequestDisplay';
+import {
+  jobSectorLabel,
+  unitNamesForSendReplacement,
+  unitRequestSearchBlob,
+  requestActionLabel,
+  requestActionOrTypeLabel,
+} from '../../src/lib/unitRequestDisplay';
+import { JOB_TYPE_LABELS } from '@/types';
 import type { JobRequest } from '@/types';
 
 function job(partial: Partial<JobRequest> & { unit_name: string }): JobRequest {
@@ -61,5 +68,28 @@ describe('jobSectorLabel — ราชการ/เอกชนของจร�
     expect(gov).toContain('ราชการ');
     expect(priv).not.toContain('ราชการ');
     expect(priv).toContain('เอกชน');
+  });
+});
+
+/**
+ * 🔴 helper กลางที่เดียวของคำนำหน้า "สาเหตุที่ขอ: " (เจ้าของเคาะ 5 ก.ย. 2569)
+ * ทุกจอ (การ์ดใบขอ/บอร์ดสาธารณะ/Dashboard ชิป/JobListPage คอลัมน์-การ์ด) ต้องเรียกฟังก์ชันนี้
+ * ห้ามพิมพ์คำนำหน้าซ้ำเอง — เทสต์นี้กันไม่ให้หลุดกลับไปพิมพ์ค่า ERP ดิบ ๆ
+ */
+describe('requestActionLabel / requestActionOrTypeLabel — คำนำหน้า "สาเหตุที่ขอ: "', () => {
+  it('มีค่า ERP จริง → เติมคำนำหน้า "สาเหตุที่ขอ: "', () => {
+    const j = job({ unit_name: 'ก', request_action_name: 'ลาออก' });
+    expect(requestActionLabel(j)).toBe('สาเหตุที่ขอ: ลาออก');
+    expect(requestActionOrTypeLabel(j)).toBe('สาเหตุที่ขอ: ลาออก');
+  });
+
+  it('ไม่มีค่า ERP จริง → requestActionLabel คืน null (ไม่ใช่ประเภทงานปลอม ๆ)', () => {
+    const j = job({ unit_name: 'ก', job_type: 'new_hire' });
+    expect(requestActionLabel(j)).toBeNull();
+  });
+
+  it('ไม่มีค่า ERP จริง → requestActionOrTypeLabel ถอยไปใช้ JOB_TYPE_LABELS โดยไม่ติดคำนำหน้า', () => {
+    const j = job({ unit_name: 'ก', job_type: 'new_hire' });
+    expect(requestActionOrTypeLabel(j)).toBe(JOB_TYPE_LABELS.new_hire);
   });
 });

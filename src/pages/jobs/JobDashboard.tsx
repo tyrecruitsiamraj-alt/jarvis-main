@@ -9,6 +9,7 @@ import DetailListDialog from '@/components/shared/DetailListDialog';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
+import { requestActionLabel } from '@/lib/unitRequestDisplay';
 import { Briefcase, AlertTriangle, CheckCircle, ListTodo, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
@@ -35,7 +36,8 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
   const badge = j.status === 'closed' ? 'ปิดแล้ว' : 'ดำเนินการ';
   const badgeVariant: JobDialogItem['badgeVariant'] =
     j.status === 'closed' ? 'success' : j.status === 'cancelled' ? 'destructive' : 'warning';
-  const actionLabel = j.request_action_name ? ` • ${j.request_action_name}` : '';
+  const requestAction = requestActionLabel(j);
+  const actionLabel = requestAction ? ` • ${requestAction}` : '';
   const positionParts = [j.job_description_code_1, j.job_description_code_2].filter(Boolean).join(' / ');
   const roleLabel = positionParts || JOB_TYPE_LABELS[j.job_type];
   return {
@@ -235,12 +237,16 @@ const JobDashboard: React.FC = () => {
                       {j.request_no ? `${unitOneLine(j)} · ${j.request_no}` : unitOneLine(j)}
                     </span>
                     <div className="flex items-center gap-2">
-                      {/* ชื่อ action ของใบขอ = "กำลังดำเนินการ" → primary ตาม token กลาง */}
-                      {j.request_action_name ? (
-                        <span className={TONE.primary.chip}>{j.request_action_name}</span>
-                      ) : (
-                        <JobUrgencyBadge job={j} className="px-2 py-0.5 rounded-full bg-secondary" compact />
-                      )}
+                      {/* ชื่อ action ของใบขอ = "กำลังดำเนินการ" → primary ตาม token กลาง
+                          เติมคำนำหน้า "สาเหตุที่ขอ: " ผ่าน requestActionLabel (เจ้าของเคาะ 5 ก.ย. 2569) */}
+                      {(() => {
+                        const action = requestActionLabel(j);
+                        return action ? (
+                          <span className={TONE.primary.chip}>{action}</span>
+                        ) : (
+                          <JobUrgencyBadge job={j} className="px-2 py-0.5 rounded-full bg-secondary" compact />
+                        );
+                      })()}
                       <StatusBadge status={j.status} type="job" />
                     </div>
                   </div>

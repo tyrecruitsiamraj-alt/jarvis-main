@@ -59,11 +59,14 @@ const ListPaginationBar: React.FC<ListPaginationBarProps> = ({
 
       {totalPages > 1 ? (
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* 🔴 py-1.5 (แค่ padding แนวตั้ง ไม่มี h-*) วัดจริงบนมือถือ 375px ได้ ~33.5px
+              < 36px ขั้นต่ำสัมผัสได้ง่าย (ผู้ทดสอบมือถือทัก 5 ก.ย. 2569)
+              → ดัน min-h-9 เฉพาะจอเล็ก sm: คืนค่าเดิม — คุมทั้งแถบเลขหน้าที่ใช้ร่วมกันทั้งระบบ */}
           <button
             type="button"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
-            className="px-3 py-1.5 rounded-full border border-border text-xs disabled:opacity-40"
+            className="min-h-9 sm:min-h-0 px-3 py-1.5 rounded-full border border-border text-xs disabled:opacity-40"
           >
             ก่อนหน้า
           </button>
@@ -80,7 +83,7 @@ const ListPaginationBar: React.FC<ListPaginationBarProps> = ({
                 onClick={() => onPageChange(item)}
                 aria-current={page === item ? 'page' : undefined}
                 className={cn(
-                  'min-w-[2.25rem] px-2.5 py-1.5 rounded-full text-xs font-medium border',
+                  'min-h-9 sm:min-h-0 min-w-[2.25rem] px-2.5 py-1.5 rounded-full text-xs font-medium border',
                   page === item
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'border-border text-foreground hover:bg-secondary/60',
@@ -95,7 +98,7 @@ const ListPaginationBar: React.FC<ListPaginationBarProps> = ({
             type="button"
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}
-            className="px-3 py-1.5 rounded-full border border-border text-xs disabled:opacity-40"
+            className="min-h-9 sm:min-h-0 px-3 py-1.5 rounded-full border border-border text-xs disabled:opacity-40"
           >
             ถัดไป
           </button>

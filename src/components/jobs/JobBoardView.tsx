@@ -1293,7 +1293,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       variant={closedDays === r.days ? 'default' : 'outline'}
                       onClick={() => onClosedDaysChange?.(r.days)}
                       className={cn(
-                        'h-7 rounded-lg px-2.5 text-xs',
+                        /* 🔴 h-7 (28px) วัดจริงบนมือถือ 375px ได้ ~31.5px < 36px ขั้นต่ำสัมผัสได้ง่าย
+                           (ผู้ทดสอบมือถือทัก 5 ก.ย. 2569) → ดัน min-h-9 เฉพาะจอเล็ก sm: คืนค่าเดิม */
+                        'min-h-9 sm:min-h-0 h-7 rounded-lg px-2.5 text-xs',
                         closedDays === r.days ? TONE.info.solid : TONE.neutral.outline,
                       )}
                     >
@@ -1307,7 +1309,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   variant="outline"
                   disabled={closedLoading}
                   onClick={() => onReloadClosed?.()}
-                  className={cn('h-7 rounded-lg px-2.5 text-xs', TONE.neutral.outline)}
+                  className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2.5 text-xs', TONE.neutral.outline)}
                 >
                   {closedLoading ? (
                     <LoaderCircle className="animate-spin" />
@@ -1692,7 +1694,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           title={SEARCH_ALL_POOLS_AND_CALL.hint}
                           /* 🔴 ui/button.tsx variant เป็นธีมสว่างล้วน (bg-white/50 ไม่มีคู่ dark)
                              → ทับด้วย TONE.*.outline ที่มีคู่ dark ครบ (กติกาข้อ 4) */
-                          className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.success.outline)}
+                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-[11px]', TONE.success.outline)}
                         >
                           <Send aria-hidden />
                           {SEARCH_ALL_POOLS_AND_CALL.label}
@@ -1712,7 +1714,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                             e.stopPropagation();
                             openUnit(job, 'applicants');
                           }}
-                          className={cn('h-7 rounded-lg px-2 text-[11px]', TONE.info.outline)}
+                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-[11px]', TONE.info.outline)}
                         >
                           <Users aria-hidden />
                           ดูรายชื่อ
