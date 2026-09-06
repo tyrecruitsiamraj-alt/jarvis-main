@@ -1,9 +1,10 @@
 /**
- * ฉากเปิดหน้าเข้าสู่ระบบ (`BrandIntro`) — เจ้าของขอลองเล่น 4 ก.ย. 2569
- * และย้ำว่า *"อย่าพึ่งเอาขึ้น ขอรันดูเองก่อนว่ามันจะน่ารำคาญไหม"*
+ * ฉากเปิดหน้าเข้าสู่ระบบ (`BrandIntro`) — เจ้าของสั่ง 6 ก.ย. 2569 ให้เล่น
+ * **ทุกครั้ง** ที่เข้าหน้า Login (เดิม 4 ก.ย. 2569 เคยจำกัดโชว์ครั้งเดียวต่อ
+ * การเปิดเบราว์เซอร์ผ่าน sessionStorage — ถอดออกแล้ว)
  *
- * 🔴 ด่านที่ห้ามหลุด (สามข้อนี้คือเหตุผลที่ฉากนี้ "ไม่กวน"):
- * 1. **โชว์ครั้งเดียวต่อการเปิดเบราว์เซอร์** — เข้าใหม่ในแท็บเดิมต้องไม่เห็นซ้ำ
+ * 🔴 ด่านที่ห้ามหลุด:
+ * 1. **เล่นทุกครั้งที่ component mount** — ไม่มี sessionStorage จำการดูอีกต่อไป
  * 2. **ข้ามได้ทันที** — กดคีย์/แตะ = ฉากเริ่มจางออกเลย ไม่ต้องรอครบเวลา
  * 3. **ห้ามกินคลิกของฟอร์ม** — ต้องมี `pointer-events-none` ตลอด
  * (ทำไมต้องเทสต์: ฉากยาว ~0.95 วิ แล้วหายไป จับด้วยการดูจอไม่ทัน)
@@ -13,11 +14,8 @@ import { render, screen, act, cleanup } from '@testing-library/react';
 
 import BrandIntro from './BrandIntro';
 
-const SEEN_KEY = 'jarvis.brandIntroSeen';
-
 beforeEach(() => {
   cleanup();
-  window.sessionStorage.clear();
   window.history.replaceState({}, '', '/login');
 });
 
@@ -37,14 +35,13 @@ describe('BrandIntro', () => {
     expect(overlay.className).toContain('pointer-events-none');
   });
 
-  it('🔴 โชว์ครั้งเดียวต่อการเปิดเบราว์เซอร์ — รอบสองไม่ขึ้น', () => {
+  it('🔴 เล่นทุกครั้งที่ mount — รอบสองก็ต้องขึ้นอีก (เจ้าของสั่ง 6 ก.ย. 2569 เลิกจำ session)', () => {
     render(<BrandIntro />);
     expect(document.querySelector('[data-brand-intro]')).not.toBeNull();
-    expect(window.sessionStorage.getItem(SEEN_KEY)).toBe('1');
 
     cleanup();
     render(<BrandIntro />);
-    expect(document.querySelector('[data-brand-intro]')).toBeNull();
+    expect(document.querySelector('[data-brand-intro]')).not.toBeNull();
   });
 
   it('🔴 กดคีย์แล้วเริ่มจางออกทันที ไม่ต้องรอครบเวลา', () => {
@@ -95,10 +92,23 @@ describe('BrandIntro', () => {
     }
   });
 
-  it('`?intro=1` บังคับเล่นซ้ำได้ แม้เคยดูแล้ว (ไว้ให้เจ้าของลองเอง)', () => {
-    window.sessionStorage.setItem(SEEN_KEY, '1');
-    window.history.replaceState({}, '', '/login?intro=1');
-    render(<BrandIntro />);
-    expect(document.querySelector('[data-brand-intro]')).not.toBeNull();
+  it('`?intro=1` บังคับเล่นแม้ตั้งลดการเคลื่อนไหวไว้', () => {
+    const spy = vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    } as unknown as MediaQueryList);
+    try {
+      window.history.replaceState({}, '', '/login?intro=1');
+      render(<BrandIntro />);
+      expect(document.querySelector('[data-brand-intro]')).not.toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
