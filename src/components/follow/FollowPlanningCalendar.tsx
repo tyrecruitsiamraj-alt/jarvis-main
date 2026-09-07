@@ -12,6 +12,7 @@ import {
   monthDayColumns,
   roundAiSummary,
   roundDispatchReason,
+  roundEmergencyPhone,
   roundResultLabel,
   roundTone,
   type FollowPlanningRound,
@@ -326,6 +327,37 @@ const FollowPlanningCalendar: React.FC<{
                                 (ไม่มีสรุปจาก AI)
                               </span>
                             ) : null}
+                            {/**
+                             * 🔴 สถานะเบอร์ฉุกเฉิน (เจ้าของสั่ง 7 ก.ย. 2569)
+                             * เขียนได้แค่ "แนบไปแล้ว" — ผลที่ Lumos ส่งกลับ **ไม่มีช่องบอก
+                             * ว่าโทรเบอร์นี้หรือยัง** (ตรวจครบทุกคีย์ 7 ก.ย. 2569)
+                             * ไม่ได้แนบเบอร์ไป = ความเสี่ยงจริง ต้องเห็นเป็นสีเตือน ไม่ใช่ช่องว่าง
+                             */}
+                            {(() => {
+                              const emg = roundEmergencyPhone(r);
+                              if (!emg) {
+                                return (
+                                  <span
+                                    className={cn(
+                                      'mt-1 inline-block rounded px-1 py-0.5 text-[9px] font-medium',
+                                      TONE.warn.chip,
+                                    )}
+                                    title="สายนี้ไม่ได้แนบเบอร์ฉุกเฉินไปด้วย — ติดต่อผู้รับไม่ได้แล้ว AI ไม่มีใครให้โทรต่อ"
+                                  >
+                                    ไม่ได้แนบเบอร์ฉุกเฉิน
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span
+                                  className="mt-1 block text-[9px] leading-snug text-muted-foreground"
+                                  title={`เบอร์ที่ AI โทรหาเมื่อติดต่อผู้รับไม่ได้ · ${emg}\nฝั่ง Lumos ยังไม่ส่งกลับมาว่าโทรเบอร์นี้แล้วหรือยัง`}
+                                >
+                                  ฉุกเฉิน {emg} ·{' '}
+                                  {r.state === 'result' ? 'ยังไม่รู้ว่าโทรหรือยัง' : 'แนบไปกับสายนี้'}
+                                </span>
+                              );
+                            })()}
                           </>
                         )}
                       </td>

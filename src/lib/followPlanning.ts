@@ -393,3 +393,22 @@ export function roundAiSummary(round: FollowPlanningRound): string | null {
   const s = (round.entry.call_summary ?? '').trim();
   return s === '' ? null : s;
 }
+
+/**
+ * **เบอร์ฉุกเฉินที่แนบไปกับสายนี้** — เบอร์ที่ AI โทรหาต่อเมื่อติดต่อผู้รับไม่ได้
+ * `null` = ไม่ได้แนบไปเลย (AI ไม่มีใครให้โทรต่อ — เป็นความเสี่ยง ไม่ใช่แค่ช่องว่าง)
+ *
+ * 🔴 **บอกได้แค่ "แนบไปแล้ว" ห้ามเขียนว่า "โทรแล้ว"** (เจ้าของสั่ง 7 ก.ย. 2569:
+ * *"ต้องมีบอกด้วยว่าโทรหาเบอร์ฉุกเฉินยัง"*)
+ * ตรวจ `result` ที่ Lumos ส่งกลับจริงวันที่ 7 ก.ย. 2569 ครบทุกคีย์แล้ว:
+ * `call_attempts · client_contact_id · ended_reason · event_id · language · message ·
+ *  next_action · outcome · plan_id · plan_status · recipient_name · recipient_phone ·
+ *  recording_url · scheduled_at · status · step_id · step_position · step_type ·
+ *  stop_early · summary · title · tone · transcript`
+ * ⇒ **ไม่มีช่องไหนบอกว่าโทรเบอร์ฉุกเฉินหรือยัง** · เขียนว่า "โทรแล้ว" ตอนนี้คือจอโกหก
+ * ต้องให้ฝั่ง Lumos เพิ่มฟิลด์มาก่อนถึงจะรายงานได้จริง
+ */
+export function roundEmergencyPhone(round: FollowPlanningRound): string | null {
+  const p = (round.entry.emergency_phone ?? '').trim();
+  return p === '' ? null : p;
+}

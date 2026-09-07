@@ -119,3 +119,40 @@ describe('ปฏิทินติดตาม — คอลัมน์แย�
     expect(screen.queryByRole('columnheader', { name: 'สายที่ 2' })).toBeNull();
   });
 });
+
+/**
+ * 🔴 เบอร์ฉุกเฉิน (เจ้าของสั่ง 7 ก.ย. 2569: *"ต้องมีบอกด้วยว่าโทรหาเบอร์ฉุกเฉินยัง"*)
+ *
+ * ⚠️ ผลที่ Lumos ส่งกลับ **ไม่มีช่องบอกว่าโทรเบอร์ฉุกเฉินหรือยัง** (ตรวจครบทุกคีย์แล้ว)
+ * จอจึงพูดได้แค่ "แนบไปแล้ว / ยังไม่รู้ว่าโทรหรือยัง" — เขียนว่า "โทรแล้ว" คือโกหก
+ */
+describe('เบอร์ฉุกเฉินบนตาราง', () => {
+  it('มีเบอร์ฉุกเฉิน + ได้ผลแล้ว ⇒ บอกเบอร์ และบอกตรง ๆ ว่ายังไม่รู้ว่าโทรหรือยัง', () => {
+    renderCalendar([
+      entry({
+        id: 'r1',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'confirmed',
+        emergency_phone: '+66898143230',
+      }),
+    ]);
+    const call1 = screen.getAllByRole('cell')[1];
+    expect(within(call1).getByText(/ฉุกเฉิน \+66898143230/)).toBeTruthy();
+    expect(within(call1).getByText(/ยังไม่รู้ว่าโทรหรือยัง/)).toBeTruthy();
+    // ห้ามมีคำว่า "โทรแล้ว" เด็ดขาด — ข้อมูลนี้ยังไม่มีจริง
+    expect(within(call1).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
+  });
+
+  it('ยังไม่ได้ผล ⇒ บอกว่าแนบไปกับสายนี้ (ไม่ใช่ "ยังไม่รู้ว่าโทรหรือยัง")', () => {
+    renderCalendar([entry({ id: 'r1', call_round: 1, emergency_phone: '+66898143230' })]);
+    const call1 = screen.getAllByRole('cell')[1];
+    expect(within(call1).getByText(/แนบไปกับสายนี้/)).toBeTruthy();
+  });
+
+  it('🔴 ไม่ได้แนบเบอร์ฉุกเฉิน ⇒ ต้องเตือน ไม่ใช่ปล่อยว่าง (AI ไม่มีใครให้โทรต่อ)', () => {
+    renderCalendar([entry({ id: 'r1', call_round: 1 })]);
+    const call1 = screen.getAllByRole('cell')[1];
+    expect(within(call1).getByText('ไม่ได้แนบเบอร์ฉุกเฉิน')).toBeTruthy();
+  });
+});
