@@ -12,7 +12,7 @@
  * 3. ไม่ไป ⇒ ต้องบอกเหตุผลที่เขาตอบ ไม่ใช่แค่บอกว่าไม่ไป
  */
 import { describe, expect, it, afterEach } from 'vitest';
-import { render, screen, cleanup, within, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, within } from '@testing-library/react';
 
 import FollowPlanningCalendar from './FollowPlanningCalendar';
 import { groupFollowEntries } from '@/lib/followGrouping';
@@ -58,14 +58,6 @@ function renderCalendar(entries: FollowEntry[]) {
   return rows;
 }
 
-/**
- * ค่าตั้งต้นของการ์ดคือหน้า **"ต้องลงมือ"** (เจ้าของสั่ง 7 ก.ย. 2569 ว่าหน้าแรกต้องตอบ
- * ว่าต้องโทรกี่คน) — เทสต์ที่ตรวจตารางเดือนต้องกดสลับหน้าก่อนเสมอ
- */
-function showMonthView() {
-  fireEvent.click(screen.getByRole('tab', { name: 'สรุปทั้งเดือน' }));
-}
-
 afterEach(cleanup);
 
 describe('ปฏิทินติดตาม — คอลัมน์แยกตามสาย', () => {
@@ -76,7 +68,6 @@ describe('ปฏิทินติดตาม — คอลัมน์แย�
 
   it('ตั้งไว้ 2 สาย ⇒ มีคอลัมน์ "สายที่ 1" และ "สายที่ 2" แยกกัน', () => {
     renderCalendar(twoRounds());
-    showMonthView();
     expect(screen.getByRole('columnheader', { name: 'สายที่ 1' })).toBeTruthy();
     expect(screen.getByRole('columnheader', { name: 'สายที่ 2' })).toBeTruthy();
   });
@@ -89,7 +80,6 @@ describe('ปฏิทินติดตาม — คอลัมน์แย�
         call_summary: 'ผู้รับสายบอกว่าไปแน่นอน เจอกันวันจันทร์เช้า',
       }),
     );
-    showMonthView();
 
     const cells = screen.getAllByRole('cell');
     // ช่องที่ 2 ของแถว = สายที่ 1 · ช่องที่ 3 = สายที่ 2 (ช่องแรกคือชื่อคน)
@@ -112,7 +102,6 @@ describe('ปฏิทินติดตาม — คอลัมน์แย�
         call_summary: 'ได้งานที่อื่นใกล้บ้านกว่าแล้ว',
       }),
     );
-    showMonthView();
     const call1 = screen.getAllByRole('cell')[1];
     expect(within(call1).getByText('ยกเลิก — ไม่ไปแล้ว')).toBeTruthy();
     expect(within(call1).getByText('ได้งานที่อื่นใกล้บ้านกว่าแล้ว')).toBeTruthy();
@@ -120,14 +109,12 @@ describe('ปฏิทินติดตาม — คอลัมน์แย�
 
   it('มีผลแล้วแต่ AI ไม่ได้เขียนสรุป ⇒ บอกตรง ๆ ไม่ปล่อยว่างให้เดา', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }));
-    showMonthView();
     const call1 = screen.getAllByRole('cell')[1];
     expect(within(call1).getByText('(ไม่มีสรุปจาก AI)')).toBeTruthy();
   });
 
   it('ไม่ได้ตั้งสายที่ 2 ไว้ ⇒ เขียนว่าไม่ได้ตั้ง (คนละเรื่องกับ "ตั้งแล้วรอผล")', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    showMonthView();
     // มีสายเดียว ⇒ มีคอลัมน์เดียว
     expect(screen.queryByRole('columnheader', { name: 'สายที่ 2' })).toBeNull();
   });
@@ -150,7 +137,6 @@ describe('เบอร์ฉุกเฉินบนตาราง', () => {
         emergency_phone: '+66898143230',
       }),
     ]);
-    showMonthView();
     const call1 = screen.getAllByRole('cell')[1];
     expect(within(call1).getByText(/ฉุกเฉิน \+66898143230/)).toBeTruthy();
     expect(within(call1).getByText(/ยังไม่รู้ว่าโทรหรือยัง/)).toBeTruthy();
@@ -160,62 +146,13 @@ describe('เบอร์ฉุกเฉินบนตาราง', () => {
 
   it('ยังไม่ได้ผล ⇒ บอกว่าแนบไปกับสายนี้ (ไม่ใช่ "ยังไม่รู้ว่าโทรหรือยัง")', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1, emergency_phone: '+66898143230' })]);
-    showMonthView();
     const call1 = screen.getAllByRole('cell')[1];
     expect(within(call1).getByText(/แนบไปกับสายนี้/)).toBeTruthy();
   });
 
   it('🔴 ไม่ได้แนบเบอร์ฉุกเฉิน ⇒ ต้องเตือน ไม่ใช่ปล่อยว่าง (AI ไม่มีใครให้โทรต่อ)', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    showMonthView();
     const call1 = screen.getAllByRole('cell')[1];
     expect(within(call1).getByText('ไม่ได้แนบเบอร์ฉุกเฉิน')).toBeTruthy();
-  });
-});
-
-/**
- * 🔴 สองหน้าในการ์ดเดียว (เจ้าของสั่ง 7 ก.ย. 2569)
- * *"แบ่งเป็น 2 หน้า หน้าแรกเพื่อดูว่าต้องมีกี่คนที่ต้องโทร ต้องตามผลไรงี้
- *   อีกหน้าเป็นหน้าสรุปเลยว่าทั้งเดือนคนไหนถูกแท็กให้โทรวันไหนบ้างแล้วผลเป็นไง"*
- */
-describe('สองหน้า: ต้องลงมือ / สรุปทั้งเดือน', () => {
-  it('ค่าตั้งต้นคือหน้า "ต้องลงมือ" — ยังไม่โชว์ตาราง 30 วัน', () => {
-    renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    expect(screen.getByRole('tab', { name: 'ต้องลงมือ' }).getAttribute('aria-selected')).toBe('true');
-    // ตารางเดือนต้องยังไม่ขึ้น (ไม่มีหัวคอลัมน์ของสาย)
-    expect(screen.queryByRole('columnheader', { name: 'สายที่ 1' })).toBeNull();
-  });
-
-  it('หน้า "ต้องลงมือ" บอกจำนวนคนที่ต้องโทรและสายที่ต้องตามผล', () => {
-    // นัด 15:23 (เลยเวลาแล้ว ยังไม่มีผล) + นัดวันนี้อีกสาย
-    renderCalendar([
-      entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-07T08:23:00Z' }),
-      entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-07T08:30:00Z' }),
-    ]);
-    expect(screen.getByText(/ต้องลงมือ 1 คน/)).toBeTruthy();
-    expect(screen.getByText(/เลยเวลานัดยังไม่มีผล 1 คน/)).toBeTruthy();
-    expect(screen.getByText(/มีนัดวันนี้ 1 คน/)).toBeTruthy();
-  });
-
-  it('🔴 คนที่จบงานแล้วต้องไม่โผล่ในหน้า "ต้องลงมือ" (ไม่งั้นลิสต์ไม่มีวันว่าง)', () => {
-    renderCalendar([
-      entry({
-        id: 'r1',
-        call_round: 1,
-        scheduled_at: '2026-09-07T08:23:00Z',
-        call_status: 'completed',
-        call_outcome: 'confirmed',
-        completed_at: '2026-09-07T08:40:00Z',
-        outcome_code: 'went',
-      }),
-    ]);
-    expect(screen.getByText(/ไม่มีใครค้างเลย/)).toBeTruthy();
-  });
-
-  it('สลับไปหน้า "สรุปทั้งเดือน" แล้วได้ตารางวันกลับมา', () => {
-    renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    showMonthView();
-    expect(screen.getByRole('columnheader', { name: 'สายที่ 1' })).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'คนที่ต้องติดตาม' })).toBeTruthy();
   });
 });
