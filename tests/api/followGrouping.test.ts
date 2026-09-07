@@ -4,7 +4,8 @@ import type { FollowEntry } from '../../src/lib/followApi';
 
 /**
  * จัดกลุ่มลิสต์หน้า Follow เป็นการ์ดเดียวต่อคน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ)
- * กลุ่ม = เบอร์ (เลข 9 ตัวท้าย) + เรื่อง — แพตเทิร์นเดียวกับ siblings ของกล่องแก้ไข
+ * กลุ่ม = เบอร์ (เลข 9 ตัวท้าย) + เรื่อง + ชื่อผู้รับ
+ * (ชื่อเข้าคีย์ 7 ก.ย. 2569 — เบอร์ซ้ำข้ามคนเคยยุบคนละคนเป็นแถวเดียว ดู followGrouping.ts)
  */
 
 const NOW = new Date('2026-08-18T10:00:00+07:00');
@@ -103,16 +104,14 @@ describe('groupFollowEntries', () => {
     expect(g.todayOrdinal).toBeNull();
   });
 
-  it('ชื่อ/หน่วยงานใช้ของรอบล่าสุด · เจ้าของข้อมูลใช้ของรอบแรกสุด', () => {
+  it('หน่วยงานใช้ของรอบล่าสุดที่ระบุ · เจ้าของข้อมูลใช้ของรอบแรกสุด', () => {
     const g = groupFollowEntries(
       [
         entry({
-          recipient_name: 'สมชาย (สะกดเก่า)',
           created_at: '2026-08-15T09:00:00+07:00',
           created_by_name: 'คนคีย์คนแรก',
         }),
         entry({
-          recipient_name: 'สมชาย ใจดี',
           created_at: '2026-08-17T09:00:00+07:00',
           created_by_name: 'คนแก้ทีหลัง',
           unit_name: 'ฮอนด้า',
@@ -125,6 +124,53 @@ describe('groupFollowEntries', () => {
     expect(g.createdByName).toBe('คนคีย์คนแรก');
     expect(g.unitName).toBe('ฮอนด้า');
     expect(g.siteCode).toBe('67LBDL0208');
+  });
+
+  /**
+   * 🔴 ด่านกันบั๊กเดิมกลับมา (เจ้าของทัก 7 ก.ย. 2569 "โชว์ไม่ครบคนป้ะ")
+   * ของจริงที่เจอ: เบอร์ +66922511703 มี 3 ชื่อ · +66898143230 มี 2 ชื่อ
+   * ทั้งหมดถูกยุบเป็นแถวเดียว แล้วเวลานัดของคนหนึ่งไปโผล่ใต้ชื่ออีกคน
+   */
+  it('🔴 เบอร์เดียวกันแต่คนละชื่อ = คนละการ์ด — ห้ามยุบ (เวลานัดจะไปแปะผิดคน)', () => {
+    const groups = groupFollowEntries(
+      [
+        entry({
+          recipient_name: 'นนท์ ธนนท์',
+          recipient_phone: '+66898143230',
+          topic: 'ติดตามเริ่มงาน',
+          scheduled_at: '2026-08-18T15:23:00+07:00',
+          created_at: '2026-08-17T01:00:00+07:00',
+        }),
+        entry({
+          recipient_name: 'นิพนธ์ กอแก้ว',
+          recipient_phone: '+66898143230',
+          topic: 'ติดตามเริ่มงาน',
+          scheduled_at: '2026-08-18T15:30:00+07:00',
+          created_at: '2026-08-17T02:00:00+07:00',
+        }),
+      ],
+      NOW,
+    );
+    expect(groups).toHaveLength(2);
+    const nont = groups.find((g) => g.name === 'นนท์ ธนนท์');
+    const niphon = groups.find((g) => g.name === 'นิพนธ์ กอแก้ว');
+    expect(nont?.rounds).toHaveLength(1);
+    expect(niphon?.rounds).toHaveLength(1);
+    // เวลานัดต้องอยู่กับเจ้าของตัวจริง ไม่ใช่ไปกองอยู่การ์ดเดียว
+    expect(nont?.rounds[0].scheduled_at).toBe('2026-08-18T15:23:00+07:00');
+    expect(niphon?.rounds[0].scheduled_at).toBe('2026-08-18T15:30:00+07:00');
+  });
+
+  it('ชื่อเดียวกันแต่เว้นวรรคเกิน/ตัวพิมพ์ต่าง = คนเดียวกัน (ไม่แตกการ์ดเพราะพิมพ์เกิน)', () => {
+    const groups = groupFollowEntries(
+      [
+        entry({ recipient_name: 'Somchai  Jaidee' }),
+        entry({ recipient_name: ' somchai jaidee ' }),
+      ],
+      NOW,
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0].rounds).toHaveLength(2);
   });
 
   it('กลุ่มที่ลงล่าสุดขึ้นก่อน — ความรู้สึกเดียวกับลิสต์เดิม', () => {
