@@ -34,6 +34,14 @@ export type FlowCallBoxes = {
   declined: FlowFollowUpItem[];
 };
 
+/**
+ * 🔴 ยอดจริงของแต่ละกล่อง — **ลิสต์ข้างบนถูกตัดที่ 50 แถว** จึงห้ามใช้ `.length` เป็นยอด
+ * (เจอจริง 7 ก.ย. 2569 ที่หน้า `/work`: ของจริงเกิน 50 เมื่อไหร่จอจะบอก "50" ตลอดกาล
+ *  — บั๊กตระกูลเดียวกับป๊อป "ส่ง AI โทร" ที่หน้าแรกแก้ไปแล้วด้วยตัวนับจากคิว)
+ * ⚠️ optional เพราะ API รุ่นก่อนหน้ายังไม่ส่งคีย์นี้มา — ไม่มีมาให้ถอยไปใช้ความยาวลิสต์
+ */
+export type FlowCallBoxCounts = { [K in keyof FlowCallBoxes]: number };
+
 /** สถานะคำขอโพสหาคน — ป้ายภาษาไทยใช้ JOB_POSTING_STATUS_LABEL ชุดเดียวกับหน้าคำขอโพส */
 export type PostingStages = { pending: number; in_progress: number; posted: number };
 
@@ -93,9 +101,24 @@ export type FlowSummary = {
     scraping_stages?: PostingStages;
   };
   call_boxes: FlowCallBoxes;
+  /** ยอดจริงของ 4 กล่องข้างบน (ลิสต์ถูกตัดที่ 50) — อ่านผ่าน `callBoxCount()` เท่านั้น */
+  call_box_counts?: FlowCallBoxCounts;
   /** รายชื่อที่ส่ง AI โทรแล้วยังไม่มีผลกลับ — แถวที่ค้างเกิน 2 วันติดธง stale */
   active_calls: FlowFollowUpItem[];
 };
+
+/**
+ * ยอดจริงของกล่องผลโทรหนึ่งกล่อง — **ทางเดียวที่จออ่านเลขนี้ได้**
+ * ถอยไปใช้ความยาวลิสต์เฉพาะตอนคุยกับ API รุ่นเก่าที่ยังไม่ส่ง `call_box_counts`
+ */
+export function callBoxCount(s: FlowSummary, box: keyof FlowCallBoxes): number {
+  return s.call_box_counts?.[box] ?? s.call_boxes[box].length;
+}
+
+/** ลิสต์ที่ได้มาสั้นกว่ายอดจริงไหม — จอต้องบอกว่า "แสดง N จาก M รายแรก" ไม่ใช่เงียบ */
+export function callBoxTruncated(s: FlowSummary, box: keyof FlowCallBoxes): boolean {
+  return callBoxCount(s, box) > s.call_boxes[box].length;
+}
 
 export async function fetchFlowSummary(): Promise<FlowSummary> {
   const r = await apiFetch('/api/matching/flow-summary');

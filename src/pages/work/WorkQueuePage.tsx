@@ -29,8 +29,9 @@ import { Sheet2, StatRow2, Stat2 } from '@/components/shared/ui-v2/Sheet2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUiV2 } from '@/lib/uiV2';
 import { cn } from '@/lib/utils';
-import { buildNextTasks, type NextTask, type NextTaskTone } from '@/lib/nextTask';
+import { buildNextTasks, type NextTaskTone } from '@/lib/nextTask';
 import {
+  callBoxCount,
   fetchFlowSummary,
   type FlowFollowUpItem,
   type FlowSummary,
@@ -38,6 +39,14 @@ import {
 import { fetchOfficeFloor, type OfficeFloorResponse } from '@/lib/officeFloorApi';
 import { bookingActionFor, bookingTargetFromPersonRef } from '@/lib/callResultBooking';
 import { ProposalConflictError, saveProposal } from '@/lib/candidateProposalsApi';
+import { METRICS } from '@/lib/metricDictionary';
+import {
+  bookingKeyOf,
+  buildWorkQueueRows,
+  workQueueHeadline,
+  type WorkPersonGroup,
+  type WorkQueueRow,
+} from '@/lib/workQueueRows';
 
 /** สีป้ายตามความด่วน — ความหมายเดิมของทั้งระบบ (ไม่ใช่สีแบรนด์) */
 const TONE_TEXT: Record<NextTaskTone, string> = {
@@ -46,22 +55,8 @@ const TONE_TEXT: Record<NextTaskTone, string> = {
   info: 'text-sky-700 dark:text-sky-300',
 };
 
-/**
- * หนึ่งงานในคิว — มีสองชนิดในลิสต์เดียวกัน (นี่คือหัวใจของ "หน้าเดียวจบงาน"):
- * `bucket` = กองงานทั้งถัง (เช่น เลยนัด 11 ราย) · `person` = รายคนที่ตัดสินใจได้เลย
- */
-type QueueRow =
-  | { kind: 'bucket'; id: string; task: NextTask }
-  | {
-      kind: 'person';
-      id: string;
-      item: FlowFollowUpItem;
-      /** กลุ่มของผลโทร — กำหนดว่าลิ้นชักขวาจะให้ทำอะไรได้ */
-      group: 'confirmed' | 'needs_human';
-    };
-
 const PERSON_GROUP: Record<
-  'confirmed' | 'needs_human',
+  WorkPersonGroup,
   { title: string; reason: string; badge: string; tone: NextTaskTone; action: string }
 > = {
   confirmed: {
@@ -79,8 +74,6 @@ const PERSON_GROUP: Record<
     action: 'เปิดหน้าติดตาม',
   },
 };
-
-const bookingKeyOf = (item: FlowFollowUpItem) => `${item.job_ref}::${item.person_ref}`;
 
 /* ── แถวในคิว — เส้นบาง ไม่มีกล่อง (ภาษาเดียวกับตัวอย่างที่เจ้าของส่งมา) ─────── */
 const QueueRowButton: React.FC<{
@@ -128,9 +121,55 @@ const QueueRowButton: React.FC<{
   </li>
 );
 
+/**
+ * ── หนึ่งก้อนของคิว ────────────────────────────────────────────────────────────
+ * 🔴 **เลขลำดับเริ่มใหม่ที่ 01 ทุกก้อน** — เพราะสองก้อนนี้คนละหน่วย (กอง ↔ คน)
+ * ถ้าเรียงเลขต่อกันคนจะอ่านว่าเป็นลิสต์เดียว แล้วเอาความยาวไปบวกกันอีก
+ */
+const QueueSection: React.FC<{
+  eyebrow: React.ReactNode;
+  /** สรุปหน่วย+ยอดจริงของก้อนนี้ — บอกด้วยว่าลิสต์ถูกตัดหรือเปล่า */
+  summary: React.ReactNode;
+  emptyText: string;
+  rows: WorkQueueRow[];
+  selectedId?: string;
+  onSelect: (id: string) => void;
+  action?: React.ReactNode;
+}> = ({ eyebrow, summary, emptyText, rows, selectedId, onSelect, action }) => (
+  <Sheet2 className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 pb-2 pt-5 lg:px-8">
+      <span className="text-[12.5px] font-medium text-foreground">{eyebrow}</span>
+      <span className="text-[12px] text-muted-foreground">{summary}</span>
+      <span className="flex-1" />
+      {action}
+    </div>
+    {rows.length === 0 ? (
+      <p className="px-6 py-8 text-center text-[13px] text-muted-foreground lg:px-8">{emptyText}</p>
+    ) : (
+      <ol className="divide-y divide-border/50 border-t border-border/60">
+        {rows.map((r, i) => (
+          <QueueRowButton
+            key={r.id}
+            index={i}
+            title={r.kind === 'bucket' ? r.task.title : r.item.name || r.item.person_ref}
+            reason={
+              r.kind === 'bucket' ? r.task.reason : r.item.summary || PERSON_GROUP[r.group].reason
+            }
+            badge={r.kind === 'bucket' ? r.task.badge : PERSON_GROUP[r.group].badge}
+            tone={r.kind === 'bucket' ? r.task.tone : PERSON_GROUP[r.group].tone}
+            count={r.kind === 'bucket' ? r.task.count : undefined}
+            active={selectedId === r.id}
+            onSelect={() => onSelect(r.id)}
+          />
+        ))}
+      </ol>
+    )}
+  </Sheet2>
+);
+
 /* ── ลิ้นชักงานฝั่งขวา — "ทำจบตรงนี้" ────────────────────────────────────────── */
 const DetailPane: React.FC<{
-  row: QueueRow | null;
+  row: WorkQueueRow | null;
   booked: Record<string, true>;
   busy: boolean;
   bookError: string | null;
@@ -279,27 +318,30 @@ const WorkQueuePage: React.FC = () => {
         applicantsUntouched: office ? office.counts.intake.untouched : null,
         claimedIdle: office ? office.counts.intake.claimedIdle : null,
         callsStale: flow ? flow.lumos.stale_delivered : null,
-        needsHuman: flow ? flow.call_boxes.needs_human.length : null,
+        needsHuman: flow ? callBoxCount(flow, 'needs_human') : null,
         slaBreached: flow ? (flow.jobs.sla_breached ?? null) : null,
       }),
     [office, flow],
   );
 
-  /** รายคนที่ตัดสินใจได้ทันที — มาจาก flow-summary ที่โหลดอยู่แล้ว */
-  const rows: QueueRow[] = useMemo(() => {
-    const buckets: QueueRow[] = tasks.map((t) => ({ kind: 'bucket', id: `b:${t.key}`, task: t }));
-    const people: QueueRow[] = [];
-    const fu = flow?.call_boxes;
-    for (const it of fu?.confirmed ?? []) {
-      people.push({ kind: 'person', id: `p:c:${bookingKeyOf(it)}`, item: it, group: 'confirmed' });
-    }
-    for (const it of fu?.needs_human ?? []) {
-      people.push({ kind: 'person', id: `p:h:${bookingKeyOf(it)}`, item: it, group: 'needs_human' });
-    }
-    return [...buckets, ...people];
-  }, [tasks, flow]);
+  /**
+   * แยกคิวเป็นสองก้อน **คนละหน่วย** (ตรรกะ+เทสต์อยู่ที่ `src/lib/workQueueRows.ts`)
+   * กองงาน = ถังทั้งใบ · คนที่ตัดสินใจได้เลย = รายคนจาก flow-summary ที่โหลดอยู่แล้ว
+   */
+  const queue = useMemo(
+    () =>
+      buildWorkQueueRows({
+        tasks,
+        confirmed: flow?.call_boxes.confirmed ?? [],
+        needsHuman: flow?.call_boxes.needs_human ?? [],
+        confirmedTotal: flow ? callBoxCount(flow, 'confirmed') : null,
+        needsHumanTotal: flow ? callBoxCount(flow, 'needs_human') : null,
+      }),
+    [tasks, flow],
+  );
 
-  const selected = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null;
+  const allRows = useMemo(() => [...queue.buckets, ...queue.people], [queue]);
+  const selected = allRows.find((r) => r.id === selectedId) ?? allRows[0] ?? null;
 
   /** จองตัว — เส้นเดียวกับปุ่มจองหน้า Matching/หน้าแรก (ไม่ได้เขียนตรรกะใหม่) */
   const book = async (item: FlowFollowUpItem) => {
@@ -339,7 +381,21 @@ const WorkQueuePage: React.FC = () => {
   const totalToDo = tasks.reduce((a, t) => a + t.count, 0);
   const pastDue = office?.counts.follow.pastDue ?? null;
   const waitingAi = office?.counts.aiCalls.waitingResult ?? null;
-  const readyToBook = flow?.call_boxes?.confirmed.length ?? null;
+  const th = (n: number) => n.toLocaleString('th-TH');
+
+  const refreshButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => void load()}
+      disabled={loading}
+      className="h-8 px-2.5 text-muted-foreground"
+    >
+      <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
+      รีเฟรช
+    </Button>
+  );
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 md:py-9">
@@ -347,90 +403,103 @@ const WorkQueuePage: React.FC = () => {
       <Sheet2 className="animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="px-6 pb-6 pt-7 lg:px-8">
           <p className="text-[12.5px] font-medium text-primary">คิวงานของคุณ</p>
-          <h1 className="mt-2 max-w-[22ch] text-[clamp(26px,3.6vw,42px)] font-semibold leading-[1.15] tracking-tight">
-            {loading
-              ? 'กำลังรวบรวมงานที่ต้องลงมือ…'
-              : rows.length === 0
-                ? 'วันนี้ไม่มีอะไรค้างให้ทำแล้ว'
-                : `เหลือ ${rows.length} เรื่องที่ต้องลงมือ`}
+          {/* 🔴 พาดหัวบอกสองหน่วยแยกกัน — เดิมยุบเป็น "เหลือ N เรื่อง" ซึ่งเอากองงาน
+              มาบวกกับจำนวนคน (ถ้อยคำอยู่ที่ `workQueueHeadline` มีเทสต์คุม) */}
+          <h1 className="mt-2 max-w-[24ch] text-[clamp(26px,3.6vw,42px)] font-semibold leading-[1.15] tracking-tight">
+            {loading ? 'กำลังรวบรวมงานที่ต้องลงมือ…' : workQueueHeadline(queue)}
           </h1>
           <p className="mt-3 max-w-[60ch] text-[13.5px] leading-relaxed text-muted-foreground">
             ทุกเรื่องรวมไว้ที่เดียว — กดที่แถวแล้วทำต่อได้เลยทางขวา ไม่ต้องเปิดหลายหน้า
+            <br />
+            ข้างล่างแยกเป็นสองก้อน: <b className="font-medium text-foreground">กองงาน</b> นับเป็น
+            &quot;กอง&quot; (กองเดียวมีได้หลายร้อยรายการ) ส่วน{' '}
+            <b className="font-medium text-foreground">คนที่ตัดสินใจได้เลย</b> นับเป็น
+            &quot;คน&quot; — สองเลขนี้บวกกันไม่ได้
           </p>
         </div>
 
-        {/* 🔴 ช่องไหนยังไม่รู้ค่า = ขีด ไม่ใช่ 0 (กติกาเดิมของทั้งระบบ) */}
+        {/* 🔴 ช่องไหนยังไม่รู้ค่า = ขีด ไม่ใช่ 0 (กติกาเดิมของทั้งระบบ)
+            ป้ายทุกช่องอ่านจากพจนานุกรมเลข ไม่พิมพ์เอง (กติกา metricDictionary) */}
         <StatRow2>
           <Stat2
-            value={loading ? '—' : rows.length.toLocaleString('th-TH')}
-            label="เรื่องในคิวตอนนี้"
+            value={loading ? '—' : th(queue.buckets.length)}
+            label={METRICS['work.queue_buckets'].label}
+            hint="นับเป็นกอง — กดกองแล้วไปเคลียร์ที่หน้าเต็ม"
           />
           {/* Wave 2.4 (5 ก.ย. 2569): ผู้ทดสอบตาใหม่เอาเลขนี้ไปเทียบกับ "เหลือหา" ของ
               ศูนย์ควบคุมใบขอแล้วงงว่าทำไมไม่ตรง — คนละนิยามกันคนละเรื่อง
               (ตัวนี้นับ "เรื่องในคิวงาน" · อีกตัวนับ "อัตราที่ยังหาไม่ได้")
               ⚠️ เติมคำกำกับอย่างเดียว ไม่แตะตัวเลข/ตรรกะ */}
           <Stat2
-            value={loading ? '—' : totalToDo.toLocaleString('th-TH')}
-            label="งานค้างรวมทั้งระบบ"
-            hint={'นับจากคิวงาน — คนละเลขกับ "เหลือหา" ของศูนย์ควบคุมใบขอ'}
+            value={loading ? '—' : th(totalToDo)}
+            label={METRICS['work.backlog_total'].label}
+            hint={'ผลบวกของทุกกอง — คนละเลขกับ "เหลือหา" ของศูนย์ควบคุมใบขอ'}
           />
           <Stat2
-            value={pastDue === null ? '—' : pastDue.toLocaleString('th-TH')}
-            label="เลยเวลานัดแล้ว"
+            value={pastDue === null ? '—' : th(pastDue)}
+            label={METRICS['closing.follow_past_due'].label}
             valueClassName={pastDue ? 'text-red-700 dark:text-red-300' : undefined}
           />
+          {/* 🔴 ยอดจริงจาก `call_box_counts` — เดิมใช้ `.length` ของลิสต์ที่ SQL ตัดที่ 50 */}
           <Stat2
-            value={readyToBook === null ? '—' : readyToBook.toLocaleString('th-TH')}
-            label="สนใจงาน รอจองตัว"
-            hint={waitingAi === null ? undefined : `รอผล AI อีก ${waitingAi.toLocaleString('th-TH')}`}
+            value={flow ? th(queue.confirmedTotal) : '—'}
+            label={METRICS['work.ready_to_book'].label}
+            hint={waitingAi === null ? undefined : `รอผล AI อีก ${th(waitingAi)}`}
           />
         </StatRow2>
       </Sheet2>
 
-      {/* ═══ ซ้าย: คิว · ขวา: ลิ้นชักงาน ═══ */}
+      {/* ═══ ซ้าย: คิวสองก้อน · ขวา: ลิ้นชักงาน ═══ */}
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <Sheet2 className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="flex items-center justify-between px-6 pb-2 pt-5 lg:px-8">
-            <span className="text-[12.5px] font-medium text-foreground">ทำก่อน → หลัง</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void load()}
-              disabled={loading}
-              className="h-8 px-2.5 text-muted-foreground"
-            >
-              <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
-              รีเฟรช
-            </Button>
-          </div>
-
-          {rows.length === 0 && !loading ? (
-            <p className="px-6 py-10 text-center text-[13px] text-muted-foreground lg:px-8">
-              ถังที่ระบบเฝ้าอยู่ว่างหมด — เปิดหน้าแรกเพื่อดูตัวเลขวันนี้
-            </p>
+        <div className="space-y-5">
+          {queue.empty && !loading ? (
+            <Sheet2 className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="flex items-center justify-between px-6 pb-2 pt-5 lg:px-8">
+                <span className="text-[12.5px] font-medium text-foreground">คิวงาน</span>
+                {refreshButton}
+              </div>
+              <p className="px-6 py-10 text-center text-[13px] text-muted-foreground lg:px-8">
+                ถังที่ระบบเฝ้าอยู่ว่างหมด — เปิดหน้าแรกเพื่อดูตัวเลขวันนี้
+              </p>
+            </Sheet2>
           ) : (
-            <ol className="divide-y divide-border/50 border-t border-border/60">
-              {rows.map((r, i) => (
-                <QueueRowButton
-                  key={r.id}
-                  index={i}
-                  title={r.kind === 'bucket' ? r.task.title : r.item.name || r.item.person_ref}
-                  reason={
-                    r.kind === 'bucket'
-                      ? r.task.reason
-                      : r.item.summary || PERSON_GROUP[r.group].reason
-                  }
-                  badge={r.kind === 'bucket' ? r.task.badge : PERSON_GROUP[r.group].badge}
-                  tone={r.kind === 'bucket' ? r.task.tone : PERSON_GROUP[r.group].tone}
-                  count={r.kind === 'bucket' ? r.task.count : undefined}
-                  active={selected?.id === r.id}
-                  onSelect={() => setSelectedId(r.id)}
-                />
-              ))}
-            </ol>
+            <>
+              {/* ── ก้อนที่ 1: กองงาน (หน่วย "กอง" · เลข 01 เป็นต้นไป) ── */}
+              <QueueSection
+                eyebrow="กองงาน · ทำก่อน → หลัง"
+                /* ⚠️ ห้ามพิมพ์ยอดรวมของค้างซ้ำที่นี่ — ช่อง "งานค้างรวมทั้งระบบ" ข้างบน
+                   นับ**ทุกถัง** รวมถังที่ถูกกางเป็นรายคนไปแล้ว (นิยามเดียวกับคิวหน้าแรก)
+                   เอามาโชว์คู่กันเมื่อไหร่ สองเลขจะไม่ตรงกันแล้วคนจะเลิกเชื่อทั้งคู่ */
+                summary={
+                  loading
+                    ? 'กำลังรวบรวม…'
+                    : `${th(queue.buckets.length)} กอง · เรียงตามความด่วน ไม่ใช่ตามจำนวน`
+                }
+                emptyText={loading ? 'กำลังรวบรวมกองงาน…' : 'ไม่มีกองงานค้างตอนนี้'}
+                rows={queue.buckets}
+                selectedId={selected?.id}
+                onSelect={setSelectedId}
+                action={refreshButton}
+              />
+
+              {/* ── ก้อนที่ 2: รายคน (หน่วย "คน" · เลขลำดับ **เริ่มใหม่** ที่ 01) ── */}
+              <QueueSection
+                eyebrow={`${METRICS['work.queue_people'].label} · ตัดสินใจได้เลยในหน้านี้`}
+                summary={
+                  loading
+                    ? 'กำลังรวบรวม…'
+                    : `${th(queue.peopleTotal)} คน · สนใจงานรอจองตัว ${th(queue.confirmedTotal)} · ต้องคนโทรเอง ${th(queue.needsHumanTotal)}` +
+                      // 🔴 ลิสต์จาก API ถูกตัดที่ 50 แถว — ต้องบอก ไม่ใช่เงียบ
+                      (queue.peopleTruncated ? ` · แสดง ${th(queue.people.length)} รายแรก` : '')
+                }
+                emptyText={loading ? 'กำลังรวบรวมรายชื่อ…' : 'ยังไม่มีใครรอให้ตัดสินใจตอนนี้'}
+                rows={queue.people}
+                selectedId={selected?.id}
+                onSelect={setSelectedId}
+              />
+            </>
           )}
-        </Sheet2>
+        </div>
 
         <Sheet2 className="h-fit lg:sticky lg:top-24">
           <DetailPane

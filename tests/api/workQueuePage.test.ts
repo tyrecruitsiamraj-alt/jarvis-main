@@ -10,9 +10,28 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { buildNextTasks } from '@/lib/nextTask';
+import { buildWorkQueueRows, workQueueHeadline } from '@/lib/workQueueRows';
+import type { FlowFollowUpItem } from '@/lib/flowSummaryApi';
+
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), 'utf8');
 const page = read('src/pages/work/WorkQueuePage.tsx');
 const home = read('src/pages/HomePage.tsx');
+
+/** คนหนึ่งคนในลิสต์ผลโทร — เท่าที่คิวงานใช้จริง */
+const person = (n: number): FlowFollowUpItem => ({
+  job_ref: `siamraj-sql:OPL${n}`,
+  request_no: `OPL${n}`,
+  person_ref: `card-${n}`,
+  channel: 'interview',
+  name: `คนที่ ${n}`,
+  phone: '0800000000',
+  summary: null,
+  outcome: 'confirmed',
+  updated_at: '2026-09-07T03:00:00.000Z',
+  job_position: null,
+  job_unit: null,
+});
 
 describe('ปลอดภัยกับ production', () => {
   it('🔴 ไม่ได้เปิดสวิตช์ = เด้งกลับหน้าแรก (พนักงานทั่วไปไม่มีทางหลงเข้ามา)', () => {
@@ -89,6 +108,80 @@ describe('ตัวเลขต้องตรงกับหน้าแรก 
 
   it('ใช้ตรรกะกลาง `buildNextTasks` ไม่เขียนเงื่อนไขคิวเอง', () => {
     expect(page).toContain("from '@/lib/nextTask'");
+  });
+});
+
+/**
+ * ═══ 🔴 คิวสองก้อน คนละหน่วย — ห้ามนับซ้ำ ห้ามบวกข้ามหน่วย ═══
+ * ที่มา: สืบสวนเลขคิว 7 ก.ย. 2569 · หน้านี้เคยต่อ "กองงาน" กับ "รายคน" เป็นลิสต์เดียว
+ * แล้วโชว์ `rows.length` ว่า "เหลือ 6 เรื่อง" (ของจริง = 4 กอง + 2 คน)
+ * และคนกลุ่ม needs_human ยังโผล่ซ้ำสองที่ (เป็นถัง + เป็นรายคน) ในลิสต์เดียวกัน
+ */
+describe('คิวแยกสองก้อน · กันนับซ้ำ', () => {
+  const tasks = buildNextTasks({ followPastDue: 3, needsHuman: 2, slaBreached: 10 });
+
+  it('🔴 needs_human กางเป็นรายคนแล้ว ถังใบเดิมต้องไม่ขึ้นซ้ำ', () => {
+    expect(tasks.map((t) => t.key)).toContain('needs-human');
+    const q = buildWorkQueueRows({
+      tasks,
+      confirmed: [],
+      needsHuman: [person(1), person(2)],
+      needsHumanTotal: 2,
+    });
+    expect(q.buckets.map((r) => (r.kind === 'bucket' ? r.task.key : ''))).not.toContain(
+      'needs-human',
+    );
+    expect(q.people).toHaveLength(2);
+    // คนสองคนนี้ต้องถูกนับ "ครั้งเดียว" ในระบบทั้งหน้า
+    expect(q.peopleTotal).toBe(2);
+    expect(q.buckets).toHaveLength(2); // เหลือ follow-past-due + sla-breached
+  });
+
+  it('ไม่มีรายชื่อ needs_human มาให้ (เช่นโหลดไม่ได้) ⇒ ถังยังอยู่ ไม่ทำข้อมูลหาย', () => {
+    const q = buildWorkQueueRows({ tasks, confirmed: [], needsHuman: [] });
+    expect(q.buckets.map((r) => (r.kind === 'bucket' ? r.task.key : ''))).toContain('needs-human');
+  });
+
+  it('🔴 ยอดคนใช้ตัวนับจริง ไม่ใช่ความยาวลิสต์ที่ SQL ตัดที่ 50', () => {
+    const fifty = Array.from({ length: 50 }, (_, i) => person(i));
+    const q = buildWorkQueueRows({
+      tasks: [],
+      confirmed: fifty,
+      needsHuman: [],
+      confirmedTotal: 137,
+    });
+    expect(q.confirmedTotal).toBe(137);
+    expect(q.peopleTotal).toBe(137);
+    expect(q.peopleTruncated).toBe(true);
+    expect(q.people).toHaveLength(50);
+  });
+
+  it('ไม่มีตัวนับมาจาก API รุ่นเก่า ⇒ ถอยไปใช้ความยาวลิสต์ (ไม่พัง)', () => {
+    const q = buildWorkQueueRows({ tasks: [], confirmed: [person(1)], needsHuman: [person(2)] });
+    expect(q.peopleTotal).toBe(2);
+    expect(q.peopleTruncated).toBe(false);
+  });
+
+  it('พาดหัวบอกสองหน่วยแยกกัน — ห้ามยุบเป็นเลขเดียว', () => {
+    const q = buildWorkQueueRows({
+      tasks,
+      confirmed: [person(1)],
+      needsHuman: [person(2)],
+      confirmedTotal: 1,
+      needsHumanTotal: 1,
+    });
+    const line = workQueueHeadline(q);
+    expect(line).toContain('กอง');
+    expect(line).toContain('คน');
+    // 2 กอง + 2 คน — ห้ามมีคำว่า "4 เรื่อง" โผล่มาจากไหน
+    expect(line).not.toMatch(/4/);
+    expect(workQueueHeadline({ buckets: [], peopleTotal: 0 })).toBe('วันนี้ไม่มีอะไรค้างให้ทำแล้ว');
+  });
+
+  it('จอต้องเรียกตรรกะกลาง ไม่ปั้นลิสต์รวมเอง', () => {
+    expect(page).toContain('buildWorkQueueRows');
+    expect(page).toContain('workQueueHeadline');
+    expect(page).not.toMatch(/\[\.\.\.buckets, \.\.\.people\]/);
   });
 });
 

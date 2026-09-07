@@ -57,9 +57,24 @@ export type NextTaskInput = {
   needsHuman?: number | null;
   /** ใบขอที่หลุด SLA แล้ว */
   slaBreached?: number | null;
-  /** รายการติดตามที่ระบบไม่ได้ส่งให้ AI โทร */
-  followNotDispatched?: number | null;
 };
+
+/*
+ * 🗑️ **ถังที่ถูกลบทิ้ง 7 ก.ย. 2569 — `follow-not-dispatched`** ("รายการติดตามที่ระบบ
+ * ไม่ได้ส่งให้ AI โทร") · ลบพร้อมช่อง `followNotDispatched`
+ *
+ * เหตุผล: ถังนี้อยู่ในโค้ดมาตั้งแต่ต้นแต่ **ไม่มีใครป้อนค่าให้เลยสักหน้าเดียว**
+ * (grep ทั้ง repo เจอแต่ตัวนิยามกับเทสต์ของตัวเอง) ⇒ เป็นถังตายที่อ่านแล้วเข้าใจผิดว่า
+ * ระบบเฝ้าอยู่ · ค่าที่ต้องใช้ (`follow_entries.dispatch_state` ที่ `needsAction`)
+ * **ไม่มีอยู่ในคำตอบของทั้ง `/api/matching/flow-summary` และ `/api/office-floor`**
+ * ⇒ จะปลุกถังนี้ต้องเพิ่มคอลัมน์รวมใหม่ใน `FOLLOW_SQL` ซึ่งเกินขอบเขตรอบนี้
+ *
+ * ข้อมูลไม่ได้หายไปไหน: หน้า `/follow` บอกเหตุผลรายแถวอยู่แล้วผ่าน
+ * `followDispatchLabel()` (`src/lib/followDispatchState.ts`) ที่ระบุทั้งป้าย เหตุผล
+ * และว่ากดส่งใหม่ได้ไหม — ที่ขาดคือ "ยอดรวม" บนคิวหน้าแรกเท่านั้น
+ * อยากได้คืนเมื่อไหร่: เพิ่ม `count(*) filter (...)` ใน `FOLLOW_SQL` ของ
+ * `api/_handlers/office-floor.ts` แล้วเอานิยามนี้กลับมาจาก git (commit นี้)
+ */
 
 /**
  * ลำดับความด่วน — **เรียงตามความเสียหายถ้าปล่อยไว้ ไม่ใช่ตามจำนวน**
@@ -88,17 +103,6 @@ const ORDER: Array<{
     tone: 'danger',
     path: '/follow',
     action: 'เปิดหน้าติดตาม',
-    stepKey: 'follow',
-  },
-  {
-    key: 'follow-not-dispatched',
-    badge: 'ไม่มีใครโทร',
-    field: 'followNotDispatched',
-    title: (n) => `รายการติดตาม ${n} รายการไม่ได้ถูกส่งให้ AI โทร`,
-    reason: 'ระบบกันไว้ตอนสร้าง — ไม่มีใครโทรจนกว่าจะกดส่งใหม่หรือโทรเอง',
-    tone: 'danger',
-    path: '/follow',
-    action: 'ดูว่าติดอะไร',
     stepKey: 'follow',
   },
   {

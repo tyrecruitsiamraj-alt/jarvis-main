@@ -180,9 +180,25 @@ async function listDeclinedThisMonth(jobIds: string[], limit: number): Promise<F
 }
 
 /**
- * คนที่ Lumos โทรแล้วได้ outcome ตามที่ระบุ และยังไม่มีใครรับช่วงต่อ (ไม่มี proposal
+ * เงื่อนไข "โทรแล้วได้ outcome ตามที่ระบุ และยังไม่มีใครรับช่วงต่อ" (ไม่มี proposal
  * ติดต่อ/จอง/ลงงานของคนนั้นในใบนั้น) — คือรายการ "ต้องติดตาม" ตัวจริง
+ *
+ * 🔴 **นิยามเดียว ใช้ทั้งลิสต์และตัวนับ** — ลิสต์ถูกตัดที่ 50 แถว ตัวนับต้องบอกยอดจริง
+ * ถ้าก๊อปเงื่อนไขไปเขียนสองที่ วันหนึ่งจะเพี้ยนแบบเงียบ ๆ (กับดักเดิมของไฟล์นี้)
+ * พารามิเตอร์: `$1` = outcomes[] · `$2` = jobIds[] (ลิสต์เติม `$3` = limit)
  */
+const CALLS_AWAITING_ACTION_WHERE = `q.job_ref = any($2)
+        and coalesce(q.last_outcome, q.result->>'outcome') = any($1)
+        and not exists (
+          select 1 from ${proposalsTable} p
+           where p.job_id = q.job_ref
+             and p.source = case when q.person_ref like 'card-%' then 'board'
+                                 when q.person_ref like 'app-%' then 'application'
+                                 else 'irecruit' end
+             and p.candidate_ref = regexp_replace(q.person_ref, '^(card|ir)-', '')
+             and p.status in ('contacted', 'reserved', 'placed')
+        )`;
+
 async function listCallsAwaitingAction(
   outcomes: string[],
   jobIds: string[],
@@ -195,22 +211,24 @@ async function listCallsAwaitingAction(
             q.result->>'summary' as summary,
             coalesce(q.last_outcome, q.result->>'outcome') as outcome
        from ${queueTable} q
-      where q.job_ref = any($3)
-        and coalesce(q.last_outcome, q.result->>'outcome') = any($1)
-        and not exists (
-          select 1 from ${proposalsTable} p
-           where p.job_id = q.job_ref
-             and p.source = case when q.person_ref like 'card-%' then 'board'
-                                 when q.person_ref like 'app-%' then 'application'
-                                 else 'irecruit' end
-             and p.candidate_ref = regexp_replace(q.person_ref, '^(card|ir)-', '')
-             and p.status in ('contacted', 'reserved', 'placed')
-        )
+      where ${CALLS_AWAITING_ACTION_WHERE}
       order by q.updated_at desc
-      limit $2`,
-    [outcomes, limit, jobIds],
+      limit $3`,
+    [outcomes, jobIds, limit],
   );
   return rows.map(toFollowUp);
+}
+
+/**
+ * ยอดจริงของถังข้างบน — **ไม่ใช่ความยาวลิสต์** (ลิสต์ถูกตัดที่ 50)
+ * แพตเทิร์นเดียวกับตัวนับ "รอผลอยู่ตอนนี้" ที่หน้าแรกใช้อยู่แล้ว
+ */
+async function countCallsAwaitingAction(outcomes: string[], jobIds: string[]): Promise<number> {
+  const { rows } = await dbQuery<{ n: string | number }>(
+    `select count(*)::int as n from ${queueTable} q where ${CALLS_AWAITING_ACTION_WHERE}`,
+    [outcomes, jobIds],
+  );
+  return Number(rows[0]?.n) || 0;
 }
 
 async function handler(req: AuthedReq, res: ApiRes) {
@@ -334,6 +352,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       stale_delivered: string;
       stale_pending: string;
       retry_scheduled: string;
+      needs_human_total: string;
+      declined_month: string;
       attempts_total: string;
       last_result_at: string | null;
       last_sent_at: string | null;
@@ -348,6 +368,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
          count(*) filter (where ${QUEUE_STALE_2D})                                               as stale_delivered,
          count(*) filter (where ${QUEUE_STALE_PENDING_2D})                                       as stale_pending,
          count(*) filter (where followup_state = 'retry_scheduled')                              as retry_scheduled,
+         -- 🔴 ยอดจริงของสองกล่องผลโทร — ลิสต์ที่ส่งไปคู่กันถูกตัดที่ 50 แถว
+         --    เงื่อนไขตรงกับ listByFollowupState/listDeclinedThisMonth เป๊ะ (ห้ามแก้ข้างเดียว)
+         count(*) filter (where followup_state = 'needs_human')                                 as needs_human_total,
+         count(*) filter (where coalesce(last_outcome, result->>'outcome') = 'declined'
+                            and updated_at >= date_trunc('month', now()))                       as declined_month,
          coalesce(sum(attempt_count) filter (where updated_at >= date_trunc('month', now())), 0) as attempts_total,
          max(updated_at) filter (where coalesce(last_outcome, result->>'outcome') is not null)   as last_result_at,
          max(created_at)                                                                          as last_sent_at
@@ -378,13 +403,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // ── 4 กล่องผลโทร (เจ้าของกำหนด 12 ส.ค. 2569 — กดขั้น "ผลจากการโทร" แล้วเห็นชื่อคน):
     //    สนใจ (ยังไม่มีคนรับช่วง) · รอ AI โทรซ้ำ · ต้องเร่งจัดการ · ไม่สนใจงาน
     //    + รายชื่อที่ส่ง AI โทรค้างอยู่ (กดขั้น "ส่ง AI โทร")
-    const [confirmedRaw, retryRaw, needsHumanRaw, declinedRaw, activeCallsRaw] = await Promise.all([
-      listCallsAwaitingAction(['confirmed'], scopedJobIds, 50),
-      listByFollowupState('retry_scheduled', scopedJobIds, 50),
-      listByFollowupState('needs_human', scopedJobIds, 50),
-      listDeclinedThisMonth(scopedJobIds, 50),
-      listActiveCalls(scopedJobIds, 100),
-    ]);
+    const [confirmedRaw, retryRaw, needsHumanRaw, declinedRaw, activeCallsRaw, confirmedTotal] =
+      await Promise.all([
+        listCallsAwaitingAction(['confirmed'], scopedJobIds, 50),
+        listByFollowupState('retry_scheduled', scopedJobIds, 50),
+        listByFollowupState('needs_human', scopedJobIds, 50),
+        listDeclinedThisMonth(scopedJobIds, 50),
+        listActiveCalls(scopedJobIds, 100),
+        // 🔴 ยอดจริงของกล่อง "สนใจงาน" — จอห้ามใช้ .length ของลิสต์ที่ถูกตัดที่ 50
+        countCallsAwaitingAction(['confirmed'], scopedJobIds),
+      ]);
     // เติมว่าแมทกับงานอะไร (ตำแหน่ง+หน่วยงาน) จากใบขอในลิสต์ที่โหลดมาแล้ว
     const jobById = new Map(jobs.map((j) => [j.id, j as unknown as Record<string, unknown>]));
     const enrich = (item: FlowFollowUpItem): FlowFollowUpItem => {
@@ -468,6 +496,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
         scraping_stages: postingStages('scraping'),
       },
       call_boxes: callBoxes,
+      /**
+       * 🔴 ยอดจริงของ 4 กล่องผลโทร — คู่กับลิสต์ข้างบนที่ถูกตัดที่ 50 แถว
+       * เจอจริง 7 ก.ย. 2569: หน้า `/work` เอา `.length` ของลิสต์ไปโชว์เป็นยอด
+       * ⇒ ของจริงเกิน 50 เมื่อไหร่ จอจะบอก "50" ตลอดกาลโดยไม่มีใครรู้
+       * ⚠️ เพิ่มแค่ **การนับ** — นิยามว่าใครเข้าข่ายยังเป็นชุดเดิมทุกตัว
+       */
+      call_box_counts: {
+        confirmed: confirmedTotal,
+        retry: Number(lumosAgg[0]?.retry_scheduled) || 0,
+        needs_human: Number(lumosAgg[0]?.needs_human_total) || 0,
+        declined: Number(lumosAgg[0]?.declined_month) || 0,
+      },
       active_calls: activeCalls,
     });
   } catch (e) {

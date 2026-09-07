@@ -61,6 +61,7 @@ describe('ทุกเลขบนหน้าแรกต้องอธิบ�
       '/matching/job-postings',
       '/follow',
       '/aftercare',
+      '/work',
     ];
     /** `?view=` ที่บอร์ดรับสมัครรองรับจริง (StaffJobBoardPage: RM_VIEWS + EXTRA_VIEWS) */
     const KNOWN_VIEWS = ['board', 'list', 'contact', 'appointments', 'postings'];
@@ -131,6 +132,43 @@ describe('แถวเปิด dialog ต้องมีคำกำกับ�
 
   it('แถว onPress มีคำจิ๋ว "กดดูรายชื่อ" กำกับ', () => {
     expect(src).toContain('กดดูรายชื่อ');
+  });
+});
+
+/**
+ * 🔴 หน้า `/work` — เลขบนหัวหน้าต้องอยู่ในพจนานุกรมเหมือนบอร์ดทีม
+ * ที่มา: สืบสวนเลขคิว 7 ก.ย. 2569 — ช่อง "เรื่องในคิวตอนนี้" เอาจำนวนกองงานมาบวกกับ
+ * จำนวนคนแล้วเรียกรวมว่า "เรื่อง" (4 กอง + 2 คน = "6 เรื่อง") โดยไม่มีนิยามที่ไหนเลย
+ */
+describe('คิวงานของฉัน (/work) ต้องอ่านป้ายจากพจนานุกรม', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'src/pages/work/WorkQueuePage.tsx'), 'utf8');
+  const WORK_KEYS = [
+    'work.queue_buckets',
+    'work.queue_people',
+    'work.backlog_total',
+    'work.ready_to_book',
+  ] as const;
+
+  it('เมตริกของหน้านี้มีอยู่จริงในพจนานุกรม', () => {
+    for (const k of WORK_KEYS) expect(METRIC_KEYS).toContain(k as MetricKey);
+  });
+
+  it('ทุก METRICS[...] ที่หน้านี้อ้าง มีอยู่จริงในพจนานุกรม', () => {
+    const used = [...src.matchAll(/METRICS\['([^']+)'\]/g)].map((m) => m[1]);
+    expect(used.length, 'หน้านี้ต้องอ่านป้ายจากพจนานุกรม ไม่ใช่พิมพ์เอง').toBeGreaterThanOrEqual(4);
+    for (const key of used) {
+      expect(METRIC_KEYS, `หน้า /work อ้าง ${key} ที่ไม่มีในพจนานุกรม`).toContain(key as MetricKey);
+    }
+  });
+
+  it('🔴 ป้ายเก่าที่เอาสองหน่วยมาบวกกันต้องไม่กลับมา', () => {
+    expect(src).not.toContain('เรื่องในคิวตอนนี้');
+    expect(src).not.toMatch(/เหลือ \$\{rows\.length\}/);
+  });
+
+  it('เมตริกสองหน่วยของหน้านี้ต้องประกาศหน่วยไม่ซ้ำกัน — กัน "เอากองมาบวกกับคน" อีกรอบ', () => {
+    expect(METRICS['work.queue_buckets'].unit).toBe('กอง');
+    expect(METRICS['work.queue_people'].unit).toBe('คน');
   });
 });
 

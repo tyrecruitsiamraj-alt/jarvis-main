@@ -7601,3 +7601,71 @@ src/components/auth/BrandIntro.test.tsx tests/api/typographyRules.test.ts` ผ�
 0 error · `npx vite build` ผ่าน
 ดูจอจริง: ไม่ได้เปิด (ฐาน local = production · การแก้เป็น JSX คงที่ล้วน ประกอบจาก
 `Button` + `Rule2` เดิม ไม่มี state/ตรรกะใหม่ · ไม่มี CSS ใหม่สักบรรทัด)
+
+---
+
+## รอบ 122 — คิวหน้า `/work` แยกสองก้อนคนละหน่วย + เพดาน 50 เลิกโกหก + ล้างถังตาย (7 ก.ย. 2569)
+
+**ที่มา:** รายงานสืบสวนเลขคิว (ต่อจาก `docs/audit-v1-v2-functions-2569-09-07.md` §4)
+เจ้าของเคาะ **ทาง (ก) + งานพ่วง 3 ข้อ** ทำให้จบในรอบเดียว
+
+### บั๊กที่ปิด
+
+| # | อาการบนจอ | ต้นเหตุจริง |
+| --- | --- | --- |
+| 1 | หัวหน้า `/work` เขียน *"เหลือ 6 เรื่องที่ต้องลงมือ"* ทั้งที่ของจริงคือ **4 กอง + 2 คน** | `rows = [...buckets, ...people]` แล้วโชว์ `rows.length` — เอาหน่วย "กอง" มาบวกกับหน่วย "คน" |
+| 2 | คน `needs_human` โผล่ **สองที่ในลิสต์เดียว** (เป็นถัง + เป็นรายคน) | ถัง `needs-human` จาก `buildNextTasks` กับแถวรายคนคือคนกลุ่มเดียวกัน |
+| 3 | เลข "สนใจงาน รอจองตัว" กับ `needsHuman` ตันที่ **50** ตลอดกาล | ใช้ `.length` ของลิสต์ที่ SQL `limit 50` (บั๊กตระกูลเดียวกับป๊อป "ส่ง AI โทร" ที่หน้าแรกแก้ไปแล้ว) |
+| 4 | ถัง `follow-not-dispatched` อยู่ในโค้ดแต่ไม่มีวันขึ้นจอ | ไม่มีหน้าไหนป้อน `followNotDispatched` เลยสักหน้า |
+
+### ไฟล์ที่แก้
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/lib/workQueueRows.ts` | **ใหม่ · pure** — `buildWorkQueueRows()` แยกคิวเป็น `buckets` / `people` + ยอดจริง (`confirmedTotal` `needsHumanTotal` `peopleTotal` `peopleTruncated`) + **กันนับซ้ำ** (กางเป็นรายคนแล้ว ถังคู่ของกลุ่มนั้นไม่ขึ้น) · `workQueueHeadline()` พาดหัวสองหน่วย · ย้าย `bookingKeyOf` มาไว้ที่นี่ |
+| `src/pages/work/WorkQueuePage.tsx` | ใช้ `buildWorkQueueRows` แทนการต่อลิสต์เอง · แยกจอเป็น **2 ผืน** (`QueueSection` ใหม่ · เลขลำดับ **เริ่มใหม่ที่ 01 ทุกก้อน**) · หัวเรื่อง + แถวสถิติเลิกใช้ `rows.length` · ป้ายทุกช่องอ่านจาก `METRICS[...]` |
+| `api/_handlers/matching-flow-summary.ts` | ยก where ของ "สนใจงาน ยังไม่มีใครรับช่วง" เป็น `CALLS_AWAITING_ACTION_WHERE` **ที่เดียว** ใช้ทั้งลิสต์และตัวนับ (`countCallsAwaitingAction`) · เพิ่ม `needs_human_total` / `declined_month` ใน `lumosAgg` · ส่งคีย์ใหม่ **`call_box_counts`** (4 กล่อง) — ⚠️ **เพิ่มแค่การนับ นิยามว่าใครเข้าข่ายไม่ถูกแตะ** |
+| `src/lib/flowSummaryApi.ts` | type `FlowCallBoxCounts` + `call_box_counts?` (optional — API รุ่นเก่าไม่ส่ง) · `callBoxCount()` / `callBoxTruncated()` = **ทางเดียวที่จออ่านยอดกล่อง** |
+| `src/pages/HomePage.tsx` | `needsHuman:` ป้อน `callBoxCount(flow,'needs_human')` แทน `.length` (เทสต์ parity บังคับให้สองหน้าป้อนชุดเดียวกันเป๊ะ ⇒ คิวหน้าแรกได้ยอดจริงตามไปด้วย) |
+| `src/lib/nextTask.ts` | **ลบถังตาย `follow-not-dispatched` + ช่อง `followNotDispatched`** พร้อมบล็อกคอมเมนต์ 🗑️ บอกเหตุผลและวิธีปลุกคืน |
+| `src/lib/metricDictionary.ts` | เพิ่มหน่วย `'กอง'` + หมู่ `work.*` 4 ตัว (`queue_buckets` `queue_people` `backlog_total` `ready_to_book`) + คอมเมนต์ 🔴 ว่า **"เรื่องในคิวตอนนี้" ถูกยกเลิก ห้ามเอากลับมา** |
+
+### ทำไมเลือกทางนี้ — งานพ่วงข้อ 2 (`follow-not-dispatched`)
+
+ค่าที่ถังนี้ต้องใช้คือ `follow_entries.dispatch_state` ที่ `needsAction`
+(`src/lib/followDispatchState.ts`) — **ไม่มีอยู่ในคำตอบของทั้ง `flow-summary` และ
+`office-floor`** ⇒ ปลุกคืนต้องเพิ่มคอลัมน์รวมใหม่ใน `FOLLOW_SQL` ของ
+`api/_handlers/office-floor.ts` ซึ่งเข้าเงื่อนไข *"ต้องเพิ่ม SQL ใหม่ = ลบทิ้ง"*
+ข้อมูลไม่หาย: หน้า `/follow` บอกเหตุผลรายแถวอยู่แล้วผ่าน `followDispatchLabel()`
+ที่ขาดคือ "ยอดรวม" บนคิวเท่านั้น · git ย้อนได้จาก commit รอบนี้
+
+### เลขบนจอเปลี่ยนจากอะไรเป็นอะไร
+
+| ที่ | ก่อน | หลัง |
+| --- | --- | --- |
+| พาดหัว | `เหลือ 6 เรื่องที่ต้องลงมือ` | `มีกองงานค้าง 4 กอง และอีก 2 คนรอให้คุณตัดสินใจ` |
+| ช่องที่ 1 | `เรื่องในคิวตอนนี้ 6` | `กองงานที่ต้องเคลียร์ 4` (+hint "นับเป็นกอง") |
+| ช่องที่ 4 | `สนใจงาน รอจองตัว` = `.length` (ตันที่ 50) | ยอดจริงจาก `call_box_counts.confirmed` |
+| หัวก้อนรายคน | ไม่มี | `คนที่รอให้ตัดสินใจ · N คน · สนใจงานรอจองตัว C · ต้องคนโทรเอง H` (+ `แสดง 50 รายแรก` เมื่อลิสต์ถูกตัด) |
+| คิวหน้าแรก | ถัง "AI ไปต่อไม่ได้" ตันที่ 50 | ยอดจริง (ผลพลอยได้จากเทสต์ parity) |
+
+### เทสต์ที่เพิ่ม
+
+- `tests/api/workQueuePage.test.ts` — describe ใหม่ "คิวแยกสองก้อน · กันนับซ้ำ" (+6 เคส):
+  **จำลอง `needs_human > 0` แล้วยืนยันว่าถังไม่ขึ้นซ้ำ** · ไม่มีรายชื่อมา ⇒ ถังยังอยู่ ·
+  ตัวนับ 137 กับลิสต์ 50 ⇒ `peopleTruncated` · API เก่าไม่มีตัวนับ ⇒ ถอยไปใช้ `.length` ·
+  พาดหัวมีทั้ง "กอง" และ "คน" · จอต้องเรียกตรรกะกลาง (ห้ามปั้น `[...buckets, ...people]` เอง)
+- `tests/api/flowSummary.test.ts` — `callBoxCount`/`callBoxTruncated` + ด่านสแกน SQL ว่า
+  `CALLS_AWAITING_ACTION_WHERE` ใช้ที่เดียวและ `p.status in (...)` มีชุดเดียวในไฟล์
+- `tests/api/metricDictionary.test.ts` — `/work` เข้ารายการ `KNOWN` · หมู่ `work.*` ต้องมีจริง ·
+  หน้า `/work` ต้องอ่านป้ายจาก `METRICS[...]` · **ห้ามมีคำว่า "เรื่องในคิวตอนนี้" กลับมา** ·
+  `queue_buckets` หน่วย "กอง" ≠ `queue_people` หน่วย "คน"
+- `tests/api/nextTask.test.ts` — ด่านใหม่ **"ทุกช่องรับค่าของ nextTask มีหน้าจอป้อนค่าให้จริง"**
+  (สแกน `field: '...'` เทียบกับ `HomePage` + `WorkQueuePage`) ⇒ ถังตายใบใหม่งอกไม่ได้อีก
+
+### ทดสอบ
+
+`npx tsc --noEmit` ผ่าน · `npx vitest run` **250 ไฟล์ · 2803 ผ่าน** (6 skip ของเดิม ·
+ก่อนแก้ 2784 ⇒ +19 คือด่านใหม่ของรอบนี้ ไม่มีเทสต์เดิมพัง) · `npx eslint` บนไฟล์ที่แก้
+0 error · `npm run build` ผ่าน
+ดูจอจริง: **ไม่ได้เปิด** (มีผู้ทดสอบอีกสายเดินจออยู่ · ฐาน local = production)
