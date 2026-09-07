@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
 import { roundTabLabel } from '@/lib/followRoundVisual';
+import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowMonthRows,
@@ -90,6 +91,24 @@ const FollowPlanningCalendar: React.FC<{
 }> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound, allCalls }) => {
   const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
   const cols = useMemo(() => monthDayColumns(month), [month]);
+
+  /**
+   * มีสายที่เท่าไหร่บ้างในข้อมูลจริง — คอลัมน์ผลจะขึ้นเท่าที่มี ไม่ยัด 3 ช่องว่างทุกแถว
+   * 🔴 ต้องนับจาก **ทุกรอบของทุกคน** (`allCalls`) ไม่ใช่แถวที่กรองรอบแล้ว
+   * ไม่งั้นเลือกแท็บ "ครั้งที่ 2" ปุ๊บ คอลัมน์ "สายที่ 1" หายทั้งตาราง
+   * อย่างน้อยต้องมีสายที่ 1 เสมอ — ตารางไม่มีคอลัมน์ผลเลยจะอ่านไม่รู้เรื่อง
+   */
+  const roundSlots = useMemo(() => {
+    const found = new Set<number>();
+    for (const { row } of monthRows) {
+      for (const r of allCalls?.get(row.group.key) ?? row.rounds) {
+        const slot = followRoundSlot(r.entry);
+        if (slot != null) found.add(slot);
+      }
+    }
+    if (found.size === 0) found.add(1);
+    return [...found].sort((a, b) => a - b);
+  }, [monthRows, allCalls]);
   const today = toYmdBangkok(new Date());
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -208,15 +227,22 @@ const FollowPlanningCalendar: React.FC<{
                   คนที่ต้องติดตาม
                 </th>
                 {/**
-                 * 🔴 ผลของ **ทุกสาย** ไม่ใช่แค่สายแรก (เจ้าของสั่ง 7 ก.ย. 2569:
-                 * *"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย ตอนนี้ต้องรอสายที่ 2
-                 * ถึงจะรายงานผลมา"*) — สายที่ 1 ได้ผลกลับเมื่อไหร่ต้องเห็นทันที
-                 * ไม่ต้องรอสายถัดไป · พร้อมสรุปที่ AI เขียนกลับมา (เดิมมีแต่ในป๊อป)
-                 * ⚠️ อ่านจากชุด **ไม่กรองรอบ** — สลับแท็บรอบแล้วคอลัมน์นี้ต้องครบเหมือนเดิม
+                 * 🔴 **หนึ่งสาย = หนึ่งคอลัมน์** (เจ้าของสั่ง 7 ก.ย. 2569:
+                 * *"แยกว่าสายแรก สาย 2 พอได้ผลก็แยกรอบ เอามารวมกันแบบนี้งงตาย"*)
+                 * รอบก่อนกองทุกสายไว้ในช่องเดียว อ่านแล้วไม่รู้ว่าอันไหนของสายไหน
+                 *
+                 * แต่ละช่องเปลี่ยนสถานะของตัวเอง: รอผล → ได้ผลแล้วบอกคำตอบ (ไป/ไม่ไป)
+                 * พร้อม **เหตุผลที่เขาตอบ** จากสรุปของ AI ⇒ สายที่ 1 ได้ผลก่อนก็เห็นก่อน
+                 * ไม่ต้องรอสายที่ 2 · อ่านจากชุด **ไม่กรองรอบ** สลับแท็บแล้วต้องครบเหมือนเดิม
                  */}
-                <th className="min-w-[240px] max-w-[340px] px-2 py-2 text-left text-[11px] font-semibold text-muted-foreground">
-                  ผลการโทรแต่ละสาย · สรุปจาก AI
-                </th>
+                {roundSlots.map((slot) => (
+                  <th
+                    key={`slot-${slot}`}
+                    className="min-w-[170px] max-w-[240px] border-l border-border/60 px-2 py-2 text-left text-[11px] font-semibold text-muted-foreground"
+                  >
+                    สายที่ {slot}
+                  </th>
+                ))}
                 {cols.map((c) => {
                   const selected = selectedYmd === c.ymd;
                   return (
@@ -253,57 +279,58 @@ const FollowPlanningCalendar: React.FC<{
                       {row.group.unitName || row.group.phone}
                     </span>
                   </td>
-                  <td className="max-w-[340px] px-2 py-1.5 align-middle">
-                    {(() => {
-                      const calls = allCalls?.get(row.group.key) ?? row.rounds;
-                      if (calls.length === 0) {
-                        return <span className="text-[10px] text-muted-foreground">—</span>;
-                      }
-                      return (
-                        <ul className="space-y-1">
-                          {calls.map((r, i) => {
-                            const ai = roundAiSummary(r);
-                            return (
-                              <li key={r.entry.id} className="leading-tight">
-                                <span className="flex items-center gap-1">
-                                  <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">
-                                    สาย {i + 1} · {r.time ?? '—'}
-                                  </span>
-                                  <span
-                                    className={cn(
-                                      'inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium',
-                                      TONE[roundTone(r)].chip,
-                                      r.state === 'cancelled' && 'opacity-60',
-                                    )}
-                                  >
-                                    {/* ✅ เขียว = ตกลงไป (เจ้าของขอเครื่องหมายถูกสีเขียวโดยเฉพาะ) */}
-                                    {isGoodResult(r) ? (
-                                      <Check className="h-3 w-3 shrink-0" aria-hidden />
-                                    ) : null}
-                                    <span className="truncate">{roundResultLabel(r)}</span>
-                                  </span>
-                                </span>
-                                {ai ? (
-                                  /* คำเต็มอยู่ที่ tooltip — ในตารางตัด 2 บรรทัดพอให้กวาดสายตาได้ */
-                                  <span
-                                    className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground"
-                                    title={ai}
-                                  >
-                                    {ai}
-                                  </span>
-                                ) : r.state === 'result' ? (
-                                  /* มีผลแล้วแต่ AI ไม่ได้เขียนสรุป — บอกตรง ๆ ห้ามปล่อยว่างให้เดา */
-                                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                                    (ไม่มีสรุปจาก AI)
-                                  </span>
+                  {roundSlots.map((slot) => {
+                    const r = (allCalls?.get(row.group.key) ?? row.rounds).find(
+                      (x) => followRoundSlot(x.entry) === slot,
+                    );
+                    const ai = r ? roundAiSummary(r) : null;
+                    return (
+                      <td
+                        key={`slot-${slot}`}
+                        className="max-w-[240px] border-l border-border/60 px-2 py-1.5 align-top"
+                      >
+                        {!r ? (
+                          /* คนนี้ไม่ได้ตั้งสายที่ N ไว้ — ต่างจาก "ตั้งไว้แต่ยังไม่มีผล" */
+                          <span className="text-[10px] text-muted-foreground">ไม่ได้ตั้งสายนี้</span>
+                        ) : (
+                          <>
+                            <span className="mb-0.5 flex items-center gap-1">
+                              <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+                                {r.time ?? '—'}
+                              </span>
+                              <span
+                                className={cn(
+                                  'inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium',
+                                  TONE[roundTone(r)].chip,
+                                  r.state === 'cancelled' && 'opacity-60',
+                                )}
+                              >
+                                {/* ✅ เขียว = ตกลงไป (เจ้าของขอเครื่องหมายถูกสีเขียวโดยเฉพาะ) */}
+                                {isGoodResult(r) ? (
+                                  <Check className="h-3 w-3 shrink-0" aria-hidden />
                                 ) : null}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      );
-                    })()}
-                  </td>
+                                <span className="truncate">{roundResultLabel(r)}</span>
+                              </span>
+                            </span>
+                            {ai ? (
+                              /* เหตุผลที่เขาตอบ — คำเต็มที่ tooltip ในตารางตัด 3 บรรทัด */
+                              <span
+                                className="line-clamp-3 text-[10px] leading-snug text-muted-foreground"
+                                title={ai}
+                              >
+                                {ai}
+                              </span>
+                            ) : r.state === 'result' ? (
+                              /* มีผลแล้วแต่ AI ไม่ได้เขียนเหตุผล — บอกตรง ๆ ห้ามปล่อยว่างให้เดา */
+                              <span className="block text-[10px] text-muted-foreground">
+                                (ไม่มีสรุปจาก AI)
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </td>
+                    );
+                  })}
                   {cols.map((c) => {
                     const rounds = byDay.get(c.ymd);
                     const selected = selectedYmd === c.ymd;
