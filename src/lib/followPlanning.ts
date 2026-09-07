@@ -368,26 +368,28 @@ export function filterPlanningRowsByRound(
 }
 
 /**
- * **ผลของ "สายแรก" ของคนคนนี้** — `null` = ยังไม่มีสายแรกในชุดที่ส่งมา
- *
- * เจ้าของสั่ง 1 ก.ย. 2569 (ข้อ 8): *"เพิ่มผลการโทรของสายแรกทุกคน และแสดงสัญลักษณ์สีเขียว"*
- *
- * 🔴 "สายแรก" = สายที่ **คนตั้งไว้ว่าเป็นสายที่ 1** (`call_round`) ไม่ใช่ "สายที่เวลาน้อยสุด"
- * — คนตั้งรอบ 2 ก่อนแล้วค่อยเพิ่มรอบ 1 ทีหลังก็มี · ไม่มี `call_round` (แถวเก่า)
- * ค่อยถอยไปใช้สายที่เวลาเร็วสุด
+ * 🗑️ `firstCallOfRow()` ถูกลบ 7 ก.ย. 2569 — ตารางเลิกโชว์เฉพาะ "สายแรก" แล้ว
+ * เจ้าของสั่งให้โชว์ผล **ทุกสาย** (*"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย"*)
+ * คอลัมน์จึงวนจาก `row.rounds` ตรง ๆ ซึ่งเรียงตามเวลานัดมาแล้วจากชั้นจัดกลุ่ม
+ * (ของเดิมอยู่ในประวัติ git ถ้าต้องการ "สายแรก" กลับมา)
  */
-export function firstCallOfRow(row: FollowPlanningRow): FollowPlanningRound | null {
-  const active = row.rounds.filter((r) => r.state !== 'cancelled');
-  if (active.length === 0) return null;
-  const marked = active.filter((r) => r.entry.call_round === 1);
-  const pool = marked.length > 0 ? marked : active;
-  return (
-    [...pool].sort((a, b) => (a.entry.scheduled_at ?? '').localeCompare(b.entry.scheduled_at ?? ''))[0] ??
-    null
-  );
-}
 
-/** สายแรกจบด้วยดีแล้วหรือยัง — ใช้ติดเครื่องหมายถูกสีเขียว */
+/** สายนี้จบด้วยดีแล้วหรือยัง — ใช้ติดเครื่องหมายถูกสีเขียว */
 export function isGoodResult(round: FollowPlanningRound): boolean {
   return roundTone(round) === 'success';
+}
+
+/**
+ * **สรุปบทสนทนาที่ AI เขียนกลับมา** — `null` = ยังไม่มี (ห้ามเดา ห้ามแต่งแทน)
+ *
+ * 🔴 เจ้าของสั่ง 7 ก.ย. 2569: *"เวลาได้ผลจาก Lumos ถ้าตกลงไปให้ขึ้นสีเขียว
+ * และบอกว่าเขาตอบว่าอะไร ... และเอาสรุปผลโดย AI มาด้วย"*
+ * เดิมค่านี้มาถึงหน้าจอแล้ว (`call_summary` จาก `result->>'summary'`) แต่ถูกใช้
+ * เฉพาะในป๊อป ⇒ ต้องกดเข้าไปอ่านทีละคน · ตารางจึงต้องโชว์ให้เห็นเลย
+ *
+ * ⚠️ ค่าว่าง/ช่องว่างล้วน = ถือว่าไม่มี — จอจะได้ไม่ขึ้นกล่องเปล่าให้เข้าใจผิดว่า AI เงียบ
+ */
+export function roundAiSummary(round: FollowPlanningRound): string | null {
+  const s = (round.entry.call_summary ?? '').trim();
+  return s === '' ? null : s;
 }

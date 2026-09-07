@@ -7,9 +7,9 @@ import { roundTabLabel } from '@/lib/followRoundVisual';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowMonthRows,
-  firstCallOfRow,
   isGoodResult,
   monthDayColumns,
+  roundAiSummary,
   roundDispatchReason,
   roundResultLabel,
   roundTone,
@@ -56,10 +56,12 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
   const detail = rounds
     .map((r) => {
       const why = r.state === 'notSent' ? ` (${roundDispatchReason(r)})` : '';
-      return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${roundResultLabel(r)}${why}`;
+      // สรุปของ AI ต่อท้ายสายที่มี — hover อ่านได้เต็มโดยไม่ต้องเปิดป๊อป
+      const ai = roundAiSummary(r);
+      return `${r.time ?? 'ไม่ได้ตั้งเวลา'} — ${roundResultLabel(r)}${why}${ai ? `\n    สรุปจาก AI: ${ai}` : ''}`;
     })
-    .join(' · ');
-  return `${name} · ${formatYmdDmyBe(ymd)} — ${detail} (กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
+    .join('\n');
+  return `${name} · ${formatYmdDmyBe(ymd)}\n${detail}\n(กดเพื่อดูรายละเอียดและจัดการรอบนี้)`;
 }
 
 const FollowPlanningCalendar: React.FC<{
@@ -77,12 +79,15 @@ const FollowPlanningCalendar: React.FC<{
    */
   activeRound?: number;
   /**
-   * ผลสายแรกของแต่ละคน (คีย์กลุ่ม → สายแรก) — **ต้องมาจากชุดที่ยังไม่ถูกกรองรอบ**
-   * 🔴 ถ้าคำนวณจาก `rows` ที่กรองแล้ว พอเลือก "ครั้งที่ 2" ช่องนี้จะเอาสายที่ 2
-   * มาแปะป้ายว่า "ผลสายแรก" ซึ่งเป็นการโกหก
+   * ทุกสายของแต่ละคน (คีย์กลุ่ม → สายทั้งหมด เรียงตามเวลานัด)
+   * — **ต้องมาจากชุดที่ยังไม่ถูกกรองรอบ**
+   *
+   * 🔴 เจ้าของสั่ง 7 ก.ย. 2569: *"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย"*
+   * เดิมส่งมาแค่ **สายแรก** ⇒ ผลของสายที่ 2 ไม่มีที่โชว์ในตาราง ต้องกดเข้าป๊อป
+   * และถ้าคำนวณจาก `rows` ที่กรองรอบแล้ว สลับแท็บทีคอลัมน์นี้จะขาดสายไปทันที
    */
-  firstCalls?: Map<string, FollowPlanningRound | null>;
-}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound, firstCalls }) => {
+  allCalls?: Map<string, readonly FollowPlanningRound[]>;
+}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound, allCalls }) => {
   const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
   const cols = useMemo(() => monthDayColumns(month), [month]);
   const today = toYmdBangkok(new Date());
@@ -202,9 +207,15 @@ const FollowPlanningCalendar: React.FC<{
                 <th className="sticky left-0 z-10 min-w-[190px] max-w-[260px] bg-card px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground">
                   คนที่ต้องติดตาม
                 </th>
-                {/* ผลสายแรกของทุกคน อ่านได้โดยไม่ต้องกวาดหาในตาราง (เจ้าของสั่งข้อ 8) */}
-                <th className="min-w-[110px] px-2 py-2 text-left text-[11px] font-semibold text-muted-foreground">
-                  ผลสายแรก
+                {/**
+                 * 🔴 ผลของ **ทุกสาย** ไม่ใช่แค่สายแรก (เจ้าของสั่ง 7 ก.ย. 2569:
+                 * *"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย ตอนนี้ต้องรอสายที่ 2
+                 * ถึงจะรายงานผลมา"*) — สายที่ 1 ได้ผลกลับเมื่อไหร่ต้องเห็นทันที
+                 * ไม่ต้องรอสายถัดไป · พร้อมสรุปที่ AI เขียนกลับมา (เดิมมีแต่ในป๊อป)
+                 * ⚠️ อ่านจากชุด **ไม่กรองรอบ** — สลับแท็บรอบแล้วคอลัมน์นี้ต้องครบเหมือนเดิม
+                 */}
+                <th className="min-w-[240px] max-w-[340px] px-2 py-2 text-left text-[11px] font-semibold text-muted-foreground">
+                  ผลการโทรแต่ละสาย · สรุปจาก AI
                 </th>
                 {cols.map((c) => {
                   const selected = selectedYmd === c.ymd;
@@ -242,24 +253,54 @@ const FollowPlanningCalendar: React.FC<{
                       {row.group.unitName || row.group.phone}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 align-middle">
+                  <td className="max-w-[340px] px-2 py-1.5 align-middle">
                     {(() => {
-                      const first = firstCalls ? (firstCalls.get(row.group.key) ?? null) : firstCallOfRow(row);
-                      if (!first) {
+                      const calls = allCalls?.get(row.group.key) ?? row.rounds;
+                      if (calls.length === 0) {
                         return <span className="text-[10px] text-muted-foreground">—</span>;
                       }
                       return (
-                        <span
-                          className={cn(
-                            'inline-flex max-w-[104px] items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
-                            TONE[roundTone(first)].chip,
-                          )}
-                          title={`สายแรก ${first.time ?? ''} — ${roundResultLabel(first)}`}
-                        >
-                          {/* ✅ เขียว = จบดี (เจ้าของขอสัญลักษณ์สีเขียวโดยเฉพาะ) */}
-                          {isGoodResult(first) ? <Check className="h-3 w-3 shrink-0" aria-hidden /> : null}
-                          <span className="truncate">{roundResultLabel(first)}</span>
-                        </span>
+                        <ul className="space-y-1">
+                          {calls.map((r, i) => {
+                            const ai = roundAiSummary(r);
+                            return (
+                              <li key={r.entry.id} className="leading-tight">
+                                <span className="flex items-center gap-1">
+                                  <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+                                    สาย {i + 1} · {r.time ?? '—'}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      'inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium',
+                                      TONE[roundTone(r)].chip,
+                                      r.state === 'cancelled' && 'opacity-60',
+                                    )}
+                                  >
+                                    {/* ✅ เขียว = ตกลงไป (เจ้าของขอเครื่องหมายถูกสีเขียวโดยเฉพาะ) */}
+                                    {isGoodResult(r) ? (
+                                      <Check className="h-3 w-3 shrink-0" aria-hidden />
+                                    ) : null}
+                                    <span className="truncate">{roundResultLabel(r)}</span>
+                                  </span>
+                                </span>
+                                {ai ? (
+                                  /* คำเต็มอยู่ที่ tooltip — ในตารางตัด 2 บรรทัดพอให้กวาดสายตาได้ */
+                                  <span
+                                    className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground"
+                                    title={ai}
+                                  >
+                                    {ai}
+                                  </span>
+                                ) : r.state === 'result' ? (
+                                  /* มีผลแล้วแต่ AI ไม่ได้เขียนสรุป — บอกตรง ๆ ห้ามปล่อยว่างให้เดา */
+                                  <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                                    (ไม่มีสรุปจาก AI)
+                                  </span>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       );
                     })()}
                   </td>

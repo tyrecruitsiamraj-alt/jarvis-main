@@ -10,6 +10,7 @@ import {
   roundTone,
   followRoundState,
   isRoundOpen,
+  roundAiSummary,
 } from '../../src/lib/followPlanning';
 
 const NOW = new Date('2026-09-01T05:00:00Z'); // 12:00 น. เวลาไทย
@@ -331,5 +332,82 @@ describe('🔴 สายที่คนเลือกไว้ชนะ attempt
   it('เลือกครั้งที่ 2 ได้อีกสายหนึ่ง', () => {
     const out = filterPlanningRowsByRound(twoRounds(), 2);
     expect(out[0].rounds.map((r) => r.entry.id)).toEqual(['b']);
+  });
+});
+
+/**
+ * 🔴 เจ้าของสั่ง 7 ก.ย. 2569
+ * *"เวลาได้ผลจาก Lumos ถ้าตกลงไปให้ขึ้นสีเขียว และบอกว่าเขาตอบว่าอะไร
+ *   ... และเอาสรุปผลโดย AI มาด้วย"*
+ * *"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย ตอนนี้ต้องรอสายที่ 2 ถึงจะรายงานผลมา"*
+ */
+describe('ผลการโทรทุกสาย + สรุปจาก AI', () => {
+  it('ตกลงไป (confirmed) = เขียว และคำบนจอต้องบอกว่าเขาตอบว่าอะไร', () => {
+    const r = buildFollowPlanningRows(
+      groupFollowEntries([entry({ call_status: 'completed', call_outcome: 'confirmed' })], NOW),
+      NOW,
+    )[0].rounds[0];
+    expect(roundTone(r)).toBe('success');
+    expect(roundResultLabel(r)).toBe('ยืนยันว่าไป');
+  });
+
+  it('ไม่ไปแล้ว (declined) = แดง ห้ามเขียวเพราะแค่ "มีผลแล้ว"', () => {
+    const r = buildFollowPlanningRows(
+      groupFollowEntries([entry({ call_status: 'completed', call_outcome: 'declined' })], NOW),
+      NOW,
+    )[0].rounds[0];
+    expect(roundTone(r)).toBe('danger');
+    expect(roundResultLabel(r)).toBe('ยกเลิก — ไม่ไปแล้ว');
+  });
+
+  it('roundAiSummary คืนสรุปที่ AI เขียน · ว่าง/ช่องว่างล้วน = null (ห้ามขึ้นกล่องเปล่า)', () => {
+    const withSummary = buildFollowPlanningRows(
+      groupFollowEntries(
+        [entry({ call_status: 'completed', call_outcome: 'confirmed', call_summary: 'ผู้รับสายยืนยันว่าจะไปเริ่มงานวันจันทร์' })],
+        NOW,
+      ),
+      NOW,
+    )[0].rounds[0];
+    expect(roundAiSummary(withSummary)).toBe('ผู้รับสายยืนยันว่าจะไปเริ่มงานวันจันทร์');
+
+    const blank = buildFollowPlanningRows(
+      groupFollowEntries([entry({ call_status: 'completed', call_outcome: 'confirmed', call_summary: '   ' })], NOW),
+      NOW,
+    )[0].rounds[0];
+    expect(roundAiSummary(blank)).toBeNull();
+  });
+
+  it('🔴 สายที่ 1 ได้ผลแล้วต้องอ่านได้ทันที ไม่ต้องรอสายที่ 2', () => {
+    const row = buildFollowPlanningRows(
+      groupFollowEntries(
+        [
+          entry({
+            id: 'r1',
+            call_round: 1,
+            scheduled_at: '2026-09-01T02:00:00Z',
+            call_status: 'completed',
+            call_outcome: 'confirmed',
+            call_summary: 'ตอบว่าไปแน่นอน',
+          }),
+          entry({
+            id: 'r2',
+            call_round: 2,
+            scheduled_at: '2026-09-01T04:00:00Z',
+            call_status: 'pending',
+            call_outcome: null,
+          }),
+        ],
+        NOW,
+      ),
+      NOW,
+    )[0];
+
+    // ทั้งสองสายอยู่ในแถวเดียวกัน เรียงตามเวลานัด
+    expect(row.rounds).toHaveLength(2);
+    expect(roundTone(row.rounds[0])).toBe('success');
+    expect(roundAiSummary(row.rounds[0])).toBe('ตอบว่าไปแน่นอน');
+    // สายที่ 2 ยังไม่มีผล — ต้องไม่ลบผลของสายที่ 1 ทิ้ง และต้องไม่แต่งสรุปให้
+    expect(roundAiSummary(row.rounds[1])).toBeNull();
+    expect(roundTone(row.rounds[1])).not.toBe('success');
   });
 });

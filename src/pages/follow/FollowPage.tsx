@@ -79,7 +79,6 @@ import { type FollowOutcome } from '@/lib/followOutcome';
 import {
   buildFollowPlanningRows,
   filterPlanningRowsByRound,
-  firstCallOfRow,
 } from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
@@ -836,11 +835,14 @@ const FollowPage: React.FC = () => {
   );
 
   /**
-   * ผลสายแรกของทุกคน (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 8) — คิดจาก **ชุดที่ยังไม่กรองรอบ**
-   * ไม่งั้นเลือก "ครั้งที่ 2" แล้วช่องนี้จะเอาสายที่ 2 มาแปะป้ายว่าเป็นสายแรก
+   * ผลการโทร **ทุกสาย** ของทุกคน — คิดจาก **ชุดที่ยังไม่กรองรอบ**
+   *
+   * เดิมส่งแค่สายแรก (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 8) · ขยายเป็นทุกสาย 7 ก.ย. 2569
+   * (*"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย ตอนนี้ต้องรอสายที่ 2 ถึงจะรายงานผลมา"*)
+   * ⚠️ ต้องเป็นชุดไม่กรองรอบ ไม่งั้นเลือกแท็บ "ครั้งที่ 2" แล้วสายที่ 1 จะหายไปจากคอลัมน์
    */
-  const firstCalls = useMemo(
-    () => new Map(planningRowsAllRounds.map((r) => [r.group.key, firstCallOfRow(r)])),
+  const allCalls = useMemo(
+    () => new Map(planningRowsAllRounds.map((r) => [r.group.key, r.rounds])),
     [planningRowsAllRounds],
   );
 
@@ -1006,7 +1008,7 @@ const FollowPage: React.FC = () => {
           onSelect={pickCalendarDay}
           onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
           activeRound={activeRound}
-          firstCalls={firstCalls}
+          allCalls={allCalls}
         />
 
         {/* 🔴 แถบสรุปเลข (ต้องโทรใครตอนนี้ / สถานะสาย) กับปุ่มรีเฟรช **ถูกถอดออก**
