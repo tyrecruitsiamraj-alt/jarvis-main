@@ -24,6 +24,7 @@ import { listNeedsHumanQueueItems } from '../_lib/callFollowup.js';
 import {
   queueOutcome,
   queueCancelled,
+  queueHasResult,
   queuePending,
   queueWaiting,
   queueSentAt,
@@ -45,9 +46,19 @@ export type CallFunnel = {
   queued: number;
   /** ส่ง AI โทรจริง = queued ที่ยังไม่ถูกยกเลิก (ตัวเลข "ส่งทั้งหมด" ที่เจ้าของอยากเห็น) */
   queuedActive: number;
-  /** Lumos ดึงไปแล้ว */
+  /**
+   * **"กำลังโทร"** = Lumos ดึงไปแล้ว **แต่ยังไม่มีผลกลับ** (`queueWaiting`)
+   *
+   * 🔴 เดิมนับจาก `status='delivered'` เฉย ๆ (7 ก.ย. 2569 วัดได้ 37) ทั้งที่ 37 แถวนั้น
+   * **มีผลครบแล้ว** — สถานะค้างเป็น delivered เพราะตอนตั้งโทรซ้ำระบบไม่ถอยสถานะ
+   * ⇒ หน้าจับคู่งานขึ้น "กำลังโทร 37" แต่กดดูรายชื่อได้ 0 คน (ช่องนั้นดึงรายชื่อด้วย
+   * `CELL_WHERE.calling` = `queueWaiting`) · เลข 37 ไม่ได้หายไปไหน — อยู่ในถังผลโทร
+   * และช่อง "รอ AI โทรใหม่" ตามเดิม
+   */
   delivered: number;
-  /** รอโทร (ยังไม่ถูกดึง หรือ นัดโทรซ้ำไว้) */
+  /** ยังไม่ถึงมือ Lumos (`queuePending` ที่ยังไม่ถูกยกเลิก) — "เตรียมไว้" */
+  pending: number;
+  /** ยังไม่มีผลกลับ (นับเฉพาะแถวที่ยังไม่ถูกยกเลิก — สายที่ยกเลิกไม่มีใครรอ) */
   waiting: number;
   /** นัดโทรซ้ำไว้ (นับจาก next_attempt_at > now) — ส่วนหนึ่งของ waiting */
   retryScheduled: number;
@@ -197,6 +208,7 @@ function emptyFunnel(): CallFunnel {
     queued: 0,
     queuedActive: 0,
     delivered: 0,
+    pending: 0,
     waiting: 0,
     retryScheduled: 0,
     retryScheduledState: 0,
@@ -272,6 +284,10 @@ type StatRow = {
   last_outcome: string | null;
   followup_state: string | null;
   has_result: boolean;
+  /** Lumos รับไปแล้วแต่ยังไม่มีผล = "กำลังโทร" (`queueWaiting`) */
+  is_waiting: boolean;
+  /** ยังไม่ถึงมือ Lumos (`queuePending`) */
+  is_pending: boolean;
   scheduled_ahead: boolean;
   attempt_no: number;
   n: string;
@@ -308,10 +324,16 @@ async function loadFunnel(
       // อ่าน outcome จาก last_outcome ก่อน · ไม่มีก็ถอยไปดู result->>'outcome'
       // เพราะ last_outcome เป็นคอลัมน์ใหม่ (migration 070) แถวที่มีผลอยู่ก่อนหน้าจะว่าง
       // ถ้าไม่ถอยให้ หน้าเว็บจะโชว์ "มีผลกลับ 458 แต่โทรติด 0" ซึ่งดูเหมือนพัง
+      //
+      // 🔴 has_result เคยเขียน `(q.result is not null)` เอง = **นิยามที่สอง** ที่หัวไฟล์
+      // lumosQueueDefs ห้ามไว้ตรง ๆ — วัดฐาน 7 ก.ย. 2569 ได้ 14 ทั้งที่ของจริง 51
+      // (ผลที่คนบันทึกเอง + สายที่ตั้งโทรซ้ำแล้ว `result` ถูกล้าง อยู่ที่ last_outcome)
       `select q.status,
-              coalesce(q.last_outcome, q.result->>'outcome') as last_outcome,
+              ${queueOutcome('q')} as last_outcome,
               q.followup_state,
-              (q.result is not null) as has_result,
+              ${queueHasResult('q')} as has_result,
+              ${queueWaiting('q')} as is_waiting,
+              ${queuePending('q')} as is_pending,
               (q.next_attempt_at is not null and q.next_attempt_at > now()) as scheduled_ahead,
               -- รอบที่โทร — เกิน 3 รวบเป็น 3 เพราะเพดานเริ่มต้นคือ 3 ครั้ง
               --
@@ -326,8 +348,8 @@ async function loadFunnel(
          left join ${followTable} f
                 on q.person_ref = 'follow-' || f.id::text
          ${sinceClause}
-        group by q.status, coalesce(q.last_outcome, q.result->>'outcome'),
-                 q.followup_state, has_result, scheduled_ahead,
+        group by q.status, ${queueOutcome('q')},
+                 q.followup_state, has_result, is_waiting, is_pending, scheduled_ahead,
                  least(greatest(coalesce(f.call_round, q.attempt_count, 1), 1), 3)`,
       params,
     );
@@ -337,9 +359,13 @@ async function loadFunnel(
       const isCancelled = r.status === 'cancelled' || r.last_outcome === 'cancelled';
       funnel.queued += n;
       if (!isCancelled) funnel.queuedActive += n;
-      if (r.status === 'delivered') funnel.delivered += n;
+      // "กำลังโทร" = ดึงไปแล้วยังไม่มีผล — นิยามเดียวกับ `CELL_WHERE.calling` ที่ดึงรายชื่อ
+      // ช่องเดียวกัน (เดิมนับ status='delivered' เฉย ๆ ⇒ เลขกับรายชื่อเถียงกัน 37 vs 0)
+      if (r.is_waiting) funnel.delivered += n;
       if (r.has_result) funnel.withResult += n;
-      else funnel.waiting += n;
+      // "ยังไม่มีผล" ไม่นับแถวที่ยกเลิก — สายที่ตายแล้วไม่มีใครรอ (กติกาแม่ของโปรเจกต์)
+      else if (!isCancelled) funnel.waiting += n;
+      if (!isCancelled && r.is_pending) funnel.pending += n;
       if (r.scheduled_ahead) funnel.retryScheduled += n;
       if (r.followup_state === 'retry_scheduled') funnel.retryScheduledState += n;
 

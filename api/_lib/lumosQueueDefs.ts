@@ -45,9 +45,20 @@ export function queueHasResult(alias = 'q'): string {
  * ยกเลิกแล้ว — 🔴 **ห้ามนับรวมใน "ส่งเข้าทั้งหมด"**
  * (กติกาแม่ของโปรเจกต์: ห้ามนับที่ถูกยกเลิกเป็นที่หาได้ · เลนที่มีแต่แถวยกเลิก
  * เคยขึ้นจอว่า "ส่งเข้าทั้งหมด 1 · รอโทร 0 · รอผลกลับ 0 · ได้ผลแล้ว 0" ซึ่งอ่านไม่รู้เรื่อง)
+ *
+ * 🔴 **ทำไมต้องมี `coalesce(..., false)` ครอบ** (บั๊กที่วัดเจอจริง 7 ก.ย. 2569 — ญาติของ
+ * `result is null` ที่หัวไฟล์นี้เตือนไว้): แถวที่ยังไม่มีผล `${queueOutcome()}` เป็น NULL
+ * ⇒ `false or NULL` = **NULL** (ตรรกะสามค่าของ SQL) ⇒ `queueActive` = `not NULL` = NULL
+ * ⇒ `count(*) filter (where ...)` **ข้ามแถวนั้นทิ้งเงียบ ๆ** เพราะ NULL ไม่ใช่ true
+ *
+ * ```
+ * เลน follow (ฐานจริง 7 ก.ย.):  ทั้งหมด 11 · รอโทร 0   ← ก่อนแก้ (11 แถว pending หายไป)
+ *                               ทั้งหมด 22 · รอโทร 11  ← หลังแก้
+ * ```
+ * ⇒ **ทุกเงื่อนไขที่เอา NULL มาต่อกับ or/not ต้องปิดท้ายด้วย coalesce เสมอ**
  */
 export function queueCancelled(alias = 'q'): string {
-  return `(${col(alias, 'status')} = 'cancelled' or ${queueOutcome(alias)} = 'cancelled')`;
+  return `coalesce(${col(alias, 'status')} = 'cancelled' or ${queueOutcome(alias)} = 'cancelled', false)`;
 }
 
 /** แถวที่ยังอยู่ในเกม — ทุกตัวหารต้องใช้อันนี้ ไม่ใช่ `count(*)` เปล่า */

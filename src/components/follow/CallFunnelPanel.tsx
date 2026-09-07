@@ -462,20 +462,23 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <p className={DASH.eyebrow}>สถานะการโทรรายรอบ</p>
             <p className={cn('text-[11px]', DASH.muted)}>
-              {/* เตรียมไว้ = เข้าคิวแล้วแต่ Lumos ยังไม่หยิบไปโทร (queued − delivered)
-                  ⚠️ ห้ามใช้ `waiting` ตรงนี้ — มันคือ "ยังไม่มีผลกลับ" ซึ่งได้เลขเท่า "เหลือโทร"
-                  พอดี กลายเป็นโชว์เลขเดียวกันสองช่อง (เจอตอนตรวจจริง) */}
+              {/* เตรียมไว้ = เข้าคิวแล้วแต่ Lumos ยังไม่หยิบไปโทร = `funnel.pending`
+                  🔴 เดิมคิดเอง `queued − delivered` ซึ่งพังทันทีที่ delivered เปลี่ยนนิยาม
+                  เป็น "กำลังโทร" (7 ก.ย. 2569) — จะได้ 84 = ยอดทั้งคิว ซึ่งไม่จริงเลย
+                  ⇒ ใช้ field ที่ฝั่ง API นับด้วยนิยามกลาง (`queuePending`) ตรง ๆ */}
               เตรียมไว้{' '}
               <span className="font-mono font-semibold tabular-nums">
-                {Math.max(funnel.queued - funnel.delivered, 0).toLocaleString('th-TH')}
+                {funnel.pending.toLocaleString('th-TH')}
               </span>
               {' · '}ส่งโทรทั้งหมด{' '}
               <span className="font-mono font-semibold tabular-nums">{funnel.queued.toLocaleString('th-TH')}</span>
               {' · '}โทรไปแล้ว{' '}
               <span className="font-mono font-semibold tabular-nums">{funnel.withResult.toLocaleString('th-TH')}</span>
               {' · '}เหลือโทร{' '}
+              {/* = `funnel.waiting` (ยังไม่มีผล และยังไม่ถูกยกเลิก) — เดิมคิดเอง
+                  `queued − withResult` ซึ่งเอาสายที่ยกเลิกไปแล้วมานับเป็น "เหลือโทร" ด้วย */}
               <span className={cn('font-mono font-semibold tabular-nums', TONE.warn.value)}>
-                {Math.max(funnel.queued - funnel.withResult, 0).toLocaleString('th-TH')}
+                {funnel.waiting.toLocaleString('th-TH')}
               </span>
             </p>
           </div>

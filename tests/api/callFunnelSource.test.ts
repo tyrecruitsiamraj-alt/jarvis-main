@@ -161,6 +161,66 @@ describe('field ฝั่ง AI โทร + คนเก็บไปโทร', 
     expect(round1.pending).toBe(10); // ยกเลิกไม่ตกไปปนกับ pending
   });
 
+  /**
+   * 🔴 บั๊ก 7 ก.ย. 2569 — หน้าจับคู่งานขึ้น "กำลังโทร 37" แต่กดดูรายชื่อได้ 0 คน
+   * เพราะเลขนับจาก `status='delivered'` เฉย ๆ ส่วนรายชื่อดึงด้วย `queueWaiting`
+   * (สถานะค้างเป็น delivered ได้ทั้งที่มีผลครบแล้ว — ตอนตั้งโทรซ้ำระบบไม่ถอยสถานะ)
+   */
+  it('"กำลังโทร" = ส่งแล้วยังไม่มีผล เท่านั้น — แถว delivered ที่มีผลแล้วห้ามนับ', async () => {
+    vi.mocked(dbQuery).mockImplementation((async (sql: string) => {
+      if (String(sql).includes('attempt_no')) {
+        return {
+          rows: [
+            // มีผลแล้ว แต่สถานะยังค้างเป็น delivered ⇒ ไม่ใช่ "กำลังโทร"
+            {
+              status: 'delivered', last_outcome: 'no_answer', followup_state: null,
+              has_result: true, is_waiting: false, is_pending: false,
+              scheduled_ahead: false, attempt_no: 1, n: '37',
+            },
+            // ส่งไปแล้วเงียบจริง ๆ ⇒ นี่คือ "กำลังโทร"
+            {
+              status: 'delivered', last_outcome: null, followup_state: null,
+              has_result: false, is_waiting: true, is_pending: false,
+              scheduled_ahead: false, attempt_no: 1, n: '2',
+            },
+            // ยังไม่ถึงมือ Lumos ⇒ "เตรียมไว้"
+            {
+              status: 'pending', last_outcome: null, followup_state: null,
+              has_result: false, is_waiting: false, is_pending: true,
+              scheduled_ahead: false, attempt_no: 1, n: '11',
+            },
+            // ยกเลิกแล้ว ⇒ ห้ามไปโผล่ในถัง "ยังไม่มีผล" (ไม่มีใครรอสายที่ตายแล้ว)
+            {
+              status: 'cancelled', last_outcome: null, followup_state: null,
+              has_result: false, is_waiting: false, is_pending: false,
+              scheduled_ahead: false, attempt_no: 1, n: '22',
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    }) as never);
+    const { res, json } = mockRes();
+    await handler({ method: 'GET', query: {} } as never, res as never);
+    const { funnel } = json.mock.calls[0][0];
+    expect(funnel.delivered).toBe(2); // ไม่ใช่ 39 (37 ที่มีผลแล้วไม่นับ)
+    expect(funnel.pending).toBe(11);
+    expect(funnel.withResult).toBe(37);
+    expect(funnel.waiting).toBe(13); // 2 รอผล + 11 รอโทร — ไม่รวม 22 ที่ยกเลิก
+    expect(funnel.queued).toBe(72);
+    expect(funnel.queuedActive).toBe(50);
+  });
+
+  it('has_result / is_waiting / is_pending มาจากนิยามกลาง ไม่ใช่ `result is not null`', async () => {
+    const { res } = mockRes();
+    await handler({ method: 'GET', query: {} } as never, res as never);
+    const sql = sqlOf(0);
+    expect(sql).not.toMatch(/\(q\.result is not null\) as has_result/);
+    expect(sql).toMatch(/coalesce\(q\.last_outcome, q\.result->>'outcome'\) is not null\) as has_result/);
+    expect(sql).toMatch(/as is_waiting/);
+    expect(sql).toMatch(/as is_pending/);
+  });
+
   it('retryScheduledState นับจาก followup_state ไม่ใช่ next_attempt_at', async () => {
     vi.mocked(dbQuery).mockImplementation((async (sql: string) => {
       if (String(sql).includes('attempt_no')) {

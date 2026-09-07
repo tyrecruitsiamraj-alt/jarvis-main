@@ -17,7 +17,15 @@ export type CallFunnel = {
   queued: number;
   /** ส่ง AI โทรจริง = queued ที่ยังไม่ยกเลิก */
   queuedActive: number;
+  /**
+   * "กำลังโทร" = Lumos ดึงไปแล้วแต่ยังไม่มีผลกลับ
+   * 🔴 ไม่ใช่ `status='delivered'` เฉย ๆ — สถานะค้างเป็น delivered ได้ทั้งที่มีผลครบแล้ว
+   * (วัดจริง 7 ก.ย. 2569: 37 แถว "กำลังโทร" ที่กดดูรายชื่อได้ 0 คน)
+   */
   delivered: number;
+  /** ยังไม่ถึงมือ Lumos (เตรียมไว้) — ไม่รวมสายที่ยกเลิก */
+  pending: number;
+  /** ยังไม่มีผลกลับ — ไม่รวมสายที่ยกเลิก */
   waiting: number;
   retryScheduled: number;
   /** "ไม่สะดวกคุย รอ AI โทรใหม่" = followup_state='retry_scheduled' */
@@ -64,6 +72,7 @@ export const EMPTY_FUNNEL: CallFunnel = {
   queued: 0,
   queuedActive: 0,
   delivered: 0,
+  pending: 0,
   waiting: 0,
   retryScheduled: 0,
   retryScheduledState: 0,
