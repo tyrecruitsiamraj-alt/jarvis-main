@@ -7718,3 +7718,51 @@ src/components/auth/BrandIntro.test.tsx tests/api/typographyRules.test.ts` ผ�
   v1 ได้ปุ่มเดิม · v2 อ่านยอด/ผลแยก/ชื่อคน+งานได้โดยไม่กด · ยอด 137 ไม่ใช่ 50 ·
   กดชื่อเรียก `onOpenPerson` · ปุ่มเปิดป๊อปเดิมทำงาน · ไม่มีใครสนใจ ⇒ บอกตรง ๆ ·
   `floor` ยังไม่มา ⇒ ขีด ไม่ใช่ 0 ปลอม
+
+## รอบ 124 — ป๊อป "ดูรายละเอียด" เปิดดูไฟล์แนบได้จริง (7 ก.ย. 2569)
+
+**ที่มา:** เจ้าของกดปุ่มตา "ดูรายละเอียด" ในตารางผู้สมัคร (หน้างานสรรหา RM)
+แล้วแจ้งว่า *"มีไฟล์แนบมาแต่ดูไม่ได้"*
+
+### ต้นเหตุจริง (สืบแล้ว ไม่ใช่เดา)
+
+| ชิ้นส่วน | สภาพ |
+| --- | --- |
+| ปุ่มตา | `src/components/recruit-rm/RmTable.tsx` action `view` → `RmWorkspace.onAction` → `setContactApp(row)` |
+| ป๊อปที่เปิด | `src/components/recruit-rm/ApplicantContactDialog.tsx` |
+| ธงว่ามีไฟล์ | `has_document` มาถึงหน้าจอครบ (`api/_handlers/job-applications.ts` — `(document_bytes is not null) as has_document`) และ **ตารางขึ้นไอคอน 📄 "มีเอกสารแนบ" อยู่แล้ว** |
+| เส้นเสิร์ฟไฟล์ | `GET /api/job-application-document` **มีอยู่และทำงานปกติ** (`JobApplicantsDialog` ใช้ดาวน์โหลดอยู่) |
+| 🔴 ที่ขาด | **ป๊อปรายละเอียดไม่เคยวาดส่วนไฟล์แนบเลยสักบรรทัด** — ไม่มีทั้งลิงก์และปุ่ม ⇒ เห็นว่ามีไฟล์ แต่ไม่มีทางเปิด |
+
+⇒ ไม่ใช่ปัญหา path/สิทธิ์/endpoint · เป็น **หน้าจอที่ขาดไป** ล้วน ๆ
+
+### ไฟล์ที่แก้
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `src/lib/applicantDocument.ts` | **ใหม่ · pure** — `attachmentKind()` (ดู mime ก่อน แล้วถอยไปดูนามสกุล เพราะใบเก่าเก็บ mime เป็น `application/octet-stream`) · `attachmentKindLabel()` · `attachmentFilename()` · `base64ToBlob()` |
+| `src/components/recruit-rm/ApplicantAttachmentPanel.tsx` | **ใหม่** — โหลดไฟล์เมื่อกดเท่านั้น (base64 ก้อนใหญ่) แล้ววาดพรีวิว: รูป → `<img>` · PDF → `<iframe>` · ชนิดอื่น → บอกให้ดาวน์โหลด · ทุกกรณีมีลิงก์ "เปิดแท็บใหม่" + "ดาวน์โหลด" · เปิดคนใหม่ล้างของคนเก่า + `revokeObjectURL` |
+| `src/components/recruit-rm/ApplicantContactDialog.tsx` | เสียบแผงไฟล์แนบใต้บล็อก "รายละเอียดผู้สมัคร" (ได้ผลทั้งป๊อป RM และโหมด `embedded` ใน `JobApplicantsDialog`) |
+
+### กติกาที่ยึด
+
+* 🔴 **ห้ามซ้อน Dialog ใน Dialog** — พรีวิวอยู่ในเนื้อป๊อปเดิม (เทสต์บังคับว่าแผงนี้
+  ห้าม import `@/components/ui/dialog`)
+* 🔴 **`blob:` ไม่ใช่ `data:`** — เบราว์เซอร์บล็อกการเปิด `data:` URL เป็นแท็บใหม่
+  (Chrome ตั้งแต่ 60) และใน `<iframe>` ด้วย ⇒ `data:` จะได้หน้าว่างเงียบ ๆ
+* **เปิดแท็บใหม่ด้วย `<a target="_blank">` ไม่ใช่ `window.open()`** — เปิดหลัง `await`
+  จะโดน popup blocker · ลิงก์ที่คนกดเองคือ user gesture จริง
+* **ฝั่ง API ไม่แตะเลย** — เส้นเดิมเป็น GET + `withRbac('job-applications')` +
+  `isApplicationInWriteScope` (จำกัด BU) อยู่แล้ว **ไม่เปิด public ไม่เพิ่มเส้นใหม่**
+* เป็นการซ่อมของพัง จึงมีผลทั้ง v1/v2 — แต่หน้าตาส่วนอื่นของ v1 ไม่ถูกแตะ
+
+### เทสต์ที่เพิ่ม
+
+- `tests/api/applicantDocument.test.ts` (16 เคส) — `attachmentKind` อ่าน mime ก่อน/
+  ถอยไปนามสกุลเมื่อเป็น octet-stream · ด่านสแกนไฟล์: ป๊อปต้องวาดแผงไฟล์แนบ ·
+  แผงห้ามเปิด Dialog ซ้อน · ต้องใช้ `createObjectURL` + `revokeObjectURL` ·
+  ต้องมีทั้ง `<img>`/`<iframe>`/แท็บใหม่/ดาวน์โหลด · เส้น API ยังเป็น GET + RBAC + BU scope
+- `src/components/recruit-rm/ApplicantAttachmentPanel.test.tsx` (8 เคส · **render จริง**) —
+  ไม่มีไฟล์ ⇒ ไม่วาดอะไร · ยังไม่กด ⇒ ยังไม่ยิงเส้น · กดแล้ว PDF ขึ้น `<iframe>` ที่ชี้
+  `blob:` และลิงก์แท็บใหม่/ดาวน์โหลดชี้ตัวเดียวกัน · รูปขึ้น `<img>` · docx บอกให้ดาวน์โหลด ·
+  โหลดล้ม ⇒ ขึ้นเหตุผลบนจอ · เปิดคนใหม่ ⇒ ล้างของเก่า + revoke

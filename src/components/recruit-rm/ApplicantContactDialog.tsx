@@ -22,6 +22,7 @@ import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
 import { unitRequestCardTitle } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
 import { CheckCircle2, Loader2, Phone, XCircle } from 'lucide-react';
+import ApplicantAttachmentPanel from '@/components/recruit-rm/ApplicantAttachmentPanel';
 
 /**
  * dialog รายละเอียดผู้สมัคร + บันทึกผลการติดต่อ (ลิสต์ข้อ 7 · เจ้าของสั่ง 14 ส.ค. 2569):
@@ -326,6 +327,19 @@ export default function ApplicantContactDialog({
               <p className={DASH.muted}>{dashIfEmpty(applicantAddressLine(a))}</p>
               {a.note ? <p className={DASH.muted}>หมายเหตุ: {a.note}</p> : null}
             </div>
+
+            {/*
+              🔴 ไฟล์แนบ (เจ้าของแจ้ง 7 ก.ย. 2569: *"มีไฟล์แนบมาแต่ดูไม่ได้"*)
+              ตารางขึ้นไอคอน 📄 "มีเอกสารแนบ" มาตลอด แต่ป๊อปนี้ **ไม่เคยวาดส่วนไฟล์แนบเลย**
+              ⇒ เห็นว่ามี แต่ไม่มีทางเปิด · เส้น API เดิมพร้อมอยู่แล้ว ขาดแค่หน้าจอ
+              ⚠️ พรีวิวอยู่ในเนื้อป๊อปนี้ ห้ามเปิด Dialog ซ้อน Dialog
+            */}
+            <ApplicantAttachmentPanel
+              applicationId={a.id}
+              hasDocument={a.has_document}
+              filename={a.document_filename}
+              mime={a.document_mime}
+            />
 
             {/* เบอร์ใช้โทรไม่ได้ (087) — ช่องแก้โผล่เฉพาะใบที่ติดธง · แก้แล้วใบกลับเข้า
                 เกณฑ์ส่ง AI โทร/เก็บไปโทรเอง (=== false เพราะ server เก่าไม่ส่ง field) */}
