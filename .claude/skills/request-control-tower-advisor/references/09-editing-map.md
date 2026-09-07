@@ -7409,3 +7409,135 @@ tsconfig.app.json) ผ่าน · eslint 0 error ทั้งโปรเจก
 src/components/auth/BrandIntro.test.tsx tests/api/typographyRules.test.ts` ผ่านครบ (7 + 13
 เคส) · `npx eslint src --ext .ts,.tsx` 0 error (18 warning เดิม ไม่เกี่ยวกับไฟล์นี้) ·
 `npm run build` ผ่าน
+
+## รอบ 120 — ปิดรายงาน audit v1↔v2: คืนของหาย · ทำเฟส 5 จริง · คืนจุดยึดสายตา (7 ก.ย. 2569)
+
+โจทย์ทั้งรอบมาจาก `docs/audit-v1-v2-functions-2569-09-07.md` (ผู้ตรวจไล่เทียบ 83 รายการ
+จาก 10 จุดที่โค้ดแตกกิ่ง v1/v2) · เจ้าของเคาะให้ทำ 3 ก้อนในรอบเดียว
+🔴 ทุกอย่างอยู่หลังสวิตช์ `?ui=v2` — ไฟล์เส้นทาง v1 ล้วน (`CommandDeck.tsx` ·
+`CallFunnelPanel.tsx`) **ไม่ถูกแตะแม้แต่บรรทัดเดียว** (ยืนยันด้วย `git diff --name-only`)
+
+### ก้อน A — คืนของหาย 3 ข้อ (`b5991ca`)
+
+`src/components/shared/StatCard.tsx` (🔴 หาย-1 · กระทบ 5 หน้า):
+- เพิ่มตาราง `VARIANT_TONE` แปลง prop `variant` (default/primary/success/warning/
+  destructive/info) → `ToneKey` ของ `designTokens` · `default` → `null` = ไม่มีความหมาย
+  จึงไม่ทาสี (กันสีเฟ้อ)
+- กิ่ง v2 เดิม **ทิ้ง prop `variant` ทั้งตัว** การ์ดทุกใบจึงขาวเหมือนกันหมด · ที่ร้ายคือ
+  4 จุดที่ `variant` ถูกคำนวณจากค่าตัวเลขเอง (`EmployeeProfile.tsx:205,213,223` ·
+  `JobDetailPage.tsx:491`) สีจึงเป็น "คำตอบ" ไม่ใช่ของประดับ
+- คืนแบบเดียวกับที่ `DashboardHeroStrip` ทำถูกไว้แล้ว (ชุด `numLight`): **ไม่เอาพื้นพาสเทล
+  กลับมา** (นั่นคือของที่เจ้าของสั่งรื้อ) แต่ย้ายสีไปอยู่ที่ **หมึก** ตามหลัก "หมึกกับกระดาษ" —
+  ตัวเลขใช้ `TONE[tone].value` · กรอบไอคอนใช้ `TONE[tone].soft` (ขอบสีโทน พื้นเป็นกลาง)
+- ⚠️ ไม่มีสีใหม่ ทุกค่ามาจาก `TONE` · ปิดสวิตช์ = ได้พื้นพาสเทลเดิมกลับครบ
+
+`src/components/shared/ui-v2/Sheet2.tsx` (หาย-2 · ของกลาง):
+- `SheetHead2` รับ prop ใหม่ `brand` (ป้ายตัวตนซ้ายสุด + เส้นคั่นตั้ง `h-3.5 w-px bg-border`)
+  ไม่ส่งมา = ไม่มีป้าย ⇒ ผืนอื่นที่ใช้ `SheetHead2` อยู่แล้วไม่กระทบ
+
+`src/components/home/HomeDeckV2.tsx`:
+- หาย-2: `<SheetHead2 brand="SO RECRUIT" eyebrow="งานถัดไปของคุณ" stamp={<DeckStamp/>} />`
+  ⇒ แถวหัวอ่านครบเรื่อง: อยู่ที่ไหน → ผืนนี้คือเรื่องอะไร → สดแค่ไหน
+  (**ไม่ใช่ป้าย mono HUD ของเดิม** — Kanit ตัวหนา สีหมึกกรมท่า ตามภาษา editorial)
+- หาย-4: `Mascot` เรียก `useReducedMotion()` แล้วสลับเป็นภาพนิ่ง `/robot-mascot.png`
+  (ไฟล์ `.webp` เป็นภาพเคลื่อนไหว · v1 เช็กอยู่แล้ว โฉมใหม่ฝังตรง ๆ) ·
+  **ไม่ได้คืนท่าลอยขึ้นลง** (กฎ perf ห้ามแอนิเมชันวนไม่จบ)
+- งง-2: ย้ายบล็อกวงตัวเลข "ต้องลงมือ" ให้เรนเดอร์ **ก่อน** บล็อกหัวเรื่องงาน (กลับมาอยู่
+  ซ้ายมือ — สายตาไทยอ่านซ้าย→ขวา) + ขยาย `h-36 w-36` → `h-40 w-40 sm:h-48 sm:w-48`
+  (144px → 160/192px) และเลข `text-[44px]` → `text-[52px] sm:text-[64px]` ·
+  บรรทัดสถานะใต้วงตาม `max-w-40 sm:max-w-48`
+- ⚠️ **วินาทีบนนาฬิกา (หาย-3) ไม่คืน** — จงใจถอดตามแผน (คำใหม่คือ "อัปเดตล่าสุด HH:MM")
+
+### ก้อน B — เฟส 5 ที่แผนติ๊ก ✅ แต่ไม่ได้ทำจริง (`167ef13`)
+
+ข้อเท็จจริงจาก audit §1.4: รอบแรกไปแก้ `src/components/follow/CallFunnelPanel.tsx`
+ซึ่ง **ไม่มีหน้าไหน import ตั้งแต่ 18 ส.ค. 2569** (ถูกแทนด้วย `FollowCallRoundsPanel`)
+และ `AftercarePage` ไม่ได้ใช้ `StatCard`/`PageHeroStrip` ⇒ สองหน้านี้ไม่เคยมีกิ่ง v2
+
+`src/components/follow/FollowCallRoundsPanel.tsx` — เพิ่ม `const v2 = useUiV2()`
+แล้วแตกกิ่ง **เฉพาะคลาสสี/ระยะ** โครง JSX และข้อมูลเส้นเดียวกันทั้งสองโฉม:
+- เปลือกนอก: `overflow-hidden rounded-2xl border border-border bg-card shadow-sm`
+  (ไม่มี padding — แต่ละส่วนคั่นด้วย `Rule2`/`border-t` แทนการขึ้นกล่องใหม่)
+- หัวแผง: `<h2>` เป็น `text-[12.5px] font-medium text-primary` (eyebrow เบอร์กันดี)
+- แท็บ 3 รอบ: จากการ์ดพาสเทล 3 ใบ → กริดคั่นเส้นบาง · เลือกอยู่ = `bg-accent` +
+  `ring-1 ring-inset ring-primary/40` (สีเน้นสีเดียวของโฉมใหม่)
+- แถบสัญญาณ + บรรทัดผลโทร + ข้อความ empty + ย่อหน้ากันบวกเลข: เปลี่ยนจากกล่องพาสเทล
+  เป็นแถวคั่นเส้น (`border-t border-border/70 px-4 py-2.5 md:px-5`) — **สีตัวหนังสือ
+  ยังเป็น `tone.value` เดิม** ความหมายไม่หาย
+- 7 ช่องถัง: กริดคั่นเส้นบนพื้นขาว · **พื้นพาสเทลเหลือเฉพาะช่อง `vis.actionable`**
+  (กติกาเดิมของ `TONE`: ใส่เกิน 1-2 ที่ต่อหน้าแล้วจะไม่เหลือของที่เด่นจริง) ·
+  ช่องว่าง (`vis.muted`) เหลือ `opacity-70` · จุดสี/ป้าย/ตัวเลขทุกช่องยังเป็นสีโทนเดิม
+- 🔴 **ไม่แตะตรรกะเลย** — `followRoundSlot` · `countFollowRoundBuckets` ·
+  `roundSignal` · `bucketVisual` · popup รายชื่อ · ปุ่ม `headerExtras` เหมือนเดิมทุกตัว
+
+`src/pages/aftercare/AftercarePage.tsx` — เพิ่ม `const uiV2 = useUiV2()` แล้วแตกกิ่ง
+เฉพาะบล็อกการ์ดสรุป 3 ใบ:
+- v2 → `Sheet2` + `SheetHead2 eyebrow="ภาพรวมการดูแล"` + `StatRow2`/`Stat2`
+  (แถวตัวเลขมาตรฐานตามที่แผนเฟส 5 เขียนไว้ตั้งแต่ต้น)
+- `StatRow2` ตั้งค่าเริ่มต้นเป็น 4 คอลัมน์ ⇒ ส่ง
+  `className="mt-3 sm:grid-cols-3 max-sm:[&>*:last-child]:col-span-2"`
+  (คอลัมน์ที่ 3 ยืดเต็มแถวบนมือถือ — ไม่งั้นเหลือช่องว่างครึ่งแถว · วัดบนจอ 375px แล้ว)
+- สามเลขเดิม + คำอธิบาย "ตั้งรอบโทรไม่ได้จนกรอกวัน" อยู่ครบ · สีความหมายอยู่ครบ
+  (ฟ้า=กำลังดูแล · เหลือง/เขียว=ยังไม่ระบุวัน · แดง/เขียว=เลยรอบ)
+- 🔴 ปฏิทิน/ลิสต์/ปุ่ม/ตัวกรอง/`BoardPersonPicker` **ไม่ถูกแตะสักบรรทัด**
+
+`docs/plan-ui-overhaul-2569-09-05.md` — แก้แถวเฟส 5 ในตารางสถานะให้ตรงความจริง
++ เพิ่มหัวข้อ "หมายเหตุเฟส 5" อธิบายว่ารอบแรกติ๊กผิดเพราะอะไร และรอบนี้ทำอะไร
+
+`src/components/follow/CallFunnelPanel.tsx` — **ยังไม่ลบ** (กติกา "เก็บของเดิมไว้จน
+เจ้าของสั่งลบ") · มีด่านเทสต์กันไม่ให้หน้าไหนกลับไปเรนเดอร์มันโดยไม่รู้ตัว
+
+### ก้อน C — คืนจุดยึดสายตาหน้าแรก (`1cfca0a`)
+
+`src/components/ui/button.tsx` (งง-5 · ของกลาง แก้ที่เดียวตามกติกา "ห้ามปั้นปุ่มเอง"):
+- เพิ่ม variant `outlineStrong` = `border border-foreground/25 bg-background
+  text-foreground shadow-sm hover:border-foreground/40 hover:bg-accent
+  hover:text-accent-foreground` (ขอบสืบจาก `--foreground` จึงมีคู่มืดอัตโนมัติ)
+- เปลี่ยนปลายทางการแปลง v2: `hero` → **`outlineStrong`** (เดิม `outline` ซึ่งเป็น
+  `border-border` + `bg-background/70` — บนแถบหัวพื้นขาว ทั้งขอบและพื้นแทบเท่าพื้น)
+- `heroSolid` → `default` (เบอร์กันดี) เหมือนเดิม = ปุ่มเด่นปุ่มเดียวต่อแถบ
+- 🔴 **ห้ามแก้ variant `outline` ตัวเดิม** — ทั้งระบบและโฉม v1 ใช้อยู่ (มีเทสต์ล็อกไว้)
+
+`src/components/jobs/RecruitBoardTools.tsx` — `btnVariant()` เพิ่มสาขา
+`if (v2) return key === 'link' ? 'default' : 'outlineStrong'` (แทรกก่อนสาขาเดิม
+ที่คืน `'outline'` ซึ่งยังใช้กับกรณี `variant !== 'onDark'` ของ v1)
+
+`src/components/matching/AiCallFlowPanel.tsx` — ปุ่มสลับต้นทาง 3 ตัว: ตัวที่เลือกอยู่
+ในกิ่ง v2 เปลี่ยนจาก `bg-accent text-accent-foreground` (จางจนแยกไม่ออก) เป็น
+`border-primary/50 bg-primary/10 font-semibold text-primary` + เพิ่ม `aria-pressed`
+(a11y · ไม่มีผลกับหน้าตา จึงปลอดภัยกับ v1)
+
+`src/pages/HomePage.tsx` (งง-4) — แทรกแถบคั่นก่อน `<TeamBoardPanel>` **เฉพาะ `uiV2`**:
+หัวเรื่องกลุ่ม "ภาพรวมทั้งระบบ" (`text-[12.5px] font-medium text-muted-foreground`)
++ เส้นบาง `<span className="h-px flex-1 bg-border" aria-hidden />` ⇒ แยก
+"งานของฉัน" (deck) ออกจาก "ภาพรวมทั้งระบบ" (บอร์ดทีม + ตัวเลขวันนี้)
+ไม่มีข้อมูลเพิ่ม/ลด · ไม่มี CSS ใหม่ (utility ของ Tailwind + token ธีมล้วน)
+
+### เทสต์ที่เพิ่ม — `tests/api/uiV2Rollout.test.ts` (+12 เคส · 13 → 25)
+
+- `SKINNED` เพิ่ม `FollowCallRoundsPanel.tsx` + `AftercarePage.tsx` และคอมเมนต์เตือนว่า
+  `CallFunnelPanel.tsx` เป็นไฟล์ตาย (เก็บไว้เป็นทางถอย ห้ามลบ)
+- describe "ของที่รอบรื้อทำหายต้องกลับมาครบ" (4) — StatCard ใช้ `TONE` + `VARIANT_TONE`
+  และ `default: null` · ป้าย "SO RECRUIT" อยู่ทั้งสองโฉม · `useReducedMotion` + สลับไฟล์ภาพ ·
+  วงตัวเลขต้องเรนเดอร์ก่อน `{head.title}`
+- describe "เฟส 5 ต้องลงที่แผงตัวจริง ไม่ใช่ไฟล์ตาย" (3) — `FollowPage` เรนเดอร์
+  `FollowCallRoundsPanel` และแผงนั้นอ่านสวิตช์ · `AftercarePage` มี `useUiV2` + `StatRow2`
+  + สามป้ายสรุปครบ · ไม่มีหน้าไหนเรนเดอร์ `<CallFunnelPanel` แต่ไฟล์ยังต้องอยู่
+- describe "โฉมใหม่ต้องมีจุดยึดสายตา" (3) — เส้นแบ่งบนหน้าแรก · `outlineStrong` อยู่ที่
+  `button.tsx` ที่เดียว + `hero → outlineStrong` + **`outline` เดิมไม่ถูกแตะ** ·
+  ปุ่มรองบอร์ด/ปุ่มต้นทาง AI โทร แยกออกจากพื้นได้
+
+### ทดสอบ
+
+`npx tsc --noEmit` ครบทั้ง 4 config ผ่าน · `npx vitest run` **250 ไฟล์ · 2780 ผ่าน**
+(6 skip ของเดิม · เดิม 2768 ⇒ +12 คือด่านใหม่ของรอบนี้ ไม่มีเทสต์เดิมพัง) ·
+`npx eslint .` 0 error (warning เดิมเท่าเดิม) · `npm run build` ผ่าน
+
+ดูจอจริง: ⚠️ **เข้าหน้าหลังล็อกอินไม่ได้ในรอบนี้** — ทางเข้า `dev-role` ถูกด่านสิทธิ์ปฏิเสธ
+และห้ามกรอกรหัสผ่านเอง ⇒ ตรวจด้วย **หน้า harness ชั่วคราว** (`uikit-preview.html` +
+`src/uikit-preview.tsx` · **ลบทิ้งแล้ว ไม่ commit**) ที่เรนเดอร์ component จริงด้วยข้อมูล
+จำลอง บน Vite dev + `src/index.css` + ธีมจริง — ครอบ `StatCard` 8 ใบ (ทุก variant) ·
+`HomeDeckV2` · `FollowCallRoundsPanel` · แถวตัวเลข Aftercare · แถบคั่น C3 · ปุ่มทั้ง 4 ทรง
+ตรวจครบ **สว่าง/มืด × เดสก์ท็อป 1280 / มือถือ 375** และ **`?ui=v2` เทียบ `?ui=v1`**
+(v1 ยืนยันว่าได้พื้นพาสเทล/ทรงเดิมกลับครบ) · หน้าสาธารณะ `/apply?ui=v2` เปิดจริงผ่าน ไม่พัง
+🔴 ไม่ได้กดปุ่มที่เขียนข้อมูลเลยสักปุ่ม (ฐาน local = production)
