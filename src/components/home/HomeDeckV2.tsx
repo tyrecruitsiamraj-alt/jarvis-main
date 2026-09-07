@@ -22,6 +22,7 @@
 import * as React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { useReducedMotion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
 import { Sheet2, SheetHead2, Rule2 } from '@/components/shared/ui-v2/Sheet2';
@@ -66,15 +67,27 @@ const DeckStamp: React.FC = () => {
   );
 };
 
-/** หุ่นยนต์ผู้ช่วย — ไฟล์เดียวกับของเดิม (พื้นหลังถูกลบออกจากตัวไฟล์แล้ว) */
-const Mascot: React.FC = () => (
-  <img
-    src="/robot-mascot.webp"
-    alt=""
-    aria-hidden
-    className="pointer-events-none hidden w-[132px] select-none xl:block"
-  />
-);
+/**
+ * หุ่นยนต์ผู้ช่วย — ไฟล์เดียวกับของเดิม (พื้นหลังถูกลบออกจากตัวไฟล์แล้ว)
+ *
+ * 🔴 **เคารพ "ลดการเคลื่อนไหว" เหมือน v1** (คืนของหาย-4 จาก audit 7 ก.ย. 2569)
+ * `/robot-mascot.webp` เป็นภาพ **เคลื่อนไหว** · โฉมใหม่ฝังตรง ๆ ไม่เช็กอะไรเลย
+ * ⇒ คนที่ตั้งค่าเครื่องว่า "ลดการเคลื่อนไหว" ยังเห็นมันขยับอยู่ดี
+ * ของเดิม (`CommandDeck.tsx`) สลับเป็นภาพนิ่ง `/robot-mascot.png` ให้อยู่แล้ว
+ * ⚠️ โฉมใหม่ตั้งใจ **ไม่มีท่าลอยขึ้นลง** อยู่แล้ว (กฎ perf: ห้ามแอนิเมชันวนไม่จบ)
+ * ที่คืนคือการสลับไฟล์ภาพ ไม่ใช่คืนท่าลอย
+ */
+const Mascot: React.FC = () => {
+  const reduceMotion = useReducedMotion();
+  return (
+    <img
+      src={reduceMotion ? '/robot-mascot.png' : '/robot-mascot.webp'}
+      alt=""
+      aria-hidden
+      className="pointer-events-none hidden w-[132px] select-none xl:block"
+    />
+  );
+};
 
 const HomeDeckV2: React.FC<{
   greeting: string;
@@ -94,10 +107,44 @@ const HomeDeckV2: React.FC<{
 
   return (
     <Sheet2 className={className} aria-label="งานถัดไปของคุณ">
-      <SheetHead2 eyebrow="งานถัดไปของคุณ" stamp={<DeckStamp />} />
+      {/* 🔴 ป้ายตัวตน "SO RECRUIT" คืนมาตาม audit 7 ก.ย. 2569 (หาย-2 · งง-1)
+          แถวหัวจึงอ่านได้ครบเรื่อง: **อยู่ที่ไหน** → **ผืนนี้คือเรื่องอะไร** → **สดแค่ไหน** */}
+      <SheetHead2 brand="SO RECRUIT" eyebrow="งานถัดไปของคุณ" stamp={<DeckStamp />} />
 
       {/* ── หัวเรื่องงาน + วงตัวเลข + หุ่นยนต์ ── */}
-      <div className="flex flex-wrap items-center gap-8 px-6 pb-7 pt-4 lg:px-8">
+      <div className="flex flex-wrap items-center gap-8 px-6 pb-7 pt-5 lg:px-8">
+        {/*
+         * วงตัวเลข "ต้องลงมือ" — บางลง ไม่หมุน ไม่เรือง
+         * 🔴 **กลับมาอยู่ซ้ายมือและโตขึ้น** (แก้ งง-2 จาก audit 7 ก.ย. 2569)
+         * รอบรื้อ 5 ก.ย. ย้ายวงไปขวาแล้วหดจาก ~250px เหลือ 144px ⇒ "ตัวเลขสรุปของวัน"
+         * ไม่ใช่สิ่งแรกที่ตาไปโดนอีกเลย (สายตาไทยอ่านซ้าย→ขวา) · เจ้าของเปิดมาแล้วงง
+         * จนไม่กล้าไปหน้าอื่น ⇒ คืนตำแหน่งซ้าย + ขยายเป็น 160/192px ให้เป็นพระเอกของจอ
+         * ⚠️ ยังเป็นภาษาโฉมใหม่: วงเส้นบาง พื้นจาง ไม่มีเรืองแสง ไม่มีของหมุน
+         * 🔴 ป้ายแยกบน/ล่างของตัวเลข (ผู้ทดสอบ: "เรื่องต้องลงมือ" เบียดกับเลขใหญ่
+         * อ่านสะดุด) — แพตเทิร์นเดียวกับวงเดิมที่ `CommandDeck.tsx` (v1)
+         */}
+        <div className="mx-auto shrink-0 sm:mx-0">
+          <div className="flex h-40 w-40 flex-col items-center justify-center rounded-full border border-primary/25 bg-primary/[0.04] text-center sm:h-48 sm:w-48">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              ต้องลงมือ
+            </span>
+            <span className="mt-1.5 text-[52px] font-semibold leading-none tabular-nums sm:text-[64px]">
+              {loading ? '—' : tasks.length}
+            </span>
+            <span className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              เรื่อง
+            </span>
+          </div>
+          <p
+            className={cn(
+              'mt-2.5 max-w-40 text-center text-[11.5px] sm:max-w-48',
+              TONE_TEXT[status.tone as NextTaskTone | 'ok'],
+            )}
+          >
+            {status.text}
+          </p>
+        </div>
+
         <div className="min-w-[16rem] flex-1">
           <p className="text-[12.5px] text-muted-foreground">
             {greeting}
@@ -144,30 +191,6 @@ const HomeDeckV2: React.FC<{
               </p>
             </>
           )}
-        </div>
-
-        {/*
-         * วงตัวเลข "ต้องลงมือ" — บางลง ไม่หมุน ไม่เรือง
-         * 🔴 ป้ายแยกบน/ล่างของตัวเลข (ผู้ทดสอบ: "เรื่องต้องลงมือ" เบียดกับเลขใหญ่
-         * อ่านสะดุด) — เดิมยัดเป็นบรรทัดเดียวใต้เลข ชิดกันแค่ `mt-1` (4px) ทั้งที่เลขใหญ่ถึง
-         * 44px จับคู่แพตเทิร์นเดียวกับวงเดิมที่ `CommandDeck.tsx` (v1) ที่แยก "ต้องลงมือ"
-         * ไว้บนเลขและ "เรื่อง" ไว้ล่างเลขอยู่แล้ว ให้สองโฉมสอดคล้องกัน
-         */}
-        <div className="mx-auto shrink-0 sm:mx-0">
-          <div className="flex h-36 w-36 flex-col items-center justify-center rounded-full border border-primary/20 bg-primary/[0.04] text-center">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              ต้องลงมือ
-            </span>
-            <span className="mt-1.5 text-[44px] font-semibold leading-none tabular-nums">
-              {loading ? '—' : tasks.length}
-            </span>
-            <span className="mt-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              เรื่อง
-            </span>
-          </div>
-          <p className={cn('mt-2.5 max-w-36 text-center text-[11.5px]', TONE_TEXT[status.tone as NextTaskTone | 'ok'])}>
-            {status.text}
-          </p>
         </div>
 
         <Mascot />

@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 import { useUiV2 } from '@/lib/uiV2';
+import { TONE, type ToneKey } from '@/lib/designTokens';
 
 interface StatCardProps {
   title: string;
@@ -33,6 +34,32 @@ const iconVariantStyles = {
   info: 'text-sky-600 bg-sky-500/12',
 };
 
+/**
+ * 🔴 **สีที่มีความหมายบนพื้นขาว** (คืนของหาย-1 จาก `docs/audit-v1-v2-functions-2569-09-07.md`)
+ *
+ * รอบรื้อ 5 ก.ย. 2569 เปิดสวิตช์แล้ว **ทิ้ง prop `variant` ทั้งตัว** การ์ดจึงขาวเหมือนกันหมด
+ * ทั้ง 5 หน้า · ปัญหาไม่ใช่ "เปลี่ยนสี" แต่เป็น **ข้อมูลหาย** เพราะมี 4 จุดที่ `variant`
+ * ถูก **คำนวณจากค่าตัวเลขเอง** — สีคือคำตอบ ไม่ใช่ของประดับ:
+ *   `EmployeeProfile.tsx` เขียว/เหลือง = Reliability ผ่าน/ไม่ผ่าน · แดง = ปัญหาเกินเกณฑ์
+ *                          เขียว/แดง = กำไร/ขาดทุน
+ *   `JobDetailPage.tsx`    แดง = มีค่าปรับแล้ว · เขียว = ยังไม่มี
+ * ⇒ ผิดกติกา `CLAUDE.md` *"สีที่มีความหมายห้ามแตะ — success/warn/danger/info/violet
+ *   เป็นภาษาของตัวเลข"* ตรง ๆ
+ *
+ * **วิธีคืน = แบบเดียวกับที่ `DashboardHeroStrip` ทำถูกไว้แล้ว** (ชุด `numLight`):
+ * ไม่เอาพื้นพาสเทลกลับมา (นั่นคือของที่เจ้าของสั่งรื้อ) แต่ย้ายสีไป **อยู่ที่หมึก** —
+ * ตัวเลข + ไอคอน ตามหลัก "หมึกกับกระดาษ" ของ `designTokens.ts`
+ * ⚠️ ทุกค่ามาจาก `TONE` ไม่มีสีใหม่ · `default` = ไม่มีความหมาย จึงคงเป็น `text-foreground`
+ */
+const VARIANT_TONE: Record<NonNullable<StatCardProps['variant']>, ToneKey | null> = {
+  default: null,
+  primary: 'primary',
+  success: 'success',
+  warning: 'warn',
+  destructive: 'danger',
+  info: 'info',
+};
+
 const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
@@ -51,6 +78,8 @@ const StatCard: React.FC<StatCardProps> = ({
    * ⚠️ ข้อมูลเท่าเดิมทุกชิ้น (หัวข้อ · ตัวเลข · บรรทัดรอง · แนวโน้ม · ไอคอน)
    */
   const v2 = useUiV2();
+  /** โทนความหมายของการ์ดใบนี้ — `null` = variant `default` (ไม่มีความหมาย ไม่ต้องมีสี) */
+  const tone = VARIANT_TONE[variant];
   return (
     <div
       onClick={onClick}
@@ -77,6 +106,9 @@ const StatCard: React.FC<StatCardProps> = ({
             className={cn(
               'mt-1 tracking-tight text-foreground',
               v2 ? 'text-[26px] font-semibold tabular-nums' : 'text-2xl font-bold',
+              /* 🔴 สีของ **ตัวเลข** คือที่ที่ความหมายไปอยู่ในโฉมใหม่ (ดู VARIANT_TONE)
+                 การ์ดหลายใบไม่มีไอคอน (เช่น "กำไร/ขาดทุน") ⇒ ถ้าไม่ทาที่เลข สัญญาณหายเกลี้ยง */
+              v2 && tone ? TONE[tone].value : '',
             )}
           >
             {value}
@@ -96,10 +128,14 @@ const StatCard: React.FC<StatCardProps> = ({
         {Icon && (
           <div
             className={cn(
-              'rounded-2xl p-2.5',
+              'rounded-2xl border p-2.5',
               v2
-                ? 'border border-border/70 bg-background/60 text-muted-foreground'
-                : cn('border border-white/60', iconVariantStyles[variant]),
+                ? /* กรอบไอคอนรับสีความหมายด้วย — `soft` = ขอบสีโทน + พื้นเป็นกลาง
+                     (ไม่ใช่พื้นพาสเทลของเดิมที่เจ้าของสั่งรื้อ) */
+                  tone
+                  ? cn(TONE[tone].soft, TONE[tone].value)
+                  : 'border-border/70 bg-background/60 text-muted-foreground'
+                : cn('border-white/60', iconVariantStyles[variant]),
             )}
           >
             <Icon className="w-5 h-5" />

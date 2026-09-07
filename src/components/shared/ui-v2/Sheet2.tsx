@@ -34,14 +34,31 @@ export const Sheet2: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
  * (แทนแถบหัวแบบ HUD เดิมที่เป็น "SO RECRUIT · สถานะสด · นาฬิกา mono")
  */
 export const SheetHead2: React.FC<{
+  /**
+   * 🔴 **ป้ายตัวตน** — ชื่อระบบ/เจ้าของผืน (เช่น `SO RECRUIT`)
+   *
+   * คืนมาตามรายงาน `docs/audit-v1-v2-functions-2569-09-07.md` (หาย-2 · งง-1):
+   * ของเดิมแถบหัวเปิดด้วย "SO RECRUIT" คนอ่านจึงรู้ทันทีว่ายืนอยู่ที่ไหน
+   * พอโฉมใหม่เหลือแต่ eyebrow ของ section จุดยึดสายตาแรกสุดหายไปทั้งแถว
+   * ⚠️ **ไม่ใช่ป้าย mono HUD ของเดิม** — เป็นตัวหนังสือ Kanit ปกติ ตัวหนา สีหมึกกรมท่า
+   * (`text-foreground`) ตามภาษา editorial ของโฉมใหม่ · ไม่ส่งมา = ไม่มีป้าย (หน้าอื่นไม่กระทบ)
+   */
+  brand?: React.ReactNode;
   /** ป้ายบรรทัดบน — บอกว่าผืนนี้คือเรื่องอะไร */
   eyebrow: React.ReactNode;
   /** ข้อความขวามือ เช่น "อัปเดตล่าสุด 12:04" — ภาษาคน ไม่ใช่ศัพท์เครื่องจักร */
   stamp?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
-}> = ({ eyebrow, stamp, action, className }) => (
-  <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 px-6 pt-5 lg:px-8', className)}>
+}> = ({ brand, eyebrow, stamp, action, className }) => (
+  <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 lg:px-8', className)}>
+    {brand ? (
+      <>
+        <span className="text-[13px] font-semibold tracking-tight text-foreground">{brand}</span>
+        {/* เส้นคั่นบางแทนจุดไข่ปลา — ภาษาเดียวกับ Rule2 ของผืน */}
+        <span className="h-3.5 w-px bg-border" aria-hidden />
+      </>
+    ) : null}
     <span className="text-[12.5px] font-medium text-primary">{eyebrow}</span>
     <span className="flex-1" />
     {stamp ? <span className="text-[12px] text-muted-foreground">{stamp}</span> : null}
