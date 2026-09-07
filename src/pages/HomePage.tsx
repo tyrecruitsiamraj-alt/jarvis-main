@@ -318,9 +318,12 @@ const HomePage: React.FC = () => {
    * ถ้าคำนวณเองคนละสูตร สองหน้าจะโชว์ % ไม่ตรงกัน แล้วไม่มีใครเชื่อสักหน้า
    * ⚠️ โหลดพลาด = `null` ให้จอขึ้นขีด **ห้ามแปลงเป็น 0%**
    */
-  const [successRate, setSuccessRate] = useState<{ pct: number | null; connected: number } | null>(
-    null,
-  );
+  const [successRate, setSuccessRate] = useState<{
+    pct: number | null;
+    connected: number;
+    fromYmd: string;
+    toYmd: string;
+  } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -331,6 +334,9 @@ const HomePage: React.FC = () => {
         setSuccessRate({
           pct: trend.current.successRatePct,
           connected: trend.current.connected,
+          // ช่วงจริงที่ % นี้นับ — จอเขียนกำกับ ไม่ใช่ให้คนเดาเองว่า "7 วันล่าสุด" คือวันไหน
+          fromYmd: trend.current.fromYmd,
+          toYmd: trend.current.toYmd,
         });
       })
       .catch(() => undefined);

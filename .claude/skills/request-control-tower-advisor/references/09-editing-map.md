@@ -7766,3 +7766,66 @@ src/components/auth/BrandIntro.test.tsx tests/api/typographyRules.test.ts` ผ�
   ไม่มีไฟล์ ⇒ ไม่วาดอะไร · ยังไม่กด ⇒ ยังไม่ยิงเส้น · กดแล้ว PDF ขึ้น `<iframe>` ที่ชี้
   `blob:` และลิงก์แท็บใหม่/ดาวน์โหลดชี้ตัวเดียวกัน · รูปขึ้น `<img>` · docx บอกให้ดาวน์โหลด ·
   โหลดล้ม ⇒ ขึ้นเหตุผลบนจอ · เปิดคนใหม่ ⇒ ล้างของเก่า + revoke
+
+## รอบ 125 — ซ่อมเลขคิว Lumos ที่หายเงียบเพราะ NULL (7 ก.ย. 2569)
+
+**ที่มา:** เจ้าของทักว่าเลขคิวโทรเพี้ยน — กล่องทีมหน้าแรกขึ้น *"เลน Follow: ส่งเข้า
+ทั้งหมด 11 · รอโทร 0"* ส่วนหน้าจับคู่งานขึ้น *"กำลังโทร 37"* ที่กดดูรายชื่อแล้วได้ 0 คน
+
+### ต้นเหตุจริง (วัดกับฐานจริงแล้ว ไม่ใช่เดา)
+
+| จุด | อาการ | เลขจริงตอนวัด |
+| --- | --- | --- |
+| `api/_lib/lumosQueueDefs.ts:50` `queueCancelled` | `(status='cancelled' or outcome='cancelled')` · แถวที่ยังไม่มีผล outcome = NULL ⇒ `false or NULL` = **NULL** ⇒ `queueActive` = `not NULL` = NULL ⇒ `count(*) filter` **ข้ามแถวทิ้งเงียบ ๆ** | เลน follow: ทั้งหมด 11 · รอโทร 0 (ของจริง 22 · 11) |
+| `api/_handlers/lumos-call-funnel.ts` `funnel.delivered` | นับจาก `status='delivered'` เฉย ๆ ทั้งที่ 37 แถวนั้นมีผลครบแล้ว (ตั้งโทรซ้ำไม่ถอยสถานะ) · รายชื่อช่องเดียวกันดึงด้วย `queueWaiting` ⇒ เลขกับรายชื่อเถียงกัน | กำลังโทร 37 · รายชื่อ 0 |
+| `api/_handlers/lumos-call-funnel.ts` `has_result` | เขียน `(q.result is not null)` เอง = **แพตเทิร์นต้องห้ามตามหัวไฟล์นิยามกลาง** (ผลที่คนบันทึกเอง + สายที่ตั้งโทรซ้ำแล้ว `result` ถูกล้าง อยู่ที่ `last_outcome`) | มีผลแล้ว 14 (ของจริง 51) |
+| `tests/api/lumosQueueDefs.test.ts` | เทียบ SQL เป็น **สตริง** ⇒ จับตรรกะสามค่าของ NULL ไม่ได้เลย | บั๊กหลุดขึ้น main |
+
+### ไฟล์ที่แก้
+
+| ไฟล์ | แก้อะไร |
+| --- | --- |
+| `api/_lib/lumosQueueDefs.ts` | `queueCancelled` = `coalesce(<เดิม>, false)` — **จุดเดียว ได้ทุกเส้นที่ใช้ `queueActive`** |
+| `api/_handlers/lumos-call-funnel.ts` | `has_result` มาจาก `queueHasResult()` · เพิ่มคอลัมน์ `is_waiting`/`is_pending` จาก `queueWaiting()`/`queuePending()` · `funnel.delivered` ("กำลังโทร") นับจาก `is_waiting` · `funnel.waiting` ไม่นับแถวที่ยกเลิก · **field ใหม่ `funnel.pending`** ("เตรียมไว้") |
+| `api/_handlers/office-team.ts` | เพิ่ม `stale_pending` ต่อเลน ด้วย `queueStalePending("'2 days'")` (เกณฑ์เดียวกับ `matching-flow-summary.ts:111`) |
+| `src/lib/officeTeam.ts` | `LaneCounts.stalePending` |
+| `src/lib/callFunnelApi.ts` | `CallFunnel.pending` + เขียนนิยาม `delivered`/`waiting` ให้ตรงความจริง |
+| `src/lib/lumosCallRate.ts` | **ใหม่ · pure** — `ymdDayText()` · `callRateRangeText()` (แหล่งเดียวของป้ายช่วงวันที่) |
+| `src/lib/metricDictionary.ts` | เมตริกใหม่ `lumos.stale_pending` ("ค้างเกิน 2 วัน" · แถวลูกของ "รอโทร") |
+| `src/components/home/TeamBoardPanel.tsx` | ธงค้างใต้ "รอโทร" (โชว์เมื่อ > 0 · `childOf` + `alert`) · Success Rate เขียนช่วงวันที่จริงกำกับ |
+| `src/pages/HomePage.tsx` | ส่ง `fromYmd`/`toYmd` ของช่วงที่ % นั้นนับ ไปกับ `successRate` |
+| `src/components/dashboard/LumosCallRatePanel.tsx` | `fmtDay` = `ymdDayText` จาก lib (เลิกมีฟอร์แมตวันที่ตัวที่สอง) |
+| `src/components/follow/CallFunnelPanel.tsx` | "เตรียมไว้" = `funnel.pending` · "เหลือโทร" = `funnel.waiting` (เลิกคิดเอง `queued − delivered` / `queued − withResult` ที่พังทันทีที่นิยามขยับ) |
+
+### เลขก่อน/หลัง (ฐานจริง 7 ก.ย. 2569)
+
+| ที่ | ก่อน | หลัง |
+| --- | --- | --- |
+| กล่องทีม เลน Follow | ทั้งหมด 11 · รอโทร 0 · ได้ผล 11 | ทั้งหมด 22 · รอโทร 11 (ค้างเกิน 2 วัน 11) · ได้ผล 11 |
+| รวมสามเลน | 51 | **62** (ตรงกับ "ทั้งหมด" หน้าจับคู่งาน) |
+| หน้าจับคู่งาน "กำลังโทร" | 37 (รายชื่อ 0) | **0** (ตรงกับรายชื่อ · 37 อยู่ในถังผล/รอ AI โทรใหม่ครบ) |
+| funnel "มีผลแล้ว" | 14 | **51** |
+| funnel "รอโทร/เหลือโทร" | 70 | **11** (หัก 22 ที่ยกเลิกออก) |
+
+### กติกาที่ยึด
+
+* 🔴 **ทุกเงื่อนไขที่เอา NULL มาต่อกับ `or`/`not` ต้องปิดท้ายด้วย `coalesce(..., false)`** —
+  ตระกูลเดียวกับ `result is null` ที่หัวไฟล์ `lumosQueueDefs.ts` ห้ามไว้
+* เลขที่ขยับเป็น **การซ่อมความจริง** ไม่ใช่เปลี่ยนหน้าตา ⇒ มีผลทั้ง v1/v2 โดยตั้งใจ
+* หน้าตา/โครงจอไม่ถูกแตะ นอกจากสองจุดที่เจ้าของสั่ง (ธงค้าง + ป้ายช่วง Success Rate)
+* ไม่มี CSS ใหม่ · สีความหมายใช้ทางเดิมของบอร์ด (`alert` = แดง)
+
+### เทสต์ที่เพิ่ม/แก้
+
+- `tests/api/lumosQueueDefs.test.ts` — **ชั้นใหม่: รันเงื่อนไขจริงกับฐานในหน่วยความจำ**
+  (`node:sqlite` · ตรรกะสามค่าของ NULL เป็นมาตรฐาน SQL เหมือน postgres) 6 เคส:
+  แถว pending/outcome NULL ต้องอยู่ใน `queueActive` · ยกเลิกสองทางหลุดออกครบและ
+  active+cancelled = ทุกแถว · **เวอร์ชันบั๊กเดิมทำแถวหายจริง** (ด่านกันย้อนกลับ) ·
+  `queueHasResult` เห็นผลทั้งสองที่เก็บ · pending/waiting แบ่งขาด · ค้างเกิน 2 วัน
+  จับเฉพาะตัวที่ค้างจริง — พร้อมเทสต์สตริงว่า `queueCancelled` ต้องลงท้าย `, false)`
+- `tests/api/callFunnelSource.test.ts` (+2) — "กำลังโทร" ไม่นับแถว delivered ที่มีผลแล้ว ·
+  `pending`/`waiting` ไม่นับที่ยกเลิก · SQL ต้องไม่มี `(q.result is not null) as has_result`
+- `tests/api/officeTeamQueueLanes.test.ts` (**ใหม่** · 2 เคส) — handler ส่ง `stalePending`
+  ครบทุกเลน · เกณฑ์ 2 วันตัวเดียวกับหน้าอื่น · "ส่งเข้าทั้งหมด" = รอโทร+รอผล+ได้ผล เสมอ
+- `src/components/home/TeamBoardPanel.test.tsx` (+4 · render จริง) — ธงค้างโผล่เมื่อมีของค้าง
+  และหายเมื่อไม่มี · Success Rate เขียนช่วงวันที่เมื่อรู้ช่วง และ**ไม่เดา**เมื่อไม่รู้

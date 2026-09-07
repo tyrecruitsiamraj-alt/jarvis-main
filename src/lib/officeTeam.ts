@@ -22,6 +22,11 @@ export type LaneCounts = {
   total: number;
   /** รอส่งออก (ยังไม่ถึงมือ Lumos) */
   pending: number;
+  /**
+   * ในนั้นเป็นตัวที่ **ค้างเกิน 2 วัน** กี่สาย (`queueStalePending('2 days')`)
+   * นับซ้อนอยู่ใน `pending` แล้ว ไม่ใช่กองใหม่ — เกณฑ์เดียวกับคิวงานหน้าแรก
+   */
+  stalePending: number;
   /** Lumos รับไปแล้ว ยังไม่มีผลกลับ */
   waiting: number;
   /** มีผลกลับแล้ว */

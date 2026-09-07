@@ -10,6 +10,7 @@ import {
   compareCallRate,
   stuckLevel,
   ymdAddDays,
+  ymdDayText,
   type CallRateDay,
   type CallRateWindow,
   type CallStuck,
@@ -46,10 +47,11 @@ const SOURCE_TABS: Array<{ id: CallFunnelSource; label: string; hint: string }> 
   { id: 'irecruit', label: 'iRecruit', hint: 'ที่ส่งจากผลค้นหาคนที่ยังไม่สมัคร' },
 ];
 
-// Intl ประกาศระดับโมดูลเสมอ (กติกาโปรเจกต์ — เคยทำหน้าอื่นช้ามาแล้ว)
-const TH_DM = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' });
-
-const fmtDay = (ymd: string): string => TH_DM.format(new Date(`${ymd}T00:00:00+07:00`));
+/**
+ * วันที่บนจอมาจาก `ymdDayText` ใน lumosCallRate ที่เดียว (Intl ประกาศระดับโมดูลที่นั่น)
+ * — กล่องทีมหน้าแรกเขียนช่วงของ Success Rate ด้วยตัวเดียวกัน ห้ามมีฟอร์แมตที่สอง
+ */
+const fmtDay = ymdDayText;
 const fmtN = (n: number): string => n.toLocaleString('th-TH');
 
 /** ถังผลบนแผงนี้ — สีตามความหมาย (เขียว=จบดี แดง=จบไม่ดี เหลือง=ไม่ถึงตัว ฟ้า=ติดแต่ยังไม่จบ เทา=รอ) */

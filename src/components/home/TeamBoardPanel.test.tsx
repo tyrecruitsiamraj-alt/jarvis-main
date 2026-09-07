@@ -16,6 +16,8 @@ import { MemoryRouter } from 'react-router-dom';
 import TeamBoardPanel from './TeamBoardPanel';
 import { buildCallDigest } from '@/lib/homeCallDigest';
 import type { FlowFollowUpItem, FlowSummary } from '@/lib/flowSummaryApi';
+import type { LaneCounts } from '@/lib/officeTeam';
+import type { OfficeTeamResponse } from '@/lib/officeTeamApi';
 
 const person = (n: number, over: Partial<FlowFollowUpItem> = {}): FlowFollowUpItem => ({
   job_ref: `job-${n}`,
@@ -142,5 +144,59 @@ describe('โฉมใหม่ (v2) — สรุปผลโทรอยู่
     );
     expect(screen.getByText('ผลกลับมาวันนี้')).toBeTruthy();
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * 🔴 รอบแก้เลขคิว Lumos 7 ก.ย. 2569 — สองจุดที่เจ้าของสั่งให้ "บอกความจริงให้ครบ"
+ * 1. รอโทรที่ค้างเกิน 2 วัน ต้องมีธงกำกับ ไม่ใช่จมอยู่ในเลขรวม
+ * 2. Success Rate ต้องบอกช่วงวันที่ของสายที่นับ ("7 วันล่าสุด" ตอบไม่ได้ว่าวันไหน)
+ */
+const lane = (over: Partial<LaneCounts> = {}): LaneCounts => ({
+  total: 0,
+  pending: 0,
+  stalePending: 0,
+  waiting: 0,
+  done: 0,
+  cancelled: 0,
+  ...over,
+});
+
+const teamWithLanes = (follow: LaneCounts): OfficeTeamResponse =>
+  ({
+    generated_at: '2026-09-07T03:00:00.000Z',
+    open_total: 3,
+    teams: {
+      online: null,
+      recruit: null,
+      lumos: { public: lane(), match: lane(), follow },
+      errors: {},
+    },
+  }) as OfficeTeamResponse;
+
+describe('ธงงานค้างของ "รอโทร"', () => {
+  it('รอโทรค้างเกิน 2 วัน ⇒ มีแถวกำกับพร้อมจำนวน', () => {
+    renderPanel({ team: teamWithLanes(lane({ total: 22, pending: 11, stalePending: 11, done: 11 })) });
+    expect(screen.getByText('ค้างเกิน 2 วัน')).toBeTruthy();
+    // 11 โผล่ทั้งแถว "รอโทร" และแถวธงค้าง
+    expect(screen.getAllByText('11').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ไม่มีของค้าง ⇒ ไม่ต้องมีบรรทัดขยะ 0 ทุกวัน', () => {
+    renderPanel({ team: teamWithLanes(lane({ total: 40, done: 40 })) });
+    expect(screen.queryByText('ค้างเกิน 2 วัน')).toBeNull();
+  });
+});
+
+describe('Success Rate ต้องบอกช่วงวันที่ของสายที่นับ', () => {
+  it('มีช่วงวันที่ ⇒ เขียนกำกับใต้ตัวเลข', () => {
+    renderPanel({ successRate: { pct: 42, connected: 12, fromYmd: '2026-09-01', toYmd: '2026-09-07' } });
+    expect(screen.getByText('จากคนที่รับสาย 12 สาย')).toBeTruthy();
+    expect(screen.getByText(/นับจากสายที่ส่งเข้า .*1 ก\.ย\..*7 ก\.ย\./)).toBeTruthy();
+  });
+
+  it('ไม่รู้ช่วง ⇒ ไม่เดาให้ (ไม่มีบรรทัดช่วงวันที่)', () => {
+    renderPanel({ successRate: { pct: 42, connected: 12 } });
+    expect(screen.queryByText(/นับจากสายที่ส่งเข้า/)).toBeNull();
   });
 });

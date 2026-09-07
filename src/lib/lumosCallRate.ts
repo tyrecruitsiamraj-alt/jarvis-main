@@ -114,6 +114,24 @@ const TH_YMD = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+/** วันเดียวแบบคนอ่าน (เช่น "1 ก.ย.") — โซนไทยเสมอ */
+const TH_DM = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' });
+
+export function ymdDayText(ymd: string): string {
+  return TH_DM.format(new Date(`${ymd}T00:00:00+07:00`));
+}
+
+/**
+ * ช่วงวันที่ของสายที่ถูกนับ — **แหล่งเดียวของป้ายช่วง** (แผง Rate บนแดชบอร์ด +
+ * Success Rate บนกล่องทีมหน้าแรก ต้องเขียนช่วงเดียวกันเป๊ะ)
+ *
+ * 🔴 ทำไมต้องเขียนช่วงกำกับ: "Success Rate · 7 วันล่าสุด" ไม่ได้บอกว่า 7 วันไหน —
+ * คนอ่านเดาเองว่ารวมวันนี้ไหม แล้วเอาไปเทียบกับเลขหน้าอื่นที่คนละช่วงโดยไม่รู้ตัว
+ */
+export function callRateRangeText(fromYmd: string, toYmd: string): string {
+  return fromYmd === toYmd ? ymdDayText(toYmd) : `${ymdDayText(fromYmd)} – ${ymdDayText(toYmd)}`;
+}
+
 function pctOf(n: number, base: number): number | null {
   if (base <= 0) return null;
   return Math.round((n / base) * 100);

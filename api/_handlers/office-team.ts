@@ -34,6 +34,7 @@ import {
   queueCancelled,
   queueHasResult,
   queuePending,
+  queueStalePending,
   queueWaiting,
 } from '../_lib/lumosQueueDefs.js';
 import type {
@@ -65,6 +66,13 @@ const QUEUE_ACTIVE = queueActive('');
 const QUEUE_PENDING = queuePending('');
 const QUEUE_WAITING = queueWaiting('');
 const QUEUE_HAS_RESULT = queueHasResult('');
+/**
+ * "รอโทร" ที่ค้างนานเกินไป — เกณฑ์ 2 วัน **ตัวเดียวกับคิวงานหน้าแรก**
+ * (`matching-flow-summary` ใช้ `queueStalePending("'2 days'")` อยู่แล้ว ห้ามตั้งเกณฑ์ที่สอง)
+ * 🔴 ทำไมต้องโชว์: เลน follow มี "รอโทร 11" ที่ค้างครบทั้ง 11 — ตัวเลขเฉย ๆ อ่านเหมือน
+ * งานที่กำลังเดิน ทั้งที่มันคือกองที่ไม่มีใครหยิบ (ยิ่งเงียบตอน `queueActive` พังทั้งช่อง)
+ */
+const QUEUE_STALE_PENDING_2D = queueStalePending("'2 days'", '');
 
 type Body = {
   generated_at: string;
@@ -173,6 +181,7 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
     lane: string;
     cancelled: number;
     pending: number;
+    stale_pending: number;
     waiting: number;
     done: number;
     n: number;
@@ -185,19 +194,28 @@ async function loadLumosTeam(): Promise<LumosTeamStats> {
             end as lane,
             count(*) filter (where ${QUEUE_CANCELLED})::int as cancelled,
             count(*) filter (where ${QUEUE_ACTIVE} and ${QUEUE_PENDING})::int as pending,
+            count(*) filter (where ${QUEUE_ACTIVE} and ${QUEUE_STALE_PENDING_2D})::int as stale_pending,
             count(*) filter (where ${QUEUE_ACTIVE} and ${QUEUE_WAITING})::int as waiting,
             count(*) filter (where ${QUEUE_ACTIVE} and ${QUEUE_HAS_RESULT})::int as done,
             count(*) filter (where ${QUEUE_ACTIVE})::int as n
        from ${queueTable}
       group by 1`,
   );
-  const mk = (): LaneCounts => ({ total: 0, pending: 0, waiting: 0, done: 0, cancelled: 0 });
+  const mk = (): LaneCounts => ({
+    total: 0,
+    pending: 0,
+    stalePending: 0,
+    waiting: 0,
+    done: 0,
+    cancelled: 0,
+  });
   const lanes: LumosTeamStats = { public: mk(), match: mk(), follow: mk() };
   for (const r of rows) {
     const lane = lanes[r.lane as keyof LumosTeamStats];
     if (!lane) continue;
     lane.total = r.n;
     lane.pending = r.pending;
+    lane.stalePending = r.stale_pending;
     lane.waiting = r.waiting;
     lane.done = r.done;
     lane.cancelled = r.cancelled;

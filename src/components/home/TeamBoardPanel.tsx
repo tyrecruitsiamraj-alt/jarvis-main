@@ -28,6 +28,7 @@ import Term from '@/components/shared/Term';
 import { TONE } from '@/lib/designTokens';
 import type { FlowFollowUpItem } from '@/lib/flowSummaryApi';
 import { FOLLOW_UP_TONE, interestedJobLine, type CallDigest } from '@/lib/homeCallDigest';
+import { callRateRangeText } from '@/lib/lumosCallRate';
 
 /**
  * ป้าย/คำอธิบาย/ปลายทางหัวคอลัมน์มาจาก HOME_TEAM_NAV ที่เดียว (มีเทสต์คุม
@@ -182,6 +183,13 @@ const LaneRows: React.FC<{
     <GroupTitle>{name}</GroupTitle>
     <Row metric="lumos.total" value={lane ? lane.total : null} onPress={onResults} />
     <Row metric="lumos.pending" value={lane ? lane.pending : null} onPress={onWaiting} />
+    {/* 🔴 ธงค้าง — "รอโทร 11" เฉย ๆ อ่านเหมือนงานที่กำลังเดิน ทั้งที่ทั้ง 11 สายค้าง
+        เกิน 2 วันแล้ว (วัดจริง 7 ก.ย. 2569) · นับซ้อนใน "รอโทร" จึงเยื้องเข้าเป็นแถวลูก
+        เกณฑ์ 2 วันตัวเดียวกับคิวงานหน้าแรก (`queueStalePending`) ไม่ตั้งเกณฑ์ที่สอง
+        ⚠️ โชว์เฉพาะตอนมีจริง — 0 ทุกวันคือบรรทัดขยะ */}
+    {lane && lane.stalePending > 0 ? (
+      <Row metric="lumos.stale_pending" value={lane.stalePending} alert childOf />
+    ) : null}
     <Row metric="lumos.waiting" value={lane ? lane.waiting : null} alert onPress={onWaiting} />
     <Row metric="lumos.done" value={lane ? lane.done : null} onPress={onResults} />
     {/* ยกเลิกแล้ว: โชว์เฉพาะตอนมีจริง — 0 ทุกวันคือบรรทัดขยะ แต่ถ้ามีแล้วซ่อน = เลขหาย */}
@@ -353,8 +361,16 @@ const TeamBoardPanel: React.FC<{
    *
    * 🔴 **ใช้เลขชุดเดียวกับแดชบอร์ดเป๊ะ** (`compareCallRate(series, 7)`) — ถ้าคำนวณเอง
    * คนละสูตร สองหน้าจะโชว์ % ไม่ตรงกัน แล้วไม่มีใครเชื่อสักหน้า
+   *
+   * `fromYmd`/`toYmd` = **ช่วงวันที่จริงของสายที่ถูกนับ** (วันที่ส่งเข้าคิว) — ต้องเขียน
+   * กำกับบนจอ ไม่งั้น "7 วันล่าสุด" ตอบไม่ได้ว่า 7 วันไหน แล้วเอาไปเทียบข้ามหน้าผิด
    */
-  successRate?: { pct: number | null; connected: number } | null;
+  successRate?: {
+    pct: number | null;
+    connected: number;
+    fromYmd?: string;
+    toYmd?: string;
+  } | null;
   /** เลขจาก office-floor ที่หน้าแรกโหลดอยู่แล้ว (คิว AI · Follow · aftercare · ใบสมัครค้าง) */
   floor: OfficeFloorCounts | null;
   /** dialog เดิมของสายโทร (มีปุ่มจองตัว — ฟีเจอร์ 12 ส.ค. ห้ามหาย) */
@@ -390,6 +406,11 @@ const TeamBoardPanel: React.FC<{
   className,
 }) => {
   const teams = team?.teams;
+  /** ช่วงวันที่ของสายที่ Success Rate นับ — ไม่มีวันที่ = ไม่เขียนป้าย (ห้ามเดาช่วง) */
+  const successRateRange =
+    successRate?.fromYmd && successRate.toYmd
+      ? callRateRangeText(successRate.fromYmd, successRate.toYmd)
+      : null;
   return (
     /* 🔴 เปลือกเป็น Card ของ shadcn เหมือนแผงอื่นบนหน้าหลัก (4 ก.ย. 2569)
        สกินพื้นเข้มยังเป็นคลาสเดิมที่เจ้าของเคาะไว้ · ไม่เขียน CSS ใหม่ */
@@ -612,7 +633,10 @@ const TeamBoardPanel: React.FC<{
           />
           {/* 🔴 Success Rate — ฐานคือ "คนที่รับสาย" ไม่ใช่สายทั้งหมด (เจ้าของสั่ง 4 ก.ย. 2569)
               ต้องเขียนฐานกำกับ ไม่งั้นอ่านสลับกับ % สำเร็จบนแดชบอร์ดที่ฐานกว้างกว่า
-              ⚠️ ไม่มีใครรับสาย = ขีด ห้ามโชว์ 0% */}
+              ⚠️ ไม่มีใครรับสาย = ขีด ห้ามโชว์ 0%
+              🔴 เขียน **ช่วงวันที่จริง** ของสายที่นับด้วย (7 ก.ย. 2569) — "7 วันล่าสุด"
+              ลอย ๆ ตอบไม่ได้ว่า 7 วันไหน · ข้อความช่วงมาจาก `callRateRangeText` ที่เดียว
+              (ตัวเดียวกับแผง Rate บนแดชบอร์ด) ⇒ สองหน้าพูดถึงช่วงเดียวกันเสมอ */}
           <li className="mt-3 list-none">
             <span className={cn(eyebrow, T.faint)}>Success Rate · 7 วันล่าสุด</span>
             <span className="mt-0.5 flex items-baseline gap-1.5">
@@ -625,6 +649,11 @@ const TeamBoardPanel: React.FC<{
                   : `จากคนที่รับสาย ${successRate.connected.toLocaleString('th-TH')} สาย`}
               </span>
             </span>
+            {successRateRange ? (
+              <span className={cn('mt-0.5 block text-[10px]', T.faint)}>
+                นับจากสายที่ส่งเข้า {successRateRange}
+              </span>
+            ) : null}
           </li>
           {/* 🔴 ของเดิม (v1) — บรรทัดเดียวที่ต้องกดเข้าไปถึงจะรู้ผล · โฉมใหม่แทนด้วย
               สรุปเต็มข้างล่าง แต่ **ป๊อปเดิมยังเปิดได้จากปุ่มในบล็อกนั้น** ไม่มีอะไรหาย */}
