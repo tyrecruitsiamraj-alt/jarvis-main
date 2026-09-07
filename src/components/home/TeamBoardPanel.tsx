@@ -25,6 +25,9 @@ import type { OfficeFloorCounts } from '@/lib/officeFloor';
 import { HOME_TEAM_NAV, type HomeTeamNavKey } from '@/lib/soRecruitNav';
 import { METRICS, metricHelp, type MetricKey, type MetricSpec } from '@/lib/metricDictionary';
 import Term from '@/components/shared/Term';
+import { TONE } from '@/lib/designTokens';
+import type { FlowFollowUpItem } from '@/lib/flowSummaryApi';
+import { FOLLOW_UP_TONE, interestedJobLine, type CallDigest } from '@/lib/homeCallDigest';
 
 /**
  * ป้าย/คำอธิบาย/ปลายทางหัวคอลัมน์มาจาก HOME_TEAM_NAV ที่เดียว (มีเทสต์คุม
@@ -228,6 +231,118 @@ const TeamColumn: React.FC<{
   );
 };
 
+/**
+ * ── สรุปผลโทรบนกล่องทีมเลย (เจ้าของสั่ง 7 ก.ย. 2569) ──────────────────────
+ * *"บอกด้วยว่าโทรไปแล้วเท่าไหร่ สนใจลงงานอะไรยังไง ไม่เอาแค่คำว่า ผลการโทร
+ *   แบบนั้นก็ต้องกดเข้าไปเพื่อดูอีก"*
+ *
+ * 🔴 ทุกเลขมาจาก `buildCallDigest()` ตัวเดียวกับป๊อป "ผลจากการโทร" (ยอดจริงจาก
+ * `call_box_counts` ไม่ใช่ `.length` ที่ตันที่ 50) — ห้ามนับเองในไฟล์นี้
+ * 🔴 ป๊อปเดิม **ยังอยู่ครบ** — บล็อกนี้เป็นทางลัด ไม่ใช่ตัวแทน (ปุ่มท้ายบล็อกเปิดป๊อป)
+ */
+const CallDigestBlock: React.FC<{
+  digest: CallDigest;
+  /** ผลโทรที่กลับมา "วันนี้" — เลขเดิมของปุ่ม v1 ห้ามหายไปกับการรื้อ (`null` = ยังไม่รู้) */
+  resultToday: number | null;
+  /** เปิดป๊อปผลโทรเต็ม (ของเดิม) */
+  onOpenAll?: () => void;
+  /** กดชื่อคน → เปิดรายละเอียดคนโดยตรง ไม่ต้องผ่านป๊อปกลาง */
+  onOpenPerson?: (item: FlowFollowUpItem) => void;
+}> = ({ digest, resultToday, onOpenAll, onOpenPerson }) => (
+  <>
+    <GroupTitle>ผลจากการโทร</GroupTitle>
+    <li className="-mx-2 flex items-baseline gap-2 px-2 py-1">
+      <span className={cn('min-w-0 flex-1 truncate text-xs', T.mut)}>ผลกลับมาวันนี้</span>
+      <span className={cn('text-sm', T.num)}>
+        {resultToday === null ? '—' : resultToday.toLocaleString('th-TH')}
+      </span>
+      <span className={cn('w-8 shrink-0 text-[10px]', T.faint)}>{resultToday === null ? '' : 'สาย'}</span>
+    </li>
+    <li className="-mx-2 flex items-baseline gap-2 px-2 py-1">
+      <span className={cn('min-w-0 flex-1 truncate text-xs', T.mut)}>ผลกลับมาเดือนนี้</span>
+      <span className={cn('text-sm', T.num)}>{digest.resultsMonth.toLocaleString('th-TH')}</span>
+      <span className={cn('w-8 shrink-0 text-[10px]', T.faint)}>ราย</span>
+    </li>
+    {/* แยกผลเป็นอะไรบ้าง — อ่านจบในบรรทัดเดียว ไม่ต้องกดเข้าไปนับเอง */}
+    <li className="-mx-2 px-2 py-0.5">
+      <span className="flex flex-wrap gap-1">
+        {digest.boxes.map((b) => (
+          <span
+            key={b.key}
+            title={FOLLOW_UP_TONE[b.tone].hint}
+            className={cn(
+              'inline-flex items-baseline gap-1 rounded-full border px-2 py-0.5 text-[10px]',
+              TONE[FOLLOW_UP_TONE[b.tone].tone].soft,
+            )}
+          >
+            <span className={T.mut}>{b.label}</span>
+            <span className={cn('tabular-nums', TONE[FOLLOW_UP_TONE[b.tone].tone].value)}>
+              {b.count.toLocaleString('th-TH')}
+            </span>
+          </span>
+        ))}
+      </span>
+    </li>
+    {/* คนที่สนใจ = สนใจ "ลงงานอะไร" — ชื่อคน + ตำแหน่ง/หน่วยงานของใบขอที่แมทไป */}
+    <li className={cn(eyebrow, 'mt-3 list-none', T.faint)}>
+      สนใจลงงาน · {digest.interestedTotal.toLocaleString('th-TH')} ราย
+    </li>
+    {digest.interested.length === 0 ? (
+      <li className="-mx-2 px-2 py-1">
+        <p className={cn('text-[11px]', T.mut)}>ยังไม่มีใครตอบว่าสนใจ</p>
+      </li>
+    ) : (
+      digest.interested.map((it) => {
+        const line = (
+          <>
+            <span className="flex items-baseline gap-1.5">
+              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">
+                {it.name || it.person_ref}
+              </span>
+              <span className={cn('shrink-0 font-mono text-[10px]', T.faint)}>{it.request_no}</span>
+            </span>
+            <span className={cn('block truncate text-[10px]', T.mut)}>{interestedJobLine(it)}</span>
+          </>
+        );
+        return (
+          <li key={`${it.job_ref}:${it.person_ref}`}>
+            {onOpenPerson ? (
+              <button
+                type="button"
+                onClick={() => onOpenPerson(it)}
+                title={`${it.name || it.person_ref} — ${interestedJobLine(it)} (กดดูรายละเอียด/จองตัว)`}
+                className="-mx-2 block w-full rounded-lg px-2 py-1 text-left transition-colors hover:bg-slate-900/5 dark:hover:bg-white/5"
+              >
+                {line}
+              </button>
+            ) : (
+              <span className="-mx-2 block px-2 py-1">{line}</span>
+            )}
+          </li>
+        );
+      })
+    )}
+    {digest.interestedMore > 0 ? (
+      <li className="-mx-2 px-2 pt-0.5">
+        <p className={cn('text-[10px]', T.faint)}>
+          …และอีก {digest.interestedMore.toLocaleString('th-TH')} ราย
+        </p>
+      </li>
+    ) : null}
+    {onOpenAll ? (
+      <li className="mt-2 list-none">
+        <button
+          type="button"
+          onClick={onOpenAll}
+          className={cn('text-xs hover:underline', ACCENT.lumos)}
+        >
+          เปิดดูรายชื่อทั้ง 4 กล่อง (มีปุ่มจองตัว) →
+        </button>
+      </li>
+    ) : null}
+  </>
+);
+
 const TeamBoardPanel: React.FC<{
   team: OfficeTeamResponse | null;
   loading?: boolean;
@@ -246,6 +361,14 @@ const TeamBoardPanel: React.FC<{
   onOpenCallResults?: () => void;
   onOpenActiveCalls?: () => void;
   /**
+   * 🔴 **สรุปผลโทรบนกล่องทีม — โฉมใหม่เท่านั้น** (เจ้าของสั่ง 7 ก.ย. 2569)
+   * ไม่ส่ง/`null` = ของเดิมเป๊ะ (คอลัมน์ Lumos จบที่ปุ่ม "ผลโทรวันนี้ … เปิดดูรายชื่อ")
+   * หน้าแรกส่งค่านี้ให้เฉพาะตอนสวิตช์ `uiV2` เปิด ⇒ v1 ไม่ขยับแม้แต่พิกเซลเดียว
+   */
+  callDigest?: CallDigest | null;
+  /** กดชื่อ "คนที่สนใจ" บนกล่องทีม → เปิด dialog รายละเอียดคน (ตัวเดียวกับในป๊อป) */
+  onOpenPerson?: (item: FlowFollowUpItem) => void;
+  /**
    * 🔴 **สกินของเปลือก — ข้อมูลข้างในเหมือนกันทุกตัว** (5 ก.ย. 2569)
    * `deck` = ของเดิมที่ทุกคนใช้อยู่ (ค่าตั้งต้น ห้ามเปลี่ยน) ·
    * `plain` = โฉมใหม่หลังสวิตช์ `?ui=v2` — ผืนขาวเรียบ ไม่มีพื้นไล่เฉด/กริดจุด
@@ -261,6 +384,8 @@ const TeamBoardPanel: React.FC<{
   onOpenCallResults,
   onOpenActiveCalls,
   successRate,
+  callDigest,
+  onOpenPerson,
   skin = 'deck',
   className,
 }) => {
@@ -501,15 +626,26 @@ const TeamBoardPanel: React.FC<{
               </span>
             </span>
           </li>
-          <li className="mt-2 list-none">
-            <button
-              type="button"
-              onClick={onOpenCallResults}
-              className={cn('text-xs hover:underline', ACCENT.lumos)}
-            >
-              ผลโทรวันนี้ {floor ? floor.aiCalls.resultToday : '—'} สาย — เปิดดูรายชื่อ →
-            </button>
-          </li>
+          {/* 🔴 ของเดิม (v1) — บรรทัดเดียวที่ต้องกดเข้าไปถึงจะรู้ผล · โฉมใหม่แทนด้วย
+              สรุปเต็มข้างล่าง แต่ **ป๊อปเดิมยังเปิดได้จากปุ่มในบล็อกนั้น** ไม่มีอะไรหาย */}
+          {callDigest ? (
+            <CallDigestBlock
+              digest={callDigest}
+              resultToday={floor ? floor.aiCalls.resultToday : null}
+              onOpenAll={onOpenCallResults}
+              onOpenPerson={onOpenPerson}
+            />
+          ) : (
+            <li className="mt-2 list-none">
+              <button
+                type="button"
+                onClick={onOpenCallResults}
+                className={cn('text-xs hover:underline', ACCENT.lumos)}
+              >
+                ผลโทรวันนี้ {floor ? floor.aiCalls.resultToday : '—'} สาย — เปิดดูรายชื่อ →
+              </button>
+            </li>
+          )}
         </TeamColumn>
       </div>
     </Card>

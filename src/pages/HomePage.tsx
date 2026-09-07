@@ -22,10 +22,17 @@ import {
   confirmedThisMonth,
   callResultsThisMonth,
   callBoxCount,
+  callBoxTruncated,
   type FlowSummary,
   type FlowFollowUpItem,
   type PostingStages,
 } from '@/lib/flowSummaryApi';
+import {
+  buildCallDigest,
+  CALL_BOX_META,
+  FOLLOW_UP_TONE,
+  type FollowUpTone,
+} from '@/lib/homeCallDigest';
 import {
   bookingActionFor,
   bookingTargetFromPersonRef,
@@ -62,32 +69,16 @@ import { lumosConnectRate } from '@/lib/lumosLinkHealth';
  * สีทั้งแถบหัวการ์ดและตัวเลขมาจาก token กลางตัวเดียว (@/lib/designTokens) ไม่ประกาศ class สีที่นี่
  */
 /**
- * โทนของ 4 กล่องผลโทร (เจ้าของกำหนด 12 ส.ค. 2569) — ทิศทางสีชุดเดียวกับ callOutcomeTone:
- * เขียว=จบดี · เหลือง=ยังไม่จบ รอโทรซ้ำ · ส้ม=ต้องคนตาม · แดง=จบไม่ดี
+ * 🔴 โทน/ป้าย/ตัวสร้างสรุปของ 4 กล่องผลโทร **ย้ายไป `@/lib/homeCallDigest`** แล้ว
+ * (7 ก.ย. 2569) — บอร์ดทีมกับป๊อปนี้ต้องอ่านชุดเดียวกัน ไม่งั้นเลขบนจอเดียวกันขัดกันเอง
+ * ที่เหลือไว้ในไฟล์จอคือ **ไอคอน** อย่างเดียว (component ของ React ไม่ควรอยู่ใน lib ข้อมูล)
  */
-const FOLLOW_UP_TONE = {
-  good: {
-    tone: 'success',
-    dot: '🟢',
-    hint: 'สนใจงาน — พร้อมให้จอง',
-  },
-  warn: {
-    tone: 'warn',
-    dot: '🟡',
-    hint: 'ไม่สะดวก — รอ AI โทรซ้ำตามนัด',
-  },
-  act: {
-    tone: 'orange',
-    dot: '🟠',
-    hint: 'ไม่สะดวก — ต้องคนเร่งจัดการ',
-  },
-  bad: {
-    tone: 'danger',
-    dot: '🔴',
-    hint: 'ไม่สนใจงาน',
-  },
-} as const satisfies Record<string, { tone: ToneKey; dot: string; hint: string }>;
-type FollowUpTone = keyof typeof FOLLOW_UP_TONE;
+const CALL_BOX_ICON = {
+  confirmed: PhoneCall,
+  retry: PhoneForwarded,
+  needs_human: AlertTriangle,
+  declined: Phone,
+} as const;
 
 /** รายชื่อคนในกล่องผลโทร — สีของแถวบอกปลายทางเอง กดแล้วเปิดรายละเอียดคน */
 function FollowUpList({
@@ -275,6 +266,12 @@ const HomePage: React.FC = () => {
     [office, flow],
   );
 
+  /**
+   * สรุปผลโทรที่ต้องเห็นบนกล่องทีมเลย (เจ้าของสั่ง 7 ก.ย. 2569) — ประกอบจาก `flow`
+   * ที่หน้านี้โหลดอยู่แล้ว **ไม่ยิงเส้นใหม่** และไม่มีนิยามเลขใหม่ (ดู lib/homeCallDigest)
+   */
+  const callDigest = React.useMemo(() => buildCallDigest(flow), [flow]);
+
   /** คีย์กันกดซ้ำ — คนเดียวโผล่ได้หลายใบขอ จึงต้องผูกกับใบด้วย ไม่ใช่แค่ตัวคน */
   const bookingKeyOf = (item: FlowFollowUpItem) => `${item.job_ref}::${item.person_ref}`;
 
@@ -415,6 +412,13 @@ const HomePage: React.FC = () => {
         onOpenCallResults={() => setCallResultsOpen(true)}
         onOpenActiveCalls={() => setActiveCallsOpen(true)}
         successRate={successRate}
+        /* 🔴 สรุปผลโทรบนกล่องทีม (เจ้าของสั่ง 7 ก.ย. 2569) — **โฉมใหม่เท่านั้น**
+           v1 ได้ `null` ⇒ คอลัมน์ Lumos จบที่ปุ่มเดิมเป๊ะ ไม่ขยับ */
+        callDigest={uiV2 ? callDigest : null}
+        onOpenPerson={(it) => {
+          setBookingError(null);
+          setPersonDetail({ item: it, tone: 'good' });
+        }}
       />
 
       {/*
@@ -490,22 +494,25 @@ const HomePage: React.FC = () => {
           </DialogHeader>
           {flow ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {(
-                [
-                  { key: 'confirmed', label: 'สนใจงาน', tone: 'good', icon: PhoneCall },
-                  { key: 'retry', label: 'ไม่สะดวก — รอ AI โทรซ้ำ', tone: 'warn', icon: PhoneForwarded },
-                  { key: 'needs_human', label: 'ไม่สะดวก — ต้องเร่งจัดการ', tone: 'act', icon: AlertTriangle },
-                  { key: 'declined', label: 'ไม่สนใจงาน', tone: 'bad', icon: Phone },
-                ] as const
-              ).map(({ key, label, tone, icon: Icon }) => {
+              {CALL_BOX_META.map(({ key, label, tone }) => {
+                const Icon = CALL_BOX_ICON[key];
                 const items = flow.call_boxes[key];
                 const t = FOLLOW_UP_TONE[tone];
+                /* 🔴 ยอดจริงจาก `call_box_counts` — เดิมใช้ `items.length` ที่ SQL ตัดไว้ที่ 50
+                   ⇒ ของจริงเกิน 50 เมื่อไหร่ ป๊อปจะบอก "50" ตลอดกาล และขัดกับสรุปบนบอร์ดทีม
+                   (บั๊กตระกูลเดียวกับที่หน้า `/work` แก้ไปแล้ว commit b34ab30) */
+                const total = callBoxCount(flow, key);
                 return (
                   <div key={key} className={cn('rounded-2xl border p-3', TONE[t.tone].soft)}>
                     <div className={cn('flex items-center gap-1.5 text-xs font-semibold', TONE[t.tone].num)}>
                       <Icon className="h-3.5 w-3.5" aria-hidden />
-                      {label} ({items.length})
+                      {label} ({total.toLocaleString('th-TH')})
                     </div>
+                    {callBoxTruncated(flow, key) ? (
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        แสดง {items.length} รายแรกจาก {total.toLocaleString('th-TH')}
+                      </p>
+                    ) : null}
                     <FollowUpList
                       items={items}
                       tone={tone}
