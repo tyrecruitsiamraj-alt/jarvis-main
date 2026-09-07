@@ -395,6 +395,162 @@ export function roundAiSummary(round: FollowPlanningRound): string | null {
 }
 
 /**
+ * ═══ ปฏิทินติดตามสองหน้า (เจ้าของสั่ง 7 ก.ย. 2569 · ฉบับที่ 2 หลังย้อนฉบับแรกออก) ═══
+ *
+ * > *"หน้าแรก: บอกว่ามีกี่สายที่ต้องตาม · แยกผลของทุกสายตาม Filter · สายแรกจบเอาผลมาบอก
+ * >  สีต้องบอกได้ว่า เขียวคือตกลง เหลืองติดต่อไม่ได้ แดงคือไม่ไป · บอกด้วยว่าเขาตอบว่ายังไง
+ * >  · เลือกวันได้จากปฏิทิน"*
+ * > *"หน้าสอง: ภาพรวมทั้งเดือน นาย ก ข ค ทั้งเดือนติดตามกี่ครั้ง วันไหนไป วันไหนไม่ไป
+ * >  วันไหนติดต่อไม่ได้"*
+ *
+ * ทั้งสองหน้าใช้ **หมวดผล** ชุดเดียวกันข้างล่างนี้ — เลขหน้าแรกกับสีหน้าสองจึงเล่าเรื่องเดียวกัน
+ *
+ * 🔴 หมวดตัดสินจาก `followRoundState` + `CALL_OUTCOME_TONE` **ไม่ประดิษฐ์นิยามใหม่**
+ * (กติกาหนึ่งเมตริกหนึ่งนิยาม) · "เลยเวลายังไม่มีผล" แยกจาก "ติดต่อไม่ได้" โดยตั้งใจ —
+ * อันแรกยังไม่มีใครรับสายเลย อันหลัง AI โทรแล้วแต่ไม่ถึงตัว คนละงานที่ต้องทำต่อ
+ */
+export type FollowCallCategory =
+  /** ตกลง — ยืนยันว่าไป / รับสายแล้ว / ปิดงานว่าไป */
+  | 'agreed'
+  /** ติดต่อไม่ได้ — ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ/เบอร์ผิด/ขอเลื่อน */
+  | 'unreachable'
+  /** ไม่ไป — ปฏิเสธ / ปิดงานว่าไม่ไป */
+  | 'lost'
+  /** ส่งแล้ว รอผล (ยังไม่เลยเวลา) หรือยังไม่ถึงเวลา */
+  | 'waiting'
+  /** เลยเวลานัดแล้วยังไม่มีผลกลับ */
+  | 'overdue'
+  /** ไม่ได้ส่งให้ AI เลย — ต้องคนจัดการ */
+  | 'notSent'
+  /** ยกเลิกทิ้ง */
+  | 'cancelled'
+  /** ปิดงานด้วยผลที่ยังไม่รู้ว่าไปหรือไม่ (ลา/เลื่อน/อื่น ๆ) */
+  | 'other';
+
+export const FOLLOW_CALL_CATEGORY_LABEL: Record<FollowCallCategory, string> = {
+  agreed: 'ตกลง · ไป',
+  unreachable: 'ติดต่อไม่ได้',
+  lost: 'ไม่ไป',
+  waiting: 'รอผล',
+  overdue: 'เลยเวลา ยังไม่มีผล',
+  notSent: 'ไม่ได้ส่งให้ AI',
+  cancelled: 'ยกเลิก',
+  other: 'ยังไม่รู้ผล',
+};
+
+/** สีของหมวด — ต้องเท่ากับ `roundTone` ของรอบในหมวดนั้น ไม่งั้นเลขกับชิปสีคนละเรื่อง */
+export const FOLLOW_CALL_CATEGORY_TONE: Record<FollowCallCategory, ToneKey> = {
+  agreed: 'success',
+  unreachable: 'warn',
+  lost: 'danger',
+  waiting: 'primary',
+  overdue: 'warn',
+  notSent: 'orange',
+  cancelled: 'neutral',
+  other: 'warn',
+};
+
+export function callCategory(round: FollowPlanningRound): FollowCallCategory {
+  const e = round.entry;
+  switch (round.state) {
+    case 'cancelled':
+      return 'cancelled';
+    case 'closed':
+      if (isSuccessOutcome(e.outcome_code)) return 'agreed';
+      if (isLostOutcome(e.outcome_code)) return 'lost';
+      return 'other';
+    case 'result': {
+      const tone = CALL_OUTCOME_TONE[(e.call_outcome ?? '') as keyof typeof CALL_OUTCOME_TONE];
+      if (tone === 'success') return 'agreed';
+      if (tone === 'danger') return 'lost';
+      if (tone === 'neutral') return 'cancelled';
+      return 'unreachable';
+    }
+    case 'overdue':
+      return 'overdue';
+    case 'notSent':
+      return 'notSent';
+    default:
+      return 'waiting';
+  }
+}
+
+/** ตัวกรองรอบของหน้ารายวัน — `'all'` = ทุกสาย */
+export type FollowRoundFilter = 'all' | 1 | 2 | 3;
+
+export type FollowDayCall = {
+  row: FollowPlanningRow;
+  round: FollowPlanningRound;
+  /** สายที่เท่าไหร่ (นิยามเดียวกับแท็บรอบ · null = ยังไม่รู้) */
+  slot: 1 | 2 | 3 | null;
+  category: FollowCallCategory;
+};
+
+/**
+ * **ทุกสายของวันเดียว** เรียงตามเวลา — หนึ่งแถว = หนึ่งสาย (ไม่ใช่หนึ่งคน)
+ * เพราะคำถามของหน้านี้คือ "สายไหนต้องตาม" ไม่ใช่ "ใครอยู่ในระบบ"
+ * ⚠️ รวมสายที่ยกเลิกด้วย (โชว์จาง) — Lumos โชว์ว่ายกเลิก จอเราต้องเห็นด้วย
+ */
+export function buildFollowDayCalls(
+  rows: readonly FollowPlanningRow[],
+  ymd: string,
+  roundFilter: FollowRoundFilter = 'all',
+): FollowDayCall[] {
+  const out: FollowDayCall[] = [];
+  for (const row of rows) {
+    for (const round of row.rounds) {
+      if (round.ymd !== ymd) continue;
+      const slot = followRoundSlot(round.entry);
+      if (roundFilter !== 'all' && slot !== roundFilter) continue;
+      out.push({ row, round, slot, category: callCategory(round) });
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      (a.round.time ?? '99:99').localeCompare(b.round.time ?? '99:99') ||
+      a.row.group.name.localeCompare(b.row.group.name, 'th'),
+  );
+}
+
+/** สายที่มีในวันนั้น (ทุกรอบ) — ไว้สร้างชิปตัวกรอง "สายที่ N" เฉพาะที่มีจริง */
+export function roundSlotsOfDay(rows: readonly FollowPlanningRow[], ymd: string): Array<1 | 2 | 3> {
+  const found = new Set<1 | 2 | 3>();
+  for (const c of buildFollowDayCalls(rows, ymd, 'all')) if (c.slot) found.add(c.slot);
+  return [...found].sort((a, b) => a - b);
+}
+
+export type FollowCallSummary = Record<FollowCallCategory, number> & {
+  /** สายที่ต้องตาม = ทุกสายที่ไม่ได้ยกเลิก */
+  total: number;
+};
+
+/** นับสายตามหมวด — ใช้ทั้งหัวหน้ารายวันและสรุปรายคนของหน้ารายเดือน */
+export function summarizeFollowCalls(rounds: readonly FollowPlanningRound[]): FollowCallSummary {
+  const s: FollowCallSummary = {
+    agreed: 0,
+    unreachable: 0,
+    lost: 0,
+    waiting: 0,
+    overdue: 0,
+    notSent: 0,
+    cancelled: 0,
+    other: 0,
+    total: 0,
+  };
+  for (const r of rounds) {
+    const c = callCategory(r);
+    s[c] += 1;
+    if (c !== 'cancelled') s.total += 1;
+  }
+  return s;
+}
+
+/** สรุปทั้งเดือนของคนหนึ่งคน (หน้ารายเดือน: "ทั้งเดือนติดตามกี่ครั้ง ไป/ไม่ไป/ติดต่อไม่ได้") */
+export function personMonthSummary(row: FollowPlanningRow, month: string): FollowCallSummary {
+  return summarizeFollowCalls(row.rounds.filter((r) => r.ymd?.slice(0, 7) === month));
+}
+
+/**
  * **เบอร์ฉุกเฉินที่แนบไปกับสายนี้** — เบอร์ที่ AI โทรหาต่อเมื่อติดต่อผู้รับไม่ได้
  * `null` = ไม่ได้แนบไปเลย (AI ไม่มีใครให้โทรต่อ — เป็นความเสี่ยง ไม่ใช่แค่ช่องว่าง)
  *

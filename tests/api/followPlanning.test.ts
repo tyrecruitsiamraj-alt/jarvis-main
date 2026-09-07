@@ -11,6 +11,12 @@ import {
   followRoundState,
   isRoundOpen,
   roundAiSummary,
+  callCategory,
+  FOLLOW_CALL_CATEGORY_TONE,
+  buildFollowDayCalls,
+  roundSlotsOfDay,
+  summarizeFollowCalls,
+  personMonthSummary,
 } from '../../src/lib/followPlanning';
 
 const NOW = new Date('2026-09-01T05:00:00Z'); // 12:00 น. เวลาไทย
@@ -409,5 +415,106 @@ describe('ผลการโทรทุกสาย + สรุปจาก AI'
     // สายที่ 2 ยังไม่มีผล — ต้องไม่ลบผลของสายที่ 1 ทิ้ง และต้องไม่แต่งสรุปให้
     expect(roundAiSummary(row.rounds[1])).toBeNull();
     expect(roundTone(row.rounds[1])).not.toBe('success');
+  });
+});
+
+/**
+ * ═══ ปฏิทินสองหน้า ฉบับที่ 2 (เจ้าของสั่ง 7 ก.ย. 2569) — หมวดผลชุดเดียวใช้ทั้งสองหน้า ═══
+ * *"เขียวคือตกลง เหลืองติดต่อไม่ได้ แดงคือไม่ไป"* · *"ทั้งเดือนติดตามกี่ครั้ง วันไหนไป วันไหนไม่ไป"*
+ */
+describe('callCategory — หมวดผลของสาย', () => {
+  const cat = (over: Partial<FollowEntry>) =>
+    callCategory(buildFollowPlanningRows(groupFollowEntries([entry(over)], NOW), NOW)[0].rounds[0]);
+
+  it('ตกลง: confirmed/acknowledged และปิดงานว่าไป', () => {
+    expect(cat({ call_status: 'completed', call_outcome: 'confirmed' })).toBe('agreed');
+    expect(cat({ call_status: 'completed', call_outcome: 'acknowledged' })).toBe('agreed');
+    expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'went' })).toBe('agreed');
+  });
+
+  it('ไม่ไป: declined และปิดงานว่าไม่ไป/ยกเลิก', () => {
+    expect(cat({ call_status: 'completed', call_outcome: 'declined' })).toBe('lost');
+    expect(cat({ completed_at: '2026-09-01T03:00:00Z', outcome_code: 'cancelled' })).toBe('lost');
+  });
+
+  it('ติดต่อไม่ได้: ไม่รับ/ไม่ว่าง/ไม่ตอบ/โทรไม่สำเร็จ/เบอร์ผิด — เป็นสีเหลืองทั้งชุด', () => {
+    for (const o of ['no_answer', 'busy', 'unresponsive', 'failed', 'wrong_person'] as const) {
+      expect(cat({ call_status: 'completed', call_outcome: o })).toBe('unreachable');
+    }
+  });
+
+  it('🔴 เลยเวลายังไม่มีผล ≠ ติดต่อไม่ได้ — คนละงานที่ต้องทำต่อ', () => {
+    // นัด 09:00 · NOW = 12:00 · ยังไม่มีผล · อยู่ในคิว
+    expect(cat({ scheduled_at: '2026-09-01T02:00:00Z', call_status: 'pending' })).toBe('overdue');
+    // ยังไม่ถึงเวลา
+    expect(cat({ scheduled_at: '2026-09-01T09:00:00Z', call_status: 'pending' })).toBe('waiting');
+    // ไม่เคยเข้าคิว
+    expect(cat({ scheduled_at: '2026-09-01T09:00:00Z', call_status: null })).toBe('notSent');
+  });
+
+  it('สีของหมวดต้องเท่ากับสีของชิป (roundTone) เสมอ — ไม่งั้นเลขกับสีคนละเรื่อง', () => {
+    const cases: Array<Partial<FollowEntry>> = [
+      { call_status: 'completed', call_outcome: 'confirmed' },
+      { call_status: 'completed', call_outcome: 'declined' },
+      { call_status: 'completed', call_outcome: 'no_answer' },
+      { scheduled_at: '2026-09-01T02:00:00Z', call_status: 'pending' },
+      { scheduled_at: '2026-09-01T09:00:00Z', call_status: 'pending' },
+      { scheduled_at: '2026-09-01T09:00:00Z', call_status: null },
+      { cancelled: true },
+    ];
+    for (const c of cases) {
+      const r = buildFollowPlanningRows(groupFollowEntries([entry(c)], NOW), NOW)[0].rounds[0];
+      expect(FOLLOW_CALL_CATEGORY_TONE[callCategory(r)]).toBe(roundTone(r));
+    }
+  });
+});
+
+describe('หน้ารายวัน — buildFollowDayCalls / summarizeFollowCalls', () => {
+  const rows = () =>
+    buildFollowPlanningRows(
+      groupFollowEntries(
+        [
+          // สมชาย: สาย 1 ตกลง · สาย 2 รอผล (วันเดียวกัน)
+          entry({ id: 'a1', call_round: 1, scheduled_at: '2026-09-01T01:00:00Z', call_status: 'completed', call_outcome: 'confirmed', call_summary: 'ไปแน่' }),
+          entry({ id: 'a2', call_round: 2, scheduled_at: '2026-09-01T08:00:00Z' }),
+          // สมหญิง: สาย 1 ไม่ไป
+          entry({ id: 'b1', recipient_name: 'สมหญิง', recipient_phone: '0899999999', call_round: 1, scheduled_at: '2026-09-01T00:30:00Z', call_status: 'completed', call_outcome: 'declined' }),
+          // คนละวัน — ต้องไม่โผล่
+          entry({ id: 'c1', recipient_name: 'คนพรุ่งนี้', recipient_phone: '0877777777', call_round: 1, scheduled_at: '2026-09-02T01:00:00Z' }),
+          // ยกเลิก — โชว์แต่ไม่นับเป็น "ต้องตาม"
+          entry({ id: 'd1', recipient_name: 'คนยกเลิก', recipient_phone: '0866666666', call_round: 1, scheduled_at: '2026-09-01T03:00:00Z', cancelled: true }),
+        ],
+        NOW,
+      ),
+      NOW,
+    );
+
+  it('หนึ่งแถว = หนึ่งสาย เรียงตามเวลา เฉพาะวันนั้น (รวมที่ยกเลิก)', () => {
+    const calls = buildFollowDayCalls(rows(), '2026-09-01');
+    expect(calls.map((c) => c.round.entry.id)).toEqual(['b1', 'a1', 'd1', 'a2']);
+    expect(calls.every((c) => c.round.ymd === '2026-09-01')).toBe(true);
+  });
+
+  it('🔴 กรอง "สายที่ 1" แล้วต้องไม่มีสายที่ 2 ปน — และกลับกัน', () => {
+    expect(buildFollowDayCalls(rows(), '2026-09-01', 1).map((c) => c.round.entry.id)).toEqual(['b1', 'a1', 'd1']);
+    expect(buildFollowDayCalls(rows(), '2026-09-01', 2).map((c) => c.round.entry.id)).toEqual(['a2']);
+    expect(roundSlotsOfDay(rows(), '2026-09-01')).toEqual([1, 2]);
+  });
+
+  it('หัวสรุป: ต้องตามไม่นับที่ยกเลิก · แยกตกลง/ไม่ไป/รอผล', () => {
+    const s = summarizeFollowCalls(buildFollowDayCalls(rows(), '2026-09-01').map((c) => c.round));
+    expect(s.total).toBe(3); // a1 a2 b1 (d1 ยกเลิก)
+    expect(s.agreed).toBe(1);
+    expect(s.lost).toBe(1);
+    expect(s.waiting).toBe(1);
+    expect(s.cancelled).toBe(1);
+  });
+
+  it('สรุปรายคนทั้งเดือน (หน้ารายเดือน) — นับเฉพาะสายในเดือนนั้น', () => {
+    const somchai = rows().find((r) => r.group.name === 'สมชาย ใจดี')!;
+    const s = personMonthSummary(somchai, '2026-09');
+    expect(s.total).toBe(2);
+    expect(s.agreed).toBe(1);
+    expect(personMonthSummary(somchai, '2026-10').total).toBe(0);
   });
 });

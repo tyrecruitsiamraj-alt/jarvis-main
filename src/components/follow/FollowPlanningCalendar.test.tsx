@@ -1,25 +1,28 @@
 /**
- * ปฏิทินติดตาม — **หนึ่งสาย = หนึ่งคอลัมน์ พร้อมคำตอบและเหตุผล**
+ * ปฏิทินติดตาม — **สองหน้าในผืนเดียว** (เจ้าของสั่ง 7 ก.ย. 2569 · ฉบับที่ 2)
  *
- * เจ้าของสั่ง 7 ก.ย. 2569:
- * > *"แยกว่าสายแรก สาย 2 พอได้ผลก็แยกรอบ เอามารวมกันแบบนี้งงตาย
- * >  เช่น ตอนแรกบอก รอผลโทร ถ้ารอบแรกบอกไป ก็เปลี่ยนเป็น ตกลง และคำตอบเขาคือ ไป
- * >  ถ้าเขาไม่ไปก็บอก ไม่ไป เหตุผลที่เขาตอบ ไรงี้ ทั้ง 2 รอบ"*
+ * > *"หน้าแรก: บอกว่ามีกี่สายที่ต้องตาม · แยกผลของทุกสายตาม Filter · สายแรกจบเอาผลมาบอก
+ * >  สีต้องบอกได้ว่า เขียวคือตกลง เหลืองติดต่อไม่ได้ แดงคือไม่ไป · บอกด้วยว่าเขาตอบว่ายังไง"*
+ * > *"หน้าสอง: ภาพรวมทั้งเดือน นาย ก ข ค ทั้งเดือนติดตามกี่ครั้ง วันไหนไป วันไหนไม่ไป"*
  *
  * 🔴 ด่านที่ห้ามหลุด:
- * 1. มี 2 สาย ⇒ ต้องมี **คอลัมน์ "สายที่ 1" และ "สายที่ 2" แยกกัน** ไม่กองรวมช่องเดียว
- * 2. สายที่ 1 ได้ผลแล้ว ⇒ เห็นคำตอบ + เหตุผลทันที **โดยที่สายที่ 2 ยังรอผลอยู่**
- * 3. ไม่ไป ⇒ ต้องบอกเหตุผลที่เขาตอบ ไม่ใช่แค่บอกว่าไม่ไป
+ * 1. เปิดมาเจอหน้า **รายวัน** ก่อน (เจ้าของเรียกว่า "หน้าแรก")
+ * 2. หน้ารายวัน: เลข "สายที่ต้องตาม" ถูก · กรองสายที่ 1/2 แล้วลิสต์เปลี่ยนตาม
+ * 3. สายที่ 1 ได้ผลแล้วเห็นคำตอบ + "เขาตอบ:" ทันที ทั้งที่สายที่ 2 ยังรอผล
+ * 4. หน้ารายเดือน: ใต้ชื่อบอกทั้งเดือนกี่ครั้ง/ไป/ไม่ไป (ในคอลัมน์ที่ตรึง) และช่องวันยังอยู่
+ * 5. เบอร์ฉุกเฉิน: ห้ามมีคำว่า "โทรแล้ว" (Lumos ไม่ส่งข้อมูลนี้กลับมา)
  */
-import { describe, expect, it, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import { describe, expect, it, afterEach, vi } from 'vitest';
+import { render, screen, cleanup, within, fireEvent } from '@testing-library/react';
 
 import FollowPlanningCalendar from './FollowPlanningCalendar';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import type { FollowEntry } from '@/lib/followApi';
 
-const NOW = new Date('2026-09-07T09:00:00Z'); // 16:00 น. เวลาไทย
+/** 16:00 น. เวลาไทย ของวันที่ 7 ก.ย. 2569 — เทสต์นี้ยึด "วันนี้" เป็นวันนั้น */
+const NOW = new Date('2026-09-07T09:00:00Z');
+const TODAY = '2026-09-07';
 
 function entry(over: Partial<FollowEntry> = {}): FollowEntry {
   return {
@@ -41,38 +44,47 @@ function entry(over: Partial<FollowEntry> = {}): FollowEntry {
   } as FollowEntry;
 }
 
-function renderCalendar(entries: FollowEntry[]) {
+function renderCalendar(entries: FollowEntry[], opts: { selectedYmd?: string; onOpenCell?: () => void } = {}) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
-  const allCalls = new Map(rows.map((r) => [r.group.key, r.rounds]));
   render(
     <FollowPlanningCalendar
       rows={rows}
       month="2026-09"
       onMonthChange={() => {}}
-      selectedYmd=""
+      selectedYmd={opts.selectedYmd ?? TODAY}
       onSelect={() => {}}
-      onOpenCell={() => {}}
-      allCalls={allCalls}
+      onOpenCell={opts.onOpenCell ?? (() => {})}
     />,
   );
   return rows;
 }
 
+/** Radix Tabs สลับด้วย mousedown (ไม่ใช่ click) — กดจริงบนจอก็คือ mousedown ก่อนอยู่แล้ว */
+const showMonthView = () =>
+  fireEvent.mouseDown(screen.getByRole('tab', { name: /รายเดือน/ }), { button: 0 });
+
+/** เลขใหญ่ในช่องสถิติที่มีป้ายนี้ */
+const statValue = (label: string) =>
+  screen.getByText(label, { selector: 'div' }).previousElementSibling?.textContent;
+
+const twoRounds = (over1: Partial<FollowEntry> = {}, over2: Partial<FollowEntry> = {}) => [
+  entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-07T08:23:00Z', ...over1 }),
+  entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-07T08:30:00Z', ...over2 }),
+];
+
 afterEach(cleanup);
+vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
 
-describe('ปฏิทินติดตาม — คอลัมน์แยกตามสาย', () => {
-  const twoRounds = (over1: Partial<FollowEntry> = {}, over2: Partial<FollowEntry> = {}) => [
-    entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-07T08:23:00Z', ...over1 }),
-    entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-07T08:30:00Z', ...over2 }),
-  ];
-
-  it('ตั้งไว้ 2 สาย ⇒ มีคอลัมน์ "สายที่ 1" และ "สายที่ 2" แยกกัน', () => {
+describe('หน้ารายวัน — สายที่ต้องตาม', () => {
+  it('เปิดมาเจอหน้ารายวันก่อน · บอกว่ามีกี่สายที่ต้องตาม', () => {
     renderCalendar(twoRounds());
-    expect(screen.getByRole('columnheader', { name: 'สายที่ 1' })).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'สายที่ 2' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /รายวัน/ }).getAttribute('aria-selected')).toBe('true');
+    // 2 สาย ยังไม่มีผล ทั้งคู่เลยเวลา (16:00 > 15:23/15:30)
+    expect(statValue('สายที่ต้องตาม')).toBe('2');
+    expect(statValue('เลยเวลา ยังไม่มีผล')).toBe('2');
   });
 
-  it('🔴 สายที่ 1 ตอบว่าไป ⇒ เห็นคำตอบ + เหตุผลทันที ทั้งที่สายที่ 2 ยังรอผล', () => {
+  it('🔴 สายที่ 1 ตกลงแล้ว ⇒ เห็นเขียว + "เขาตอบ:" ทันที ทั้งที่สายที่ 2 ยังรอผล', () => {
     renderCalendar(
       twoRounds({
         call_status: 'completed',
@@ -80,79 +92,124 @@ describe('ปฏิทินติดตาม — คอลัมน์แย�
         call_summary: 'ผู้รับสายบอกว่าไปแน่นอน เจอกันวันจันทร์เช้า',
       }),
     );
-
-    const cells = screen.getAllByRole('cell');
-    // ช่องที่ 2 ของแถว = สายที่ 1 · ช่องที่ 3 = สายที่ 2 (ช่องแรกคือชื่อคน)
-    const call1 = cells[1];
-    const call2 = cells[2];
-
-    expect(within(call1).getByText('ยืนยันว่าไป')).toBeTruthy();
-    expect(within(call1).getByText('ผู้รับสายบอกว่าไปแน่นอน เจอกันวันจันทร์เช้า')).toBeTruthy();
-
-    // สายที่ 2 ยังไม่มีผล — ต้องไม่ถูกผลของสายที่ 1 กลบ และห้ามแต่งเหตุผลให้
-    expect(within(call2).queryByText('ยืนยันว่าไป')).toBeNull();
-    expect(within(call2).queryByText(/ไปแน่นอน/)).toBeNull();
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    // เรียงตามเวลา — 15:23 (สาย 1) มาก่อน 15:30 (สาย 2)
+    expect(within(items[0]).getByText('ตกลง · ไป')).toBeTruthy();
+    expect(within(items[0]).getByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toBeTruthy();
+    expect(within(items[0]).getByText('สายที่ 1')).toBeTruthy();
+    // สาย 2 ยังไม่มีผล — ต้องไม่โดนผลของสาย 1 กลบ
+    expect(within(items[1]).getByText('สายที่ 2')).toBeTruthy();
+    expect(within(items[1]).queryByText(/ไปแน่นอน/)).toBeNull();
+    expect(within(items[1]).queryByText(/ตกลง/)).toBeNull();
+    expect(statValue('ตกลง · ไป')).toBe('1');
   });
 
-  it('ตอบว่าไม่ไป ⇒ บอกเหตุผลที่เขาตอบด้วย ไม่ใช่แค่บอกว่าไม่ไป', () => {
+  it('ไม่ไป ⇒ แดง + เหตุผลที่เขาตอบ', () => {
     renderCalendar(
-      twoRounds({
-        call_status: 'completed',
-        call_outcome: 'declined',
-        call_summary: 'ได้งานที่อื่นใกล้บ้านกว่าแล้ว',
-      }),
+      twoRounds({ call_status: 'completed', call_outcome: 'declined', call_summary: 'ได้งานที่อื่นใกล้บ้านกว่าแล้ว' }),
     );
-    const call1 = screen.getAllByRole('cell')[1];
-    expect(within(call1).getByText('ยกเลิก — ไม่ไปแล้ว')).toBeTruthy();
-    expect(within(call1).getByText('ได้งานที่อื่นใกล้บ้านกว่าแล้ว')).toBeTruthy();
+    const first = screen.getAllByRole('listitem')[0];
+    expect(within(first).getByText('ไม่ไป')).toBeTruthy();
+    expect(within(first).getByText(/ได้งานที่อื่นใกล้บ้านกว่าแล้ว/)).toBeTruthy();
+    expect(statValue('ไม่ไป')).toBe('1');
   });
 
-  it('มีผลแล้วแต่ AI ไม่ได้เขียนสรุป ⇒ บอกตรง ๆ ไม่ปล่อยว่างให้เดา', () => {
+  it('ติดต่อไม่ได้ (ไม่รับสาย) ⇒ นับในช่องเหลือง "ติดต่อไม่ได้"', () => {
+    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'no_answer' }));
+    expect(statValue('ติดต่อไม่ได้')).toBe('1');
+  });
+
+  it('🔴 กรอง "สายที่ 2" ⇒ ลิสต์เหลือสายเดียว และเลขหัวคิดใหม่ตามที่กรอง', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }));
-    const call1 = screen.getAllByRole('cell')[1];
-    expect(within(call1).getByText('(ไม่มีสรุปจาก AI)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'สายที่ 2', pressed: false }));
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
+    expect(statValue('สายที่ต้องตาม')).toBe('1');
+    expect(statValue('ตกลง · ไป')).toBe('0');
   });
 
-  it('ไม่ได้ตั้งสายที่ 2 ไว้ ⇒ เขียนว่าไม่ได้ตั้ง (คนละเรื่องกับ "ตั้งแล้วรอผล")', () => {
+  it('ชิปกรองขึ้นเฉพาะสายที่มีจริงในวันนั้น', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    // มีสายเดียว ⇒ มีคอลัมน์เดียว
-    expect(screen.queryByRole('columnheader', { name: 'สายที่ 2' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'สายที่ 1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'สายที่ 2' })).toBeNull();
+  });
+
+  it('กดแถวสาย ⇒ เปิดรายละเอียดของสายนั้น', () => {
+    const onOpenCell = vi.fn();
+    renderCalendar(twoRounds(), { onOpenCell });
+    fireEvent.click(screen.getAllByRole('listitem')[1].querySelector('button')!);
+    expect(onOpenCell).toHaveBeenCalledTimes(1);
+    expect(onOpenCell.mock.calls[0][2][0].entry.id).toBe('r2');
+  });
+
+  it('วันที่เลือกไม่มีสาย ⇒ บอกทางไปต่อ ไม่ใช่ตารางว่าง', () => {
+    renderCalendar(twoRounds(), { selectedYmd: '2026-09-08' });
+    expect(screen.getByText(/ไม่มีสายที่ต้องตาม/)).toBeTruthy();
+  });
+
+  it('ยกเลิกแล้วยังเห็น (จาง) แต่ไม่นับเป็นสายที่ต้องตาม', () => {
+    renderCalendar([entry({ id: 'r1', call_round: 1, cancelled: true })]);
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(statValue('สายที่ต้องตาม')).toBe('0');
   });
 });
 
-/**
- * 🔴 เบอร์ฉุกเฉิน (เจ้าของสั่ง 7 ก.ย. 2569: *"ต้องมีบอกด้วยว่าโทรหาเบอร์ฉุกเฉินยัง"*)
- *
- * ⚠️ ผลที่ Lumos ส่งกลับ **ไม่มีช่องบอกว่าโทรเบอร์ฉุกเฉินหรือยัง** (ตรวจครบทุกคีย์แล้ว)
- * จอจึงพูดได้แค่ "แนบไปแล้ว / ยังไม่รู้ว่าโทรหรือยัง" — เขียนว่า "โทรแล้ว" คือโกหก
- */
-describe('เบอร์ฉุกเฉินบนตาราง', () => {
-  it('มีเบอร์ฉุกเฉิน + ได้ผลแล้ว ⇒ บอกเบอร์ และบอกตรง ๆ ว่ายังไม่รู้ว่าโทรหรือยัง', () => {
+describe('เบอร์ฉุกเฉินบนหน้ารายวัน', () => {
+  it('มีเบอร์ + ได้ผลแล้ว ⇒ บอกเบอร์ และบอกตรง ๆ ว่ายังไม่รู้ว่าโทรหรือยัง · ห้ามมีคำว่า "โทรแล้ว"', () => {
     renderCalendar([
-      entry({
-        id: 'r1',
-        call_round: 1,
-        call_status: 'completed',
-        call_outcome: 'confirmed',
-        emergency_phone: '+66898143230',
-      }),
+      entry({ id: 'r1', call_round: 1, call_status: 'completed', call_outcome: 'no_answer', emergency_phone: '+66898143230' }),
     ]);
-    const call1 = screen.getAllByRole('cell')[1];
-    expect(within(call1).getByText(/ฉุกเฉิน \+66898143230/)).toBeTruthy();
-    expect(within(call1).getByText(/ยังไม่รู้ว่าโทรหรือยัง/)).toBeTruthy();
-    // ห้ามมีคำว่า "โทรแล้ว" เด็ดขาด — ข้อมูลนี้ยังไม่มีจริง
-    expect(within(call1).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
+    const li = screen.getAllByRole('listitem')[0];
+    expect(within(li).getByText(/ฉุกเฉิน \+66898143230 · ยังไม่รู้ว่าโทรหรือยัง/)).toBeTruthy();
+    expect(within(li).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
   });
 
-  it('ยังไม่ได้ผล ⇒ บอกว่าแนบไปกับสายนี้ (ไม่ใช่ "ยังไม่รู้ว่าโทรหรือยัง")', () => {
-    renderCalendar([entry({ id: 'r1', call_round: 1, emergency_phone: '+66898143230' })]);
-    const call1 = screen.getAllByRole('cell')[1];
-    expect(within(call1).getByText(/แนบไปกับสายนี้/)).toBeTruthy();
-  });
-
-  it('🔴 ไม่ได้แนบเบอร์ฉุกเฉิน ⇒ ต้องเตือน ไม่ใช่ปล่อยว่าง (AI ไม่มีใครให้โทรต่อ)', () => {
+  it('🔴 ไม่ได้แนบเบอร์ฉุกเฉิน ⇒ ต้องเตือน', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    const call1 = screen.getAllByRole('cell')[1];
-    expect(within(call1).getByText('ไม่ได้แนบเบอร์ฉุกเฉิน')).toBeTruthy();
+    expect(within(screen.getAllByRole('listitem')[0]).getByText('ไม่ได้แนบเบอร์ฉุกเฉิน')).toBeTruthy();
+  });
+});
+
+describe('หน้ารายเดือน — ภาพรวม', () => {
+  it('สลับไปรายเดือน ⇒ มีคอลัมน์ "เดือนนี้" + ช่องวันครบเดือน', () => {
+    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }));
+    showMonthView();
+    expect(screen.getByRole('columnheader', { name: /คนที่ต้องติดตาม/ })).toBeTruthy();
+    // กันยายนมี 30 วัน → หัวคอลัมน์วัน 30 ตัว (+1 คอลัมน์ชื่อที่ตรึงไว้)
+    expect(screen.getAllByRole('columnheader')).toHaveLength(31);
+  });
+
+  it('🔴 สรุปทั้งเดือนอยู่ใต้ชื่อในคอลัมน์ที่ตรึงไว้ — กี่ครั้ง และแยก ไป/ไม่ไป/ติดต่อไม่ได้', () => {
+    renderCalendar([
+      entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-01T02:00:00Z', call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-03T02:00:00Z', call_status: 'completed', call_outcome: 'no_answer' }),
+      entry({ id: 'r3', call_round: 3, scheduled_at: '2026-09-05T02:00:00Z', call_status: 'completed', call_outcome: 'declined' }),
+    ]);
+    showMonthView();
+    const monthCell = screen.getAllByRole('cell')[0];
+    expect(within(monthCell).getByText('3 ครั้ง')).toBeTruthy();
+    expect(within(monthCell).getByText('ตกลง · ไป 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ติดต่อไม่ได้ 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ไม่ไป 1')).toBeTruthy();
+  });
+
+  it('ช่องวันบอกผลด้วยคำสั้นของหมวด (ไม่ใช่คำยาวที่ล้นช่อง)', () => {
+    renderCalendar([
+      entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-01T02:00:00Z', call_status: 'completed', call_outcome: 'declined' }),
+    ]);
+    showMonthView();
+    const dayCells = screen.getAllByRole('cell').slice(1);
+    expect(dayCells.some((c) => within(c).queryByText('ไม่ไป'))).toBe(true);
+    expect(dayCells.some((c) => within(c).queryByText(/ยกเลิก — ไม่ไปแล้ว/))).toBe(false);
+  });
+
+  it('คำอธิบายสีใช้คำของเจ้าของ: เขียวตกลง เหลืองติดต่อไม่ได้ แดงไม่ไป', () => {
+    renderCalendar(twoRounds());
+    showMonthView();
+    expect(screen.getByText('เขียว = ตกลง · ไป')).toBeTruthy();
+    expect(screen.getByText(/เหลือง = ติดต่อไม่ได้/)).toBeTruthy();
+    expect(screen.getByText('แดง = ไม่ไป')).toBeTruthy();
   });
 });

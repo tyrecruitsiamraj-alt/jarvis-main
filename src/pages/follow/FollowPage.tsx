@@ -78,7 +78,6 @@ import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import { type FollowOutcome } from '@/lib/followOutcome';
 import {
   buildFollowPlanningRows,
-  filterPlanningRowsByRound,
 } from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
@@ -824,27 +823,11 @@ const FollowPage: React.FC = () => {
   const planningRowsAllRounds = useMemo(() => buildFollowPlanningRows(groups), [groups]);
 
   /**
-   * ปฏิทินโชว์เฉพาะ "การโทรครั้งที่" ที่เลือกไว้ข้างบน — **ทั้งแถวและช่อง**
-   * (เจ้าของทัก 1 ก.ย. 2569: *"เลือกครั้งที่เท่าไหร่ ก็โชว์ข้อมูลของรอบนั้น ๆ พอสิ"*
-   * รอบแรกกรองแค่แถว ช่องเลยยังมีสายของรอบอื่นปนอยู่)
-   * 🔴 ป๊อปรายละเอียดยังอ่านจาก `allRows` ที่ไม่ผ่านตัวกรอง — กดเข้าไปต้องเห็นครบทุกรอบเสมอ
+   * 🔴 ปฏิทินรับ **ชุดไม่กรองรอบ** (เปลี่ยน 7 ก.ย. 2569 · ฉบับที่ 2 ของปฏิทินสองหน้า)
+   * การ์ดมีชิปกรอง "ทุกสาย / สายที่ 1-3" ของตัวเองแล้ว และยังตามแท็บ `activeRound` ข้างบน
+   * เมื่อกดเปลี่ยน (พฤติกรรม 1 ก.ย. 2569) — ถ้ากรองที่นี่อีกชั้น หน้ารายเดือนจะขาดสายอื่นของคนเดิม
+   * ป๊อปรายละเอียดยังอ่านจาก `allRows` ที่ไม่ผ่านตัวกรองใด ๆ เหมือนเดิม
    */
-  const planningRows = useMemo(
-    () => filterPlanningRowsByRound(planningRowsAllRounds, activeRound),
-    [planningRowsAllRounds, activeRound],
-  );
-
-  /**
-   * ผลการโทร **ทุกสาย** ของทุกคน — คิดจาก **ชุดที่ยังไม่กรองรอบ**
-   *
-   * เดิมส่งแค่สายแรก (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 8) · ขยายเป็นทุกสาย 7 ก.ย. 2569
-   * (*"ถ้าเพิ่มไว้ 2 สาย ช่วยเอาผลมาทั้ง 2 สาย ตอนนี้ต้องรอสายที่ 2 ถึงจะรายงานผลมา"*)
-   * ⚠️ ต้องเป็นชุดไม่กรองรอบ ไม่งั้นเลือกแท็บ "ครั้งที่ 2" แล้วสายที่ 1 จะหายไปจากคอลัมน์
-   */
-  const allCalls = useMemo(
-    () => new Map(planningRowsAllRounds.map((r) => [r.group.key, r.rounds])),
-    [planningRowsAllRounds],
-  );
 
   /**
    * 🔴 **ชุดเต็มไม่ผ่านตัวกรองใด ๆ** — ใช้เฉพาะกับป๊อปรายละเอียด
@@ -1001,14 +984,13 @@ const FollowPage: React.FC = () => {
             *"เปิดมาปุ๊บ เจอ 3 หลัก ๆ: ปฏิทิน · ปุ่มเพิ่มคน · Planning"* — เรียงตามนั้นเลย
             🔴 ช่องวันต้องมีชื่อคนอยู่ในนั้นจริง ๆ ไม่ใช่แค่จำนวนสาย (เจ้าของทักเอง) */}
         <FollowPlanningCalendar
-          rows={planningRows}
+          rows={planningRowsAllRounds}
           month={calMonth}
           onMonthChange={setCalMonth}
           selectedYmd={fDate}
           onSelect={pickCalendarDay}
           onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
           activeRound={activeRound}
-          allCalls={allCalls}
         />
 
         {/* 🔴 แถบสรุปเลข (ต้องโทรใครตอนนี้ / สถานะสาย) กับปุ่มรีเฟรช **ถูกถอดออก**
