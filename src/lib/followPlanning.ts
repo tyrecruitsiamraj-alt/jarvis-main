@@ -395,6 +395,74 @@ export function roundAiSummary(round: FollowPlanningRound): string | null {
 }
 
 /**
+ * ═══ หน้า "ต้องลงมือ" ของปฏิทินติดตาม (เจ้าของสั่ง 7 ก.ย. 2569) ═══
+ *
+ * > *"ปฏิทินติดตาม แบ่งเป็น 2 หน้า หน้าแรกเพื่อดูว่าต้องมีกี่คนที่ต้องโทร ต้องตามผลไรงี้
+ * >  อีกหน้าเป็นหน้าสรุปเลยว่าทั้งเดือนคนไหนถูกแท็กให้โทรวันไหนบ้างแล้วผลเป็นไง"*
+ *
+ * ตาราง 30 คอลัมน์เหมาะกับ "ดูภาพรวมทั้งเดือน" แต่ตอบไม่ได้ว่า **วันนี้ต้องทำอะไร**
+ * หน้านี้จึงตัดคอลัมน์วันทิ้ง เหลือเฉพาะคนที่ยังมีงานค้างจริง
+ *
+ * 🔴 **นิยามเดียวกับ `followScheduleCounts`** (หน้าแรกใช้ตัวนั้น) — แยกเขียนเมื่อไหร่
+ * เลขสองหน้าจะเถียงกันเหมือนที่เคยโดนมาแล้ว:
+ * - `overdue` = เลยเวลานัด **และยังไม่มีผล** (ของค้าง ต้องตามผล)
+ * - `today`   = นัดอยู่ในวันนี้ (ถึงยังไม่ถึงเวลาก็นับ)
+ * ⚠️ รอบเดียวเป็นได้ทั้งสองอย่าง (นัดเช้าวันนี้แล้วเลยเวลา) — จอต้องเขียนกำกับ
+ *   ห้ามให้คนบวกเอง
+ */
+export type FollowActionRow = {
+  row: FollowPlanningRow;
+  /** รอบที่เลยเวลานัดแล้วยังไม่มีผล — เก่าสุดก่อน */
+  overdue: FollowPlanningRound[];
+  /** รอบที่นัดไว้วันนี้ (รวมที่เลยเวลาไปแล้ว) */
+  today: FollowPlanningRound[];
+};
+
+export function buildFollowActionRows(
+  rows: readonly FollowPlanningRow[],
+  now: Date = new Date(),
+): FollowActionRow[] {
+  const todayKey = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  const out: FollowActionRow[] = [];
+  for (const row of rows) {
+    const live = row.rounds.filter((r) => r.state !== 'cancelled' && r.state !== 'closed');
+    const overdue = live.filter((r) => r.state === 'overdue');
+    const today = live.filter((r) => r.ymd === todayKey);
+    if (overdue.length === 0 && today.length === 0) continue;
+    out.push({ row, overdue, today });
+  }
+  /**
+   * ของค้างขึ้นก่อนเสมอ · ในกลุ่มเดียวกันเรียงตามเวลานัดที่ต้องทำถัดไป
+   * (`dueAtMs` คิดมาแล้วจากชั้นสร้างแถว — ไม่คิดใหม่ที่นี่ให้เพี้ยนกัน)
+   */
+  return out.sort((a, b) => {
+    if ((a.overdue.length > 0) !== (b.overdue.length > 0)) return a.overdue.length > 0 ? -1 : 1;
+    return (a.row.dueAtMs ?? Number.MAX_SAFE_INTEGER) - (b.row.dueAtMs ?? Number.MAX_SAFE_INTEGER);
+  });
+}
+
+/** สรุปหัวหน้า "ต้องลงมือ" — นับ **คน** ไม่ใช่นับสาย (คนหนึ่งมีหลายสายได้) */
+export function followActionSummary(actions: readonly FollowActionRow[]): {
+  people: number;
+  overduePeople: number;
+  todayPeople: number;
+  waitingResultCalls: number;
+} {
+  let overduePeople = 0;
+  let todayPeople = 0;
+  let waitingResultCalls = 0;
+  for (const a of actions) {
+    if (a.overdue.length > 0) overduePeople += 1;
+    if (a.today.length > 0) todayPeople += 1;
+    // ส่งไปแล้วยังไม่มีผลกลับ = สายที่ต้อง "ตามผล" (นับเป็นสาย เพราะตามทีละสาย)
+    for (const r of [...a.overdue, ...a.today]) {
+      if (r.state === 'sent' || r.state === 'overdue') waitingResultCalls += 1;
+    }
+  }
+  return { people: actions.length, overduePeople, todayPeople, waitingResultCalls };
+}
+
+/**
  * **เบอร์ฉุกเฉินที่แนบไปกับสายนี้** — เบอร์ที่ AI โทรหาต่อเมื่อติดต่อผู้รับไม่ได้
  * `null` = ไม่ได้แนบไปเลย (AI ไม่มีใครให้โทรต่อ — เป็นความเสี่ยง ไม่ใช่แค่ช่องว่าง)
  *

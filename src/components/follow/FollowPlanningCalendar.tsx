@@ -7,7 +7,9 @@ import { roundTabLabel } from '@/lib/followRoundVisual';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
+  buildFollowActionRows,
   buildFollowMonthRows,
+  followActionSummary,
   isGoodResult,
   monthDayColumns,
   roundAiSummary,
@@ -99,6 +101,12 @@ const FollowPlanningCalendar: React.FC<{
    * ไม่งั้นเลือกแท็บ "ครั้งที่ 2" ปุ๊บ คอลัมน์ "สายที่ 1" หายทั้งตาราง
    * อย่างน้อยต้องมีสายที่ 1 เสมอ — ตารางไม่มีคอลัมน์ผลเลยจะอ่านไม่รู้เรื่อง
    */
+  const [view, setView] = React.useState<'action' | 'month'>('action');
+
+  /** งานที่ต้องลงมือ — คิดจาก `rows` ตรง ๆ ไม่ผูกกับเดือนที่กำลังดู (ของค้างข้ามเดือนได้) */
+  const actions = useMemo(() => buildFollowActionRows(rows), [rows]);
+  const actionSummary = useMemo(() => followActionSummary(actions), [actions]);
+
   const roundSlots = useMemo(() => {
     const found = new Set<number>();
     for (const { row } of monthRows) {
@@ -137,15 +145,45 @@ const FollowPlanningCalendar: React.FC<{
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden />
         <span className="text-sm font-bold text-foreground">ปฏิทินติดตาม</span>
+        {/**
+         * 🔴 สองหน้าในการ์ดเดียว (เจ้าของสั่ง 7 ก.ย. 2569)
+         * *"แบ่งเป็น 2 หน้า หน้าแรกเพื่อดูว่าต้องมีกี่คนที่ต้องโทร ต้องตามผลไรงี้
+         *   อีกหน้าเป็นหน้าสรุปเลยว่าทั้งเดือนคนไหนถูกแท็กให้โทรวันไหนบ้างแล้วผลเป็นไง"*
+         * ตาราง 30 คอลัมน์ตอบ "ภาพรวมทั้งเดือน" ได้ แต่ตอบ "วันนี้ต้องทำอะไร" ไม่ได้
+         */}
+        <div className="flex items-center gap-1" role="tablist" aria-label="มุมมองปฏิทินติดตาม">
+          {(
+            [
+              ['action', 'ต้องลงมือ'],
+              ['month', 'สรุปทั้งเดือน'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={view === key}
+              onClick={() => setView(key)}
+              className={cn(
+                'inline-flex h-7 items-center rounded-full border px-3 text-[11px] font-semibold',
+                view === key ? TONE.info.chip : TONE.neutral.outline,
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <span className="text-[11px] text-muted-foreground">
-          แถว = คน · คอลัมน์ = วัน · กดช่องเวลา = เปิดรายละเอียด/จัดการรอบนั้น · กดหัววัน = ดูเฉพาะวันนั้น
+          {view === 'action'
+            ? 'เฉพาะคนที่มีงานค้างจริง — ของค้างขึ้นก่อน · กดแถวเพื่อจัดการสายนั้น'
+            : 'แถว = คน · คอลัมน์ = วัน · กดช่องเวลา = เปิดรายละเอียด/จัดการรอบนั้น · กดหัววัน = ดูเฉพาะวันนั้น'}
         </span>
-        {activeRound ? (
+        {view === 'month' && activeRound ? (
           <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', TONE.info.chip)}>
             กำลังดู {roundTabLabel(activeRound)} · เฉพาะเดือนนี้
           </span>
         ) : null}
-        <div className="ml-auto flex items-center gap-1">
+        <div className={cn('ml-auto flex items-center gap-1', view === 'action' && 'hidden')}>
           <button
             type="button"
             onClick={() => onMonthChange(shiftMonth(month, -1))}
@@ -213,7 +251,99 @@ const FollowPlanningCalendar: React.FC<{
         ))}
       </div>
 
-      {monthRows.length === 0 ? (
+      {view === 'action' ? (
+        <div>
+          {/* สรุปหัวหน้า — นับ "คน" ไม่ใช่ "สาย" · เขียนกำกับว่าช่องไหนซ้อนกันได้ */}
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className={cn('rounded-full px-2.5 py-1 font-semibold', TONE.neutral.chip)}>
+              ต้องลงมือ {actionSummary.people.toLocaleString('th-TH')} คน
+            </span>
+            <span className={cn('rounded-full px-2.5 py-1 font-semibold', TONE.warn.chip)}>
+              เลยเวลานัดยังไม่มีผล {actionSummary.overduePeople.toLocaleString('th-TH')} คน
+            </span>
+            <span className={cn('rounded-full px-2.5 py-1 font-semibold', TONE.info.chip)}>
+              มีนัดวันนี้ {actionSummary.todayPeople.toLocaleString('th-TH')} คน
+            </span>
+            <span className={cn('rounded-full px-2.5 py-1 font-semibold', TONE.primary.chip)}>
+              สายที่ต้องตามผล {actionSummary.waitingResultCalls.toLocaleString('th-TH')} สาย
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              ⚠️ "เลยเวลานัด" กับ "มีนัดวันนี้" ซ้อนกันได้ (นัดเช้าวันนี้แล้วเลยเวลา) — อย่าบวกกัน
+            </span>
+          </div>
+
+          {actions.length === 0 ? (
+            <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.success.soft)}>
+              ไม่มีใครค้างเลย — ทั้งของค้างและนัดวันนี้เคลียร์หมดแล้ว
+              {activeRound ? ` (กำลังดู ${roundTabLabel(activeRound)})` : ''}
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60 rounded-xl border border-border">
+              {actions.map(({ row, overdue, today: todayRounds }) => (
+                <li key={row.group.key} className="px-3 py-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-xs font-bold text-foreground">{row.group.name}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {row.group.unitName || row.group.phone}
+                    </span>
+                    {overdue.length > 0 ? (
+                      <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', TONE.warn.chip)}>
+                        เลยเวลานัด {overdue.length} สาย — ต้องตามผล
+                      </span>
+                    ) : null}
+                    {todayRounds.length > 0 ? (
+                      <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', TONE.info.chip)}>
+                        นัดวันนี้ {todayRounds.length} สาย
+                      </span>
+                    ) : null}
+                  </div>
+                  {/* ทุกสายของคนนี้ (รวมสายที่จบแล้ว) — จะได้เห็นว่ารอบก่อนคุยไว้ว่าอะไร */}
+                  <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                    {(allCalls?.get(row.group.key) ?? row.rounds).map((r) => {
+                      const slot = followRoundSlot(r.entry);
+                      const ai = roundAiSummary(r);
+                      return (
+                        <li key={r.entry.id} className="min-w-[200px] max-w-[320px]">
+                          <button
+                            type="button"
+                            onClick={() => onOpenCell(row, r.ymd ?? today, [r])}
+                            className="w-full text-left"
+                            title="กดเพื่อดูรายละเอียดและจัดการสายนี้"
+                          >
+                            <span className="flex items-center gap-1">
+                              <span className="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+                                สายที่ {slot ?? '—'} · {r.time ?? '—'}
+                              </span>
+                              <span
+                                className={cn(
+                                  'inline-flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium',
+                                  TONE[roundTone(r)].chip,
+                                  r.state === 'cancelled' && 'opacity-60',
+                                )}
+                              >
+                                {isGoodResult(r) ? <Check className="h-3 w-3 shrink-0" aria-hidden /> : null}
+                                <span className="truncate">{roundResultLabel(r)}</span>
+                              </span>
+                            </span>
+                            {ai ? (
+                              <span
+                                className="mt-0.5 line-clamp-2 block text-[10px] leading-snug text-muted-foreground"
+                                title={ai}
+                              >
+                                {ai}
+                              </span>
+                            ) : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : monthRows.length === 0 ? (
         <p className={cn('rounded-xl border px-3 py-4 text-center text-xs text-muted-foreground', TONE.neutral.soft)}>
           เดือนนี้ไม่มีนัดโทรของใครเลย
           {activeRound ? ` ใน "${roundTabLabel(activeRound)}" — กดรอบอื่นข้างบนเพื่อดูรอบนั้น` : ''}
