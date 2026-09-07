@@ -243,7 +243,14 @@ export default function AiCallFlowPanel({
               size="sm"
               title={t.hint}
               onClick={() => setSource(t.id)}
-              className={cn(source === t.id && (v2 ? 'bg-accent text-accent-foreground' : 'bg-white/25'))}
+              aria-pressed={source === t.id}
+              /* 🔴 ตัวที่ถูกเลือกต้องแยกจากตัวที่ไม่ถูกเลือกให้ออก (audit 7 ก.ย. 2569 · งง-5)
+                 เดิมโฉมใหม่ใช้ `bg-accent` จาง ๆ อย่างเดียว กวาดตาแล้วดูเหมือนกันหมด
+                 ⇒ ใช้สีเน้นสีเดียวของโฉมใหม่ (เบอร์กันดี = `primary`) ทั้งขอบ พื้นจาง และตัวหนังสือ */
+              className={cn(
+                source === t.id &&
+                  (v2 ? 'border-primary/50 bg-primary/10 font-semibold text-primary' : 'bg-white/25'),
+              )}
             >
               {t.label}
             </Button>

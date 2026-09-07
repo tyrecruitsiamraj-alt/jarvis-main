@@ -24,6 +24,19 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full",
         outline:
           "border border-border bg-background/70 text-foreground hover:bg-accent hover:text-accent-foreground",
+        /**
+         * 🔴 **ปุ่มรองที่ "มองเห็นขอบจริง"** (7 ก.ย. 2569 · แก้ งง-5 ของ
+         * `docs/audit-v1-v2-functions-2569-09-07.md`)
+         *
+         * โฉมใหม่แปลงปุ่มบนแถบหัวจาก `hero` (ขาวโปร่งบนพื้นกรมท่า) เป็น `outline`
+         * ซึ่งเป็น `border-border` + `bg-background/70` — บนแถบหัว **พื้นขาว** ของโฉมใหม่
+         * ทั้งขอบและพื้นแทบเท่าพื้น ปุ่มจึงกลืนหายไป น้ำหนักสายตาหล่นจนคนหาไม่เจอ
+         * ⇒ variant นี้ = ขอบหมึกจริง (สืบจาก `--foreground` = กรมท่า/ขาวตามธีม) + พื้นทึบ
+         * ⚠️ **ห้ามไปแก้ `outline` ตัวเดิม** — ทั้งระบบใช้อยู่ รวมทั้งโฉมเดิม (v1) ที่ห้ามแตะ
+         * ตัวนี้จึงเป็นของใหม่ที่ **ใช้เฉพาะจุดที่โฉมใหม่ต้องการ** (ดูการแปลง variant ข้างล่าง)
+         */
+        outlineStrong:
+          "border border-foreground/25 bg-background text-foreground shadow-sm hover:border-foreground/40 hover:bg-accent hover:text-accent-foreground",
         secondary:
           "border border-border bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground rounded-full",
@@ -73,9 +86,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
      * ปุ่ม `hero`/`heroSolid` ถูกออกแบบมาให้อ่านออกบนพื้นเข้มเท่านั้น พอแถบหัวกลายเป็น
      * พื้นขาว ปุ่มขาวโปร่งจะหายไปกับพื้น ⇒ แปลงเป็นปุ่มมาตรฐานของธีมให้อัตโนมัติ
      * (แปลงที่นี่ที่เดียว ทุกหน้าที่ใช้ปุ่มบนแถบหัวได้ตามหมด · ปิดสวิตช์ = กลับของเดิม)
+     *
+     * ⚠️ แก้ปลายทางของ `hero` จาก `outline` → `outlineStrong` (7 ก.ย. 2569) เพราะ
+     * `outline` ยังจางเกินไปบนพื้นขาว — เจ้าของหาปุ่มบนแถบหัวไม่เจอ (audit งง-5)
+     * `heroSolid` ยังเป็น `default` (เบอร์กันดี) = ปุ่มเด่นปุ่มเดียวของหน้าเหมือนเดิม
      */
     const v2 = useUiV2();
-    const resolved = v2 && variant === "hero" ? "outline" : v2 && variant === "heroSolid" ? "default" : variant;
+    const resolved =
+      v2 && variant === "hero"
+        ? "outlineStrong"
+        : v2 && variant === "heroSolid"
+          ? "default"
+          : variant;
     return <Comp className={cn(buttonVariants({ variant: resolved, size, className }))} ref={ref} {...props} />;
   },
 );

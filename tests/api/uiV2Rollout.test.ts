@@ -129,6 +129,36 @@ describe('เฟส 5 ต้องลงที่แผงตัวจริง 
   });
 });
 
+/**
+ * ═══ จุดยึดสายตาหน้าแรก — "ของอยู่ครบ แต่หายาก" ═══
+ * ที่มา: `docs/audit-v1-v2-functions-2569-09-07.md` §5 (งง-1 · งง-4 · งง-5)
+ * เจ้าของเปิด v2 มาแล้วงงจนไม่กล้าไปหน้าอื่น
+ */
+describe('โฉมใหม่ต้องมีจุดยึดสายตา ไม่ใช่ผืนขาวติดกันหมด', () => {
+  it('🔴 งง-4 · หน้าแรกมีเส้นแบ่งระหว่าง deck กับบอร์ดทีม (โฉมใหม่เท่านั้น)', () => {
+    const page = read('src/pages/HomePage.tsx');
+    expect(page).toMatch(/uiV2 \? \([\s\S]{0,400}ภาพรวมทั้งระบบ/);
+  });
+
+  it('🔴 งง-5 · ปุ่มบนแถบหัวของโฉมใหม่ต้องมีขอบที่มองเห็นจริง', () => {
+    const btn = read('src/components/ui/button.tsx');
+    // variant ใหม่ต้องอยู่ที่ button.tsx ที่เดียว (กติกา "ห้ามปั้นปุ่มเอง")
+    expect(btn).toContain('outlineStrong:');
+    expect(btn).toMatch(/variant === "hero"\s*\?\s*"outlineStrong"/);
+    // ⚠️ ห้ามแตะ variant `outline` ตัวเดิม — v1 ทั้งระบบใช้อยู่
+    expect(btn).toContain('outline:\n          "border border-border bg-background/70');
+    // ปุ่มเบอร์กันดียังเหลือใบเดียวต่อแถบ (heroSolid → default)
+    expect(btn).toMatch(/variant === "heroSolid"\s*\n?\s*\?\s*"default"/);
+  });
+
+  it('ปุ่มรองบนแถบบอร์ดรับสมัคร + ปุ่มต้นทางของแผง AI โทร แยกออกจากพื้นได้', () => {
+    expect(read('src/components/jobs/RecruitBoardTools.tsx')).toContain("'outlineStrong' as const");
+    const ai = read('src/components/matching/AiCallFlowPanel.tsx');
+    expect(ai).toContain('aria-pressed={source === t.id}');
+    expect(ai).toMatch(/v2 \? 'border-primary\/50 bg-primary\/10/);
+  });
+});
+
 describe('CSS ที่ตายแล้วต้องไม่ค้างในไฟล์สไตล์', () => {
   const css = read('src/index.css');
 

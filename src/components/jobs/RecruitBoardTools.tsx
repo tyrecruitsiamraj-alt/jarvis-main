@@ -166,6 +166,13 @@ const RecruitBoardTools: React.FC<{
   const btnVariant = (key: RmToolbarKey) => {
     // โฉมใหม่: แถบหัวเป็นพื้นขาวแล้ว ⇒ ใช้ปุ่มมาตรฐานเหมือนบนพื้นสว่าง (5 ก.ย. 2569)
     if (variant === 'onDark' && !v2) return key === 'link' ? ('heroSolid' as const) : ('hero' as const);
+    /**
+     * ⚠️ ปุ่มรองบนแถบหัวขาวใช้ `outlineStrong` ไม่ใช่ `outline` (7 ก.ย. 2569 · audit งง-5)
+     * `outline` เป็นขอบ `--border` + พื้น `--background/70` ซึ่งบนแถบขาวแทบเท่าพื้น
+     * ⇒ ปุ่ม "ตั้งค่าบอร์ด" มองไม่เห็นว่าเป็นปุ่ม · `outlineStrong` มีขอบหมึกจริง
+     * 🔴 ปุ่มเบอร์กันดี (`default`) ยังเหลือใบเดียวคือ "สร้างลิงก์" ตามกติกาโฉมใหม่
+     */
+    if (v2) return key === 'link' ? ('default' as const) : ('outlineStrong' as const);
     return key === 'link' ? ('default' as const) : ('outline' as const);
   };
 
