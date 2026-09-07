@@ -21,7 +21,7 @@
  */
 import * as React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ListChecks } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
@@ -282,6 +282,32 @@ const HomeDeckV2: React.FC<{
           </ol>
         </>
       ) : null}
+
+      {/* ── ทางเข้าหน้า "คิวงานของฉัน" (`/work`) — ระดับรอง ปิดท้ายผืน ──
+          🔴 แก้ งง-6 ของ `docs/audit-v1-v2-functions-2569-09-07.md` (ข้อเสนอที่ 7):
+          หน้า `/work` มีมาตั้งแต่ 5 ก.ย. 2569 แต่เข้าได้ทาง **เมนู burger ทางเดียว**
+          ⇒ คนที่ไม่เปิดเมนูไม่มีวันรู้ว่ามีหน้านี้ · และคนที่บังเอิญเจอก็ไม่รู้ว่ามัน
+          ต่างจากคิวข้างบนยังไง ⇒ ใส่ทั้ง **ทางเข้า** และ **ประโยคบอกว่ามันคืออะไร**
+
+          ⚠️ **v1 ไม่เห็นแถวนี้เลย** — ไฟล์นี้ทั้งไฟล์ถูกเรนเดอร์เฉพาะตอนเปิดสวิตช์
+          (`HomePage.tsx` เลือก `<HomeDeckV2>` เมื่อ `uiV2` เท่านั้น · ปิดสวิตช์ได้
+          `<CommandDeck>` ของเดิมซึ่งไม่มีลิงก์นี้) ⇒ ไม่ต้องเช็กธงซ้ำในไฟล์นี้
+          ⚠️ **ปุ่มเบอร์กันดีของหน้านี้ถูกจองไว้แล้ว** โดยปุ่ม "ไปทำงาน" ของงานถัดไป
+          ตัวนี้จึงเป็นปุ่มขอบ (`outlineStrong`) = ทางเลือกรอง ไม่แย่งสายตาพระเอก
+          ⚠️ อยู่ท้ายสุดเสมอ (นอกเงื่อนไข `head` / `rest`) — วันที่งานว่างก็ยังหาเจอ */}
+      <Rule2 />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-6 py-4 lg:px-8">
+        <p className="max-w-[56ch] text-[11.5px] leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">คิวงานของฉัน</span> — คิวชุดเดียวกับข้างบน
+          แต่รวมไว้หน้าเดียว กดแถวไหนแล้วทำต่อได้เลยในหน้านั้น ไม่ต้องเปิดหลายหน้า
+        </p>
+        <Button asChild variant="outlineStrong" size="sm">
+          <Link to="/work">
+            <ListChecks aria-hidden />
+            เปิดคิวงานของฉัน
+          </Link>
+        </Button>
+      </div>
     </Sheet2>
   );
 };

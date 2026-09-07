@@ -31,6 +31,43 @@ describe('ปลอดภัยกับ production', () => {
   });
 });
 
+/**
+ * ═══ ทางเข้าหน้านี้ต้อง "หาเจอ" แต่ต้องโผล่เฉพาะโฉมใหม่ ═══
+ * ที่มา: `docs/audit-v1-v2-functions-2569-09-07.md` §5 งง-6 + §6 ข้อเสนอที่ 7 —
+ * หน้า `/work` เข้าได้ทางเมนู burger ทางเดียว คนที่ไม่เปิดเมนูไม่มีวันรู้ว่ามีหน้านี้
+ */
+describe('ทางเข้าหน้า /work ต้องมีสองจุด และเห็นเฉพาะ v2', () => {
+  const deckV2 = read('src/components/home/HomeDeckV2.tsx');
+  const deckV1 = read('src/components/home/CommandDeck.tsx');
+  const drawer = read('src/components/layout/AppNavDrawer.tsx');
+
+  it('จุดที่ 1 · เมนู burger มีรายการ "คิวงานของฉัน"', () => {
+    expect(drawer).toContain('คิวงานของฉัน');
+    expect(drawer).toMatch(/go\('\/work'\)/);
+  });
+
+  it('จุดที่ 2 · หน้าแรกโฉมใหม่มีลิงก์ไป /work พร้อมประโยคอธิบายว่ามันคืออะไร', () => {
+    expect(deckV2).toMatch(/to="\/work"/);
+    expect(deckV2).toContain('คิวงานของฉัน');
+    // งง-6: ไม่ใช่แค่ลิงก์เปล่า ต้องบอกด้วยว่าต่างจากคิวบนหน้าแรกยังไง
+    expect(deckV2).toMatch(/คิวชุดเดียวกับข้างบน[\s\S]{0,80}หน้าเดียว/);
+  });
+
+  it('🔴 ทางเข้าบนหน้าแรกอยู่หลังสวิตช์ — v1 ไม่เห็นอะไรเปลี่ยนเลย', () => {
+    // `HomeDeckV2` ถูกเรนเดอร์เฉพาะกิ่ง uiV2 เท่านั้น (ธงอยู่ที่หน้า ไม่ใช่ในแผง)
+    expect(home).toMatch(/uiV2 \? \(\s*<HomeDeckV2/);
+    // ของเดิมต้องไม่มีทางเข้า — v1 เข้า /work ไปก็โดนเด้งกลับหน้าแรก
+    expect(deckV1).not.toContain('/work');
+  });
+
+  it('🔴 ปุ่มเบอร์กันดีของหน้าแรกยังมีใบเดียว — ทางเข้า /work เป็นปุ่มรอง', () => {
+    // ปุ่ม default (เบอร์กันดี) = ปุ่ม "ไปทำงาน" ของงานถัดไปเท่านั้น
+    expect(deckV2).not.toMatch(/variant="default"/);
+    expect(deckV2).toMatch(/<Button asChild variant="outlineStrong"/);
+    expect((deckV2.match(/<Button asChild(?! variant)/g) ?? []).length).toBe(1);
+  });
+});
+
 describe('ตัวเลขต้องตรงกับหน้าแรก (ห้ามคิดเอง)', () => {
   /** ดึงพารามิเตอร์ที่ป้อนให้ buildNextTasks ออกมาเทียบกันสองไฟล์ */
   const inputsOf = (src: string): string[] => {
