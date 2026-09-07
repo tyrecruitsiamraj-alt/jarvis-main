@@ -19,7 +19,15 @@ const SKINNED = [
   'src/components/ui/button.tsx',
   'src/components/home/TeamBoardPanel.tsx',
   'src/components/matching/AiCallFlowPanel.tsx',
+  /**
+   * ⚠️ `CallFunnelPanel.tsx` **เป็นไฟล์ตาย** — ไม่มีหน้าไหน import ตั้งแต่ 18 ส.ค. 2569
+   * (ถูกแทนด้วย `FollowCallRoundsPanel`) · รอบรื้อ 5 ก.ย. เผลอไปทำเฟส 5 ลงในไฟล์นี้
+   * จึงไม่มีผลกับจอจริงเลย (audit 7 ก.ย. 2569 §1.4) · **ห้ามลบจนเจ้าของสั่ง**
+   * ยังคงไว้ในรายการเพื่อกันของเดิมหาย แต่ตัวจริงของหน้าติดตามคือบรรทัดถัดไป
+   */
   'src/components/follow/CallFunnelPanel.tsx',
+  'src/components/follow/FollowCallRoundsPanel.tsx',
+  'src/pages/aftercare/AftercarePage.tsx',
   'src/components/dashboard/analytics/DashboardHeroStrip.tsx',
   'src/components/jobs/RecruitBoardTools.tsx',
 ];
@@ -88,6 +96,36 @@ describe('ของที่รอบรื้อทำหายต้องก�
     expect(ring).toBeGreaterThan(-1);
     expect(headline).toBeGreaterThan(-1);
     expect(ring, 'วงตัวเลขต้องถูกเรนเดอร์ก่อนหัวเรื่อง').toBeLessThan(headline);
+  });
+});
+
+/**
+ * ═══ เฟส 5 — "ติดตาม + ดูแลหลังเริ่มงาน" ต้องเปลี่ยนจริงเมื่อเปิดสวิตช์ ═══
+ * รอบแรก (5 ก.ย. 2569) ติ๊ก ✅ แต่ลงไปในไฟล์ตาย ⇒ สองหน้านี้ไม่เคยมีกิ่ง v2
+ * (`docs/audit-v1-v2-functions-2569-09-07.md` §1.4 · งง-7)
+ */
+describe('เฟส 5 ต้องลงที่แผงตัวจริง ไม่ใช่ไฟล์ตาย', () => {
+  it('🔴 หน้าติดตามรื้อที่ FollowCallRoundsPanel (แผงที่หน้า Follow เรนเดอร์จริง)', () => {
+    const page = read('src/pages/follow/FollowPage.tsx');
+    expect(page).toContain('<FollowCallRoundsPanel');
+    expect(read('src/components/follow/FollowCallRoundsPanel.tsx')).toContain('useUiV2');
+  });
+
+  it('🔴 หน้าดูแลหลังเริ่มงานมีกิ่ง v2 และใช้แถวตัวเลขมาตรฐาน', () => {
+    const page = read('src/pages/aftercare/AftercarePage.tsx');
+    expect(page).toContain('useUiV2');
+    expect(page).toContain('StatRow2');
+    // สามเลขสรุปเดิมต้องอยู่ครบ ไม่ใช่ยุบทิ้งตอนเปลี่ยนทรง
+    for (const label of ['กำลังดูแล', 'ยังไม่ระบุวันเริ่มงาน', 'เลยรอบที่ควรโทร']) {
+      expect(page.split(label).length - 1, label).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('CallFunnelPanel เป็นไฟล์ตาย — ยังอยู่เป็นทางถอย แต่ต้องไม่มีหน้าไหนเรนเดอร์', () => {
+    for (const f of ['src/pages/follow/FollowPage.tsx', 'src/pages/matching/MatchingPage.tsx']) {
+      expect(read(f), f).not.toMatch(/<CallFunnelPanel/);
+    }
+    expect(fs.existsSync(path.join(root, 'src/components/follow/CallFunnelPanel.tsx'))).toBe(true);
   });
 });
 

@@ -6,6 +6,8 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { useListPagination } from '@/hooks/useListPagination';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
+import { Sheet2, SheetHead2, StatRow2, Stat2 } from '@/components/shared/ui-v2/Sheet2';
+import { useUiV2 } from '@/lib/uiV2';
 import { EM_DASH } from '@/lib/displayFallback';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import {
@@ -40,6 +42,20 @@ import { LoaderCircle, RefreshCw, UserCheck, Users } from 'lucide-react';
  */
 const AftercarePage: React.FC = () => {
   const navigate = useNavigate();
+  /**
+   * ═══ 🔴 โฉมใหม่ (เฟส 5 · ทำจริง 7 ก.ย. 2569) ═══
+   * แผน `docs/plan-ui-overhaul-2569-09-05.md` ติ๊กเฟส 5 ว่า ✅ แต่หน้านี้ไม่ได้ใช้
+   * `StatCard` และไม่ได้ใช้ `PageHeroStrip` ⇒ **ไม่มีกิ่ง v2 เลย** เปิดสวิตช์แล้วเห็น
+   * หน้าเดิม ปนอยู่กับหน้าอื่นที่เป็นผืนขาว จนอ่านได้ว่า "สวิตช์พังครึ่งระบบ"
+   * (`docs/audit-v1-v2-functions-2569-09-07.md` §1.4 · งง-7)
+   *
+   * ⚠️ **เปลือกเท่านั้น** — สามเลขสรุปเดิม (กำลังดูแล · ยังไม่ระบุวันเริ่มงาน ·
+   * เลยรอบที่ควรโทร) พร้อมคำอธิบายใต้เลข อยู่ครบทุกตัว · เปลี่ยนจากการ์ดพาสเทล 3 ใบ
+   * เป็น **แถวตัวเลขมาตรฐาน** บนผืนขาวใบเดียว ตามที่แผนเฟส 5 เขียนไว้ตั้งแต่ต้น
+   * · สีที่มีความหมายยังอยู่ครบ (ฟ้า=กำลังดูแล · เหลือง/เขียว=ยังไม่ระบุวัน · แดง/เขียว=เลยรอบ)
+   * · ปฏิทิน/ลิสต์/ปุ่ม/ตัวกรอง **ไม่ถูกแตะสักบรรทัด** (หน้านี้เพิ่งรื้อตรรกะรอบ ก.ย.)
+   */
+  const uiV2 = useUiV2();
   const [items, setItems] = useState<AftercarePerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +147,30 @@ const AftercarePage: React.FC = () => {
 
       <div className="mt-4 space-y-3">
         {/* สรุปที่ลงมือได้ (7.5) — ทุกเลขบอกหน่วยและมีทางไปต่อ */}
+        {uiV2 ? (
+          <Sheet2 aria-label="สรุปการดูแลหลังเริ่มงาน">
+            <SheetHead2 eyebrow="ภาพรวมการดูแล" />
+            {/* คอลัมน์ที่ 3 ยืดเต็มแถวบนมือถือ — ไม่งั้นเหลือช่องว่างครึ่งแถว */}
+            <StatRow2 className="mt-3 sm:grid-cols-3 max-sm:[&>*:last-child]:col-span-2">
+              <Stat2
+                value={`${open.length.toLocaleString('th-TH')} คน`}
+                label="กำลังดูแล"
+                valueClassName={TONE.info.value}
+              />
+              <Stat2
+                value={`${needStartDate.length.toLocaleString('th-TH')} คน`}
+                label="ยังไม่ระบุวันเริ่มงาน"
+                hint="ตั้งรอบโทรไม่ได้จนกรอกวัน"
+                valueClassName={needStartDate.length > 0 ? TONE.warn.value : TONE.success.value}
+              />
+              <Stat2
+                value={`${overdueCount.toLocaleString('th-TH')} คน`}
+                label="เลยรอบที่ควรโทร"
+                valueClassName={overdueCount > 0 ? TONE.danger.value : TONE.success.value}
+              />
+            </StatRow2>
+          </Sheet2>
+        ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div className={cn('rounded-xl border px-3 py-2', TONE.info.soft)}>
             <p className={cn('text-[11px] font-medium', DASH.muted)}>กำลังดูแล</p>
@@ -152,6 +192,7 @@ const AftercarePage: React.FC = () => {
             </p>
           </div>
         </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm"

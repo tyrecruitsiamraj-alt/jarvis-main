@@ -33,6 +33,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Rule2 } from '@/components/shared/ui-v2/Sheet2';
+import { useUiV2 } from '@/lib/uiV2';
 import { HelpCircle, Phone, RefreshCw } from 'lucide-react';
 
 /**
@@ -58,6 +60,17 @@ const ROUND_HELP_TEXT =
  * 🔴 **ยอดกับรายชื่อต้องมาจากชุดเดียวกัน** — ทั้งเลขบนกล่องและชื่อใน popup นับจาก
  * `entries` ชุดเดียว (เคยแยกเส้นแล้วเลขไม่ตรงกับชื่อ) ·
  * เงื่อนไขแบ่งถังอยู่ที่ `callOutcomeBuckets.ts` / `followRoundBuckets.ts` ที่เดียว
+ *
+ * ═══ 🔴 โฉมใหม่ (เฟส 5 · ทำจริง 7 ก.ย. 2569) ═══
+ * รอบรื้อ 5 ก.ย. ติ๊กเฟส 5 ว่า ✅ แต่ไปแก้ที่ `CallFunnelPanel` ซึ่งเป็น **ไฟล์ตาย**
+ * (ไม่มีหน้าไหน import ตั้งแต่ 18 ส.ค. 2569 · ตัวจริงคือแผงนี้) ⇒ หน้าติดตามไม่เคยถูกรื้อ
+ * เปิดสวิตช์แล้วเห็นหน้าเดิม ปนอยู่กับหน้าอื่นที่เป็นผืนขาว จนอ่านได้ว่า "สวิตช์พัง"
+ * (`docs/audit-v1-v2-functions-2569-09-07.md` §1.4 · งง-7)
+ *
+ * ⚠️ **เปลือกล้วน ๆ** — หน้านี้เพิ่งถูกรื้อ *ตรรกะ* รอบ ก.ย. 2569 จึงห้ามแตะนิยาม/การนับ/
+ * ปฏิทิน · ที่เปลี่ยนคือคลาสสีและระยะเท่านั้น: ผืนขาวใบเดียวคั่นด้วยเส้นบาง แทนกล่อง
+ * พาสเทลซ้อนกล่อง · **สีที่มีความหมายอยู่ครบ** (จุด · ตัวเลข · ป้าย ยังเป็นสีโทนเดิม)
+ * และพื้นพาสเทลเหลือเฉพาะช่อง "ต้องลงมือ" ซึ่งเป็นกติกาเดิมของ TONE อยู่แล้ว
  */
 
 /** รายละเอียดของคนหนึ่งคนใน popup — เจ้าของขอ "ชื่อพร้อมรายละเอียดของแต่ละคน" */
@@ -137,6 +150,8 @@ export default function FollowCallRoundsPanel({
    */
   onRoundChange?: (slot: number) => void;
 }) {
+  /** โฉมใหม่อยู่ไหม — เปลี่ยนแค่คลาสสี/ระยะ โครง JSX และข้อมูลเส้นเดียวกันทั้งสองโฉม */
+  const v2 = useUiV2();
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
   const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
   /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
@@ -191,11 +206,28 @@ export default function FollowCallRoundsPanel({
   };
 
   return (
-    <div className={cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card)}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div
+      className={cn(
+        v2
+          ? 'overflow-hidden rounded-2xl border border-border bg-card shadow-sm'
+          : cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card),
+      )}
+    >
+      <div
+        className={cn(
+          'flex flex-wrap items-start justify-between gap-2',
+          v2 && 'px-4 pb-3 pt-4 md:px-5',
+        )}
+      >
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <h2 className={cn('text-sm font-bold', DASH.cellStrong)}>การโทรของงาน Follow</h2>
+            <h2
+              className={cn(
+                v2 ? 'text-[12.5px] font-medium text-primary' : cn('text-sm font-bold', DASH.cellStrong),
+              )}
+            >
+              การโทรของงาน Follow
+            </h2>
             {/* Wave 2.1 (5 ก.ย. 2569): บนมือถือคำอธิบายยาวกินจอไปทั้งหน้าจอแรก
                 ⇒ พับไว้หลังไอคอน (?) — ข้อความ **ตัวเดียวกันเป๊ะ** ไม่มีคำไหนหาย
                 เดสก์ท็อป (sm ขึ้นไป) ยังโชว์เต็มเหมือนเดิม จึงซ่อนไอคอนที่ sm */}
@@ -244,7 +276,18 @@ export default function FollowCallRoundsPanel({
           จะได้กวาดตาเห็นตั้งแต่ยังไม่กดว่ารอบไหนมีของค้าง */}
       {/* Wave 2.1: จอ < sm เรียงตั้ง 1 คอลัมน์ (การ์ดละบรรทัดกระชับ) — เดิม 3 ใบเรียงนอน
           บน 375px ป้ายถูกตัดเหลือ "รอบโทร…" ทั้งสามใบ อ่านไม่ออกว่าใบไหนรอบไหน */}
-      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+      {v2 ? <Rule2 /> : null}
+      <div
+        className={cn(
+          v2
+            ? /* โฉมใหม่: แถวเดียวคั่นเส้นบาง ไม่ใช่การ์ดพาสเทล 3 ใบลอย ๆ ในกล่อง */
+              cn(
+                'grid grid-cols-1 sm:grid-cols-3',
+                '[&>*]:border-border/60 max-sm:[&>*:not(:first-child)]:border-t sm:[&>*:not(:first-child)]:border-l',
+              )
+            : 'grid grid-cols-1 gap-1.5 sm:grid-cols-3',
+        )}
+      >
         {[1, 2, 3].map((slot) => {
           const counts = countsByRound.get(slot);
           const rows = roundRows.get(slot) ?? [];
@@ -259,8 +302,20 @@ export default function FollowCallRoundsPanel({
               onClick={() => pickRound(slot)}
               aria-pressed={active}
               className={cn(
-                'rounded-xl border px-2.5 py-2 text-left transition-colors',
-                active ? cn(tone.soft, 'ring-2 ring-ring') : cn(TONE.neutral.soft, TONE.neutral.softHover),
+                'text-left transition-colors',
+                v2
+                  ? /* เลือกอยู่ = พื้น hover ของธีม + เส้นเน้นเบอร์กันดี (สีเน้นสีเดียวของโฉมใหม่)
+                       ⚠️ จุดสี/ตัวเลข/ป้ายผลโทร ยังเป็นสีโทนเดิม = ความหมายไม่หาย */
+                    cn(
+                      'px-4 py-3 md:px-5',
+                      active
+                        ? 'bg-accent ring-1 ring-inset ring-primary/40'
+                        : 'hover:bg-accent/60',
+                    )
+                  : cn(
+                      'rounded-xl border px-2.5 py-2',
+                      active ? cn(tone.soft, 'ring-2 ring-ring') : cn(TONE.neutral.soft, TONE.neutral.softHover),
+                    ),
               )}
             >
               {/* มือถือ: ป้าย + ตัวเลขอยู่บรรทัดเดียวกัน (การ์ดเตี้ย เห็นครบสามรอบโดยไม่ต้องเลื่อน)
@@ -319,10 +374,17 @@ export default function FollowCallRoundsPanel({
         const signal = roundSignal(counts, overdueWaitingCount(roundRows.get(activeRound) ?? []));
         const signalTone = TONE[signal.tone];
         return (
-          <div className="space-y-2">
+          <div className={cn(v2 ? '' : 'space-y-2')}>
             {/* รอบว่าง = ไม่มีข้อความ ไม่ต้องเรนเดอร์แถบ (เจ้าของสั่ง 18 ส.ค. 2569) */}
             {signal.text ? (
-              <div className={cn('flex items-center gap-2 rounded-xl border px-3 py-2', signalTone.soft)}>
+              <div
+                className={cn(
+                  'flex items-center gap-2',
+                  v2
+                    ? 'border-t border-border/70 px-4 py-2.5 md:px-5'
+                    : cn('rounded-xl border px-3 py-2', signalTone.soft),
+                )}
+              >
                 <span className={cn('h-2 w-2 shrink-0 rounded-full', signalTone.dot)} aria-hidden />
                 <p className={cn('text-[11px] font-semibold', signalTone.value)}>{signal.text}</p>
               </div>
@@ -336,13 +398,27 @@ export default function FollowCallRoundsPanel({
               const text = followCallResultSummary(rows);
               if (!text) {
                 return rows.length > 0 ? (
-                  <p className={cn('text-[11px]', DASH.muted)}>
+                  <p
+                    className={cn(
+                      'text-[11px]',
+                      v2 && 'border-t border-border/70 px-4 py-2.5 md:px-5',
+                      DASH.muted,
+                    )}
+                  >
                     สายนี้ยังไม่มีผลกลับจาก AI เลย
                   </p>
                 ) : null;
               }
               return (
-                <p className={cn('rounded-xl border px-3 py-2 text-[11px] font-semibold', TONE.info.soft, TONE.info.value)}>
+                <p
+                  className={cn(
+                    'text-[11px] font-semibold',
+                    v2
+                      ? 'border-t border-border/70 px-4 py-2.5 md:px-5'
+                      : cn('rounded-xl border px-3 py-2', TONE.info.soft),
+                    TONE.info.value,
+                  )}
+                >
                   {text}
                 </p>
               );
@@ -350,7 +426,17 @@ export default function FollowCallRoundsPanel({
 
             {/* Wave 2.1: มือถือ 2 คอลัมน์ (ช่องกว้างพอให้ป้ายอ่านจบ) — เดิม 4 ช่องต่อแถว
                 บน 375px ป้ายถูกตัดเป็น "ทั้งห…" "กำลัง…" "โทรไม่…" · ช่องครบ 7 ช่องเท่าเดิม */}
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-7">
+            <div
+              className={cn(
+                v2
+                  ? cn(
+                      'grid grid-cols-2 border-t border-border/70 sm:grid-cols-7',
+                      '[&>*]:border-border/50 [&>*:not(:first-child)]:border-l',
+                      'max-sm:[&>*:nth-child(odd)]:border-l-0 max-sm:[&>*:nth-child(n+3)]:border-t',
+                    )
+                  : 'grid grid-cols-2 gap-1.5 sm:grid-cols-7',
+              )}
+            >
               {FOLLOW_ROUND_BUCKETS.map((b) => {
                 const n = counts[b];
                 const vis = bucketVisual(b, n);
@@ -363,13 +449,28 @@ export default function FollowCallRoundsPanel({
                     title={FOLLOW_ROUND_BUCKET_HINT[b]}
                     onClick={() => openBucketDialog(activeRound, b)}
                     className={cn(
-                      'rounded-lg border px-2 py-1.5 text-left transition-colors',
-                      // ช่องว่าง: สีประจำตัวยังอยู่ (จุด+ป้าย) แต่พื้นไม่ติดสี ไม่แย่งสายตา
-                      vis.muted
-                        ? cn('cursor-default border-border/60 bg-background/40 opacity-75')
-                        : cn(tone.soft, tone.softHover, 'hover:brightness-105'),
-                      // ช่องที่ต้องลงมือ = กรอบหนา กวาดตาเจอก่อนเพื่อน แม้เลขน้อย
-                      vis.actionable ? 'border-2 font-bold shadow-sm' : '',
+                      'text-left transition-colors',
+                      v2
+                        ? /* โฉมใหม่: ช่องอยู่บนผืนขาวคั่นเส้นบาง · **พื้นพาสเทลเหลือเฉพาะช่องที่
+                             ต้องลงมือ** ตามกติกาเดิมของ TONE ("ใส่เกิน 1-2 ที่ต่อหน้าแล้วจะ
+                             ไม่เหลือของที่เด่นจริง") · สีจุด/ป้าย/ตัวเลขของทุกช่องยังอยู่ครบ */
+                          cn(
+                            'px-3 py-3',
+                            vis.muted
+                              ? 'cursor-default opacity-70'
+                              : vis.actionable
+                                ? cn(tone.soft, tone.softHover, 'font-bold')
+                                : 'hover:bg-accent/60',
+                          )
+                        : cn(
+                            'rounded-lg border px-2 py-1.5',
+                            // ช่องว่าง: สีประจำตัวยังอยู่ (จุด+ป้าย) แต่พื้นไม่ติดสี ไม่แย่งสายตา
+                            vis.muted
+                              ? cn('cursor-default border-border/60 bg-background/40 opacity-75')
+                              : cn(tone.soft, tone.softHover, 'hover:brightness-105'),
+                            // ช่องที่ต้องลงมือ = กรอบหนา กวาดตาเจอก่อนเพื่อน แม้เลขน้อย
+                            vis.actionable ? 'border-2 font-bold shadow-sm' : '',
+                          ),
                     )}
                   >
                     {/* จุดสี + ป้ายสีโทน — เดิมป้ายเป็นเทาทุกช่อง เห็นสีแค่ตัวเลข
@@ -403,13 +504,27 @@ export default function FollowCallRoundsPanel({
       })()}
 
       {entries.length === 0 ? (
-        <p className={cn('rounded-xl border px-3 py-2 text-[11px]', TONE.neutral.soft, DASH.muted)}>
+        <p
+          className={cn(
+            'text-[11px]',
+            v2
+              ? 'border-t border-border/70 px-4 py-2.5 md:px-5'
+              : cn('rounded-xl border px-3 py-2', TONE.neutral.soft),
+            DASH.muted,
+          )}
+        >
           ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
         </p>
       ) : null}
       {/* ⚠️ ช่องพวกนี้ **ซ้อนกันได้** — "โทรติด" กับ "ไป" คนละแกน (สถานะสาย vs ผลปิดงาน)
           บวกทุกช่องแล้วมากกว่า "ทั้งหมด" เป็นเรื่องปกติ ไม่ใช่บั๊ก */}
-      <p className={cn('text-[10px]', DASH.muted)}>
+      <p
+        className={cn(
+          'text-[10px]',
+          v2 && 'border-t border-border/70 px-4 py-3 md:px-5',
+          DASH.muted,
+        )}
+      >
         รอโทร/กำลังโทร/โทรติด/โทรไม่ติด = สถานะของสาย · ไป/ไม่ไป = ผลปิดงานติดตาม —
         คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
       </p>
