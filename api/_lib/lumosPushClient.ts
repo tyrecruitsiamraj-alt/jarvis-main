@@ -18,7 +18,7 @@
  *   GET    /api/public/v1/events?status=&since=&limit=                 → listEvents()
  */
 
-import { logError, logInfo } from './logger.js';
+import { logError, logInfo, logWarn } from './logger.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -139,21 +139,55 @@ export type LumosPushReminderRecord = {
 
 // ─── HTTP helper ─────────────────────────────────────────────────────────────
 
+/**
+ * retry เฉพาะตอน `fetch()` เอง throw (DNS หาไม่เจอ/ต่อปลายทางไม่ติด/connection reset
+ * กลางทาง — ขึ้น "fetch failed" เฉย ๆ ไม่มีรายละเอียด) **ไม่ retry ตอนได้ HTTP response
+ * กลับมาแล้ว** (4xx/5xx ปล่อยให้ผู้เรียกจัดการเอง ไม่ใช่ปัญหาที่ retry แก้ได้)
+ *
+ * เจอจริง 8 ก.ย. 2569: ส่งคิว follow 16 รายการ ผ่านแค่ 4 ที่เหลือ "fetch failed"
+ * ทั้งที่ payload/credential ถูกทุกตัว — เข้าข่ายเครือข่ายหลุดเป็นระยะ ไม่ใช่ยิงพร้อมกัน
+ * (ทุก request คือ POST /api/follow แยกกันทีละครั้ง ไม่ใช่ยิง 16 ทีเดียว)
+ *
+ * ปลอดภัยที่จะส่งซ้ำเพราะทุก endpoint ต้องมีคีย์กันซ้ำฝั่ง Lumos เอง — POST มี
+ * client_interview_id/client_contact_id ต่อ record (Lumos ใช้จับคู่ผลกลับอยู่แล้ว)
+ * และ pushInterviews/pushReminders รับ Idempotency-Key ต่อ batch ด้วย · ส่งซ้ำจึงไม่ทำให้
+ * เกิดสายที่สองไปหาคนจริง
+ */
+const FETCH_MAX_ATTEMPTS = 3;
+const FETCH_RETRY_DELAYS_MS = [300, 900];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function lumosFetch(
   config: LumosPushConfig,
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
   const url = `${config.baseUrl}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
-  return res;
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${config.apiKey}`,
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetch(url, { ...init, headers });
+    } catch (e) {
+      lastErr = e;
+      if (attempt < FETCH_MAX_ATTEMPTS) {
+        logWarn('lumos.fetch.retry', {
+          path,
+          attempt,
+          message: e instanceof Error ? e.message : String(e),
+        });
+        await sleep(FETCH_RETRY_DELAYS_MS[attempt - 1]);
+      }
+    }
+  }
+  throw lastErr;
 }
 
 async function readLumosError(res: Response): Promise<string> {

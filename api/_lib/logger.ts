@@ -27,6 +27,26 @@ export function logWarn(msg: string, fields?: LogFields): void {
 }
 
 /**
+ * ดึงเหตุผลจริงออกจาก `error.cause` — `fetch()` ของ Node (undici) โยน
+ * `TypeError: fetch failed` เสมอไม่ว่าสาเหตุจริงจะเป็นอะไร (DNS หาไม่เจอ/
+ * ต่อปลายทางไม่ติด/TLS ผิดพลาด/timeout) ตัวสาเหตุจริงถูกซ่อนอยู่ใน `.cause`
+ * (บาง network stack ห่อเป็น AggregateError ที่มี `.errors` อีกที)
+ * ไม่ดึงออกมา log ก็จะเห็นแต่ "fetch failed" เฉย ๆ ไล่ต้นเหตุไม่ได้เลย
+ */
+function describeError(err: unknown, depth = 0): unknown {
+  if (depth > 3) return undefined; // กันวนไม่รู้จบถ้า cause อ้างตัวเอง
+  if (!(err instanceof Error)) return err === undefined ? undefined : String(err);
+  const out: Record<string, unknown> = { message: err.message };
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code) out.code = code;
+  if (err instanceof AggregateError && Array.isArray(err.errors)) {
+    out.errors = err.errors.map((e) => describeError(e, depth + 1));
+  }
+  if (err.cause !== undefined) out.cause = describeError(err.cause, depth + 1);
+  return out;
+}
+
+/**
  * มี 5 จุดในระบบเรียกแบบ `logError(msg, e, {context})` มาตลอด แต่ signature เดิม
  * รับแค่ (msg, fields) — Error เลยไปนั่งช่อง fields (spread ไม่ออก เพราะ property
  * ของ Error เป็น non-enumerable) และ context ถูกทิ้งเงียบ ๆ
@@ -38,6 +58,7 @@ export function logError(msg: string, errorOrFields?: unknown, fields?: LogField
     emit('error', msg, {
       message: errorOrFields.message,
       stack: errorOrFields.stack,
+      ...(errorOrFields.cause !== undefined ? { cause: describeError(errorOrFields.cause) } : {}),
       ...fields,
     });
     return;

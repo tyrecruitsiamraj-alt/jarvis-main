@@ -379,12 +379,19 @@ export async function enqueueLumosInterviewForApplications(
     const pushPayloads = items
       .filter((i) => addedSet.has(i.personRef))
       .map((i) => i.payload as unknown as LumosPushInterviewRecord);
-    try {
-      await pushInterviews(pushPayloads);
-      logInfo('lumos.push.application.ok', { jobId, pushed: pushPayloads.length });
-    } catch (e) {
-      logError('lumos.push.application failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { jobId });
-    }
+    // ไม่รอ push ให้จบก่อนตอบ — ผล enqueue ไม่ได้ขึ้นกับ push สำเร็จอยู่แล้ว (แถวเข้าคิว
+    // แล้วเสมอ, retry ใน lumosFetch ใช้เวลาได้ถึงวินาทีกว่า ไม่ควรให้คนกดปุ่มรอ)
+    void (async () => {
+      try {
+        await pushInterviews(pushPayloads);
+        logInfo('lumos.push.application.ok', { jobId, pushed: pushPayloads.length });
+      } catch (e) {
+        logError('lumos.push.application failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, {
+          jobId,
+          pushed: pushPayloads.length,
+        });
+      }
+    })();
   }
   return { queued: added.length, duplicated, skipped };
 }
@@ -748,12 +755,18 @@ export async function enqueueLumosReminderForSelected(
     const pushPayloads = items
       .filter((i) => addedSet.has(i.personRef))
       .map((i) => i.payload as unknown as LumosPushReminderRecord);
-    try {
-      await pushReminders(pushPayloads);
-      logInfo('lumos.push.reminder.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
-    } catch (e) {
-      logError('lumos.push.reminder.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { jobId: result.jobId });
-    }
+    // ไม่รอ push ให้จบก่อนตอบ — ดูคอมเมนต์เดียวกับเลน application ด้านบน
+    void (async () => {
+      try {
+        await pushReminders(pushPayloads);
+        logInfo('lumos.push.reminder.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
+      } catch (e) {
+        logError('lumos.push.reminder.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, {
+          jobId: result.jobId,
+          pushed: pushPayloads.length,
+        });
+      }
+    })();
   }
   return { queued: added.length, duplicated, skipped };
 }
@@ -823,12 +836,18 @@ export async function enqueueLumosInterviewForSelected(
     const pushPayloads = items
       .filter((i) => addedSet.has(i.personRef))
       .map((i) => i.payload as unknown as LumosPushInterviewRecord);
-    try {
-      await pushInterviews(pushPayloads);
-      logInfo('lumos.push.interview.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
-    } catch (e) {
-      logError('lumos.push.interview.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { jobId: result.jobId });
-    }
+    // ไม่รอ push ให้จบก่อนตอบ — ดูคอมเมนต์เดียวกับเลน application ด้านบน
+    void (async () => {
+      try {
+        await pushInterviews(pushPayloads);
+        logInfo('lumos.push.interview.manual.ok', { jobId: result.jobId, pushed: pushPayloads.length });
+      } catch (e) {
+        logError('lumos.push.interview.manual failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, {
+          jobId: result.jobId,
+          pushed: pushPayloads.length,
+        });
+      }
+    })();
   }
   return { queued: added.length, duplicated, skipped };
 }
@@ -1612,7 +1631,10 @@ export async function enqueueFollowReminder(
   ]);
   logInfo('lumos.dispatch.follow', { followId: entry.id, added, held, suppressed, guarded });
   if (added.length > 0) {
-    await pushFollowReminderToLumos(entry.id, payload);
+    // ไม่รอ push ให้จบก่อนตอบ — ผลคืน 'queued' ไม่ได้ขึ้นกับ push สำเร็จอยู่แล้ว
+    // (แถวเข้าคิวแล้วเสมอ, retry ใน lumosFetch ใช้เวลาได้ถึงวินาทีกว่า ไม่ควรให้คนกดปุ่มรอ —
+    // เจอจริง 8 ก.ย. 2569: เพิ่มติดตามทีละแถวจากหน้าเว็บ 16 แถว รอ push ครบก่อนตอบทุกแถว)
+    void pushFollowReminderToLumos(entry.id, payload);
     return 'queued';
   }
   if (held.length > 0) return 'held';

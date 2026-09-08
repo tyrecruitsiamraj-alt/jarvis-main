@@ -47,6 +47,28 @@ describe('logError — ต้องเก็บทั้ง error และ cont
     expect(c.line().message).toBe('timeout 30s');
     c.restore();
   });
+
+  it('Error มี .cause (เช่น fetch failed ของ undici) → ดึงสาเหตุจริงออกมา log ด้วย', () => {
+    const c = capture();
+    const dnsErr = new Error('getaddrinfo ENOTFOUND api-so-ai-recruit.lumos.co.th');
+    (dnsErr as NodeJS.ErrnoException).code = 'ENOTFOUND';
+    const fetchErr = new Error('fetch failed', { cause: dnsErr });
+    logError('lumos.push.follow failed', fetchErr, { followId: 'f1' });
+    const line = c.line();
+    expect(line.message).toBe('fetch failed');
+    expect(line.cause).toEqual({
+      message: 'getaddrinfo ENOTFOUND api-so-ai-recruit.lumos.co.th',
+      code: 'ENOTFOUND',
+    });
+    c.restore();
+  });
+
+  it('ไม่มี .cause ก็ไม่ใส่คีย์ cause ไปเปล่า ๆ', () => {
+    const c = capture();
+    logError('x.failed', new Error('ธรรมดา'));
+    expect('cause' in c.line()).toBe(false);
+    c.restore();
+  });
 });
 
 describe('เส้นปล่อยชุดโทร — ชื่อคนต้องประกอบจาก first/last จริง', () => {

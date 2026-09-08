@@ -125,3 +125,55 @@ describe('pushReminders / cancelPushedReminder — รูป request ที่�
     expect(init.method).toBe('DELETE');
   });
 });
+
+describe('lumosFetch — retry เมื่อ fetch() เอง throw (เจอจริง 8 ก.ย. 2569: ส่ง 16 ผ่านแค่ 4)', () => {
+  beforeEach(() => {
+    for (const [k, v] of Object.entries(PUSH_ENV)) vi.stubEnv(k, v);
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('fetch() throw 2 ครั้งแรกแล้วสำเร็จรอบ 3 → ไม่โยน error ออกไป (retry กู้ได้)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(okPushResponse(1));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultPromise = pushReminders(buildFollowPushRecord(samplePayload('2026-08-27T03:30:00.000Z')));
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.accepted).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('fetch() throw ครบ 3 ครั้ง (เพดาน retry) → โยน error เดิมออกไปให้ผู้เรียก catch', async () => {
+    const err = new TypeError('fetch failed');
+    const fetchMock = vi.fn().mockRejectedValue(err);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultPromise = pushReminders(buildFollowPushRecord(samplePayload('2026-08-27T03:30:00.000Z')));
+    const assertion = expect(resultPromise).rejects.toThrow('fetch failed');
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('HTTP response ที่ไม่ ok (เช่น 401) ไม่ retry — fetch() เองไม่ throw', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'invalid api key' }), { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(pushReminders(buildFollowPushRecord(samplePayload('2026-08-27T03:30:00.000Z'))))
+      .rejects.toThrow('invalid api key');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
