@@ -427,12 +427,22 @@ export type FollowCallCategory =
   /** ปิดงานด้วยผลที่ยังไม่รู้ว่าไปหรือไม่ (ลา/เลื่อน/อื่น ๆ) */
   | 'other';
 
+/**
+ * 🔴 **คำต้องเป็นชุดเดียวกับแผง "การโทรของงาน Follow" ข้างบน**
+ * (แก้ 8 ก.ย. 2569 หลังผู้ทดสอบตาใหม่ให้ 6/10 แล้วถามว่า *"โทรไม่ติด กับ ติดต่อไม่ได้
+ * คือเรื่องเดียวกันไหม · รอโทร กับ รอผล กับ สายที่ต้องตาม ต่างกันยังไง"*)
+ *
+ * เดิมการ์ดนี้ประดิษฐ์ศัพท์ชุดที่สาม (`ตกลง · ไป` / `ติดต่อไม่ได้` / `รอผล`) ทั้งที่
+ * `FOLLOW_ROUND_BUCKET_LABEL` ของแผงข้างบนมีคำอยู่แล้ว ⇒ จอเดียวพูดสองภาษา
+ * ตอนนี้ยืมคำจากที่นั่นตรง ๆ: **ไป · ไม่ไป · โทรไม่ติด · รอโทร**
+ * (`เลยเวลานัด` / `ไม่ได้ส่งให้ AI` ไม่มีในแผงข้างบน — ใช้คำที่อธิบายตัวเองได้)
+ */
 export const FOLLOW_CALL_CATEGORY_LABEL: Record<FollowCallCategory, string> = {
-  agreed: 'ตกลง · ไป',
-  unreachable: 'ติดต่อไม่ได้',
+  agreed: 'ไป',
+  unreachable: 'โทรไม่ติด',
   lost: 'ไม่ไป',
-  waiting: 'รอผล',
-  overdue: 'เลยเวลา ยังไม่มีผล',
+  waiting: 'รอโทร',
+  overdue: 'เลยเวลานัด',
   notSent: 'ไม่ได้ส่งให้ AI',
   cancelled: 'ยกเลิก',
   other: 'ยังไม่รู้ผล',
@@ -525,9 +535,34 @@ export function roundSlotsOfDay(rows: readonly FollowPlanningRow[], ymd: string)
   return [...found].sort((a, b) => a - b);
 }
 
+/**
+ * ═══ คำตอบสามทางที่คนใช้จริงอยากรู้ ═══
+ *
+ * 🔴 ผู้ทดสอบตาใหม่ (8 ก.ย. 2569) อ่านหัวตัวเลข 6 ช่องแล้วไม่รู้ว่าช่องไหนต่างกับช่องไหน
+ * โดยเฉพาะ *"ติดต่อไม่ได้ กับ เลยเวลา ยังไม่มีผล ต่างกันยังไง — ดูเหมือนยังไม่ได้ผลเหมือนกัน"*
+ *
+ * ⇒ หัวตัวเลขยุบเหลือ **รู้แล้วว่าไป / รู้แล้วว่าไม่ไป / ยังไม่รู้ผล**
+ * ส่วนเหตุผลว่าทำไมยังไม่รู้ (โทรไม่ติด · รอโทร · เลยเวลานัด · ไม่ได้ส่งให้ AI)
+ * ไปอยู่บนชิปของ**แต่ละแถว** ซึ่งเป็นที่ที่ต้องลงมือจริง — ไม่ใช่บนหัวที่ไว้กวาดสายตา
+ */
+export type FollowVerdict = 'went' | 'notWent' | 'unknown';
+
+export function callVerdict(category: FollowCallCategory): FollowVerdict | null {
+  if (category === 'cancelled') return null; // ยกเลิกแล้ว ไม่ใช่สายที่ต้องตาม
+  if (category === 'agreed') return 'went';
+  if (category === 'lost') return 'notWent';
+  return 'unknown';
+}
+
 export type FollowCallSummary = Record<FollowCallCategory, number> & {
   /** สายที่ต้องตาม = ทุกสายที่ไม่ได้ยกเลิก */
   total: number;
+  /** รู้แล้วว่าไป (= agreed) */
+  went: number;
+  /** รู้แล้วว่าไม่ไป (= lost) */
+  notWent: number;
+  /** ยังไม่รู้ผล — โทรไม่ติด + รอโทร + เลยเวลานัด + ไม่ได้ส่งให้ AI + อื่น ๆ */
+  unknown: number;
 };
 
 /** นับสายตามหมวด — ใช้ทั้งหัวหน้ารายวันและสรุปรายคนของหน้ารายเดือน */
@@ -542,16 +577,24 @@ export function summarizeFollowCalls(rounds: readonly FollowPlanningRound[]): Fo
     cancelled: 0,
     other: 0,
     total: 0,
+    went: 0,
+    notWent: 0,
+    unknown: 0,
   };
   for (const r of rounds) {
     const c = callCategory(r);
     s[c] += 1;
-    if (c !== 'cancelled') s.total += 1;
+    const v = callVerdict(c);
+    if (v === null) continue; // ยกเลิก — ไม่นับเป็นสายที่ต้องตาม
+    s.total += 1;
+    if (v === 'went') s.went += 1;
+    else if (v === 'notWent') s.notWent += 1;
+    else s.unknown += 1;
   }
   return s;
 }
 
-/** สรุปทั้งเดือนของคนหนึ่งคน (หน้ารายเดือน: "ทั้งเดือนติดตามกี่ครั้ง ไป/ไม่ไป/ติดต่อไม่ได้") */
+/** สรุปทั้งเดือนของคนหนึ่งคน (หน้ารายเดือน: "ทั้งเดือนติดตามกี่ครั้ง ไป/ไม่ไป/ยังไม่รู้ผล") */
 export function personMonthSummary(row: FollowPlanningRow, month: string): FollowCallSummary {
   return summarizeFollowCalls(row.rounds.filter((r) => r.ymd?.slice(0, 7) === month));
 }

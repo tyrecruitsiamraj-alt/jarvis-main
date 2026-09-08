@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
@@ -26,7 +26,7 @@ import {
   type FollowPlanningRow,
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
-import { Rule2, Sheet2, SheetHead2, Stat2 } from '@/components/shared/ui-v2/Sheet2';
+import { Rule2, Sheet2, SheetHead2, Stat2, StatRow2 } from '@/components/shared/ui-v2/Sheet2';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 
@@ -39,18 +39,22 @@ import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
  * **หน้ารายวัน — "สายที่ต้องตาม"**
  *   1. บอกว่ามีกี่สายที่ต้องตาม (แถวตัวเลข)
  *   2. แยกผลของทุกสาย · กรองได้ว่าดูสายที่ 1/2/3 (ชิปกรอง)
- *   3. สายไหนจบแล้วเอาผลมาบอกเลย · สี = ความหมาย (เขียวตกลง · เหลืองติดต่อไม่ได้ · แดงไม่ไป)
+ *   3. สายไหนจบแล้วเอาผลมาบอกเลย · สี = ความหมาย (เขียว ไป · เหลือง ยังไม่รู้ผล · แดง ไม่ไป)
  *   4. บอกว่าเขาตอบว่ายังไง (สรุปจาก AI ใต้ชื่อ)
  *   5. เลือกวันจากปฏิทินได้ (ตัวเลือกวันเดียวกับตัวกรองของหน้า — ห้ามมีสองตัว)
  *
  * **หน้ารายเดือน — "ภาพรวม"**
- *   1. แถวละคน: ทั้งเดือนติดตามกี่ครั้ง · ไปกี่ · ไม่ไปกี่ · ติดต่อไม่ได้กี่ · แล้วช่องวันบอกว่าวันไหนเป็นอะไร
+ *   1. แถวละคน: ทั้งเดือนติดตามกี่ครั้ง · ไปกี่ · ไม่ไปกี่ · ยังไม่รู้ผลกี่ · แล้วช่องวันบอกว่าวันไหนเป็นอะไร
  *   2. เลือกวัน/เดือนจากปฏิทินตัวเดียวกัน
  *
  * 🔴 ภาษาเดียวกับหน้าอื่นของโฉมใหม่: ผืนขาวใบเดียว คั่นด้วยเส้นบาง · เลขใหญ่ tabular · สีเน้นเดียว
  * 🔴 เลขทุกตัวมาจาก `callCategory` ชุดเดียว (followPlanning.ts) — หน้ารายวันกับสีหน้ารายเดือน
  *    จึงเล่าเรื่องเดียวกันเสมอ
  * 🔴 ตัวกรองวันใช้ช่องเดียวกับแผงตัวกรอง (`fDate`) — เลือกวันที่นี่ ลิสต์ข้างล่างกรองตามด้วย
+ *
+ * 🔴 **คำบนจอยืมจากแผง "การโทรของงาน Follow" ข้างบน** (แก้ 8 ก.ย. 2569 หลังผู้ทดสอบตาใหม่
+ * ให้ 6/10 แล้วถามว่า *"โทรไม่ติด กับ ติดต่อไม่ได้ คือเรื่องเดียวกันไหม"*) — ห้ามประดิษฐ์
+ * ศัพท์ชุดใหม่ที่นี่อีก มีด่านเทสต์คุมใน `tests/api/followPlanning.test.ts`
  */
 
 type View = 'day' | 'month';
@@ -105,17 +109,19 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
 
 /**
  * คำอธิบายสี — **ใช้คำของเจ้าของเอง** (7 ก.ย. 2569: *"เขียวคือตกลง เหลืองติดต่อไม่ได้
- * แดงคือไม่ไป"*) · เหลืองรวม "เลยเวลายังไม่มีผล" ด้วยเพราะเป็นโทนเดียวกันบนชิป —
- * เขียนกำกับไว้ให้ไม่ต้องเดา
+ * แดงคือไม่ไป"*) แต่เปลี่ยนคำให้ตรงกับแผงข้างบนแล้ว (8 ก.ย. 2569 — ดู
+ * `FOLLOW_CALL_CATEGORY_LABEL`) · หน้ารายวันใช้ชุดสั้น หน้ารายเดือนใช้ชุดเต็ม
+ * เพราะช่องวันมีสีครบทุกแบบ
  */
-const LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
-  ['success', 'เขียว = ตกลง · ไป'],
-  ['warn', 'เหลือง = ติดต่อไม่ได้ / เลยเวลายังไม่มีผล'],
+const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
+  ['success', 'เขียว = ไป'],
   ['danger', 'แดง = ไม่ไป'],
-  ['primary', 'น้ำเงิน = รอผล'],
+  ['warn', 'เหลือง = ยังไม่รู้ผล (โทรไม่ติด · เลยเวลานัด)'],
+  ['primary', 'น้ำเงิน = รอโทร'],
   ['orange', 'ส้ม = ไม่ได้ส่งให้ AI'],
-  ['neutral', 'เทา = ยังไม่ถึงเวลา / ยกเลิก (ขีดฆ่า)'],
+  ['neutral', 'เทา = ยกเลิก (ขีดฆ่า)'],
 ];
+
 
 const NAV_BTN = cn(
   'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
@@ -256,32 +262,51 @@ const FollowPlanningCalendar: React.FC<{
 
       {view === 'day' ? (
         <>
-          {/* 1. มีกี่สายที่ต้องตาม — แถวตัวเลขมาตรฐานของโฉมใหม่ */}
-          {/* 6 ช่องบนจอใหญ่ · 3×2 บนจอเล็ก — เขียนกริดเองแทน StatRow2 ที่ล็อกเส้นคั่นไว้สำหรับ 4 ช่อง */}
-          <div
-            className={cn(
-              'grid grid-cols-3 border-t border-border/70 lg:grid-cols-6',
-              '[&>*]:border-border/50 [&>*:not(:first-child)]:border-l',
-              'max-lg:[&>*:nth-child(4)]:border-l-0 max-lg:[&>*:nth-child(-n+3)]:border-b',
-            )}
-          >
+          {/**
+           * 1. มีกี่สายที่ต้องตาม — **4 ช่อง ตอบสามคำถามพอ** (แก้ 8 ก.ย. 2569)
+           * เดิม 6 ช่อง (ตกลง · ติดต่อไม่ได้ · ไม่ไป · รอผล · เลยเวลา) ผู้ทดสอบตาใหม่อ่านแล้ว
+           * ไม่รู้ว่าช่องไหนต่างกับช่องไหน — เหตุผลว่า "ทำไมยังไม่รู้ผล" ย้ายไปอยู่บนชิปของแต่ละแถว
+           * ซึ่งเป็นที่ที่ต้องลงมือจริง
+           */}
+          <StatRow2>
             <Stat2 value={daySummary.total} label="สายที่ต้องตาม" hint="ทุกสายของวันนี้ ไม่นับที่ยกเลิก" />
-            <Stat2 value={daySummary.agreed} label={FOLLOW_CALL_CATEGORY_LABEL.agreed} valueClassName={statTone('agreed')} />
-            <Stat2 value={daySummary.unreachable} label={FOLLOW_CALL_CATEGORY_LABEL.unreachable} valueClassName={statTone('unreachable')} />
-            <Stat2 value={daySummary.lost} label={FOLLOW_CALL_CATEGORY_LABEL.lost} valueClassName={statTone('lost')} />
-            <Stat2 value={daySummary.waiting} label={FOLLOW_CALL_CATEGORY_LABEL.waiting} valueClassName={statTone('waiting')} />
+            <Stat2 value={daySummary.went} label="ไป" valueClassName={statTone('agreed')} hint="รู้แล้วว่าไป" />
+            <Stat2 value={daySummary.notWent} label="ไม่ไป" valueClassName={statTone('lost')} hint="รู้แล้วว่าไม่ไป" />
             <Stat2
-              value={daySummary.overdue}
-              label={FOLLOW_CALL_CATEGORY_LABEL.overdue}
+              value={daySummary.unknown}
+              label="ยังไม่รู้ผล"
               valueClassName={statTone('overdue')}
-              hint={daySummary.overdue > 0 ? 'มีคนรอสายอยู่ — ต้องตามผล' : undefined}
+              hint="โทรไม่ติด · รอโทร · เลยเวลานัด · ไม่ได้ส่งให้ AI"
             />
+          </StatRow2>
+
+          {/**
+           * ป้ายอธิบายสี — **หน้ารายวันก็ต้องมี** (ผู้ทดสอบตาใหม่ 8 ก.ย. 2569 ขอเพิ่ม:
+           * เดิมมีแต่หน้ารายเดือน คนอ่านสีบนแถวไม่ออกว่าแปลว่าอะไร)
+           */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/70 px-6 py-2 text-[11px] text-muted-foreground lg:px-8">
+            {DAY_LEGEND.map(([tone, label]) => (
+              <span key={tone} className="flex items-center gap-1.5">
+                <span className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', TONE[tone].dot)} aria-hidden />
+                {label}
+              </span>
+            ))}
           </div>
           <Rule2 />
 
-          {/* 2. แยกตามสาย — ชิปกรองเฉพาะสายที่มีจริงในวันนี้ */}
-          <div className="flex flex-wrap items-center gap-2 px-6 py-3 lg:px-8">
-            <span className="text-[12px] text-muted-foreground">ดูเฉพาะ</span>
+          {/**
+           * 2. แยกตามสาย — ชิปกรองเฉพาะสายที่มีจริงในวันนี้
+           * 🔴 ต้องอ่านออกว่า **เป็นตัวกรอง ไม่ใช่ปุ่มสั่งโทร** (ผู้ทดสอบตาใหม่ 8 ก.ย. 2569
+           * ไม่กล้ากดเลยสักปุ่ม: *"ห่วงว่า สายที่ 1 อาจเป็นปุ่มกด ห้ามกด"*)
+           * ⇒ เขียนคำว่า "ตัวกรอง" ไว้หน้าแถว + tooltip บอกตรง ๆ ว่าแค่ซ่อน/แสดงรายการ
+           */}
+          <div
+            className="flex flex-wrap items-center gap-2 px-6 py-3 lg:px-8"
+            role="group"
+            aria-label="ตัวกรองสาย"
+          >
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            <span className="text-[12px] text-muted-foreground">ตัวกรอง — ดูเฉพาะ</span>
             {(['all', ...daySlots] as FollowRoundFilter[]).map((f) => {
               const active = roundFilter === f;
               const label = f === 'all' ? 'ทุกสาย' : `สายที่ ${f}`;
@@ -290,6 +315,11 @@ const FollowPlanningCalendar: React.FC<{
                   key={String(f)}
                   type="button"
                   aria-pressed={active}
+                  title={
+                    f === 'all'
+                      ? 'ตัวกรอง — แสดงทุกสายของวันนี้ (ไม่ได้สั่งโทร)'
+                      : `ตัวกรอง — แสดงเฉพาะสายที่ ${f} ของวันนี้ (ไม่ได้สั่งโทร)`
+                  }
                   onClick={() => setRoundFilter(f)}
                   className={cn(
                     'inline-flex h-7 items-center rounded-full border px-3 text-[11px] font-semibold transition-colors',
@@ -385,7 +415,9 @@ const FollowPlanningCalendar: React.FC<{
                           </span>
                         ) : round.state === 'result' ? (
                           <span className="mt-1 block text-[12px] text-muted-foreground">(ไม่มีสรุปจาก AI)</span>
-                        ) : round.state === 'notSent' ? (
+                        ) : round.state === 'notSent' &&
+                          !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
+                          /* เหตุผลว่าทำไมไม่ได้ส่ง — ข้ามถ้าซ้ำคำกับชิป (ค่าปริยายคือ "ไม่ได้ส่งให้ AI โทร") */
                           <span className="mt-1 block text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
                         ) : null}
                         {/* เบอร์ฉุกเฉิน — พูดได้แค่ "แนบไปแล้ว" (Lumos ไม่ส่งกลับว่าโทรหรือยัง) */}
@@ -411,7 +443,7 @@ const FollowPlanningCalendar: React.FC<{
         <>
           {/* คำอธิบายสี — บรรทัดเดียว คำของเจ้าของเอง */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3 text-[11px] text-muted-foreground lg:px-8">
-            {LEGEND.map(([tone, label]) => (
+            {DAY_LEGEND.map(([tone, label]) => (
               <span key={tone} className="flex items-center gap-1.5">
                 <span className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', TONE[tone].dot)} aria-hidden />
                 {label}
@@ -464,11 +496,18 @@ const FollowPlanningCalendar: React.FC<{
                 <tbody>
                   {monthRows.map(({ row, byDay }) => {
                     const s = personMonthSummary(row, month);
+                    /**
+                     * 🔴 สรุปใต้ชื่อเหลือ **สามคำตอบ** (แก้ 8 ก.ย. 2569) — เดิมไล่ทุกหมวด
+                     * ได้บรรทัดอย่าง *"2 ครั้ง · เลยเวลา ยังไม่มีผล 2"* ที่ผู้ทดสอบตาใหม่
+                     * อ่านแล้วไม่รู้ว่าคืออะไร · หมวดละเอียดยังอยู่บนชิปของช่องวันเหมือนเดิม
+                     */
                     const parts: Array<[FollowCallCategory, number]> = (
-                      ['agreed', 'lost', 'unreachable', 'overdue', 'waiting', 'notSent'] as FollowCallCategory[]
-                    )
-                      .map((c) => [c, s[c]] as [FollowCallCategory, number])
-                      .filter(([, n]) => n > 0);
+                      [
+                        ['agreed', s.went],
+                        ['lost', s.notWent],
+                        ['overdue', s.unknown],
+                      ] as Array<[FollowCallCategory, number]>
+                    ).filter(([, n]) => n > 0);
                     return (
                       <tr key={row.group.key} className="border-b border-border/50 last:border-0">
                         <td className="sticky left-0 z-10 max-w-[260px] bg-card px-6 py-2 align-top lg:px-8">
@@ -476,12 +515,12 @@ const FollowPlanningCalendar: React.FC<{
                           <span className="block truncate text-[11px] text-muted-foreground">
                             {row.group.unitName || row.group.phone}
                           </span>
-                          {/* 1. ทั้งเดือนติดตามกี่ครั้ง · ไป/ไม่ไป/ติดต่อไม่ได้ — สีเดียวกับช่องวัน */}
+                          {/* 1. ทั้งเดือนติดตามกี่ครั้ง · ไป / ไม่ไป / ยังไม่รู้ผล — สีเดียวกับช่องวัน */}
                           <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10px]">
                             <span className="font-semibold tabular-nums text-foreground">{s.total} ครั้ง</span>
                             {parts.map(([c, n]) => (
                               <span key={c} className={cn('font-medium', statTone(c))}>
-                                {FOLLOW_CALL_CATEGORY_LABEL[c]} {n}
+                                {c === 'overdue' ? 'ยังไม่รู้ผล' : FOLLOW_CALL_CATEGORY_LABEL[c]} {n}
                               </span>
                             ))}
                           </span>

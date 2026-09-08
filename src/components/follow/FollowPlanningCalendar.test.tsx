@@ -82,7 +82,10 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(screen.getByRole('tab', { name: /รายวัน/ }).getAttribute('aria-selected')).toBe('true');
     // 2 สาย ยังไม่มีผล ทั้งคู่เลยเวลา (16:00 > 15:23/15:30)
     expect(statValue('สายที่ต้องตาม')).toBe('2');
-    expect(statValue('เลยเวลา ยังไม่มีผล')).toBe('2');
+    // ทั้งคู่ยังไม่มีผล ⇒ ไปกองที่ช่อง "ยังไม่รู้ผล" ช่องเดียว (เดิมแยก 6 ช่องจนอ่านไม่ออก)
+    expect(statValue('ยังไม่รู้ผล')).toBe('2');
+    expect(statValue('ไป')).toBe('0');
+    expect(statValue('ไม่ไป')).toBe('0');
   });
 
   it('🔴 สายที่ 1 ตกลงแล้ว ⇒ เห็นเขียว + "เขาตอบ:" ทันที ทั้งที่สายที่ 2 ยังรอผล', () => {
@@ -96,14 +99,14 @@ describe('หน้ารายวัน — สายที่ต้องต�
     const items = screen.getAllByRole('listitem');
     expect(items).toHaveLength(2);
     // เรียงตามเวลา — 15:23 (สาย 1) มาก่อน 15:30 (สาย 2)
-    expect(within(items[0]).getByText('ตกลง · ไป')).toBeTruthy();
+    expect(within(items[0]).getByText('ไป')).toBeTruthy();
     expect(within(items[0]).getByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toBeTruthy();
     expect(within(items[0]).getByText('สายที่ 1')).toBeTruthy();
     // สาย 2 ยังไม่มีผล — ต้องไม่โดนผลของสาย 1 กลบ
     expect(within(items[1]).getByText('สายที่ 2')).toBeTruthy();
     expect(within(items[1]).queryByText(/ไปแน่นอน/)).toBeNull();
-    expect(within(items[1]).queryByText(/ตกลง/)).toBeNull();
-    expect(statValue('ตกลง · ไป')).toBe('1');
+    expect(within(items[1]).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(statValue('ไป')).toBe('1');
   });
 
   it('ไม่ไป ⇒ แดง + เหตุผลที่เขาตอบ', () => {
@@ -116,9 +119,12 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(statValue('ไม่ไป')).toBe('1');
   });
 
-  it('ติดต่อไม่ได้ (ไม่รับสาย) ⇒ นับในช่องเหลือง "ติดต่อไม่ได้"', () => {
+  it('ไม่รับสาย ⇒ ชิปบนแถวใช้คำเดียวกับแผงข้างบน ("โทรไม่ติด") และนับรวมใน "ยังไม่รู้ผล"', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'no_answer' }));
-    expect(statValue('ติดต่อไม่ได้')).toBe('1');
+    const first = screen.getAllByRole('listitem')[0];
+    expect(within(first).getByText(/โทรไม่ติด/)).toBeTruthy();
+    // โทรไม่ติด (สาย 1) + เลยเวลานัด (สาย 2) = ยังไม่รู้ผลทั้งคู่
+    expect(statValue('ยังไม่รู้ผล')).toBe('2');
   });
 
   it('🔴 กรอง "สายที่ 2" ⇒ ลิสต์เหลือสายเดียว และเลขหัวคิดใหม่ตามที่กรอง', () => {
@@ -128,7 +134,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(items).toHaveLength(1);
     expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
     expect(statValue('สายที่ต้องตาม')).toBe('1');
-    expect(statValue('ตกลง · ไป')).toBe('0');
+    expect(statValue('ไป')).toBe('0');
   });
 
   it('ชิปกรองขึ้นเฉพาะสายที่มีจริงในวันนั้น', () => {
@@ -182,7 +188,7 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     expect(screen.getAllByRole('columnheader')).toHaveLength(31);
   });
 
-  it('🔴 สรุปทั้งเดือนอยู่ใต้ชื่อในคอลัมน์ที่ตรึงไว้ — กี่ครั้ง และแยก ไป/ไม่ไป/ติดต่อไม่ได้', () => {
+  it('🔴 สรุปทั้งเดือนใต้ชื่อ — กี่ครั้ง และแยกสามคำตอบ ไป/ไม่ไป/ยังไม่รู้ผล', () => {
     renderCalendar([
       entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-01T02:00:00Z', call_status: 'completed', call_outcome: 'confirmed' }),
       entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-03T02:00:00Z', call_status: 'completed', call_outcome: 'no_answer' }),
@@ -191,9 +197,9 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     showMonthView();
     const monthCell = screen.getAllByRole('cell')[0];
     expect(within(monthCell).getByText('3 ครั้ง')).toBeTruthy();
-    expect(within(monthCell).getByText('ตกลง · ไป 1')).toBeTruthy();
-    expect(within(monthCell).getByText('ติดต่อไม่ได้ 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ไป 1')).toBeTruthy();
     expect(within(monthCell).getByText('ไม่ไป 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ยังไม่รู้ผล 1')).toBeTruthy();
   });
 
   it('ช่องวันบอกผลด้วยคำสั้นของหมวด (ไม่ใช่คำยาวที่ล้นช่อง)', () => {
@@ -206,11 +212,11 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     expect(dayCells.some((c) => within(c).queryByText(/ยกเลิก — ไม่ไปแล้ว/))).toBe(false);
   });
 
-  it('คำอธิบายสีใช้คำของเจ้าของ: เขียวตกลง เหลืองติดต่อไม่ได้ แดงไม่ไป', () => {
+  it('คำอธิบายสีเป็นชุดเดียวกับหน้ารายวัน — เขียวไป เหลืองยังไม่รู้ผล แดงไม่ไป', () => {
     renderCalendar(twoRounds());
     showMonthView();
-    expect(screen.getByText('เขียว = ตกลง · ไป')).toBeTruthy();
-    expect(screen.getByText(/เหลือง = ติดต่อไม่ได้/)).toBeTruthy();
+    expect(screen.getByText('เขียว = ไป')).toBeTruthy();
+    expect(screen.getByText(/เหลือง = ยังไม่รู้ผล/)).toBeTruthy();
     expect(screen.getByText('แดง = ไม่ไป')).toBeTruthy();
   });
 });

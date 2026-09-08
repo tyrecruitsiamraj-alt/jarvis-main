@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FollowEntry } from '../../src/lib/followApi';
 import { groupFollowEntries } from '../../src/lib/followGrouping';
+import { FOLLOW_ROUND_BUCKET_LABEL } from '../../src/lib/followRoundBuckets';
 import {
   buildFollowMonthRows,
   buildFollowPlanningRows,
@@ -17,6 +18,8 @@ import {
   roundSlotsOfDay,
   summarizeFollowCalls,
   personMonthSummary,
+  FOLLOW_CALL_CATEGORY_LABEL,
+  callVerdict,
 } from '../../src/lib/followPlanning';
 
 const NOW = new Date('2026-09-01T05:00:00Z'); // 12:00 น. เวลาไทย
@@ -539,5 +542,65 @@ describe('buildFollowDayCalls — "ไม่ไป" ขึ้นบนสุด�
       'wait',
       'ok',
     ]);
+  });
+});
+
+/**
+ * 🔴 **ด่านกันจอพูดสองภาษา** (แก้ 8 ก.ย. 2569)
+ * ผู้ทดสอบตาใหม่ถามว่า *"โทรไม่ติด กับ ติดต่อไม่ได้ คือเรื่องเดียวกันไหม"* เพราะการ์ดปฏิทิน
+ * เคยประดิษฐ์ศัพท์ชุดที่สาม ทั้งที่แผง "การโทรของงาน Follow" ข้างบนมีคำอยู่แล้ว
+ */
+describe('คำของการ์ดปฏิทินต้องยืมจากแผงข้างบน ไม่ประดิษฐ์ใหม่', () => {
+  it('ไป / ไม่ไป / โทรไม่ติด / รอโทร ต้องเป็นคำเดียวกับ FOLLOW_ROUND_BUCKET_LABEL เป๊ะ', () => {
+    expect(FOLLOW_CALL_CATEGORY_LABEL.agreed).toBe(FOLLOW_ROUND_BUCKET_LABEL.went);
+    expect(FOLLOW_CALL_CATEGORY_LABEL.lost).toBe(FOLLOW_ROUND_BUCKET_LABEL.not_went);
+    expect(FOLLOW_CALL_CATEGORY_LABEL.unreachable).toBe(FOLLOW_ROUND_BUCKET_LABEL.unreached);
+    expect(FOLLOW_CALL_CATEGORY_LABEL.waiting).toBe(FOLLOW_ROUND_BUCKET_LABEL.waiting);
+  });
+
+  it('ห้ามใช้คำที่เคยทำให้สับสนกลับมาอีก', () => {
+    const banned = ['ติดต่อไม่ได้', 'ตกลง · ไป', 'รอผล'];
+    for (const word of Object.values(FOLLOW_CALL_CATEGORY_LABEL)) {
+      expect(banned, `"${word}" เคยทำให้ผู้ใช้งงมาแล้ว`).not.toContain(word);
+    }
+  });
+});
+
+describe('callVerdict / summarize — สามคำตอบบนหัวหน้ารายวัน', () => {
+  const sum = (list: Partial<FollowEntry>[]) =>
+    summarizeFollowCalls(
+      buildFollowPlanningRows(
+        groupFollowEntries(
+          list.map((o, i) => entry({ id: `v${i}`, recipient_phone: `08000000${i}`, ...o })),
+          NOW,
+        ),
+        NOW,
+      ).flatMap((r) => r.rounds),
+    );
+
+  it('ไป = agreed · ไม่ไป = lost · ที่เหลือทั้งหมด = ยังไม่รู้ผล · ยกเลิกไม่นับ', () => {
+    const s = sum([
+      { call_status: 'completed', call_outcome: 'confirmed' }, // ไป
+      { call_status: 'completed', call_outcome: 'acknowledged' }, // ไป
+      { call_status: 'completed', call_outcome: 'declined' }, // ไม่ไป
+      { call_status: 'completed', call_outcome: 'no_answer' }, // โทรไม่ติด → ยังไม่รู้ผล
+      { scheduled_at: '2026-09-01T02:00:00Z' }, // เลยเวลานัด → ยังไม่รู้ผล
+      { scheduled_at: '2026-09-01T09:00:00Z', call_status: null }, // ไม่ได้ส่ง → ยังไม่รู้ผล
+      { cancelled: true }, // ยกเลิก → ไม่นับเลย
+    ]);
+    expect(s.went).toBe(2);
+    expect(s.notWent).toBe(1);
+    expect(s.unknown).toBe(3);
+    expect(s.total).toBe(6);
+    expect(s.went + s.notWent + s.unknown).toBe(s.total);
+  });
+
+  it('callVerdict คืน null เฉพาะที่ยกเลิก (ไม่ใช่สายที่ต้องตาม)', () => {
+    expect(callVerdict('cancelled')).toBeNull();
+    expect(callVerdict('agreed')).toBe('went');
+    expect(callVerdict('lost')).toBe('notWent');
+    for (const c of ['unreachable', 'waiting', 'overdue', 'notSent', 'other'] as const) {
+      expect(callVerdict(c)).toBe('unknown');
+    }
   });
 });
