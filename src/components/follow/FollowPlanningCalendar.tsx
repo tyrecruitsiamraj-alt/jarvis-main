@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
@@ -9,6 +9,7 @@ import {
   buildFollowDayCalls,
   buildFollowMonthRows,
   callCategory,
+  filterPlanningRowsByRound,
   FOLLOW_CALL_CATEGORY_LABEL,
   FOLLOW_CALL_CATEGORY_TONE,
   isGoodResult,
@@ -28,7 +29,6 @@ import {
 } from '@/lib/followPlanning';
 import { Rule2, Sheet2, SheetHead2, Stat2, StatRow2 } from '@/components/shared/ui-v2/Sheet2';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 
 /**
  * ═══ ปฏิทินติดตาม — สองหน้าในผืนเดียว (เจ้าของสั่ง 7 ก.ย. 2569 · ฉบับที่ 2) ═══
@@ -139,24 +139,28 @@ const FollowPlanningCalendar: React.FC<{
   /** กดสาย/ช่อง = เปิดป๊อปรายละเอียดของคนนั้นในวันนั้น */
   onOpenCell: (row: FollowPlanningRow, ymd: string, rounds: FollowPlanningRound[]) => void;
   /**
-   * รอบที่แผง "การโทรของงาน Follow" เลือกอยู่ — กดแท็บข้างบนเมื่อไหร่ ตัวกรองรอบของ
-   * การ์ดนี้ตามไปด้วย (พฤติกรรมที่เจ้าของเคาะ 1 ก.ย. 2569) แต่กดชิปในการ์ดทับได้
+   * รอบที่เลือกอยู่ — **ตัวเลือกรอบมีที่เดียวทั้งหน้า** อยู่ใน `roundsSlot`
+   * (รวมแผง "การโทรของงาน Follow" เข้ามาเป็นการ์ดเดียว 8 ก.ย. 2569)
    */
-  activeRound?: number;
-}> = ({ rows, month, onMonthChange, selectedYmd, onSelect, onOpenCell, activeRound }) => {
+  roundFilter: FollowRoundFilter;
+  /** แผงรอบโทร + 7 กล่องสถานะสาย ที่ฝังอยู่ในผืนเดียวกัน */
+  roundsSlot?: React.ReactNode;
+  /** ปุ่มของหน้าแม่ (เพิ่มคน · ตัวกรอง · เพิ่มเรื่อง/เจ้าหน้าที่ · รีเฟรช) */
+  headerAction?: React.ReactNode;
+}> = ({
+  rows,
+  month,
+  onMonthChange,
+  selectedYmd,
+  onSelect,
+  onOpenCell,
+  roundFilter,
+  roundsSlot,
+  headerAction,
+}) => {
   const [view, setView] = useState<View>('day');
-  const [roundFilter, setRoundFilter] = useState<FollowRoundFilter>('all');
   const today = toYmdBangkok(new Date());
   const dayYmd = selectedYmd || today;
-
-  // ตามแท็บรอบข้างบน **เฉพาะตอนมันเปลี่ยน** — ค่าเริ่มต้นยังเป็น "ทุกสาย"
-  const prevActiveRound = useRef(activeRound);
-  useEffect(() => {
-    if (activeRound !== prevActiveRound.current) {
-      prevActiveRound.current = activeRound;
-      if (activeRound === 1 || activeRound === 2 || activeRound === 3) setRoundFilter(activeRound);
-    }
-  }, [activeRound]);
 
   /* ─── หน้ารายวัน ─── */
   const dayCalls = useMemo(() => buildFollowDayCalls(rows, dayYmd, roundFilter), [rows, dayYmd, roundFilter]);
@@ -164,7 +168,12 @@ const FollowPlanningCalendar: React.FC<{
   const daySummary = useMemo(() => summarizeFollowCalls(dayCalls.map((c) => c.round)), [dayCalls]);
 
   /* ─── หน้ารายเดือน ─── */
-  const monthRows = useMemo(() => buildFollowMonthRows(rows, month), [rows, month]);
+  /** 🔴 กรองรอบเหมือนหน้ารายวัน — เลือก "สายที่ 2" แล้วทั้งการ์ดต้องพูดเรื่องรอบนั้นเรื่องเดียว */
+  const monthSource = useMemo(
+    () => (roundFilter === 'all' ? rows : filterPlanningRowsByRound(rows, roundFilter)),
+    [rows, roundFilter],
+  );
+  const monthRows = useMemo(() => buildFollowMonthRows(monthSource, month), [monthSource, month]);
   const cols = useMemo(() => monthDayColumns(month), [month]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -195,14 +204,18 @@ const FollowPlanningCalendar: React.FC<{
         eyebrow="ปฏิทินติดตาม"
         stamp={view === 'day' ? dayHeading(dayYmd) : monthLabel(month)}
         action={
-          <DayCalendarPicker
-            className="h-8 min-h-0 py-1 text-[11px]"
-            value={selectedYmd}
-            onChange={onSelect}
-            emptyLabel="เลือกวัน"
-          />
+          /* ตัวเลือกวันมาจากหน้าแม่ (ตัวเดียวกับตัวกรองของลิสต์ — ห้ามมีสองตัวในหน้าเดียว) */
+          headerAction
         }
       />
+
+      {/* แผงรอบโทร + 7 กล่องสถานะสาย — เดิมเป็นการ์ดแยกข้างบน (รวมเข้ามา 8 ก.ย. 2569) */}
+      {roundsSlot ? (
+        <>
+          <Rule2 />
+          {roundsSlot}
+        </>
+      ) : null}
 
       {/* แถวควบคุม: สวิตช์สองหน้า (ซ้าย) · เลื่อนวัน/เดือน (ขวา) */}
       <div className="flex flex-wrap items-center gap-2 px-6 pb-4 pt-3 lg:px-8">
@@ -294,53 +307,20 @@ const FollowPlanningCalendar: React.FC<{
           </div>
           <Rule2 />
 
-          {/**
-           * 2. แยกตามสาย — ชิปกรองเฉพาะสายที่มีจริงในวันนี้
-           * 🔴 ต้องอ่านออกว่า **เป็นตัวกรอง ไม่ใช่ปุ่มสั่งโทร** (ผู้ทดสอบตาใหม่ 8 ก.ย. 2569
-           * ไม่กล้ากดเลยสักปุ่ม: *"ห่วงว่า สายที่ 1 อาจเป็นปุ่มกด ห้ามกด"*)
-           * ⇒ เขียนคำว่า "ตัวกรอง" ไว้หน้าแถว + tooltip บอกตรง ๆ ว่าแค่ซ่อน/แสดงรายการ
-           */}
-          <div
-            className="flex flex-wrap items-center gap-2 px-6 py-3 lg:px-8"
-            role="group"
-            aria-label="ตัวกรองสาย"
-          >
-            <Filter className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-            <span className="text-[12px] text-muted-foreground">ตัวกรอง — ดูเฉพาะ</span>
-            {(['all', ...daySlots] as FollowRoundFilter[]).map((f) => {
-              const active = roundFilter === f;
-              const label = f === 'all' ? 'ทุกสาย' : `สายที่ ${f}`;
-              return (
-                <button
-                  key={String(f)}
-                  type="button"
-                  aria-pressed={active}
-                  title={
-                    f === 'all'
-                      ? 'ตัวกรอง — แสดงทุกสายของวันนี้ (ไม่ได้สั่งโทร)'
-                      : `ตัวกรอง — แสดงเฉพาะสายที่ ${f} ของวันนี้ (ไม่ได้สั่งโทร)`
-                  }
-                  onClick={() => setRoundFilter(f)}
-                  className={cn(
-                    'inline-flex h-7 items-center rounded-full border px-3 text-[11px] font-semibold transition-colors',
-                    active ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
-                  )}
-                >
-                  {label}
-                </button>
-              );
-            })}
-            {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
-              <span className="text-[11px] text-muted-foreground">
-                วันนี้ไม่มี{roundTabLabel(roundFilter)} — กด "ทุกสาย" เพื่อดูสายอื่น
-              </span>
-            ) : null}
-            {daySummary.notSent > 0 ? (
-              <span className={cn('ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold', TONE.orange.chip)}>
-                {daySummary.notSent} สายไม่ได้ส่งให้ AI — ต้องคนจัดการ
-              </span>
-            ) : null}
-          </div>
+          {daySummary.notSent > 0 || (roundFilter !== 'all' && !daySlots.includes(roundFilter)) ? (
+            <div className="flex flex-wrap items-center gap-2 px-6 py-3 lg:px-8">
+              {roundFilter !== 'all' && !daySlots.includes(roundFilter) ? (
+                <span className="text-[11px] text-muted-foreground">
+                  วันนี้ไม่มี{roundTabLabel(roundFilter)} — กด "ทุกสาย" ข้างบนเพื่อดูสายอื่น
+                </span>
+              ) : null}
+              {daySummary.notSent > 0 ? (
+                <span className={cn('ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold', TONE.orange.chip)}>
+                  {daySummary.notSent} สายไม่ได้ส่งให้ AI — ต้องคนจัดการ
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <Rule2 />
 
           {/* 3-4. รายการทีละสาย: ผลสีตามความหมาย + เขาตอบว่าอะไร */}
@@ -388,8 +368,10 @@ const FollowPlanningCalendar: React.FC<{
                           {row.group.unitName ? (
                             <span className="text-[12px] text-muted-foreground">{row.group.unitName}</span>
                           ) : null}
+                          {/* 🔴 คำเดียวกับตัวเลือกรอบข้างบน (`roundTabLabel`) — เคยเขียน "สายที่ N"
+                              ที่นี่ แต่ตัวเลือกเขียน "รอบโทรที่ N" ⇒ จอเดียวสองคำอีกแล้ว */}
                           <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            สายที่ {slot ?? '—'}
+                            {slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
                           </span>
                           <span
                             className={cn(

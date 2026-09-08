@@ -25,7 +25,7 @@ import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowEntry,
@@ -76,9 +76,7 @@ import FollowRoundsDialog from '@/components/follow/FollowRoundsDialog';
 import FollowPlanningCalendar from '@/components/follow/FollowPlanningCalendar';
 import DayCalendarPicker from '@/components/shared/DayCalendarPicker';
 import { type FollowOutcome } from '@/lib/followOutcome';
-import {
-  buildFollowPlanningRows,
-} from '@/lib/followPlanning';
+import { buildFollowPlanningRows, type FollowRoundFilter } from '@/lib/followPlanning';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { listFollowTopics, createFollowTopic, type FollowTopic } from '@/lib/followTopicsApi';
 import {
@@ -138,7 +136,12 @@ const FollowPage: React.FC = () => {
    * *"ถ้าเลือกการโทรครั้งที่ 1 ตารางปฏิทินก็โชว์ข้อมูลแค่ของครั้งที่ 1 สิ"*)
    * 🔴 นิยาม "อยู่รอบไหน" ใช้ `followRoundSlot` ตัวเดียวกับที่แผงนับ — ห้ามเขียนซ้ำ
    */
-  const [activeRound, setActiveRound] = useState(1);
+  /**
+   * รอบที่กำลังดู — **ที่เดียวทั้งหน้า** (รวมแผงการโทรกับปฏิทินเป็นการ์ดเดียว 8 ก.ย. 2569)
+   * เดิมแผงบนถือ state ของตัวเอง + ปฏิทินมีชิปกรองอีกชุด ⇒ ผู้ทดสอบตาใหม่ถามว่า
+   * *"ทำไมมีสองที่พูดเรื่องเดียวกัน"* · ค่าเริ่มต้น "ทุกสาย" = เปิดมาเห็นงานครบก่อน
+   */
+  const [activeRound, setActiveRound] = useState<FollowRoundFilter>('all');
 
   const [formOpen, setFormOpen] = useState(false);
   const [prefix, setPrefix] = useState('');
@@ -900,19 +903,38 @@ const FollowPage: React.FC = () => {
         {/* ปุ่ม "เพิ่มเรื่อง / เพิ่มเจ้าหน้าที่" อยู่ข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค.
             2569 ค่ำ-5 — แทนกล่อง TopicManager ของค่ำ-4 ที่ถูกถอดออก) · โผล่เฉพาะ
             supervisor+ เท่านั้น server กันอีกชั้นที่ rbac ไม่ใช่แค่ซ่อนปุ่ม */}
-        <FollowCallRoundsPanel
-          /* 🔴 ส่งรายการก้อนเดียวกับที่หน้านี้ใช้ — แผงนี้ห้ามโหลดเอง
-             (เดิมโหลดแยก ⇒ จอเดียวมี "ทั้งหมด" สามค่าที่ไม่ตรงกัน) */
-          entries={items}
-          loading={loading}
-          onReload={() => void reload()}
-          onRoundChange={setActiveRound}
-          /* 🔴 ปุ่ม "เพิ่มคนที่ต้องการติดตาม" ย้ายมาอยู่แถวเดียวกับ "เพิ่มเจ้าหน้าที่"
-             (เจ้าของสั่ง 1 ก.ย. 2569) · ปุ่มนี้ **ทุกคนกดได้** ต่างจากอีกสองปุ่มที่เป็น
-             supervisor+ จึงอยู่นอกเงื่อนไข canManageMasters */
-          headerExtras={
+        {/* ═══ การ์ดเดียวจบ: การโทร + ปฏิทิน (รวมกัน 8 ก.ย. 2569) ═══
+            เดิมเป็นสองการ์ดซ้อนกัน ทั้งคู่พูดเรื่อง "การโทร" และมีตัวเลือกรอบคนละชุด
+            ผู้ทดสอบตาใหม่ถามว่า *"สองอันนี้บอกเรื่องเดียวกันหรือคนละเรื่อง งงว่าทำไมมีสองที่"*
+            ⇒ ยุบเป็นผืนเดียว · ตัวเลือกรอบมีที่เดียว (`activeRound`) · ตัวเลือกวันมีที่เดียว (`fDate`)
+            🔴 ของเดิมอยู่ครบทุกชิ้น: แท็บรอบ + 7 กล่องสถานะสาย + ป๊อปรายชื่อ + ปุ่มทุกปุ่ม */}
+        <FollowPlanningCalendar
+          rows={planningRowsAllRounds}
+          month={calMonth}
+          onMonthChange={setCalMonth}
+          selectedYmd={fDate}
+          onSelect={pickCalendarDay}
+          onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
+          roundFilter={activeRound}
+          roundsSlot={
+            <FollowCallRoundsPanel
+              embedded
+              /* 🔴 ส่งรายการก้อนเดียวกับที่หน้านี้ใช้ — แผงนี้ห้ามโหลดเอง
+                 (เดิมโหลดแยก ⇒ จอเดียวมี "ทั้งหมด" สามค่าที่ไม่ตรงกัน) */
+              entries={items}
+              loading={loading}
+              onReload={() => void reload()}
+              round={activeRound}
+              onRoundChange={setActiveRound}
+            />
+          }
+          headerAction={
             <>
-              <Button size="sm"
+              {/* 🔴 ปุ่ม "เพิ่มคนที่ต้องการติดตาม" อยู่แถวเดียวกับ "เพิ่มเจ้าหน้าที่"
+                  (เจ้าของสั่ง 1 ก.ย. 2569) · ปุ่มนี้ **ทุกคนกดได้** ต่างจากอีกสองปุ่มที่เป็น
+                  supervisor+ จึงอยู่นอกเงื่อนไข canManageMasters */}
+              <Button
+                size="sm"
                 type="button"
                 onClick={() => {
                   setFormOpen(true);
@@ -924,7 +946,8 @@ const FollowPage: React.FC = () => {
               </Button>
               {/* ═══ ตัวกรองทั้งหมดอยู่ในกล่องเดียว ข้าง ๆ ปุ่มเพิ่มคน (เจ้าของสั่ง 1 ก.ย. 2569) ═══
                   *"ย้ายทุกช่วงเวลาเข้าไปไว้กับเลือกวัน · แล้วย้ายเลือกวันไปไว้ข้าง ๆ เพิ่มคน"*
-                  🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — ย้ายแค่ที่วาง ไม่ได้เพิ่มตัวกรองใหม่ */}
+                  🔴 ยังเป็น `fDate`/`fBand` ชุดเดิม — และเป็น **ตัวเลือกวันตัวเดียวของหน้า**
+                  (ปฏิทินในการ์ดใช้ค่านี้ ไม่มีปุ่มเลือกวันของตัวเอง) */}
               <DayCalendarPicker
                 className="h-8 min-h-0 py-1 text-[11px]"
                 value={fDate}
@@ -953,44 +976,42 @@ const FollowPage: React.FC = () => {
                 }
               />
               {canManageMasters ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setTopicManagerOpen(true)}
-                  className={cn(
-                    'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
-                    TONE.info.outline,
-                  )}
-                >
-                  <Plus className="h-3 w-3" aria-hidden /> เพิ่มเรื่อง
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStaffManagerOpen(true)}
-                  className={cn(
-                    'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
-                    TONE.info.outline,
-                  )}
-                >
-                  <Plus className="h-3 w-3" aria-hidden /> เพิ่มเจ้าหน้าที่
-                </button>
-              </>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setTopicManagerOpen(true)}
+                    className={cn(
+                      'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
+                      TONE.info.outline,
+                    )}
+                  >
+                    <Plus className="h-3 w-3" aria-hidden /> เพิ่มเรื่อง
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStaffManagerOpen(true)}
+                    className={cn(
+                      'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
+                      TONE.info.outline,
+                    )}
+                  >
+                    <Plus className="h-3 w-3" aria-hidden /> เพิ่มเจ้าหน้าที่
+                  </button>
+                </>
               ) : null}
+              {/* รีเฟรช — ย้ายมาจากมุมขวาบนของแผงการโทรที่ถูกยุบเข้ามา */}
+              <button
+                type="button"
+                onClick={() => void reload()}
+                disabled={loading}
+                aria-label="รีเฟรช"
+                title="รีเฟรช"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-secondary disabled:opacity-50"
+              >
+                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
+              </button>
             </>
           }
-        />
-
-        {/* ═══ ปฏิทิน Planning (เจ้าของสั่ง 1 ก.ย. 2569 ข้อ 1.1 + ข้อ 3 ของ concept) ═══
-            *"เปิดมาปุ๊บ เจอ 3 หลัก ๆ: ปฏิทิน · ปุ่มเพิ่มคน · Planning"* — เรียงตามนั้นเลย
-            🔴 ช่องวันต้องมีชื่อคนอยู่ในนั้นจริง ๆ ไม่ใช่แค่จำนวนสาย (เจ้าของทักเอง) */}
-        <FollowPlanningCalendar
-          rows={planningRowsAllRounds}
-          month={calMonth}
-          onMonthChange={setCalMonth}
-          selectedYmd={fDate}
-          onSelect={pickCalendarDay}
-          onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
-          activeRound={activeRound}
         />
 
         {/* 🔴 แถบสรุปเลข (ต้องโทรใครตอนนี้ / สถานะสาย) กับปุ่มรีเฟรช **ถูกถอดออก**

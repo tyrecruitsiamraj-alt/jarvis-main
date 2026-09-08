@@ -13,6 +13,7 @@ import {
   inFollowRoundBucket,
   type FollowRoundBucket,
 } from '@/lib/followRoundBuckets';
+import type { FollowRoundFilter } from '@/lib/followPlanning';
 import {
   followCallResultSummary,
   countFollowCallResults,
@@ -126,7 +127,9 @@ export default function FollowCallRoundsPanel({
   entries,
   loading = false,
   onReload,
+  round,
   onRoundChange,
+  embedded = false,
 }: {
   /**
    * ปุ่มเสริมข้างไอคอนปฏิทิน (เจ้าของสั่ง 18 ส.ค. 2569 ค่ำ-5: ปุ่ม "เพิ่มเรื่อง" /
@@ -145,22 +148,25 @@ export default function FollowCallRoundsPanel({
   loading?: boolean;
   onReload?: () => void;
   /**
-   * บอกหน้าแม่ว่ากำลังดูรอบไหนอยู่ (เจ้าของสั่ง 1 ก.ย. 2569:
-   * *"ถ้าเลือกการโทรครั้งที่ 1 ตารางปฏิทินก็โชว์ข้อมูลแค่ของครั้งที่ 1 สิ"*)
+   * รอบที่กำลังดู — **หน้าแม่เป็นเจ้าของ state** (รวมแผงกับปฏิทินเป็นการ์ดเดียว
+   * 8 ก.ย. 2569) เดิมแผงนี้ถือ state เอง ⇒ จอมีตัวเลือกรอบสองที่ (แท็บบนแผง +
+   * ชิปในปฏิทิน) ผู้ทดสอบตาใหม่ถามว่า *"ทำไมมีสองที่พูดเรื่องเดียวกัน"*
    */
-  onRoundChange?: (slot: number) => void;
+  round: FollowRoundFilter;
+  onRoundChange: (round: FollowRoundFilter) => void;
+  /**
+   * ฝังอยู่ในผืนของการ์ดอื่น — ไม่วาดเปลือกการ์ด/หัวเรื่อง/ปุ่มรีเฟรชของตัวเอง
+   * (แพตเทิร์นเดียวกับ `embedded` ของ dialog ตามกติกา CLAUDE.md)
+   */
+  embedded?: boolean;
 }) {
   /** โฉมใหม่อยู่ไหม — เปลี่ยนแค่คลาสสี/ระยะ โครง JSX และข้อมูลเส้นเดียวกันทั้งสองโฉม */
   const v2 = useUiV2();
   /** popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน · null = ปิดอยู่ */
   const [peopleDialog, setPeopleDialog] = useState<PeopleDialogState | null>(null);
-  /** รอบที่กำลังดูอยู่ — แท็บ "การโทรครั้งที่ 1/2/3" กดแล้ว visual เปลี่ยนตาม */
-  const [activeRound, setActiveRound] = useState(1);
-  /** เปลี่ยนรอบ = บอกหน้าแม่ด้วย ปฏิทินข้างล่างจะได้กรองตาม */
-  const pickRound = (slot: number) => {
-    setActiveRound(slot);
-    onRoundChange?.(slot);
-  };
+  /** รอบที่กำลังดูอยู่ — มาจากหน้าแม่ (ตัวเลือกรอบมีที่เดียวทั้งหน้า) */
+  const activeRound = round;
+  const pickRound = (r: FollowRoundFilter) => onRoundChange(r);
 
   /**
    * คนในแต่ละรอบ — นับจาก **ชุดเดียวกับที่แสดงชื่อ** ยอดกับรายชื่อจึงตรงกันเสมอ
@@ -195,11 +201,25 @@ export default function FollowCallRoundsPanel({
     return map;
   }, [roundRows]);
 
-  const openBucketDialog = (slot: number, b: FollowRoundBucket) => {
-    const rows = roundRows.get(slot) ?? [];
+  /**
+   * คนของรอบที่เลือก — `'all'` = ทุกสายที่อยู่ในรอบใดรอบหนึ่งแล้ว
+   * (คนที่ยังไม่เคยเข้าคิวและยังไม่มีผลไม่อยู่รอบไหน จึงไม่ถูกนับ — นิยามเดิมของ `roundRows`)
+   */
+  const rowsOfRound = useMemo(
+    () =>
+      activeRound === 'all'
+        ? [...roundRows.values()].flat()
+        : (roundRows.get(activeRound) ?? []),
+    [roundRows, activeRound],
+  );
+  const countsOfRound = useMemo(() => countFollowRoundBuckets(rowsOfRound), [rowsOfRound]);
+  const roundLabelOf = (r: FollowRoundFilter) => (r === 'all' ? 'ทุกสาย' : roundTabLabel(r));
+
+  const openBucketDialog = (slot: FollowRoundFilter, b: FollowRoundBucket) => {
+    const rows = slot === 'all' ? rowsOfRound : (roundRows.get(slot) ?? []);
     const list = rows.filter((r) => inFollowRoundBucket(r, b));
     setPeopleDialog({
-      title: `${roundTabLabel(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
+      title: `${roundLabelOf(slot)} · ${FOLLOW_ROUND_BUCKET_LABEL[b]} (${list.length.toLocaleString('th-TH')} คน)`,
       hint: FOLLOW_ROUND_BUCKET_HINT[b],
       people: list,
     });
@@ -208,14 +228,17 @@ export default function FollowCallRoundsPanel({
   return (
     <div
       className={cn(
-        v2
-          ? 'overflow-hidden rounded-2xl border border-border bg-card shadow-sm'
-          : cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card),
+        embedded
+          ? '' // ฝังในผืนของการ์ดอื่น — เปลือก/หัวเรื่อง/ปุ่มรีเฟรชเป็นของการ์ดแม่
+          : v2
+            ? 'overflow-hidden rounded-2xl border border-border bg-card shadow-sm'
+            : cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card),
       )}
     >
       <div
         className={cn(
           'flex flex-wrap items-start justify-between gap-2',
+          embedded && 'hidden',
           v2 && 'px-4 pb-3 pt-4 md:px-5',
         )}
       >
@@ -282,22 +305,23 @@ export default function FollowCallRoundsPanel({
           v2
             ? /* โฉมใหม่: แถวเดียวคั่นเส้นบาง ไม่ใช่การ์ดพาสเทล 3 ใบลอย ๆ ในกล่อง */
               cn(
-                'grid grid-cols-1 sm:grid-cols-3',
-                '[&>*]:border-border/60 max-sm:[&>*:not(:first-child)]:border-t sm:[&>*:not(:first-child)]:border-l',
+                'grid grid-cols-2 sm:grid-cols-4',
+                '[&>*]:border-border/60 max-sm:[&>*:nth-child(n+3)]:border-t sm:[&>*:not(:first-child)]:border-l',
+                'max-sm:[&>*:nth-child(even)]:border-l',
               )
-            : 'grid grid-cols-1 gap-1.5 sm:grid-cols-3',
+            : 'grid grid-cols-2 gap-1.5 sm:grid-cols-4',
         )}
       >
-        {[1, 2, 3].map((slot) => {
-          const counts = countsByRound.get(slot);
-          const rows = roundRows.get(slot) ?? [];
+        {(['all', 1, 2, 3] as FollowRoundFilter[]).map((slot) => {
+          const rows = slot === 'all' ? [...roundRows.values()].flat() : (roundRows.get(slot) ?? []);
+          const counts = slot === 'all' ? countFollowRoundBuckets(rows) : countsByRound.get(slot);
           if (!counts) return null;
           const signal = roundSignal(counts, overdueWaitingCount(rows));
           const active = slot === activeRound;
           const tone = TONE[signal.tone];
           return (
             <button
-              key={slot}
+              key={String(slot)}
               type="button"
               onClick={() => pickRound(slot)}
               aria-pressed={active}
@@ -324,7 +348,7 @@ export default function FollowCallRoundsPanel({
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
                   <span className={cn('text-[11px] font-bold sm:truncate', active ? tone.value : DASH.cellStrong)}>
-                    {roundTabLabel(slot)}
+                    {roundLabelOf(slot)}
                   </span>
                 </span>
                 <span
@@ -369,9 +393,8 @@ export default function FollowCallRoundsPanel({
           สีพื้นบอกว่าควรทำอะไร: เขียว=ดีแล้ว · เหลือง=ต้องตามต่อ · แดง=หลุด ต้องตัดสินใจ ·
           น้ำเงิน=กำลังเดิน · เทา=ยังไม่ถึงคิว หรือไม่มีใครในช่อง */}
       {(() => {
-        const counts = countsByRound.get(activeRound);
-        if (!counts) return null;
-        const signal = roundSignal(counts, overdueWaitingCount(roundRows.get(activeRound) ?? []));
+        const counts = countsOfRound;
+        const signal = roundSignal(counts, overdueWaitingCount(rowsOfRound));
         const signalTone = TONE[signal.tone];
         return (
           <div className={cn(v2 ? '' : 'space-y-2')}>
@@ -394,7 +417,7 @@ export default function FollowCallRoundsPanel({
                 (เจ้าของสั่งไว้ว่าเจ็ดกล่องคือเจ็ด) · ช่อง "ไป/ไม่ไป" ในกล่องคือผลที่
                 **คนกดปิดงาน** ส่วนบรรทัดนี้คือคำตอบที่ **AI ได้มาจากปากคนรับสาย** */}
             {(() => {
-              const rows = roundRows.get(activeRound) ?? [];
+              const rows = rowsOfRound;
               const text = followCallResultSummary(rows);
               if (!text) {
                 return rows.length > 0 ? (
@@ -426,6 +449,14 @@ export default function FollowCallRoundsPanel({
 
             {/* Wave 2.1: มือถือ 2 คอลัมน์ (ช่องกว้างพอให้ป้ายอ่านจบ) — เดิม 4 ช่องต่อแถว
                 บน 375px ป้ายถูกตัดเป็น "ทั้งห…" "กำลัง…" "โทรไม่…" · ช่องครบ 7 ช่องเท่าเดิม */}
+            {/* 🔴 บอกขอบเขตให้ชัด — ตัวเลขชุดนี้คือ "ทุกวัน" ส่วนตัวเลขของปฏิทินข้างล่างคือ
+                "วันที่เลือก" · ผู้ทดสอบตาใหม่ (8 ก.ย. 2569) สับสนว่าทำไมมีตัวเลขสองชุด */}
+            {embedded ? (
+              <p className={cn('border-t border-border/70 px-4 py-2.5 text-[11px] md:px-5', DASH.muted)}>
+                สถานะสายของ <span className="font-semibold">{roundLabelOf(activeRound)}</span> ·{' '}
+                <span className="font-semibold">ทุกวัน</span> — กดกล่องเพื่อดูรายชื่อ
+              </p>
+            ) : null}
             <div
               className={cn(
                 v2

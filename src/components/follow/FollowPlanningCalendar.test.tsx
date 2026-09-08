@@ -19,6 +19,7 @@ import FollowPlanningCalendar from './FollowPlanningCalendar';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import type { FollowEntry } from '@/lib/followApi';
+import type { FollowRoundFilter } from '@/lib/followPlanning';
 import { TONE } from '@/lib/designTokens';
 
 /** 16:00 น. เวลาไทย ของวันที่ 7 ก.ย. 2569 — เทสต์นี้ยึด "วันนี้" เป็นวันนั้น */
@@ -45,7 +46,20 @@ function entry(over: Partial<FollowEntry> = {}): FollowEntry {
   } as FollowEntry;
 }
 
-function renderCalendar(entries: FollowEntry[], opts: { selectedYmd?: string; onOpenCell?: () => void } = {}) {
+/**
+ * ⚠️ ตัวเลือกรอบ (ทุกสาย/สายที่ 1-3) **ไม่ได้อยู่ในการ์ดนี้แล้ว** — ย้ายไปอยู่กับแผงรอบโทร
+ * ที่หน้าแม่ส่งเข้ามาทาง `roundsSlot` (รวมสองการ์ดเป็นหนึ่ง 8 ก.ย. 2569)
+ * เทสต์จึงคุมด้วย prop `roundFilter` ตรง ๆ แทนการกดชิป
+ */
+function renderCalendar(
+  entries: FollowEntry[],
+  opts: {
+    selectedYmd?: string;
+    onOpenCell?: () => void;
+    roundFilter?: FollowRoundFilter;
+    roundsSlot?: React.ReactNode;
+  } = {},
+) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
   render(
     <FollowPlanningCalendar
@@ -55,6 +69,8 @@ function renderCalendar(entries: FollowEntry[], opts: { selectedYmd?: string; on
       selectedYmd={opts.selectedYmd ?? TODAY}
       onSelect={() => {}}
       onOpenCell={opts.onOpenCell ?? (() => {})}
+      roundFilter={opts.roundFilter ?? 'all'}
+      roundsSlot={opts.roundsSlot}
     />,
   );
   return rows;
@@ -101,9 +117,9 @@ describe('หน้ารายวัน — สายที่ต้องต�
     // เรียงตามเวลา — 15:23 (สาย 1) มาก่อน 15:30 (สาย 2)
     expect(within(items[0]).getByText('ไป')).toBeTruthy();
     expect(within(items[0]).getByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toBeTruthy();
-    expect(within(items[0]).getByText('สายที่ 1')).toBeTruthy();
+    expect(within(items[0]).getByText('รอบโทรที่ 1')).toBeTruthy();
     // สาย 2 ยังไม่มีผล — ต้องไม่โดนผลของสาย 1 กลบ
-    expect(within(items[1]).getByText('สายที่ 2')).toBeTruthy();
+    expect(within(items[1]).getByText('รอบโทรที่ 2')).toBeTruthy();
     expect(within(items[1]).queryByText(/ไปแน่นอน/)).toBeNull();
     expect(within(items[1]).getByText('เลยเวลานัด')).toBeTruthy();
     expect(statValue('ไป')).toBe('1');
@@ -127,20 +143,25 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(statValue('ยังไม่รู้ผล')).toBe('2');
   });
 
-  it('🔴 กรอง "สายที่ 2" ⇒ ลิสต์เหลือสายเดียว และเลขหัวคิดใหม่ตามที่กรอง', () => {
-    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }));
-    fireEvent.click(screen.getByRole('button', { name: 'สายที่ 2', pressed: false }));
+  it('🔴 เลือก "สายที่ 2" ⇒ ลิสต์เหลือสายเดียว และเลขหัวคิดใหม่ตามที่เลือก', () => {
+    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }), { roundFilter: 2 });
     const items = screen.getAllByRole('listitem');
     expect(items).toHaveLength(1);
-    expect(within(items[0]).getByText('สายที่ 2')).toBeTruthy();
+    expect(within(items[0]).getByText('รอบโทรที่ 2')).toBeTruthy();
     expect(statValue('สายที่ต้องตาม')).toBe('1');
     expect(statValue('ไป')).toBe('0');
   });
 
-  it('ชิปกรองขึ้นเฉพาะสายที่มีจริงในวันนั้น', () => {
-    renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    expect(screen.getByRole('button', { name: 'สายที่ 1' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'สายที่ 2' })).toBeNull();
+  it('เลือกสายที่วันนั้นไม่มี ⇒ บอกให้กลับไปกด "ทุกสาย" ไม่ใช่ปล่อยจอว่าง', () => {
+    renderCalendar([entry({ id: 'r1', call_round: 1 })], { roundFilter: 2 });
+    expect(screen.getByText(/วันนี้ไม่มีรอบโทรที่ 2/)).toBeTruthy();
+  });
+
+  it('🔴 แผงรอบโทรที่หน้าแม่ส่งมา ต้องอยู่ในผืนเดียวกัน (ยุบสองการ์ดเป็นหนึ่ง)', () => {
+    renderCalendar(twoRounds(), {
+      roundsSlot: <div data-testid="rounds-slot">แผงรอบโทร</div>,
+    });
+    expect(screen.getByTestId('rounds-slot')).toBeTruthy();
   });
 
   it('กดแถวสาย ⇒ เปิดรายละเอียดของสายนั้น', () => {
