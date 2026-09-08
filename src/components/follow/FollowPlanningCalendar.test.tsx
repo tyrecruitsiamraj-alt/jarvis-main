@@ -80,9 +80,12 @@ function renderCalendar(
 const showMonthView = () =>
   fireEvent.mouseDown(screen.getByRole('tab', { name: /รายเดือน/ }), { button: 0 });
 
-/** เลขใหญ่ในช่องสถิติที่มีป้ายนี้ */
+/** เลขใหญ่ในการ์ดสถิติใบที่มีป้ายนี้ (การ์ดติด `data-stat` ไว้ให้เล็ง) */
 const statValue = (label: string) =>
-  screen.getByText(label, { selector: 'div' }).previousElementSibling?.textContent;
+  document.querySelector(`[data-stat="${label}"] p`)?.textContent;
+
+/** แถวของรายการหลักเท่านั้น — แผงข้างขวาก็เป็น <li> เหมือนกัน ต้องกันไม่ให้ปน */
+const dayRows = () => within(screen.getByTestId('day-calls')).getAllByRole('listitem');
 
 const twoRounds = (over1: Partial<FollowEntry> = {}, over2: Partial<FollowEntry> = {}) => [
   entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-07T08:23:00Z', ...over1 }),
@@ -112,7 +115,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
         call_summary: 'ผู้รับสายบอกว่าไปแน่นอน เจอกันวันจันทร์เช้า',
       }),
     );
-    const items = screen.getAllByRole('listitem');
+    const items = dayRows();
     expect(items).toHaveLength(2);
     // เรียงตามเวลา — 15:23 (สาย 1) มาก่อน 15:30 (สาย 2)
     expect(within(items[0]).getByText('ไป')).toBeTruthy();
@@ -129,7 +132,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
     renderCalendar(
       twoRounds({ call_status: 'completed', call_outcome: 'declined', call_summary: 'ได้งานที่อื่นใกล้บ้านกว่าแล้ว' }),
     );
-    const first = screen.getAllByRole('listitem')[0];
+    const first = dayRows()[0];
     expect(within(first).getByText('ไม่ไป')).toBeTruthy();
     expect(within(first).getByText(/ได้งานที่อื่นใกล้บ้านกว่าแล้ว/)).toBeTruthy();
     expect(statValue('ไม่ไป')).toBe('1');
@@ -137,7 +140,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
 
   it('ไม่รับสาย ⇒ ชิปบนแถวใช้คำเดียวกับแผงข้างบน ("โทรไม่ติด") และนับรวมใน "ยังไม่รู้ผล"', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'no_answer' }));
-    const first = screen.getAllByRole('listitem')[0];
+    const first = dayRows()[0];
     expect(within(first).getByText(/โทรไม่ติด/)).toBeTruthy();
     // โทรไม่ติด (สาย 1) + เลยเวลานัด (สาย 2) = ยังไม่รู้ผลทั้งคู่
     expect(statValue('ยังไม่รู้ผล')).toBe('2');
@@ -145,7 +148,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
 
   it('🔴 เลือก "สายที่ 2" ⇒ ลิสต์เหลือสายเดียว และเลขหัวคิดใหม่ตามที่เลือก', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'confirmed' }), { roundFilter: 2 });
-    const items = screen.getAllByRole('listitem');
+    const items = dayRows();
     expect(items).toHaveLength(1);
     expect(within(items[0]).getByText('รอบโทรที่ 2')).toBeTruthy();
     expect(statValue('สายที่ต้องตาม')).toBe('1');
@@ -167,7 +170,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
   it('กดแถวสาย ⇒ เปิดรายละเอียดของสายนั้น', () => {
     const onOpenCell = vi.fn();
     renderCalendar(twoRounds(), { onOpenCell });
-    fireEvent.click(screen.getAllByRole('listitem')[1].querySelector('button')!);
+    fireEvent.click(dayRows()[1].querySelector('button')!);
     expect(onOpenCell).toHaveBeenCalledTimes(1);
     expect(onOpenCell.mock.calls[0][2][0].entry.id).toBe('r2');
   });
@@ -179,7 +182,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
 
   it('ยกเลิกแล้วยังเห็น (จาง) แต่ไม่นับเป็นสายที่ต้องตาม', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1, cancelled: true })]);
-    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(dayRows()).toHaveLength(1);
     expect(statValue('สายที่ต้องตาม')).toBe('0');
   });
 });
@@ -189,14 +192,14 @@ describe('เบอร์ฉุกเฉินบนหน้ารายวั�
     renderCalendar([
       entry({ id: 'r1', call_round: 1, call_status: 'completed', call_outcome: 'no_answer', emergency_phone: '+66898143230' }),
     ]);
-    const li = screen.getAllByRole('listitem')[0];
+    const li = dayRows()[0];
     expect(within(li).getByText(/ฉุกเฉิน \+66898143230 · ยังไม่รู้ว่าโทรหรือยัง/)).toBeTruthy();
     expect(within(li).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
   });
 
   it('🔴 ไม่ได้แนบเบอร์ฉุกเฉิน ⇒ ต้องเตือน', () => {
     renderCalendar([entry({ id: 'r1', call_round: 1 })]);
-    expect(within(screen.getAllByRole('listitem')[0]).getByText('ไม่ได้แนบเบอร์ฉุกเฉิน')).toBeTruthy();
+    expect(within(dayRows()[0]).getByText('ไม่ได้แนบเบอร์ฉุกเฉิน')).toBeTruthy();
   });
 });
 
@@ -254,7 +257,7 @@ describe('แถว "ไม่ไป" — พื้นแดงอ่อนท�
         { call_status: 'completed', call_outcome: 'declined' }, // 15:30 ไม่ไป
       ),
     );
-    const items = screen.getAllByRole('listitem');
+    const items = dayRows();
     expect(items[0].getAttribute('data-category')).toBe('lost');
     expect(within(items[0]).getByText('15:30')).toBeTruthy();
     expect(items[1].getAttribute('data-category')).toBe('agreed');
@@ -267,7 +270,7 @@ describe('แถว "ไม่ไป" — พื้นแดงอ่อนท�
         { call_status: 'completed', call_outcome: 'confirmed' },
       ),
     );
-    const [lost, agreed] = screen.getAllByRole('listitem');
+    const [lost, agreed] = dayRows();
     // พื้นย้อมมาจาก token `TONE.danger.wash` ตัวเดียว — ไม่ใช่สีที่พิมพ์เองในไฟล์จอ
     const washBg = TONE.danger.wash.split(' ')[0];
     expect(lost.className).toContain(washBg);

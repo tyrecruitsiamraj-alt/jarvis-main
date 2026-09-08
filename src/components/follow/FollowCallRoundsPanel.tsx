@@ -229,7 +229,8 @@ export default function FollowCallRoundsPanel({
     <div
       className={cn(
         embedded
-          ? '' // ฝังในผืนของการ์ดอื่น — เปลือก/หัวเรื่อง/ปุ่มรีเฟรชเป็นของการ์ดแม่
+          ? /* การ์ดของตัวเองตามแบบอ้างอิง (หัวเรื่อง/ปุ่มรีเฟรชยังเป็นของหน้าแม่) */
+            'overflow-hidden rounded-2xl border bg-card shadow-sm'
           : v2
             ? 'overflow-hidden rounded-2xl border border-border bg-card shadow-sm'
             : cn('space-y-3 rounded-2xl border p-4 md:p-5', DASH.card),
@@ -453,7 +454,7 @@ export default function FollowCallRoundsPanel({
                 "วันที่เลือก" · ผู้ทดสอบตาใหม่ (8 ก.ย. 2569) สับสนว่าทำไมมีตัวเลขสองชุด */}
             {embedded ? (
               <p className={cn('border-t border-border/70 px-4 py-2.5 text-[11px] md:px-5', DASH.muted)}>
-                สถานะสายของ <span className="font-semibold">{roundLabelOf(activeRound)}</span> ·{' '}
+                ขั้นตอนของสาย · <span className="font-semibold">{roundLabelOf(activeRound)}</span> ·{' '}
                 <span className="font-semibold">ทุกวัน</span> — กดกล่องเพื่อดูรายชื่อ
               </p>
             ) : null}
@@ -525,6 +526,17 @@ export default function FollowCallRoundsPanel({
                       className={cn('block text-lg font-bold tabular-nums', tone.num, vis.muted && 'opacity-45')}
                     >
                       {n.toLocaleString('th-TH')}
+                    </span>
+                    {/* หลอดความคืบหน้าเทียบกับ "ทั้งหมด" — ยกมาจากการ์ดขั้นตอนของแบบอ้างอิง
+                        (ช่อง "ทั้งหมด" เองเป็นฐาน จึงเต็มเสมอ) · ความกว้างเป็น inline style
+                        เพราะเป็นค่าคำนวณ ไม่ใช่คลาสใหม่ */}
+                    <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
+                      <span
+                        className={cn('block h-full rounded-full', tone.dot)}
+                        style={{
+                          width: `${counts.all > 0 ? Math.round((n / counts.all) * 100) : 0}%`,
+                        }}
+                      />
                     </span>
                   </button>
                 );
