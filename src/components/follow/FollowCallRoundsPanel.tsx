@@ -36,7 +36,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Rule2 } from '@/components/shared/ui-v2/Sheet2';
 import { useUiV2 } from '@/lib/uiV2';
-import { HelpCircle, Phone, RefreshCw } from 'lucide-react';
+import { GitBranch, HelpCircle, Phone, RefreshCw } from 'lucide-react';
 
 /**
  * คำอธิบายนิยาม "รอบโทรที่" — **ข้อความเดียว ใช้สองที่** (เดสก์ท็อปโชว์เต็ม ·
@@ -224,6 +224,171 @@ export default function FollowCallRoundsPanel({
       people: list,
     });
   };
+
+  /** ป๊อปรายชื่อ — ใช้ร่วมทั้งโฉมเดิมและโฉมตามแบบอ้างอิง */
+  const peopleDialogEl = (
+    <>
+      {/* popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน */}
+      <Dialog open={peopleDialog != null} onOpenChange={(open) => !open && setPeopleDialog(null)}>
+        <DialogContent className="flex max-h-[min(88dvh,720px)] w-[min(calc(100vw-1.25rem),34rem)] max-w-none flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border/50 px-4 pb-3 pt-4 text-left">
+            <DialogTitle className="pr-8 text-sm font-bold leading-snug">
+              {peopleDialog?.title ?? ''}
+            </DialogTitle>
+            <DialogDescription className={cn('text-[11px]', DASH.muted)}>
+              {peopleDialog?.hint ?? ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+            {peopleDialog && peopleDialog.people.length > 0 ? (
+              <ul className="space-y-1.5">
+                {peopleDialog.people.map((p) => (
+                  <PersonRow key={p.id} p={p} />
+                ))}
+              </ul>
+            ) : (
+              <p className={cn('py-4 text-center text-xs', DASH.muted)}>ไม่มีรายชื่อในกล่องนี้</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
+  /**
+   * ═══ โฉมตามแบบอ้างอิงที่เจ้าของส่งมา (8 ก.ย. 2569) — การ์ด "ขั้นตอนของสาย" ═══
+   *
+   * เจ้าของทักว่า *"ตัวอย่างมันไม่ชัดเจนหรือว่าไง ถึงได้ทำออกมาให้เหมือนเขาไม่ได้"* —
+   * รอบก่อนผมเอาโครงเดิม (การ์ดรอบใหญ่ 4 ใบ + ช่องถัง 7 ช่องแบน ๆ) มาทาสีใหม่เฉย ๆ
+   * ซึ่งหน้าตาไม่ใช่ **Pipeline Stages** ของแบบอ้างอิงเลย
+   *
+   * แบบอ้างอิง = การ์ดใบเดียว หัวมีไอคอน+ชื่อเรื่องซ้าย เป้าหมายขวา · ข้างในเป็น
+   * **การ์ดขั้นตอนย่อย** แต่ละใบมี: ป้าย "ขั้นที่ N" · ตัวเลขในวงกลมมุมขวา · ชื่อไทยตัวหนา ·
+   * ชื่ออังกฤษตัวเทา · **หลอดหนาเต็มความกว้างที่ก้นการ์ด**
+   *
+   * ของเรา 7 ช่องสถานะสายคือ pipeline จริง ๆ อยู่แล้ว (รอโทร → กำลังโทร → โทรติด/ไม่ติด
+   * → ไป/ไม่ไป) จึงจับมาวางในทรงเดียวกันเป๊ะ · ตัวเลือกรอบย่อเป็นเม็ดยาเล็กบนหัวการ์ด
+   * (ของเดิมเป็นการ์ดใหญ่ 4 ใบ กินที่เท่า pipeline ทั้งแถบ)
+   *
+   * 🔴 ของเดิมอยู่ครบ: ยอดต่อรอบ · แถบสัญญาณ · บรรทัดผลจาก AI · 7 ช่องกดดูรายชื่อได้
+   */
+  if (embedded) {
+    const signal = roundSignal(countsOfRound, overdueWaitingCount(rowsOfRound));
+    const aiText = followCallResultSummary(rowsOfRound);
+    return (
+      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวเลือกรอบ ขวา (แบบอ้างอิงวางเป้าหมายไว้ขวา) */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-5">
+          <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
+          <h2 className="text-[17px] font-bold text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
+          <span className="flex-1" />
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="ตัวกรองรอบ">
+            <span className="text-[11px] text-muted-foreground">ดูเฉพาะ</span>
+            {(['all', 1, 2, 3] as FollowRoundFilter[]).map((r) => {
+              const rows = r === 'all' ? [...roundRows.values()].flat() : (roundRows.get(r) ?? []);
+              const active = r === activeRound;
+              return (
+                <button
+                  key={String(r)}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => pickRound(r)}
+                  title={`ตัวกรอง — แสดงเฉพาะ${roundLabelOf(r)} (ไม่ได้สั่งโทร)`}
+                  className={cn(
+                    'inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold transition-colors',
+                    active ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
+                  )}
+                >
+                  {roundLabelOf(r)}
+                  <span className={cn('tabular-nums', active ? 'opacity-90' : 'text-muted-foreground')}>
+                    {rows.length.toLocaleString('th-TH')}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* การ์ดขั้นตอนย่อย — ทรงเดียวกับ Pipeline Stages ของแบบอ้างอิง */}
+        <div className="grid grid-cols-2 gap-3 px-5 pb-4 pt-4 md:grid-cols-4 xl:grid-cols-7">
+          {FOLLOW_ROUND_BUCKETS.map((b, i) => {
+            const n = countsOfRound[b];
+            const vis = bucketVisual(b, n);
+            const tone = TONE[vis.tone];
+            const pct = countsOfRound.all > 0 ? Math.round((n / countsOfRound.all) * 100) : 0;
+            return (
+              <button
+                key={b}
+                type="button"
+                disabled={n === 0}
+                title={FOLLOW_ROUND_BUCKET_HINT[b]}
+                onClick={() => openBucketDialog(activeRound, b)}
+                className={cn(
+                  'flex flex-col rounded-xl border p-3 text-left transition-all',
+                  vis.muted
+                    ? 'cursor-default border-border/60 opacity-70'
+                    : cn(
+                        'border-border hover:-translate-y-0.5 hover:shadow-md',
+                        vis.actionable && cn(tone.soft, 'border-transparent'),
+                      ),
+                )}
+              >
+                <span className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-medium text-muted-foreground">ขั้นที่ {i + 1}</span>
+                  <span
+                    className={cn(
+                      'flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums',
+                      tone.chip,
+                    )}
+                  >
+                    {n.toLocaleString('th-TH')}
+                  </span>
+                </span>
+                <span className={cn('mt-2 text-[14px] font-bold leading-tight', tone.value)}>
+                  {FOLLOW_ROUND_BUCKET_LABEL[b]}
+                </span>
+                <span className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
+                  {FOLLOW_ROUND_BUCKET_HINT[b]}
+                </span>
+                {/* หลอดหนาที่ก้นการ์ด — จุดเด่นของแบบอ้างอิง */}
+                <span className="mt-auto block h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
+                  <span className={cn('block h-full rounded-full', tone.dot)} style={{ width: `${pct}%` }} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* สัญญาณ + ผลจาก AI ของรอบที่เลือก (ของเดิม ย้ายมาเป็นบรรทัดท้ายการ์ด) */}
+        {signal.text ? (
+          <div className="flex items-center gap-2 border-t border-border/70 px-5 py-2.5">
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', TONE[signal.tone].dot)} aria-hidden />
+            <p className={cn('text-[11.5px] font-semibold', TONE[signal.tone].value)}>{signal.text}</p>
+          </div>
+        ) : null}
+        {aiText ? (
+          <p className={cn('border-t border-border/70 px-5 py-2.5 text-[11.5px] font-semibold', TONE.info.value)}>
+            {aiText}
+          </p>
+        ) : rowsOfRound.length > 0 ? (
+          <p className={cn('border-t border-border/70 px-5 py-2.5 text-[11.5px]', DASH.muted)}>
+            {roundLabelOf(activeRound)} ยังไม่มีผลกลับจาก AI เลย
+          </p>
+        ) : null}
+        <p className={cn('border-t border-border/70 px-5 py-3 text-[10.5px]', DASH.muted)}>
+          ตัวเลขชุดนี้คือ <span className="font-semibold">ทุกวัน</span> (ของปฏิทินข้างล่างคือวันที่เลือก) ·
+          รอโทร/กำลังโทร/โทรติด/โทรไม่ติด = สถานะของสาย · ไป/ไม่ไป = ผลปิดงานติดตาม —
+          คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
+        </p>
+        {entries.length === 0 ? (
+          <p className={cn('border-t border-border/70 px-5 py-3 text-[11.5px]', DASH.muted)}>
+            ยังไม่มีงาน Follow — เพิ่มรายชื่อข้างล่างแล้วส่งโทร
+          </p>
+        ) : null}
+        {peopleDialogEl}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -572,30 +737,7 @@ export default function FollowCallRoundsPanel({
         คนเดียวอยู่ได้ทั้งสองแกน ช่องจึงไม่ได้บวกกันเป็น "ทั้งหมด"
       </p>
 
-      {/* popup รายชื่อ — ใช้ร่วมกันทั้งกล่องถังและวันบนปฏิทิน */}
-      <Dialog open={peopleDialog != null} onOpenChange={(open) => !open && setPeopleDialog(null)}>
-        <DialogContent className="flex max-h-[min(88dvh,720px)] w-[min(calc(100vw-1.25rem),34rem)] max-w-none flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 border-b border-border/50 px-4 pb-3 pt-4 text-left">
-            <DialogTitle className="pr-8 text-sm font-bold leading-snug">
-              {peopleDialog?.title ?? ''}
-            </DialogTitle>
-            <DialogDescription className={cn('text-[11px]', DASH.muted)}>
-              {peopleDialog?.hint ?? ''}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-            {peopleDialog && peopleDialog.people.length > 0 ? (
-              <ul className="space-y-1.5">
-                {peopleDialog.people.map((p) => (
-                  <PersonRow key={p.id} p={p} />
-                ))}
-              </ul>
-            ) : (
-              <p className={cn('py-4 text-center text-xs', DASH.muted)}>ไม่มีรายชื่อในกล่องนี้</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {peopleDialogEl}
     </div>
   );
 }

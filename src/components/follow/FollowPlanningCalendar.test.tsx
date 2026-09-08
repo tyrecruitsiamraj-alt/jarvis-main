@@ -84,8 +84,11 @@ const showMonthView = () =>
 const statValue = (label: string) =>
   document.querySelector(`[data-stat="${label}"] p`)?.textContent;
 
-/** แถวของรายการหลักเท่านั้น — แผงข้างขวาก็เป็น <li> เหมือนกัน ต้องกันไม่ให้ปน */
-const dayRows = () => within(screen.getByTestId('day-calls')).getAllByRole('listitem');
+/**
+ * แถวของตารางรายวันเท่านั้น — แผงข้างขวาก็มีรายการเหมือนกัน ต้องกันไม่ให้ปน
+ * (ตารางเปลี่ยนจาก `<ul><li>` เป็น `<table>` ตามแบบอ้างอิง 8 ก.ย. 2569)
+ */
+const dayRows = () => within(screen.getByTestId('day-calls')).getAllByRole('row');
 
 const twoRounds = (over1: Partial<FollowEntry> = {}, over2: Partial<FollowEntry> = {}) => [
   entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-07T08:23:00Z', ...over1 }),
@@ -170,7 +173,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
   it('กดแถวสาย ⇒ เปิดรายละเอียดของสายนั้น', () => {
     const onOpenCell = vi.fn();
     renderCalendar(twoRounds(), { onOpenCell });
-    fireEvent.click(dayRows()[1].querySelector('button')!);
+    fireEvent.click(within(dayRows()[1]).getByRole('button', { name: 'จัดการ' }));
     expect(onOpenCell).toHaveBeenCalledTimes(1);
     expect(onOpenCell.mock.calls[0][2][0].entry.id).toBe('r2');
   });
@@ -193,7 +196,10 @@ describe('เบอร์ฉุกเฉินบนหน้ารายวั�
       entry({ id: 'r1', call_round: 1, call_status: 'completed', call_outcome: 'no_answer', emergency_phone: '+66898143230' }),
     ]);
     const li = dayRows()[0];
-    expect(within(li).getByText(/ฉุกเฉิน \+66898143230 · ยังไม่รู้ว่าโทรหรือยัง/)).toBeTruthy();
+    // คอลัมน์ "เบอร์ฉุกเฉิน" ของตาราง — เบอร์บรรทัดบน สถานะบรรทัดล่าง (ไม่มีคำว่า "ฉุกเฉิน" นำแล้ว
+    // เพราะหัวคอลัมน์บอกอยู่)
+    expect(within(li).getByText(/\+66898143230/)).toBeTruthy();
+    expect(within(li).getByText('ยังไม่รู้ว่าโทรหรือยัง')).toBeTruthy();
     expect(within(li).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
   });
 

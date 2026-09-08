@@ -26,6 +26,7 @@ import {
   type FollowPlanningRow,
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
+import { DASH } from '@/lib/designTokens';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -54,6 +55,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
  */
 
 type View = 'day' | 'month';
+
+/** จำนวนสายต่อหน้าในตารางรายวัน (แบบอ้างอิงแบ่งหน้าเหมือนกัน) */
+const DAY_PAGE_SIZE = 12;
 
 /** ชื่อเดือนไทย + ปี พ.ศ. จากคีย์ YYYY-MM */
 function monthLabel(monthKey: string): string {
@@ -237,6 +241,15 @@ const FollowPlanningCalendar: React.FC<{
   }, [rows, dayYmd]);
   const daySummary = useMemo(() => summarizeFollowCalls(dayCalls.map((c) => c.round)), [dayCalls]);
 
+  /** แบ่งหน้าแบบแบบอ้างอิง — เปลี่ยนวัน/รอบแล้วต้องเด้งกลับหน้า 1 ไม่งั้นค้างหน้าว่าง */
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [dayYmd, roundFilter]);
+  const pageCount = Math.max(1, Math.ceil(dayCalls.length / DAY_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const firstIndex = (safePage - 1) * DAY_PAGE_SIZE;
+  const lastIndex = Math.min(firstIndex + DAY_PAGE_SIZE, dayCalls.length);
+  const pageCalls = dayCalls.slice(firstIndex, lastIndex);
+
   /* ─── มุมมองรายเดือน ─── */
   const monthSource = useMemo(
     () => (roundFilter === 'all' ? rows : filterPlanningRowsByRound(rows, roundFilter)),
@@ -348,7 +361,7 @@ const FollowPlanningCalendar: React.FC<{
       {roundsSlot}
 
       {/* ── 3. รายการหลัก (2/3) + แผงข้างขวา (1/3) ── */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+      <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2.4fr)_minmax(320px,1fr)]">
         <Card className="overflow-hidden rounded-2xl shadow-sm">
           <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-3 md:px-5">
             <Tabs value={view} onValueChange={(v) => setView(v as View)}>
@@ -463,126 +476,215 @@ const FollowPlanningCalendar: React.FC<{
                   หรือกดปฏิทินเลือกวัน
                 </p>
               ) : (
-                <ul data-testid="day-calls" className="divide-y divide-border/60">
-                  {dayCalls.map(({ row, round, slot, category }) => {
-                    const ai = roundAiSummary(round);
-                    const emg = roundEmergencyPhone(round);
-                    const tone = roundTone(round);
-                    const cancelled = round.state === 'cancelled';
-                    return (
-                      <li
-                        key={round.entry.id}
-                        data-category={category}
-                        className={cn(
-                          'transition-colors',
-                          category === 'lost' ? TONE.danger.wash : 'hover:bg-secondary/50',
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => onOpenCell(row, round.ymd ?? dayYmd, [round])}
-                          className={cn(
-                            'flex w-full items-start gap-3 px-4 py-3 text-left md:px-5',
-                            cancelled && 'opacity-60',
-                          )}
-                          title="กดเพื่อดูรายละเอียดและจัดการสายนี้"
-                        >
-                          {/* วงกลมอักษรย่อ — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป */}
-                          <span
-                            className={cn(
-                              'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-bold',
-                              TONE[tone].soft,
-                              TONE[tone].value,
-                            )}
-                            aria-hidden
-                          >
-                            {initials(row.group.name)}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span
-                                className={cn(
-                                  'text-[14px] font-bold text-foreground',
-                                  cancelled && 'line-through',
-                                )}
-                              >
-                                {row.group.name}
-                              </span>
-                              {row.group.unitName ? (
-                                <span className="text-[12px] text-muted-foreground">
-                                  {row.group.unitName}
+                <>
+                  {/**
+                   * 🔴 **ตารางมีหัวคอลัมน์** ตามแบบอ้างอิง (แก้ 8 ก.ย. 2569 — เจ้าของทักว่า
+                   * *"ทำออกมาให้เหมือนเขาไม่ได้"*) · ของเดิมเป็นลิสต์ อ่านได้แต่ไม่ใช่ทรงเดียวกับเขา
+                   * คอลัมน์จับคู่กับของเขา: ผู้สมัคร/ติดต่อ · หน่วยงาน · กำหนด(เวลานัด) ·
+                   * สถานะ · บันทึกล่าสุด(สรุป AI) · เบอร์ฉุกเฉิน · จัดการ
+                   */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-collapse text-left">
+                      <thead>
+                        <tr className={cn('border-b border-border', DASH.tableHead)}>
+                          <th className="min-w-[210px] px-4 py-2.5 text-[11px] font-semibold md:px-5">
+                            ผู้ที่ต้องติดตาม / ติดต่อ
+                          </th>
+                          <th className="hidden min-w-[130px] px-3 py-2.5 text-[11px] font-semibold lg:table-cell">หน่วยงาน</th>
+                          <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-semibold">เวลานัด / รอบ</th>
+                          <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-semibold">สถานะการโทร</th>
+                          <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-semibold">เขาตอบว่าอะไร</th>
+                          <th className="hidden min-w-[150px] px-3 py-2.5 text-[11px] font-semibold xl:table-cell">เบอร์ฉุกเฉิน</th>
+                          <th className="px-3 py-2.5 text-right text-[11px] font-semibold md:px-5">จัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody data-testid="day-calls">
+                        {pageCalls.map(({ row, round, slot, category }) => {
+                          const ai = roundAiSummary(round);
+                          const emg = roundEmergencyPhone(round);
+                          const tone = roundTone(round);
+                          const cancelled = round.state === 'cancelled';
+                          return (
+                            <tr
+                              key={round.entry.id}
+                              data-category={category}
+                              className={cn(
+                                'border-b border-border/50 align-top transition-colors last:border-0',
+                                category === 'lost' ? TONE.danger.wash : 'hover:bg-secondary/50',
+                                cancelled && 'opacity-60',
+                              )}
+                            >
+                              <td className="px-4 py-3 md:px-5">
+                                <span className="flex items-start gap-2.5">
+                                  {/* วงกลมอักษรย่อ — แบบอ้างอิงใช้รูปคน ฐานเราไม่มีรูป */}
+                                  <span
+                                    className={cn(
+                                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-bold',
+                                      TONE[tone].soft,
+                                      TONE[tone].value,
+                                    )}
+                                    aria-hidden
+                                  >
+                                    {initials(row.group.name)}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span
+                                      className={cn(
+                                        'block truncate text-[13.5px] font-bold text-foreground',
+                                        cancelled && 'line-through',
+                                      )}
+                                    >
+                                      {row.group.name}
+                                    </span>
+                                    <span className="block truncate text-[11.5px] text-muted-foreground">
+                                      {row.group.phone}
+                                    </span>
+                                  </span>
                                 </span>
-                              ) : null}
-                              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                {slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
-                              </span>
-                              {/* ป้ายสถานะ = เม็ดยากลม มีจุดสีนำหน้า (ตามแบบอ้างอิง) */}
-                              <span
-                                className={cn(
-                                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
-                                  TONE[tone].chip,
+                              </td>
+                              <td className="hidden px-3 py-3 text-[12px] text-muted-foreground lg:table-cell">
+                                {row.group.unitName || '—'}
+                              </td>
+                              <td className="px-3 py-3">
+                                <span
+                                  className={cn(
+                                    'block text-[16px] font-bold leading-none tabular-nums text-foreground',
+                                    cancelled && 'line-through',
+                                  )}
+                                >
+                                  {round.time ?? '—'}
+                                </span>
+                                <span className="mt-1 block text-[10.5px] text-muted-foreground">
+                                  {slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3">
+                                {/* ป้ายสถานะ = เม็ดยากลม มีจุดสีนำหน้า (ตามแบบอ้างอิง) */}
+                                <span
+                                  className={cn(
+                                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                                    TONE[tone].chip,
+                                  )}
+                                >
+                                  {isGoodResult(round) ? (
+                                    <Check className="h-3 w-3" aria-hidden />
+                                  ) : (
+                                    <span className={cn('h-1.5 w-1.5 rounded-full', TONE[tone].dot)} aria-hidden />
+                                  )}
+                                  {FOLLOW_CALL_CATEGORY_LABEL[category]}
+                                  {round.state === 'result' &&
+                                  (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
+                                    ? ` — ${roundResultLabel(round)}`
+                                    : ''}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3">
+                                {ai ? (
+                                  <span className="line-clamp-3 text-[12px] leading-snug text-foreground/80" title={ai}>
+                                    {ai}
+                                  </span>
+                                ) : round.state === 'result' ? (
+                                  <span className="text-[12px] text-muted-foreground">(ไม่มีสรุปจาก AI)</span>
+                                ) : round.state === 'notSent' &&
+                                  !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
+                                  <span className="text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
+                                ) : (
+                                  <span className="text-[12px] text-muted-foreground">—</span>
                                 )}
-                              >
-                                {isGoodResult(round) ? (
-                                  <Check className="h-3 w-3" aria-hidden />
+                              </td>
+                              <td className="hidden px-3 py-3 xl:table-cell">
+                                {emg ? (
+                                  <span className="block text-[11.5px] text-muted-foreground">
+                                    {emg}
+                                    {round.state === 'result' ? (
+                                      <span className="block text-[10.5px]">ยังไม่รู้ว่าโทรหรือยัง</span>
+                                    ) : null}
+                                  </span>
                                 ) : (
                                   <span
-                                    className={cn('h-1.5 w-1.5 rounded-full', TONE[tone].dot)}
-                                    aria-hidden
-                                  />
+                                    className={cn('inline-block rounded px-1.5 py-0.5 text-[10.5px] font-medium', TONE.warn.chip)}
+                                  >
+                                    ไม่ได้แนบเบอร์ฉุกเฉิน
+                                  </span>
                                 )}
-                                {FOLLOW_CALL_CATEGORY_LABEL[category]}
-                                {round.state === 'result' &&
-                                (category === 'unreachable' ||
-                                  round.entry.call_outcome === 'acknowledged')
-                                  ? ` — ${roundResultLabel(round)}`
-                                  : ''}
-                              </span>
-                            </span>
-                            {ai ? (
-                              <span className="mt-1 block text-[12px] leading-snug text-foreground/80">
-                                <span className="text-muted-foreground">เขาตอบ: </span>
-                                {ai}
-                              </span>
-                            ) : round.state === 'result' ? (
-                              <span className="mt-1 block text-[12px] text-muted-foreground">
-                                (ไม่มีสรุปจาก AI)
-                              </span>
-                            ) : round.state === 'notSent' &&
-                              !roundDispatchReason(round).startsWith(
-                                FOLLOW_CALL_CATEGORY_LABEL.notSent,
-                              ) ? (
-                              <span className="mt-1 block text-[12px] text-muted-foreground">
-                                {roundDispatchReason(round)}
-                              </span>
-                            ) : null}
-                            <span className="mt-1 block text-[11px] text-muted-foreground">
-                              {emg ? (
-                                <>
-                                  ฉุกเฉิน {emg}
-                                  {round.state === 'result' ? ' · ยังไม่รู้ว่าโทรหรือยัง' : ''}
-                                </>
-                              ) : (
-                                <span className={cn('rounded px-1 py-0.5 font-medium', TONE.warn.chip)}>
-                                  ไม่ได้แนบเบอร์ฉุกเฉิน
+                              </td>
+                              <td className="px-3 py-3 text-right md:px-5">
+                                <span className="inline-flex items-center gap-1.5">
+                                  {/* แบบอ้างอิงมีปุ่มโทรในแถว — ของเราลิงก์ tel: ไปแอปโทรของเครื่อง */}
+                                  <a
+                                    href={`tel:${row.group.phone}`}
+                                    aria-label={`โทรหา ${row.group.name}`}
+                                    title={`โทรหา ${row.group.name} · ${row.group.phone}`}
+                                    className={cn(
+                                      'inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
+                                      TONE.info.outline,
+                                    )}
+                                  >
+                                    <Phone className="h-3.5 w-3.5" aria-hidden />
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenCell(row, round.ymd ?? dayYmd, [round])}
+                                    title="ดูรายละเอียดและจัดการสายนี้"
+                                    className={cn(
+                                      'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-semibold transition-colors',
+                                      TONE.neutral.outline,
+                                    )}
+                                  >
+                                    จัดการ
+                                  </button>
                                 </span>
-                              )}
-                            </span>
-                          </span>
-                          {/* เวลาอยู่ขวาสุด — ตำแหน่งเดียวกับคอลัมน์ "กำหนดเริ่มงาน" ของแบบอ้างอิง */}
-                          <span
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* แถบแบ่งหน้า — แบบอ้างอิงมี "แสดง 1 ถึง 4 จากทั้งหมด 48 รายการติดตาม" */}
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3 md:px-5">
+                    <span className="text-[11.5px] text-muted-foreground">
+                      แสดง {firstIndex + 1} ถึง {lastIndex} จากทั้งหมด {dayCalls.length.toLocaleString('th-TH')} สาย
+                    </span>
+                    {pageCount > 1 ? (
+                      <span className="ml-auto flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label="หน้าก่อนหน้า"
+                          disabled={page <= 1}
+                          onClick={() => setPage((n) => Math.max(1, n - 1))}
+                          className={cn(NAV_BTN, 'disabled:opacity-40')}
+                        >
+                          <ChevronLeft className="h-4 w-4" aria-hidden />
+                        </button>
+                        {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            aria-current={n === page ? 'page' : undefined}
+                            onClick={() => setPage(n)}
                             className={cn(
-                              'shrink-0 text-[17px] font-bold leading-none tabular-nums text-foreground',
-                              cancelled && 'line-through',
+                              'inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-[11px] font-semibold tabular-nums transition-colors',
+                              n === page ? 'border-primary bg-primary text-primary-foreground' : TONE.neutral.outline,
                             )}
                           >
-                            {round.time ?? '—'}
-                          </span>
+                            {n}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          aria-label="หน้าถัดไป"
+                          disabled={page >= pageCount}
+                          onClick={() => setPage((n) => Math.min(pageCount, n + 1))}
+                          className={cn(NAV_BTN, 'disabled:opacity-40')}
+                        >
+                          <ChevronRight className="h-4 w-4" aria-hidden />
                         </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      </span>
+                    ) : null}
+                  </div>
+                </>
               )}
             </>
           ) : monthRows.length === 0 ? (
