@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { FollowEntry } from '../../src/lib/followApi';
 import { groupFollowEntries } from '../../src/lib/followGrouping';
-import { FOLLOW_ROUND_BUCKET_LABEL } from '../../src/lib/followRoundBuckets';
+import { FOLLOW_ROUND_BUCKET_LABEL, inFollowRoundBucket } from '../../src/lib/followRoundBuckets';
 import {
   buildFollowMonthRows,
   buildFollowPlanningRows,
@@ -550,15 +550,40 @@ describe('buildFollowDayCalls — "ไม่ไป" ขึ้นบนสุด�
  * ผู้ทดสอบตาใหม่ถามว่า *"โทรไม่ติด กับ ติดต่อไม่ได้ คือเรื่องเดียวกันไหม"* เพราะการ์ดปฏิทิน
  * เคยประดิษฐ์ศัพท์ชุดที่สาม ทั้งที่แผง "การโทรของงาน Follow" ข้างบนมีคำอยู่แล้ว
  */
-describe('คำของการ์ดปฏิทินต้องยืมจากแผงข้างบน ไม่ประดิษฐ์ใหม่', () => {
-  it('ไป / ไม่ไป / โทรไม่ติด / รอโทร ต้องเป็นคำเดียวกับ FOLLOW_ROUND_BUCKET_LABEL เป๊ะ', () => {
-    expect(FOLLOW_CALL_CATEGORY_LABEL.agreed).toBe(FOLLOW_ROUND_BUCKET_LABEL.went);
-    expect(FOLLOW_CALL_CATEGORY_LABEL.lost).toBe(FOLLOW_ROUND_BUCKET_LABEL.not_went);
-    expect(FOLLOW_CALL_CATEGORY_LABEL.unreachable).toBe(FOLLOW_ROUND_BUCKET_LABEL.unreached);
-    expect(FOLLOW_CALL_CATEGORY_LABEL.waiting).toBe(FOLLOW_ROUND_BUCKET_LABEL.waiting);
+describe('🔴 คำของหมวดผล ต้องไม่ชนกับคำของช่อง Pipeline (คนละนิยาม)', () => {
+  /**
+   * เจ้าของจับได้ 8 ก.ย. 2569: *"คำว่า ไป ด้านบนบอก 3 ด้านล่าง 0 ยังไงเนี่ย
+   * แล้วจะเชื่อถือได้หรอ"* — เช้าวันเดียวกันมีเทสต์บังคับให้ใช้ **คำเดียวกัน**
+   * โดยไม่ได้ตรวจว่านิยามตรงกันไหม ซึ่งไม่ตรงเลยสักคู่ ⇒ กลับด้านเป็นบังคับให้ **ต่างกัน**
+   */
+  it('ไป/ไม่ไป/โทรไม่ติด/รอโทร ของ Pipeline ต้องไม่ถูกยืมมาใช้เป็นคำของหมวด', () => {
+    const bucketWords = [
+      FOLLOW_ROUND_BUCKET_LABEL.went,
+      FOLLOW_ROUND_BUCKET_LABEL.not_went,
+      FOLLOW_ROUND_BUCKET_LABEL.unreached,
+      FOLLOW_ROUND_BUCKET_LABEL.waiting,
+      FOLLOW_ROUND_BUCKET_LABEL.connected,
+      FOLLOW_ROUND_BUCKET_LABEL.calling,
+    ];
+    for (const key of ['agreed', 'lost', 'unreachable', 'waiting'] as const) {
+      expect(
+        bucketWords,
+        `"${FOLLOW_CALL_CATEGORY_LABEL[key]}" ซ้ำกับคำของช่อง Pipeline ที่นับคนละอย่าง`,
+      ).not.toContain(FOLLOW_CALL_CATEGORY_LABEL[key]);
+    }
   });
 
-  it('ห้ามใช้คำที่เคยทำให้สับสนกลับมาอีก', () => {
+  it('หมวด "ตอบว่าไป" กว้างกว่าช่อง "ไป" ของ Pipeline จริง — จึงต้องคนละคำ', () => {
+    // ผลโทรว่ายืนยันจะไป แต่ยังไม่ได้ปิดงาน
+    const r = buildFollowPlanningRows(
+      groupFollowEntries([entry({ call_status: 'completed', call_outcome: 'confirmed' })], NOW),
+      NOW,
+    )[0].rounds[0];
+    expect(callCategory(r)).toBe('agreed'); // นับใน "ตอบว่าไป"
+    expect(inFollowRoundBucket(r.entry, 'went')).toBe(false); // แต่ไม่นับในช่อง "ไป"
+  });
+
+  it('ห้ามใช้คำที่เคยทำให้ผู้ใช้งงกลับมาอีก', () => {
     const banned = ['ติดต่อไม่ได้', 'ตกลง · ไป', 'รอผล'];
     for (const word of Object.values(FOLLOW_CALL_CATEGORY_LABEL)) {
       expect(banned, `"${word}" เคยทำให้ผู้ใช้งงมาแล้ว`).not.toContain(word);

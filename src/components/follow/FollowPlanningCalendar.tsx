@@ -114,10 +114,10 @@ function cellTitle(name: string, ymd: string, rounds: FollowPlanningRound[]): st
 
 /** คำอธิบายสี — ชุดเดียวใช้ทั้งสองมุมมอง (คำของเจ้าของ ปรับให้ตรงแผงข้างบน 8 ก.ย. 2569) */
 const DAY_LEGEND: ReadonlyArray<[keyof typeof TONE, string]> = [
-  ['success', 'เขียว = ไป'],
-  ['danger', 'แดง = ไม่ไป'],
-  ['warn', 'เหลือง = ยังไม่รู้ผล (โทรไม่ติด · เลยเวลานัด)'],
-  ['primary', 'น้ำเงิน = รอโทร'],
+  ['success', 'เขียว = ตอบว่าไป'],
+  ['danger', 'แดง = ตอบว่าไม่ไป'],
+  ['warn', 'เหลือง = ยังไม่รู้ผล (ไม่ได้คำตอบ · เลยเวลานัด)'],
+  ['primary', 'น้ำเงิน = ยังไม่ถึงเวลา'],
   ['orange', 'ส้ม = ไม่ได้ส่งให้ AI'],
   ['neutral', 'เทา = ยกเลิก (ขีดฆ่า)'],
 ];
@@ -334,26 +334,28 @@ const FollowPlanningCalendar: React.FC<{
           icon={<Phone className="h-5 w-5" />}
           foot="ทุกสายของวันที่เลือก ไม่นับที่ยกเลิก"
         />
+        {/* 🔴 "ตอบว่าไป" ≠ ช่อง "ไป" ใน Pipeline ข้างล่าง — อันนั้นคือ *ปิดงาน* แล้วเท่านั้น
+            (เจ้าของจับได้ 8 ก.ย. 2569 ว่าเลขสองที่ไม่ตรงกัน) เขียนกำกับที่ท้ายการ์ดให้ชัด */}
         <StatCard
-          label="ไป"
+          label="ตอบว่าไป"
           value={daySummary.went}
           tone="success"
           icon={<Check className="h-5 w-5" />}
-          foot="รู้แล้วว่าไป — ไม่ต้องตามต่อ"
+          foot="คำตอบจากสาย — ยังไม่ใช่การปิดงาน"
         />
         <StatCard
-          label="ไม่ไป"
+          label="ตอบว่าไม่ไป"
           value={daySummary.notWent}
           tone="danger"
           icon={<X className="h-5 w-5" />}
-          foot={daySummary.notWent > 0 ? 'ต้องหาคนแทน / แจ้งหน่วยงาน' : 'ยังไม่มีใครบอกว่าไม่ไป'}
+          foot={daySummary.notWent > 0 ? 'ต้องหาคนแทน / แจ้งหน่วยงาน' : 'ยังไม่มีใครตอบว่าไม่ไป'}
         />
         <StatCard
           label="ยังไม่รู้ผล"
           value={daySummary.unknown}
           tone="warn"
           icon={<Clock className="h-5 w-5" />}
-          foot="โทรไม่ติด · รอโทร · เลยเวลานัด · ไม่ได้ส่งให้ AI"
+          foot="ไม่ได้คำตอบ · ยังไม่ถึงเวลา · เลยเวลานัด · ไม่ได้ส่งให้ AI"
         />
       </div>
 
@@ -834,13 +836,13 @@ const FollowPlanningCalendar: React.FC<{
             </div>
             <dl className="mt-3 space-y-1.5 border-t border-border/70 pt-3 text-[12px]">
               <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">ไป</dt>
+                <dt className="text-muted-foreground">ตอบว่าไป</dt>
                 <dd className={cn('font-semibold tabular-nums', statTone('agreed'))}>
                   {monthSummary.went}
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">ไม่ไป</dt>
+                <dt className="text-muted-foreground">ตอบว่าไม่ไป</dt>
                 <dd className={cn('font-semibold tabular-nums', statTone('lost'))}>
                   {monthSummary.notWent}
                 </dd>

@@ -106,8 +106,8 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(statValue('สายที่ต้องตาม')).toBe('2');
     // ทั้งคู่ยังไม่มีผล ⇒ ไปกองที่ช่อง "ยังไม่รู้ผล" ช่องเดียว (เดิมแยก 6 ช่องจนอ่านไม่ออก)
     expect(statValue('ยังไม่รู้ผล')).toBe('2');
-    expect(statValue('ไป')).toBe('0');
-    expect(statValue('ไม่ไป')).toBe('0');
+    expect(statValue('ตอบว่าไป')).toBe('0');
+    expect(statValue('ตอบว่าไม่ไป')).toBe('0');
   });
 
   it('🔴 สายที่ 1 ตกลงแล้ว ⇒ เห็นเขียว + "เขาตอบ:" ทันที ทั้งที่สายที่ 2 ยังรอผล', () => {
@@ -121,14 +121,14 @@ describe('หน้ารายวัน — สายที่ต้องต�
     const items = dayRows();
     expect(items).toHaveLength(2);
     // เรียงตามเวลา — 15:23 (สาย 1) มาก่อน 15:30 (สาย 2)
-    expect(within(items[0]).getByText('ไป')).toBeTruthy();
+    expect(within(items[0]).getByText('ตอบว่าไป')).toBeTruthy();
     expect(within(items[0]).getByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toBeTruthy();
     expect(within(items[0]).getByText('รอบโทรที่ 1')).toBeTruthy();
     // สาย 2 ยังไม่มีผล — ต้องไม่โดนผลของสาย 1 กลบ
     expect(within(items[1]).getByText('รอบโทรที่ 2')).toBeTruthy();
     expect(within(items[1]).queryByText(/ไปแน่นอน/)).toBeNull();
     expect(within(items[1]).getByText('เลยเวลานัด')).toBeTruthy();
-    expect(statValue('ไป')).toBe('1');
+    expect(statValue('ตอบว่าไป')).toBe('1');
   });
 
   it('ไม่ไป ⇒ แดง + เหตุผลที่เขาตอบ', () => {
@@ -136,15 +136,15 @@ describe('หน้ารายวัน — สายที่ต้องต�
       twoRounds({ call_status: 'completed', call_outcome: 'declined', call_summary: 'ได้งานที่อื่นใกล้บ้านกว่าแล้ว' }),
     );
     const first = dayRows()[0];
-    expect(within(first).getByText('ไม่ไป')).toBeTruthy();
+    expect(within(first).getByText('ตอบว่าไม่ไป')).toBeTruthy();
     expect(within(first).getByText(/ได้งานที่อื่นใกล้บ้านกว่าแล้ว/)).toBeTruthy();
-    expect(statValue('ไม่ไป')).toBe('1');
+    expect(statValue('ตอบว่าไม่ไป')).toBe('1');
   });
 
-  it('ไม่รับสาย ⇒ ชิปบนแถวใช้คำเดียวกับแผงข้างบน ("โทรไม่ติด") และนับรวมใน "ยังไม่รู้ผล"', () => {
+  it('ไม่รับสาย ⇒ ชิปบอก "ไม่ได้คำตอบ" (คนละคำกับช่อง "โทรไม่ติด" ของ Pipeline) และนับใน "ยังไม่รู้ผล"', () => {
     renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'no_answer' }));
     const first = dayRows()[0];
-    expect(within(first).getByText(/โทรไม่ติด/)).toBeTruthy();
+    expect(within(first).getByText(/ไม่ได้คำตอบ/)).toBeTruthy();
     // โทรไม่ติด (สาย 1) + เลยเวลานัด (สาย 2) = ยังไม่รู้ผลทั้งคู่
     expect(statValue('ยังไม่รู้ผล')).toBe('2');
   });
@@ -155,7 +155,7 @@ describe('หน้ารายวัน — สายที่ต้องต�
     expect(items).toHaveLength(1);
     expect(within(items[0]).getByText('รอบโทรที่ 2')).toBeTruthy();
     expect(statValue('สายที่ต้องตาม')).toBe('1');
-    expect(statValue('ไป')).toBe('0');
+    expect(statValue('ตอบว่าไป')).toBe('0');
   });
 
   it('เลือกสายที่วันนั้นไม่มี ⇒ บอกให้กลับไปกด "ทุกสาย" ไม่ใช่ปล่อยจอว่าง', () => {
@@ -227,8 +227,8 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     showMonthView();
     const monthCell = screen.getAllByRole('cell')[0];
     expect(within(monthCell).getByText('3 ครั้ง')).toBeTruthy();
-    expect(within(monthCell).getByText('ไป 1')).toBeTruthy();
-    expect(within(monthCell).getByText('ไม่ไป 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ตอบว่าไป 1')).toBeTruthy();
+    expect(within(monthCell).getByText('ตอบว่าไม่ไป 1')).toBeTruthy();
     expect(within(monthCell).getByText('ยังไม่รู้ผล 1')).toBeTruthy();
   });
 
@@ -238,16 +238,16 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     ]);
     showMonthView();
     const dayCells = screen.getAllByRole('cell').slice(1);
-    expect(dayCells.some((c) => within(c).queryByText('ไม่ไป'))).toBe(true);
+    expect(dayCells.some((c) => within(c).queryByText('ตอบว่าไม่ไป'))).toBe(true);
     expect(dayCells.some((c) => within(c).queryByText(/ยกเลิก — ไม่ไปแล้ว/))).toBe(false);
   });
 
   it('คำอธิบายสีเป็นชุดเดียวกับหน้ารายวัน — เขียวไป เหลืองยังไม่รู้ผล แดงไม่ไป', () => {
     renderCalendar(twoRounds());
     showMonthView();
-    expect(screen.getByText('เขียว = ไป')).toBeTruthy();
+    expect(screen.getByText('เขียว = ตอบว่าไป')).toBeTruthy();
     expect(screen.getByText(/เหลือง = ยังไม่รู้ผล/)).toBeTruthy();
-    expect(screen.getByText('แดง = ไม่ไป')).toBeTruthy();
+    expect(screen.getByText('แดง = ตอบว่าไม่ไป')).toBeTruthy();
   });
 });
 
