@@ -487,8 +487,12 @@ export type FollowDayCall = {
 };
 
 /**
- * **ทุกสายของวันเดียว** เรียงตามเวลา — หนึ่งแถว = หนึ่งสาย (ไม่ใช่หนึ่งคน)
+ * **ทุกสายของวันเดียว** — หนึ่งแถว = หนึ่งสาย (ไม่ใช่หนึ่งคน)
  * เพราะคำถามของหน้านี้คือ "สายไหนต้องตาม" ไม่ใช่ "ใครอยู่ในระบบ"
+ *
+ * 🔴 **เรียง: "ไม่ไป" ขึ้นบนสุดก่อน แล้วค่อยเรียงตามเวลา** (เจ้าของสั่ง 8 ก.ย. 2569:
+ * *"คนไหนไม่ไปขอสีแดงอ่อน ๆ ในช่องนั้นไปเลย เปิดมารู้เลยว่านี่แหละไม่ไป และเรียงให้สีแดงอยู่บน ๆ"*)
+ * — คนที่บอกว่าไม่ไปคือเรื่องที่ต้องหาคนแทน/แจ้งหน่วยงานทันที ห้ามจมอยู่กลางลิสต์ตามเวลานัด
  * ⚠️ รวมสายที่ยกเลิกด้วย (โชว์จาง) — Lumos โชว์ว่ายกเลิก จอเราต้องเห็นด้วย
  */
 export function buildFollowDayCalls(
@@ -505,8 +509,10 @@ export function buildFollowDayCalls(
       out.push({ row, round, slot, category: callCategory(round) });
     }
   }
+  const lostFirst = (c: FollowDayCall) => (c.category === 'lost' ? 0 : 1);
   return out.sort(
     (a, b) =>
+      lostFirst(a) - lostFirst(b) ||
       (a.round.time ?? '99:99').localeCompare(b.round.time ?? '99:99') ||
       a.row.group.name.localeCompare(b.row.group.name, 'th'),
   );

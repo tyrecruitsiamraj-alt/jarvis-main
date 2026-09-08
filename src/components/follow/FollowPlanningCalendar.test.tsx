@@ -19,6 +19,7 @@ import FollowPlanningCalendar from './FollowPlanningCalendar';
 import { groupFollowEntries } from '@/lib/followGrouping';
 import { buildFollowPlanningRows } from '@/lib/followPlanning';
 import type { FollowEntry } from '@/lib/followApi';
+import { TONE } from '@/lib/designTokens';
 
 /** 16:00 น. เวลาไทย ของวันที่ 7 ก.ย. 2569 — เทสต์นี้ยึด "วันนี้" เป็นวันนั้น */
 const NOW = new Date('2026-09-07T09:00:00Z');
@@ -211,5 +212,38 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
     expect(screen.getByText('เขียว = ตกลง · ไป')).toBeTruthy();
     expect(screen.getByText(/เหลือง = ติดต่อไม่ได้/)).toBeTruthy();
     expect(screen.getByText('แดง = ไม่ไป')).toBeTruthy();
+  });
+});
+
+/**
+ * 🔴 เจ้าของสั่ง 8 ก.ย. 2569: *"คนไหนไม่ไปขอสีแดงอ่อน ๆ ในช่องนั้นไปเลย เปิดมารู้เลยว่านี่แหละไม่ไป
+ * และเรียงให้สีแดงอยู่บน ๆ"*
+ */
+describe('แถว "ไม่ไป" — พื้นแดงอ่อนทั้งแถว และอยู่บนสุด', () => {
+  it('ไม่ไปตอน 15:30 ต้องอยู่เหนือ ตกลงตอน 15:23 — ไม่ใช่เรียงตามเวลาอย่างเดียว', () => {
+    renderCalendar(
+      twoRounds(
+        { call_status: 'completed', call_outcome: 'confirmed' }, // 15:23 ตกลง
+        { call_status: 'completed', call_outcome: 'declined' }, // 15:30 ไม่ไป
+      ),
+    );
+    const items = screen.getAllByRole('listitem');
+    expect(items[0].getAttribute('data-category')).toBe('lost');
+    expect(within(items[0]).getByText('15:30')).toBeTruthy();
+    expect(items[1].getAttribute('data-category')).toBe('agreed');
+  });
+
+  it('แถวไม่ไปมีพื้นสี · แถวอื่นไม่มี', () => {
+    renderCalendar(
+      twoRounds(
+        { call_status: 'completed', call_outcome: 'declined' },
+        { call_status: 'completed', call_outcome: 'confirmed' },
+      ),
+    );
+    const [lost, agreed] = screen.getAllByRole('listitem');
+    // พื้นย้อมมาจาก token `TONE.danger.wash` ตัวเดียว — ไม่ใช่สีที่พิมพ์เองในไฟล์จอ
+    const washBg = TONE.danger.wash.split(' ')[0];
+    expect(lost.className).toContain(washBg);
+    expect(agreed.className).not.toContain(washBg);
   });
 });

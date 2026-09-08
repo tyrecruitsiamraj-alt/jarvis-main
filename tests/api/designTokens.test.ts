@@ -50,6 +50,7 @@ describe('designTokens — TONE', () => {
       'value',
       'soft',
       'softHover',
+      'wash',
       'outline',
       'solid',
       'dot',

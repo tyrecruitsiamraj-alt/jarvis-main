@@ -518,3 +518,26 @@ describe('หน้ารายวัน — buildFollowDayCalls / summarizeFoll
     expect(personMonthSummary(somchai, '2026-10').total).toBe(0);
   });
 });
+
+describe('buildFollowDayCalls — "ไม่ไป" ขึ้นบนสุดก่อนเวลา (เจ้าของสั่ง 8 ก.ย. 2569)', () => {
+  it('lost มาก่อนทุกหมวด แล้วในหมวดเดียวกันค่อยเรียงเวลา', () => {
+    const rows = buildFollowPlanningRows(
+      groupFollowEntries(
+        [
+          entry({ id: 'ok', recipient_phone: '0800000001', scheduled_at: '2026-09-01T01:00:00Z', call_status: 'completed', call_outcome: 'confirmed' }),
+          entry({ id: 'lost-late', recipient_phone: '0800000002', scheduled_at: '2026-09-01T08:00:00Z', call_status: 'completed', call_outcome: 'declined' }),
+          entry({ id: 'lost-early', recipient_phone: '0800000003', scheduled_at: '2026-09-01T02:00:00Z', call_status: 'completed', call_outcome: 'declined' }),
+          entry({ id: 'wait', recipient_phone: '0800000004', scheduled_at: '2026-09-01T00:30:00Z' }),
+        ],
+        NOW,
+      ),
+      NOW,
+    );
+    expect(buildFollowDayCalls(rows, '2026-09-01').map((c) => c.round.entry.id)).toEqual([
+      'lost-early',
+      'lost-late',
+      'wait',
+      'ok',
+    ]);
+  });
+});

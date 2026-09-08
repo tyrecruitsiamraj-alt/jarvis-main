@@ -55,6 +55,13 @@ export type ToneClasses = {
   /** hover ของกล่อง soft ที่กดได้ — ใส่คู่กับ soft เท่านั้น */
   softHover: string;
   /**
+   * **พื้นย้อมสีโทนจาง ๆ ทั้งแถว/ทั้งช่อง** + hover (เจ้าของสั่ง 8 ก.ย. 2569: *"คนไหนไม่ไป
+   * ขอสีแดงอ่อน ๆ ในช่องนั้นไปเลย เปิดมารู้เลย"*)
+   * ต่างจาก `soft` ที่เป็น "กระดาษเทา + ขอบสี" (บอกความหมายด้วยขอบ) — `wash` ย้อมพื้นเลย
+   * ใช้เฉพาะแถวที่ต้องสะดุดตาตั้งแต่ยังไม่ได้อ่าน ไม่ใช่ทาทุกแถวจนจอเป็นสีรุ้ง
+   */
+  wash: string;
+  /**
    * ปุ่ม/ลิงก์แบบเส้นขอบบนพื้นขาว (ธีมสว่าง) — เส้นขอบ + ตัวหนังสือสีโทน + hover จาง
    *
    * มีไว้เพราะเวลาเขียนมือมักลืมคู่มืดของ `bg-white` → ปุ่มเป็นสี่เหลี่ยมขาวโพลน
@@ -105,6 +112,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-slate-700 dark:text-slate-300',
     soft: 'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-slate-50 hover:bg-slate-100/70 dark:bg-slate-950/30 dark:hover:bg-slate-950/50',
     outline: 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-950/50',
     solid: 'bg-slate-700 text-white hover:bg-slate-600',
     dot: 'bg-slate-400',
@@ -119,6 +127,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-sky-800 dark:text-sky-300',
     soft: 'border-sky-300/70 bg-slate-50 dark:border-sky-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/30 dark:hover:bg-sky-950/50',
     outline: 'border-sky-300 bg-white text-sky-800 hover:bg-slate-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-950/50',
     solid: 'bg-sky-700 text-white hover:bg-sky-600',
     dot: 'bg-sky-600',
@@ -134,6 +143,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-blue-800 dark:text-blue-300',
     soft: 'border-blue-300/70 bg-slate-50 dark:border-blue-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-blue-50 hover:bg-blue-100/70 dark:bg-blue-950/30 dark:hover:bg-blue-950/50',
     outline: 'border-blue-300 bg-white text-blue-800 hover:bg-slate-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-slate-950/50',
     solid: 'bg-blue-800 text-white hover:bg-blue-700',
     dot: 'bg-blue-800',
@@ -150,6 +160,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-emerald-800 dark:text-emerald-300',
     soft: 'border-emerald-300/70 bg-slate-50 dark:border-emerald-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-emerald-50 hover:bg-emerald-100/70 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50',
     outline: 'border-emerald-300 bg-white text-emerald-800 hover:bg-slate-50 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-950/50',
     solid: 'bg-emerald-700 text-white hover:bg-emerald-600',
     dot: 'bg-emerald-700',
@@ -165,6 +176,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-amber-800 dark:text-amber-300',
     soft: 'border-amber-300/70 bg-slate-50 dark:border-amber-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/30 dark:hover:bg-amber-950/50',
     outline: 'border-amber-300 bg-white text-amber-800 hover:bg-slate-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-slate-950/50',
     solid: 'bg-amber-700 text-white hover:bg-amber-600',
     dot: 'bg-amber-700',
@@ -179,6 +191,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-rose-800 dark:text-red-300',
     soft: 'border-rose-300/70 bg-slate-50 dark:border-red-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-rose-50 hover:bg-rose-100/70 dark:bg-rose-950/30 dark:hover:bg-rose-950/50',
     outline: 'border-rose-300 bg-white text-rose-800 hover:bg-slate-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-300 dark:hover:bg-slate-950/50',
     solid: 'bg-rose-800 text-white hover:bg-rose-700',
     dot: 'bg-rose-800',
@@ -194,6 +207,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-violet-800 dark:text-violet-300',
     soft: 'border-violet-300/70 bg-slate-50 dark:border-violet-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-violet-50 hover:bg-violet-100/70 dark:bg-violet-950/30 dark:hover:bg-violet-950/50',
     outline: 'border-violet-300 bg-white text-violet-800 hover:bg-slate-50 dark:border-violet-800 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-slate-950/50',
     solid: 'bg-violet-700 text-white hover:bg-violet-600',
     dot: 'bg-violet-700',
@@ -209,6 +223,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-orange-800 dark:text-orange-300',
     soft: 'border-orange-300/70 bg-slate-50 dark:border-orange-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/30 dark:hover:bg-orange-950/50',
     outline: 'border-orange-300 bg-white text-orange-800 hover:bg-slate-50 dark:border-orange-800 dark:bg-slate-900 dark:text-orange-300 dark:hover:bg-slate-950/50',
     solid: 'bg-orange-600 text-white hover:bg-orange-500',
     dot: 'bg-orange-600',
@@ -223,6 +238,7 @@ export const TONE: Record<ToneKey, ToneClasses> = {
     value: 'text-teal-800 dark:text-teal-300',
     soft: 'border-teal-300/70 bg-slate-50 dark:border-teal-800/70 dark:bg-slate-800/50',
     softHover: 'hover:bg-slate-100 dark:hover:bg-slate-800',
+    wash: 'bg-teal-50 hover:bg-teal-100/70 dark:bg-teal-950/30 dark:hover:bg-teal-950/50',
     outline: 'border-teal-300 bg-white text-teal-800 hover:bg-slate-50 dark:border-teal-800 dark:bg-slate-900 dark:text-teal-300 dark:hover:bg-slate-950/50',
     solid: 'bg-teal-700 text-white hover:bg-teal-600',
     dot: 'bg-teal-700',
@@ -240,6 +256,7 @@ export const TONE_DARK_REQUIRED_VARIANTS = [
   'value',
   'soft',
   'softHover',
+  'wash',
   'outline',
 ] as const;
 

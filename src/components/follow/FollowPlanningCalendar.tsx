@@ -328,12 +328,22 @@ const FollowPlanningCalendar: React.FC<{
                 const tone = roundTone(round);
                 const cancelled = round.state === 'cancelled';
                 return (
-                  <li key={round.entry.id}>
+                  <li
+                    key={round.entry.id}
+                    data-category={category}
+                    className={cn(
+                      /* 🔴 "ไม่ไป" ทาแดงอ่อนทั้งแถว — เปิดมาต้องรู้เลยว่าแถวนี้แหละไม่ไป
+                         (เจ้าของสั่ง 8 ก.ย. 2569) · `wash` = พื้นย้อมโทนจาง ๆ ของ designTokens
+                         (ไม่ใช่ `soft` ที่เป็นกระดาษเทา — อันนั้นบอกความหมายด้วยขอบ ไม่ใช่พื้น) */
+                      'transition-colors',
+                      category === 'lost' ? TONE.danger.wash : 'hover:bg-secondary/50',
+                    )}
+                  >
                     <button
                       type="button"
                       onClick={() => onOpenCell(row, round.ymd ?? dayYmd, [round])}
                       className={cn(
-                        'grid w-full grid-cols-[56px_1fr] gap-x-3 px-6 py-3 text-left transition-colors hover:bg-secondary/50 lg:grid-cols-[64px_1fr] lg:px-8',
+                        'grid w-full grid-cols-[56px_1fr] gap-x-3 px-6 py-3 text-left lg:grid-cols-[64px_1fr] lg:px-8',
                         cancelled && 'opacity-60',
                       )}
                       title="กดเพื่อดูรายละเอียดและจัดการสายนี้"
