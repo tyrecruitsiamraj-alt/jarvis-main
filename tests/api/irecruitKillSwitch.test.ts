@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   getIrecruitSqlServerConfig,
   getIrecruitSqlServerPool,
+  irecruitUnavailableReason,
   isIrecruitEnabled,
 } from '../../api/_lib/irecruitSqlServer.js';
 
@@ -81,5 +82,28 @@ describe('สวิตช์ IRECRUIT_ENABLED', () => {
       process.env.IRECRUIT_ENABLED = v;
       expect(isIrecruitEnabled()).toBe(true);
     }
+  });
+});
+
+describe('เหตุผลที่ใช้ iRecruit ไม่ได้ (ต้องบอกให้ตรง ไม่งั้นคนไปตามหาของที่ไม่ได้หาย)', () => {
+  it('ใช้ได้ปกติ = null', () => {
+    fullCredentials();
+    delete process.env.IRECRUIT_ENABLED;
+    expect(irecruitUnavailableReason()).toBeNull();
+  });
+
+  it('ปิดสวิตช์ ⇒ บอกว่าปิดไว้ ไม่ใช่บอกว่ายังไม่ได้ตั้งค่า', () => {
+    fullCredentials();
+    process.env.IRECRUIT_ENABLED = 'false';
+    const reason = irecruitUnavailableReason() ?? '';
+    expect(reason).toContain('ปิดการเชื่อม');
+    expect(reason).not.toContain('IRECRUIT_DB_HOST');
+  });
+
+  it('ไม่มีค่าเชื่อมต่อ ⇒ บอกให้ไปตั้งค่า', () => {
+    fullCredentials();
+    delete process.env.IRECRUIT_ENABLED;
+    delete process.env.IRECRUIT_DB_HOST;
+    expect(irecruitUnavailableReason()).toContain('IRECRUIT_DB_HOST');
   });
 });

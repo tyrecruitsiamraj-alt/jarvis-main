@@ -21,7 +21,7 @@ import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
 import { getCachedCandidateSpec } from '../_lib/candidateSpecAnalyzer.js';
 import { listRecruitCandidatesByIds } from '../_lib/recruitRegisterSql.js';
-import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
+import { irecruitUnavailableReason } from '../_lib/irecruitSqlServer.js';
 import {
   listBoardReadyCandidates,
   boardPrimaryColumnId,
@@ -265,8 +265,9 @@ async function dispatchSelected(req: AuthedReq, res: ApiRes) {
   }
 
   if (irecruitIds.length > 0) {
-    if (!getIrecruitSqlServerConfig()) {
-      return sendError(res, 503, 'Service unavailable', 'ยังไม่ได้ตั้งค่า iRecruit DB');
+    const unavailable = irecruitUnavailableReason();
+    if (unavailable) {
+      return sendError(res, 503, 'Service unavailable', unavailable);
     }
     const candidates = await listRecruitCandidatesByIds(irecruitIds);
     const found = new Set(candidates.map((c) => c.id));

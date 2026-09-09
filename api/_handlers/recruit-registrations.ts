@@ -5,7 +5,10 @@ import {
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
-import { getIrecruitSqlServerConfig } from '../_lib/irecruitSqlServer.js';
+import {
+  getIrecruitSqlServerConfig,
+  irecruitUnavailableReason,
+} from '../_lib/irecruitSqlServer.js';
 import { listRecruitRegistrations } from '../_lib/recruitRegisterSql.js';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -26,9 +29,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'GET' && getQuery(req, 'meta') === '1') {
       const cfg = getIrecruitSqlServerConfig();
       // ⚠ ไม่คืน host/IP + ชื่อ database ให้ client (กันหลุด infra) — แค่บอกว่าต่อได้ไหมพอ
+      // แยก "ปิดสวิตช์" ออกจาก "ยังไม่ได้ตั้งค่า" — สองอย่างนี้แก้คนละทาง
       return res.status(200).json({
         enabled: Boolean(cfg),
         sqlServerConfigured: Boolean(cfg),
+        disabledReason: irecruitUnavailableReason(),
         owner: (process.env.RECRUIT_REGISTER_OWNER || 'RM').trim(),
         readOnly: true,
       });
@@ -38,13 +43,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 405, 'Method not allowed', 'Read-only feed from iRecruit');
     }
 
-    if (!getIrecruitSqlServerConfig()) {
-      return sendError(
-        res,
-        503,
-        'Service unavailable',
-        'ตั้งค่า IRECRUIT_DB_HOST / IRECRUIT_DB_USER / IRECRUIT_DB_NAME บนเซิร์ฟเวอร์ก่อน',
-      );
+    const unavailable = irecruitUnavailableReason();
+    if (unavailable) {
+      return sendError(res, 503, 'Service unavailable', unavailable);
     }
 
     const limitRaw = getQuery(req, 'limit');

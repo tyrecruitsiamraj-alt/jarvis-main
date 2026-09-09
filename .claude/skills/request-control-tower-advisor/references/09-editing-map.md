@@ -8233,7 +8233,7 @@ helper เทสต์เปลี่ยนมาเล็งสองจุด�
 
 | ไฟล์ | บทบาท |
 | --- | --- |
-| `api/_lib/irecruitSqlServer.ts` | `isIrecruitEnabled()` + `getIrecruitSqlServerConfig()` คืน `null` ทันทีเมื่อปิด — **จุดตายจุดเดียว** |
+| `api/_lib/irecruitSqlServer.ts` | `isIrecruitEnabled()` + `getIrecruitSqlServerConfig()` คืน `null` ทันทีเมื่อปิด — **จุดตายจุดเดียว** · `irecruitUnavailableReason()` คืนข้อความไทยที่ตรงเหตุ |
 | `tests/api/irecruitKillSwitch.test.ts` | คุมว่าปิดแล้วต้องไม่ต่อฐาน **แม้ env ครบ** · typo (`true`/`1`/`on`) ต้องไม่ทำระบบดับเงียบ |
 
 **ทำไมปิดแล้วจอไม่พัง** — ทุกทางเข้ารองรับสภาพ "ไม่มี config" อยู่ก่อนแล้ว:
@@ -8246,5 +8246,10 @@ helper เทสต์เปลี่ยนมาเล็งสองจุด�
   ⇒ จับคู่ต่อได้จากอีก 3 แหล่ง (`so_recruit` · `checklist` · `declined`) แค่ไม่มีคนจาก iRecruit
 * ไม่มี worker เบื้องหลังตัวไหนยิง iRecruit — `matchPrecomputeWorker` ใช้เฉพาะผู้สมัครบนบอร์ด
 
-⚠️ **เพิ่มทางเข้าใหม่ที่แตะ iRecruit เมื่อไหร่ ต้องเช็ค `getIrecruitSqlServerConfig()` ก่อนเสมอ**
+**ข้อความบอกผู้ใช้ต้องตรงเหตุ** — `irecruitUnavailableReason()` แยกสองเหตุออกจากกัน
+เพราะ **แก้คนละทาง**: "ปิดสวิตช์" (ค่าเชื่อมต่อครบ ตั้งใจปิด) กับ "ยังไม่ได้ตั้งค่า"
+เดิมทั้ง 3 handler ตอบ *"ยังไม่ได้ตั้งค่า iRecruit DB"* เหมือนกันหมด — ปิดสวิตช์แล้วจะ
+ส่งคนไปตามหา env ที่ไม่ได้หาย · `?meta=1` เพิ่มฟิลด์ `disabledReason` ให้จอเอาไปขึ้นป้ายได้
+
+⚠️ **เพิ่มทางเข้าใหม่ที่แตะ iRecruit เมื่อไหร่ ต้องเช็ค `irecruitUnavailableReason()` ก่อนเสมอ**
 (หรือหุ้ม try/catch แบบ `loadIrecruit`) ไม่งั้นปิดสวิตช์แล้วหน้านั้นจะ 500 แทนที่จะบอกผู้ใช้ดี ๆ

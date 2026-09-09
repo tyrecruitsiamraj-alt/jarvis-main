@@ -28,6 +28,23 @@ export function isIrecruitEnabled(): boolean {
   return !['false', '0', 'off', 'no'].includes(v);
 }
 
+/**
+ * เหตุผลที่ใช้ iRecruit ไม่ได้ตอนนี้ — `null` = ใช้ได้ปกติ
+ *
+ * มีไว้เพราะสองเหตุนี้ **แก้คนละทาง** และถ้าบอกผิดคนจะไปตามหาของที่ไม่ได้หาย:
+ *   ปิดสวิตช์ = ตั้งใจปิด · ค่าเชื่อมต่อครบอยู่
+ *   ไม่มี config = ยังไม่ได้ใส่ค่าบนเซิร์ฟเวอร์
+ */
+export function irecruitUnavailableReason(): string | null {
+  if (!isIrecruitEnabled()) {
+    return 'ปิดการเชื่อม iRecruit ไว้ชั่วคราวตามที่สั่ง (IRECRUIT_ENABLED=false) — ค่าเชื่อมต่อยังอยู่ครบ เปิดกลับได้ทันที';
+  }
+  if (!getIrecruitSqlServerConfig()) {
+    return 'ตั้งค่า IRECRUIT_DB_HOST / IRECRUIT_DB_USER / IRECRUIT_DB_NAME บนเซิร์ฟเวอร์ก่อน';
+  }
+  return null;
+}
+
 export function getIrecruitSqlServerConfig(): SiamrajSqlServerConfig | null {
   // 🔴 ปิดสวิตช์ = เหมือนยังไม่ได้ตั้งค่า — ห้ามต่อฐานแม้ env ครบ
   if (!isIrecruitEnabled()) return null;
