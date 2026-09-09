@@ -4,7 +4,33 @@ import {
   type SiamrajSqlServerConfig,
 } from './siamrajSqlServer.js';
 
+/**
+ * ═══ สวิตช์ปิดการเชื่อม iRecruit (เจ้าของสั่ง 9 ก.ย. 2569) ═══
+ *
+ * > *"หยุดเชื่อมกับ iRecruit ก่อนได้ไหม จะเชื่อมใหม่แล้วเดี๋ยวบอก"*
+ *
+ * ปิดด้วย `IRECRUIT_ENABLED=false` — **ไม่ต้องลบรหัสผ่าน/โฮสต์ทิ้ง** จะได้เปิดกลับได้ทันที
+ * (ลบ env ทิ้งแล้วเวลาจะต่อใหม่ต้องไปตามหาค่ามาใส่ใหม่ทั้งชุด)
+ *
+ * ปิดแล้วเกิดอะไร: `getIrecruitSqlServerConfig()` คืน `null` เหมือนตอน "ยังไม่ได้ตั้งค่า"
+ * ซึ่งเป็นสภาพที่ทุกทางเข้ารองรับอยู่แล้ว — ตอบ 503 พร้อมข้อความไทย ไม่ใช่จอพัง
+ * (`recruit-registrations` · `matching-irecruit-candidates` · `lumos-dispatch`
+ *  และ `recruit-registrations?meta=1` จะรายงาน `enabled: false`)
+ *
+ * ⚠️ ไม่มี worker เบื้องหลังตัวไหนยิง iRecruit เอง (ตรวจแล้ว 9 ก.ย. 2569 —
+ * `matchPrecomputeWorker` ใช้เฉพาะผู้สมัครบนบอร์ด) ปิดแล้วจึงไม่มีสายค้างวิ่งอยู่
+ *
+ * ค่าที่ถือว่า "ปิด": `false` `0` `off` `no` (ไม่ตั้งค่า = เปิดตามเดิม)
+ */
+export function isIrecruitEnabled(): boolean {
+  const v = (process.env.IRECRUIT_ENABLED ?? '').trim().toLowerCase();
+  if (v === '') return true;
+  return !['false', '0', 'off', 'no'].includes(v);
+}
+
 export function getIrecruitSqlServerConfig(): SiamrajSqlServerConfig | null {
+  // 🔴 ปิดสวิตช์ = เหมือนยังไม่ได้ตั้งค่า — ห้ามต่อฐานแม้ env ครบ
+  if (!isIrecruitEnabled()) return null;
   const explicitHost = (process.env.IRECRUIT_DB_HOST || '').trim();
   const useMainDb =
     !explicitHost && (process.env.DB_NAME || '').trim().toLowerCase() === 'irecruit';
@@ -49,7 +75,13 @@ const globalForMssql = globalThis as unknown as { __jarvisIrecruitMssqlPool?: sq
 
 export async function getIrecruitSqlServerPool(): Promise<sql.ConnectionPool> {
   const cfg = getIrecruitSqlServerConfig();
-  if (!cfg) throw new Error('Missing IRECRUIT_DB_HOST / IRECRUIT_DB_USER / IRECRUIT_DB_NAME for SQL Server');
+  if (!cfg) {
+    throw new Error(
+      isIrecruitEnabled()
+        ? 'Missing IRECRUIT_DB_HOST / IRECRUIT_DB_USER / IRECRUIT_DB_NAME for SQL Server'
+        : 'ปิดการเชื่อม iRecruit อยู่ (IRECRUIT_ENABLED=false) — เปิดกลับด้วยการลบตัวแปรนี้หรือตั้งเป็น true',
+    );
+  }
 
   if (globalForMssql.__jarvisIrecruitMssqlPool?.connected) {
     return globalForMssql.__jarvisIrecruitMssqlPool;

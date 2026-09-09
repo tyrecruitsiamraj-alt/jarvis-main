@@ -8221,3 +8221,30 @@ helper เทสต์เปลี่ยนมาเล็งสองจุด�
 
 🔴 **บทเรียน:** ก่อนยืมคำจากที่อื่นมาใช้ ต้องพิสูจน์ว่า **นิยามตรงกัน** ไม่ใช่แค่ "ความหมายคล้ายกัน"
 — คำเดียวกันบนจอเดียวต้องนับของชุดเดียวกันเสมอ ไม่งั้นคนเลิกเชื่อทั้งจอ
+
+---
+
+## สวิตช์ปิดการเชื่อม iRecruit (9 ก.ย. 2569)
+
+เจ้าของสั่ง: *"หยุดเชื่อมกับ iRecruit ก่อนได้ไหม จะเชื่อมใหม่แล้วเดี๋ยวบอก"*
+
+**ปิด/เปิดที่ตัวแปรตัวเดียว** — `IRECRUIT_ENABLED=false` (ลบตัวแปรทิ้ง = เปิดกลับ)
+เจตนาคือ **ไม่แตะ `IRECRUIT_DB_*`** เพราะลบรหัสผ่านทิ้งแล้วเวลาจะต่อใหม่ต้องไปตามหาค่าใหม่ทั้งชุด
+
+| ไฟล์ | บทบาท |
+| --- | --- |
+| `api/_lib/irecruitSqlServer.ts` | `isIrecruitEnabled()` + `getIrecruitSqlServerConfig()` คืน `null` ทันทีเมื่อปิด — **จุดตายจุดเดียว** |
+| `tests/api/irecruitKillSwitch.test.ts` | คุมว่าปิดแล้วต้องไม่ต่อฐาน **แม้ env ครบ** · typo (`true`/`1`/`on`) ต้องไม่ทำระบบดับเงียบ |
+
+**ทำไมปิดแล้วจอไม่พัง** — ทุกทางเข้ารองรับสภาพ "ไม่มี config" อยู่ก่อนแล้ว:
+
+* `api/_handlers/recruit-registrations.ts:41` · `matching-irecruit-candidates.ts:32` ·
+  `lumos-dispatch.ts:268` → ตอบ 503 พร้อมข้อความไทย
+* `recruit-registrations?meta=1` → `enabled: false` (จอเอาไปขึ้นป้ายบอกผู้ใช้ได้)
+* ทางอ้อม `matching-suggestions` / `matching-parse-branch-demand-job` →
+  `matchingEngine` → `recruitLaneMatcher.loadIrecruit()` ซึ่งมี try/catch คืนกองว่าง
+  ⇒ จับคู่ต่อได้จากอีก 3 แหล่ง (`so_recruit` · `checklist` · `declined`) แค่ไม่มีคนจาก iRecruit
+* ไม่มี worker เบื้องหลังตัวไหนยิง iRecruit — `matchPrecomputeWorker` ใช้เฉพาะผู้สมัครบนบอร์ด
+
+⚠️ **เพิ่มทางเข้าใหม่ที่แตะ iRecruit เมื่อไหร่ ต้องเช็ค `getIrecruitSqlServerConfig()` ก่อนเสมอ**
+(หรือหุ้ม try/catch แบบ `loadIrecruit`) ไม่งั้นปิดสวิตช์แล้วหน้านั้นจะ 500 แทนที่จะบอกผู้ใช้ดี ๆ
