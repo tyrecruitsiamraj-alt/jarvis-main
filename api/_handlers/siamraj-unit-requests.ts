@@ -81,6 +81,13 @@ export async function attachNotes(items: unknown[]): Promise<void> {
       // apply field overrides ที่ผู้ใช้แก้เอง (persist) ทับค่าจาก ERP
       const fo = n.field_overrides;
       if (fo) {
+        /**
+         * เกณฑ์ความเร่งเฉพาะใบ (10 ก.ย. 2569) — แนบดิบ ๆ ให้หน้าเว็บ
+         * ฝั่งหน้าเว็บ resolve เองที่ `jobLeadRules(job)` (ไม่ได้ตั้ง = ค่ากลาง)
+         * 🔴 ต้องแนบ**ทุกเส้นที่ส่งใบขอออกมา** ไม่งั้นหน้าหนึ่งวัดด้วยเกณฑ์ใบ อีกหน้าวัดด้วย
+         * ค่ากลาง แล้วเลขสองหน้าไม่ตรงกันโดยไม่มีใครรู้
+         */
+        if (fo.lead_rules) it.lead_rules = fo.lead_rules;
         if (fo.age_min !== undefined) it.age_range_min = fo.age_min;
         if (fo.age_max !== undefined) it.age_range_max = fo.age_max;
         if (fo.gender !== undefined && fo.gender !== null) it.gender_requirement = fo.gender;

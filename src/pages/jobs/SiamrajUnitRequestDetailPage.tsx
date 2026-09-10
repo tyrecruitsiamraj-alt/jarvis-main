@@ -12,7 +12,7 @@ import PrequestBadge from '@/components/jobs/PrequestBadge';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
-import { computeJobUrgency, URGENCY_FILTER_OPTIONS } from '@/lib/jobUrgency';
+import { computeJobUrgency, jobUrgencyHint } from '@/lib/jobUrgency';
 import { RosterBackedStaffSelect } from '@/components/jobs/RosterBackedStaffSelect';
 import { fetchSiamrajUnitRequest, saveSiamrajUnitAssignment } from '@/lib/siamrajUnitRequestsApi';
 import { buildRecruiterNameOptions, buildScreenerNameOptions, buildOplNameOptions } from '@/lib/jobStaffNames';
@@ -21,6 +21,7 @@ import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
 import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
+import RequestLeadRulesCard from '@/components/jobs/RequestLeadRulesCard';
 import { UnitRequestReplacementSelect } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
   UnitRequestWorkStatusBadge,
@@ -205,7 +206,11 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
   };
 
   const urgencyMeta = data ? computeJobUrgency(data) : null;
-  const urgencyHint = URGENCY_FILTER_OPTIONS.find((o) => o.value === urgencyMeta?.kind)?.hint;
+  /**
+   * คำอธิบายต้องพูด**เลขของใบนี้** — ใบที่ตั้งเกณฑ์เอง (10 ก.ย. 2569) ถ้ายังอ่านคำอธิบาย
+   * จากค่ากลาง ป้ายจะบอก "น้อยกว่า 7 วัน" ทั้งที่ใบนี้ตั้งไว้ 3 วัน = จอโกหก
+   */
+  const urgencyHint = data ? jobUrgencyHint(data) : undefined;
   /** อัตราของใบขอ + รายได้จริงของคนเดิม — คิดที่ pure lib ที่เดียว (มีเทสต์คุม) */
   const rateLines = React.useMemo(() => (data ? visibleRateLines(data) : []), [data]);
   const incomeRows = React.useMemo(() => (data ? resignedIncomeRows(data) : null), [data]);
@@ -267,6 +272,15 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                 <span className="text-xs text-muted-foreground">สถานะ ST: {data.siamraj_status}</span>
               ) : null}
             </div>
+
+            {/* เกณฑ์ความเร่งเฉพาะใบ (เจ้าของสั่ง 10 ก.ย. 2569) — วางไว้ใต้ป้ายสถานะ
+                เพราะป้าย "ฉุกเฉิน/ล่วงหน้า" ด้านบนมาจากเกณฑ์ชุดนี้ตรง ๆ */}
+            <RequestLeadRulesCard
+              job={data}
+              onSaved={() => {
+                void queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-request', id] });
+              }}
+            />
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
               {/* หัวข้อเป็นปุ่มกาง/หุบ (เจ้าของสั่ง 25 ส.ค. 2569) — ลูกศรหมุนตามสถานะ

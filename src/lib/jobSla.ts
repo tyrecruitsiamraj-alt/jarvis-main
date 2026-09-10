@@ -1,6 +1,12 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobRequest } from '@/types';
-import { computeJobUrgency, effectiveRequestDateYmd, type RequestStatusKind } from '@/lib/jobUrgency';
+import {
+  computeJobUrgency,
+  effectiveRequestDateYmd,
+  jobLeadRules,
+  type RequestStatusKind,
+} from '@/lib/jobUrgency';
+import { slaDaysForLeadKind } from '@/lib/requestLeadKind';
 import { toYmdBangkok } from '@/lib/dateTh';
 import type { RequestControlStatus } from '@/lib/requestControl';
 
@@ -31,17 +37,11 @@ function submittedYmd(job: JobRequest): string | null {
   return safeYmd(job.submittedAt) || safeYmd(job.request_date) || safeYmd(job.created_at);
 }
 
-function slaDaysForKind(kind: RequestStatusKind | 'unknown'): number {
-  switch (kind) {
-    case 'retroactive':
-      return 7;
-    case 'urgent':
-    case 'advance':
-      return 15;
-    default:
-      return 15;
-  }
-}
+/**
+ * 🔴 **ไม่มี `slaDaysForKind` ในไฟล์นี้แล้ว** (10 ก.ย. 2569) — เลข 7/15/15 ย้ายไปอยู่ที่
+ * `requestLeadKind.ts` ที่เดียวพร้อมค่าที่ตั้งทับได้ต่อใบ (`slaDaysForLeadKind`)
+ * เขียนเลขกลับมาที่นี่เมื่อไหร่ = ใบที่เจ้าของตั้งเกณฑ์เองจะถูกวัดด้วยเลขผิดเงียบ ๆ
+ */
 
 /**
  * บวกวันปฏิทินบน YYYY-MM-DD โดยคิดเป็นเวลาท้องถิ่นล้วน
@@ -65,7 +65,8 @@ export function computeJobSla(
 ): JobSlaMeta {
   const urgency = computeJobUrgency(job, today);
   const kind = urgency.kind;
-  const slaDays = slaDaysForKind(kind);
+  // เกณฑ์ของ**ใบนี้** (ตั้งเองได้ที่หน้าใบขอ · ไม่ได้ตั้ง = ค่ากลาง)
+  const slaDays = slaDaysForLeadKind(kind, jobLeadRules(job));
 
   const slaStartDate =
     kind === 'retroactive' ? submittedYmd(job) : safeYmd(job.required_date) || submittedYmd(job);

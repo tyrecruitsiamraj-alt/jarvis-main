@@ -3,9 +3,13 @@ import type { JobRequest, JobUrgency } from '@/types';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { toYmdBangkok } from '@/lib/dateTh';
 import {
+  REQUEST_LEAD_KIND_HINT,
   REQUEST_LEAD_KIND_TONE,
   requestLeadKindFromDays,
+  requestLeadKindHint,
+  resolveRequestLeadRules,
   URGENCY_LEAD_DAYS,
+  type RequestLeadRules,
 } from '@/lib/requestLeadKind';
 import type { ToneKey } from '@/lib/designTokens';
 
@@ -62,22 +66,27 @@ export const JOB_LIST_SORT_OPTIONS: { value: JobListSort; label: string }[] = [
   { value: 'oldest', label: 'กรอกเก่าสุด' },
 ];
 
+/**
+ * ตัวกรองบน**รายการ**ใบขอ — คำอธิบายพูดถึง**ค่ากลาง** เพราะกรองข้ามหลายใบพร้อมกัน
+ * (ใบที่ตั้งเกณฑ์เอง คำอธิบายเฉพาะใบอยู่บนหน้าใบขอผ่าน `jobUrgencyHint`)
+ * 🔴 เลขวันมาจาก `REQUEST_LEAD_KIND_HINT` ที่เดียว — ห้ามพิมพ์ "7 วัน" ซ้ำที่นี่
+ */
 export const URGENCY_FILTER_OPTIONS: { value: UrgencyFilter; label: string; hint?: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   {
     value: 'retroactive',
     label: 'ฉุกเฉิน/ย้อนหลัง',
-    hint: 'วันที่ต้องการอยู่ก่อนวันที่กรอกใบขอ (ขอคนย้อนหลัง)',
+    hint: REQUEST_LEAD_KIND_HINT.retroactive,
   },
   {
     value: 'urgent',
     label: 'ฉุกเฉิน',
-    hint: 'วันที่กรอกถึงวันที่ต้องการน้อยกว่า 7 วัน',
+    hint: REQUEST_LEAD_KIND_HINT.urgent,
   },
   {
     value: 'advance',
     label: 'ล่วงหน้า',
-    hint: 'วันที่กรอกถึงวันที่ต้องการ 7 วันขึ้นไป',
+    hint: REQUEST_LEAD_KIND_HINT.advance,
   },
 ];
 
@@ -211,15 +220,32 @@ export function getJobRequestSubmittedDate(job: JobRequest): Date | null {
   return submittedDate(job);
 }
 
+/**
+ * เกณฑ์ความเร่งที่ใช้กับใบนี้ — ค่าที่ตั้งไว้บนใบชนะค่ากลาง (10 ก.ย. 2569)
+ *
+ * `job.lead_rules` ถูกแนบมาจากฝั่ง API (`attachNotes`) ทุกเส้นที่ส่งใบขอออกมา
+ * ⇒ ทุกหน้าที่เรียก `computeJobUrgency(job)` อยู่แล้วได้เกณฑ์ของใบนั้นทันที
+ * **ห้ามอ่าน `job.lead_rules` ตรง ๆ ที่อื่น** ให้เรียกตัวนี้เพื่อให้ fallback เหมือนกันหมด
+ */
+export function jobLeadRules(job: JobRequest): RequestLeadRules {
+  return resolveRequestLeadRules(job.lead_rules);
+}
+
+/** คำอธิบายเกณฑ์ของใบนี้ — พูดเลขของใบ ไม่ใช่เลขกลาง */
+export function jobUrgencyHint(job: JobRequest, today = new Date()): string {
+  return requestLeadKindHint(computeJobUrgency(job, today).kind, jobLeadRules(job));
+}
+
 export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgencyMeta {
   const submitted = submittedDate(job);
   const required = parseJobDate(job.required_date);
   const today0 = todayStart(today);
+  const rules = jobLeadRules(job);
 
   if (!submitted || !required) {
     return {
       kind: 'advance',
-      leadDays: URGENCY_LEAD_DAYS,
+      leadDays: rules.urgentThresholdDays,
       daysUntilRequired: 0,
       daysPastRequired: 0,
       wasAdvanceAtSubmit: true,
@@ -229,11 +255,10 @@ export function computeJobUrgency(job: JobRequest, today = new Date()): JobUrgen
   const leadDays = differenceInCalendarDays(required, submitted);
   const daysUntilRequired = differenceInCalendarDays(required, today0);
   const daysPastRequired = differenceInCalendarDays(today0, required);
-  const wasAdvanceAtSubmit = leadDays >= URGENCY_LEAD_DAYS;
 
   // เส้นแบ่ง ล่วงหน้า/ฉุกเฉิน/ย้อนหลัง อยู่ที่ `requestLeadKind.ts` ที่เดียว
   // (ฝั่ง API ของ throughput ใช้ตัวเดียวกัน — เขียนซ้ำเมื่อไหร่คือรอวันเพี้ยน)
-  const kind = requestLeadKindFromDays(leadDays);
+  const kind = requestLeadKindFromDays(leadDays, rules);
   return {
     kind,
     leadDays,

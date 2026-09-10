@@ -1,6 +1,13 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { normalizeSiamrajRequestNoForDisplay } from './siamrajRequestNo.js';
-import { requestLeadKindFromYmd, type RequestLeadKind } from '../../src/lib/requestLeadKind.js';
+import {
+  DEFAULT_REQUEST_LEAD_RULES,
+  requestLeadKindFromYmd,
+  resolveRequestLeadRules,
+  type RequestLeadKind,
+  type RequestLeadRules,
+} from '../../src/lib/requestLeadKind.js';
+import { getLeadRulesOverrideMap } from './siamrajUnitNotes.js';
 import { toBangkokYmd } from './businessDate.js';
 import { staffingPositionBreakdown } from './siamrajStaffingOpen.js';
 import {
@@ -109,7 +116,14 @@ function requestOpenDateYmdFromRow(row: SqlThroughputRow): string | null {
   return toYmd(row.want_date_from) || toYmd(row.request_date);
 }
 
-function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
+function mapThroughputRow(
+  row: SqlThroughputRow,
+  /**
+   * เกณฑ์ความเร่งของใบนี้ — ใบที่เจ้าของตั้งเองต้องถูกจัดกลุ่มด้วยเลขของใบ
+   * ไม่ใช่ค่ากลาง (เจ้าของเคาะ 10 ก.ย. 2569: *"มีผลทุกที่ทั้งระบบ"*)
+   */
+  rules: RequestLeadRules = DEFAULT_REQUEST_LEAD_RULES,
+): SiamrajThroughputRecord[] {
   /** เดือนที่「เข้ามา」= **วันที่ต้องการคน** (fallback วันที่กรอก) — เจ้าของเคาะ 20 ส.ค. 2569 */
   const requestDate = requestOpenDateYmdFromRow(row);
   if (!requestDate) return [];
@@ -130,7 +144,7 @@ function mapThroughputRow(row: SqlThroughputRow): SiamrajThroughputRecord[] {
    * (= วันที่ต้องการ) ถ้าเอามาคิด lead จะได้ 0 วันทุกใบแล้วกลายเป็น "ฉุกเฉิน" ทั้งระบบ
    */
   const requiredDate = toYmd(row.want_date_from);
-  const leadKind = requestLeadKindFromYmd(toYmd(row.request_date), requiredDate);
+  const leadKind = requestLeadKindFromYmd(toYmd(row.request_date), requiredDate, rules);
   const breakdown = staffingPositionBreakdown(row);
   const closureDate = toYmd(row.stop_date) || toYmd(row.cancel_date) || requestDate;
   const requestActionCode = (row.request_action_code || '').trim() || undefined;
@@ -292,7 +306,17 @@ export async function listSiamrajSqlServerThroughput(options: {
     { ...filters, fromDate: from, toDate: to, ...deptScope.params },
   );
 
-  return rows.flatMap(mapThroughputRow);
+  /**
+   * ใบที่ตั้งเกณฑ์เองมีไม่กี่ใบ — ดึงทั้งชุดครั้งเดียวแล้ว lookup ด้วยเลขที่ใบขอ**ดิบ**
+   * ⚠️ ต้องเป็นเลขดิบ (`row.request_no`) ตัวเดียวกับที่ `siamraj_unit_notes` ใช้เป็นคีย์
+   * ห้ามใช้เลขแบบที่โชว์บนจอ (`requestNoDisplay` เติมนำหน้าจาก site_code แล้ว) — ผิดคีย์
+   * เมื่อไหร่ ค่าที่ตั้งไว้จะเงียบหายจากแดชบอร์ดโดยไม่มี error
+   */
+  const overrides = await getLeadRulesOverrideMap();
+  if (overrides.size === 0) return rows.flatMap((r) => mapThroughputRow(r));
+  return rows.flatMap((r) =>
+    mapThroughputRow(r, resolveRequestLeadRules(overrides.get((r.request_no || '').trim()))),
+  );
 }
 
 export type ResignationUnitRank = {

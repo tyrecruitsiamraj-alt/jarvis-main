@@ -8253,3 +8253,36 @@ helper เทสต์เปลี่ยนมาเล็งสองจุด�
 
 ⚠️ **เพิ่มทางเข้าใหม่ที่แตะ iRecruit เมื่อไหร่ ต้องเช็ค `irecruitUnavailableReason()` ก่อนเสมอ**
 (หรือหุ้ม try/catch แบบ `loadIrecruit`) ไม่งั้นปิดสวิตช์แล้วหน้านั้นจะ 500 แทนที่จะบอกผู้ใช้ดี ๆ
+
+---
+
+## เกณฑ์ความเร่งเฉพาะใบ (10 ก.ย. 2569)
+
+เจ้าของสั่ง: *"หลักเกณฑ์ ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง / ล่วงหน้า ทำให้ Set เป็นใบไว้หน่อย
+เพราะบางใบใช้คำนวณไม่เหมือนกัน แต่ถ้าไม่ Set ก็เอาของเดิมเป็น Default แก้ก็แก้ที่หน้าใบขอ"*
+เคาะเพิ่ม: ตั้งเป็น **ตัวเลขเกณฑ์** (ไม่ใช่เลือกประเภทเอง) และ **มีผลทุกที่ทั้งระบบ**
+
+| ไฟล์ | บทบาท |
+| --- | --- |
+| `src/lib/requestLeadKind.ts` | **นิยามที่เดียว** — ค่ากลาง `DEFAULT_REQUEST_LEAD_RULES` · `cleanRequestLeadRulesOverride` (sanitize ใช้ร่วมกันทั้งหน้าเว็บและ API) · `resolveRequestLeadRules` · `slaDaysForLeadKind` · `requestLeadKindHint` |
+| `src/lib/jobUrgency.ts` | `jobLeadRules(job)` = ทางเข้าเดียวที่อ่านเกณฑ์ของใบ · `computeJobUrgency` ใช้เส้นแบ่งของใบ |
+| `src/lib/jobSla.ts` | ใช้ `slaDaysForLeadKind` — **เลข 7/15/15 ถูกถอดออกจากไฟล์นี้แล้ว** |
+| `src/components/jobs/RequestLeadRulesCard.tsx` | กล่องตั้งค่า 4 ช่องบนหน้าใบขอ + ตัวอย่างผลลัพธ์สด · `buildLeadRulesPatch` (แยกออกมาให้เทสต์จับ) |
+| `api/_lib/siamrajUnitNotes.ts` | `lead_rules` ใน `field_overrides` · `getLeadRulesOverrideMap()` · `attachLeadRules()` |
+| `api/_lib/siamrajUnitRequests.ts` | เรียก `attachLeadRules` **หลังชั้น cache** — จุดเดียวที่ทำให้ทุกผู้เรียกได้เกณฑ์เดียวกัน |
+| `api/_lib/siamrajSqlServerThroughput.ts` | แดชบอร์ดจัดกลุ่มด้วยเกณฑ์ของใบ (lookup ด้วยเลขที่ใบขอ**ดิบ**) |
+| `src/lib/requestLeadRules.test.ts` · `tests/api/leadRulesOverrideStorage.test.ts` | ด่านคุม |
+
+**กับดักที่เจอระหว่างทำ (อย่าเหยียบซ้ำ):**
+
+1. 🔴 **ต้องแนบหลัง cache** — `listSiamrajUnitRequests` มี read-through cache ถ้าแนบเกณฑ์
+   ก่อนเข้า cache ค่าที่เพิ่งแก้จะไม่มีผลจนกว่า cache หมดอายุ · และต้อง**ลบคีย์ทิ้ง**
+   เมื่อไม่มี override ด้วย ไม่ใช่แค่เซ็ตตอนมี (object ใน cache ค้างค่าเดิมไว้)
+2. 🔴 **คีย์ต้องเป็นเลขที่ใบขอดิบ** — `siamraj_unit_notes` ใช้ `request_no` ดิบ
+   ส่วนแดชบอร์ดมี `requestNoDisplay` ที่เติมนำหน้าจาก `site_code` แล้ว · ใช้ผิดตัว
+   ค่าที่ตั้งจะเงียบหายจากแดชบอร์ดโดยไม่มี error (ดู [[jarvis-bu-lives-in-site-code]])
+3. 🔴 **`field_overrides` ถูกเขียนทับทั้งก้อน** — `upsertUnitNote` ไม่ merge ให้
+   ต้องส่ง override เดิมไปครบทุกครั้ง มีเทสต์คุมที่ `leadRulesOverrideStorage.test.ts`
+   ⚠️ **ของเดิม 3 จุดยังส่งไม่ครบ** (`EditPublicJobFieldsDialog` · `PreCheckPage` ·
+   `MatchingPage`) — บันทึกจุดหนึ่งแล้วค่าของอีกจุดหาย เป็นบั๊กเดิมที่ยังไม่ได้แก้
+4. ให้เวลาหาคน 0 วันตั้งไม่ได้ แต่เส้นแบ่ง 0 วันตั้งได้ — คนละความหมาย

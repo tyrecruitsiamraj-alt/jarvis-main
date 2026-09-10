@@ -1,4 +1,5 @@
 import { readThroughCache } from './unitRequestCache.js';
+import { attachLeadRules } from './siamrajUnitNotes.js';
 import { dbQuery } from './postgres.js';
 import { getSiamrajSqlServerConfig } from './siamrajSqlServer.js';
 import {
@@ -269,6 +270,12 @@ export async function listSiamrajUnitRequests(options: {
     () => loadSiamrajUnitRequests(options),
     { fresh: options.fresh },
   );
+  /**
+   * เกณฑ์ความเร่งเฉพาะใบ — แนบ**หลัง** cache เสมอ (เจ้าของสั่ง 10 ก.ย. 2569 ให้มีผลทุกที่)
+   * แนบตรงนี้จุดเดียวทำให้ทุกผู้เรียก (หน้าแรก · Matching · office-team · worker) ใช้เกณฑ์
+   * ชุดเดียวกัน — ไม่ต้องไปไล่แนบทีละ handler แล้วลืมไปสักตัว
+   */
+  await attachLeadRules(outcome.value as unknown[]);
   return outcome.value;
 }
 

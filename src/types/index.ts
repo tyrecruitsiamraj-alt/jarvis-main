@@ -1,5 +1,6 @@
 import type { UnitSector } from '@/lib/unitSector';
 import type { UnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
+import type { RequestLeadRulesOverride } from '@/lib/requestLeadKind';
 
 // ============ AUTH & USERS ============
 export type UserRole = 'admin' | 'supervisor' | 'staff' | 'opl';
@@ -366,6 +367,13 @@ export interface JobRequest {
     lng?: number | null;
     geocode_status?: 'unverified' | 'estimated' | 'confirmed' | 'not_found';
   }> | null;
+  /**
+   * เกณฑ์ความเร่งเฉพาะใบนี้ (ตั้งที่หน้าใบขอ 10 ก.ย. 2569) — ไม่ตั้ง/ไม่มี = ใช้ค่ากลาง
+   *
+   * ⚠️ **ห้ามอ่านตรง ๆ** ให้ผ่าน `jobLeadRules(job)` เพื่อให้ fallback เหมือนกันทุกที่
+   * แนบมาจากฝั่ง API (`attachNotes`) ทุกเส้นที่ส่งใบขอออกมา
+   */
+  lead_rules?: RequestLeadRulesOverride | null;
   /** override ฟิลด์ใบขอที่ผู้ใช้แก้เอง (อายุ/เพศ/สาขา) */
   field_overrides?: {
     age_min?: number | null;

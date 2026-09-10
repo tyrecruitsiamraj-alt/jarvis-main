@@ -1,5 +1,9 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import {
+  cleanRequestLeadRulesOverride,
+  type RequestLeadRulesOverride,
+} from '../../src/lib/requestLeadKind.js';
 
 const table = tableInAppSchema('siamraj_unit_notes');
 const MAX_NOTE_LENGTH = 2000;
@@ -51,6 +55,11 @@ export type UnitFieldOverrides = {
     lines: { label: string; amount: number }[];
     total: number | null;
   } | null;
+  /**
+   * เกณฑ์ความเร่งเฉพาะใบ (10 ก.ย. 2569) — เส้นแบ่งฉุกเฉิน/ล่วงหน้า + วันที่ให้หาคนแยกประเภท
+   * มีคีย์นี้ = ใบนี้ไม่ใช้ค่ากลาง (แดชบอร์ดดึงเฉพาะใบที่มีคีย์นี้มาคำนวณทับ)
+   */
+  lead_rules?: RequestLeadRulesOverride | null;
 };
 
 export type UnitNote = {
@@ -165,6 +174,10 @@ export function cleanFieldOverrides(v: unknown): UnitFieldOverrides | null {
       out.benefits = lines;
     }
   }
+
+  // เกณฑ์ความเร่งเฉพาะใบ — กติกา/เพดานอยู่ที่ src/lib/requestLeadKind.ts ที่เดียว
+  // (หน้าเว็บกับฝั่ง API ต้อง sanitize ด้วยตัวเดียวกัน ไม่งั้นค่าที่บันทึกได้อาจคำนวณไม่ได้)
+  if ('lead_rules' in o) out.lead_rules = cleanRequestLeadRulesOverride(o.lead_rules);
 
   // รายได้แบบแยกส่วน — เพดานเดียวกับ src/lib/incomeBreakdown.ts (10 รายการ × 30 ตัวอักษร)
   if ('income' in o) {
@@ -314,6 +327,61 @@ export async function getUnitNotesMap(requestNos: string[]): Promise<Map<string,
   );
   for (const r of rows) map.set(r.request_no, mapRow(r, cols));
   return map;
+}
+
+/**
+ * ใบที่**ตั้งเกณฑ์ความเร่งเอง** ทั้งหมด — คีย์คือเลขที่ใบขอดิบจาก ERP
+ *
+ * ทำไมไม่ดึงตามรายการใบที่ถาม: แดชบอร์ดถามทีละงวดครั้งละหลายพันใบ ส่งเลขทั้งกอง
+ * เข้า `ANY($1)` เปลืองเปล่า ๆ ในเมื่อใบที่ตั้งเกณฑ์เองมีไม่กี่ใบ — ดึงทั้งชุดทีเดียวถูกกว่า
+ *
+ * ⚠️ ฐานที่ยังไม่มีคอลัมน์ `field_overrides` (migration < 102) ต้องได้ Map ว่าง
+ * ไม่ใช่ error — แดชบอร์ดต้องขึ้นได้เสมอด้วยค่ากลาง
+ */
+export async function getLeadRulesOverrideMap(): Promise<Map<string, RequestLeadRulesOverride>> {
+  const map = new Map<string, RequestLeadRulesOverride>();
+  try {
+    if (!(await hasColumn('field_overrides'))) return map;
+    const { rows } = await dbQuery<{ request_no: string; field_overrides: unknown }>(
+      `select request_no, field_overrides from ${table}
+        where field_overrides ? 'lead_rules'`,
+    );
+    for (const r of rows) {
+      const fo = readFieldOverrides(r.field_overrides as UnitFieldOverrides | string | null);
+      const rules = cleanRequestLeadRulesOverride(fo?.lead_rules);
+      if (rules) map.set(String(r.request_no).trim(), rules);
+    }
+  } catch (e) {
+    // เกณฑ์เฉพาะใบเป็นของเสริม — อ่านไม่ได้ก็ต้องได้ค่ากลาง ไม่ใช่แดชบอร์ดล่ม
+    if (!isMissingNotesTable(e)) throw e;
+  }
+  return map;
+}
+
+/**
+ * แนบเกณฑ์ความเร่งเฉพาะใบลงบนรายการใบขอ — เรียกที่ `listSiamrajUnitRequests` จุดเดียว
+ * เพื่อให้**ทุกเส้นที่ดึงใบขอ**ใช้เกณฑ์เดียวกัน (หน้าแรก · Matching · office-team · worker)
+ *
+ * 🔴 **ต้องแนบหลังชั้น cache เสมอ** — ถ้าแนบก่อน ค่าที่เจ้าของเพิ่งแก้ที่หน้าใบขอจะไม่มีผล
+ * จนกว่า cache จะหมดอายุ (คนแก้แล้วเห็นเลขเดิมคือคนเลิกเชื่อหน้าจอ)
+ *
+ * ⚠️ **ล้างค่าเมื่อไม่มี override ด้วย** ไม่ใช่แค่เซ็ตตอนมี — object ที่ค้างใน cache
+ * เคยถูกแนบไว้รอบก่อน ถ้าไม่ล้าง เกณฑ์ที่ถูกลบไปแล้วจะยังมีผลอยู่
+ */
+export async function attachLeadRules(items: unknown[]): Promise<void> {
+  const list = items as Array<Record<string, unknown>>;
+  if (list.length === 0) return;
+  try {
+    const map = await getLeadRulesOverrideMap();
+    for (const it of list) {
+      const key = String(it.request_no || it.externalId || it.id || '').trim();
+      const rules = key ? map.get(key) : undefined;
+      if (rules) it.lead_rules = rules;
+      else if ('lead_rules' in it) delete it.lead_rules;
+    }
+  } catch {
+    /* เกณฑ์เฉพาะใบเป็นของเสริม — อ่านไม่ได้ก็ใช้ค่ากลาง ไม่ทำให้ฟีดใบขอล่ม */
+  }
 }
 
 /**
