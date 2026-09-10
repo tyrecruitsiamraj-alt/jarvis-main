@@ -915,6 +915,10 @@ const FollowPage: React.FC = () => {
           selectedYmd={fDate}
           onSelect={pickCalendarDay}
           onOpenCell={(row, ymd) => setOpenCell({ key: row.group.key, ymd })}
+          /* ดินสอบนแถว = เปิดกล่องแก้ไขของสายนั้นตรง ๆ (เจ้าของทัก 10 ก.ย. 2569 ว่าหาไม่เจอ
+             เพราะของเดิมซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น) · ไม่ต้องจำ cellToReopen
+             เพราะไม่ได้เปิดมาจากป๊อป จึงไม่มีป๊อปให้กลับไป */
+          onEditRound={(round) => setEditing(round.entry)}
           roundFilter={activeRound}
           roundsSlot={
             <FollowCallRoundsPanel

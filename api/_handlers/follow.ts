@@ -113,6 +113,8 @@ type FollowRow = {
   /** รอบที่โทรล่าสุดของแถวคิว — ใช้จัดกลุ่ม "ใครอยู่รอบไหน" บนแผงหน้าหลัก */
   call_attempt: number | null;
   call_summary: string | null;
+  /** คำที่คนรับสายพูดเอง (ต่อจาก transcript) — null = ไม่มี transcript หรือเขาไม่พูดเลย */
+  call_reply: string | null;
   call_next_action: LumosNextAction | null;
   called_at: string | Date | null;
   /** สถานะ followup ของคิว (070) — 'needs_human' = AI เอาไม่อยู่ ต้องคนตาม */
@@ -172,6 +174,8 @@ function toResponse(r: FollowRow) {
     call_outcome: r.call_outcome,
     call_attempt: r.call_attempt == null ? null : Number(r.call_attempt),
     call_summary: r.call_summary,
+    /** คำพูดของคนรับสาย — ตรงกว่า summary เวลาถามว่า "เขาตอบว่าอะไร" */
+    call_reply: r.call_reply ?? null,
     next_action: r.call_next_action ?? null,
     called_at: iso(r.called_at),
     /**
@@ -194,11 +198,29 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
      *   · `coalesce(last_outcome, result->>'outcome')` ของสายนี้ — ผลที่คนบันทึกเขียนแค่
      *     `last_outcome` ส่วนแถวก่อน migration 070 มีแต่ `result` อ่านทางเดียวจะหายเงียบ
      */
+    /**
+     * `call_reply` = **คำที่คนรับสายพูดเอง** ดึงจาก transcript เฉพาะฝั่ง candidate
+     *
+     * 🔴 เจ้าของทัก 10 ก.ย. 2569: *"ไม่แสดงข้อความที่ตอบ"* — ของเดิมส่งมาแต่
+     * `summary` ซึ่งเป็นคำบรรยายของ AI มุมมองบุคคลที่สาม (*"ผู้รับสายแจ้งว่า…"*)
+     * ไม่ใช่คำตอบของเขา · และบางสาย (เช่น `unresponsive`) ไม่มี summary เลย
+     * ⇒ ช่อง "เขาตอบว่าอะไร" ว่างทั้งที่ transcript มีคำพูดอยู่
+     *
+     * ⚠️ **ไม่ส่ง transcript ทั้งก้อน** — บางสาย 24 ตา ถ้าส่งดิบทุกแถว payload บวม
+     * และไม่มีจอไหนใช้ · ต่อคำด้วย ' · ' ให้อ่านรวดเดียว ฝั่งจอตัดความยาวเอง
+     */
     `select f.*,
             q.status                                       as call_status,
             coalesce(q.last_outcome, q.result->>'outcome') as call_outcome,
             q.attempt_count                                as call_attempt,
             q.result->>'summary'                           as call_summary,
+            (select string_agg(x.t->>'text', ' · ' order by x.ord)
+               from jsonb_array_elements(
+                      case when jsonb_typeof(q.result->'transcript') = 'array'
+                           then q.result->'transcript' else '[]'::jsonb end
+                    ) with ordinality as x(t, ord)
+              where x.t->>'role' = 'candidate'
+                and coalesce(btrim(x.t->>'text'), '') <> '')  as call_reply,
             q.result->'next_action'                        as call_next_action,
             q.updated_at                                   as called_at,
             q.followup_state                               as followup_state,

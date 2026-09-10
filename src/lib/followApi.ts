@@ -59,6 +59,13 @@ export type FollowEntry = {
    */
   followup_state?: string | null;
   call_summary: string | null;
+  /**
+   * **คำที่คนรับสายพูดเอง** (ต่อจาก transcript ฝั่ง candidate) — `null` = ไม่มี
+   *
+   * ต่างจาก `call_summary` ซึ่งเป็นคำบรรยายของ AI มุมมองบุคคลที่สาม
+   * ("ผู้รับสายแจ้งว่า…") · ช่อง "เขาตอบว่าอะไร" ต้องใช้ตัวนี้เป็นหลัก
+   */
+  call_reply?: string | null;
   next_action: LumosNextAction | null;
   called_at: string | null;
 };

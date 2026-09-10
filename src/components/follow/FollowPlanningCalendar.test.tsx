@@ -58,6 +58,7 @@ function renderCalendar(
     onOpenCell?: () => void;
     roundFilter?: FollowRoundFilter;
     roundsSlot?: React.ReactNode;
+    onEditRound?: (round: { entry: FollowEntry }) => void;
   } = {},
 ) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
@@ -71,6 +72,7 @@ function renderCalendar(
       onOpenCell={opts.onOpenCell ?? (() => {})}
       roundFilter={opts.roundFilter ?? 'all'}
       roundsSlot={opts.roundsSlot}
+      onEditRound={opts.onEditRound}
     />,
   );
   return rows;
@@ -199,7 +201,8 @@ describe('เบอร์ฉุกเฉินบนหน้ารายวั�
     // คอลัมน์ "เบอร์ฉุกเฉิน" ของตาราง — เบอร์บรรทัดบน สถานะบรรทัดล่าง (ไม่มีคำว่า "ฉุกเฉิน" นำแล้ว
     // เพราะหัวคอลัมน์บอกอยู่)
     expect(within(li).getByText(/\+66898143230/)).toBeTruthy();
-    expect(within(li).getByText('ยังไม่รู้ว่าโทรหรือยัง')).toBeTruthy();
+    // ถ้อยคำชัดขึ้น 10 ก.ย. 2569 — แยก "แนบเบอร์ไปแล้ว" (เรารู้) ออกจาก "โทรหรือยัง" (เราไม่รู้)
+    expect(within(li).getByText(/แนบไปกับสายแล้ว · Lumos ไม่ได้บอกว่าโทรหรือยัง/)).toBeTruthy();
     expect(within(li).queryByText(/โทรเบอร์ฉุกเฉินแล้ว/)).toBeNull();
   });
 
@@ -281,5 +284,109 @@ describe('แถว "ไม่ไป" — พื้นแดงอ่อนท�
     const washBg = TONE.danger.wash.split(' ')[0];
     expect(lost.className).toContain(washBg);
     expect(agreed.className).not.toContain(washBg);
+  });
+});
+
+/**
+ * ═══ ตำหนิของเจ้าของ 10 ก.ย. 2569 (ตรวจกับข้อมูลจริงในฐานก่อนแก้) ═══
+ *
+ * > *"1. ไม่แสดงการโทรติดต่อเบอร์ฉุกเฉิน คือ ไม่ยอมบอกว่าโทรหาหรือยัง
+ * >  2. บันทึกการโทรติดตามแล้ว แต่ไม่มีให้กดแก้ไขหากต้องการเปลี่ยนวัน/เวลาที่ติดตาม
+ * >  3. สายที่ 1 โทรสำเร็จ ไม่แสดงสีเขียว และไม่แสดงข้อความที่ตอบ
+ * >  4. สายที่ 2 โทรแล้ว ไม่แสดงข้อความที่ตอบ"*
+ */
+describe('ตำหนิ 10 ก.ย. 2569', () => {
+  it('🔴 สายที่ 1 มีผลว่าไป ต้องได้ **สีเขียวทั้งแถว** ไม่ใช่แค่ชิปเล็ก ๆ', () => {
+    renderCalendar(twoRounds({ call_status: 'completed', call_outcome: 'acknowledged' }));
+    const row = dayRows().find((r) => r.getAttribute('data-category') === 'agreed');
+    expect(row).toBeTruthy();
+    expect(row!.className).toContain(TONE.success.wash.split(' ')[0]);
+  });
+
+  it('สามสีตามที่เจ้าของเคาะ: เขียว=ไป · เหลือง=ไม่ได้คำตอบ · แดง=ไม่ไป · ยังไม่มีผล=ขาว', () => {
+    renderCalendar([
+      entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({ id: 'b', call_round: 2, call_status: 'completed', call_outcome: 'declined' }),
+      entry({ id: 'c', call_round: 3, call_status: 'completed', call_outcome: 'no_answer' }),
+      entry({ id: 'd', recipient_phone: '0899999999', call_round: 1 }),
+    ]);
+    const washOf = (cat: string) =>
+      dayRows().find((r) => r.getAttribute('data-category') === cat)?.className ?? '';
+    expect(washOf('agreed')).toContain(TONE.success.wash.split(' ')[0]);
+    expect(washOf('lost')).toContain(TONE.danger.wash.split(' ')[0]);
+    expect(washOf('unreachable')).toContain(TONE.warn.wash.split(' ')[0]);
+    // ยังไม่มีผล = ขาว — ถ้าระบายหมดทุกแถว สีจะเลิกบอกอะไร
+    expect(washOf('overdue')).not.toContain('bg-amber-50');
+  });
+
+  it('🔴 ช่อง "เขาตอบว่าอะไร" ต้องโชว์ **คำที่เขาพูดเอง** ไม่ใช่คำบรรยายของ AI', () => {
+    renderCalendar([
+      entry({
+        id: 'a',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'declined',
+        call_reply: 'ใช่ค่ะ · ไม่ไปแล้ว รถยางแตก',
+        call_summary: 'ผู้รับสายแจ้งว่ารถยางแตก จึงไม่ได้ไปหน่วยงาน',
+      }),
+    ]);
+    const row = dayRows()[0];
+    expect(row.textContent).toContain('ไม่ไปแล้ว รถยางแตก');
+    // สรุปของ AI ยังอยู่ แต่เป็นตัวรอง — ต้องมีคำกำกับว่าเป็นของ AI ไม่ใช่คำของเขา
+    expect(row.textContent).toContain('สรุปโดย AI:');
+  });
+
+  it('ไม่มีคำพูดแต่มีสรุป ⇒ ใช้สรุปแทน · ไม่มีทั้งคู่ ⇒ บอกตรง ๆ ห้ามเดาว่าเขาไม่พูด', () => {
+    renderCalendar([
+      entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'declined', call_summary: 'สรุปล้วน' }),
+      entry({
+        id: 'b',
+        recipient_phone: '0899999999',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'unresponsive',
+      }),
+    ]);
+    const text = screen.getByTestId('day-calls').textContent ?? '';
+    expect(text).toContain('สรุปล้วน');
+    expect(text).toContain('ไม่มีคำตอบและไม่มีสรุปจาก AI');
+  });
+
+  it('🔴 ช่องเบอร์ฉุกเฉิน **ห้ามถูกซ่อนด้วย CSS** — เดิมเห็นเฉพาะจอกว้างกว่า 1280px', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1, emergency_phone: '+66632138466' })]);
+    const head = screen.getByText('เบอร์ฉุกเฉิน');
+    expect(head.className).not.toContain('hidden');
+    expect(head.className).not.toContain('xl:table-cell');
+    expect(dayRows()[0].textContent).toContain('+66632138466');
+  });
+
+  it('เบอร์ฉุกเฉินบอกได้แค่ "แนบไปแล้ว" — Lumos ไม่ส่งกลับว่าโทรหรือยัง ห้ามเขียนว่าโทรแล้ว', () => {
+    renderCalendar([
+      entry({
+        id: 'a',
+        call_round: 1,
+        call_status: 'completed',
+        call_outcome: 'declined',
+        emergency_phone: '+66632138466',
+      }),
+    ]);
+    const text = dayRows()[0].textContent ?? '';
+    expect(text).toContain('แนบไปกับสายแล้ว');
+    expect(text).toContain('ไม่ได้บอกว่าโทรหรือยัง');
+    expect(text).not.toContain('โทรแล้ว');
+  });
+
+  it('🔴 มีปุ่มแก้ไขวัน/เวลา **บนแถว** ไม่ต้องเข้าป๊อปก่อน', () => {
+    const onEditRound = vi.fn();
+    renderCalendar([entry({ id: 'a', call_round: 1 })], { onEditRound });
+    const btn = screen.getByRole('button', { name: /แก้ไขวันเวลาของ/ });
+    fireEvent.click(btn);
+    expect(onEditRound).toHaveBeenCalledTimes(1);
+    expect((onEditRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('a');
+  });
+
+  it('สายที่ยกเลิก/ปิดงานแล้วไม่มีปุ่มแก้ไข (แก้ไปก็ไม่มีผล)', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1, cancelled: true })], { onEditRound: vi.fn() });
+    expect(screen.queryByRole('button', { name: /แก้ไขวันเวลาของ/ })).toBeNull();
   });
 });

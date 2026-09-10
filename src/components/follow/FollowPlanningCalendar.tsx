@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Clock, Phone, PhoneOff, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Clock, Pencil, Phone, PhoneOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { shiftMonth } from '@/lib/followCallCalendar';
@@ -9,6 +9,7 @@ import {
   buildFollowDayCalls,
   buildFollowMonthRows,
   callCategory,
+  callCategoryWashTone,
   FOLLOW_CALL_CATEGORY_LABEL,
   FOLLOW_CALL_CATEGORY_TONE,
   filterPlanningRowsByRound,
@@ -18,6 +19,7 @@ import {
   roundAiSummary,
   roundDispatchReason,
   roundEmergencyPhone,
+  roundReplyText,
   roundResultLabel,
   roundTone,
   summarizeFollowCalls,
@@ -27,6 +29,7 @@ import {
   type FollowRoundFilter,
 } from '@/lib/followPlanning';
 import { DASH } from '@/lib/designTokens';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -209,6 +212,8 @@ const FollowPlanningCalendar: React.FC<{
   onSelect: (ymd: string) => void;
   /** กดสาย/ช่อง = เปิดป๊อปรายละเอียดของคนนั้นในวันนั้น */
   onOpenCell: (row: FollowPlanningRow, ymd: string, rounds: FollowPlanningRound[]) => void;
+  /** กดดินสอบนแถว = เปิดกล่องแก้ไขของ **สายนั้น** ตรง ๆ (ไม่ต้องผ่านป๊อปจัดการ) */
+  onEditRound?: (round: FollowPlanningRound) => void;
   roundFilter: FollowRoundFilter;
   /** แผงรอบโทร + 7 ช่องสถานะสาย — วางเป็นการ์ดของตัวเองใต้การ์ดตัวเลข */
   roundsSlot?: React.ReactNode;
@@ -221,6 +226,7 @@ const FollowPlanningCalendar: React.FC<{
   selectedYmd,
   onSelect,
   onOpenCell,
+  onEditRound,
   roundFilter,
   roundsSlot,
   headerAction,
@@ -496,15 +502,17 @@ const FollowPlanningCalendar: React.FC<{
                           <th className="min-w-[110px] px-3 py-2.5 text-[11px] font-semibold">เวลานัด / รอบ</th>
                           <th className="min-w-[140px] px-3 py-2.5 text-[11px] font-semibold">สถานะการโทร</th>
                           <th className="min-w-[220px] px-3 py-2.5 text-[11px] font-semibold">เขาตอบว่าอะไร</th>
-                          <th className="hidden min-w-[150px] px-3 py-2.5 text-[11px] font-semibold xl:table-cell">เบอร์ฉุกเฉิน</th>
+                          <th className="min-w-[150px] px-3 py-2.5 text-[11px] font-semibold">เบอร์ฉุกเฉิน</th>
                           <th className="px-3 py-2.5 text-right text-[11px] font-semibold md:px-5">จัดการ</th>
                         </tr>
                       </thead>
                       <tbody data-testid="day-calls">
                         {pageCalls.map(({ row, round, slot, category }) => {
                           const ai = roundAiSummary(round);
+                          const reply = roundReplyText(round);
                           const emg = roundEmergencyPhone(round);
                           const tone = roundTone(round);
+                          const washTone = callCategoryWashTone(category);
                           const cancelled = round.state === 'cancelled';
                           return (
                             <tr
@@ -512,7 +520,9 @@ const FollowPlanningCalendar: React.FC<{
                               data-category={category}
                               className={cn(
                                 'border-b border-border/50 align-top transition-colors last:border-0',
-                                category === 'lost' ? TONE.danger.wash : 'hover:bg-secondary/50',
+                                /* เขียว=ตอบว่าไป · เหลือง=ไม่ได้คำตอบ · แดง=ตอบว่าไม่ไป
+                                   ยังไม่มีผล = ขาว (นิยามอยู่ที่ callCategoryWashTone) */
+                                washTone ? TONE[washTone].wash : 'hover:bg-secondary/50',
                                 cancelled && 'opacity-60',
                               )}
                             >
@@ -581,12 +591,34 @@ const FollowPlanningCalendar: React.FC<{
                                 </span>
                               </td>
                               <td className="px-3 py-3">
-                                {ai ? (
+                                {/* 🔴 คำพูดของเขามาก่อนเสมอ — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
+                                    สรุปของ AI เป็นคำบรรยายบุคคลที่สาม ใช้เป็นตัวรอง */}
+                                {reply ? (
+                                  <span className="block">
+                                    <span
+                                      className="line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground"
+                                      title={reply}
+                                    >
+                                      “{reply}”
+                                    </span>
+                                    {ai ? (
+                                      <span
+                                        className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground"
+                                        title={ai}
+                                      >
+                                        สรุปโดย AI: {ai}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                ) : ai ? (
                                   <span className="line-clamp-3 text-[12px] leading-snug text-foreground/80" title={ai}>
                                     {ai}
                                   </span>
                                 ) : round.state === 'result' ? (
-                                  <span className="text-[12px] text-muted-foreground">(ไม่มีสรุปจาก AI)</span>
+                                  /* ห้ามเขียนว่า "เขาไม่พูด" — ไม่มี transcript อาจแปลว่าสายไม่ติดก็ได้ */
+                                  <span className="text-[12px] text-muted-foreground">
+                                    ไม่มีคำตอบและไม่มีสรุปจาก AI
+                                  </span>
                                 ) : round.state === 'notSent' &&
                                   !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
                                   <span className="text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
@@ -594,13 +626,23 @@ const FollowPlanningCalendar: React.FC<{
                                   <span className="text-[12px] text-muted-foreground">—</span>
                                 )}
                               </td>
-                              <td className="hidden px-3 py-3 xl:table-cell">
+                              {/* 🔴 **ห้ามซ่อนคอลัมน์นี้** (เจ้าของทัก 10 ก.ย. 2569:
+                                  *"ไม่แสดงการโทรติดต่อเบอร์ฉุกเฉิน คือ ไม่ยอมบอกว่าโทรหาหรือยัง"*)
+                                  เดิมเป็น `hidden xl:table-cell` ⇒ จอแคบกว่า 1280px มองไม่เห็นเลย
+                                  ข้อมูลมีอยู่ในหน้าแต่ CSS ซ่อนไว้ = เท่ากับไม่มี */}
+                              <td className="px-3 py-3">
                                 {emg ? (
                                   <span className="block text-[11.5px] text-muted-foreground">
-                                    {emg}
-                                    {round.state === 'result' ? (
-                                      <span className="block text-[10.5px]">ยังไม่รู้ว่าโทรหรือยัง</span>
-                                    ) : null}
+                                    <span className="block tabular-nums text-foreground">{emg}</span>
+                                    {/**
+                                     * ⚠️ **บอกได้แค่ "แนบเบอร์ไปแล้ว" ไม่ใช่ "โทรไปแล้ว"**
+                                     * ตรวจผลจริง 18 สาย (10 ก.ย. 2569): 23 ช่องที่ Lumos ส่งกลับ
+                                     * ไม่มีช่องไหนบอกว่าโทรเบอร์ฉุกเฉินหรือยัง และไม่มีผลไหน
+                                     * เอ่ยถึงเบอร์นี้เลย · เขียนว่า "โทรแล้ว" เมื่อไหร่คือจอโกหก
+                                     */}
+                                    <span className="block text-[10.5px]">
+                                      แนบไปกับสายแล้ว · Lumos ไม่ได้บอกว่าโทรหรือยัง
+                                    </span>
                                   </span>
                                 ) : (
                                   <span
@@ -624,6 +666,28 @@ const FollowPlanningCalendar: React.FC<{
                                   >
                                     <Phone className="h-3.5 w-3.5" aria-hidden />
                                   </a>
+                                  {/**
+                                   * 🔴 ปุ่มแก้ไข**อยู่บนแถว** (เจ้าของทัก 10 ก.ย. 2569:
+                                   * *"บันทึกการโทรติดตามแล้ว แต่ไม่มีให้กดแก้ไขหากต้องการ
+                                   * เปลี่ยนวัน/เวลาที่ติดตาม"*)
+                                   *
+                                   * ของเดิม**มี**ปุ่มแก้ไข แต่ซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น
+                                   * (กด 2 ครั้งกว่าจะเจอ) · งานที่ทำบ่อยที่สุดของหน้านี้คือ
+                                   * เลื่อนวัน/เวลา จึงต้องอยู่ตรงที่มองเห็นเลย
+                                   */}
+                                  {onEditRound && round.state !== 'cancelled' && !round.entry.completed_at ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => onEditRound(round)}
+                                      title={`แก้ไขวัน/เวลาของสายนี้ · ${row.group.name}`}
+                                      aria-label={`แก้ไขวันเวลาของ ${row.group.name}`}
+                                      className="h-8 w-8 rounded-full"
+                                    >
+                                      <Pencil aria-hidden />
+                                    </Button>
+                                  ) : null}
                                   <button
                                     type="button"
                                     onClick={() => onOpenCell(row, round.ymd ?? dayYmd, [round])}

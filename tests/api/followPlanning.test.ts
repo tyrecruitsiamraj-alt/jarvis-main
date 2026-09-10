@@ -12,6 +12,8 @@ import {
   followRoundState,
   isRoundOpen,
   roundAiSummary,
+  roundReplyText,
+  callCategoryWashTone,
   callCategory,
   FOLLOW_CALL_CATEGORY_TONE,
   buildFollowDayCalls,
@@ -627,5 +629,38 @@ describe('callVerdict / summarize — สามคำตอบบนหัวห
     for (const c of ['unreachable', 'waiting', 'overdue', 'notSent', 'other'] as const) {
       expect(callVerdict(c)).toBe('unknown');
     }
+  });
+});
+
+/**
+ * ตำหนิ 10 ก.ย. 2569 — สีทั้งแถว + คำที่เขาพูดเอง
+ * (ตัวประกอบทั้งสองเป็น pure function จึงคุมที่นี่ ส่วนการวาดจอคุมใน .test.tsx)
+ */
+describe('callCategoryWashTone — สีทั้งแถว', () => {
+  it('เขียว=ตอบว่าไป · แดง=ตอบว่าไม่ไป · เหลือง=ไม่ได้คำตอบ (คำของเจ้าของ 7 ก.ย. 2569)', () => {
+    expect(callCategoryWashTone('agreed')).toBe('success');
+    expect(callCategoryWashTone('lost')).toBe('danger');
+    expect(callCategoryWashTone('unreachable')).toBe('warn');
+  });
+
+  it('🔴 ยังไม่มีผล = ไม่ระบายสี — ระบายหมดทุกแถวแล้วสีเลิกบอกอะไร', () => {
+    for (const c of ['waiting', 'overdue', 'notSent', 'cancelled', 'other'] as const) {
+      expect(callCategoryWashTone(c)).toBeNull();
+    }
+  });
+});
+
+describe('roundReplyText — คำที่คนรับสายพูดเอง', () => {
+  const round = (over: Partial<FollowEntry>) =>
+    ({ entry: { ...over } as FollowEntry, state: 'result', time: null, ymd: null }) as const;
+
+  it('คืนคำพูดตามที่ Lumos ส่งมา', () => {
+    expect(roundReplyText(round({ call_reply: 'ใช่ค่ะ · ไม่ไปแล้ว' }))).toBe('ใช่ค่ะ · ไม่ไปแล้ว');
+  });
+
+  it('ไม่มี/ว่าง = null — คนละช่องกับสรุปของ AI ห้ามเอา summary มาแทน', () => {
+    expect(roundReplyText(round({ call_reply: null, call_summary: 'ผู้รับสายแจ้งว่า…' }))).toBeNull();
+    expect(roundReplyText(round({ call_reply: '   ' }))).toBeNull();
+    expect(roundReplyText(round({}))).toBeNull();
   });
 });
