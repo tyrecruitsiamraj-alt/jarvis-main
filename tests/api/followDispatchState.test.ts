@@ -90,3 +90,43 @@ describe('summarizeDispatchResults', () => {
     expect(summarizeDispatchResults(['held'])).toBeNull();
   });
 });
+
+/**
+ * `push_failed` — ส่งเข้าคิวแล้วแต่ดันไปหา Lumos ไม่สำเร็จ (10 ก.ย. 2569)
+ *
+ * เจอตอนสอบสวนสายรอบ 1 ที่ค้าง 51 รายการ: แถวขึ้นจอว่า "รอ AI โทร" ตลอดไป
+ * แยกไม่ออกว่า **ส่งไม่ถึง** หรือ **ส่งถึงแล้วแต่เขาเงียบ** — คนละปัญหา แก้คนละทาง
+ */
+describe('push_failed — ส่งไม่ถึง Lumos', () => {
+  it('ต้องเตือนและกดส่งใหม่ได้ (ไม่ใช่สถานะปกติ)', () => {
+    const meta = FOLLOW_DISPATCH_META.push_failed;
+    expect(meta.needsAction).toBe(true);
+    expect(meta.retryable).toBe(true);
+    expect(meta.label).toContain('ส่งไม่ถึง');
+  });
+
+  it('🔴 ชนะ pending — ห้ามขึ้นว่า "ส่งให้ AI แล้ว" ทั้งที่ยังไม่ถึงเขา', () => {
+    expect(followDispatchLabel({ state: 'push_failed', callStatus: 'pending' }).label).toBe(
+      FOLLOW_DISPATCH_META.push_failed.label,
+    );
+    expect(followDispatchLabel({ state: 'push_failed', callStatus: null }).label).toBe(
+      FOLLOW_DISPATCH_META.push_failed.label,
+    );
+  });
+
+  it('แต่แพ้ delivered/completed — เขาได้ไปแล้ว (ดึงเองทีหลังได้) ของสดชนะ', () => {
+    expect(followDispatchLabel({ state: 'push_failed', callStatus: 'delivered' }).label).toBe(
+      'AI รับไปโทรแล้ว',
+    );
+    expect(followDispatchLabel({ state: 'push_failed', callStatus: 'completed' }).label).toBe(
+      'AI โทรจบแล้ว',
+    );
+    expect(followDispatchLabel({ state: 'push_failed', callStatus: 'cancelled' }).label).toBe(
+      'ถอนออกจากคิวแล้ว',
+    );
+  });
+
+  it('เป็นสถานะที่ระบบรู้จัก (กันสะกดผิดแล้วตกไปถัง "ไม่รู้ว่าทำไม")', () => {
+    expect(isFollowDispatchState('push_failed')).toBe(true);
+  });
+});

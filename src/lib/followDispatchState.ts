@@ -17,6 +17,15 @@ export const FOLLOW_DISPATCH_STATES = [
   'guarded',
   'no_phone',
   'off',
+  /**
+   * ส่งเข้าคิวแล้วแต่ **ดันไปหา Lumos ไม่สำเร็จ** (10 ก.ย. 2569)
+   *
+   * 🔴 เดิมเงียบสนิท: `pushFollowReminderToLumos()` เป็น fire-and-forget ตั้ง
+   * `queued` ตั้งแต่ก่อนรู้ผล push · HTTP ไปไม่ถึงก็เห็นแค่ใน log ส่วนบนจอขึ้นว่า
+   * "รอ AI โทร" ตลอดไป ⇒ แยกไม่ออกระหว่าง **ส่งไม่ถึง** กับ **ส่งถึงแล้วเขาเงียบ**
+   * ซึ่งเป็นคนละปัญหาและแก้คนละทาง (เจอตอนสอบสวนสายรอบ 1 ที่ค้าง 51 รายการ)
+   */
+  'push_failed',
 ] as const;
 export type FollowDispatchState = (typeof FOLLOW_DISPATCH_STATES)[number];
 
@@ -75,6 +84,12 @@ export const FOLLOW_DISPATCH_META: Record<FollowDispatchState, FollowDispatchMet
     needsAction: true,
     retryable: true,
   },
+  push_failed: {
+    label: 'ส่งไม่ถึง Lumos',
+    hint: 'อยู่ในคิวฝั่งเราแล้วแต่ดันไปหา Lumos ไม่สำเร็จ · Lumos มีทางมาดึงเองอยู่ แต่ห้ามนั่งรอเฉย ๆ — เช็กว่าสายออกจริงไหม',
+    needsAction: true,
+    retryable: true,
+  },
 };
 
 /**
@@ -90,6 +105,15 @@ export function followDispatchLabel(input: {
   callStatus: string | null | undefined;
 }): FollowDispatchMeta {
   const status = String(input.callStatus ?? '').trim();
+  /**
+   * 🔴 **`push_failed` ชนะ `pending`** — แถวอยู่ในคิวฝั่งเราจริง (`status='pending'`)
+   * แต่ฝั่ง Lumos อาจไม่เคยได้รับเลย · ถ้าปล่อยให้ `pending` ชนะ จอจะขึ้นว่า
+   * "ส่งให้ AI แล้ว" ทั้งที่ยังไม่ถึงเขา = กลับไปเงียบแบบเดิม
+   * ⚠️ แต่ `delivered`/`completed` แปลว่าเขาได้ไปแล้ว (ดึงเองทีหลังได้) ⇒ ของสดชนะ
+   */
+  if (input.state === 'push_failed' && status !== 'delivered' && status !== 'completed' && status !== 'cancelled') {
+    return FOLLOW_DISPATCH_META.push_failed;
+  }
   if (status) {
     if (status === 'cancelled') {
       return {

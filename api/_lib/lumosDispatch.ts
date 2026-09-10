@@ -67,6 +67,8 @@ import type { LumosPushInterviewRecord, LumosPushReminderRecord } from './lumosP
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
+/** ใช้จดผล push กลับลงแถวติดตาม (dispatch_state) — ดู markFollowDispatchState */
+const followEntriesTable = tableInAppSchema('follow_entries');
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -1677,8 +1679,42 @@ async function pushFollowReminderToLumos(
   try {
     await pushReminders(buildFollowPushRecord(payload), `follow-${followId}`);
     logInfo('lumos.push.follow.ok', { followId });
+    // ส่งซ้ำสำเร็จหลังเคยล้ม — ต้องล้างธงทิ้ง ไม่งั้นจอเตือนค้างทั้งที่ถึงแล้ว
+    await markFollowDispatchState(followId, 'queued', 'push_failed');
   } catch (e) {
     logError('lumos.push.follow failed (ยังอยู่ในคิว — Lumos โทรดึงได้เอง)', e, { followId });
+    /**
+     * 🔴 **จดลงแถวด้วย ไม่ใช่ log อย่างเดียว** (10 ก.ย. 2569)
+     *
+     * เดิมล้มแล้วเงียบ: แถวยังขึ้นบนจอว่า "รอ AI โทร" ตลอดไป คนนั่งรอสายที่ไม่มีวันออก
+     * — เป็นความเงียบชนิดเดียวกับเคส 24 ส.ค. 2569 ที่ทำให้ต้องมี `followDispatchState.ts`
+     * ตั้งแต่แรก · ตอนสอบสวนสายรอบ 1 ที่ค้าง 51 รายการ (10 ก.ย.) แยกไม่ออกเลยว่า
+     * **ส่งไม่ถึง** หรือ **ส่งถึงแล้วแต่ Lumos เงียบ** เพราะไม่มีใครจดไว้
+     *
+     * ⚠️ จดแบบ best-effort — จดไม่ลงก็ห้ามโยนต่อ (ตัวเรียกเป็น `void` ไม่มีใครรับ)
+     */
+    await markFollowDispatchState(followId, 'push_failed', 'queued');
+  }
+}
+
+/**
+ * เปลี่ยน `dispatch_state` ของรายการติดตาม — เปลี่ยนเฉพาะเมื่อค่าปัจจุบันตรงกับ `from`
+ *
+ * เงื่อนไข `from` กันไม่ให้ทับสถานะที่มีความหมายกว่า (`held`/`suppressed`/`no_phone`
+ * ฯลฯ ซึ่งแปลว่า **ตั้งใจไม่ส่ง**) — เคสนั้นไม่มีการ push อยู่แล้ว
+ */
+async function markFollowDispatchState(
+  followId: string,
+  to: FollowDispatchState,
+  from: FollowDispatchState,
+): Promise<void> {
+  try {
+    await dbQuery(
+      `update ${followEntriesTable} set dispatch_state = $2 where id = $1 and dispatch_state = $3`,
+      [followId, to, from],
+    );
+  } catch (e) {
+    logError('lumos.push.follow: จด dispatch_state ไม่สำเร็จ', e, { followId, to });
   }
 }
 
