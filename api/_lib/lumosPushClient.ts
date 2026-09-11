@@ -18,7 +18,15 @@
  *   GET    /api/public/v1/events?status=&since=&limit=                 → listEvents()
  */
 
-import { logError, logInfo, logWarn } from './logger.js';
+import { logError, logInfo, logWarn, errorSummaryText } from './logger.js';
+import {
+  newRequestId,
+  pickResponseHeaders,
+  readLumosHttpLogConfig,
+  redactSecrets,
+  safeHeadersForLog,
+  truncateForLog,
+} from './lumosHttpLog.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -160,6 +168,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * ═══ ทุกคำขอที่ยิงออกไปหา Lumos ผ่านตรงนี้จุดเดียว ═══
+ *
+ * 🔴 เจ้าของสั่ง 11 ก.ย. 2569: *"ให้ทำ log ในระหว่างที่ http client ยิงไปที่ Server Lumos
+ * อย่างละเอียดทุก End point โดยให้บอก Http Status, Request และ Response"*
+ *
+ * ออกมาเป็น **สองบรรทัดต่อหนึ่งครั้งที่ยิง** ผูกกันด้วย `reqId`:
+ *   `lumos.http.request`  — method · path · attempt · หัว · body ที่ส่ง
+ *   `lumos.http.response` — status · เวลาที่ใช้ · หัวที่สนใจ · body ที่ตอบ
+ * ต่อไม่ถึงเลย (ไม่มี response) จะได้ `lumos.http.error` แทนบรรทัดที่สอง
+ *
+ * ⚠️ **อ่าน body ของฝั่งตอบด้วย `clone()` เสมอ** — ถ้าอ่านจากตัวจริง ผู้เรียกที่ทำ
+ * `res.json()` ต่อจะเจอ stream ที่ถูกอ่านไปแล้วแล้วพังทั้งเส้น
+ *
+ * ⚠️ **ห้าม log แล้วทำให้คำขอล้ม** — ทุกจุดที่ log ห่อ try/catch ไว้ (งานหลักคือยิง ไม่ใช่จด)
+ */
 async function lumosFetch(
   config: LumosPushConfig,
   path: string,
@@ -171,18 +195,84 @@ async function lumosFetch(
     Authorization: `Bearer ${config.apiKey}`,
     ...(init.headers as Record<string, string> | undefined),
   };
+  const logCfg = readLumosHttpLogConfig(process.env);
+  const method = (init.method ?? 'GET').toUpperCase();
+  /** ปิดบังคีย์ + connection id ทุกบรรทัดก่อนลง log */
+  const clean = (text: string): string =>
+    truncateForLog(redactSecrets(text, [config.apiKey]), logCfg.maxChars);
+
   let lastErr: unknown;
   for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
-    try {
-      return await fetch(url, { ...init, headers });
-    } catch (e) {
-      lastErr = e;
-      if (attempt < FETCH_MAX_ATTEMPTS) {
-        logWarn('lumos.fetch.retry', {
+    const reqId = newRequestId();
+    const startedAt = Date.now();
+
+    if (logCfg.level !== 'off') {
+      try {
+        const bodyText = typeof init.body === 'string' ? init.body : undefined;
+        logInfo('lumos.http.request', {
+          reqId,
+          method,
           path,
           attempt,
-          message: e instanceof Error ? e.message : String(e),
+          maxAttempts: FETCH_MAX_ATTEMPTS,
+          headers: safeHeadersForLog(headers),
+          bodyChars: bodyText?.length ?? 0,
+          ...(logCfg.level === 'full' && bodyText ? { body: clean(bodyText) } : {}),
         });
+      } catch {
+        /* จดไม่ได้ก็ต้องยิงต่อ */
+      }
+    }
+
+    try {
+      const res = await fetch(url, { ...init, headers });
+      if (logCfg.level !== 'off') {
+        try {
+          // clone ก่อนอ่าน — ตัวจริงต้องเหลือให้ผู้เรียก .json() ต่อได้
+          const raw = logCfg.level === 'full' ? await res.clone().text() : '';
+          logInfo('lumos.http.response', {
+            reqId,
+            method,
+            path,
+            attempt,
+            status: res.status,
+            statusText: res.statusText,
+            ok: res.ok,
+            ms: Date.now() - startedAt,
+            headers: pickResponseHeaders((n) => res.headers.get(n)),
+            ...(logCfg.level === 'full' ? { bodyChars: raw.length, body: clean(raw) } : {}),
+          });
+        } catch (logErr) {
+          // อ่าน body ไม่ได้ (เช่น stream พัง) — อย่างน้อยต้องรู้ว่า status อะไร
+          logWarn('lumos.http.response.logFailed', {
+            reqId,
+            path,
+            status: res.status,
+            reason: errorSummaryText(logErr, 200),
+          });
+        }
+      }
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (logCfg.level !== 'off') {
+        try {
+          logWarn('lumos.http.error', {
+            reqId,
+            method,
+            path,
+            attempt,
+            maxAttempts: FETCH_MAX_ATTEMPTS,
+            ms: Date.now() - startedAt,
+            willRetry: attempt < FETCH_MAX_ATTEMPTS,
+            // คลี่ .cause ออกมา — "fetch failed" เปล่า ๆ ไล่ต้นเหตุไม่ได้
+            reason: errorSummaryText(e, logCfg.maxChars),
+          });
+        } catch {
+          /* ไม่เป็นไร */
+        }
+      }
+      if (attempt < FETCH_MAX_ATTEMPTS) {
         await sleep(FETCH_RETRY_DELAYS_MS[attempt - 1]);
       }
     }

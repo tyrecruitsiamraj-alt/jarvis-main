@@ -8489,3 +8489,34 @@ map เป็น `FollowEntry` → เดินผ่าน `groupFollowEntries`
 
 ⚠️ ทุกที่ที่เขียนฐานมี fallback สำหรับฐานที่ยังไม่ได้ migrate 116 (ไม่มี `dispatch_error`)
 — ล้างธงให้ได้ก่อนเป็นอันดับแรก ไม่งั้นแถวนั้นจะโดนส่งซ้ำวนไม่จบ
+
+### log การยิง HTTP ไปหา Lumos (11 ก.ย. 2569)
+
+เจ้าของสั่ง: *"ให้ทำ log ในระหว่างที่ http client ยิงไปที่ Server Lumos อย่างละเอียด
+ทุก End point โดยให้บอก Http Status, Request และ Response เพื่อให้ฉันนำมา debug"*
+
+**ทุก endpoint ผ่าน `lumosFetch()` จุดเดียว** (push interviews/reminders · cancel ทั้งสองเลน ·
+event status · list events) ⇒ ใส่ log ที่นั่นที่เดียวได้ครบ
+
+ออกมา **สองบรรทัดต่อหนึ่งครั้งที่ยิง** ผูกกันด้วย `reqId`:
+
+| บรรทัด | มีอะไร |
+| --- | --- |
+| `lumos.http.request` | method · path · attempt/maxAttempts · headers (ปิดคีย์แล้ว) · bodyChars · body |
+| `lumos.http.response` | status · statusText · ok · ms · headers ที่สนใจ (`x-request-id` · `retry-after` · rate limit) · body |
+| `lumos.http.error` | ต่อไม่ถึงเลย — ms · willRetry · `reason` ที่คลี่ `.cause` แล้ว |
+
+ระดับ: `LUMOS_HTTP_LOG` = `off` / `basic` (ไม่มี body) / **`full` (ค่าเริ่มต้น)** ·
+`LUMOS_HTTP_LOG_MAX_CHARS` ค่าเริ่มต้น 4000 (บีบอยู่ในช่วง 200–100,000)
+⚠️ ค่ามั่ว/ไม่ตั้ง ⇒ ใช้ค่าเริ่มต้น **ห้ามปิดเงียบ** (ปิดเงียบ = กลับไปไม่รู้อะไรเลย)
+
+🔴 **สามข้อที่ห้ามพลาด** (มีเทสต์คุมทุกข้อที่ `tests/api/lumosHttpLog.test.ts`)
+1. **คีย์ห้ามโผล่** — ปิดสองชั้น: หัว `Authorization` → `Bearer ***` และแทนค่าคีย์
+   ทุกที่ที่โผล่ในข้อความ (ปลายทางสะท้อนคีย์กลับมาในข้อความ error ได้)
+   · ค่าสั้นกว่า 8 ตัวอักษรไม่แทน (ไปตรงกับข้อความปกติแล้ว log อ่านไม่รู้เรื่อง)
+2. **อ่าน body ฝั่งตอบด้วย `res.clone()` เสมอ** — อ่านจากตัวจริงแล้วผู้เรียกที่ทำ
+   `res.json()` ต่อจะเจอ stream ที่ถูกอ่านไปแล้ว **พังทั้งเส้น**
+3. **log ล้มห้ามทำให้คำขอล้ม** — ทุกจุดห่อ try/catch (งานหลักคือยิง ไม่ใช่จด)
+
+ตัวช่วยเปล่า ๆ อยู่ที่ `api/_lib/lumosHttpLog.ts` (แยกออกมาเพราะจุดที่พลาดแล้วเจ็บที่สุด
+ของงาน log คือคีย์หลุด — ต้องเทสต์ได้)
