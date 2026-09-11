@@ -1602,6 +1602,133 @@ export function buildFollowReminderPayload(
   };
 }
 
+/**
+ * ═══ หลายรอบของคนเดียวกัน = **แผนเดียวหลาย step** (เจ้าของสั่ง 11 ก.ย. 2569) ═══
+ *
+ * > *"จะเพิ่มว่า 1 สายโทรกี่รอบก็ต้องโทรทุกรอบ เว้นแต่ว่าถ้าสายไหนมีการรายงานผลว่า
+ * >  ไม่ไปแล้ว ยกเลิก อะไรพวกนี้"*
+ *
+ * ของเดิมส่ง **1 รอบ = 1 แผนแยกกัน** ไปที่เบอร์เดียวกัน ⇒ แผนหลังไปทับแผนแรก
+ * (วัดจริง 11 ก.ย.: สายที่นัดทีหลังได้ผล 7/16 · สายที่นัดก่อนได้ผล 1/16)
+ *
+ * Lumos ออกแบบมาให้ 1 แผนมีหลาย step อยู่แล้ว และมี `stop_early` หยุด step ที่เหลือ
+ * เองเมื่อได้คำตอบชัด — ตรงกับข้อ 2 ของเจ้าของพอดี **ไม่ต้องเขียนตรรกะหยุดเอง**
+ *
+ * ⚠️ ยืม `buildFollowReminderPayload` ของแต่ละแถวมาต่อกัน **ห้ามประกอบข้อความเอง**
+ * — บทของสายแรกกับสายถัดไปไม่เหมือนกัน (31 ส.ค. 2569) ตรรกะนั้นอยู่ที่นั่นที่เดียว
+ */
+export function buildFollowPlanPayload(
+  entries: readonly FollowEntryInput[],
+  adminPhone?: string | null,
+): LumosReminderPayload {
+  const sorted = [...entries].sort(
+    (a, b) => a.scheduled_at.getTime() - b.scheduled_at.getTime(),
+  );
+  const leader = sorted[0];
+  const base = buildFollowReminderPayload(leader, adminPhone);
+  // แถวหนึ่งอาจมีหลาย step อยู่แล้ว (callTimes) — flatMap จึงถูกกว่า map
+  const steps = sorted.flatMap((e) => buildFollowReminderPayload(e, adminPhone).steps);
+  return { ...base, steps };
+}
+
+/**
+ * ใส่คิว + ดันแผนเดียวที่มีทุกรอบไปหา Lumos
+ *
+ * 🔴 **หนึ่งแถวคิวต่อหนึ่งรอบเหมือนเดิม** — ทั้งหน้าจอผูกกับแถวต่อรอบ (สถานะ · ผล ·
+ * ปุ่มแก้เวลา) เปลี่ยนแค่ **สิ่งที่ยิงออกไป** ไม่ใช่โครงข้อมูล
+ *
+ * แถวหัวขบวน (`step_position = 0`) ถือ payload ของ **ทั้งแผน** ไว้ — เป็นแถวเดียว
+ * ที่ถูก push (และถูกส่งซ้ำ) · แถวที่เหลือเก็บ payload ของตัวเองไว้อ้างอิงเฉย ๆ
+ * ⚠️ ถ้าเผลอ push แถวที่เหลือด้วย จะกลายเป็นหลายแผนที่เบอร์เดียวกัน = กลับไปทับกันเหมือนเดิม
+ *
+ * `plan_ref` + `step_position` คือตัวผูกผลกลับเข้าแถวของรอบนั้น (ดู `applyLumosResult`)
+ */
+export async function enqueueFollowReminderPlan(
+  entries: readonly FollowEntryInput[],
+): Promise<Map<string, FollowDispatchState>> {
+  const out = new Map<string, FollowDispatchState>();
+  if (entries.length === 0) return out;
+  if (entries.length === 1) {
+    out.set(entries[0].id, await enqueueFollowReminder(entries[0]));
+    return out;
+  }
+
+  await ensureCallScriptsFresh();
+  const sorted = [...entries].sort(
+    (a, b) => a.scheduled_at.getTime() - b.scheduled_at.getTime(),
+  );
+  const leader = sorted[0];
+  const adminPhone =
+    (leader.staffPhone ? toE164Thai(leader.staffPhone) : null) ||
+    (await resolveInterviewAdminPhone(null));
+  const planPayload = buildFollowPlanPayload(sorted, adminPhone);
+  const planRef = `follow-${leader.id}`;
+
+  /**
+   * แต่ละแถวเข้าคิวด้วย payload ของตัวเอง **ยกเว้นหัวขบวนที่ถือแผนทั้งก้อน**
+   * (ตัวจับผลแบบถอยหลังใช้ `payload->>'client_contact_id'` ซึ่งต้องไม่ซ้ำกันข้ามแถว)
+   */
+  const items = sorted.map((e) => {
+    const own = buildFollowReminderPayload(e, adminPhone);
+    return {
+      personRef: `follow-${e.id}`,
+      payload: e.id === leader.id ? planPayload : own,
+      scheduledFor: own.steps[0]?.scheduled_at ?? e.scheduled_at.toISOString(),
+    };
+  });
+
+  const { added, held, suppressed, guarded } = await insertQueueItems('reminder', 'follow', items);
+  logInfo('lumos.dispatch.followPlan', {
+    planRef,
+    rounds: sorted.length,
+    steps: planPayload.steps.length,
+    added,
+    held,
+    suppressed,
+    guarded,
+  });
+
+  const stateOf = (id: string): FollowDispatchState => {
+    const ref = `follow-${id}`;
+    if (held.includes(ref)) return 'held';
+    if (suppressed.includes(ref)) return 'suppressed';
+    if (guarded.includes(ref)) return 'guarded';
+    // เข้าคิวแล้ว หรือชน unique เดิม (ส่งไปแล้วรอบก่อน) — ทั้งคู่ถือว่าอยู่ในคิว
+    return 'queued';
+  };
+  for (const e of sorted) out.set(e.id, stateOf(e.id));
+
+  // จดว่าแถวไหนอยู่แผนไหน ลำดับที่เท่าไหร่ — ต้องทำก่อน push เพราะผลอาจกลับมาเร็วมาก
+  await stampPlanSteps(planRef, sorted.map((e) => `follow-${e.id}`));
+
+  if (sorted.some((e) => out.get(e.id) === 'queued')) {
+    // ดันครั้งเดียวทั้งแผน (ไม่รอให้จบ — เหตุผลเดียวกับ enqueueFollowReminder)
+    void pushFollowReminderToLumos(leader.id, planPayload);
+  }
+  return out;
+}
+
+/**
+ * จด `plan_ref`/`step_position` ให้แถวในแผนเดียวกัน — ลำดับตาม array ที่ส่งเข้ามา
+ * ⚠️ ฐานที่ยังไม่ได้รัน migration 117 จะไม่มีคอลัมน์ ⇒ ข้ามไปเงียบ ๆ ได้
+ * (ผลจะถอยไปจับด้วย `client_contact_id` แบบเดิม ซึ่งยังถูกสำหรับแถวหัวขบวน)
+ */
+async function stampPlanSteps(planRef: string, personRefs: readonly string[]): Promise<void> {
+  try {
+    for (let i = 0; i < personRefs.length; i += 1) {
+      await dbQuery(
+        `update ${queueTable}
+            set plan_ref = $2, step_position = $3
+          where channel = 'reminder' and job_ref = 'follow' and person_ref = $1`,
+        [personRefs[i], planRef, i],
+      );
+    }
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) throw e;
+    logWarn('lumos.dispatch.followPlan: ยังไม่ได้รัน migration 117', { planRef });
+  }
+}
+
 /** รายชื่อ Follow ที่คนกรอก → คิว reminder (throw ให้ handler จัดการ เพราะผู้ใช้ต้องรู้ว่าเข้าคิวไหม) */
 /**
  * 🔴 **คืนผลออกไป ไม่ใช่ log ทิ้ง** (เจ้าของสั่ง 25 ส.ค. 2569)
@@ -2081,6 +2208,16 @@ export async function applyLumosResult(
   outcomeForFollowup?: string | null,
 ): Promise<boolean> {
   const idField = channel === 'reminder' ? 'client_contact_id' : 'client_candidate_id';
+  /**
+   * 🔴 **แผนเดียวหลายรอบ: ผลต้องเข้าแถวของรอบนั้น ไม่ใช่ทับกันที่แถวเดียว**
+   * (เจ้าของสั่ง 11 ก.ย. 2569: *"ส่งผลกลับมาทุกสาย"*)
+   *
+   * ผลที่ Lumos ส่งกลับผูกด้วย `client_contact_id` ของ **แผน** (= แถวหัวขบวน)
+   * ทุก step จึงมี id เดียวกันหมด — ตัวแยกคือ `step_position`
+   * ลองจับด้วย `plan_ref + step_position` ก่อนเสมอ · ไม่เจอค่อยถอยไปวิธีเดิม
+   * (แถวเก่าที่เป็นแผนเดี่ยวไม่มีสองคอลัมน์นี้ · ฐานที่ยังไม่ migrate 117 ก็ไม่มี)
+   */
+  const stepPosition = readStepPosition(result);
   // ⚠️ stamp `first_result_at` **ใน UPDATE เดียวกับผล** (migration 088) — เวลานี้คือ
   // หลักฐาน "ถูกโทรแล้ว" ของ dashboard เขียนครั้งเดียวด้วย coalesce แล้วห้ามมี reset
   // ที่ไหนล้าง (มีเทสต์ guard คุม) · ฐานยังไม่รัน 088 → ถอยไป SQL เดิม (คิวห้ามหยุดเดิน)
@@ -2096,7 +2233,32 @@ export async function applyLumosResult(
       where channel = $1 and payload->>'${idField}' = $2
       returning id`;
   const params = [channel, clientId, status, JSON.stringify(result ?? null)];
-  let rows: Array<{ id: number }>;
+  let rows: Array<{ id: number }> = [];
+
+  if (stepPosition !== null) {
+    const planSql = (withStamps: boolean) =>
+      `${applySql(withStamps).replace(
+        `where channel = $1 and payload->>'${idField}' = $2`,
+        'where channel = $1 and plan_ref = $2 and step_position = $5',
+      )}`;
+    try {
+      ({ rows } = await dbQuery<{ id: number }>(planSql(true), [...params, stepPosition]));
+    } catch (e) {
+      // ไม่มีคอลัมน์ (ยังไม่ migrate 117) หรือไม่มี stamp 088 — ถอยไปทางเดิมทั้งคู่
+      if (!isUndefinedColumnError(e)) throw e;
+      try {
+        ({ rows } = await dbQuery<{ id: number }>(planSql(false), [...params, stepPosition]));
+      } catch (e2) {
+        if (!isUndefinedColumnError(e2)) throw e2;
+        rows = [];
+      }
+    }
+    if (rows.length > 0) {
+      await runFollowupForResult(rows[0].id, result, outcomeForFollowup);
+      return true;
+    }
+  }
+
   try {
     ({ rows } = await dbQuery<{ id: number }>(applySql(true), params));
   } catch (e) {
@@ -2107,18 +2269,34 @@ export async function applyLumosResult(
     ({ rows } = await dbQuery<{ id: number }>(applySql(false), params));
   }
   if (rows.length === 0) return false;
-
-  // ได้ผลแล้วต้องมีคนทำอะไรต่อ — ไม่รับสายก็โทรซ้ำ ขอเลื่อนก็นัดใหม่ ครบเพดานก็ส่งให้คนตาม
-  // เดิมจบแค่บันทึกผล งานเลยตายคาที่ · error ที่นี่ห้ามทำให้ ingest ล้ม (Lumos จะยิงซ้ำ)
-  const outcome = outcomeForFollowup ?? readOutcome(result);
-  if (outcome) {
-    try {
-      await applyCallFollowupToQueueRow({ queueId: rows[0].id, outcome, result });
-    } catch (e) {
-      logError('lumos.followup.failed', e, { queueId: rows[0].id, outcome });
-    }
-  }
+  await runFollowupForResult(rows[0].id, result, outcomeForFollowup);
   return true;
+}
+
+/** ลำดับ step ที่ Lumos ส่งกลับ — `null` = ผลนี้ไม่ได้มาจากแผนหลาย step */
+function readStepPosition(result: unknown): number | null {
+  if (typeof result !== 'object' || result === null) return null;
+  const v = (result as Record<string, unknown>).step_position;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/**
+ * ได้ผลแล้วต้องมีคนทำอะไรต่อ — ไม่รับสายก็โทรซ้ำ ขอเลื่อนก็นัดใหม่ ครบเพดานก็ส่งให้คนตาม
+ * เดิมจบแค่บันทึกผล งานเลยตายคาที่ · error ที่นี่ห้ามทำให้ ingest ล้ม (Lumos จะยิงซ้ำ)
+ */
+async function runFollowupForResult(
+  queueId: number,
+  result: unknown,
+  outcomeForFollowup?: string | null,
+): Promise<void> {
+  const outcome = outcomeForFollowup ?? readOutcome(result);
+  if (!outcome) return;
+  try {
+    await applyCallFollowupToQueueRow({ queueId, outcome, result });
+  } catch (e) {
+    logError('lumos.followup.failed', e, { queueId, outcome });
+  }
 }
 
 /** ดึง outcome ออกจากผลที่ Lumos ส่งมา (รูปแบบต่างกันเล็กน้อยระหว่าง 2 ช่อง) */

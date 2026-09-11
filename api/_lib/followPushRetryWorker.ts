@@ -71,6 +71,11 @@ type StuckRow = {
  *
  * ⚠️ `q.status = 'pending'` สำคัญที่สุด — ถ้าเป็น `delivered`/`completed` แปลว่า
  * Lumos ได้ไปแล้ว (หรือโทรจบแล้ว) การส่งซ้ำตอนนั้นคือความเสี่ยงเปล่า ๆ
+ *
+ * 🔴 **เอาเฉพาะแถวหัวขบวนของแผน** (`step_position = 0`) — หลายรอบของคนเดียวกัน
+ * ถูกยิงเป็น **แผนเดียว** ที่ถือ payload ไว้ที่แถวนั้น · ส่งซ้ำแถวที่เหลือด้วยเมื่อไหร่
+ * จะกลายเป็นหลายแผนที่เบอร์เดียวกัน = กลับไปทับกันเหมือนปัญหาเดิมที่เพิ่งแก้
+ * (`null` = แถวเดี่ยวแบบเดิม ยังต้องส่งซ้ำตามปกติ)
  */
 async function findStuck(limit: number): Promise<StuckRow[]> {
   const { rows } = await dbQuery<StuckRow>(
@@ -84,6 +89,9 @@ async function findStuck(limit: number): Promise<StuckRow[]> {
         and f.completed_at is null
         and q.status = 'pending'
         and q.result is null
+        -- ส่งซ้ำเฉพาะแถวหัวขบวนของแผน (step 0) หรือแถวเดี่ยวแบบเดิม (null)
+        -- ส่งซ้ำแถวที่เหลือด้วย = กลายเป็นหลายแผนที่เบอร์เดียวกัน กลับไปทับกันเหมือนเดิม
+        and coalesce(q.step_position, 0) = 0
       order by f.scheduled_at asc nulls last
       limit $1`,
     [limit],
@@ -91,8 +99,31 @@ async function findStuck(limit: number): Promise<StuckRow[]> {
   return rows;
 }
 
+/**
+ * ส่งแผนสำเร็จ ⇒ ล้างธงให้ **ทุกรอบในแผนเดียวกัน** ไม่ใช่แค่แถวหัวขบวน
+ * (แถวที่เหลือไม่เคยถูก push เอง แต่มันอยู่ในแผนที่เพิ่งส่งไปแล้ว)
+ */
 async function markSent(id: string): Promise<void> {
   try {
+    await dbQuery(
+      `update ${followTable}
+          set dispatch_state = 'queued', dispatch_error = null
+        where dispatch_state = 'push_failed'
+          and id in (
+            select f2.id from ${followTable} f2
+              join ${queueTable} q2
+                on q2.channel = 'reminder' and q2.job_ref = 'follow'
+               and q2.person_ref = 'follow-' || f2.id::text
+             where q2.plan_ref = (
+                     select q3.plan_ref from ${queueTable} q3
+                      where q3.channel = 'reminder' and q3.job_ref = 'follow'
+                        and q3.person_ref = 'follow-' || $1::text
+                   )
+               and q2.plan_ref is not null
+          )`,
+      [id],
+    );
+    // แถวเดี่ยว (ไม่มี plan_ref) — คำสั่งข้างบนไม่โดน ต้องล้างตรง ๆ อีกที
     await dbQuery(
       `update ${followTable}
           set dispatch_state = 'queued', dispatch_error = null

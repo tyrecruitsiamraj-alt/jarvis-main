@@ -26,6 +26,7 @@ import { logWarn } from '../_lib/logger.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import {
   enqueueFollowReminder,
+  enqueueFollowReminderPlan,
   cancelFollowReminder,
   refreshFollowReminderPayload,
 } from '../_lib/lumosDispatch.js';
@@ -350,16 +351,113 @@ export function parseFollowInput(raw: unknown, now = new Date()): FollowInputRes
   };
 }
 
-async function createFollow(req: AuthedReq, res: ApiRes) {
-  const parsed = parseFollowInput(await readJsonBody(req));
-  if (parsed.error || !parsed.value) {
-    return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
-  }
-  const { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound } =
-    parsed.value;
+export type FollowRoundInput = { when: Date; staffPhone: string | null; callRound: number | null };
 
-  // ฐานที่รัน 092 แล้วเก็บ group_id/call_times · ยังไม่รัน → ถอยไป insert ชุดเดิม (42703)
-  let created: FollowRow | undefined;
+/**
+ * อ่านรายการรอบจาก body — `rounds: [{ scheduled_at, staff_phone?, call_round? }, …]`
+ *
+ * ไม่ส่ง `rounds` มา = รอบเดียวตามของเดิม (เส้นเก่ายังใช้ได้ทุกตัว)
+ * ⚠️ **เรียงตามเวลาและตัดเวลาซ้ำ** ที่นี่เลย — step ในแผนต้องเรียงถูกและห้ามซ้ำ
+ * ไม่งั้น Lumos โทรซ้ำเวลาเดียวกันสองครั้ง
+ */
+export function parseFollowRounds(raw: unknown, primary: FollowRoundInput): FollowRoundInput[] {
+  const list = (raw as { rounds?: unknown } | null)?.rounds;
+  if (!Array.isArray(list) || list.length === 0) return [primary];
+
+  const out: FollowRoundInput[] = [];
+  const seen = new Set<number>();
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const at = typeof o.scheduled_at === 'string' ? new Date(o.scheduled_at) : null;
+    if (!at || Number.isNaN(at.getTime())) continue;
+    if (seen.has(at.getTime())) continue;
+    seen.add(at.getTime());
+    const phoneRaw = typeof o.staff_phone === 'string' ? o.staff_phone.trim() : '';
+    const roundRaw = Number(o.call_round);
+    out.push({
+      when: at,
+      staffPhone: phoneRaw || primary.staffPhone,
+      callRound: Number.isInteger(roundRaw) && roundRaw >= 1 ? roundRaw : null,
+    });
+  }
+  if (out.length === 0) return [primary];
+  return out.sort((a, b) => a.when.getTime() - b.when.getTime());
+}
+
+/**
+ * สร้างหลายรอบในคำขอเดียว แล้วดัน **แผนเดียว** ที่มีครบทุกรอบไปหา Lumos
+ *
+ * 🔴 ยังเป็น **หนึ่งแถวต่อหนึ่งรอบ** เหมือนเดิม — ทั้งหน้าจอผูกกับแถวต่อรอบ
+ * (สถานะ · ผล · ปุ่มแก้เวลา) เปลี่ยนแค่สิ่งที่ยิงออกไป ไม่ใช่โครงข้อมูล
+ */
+async function createFollowRounds(
+  req: AuthedReq,
+  res: ApiRes,
+  base: ParsedFollowInput,
+  rounds: FollowRoundInput[],
+): Promise<unknown> {
+  const createdRows: FollowRow[] = [];
+  for (const r of rounds) {
+    const row = await insertFollowRow(req, base, r);
+    if (row) createdRows.push(row);
+  }
+  if (createdRows.length === 0) return sendError(res, 500, 'Failed to create follow entries');
+
+  let states = new Map<string, FollowDispatchState>();
+  if (await isAutoDispatchEnabled('follow_entry')) {
+    const staffName = await staffNameOfPhone(base.staffPhone);
+    states = await enqueueFollowReminderPlan(
+      createdRows.map((row, i) => ({
+        id: row.id,
+        recipient_name: base.name,
+        recipient_phone: base.phone,
+        topic: base.topic,
+        note: base.note,
+        staffPhone: rounds[i]?.staffPhone ?? base.staffPhone,
+        staffName,
+        unitName: base.unitName,
+        scheduled_at: rounds[i]?.when ?? new Date(String(row.scheduled_at)),
+        callTimes: base.callTimes,
+        callRound: rounds[i]?.callRound ?? null,
+      })),
+    );
+  }
+
+  const out: FollowRow[] = [];
+  for (const row of createdRows) {
+    const state = states.get(row.id) ?? 'off';
+    try {
+      await dbQuery(`update ${followTable} set dispatch_state = $2 where id = $1`, [row.id, state]);
+      out.push({ ...row, dispatch_state: state });
+    } catch (e) {
+      // ฐานยังไม่รัน 109 → ข้ามการจด (จอถอยไปอ่านสถานะจากคิวเหมือนเดิม)
+      if (!isUndefinedColumn(e)) throw e;
+      out.push(row);
+    }
+    await auditFromAuthed(req, {
+      action: 'follow.create',
+      entityType: 'follow_entry',
+      entityId: row.id,
+      after: toResponse(row),
+    });
+  }
+
+  return res.status(201).json({ items: out.map(toResponse) });
+}
+
+/**
+ * insert หนึ่งแถวติดตาม — แยกออกมาเพราะทางสร้าง **หลายรอบในคำขอเดียว** (11 ก.ย. 2569)
+ * ต้องใช้ตัวเดียวกัน ไม่ใช่ก๊อป SQL ไปอีกชุดแล้วค่อย ๆ เพี้ยนกัน
+ *
+ * ฐานที่รัน 092 แล้วเก็บ `group_id`/`call_times` · ยังไม่รัน → ถอยไป insert ชุดเดิม (42703)
+ */
+async function insertFollowRow(
+  req: AuthedReq,
+  base: ParsedFollowInput,
+  round: { when: Date; staffPhone: string | null; callRound: number | null },
+): Promise<FollowRow | undefined> {
+  const { name, phone, topic, note, groupId, callTimes, unitName, siteCode } = base;
   try {
     const { rows } = await dbQuery<FollowRow>(
       `insert into ${followTable}
@@ -367,10 +465,10 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
           group_id, call_times, unit_name, site_code, call_round, created_by, created_by_name)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        returning *`,
-      [name, phone, topic, note, staffPhone, when.toISOString(), groupId, callTimes,
-       unitName, siteCode, callRound, req.user.sub, req.user.email],
+      [name, phone, topic, note, round.staffPhone, round.when.toISOString(), groupId, callTimes,
+       unitName, siteCode, round.callRound, req.user.sub, req.user.email],
     );
-    created = rows[0];
+    return rows[0];
   } catch (e) {
     if (!isUndefinedColumn(e)) throw e;
     const { rows } = await dbQuery<FollowRow>(
@@ -378,10 +476,39 @@ async function createFollow(req: AuthedReq, res: ApiRes) {
          (recipient_name, recipient_phone, topic, note, staff_phone, scheduled_at, created_by, created_by_name)
        values ($1, $2, $3, $4, $5, $6, $7, $8)
        returning *`,
-      [name, phone, topic, note, staffPhone, when.toISOString(), req.user.sub, req.user.email],
+      [name, phone, topic, note, round.staffPhone, round.when.toISOString(), req.user.sub, req.user.email],
     );
-    created = rows[0];
+    return rows[0];
   }
+}
+
+async function createFollow(req: AuthedReq, res: ApiRes) {
+  const raw = await readJsonBody(req);
+  const parsed = parseFollowInput(raw);
+  if (parsed.error || !parsed.value) {
+    return sendError(res, 400, 'Bad request', parsed.error || 'ข้อมูลไม่ถูกต้อง');
+  }
+  const { name, phone, topic, note, staffPhone, when, groupId, callTimes, unitName, siteCode, callRound } =
+    parsed.value;
+
+  /**
+   * 🔴 **หลายรอบของคนเดียวกัน = คำขอเดียว = แผนเดียว** (เจ้าของสั่ง 11 ก.ย. 2569)
+   *
+   * เดิมหน้าเว็บวนยิงทีละรอบ ⇒ ฝั่งเราสร้าง **แผนแยกกันรอบละแผน** ไปที่เบอร์เดียวกัน
+   * แผนหลังไปทับแผนแรก สายแรกจึงไม่ได้โทรและไม่มีผลกลับ
+   * (วัดจริง 11 ก.ย.: สายที่นัดทีหลังได้ผล 7/16 · สายที่นัดก่อนได้ผล 1/16)
+   *
+   * ต้องรู้ทุกรอบ**ตั้งแต่ตอนสร้าง** ถึงจะประกอบแผนเดียวที่มีครบทุก step ได้ —
+   * จะไปรวมทีหลังไม่ได้ เพราะแผนแรกถูกส่งไปแล้ว
+   */
+  const rounds = parseFollowRounds(raw, { when, staffPhone, callRound });
+  if (rounds.length > 1) return createFollowRounds(req, res, parsed.value, rounds);
+
+  let created = await insertFollowRow(req, parsed.value, {
+    when,
+    staffPhone,
+    callRound,
+  });
   if (!created) return sendError(res, 500, 'Failed to create follow entry');
 
   /**

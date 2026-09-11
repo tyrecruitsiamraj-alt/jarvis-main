@@ -94,6 +94,14 @@ export type NewFollowEntry = {
    * 1 = ใช้บทสายแรก · 2 ขึ้นไป = ใช้บทรอบถัดไป · ไม่ส่ง = ถือเป็นสายแรก
    */
   call_round?: number;
+  /**
+   * **ทุกรอบของคนนี้ในคำขอเดียว** (11 ก.ย. 2569) — ส่งมาเมื่อไหร่ ฝั่ง API จะสร้าง
+   * ครบทุกรอบแล้วดัน **แผนเดียว** ที่มีทุก step ไปหา Lumos
+   *
+   * 🔴 ต้องส่งพร้อมกัน **ห้ามยิงทีละรอบ** — ยิงทีละรอบ = แผนแยกกันรอบละแผนไปที่
+   * เบอร์เดียวกัน แผนหลังทับแผนแรก สายแรกไม่ได้โทร (วัดจริง 11 ก.ย. 2569)
+   */
+  rounds?: Array<{ scheduled_at: string; staff_phone?: string; call_round?: number }>;
 };
 
 /** ฟิลด์ที่แก้ไขได้ (096) — ไม่รวมเจ้าของข้อมูลและตารางโทร (ดูเหตุผลที่ฝั่ง API) */
@@ -124,6 +132,25 @@ export async function createFollowEntry(input: NewFollowEntry): Promise<FollowEn
   const r = await apiFetch('/api/follow', { method: 'POST', body: JSON.stringify(input) });
   if (!r.ok) throw new Error(await readError(r));
   return (await r.json()) as FollowEntry;
+}
+
+/**
+ * สร้าง **ทุกรอบของคนเดียวกันในคำขอเดียว** — คืนทุกแถวที่สร้าง
+ *
+ * 🔴 ใช้ตัวนี้เสมอเมื่อตั้งมากกว่าหนึ่งรอบ (เจ้าของสั่ง 11 ก.ย. 2569)
+ * ยิงทีละรอบ = ฝั่งเราสร้างแผนแยกกันรอบละแผนไปที่เบอร์เดียวกัน แผนหลังทับแผนแรก
+ * **สายแรกจะไม่ได้โทรและไม่มีผลกลับ**
+ */
+export async function createFollowRounds(
+  input: NewFollowEntry & { rounds: NonNullable<NewFollowEntry['rounds']> },
+): Promise<FollowEntry[]> {
+  const r = await apiFetch('/api/follow', { method: 'POST', body: JSON.stringify(input) });
+  if (!r.ok) throw new Error(await readError(r));
+  const data = (await r.json()) as { items?: FollowEntry[] } | FollowEntry;
+  // เส้นเดิมคืนแถวเดียว (ตอนส่งรอบเดียว) — รองรับทั้งสองรูปเพื่อไม่ผูกกับลำดับ deploy
+  return Array.isArray((data as { items?: FollowEntry[] }).items)
+    ? ((data as { items: FollowEntry[] }).items)
+    : [data as FollowEntry];
 }
 
 /**

@@ -29,6 +29,7 @@ import { Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, C
 import {
   listFollowEntries,
   createFollowEntry,
+  createFollowRounds,
   cancelFollowEntry,
   purgeFollowEntry,
   completeFollowEntry,
@@ -663,18 +664,29 @@ const FollowPage: React.FC = () => {
       let done = 0;
       const dispatchStates: Array<string | null> = [];
       try {
-        for (const t of sendIso) {
-          const createdEntry = await createFollowEntry({
-            recipient_name: recipientName,
-            recipient_phone: phone,
-            topic,
-            note: note || undefined,
-            staff_phone: phoneByIso.get(t) || undefined,
+        /**
+         * 🔴 **ยิงครั้งเดียวทุกรอบ** (เจ้าของสั่ง 11 ก.ย. 2569) — เดิมวนยิงทีละรอบ
+         * ฝั่งเราเลยสร้าง **แผนแยกกันรอบละแผน** ไปที่เบอร์เดียวกัน แผนหลังทับแผนแรก
+         * สายแรกจึงไม่ได้โทรและไม่มีผลกลับ (วัดจริง: สายที่นัดก่อนได้ผล 1 จาก 16)
+         * ⚠️ ห้ามกลับไปวน `for` ยิงทีละรอบเด็ดขาด
+         */
+        const createdEntries = await createFollowRounds({
+          recipient_name: recipientName,
+          recipient_phone: phone,
+          topic,
+          note: note || undefined,
+          staff_phone: phoneByIso.get(sendIso[0]) || undefined,
+          scheduled_at: sendIso[0],
+          call_round: roundByIso.get(sendIso[0]) ?? 1,
+          unit_name: unitName.trim() || undefined,
+          site_code: siteCode.trim() || undefined,
+          rounds: sendIso.map((t) => ({
             scheduled_at: t,
+            staff_phone: phoneByIso.get(t) || undefined,
             call_round: roundByIso.get(t) ?? 1,
-            unit_name: unitName.trim() || undefined,
-            site_code: siteCode.trim() || undefined,
-          });
+          })),
+        });
+        for (const createdEntry of createdEntries) {
           dispatchStates.push(createdEntry.dispatch_state ?? null);
           done += 1;
         }
