@@ -17,6 +17,7 @@ import { startMatchPrecomputeWorker } from '../api/_lib/matchPrecomputeWorker.ts
 import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveWorker.ts';
 import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
 import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
+import { startFollowPushRetryWorker } from '../api/_lib/followPushRetryWorker.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
@@ -190,6 +191,12 @@ server.listen(port, '127.0.0.1', () => {
   // 🔴 worker กันชื่อดอง — **ปิดโดยดีฟอลต์** (ถอด claim ของคนจริง + ยิงสายจริง)
   // เปิดที่ deploy ด้วย CLAIM_GUARD_ENABLED=true เท่านั้น (ฐาน dev = production)
   startClaimGuardWorker();
+  /**
+   * ส่งซ้ำรายการติดตามที่ยังไปไม่ถึง Lumos — **เปิดโดยดีฟอลต์** (เจ้าของสั่ง 11 ก.ย. 2569:
+   * *"ต้องการแค่เพิ่มแล้วต้องไปโผล่ที่ lumos"*) · ไม่ได้ตัดสินใจอะไรแทนคน
+   * แค่ทำสิ่งที่คนสั่งไว้แล้วให้สำเร็จ · ปิดด้วย FOLLOW_PUSH_RETRY_ENABLED=false
+   */
+  startFollowPushRetryWorker();
   /**
    * อุ่นสำเนาใบขอทันทีหลังเปิดรับ request แล้ว (Wave 3.1 · 5 ก.ย. 2569)
    *

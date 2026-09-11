@@ -8456,3 +8456,36 @@ map เป็น `FollowEntry` → เดินผ่าน `groupFollowEntries`
    (แถวในคิวยังอยู่ครบ · Lumos ไม่เคย pull เลย ดังนั้นรอเฉย ๆ ไม่มีทางออกเอง)
 2. ขยายช่วง retry ในคำขอเดียว (ตอนนี้ 1.2 วินาที) — ควรทำคู่กับข้อ 1 ไม่ใช่แทนกัน
 3. ปุ่ม "ส่งใหม่" บนแถวให้คนกดเองได้
+
+### ตัวส่งซ้ำไปหา Lumos (11 ก.ย. 2569)
+
+เจ้าของสั่ง: *"ฉันไม่สนใจ ฉันต้องการแค่เพิ่มแล้วต้องไปโผล่ที่ lumos ถ้าผิดที่เราก็แก้ดิ"*
+
+| ไฟล์ | บทบาท |
+| --- | --- |
+| `src/lib/followPushRetryPolicy.ts` | กติกาเปล่า ๆ — `readFollowPushRetryConfig` · `shouldRetryFollowPush` (เทสต์คุมทุกเส้น) |
+| `api/_lib/followPushRetryWorker.ts` | `runFollowPushRetryOnce()` · `startFollowPushRetryWorker()` |
+| `server/local-api.ts` | บูต worker (โปรดักชันรัน process นี้จริง — `docker/supervisord.conf` → `tsx server/local-api.ts`) |
+
+🔴 **เปิดเป็นค่าเริ่มต้น** ต่างจาก worker ตัวอื่นที่ปิดไว้ เพราะตัวนี้**ไม่ได้ตัดสินใจแทนคน**
+— คนกดเพิ่มรายการเอง ตั้งเวลาเอง แถวในคิวมีอยู่แล้ว มันแค่ทำให้สิ่งที่สั่งไว้สำเร็จ
+⇒ **ไม่ต้องเติมบรรทัดใน `deploy.yml`** (กับดักเดิมคือ flag ที่ default ปิดแล้วลืมใส่ตอน deploy
+เช่น `APPLICATION_AUTO_DISPATCH_ENABLED` ที่ปิดอยู่เงียบ ๆ หลายวัน) · ปิดด้วย
+`FOLLOW_PUSH_RETRY_ENABLED=false`
+
+**เงื่อนไขคัดแถว — ครบทุกข้อ ไม่ใช่แค่ธง `push_failed`:**
+`cancelled_at is null` · `completed_at is null` · `q.status = 'pending'` · `q.result is null`
+⚠️ `q.status` สำคัญที่สุด — เป็น `delivered`/`completed` แปลว่า Lumos ได้ไปแล้ว ส่งซ้ำคือเสี่ยงเปล่า
+
+**ส่งซ้ำ ≠ สายใหม่** — `Idempotency-Key = follow-<id>` ตัวเดิม + `client_contact_id` เดิม
+⇒ ถ้าครั้งแรกถึงจริงแต่เราไม่รู้ Lumos ตัดซ้ำให้เอง (หัวไฟล์ `lumosPushClient.ts` ยืนยันไว้)
+
+🔴 **เพดานเวลา `maxLateMinutes` = 120 นาที** — สายติดตามถามว่า "ไปทำงานหรือยัง"
+โทรช้าครึ่งชั่วโมงยังมีความหมาย โทรช้าครึ่งวันคือไปกวนเขาเปล่า ๆ · เลยเพดานแล้ว
+**เลิกส่ง** ปล่อยป้าย "ส่งไม่ถึง Lumos" ค้างไว้ให้คนตัดสินใจเอง **ห้ามส่งซ้ำไม่จำกัด**
+
+**สำเร็จ ⇒ ล้างธงเป็น `queued` + ล้าง `dispatch_error`** (ไม่ล้าง = วนส่งซ้ำไม่จบ)
+**ล้มอีก ⇒ คงธงไว้ + จดเหตุใหม่** รอบหน้าลองต่อ
+
+⚠️ ทุกที่ที่เขียนฐานมี fallback สำหรับฐานที่ยังไม่ได้ migrate 116 (ไม่มี `dispatch_error`)
+— ล้างธงให้ได้ก่อนเป็นอันดับแรก ไม่งั้นแถวนั้นจะโดนส่งซ้ำวนไม่จบ
