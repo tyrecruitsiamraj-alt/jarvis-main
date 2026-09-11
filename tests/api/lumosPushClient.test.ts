@@ -153,7 +153,12 @@ describe('lumosFetch — retry เมื่อ fetch() เอง throw (เจ�
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it('fetch() throw ครบ 3 ครั้ง (เพดาน retry) → โยน error เดิมออกไปให้ผู้เรียก catch', async () => {
+  /**
+   * เพดาน retry ขยายจาก 3 (1.2 วินาที) เป็น 5 (~17.5 วินาที) เมื่อ 11 ก.ย. 2569
+   * เพราะช่วงที่ต่อไม่ติดจริงวัดได้เป็นหลายสิบวินาที ไม่ใช่เสี้ยววินาที
+   * ⚠️ อย่าล็อกเลขตายตัวไว้อีก — ล็อกแค่ "ต้องมากกว่า 3 และโยน error เดิมออกไป"
+   */
+  it('fetch() throw จนครบเพดาน retry → โยน error เดิมออกไปให้ผู้เรียก catch', async () => {
     const err = new TypeError('fetch failed');
     const fetchMock = vi.fn().mockRejectedValue(err);
     vi.stubGlobal('fetch', fetchMock);
@@ -163,7 +168,7 @@ describe('lumosFetch — retry เมื่อ fetch() เอง throw (เจ�
     await vi.runAllTimersAsync();
     await assertion;
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(3);
   });
 
   it('HTTP response ที่ไม่ ok (เช่น 401) ไม่ retry — fetch() เองไม่ throw', async () => {

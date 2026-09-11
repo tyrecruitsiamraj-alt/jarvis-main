@@ -1804,8 +1804,14 @@ async function pushFollowReminderToLumos(
 ): Promise<void> {
   if (!getLumosPushConfig()) return;
   try {
-    await pushReminders(buildFollowPushRecord(payload), `follow-${followId}`);
-    logInfo('lumos.push.follow.ok', { followId });
+    const ack = await pushReminders(buildFollowPushRecord(payload), `follow-${followId}`);
+    logInfo('lumos.push.follow.ok', { followId, accepted: ack?.accepted });
+    /**
+     * 🔴 **จดหลักฐานว่าเขารับไปแล้วจริง** (11 ก.ย. 2569) — ก่อนหน้านี้เรารู้แค่
+     * "ยิงแล้วไม่ error" พอไม่มีผลกลับมาก็เถียงกันไม่จบว่าของไม่ถึง หรือถึงแล้วเขาไม่โทร
+     * `event_id` คือเลขอ้างอิงร่วมกับฝั่งเขา ถามตรง ๆ ได้เลย
+     */
+    await recordPushAck(followId, ack);
     // ส่งซ้ำสำเร็จหลังเคยล้ม — ต้องล้างธงทิ้ง ไม่งั้นจอเตือนค้างทั้งที่ถึงแล้ว
     await markFollowDispatchState(followId, 'queued', 'push_failed');
   } catch (e) {
@@ -1822,6 +1828,64 @@ async function pushFollowReminderToLumos(
      */
     await markFollowDispatchState(followId, 'push_failed', 'queued', pushErrorText(e));
   }
+}
+
+/**
+ * ทุกแถวที่อยู่ในแผนเดียวกับรายการนี้ (รวมตัวมันเอง)
+ * แถวเดี่ยว/ฐานที่ยังไม่ migrate 117 ⇒ คืนแค่ตัวมันเอง
+ */
+async function planMemberIds(followId: string): Promise<string[]> {
+  try {
+    const { rows } = await dbQuery<{ id: string }>(
+      `select f.id
+         from ${followEntriesTable} f
+         join ${queueTable} q
+           on q.channel = 'reminder' and q.job_ref = 'follow'
+          and q.person_ref = 'follow-' || f.id::text
+        where q.plan_ref is not null
+          and q.plan_ref = (
+            select q2.plan_ref from ${queueTable} q2
+             where q2.channel = 'reminder' and q2.job_ref = 'follow'
+               and q2.person_ref = $1
+          )`,
+      [`follow-${followId}`],
+    );
+    const ids = rows.map((r) => r.id);
+    return ids.includes(followId) ? ids : [...ids, followId];
+  } catch {
+    return [followId];
+  }
+}
+
+/** จด `event_id` ที่ Lumos ตอบกลับลงแถวคิว — best-effort ล้มก็แค่ไม่มีหลักฐาน */
+async function recordPushAck(followId: string, ack: unknown): Promise<void> {
+  const eventId = readFirstEventId(ack);
+  try {
+    await dbQuery(
+      `update ${queueTable}
+          set push_event_id = $2, push_accepted_at = now()
+        where channel = 'reminder' and job_ref = 'follow' and person_ref = $1`,
+      [`follow-${followId}`, eventId],
+    );
+  } catch (e) {
+    if (!isUndefinedColumnError(e)) {
+      logWarn('lumos.push.follow: จด event_id ไม่สำเร็จ', {
+        followId,
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    }
+    // ยังไม่ได้รัน migration 118 — ข้ามไปเงียบ ๆ (ไม่ใช่เรื่องคอขาดบาดตาย)
+  }
+}
+
+function readFirstEventId(ack: unknown): string | null {
+  if (typeof ack !== 'object' || ack === null) return null;
+  const list = (ack as { results?: unknown }).results;
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const first = list[0];
+  if (typeof first !== 'object' || first === null) return null;
+  const id = (first as { event_id?: unknown }).event_id;
+  return typeof id === 'string' && id.trim() ? id.trim() : null;
 }
 
 /**
@@ -1850,12 +1914,20 @@ async function markFollowDispatchState(
   from: FollowDispatchState,
   error: string | null = null,
 ): Promise<void> {
+  /**
+   * 🔴 **ติดธงทั้งแผน ไม่ใช่แค่แถวหัวขบวน** (แก้ 11 ก.ย. 2569)
+   *
+   * แผนเดียวมีหลายสาย แต่ push ครั้งเดียวที่หัวขบวน · ของเดิมติดธงแถวเดียว
+   * ⇒ สายที่ 2 ขึ้นจอว่า "ส่งแล้ว" ทั้งที่ไม่มีอะไรถูกส่งเลย = **จอโกหก**
+   * (เจ้าของเห็นเองจากเคส "ไบรโอนี่ คิคิ": ร1 push_failed · ร2 queued)
+   */
+  const ids = await planMemberIds(followId);
   try {
     await dbQuery(
       `update ${followEntriesTable}
           set dispatch_state = $2, dispatch_error = $4
-        where id = $1 and dispatch_state = $3`,
-      [followId, to, from, error],
+        where id = any($1::uuid[]) and dispatch_state = $3`,
+      [ids, to, from, error],
     );
   } catch (e) {
     /**
@@ -1864,8 +1936,9 @@ async function markFollowDispatchState(
      */
     try {
       await dbQuery(
-        `update ${followEntriesTable} set dispatch_state = $2 where id = $1 and dispatch_state = $3`,
-        [followId, to, from],
+        `update ${followEntriesTable} set dispatch_state = $2
+          where id = any($1::uuid[]) and dispatch_state = $3`,
+        [ids, to, from],
       );
     } catch (e2) {
       logError('lumos.push.follow: จด dispatch_state ไม่สำเร็จ', e2, { followId, to });

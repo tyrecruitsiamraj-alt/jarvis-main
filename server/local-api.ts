@@ -18,6 +18,7 @@ import { startApplicationAutoMoveWorker } from '../api/_lib/applicationAutoMoveW
 import { startSystemHealthWorker } from '../api/_lib/systemHealthWorker.ts';
 import { startClaimGuardWorker } from '../api/_lib/callChoiceWorker.ts';
 import { startFollowPushRetryWorker } from '../api/_lib/followPushRetryWorker.ts';
+import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
 import type { ApiReq } from '../api/_lib/http.ts';
 
@@ -190,6 +191,12 @@ server.listen(port, '127.0.0.1', () => {
   startSystemHealthWorker();
   // 🔴 worker กันชื่อดอง — **ปิดโดยดีฟอลต์** (ถอด claim ของคนจริง + ยิงสายจริง)
   // เปิดที่ deploy ด้วย CLAIM_GUARD_ENABLED=true เท่านั้น (ฐาน dev = production)
+  /**
+   * 🔴 ออกเน็ตทาง IPv4 ก่อน — เครื่องนี้ไม่มีทางออก IPv6 แต่ DNS ของ Lumos ตอบ AAAA มาด้วย
+   * (จับได้จาก log 11 ก.ย. 2569: `ENETUNREACH ... Local (:::0)`) ทำให้เสียเวลากับเส้นตาย
+   * ทุกครั้งจนเส้น IPv4 หมดเวลาตาม · ต้องตั้งก่อนมีใครยิงออกเน็ต
+   */
+  preferIpv4();
   startClaimGuardWorker();
   /**
    * ส่งซ้ำรายการติดตามที่ยังไปไม่ถึง Lumos — **เปิดโดยดีฟอลต์** (เจ้าของสั่ง 11 ก.ย. 2569:

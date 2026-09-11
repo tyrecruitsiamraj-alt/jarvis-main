@@ -161,8 +161,19 @@ export type LumosPushReminderRecord = {
  * และ pushInterviews/pushReminders รับ Idempotency-Key ต่อ batch ด้วย · ส่งซ้ำจึงไม่ทำให้
  * เกิดสายที่สองไปหาคนจริง
  */
-const FETCH_MAX_ATTEMPTS = 3;
-const FETCH_RETRY_DELAYS_MS = [300, 900];
+/**
+ * 🔴 **ขยายช่วง retry ให้ครอบช่วงเน็ตหลุดจริง** (11 ก.ย. 2569)
+ *
+ * ของเดิม 3 ครั้ง หน่วง 300/900ms = ครอบแค่ **~1.2 วินาที** แต่ช่วงที่ต่อไม่ติดจริง
+ * วัดได้เป็น**หลายสิบวินาที** (10:07 น. ล้มติดกัน 23 วินาทีแล้วกลับมาเอง)
+ * ⇒ retry เดิมแทบไม่ช่วยอะไรเลย
+ *
+ * ตอนนี้ 5 ครั้ง หน่วง 0.5/2/5/10 วินาที ≈ ครอบ **17.5 วินาที**
+ * ⚠️ ยาวกว่านี้ไม่คุ้ม — ตัวที่รับประกันว่า "ต้องถึง" คือ `followPushRetryWorker`
+ * ที่ส่งซ้ำทุกนาทีจนกว่าจะสำเร็จ · ตัวนี้แค่กันเคสสะดุดสั้น ๆ ไม่ให้ไปถึงมือ worker
+ */
+const FETCH_MAX_ATTEMPTS = 5;
+const FETCH_RETRY_DELAYS_MS = [500, 2000, 5000, 10000];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
