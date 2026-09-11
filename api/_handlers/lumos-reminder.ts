@@ -7,7 +7,8 @@
 import { withLumosAuth } from '../_lib/lumos-auth.js';
 import { readJsonBody } from '../_lib/body.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
-import { logInfo } from '../_lib/logger.js';
+import { logInfo, logWarn } from '../_lib/logger.js';
+import { recordLumosResultInbox, readInboxFields } from '../_lib/lumosResultInbox.js';
 import { takePendingLumosItems, applyLumosResult } from '../_lib/lumosDispatch.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -113,17 +114,51 @@ async function postReminderResults(req: ApiReq, res: ApiRes): Promise<void> {
       }
     }
 
+    /**
+     * 🔴 **จด log ขาเข้าให้ละเอียดเท่าขาออก** (11 ก.ย. 2569)
+     * ของเดิมจดแค่ count/plan_id/step_id ⇒ เวลา "ผลรอบแรกไม่ขึ้น" ไล่ไม่ได้ว่า
+     * ใบนั้นเข้ามาถึงเราหรือเปล่า และเข้ามาหน้าตาแบบไหน
+     */
     logInfo('lumos.reminder.results', {
       count: results.length,
-      plan_ids: results.map((r) => (r as ReminderResult).plan_id),
-      step_ids: results.map((r) => (r as ReminderResult).step_id),
+      items: (results as ReminderResult[]).map((r) => ({
+        client_contact_id: r.client_contact_id,
+        plan_id: r.plan_id,
+        step_id: r.step_id,
+        step_position: (r as unknown as { step_position?: unknown }).step_position ?? null,
+        status: r.status,
+        outcome: r.outcome,
+        plan_status: (r as unknown as { plan_status?: unknown }).plan_status ?? null,
+      })),
     });
 
-    // ผูกผลกลับเข้าคิว dispatch (match ด้วย client_contact_id)
+    // ผูกผลกลับเข้าคิว dispatch (match ด้วย client_contact_id + step_position)
     let matched = 0;
     for (const item of results as ReminderResult[]) {
       const ok = await applyLumosResult('reminder', item.client_contact_id, item.status, item);
       if (ok) matched += 1;
+      /**
+       * 🔴 **เก็บทุกใบลงกล่องรับ ไม่ว่าจับคู่ได้หรือไม่** — ของเดิมจับคู่ไม่ได้แล้วทิ้งเงียบ
+       * ⇒ เวลาผลไม่ขึ้นบนจอ แยกไม่ออกว่า "เขาไม่ส่ง" หรือ "ส่งแล้วเราจับคู่ไม่ได้"
+       * ซึ่งเป็นคนละเรื่องและแก้คนละทางโดยสิ้นเชิง
+       */
+      await recordLumosResultInbox({
+        channel: 'reminder',
+        ...readInboxFields(item),
+        matched: ok,
+        unmatchedReason: ok
+          ? null
+          : 'ไม่พบแถวคิวที่ตรงกับ client_contact_id (+step_position) ที่ส่งมา',
+        payload: item,
+      });
+    }
+    if (matched < results.length) {
+      // ผลที่จับคู่ไม่ได้ = ไม่ได้ขึ้นจอที่ไหนเลย ต้องเห็นชัดใน log ไม่ใช่ซ่อนในตัวเลข
+      logWarn('lumos.reminder.results.unmatched', {
+        received: results.length,
+        matched,
+        unmatched: results.length - matched,
+      });
     }
 
     return res.status(200).json({
