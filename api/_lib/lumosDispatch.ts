@@ -18,7 +18,7 @@
  */
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
-import { logWarn, logInfo, logError } from './logger.js';
+import { errorSummaryText, logWarn, logInfo, logError } from './logger.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { applyCallFollowupToQueueRow, listSuppressedPhones } from './callFollowup.js';
 import { countPendingApprovalByJob, releaseDueCallBatches } from './callBatchStore.js';
@@ -1698,12 +1698,17 @@ async function pushFollowReminderToLumos(
 }
 
 /**
- * ข้อความสั้นที่เอาไปโชว์บนจอได้ — ตัดให้สั้นและ **ห้ามมีคีย์/payload**
- * (ข้อความที่ `pushReminders` โยนมามีแต่สถานะกับ body ที่ Lumos ตอบ ซึ่งปลอดภัย)
+ * ข้อความสั้นที่เอาไปโชว์บนจอได้ — **ต้องบอกเหตุจริง ไม่ใช่แค่ "fetch failed"**
+ *
+ * 🔴 `pushReminders` โยนสองแบบ: (1) Lumos ตอบ 4xx/5xx ⇒ ข้อความมีสถานะ+เหตุจากเขา
+ * (2) ต่อไม่ถึงเลย ⇒ `fetch()` ของ Node โยน `TypeError: fetch failed` เปล่า ๆ
+ * เหตุจริงซ่อนใน `.cause` · `errorSummaryText` คลี่ให้ (ตัวเดียวกับที่ `logError` ใช้)
+ *
+ * ⚠️ ข้อความที่ได้มีแต่สถานะ/รหัส network/body ที่ Lumos ตอบ — **ไม่มีคีย์หรือ payload**
+ * (คอลัมน์นี้ถูกส่งออกไปให้จอผู้ใช้เห็น)
  */
 function pushErrorText(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e);
-  return raw.replace(/\s+/g, ' ').trim().slice(0, 300);
+  return errorSummaryText(e, 300);
 }
 
 /**

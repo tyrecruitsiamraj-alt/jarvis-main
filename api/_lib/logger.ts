@@ -72,3 +72,40 @@ export function logError(msg: string, errorOrFields?: unknown, fields?: LogField
     ...fields,
   });
 }
+
+/**
+ * สรุป error เป็น**ข้อความบรรทัดเดียวที่บอกเหตุจริง** — เอาไปโชว์บนจอได้
+ *
+ * 🔴 ทำไมต้องมี: `fetch()` ของ Node โยน `TypeError: fetch failed` เสมอ ไม่ว่าสาเหตุจริง
+ * จะเป็น DNS หาไม่เจอ · ต่อไม่ติด · TLS พัง · หรือ timeout — เหตุจริงซ่อนอยู่ใน `.cause`
+ * จดแค่ `e.message` ลงฐานจึงได้คำว่า "fetch failed" เปล่า ๆ ซึ่งไล่ต้นเหตุไม่ได้เลย
+ * (เจ้าของถาม 11 ก.ย. 2569: *"อยากรู้ว่าเพราะอะไร เพราะมันเป็นบ่อยแล้ว"*)
+ *
+ * ตัวอย่างผลลัพธ์: `fetch failed (ECONNRESET: read ECONNRESET)`
+ *
+ * ⚠️ ใช้ตัวถอด `.cause` ตัวเดียวกับ `logError` — log กับจอต้องเล่าเรื่องเดียวกัน
+ */
+export function errorSummaryText(err: unknown, maxLength = 300): string {
+  const parts: string[] = [];
+  const walk = (e: unknown, depth = 0): void => {
+    if (depth > 3 || e == null) return;
+    if (!(e instanceof Error)) {
+      parts.push(String(e));
+      return;
+    }
+    const code = (e as NodeJS.ErrnoException).code;
+    parts.push(code ? `${code}: ${e.message}` : e.message);
+    if (e instanceof AggregateError && Array.isArray(e.errors)) {
+      for (const inner of e.errors.slice(0, 2)) walk(inner, depth + 1);
+    }
+    if (e.cause !== undefined) walk(e.cause, depth + 1);
+  };
+  walk(err);
+  // ตัดข้อความซ้ำ (cause มักพูดซ้ำกับ message ชั้นนอก) แล้วต่อเป็นบรรทัดเดียว
+  const seen = new Set<string>();
+  const text = parts
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter((p) => p && !seen.has(p) && seen.add(p))
+    .join(' | ');
+  return text.slice(0, maxLength);
+}
