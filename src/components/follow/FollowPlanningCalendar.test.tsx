@@ -496,3 +496,47 @@ describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคน
     expect(within(row).queryByText('รอบโทรที่ 1')).toBeNull();
   });
 });
+
+/**
+ * ═══ ส่งไม่ถึง Lumos ต้องเห็นบนแถว (11 ก.ย. 2569) ═══
+ *
+ * เจ้าของถามถึงเคส "ลูกชาย สองคน" ว่าสายแรกทำไมไม่ปรับสถานะ · ตรวจฐานวันนั้นเจอว่า
+ * **12 จาก 42 สายเป็น `push_failed` ไม่ได้ผลสักสาย** แต่จอขึ้นว่า "เลยเวลานัด"
+ * เหมือนสายที่ Lumos รับไปแล้วแต่เงียบ — คนละปัญหา แก้คนละทาง
+ */
+describe('ส่งไม่ถึง Lumos (push_failed)', () => {
+  const failed = (over: Partial<FollowEntry> = {}) =>
+    entry({ id: 'f1', call_round: 1, dispatch_state: 'push_failed', ...over });
+
+  it('🔴 ขึ้นป้าย "ส่งไม่ถึง Lumos" — ไม่ใช่ปล่อยให้อ่านว่าเลยเวลานัดเฉย ๆ', () => {
+    renderCalendar([failed()]);
+    const row = dayRows()[0];
+    expect(within(row).getByText('ส่งไม่ถึง Lumos')).toBeTruthy();
+    // ป้ายเดิมยังอยู่ — บอกทั้งสองเรื่อง ไม่ใช่เอาอันใหม่ไปทับ
+    expect(within(row).getByText('เลยเวลานัด')).toBeTruthy();
+  });
+
+  it('บอกเหตุจริงที่ Lumos ตอบกลับ แทนที่จะเป็นขีดกลางว่าง ๆ', () => {
+    renderCalendar([failed({ dispatch_error: 'Lumos push reminders ล้มเหลว: 429 Too Many Requests' })]);
+    expect(within(dayRows()[0]).getByText(/429 Too Many Requests/)).toBeTruthy();
+  });
+
+  it('ไม่มีเหตุจดไว้ (ฐานยังไม่ migrate) ⇒ ยังขึ้นป้าย แต่ไม่แต่งเหตุขึ้นเอง', () => {
+    renderCalendar([failed({ dispatch_error: null })]);
+    const row = dayRows()[0];
+    expect(within(row).getByText('ส่งไม่ถึง Lumos')).toBeTruthy();
+    expect(within(row).queryByText(/ส่งไม่สำเร็จ:/)).toBeNull();
+  });
+
+  it('🔴 ได้ผลกลับมาแล้วห้ามเตือนย้อนหลัง (ส่งซ้ำแล้วสำเร็จก็มี)', () => {
+    renderCalendar([failed({ call_status: 'completed', call_outcome: 'confirmed' })]);
+    expect(within(dayRows()[0]).queryByText('ส่งไม่ถึง Lumos')).toBeNull();
+  });
+
+  it('🔴 ไม่ไปแตะตัวเลขบนการ์ด — push_failed เป็นป้ายเสริม ไม่ใช่หมวดใหม่', () => {
+    renderCalendar([failed()]);
+    expect(statValue('สายที่ต้องตาม')).toBe('1');
+    expect(statValue('ยังไม่รู้ผล')).toBe('1');
+    expect(dayRows()[0].getAttribute('data-category')).toBe('overdue');
+  });
+});

@@ -18,6 +18,11 @@ export type FollowEntry = {
    * `null` = แถวเก่าก่อนมีคอลัมน์นี้ ⇒ ไม่รู้ว่าทำไม (ห้ามตีความว่าส่งแล้ว)
    */
   dispatch_state?: string | null;
+  /**
+   * เหตุที่ดันรายการไปหา Lumos ไม่สำเร็จ (คู่กับ `dispatch_state = 'push_failed'`)
+   * `null` = ไม่เคยล้ม หรือส่งซ้ำสำเร็จแล้ว
+   */
+  dispatch_error?: string | null;
   scheduled_at: string | null;
   /** หน่วยงานที่ตามเรื่องให้ + รหัสไซต์ (096) — null = ไม่ได้ระบุ */
   unit_name?: string | null;

@@ -20,6 +20,8 @@ import {
   roundAiSummary,
   roundDispatchReason,
   roundEmergencyPhone,
+  roundPushError,
+  roundPushFailed,
   roundReplyText,
   roundResultLabel,
   roundTone,
@@ -625,8 +627,18 @@ const FollowPlanningCalendar: React.FC<{
                                 <span className="block space-y-2">
                                   {calls.map(({ round, category }) => {
                                     const tone = roundTone(round);
+                                    /**
+                                     * 🔴 **ส่งไม่ถึง Lumos ต้องเห็นบนแถว** (11 ก.ย. 2569)
+                                     * วัดจริงวันนั้น 12 จาก 42 สายเป็น push_failed ไม่ได้ผลสักสาย
+                                     * แต่จอขึ้นว่า "เลยเวลานัด" เหมือนสายที่เขารับไปแล้วแต่เงียบ
+                                     * — คนละปัญหา อันนี้กดส่งใหม่ได้ อันนั้นต้องไปถาม Lumos
+                                     */
+                                    const failed = roundPushFailed(round);
                                     return (
-                                      <span key={round.entry.id} className="flex min-h-[34px] items-center">
+                                      <span
+                                        key={round.entry.id}
+                                        className="flex min-h-[34px] flex-wrap items-center gap-1"
+                                      >
                                         {/* ป้ายสถานะ = เม็ดยากลม มีจุดสีนำหน้า (ตามแบบอ้างอิง) */}
                                         <span
                                           className={cn(
@@ -645,6 +657,20 @@ const FollowPlanningCalendar: React.FC<{
                                             ? ` — ${roundResultLabel(round)}`
                                             : ''}
                                         </span>
+                                        {failed ? (
+                                          <span
+                                            className={cn(
+                                              'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold',
+                                              TONE.orange.chip,
+                                            )}
+                                            title={
+                                              roundPushError(round) ??
+                                              'ส่งไปหา Lumos ไม่สำเร็จ — ไม่มีสายไหนกำลังจะออก ต้องส่งใหม่'
+                                            }
+                                          >
+                                            ส่งไม่ถึง Lumos
+                                          </span>
+                                        ) : null}
                                       </span>
                                     );
                                   })}
@@ -656,11 +682,17 @@ const FollowPlanningCalendar: React.FC<{
                                   {calls.map(({ round }) => {
                                     const ai = roundAiSummary(round);
                                     const reply = roundReplyText(round);
+                                    const pushErr = roundPushFailed(round) ? roundPushError(round) : null;
                                     return (
                                       <span key={round.entry.id} className="flex min-h-[34px] flex-col justify-center">
                                         {/* 🔴 คำพูดของเขามาก่อนเสมอ — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
                                             สรุปของ AI เป็นคำบรรยายบุคคลที่สาม ใช้เป็นตัวรอง */}
-                                        {reply ? (
+                                        {pushErr ? (
+                                          /* เหตุจริงจาก Lumos — มีค่ากว่าขีดกลางว่าง ๆ */
+                                          <span className={cn('text-[11.5px] leading-snug', TONE.orange.value)} title={pushErr}>
+                                            ส่งไม่สำเร็จ: <span className="line-clamp-2">{pushErr}</span>
+                                          </span>
+                                        ) : reply ? (
                                           <>
                                             <span
                                               className="line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground"

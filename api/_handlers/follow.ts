@@ -108,6 +108,8 @@ type FollowRow = {
    * `null` = แถวเก่าก่อนมีคอลัมน์นี้ ⇒ **ไม่รู้ว่าทำไม** ห้ามตีความว่าส่งแล้ว
    */
   dispatch_state: string | null;
+  /** เหตุที่ push ไม่สำเร็จ (migration 116) — undefined = ฐานยังไม่มีคอลัมน์นี้ */
+  dispatch_error?: string | null;
   call_status: string | null;
   call_outcome: string | null;
   /** รอบที่โทรล่าสุดของแถวคิว — ใช้จัดกลุ่ม "ใครอยู่รอบไหน" บนแผงหน้าหลัก */
@@ -142,6 +144,7 @@ function toResponse(r: FollowRow) {
     note: r.note,
     staff_phone: r.staff_phone ?? null,
     dispatch_state: r.dispatch_state ?? null,
+    dispatch_error: r.dispatch_error ?? null,
     scheduled_at: iso(r.scheduled_at),
     unit_name: r.unit_name ?? null,
     site_code: r.site_code ?? null,

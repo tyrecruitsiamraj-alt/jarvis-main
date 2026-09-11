@@ -18,7 +18,7 @@
  */
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
-import { logInfo, logError } from './logger.js';
+import { logWarn, logInfo, logError } from './logger.js';
 import type { FollowDispatchState } from '@/lib/followDispatchState';
 import { applyCallFollowupToQueueRow, listSuppressedPhones } from './callFollowup.js';
 import { countPendingApprovalByJob, releaseDueCallBatches } from './callBatchStore.js';
@@ -1693,8 +1693,17 @@ async function pushFollowReminderToLumos(
      *
      * ⚠️ จดแบบ best-effort — จดไม่ลงก็ห้ามโยนต่อ (ตัวเรียกเป็น `void` ไม่มีใครรับ)
      */
-    await markFollowDispatchState(followId, 'push_failed', 'queued');
+    await markFollowDispatchState(followId, 'push_failed', 'queued', pushErrorText(e));
   }
+}
+
+/**
+ * ข้อความสั้นที่เอาไปโชว์บนจอได้ — ตัดให้สั้นและ **ห้ามมีคีย์/payload**
+ * (ข้อความที่ `pushReminders` โยนมามีแต่สถานะกับ body ที่ Lumos ตอบ ซึ่งปลอดภัย)
+ */
+function pushErrorText(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  return raw.replace(/\s+/g, ' ').trim().slice(0, 300);
 }
 
 /**
@@ -1707,14 +1716,33 @@ async function markFollowDispatchState(
   followId: string,
   to: FollowDispatchState,
   from: FollowDispatchState,
+  error: string | null = null,
 ): Promise<void> {
   try {
     await dbQuery(
-      `update ${followEntriesTable} set dispatch_state = $2 where id = $1 and dispatch_state = $3`,
-      [followId, to, from],
+      `update ${followEntriesTable}
+          set dispatch_state = $2, dispatch_error = $4
+        where id = $1 and dispatch_state = $3`,
+      [followId, to, from, error],
     );
   } catch (e) {
-    logError('lumos.push.follow: จด dispatch_state ไม่สำเร็จ', e, { followId, to });
+    /**
+     * ฐานที่ยังไม่ได้รัน migration 116 ไม่มีคอลัมน์ `dispatch_error` — ถอยไปเขียน
+     * เฉพาะสถานะ ดีกว่าไม่จดอะไรเลยแล้วกลับไปเงียบแบบเดิม
+     */
+    try {
+      await dbQuery(
+        `update ${followEntriesTable} set dispatch_state = $2 where id = $1 and dispatch_state = $3`,
+        [followId, to, from],
+      );
+    } catch (e2) {
+      logError('lumos.push.follow: จด dispatch_state ไม่สำเร็จ', e2, { followId, to });
+      return;
+    }
+    logWarn('lumos.push.follow: จดเหตุผลไม่ได้ (ยังไม่ได้ migrate 116?)', {
+      followId,
+      reason: e instanceof Error ? e.message : String(e),
+    });
   }
 }
 

@@ -317,6 +317,29 @@ export function roundTone(round: FollowPlanningRound): ToneKey {
 }
 
 /** เหตุผลเต็มว่าทำไมไม่ได้ส่ง — ช่องในปฏิทินแคบ เก็บคำเต็มไว้ที่ tooltip/ป๊อป */
+/**
+ * สายนี้ **ส่งไปไม่ถึง Lumos** หรือเปล่า (11 ก.ย. 2569)
+ *
+ * 🔴 วัดจริงวันนั้น: 12 จาก 42 สายเป็น `push_failed` **ไม่ได้ผลสักสาย** แต่บนจอขึ้นว่า
+ * "เลยเวลานัด" เหมือนสายที่ Lumos รับไปแล้วแต่เงียบ — คนละปัญหา แก้คนละทาง
+ * (อันนี้กดส่งใหม่ได้ อันนั้นต้องไปถาม Lumos)
+ *
+ * ⚠️ **ไม่แตะ `followRoundState`/`callCategory`** โดยตั้งใจ — ตัวเลขบนการ์ดกับถังสี
+ * มีนิยามของมันอยู่แล้ว การเพิ่มสถานะใหม่เข้าไปจะทำให้เลขทุกช่องขยับพร้อมกัน
+ * ตัวนี้เป็น **ป้ายเสริมบนแถว** เท่านั้น
+ */
+export function roundPushFailed(round: FollowPlanningRound): boolean {
+  if (round.entry.dispatch_state !== 'push_failed') return false;
+  // ได้ผลแล้ว/ปิดแล้ว/ยกเลิกแล้ว = เรื่องจบไปแล้ว ไม่ต้องเตือนย้อนหลัง
+  return round.state !== 'result' && round.state !== 'closed' && round.state !== 'cancelled';
+}
+
+/** เหตุที่ส่งไม่ถึง — `null` = ฐานยังไม่มีคอลัมน์ หรือไม่ได้จดไว้ */
+export function roundPushError(round: FollowPlanningRound): string | null {
+  const t = (round.entry.dispatch_error ?? '').trim();
+  return t === '' ? null : t;
+}
+
 export function roundDispatchReason(round: FollowPlanningRound): string {
   return followDispatchLabel({
     state: round.entry.dispatch_state,
