@@ -578,6 +578,102 @@ export function buildFollowDayCalls(
   );
 }
 
+/**
+ * ═══ หนึ่งแถว = หนึ่ง**คน** (เจ้าของทัก 11 ก.ย. 2569) ═══
+ *
+ * > *"พอเพิ่มโทรหลายรอบ มันขึ้นหลายบรรทัดอะ คนดูเขางง"*
+ *
+ * เดิมตารางรายวันเป็นหนึ่งแถวต่อหนึ่ง**สาย** ⇒ คนเดียวตั้ง 3 รอบ = 3 บรรทัด
+ * ชื่อซ้ำกันสามที ต้องกวาดตาหาเองว่าบรรทัดไหนเป็นคนเดียวกัน
+ * ⇒ รวมเป็นแถวเดียวต่อคน แล้ววางรอบไว้**ในแถว** เรียงตามเวลา
+ *
+ * 🔴 **ไม่มีข้อมูลหาย** — ทุกรอบยังอยู่ครบใน `calls` แค่ย้ายจากแนวตั้งมาแนวใน
+ * (ตัวเลขบนการ์ดยังนับเป็น "สาย" เหมือนเดิม ไม่ได้เปลี่ยนนิยาม)
+ */
+export type FollowDayPerson = {
+  row: FollowPlanningRow;
+  /** ทุกสายของคนนี้ในวันนั้น เรียงตามเวลา (สายไม่มีเวลาไปท้าย) */
+  calls: FollowDayCall[];
+  /** เรื่องที่ต้องรู้ก่อนของคนนี้ — ใช้ระบายสีทั้งแถวและใช้เรียงลำดับ */
+  headline: FollowCallCategory;
+};
+
+/**
+ * ลำดับความสำคัญของหมวดเวลาสรุปคนหนึ่งคน
+ *
+ * กติกาที่อธิบายได้บรรทัดเดียว: **ตอบแล้วชนะยังไม่ตอบ** (คำตอบคือข้อเท็จจริง) ·
+ * **ไม่ไปชนะไป** (ต้องรีบที่สุด) · ที่เหลือเรียงตามว่าต้องลงมือแค่ไหน
+ */
+const DAY_HEADLINE_ORDER: FollowCallCategory[] = [
+  'lost',
+  'agreed',
+  'unreachable',
+  'overdue',
+  'notSent',
+  'waiting',
+  'cancelled',
+  'other',
+];
+
+function headlineOf(calls: readonly FollowDayCall[]): FollowCallCategory {
+  for (const cat of DAY_HEADLINE_ORDER) {
+    if (calls.some((c) => c.category === cat)) return cat;
+  }
+  return 'other';
+}
+
+/**
+ * ทุกคนที่ต้องตามในวันนั้น — หนึ่งรายการ = หนึ่งคน (รวมทุกรอบไว้ข้างใน)
+ *
+ * เรียง: เรื่องด่วนก่อน (`DAY_HEADLINE_ORDER`) แล้วค่อยเรียงตามเวลานัดแรกของคนนั้น
+ * — คงเจตนาเดิมของเจ้าของไว้ (8 ก.ย. 2569: *"เรียงให้สีแดงอยู่บน ๆ"*)
+ */
+export function buildFollowDayPeople(
+  rows: readonly FollowPlanningRow[],
+  ymd: string,
+  roundFilter: FollowRoundFilter = 'all',
+): FollowDayPerson[] {
+  const byKey = new Map<string, FollowDayCall[]>();
+  // ยืม buildFollowDayCalls มาทั้งดุ้น — นิยาม "สายของวันนี้" ต้องมีที่เดียว
+  for (const call of buildFollowDayCalls(rows, ymd, roundFilter)) {
+    const key = call.row.group.key;
+    const list = byKey.get(key);
+    if (list) list.push(call);
+    else byKey.set(key, [call]);
+  }
+
+  const out: FollowDayPerson[] = [];
+  for (const calls of byKey.values()) {
+    /**
+     * 🔴 เรียง**ตามเลขรอบก่อน** ไม่ใช่ตามเวลา — ในแถวของคนคนหนึ่ง คนอ่านคาดหวัง
+     * "สายแรก แล้วสายสอง" · ข้อมูลจริง 9 ก.ย. 2569 มีเคสที่ตั้งรอบ 2 ไว้**ก่อน**รอบ 1
+     * (16:30 รอบ 2 · 16:35 รอบ 1) ถ้าเรียงตามเวลา รอบ 2 จะไปอยู่บนรอบ 1 อ่านแล้วสะดุด
+     * เรียงตามรอบทำให้เวลาที่สลับกัน**มองเห็นได้** แทนที่จะถูกกลบ
+     */
+    const sorted = [...calls].sort(
+      (a, b) =>
+        (a.slot ?? 9) - (b.slot ?? 9) ||
+        (a.round.time ?? '99:99').localeCompare(b.round.time ?? '99:99'),
+    );
+    out.push({ row: sorted[0].row, calls: sorted, headline: headlineOf(sorted) });
+  }
+
+  /** เวลานัดแรกสุดของคนนั้น — ใช้เรียงคน (คนละเรื่องกับลำดับรอบในแถว) */
+  const firstTime = (p: FollowDayPerson) =>
+    p.calls.reduce((min, c) => {
+      const t = c.round.time ?? '99:99';
+      return t < min ? t : min;
+    }, '99:99');
+
+  const rank = (p: FollowDayPerson) => DAY_HEADLINE_ORDER.indexOf(p.headline);
+  return out.sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      firstTime(a).localeCompare(firstTime(b)) ||
+      a.row.group.name.localeCompare(b.row.group.name, 'th'),
+  );
+}
+
 /** สายที่มีในวันนั้น (ทุกรอบ) — ไว้สร้างชิปตัวกรอง "สายที่ N" เฉพาะที่มีจริง */
 export function roundSlotsOfDay(rows: readonly FollowPlanningRow[], ymd: string): Array<1 | 2 | 3> {
   const found = new Set<1 | 2 | 3>();

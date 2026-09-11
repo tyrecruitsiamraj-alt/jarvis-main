@@ -17,6 +17,7 @@ import {
   callCategory,
   FOLLOW_CALL_CATEGORY_TONE,
   buildFollowDayCalls,
+  buildFollowDayPeople,
   roundSlotsOfDay,
   summarizeFollowCalls,
   personMonthSummary,
@@ -662,5 +663,115 @@ describe('roundReplyText — คำที่คนรับสายพูดเ
     expect(roundReplyText(round({ call_reply: null, call_summary: 'ผู้รับสายแจ้งว่า…' }))).toBeNull();
     expect(roundReplyText(round({ call_reply: '   ' }))).toBeNull();
     expect(roundReplyText(round({}))).toBeNull();
+  });
+});
+
+/**
+ * `buildFollowDayPeople` — หนึ่งแถว = หนึ่งคน (เจ้าของทัก 11 ก.ย. 2569:
+ * *"เพิ่มโทรหลายรอบ มันขึ้นหลายบรรทัด คนดูเขางง"*)
+ */
+describe('buildFollowDayPeople — รวมสายของคนเดียวกัน', () => {
+  const at = (hhmm: string) => `2026-09-07T${hhmm}:00Z`;
+  const e = (over: Partial<FollowEntry>): FollowEntry =>
+    ({
+      id: 'x',
+      recipient_name: 'ก',
+      recipient_phone: '0812345678',
+      topic: 'ติดตามเริ่มงาน',
+      note: null,
+      scheduled_at: at('08:00'),
+      created_by_name: null,
+      created_at: at('07:00'),
+      cancelled: false,
+      call_status: 'pending',
+      call_outcome: null,
+      call_summary: null,
+      next_action: null,
+      called_at: null,
+      ...over,
+    }) as FollowEntry;
+  const NOW = new Date('2026-09-07T09:00:00Z');
+  const build = (entries: FollowEntry[]) =>
+    buildFollowDayPeople(buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW), '2026-09-07');
+
+  it('3 รอบของคนเดียว = 1 รายการ · เรียงตามเลขรอบ', () => {
+    const people = build([
+      e({ id: 'c', call_round: 3, scheduled_at: at('09:30') }),
+      e({ id: 'a', call_round: 1, scheduled_at: at('08:23') }),
+      e({ id: 'b', call_round: 2, scheduled_at: at('08:30') }),
+    ]);
+    expect(people).toHaveLength(1);
+    expect(people[0].calls.map((c) => c.round.entry.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('🔴 ตั้งรอบ 2 ไว้ก่อนรอบ 1 ⇒ ยังเรียง 1 แล้ว 2 (เวลาสลับต้องมองเห็น ไม่ใช่ถูกกลบ)', () => {
+    // เคสจริงจากฐาน 9 ก.ย. 2569: รอบ 2 นัด 16:30 · รอบ 1 นัด 16:35
+    const people = build([
+      e({ id: 'r2', call_round: 2, scheduled_at: at('08:30') }),
+      e({ id: 'r1', call_round: 1, scheduled_at: at('08:35') }),
+    ]);
+    expect(people[0].calls.map((c) => c.round.entry.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('เรียงคนใช้เวลานัด**แรกสุด**ของคนนั้น ไม่ใช่เวลาของรอบ 1', () => {
+    const people = build([
+      // คน ก: รอบ 2 เร็วสุด 08:05 (รอบ 1 อยู่ 08:40)
+      e({ id: 'a2', call_round: 2, scheduled_at: at('08:05') }),
+      e({ id: 'a1', call_round: 1, scheduled_at: at('08:40') }),
+      // คน ข: รอบเดียว 08:20
+      e({ id: 'b1', recipient_name: 'ข', recipient_phone: '0899999999', call_round: 1, scheduled_at: at('08:20') }),
+    ]);
+    expect(people.map((p) => p.row.group.name)).toEqual(['ก', 'ข']);
+  });
+
+  it('คนละเบอร์ = คนละรายการ', () => {
+    const people = build([
+      e({ id: 'a', call_round: 1 }),
+      e({ id: 'b', recipient_name: 'ข', recipient_phone: '0899999999', call_round: 1 }),
+    ]);
+    expect(people).toHaveLength(2);
+  });
+
+  it('🔴 หัวเรื่องของคน: ตอบแล้วชนะยังไม่ตอบ · ไม่ไปชนะไป', () => {
+    const both = build([
+      e({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      e({ id: 'b', call_round: 2, scheduled_at: at('08:30'), call_status: 'completed', call_outcome: 'declined' }),
+    ]);
+    expect(both[0].headline).toBe('lost');
+
+    // ตอบว่าไปแล้ว + อีกรอบยังเลยเวลา ⇒ คำตอบที่ได้แล้วคือข้อเท็จจริง ชนะรอบที่ยังค้าง
+    const answered = build([
+      e({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      e({ id: 'b', call_round: 2, scheduled_at: at('08:30') }),
+    ]);
+    expect(answered[0].headline).toBe('agreed');
+  });
+
+  it('เรียงคน: เรื่องด่วนก่อน แล้วค่อยเวลานัดแรก', () => {
+    const people = build([
+      e({ id: 'ok', call_round: 1, scheduled_at: at('08:10'), call_status: 'completed', call_outcome: 'confirmed' }),
+      e({
+        id: 'no',
+        recipient_name: 'ข',
+        recipient_phone: '0899999999',
+        call_round: 1,
+        scheduled_at: at('08:50'),
+        call_status: 'completed',
+        call_outcome: 'declined',
+      }),
+    ]);
+    expect(people.map((p) => p.headline)).toEqual(['lost', 'agreed']);
+  });
+
+  it('รวมแถวแล้ว **จำนวนสายรวมต้องเท่าเดิม** — ห้ามมีสายหายไปกับการรวม', () => {
+    const entries = [
+      e({ id: 'a', call_round: 1, scheduled_at: at('08:10') }),
+      e({ id: 'b', call_round: 2, scheduled_at: at('08:20') }),
+      e({ id: 'c', recipient_name: 'ข', recipient_phone: '0899999999', call_round: 1, scheduled_at: at('08:30') }),
+    ];
+    const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
+    const calls = buildFollowDayCalls(rows, '2026-09-07', 'all');
+    const people = buildFollowDayPeople(rows, '2026-09-07', 'all');
+    expect(people.reduce((n, p) => n + p.calls.length, 0)).toBe(calls.length);
   });
 });

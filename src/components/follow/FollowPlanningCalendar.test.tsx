@@ -120,16 +120,18 @@ describe('หน้ารายวัน — สายที่ต้องต�
         call_summary: 'ผู้รับสายบอกว่าไปแน่นอน เจอกันวันจันทร์เช้า',
       }),
     );
+    // คนเดียวกัน = แถวเดียว (11 ก.ย. 2569) · สองรอบอยู่ในแถวนั้น เรียงตามเวลา
     const items = dayRows();
-    expect(items).toHaveLength(2);
-    // เรียงตามเวลา — 15:23 (สาย 1) มาก่อน 15:30 (สาย 2)
-    expect(within(items[0]).getByText('ตอบว่าไป')).toBeTruthy();
-    expect(within(items[0]).getByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toBeTruthy();
+    expect(items).toHaveLength(1);
+    const cells = items[0].querySelectorAll('td');
     expect(within(items[0]).getByText('รอบโทรที่ 1')).toBeTruthy();
-    // สาย 2 ยังไม่มีผล — ต้องไม่โดนผลของสาย 1 กลบ
-    expect(within(items[1]).getByText('รอบโทรที่ 2')).toBeTruthy();
-    expect(within(items[1]).queryByText(/ไปแน่นอน/)).toBeNull();
-    expect(within(items[1]).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(within(items[0]).getByText('รอบโทรที่ 2')).toBeTruthy();
+    // 🔴 ผลของสาย 1 ต้องไม่ลามไปทับสาย 2 — ช่องคำตอบมีข้อความของสาย 1 ช่องเดียว
+    expect(within(items[0]).getByText('ตอบว่าไป')).toBeTruthy();
+    expect(within(items[0]).getByText('เลยเวลานัด')).toBeTruthy();
+    expect(within(items[0]).getAllByText(/ผู้รับสายบอกว่าไปแน่นอน/)).toHaveLength(1);
+    // บรรทัดของทั้งสามคอลัมน์ต้องเท่ากัน (บรรทัดที่ N = สายเดียวกัน)
+    expect(cells[2].querySelectorAll(':scope > span > span').length).toBe(2);
     expect(statValue('ตอบว่าไป')).toBe('1');
   });
 
@@ -175,9 +177,11 @@ describe('หน้ารายวัน — สายที่ต้องต�
   it('กดแถวสาย ⇒ เปิดรายละเอียดของสายนั้น', () => {
     const onOpenCell = vi.fn();
     renderCalendar(twoRounds(), { onOpenCell });
-    fireEvent.click(within(dayRows()[1]).getByRole('button', { name: 'จัดการ' }));
+    fireEvent.click(within(dayRows()[0]).getByRole('button', { name: 'จัดการ' }));
     expect(onOpenCell).toHaveBeenCalledTimes(1);
-    expect(onOpenCell.mock.calls[0][2][0].entry.id).toBe('r2');
+    // แถวเดียว = คนเดียว ⇒ ส่ง **ทุกรอบของวันนั้น** ไปให้ป๊อป ไม่ใช่รอบเดียว
+    const rounds = onOpenCell.mock.calls[0][2] as Array<{ entry: FollowEntry }>;
+    expect(rounds.map((r) => r.entry.id)).toEqual(['r1', 'r2']);
   });
 
   it('วันที่เลือกไม่มีสาย ⇒ บอกทางไปต่อ ไม่ใช่ตารางว่าง', () => {
@@ -260,12 +264,19 @@ describe('หน้ารายเดือน — ภาพรวม', () => {
  */
 describe('แถว "ไม่ไป" — พื้นแดงอ่อนทั้งแถว และอยู่บนสุด', () => {
   it('ไม่ไปตอน 15:30 ต้องอยู่เหนือ ตกลงตอน 15:23 — ไม่ใช่เรียงตามเวลาอย่างเดียว', () => {
-    renderCalendar(
-      twoRounds(
-        { call_status: 'completed', call_outcome: 'confirmed' }, // 15:23 ตกลง
-        { call_status: 'completed', call_outcome: 'declined' }, // 15:30 ไม่ไป
-      ),
-    );
+    // 🔴 ต้องเป็น **คนละคน** — คนเดียวกันรวมเป็นแถวเดียวแล้ว (11 ก.ย. 2569)
+    renderCalendar([
+      entry({ id: 'ok', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({
+        id: 'no',
+        recipient_name: 'อีกคน',
+        recipient_phone: '0899999999',
+        call_round: 1,
+        scheduled_at: '2026-09-07T08:30:00Z',
+        call_status: 'completed',
+        call_outcome: 'declined',
+      }),
+    ]);
     const items = dayRows();
     expect(items[0].getAttribute('data-category')).toBe('lost');
     expect(within(items[0]).getByText('15:30')).toBeTruthy();
@@ -273,12 +284,18 @@ describe('แถว "ไม่ไป" — พื้นแดงอ่อนท�
   });
 
   it('แถวไม่ไปมีพื้นสี · แถวอื่นไม่มี', () => {
-    renderCalendar(
-      twoRounds(
-        { call_status: 'completed', call_outcome: 'declined' },
-        { call_status: 'completed', call_outcome: 'confirmed' },
-      ),
-    );
+    renderCalendar([
+      entry({ id: 'no', call_round: 1, call_status: 'completed', call_outcome: 'declined' }),
+      entry({
+        id: 'ok',
+        recipient_name: 'อีกคน',
+        recipient_phone: '0899999999',
+        call_round: 1,
+        scheduled_at: '2026-09-07T08:30:00Z',
+        call_status: 'completed',
+        call_outcome: 'confirmed',
+      }),
+    ]);
     const [lost, agreed] = dayRows();
     // พื้นย้อมมาจาก token `TONE.danger.wash` ตัวเดียว — ไม่ใช่สีที่พิมพ์เองในไฟล์จอ
     const washBg = TONE.danger.wash.split(' ')[0];
@@ -304,10 +321,11 @@ describe('ตำหนิ 10 ก.ย. 2569', () => {
   });
 
   it('สามสีตามที่เจ้าของเคาะ: เขียว=ไป · เหลือง=ไม่ได้คำตอบ · แดง=ไม่ไป · ยังไม่มีผล=ขาว', () => {
+    // คนละเบอร์ = คนละแถว (คนเดียวกันจะถูกรวมเป็นแถวเดียว)
     renderCalendar([
-      entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
-      entry({ id: 'b', call_round: 2, call_status: 'completed', call_outcome: 'declined' }),
-      entry({ id: 'c', call_round: 3, call_status: 'completed', call_outcome: 'no_answer' }),
+      entry({ id: 'a', recipient_phone: '0811111111', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({ id: 'b', recipient_phone: '0822222222', call_round: 1, call_status: 'completed', call_outcome: 'declined' }),
+      entry({ id: 'c', recipient_phone: '0833333333', call_round: 1, call_status: 'completed', call_outcome: 'no_answer' }),
       entry({ id: 'd', recipient_phone: '0899999999', call_round: 1 }),
     ]);
     const washOf = (cat: string) =>
@@ -388,5 +406,93 @@ describe('ตำหนิ 10 ก.ย. 2569', () => {
   it('สายที่ยกเลิก/ปิดงานแล้วไม่มีปุ่มแก้ไข (แก้ไปก็ไม่มีผล)', () => {
     renderCalendar([entry({ id: 'a', call_round: 1, cancelled: true })], { onEditRound: vi.fn() });
     expect(screen.queryByRole('button', { name: /แก้ไขวันเวลาของ/ })).toBeNull();
+  });
+});
+
+/**
+ * ═══ ตำหนิ 11 ก.ย. 2569 — หลายรอบขึ้นหลายบรรทัด ═══
+ *
+ * > *"หน้าติดตามพอเพิ่มโทรหลายรอบ มันขึ้นหลายบรรทัดอะ คนดูเขางง"*
+ *
+ * 🔴 หนึ่งแถว = หนึ่ง**คน** · ทุกรอบอยู่ในแถวนั้น **ห้ามมีข้อมูลหาย**
+ */
+describe('ตำหนิ 11 ก.ย. 2569 — รวมสายของคนเดียวกันเป็นแถวเดียว', () => {
+  const threeRounds = () => [
+    entry({ id: 'r1', call_round: 1, scheduled_at: '2026-09-07T08:23:00Z' }),
+    entry({ id: 'r2', call_round: 2, scheduled_at: '2026-09-07T08:30:00Z' }),
+    entry({ id: 'r3', call_round: 3, scheduled_at: '2026-09-07T09:30:00Z' }),
+  ];
+
+  it('🔴 คนเดียวตั้ง 3 รอบ = 1 แถว ไม่ใช่ 3 แถว · ชื่อขึ้นครั้งเดียว', () => {
+    renderCalendar(threeRounds());
+    const items = dayRows();
+    expect(items).toHaveLength(1);
+    expect(items[0].getAttribute('data-rounds')).toBe('3');
+    expect(within(items[0]).getAllByText('สู้สู้ จ้าาา')).toHaveLength(1);
+  });
+
+  it('ทุกรอบยังอยู่ครบในแถวนั้น — เวลาและป้ายรอบไม่หาย', () => {
+    renderCalendar(threeRounds());
+    const row = dayRows()[0];
+    for (const t of ['15:23', '15:30', '16:30']) expect(within(row).getByText(t)).toBeTruthy();
+    for (const n of [1, 2, 3]) expect(within(row).getByText(`รอบโทรที่ ${n}`)).toBeTruthy();
+  });
+
+  it('บอกใต้ชื่อว่าวันนี้กี่สาย — กันคนอ่านว่าแถวนี้มีสายเดียว', () => {
+    renderCalendar(threeRounds());
+    expect(within(dayRows()[0]).getByText('วันนี้ 3 สาย')).toBeTruthy();
+    // มีสายเดียวไม่ต้องบอก (รกเปล่า ๆ)
+    cleanup();
+    renderCalendar([entry({ id: 'r1', call_round: 1 })]);
+    expect(within(dayRows()[0]).queryByText(/วันนี้ .* สาย/)).toBeNull();
+  });
+
+  it('🔴 ตัวเลขบนการ์ดยังนับเป็น "สาย" เหมือนเดิม — รวมแถวห้ามทำเลขเปลี่ยน', () => {
+    renderCalendar(threeRounds());
+    expect(statValue('สายที่ต้องตาม')).toBe('3');
+    expect(dayRows()).toHaveLength(1);
+  });
+
+  it('ท้ายตารางบอกทั้งจำนวนคนและจำนวนสาย', () => {
+    renderCalendar(threeRounds());
+    expect(screen.getByText(/จากทั้งหมด/).textContent?.replace(/\s+/g, ' ')).toContain(
+      '1 คน · 3 สาย',
+    );
+  });
+
+  it('ปุ่มแก้ไขมีทีละรอบ — แก้เวลารอบไหนก็กดดินสอของรอบนั้น', () => {
+    const onEditRound = vi.fn();
+    renderCalendar(threeRounds(), { onEditRound });
+    const pencils = screen.getAllByRole('button', { name: /แก้ไขวันเวลาของ/ });
+    expect(pencils).toHaveLength(3);
+    fireEvent.click(pencils[2]);
+    expect((onEditRound.mock.calls[0][0] as { entry: FollowEntry }).entry.id).toBe('r3');
+  });
+
+  it('สีทั้งแถวใช้เรื่องด่วนที่สุดของคนนั้น — ไม่ไปชนะไป', () => {
+    renderCalendar([
+      entry({ id: 'r1', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' }),
+      entry({
+        id: 'r2',
+        call_round: 2,
+        scheduled_at: '2026-09-07T08:30:00Z',
+        call_status: 'completed',
+        call_outcome: 'declined',
+      }),
+    ]);
+    const row = dayRows()[0];
+    expect(row.getAttribute('data-category')).toBe('lost');
+    expect(row.className).toContain(TONE.danger.wash.split(' ')[0]);
+    // แต่ผลของทั้งสองรอบยังอ่านได้ในแถว
+    expect(within(row).getByText('ตอบว่าไป')).toBeTruthy();
+    expect(within(row).getByText('ตอบว่าไม่ไป')).toBeTruthy();
+  });
+
+  it('กรองรอบแล้วแถวเหลือเฉพาะรอบนั้น', () => {
+    renderCalendar(threeRounds(), { roundFilter: 2 });
+    const row = dayRows()[0];
+    expect(row.getAttribute('data-rounds')).toBe('1');
+    expect(within(row).getByText('รอบโทรที่ 2')).toBeTruthy();
+    expect(within(row).queryByText('รอบโทรที่ 1')).toBeNull();
   });
 });

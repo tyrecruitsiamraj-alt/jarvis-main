@@ -7,6 +7,7 @@ import { roundTabLabel } from '@/lib/followRoundVisual';
 import { toYmdBangkok, THAI_MONTHS, ceToBeYear, formatYmdDmyBe } from '@/lib/dateTh';
 import {
   buildFollowDayCalls,
+  buildFollowDayPeople,
   buildFollowMonthRows,
   callCategory,
   callCategoryWashTone,
@@ -246,15 +247,24 @@ const FollowPlanningCalendar: React.FC<{
     return [...found].sort((a, b) => a - b);
   }, [rows, dayYmd]);
   const daySummary = useMemo(() => summarizeFollowCalls(dayCalls.map((c) => c.round)), [dayCalls]);
+  /**
+   * 🔴 **ตารางนับเป็น "คน" ไม่ใช่ "สาย"** (เจ้าของทัก 11 ก.ย. 2569: *"เพิ่มโทรหลายรอบ
+   * มันขึ้นหลายบรรทัด คนดูเขางง"*) · การ์ดตัวเลขด้านบนยังนับเป็นสายเหมือนเดิม
+   * — คนละคำถาม: การ์ดถามว่า "มีกี่สายต้องตาม" ตารางถามว่า "ต้องตามใครบ้าง"
+   */
+  const dayPeople = useMemo(
+    () => buildFollowDayPeople(rows, dayYmd, roundFilter),
+    [rows, dayYmd, roundFilter],
+  );
 
   /** แบ่งหน้าแบบแบบอ้างอิง — เปลี่ยนวัน/รอบแล้วต้องเด้งกลับหน้า 1 ไม่งั้นค้างหน้าว่าง */
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [dayYmd, roundFilter]);
-  const pageCount = Math.max(1, Math.ceil(dayCalls.length / DAY_PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(dayPeople.length / DAY_PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const firstIndex = (safePage - 1) * DAY_PAGE_SIZE;
-  const lastIndex = Math.min(firstIndex + DAY_PAGE_SIZE, dayCalls.length);
-  const pageCalls = dayCalls.slice(firstIndex, lastIndex);
+  const lastIndex = Math.min(firstIndex + DAY_PAGE_SIZE, dayPeople.length);
+  const pagePeople = dayPeople.slice(firstIndex, lastIndex);
 
   /* ─── มุมมองรายเดือน ─── */
   const monthSource = useMemo(
@@ -507,23 +517,29 @@ const FollowPlanningCalendar: React.FC<{
                         </tr>
                       </thead>
                       <tbody data-testid="day-calls">
-                        {pageCalls.map(({ row, round, slot, category }) => {
-                          const ai = roundAiSummary(round);
-                          const reply = roundReplyText(round);
-                          const emg = roundEmergencyPhone(round);
-                          const tone = roundTone(round);
-                          const washTone = callCategoryWashTone(category);
-                          const cancelled = round.state === 'cancelled';
+                        {pagePeople.map(({ row, calls, headline }) => {
+                          const washTone = callCategoryWashTone(headline);
+                          /* ทุกสายของคนนี้ยกเลิกหมด = ทั้งแถวจาง (เดิมตัดสินรายสาย) */
+                          const allCancelled = calls.every((c) => c.round.state === 'cancelled');
+                          const headTone = roundTone(calls[0].round);
+                          /* เบอร์ฉุกเฉินของคนเดียวกันมักเป็นเบอร์เดียว — โชว์ที่ไม่ซ้ำ */
+                          const emgList = [
+                            ...new Set(
+                              calls.map((c) => roundEmergencyPhone(c.round)).filter((v): v is string => Boolean(v)),
+                            ),
+                          ];
+                          const anyResult = calls.some((c) => c.round.state === 'result');
                           return (
                             <tr
-                              key={round.entry.id}
-                              data-category={category}
+                              key={row.group.key}
+                              data-category={headline}
+                              data-rounds={calls.length}
                               className={cn(
                                 'border-b border-border/50 align-top transition-colors last:border-0',
                                 /* เขียว=ตอบว่าไป · เหลือง=ไม่ได้คำตอบ · แดง=ตอบว่าไม่ไป
                                    ยังไม่มีผล = ขาว (นิยามอยู่ที่ callCategoryWashTone) */
                                 washTone ? TONE[washTone].wash : 'hover:bg-secondary/50',
-                                cancelled && 'opacity-60',
+                                allCancelled && 'opacity-60',
                               )}
                             >
                               <td className="px-4 py-3 md:px-5">
@@ -532,8 +548,8 @@ const FollowPlanningCalendar: React.FC<{
                                   <span
                                     className={cn(
                                       'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-bold',
-                                      TONE[tone].soft,
-                                      TONE[tone].value,
+                                      TONE[headTone].soft,
+                                      TONE[headTone].value,
                                     )}
                                     aria-hidden
                                   >
@@ -543,7 +559,7 @@ const FollowPlanningCalendar: React.FC<{
                                     <span
                                       className={cn(
                                         'block truncate text-[13.5px] font-bold text-foreground',
-                                        cancelled && 'line-through',
+                                        allCancelled && 'line-through',
                                       )}
                                     >
                                       {row.group.name}
@@ -551,89 +567,149 @@ const FollowPlanningCalendar: React.FC<{
                                     <span className="block truncate text-[11.5px] text-muted-foreground">
                                       {row.group.phone}
                                     </span>
+                                    {/* บอกจำนวนสายไว้ใต้ชื่อ — กันคนอ่านว่าแถวนี้มีสายเดียว */}
+                                    {calls.length > 1 ? (
+                                      <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
+                                        วันนี้ {calls.length} สาย
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </span>
                               </td>
                               <td className="hidden px-3 py-3 text-[12px] text-muted-foreground lg:table-cell">
                                 {row.group.unitName || '—'}
                               </td>
+
+                              {/**
+                               * 🔴 สามคอลัมน์ถัดไปเรียงบรรทัด **ตรงกันทีละรอบ** — บรรทัดที่ N
+                               * ของทุกคอลัมน์คือสายเดียวกัน ถ้าเรียงไม่ตรง คนจะอ่านคำตอบผิดสาย
+                               * (ใช้ `space-y-2` ชุดเดียวกันทั้งสามช่อง ห้ามใส่ระยะต่างกัน)
+                               */}
                               <td className="px-3 py-3">
-                                <span
-                                  className={cn(
-                                    'block text-[16px] font-bold leading-none tabular-nums text-foreground',
-                                    cancelled && 'line-through',
-                                  )}
-                                >
-                                  {round.time ?? '—'}
-                                </span>
-                                <span className="mt-1 block text-[10.5px] text-muted-foreground">
-                                  {slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3">
-                                {/* ป้ายสถานะ = เม็ดยากลม มีจุดสีนำหน้า (ตามแบบอ้างอิง) */}
-                                <span
-                                  className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                                    TONE[tone].chip,
-                                  )}
-                                >
-                                  {isGoodResult(round) ? (
-                                    <Check className="h-3 w-3" aria-hidden />
-                                  ) : (
-                                    <span className={cn('h-1.5 w-1.5 rounded-full', TONE[tone].dot)} aria-hidden />
-                                  )}
-                                  {FOLLOW_CALL_CATEGORY_LABEL[category]}
-                                  {round.state === 'result' &&
-                                  (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
-                                    ? ` — ${roundResultLabel(round)}`
-                                    : ''}
-                                </span>
-                              </td>
-                              <td className="px-3 py-3">
-                                {/* 🔴 คำพูดของเขามาก่อนเสมอ — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
-                                    สรุปของ AI เป็นคำบรรยายบุคคลที่สาม ใช้เป็นตัวรอง */}
-                                {reply ? (
-                                  <span className="block">
-                                    <span
-                                      className="line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground"
-                                      title={reply}
-                                    >
-                                      “{reply}”
-                                    </span>
-                                    {ai ? (
-                                      <span
-                                        className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground"
-                                        title={ai}
-                                      >
-                                        สรุปโดย AI: {ai}
+                                <span className="block space-y-2">
+                                  {calls.map(({ round, slot }) => (
+                                    <span key={round.entry.id} className="flex items-center gap-1.5">
+                                      <span className="min-w-0">
+                                        <span
+                                          className={cn(
+                                            'block text-[15px] font-bold leading-none tabular-nums text-foreground',
+                                            round.state === 'cancelled' && 'line-through',
+                                          )}
+                                        >
+                                          {round.time ?? '—'}
+                                        </span>
+                                        <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
+                                          {slot ? roundTabLabel(slot) : 'ยังไม่อยู่รอบไหน'}
+                                        </span>
                                       </span>
-                                    ) : null}
-                                  </span>
-                                ) : ai ? (
-                                  <span className="line-clamp-3 text-[12px] leading-snug text-foreground/80" title={ai}>
-                                    {ai}
-                                  </span>
-                                ) : round.state === 'result' ? (
-                                  /* ห้ามเขียนว่า "เขาไม่พูด" — ไม่มี transcript อาจแปลว่าสายไม่ติดก็ได้ */
-                                  <span className="text-[12px] text-muted-foreground">
-                                    ไม่มีคำตอบและไม่มีสรุปจาก AI
-                                  </span>
-                                ) : round.state === 'notSent' &&
-                                  !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
-                                  <span className="text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
-                                ) : (
-                                  <span className="text-[12px] text-muted-foreground">—</span>
-                                )}
+                                      {/* ดินสอติดกับ **รอบนั้น** — แก้เวลาได้ทีละสายโดยไม่ต้องเข้าป๊อป */}
+                                      {onEditRound && round.state !== 'cancelled' && !round.entry.completed_at ? (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => onEditRound(round)}
+                                          title={`แก้ไขวัน/เวลาของสายนี้ · ${row.group.name}`}
+                                          aria-label={`แก้ไขวันเวลาของ ${row.group.name} ${slot ? roundTabLabel(slot) : ''}`}
+                                          className="h-7 w-7 shrink-0 rounded-full"
+                                        >
+                                          <Pencil aria-hidden />
+                                        </Button>
+                                      ) : null}
+                                    </span>
+                                  ))}
+                                </span>
                               </td>
+
+                              <td className="px-3 py-3">
+                                <span className="block space-y-2">
+                                  {calls.map(({ round, category }) => {
+                                    const tone = roundTone(round);
+                                    return (
+                                      <span key={round.entry.id} className="flex min-h-[34px] items-center">
+                                        {/* ป้ายสถานะ = เม็ดยากลม มีจุดสีนำหน้า (ตามแบบอ้างอิง) */}
+                                        <span
+                                          className={cn(
+                                            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                                            TONE[tone].chip,
+                                          )}
+                                        >
+                                          {isGoodResult(round) ? (
+                                            <Check className="h-3 w-3" aria-hidden />
+                                          ) : (
+                                            <span className={cn('h-1.5 w-1.5 rounded-full', TONE[tone].dot)} aria-hidden />
+                                          )}
+                                          {FOLLOW_CALL_CATEGORY_LABEL[category]}
+                                          {round.state === 'result' &&
+                                          (category === 'unreachable' || round.entry.call_outcome === 'acknowledged')
+                                            ? ` — ${roundResultLabel(round)}`
+                                            : ''}
+                                        </span>
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              </td>
+
+                              <td className="px-3 py-3">
+                                <span className="block space-y-2">
+                                  {calls.map(({ round }) => {
+                                    const ai = roundAiSummary(round);
+                                    const reply = roundReplyText(round);
+                                    return (
+                                      <span key={round.entry.id} className="flex min-h-[34px] flex-col justify-center">
+                                        {/* 🔴 คำพูดของเขามาก่อนเสมอ — หัวคอลัมน์ถามว่า "เขาตอบว่าอะไร"
+                                            สรุปของ AI เป็นคำบรรยายบุคคลที่สาม ใช้เป็นตัวรอง */}
+                                        {reply ? (
+                                          <>
+                                            <span
+                                              className="line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground"
+                                              title={reply}
+                                            >
+                                              “{reply}”
+                                            </span>
+                                            {ai ? (
+                                              <span
+                                                className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground"
+                                                title={ai}
+                                              >
+                                                สรุปโดย AI: {ai}
+                                              </span>
+                                            ) : null}
+                                          </>
+                                        ) : ai ? (
+                                          <span className="line-clamp-3 text-[12px] leading-snug text-foreground/80" title={ai}>
+                                            {ai}
+                                          </span>
+                                        ) : round.state === 'result' ? (
+                                          /* ห้ามเขียนว่า "เขาไม่พูด" — ไม่มี transcript อาจแปลว่าสายไม่ติดก็ได้ */
+                                          <span className="text-[12px] text-muted-foreground">
+                                            ไม่มีคำตอบและไม่มีสรุปจาก AI
+                                          </span>
+                                        ) : round.state === 'notSent' &&
+                                          !roundDispatchReason(round).startsWith(FOLLOW_CALL_CATEGORY_LABEL.notSent) ? (
+                                          <span className="text-[12px] text-muted-foreground">{roundDispatchReason(round)}</span>
+                                        ) : (
+                                          <span className="text-[12px] text-muted-foreground">—</span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              </td>
+
                               {/* 🔴 **ห้ามซ่อนคอลัมน์นี้** (เจ้าของทัก 10 ก.ย. 2569:
                                   *"ไม่แสดงการโทรติดต่อเบอร์ฉุกเฉิน คือ ไม่ยอมบอกว่าโทรหาหรือยัง"*)
                                   เดิมเป็น `hidden xl:table-cell` ⇒ จอแคบกว่า 1280px มองไม่เห็นเลย
                                   ข้อมูลมีอยู่ในหน้าแต่ CSS ซ่อนไว้ = เท่ากับไม่มี */}
                               <td className="px-3 py-3">
-                                {emg ? (
+                                {emgList.length > 0 ? (
                                   <span className="block text-[11.5px] text-muted-foreground">
-                                    <span className="block tabular-nums text-foreground">{emg}</span>
+                                    {emgList.map((p) => (
+                                      <span key={p} className="block tabular-nums text-foreground">
+                                        {p}
+                                      </span>
+                                    ))}
                                     {/**
                                      * ⚠️ **บอกได้แค่ "แนบเบอร์ไปแล้ว" ไม่ใช่ "โทรไปแล้ว"**
                                      * ตรวจผลจริง 18 สาย (10 ก.ย. 2569): 23 ช่องที่ Lumos ส่งกลับ
@@ -652,6 +728,7 @@ const FollowPlanningCalendar: React.FC<{
                                   </span>
                                 )}
                               </td>
+
                               <td className="px-3 py-3 text-right md:px-5">
                                 <span className="inline-flex items-center gap-1.5">
                                   {/* แบบอ้างอิงมีปุ่มโทรในแถว — ของเราลิงก์ tel: ไปแอปโทรของเครื่อง */}
@@ -666,32 +743,20 @@ const FollowPlanningCalendar: React.FC<{
                                   >
                                     <Phone className="h-3.5 w-3.5" aria-hidden />
                                   </a>
-                                  {/**
-                                   * 🔴 ปุ่มแก้ไข**อยู่บนแถว** (เจ้าของทัก 10 ก.ย. 2569:
-                                   * *"บันทึกการโทรติดตามแล้ว แต่ไม่มีให้กดแก้ไขหากต้องการ
-                                   * เปลี่ยนวัน/เวลาที่ติดตาม"*)
-                                   *
-                                   * ของเดิม**มี**ปุ่มแก้ไข แต่ซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น
-                                   * (กด 2 ครั้งกว่าจะเจอ) · งานที่ทำบ่อยที่สุดของหน้านี้คือ
-                                   * เลื่อนวัน/เวลา จึงต้องอยู่ตรงที่มองเห็นเลย
-                                   */}
-                                  {onEditRound && round.state !== 'cancelled' && !round.entry.completed_at ? (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon"
-                                      onClick={() => onEditRound(round)}
-                                      title={`แก้ไขวัน/เวลาของสายนี้ · ${row.group.name}`}
-                                      aria-label={`แก้ไขวันเวลาของ ${row.group.name}`}
-                                      className="h-8 w-8 rounded-full"
-                                    >
-                                      <Pencil aria-hidden />
-                                    </Button>
-                                  ) : null}
                                   <button
                                     type="button"
-                                    onClick={() => onOpenCell(row, round.ymd ?? dayYmd, [round])}
-                                    title="ดูรายละเอียดและจัดการสายนี้"
+                                    onClick={() =>
+                                      onOpenCell(
+                                        row,
+                                        calls[0].round.ymd ?? dayYmd,
+                                        calls.map((c) => c.round),
+                                      )
+                                    }
+                                    title={
+                                      calls.length > 1
+                                        ? `ดูรายละเอียดและจัดการทั้ง ${calls.length} สายของคนนี้`
+                                        : 'ดูรายละเอียดและจัดการสายนี้'
+                                    }
                                     className={cn(
                                       'inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-semibold transition-colors',
                                       TONE.neutral.outline,
@@ -711,7 +776,9 @@ const FollowPlanningCalendar: React.FC<{
                   {/* แถบแบ่งหน้า — แบบอ้างอิงมี "แสดง 1 ถึง 4 จากทั้งหมด 48 รายการติดตาม" */}
                   <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3 md:px-5">
                     <span className="text-[11.5px] text-muted-foreground">
-                      แสดง {firstIndex + 1} ถึง {lastIndex} จากทั้งหมด {dayCalls.length.toLocaleString('th-TH')} สาย
+                      แสดง {firstIndex + 1} ถึง {lastIndex} จากทั้งหมด{' '}
+                      {dayPeople.length.toLocaleString('th-TH')} คน ·{' '}
+                      {dayCalls.length.toLocaleString('th-TH')} สาย
                     </span>
                     {pageCount > 1 ? (
                       <span className="ml-auto flex items-center gap-1">
