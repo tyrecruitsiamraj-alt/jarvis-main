@@ -47,7 +47,15 @@ function boolEnv(raw: string | undefined, fallback: boolean): boolean {
 }
 
 function intEnv(raw: string | undefined, fallback: number, min: number, max: number): number {
-  const n = Number((raw ?? '').trim());
+  const t = (raw ?? '').trim();
+  /**
+   * 🔴 ต้องเช็คว่างก่อนแปลงเลข — `Number('') === 0` ไม่ใช่ NaN!
+   * บั๊กจริง 12 ก.ย. 2569: ไม่ได้ตั้ง env เลยแต่ worker ขึ้น `maxLateMinutes: 0`
+   * (ทุกค่ากลายเป็น 0 แล้วถูกบีบลงค่าต่ำสุด) — ตัวส่งซ้ำเลยเลิกส่งทันทีที่เลยเวลานัด
+   * ทั้งที่ค่าเริ่มต้นควรเป็น 120 นาที
+   */
+  if (t === '') return fallback;
+  const n = Number(t);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(Math.max(Math.trunc(n), min), max);
 }

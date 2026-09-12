@@ -37,7 +37,10 @@ export function readLumosHttpLogConfig(
       : // ค่ามั่ว/ไม่ตั้ง = ใช้ค่าเริ่มต้น **ห้ามปิดเงียบ** (ปิดเงียบ = กลับไปไม่รู้อะไรเลย)
         LUMOS_HTTP_LOG_DEFAULTS.level;
 
-  const n = Number((env.LUMOS_HTTP_LOG_MAX_CHARS ?? '').trim());
+  // ⚠️ เช็คว่างก่อนแปลง — `Number('') === 0` ไม่ใช่ NaN (บั๊กเดียวกับ followPushRetryPolicy
+  // 12 ก.ย. 2569: ไม่ได้ตั้ง env แต่ body ใน log โดนตัดเหลือ 200 ตัวอักษรแทนที่จะเป็น 4000)
+  const rawChars = (env.LUMOS_HTTP_LOG_MAX_CHARS ?? '').trim();
+  const n = rawChars === '' ? Number.NaN : Number(rawChars);
   const maxChars = Number.isFinite(n)
     ? Math.min(Math.max(Math.trunc(n), 200), 100_000)
     : LUMOS_HTTP_LOG_DEFAULTS.maxChars;

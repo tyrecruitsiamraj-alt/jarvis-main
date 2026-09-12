@@ -21,6 +21,15 @@ describe('readFollowPushRetryConfig', () => {
     expect(readFollowPushRetryConfig({}).enabled).toBe(true);
   });
 
+  it('🔴 ไม่ตั้งค่าเลย = ได้ค่าเริ่มต้น **ทุกตัวเลข** — Number("") เป็น 0 ไม่ใช่ NaN เคยทำ' +
+     'ทุกค่าถูกบีบลงต่ำสุดโดยไม่มีใครตั้ง (เจอจริง 12 ก.ย. 2569: maxLateMinutes กลายเป็น 0)', () => {
+    expect(readFollowPushRetryConfig({})).toEqual(FOLLOW_PUSH_RETRY_DEFAULTS);
+    // ตั้งเป็นช่องว่างเปล่า ๆ ก็ต้องได้ค่าเริ่มต้นเหมือนกัน
+    expect(readFollowPushRetryConfig({ FOLLOW_PUSH_RETRY_MAX_LATE_MIN: ' ' }).maxLateMinutes).toBe(
+      FOLLOW_PUSH_RETRY_DEFAULTS.maxLateMinutes,
+    );
+  });
+
   it('ปิดได้ด้วย FOLLOW_PUSH_RETRY_ENABLED=false', () => {
     for (const v of ['false', '0', 'off', 'no', 'FALSE'])
       expect(readFollowPushRetryConfig({ FOLLOW_PUSH_RETRY_ENABLED: v }).enabled).toBe(false);

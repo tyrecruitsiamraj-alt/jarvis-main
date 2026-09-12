@@ -34,6 +34,11 @@ describe('readLumosHttpLogConfig', () => {
     expect(readLumosHttpLogConfig({ LUMOS_HTTP_LOG_MAX_CHARS: 'x' }).maxChars).toBe(
       LUMOS_HTTP_LOG_DEFAULTS.maxChars,
     );
+    // 🔴 ไม่ตั้ง/ว่าง = ค่าเริ่มต้น 4000 — Number('') เป็น 0 เคยทำ log โดนตัดเหลือ 200
+    expect(readLumosHttpLogConfig({}).maxChars).toBe(LUMOS_HTTP_LOG_DEFAULTS.maxChars);
+    expect(readLumosHttpLogConfig({ LUMOS_HTTP_LOG_MAX_CHARS: '' }).maxChars).toBe(
+      LUMOS_HTTP_LOG_DEFAULTS.maxChars,
+    );
   });
 });
 
