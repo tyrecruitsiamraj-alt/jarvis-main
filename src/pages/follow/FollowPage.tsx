@@ -227,6 +227,22 @@ const FollowPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
+  /**
+   * ตัวเลขสำหรับกล่อง "ทวนก่อนส่ง" — **ใช้สูตรเดียวกับตอนส่งจริง**
+   * (วันที่ติ๊กไว้ × รอบเวลาที่อ่านออก) ไม่งั้นสิ่งที่ทวนกับสิ่งที่ส่งจะคนละเลข
+   */
+  const sendDaysPreview = useMemo(
+    () => daysInRange(dateFrom, dateTo).filter((d) => !skippedDays.has(d)).length,
+    [dateFrom, dateTo, skippedDays],
+  );
+  const roundTimesPreview = useMemo(
+    () => new Set(roundTimes.filter((t) => /^\d{1,2}:\d{2}$/.test(t))).size,
+    [roundTimes],
+  );
+  const scheduledAtsPreview = useMemo(
+    () => scheduledAts.filter((t) => t.trim()).length,
+    [scheduledAts],
+  );
   /** เวลาที่ดึงรายการสำเร็จล่าสุด — `null` = ยังไม่เคยโหลดจบ */
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
 
@@ -1025,7 +1041,7 @@ const FollowPage: React.FC = () => {
                         TONE.neutral.outline,
                       )}
                     >
-                      <Settings2 className="h-3 w-3" aria-hidden /> ตั้งค่า
+                      <Settings2 className="h-3 w-3" aria-hidden /> ตั้งค่าตัวเลือก
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-52">
@@ -1137,7 +1153,13 @@ const FollowPage: React.FC = () => {
             {/* 🔴 บอกทางทั้งเส้นก่อน (12 ก.ย. 2569) — ตาใหม่ปิดฟอร์มทิ้งกลางคันเพราะ
                 ไม่รู้ว่าขั้น 2-3 มีอะไร กลัวกรอกผิดแล้วพัง */}
             <p className="text-[11.5px] leading-snug text-muted-foreground">
-              กรอก 3 ขั้น — ① คนที่จะติดตาม → ② หน่วยงาน (ข้ามได้) → ③ วันเวลาที่ให้ AI โทร
+              <span className="font-semibold text-foreground">ขั้นที่ {step} จาก 3</span>
+              {' · '}① คนที่จะติดตาม → ② หน่วยงาน (ข้ามได้) → ③ วันเวลาที่ให้ AI โทร
+              {step === 1 ? (
+                <>
+                  {' · '}ช่องที่มี <span className={TONE.danger.value}>*</span> ต้องกรอก
+                </>
+              ) : null}
             </p>
             {/* แถบขั้น 1→2→3 (เจ้าของสั่ง 18 ส.ค. 2569) — กดย้อนกลับขั้นที่ทำแล้วได้
                 ขั้นที่ยังไม่ถึงกดไม่ได้ ต้องผ่านด่านของขั้นก่อนหน้าเอง */}
@@ -1221,8 +1243,9 @@ const FollowPage: React.FC = () => {
                 </select>
               </div>
               <div className="space-y-1.5">
+                {/* 🔴 ช่องบังคับต้องรู้ตั้งแต่ก่อนกด (12 ก.ย. 2569) — ของเดิมรู้ตอนโดนเตือนแล้ว */}
                 <label htmlFor="followFirst" className="ml-1 text-xs font-medium text-muted-foreground">
-                  ชื่อ
+                  ชื่อ <span className={TONE.danger.value}>*</span>
                 </label>
                 <input
                   id="followFirst"
@@ -1248,7 +1271,7 @@ const FollowPage: React.FC = () => {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="followPhone" className="ml-1 text-xs font-medium text-muted-foreground">
-                เบอร์โทร (มือถือ 10 หลัก)
+                เบอร์โทร (มือถือ 10 หลัก) <span className={TONE.danger.value}>*</span>
               </label>
               <input
                 id="followPhone"
@@ -1617,6 +1640,33 @@ const FollowPage: React.FC = () => {
               <p className="text-xs font-medium text-destructive" role="alert">
                 {formError}
               </p>
+            ) : null}
+
+            {/**
+             * 🔴 **ทวนก่อนกดส่ง** (12 ก.ย. 2569) — ผู้ทดสอบตาใหม่บอกว่าไม่มี preview
+             * เลยไม่กล้ากดบันทึก เพราะไม่รู้ว่าจะโทรหาใคร เรื่องอะไร กี่รอบ
+             * ⚠️ ทวนจากค่าที่กรอกจริงในฟอร์ม **ห้ามคำนวณใหม่แยกทาง** ไม่งั้นสิ่งที่ทวน
+             * กับสิ่งที่ส่งจะไม่ใช่ของเดียวกัน
+             */}
+            {step === 3 ? (
+              <div className={cn('rounded-xl px-3 py-2.5 text-[12px] leading-snug', TONE.primary.soft)}>
+                <span className="block font-semibold text-foreground">ทวนก่อนส่ง</span>
+                <span className="mt-0.5 block text-foreground/80">
+                  AI จะโทรหา{' '}
+                  <span className="font-semibold">
+                    {composeRecipientName(prefix, firstName, lastName) || '— ยังไม่ได้กรอกชื่อ —'}
+                  </span>{' '}
+                  เบอร์ <span className="tabular-nums">{phone || '—'}</span>
+                  {topic ? <> · เรื่อง “{topic}”</> : null}
+                  {unitName ? <> · หน่วยงาน {unitName}</> : null}
+                </span>
+                <span className="mt-0.5 block text-muted-foreground">
+                  {scheduleMode
+                    ? `ตารางหลายวัน — ${sendDaysPreview} วัน วันละ ${roundTimesPreview} รอบ`
+                    : `ตั้งไว้ ${scheduledAtsPreview} รอบ`}
+                  {' · '}กดแล้วไม่ต้องทำอะไรต่อ AI โทรเองตามเวลา
+                </span>
+              </div>
             ) : null}
 
             {/* ปุ่มเดินขั้น — ปุ่มบันทึกโผล่เฉพาะขั้นสุดท้าย กันกดส่งตั้งแต่ยังไม่ตั้งเวลา */}

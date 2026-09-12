@@ -30,6 +30,7 @@ export default function TopicField({
     <FollowMasterSelect<FollowTopic>
       id={id}
       label="เรื่องที่จะให้โทรติดตาม"
+      required
       value={value}
       onChange={onChange}
       reloadSignal={reloadSignal}

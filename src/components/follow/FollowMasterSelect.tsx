@@ -17,6 +17,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 export default function FollowMasterSelect<T>({
   id,
   label,
+  required = false,
   value,
   onChange,
   emptyOptionLabel,
@@ -30,6 +31,8 @@ export default function FollowMasterSelect<T>({
 }: {
   id: string;
   label: string;
+  /** ช่องนี้ต้องกรอก — โชว์ดาวแดงท้ายป้าย */
+  required?: boolean;
   /** ค่าที่เก็บจริงในฟอร์ม — '' = ไม่ระบุ */
   value: string;
   onChange: (next: string) => void;
@@ -84,6 +87,8 @@ export default function FollowMasterSelect<T>({
     <div className="space-y-1.5">
       <label htmlFor={id} className="ml-1 text-xs font-medium text-muted-foreground">
         {label}
+        {/* ช่องบังคับต้องรู้ตั้งแต่ก่อนกดถัดไป — ไม่ใช่รู้ตอนโดนเตือน (12 ก.ย. 2569) */}
+        {required ? <span className={TONE.danger.value}> *</span> : null}
       </label>
 
       {showManualInput ? (
