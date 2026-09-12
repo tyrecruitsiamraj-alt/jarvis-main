@@ -16,6 +16,8 @@ export type FollowTopic = {
   sort_order: number;
   created_by_name: string | null;
   created_at: string;
+  /** คำอธิบายสั้นว่าใช้ตอนไหน (migration 120) — `undefined` = ฐานยังไม่มีคอลัมน์ */
+  description?: string | null;
 };
 
 /** ตรวจ body ของ POST — pure เพื่อคุมด้วย unit test */
@@ -30,12 +32,29 @@ export function parseTopicInput(raw: unknown): { error: string | null; value: { 
 }
 
 /** เรียงตาม sort_order แล้วชื่อ — ชุดตั้งต้นของระบบจึงอยู่บนสุดตามที่ตั้งไว้ */
+/** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 120 */
+function isUndefinedColumn(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === '42703';
+}
+
 export async function listFollowTopics(): Promise<FollowTopic[]> {
   const { rows } = await dbQuery<FollowTopic>(
-    `select id, name, sort_order, created_by_name, created_at
+    /**
+     * `description` = คำอธิบายสั้นว่าเรื่องนี้ใช้ตอนไหน (migration 120)
+     * ⚠️ ฐานที่ยังไม่ migrate ไม่มีคอลัมน์นี้ ⇒ ถอยไป select ชุดเดิม
+     * (ตัวเลือกต้องขึ้นให้ได้เสมอ ขาดคำอธิบายดีกว่า dropdown ว่าง)
+     */
+    `select id, name, sort_order, created_by_name, created_at, description
        from ${topicsTable}
       order by sort_order asc, name asc`,
-  );
+  ).catch(async (e) => {
+    if (!isUndefinedColumn(e)) throw e;
+    return dbQuery<FollowTopic>(
+      `select id, name, sort_order, created_by_name, created_at
+         from ${topicsTable}
+        order by sort_order asc, name asc`,
+    );
+  });
   return rows;
 }
 

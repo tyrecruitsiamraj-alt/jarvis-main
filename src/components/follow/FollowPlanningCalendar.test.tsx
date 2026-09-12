@@ -59,6 +59,7 @@ function renderCalendar(
     roundFilter?: FollowRoundFilter;
     roundsSlot?: React.ReactNode;
     onEditRound?: (round: { entry: FollowEntry }) => void;
+    lastLoadedAt?: Date | null;
   } = {},
 ) {
   const rows = buildFollowPlanningRows(groupFollowEntries(entries, NOW), NOW);
@@ -73,6 +74,7 @@ function renderCalendar(
       roundFilter={opts.roundFilter ?? 'all'}
       roundsSlot={opts.roundsSlot}
       onEditRound={opts.onEditRound}
+      lastLoadedAt={opts.lastLoadedAt ?? null}
     />,
   );
   return rows;
@@ -538,5 +540,58 @@ describe('ส่งไม่ถึง Lumos (push_failed)', () => {
     expect(statValue('สายที่ต้องตาม')).toBe('1');
     expect(statValue('ยังไม่รู้ผล')).toBe('1');
     expect(dayRows()[0].getAttribute('data-category')).toBe('overdue');
+  });
+});
+
+/**
+ * ═══ แผนดัน 20/20 รอบ 1–3 (12 ก.ย. 2569) ═══
+ *
+ * ฐาน: ผู้ทดสอบตาใหม่ให้ 62/100 · ทุกข้อที่เพิ่มคือ "คำถามในหัวคนใหม่ที่ไม่มีคำตอบบนจอ"
+ */
+describe('แผน 20/20 — คำตอบต้องอยู่บนจอ', () => {
+  it('🔴 ยังไม่มีข้อมูลสักแถว ⇒ ขึ้นการ์ดวันแรก บอกครบ 3 ขั้น', () => {
+    renderCalendar([]);
+    expect(screen.getByText('เริ่มใช้งานหน้านี้')).toBeTruthy();
+    // ขั้นที่ 2 คือคำตอบของความกังวลอันดับหนึ่ง: เพิ่มแล้วต้องกดอะไรต่อ
+    expect(screen.getByText(/AI โทรเองตามเวลา/)).toBeTruthy();
+    expect(screen.getByText(/ไม่ต้องกดสั่งโทร/)).toBeTruthy();
+    expect(screen.getByText(/ผลกลับช้าได้ถึงราว 2 ชั่วโมง/)).toBeTruthy();
+  });
+
+  it('🔴 มีข้อมูลแล้วการ์ดวันแรกต้องหาย — ไม่ใช่สอนซ้ำทุกวันที่ว่าง', () => {
+    // มีสายในระบบ แต่เป็นของ "วันอื่น" (วันที่เลือกยังว่าง)
+    renderCalendar([entry({ id: 'a', call_round: 1, scheduled_at: '2026-09-20T08:00:00Z' })]);
+    expect(screen.queryByText('เริ่มใช้งานหน้านี้')).toBeNull();
+  });
+
+  it('ยังไม่มีผลเดือนนี้ ⇒ ไม่วาดวงกลม (เดิมดูเหมือนโหลดค้าง)', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1 })]);
+    expect(screen.getByText('ยังไม่มีผลเดือนนี้')).toBeTruthy();
+    expect(screen.queryByRole('img', { name: 'ตอบว่าไป' })).toBeNull();
+  });
+
+  it('มีผลแล้ว ⇒ วงกลมกลับมา', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1, call_status: 'completed', call_outcome: 'confirmed' })]);
+    expect(screen.getByRole('img', { name: 'ตอบว่าไป' })).toBeTruthy();
+    expect(screen.queryByText('ยังไม่มีผลเดือนนี้')).toBeNull();
+  });
+
+  it('🔴 "ต้องตามด่วน" ต้องบอกสิ่งที่ต้องลงมือ ไม่ใช่บอกแค่สถานะ', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1 })]);
+    expect(screen.getByText(/กดปุ่มโทรข้างชื่อ โทรเองได้เลย/)).toBeTruthy();
+  });
+
+  it('ท้ายตารางบอกเวลาอัปเดต + ว่าหน้าดึงเอง + ว่าผลช้าได้', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1 })], {
+      lastLoadedAt: new Date('2026-09-07T09:05:00Z'),
+    });
+    const foot = screen.getByText(/อัปเดตล่าสุด/);
+    expect(foot.textContent).toContain('หน้าจะดึงผลใหม่ให้เอง');
+    expect(foot.textContent).toContain('2 ชั่วโมง');
+  });
+
+  it('ไม่รู้เวลาอัปเดต ⇒ ไม่แต่งเวลาขึ้นเอง', () => {
+    renderCalendar([entry({ id: 'a', call_round: 1 })]);
+    expect(screen.queryByText(/อัปเดตล่าสุด/)).toBeNull();
   });
 });

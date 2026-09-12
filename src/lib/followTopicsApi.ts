@@ -12,6 +12,8 @@ export type FollowTopic = {
   sort_order: number;
   created_by_name: string | null;
   created_at: string;
+  /** คำอธิบายสั้นว่าเรื่องนี้ใช้ตอนไหน — `null`/ไม่มี = เรื่องที่เจ้าหน้าที่เพิ่มเอง */
+  description?: string | null;
 };
 
 async function readError(r: Response): Promise<string> {

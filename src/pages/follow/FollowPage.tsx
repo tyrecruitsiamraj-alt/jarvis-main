@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -25,7 +32,7 @@ import { TONE } from '@/lib/designTokens';
 import { followScheduleCounts } from '@/lib/followSchedule';
 import { roundTabLabel } from '@/lib/followRoundVisual';
 import { conveyorLabel } from '@/lib/soRecruitNav';
-import { Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, Building2, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import {
   listFollowEntries,
   createFollowEntry,
@@ -220,6 +227,8 @@ const FollowPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
+  /** เวลาที่ดึงรายการสำเร็จล่าสุด — `null` = ยังไม่เคยโหลดจบ */
+  const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null);
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -342,6 +351,8 @@ const FollowPage: React.FC = () => {
     if (!silent) setError(null);
     try {
       setItems(await listFollowEntries());
+      // จดเวลาที่ **ดึงสำเร็จ** — ท้ายตารางเอาไปบอกคนว่าหน้าไม่ได้ค้าง (12 ก.ย. 2569)
+      setLastLoadedAt(new Date());
     } catch (e) {
       // รีเฟรชเงียบล้ม = เงียบต่อ ของบนจอยังเป็นของเดิมที่ยังใช้ได้
       if (!silent) setError(e instanceof Error ? e.message : 'โหลดรายการไม่สำเร็จ');
@@ -594,7 +605,8 @@ const FollowPage: React.FC = () => {
           /* 🔴 บอกทันทีถ้ามีรายการที่ "ไม่ได้ส่งให้ AI" — เดิมขึ้นว่าสำเร็จอย่างเดียว
              คนนั่งรอสายที่ไม่มีวันออก (เกิดจริง 24 ส.ค. 2569) */
           const warn = summarizeDispatchResults(dispatchStates);
-          const okText = `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย)`;
+          /* 🔴 ย้ำขั้นที่ ② ของการ์ดวันแรก — ตาใหม่กังวลที่สุดว่า "เพิ่มแล้วต้องกดอะไรต่อ" */
+          const okText = `ตั้งตารางโทรแล้ว — ${sendDays.length} วัน วันละ ${rounds.length} รอบ (รวม ${sendDays.length * rounds.length} สาย) · AI จะโทรเองตามเวลา ไม่ต้องกดอะไรอีก`;
           if (warn) {
             setFormError(`${okText}\n${warn.text}`);
           } else {
@@ -693,8 +705,10 @@ const FollowPage: React.FC = () => {
         resetForm();
         setFormOpen(false);
         const warn = summarizeDispatchResults(dispatchStates);
+        /* 🔴 ย้ำขั้นที่ ② ของการ์ดวันแรก — ตาใหม่กังวลที่สุดว่า "เพิ่มแล้วต้องกดอะไรต่อ" */
         const okText =
-          sendIso.length > 1 ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${sendIso.length} รอบ` : 'เพิ่มรายชื่อแล้ว';
+          (sendIso.length > 1 ? `เพิ่มรายชื่อแล้ว — ตั้งให้โทร ${sendIso.length} รอบ` : 'เพิ่มรายชื่อแล้ว') +
+          ' · AI จะโทรเองตามเวลา ไม่ต้องกดอะไรอีก';
         if (warn) {
           setFormError(`${okText}\n${warn.text}`);
         } else {
@@ -931,6 +945,7 @@ const FollowPage: React.FC = () => {
              เพราะของเดิมซ่อนอยู่ในป๊อป "จัดการ" อีกชั้น) · ไม่ต้องจำ cellToReopen
              เพราะไม่ได้เปิดมาจากป๊อป จึงไม่มีป๊อปให้กลับไป */
           onEditRound={(round) => setEditing(round.entry)}
+          lastLoadedAt={lastLoadedAt}
           roundFilter={activeRound}
           roundsSlot={
             <FollowCallRoundsPanel
@@ -968,7 +983,9 @@ const FollowPage: React.FC = () => {
                 className="h-8 min-h-0 py-1 text-[11px]"
                 value={fDate}
                 onChange={pickCalendarDay}
-                emptyLabel="เลือกวัน"
+                /* 🔴 "เลือกวัน" ทำให้คนใหม่คิดว่าต้องกดก่อนเพิ่มคน (ตาใหม่ 12 ก.ย. 2569)
+                   — มันคือตัวเปลี่ยนวันที่ "ดู" ไม่ใช่ขั้นตอนของการสร้างงาน */
+                emptyLabel="ดูวันอื่น"
                 active={hasActiveFilter}
                 suffix={fBand ? TIME_BAND_LABEL[fBand].replace(/\s*\(.*\)$/, '') : ''}
                 onClearAll={() => {
@@ -991,29 +1008,38 @@ const FollowPage: React.FC = () => {
                   </label>
                 }
               />
+              {/**
+               * 🔴 **ยุบเป็นเมนูรอง** (12 ก.ย. 2569) — "เพิ่มเรื่อง"/"เพิ่มเจ้าหน้าที่" เป็นงาน
+               * ตั้งค่าครั้งแรก ไม่ใช่งานประจำวัน · ของเดิมยืนเรียงเท่ากับปุ่มหลัก ทำให้คนใหม่
+               * ไม่รู้ว่าต้องกดอันไหนก่อน (ตาใหม่: *"ต้องกดก่อนหรือหลังเพิ่มคน"*)
+               * ⇒ หัวหน้าเหลือปุ่มเด่นปุ่มเดียวคือ "เพิ่มคนที่ต้องการติดตาม"
+               */}
               {canManageMasters ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setTopicManagerOpen(true)}
-                    className={cn(
-                      'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
-                      TONE.info.outline,
-                    )}
-                  >
-                    <Plus className="h-3 w-3" aria-hidden /> เพิ่มเรื่อง
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStaffManagerOpen(true)}
-                    className={cn(
-                      'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
-                      TONE.info.outline,
-                    )}
-                  >
-                    <Plus className="h-3 w-3" aria-hidden /> เพิ่มเจ้าหน้าที่
-                  </button>
-                </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title="ตั้งค่ารายการตัวเลือก (ทำครั้งเดียวตอนเริ่มใช้)"
+                      className={cn(
+                        'inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold',
+                        TONE.neutral.outline,
+                      )}
+                    >
+                      <Settings2 className="h-3 w-3" aria-hidden /> ตั้งค่า
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-52">
+                    <DropdownMenuLabel className="text-[11px]">
+                      ตั้งค่ารายการตัวเลือก
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => setTopicManagerOpen(true)}>
+                      <Plus aria-hidden /> เพิ่มเรื่องที่ให้โทรติดตาม
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setStaffManagerOpen(true)}>
+                      <Plus aria-hidden /> เพิ่มเจ้าหน้าที่ผู้ติดตาม
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : null}
               {/* รีเฟรช — ย้ายมาจากมุมขวาบนของแผงการโทรที่ถูกยุบเข้ามา */}
               <button
@@ -1108,6 +1134,11 @@ const FollowPage: React.FC = () => {
             }}
             className="jarvis-frost space-y-3 p-4 sm:p-5"
           >
+            {/* 🔴 บอกทางทั้งเส้นก่อน (12 ก.ย. 2569) — ตาใหม่ปิดฟอร์มทิ้งกลางคันเพราะ
+                ไม่รู้ว่าขั้น 2-3 มีอะไร กลัวกรอกผิดแล้วพัง */}
+            <p className="text-[11.5px] leading-snug text-muted-foreground">
+              กรอก 3 ขั้น — ① คนที่จะติดตาม → ② หน่วยงาน (ข้ามได้) → ③ วันเวลาที่ให้ AI โทร
+            </p>
             {/* แถบขั้น 1→2→3 (เจ้าของสั่ง 18 ส.ค. 2569) — กดย้อนกลับขั้นที่ทำแล้วได้
                 ขั้นที่ยังไม่ถึงกดไม่ได้ ต้องผ่านด่านของขั้นก่อนหน้าเอง */}
             <ol className="flex items-stretch gap-1.5">
@@ -1126,7 +1157,8 @@ const FollowPage: React.FC = () => {
                           ? 'border-primary bg-primary/10'
                           : done
                             ? cn(TONE.success.soft, 'hover:bg-secondary')
-                            : 'border-border bg-background opacity-60',
+                            /* จางแต่ยัง "อ่านออก" — opacity-60 เดิมอ่านเป็น "ปุ่มเสีย" */
+                            : 'border-border bg-background opacity-80',
                       )}
                     >
                       <span

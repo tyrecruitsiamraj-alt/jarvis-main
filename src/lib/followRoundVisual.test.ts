@@ -1,3 +1,4 @@
+import { FOLLOW_ROUND_BUCKET_LABEL } from '@/lib/followRoundBuckets';
 import { describe, expect, it } from 'vitest';
 import {
   actionableBuckets,
@@ -107,9 +108,14 @@ describe('actionableBuckets / actionableSummary', () => {
     expect(actionableBuckets(counts({ all: 5, connected: 5 }))).toEqual([]);
   });
 
+  /**
+   * ⚠️ คำในสรุปยืมมาจาก `FOLLOW_ROUND_BUCKET_LABEL` ที่เดียว — อย่าพิมพ์คำซ้ำไว้ที่นี่
+   * (เปลี่ยนคำที่แหล่งเมื่อ 12 ก.ย. 2569: `not_went` → "ปิดงาน: ไม่ไป" ให้คำประกาศตัวเอง
+   * ว่าเป็นคนละแกนกับ "ตอบว่าไม่ไป" บนการ์ดตัวเลข) · เทสต์นี้จึงประกอบคำจากแหล่งเดียวกัน
+   */
   it('สรุปเป็นข้อความ · ไม่มีของต้องทำ = null (ห้ามขึ้นข้อความว่าง)', () => {
     expect(actionableSummary(counts({ all: 5, unreached: 2, not_went: 1 }))).toBe(
-      'โทรไม่ติด 2 · ไม่ไป 1',
+      `${FOLLOW_ROUND_BUCKET_LABEL.unreached} 2 · ${FOLLOW_ROUND_BUCKET_LABEL.not_went} 1`,
     );
     expect(actionableSummary(counts({ all: 5, went: 5 }))).toBeNull();
     expect(actionableSummary(counts())).toBeNull();

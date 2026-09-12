@@ -275,6 +275,29 @@ export default function FollowCallRoundsPanel({
   if (embedded) {
     const signal = roundSignal(countsOfRound, overdueWaitingCount(rowsOfRound));
     const aiText = followCallResultSummary(rowsOfRound);
+    /**
+     * 🔴 **ไม่มีงานสักสายเลย ⇒ หุบเหลือหัวการ์ด** (12 ก.ย. 2569)
+     *
+     * ผู้ทดสอบตาใหม่เจอ 7 กล่องเลขศูนย์ตั้งแต่ยังไม่ได้ทำอะไร แล้วบอกว่า
+     * *"งง จนไม่อยากกด"* — กำแพงคำศัพท์ตั้งแต่ยังไม่มีบริบทคือสิ่งที่ทำให้คนใหม่ถอย
+     *
+     * ⚠️ **ไม่ได้ลบหรือลดขั้น** (ดีไซน์ Stitch ที่เจ้าของเคาะ ห้ามรื้อ) — แค่หุบเมื่อว่างเปล่า
+     * และกางเองทันทีที่มีงานเข้ามาสายแรก
+     */
+    const allEmpty = entries.length === 0;
+    if (allEmpty) {
+      return (
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-4">
+            <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
+            <h2 className="text-[17px] font-bold text-foreground">ขั้นตอนของสาย (Call Pipeline)</h2>
+            <span className="w-full text-[11.5px] leading-snug text-muted-foreground sm:w-auto sm:flex-1">
+              ยังไม่มีสายในระบบ — ตารางนี้จะกางเองเมื่อมีสายแรกเข้ามา
+            </span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวเลือกรอบ ขวา (แบบอ้างอิงวางเป้าหมายไว้ขวา) */}
